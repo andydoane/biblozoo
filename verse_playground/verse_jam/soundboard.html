@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Verse Jam Soundboard</title>
+  <style>
+    :root {
+      --bg: #17122b;
+      --panel: rgba(255,255,255,.08);
+      --panel2: rgba(255,255,255,.12);
+      --text: #fff7e8;
+      --muted: rgba(255,247,232,.72);
+      --accent: #8df7ff;
+      --yellow: #ffe27a;
+      --green: #9dff8d;
+      --pink: #ff7ad9;
+      --danger: #ff8fa3;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(141,247,255,.18), transparent 30%),
+        radial-gradient(circle at 80% 8%, rgba(255,226,122,.18), transparent 26%),
+        radial-gradient(circle at 50% 110%, rgba(255,122,217,.18), transparent 36%),
+        linear-gradient(145deg, #17122b, #2b1748 58%, #151326);
+      padding: 16px;
+      touch-action: manipulation;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(1.7rem, 6vw, 2.7rem); line-height: 1; }
+    h2 { font-size: 1.05rem; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+    h3 { font-size: .95rem; color: var(--yellow); }
+    p, label, output, small { color: var(--muted); }
+    small { display: block; line-height: 1.35; }
+
+    .app { width: min(1120px, 100%); margin: 0 auto; display: grid; gap: 14px; }
+    .hero, .panel {
+      border: 1px solid rgba(255,255,255,.14);
+      background: var(--panel);
+      border-radius: 18px;
+      box-shadow: 0 18px 44px rgba(0,0,0,.24);
+      backdrop-filter: blur(10px);
+    }
+    .hero { padding: 18px; display: grid; gap: 12px; }
+    .hero-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .panel { padding: 14px; display: grid; gap: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .controls { display: grid; gap: 10px; }
+    .slider-row { display: grid; grid-template-columns: 120px 1fr 58px; align-items: center; gap: 10px; }
+    @media (max-width: 560px) { .slider-row { grid-template-columns: 1fr; gap: 4px; } }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    button, select {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 14px;
+      color: #21163a;
+      background: var(--yellow);
+      font-weight: 900;
+      font-size: .98rem;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(0,0,0,.22), inset 0 -4px 0 rgba(0,0,0,.12);
+    }
+    button:active { transform: translateY(1px) scale(.99); }
+    button.secondary { background: var(--accent); }
+    button.green { background: var(--green); }
+    button.pink { background: var(--pink); color: #fff; }
+    button.danger { background: var(--danger); color: #fff; }
+    button.dark { background: rgba(255,255,255,.14); color: var(--text); box-shadow: none; border: 1px solid rgba(255,255,255,.16); }
+    .button-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap: 8px; }
+    .button-grid.wide { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+    .status { padding: 9px 11px; border-radius: 12px; background: rgba(0,0,0,.22); color: var(--muted); font-size: .92rem; }
+    .status strong { color: var(--text); }
+    .pillrow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .pill { border-radius: 999px; padding: 6px 10px; background: rgba(255,255,255,.12); color: var(--muted); font-size: .86rem; }
+    .readout {
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 12px;
+      min-height: 120px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.12);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .84rem;
+      color: #e9fff8;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <div class="hero-row">
+        <div>
+          <h1>Verse Jam Soundboard</h1>
+          <p>Standalone mix tester for drums, word tones, pads, transitions, voice bits, score sparkle, and endings.</p>
+        </div>
+        <div class="pillrow">
+          <button class="green" id="unlockBtn">Unlock Audio</button>
+          <button class="danger" id="stopBtn">Stop All</button>
+        </div>
+      </div>
+      <div class="status" id="status">Audio is locked. Tap <strong>Unlock Audio</strong> first, especially on iPhone.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Global mix</h2>
+      <div class="controls" id="mixControls"></div>
+      <small>The real game currently uses master gain around 0.72. Use “Game master” and “Output boost” to test whether Verse Jam is simply too quiet overall.</small>
+    </section>
+
+    <section class="grid">
+      <section class="panel">
+        <h2>Core sounds</h2>
+        <div class="button-grid">
+          <button onclick="playCountdown(false)">Countdown Beep</button>
+          <button onclick="playCountdown(true)">GO Beep</button>
+          <button onclick="playWord('warmup')">Warmup Word</button>
+          <button onclick="playWord('default')">Jam Word</button>
+          <button onclick="playButtonPop()">Button Pop-In</button>
+          <button onclick="playClapSound()">Clap Filler</button>
+          <button onclick="playNoNote()">Wrong Tap</button>
+          <button onclick="playScoreRevealSparkle()">Score Sparkle</button>
+          <button onclick="playCompletionArpeggio()">Final Arpeggio</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Drums</h2>
+        <div class="button-grid">
+          <button onclick="playDrum('kick', now(), 1)">Kick</button>
+          <button onclick="playDrum('snare', now(), 1)">Snare</button>
+          <button onclick="playDrum('hat', now(), .2)">Hat</button>
+          <button onclick="playDrum('extra', now(), .7)">Extra</button>
+        </div>
+        <div class="button-grid wide">
+          <button class="secondary" onclick="playBar('basic')">Basic Bar</button>
+          <button class="secondary" onclick="playBar('middle')">Middle Bar</button>
+          <button class="secondary" onclick="playBar('final')">Final Bar</button>
+          <button class="green" onclick="startLoop('basic')">Loop Basic</button>
+          <button class="green" onclick="startLoop('middle')">Loop Middle</button>
+          <button class="green" onclick="startLoop('final')">Loop Final</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Voice bits</h2>
+        <div class="button-grid" id="voiceButtons"></div>
+        <button class="secondary" id="loadVoicesBtn">Load Voice Samples</button>
+        <small>These load from <code>./verse_jam_sounds/</code>, so put this file in the <code>verse_jam</code> directory.</small>
+      </section>
+
+      <section class="panel">
+        <h2>Pads and phrase combos</h2>
+        <div class="button-grid wide">
+          <button onclick="schedulePhrasePad(now(), 4)">Pad: 4-beat phrase</button>
+          <button onclick="schedulePhrasePad(now(), 8)">Pad: 8-beat phrase</button>
+          <button onclick="playPhraseScenario(4)">4-beat phrase + pad + words</button>
+          <button onclick="playPhraseScenario(8)">8-beat phrase + pad + words</button>
+          <button onclick="playPhraseWithDrums(4, 'middle')">4-beat phrase + middle drums</button>
+          <button onclick="playPhraseWithDrums(8, 'final')">8-beat phrase + final drums</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Transitions</h2>
+        <div class="button-grid wide">
+          <button onclick="playTransition('jam')">time / to / jam!</button>
+          <button onclick="playTransition('speed')">speed / it / up</button>
+          <button onclick="playTransition('groove')">feel / that / groove</button>
+          <button class="green" onclick="playTransitionWithResume('speed', 'final')">speed break → final groove</button>
+          <button class="green" onclick="playTransitionWithResume('groove', 'final')">groove break → final groove</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>End-game scenarios</h2>
+        <div class="button-grid wide">
+          <button onclick="playEndingSting()">Ending Sting</button>
+          <button onclick="playScoreScreenScenario()">Score Screen: sparkle over drum</button>
+          <button onclick="playEndToArpeggioScenario()">Tap Continue: drum stop → arpeggio</button>
+          <button onclick="playZeroScoreScenario()">Zero Score: ending → arpeggio</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel">
+      <h2>Export current settings</h2>
+      <div class="button-grid wide">
+        <button class="green" id="copyBtn">Copy settings JSON</button>
+        <button class="dark" id="resetBtn">Reset defaults</button>
+      </div>
+      <div class="readout" id="settingsOut"></div>
+    </section>
+  </main>
+
+<script>
+(() => {
+  const SOUND_BIT_BASE_URL = "./verse_jam_sounds/";
+  const SOUND_BITS = [
+    { id: "boom", label: "Boom!", filename: "verse_jam_voice_boom.mp3" },
+    { id: "hey", label: "Hey!", filename: "verse_jam_voice_hey.mp3" },
+    { id: "woo", label: "Woo!", filename: "verse_jam_voice_woo.mp3" },
+    { id: "yeah", label: "Yeah!", filename: "verse_jam_voice_yeah.mp3" },
+    { id: "yo", label: "Yo!", filename: "verse_jam_voice_yo.mp3" }
+  ];
+
+  const DRUM_LOOPS = {
+    basic: [
+      { beat: 0, sound: "hat", volume: 0.2 }, { beat: 0, sound: "kick", volume: 1 },
+      { beat: 0.5, sound: "hat", volume: 0.2 }, { beat: 1, sound: "hat", volume: 0.2 },
+      { beat: 1, sound: "snare", volume: 1 }, { beat: 1.5, sound: "hat", volume: 0.2 },
+      { beat: 2, sound: "hat", volume: 0.2 }, { beat: 2, sound: "kick", volume: 1 },
+      { beat: 2.5, sound: "hat", volume: 0.2 }, { beat: 3, sound: "hat", volume: 0.2 },
+      { beat: 3, sound: "snare", volume: 1 }, { beat: 3.5, sound: "hat", volume: 0.2 }
+    ],
+    middle: [
+      { beat: 0, sound: "hat", volume: 0.2 }, { beat: 0, sound: "kick", volume: 1 },
+      { beat: 0.5, sound: "hat", volume: 0.2 }, { beat: 1, sound: "hat", volume: 0.2 },
+      { beat: 1, sound: "snare", volume: 1 }, { beat: 1.5, sound: "hat", volume: 0.2 },
+      { beat: 1.5, sound: "kick", volume: 1 }, { beat: 2, sound: "hat", volume: 0.2 },
+      { beat: 2, sound: "kick", volume: 1 }, { beat: 2.5, sound: "hat", volume: 0.2 },
+      { beat: 3, sound: "hat", volume: 0.2 }, { beat: 3, sound: "snare", volume: 1 },
+      { beat: 3.5, sound: "hat", volume: 0.2 }, { beat: 3.75, sound: "snare", volume: 1 }
+    ],
+    final: [
+      { beat: 0, sound: "hat", volume: 0.2 }, { beat: 0, sound: "kick", volume: 1 },
+      { beat: 0.5, sound: "hat", volume: 0.2 }, { beat: 0.75, sound: "kick", volume: 1 },
+      { beat: 1, sound: "hat", volume: 0.2 }, { beat: 1, sound: "kick", volume: 1 },
+      { beat: 1, sound: "snare", volume: 1 }, { beat: 1.5, sound: "hat", volume: 0.2 },
+      { beat: 1.75, sound: "kick", volume: 1 }, { beat: 2, sound: "hat", volume: 0.2 },
+      { beat: 2.5, sound: "hat", volume: 0.2 }, { beat: 2.5, sound: "kick", volume: 1 },
+      { beat: 3, sound: "hat", volume: 0.2 }, { beat: 3, sound: "snare", volume: 1 },
+      { beat: 3.5, sound: "extra", volume: 0.7 }, { beat: 3.75, sound: "snare", volume: 1 }
+    ]
+  };
+
+  const defaults = {
+    gameMaster: 0.72,
+    outputBoost: 1.0,
+    bpm: 112,
+    drumMaster: 2.0,
+    countdownBeep: 0.060,
+    countdownGo: 0.075,
+    buttonPopIn: 0.400,
+    warmupWord: 0.260,
+    defaultWord: 0.135,
+    voice: 0.350,
+    pad: 0.016,
+    transition: 1.0,
+    scoreSparkle: 1.0,
+    finalArpeggio: 1.0,
+    wrongTap: 1.0,
+    clap: 1.0
+  };
+
+  let settings = { ...defaults };
+  let audioCtx = null;
+  let masterGain = null;
+  let compressor = null;
+  let muted = false;
+  let loopTimer = null;
+  let loopType = null;
+  const activeSources = new Set();
+  const sampleBuffers = {};
+
+  const controls = [
+    ["gameMaster", "Game master", 0, 1.4, 0.01],
+    ["outputBoost", "Output boost", 0.25, 3.0, 0.01],
+    ["bpm", "BPM", 80, 150, 1],
+    ["drumMaster", "Drum master", 0, 4.0, 0.01],
+    ["warmupWord", "Warmup word", 0, 0.8, 0.005],
+    ["defaultWord", "Jam word", 0, 0.8, 0.005],
+    ["buttonPopIn", "Button pop-in", 0, 0.9, 0.005],
+    ["pad", "Pad", 0, 0.08, 0.001],
+    ["voice", "Voice bits", 0, 1.3, 0.01],
+    ["countdownBeep", "Countdown beep", 0, 0.3, 0.005],
+    ["countdownGo", "GO beep", 0, 0.3, 0.005],
+    ["transition", "Transition stings", 0, 2.0, 0.01],
+    ["scoreSparkle", "Score sparkle", 0, 2.0, 0.01],
+    ["finalArpeggio", "Final arpeggio", 0, 2.0, 0.01],
+    ["clap", "Clap filler", 0, 2.0, 0.01],
+    ["wrongTap", "Wrong tap", 0, 2.0, 0.01]
+  ];
+
+  function $(id) { return document.getElementById(id); }
+  function beat() { return 60 / settings.bpm; }
+  window.now = () => audioCtx ? audioCtx.currentTime + 0.025 : 0;
+
+  function setStatus(text) { $("status").innerHTML = text; }
+  function updateMaster() {
+    if (masterGain && audioCtx) {
+      masterGain.gain.setValueAtTime(muted ? 0 : settings.gameMaster * settings.outputBoost, audioCtx.currentTime);
+    }
+  }
+
+  function ensureAudio() {
+    if (audioCtx) {
+      if (audioCtx.state !== "running") audioCtx.resume();
+      updateMaster();
+      return audioCtx;
+    }
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctor();
+    masterGain = audioCtx.createGain();
+    compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value = 24;
+    compressor.ratio.value = 8;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.18;
+    masterGain.connect(compressor);
+    compressor.connect(audioCtx.destination);
+    updateMaster();
+    setStatus("Audio unlocked. Voice samples load from <strong>./verse_jam_sounds/</strong>.");
+    return audioCtx;
+  }
+
+  function track(source) {
+    if (!source) return source;
+    activeSources.add(source);
+    source.addEventListener?.("ended", () => activeSources.delete(source), { once: true });
+    return source;
+  }
+
+  function stopAll() {
+    if (loopTimer) clearInterval(loopTimer);
+    loopTimer = null;
+    loopType = null;
+    activeSources.forEach(src => { try { src.stop(0); } catch (err) {} });
+    activeSources.clear();
+    setStatus("Stopped all active soundboard sources.");
+  }
+
+  function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+  function playTone({ midi = 60, when = window.now(), duration = 0.22, volume = 0.16, type = "triangle" } = {}) {
+    ensureAudio();
+    if (muted) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(midiToFreq(midi), when);
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, volume), when + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    track(osc);
+    osc.start(when);
+    osc.stop(when + duration + 0.03);
+  }
+
+  function drumVolume(value = 1) { return Math.max(0, value) * settings.drumMaster; }
+  window.playDrum = function(sound, when = window.now(), volume = 1) {
+    ensureAudio();
+    if (muted) return;
+    if (sound === "kick") {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(120, when);
+      osc.frequency.exponentialRampToValueAtTime(48, when + 0.14);
+      gain.gain.setValueAtTime(0.0001, when);
+      gain.gain.exponentialRampToValueAtTime(0.22 * drumVolume(volume), when + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.18);
+      osc.connect(gain); gain.connect(masterGain); track(osc);
+      osc.start(when); osc.stop(when + 0.2); return;
+    }
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(sound === "snare" ? 185 : sound === "extra" ? 320 : 520, when);
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.exponentialRampToValueAtTime((sound === "snare" ? 0.09 : 0.045) * drumVolume(volume), when + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + (sound === "snare" ? 0.11 : 0.045));
+    osc.connect(gain); gain.connect(masterGain); track(osc);
+    osc.start(when); osc.stop(when + 0.13);
+  };
+
+  window.playBar = function(type = "middle", startAt = window.now()) {
+    ensureAudio();
+    const b = beat();
+    (DRUM_LOOPS[type] || DRUM_LOOPS.middle).forEach(event => playDrum(event.sound, startAt + event.beat * b, event.volume));
+  };
+
+  window.startLoop = function(type = "middle") {
+    ensureAudio();
+    if (loopTimer) clearInterval(loopTimer);
+    loopType = type;
+    const schedule = () => playBar(loopType, audioCtx.currentTime + 0.05);
+    schedule();
+    loopTimer = setInterval(schedule, beat() * 4 * 1000);
+    setStatus(`Looping <strong>${type}</strong> drum bar at <strong>${settings.bpm} BPM</strong>.`);
+  };
+
+  window.playCountdown = function(isGo = false) {
+    const midi = isGo ? 79 : 72;
+    playTone({ midi, duration: isGo ? 0.18 : 0.12, volume: isGo ? settings.countdownGo : settings.countdownBeep, type: "square" });
+  };
+
+  window.playWord = function(kind = "default") {
+    playTone({ midi: kind === "warmup" ? 64 : 72, duration: 0.22, volume: kind === "warmup" ? settings.warmupWord : settings.defaultWord, type: kind === "warmup" ? "triangle" : "square" });
+  };
+
+  window.playButtonPop = function() {
+    playTone({ midi: 84, duration: 0.12, volume: settings.buttonPopIn, type: "square" });
+  };
+
+  window.playClapSound = function() {
+    const n = window.now();
+    playTone({ midi: 72, when: n, duration: 0.055, volume: 0.13 * settings.clap, type: "square" });
+    playTone({ midi: 84, when: n + 0.025, duration: 0.045, volume: 0.08 * settings.clap, type: "square" });
+  };
+
+  window.playNoNote = function() {
+    const n = window.now();
+    playTone({ midi: 43, when: n, duration: 0.16, volume: 0.13 * settings.wrongTap, type: "sine" });
+    playTone({ midi: 38, when: n + 0.07, duration: 0.13, volume: 0.08 * settings.wrongTap, type: "sine" });
+  };
+
+  window.schedulePhrasePad = function(startAt = window.now(), phraseBeats = 8) {
+    const b = beat();
+    const duration = b * Math.max(1, phraseBeats - 0.25);
+    [48, 52, 55, 60].forEach(midi => playTone({ midi, when: startAt, duration, volume: settings.pad, type: "triangle" }));
+  };
+
+  function playWordAt(midi, at, vol = settings.defaultWord) {
+    playTone({ midi, when: at, duration: 0.22, volume: vol, type: "square" });
+  }
+
+  window.playPhraseScenario = function(phraseBeats = 4) {
+    const start = window.now() + 0.03;
+    const b = beat();
+    schedulePhrasePad(start, phraseBeats);
+    const offsets = phraseBeats === 4 ? [0, 1, 2] : [0, 2, 4, 5, 6];
+    offsets.forEach((off, i) => playWordAt([60, 64, 67, 72, 76][i % 5], start + off * b));
+  };
+
+  window.playPhraseWithDrums = function(phraseBeats = 4, loop = "middle") {
+    const start = window.now() + 0.06;
+    playBar(loop, start);
+    if (phraseBeats > 4) playBar(loop, start + beat() * 4);
+    schedulePhrasePad(start, phraseBeats);
+    const offsets = phraseBeats === 4 ? [0, 1, 2] : [0, 2, 4, 5, 6];
+    offsets.forEach((off, i) => playWordAt([60, 64, 67, 72, 76][i % 5], start + off * beat()));
+  };
+
+  const transitionData = {
+    jam: {
+      words: ["time", "to", "jam!"], notes: [76, 79, 84],
+      sting: [
+        { midi: 60, beat: 0, duration: 0.42, volume: 0.052, type: "triangle" },
+        { midi: 67, beat: 0, duration: 0.42, volume: 0.048, type: "triangle" },
+        { midi: 72, beat: 0, duration: 0.46, volume: 0.046, type: "triangle" },
+        { midi: 76, beat: 1, duration: 0.16, volume: 0.040, type: "square" },
+        { midi: 79, beat: 2, duration: 0.18, volume: 0.038, type: "square" },
+        { midi: 84, beat: 3, duration: 0.16, volume: 0.030, type: "triangle" }
+      ]
+    },
+    speed: {
+      words: ["speed", "it", "up"], notes: [72, 76, 79],
+      sting: [
+        { midi: 72, beat: 0, duration: 0.14, volume: 0.040, type: "square" },
+        { midi: 76, beat: 1, duration: 0.14, volume: 0.038, type: "square" },
+        { midi: 79, beat: 2, duration: 0.20, volume: 0.036, type: "square" },
+        { midi: 84, beat: 3, duration: 0.14, volume: 0.026, type: "triangle" }
+      ]
+    },
+    groove: {
+      words: ["feel", "that", "groove"], notes: [67, 72, 79],
+      sting: [
+        { midi: 67, beat: 0, duration: 0.16, volume: 0.038, type: "triangle" },
+        { midi: 72, beat: 1, duration: 0.16, volume: 0.040, type: "square" },
+        { midi: 79, beat: 2, duration: 0.22, volume: 0.038, type: "square" },
+        { midi: 84, beat: 3, duration: 0.16, volume: 0.026, type: "triangle" }
+      ]
+    }
+  };
+
+  window.playTransition = function(kind = "speed", startAt = window.now()) {
+    const data = transitionData[kind] || transitionData.speed;
+    const b = beat();
+    data.sting.forEach(note => playTone({ ...note, when: startAt + b * note.beat, volume: note.volume * settings.transition }));
+    data.notes.forEach((midi, i) => playTone({ midi, when: startAt + b * i, duration: 0.11, volume: 0.045 * settings.transition, type: "square" }));
+    setStatus(`Played transition: <strong>${data.words.join(" / ")}</strong>.`);
+  };
+
+  window.playTransitionWithResume = function(kind = "speed", loop = "final") {
+    const start = window.now() + 0.05;
+    playTransition(kind, start);
+    playBar(loop, start + beat() * 4);
+  };
+
+  window.playEndingSting = function(startAt = window.now()) {
+    const b = beat();
+    [
+      { midi: 67, beat: 0, duration: 0.15, volume: 0.050, type: "square" },
+      { midi: 69, beat: 1, duration: 0.15, volume: 0.050, type: "square" },
+      { midi: 67, beat: 2, duration: 0.22, volume: 0.052, type: "square" },
+      { midi: 64, beat: 4, duration: 0.15, volume: 0.050, type: "square" },
+      { midi: 62, beat: 5, duration: 0.15, volume: 0.050, type: "square" },
+      { midi: 60, beat: 6, duration: 0.36, volume: 0.062, type: "triangle" },
+      { midi: 48, beat: 6.02, duration: 1.30, volume: 0.020, type: "triangle" },
+      { midi: 52, beat: 6.04, duration: 1.22, volume: 0.017, type: "triangle" },
+      { midi: 55, beat: 6.06, duration: 1.16, volume: 0.016, type: "triangle" },
+      { midi: 60, beat: 6.08, duration: 1.10, volume: 0.015, type: "triangle" }
+    ].forEach(note => playTone({ ...note, when: startAt + b * note.beat }));
+  };
+
+  window.playScoreRevealSparkle = function() {
+    const n = window.now();
+    [
+      { midi: 72, delay: 0.00, duration: 0.12, volume: 0.048, type: "square" },
+      { midi: 76, delay: 0.075, duration: 0.13, volume: 0.044, type: "square" },
+      { midi: 79, delay: 0.155, duration: 0.18, volume: 0.040, type: "triangle" }
+    ].forEach(note => playTone({ ...note, when: n + note.delay, volume: note.volume * settings.scoreSparkle }));
+  };
+
+  window.playCompletionArpeggio = function() {
+    const n = window.now();
+    [
+      { midi: 60, delay: 0.00, duration: 0.16, volume: 0.075, type: "square" },
+      { midi: 64, delay: 0.08, duration: 0.16, volume: 0.070, type: "square" },
+      { midi: 67, delay: 0.16, duration: 0.18, volume: 0.068, type: "square" },
+      { midi: 72, delay: 0.25, duration: 0.22, volume: 0.066, type: "square" },
+      { midi: 76, delay: 0.36, duration: 0.24, volume: 0.056, type: "triangle" },
+      { midi: 79, delay: 0.48, duration: 0.28, volume: 0.050, type: "triangle" },
+      { midi: 84, delay: 0.62, duration: 0.42, volume: 0.045, type: "triangle" },
+      { midi: 91, delay: 0.80, duration: 0.18, volume: 0.030, type: "triangle" }
+    ].forEach(note => playTone({ ...note, when: n + note.delay, volume: note.volume * settings.finalArpeggio }));
+  };
+
+  window.playScoreScreenScenario = function() {
+    const start = window.now() + 0.04;
+    playBar("final", start);
+    playScoreRevealSparkle();
+  };
+
+  window.playEndToArpeggioScenario = function() {
+    startLoop("final");
+    setStatus("Final drum loop started. It will stop and play arpeggio in 2 seconds.");
+    setTimeout(() => { stopAll(); playCompletionArpeggio(); }, 2000);
+  };
+
+  window.playZeroScoreScenario = function() {
+    const start = window.now() + 0.04;
+    playEndingSting(start);
+    setTimeout(() => playCompletionArpeggio(), beat() * 8 * 1000);
+  };
+
+  async function loadVoiceSamples() {
+    ensureAudio();
+    setStatus("Loading voice samples…");
+    await Promise.all(SOUND_BITS.map(async sound => {
+      if (sampleBuffers[sound.id] !== undefined) return;
+      try {
+        const res = await fetch(SOUND_BIT_BASE_URL + sound.filename, { cache: "force-cache" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const arrayBuffer = await res.arrayBuffer();
+        sampleBuffers[sound.id] = await audioCtx.decodeAudioData(arrayBuffer);
+      } catch (err) {
+        console.warn("Could not load", sound.filename, err);
+        sampleBuffers[sound.id] = null;
+      }
+    }));
+    const loaded = SOUND_BITS.filter(s => sampleBuffers[s.id]).length;
+    setStatus(`Loaded <strong>${loaded}/${SOUND_BITS.length}</strong> voice samples.`);
+  }
+
+  window.playVoice = async function(id) {
+    ensureAudio();
+    if (sampleBuffers[id] === undefined) await loadVoiceSamples();
+    const sound = SOUND_BITS.find(s => s.id === id);
+    const buffer = sampleBuffers[id];
+    if (!buffer) { setStatus(`Could not load <strong>${sound?.filename || id}</strong>. Check the file path.`); return; }
+    const source = audioCtx.createBufferSource();
+    const gain = audioCtx.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(Math.max(0, settings.voice), window.now());
+    source.connect(gain); gain.connect(masterGain); track(source);
+    source.start(window.now());
+  };
+
+  function renderControls() {
+    const wrap = $("mixControls");
+    wrap.innerHTML = controls.map(([key, label, min, max, step]) => `
+      <label class="slider-row">
+        <span>${label}</span>
+        <input id="ctrl_${key}" type="range" min="${min}" max="${max}" step="${step}" value="${settings[key]}">
+        <output id="out_${key}">${settings[key]}</output>
+      </label>`).join("");
+
+    controls.forEach(([key]) => {
+      const input = $("ctrl_" + key);
+      input.addEventListener("input", () => {
+        settings[key] = Number(input.value);
+        $("out_" + key).textContent = settings[key].toFixed(key === "bpm" ? 0 : 3).replace(/0+$/, "").replace(/\.$/, "");
+        updateMaster();
+        updateSettingsOut();
+      });
+    });
+    updateSettingsOut();
+  }
+
+  function renderVoiceButtons() {
+    $("voiceButtons").innerHTML = SOUND_BITS.map(s => `<button onclick="playVoice('${s.id}')">${s.label}</button>`).join("");
+  }
+
+  function updateSettingsOut() {
+    $("settingsOut").textContent = JSON.stringify(settings, null, 2);
+  }
+
+  $("unlockBtn").addEventListener("click", () => { ensureAudio(); loadVoiceSamples(); });
+  $("stopBtn").addEventListener("click", stopAll);
+  $("loadVoicesBtn").addEventListener("click", loadVoiceSamples);
+  $("copyBtn").addEventListener("click", async () => {
+    updateSettingsOut();
+    try {
+      await navigator.clipboard.writeText($("settingsOut").textContent);
+      setStatus("Copied settings JSON to clipboard.");
+    } catch (err) {
+      setStatus("Could not copy automatically. Select the JSON and copy it manually.");
+    }
+  });
+  $("resetBtn").addEventListener("click", () => {
+    settings = { ...defaults };
+    renderControls();
+    updateMaster();
+    setStatus("Reset to current Verse Jam defaults.");
+  });
+
+  renderControls();
+  renderVoiceButtons();
+  updateSettingsOut();
+
+  window.addEventListener("pagehide", stopAll);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1056 @@
+@font-face {
+  font-family: "Baloo 2";
+  src: url("../../verse_fonts/Baloo2.ttf") format("truetype");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Titan One";
+  src: url("../../verse_fonts/TitanOne.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  --vj-bg: #221447;
+  --vj-accent: #8df7ff;
+  --vj-yellow: #ffe27a;
+  --vj-pink: #ff7ad9;
+  --vj-purple: #7f66c6;
+  --vj-green: #9dff8d;
+  --vj-red: #ff8fa3;
+  --vj-text: #fff7e8;
+
+  --vj-stage-max: 860px;
+  --vj-button-stack-max: 430px;
+  --vj-intro-stack-max: 430px;
+
+  --vj-page-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, .045)),
+    radial-gradient(circle at 30% 10%, rgba(141, 247, 255, .16), transparent 28%),
+    radial-gradient(circle at 18% 15%, rgba(141, 247, 255, .22), transparent 28%),
+    radial-gradient(circle at 80% 12%, rgba(255, 226, 122, .20), transparent 24%),
+    radial-gradient(circle at 50% 115%, rgba(255, 122, 217, .18), transparent 34%),
+    linear-gradient(145deg, #17122b, #2b1748 56%, #151326);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--vj-page-bg);
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  touch-action: manipulation;
+  font-family: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Verse Jam owns the full-screen background.
+   This also neutralizes the shared .vm-shell padding/layout so the shell
+   screens do not sit inside an inset app container. */
+#app.vm-shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  width: 100%;
+  padding: 0;
+  display: block;
+  overflow: hidden;
+  text-align: initial;
+  font-family: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--vj-page-bg);
+}
+
+/* Shared title/mode/completion containers should not repaint the gradient.
+   If they repaint it, the same gradient can restart inside the centered
+   container and look like a subtle darker rectangle. */
+.vm-game-screen,
+.vm-game-stage,
+.vm-game-center {
+  background: transparent !important;
+}
+
+.versejam-root {
+  position: relative;
+  min-height: 100svh;
+  width: 100%;
+  color: var(--vj-text);
+  background: transparent;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.versejam-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .12;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .22) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.versejam-stage {
+  position: relative;
+  z-index: 1;
+  width: min(var(--vj-stage-max), 100%);
+  min-height: calc(100svh - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.versejam-headphones-screen {
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  color: var(--vj-text);
+  background: transparent;
+}
+
+.versejam-headphones-card {
+  width: min(430px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.versejam-headphones-images {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.versejam-headphones-earbud {
+  width: clamp(74px, 24vw, 116px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .28));
+}
+
+.versejam-headphones-earbud.is-flipped {
+  transform: scaleX(-1);
+}
+
+.versejam-headphones-title {
+  border-radius: 999px;
+  padding: 10px 20px 12px;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.8rem, 10vw, 3rem);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: .035em;
+  color: #333333;
+  background: linear-gradient(180deg, #fff4a9, #ffe27a);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, .24), inset 0 -5px 0 rgba(0, 0, 0, .12);
+}
+
+.versejam-headphones-copy {
+  max-width: 380px;
+  margin: 0;
+  font-family: "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.12rem, 5vw, 1.45rem);
+  line-height: 1.14;
+  font-weight: 800;
+  color: #fff7e8;
+  text-wrap: balance;
+  text-wrap: pretty;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .18);
+}
+
+
+.versejam-headphones-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 28px 15px;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.35rem, 7vw, 2rem);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: .035em;
+  color: #fff7e8;
+  background: linear-gradient(180deg, #9dff8d, #28b85f);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, .26), inset 0 -6px 0 rgba(0, 0, 0, .16);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.versejam-headphones-button:active {
+  transform: translateY(2px) scale(.98);
+  box-shadow: 0 9px 18px rgba(0, 0, 0, .24), inset 0 -4px 0 rgba(0, 0, 0, .16);
+}
+
+@media (max-height:600px) {
+  .versejam-headphones-screen {
+    padding: 12px;
+  }
+
+  .versejam-headphones-card {
+    gap: 10px;
+  }
+
+  .versejam-headphones-earbud {
+    width: clamp(58px, 19vw, 82px);
+  }
+
+  .versejam-headphones-title {
+    padding: 8px 17px 10px;
+    font-size: clamp(1.45rem, 8vw, 2.25rem);
+  }
+
+  .versejam-headphones-copy {
+    font-size: clamp(1rem, 4.5vw, 1.18rem);
+    line-height: 1.08;
+  }
+
+
+  .versejam-headphones-button {
+    padding: 10px 24px 12px;
+    font-size: clamp(1.15rem, 6vw, 1.55rem);
+  }
+}
+
+.versejam-build-wrap {
+  flex: 0 0 auto;
+}
+
+.versejam-build {
+  background: rgba(255, 255, 255, .94) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .22), inset 0 0 0 1px rgba(255, 255, 255, .65);
+}
+
+.versejam-play-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.versejam-board {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.versejam-board::before {
+  content: none;
+}
+
+.versejam-particle-layer,
+.versejam-float-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 8;
+}
+
+.versejam-board-content {
+  position: relative;
+  z-index: 4;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+}
+
+.versejam-overlay-pills {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.versejam-pill {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #2a1b3d;
+  background: rgba(255, 226, 122, .96);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .22), inset 0 0 0 1px rgba(255, 255, 255, .42);
+  pointer-events: auto;
+}
+
+.versejam-round-pill {
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: .025em;
+  background: rgba(141, 247, 255, .92);
+}
+
+.versejam-main-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 52px 14px 20px;
+}
+
+.versejam-intro-stack,
+.versejam-button-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+}
+
+.versejam-intro-stack {
+  max-width: var(--vj-intro-stack-max);
+}
+
+.versejam-button-stack {
+  max-width: var(--vj-button-stack-max);
+}
+
+.versejam-intro-word {
+  align-self: center;
+  min-width: 62%;
+  border-radius: 22px;
+  padding: 14px 18px;
+  text-align: center;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.25rem, 7vw, 2.25rem);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: .025em;
+  color: #261840;
+  background: linear-gradient(180deg, #fff4a9, #ffe27a);
+  box-shadow: 0 14px 24px rgba(0, 0, 0, .22), inset 0 -5px 0 rgba(0, 0, 0, .10);
+  transform: scale(.2) rotate(-2deg);
+  opacity: 0;
+}
+
+.versejam-intro-word.is-response-phrase {
+  color: #fff7e8;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .18);
+  background: linear-gradient(180deg, #9dff8d, #28b85f);
+}
+
+.versejam-intro-word.is-in {
+  animation: vj-pop-in 260ms cubic-bezier(.2, 1.45, .35, 1) forwards;
+}
+
+.versejam-intro-word.is-out {
+  animation: vj-pop-out 220ms ease-in forwards;
+}
+
+.versejam-word-btn {
+  position: relative;
+  width: 100%;
+  border: 0;
+  border-radius: 24px;
+  padding: 15px 16px 17px;
+  font-family: inherit;
+  font-size: clamp(1.18rem, 5.8vw, 1.8rem);
+  line-height: 1.02;
+  font-weight: 900;
+  color: #fff7e8;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .22), rgba(255, 255, 255, .10));
+  box-shadow: 0 13px 26px rgba(0, 0, 0, .24), inset 0 0 0 1px rgba(255, 255, 255, .18), inset 0 -6px 0 rgba(0, 0, 0, .12);
+  transform: scale(var(--vj-beat-scale, 1));
+  transition: transform 90ms linear, filter 140ms ease, opacity 180ms ease, background 180ms ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.versejam-word-btn::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+
+.versejam-word-btn.is-spawning {
+  animation: vj-button-in 240ms cubic-bezier(.2, 1.4, .35, 1) both;
+}
+
+.versejam-word-btn.is-next {
+  background: linear-gradient(180deg, rgba(141, 247, 255, .32), rgba(127, 102, 198, .22));
+  box-shadow: 0 0 0 3px rgba(141, 247, 255, .45), 0 0 30px rgba(141, 247, 255, .22), 0 13px 26px rgba(0, 0, 0, .24), inset 0 -6px 0 rgba(0, 0, 0, .12);
+}
+
+.versejam-word-btn.is-next::after {
+  border-color: rgba(255, 255, 255, .72);
+  animation: vj-cue-breathe 650ms ease-in-out infinite alternate;
+}
+
+.versejam-word-btn.is-rainbow-next {
+  background: linear-gradient(90deg, rgba(255, 122, 217, .38), rgba(255, 226, 122, .35), rgba(141, 247, 255, .38), rgba(157, 255, 141, .35));
+  background-size: 260% 100%;
+  animation: vj-rainbow-bg 1.1s linear infinite;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, .32), 0 0 38px rgba(255, 122, 217, .24), 0 13px 26px rgba(0, 0, 0, .24), inset 0 -6px 0 rgba(0, 0, 0, .12);
+}
+
+.versejam-word-btn.is-removing {
+  pointer-events: none;
+  animation: vj-remove 250ms ease-in forwards;
+}
+
+.versejam-word-btn.is-wrong {
+  animation: vj-wrong 230ms ease;
+  background: linear-gradient(180deg, rgba(255, 143, 163, .34), rgba(255, 143, 163, .14));
+}
+
+.versejam-word-btn:disabled {
+  cursor: default;
+}
+
+.versejam-word-btn.is-clap-button {
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #fff4a9, #ffc83d);
+}
+
+.versejam-word-btn.is-clap-button.is-next,
+.versejam-word-btn.is-clap-button.is-rainbow-next {
+  box-shadow:
+    0 0 0 4px rgba(255, 226, 122, 0.28),
+    0 0 22px rgba(255, 226, 122, 0.45);
+}
+
+.versejam-word-btn.is-sound-bit-button {
+  color: #fff7e8;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .18);
+  background: linear-gradient(180deg, #9dff8d, #28b85f);
+}
+
+.versejam-word-btn.is-sound-bit-button.is-next,
+.versejam-word-btn.is-sound-bit-button.is-rainbow-next {
+  box-shadow:
+    0 0 0 4px rgba(157, 255, 141, 0.28),
+    0 0 24px rgba(157, 255, 141, 0.46),
+    0 13px 26px rgba(0, 0, 0, .24),
+    inset 0 -6px 0 rgba(0, 0, 0, .12);
+}
+
+.versejam-pixel {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--vj-pcolor, #ffe27a);
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  animation: vj-pixel 620ms ease-out forwards;
+}
+
+.versejam-beat-ring {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffe27a;
+  box-shadow: 0 0 24px rgba(255, 226, 122, .65);
+  transform: scale(var(--vj-dot-scale, 1));
+  transition: transform 80ms linear;
+  z-index: 7;
+}
+
+.versejam-float-note {
+  position: absolute;
+  color: rgba(255, 255, 255, .72);
+  font-weight: 900;
+  font-size: 1.1rem;
+  animation: vj-float-note 720ms ease-out forwards;
+}
+
+@keyframes vj-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(.2) translateY(18px) rotate(-4deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0);
+  }
+}
+
+@keyframes vj-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(.2) translateY(-18px) rotate(4deg);
+  }
+}
+
+@keyframes vj-button-in {
+  from {
+    opacity: 0;
+    transform: scale(.25) translateY(20px) rotate(-2deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0);
+  }
+}
+
+@keyframes vj-cue-breathe {
+  from {
+    transform: scale(.985);
+    opacity: .5;
+  }
+
+  to {
+    transform: scale(1.025);
+    opacity: 1;
+  }
+}
+
+@keyframes vj-rainbow-bg {
+  from {
+    background-position: 0 50%;
+  }
+
+  to {
+    background-position: 260% 50%;
+  }
+}
+
+@keyframes vj-remove {
+  from {
+    opacity: 1;
+    transform: scale(var(--vj-beat-scale, 1));
+    filter: brightness(1.15);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(.25) rotate(8deg);
+    filter: brightness(2);
+  }
+}
+
+@keyframes vj-wrong {
+
+  0%,
+  100% {
+    transform: translateX(0) scale(var(--vj-beat-scale, 1));
+  }
+
+  25% {
+    transform: translateX(-8px) scale(var(--vj-beat-scale, 1));
+  }
+
+  75% {
+    transform: translateX(8px) scale(var(--vj-beat-scale, 1));
+  }
+}
+
+@keyframes vj-pixel {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--vj-dx)), calc(-50% + var(--vj-dy))) scale(.15) rotate(var(--vj-rot));
+  }
+}
+
+@keyframes vj-float-note {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.8);
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-48px) scale(1.12);
+  }
+}
+
+@media (min-width:760px) {
+  .versejam-root {
+    padding: 18px;
+  }
+
+  .versejam-stage {
+    min-height: calc(100svh - 36px);
+    gap: 14px;
+  }
+
+  .versejam-board-content {
+    padding: 18px;
+  }
+
+  .versejam-main-area {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+}
+
+@media (max-height:680px) {
+  .versejam-root {
+    padding: 8px;
+  }
+
+  .versejam-stage {
+    min-height: calc(100svh - 16px);
+    gap: 7px;
+  }
+
+  .versejam-board {
+    border-radius: 0;
+  }
+
+  .versejam-board-content {
+    padding: 9px;
+  }
+
+  .versejam-overlay-pills {
+    top: 9px;
+    left: 9px;
+    right: 9px;
+  }
+
+  .versejam-pill {
+    padding: 6px 10px;
+    font-size: .88rem;
+  }
+
+  .versejam-main-area {
+    padding: 38px 12px 6px;
+  }
+
+  .versejam-intro-stack {
+    gap: 6px;
+  }
+
+  .versejam-intro-word {
+    min-width: 54%;
+    padding: 9px 12px 10px;
+    border-radius: 18px;
+    font-size: clamp(1rem, 5.7vw, 1.55rem);
+    box-shadow: 0 10px 18px rgba(0, 0, 0, .20), inset 0 -4px 0 rgba(0, 0, 0, .10);
+  }
+
+  .versejam-button-stack {
+    gap: 7px;
+  }
+
+  .versejam-word-stack {
+    gap: 7px;
+  }
+
+  .versejam-cue-button {
+    padding: 9px 13px 11px;
+    font-size: clamp(1rem, 4.8vw, 1.38rem);
+  }
+
+  .versejam-word-btn {
+    padding: 11px 12px 13px;
+    border-radius: 20px;
+  }
+}
+
+@media (max-height:600px) {
+  .versejam-root {
+    padding: 6px;
+  }
+
+  .versejam-stage {
+    min-height: calc(100svh - 12px);
+    gap: 6px;
+  }
+
+  .versejam-board {
+    border-radius: 0;
+  }
+
+  .versejam-board-content {
+    padding: 8px;
+  }
+
+  .versejam-main-area {
+    padding: 34px 10px 6px;
+  }
+
+  .versejam-overlay-pills {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .versejam-pill {
+    padding: 5px 9px;
+    font-size: .8rem;
+  }
+
+  .versejam-intro-stack {
+    gap: 5px;
+  }
+
+  .versejam-intro-word {
+    min-width: 50%;
+    padding: 7px 10px 8px;
+    border-radius: 16px;
+    font-size: clamp(.92rem, 5.1vw, 1.28rem);
+    letter-spacing: .015em;
+  }
+
+  .versejam-button-stack {
+    gap: 6px;
+  }
+
+  .versejam-word-stack {
+    gap: 6px;
+  }
+
+  .versejam-cue-button {
+    padding: 8px 11px 10px;
+    font-size: clamp(.92rem, 4.4vw, 1.22rem);
+    letter-spacing: .035em;
+  }
+
+  .versejam-word-btn {
+    padding: 9px 10px 11px;
+    border-radius: 18px;
+    font-size: clamp(1rem, 5.15vw, 1.38rem);
+  }
+}
+
+.versejam-word-btn {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.versejam-score-screen {
+  width: min(430px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+  animation: vj-score-screen-in 320ms cubic-bezier(.2, 1.35, .35, 1) both;
+}
+
+.versejam-score-title {
+  border-radius: 999px;
+  padding: 12px 20px 14px;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.55rem, 8vw, 3.05rem);
+  line-height: .95;
+  font-weight: 400;
+  letter-spacing: .035em;
+  color: #fff7e8;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, .22);
+  background: linear-gradient(90deg,
+      rgba(255, 122, 217, .95),
+      rgba(255, 226, 122, .95),
+      rgba(141, 247, 255, .95),
+      rgba(157, 255, 141, .95),
+      rgba(255, 122, 217, .95));
+  background-size: 260% 100%;
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, .24),
+    inset 0 -6px 0 rgba(0, 0, 0, .14),
+    0 0 30px rgba(255, 122, 217, .20);
+  animation: vj-rainbow-bg 1.35s linear infinite, vj-score-title-pulse 760ms ease-in-out infinite alternate;
+}
+
+.versejam-score-number {
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(3.8rem, 22vw, 8.4rem);
+  line-height: .9;
+  font-weight: 400;
+  color: #fff7e8;
+  letter-spacing: .025em;
+  text-shadow:
+    0 6px 0 rgba(0, 0, 0, .30),
+    0 0 26px rgba(255, 255, 255, .22);
+  animation: vj-score-number-pop 440ms cubic-bezier(.2, 1.45, .35, 1) both;
+}
+
+.versejam-score-continue {
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 26px 16px;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.15rem, 6vw, 1.85rem);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: .035em;
+  color: #fff7e8;
+  background: linear-gradient(180deg, #9dff8d, #28b85f);
+  box-shadow:
+    0 14px 26px rgba(0, 0, 0, .26),
+    inset 0 -6px 0 rgba(0, 0, 0, .16);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.versejam-score-continue:active {
+  transform: translateY(2px) scale(.98);
+  box-shadow:
+    0 9px 18px rgba(0, 0, 0, .24),
+    inset 0 -4px 0 rgba(0, 0, 0, .16);
+}
+
+.versejam-score-continue:disabled {
+  opacity: .82;
+  cursor: default;
+}
+
+@keyframes vj-score-screen-in {
+  from {
+    opacity: 0;
+    transform: scale(.84) translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes vj-score-title-pulse {
+  from {
+    transform: scale(.985);
+    filter: brightness(1);
+  }
+
+  to {
+    transform: scale(1.035);
+    filter: brightness(1.14);
+  }
+}
+
+@keyframes vj-score-number-pop {
+  from {
+    opacity: 0;
+    transform: scale(.28) rotate(-4deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+.versejam-score-splash {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 31;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(.35) rotate(-3deg);
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(2rem, 12vw, 4.1rem);
+  line-height: .9;
+  font-weight: 400;
+  letter-spacing: .03em;
+  color: #fff7e8;
+  text-shadow:
+    0 4px 0 rgba(0, 0, 0, .28),
+    0 0 24px rgba(255, 255, 255, .28);
+  animation: vj-score-splash 900ms cubic-bezier(.18, 1.35, .3, 1) forwards;
+}
+
+@keyframes vj-score-splash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -45%) scale(.25) rotate(-7deg);
+  }
+
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -72%) scale(1.08) rotate(2deg);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -76%) scale(1) rotate(-1deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -102%) scale(.72) rotate(5deg);
+  }
+}
+
+.versejam-perfect-splash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 30;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(.35) rotate(-5deg);
+  border-radius: 28px;
+  padding: 18px 26px 20px;
+  font-size: clamp(2rem, 13vw, 4.25rem);
+  line-height: .9;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: .02em;
+  color: #271841;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, .45);
+  background: linear-gradient(90deg, #ff7ad9, #ffe27a, #8df7ff, #9dff8d, #ff7ad9);
+  background-size: 260% 100%;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .34), 0 0 0 5px rgba(255, 255, 255, .25), inset 0 -8px 0 rgba(0, 0, 0, .12);
+  animation: vj-perfect-splash 900ms cubic-bezier(.18, 1.35, .3, 1) forwards;
+}
+
+@keyframes vj-perfect-splash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.25) rotate(-9deg);
+    background-position: 0 50%;
+  }
+
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.12) rotate(3deg);
+  }
+
+  35% {
+    transform: translate(-50%, -50%) scale(.98) rotate(-2deg);
+  }
+
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.02) rotate(1deg);
+    background-position: 180% 50%;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -68%) scale(.72) rotate(7deg);
+    background-position: 260% 50%;
+  }
+}
+
+.versejam-word-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 10px;
+}
+
+.versejam-cue-button {
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px 14px;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(1.12rem, 5vw, 1.65rem);
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: .045em;
+  color: #261840;
+  text-align: center;
+  transform: scale(var(--vj-beat-scale, 1));
+  transition: transform 90ms linear, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, .24), inset 0 -6px 0 rgba(0, 0, 0, .13), inset 0 0 0 1px rgba(255, 255, 255, .42);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.versejam-cue-listen {
+  background: linear-gradient(180deg, #9cf8ff, #55dce8);
+  box-shadow: 0 0 0 3px rgba(141, 247, 255, .28), 0 12px 26px rgba(0, 0, 0, .24), inset 0 -6px 0 rgba(0, 0, 0, .13);
+}
+
+.versejam-cue-3 {
+  background: linear-gradient(180deg, #ff9eb0, #ff426a);
+  color: #fff7e8;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .2);
+}
+
+.versejam-cue-2 {
+  background: linear-gradient(180deg, #ffc077, #ff8b2b);
+  color: #fff7e8;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .16);
+}
+
+.versejam-cue-1 {
+  background: linear-gradient(180deg, #fff4a9, #ffe27a);
+  color: #261840;
+}
+
+.versejam-cue-go,
+.versejam-cue-tap {
+  background: linear-gradient(90deg, #9dff8d, #8df7ff, #ffe27a, #9dff8d);
+  background-size: 240% 100%;
+  color: #1e2040;
+  animation: vj-cue-go-rainbow 700ms linear infinite;
+  box-shadow: 0 0 0 4px rgba(157, 255, 141, .28), 0 0 34px rgba(157, 255, 141, .28), 0 12px 26px rgba(0, 0, 0, .24), inset 0 -6px 0 rgba(0, 0, 0, .13);
+}
+
+.versejam-cue-tap {
+  background: linear-gradient(90deg, #8df7ff, #ff7ad9, #ffe27a, #8df7ff);
+  background-size: 260% 100%;
+}
+
+@keyframes vj-cue-go-rainbow {
+  from {
+    background-position: 0 50%;
+  }
+
+  to {
+    background-position: 240% 50%;
+  }
+}
+
+@media (max-height:680px) {
+  .versejam-word-stack {
+    gap: 7px;
+  }
+}
