@@ -9,9 +9,9 @@
 (function () {
   "use strict";
 
-  const PROFILE_REGISTRY_STORAGE_KEY = "biblozooProfiles";
+  const PROFILE_REGISTRY_STORAGE_KEY = "biblozooPwaProfiles";
   const PROFILE_REGISTRY_VERSION = 1;
-  const LEGACY_PROGRESS_STORAGE_KEY = "verseMemoryProgress";
+  const LEGACY_PROGRESS_STORAGE_KEY = "biblozooPwaProgress";
   const LEGACY_PROGRESS_MIGRATION_VERSION = 1;
   const PROFILE_NAME_MAX_LENGTH = 16;
 
