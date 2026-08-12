@@ -32,7 +32,7 @@ const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
 const APP_VERSION = "1.0.3";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
-const PRIVACY_POLICY_URL = "https://andydoane.github.io/eatyourbible/pwa/verse/privacy_policy.html";
+const PRIVACY_POLICY_URL = "privacy_policy.html";
 
 // =========================================================
 // DEBUG fallback: lets the app run offline (file://) without fetch()
