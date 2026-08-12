@@ -1,0 +1,27 @@
+{
+  "biblopet": "🦗",
+  "biblopetDefaultName": "Gene",
+  "biblopetFeetFromBottom": "11.8%",
+  "verseId": "psalm_135_6",
+  "translation": "ESV",
+  "echoParts": [
+    "Whatever the Lord pleases",
+    "he does",
+    "in heaven and on earth",
+    "in the seas and all deeps"
+  ],
+
+  "verseText": "Whatever the Lord pleases, he does, in heaven and on earth, in the seas and all deeps.",
+   "meaning": "God has the power to do whatever he feels like, wherever he wants: all the way from heaven above down to the bottom of the sea.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "pleases", "occurrence": 1, "emoji": "😀" },
+    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "⛅" },
+    { "type": "emoji", "word": "earth", "occurrence": 1, "emoji": "🌍" },
+    { "type": "emoji", "word": "seas", "occurrence": 1, "emoji": "🌊" },
+    { "type": "underscore", "word": "deeps", "occurrence": 1 },
+    { "type": "underscore", "word": "does", "occurrence": 1 },
+    { "type": "underscore", "word": "whatever", "occurrence": 1 }
+  ]
+}

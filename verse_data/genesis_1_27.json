@@ -1,0 +1,30 @@
+{
+  "biblopet": "🦛",
+  "biblopetDefaultName": "Humphrey",
+  "biblopetFeetFromBottom": "14.3%",
+  "verseId": "genesis_1_27",
+  "translation": "ESV",
+  "echoParts": [
+    "So God created man",
+    "in his own image",
+    "in the image of God",
+    "he created him",
+    "male and female",
+    "he created them"
+  ],
+
+  "verseText": "So God created man in his own image, in the image of God he created him; male and female he created them.",
+  "meaning": "God created human beings in his likeness. That makes us special. We are more like God than any of the other creatures he made.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "created", "occurrence": 1, "emoji": "🛠️" },
+    { "type": "emoji", "word": "man", "occurrence": 1, "emoji": "🧔‍♂️" },
+    { "type": "emoji", "word": "image", "occurrence": 1, "emoji": "🖼️" },
+    { "type": "emoji", "word": "image", "occurrence": 2, "emoji": "🖼️" },
+    { "type": "emoji", "word": "God", "occurrence": 2, "emoji": "👑" },
+    { "type": "emoji", "word": "created", "occurrence": 2, "emoji": "🛠️" },
+    { "type": "emoji", "word": "male", "occurrence": 1, "emoji": "👨‍🦱" },
+    { "type": "emoji", "word": "female", "occurrence": 1, "emoji": "👩" }
+  ]
+}

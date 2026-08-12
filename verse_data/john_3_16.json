@@ -1,0 +1,29 @@
+{
+  "biblopet": "🐻",
+  "biblopetDefaultName": "Walter",
+  "biblopetFeetFromBottom": "12.7%",
+  "verseId": "john_3_16",
+  "translation": "ESV",
+  "echoParts": [
+  "For God so loved the world",
+  "that he gave his only Son",
+  "that whoever believes in him",
+  "should not perish, but have eternal life."
+],
+  "verseText": "For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.",
+  "meaning": "God loved the sinners of the world so much, he sent Jesus to rescue us from our sin.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "loved",  "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "God",    "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "Son",    "occurrence": 1, "emoji": "👦" },
+    { "type": "emoji", "word": "gave",   "occurrence": 1, "emoji": "🎁" },
+    { "type": "emoji", "word": "world",  "occurrence": 1, "emoji": "🌍" },
+
+    { "type": "underscore", "word": "whoever",  "occurrence": 1 },
+    { "type": "underscore", "word": "believes", "occurrence": 1 },
+    { "type": "underscore", "word": "perish",   "occurrence": 1 },
+    { "type": "underscore", "word": "eternal",  "occurrence": 1 },
+    { "type": "underscore", "word": "life",     "occurrence": 1 }
+  ]
+}

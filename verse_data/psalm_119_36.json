@@ -1,0 +1,25 @@
+{
+  "biblopet": "👀",
+  "biblopetDefaultName": "Fraggy",
+  "biblopetFeetFromBottom": "18.3%",
+  "verseId": "psalm_119_36",
+  "translation": "ESV",
+  "echoParts": [
+    "Incline my heart",
+    "to your testimonies",
+    "and not to selfish gain"
+  ],
+
+  "verseText": "Incline my heart to your testimonies, and not to selfish gain!",
+  "meaning": "We need God to help our hearts love his word more than money or selfish things.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "testimonies", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "gain", "occurrence": 1, "emoji": "💰" },
+    { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
+    { "type": "underscore", "word": "selfish", "occurrence": 1 },
+    { "type": "underscore", "word": "incline", "occurrence": 1 }
+  ]
+}
+

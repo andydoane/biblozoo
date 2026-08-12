@@ -1,0 +1,26 @@
+{
+  "biblopet": "🕊️",
+  "biblopetDefaultName": "Manny",
+  "biblopetFeetFromBottom": "5.7%",
+  "verseId": "acts_16_31",
+  "translation": "ESV",
+  "echoParts": [
+    "And they said",
+    "Believe in the Lord Jesus",
+    "and you will be saved",
+    "you and your household"
+  ],
+
+  "verseText": "And they said, 'Believe in the Lord Jesus, and you will be saved, you and your household.'",
+   "meaning": "Paul and Silas said these words. They explain how we can be saved. Anyone who believes in Jesus can be saved. It includes you and everyone in your house.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "said", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "saved", "occurrence": 1, "emoji": "🦸" },
+    { "type": "emoji", "word": "household", "occurrence": 1, "emoji": "🏠" },
+    { "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" },
+    { "type": "emoji", "word": "you", "occurrence": 2, "emoji": "🫵" },
+    { "type": "underscore", "word": "believe", "occurrence": 1 }
+  ]
+}

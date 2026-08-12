@@ -1,0 +1,30 @@
+{
+  "biblopet": "🐳",
+  "biblopetDefaultName": "Dale",
+  "biblopetFeetFromBottom": "25.9%",
+  "verseId": "revelation_7_9",
+  "translation": "ESV",
+  "echoParts": [
+    "Behold, a great multitude",
+    "that no one could number",
+    "from every nation",
+    "from all tribes and peoples and languages",
+    "standing before the throne",
+    "and before the Lamb"
+  ],
+
+  "verseText": "Behold, a great multitude that no one could number, from every nation, from all tribes and peoples and languages, standing before the throne and before the Lamb...",
+   "meaning": "This describes God's future forever kingdom, where people from all over the world will worship him together.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "number", "occurrence": 1, "emoji": "🔢" },
+    { "type": "emoji", "word": "nation", "occurrence": 1, "emoji": "🏳️" },
+    { "type": "emoji", "word": "tribes", "occurrence": 1, "emoji": "⛺" },
+    { "type": "emoji", "word": "peoples", "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
+    { "type": "emoji", "word": "languages", "occurrence": 1, "emoji": "💬" },
+    { "type": "emoji", "word": "throne", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "lamb", "occurrence": 1, "emoji": "🐑" },
+    { "type": "emoji", "word": "behold", "occurrence": 1, "emoji": "📣" },
+    { "type": "underscore", "word": "standing", "occurrence": 1 }
+  ]
+}

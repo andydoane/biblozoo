@@ -1,0 +1,25 @@
+{
+  "biblopet": "🐈",
+  "biblopetDefaultName": "Whiskers",
+  "biblopetFeetFromBottom": "13.4%",
+  "verseId": "genesis_1_1",
+  "translation": "ESV",
+  "echoParts": [
+    "In the beginning",
+    "God created",
+    "the heavens and the earth"
+  ],
+
+  "verseText": "In the beginning, God created the heavens and the earth.",
+  "meaning": "God is the maker of everything. Before anything else existed, God was already there, and he created the heavens and the earth.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "beginning", "occurrence": 1, "emoji": "📘" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
+    { "type": "emoji", "word": "created", "occurrence": 1, "emoji": "🛠️" },
+    { "type": "emoji", "word": "heavens", "occurrence": 1, "emoji": "⛅" },
+    { "type": "emoji", "word": "earth", "occurrence": 1, "emoji": "🌍" },
+    { "type": "emoji", "word": "and", "occurrence": 1, "emoji": "➕" },
+    { "type": "underscore", "word": "in", "occurrence": 1 }
+  ]
+}

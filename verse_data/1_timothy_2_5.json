@@ -1,0 +1,28 @@
+{
+  "biblopet": "🐠",
+  "biblopetDefaultName": "Gilbert",
+  "biblopetFeetFromBottom": "15.0%",
+  "verseId": "1_timothy_2_5",
+  "translation": "ESV",
+  "echoParts": [
+    "For there is one God",
+    "and there is one mediator",
+    "between God and men",
+    "the man Christ Jesus"
+  ],
+
+  "verseText": "For there is one God, and there is one mediator between God and men, the man Christ Jesus.",
+   "meaning": "Jesus is our mediator, the man who stands in the middle between sinners and our sinless God.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "one", "occurrence": 1, "emoji": "1️⃣" },
+    { "type": "emoji", "word": "one", "occurrence": 2, "emoji": "1️⃣" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "man", "occurrence": 1, "emoji": "🙍‍♂️" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "underscore", "word": "between", "occurrence": 1 },
+    { "type": "underscore", "word": "Christ", "occurrence": 1 },
+    { "type": "underscore", "word": "mediator", "occurrence": 1 }
+  ]
+}
+

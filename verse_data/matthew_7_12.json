@@ -1,0 +1,31 @@
+{
+  "biblopet": "🐂",
+  "biblopetDefaultName": "Fernando",
+  "biblopetFeetFromBottom": "26.8%",
+  "verseId": "matthew_7_12",
+  "translation": "ESV",
+  "echoParts": [
+    "So whatever you wish",
+    "that others",
+    "would do to you,",
+    "do also to them."
+  ],
+
+  "verseText": "So whatever you wish that others would do to you, do also to them.",
+   "meaning": "This verse is another way to say the second Great Commandment: 'Love your neighbor as you love yourself.'",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "wish", "occurrence": 1, "emoji": "🌠" },
+    { "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" },
+    { "type": "emoji", "word": "whatever", "occurrence": 1, "emoji": "🤷‍♂️" },
+    { "type": "underscore", "word": "others", "occurrence": 1 },
+    { "type": "underscore", "word": "also", "occurrence": 1 },
+    { "type": "underscore", "word": "them", "occurrence": 1 },
+    { "type": "underscore", "word": "do", "occurrence": 1 }
+  ]
+}
+
+
+
+
+    

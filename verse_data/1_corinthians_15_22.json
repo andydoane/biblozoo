@@ -1,0 +1,29 @@
+{
+  "biblopet": "🦡",
+  "biblopetDefaultName": "Brock",
+  "biblopetFeetFromBottom": "15.2%",
+  "verseId": "1_corinthians_15_22",
+  "translation": "ESV",
+  "echoParts": [
+    "For as in Adam",
+    "all die",
+    "so also in Christ",
+    "shall all be made alive"
+  ],
+
+  "verseText": "For as in Adam all die, so also in Christ shall all be made alive.",
+  "meaning": "Because of Adam's sin all people die, but through Jesus Christ those who belong to him will have forever life.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
+    { "type": "emoji", "word": "Adam", "occurrence": 1, "emoji": "🧔‍♂️" },
+    { "type": "emoji", "word": "die", "occurrence": 1, "emoji": "💀" },
+    { "type": "emoji", "word": "Christ", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "alive", "occurrence": 1, "emoji": "💓" },
+    { "type": "underscore", "word": "all", "occurrence": 1 },
+    { "type": "underscore", "word": "also", "occurrence": 1 },
+    { "type": "underscore", "word": "all", "occurrence": 2 },
+    { "type": "underscore", "word": "made", "occurrence": 1 }
+
+  ]
+}

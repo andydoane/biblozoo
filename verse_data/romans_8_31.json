@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐥",
+  "biblopetDefaultName": "Peeps",
+  "biblopetFeetFromBottom": "10.3%",
+  "verseId": "romans_8_31",
+  "translation": "ESV",
+  "echoParts": [
+    "What then shall we say",
+    "to these things?",
+    "If God is for us",
+    "who can be against us?"
+  ],
+
+  "verseText": "What then shall we say to these things? If God is for us, who can be against us?",
+   "meaning": "We know God is on our side because he sent Jesus to save us. And if God is on our side, no one can defeat us.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "What", "occurrence": 1, "emoji": "🤷" },
+    { "type": "emoji", "word": "say", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
+    { "type": "underscore", "word": "things", "occurrence": 1 },
+    { "type": "underscore", "word": "who", "occurrence": 1 },
+    { "type": "underscore", "word": "against", "occurrence": 1 }
+  ]
+}

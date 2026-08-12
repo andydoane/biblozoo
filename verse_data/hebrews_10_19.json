@@ -1,0 +1,25 @@
+{
+  "biblopet": "🦒",
+  "biblopetDefaultName": "Shorty",
+  "biblopetFeetFromBottom": "18.5%",
+  "verseId": "hebrews_10_19",
+  "translation": "ESV",
+  "echoParts": [
+    "We have confidence",
+    "to enter the Most Holy Place",
+    "by the blood of Jesus"
+  ],
+
+  "verseText": "We have confidence to enter the Most Holy Place by the blood of Jesus...",
+   "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to him anytime.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "blood", "occurrence": 1, "emoji": "🩸" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "holy", "occurrence": 1, "emoji": "😇" },
+    { "type": "emoji", "word": "enter", "occurrence": 1, "emoji": "➡️🚪" },
+    { "type": "underscore", "word": "most", "occurrence": 1 },
+    { "type": "underscore", "word": "place", "occurrence": 1 },
+    { "type": "underscore", "word": "confidence", "occurrence": 1 }
+  ]
+}

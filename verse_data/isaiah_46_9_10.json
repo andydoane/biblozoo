@@ -1,0 +1,26 @@
+{
+  "biblopet": "🦞",
+  "biblopetDefaultName": "Pinchy",
+  "biblopetFeetFromBottom": "11.2%",
+  "verseId": "isaiah_46_9_10",
+  "translation": "ESV",
+  "echoParts": [
+    "I am God",
+    "and there is none like me",
+    "declaring the end",
+    "from the beginning"
+  ],
+
+  "verseText": "I am God, and there is none like me, declaring the end from the beginning...",
+   "meaning": "No one is like God. He knows every single thing that will happen in the future.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "I", "occurrence": 1, "emoji": "👁️" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "☝️" },
+    { "type": "emoji", "word": "none", "occurrence": 1, "emoji": "🚫" },
+    { "type": "emoji", "word": "declaring", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "underscore", "word": "end", "occurrence": 1 },
+    { "type": "underscore", "word": "beginning", "occurrence": 1 },
+    { "type": "underscore", "word": "me", "occurrence": 1 }
+  ]
+}

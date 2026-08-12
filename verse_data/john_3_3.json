@@ -1,0 +1,31 @@
+{
+  "biblopet": "🦑",
+  "biblopetDefaultName": "Squillie",
+  "biblopetFeetFromBottom": "26.9%",
+  "verseId": "john_3_3",
+  "translation": "ESV",
+  "echoParts": [
+    "Jesus answered him",
+    "Truly, truly, I say to you",
+    "unless one is born again",
+    "he cannot see the kingdom of God"
+  ],
+
+  "verseText": "Jesus answered him, 'Truly, truly, I say to you, unless one is born again he cannot see the kingdom of God.'",
+   "meaning": "Our spirits (or souls) are born dead in sin. In order to believe and join God's kingdom, we need God's Spirit to bring our spirits to life.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "say", "occurrence": 1, "emoji": "💬" },
+    { "type": "emoji", "word": "born", "occurrence": 1, "emoji": "👩‍🍼" },
+    { "type": "emoji", "word": "see", "occurrence": 1, "emoji": "👀" },
+    { "type": "emoji", "word": "kingdom", "occurrence": 1, "emoji": "🏰" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "underscore", "word": "truly", "occurrence": 1 }
+  ]
+}
+
+
+
+
+

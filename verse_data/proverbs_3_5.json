@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐯",
+  "biblopetDefaultName": "Cecil",
+  "biblopetFeetFromBottom": "7%",
+  "verseId": "proverbs_3_5",
+  "translation": "ESV",
+  "echoParts": [
+    "Trust in the Lord",
+    "with all your heart",
+    "and do not lean",
+    "on your own understanding"
+  ],
+
+  "verseText": "Trust in the Lord with all your heart, and do not lean on your own understanding.",
+   "meaning": "Rather than trusting in what we think is right and true, we should trust totally in what God thinks is right and true",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+      { "type": "underscore", "word": "trust", "occurrence": 1 },
+      { "type": "underscore", "word": "all", "occurrence": 1 },
+      { "type": "underscore", "word": "lean", "occurrence": 1 },
+      { "type": "underscore", "word": "own", "occurrence": 1 },
+      { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆" },
+      { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" },
+      { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
+      { "type": "emoji", "word": "understanding", "occurrence": 1, "emoji": "🧠" }
+  ]
+}

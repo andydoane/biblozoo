@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐁",
+  "biblopetDefaultName": "Rizzo",
+  "biblopetFeetFromBottom": "11.8%",
+  "verseId": "john_1_14",
+  "translation": "ESV",
+  "echoParts": [
+  "And the Word became flesh",
+  "and dwelt among us",
+  "and we have seen His glory"
+],
+
+  "verseText": "And the Word became flesh and dwelt among us, and we have seen his glory...",
+   "meaning": "The Word is a special name for Jesus. To save us, Jesus 'became flesh,' which means he came in a flesh-and-bone human body.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Word",  "occurrence": 1, "emoji": "📘" },
+    { "type": "emoji", "word": "flesh",    "occurrence": 1, "emoji": "🥩" },
+    { "type": "emoji", "word": "dwelt",    "occurrence": 1, "emoji": "🏠" },
+    { "type": "emoji", "word": "seen",  "occurrence": 1, "emoji": "👀" },
+    { "type": "emoji", "word": "glory",  "occurrence": 1, "emoji": "🙌" },
+    { "type": "underscore", "word": "we",  "occurrence": 1 },
+    { "type": "underscore", "word": "became",  "occurrence": 1 },
+    { "type": "underscore", "word": "us",   "occurrence": 1 }
+  ]
+}

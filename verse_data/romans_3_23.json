@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐤",
+  "biblopetDefaultName": "Cheepster",
+  "biblopetFeetFromBottom": "21%",
+  "verseId": "romans_3_23",
+  "translation": "ESV",
+  "echoParts": [
+    "for all have sinned",
+    "and fall short",
+    "of the glory",
+    "of God"
+  ],
+
+  "verseText": "For all have sinned and fall short of the glory of God.",
+   "meaning": "God is gloriously sinless and perfect. All human beings have sinned – we miss the mark of perfect obedience.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
+    { "type": "emoji", "word": "sinned", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "glory", "occurrence": 1, "emoji": "🙌" },
+    { "type": "emoji", "word": "god", "occurrence": 1, "emoji": "👑" },
+    { "type": "underscore", "word": "fall", "occurrence": 1 },
+    { "type": "underscore", "word": "all", "occurrence": 1 },
+    { "type": "underscore", "word": "short", "occurrence": 1 }
+  ]
+}

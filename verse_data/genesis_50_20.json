@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦢",
+  "biblopetDefaultName": "Odette",
+  "biblopetFeetFromBottom": "22%",
+  "verseId": "genesis_50_20",
+  "translation": "ESV",
+  "echoParts": [
+    "As for you",
+    "you meant evil against me",
+    "but God meant it for good",
+    "to bring it about",
+    "that many people",
+    "should be kept alive"
+  ],
+
+  "verseText": "As for you, you meant evil against me, but God meant it for good, to bring it about that many people should be kept alive...",
+   "meaning": "Joseph's brothers had an evil plan to hurt Joseph. But God had a good plan the whole time, to use Joseph to save many people",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "evil", "occurrence": 1, "emoji": "👺" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "☝️" },
+    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "people", "occurrence": 1, "emoji": "👥👥" },
+    { "type": "underscore", "word": "you", "occurrence": 1 },
+    { "type": "underscore", "word": "alive", "occurrence": 1 },
+    { "type": "underscore", "word": "me", "occurrence": 1 }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦫",
+  "biblopetDefaultName": "Jerry",
+  "biblopetFeetFromBottom": "12.8%",
+  "verseId": "luke_6_27",
+  "translation": "ESV",
+  "echoParts": [
+    "But I say",
+    "to you who hear",
+    "Love your enemies",
+    "Do good",
+    "to those who hate you."
+  ],
+
+  "verseText": "But I say to you who hear, 'Love your enemies. Do good to those who hate you...'",
+   "meaning": "When someone hurts us, we feel like getting revenge. But Jesus wants us to love them instead.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "say", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "hear", "occurrence": 1, "emoji": "👂" },
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "enemies", "occurrence": 1, "emoji": "👿" },
+    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "hate", "occurrence": 1, "emoji": "😡" },
+    { "type": "underscore", "word": "those", "occurrence": 1 },
+    { "type": "underscore", "word": "you", "occurrence": 1 }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "biblopet": "🦜",
+  "biblopetDefaultName": "Maury",
+  "biblopetFeetFromBottom": "31.6%",
+  "verseId": "mark_1_17",
+  "translation": "ESV",
+  "echoParts": [
+    "And Jesus said to them",
+    "Follow me",
+    "and I will make you become",
+    "fishers of men"
+  ],
+
+  "verseText": "And Jesus said to them, 'Follow me, and I will make you become fishers of men.'",
+   "meaning": "Jesus called his disciples to follow him. By sharing the good news, they would 'catch' people for God's forever kingdom.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "said", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "follow", "occurrence": 1, "emoji": "🚶🚶" },
+    { "type": "emoji", "word": "fishers", "occurrence": 1, "emoji": "🎣" },
+    { "type": "emoji", "word": "men", "occurrence": 1, "emoji": "👨🧔‍♂️" },
+    { "type": "underscore", "word": "make", "occurrence": 1 },
+    { "type": "underscore", "word": "become", "occurrence": 1 }
+  ]
+}

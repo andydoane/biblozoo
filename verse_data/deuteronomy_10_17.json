@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦅",
+  "biblopetDefaultName": "Eddie",
+  "biblopetFeetFromBottom": "23.1%",
+  "verseId": "deuteronomy_10_17",
+  "translation": "ESV",
+  "echoParts": [
+    "For the Lord your God",
+    "is God of gods",
+    "and Lord of lords",
+    "the great, the mighty",
+    "and the awesome God"
+  ],
+
+  "verseText": "For the Lord your God is God of gods and Lord of lords, the great, the mighty, and the awesome God...",
+   "meaning": "The Lord God is powerful and awesome. He's the one true God in charge of everything and everyone.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "mighty", "occurrence": 1, "emoji": "💪" },
+    { "type": "emoji", "word": "awesome", "occurrence": 1, "emoji": "😮" },
+    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
+    { "type": "underscore", "word": "gods", "occurrence": 1 },
+    { "type": "underscore", "word": "lords", "occurrence": 1 },
+    { "type": "underscore", "word": "Lord", "occurrence": 1 }
+  ]
+}

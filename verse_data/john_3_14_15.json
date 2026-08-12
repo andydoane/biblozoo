@@ -1,0 +1,30 @@
+{
+  "biblopet": "🦩",
+  "biblopetDefaultName": "Buzz",
+  "biblopetFeetFromBottom": "23%",
+  "verseId": "john_3_14_15",
+  "translation": "ESV",
+  "echoParts": [
+    "And as Moses",
+    "lifted up the serpent in the wilderness",
+    "so must the Son of Man",
+    "be lifted up",
+    "that whoever believes in him",
+    "may have eternal life."
+  ],
+
+  "verseText": "And as Moses lifted up the serpent in the wilderness, so must the Son of Man be lifted up, that whoever believes in him may have eternal life.",
+   "meaning": "God told Moses to lift up a bronze snake so that people who had been bitten by a snake could look at it and live. It was a picture of how Jesus would be lifted up on the cross to save us from sin.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "serpent", "occurrence": 1, "emoji": "🐍" },
+    { "type": "emoji", "word": "wilderness", "occurrence": 1, "emoji": "🌵" },
+    { "type": "emoji", "word": "up", "occurrence": 1, "emoji": "⬆️" },
+    { "type": "emoji", "word": "eternal", "occurrence": 1, "emoji": "♾️" },
+    { "type": "emoji", "word": "up", "occurrence": 2, "emoji": "⬆️" },
+    { "type": "emoji", "word": "man", "occurrence": 1, "emoji": "🙍‍♂️" },
+    { "type": "underscore", "word": "Moses", "occurrence": 1 },
+    { "type": "underscore", "word": "believes", "occurrence": 1 },
+    { "type": "underscore", "word": "life", "occurrence": 1 }
+  ]
+}

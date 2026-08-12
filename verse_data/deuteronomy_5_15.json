@@ -1,0 +1,29 @@
+{
+  "biblopet": "🦈",
+  "biblopetDefaultName": "Chewy",
+  "biblopetFeetFromBottom": "16.4%",
+  "verseId": "deuteronomy_5_15",
+  "translation": "ESV",
+  "echoParts": [
+    "You shall remember",
+    "that you were a slave",
+    "in the land of Egypt",
+    "and the Lord your God",
+    "brought you out from there",
+    "with a mighty hand"
+  ],
+
+  "verseText": "You shall remember that you were a slave in the land of Egypt, and the Lord your God brought you out from there with a mighty hand.",
+   "meaning": "God wanted his people to never forget how he rescued them. In the same way, we should never forget how Jesus rescued us.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "remember", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "slave", "occurrence": 1, "emoji": "🔗" },
+    { "type": "emoji", "word": "land", "occurrence": 1, "emoji": "⛰️" },
+    { "type": "emoji", "word": "Egypt", "occurrence": 1, "emoji": "🛕" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "out", "occurrence": 1, "emoji": "➡️" },
+    { "type": "emoji", "word": "mighty", "occurrence": 1, "emoji": "💪" },
+    { "type": "emoji", "word": "hand", "occurrence": 1, "emoji": "🖐️" }
+  ]
+}

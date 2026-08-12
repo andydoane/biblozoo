@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐇",
+  "biblopetDefaultName": "Dobie",
+  "biblopetFeetFromBottom": "5.1%",
+  "verseId": "john_20_31",
+  "translation": "ESV",
+  "echoParts": [
+    "But these are written",
+    "so that you may believe",
+    "that Jesus is the Christ",
+    "the Son of God"
+  ],
+
+  "verseText": "But these are written so that you may believe that Jesus is the Christ, the Son of God...",
+   "meaning": "John wrote a book describing many of Jesus' miracles. He wrote it so that people would believe that Jesus was the Christ, the savior sent to rescue us from our sins.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "written", "occurrence": 1, "emoji": "📝" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "son", "occurrence": 1, "emoji": "👨‍🍼" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
+    { "type": "underscore", "word": "Christ", "occurrence": 1 },
+    { "type": "underscore", "word": "you", "occurrence": 1 },
+    { "type": "underscore", "word": "believe", "occurrence": 1 }
+  ]
+}

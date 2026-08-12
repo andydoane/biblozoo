@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐶",
+  "biblopetDefaultName": "Slurpy",
+  "biblopetFeetFromBottom": "19.6%",
+  "verseId": "hebrews_11_30",
+  "translation": "ESV",
+  "echoParts": [
+    "By faith",
+    "the walls of Jericho fell down",
+    "after they had been encircled",
+    "for seven days."
+  ],
+
+  "verseText": "By faith the walls of Jericho fell down after they had been encircled for seven days.",
+   "meaning": "When the Israelites had faith and trusted in God's promise, they followed his strange plan, and the walls of Jericho fell down.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "walls", "occurrence": 1, "emoji": "🧱" },
+    { "type": "emoji", "word": "down", "occurrence": 1, "emoji": "⬇️" },
+    { "type": "emoji", "word": "encircled", "occurrence": 1, "emoji": "⭕" },
+    { "type": "emoji", "word": "seven", "occurrence": 1, "emoji": "7️⃣" },
+    { "type": "emoji", "word": "days", "occurrence": 1, "emoji": "📅" },
+    { "type": "underscore", "word": "Jericho", "occurrence": 1 },
+    { "type": "underscore", "word": "faith", "occurrence": 1 }
+  ]
+}

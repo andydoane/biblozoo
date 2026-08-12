@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦄",
+  "biblopetDefaultName": "Fairlight",
+  "biblopetFeetFromBottom": "13.6%",
+  "verseId": "psalm_23_4",
+  "translation": "ESV",
+  "echoParts": [
+    "Even though I walk",
+    "through the valley",
+    "of the shadow of death",
+    "I will fear no evil",
+    "for you are with me"
+  ],
+
+  "verseText": "Even though I walk through the valley of the shadow of death, I will fear no evil, for you are with me...",
+   "meaning": "Even when we experience tough times of trouble in life, we don't need to be afraid. God has promised to be with us.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "walk", "occurrence": 1, "emoji": "🚶" },
+    { "type": "emoji", "word": "death", "occurrence": 1, "emoji": "💀" },
+    { "type": "emoji", "word": "fear", "occurrence": 1, "emoji": "😱" },
+    { "type": "emoji", "word": "evil", "occurrence": 1, "emoji": "😈" },
+    { "type": "emoji", "word": "shadow", "occurrence": 1, "emoji": "👤" },
+    { "type": "emoji", "word": "with", "occurrence": 1, "emoji": "🤝" },
+    { "type": "underscore", "word": "you", "occurrence": 1 },
+    { "type": "underscore", "word": "valley", "occurrence": 1 }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐏",
+  "biblopetDefaultName": "Marshall",
+  "biblopetFeetFromBottom": "12.1%",
+  "verseId": "psalm_117_2",
+  "translation": "ESV",
+  "echoParts": [
+    "For great",
+    "is his steadfast love",
+    "toward us",
+    "and the faithfulness of the Lord",
+    "endures forever"
+  ],
+
+  "verseText": "For great is his steadfast love toward us, and the faithfulness of the Lord endures forever.",
+   "meaning": "God loves his people with a never-stopping love. We can trust him to always keep his promises.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "faithfulness", "occurrence": 1, "emoji": "🤞" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆👑" },
+    { "type": "emoji", "word": "forever", "occurrence": 1, "emoji": "♾️" },
+    { "type": "emoji", "word": "steadfast", "occurrence": 1, "emoji": "🚫🛑" },
+    { "type": "underscore", "word": "endures", "occurrence": 1 }
+  ]
+}

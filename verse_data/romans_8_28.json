@@ -1,0 +1,28 @@
+{
+  "biblopet": "🐫",
+  "biblopetDefaultName": "Humpty",
+  "biblopetFeetFromBottom": "6.1%",
+  "verseId": "romans_8_28",
+  "translation": "ESV",
+  "echoParts": [
+    "and we know",
+    "that for those who love God",
+    "all things",
+    "work together for good"
+  ],
+
+  "verseText": "And we know that for those who love God all things work together for good",
+  "meaning": "In every situation, we can trust that God is working out a good plan for his people.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "know", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
+    { "type": "emoji", "word": "work", "occurrence": 1, "emoji": "🔨" },
+    { "type": "emoji", "word": "together", "occurrence": 1, "emoji": "🤝" },
+    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
+    { "type": "underscore", "word": "all", "occurrence": 1 },
+    { "type": "underscore", "word": "things", "occurrence": 1 },
+    { "type": "underscore", "word": "those", "occurrence": 1 }
+  ]
+}

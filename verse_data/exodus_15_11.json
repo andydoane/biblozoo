@@ -1,0 +1,29 @@
+{
+  "biblopet": "🦆",
+  "biblopetDefaultName": "Chonkster",
+  "biblopetFeetFromBottom": "19.3%",
+  "verseId": "exodus_15_11",
+  "translation": "ESV",
+  "echoParts": [
+    "Who is like you, O Lord",
+    "among the gods?",
+    "Who is like you",
+    "majestic in holiness",
+    "awesome in glorious deeds",
+    "doing wonders?"
+  ],
+
+  "verseText": "Who is like you, O Lord, among the gods? Who is like you, majestic in holiness, awesome in glorious deeds, doing wonders?",
+   "meaning": "There is no onle like the Lord God. He's perfectly holy (without sin) and he does impossible miracles to save his people",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "wonders", "occurrence": 1, "emoji": "🤩" },
+    { "type": "emoji", "word": "who", "occurrence": 1, "emoji": "🤷" },
+    { "type": "emoji", "word": "who", "occurrence": 2, "emoji": "🤷‍♂️" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "underscore", "word": "majestic", "occurrence": 1 },
+    { "type": "underscore", "word": "holiness", "occurrence": 1 },
+    { "type": "underscore", "word": "like", "occurrence": 1 },
+    { "type": "underscore", "word": "glorious", "occurrence": 1 }
+  ]
+}

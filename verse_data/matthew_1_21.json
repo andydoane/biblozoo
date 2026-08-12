@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐱",
+  "biblopetDefaultName": "Queenie",
+  "biblopetFeetFromBottom": "17.9%",
+  "verseId": "matthew_1_21",
+  "translation": "ESV",
+  "echoParts": [
+    "She will bear a son",
+    "and you shall call his name Jesus",
+    "for he will save his people",
+    "from their sins"
+  ],
+
+  "verseText": "She will bear a son, and you shall call his name Jesus, for he will save his people from their sins.",
+   "meaning": "These are the words the angel said to Joseph in a dream. The angel was telling Joseph that Mary's baby would save the world from sin.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "son", "occurrence": 1, "emoji": "👩‍🍼" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "save", "occurrence": 1, "emoji": "🦸" },
+    { "type": "emoji", "word": "call", "occurrence": 1, "emoji": "📞" },
+    { "type": "emoji", "word": "people", "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
+    { "type": "underscore", "word": "sins", "occurrence": 1 },
+    { "type": "underscore", "word": "bear", "occurrence": 1 }
+  ]
+}

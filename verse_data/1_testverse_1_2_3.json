@@ -1,0 +1,20 @@
+{
+  "biblopet": "📃",
+  "biblopetDefaultName": "Testy",
+  "biblopetFeetFromBottom": "8.3%",
+  "verseId": "1_testverse_1_2_3",
+  "translation": "ESV",
+  "echoParts": [
+    "Raiment, chariot, and harvest.",
+    "Scourge leopard to seventy!",
+    "Seeking a furnace witness."
+  ],
+
+  "verseText": "There’s Lord’s—he said: ‘Love, rejoice!’ two-edged 144,000?",
+   "meaning": "Test meaning text",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "testword1", "occurrence": 1, "emoji": "🍩" },
+    { "type": "underscore", "word": "testword2", "occurrence": 1 }
+  ]
+}

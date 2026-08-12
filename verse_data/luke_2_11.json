@@ -1,0 +1,30 @@
+{
+  "biblopet": "🐎",
+  "biblopetDefaultName": "Trotter",
+  "biblopetFeetFromBottom": "28.9%",
+  "verseId": "luke_2_11",
+  "translation": "ESV",
+  "echoParts": [
+  "For unto you",
+  "is born this day",
+  "in the city of David",
+  "a savior",
+  "who is Christ the Lord."
+],
+
+  "verseText": "For unto you is born this day in the city of David a Savior, who is Christ the Lord.",
+  "meaning": "This is how the angels let the shepherds know that Jesus the savior was born in Bethlehem.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "born",  "occurrence": 1, "emoji": "👶" },
+    { "type": "emoji", "word": "savior",    "occurrence": 1, "emoji": "🦸" },
+    { "type": "emoji", "word": "city",    "occurrence": 1, "emoji": "🏢" },
+    { "type": "emoji", "word": "christ",   "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "you",  "occurrence": 1, "emoji": "🫵" },
+    { "type": "emoji", "word": "lord",  "occurrence": 1, "emoji": "👑" },
+        { "type": "emoji", "word": "day",  "occurrence": 1, "emoji": "📅" },
+
+    { "type": "underscore", "word": "david",  "occurrence": 1 },
+    { "type": "underscore", "word": "For",   "occurrence": 1 }
+  ]
+}

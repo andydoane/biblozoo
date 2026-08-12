@@ -1,0 +1,27 @@
+{
+  "biblopet": "🫎",
+  "biblopetDefaultName": "Mortimer",
+  "biblopetFeetFromBottom": "36.9%",
+  "verseId": "psalm_136_1",
+  "translation": "ESV",
+  "echoParts": [
+    "Give thanks to the Lord",
+    "for he is good",
+    "for his steadfast love",
+    "endures forever"
+  ],
+
+  "verseText": "Give thanks to the Lord for he is good, for his steadfast love endures forever.",
+   "meaning": "These are two reasons to praise God: he is good and he loves us with a steadfast, never-stopping kind of love.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "give", "occurrence": 1, "emoji": "🎁" },
+    { "type": "emoji", "word": "thanks", "occurrence": 1, "emoji": "🙏" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "☝️" },
+    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
+    { "type": "emoji", "word": "steadfast", "occurrence": 1, "emoji": "🚫🛑" },
+        { "type": "emoji", "word": "forever", "occurrence": 1, "emoji": "♾️" },
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "biblopet": "🦍",
+  "biblopetDefaultName": "Chico",
+  "biblopetFeetFromBottom": "6.7%",
+  "verseId": "1_john_3_5",
+  "translation": "ESV",
+  "echoParts": [
+    "You know that he appeared",
+    "in order to take away sins",
+    "and in him there is no sin"
+  ],
+
+  "verseText": "You know that he appeared in order to take away sins, and in him there is no sin.",
+   "meaning": "The reason Jesus came to earth was to take away our sins. And during his life on earth, he never sinned, not even once.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "know", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "sins", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "sin", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "no", "occurrence": 1, "emoji": "🚫" },
+    { "type": "underscore", "word": "order", "occurrence": 1 },
+    { "type": "underscore", "word": "appeared", "occurrence": 1 },
+    { "type": "underscore", "word": "away", "occurrence": 1 }
+  ]
+}

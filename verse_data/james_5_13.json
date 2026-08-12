@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐺",
+  "biblopetDefaultName": "Ferris",
+  "biblopetFeetFromBottom": "25.6%",
+  "verseId": "james_5_13",
+  "translation": "ESV",
+  "echoParts": [
+    "Is anyone",
+    "among you suffering?",
+    "Let him pray.",
+    "Is anyone cheerful?",
+    "Let him sing praise."
+  ],
+
+  "verseText": "Is anyone among you suffering? Let him pray. Is anyone cheerful? Let him sing praise.",
+   "meaning": "Whenever trouble comes, our first step should be to pray to God for help.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "suffering", "occurrence": 1, "emoji": "🤕" },
+    { "type": "emoji", "word": "cheerful", "occurrence": 1, "emoji": "😁" },
+    { "type": "emoji", "word": "sing", "occurrence": 1, "emoji": "🎵" },
+    { "type": "emoji", "word": "praise", "occurrence": 1, "emoji": "🙌" },
+    { "type": "emoji", "word": "pray", "occurrence": 1, "emoji": "🙏" },
+    { "type": "underscore", "word": "anyone", "occurrence": 1 },
+    { "type": "underscore", "word": "anyone", "occurrence": 2 }
+  ]
+}

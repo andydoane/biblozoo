@@ -1,0 +1,28 @@
+{
+  "biblopet": "🕷️",
+  "biblopetDefaultName": "Tommy",
+  "biblopetFeetFromBottom": "5.5%",
+  "verseId": "psalm_77_11",
+  "translation": "ESV",
+  "echoParts": [
+    "I will remember",
+    "the deeds of the Lord",
+    "yes, I will remember",
+    "your wonders of old"
+  ],
+
+  "verseText": "I will remember the deeds of the Lord; yes, I will remember your wonders of old.",
+   "meaning": "God has done many wonderful things in the past to rescue his people. It is good for us to look back and remember them.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "I", "occurrence": 1, "emoji": "👁️" },
+    { "type": "emoji", "word": "old", "occurrence": 1, "emoji": "🕰️" },
+    { "type": "emoji", "word": "remember", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "remember", "occurrence": 2, "emoji": "🧠" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "wonders", "occurrence": 1, "emoji": "✨" },
+    { "type": "underscore", "word": "deeds", "occurrence": 1 }
+  ]
+}
+
+

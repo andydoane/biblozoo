@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦔",
+  "biblopetDefaultName": "Quilliam",
+  "biblopetFeetFromBottom": "22.8%",
+  "verseId": "matthew_22_31_32",
+  "translation": "ESV",
+  "echoParts": [
+    "Have you not read",
+    "what was said to you by God",
+    "I am the God of Abraham",
+    "and the God of Isaac",
+    "and the God of Jacob?"
+  ],
+
+  "verseText": "Have you not read what was said to you by God: I am the God of Abraham, and the God of Isaac, and the God of Jacob...",
+   "meaning": "The God we worship today is the same God who Abraham, Isaac, and Jacob worshiped.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "read", "occurrence": 1, "emoji": "📘" },
+    { "type": "emoji", "word": "said", "occurrence": 1, "emoji": "💬" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆👑" },
+    { "type": "emoji", "word": "God", "occurrence": 2, "emoji": "👆👑" },
+    { "type": "emoji", "word": "God", "occurrence": 3, "emoji": "👆👑" },
+    { "type": "emoji", "word": "Abraham", "occurrence": 1, "emoji": "👴" },
+    { "type": "emoji", "word": "Isaac", "occurrence": 1, "emoji": "🧔‍♂️" },
+    { "type": "emoji", "word": "Jacob", "occurrence": 1, "emoji": "👨‍🦰" }
+  ]
+}

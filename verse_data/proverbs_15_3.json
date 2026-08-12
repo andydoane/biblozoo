@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐯",
+  "biblopetDefaultName": "Link",
+  "biblopetFeetFromBottom": "4.1%",
+  "verseId": "proverbs_15_3",
+  "translation": "ESV",
+  "echoParts": [
+    "The eyes of the Lord",
+    "are in every place",
+    "keeping watch",
+    "on the evil and the good."
+  ],
+
+  "verseText": "The eyes of the Lord are in every place, keeping watch on the evil and the good.",
+   "meaning": "God sees everything we do. He knows about our secret sins. And he notices when we do good, even if no one else is watching.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "eyes", "occurrence": 1, "emoji": "👀" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "evil", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "watch", "occurrence": 1, "emoji": "🔎" },
+    { "type": "underscore", "word": "every", "occurrence": 1 },
+    { "type": "underscore", "word": "place", "occurrence": 1 }
+  ]
+}

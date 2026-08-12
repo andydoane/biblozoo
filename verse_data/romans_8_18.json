@@ -1,0 +1,28 @@
+{
+  "biblopet": "🐮",
+  "biblopetDefaultName": "Milky",
+  "biblopetFeetFromBottom": "3.1%",
+  "verseId": "romans_8_18",
+  "translation": "ESV",
+  "echoParts": [
+    "For I consider",
+    "that the sufferings",
+    "of this present time",
+    "are not worth comparing",
+    "with the glory",
+    "that is to be revealed to us"
+  ],
+
+  "verseText": "For I consider that the sufferings of this present time are not worth comparing with the glory that is to be revealed to us.",
+   "meaning": "The toughest times we face in this life aren't worth thinking about when we compare them to the glory of spending forever with God",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "consider", "occurrence": 1, "emoji": "🤔" },
+    { "type": "emoji", "word": "sufferings", "occurrence": 1, "emoji": "🤕" },
+    { "type": "emoji", "word": "time", "occurrence": 1, "emoji": "⏰" },
+    { "type": "emoji", "word": "glory", "occurrence": 1, "emoji": "🙌" },
+    { "type": "emoji", "word": "revealed", "occurrence": 1, "emoji": "👀" },
+    { "type": "emoji", "word": "us", "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
+    { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "❌" }
+  ]
+}

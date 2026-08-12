@@ -1,0 +1,29 @@
+{
+  "biblopet": "🐬",
+  "biblopetDefaultName": "Echo",
+  "biblopetFeetFromBottom": "10.4%",
+  "verseId": "1_corinthians_15_3_4",
+  "translation": "ESV",
+  "echoParts": [
+    "Christ died for our sins",
+    "in accordance with the Scriptures,",
+    "that he was buried",
+    "that he was raised on the third day"
+  ],
+
+  "verseText": "Christ died for our sins in accordance with the Scriptures, that he was buried, that he was raised on the third day...",
+   "meaning": "This verse tells us the gospel: the good news that Jesus died and rose again to save us from our sins.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Christ", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "died", "occurrence": 1, "emoji": "💀" },
+    { "type": "emoji", "word": "sins", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "Scriptures", "occurrence": 1, "emoji": "📘" },
+    { "type": "emoji", "word": "buried", "occurrence": 1, "emoji": "🪦" },
+    { "type": "emoji", "word": "raised", "occurrence": 1, "emoji": "⬆️" },
+    { "type": "emoji", "word": "third", "occurrence": 1, "emoji": "3️⃣" },
+        { "type": "underscore", "word": "accordance", "occurrence": 1 }
+  ]
+}
+
+

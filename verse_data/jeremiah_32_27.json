@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐅",
+  "biblopetDefaultName": "Gibby",
+  "biblopetFeetFromBottom": "22.8%",
+  "verseId": "jeremiah_32_27",
+  "translation": "ESV",
+  "echoParts": [
+    "Behold",
+    "I am the Lord",
+    "the God of all flesh",
+    "Is anything too hard for me?"
+  ],
+
+  "verseText": "Behold, I am the Lord, the God of all flesh. Is anything too hard for me?",
+   "meaning": "God is all-powerful. Nothing is too hard for him to do.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Behold", "occurrence": 1, "emoji": "📣" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆👑" },
+    { "type": "emoji", "word": "flesh", "occurrence": 1, "emoji": "🥩" },
+    { "type": "emoji", "word": "hard", "occurrence": 1, "emoji": "🏋️" },
+    { "type": "underscore", "word": "God", "occurrence": 1 },
+    { "type": "underscore", "word": "me", "occurrence": 1 },
+    { "type": "underscore", "word": "anything", "occurrence": 1 }
+  ]
+}

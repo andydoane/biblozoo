@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐴",
+  "biblopetDefaultName": "Clover",
+  "biblopetFeetFromBottom": "16.6%",
+  "verseId": "psalm_100_3",
+  "translation": "ESV",
+  "echoParts": [
+    "Know that the Lord",
+    "he is God",
+    "It is he who made us",
+    "and we are his"
+  ],
+
+  "verseText": "Know that the Lord, he is God! It is he who made us and we are his...",
+   "meaning": "The Lord God is the one who made us. And because he made us, we belong to him.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "know", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "made", "occurrence": 1, "emoji": "🔨" },
+    { "type": "underscore", "word": "he", "occurrence": 1 },
+    { "type": "underscore", "word": "we", "occurrence": 1 },
+    { "type": "underscore", "word": "us", "occurrence": 1 },
+    { "type": "underscore", "word": "Lord", "occurrence": 1 }
+  ]
+}

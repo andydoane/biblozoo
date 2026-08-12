@@ -1,0 +1,19 @@
+{
+  "biblopet": "😢",
+  "biblopetDefaultName": "Weepy",
+  "biblopetFeetFromBottom": "5.9%",
+  "verseId": "john_11_35",
+  "translation": "ESV",
+  "echoParts": [
+    "Jesus",
+    "wept"
+  ],
+
+  "verseText": "Jesus wept.",
+   "meaning": "At Lazarus' tomb, Jesus cried.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "wept", "occurrence": 1, "emoji": "😢" }
+  ]
+}

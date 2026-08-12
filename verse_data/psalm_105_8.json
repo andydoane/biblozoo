@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐍",
+  "biblopetDefaultName": "Slinky",
+  "biblopetFeetFromBottom": "27.1%",
+  "verseId": "psalm_105_8",
+  "translation": "ESV",
+  "echoParts": [
+  "He remembers his covenant forever",
+  "the word that he commanded",
+  "for a thousand generations"
+],
+
+  "verseText": "He remembers his covenant forever, the word that he commanded for a thousand generations",
+  "meaning": "God will never forget or fail to keep the covenants (super special promises) he makes to his people.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "remembers",  "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "covenant",    "occurrence": 1, "emoji": "🤞" },
+    { "type": "emoji", "word": "forever",    "occurrence": 1, "emoji": "♾️" },
+    { "type": "emoji", "word": "word",  "occurrence": 1, "emoji": "💬" },
+    { "type": "emoji", "word": "commanded",  "occurrence": 1, "emoji": "🫅👉" },
+    { "type": "emoji", "word": "thousand",  "occurrence": 1, "emoji": "1️⃣0️⃣0️⃣0️⃣" },
+    { "type": "emoji", "word": "generations",  "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
+    { "type": "underscore", "word": "he",   "occurrence": 1 }
+  ]
+}

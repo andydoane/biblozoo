@@ -1,0 +1,26 @@
+{
+  "biblopet": "🦥",
+  "biblopetDefaultName": "Robin",
+  "biblopetFeetFromBottom": "6.5%",
+  "verseId": "numbers_23_19",
+  "translation": "ESV",
+  "echoParts": [
+    "God is not man",
+    "that he should lie",
+    "or a son of man",
+    "that he should change his mind"
+  ],
+
+  "verseText": "God is not man, that he should lie, or a son of man, that he should change his mind.",
+   "meaning": "God is different from human beings. We lie and change our minds, but God always tells the truth and keeps every promise he makes.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
+    { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
+    { "type": "emoji", "word": "man", "occurrence": 1, "emoji": "🙍‍♂️" },
+    { "type": "emoji", "word": "mind", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "change", "occurrence": 1, "emoji": "↩️" },
+    { "type": "emoji", "word": "son", "occurrence": 1, "emoji": "👨‍🍼" },
+    { "type": "underscore", "word": "lie", "occurrence": 1 }
+  ]
+}

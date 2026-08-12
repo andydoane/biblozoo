@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐒",
+  "biblopetDefaultName": "Molly",
+  "biblopetFeetFromBottom": "32.7%",
+  "verseId": "1_chronicles_16_8",
+  "translation": "ESV",
+  "echoParts": [
+    "Oh give thanks to the Lord",
+    "call upon his name",
+    "make known his deeds",
+    "among the peoples"
+  ],
+
+  "verseText": "Oh give thanks to the Lord; call upon his name; make known his deeds among the peoples!",
+   "meaning": "God has done so many amazing things to save his people. We should give thanks and share the stories with others.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "thanks", "occurrence": 1, "emoji": "🙏" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "call", "occurrence": 1, "emoji": "📞" },
+    { "type": "emoji", "word": "known", "occurrence": 1, "emoji": "🧠" },
+    { "type": "emoji", "word": "peoples", "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
+    { "type": "underscore", "word": "name", "occurrence": 1 },
+    { "type": "underscore", "word": "deeds", "occurrence": 1 }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "biblopet": "🐉",
+  "biblopetDefaultName": "Wally",
+  "biblopetFeetFromBottom": "19.8%",
+  "verseId": "psalm_128_1",
+  "translation": "ESV",
+  "echoParts": [
+    "Blessed is everyone",
+    "who fears the Lord",
+    "who walks in his ways"
+  ],
+
+  "verseText": "Blessed is everyone who fears the Lord, who walks in his ways!",
+   "meaning": "We are blessed and truly happy when we have a fearful respect of God's power and live life God's way.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "blessed", "occurrence": 1, "emoji": "😀" },
+    { "type": "emoji", "word": "everyone", "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
+    { "type": "emoji", "word": "fears", "occurrence": 1, "emoji": "😨" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "walks", "occurrence": 1, "emoji": "👣" },
+    { "type": "underscore", "word": "ways", "occurrence": 1 }
+  ]
+}

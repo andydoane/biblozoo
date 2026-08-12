@@ -1,0 +1,30 @@
+{
+  "biblopet": "🐋",
+  "biblopetDefaultName": "Blubbo",
+  "biblopetFeetFromBottom": "7.4%",
+  "verseId": "romans_6_23",
+  "translation": "ESV",
+  "echoParts": [
+    "For the wages",
+    "of sin is death",
+    "but the free gift of God",
+    "is eternal life",
+    "in Christ Jesus our Lord"
+  ],
+
+  "verseText": "For the wages of sin is death, but the free gift of God is eternal life in Christ Jesus our Lord.",
+  "meaning": "Our sin earned the pay of death, but Jesus died to offer us the gift of forever life.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "wages", "occurrence": 1, "emoji": "💰" },
+    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
+    { "type": "emoji", "word": "sin", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "death", "occurrence": 1, "emoji": "💀" },
+    { "type": "emoji", "word": "free", "occurrence": 1, "emoji": "❌" },
+    { "type": "emoji", "word": "gift", "occurrence": 1, "emoji": "🎁" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
+    { "type": "emoji", "word": "eternal", "occurrence": 1, "emoji": "♾️" },
+    { "type": "emoji", "word": "life", "occurrence": 1, "emoji": "🌱" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" }
+  ]
+}
