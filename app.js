@@ -32,7 +32,7 @@ const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
 const APP_VERSION = "1.0.3";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
-const PRIVACY_POLICY_URL = "privacy_policy.html";
+const PRIVACY_POLICY_URL = "https://andydoane.github.io/eatyourbible/pwa/verse/privacy_policy.html";
 
 // =========================================================
 // DEBUG fallback: lets the app run offline (file://) without fetch()
@@ -1358,7 +1358,7 @@ let HAS_VERSE_SELECTION = false;
 /* =========================
    Progress Storage
    ========================= */
-const PROGRESS_STORAGE_KEY = "verseMemoryProgress";
+const PROGRESS_STORAGE_KEY = "biblozooPwaProgress";
 const PROGRESS_VERSION = 2;
 const TRAFFIC_PROGRESS_MIGRATION_VERSION = 1;
 

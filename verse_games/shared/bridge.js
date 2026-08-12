@@ -1,4 +1,6 @@
 (function(){
+  const PROFILE_PROGRESS_STORAGE_KEY_BASE = "biblozooPwaProgress";
+
   function getParams(){
     const params = new URLSearchParams(window.location.search);
 
@@ -69,7 +71,7 @@
 
     if (!profileId) return "";
 
-    return `verseMemoryProgress:${profileId}`;
+    return `${PROFILE_PROGRESS_STORAGE_KEY_BASE}:${profileId}`;
   }
 
   function loadProgress(){

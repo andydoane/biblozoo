@@ -5732,12 +5732,20 @@
     }
 
     try {
-      const raw = localStorage.getItem("verseMemoryProgress");
-      const progress = raw ? JSON.parse(raw) : { version: 1, verses: {} };
+      const profileId = new URLSearchParams(window.location.search)
+        .get("profileId") || "";
+      const storageKey = profileId
+        ? `biblozooPwaProgress:${profileId}`
+        : "";
+
+      if (!storageKey) return { ok: false };
+
+      const raw = localStorage.getItem(storageKey);
+      const progress = raw ? JSON.parse(raw) : { version: 2, verses: {} };
 
       if (!progress || typeof progress !== "object") return { ok: false };
       if (!progress.verses || typeof progress.verses !== "object") progress.verses = {};
-      if (!progress.version) progress.version = 1;
+      if (!progress.version) progress.version = 2;
 
       if (!progress.verses[verseId]) {
         progress.verses[verseId] = {
@@ -5747,7 +5755,7 @@
       }
 
       progress.verses[verseId].lastPracticedAt = Date.now();
-      localStorage.setItem("verseMemoryProgress", JSON.stringify(progress));
+      localStorage.setItem(storageKey, JSON.stringify(progress));
       return { ok: true };
     } catch (err) {
       console.warn("Ghost Writer could not mark verse as practiced", err);
