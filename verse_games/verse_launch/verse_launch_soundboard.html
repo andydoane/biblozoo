@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verse Launch Soundboard</title>
+  <style>
+    :root {
+      --vl-purple: #7f66c6;
+      --vl-dark: #333333;
+      --vl-panel: rgba(255,255,255,.14);
+      --vl-panel-dark: rgba(0,0,0,.18);
+      --vl-text: #ffffff;
+      --vl-muted: rgba(255,255,255,.78);
+      --vl-good: #3dfd3d;
+      --vl-yellow: #ffc751;
+      --vl-red: #ff5a51;
+      --vl-blue: #64b5f6;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 20px;
+      color: var(--vl-text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(255,255,255,.22), transparent 30%),
+        radial-gradient(circle at 90% 92%, rgba(0,0,0,.25), transparent 35%),
+        var(--vl-purple);
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    .wrap {
+      width: min(1240px, 100%);
+      margin: 0 auto;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 52px);
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--vl-muted);
+      max-width: 980px;
+      line-height: 1.4;
+      font-size: 16px;
+    }
+
+    .toolbar,
+    .panel {
+      background: var(--vl-panel-dark);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 22px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.16);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 14px;
+      margin-bottom: 14px;
+      position: sticky;
+      top: 10px;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 15px;
+      background: #fff;
+      color: #4d3b7a;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,.22);
+    }
+
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0,0,0,.22);
+    }
+
+    .btn.secondary {
+      background: rgba(255,255,255,.18);
+      color: #fff;
+      box-shadow: none;
+      border: 1px solid rgba(255,255,255,.22);
+    }
+
+    .btn.danger {
+      background: var(--vl-red);
+      color: #fff;
+    }
+
+    .btn.small {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .master {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: min(100%, 340px);
+      flex: 1 1 340px;
+    }
+
+    .master label {
+      font-size: 13px;
+      color: var(--vl-muted);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--vl-yellow);
+    }
+
+    .value {
+      font-variant-numeric: tabular-nums;
+      font-weight: 900;
+      min-width: 42px;
+      text-align: right;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .toolbar { position: static; }
+    }
+
+    .panel {
+      padding: 16px;
+    }
+
+    .panel h2 {
+      margin: 0 0 10px;
+      line-height: 1.05;
+      font-size: 22px;
+    }
+
+    .sound-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .sound-row {
+      display: grid;
+      grid-template-columns: minmax(130px, 1fr) 110px minmax(160px, 1fr) 48px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-radius: 16px;
+      background: var(--vl-panel);
+      border: 1px solid rgba(255,255,255,.14);
+    }
+
+    @media (max-width: 720px) {
+      .sound-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sound-name {
+      min-width: 0;
+    }
+
+    .sound-name strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.1;
+    }
+
+    .sound-name span {
+      display: block;
+      color: var(--vl-muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 3px;
+    }
+
+    .context-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .context-card {
+      padding: 12px;
+      border-radius: 18px;
+      background: var(--vl-panel);
+      border: 1px solid rgba(255,255,255,.14);
+    }
+
+    .context-card h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+
+    .context-card p {
+      margin: 0 0 10px;
+      color: var(--vl-muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .context-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 260px;
+      resize: vertical;
+      border: 0;
+      border-radius: 16px;
+      padding: 12px;
+      color: #151515;
+      background: rgba(255,255,255,.95);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .status {
+      color: var(--vl-muted);
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    .meter-wrap {
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(0,0,0,.24);
+    }
+
+    .meter {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, var(--vl-blue), var(--vl-yellow), var(--vl-red));
+      transition: width 40ms linear;
+    }
+
+    .note {
+      color: var(--vl-muted);
+      font-size: 13px;
+      line-height: 1.38;
+      margin-top: 10px;
+    }
+
+    .missing {
+      color: #ffd9d6;
+    }
+
+    code {
+      background: rgba(0,0,0,.25);
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Verse Launch Soundboard</h1>
+      <p class="sub">
+        Put this file in the Verse Launch game directory, next to <code>game.js</code>.
+        It expects sounds at <code>./verse_launch_sounds/</code>. Use it to compare sounds in context,
+        adjust volumes quickly, then copy the generated <code>SOUND_TUNING</code> block back into the game.
+      </p>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" id="unlockBtn">Enable Audio</button>
+      <button class="btn danger" id="stopBtn">Stop</button>
+      <button class="btn secondary" id="resetBtn">Reset Defaults</button>
+      <button class="btn secondary" id="copyBtn">Copy SOUND_TUNING</button>
+
+      <div class="master">
+        <label for="masterVolume">Master</label>
+        <input type="range" id="masterVolume" min="0" max="1" step="0.01">
+        <span class="value" id="masterValue">0.80</span>
+      </div>
+
+      <span class="status" id="status">Audio not enabled yet</span>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Individual sounds</h2>
+        <div class="sound-list" id="soundList"></div>
+        <p class="note">
+          Tip: normalize the MP3s first, then use these sliders for gameplay importance.
+          Frequent sounds like collect/star should usually stay softer than big events like launch, hit, and explosion.
+        </p>
+      </section>
+
+      <aside class="panel">
+        <h2>Context tests</h2>
+        <div class="context-grid" id="contextList"></div>
+
+        <h2 style="margin-top:18px;">Export</h2>
+        <textarea id="exportBox" spellcheck="false"></textarea>
+      </aside>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const SOUND_BASE_PATH = "./verse_launch_sounds/";
+
+  const SOUND_FILES = {
+    correctTap: `${SOUND_BASE_PATH}verse_launch_zoom.mp3`,
+    wrongTap: `${SOUND_BASE_PATH}verse_launch_wrong.mp3`,
+    wordAdded: `${SOUND_BASE_PATH}verse_launch_collect.mp3`,
+    asteroidDestroyed: `${SOUND_BASE_PATH}verse_launch_explode.mp3`,
+    playerAsteroidHit: `${SOUND_BASE_PATH}verse_launch_explode_2.mp3`,
+    landingStart: `${SOUND_BASE_PATH}verse_launch_land.mp3`,
+    launchButton: `${SOUND_BASE_PATH}verse_launch_launch.mp3`,
+    cutsceneRocketEnter: `${SOUND_BASE_PATH}verse_launch_launch_2.mp3`,
+    starCollected: `${SOUND_BASE_PATH}verse_launch_collect.mp3`
+  };
+
+  const DEFAULT_SOUND_TUNING = {
+    masterVolume: 0.75,
+    volumes: {
+      correctTap: 0.75,
+      wrongTap: 0.75,
+      wordAdded: 0.55,
+      asteroidDestroyed: 0.80,
+      playerAsteroidHit: 0.85,
+      landingStart: 0.75,
+      launchButton: 0.85,
+      cutsceneRocketEnter: 0.75,
+      starCollected: 0.50,
+      countdownBeep: 0.42,
+      countdownFinalBeep: 0.52,
+      projectileTick: 0.12,
+      projectileTock: 0.085
+    }
+  };
+
+  const SOUND_LABELS = {
+    correctTap: ["Correct tap", "verse_launch_zoom.mp3"],
+    wrongTap: ["Wrong tap", "verse_launch_wrong.mp3"],
+    wordAdded: ["Word added", "verse_launch_collect.mp3"],
+    asteroidDestroyed: ["Asteroid destroyed", "verse_launch_explode.mp3"],
+    playerAsteroidHit: ["Player hits asteroid", "verse_launch_explode_2.mp3"],
+    landingStart: ["Landing starts", "verse_launch_land.mp3"],
+    launchButton: ["Final launch", "verse_launch_launch.mp3"],
+    cutsceneRocketEnter: ["Cutscene rocket enters", "verse_launch_launch_2.mp3"],
+    starCollected: ["Star collected", "verse_launch_collect.mp3"],
+    countdownBeep: ["Countdown beep", "Generated C4 beep"],
+    countdownFinalBeep: ["Countdown final beep", "Generated C5 beep"],
+    projectileTick: ["Projectile tick", "Generated higher tick"],
+    projectileTock: ["Projectile tock", "Generated lower/softer tock"]
+  };
+
+  const STORAGE_KEY = "verseLaunchSoundboardTuningV1";
+
+  let audioCtx = null;
+  let masterGain = null;
+  const buffers = new Map();
+  const bufferPromises = new Map();
+  const activeSources = new Set();
+  const meters = new Map();
+
+  let tuning = loadTuning();
+
+  function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  function loadTuning() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          masterVolume: parsed.masterVolume ?? DEFAULT_SOUND_TUNING.masterVolume,
+          volumes: { ...DEFAULT_SOUND_TUNING.volumes, ...(parsed.volumes || {}) }
+        };
+      }
+    } catch (err) {}
+    return clone(DEFAULT_SOUND_TUNING);
+  }
+
+  function saveTuning() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tuning));
+    updateExportBox();
+  }
+
+  function getAudioContext() {
+    if (!audioCtx) {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContextCtor();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = tuning.masterVolume;
+      masterGain.connect(audioCtx.destination);
+    }
+    return audioCtx;
+  }
+
+  async function unlockAudio() {
+    const ctx = getAudioContext();
+    if (ctx.state === "suspended") await ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.03);
+
+    Object.keys(SOUND_FILES).forEach(loadBuffer);
+    setStatus("Audio enabled");
+  }
+
+  function setStatus(message) {
+    document.getElementById("status").textContent = message;
+  }
+
+  function soundVolume(key) {
+    return Math.max(0, Math.min(1, tuning.masterVolume * (tuning.volumes[key] ?? 1)));
+  }
+
+  async function loadBuffer(key) {
+    const ctx = getAudioContext();
+    const src = SOUND_FILES[key];
+    if (!src) return null;
+    if (buffers.has(key)) return buffers.get(key);
+    if (bufferPromises.has(key)) return bufferPromises.get(key);
+
+    const promise = fetch(src)
+      .then(response => {
+        if (!response.ok) throw new Error(`${key}: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
+      .then(buffer => {
+        buffers.set(key, buffer);
+        return buffer;
+      })
+      .catch(err => {
+        setStatus(`Missing or unreadable sound: ${key}`);
+        const row = document.querySelector(`[data-row-key="${key}"]`);
+        if (row) row.classList.add("missing");
+        console.warn(err);
+        return null;
+      })
+      .finally(() => bufferPromises.delete(key));
+
+    bufferPromises.set(key, promise);
+    return promise;
+  }
+
+  function makeMeterTap(key) {
+    const ctx = getAudioContext();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    function tick() {
+      analyser.getByteTimeDomainData(data);
+      let sum = 0;
+      for (const value of data) {
+        const centered = value - 128;
+        sum += centered * centered;
+      }
+      const rms = Math.sqrt(sum / data.length) / 128;
+      const pct = Math.min(100, Math.round(rms * 240));
+      const meter = meters.get(key);
+      if (meter) meter.style.width = `${pct}%`;
+      if (pct > 1) requestAnimationFrame(tick);
+      else if (meter) meter.style.width = "0%";
+    }
+
+    requestAnimationFrame(tick);
+    return analyser;
+  }
+
+  async function playMp3(key) {
+    await unlockAudio();
+    const ctx = getAudioContext();
+    const buffer = await loadBuffer(key);
+    if (!buffer) return;
+
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    const meter = makeMeterTap(key);
+
+    gain.gain.value = soundVolume(key);
+    source.buffer = buffer;
+    source.connect(gain);
+    gain.connect(meter);
+    meter.connect(masterGain);
+
+    source.onended = () => {
+      activeSources.delete(source);
+      try { source.disconnect(); } catch (err) {}
+      try { gain.disconnect(); } catch (err) {}
+      try { meter.disconnect(); } catch (err) {}
+    };
+
+    activeSources.add(source);
+    source.start(0);
+  }
+
+  function playGeneratedBeep(key) {
+    unlockAudio().then(() => {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const meter = makeMeterTap(key);
+
+      const freq = key === "countdownFinalBeep" ? 523.25 : 261.63;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, soundVolume(key)), now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+
+      osc.connect(gain);
+      gain.connect(meter);
+      meter.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.18);
+      activeSources.add(osc);
+      osc.onended = () => activeSources.delete(osc);
+    });
+  }
+
+  function playProjectile(key) {
+    unlockAudio().then(() => {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+      const isTock = key === "projectileTock";
+      const duration = 0.058;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const meter = makeMeterTap(key);
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(isTock ? 620 : 880, now);
+      osc.frequency.exponentialRampToValueAtTime(isTock ? 820 : 1180, now + duration);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, soundVolume(key)), now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(meter);
+      meter.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+      activeSources.add(osc);
+      osc.onended = () => activeSources.delete(osc);
+    });
+  }
+
+  function playSound(key) {
+    if (SOUND_FILES[key]) return playMp3(key);
+    if (key === "countdownBeep" || key === "countdownFinalBeep") return playGeneratedBeep(key);
+    if (key === "projectileTick" || key === "projectileTock") return playProjectile(key);
+  }
+
+  function stopAll() {
+    activeSources.forEach(source => {
+      try { source.stop(0); } catch (err) {}
+    });
+    activeSources.clear();
+    document.querySelectorAll(".meter").forEach(m => m.style.width = "0%");
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function playSequence(steps) {
+    await unlockAudio();
+    stopAll();
+
+    for (const step of steps) {
+      if (step.sound) playSound(step.sound);
+      await sleep(step.wait || 0);
+    }
+  }
+
+  function renderSoundList() {
+    const keys = [
+      "correctTap",
+      "wrongTap",
+      "wordAdded",
+      "asteroidDestroyed",
+      "playerAsteroidHit",
+      "landingStart",
+      "launchButton",
+      "cutsceneRocketEnter",
+      "starCollected",
+      "countdownBeep",
+      "countdownFinalBeep",
+      "projectileTick",
+      "projectileTock"
+    ];
+
+    const host = document.getElementById("soundList");
+    host.innerHTML = keys.map(key => {
+      const [label, file] = SOUND_LABELS[key];
+      const value = tuning.volumes[key] ?? 1;
+      return `
+        <div class="sound-row" data-row-key="${key}">
+          <div class="sound-name">
+            <strong>${label}</strong>
+            <span>${file}</span>
+          </div>
+          <button class="btn small" data-play="${key}">Play</button>
+          <input type="range" min="0" max="1" step="0.01" value="${value}" data-volume="${key}">
+          <span class="value" data-value="${key}">${value.toFixed(2)}</span>
+          <div class="meter-wrap" style="grid-column: 1 / -1;"><div class="meter" data-meter="${key}"></div></div>
+        </div>`;
+    }).join("");
+
+    host.querySelectorAll("[data-play]").forEach(btn => {
+      btn.addEventListener("click", () => playSound(btn.dataset.play));
+    });
+
+    host.querySelectorAll("[data-volume]").forEach(input => {
+      input.addEventListener("input", () => {
+        const key = input.dataset.volume;
+        tuning.volumes[key] = Number(input.value);
+        document.querySelector(`[data-value="${key}"]`).textContent = Number(input.value).toFixed(2);
+        saveTuning();
+      });
+    });
+
+    host.querySelectorAll("[data-meter]").forEach(el => {
+      meters.set(el.dataset.meter, el);
+    });
+  }
+
+  function renderContexts() {
+    const contexts = [
+      {
+        title: "Correct word flow",
+        desc: "Correct tap, then word added shortly after.",
+        steps: [{ sound: "correctTap", wait: 520 }, { sound: "wordAdded", wait: 600 }]
+      },
+      {
+        title: "Wrong tap",
+        desc: "Wrong UFO tap by itself.",
+        steps: [{ sound: "wrongTap", wait: 500 }]
+      },
+      {
+        title: "Bonus countdown + launch",
+        desc: "3, 2, 1, high C, final launch, then cutscene rocket.",
+        steps: [
+          { sound: "countdownBeep", wait: 520 },
+          { sound: "countdownBeep", wait: 520 },
+          { sound: "countdownBeep", wait: 520 },
+          { sound: "countdownFinalBeep", wait: 220 },
+          { sound: "launchButton", wait: 520 },
+          { sound: "cutsceneRocketEnter", wait: 900 }
+        ]
+      },
+      {
+        title: "Star collection burst",
+        desc: "Several collect sounds close together, like the bonus round.",
+        steps: [
+          { sound: "starCollected", wait: 180 },
+          { sound: "starCollected", wait: 220 },
+          { sound: "starCollected", wait: 280 }
+        ]
+      },
+      {
+        title: "Projectile rhythm",
+        desc: "Tick/tock firing rhythm for repeated projectile volleys.",
+        steps: [
+          { sound: "projectileTick", wait: 520 },
+          { sound: "projectileTock", wait: 520 },
+          { sound: "projectileTick", wait: 520 },
+          { sound: "projectileTock", wait: 520 }
+        ]
+      },
+      {
+        title: "Shoot asteroid reward",
+        desc: "Projectile volley, asteroid destroyed, then collect payoff.",
+        steps: [
+          { sound: "projectileTick", wait: 210 },
+          { sound: "asteroidDestroyed", wait: 150 },
+          { sound: "starCollected", wait: 360 }
+        ]
+      },
+      {
+        title: "Player asteroid collision",
+        desc: "Collision/explosion feedback by itself.",
+        steps: [{ sound: "playerAsteroidHit", wait: 800 }]
+      },
+      {
+        title: "Landing transition",
+        desc: "Landing alert after a bit of projectile/space action.",
+        steps: [
+          { sound: "projectileTick", wait: 520 },
+          { sound: "projectileTock", wait: 520 },
+          { sound: "landingStart", wait: 1000 }
+        ]
+      }
+    ];
+
+    const host = document.getElementById("contextList");
+    host.innerHTML = contexts.map((ctx, index) => `
+      <div class="context-card">
+        <h3>${ctx.title}</h3>
+        <p>${ctx.desc}</p>
+        <div class="context-actions">
+          <button class="btn small" data-context="${index}">Play context</button>
+        </div>
+      </div>
+    `).join("");
+
+    host.querySelectorAll("[data-context]").forEach(btn => {
+      btn.addEventListener("click", () => playSequence(contexts[Number(btn.dataset.context)].steps));
+    });
+  }
+
+  function updateExportBox() {
+    const sortedVolumes = { ...tuning.volumes };
+    const lines = [
+      "const SOUND_TUNING = {",
+      `  masterVolume: ${Number(tuning.masterVolume).toFixed(2)},`,
+      "  volumes: {"
+    ];
+
+    Object.entries(sortedVolumes).forEach(([key, value], index, arr) => {
+      const comma = index === arr.length - 1 ? "" : ",";
+      lines.push(`    ${key}: ${Number(value).toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}${comma}`);
+    });
+
+    lines.push("  }");
+    lines.push("};");
+
+    document.getElementById("exportBox").value = lines.join("\n");
+  }
+
+  function syncMaster() {
+    const input = document.getElementById("masterVolume");
+    input.value = tuning.masterVolume;
+    document.getElementById("masterValue").textContent = Number(tuning.masterVolume).toFixed(2);
+
+    if (masterGain) masterGain.gain.value = tuning.masterVolume;
+  }
+
+  document.getElementById("unlockBtn").addEventListener("click", unlockAudio);
+  document.getElementById("stopBtn").addEventListener("click", stopAll);
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    tuning = clone(DEFAULT_SOUND_TUNING);
+    saveTuning();
+    syncMaster();
+    renderSoundList();
+    setStatus("Defaults restored");
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    updateExportBox();
+    const value = document.getElementById("exportBox").value;
+    try {
+      await navigator.clipboard.writeText(value);
+      setStatus("Copied SOUND_TUNING");
+    } catch (err) {
+      document.getElementById("exportBox").select();
+      setStatus("Select/copy from the export box");
+    }
+  });
+
+  document.getElementById("masterVolume").addEventListener("input", (event) => {
+    tuning.masterVolume = Number(event.target.value);
+    document.getElementById("masterValue").textContent = tuning.masterVolume.toFixed(2);
+    if (masterGain) masterGain.gain.value = tuning.masterVolume;
+    saveTuning();
+  });
+
+  syncMaster();
+  renderSoundList();
+  renderContexts();
+  updateExportBox();
+})();
+</script>
+</body>
+</html>

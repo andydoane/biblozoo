@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="500"
+   height="191"
+   viewBox="0 0 132.29167 50.535417"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   sodipodi:docname="versey_bird_pipe_cap.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="false"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     borderlayer="false"
+     inkscape:zoom="0.85076459"
+     inkscape:cx="135.76023"
+     inkscape:cy="305.01975"
+     inkscape:window-width="2048"
+     inkscape:window-height="1209"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="rect124"
+       style="fill:#63bc6b;stroke-width:0.0856064;stroke-linecap:round"
+       d="M 9.1589945,-5.5126951e-5 H 123.13274 c 5.07407,0 9.15896,4.084897626951 9.15896,9.158963226951 V 29.951554 c 0,5.074066 -4.08489,9.158964 -9.15896,9.158964 H 9.1589945 C 4.0849288,39.110518 3.1250001e-5,35.02562 3.1250001e-5,29.951554 V 9.1589081 C 3.1250001e-5,4.0848425 4.0849288,-5.5126951e-5 9.1589945,-5.5126951e-5 Z" />
+    <path
+       style="fill:#46a960;fill-opacity:1;stroke:none;stroke-width:0.0856064;stroke-linecap:round"
+       d="m 98.2233,3e-5 c 5.0741,0 9.159,4.08488 9.159,9.15895 v 20.79277 c 0,5.07406 -4.0849,9.15896 -9.159,9.15896 h 24.9092 c 5.074,0 9.1589,-4.0849 9.1589,-9.15896 V 9.15898 c 0,-5.07407 -4.0849,-9.15895 -9.1589,-9.15895 z"
+       id="rect124-0" />
+    <rect
+       style="fill:#93cc9b;fill-opacity:1;stroke:none;stroke-width:0.0853556;stroke-linecap:round"
+       id="rect127"
+       width="5.8225007"
+       height="9.5588646"
+       x="114.246"
+       y="9.0072079"
+       rx="2.9112504"
+       ry="2.9112504" />
+    <rect
+       style="fill:#93cc9b;fill-opacity:1;stroke:none;stroke-width:0.0846577;stroke-linecap:round"
+       id="rect128"
+       width="5.8225007"
+       height="9.403183"
+       x="114.246"
+       y="21.337194"
+       rx="2.9112504"
+       ry="2.9112504" />
+    <path
+       id="rect129"
+       style="fill:#369158;stroke-width:0.0426417;stroke-linecap:round"
+       d="M 9.9636545,39.110512 H 122.32804 V 51.064651 H 9.9636545 Z"
+       sodipodi:nodetypes="ccccc" />
+  </g>
+</svg>

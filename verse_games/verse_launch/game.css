@@ -1,0 +1,1892 @@
+@font-face {
+  font-family: "Baloo 2";
+  src: url("../../verse_fonts/Baloo2.ttf") format("truetype");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Orbitron";
+  src: url("./verse_launch_fonts/Orbitron.ttf") format("truetype");
+  font-weight: 700 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --vl-purple: #7f66c6;
+  --vl-build-bg: #f2f2f2;
+  --vl-dark: #333333;
+  --vl-red: #ff5a51;
+  --vl-orange: #ffa351;
+  --vl-yellow: #ffc751;
+  --vl-green: #a7cb6f;
+  --vl-blue: #64b5f6;
+  --vl-pink: #ff8cc8;
+  --vl-safe-top: env(safe-area-inset-top, 0px);
+  --vl-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --vl-smoke-good: #ffc751;
+  --vl-smoke-warn: #ffa351;
+  --vl-smoke-bad: #ff5a51;
+  --vl-starfield-main: url("./verse_launch_images/verse_launch_starfield.svg");
+  --vl-starfield-bonus: url("./verse_launch_images/verse_launch_starfield_bonus.svg");
+  --vl-stage-max: 840px;
+  --vl-display-font: "Orbitron", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--vl-purple);
+  font-family: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+body {
+  color: #fff;
+  overflow: hidden
+}
+
+#app.vm-shell,
+#app.vl-shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  padding: 0;
+  display: block;
+  overflow: hidden;
+}
+
+button,
+input,
+select {
+  font: inherit
+}
+
+.no-zoom {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent
+}
+
+.vl-root,
+.vl-mode-shell {
+  min-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vl-root {
+  background:
+    linear-gradient(rgba(0, 0, 0, .08), rgba(0, 0, 0, .08)),
+    var(--vl-starfield-main) center center / cover no-repeat,
+    var(--vl-purple);
+}
+
+.vl-mode-shell {
+  background: var(--vl-purple);
+}
+
+/* Keep Verse Launch title/mode shell screens app-sized on desktop.
+   This fixes the back button drifting to the far-left edge of wide screens. */
+.vl-shell .vm-game-screen {
+  width: min(100%, var(--vl-stage-max));
+  margin: 0 auto;
+}
+
+.vl-mode-shell {
+  justify-content: space-between;
+}
+
+.vl-mode-shell>.vl-mode-stage {
+  flex: 1 1 auto;
+}
+
+.vl-mode-shell>.vl-nav-wrap {
+  flex: 0 0 auto;
+}
+
+.vl-mode-stage,
+.vl-stage {
+  width: 100%;
+  max-width: var(--vl-stage-max);
+  margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vl-mode-top {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: calc(24px + var(--vl-safe-top)) 18px 24px;
+}
+
+.vl-mode-title {
+  font-size: clamp(28px, 5vw, 56px);
+  font-weight: 900;
+  line-height: 1.04
+}
+
+.vl-mode-subtitle {
+  font-size: clamp(18px, 2.4vw, 28px);
+  font-weight: 800;
+  line-height: 1.2;
+  max-width: 720px;
+  text-wrap: balance
+}
+
+.vl-mode-card {
+  width: min(100%, 620px);
+  background: rgba(0, 0, 0, .28);
+  border-radius: 26px;
+  padding: 14px
+}
+
+.vl-mode-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px
+}
+
+.vl-nav-wrap {
+  width: 100%;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  background: var(--vl-purple);
+  padding: 0 0 calc(18px + var(--vl-safe-bottom));
+}
+
+.vl-nav {
+  width: 100%;
+  max-width: var(--vl-stage-max);
+  margin: 0 auto;
+  min-height: 72px;
+  padding: 10px 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.vl-nav-btn {
+  width: 72px;
+  min-width: 72px;
+  height: 52px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+  font-size: 24px;
+}
+
+.vl-nav-center {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+}
+
+.vl-help-btn {
+  border: none;
+  border-radius: 999px;
+  height: 52px;
+  min-width: 140px;
+  padding: 0 24px;
+  background: #ffffff;
+  color: #7f66c6;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.22);
+}
+
+.vl-nav-btn:active,
+.vl-help-btn:active {
+  transform: translateY(4px);
+}
+
+@media (max-width: 520px) {
+  .vl-nav-btn {
+    width: 64px;
+    min-width: 64px;
+  }
+
+  .vl-help-btn {
+    min-width: 118px;
+    font-size: 20px;
+  }
+}
+
+.vm-btn {
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--vl-purple);
+  font-size: clamp(20px, 4vw, 30px);
+  font-weight: 900;
+  padding: 16px 22px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, .24);
+  cursor: pointer;
+}
+
+.vm-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .24)
+}
+
+.vl-build-wrap {
+  flex: 0 0 auto;
+  padding: 8px 14px 8px;
+}
+
+.vl-build {
+  position: relative;
+}
+
+.vl-build.vl-shake {
+  animation: vlBuildShake 320ms ease;
+}
+
+.vl-build-word.is-removing {
+  animation: vlBuildRemove 360ms ease forwards;
+}
+
+.vl-game-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.vl-game-board {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(0, 0, 0, .06), rgba(0, 0, 0, .06)),
+    var(--vl-starfield-main) center center / cover no-repeat,
+    var(--vl-purple);
+}
+
+@media (min-width: 700px) {
+  .vl-game-wrap {
+    padding: 0 14px 0;
+  }
+
+  .vl-game-board {
+    border-radius: 26px;
+  }
+}
+
+.vl-red-flash {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 90, 81, 0);
+  pointer-events: none;
+  z-index: 1
+}
+
+.vl-red-flash.is-flashing {
+  animation: vlRedFlash 380ms ease
+}
+
+.vl-board-content {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 0 0;
+}
+
+.vl-overlay-pills {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+}
+
+.vl-pill {
+  border: none;
+  background: rgba(255, 255, 255, .95);
+  color: var(--vl-dark);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .18)
+}
+
+.vl-menu-pill {
+  min-width: 44px;
+  text-align: center;
+  cursor: pointer
+}
+
+.vl-launch-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 0 0;
+}
+
+.vl-flight-space {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vl-launcher-band {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 170px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vl-conveyor {
+  position: relative;
+  width: 100%;
+  height: 230px;
+  overflow: hidden;
+}
+
+.vl-conveyor::before,
+.vl-conveyor::after {
+  display: none;
+}
+
+.vl-conveyor-track {
+  position: absolute;
+  inset: 0;
+}
+
+.vl-conveyor-choice {
+  --vl-ufo-button-height: clamp(44px, 10.5vw, 68px);
+  --vl-ufo-top-aspect: 1.686;
+  --vl-ufo-top-height: calc(var(--vl-ufo-button-height) * 1.17);
+  --vl-ufo-top-width: calc(var(--vl-ufo-top-height) * var(--vl-ufo-top-aspect));
+  --vl-ufo-bottom-aspect: 4.08;
+  --vl-ufo-bottom-width: var(--vl-ufo-top-width);
+  --vl-ufo-bottom-height: calc(var(--vl-ufo-bottom-width) / var(--vl-ufo-bottom-aspect));
+  --vl-ufo-bottom-visible-height: calc(var(--vl-ufo-bottom-height) * 0.68);
+  --vl-ufo-button-min-width: calc(var(--vl-ufo-top-width) * 1.5);
+  --vl-ufo-button-max-width: min(78vw, 340px);
+
+  position: absolute;
+  left: 0;
+  top: 60%;
+  width: max-content;
+  min-width: var(--vl-ufo-button-min-width);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 2;
+  transform: translate3d(
+    var(--vl-conveyor-x, 100vw),
+    calc(-50% - var(--vl-ufo-bottom-visible-height)),
+    0
+  );
+  will-change: transform;
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.vl-conveyor-track.is-fading .vl-conveyor-choice,
+.vl-conveyor-choice.is-fading-choice {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vl-conveyor-choice.is-selected-launch {
+  z-index: 6;
+}
+
+.vl-conveyor-choice.is-hidden-during-flight {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vl-conveyor-choice.is-wrong-choice {
+  filter: brightness(1.15);
+}
+
+.vl-conveyor-choice.is-lights-only {
+  width: var(--vl-ufo-locked-width, max-content);
+  min-width: var(--vl-ufo-locked-width, var(--vl-ufo-button-min-width));
+}
+
+.vl-conveyor-choice.is-lights-only .vl-ufo-float,
+.vl-conveyor-choice.is-lights-only .vl-ufo-base {
+  width: var(--vl-ufo-locked-width, max-content);
+  min-width: var(--vl-ufo-locked-width, var(--vl-ufo-button-min-width));
+  max-width: var(--vl-ufo-locked-width, var(--vl-ufo-button-max-width));
+}
+
+.vl-ufo-float {
+  position: relative;
+  display: inline-flex;
+  width: max-content;
+  min-width: var(--vl-ufo-button-min-width);
+  max-width: var(--vl-ufo-button-max-width);
+  height: calc(var(--vl-ufo-button-height) * 2.10);
+  align-items: flex-end;
+  justify-content: center;
+  isolation: isolate;
+
+  animation: vlUfoFloat var(--vl-ufo-bob-duration, 1800ms) ease-in-out infinite;
+  animation-delay: var(--vl-ufo-bob-delay, 0ms);
+}
+
+
+
+.vl-ufo-top-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--vl-ufo-button-height) * .87);
+  height: var(--vl-ufo-top-height);
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.vl-ufo-top {
+  height: 100%;
+  width: auto;
+  display: block;
+}
+
+.vl-ufo-bottom-wrap {
+  position: absolute;
+  left: 50%;
+  bottom: calc((var(--vl-ufo-bottom-height) * -1) + 2px);
+  width: var(--vl-ufo-bottom-width);
+  height: var(--vl-ufo-bottom-height);
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.vl-ufo-bottom {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.vl-ufo-base {
+  position: relative;
+  z-index: 2;
+  width: max-content;
+  min-width: var(--vl-ufo-button-min-width);
+  max-width: var(--vl-ufo-button-max-width);
+  height: var(--vl-ufo-button-height);
+  padding: 0 calc(var(--vl-ufo-button-height) * .42);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to bottom, #f2f2f2 0%, #e6e6e6 54%, #d4d4d4 100%);
+  color: #666666;
+  font-size: clamp(22px, calc(var(--vl-ufo-button-height) * .52), 35px);
+  font-weight: 900;
+  line-height: .92;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+}
+
+.vl-ufo-base::after {
+  display: none;
+}
+
+.vl-ufo-word {
+  position: relative;
+  z-index: 2;
+  color: #666666;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+  transition: opacity 220ms ease;
+}
+
+.vl-ufo-lights {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: var(--vl-ufo-button-height);
+  width: auto;
+  max-width: 88%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.vl-conveyor-track.is-text-hidden .vl-ufo-word,
+.vl-conveyor-choice.is-text-hidden .vl-ufo-word,
+.vl-conveyor-choice.is-lights-only .vl-ufo-word {
+  opacity: 0;
+}
+
+.vl-conveyor-track.is-text-hidden .vl-ufo-lights,
+.vl-conveyor-choice.is-text-hidden .vl-ufo-lights,
+.vl-conveyor-choice.is-lights-only .vl-ufo-lights {
+  opacity: 1;
+}
+
+.vl-conveyor-choice:disabled {
+  cursor: default;
+}
+
+.vl-bonus-launch-wrap {
+  width: min(100%, 720px);
+  display: flex;
+  justify-content: center;
+  padding: 0 14px calc(16px + var(--vl-safe-bottom));
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+}
+
+.vl-bonus-launch-wrap.is-fading {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.vl-countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.vl-countdown-box {
+  min-width: 120px;
+  min-height: 120px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #333333;
+  color: #3dfd3d;
+  border-radius: 0;
+  font-family: var(--vl-display-font);
+  font-size: clamp(44px, 9vw, 88px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .28);
+  text-align: center;
+}
+
+.vl-countdown-box.is-pop {
+  animation: vlCountdownPop 220ms ease;
+}
+
+.vl-landing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.vl-landing-overlay.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.vl-landing-box {
+  min-width: 190px;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #333333;
+  color: #3dfd3d;
+  border-radius: 0;
+  font-family: var(--vl-display-font);
+  font-size: clamp(28px, 7vw, 58px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .28);
+  text-align: center;
+  animation: vlLandingBlink 920ms steps(2, end) infinite;
+}
+
+@keyframes vlLandingBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .28;
+  }
+}
+
+.vl-flight-layer,
+.vl-smoke-layer,
+.vl-firework-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.vl-carousel {
+  width: min(100%, 720px);
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  align-items: end;
+  gap: 10px;
+  position: relative;
+  z-index: 4
+}
+
+.vl-side-preview {
+  display: none
+}
+
+.vl-side-preview.is-left {
+  transform: none
+}
+
+.vl-side-preview.is-right {
+  transform: none
+}
+
+.vl-preview-rocket {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  transform: none
+}
+
+.vl-preview-bubble {
+  max-width: 100%;
+  padding: 10px 12px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .18);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.04;
+  text-align: center;
+  text-wrap: balance
+}
+
+.vl-main-launcher-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  width: 100%
+}
+
+.vl-main-launcher-wrap>div {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.vl-main-launcher {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 0;
+  width: 100%
+}
+
+.vl-main-launcher.is-hidden-during-flight {
+  opacity: 0;
+}
+
+.vl-rocket-stack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  width: 100%
+}
+
+.vl-rocket {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  transform: none;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .26));
+  will-change: transform, opacity
+}
+
+.vl-smoke-base {
+  display: none
+}
+
+.vl-main-launcher.is-arming .vl-smoke-base {
+  display: none
+}
+
+.vl-smoke-dot {
+  display: none
+}
+
+.vl-smoke-dot:nth-child(2) {
+  animation-delay: 0ms
+}
+
+.vl-smoke-dot:nth-child(3) {
+  animation-delay: 0ms
+}
+
+.vl-choice-bubble {
+  max-width: min(100%, 520px);
+  min-width: min(220px, 82vw);
+  padding: 16px 24px;
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, .24);
+  color: #fff;
+  font-size: clamp(24px, 4.8vw, 36px);
+  font-weight: 900;
+  line-height: 1.02;
+  text-wrap: balance;
+  text-align: center;
+  background: var(--bubble, #fff);
+}
+
+.vl-text-dark {
+  color: var(--vl-dark)
+}
+
+.vl-launcher-hitbox {
+  position: absolute;
+  inset: 0;
+  background: none;
+  border: none;
+  cursor: pointer
+}
+
+.vl-arrow {
+  width: 62px;
+  height: 62px;
+  border: none;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  font-size: 34px;
+  font-weight: 900;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, .2);
+  align-self: center;
+  cursor: pointer
+}
+
+.vl-arrow:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .2)
+}
+
+.vl-arrow:disabled {
+  opacity: .45;
+  pointer-events: none
+}
+
+.vl-help-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, .36);
+  z-index: 9999
+}
+
+.vl-help-overlay.show {
+  display: flex
+}
+
+.vl-help-dialog {
+  width: min(100%, 560px);
+  background: #fff;
+  color: var(--vl-dark);
+  border-radius: 24px;
+  padding: 22px 18px 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .28);
+  text-align: center
+}
+
+.vl-help-title {
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 10px
+}
+
+.vl-help-body {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.32;
+  margin-top: 10px;
+  text-wrap: balance;
+  overflow-wrap: break-word
+}
+
+.vl-help-actions,
+.vl-game-menu-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px
+}
+
+.vl-help-close,
+.vl-game-menu-btn {
+  border: none;
+  border-radius: 999px;
+  background: var(--vl-purple);
+  color: #fff;
+  padding: 14px 18px;
+  font-weight: 900;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, .20);
+  cursor: pointer
+}
+
+.vl-help-close:active,
+.vl-game-menu-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .20)
+}
+
+.vl-game-menu-title {
+  color: var(--vl-purple)
+}
+
+.vl-end-card {
+  width: min(100%, 660px);
+  margin: auto auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center
+}
+
+.vl-end-title {
+  font-size: clamp(26px, 5.4vw, 40px);
+  font-weight: 900;
+  line-height: 1.08;
+  text-wrap: balance
+}
+
+.vl-end-stats {
+  font-size: clamp(18px, 4vw, 26px);
+  font-weight: 800;
+  line-height: 1.3;
+  text-wrap: balance
+}
+
+.vl-end-sub {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-wrap: balance
+}
+
+.vl-ufo-launch-clone {
+  position: fixed;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  z-index: 10000;
+  transform-origin: center center;
+}
+
+.vl-ufo-launch-clone .vl-ufo-float {
+  animation: none;
+}
+
+.vl-ufo-launch-trail {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--vl-ufo-button-height, 60px) * 1.58);
+  width: calc(var(--vl-ufo-button-height, 60px) * 2.65);
+  height: calc(var(--vl-ufo-button-height, 60px) * 2.85);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vl-ufo-launch-particle {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--vl-ufo-particle-size, 10px);
+  height: var(--vl-ufo-particle-size, 10px);
+  margin-left: calc(var(--vl-ufo-particle-size, 10px) / -2);
+  margin-top: calc(var(--vl-ufo-particle-size, 10px) / -2);
+  border-radius: 999px;
+  background: var(--vl-ufo-particle-color, #4df9fd);
+  opacity: 0;
+  filter: drop-shadow(0 0 var(--vl-ufo-particle-glow, 8px) rgba(77, 249, 253, .86));
+  animation: vlUfoLaunchParticle var(--vl-ufo-particle-duration, 900ms) linear var(--vl-ufo-particle-delay, 0ms) infinite;
+}
+
+.vl-flight-unit {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform-origin: center center
+}
+
+.vl-flight-rocket {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  transform: none;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .3))
+}
+
+.vl-flight-unit--blastoff{
+  gap:8px;
+}
+
+.vl-blast-ship{
+  position:relative;
+  width:122px;
+  height:172px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  overflow:visible;
+}
+
+.vl-flight-unit--blastoff .vl-flight-rocket {
+  position:relative;
+  z-index:2;
+  width:104px;
+  height:104px;
+}
+
+.vl-blast-trail{
+  position:absolute;
+  left:50%;
+  top:82px;
+  width:44px;
+  height:96px;
+  transform:translateX(-50%) scaleY(.78);
+  transform-origin:top center;
+  border-radius:999px;
+  background:
+    radial-gradient(circle at 50% 12%, var(--vl-trail-core, rgba(255,255,255,1)) 0 16%, rgba(255,245,180,.96) 24%, rgba(255,245,180,0) 38%),
+    linear-gradient(to bottom, rgba(255,236,120,1), var(--vl-trail-mid, rgba(255,163,81,.94)), rgba(255,90,81,.62), var(--vl-trail-end, rgba(255,90,81,0)));
+  filter:drop-shadow(0 0 10px var(--vl-trail-glow, rgba(255,199,81,.68)));
+  opacity:0;
+  z-index:1;
+  pointer-events:none;
+}
+
+.vl-flight-unit--blastoff.is-blasting .vl-blast-trail{
+  opacity:1;
+  animation:vlBlastTrailFlicker 120ms linear infinite alternate;
+}
+
+.vl-flight-unit--blastoff.is-blasting .vl-blast-trail.is-rainbow{
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255,255,255,1) 0 16%, rgba(255,255,255,.88) 24%, rgba(255,255,255,0) 38%),
+    linear-gradient(
+      to bottom,
+      #ffffff 0%,
+      #ffc751 18%,
+      #a7cb6f 36%,
+      #64b5f6 56%,
+      #7f66c6 74%,
+      #ff8cc8 90%,
+      rgba(255,140,200,0) 100%
+    );
+  filter:drop-shadow(0 0 12px rgba(255,140,200,.76));
+  animation:
+    vlBlastTrailFlicker 120ms linear infinite alternate,
+    vlRainbowTrailGlow 520ms linear infinite;
+}
+
+.vl-flight-unit--blastoff .vl-flight-label {
+  display:block;
+  max-width:min(78vw, 440px);
+  margin-top:-4px;
+  font-size:clamp(24px, 5vw, 34px);
+}
+
+.vl-flight-label {
+  padding: 12px 18px;
+  border-radius: 999px;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, .24);
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-wrap: balance;
+  color: #fff;
+  max-width: 420px
+}
+
+.vl-firework {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--pcolor, #fff);
+  animation: vlFirework 720ms cubic-bezier(.15, .82, .25, 1) forwards
+}
+
+
+
+.vl-smoke-puff {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--vl-smoke-color, rgba(90, 90, 90, .72));
+  filter: blur(1px);
+  animation: vlSmokePuff 460ms ease forwards;
+}
+
+.vl-word-burst {
+  position: absolute;
+  width: 132px;
+  height: 132px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 12;
+}
+
+.vl-word-burst-cloud {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--vl-word-burst-cloud-size, 70px);
+  height: var(--vl-word-burst-cloud-size, 70px);
+  transform: translate(-50%, -50%) scale(0.14);
+  opacity: 0;
+  color: #ffffff;
+  filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.22)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18));
+}
+
+.vl-word-burst-cloud svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.vl-word-burst-cloud path {
+  fill: currentColor;
+}
+
+.vl-word-burst-cloud.is-live {
+  animation: vlWordBurstCloudRipple var(--vl-word-burst-cloud-dur, 540ms) linear forwards;
+}
+
+.vl-word-burst-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--vl-word-burst-size, 12px);
+  height: var(--vl-word-burst-size, 12px);
+  margin-left: calc(var(--vl-word-burst-size, 12px) / -2);
+  margin-top: calc(var(--vl-word-burst-size, 12px) / -2);
+  border-radius: 50%;
+  background: #ffffff;
+  opacity: 1;
+  transform: translate(0, 0) scale(var(--vl-word-burst-start-scale, 0.75));
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.28));
+  transition:
+    transform var(--vl-word-burst-dur, 620ms) cubic-bezier(0.12, 0.75, 0.22, 1),
+    opacity var(--vl-word-burst-dur, 620ms) linear;
+}
+
+.vl-word-burst-particle.is-live {
+  opacity: 0;
+  transform: translate(var(--vl-word-burst-tx, 0px), var(--vl-word-burst-ty, 0px)) scale(var(--vl-word-burst-end-scale, 1.12));
+}
+
+@keyframes vlBuildShake {
+  0% {
+    transform: translateX(0)
+  }
+
+  20% {
+    transform: translateX(-10px)
+  }
+
+  40% {
+    transform: translateX(10px)
+  }
+
+  60% {
+    transform: translateX(-7px)
+  }
+
+  80% {
+    transform: translateX(7px)
+  }
+
+  100% {
+    transform: translateX(0)
+  }
+}
+
+@keyframes vlBuildRemove {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1)
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-16px) scale(.72)
+  }
+}
+
+@keyframes vlRedFlash {
+  0% {
+    background: rgba(255, 90, 81, 0)
+  }
+
+  25% {
+    background: rgba(255, 90, 81, .32)
+  }
+
+  100% {
+    background: rgba(255, 90, 81, 0)
+  }
+}
+
+@keyframes vlSmokeBob {
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: .65
+  }
+
+  50% {
+    transform: translateY(-7px) scale(1.08);
+    opacity: 1
+  }
+}
+
+@keyframes vlSmokePuff {
+  0% {
+    opacity: .85;
+    transform: translate(-50%, -50%) scale(.5)
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--sx, 0px), var(--sy, -20px)) scale(2.1)
+  }
+}
+
+@keyframes vlFirework {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(0, 0) scale(1)
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(.22)
+  }
+}
+
+@keyframes vlUfoFloat {
+
+  0%,
+  100% {
+    transform: translateY(0) rotate(calc(var(--vl-ufo-wobble-amount, 1deg) * -1));
+  }
+
+  50% {
+    transform: translateY(calc(var(--vl-ufo-bob-amount, 6px) * -1)) rotate(var(--vl-ufo-wobble-amount, 1deg));
+  }
+}
+
+
+@keyframes vlUfoLaunchParticle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(.25) rotate(0deg);
+  }
+
+  10% {
+    opacity: var(--vl-ufo-particle-peak-opacity, .95);
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(var(--vl-ufo-particle-x, 0px), var(--vl-ufo-particle-y, 100px)) scale(var(--vl-ufo-particle-end-scale, .48)) rotate(var(--vl-ufo-particle-rotation, 120deg));
+  }
+}
+
+@keyframes vlConveyorMove {
+  from {
+    transform: translate(var(--vl-conveyor-start-x, 100vw), -50%);
+  }
+
+  to {
+    transform: translate(var(--vl-conveyor-end-x, -340px), -50%);
+  }
+}
+
+@keyframes vlWordBurstCloudRipple {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.14) rotate(-8deg);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.82) rotate(4deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.45) rotate(14deg);
+  }
+}
+
+@keyframes vlBlastTrailFlicker {
+  0% {
+    transform: translateX(-50%) scaleX(.82) scaleY(.72);
+    opacity: .78;
+  }
+
+  100% {
+    transform: translateX(-50%) scaleX(1.14) scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes vlCountdownPop {
+  0% {
+    transform: scale(.78);
+    opacity: 0;
+  }
+
+  70% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.vl-star-launch-btn {
+  min-width: min(320px, 88vw);
+  padding: 18px 26px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--vl-purple);
+  font-family: var(--vl-display-font);
+  font-size: clamp(22px, 4.6vw, 34px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, .24);
+  cursor: pointer;
+}
+
+.vl-star-launch-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .24);
+}
+
+.vl-travel-screen,
+.vl-asteroid-screen {
+  min-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vl-travel-screen {
+  background:
+    linear-gradient(rgba(0, 0, 0, .12), rgba(0, 0, 0, .12)),
+    var(--vl-starfield-bonus) center center / cover no-repeat,
+    #11111f;
+}
+
+.vl-asteroid-screen {
+  background:
+    linear-gradient(rgba(0, 0, 0, .10), rgba(0, 0, 0, .10)),
+    var(--vl-starfield-bonus) center center / cover no-repeat,
+    #11111f;
+}
+
+.vl-bonus-topbar {
+  width: 100%;
+  max-width: var(--vl-stage-max);
+  margin: 0 auto;
+  flex: 0 0 auto;
+  padding: calc(10px + var(--vl-safe-top)) 14px 0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.vl-bonus-stage {
+  position: relative;
+  width: 100%;
+  max-width: var(--vl-stage-max);
+  margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vl-travel-text {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(.96);
+  width: min(88vw, 620px);
+  text-align: center;
+  font-size: clamp(24px, 4.5vw, 42px);
+  font-weight: 900;
+  line-height: 1.15;
+  text-wrap: balance;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.vl-travel-text.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.vl-travel-rocket-unit {
+  position: absolute;
+  left: 50%;
+  bottom: -190px;
+  z-index: 2;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.vl-travel-rocket-unit .vl-blast-ship {
+  transform: scale(.92);
+}
+
+.vl-travel-ship-rocket {
+  display: block;
+}
+
+.vl-travel-rocket {
+  position: absolute;
+  left: 50%;
+  bottom: -120px;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  transform: translateX(-50%);
+  z-index: 2;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .32));
+}
+
+.vl-travel-smoke {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vl-travel-vignette {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 140px;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, .42) 0%, rgba(0, 0, 0, .18) 40%, rgba(0, 0, 0, 0) 100%);
+}
+
+.vl-screen-fade {
+  position: absolute;
+  inset: 0;
+  background: #11111f;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+}
+
+.vl-screen-fade.is-active {
+  animation: vlScreenFadeIn 420ms ease forwards;
+}
+
+.vl-space-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.vl-moon {
+  position: absolute;
+  left: 50%;
+  top: -420px;
+  width: min(56vw, 320px);
+  height: auto;
+  transform: translateX(-50%);
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.vl-moon.is-visible {
+  opacity: 1;
+}
+
+.vl-player-unit {
+  --vl-player-rocket-size: clamp(78px, 9.5vw, 104px);
+  --vl-rainbow-rocket-scale: 1.31;
+
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--vl-player-rocket-size) * 0.5);
+  z-index: 5;
+  pointer-events: none;
+  transform-origin: center center;
+  transition:
+    transform 120ms ease,
+    opacity 180ms ease;
+}
+
+.vl-player-unit.is-despawned {
+  opacity: 0;
+}
+
+.vl-player-unit.is-hit {
+  animation: none;
+}
+
+.vl-player-unit.is-flash {
+  animation: vlPlayerFlash 180ms linear 5;
+}
+
+.vl-player-unit.is-upgrade {
+  animation: vlRocketUpgradePop 360ms ease;
+}
+
+.vl-player-blast-ship {
+  width: var(--vl-player-rocket-size);
+  height: var(--vl-player-rocket-size);
+}
+
+.vl-player-rocket-img {
+  position: relative;
+  z-index: 2;
+  width: var(--vl-player-rocket-size);
+  height: var(--vl-player-rocket-size);
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .28));
+}
+
+.vl-player-unit.is-rainbow-rocket .vl-player-rocket-img {
+  width: calc(var(--vl-player-rocket-size) * var(--vl-rainbow-rocket-scale));
+  height: calc(var(--vl-player-rocket-size) * var(--vl-rainbow-rocket-scale));
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .28));
+}
+
+
+
+.vl-player-particle-trail {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--vl-player-rocket-size) * .74);
+  width: calc(var(--vl-player-rocket-size) * 2.75);
+  height: calc(var(--vl-player-rocket-size) * 3.10);
+  transform: translateX(-50%);
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.vl-player-trail-particle {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--vl-particle-size, 18px);
+  height: var(--vl-particle-size, 18px);
+  margin-left: calc(var(--vl-particle-size, 18px) / -2);
+  margin-top: calc(var(--vl-particle-size, 18px) / -2);
+  border-radius: 999px;
+  background: var(--vl-particle-color, #ffc751);
+  opacity: 0;
+  filter: drop-shadow(0 0 var(--vl-particle-glow, 10px) var(--vl-particle-glow-color, rgba(255, 199, 81, .82)));
+  animation: vlPlayerParticleTrail var(--vl-particle-duration, 980ms) linear var(--vl-particle-delay, 0ms) infinite;
+}
+
+.vl-asteroid {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  transform-origin: center center;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.vl-star {
+  position: absolute;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  transform-origin: center center;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(255, 199, 81, .58));
+}
+
+.vl-star-sparkle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ffc751;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 7;
+  animation: vlStarSparkle 460ms ease-out forwards;
+}
+
+.vl-astro-projectile {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--vl-projectile-color, #ffc751);
+  box-shadow: 0 0 8px var(--vl-projectile-color, #ffc751);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.vl-asteroid-pop-particle {
+  position: absolute;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 7;
+  animation: vlAsteroidPopParticle 420ms ease-out forwards;
+}
+
+.vl-asteroid-reward-star {
+  position: absolute;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 7;
+  filter: drop-shadow(0 0 8px rgba(255, 199, 81, .76));
+  animation: vlAsteroidRewardStar 680ms ease-out forwards;
+}
+
+.vl-space-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  z-index: 8;
+}
+
+.vl-space-arrow {
+  width: 78px;
+  height: 78px;
+  border: none;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  font-size: 40px;
+  font-weight: 900;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, .24);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.vl-space-arrow:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, .24);
+}
+
+.vl-space-status {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 8;
+  display: flex;
+  gap: 8px;
+}
+
+.vl-star-counter {
+  min-width: 86px;
+  height: 48px;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, .24);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, .20);
+  backdrop-filter: blur(2px);
+}
+
+.vl-star-counter.is-pop {
+  animation: vlStarCounterPop 260ms ease;
+}
+
+.vl-star-counter-icon {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  display: block;
+}
+
+@keyframes vlAsteroidRewardStar {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(0, 0) scale(.45) rotate(0deg);
+  }
+
+  28% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(calc(var(--dx, 0px) * .45), calc(var(--dy, 0px) * .45)) scale(1.15) rotate(calc(var(--rot, 0deg) * .45));
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(.3) rotate(var(--rot, 0deg));
+  }
+}
+
+@keyframes vlAsteroidPopParticle {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(.18);
+  }
+}
+
+@keyframes vlStarSparkle {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(.18);
+  }
+}
+
+@keyframes vlStarCounterPop {
+  0% {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(1.16);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes vlRocketUpgradePop {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+
+  45% {
+    transform: translateX(-50%) scale(1.16);
+  }
+
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes vlRainbowTrailGlow {
+  0% {
+    filter: drop-shadow(0 0 8px rgba(255, 199, 81, .70));
+  }
+
+  33% {
+    filter: drop-shadow(0 0 12px rgba(100, 181, 246, .78));
+  }
+
+  66% {
+    filter: drop-shadow(0 0 14px rgba(255, 140, 200, .82));
+  }
+
+  100% {
+    filter: drop-shadow(0 0 8px rgba(255, 199, 81, .70));
+  }
+}
+
+@keyframes vlPlayerParticleTrail {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(.25) rotate(0deg);
+  }
+
+  10% {
+    opacity: var(--vl-particle-peak-opacity, .95);
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(var(--vl-particle-x, 0px), var(--vl-particle-y, 150px)) scale(var(--vl-particle-end-scale, .48)) rotate(var(--vl-particle-rotation, 120deg));
+  }
+}
+
+@keyframes vlScreenFadeIn {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes vlPlayerSpin {
+  0% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+
+  100% {
+    transform: translateX(-50%) rotate(360deg);
+  }
+}
+
+@keyframes vlPlayerFlash {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .28));
+    opacity: 1;
+  }
+
+  50% {
+    filter: drop-shadow(0 10px 16px rgba(255, 90, 81, .5));
+    opacity: .35;
+  }
+}
+
+@media (max-height:760px) {
+  .vl-build {
+    min-height: 96px;
+    padding: 14px 16px
+  }
+
+  .vl-rocket {
+    width: 84px;
+    height: 84px
+  }
+
+  .vl-choice-bubble {
+    font-size: clamp(20px, 4.2vw, 30px);
+    padding: 14px 18px
+  }
+
+  .vl-rocket-stack {
+    min-height: 144px
+  }
+}

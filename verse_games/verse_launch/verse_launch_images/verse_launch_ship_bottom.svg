@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="204"
+   height="50"
+   viewBox="0 0 53.975 13.229167"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   sodipodi:docname="verse_launch_ship_bottom.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="false"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     borderlayer="false"
+     inkscape:zoom="2.4063256"
+     inkscape:cx="171.83876"
+     inkscape:cy="98.698198"
+     inkscape:window-width="2048"
+     inkscape:window-height="1209"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <filter
+       id="vl-red-light-glow"
+       x="0"
+       y="0"
+       width="53.975"
+       height="13.229167"
+       filterUnits="userSpaceOnUse"
+       color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="0.32" flood-color="#f6516b" flood-opacity="0.80" />
+      <feDropShadow dx="0" dy="0" stdDeviation="0.16" flood-color="#ff9aaa" flood-opacity="0.85" />
+    </filter>
+    <filter
+       id="vl-green-light-glow"
+       x="0"
+       y="0"
+       width="53.975"
+       height="13.229167"
+       filterUnits="userSpaceOnUse"
+       color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="0.32" flood-color="#65dbc1" flood-opacity="0.80" />
+      <feDropShadow dx="0" dy="0" stdDeviation="0.16" flood-color="#b8fff0" flood-opacity="0.85" />
+    </filter>
+    <style
+       id="vl-blinking-light-style"><![CDATA[
+      #red_lights {
+        animation: vlRedLightsCycle 2s steps(1, end) infinite;
+      }
+
+      #green_light {
+        animation: vlGreenLightCycle 2s steps(1, end) infinite;
+      }
+
+      @keyframes vlRedLightsCycle {
+        0%, 49.999% {
+          filter: url(#vl-red-light-glow);
+          opacity: 1;
+        }
+
+        50%, 100% {
+          filter: none;
+          opacity: 0.72;
+        }
+      }
+
+      @keyframes vlGreenLightCycle {
+        0%, 49.999% {
+          filter: none;
+          opacity: 0.72;
+        }
+
+        50%, 100% {
+          filter: url(#vl-green-light-glow);
+          opacity: 1;
+        }
+      }
+    ]]></style>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="red_lights"
+       style="fill:#f6516b;stroke-width:0.0606374;stroke-linecap:round;stroke-linejoin:round"
+       d="M 6.7696127 4.8627523 A 3.9688942 3.9688942 0 0 0 6.7468751 5.0343181 A 3.9688942 3.9688942 0 0 0 10.715625 9.0035849 A 3.9688942 3.9688942 0 0 0 14.684375 5.0343181 A 3.9688942 3.9688942 0 0 0 14.661638 4.8627523 L 6.7696127 4.8627523 z M 39.313363 4.8627523 A 3.9688942 3.9688942 0 0 0 39.290625 5.0343181 A 3.9688942 3.9688942 0 0 0 43.259892 9.0035849 A 3.9688942 3.9688942 0 0 0 47.228642 5.0343181 A 3.9688942 3.9688942 0 0 0 47.205905 4.8627523 L 39.313363 4.8627523 z " />
+    <path
+       id="green_light"
+       style="fill:#65dbc1;fill-opacity:1;stroke-width:0.0606374;stroke-linecap:round;stroke-linejoin:round"
+       d="M 23.031153 4.8627523 A 3.9688942 3.9688942 0 0 0 23.01875 5.0348349 A 3.9688942 3.9688942 0 0 0 26.9875 9.0035849 A 3.9688942 3.9688942 0 0 0 30.95625 5.0348349 A 3.9688942 3.9688942 0 0 0 30.943848 4.8627523 L 23.031153 4.8627523 z " />
+    <path
+       id="path18"
+       style="fill:#4b6e76;stroke-width:0.0529167;stroke-linecap:round;stroke-linejoin:round"
+       d="m 47.88561,0 h -9.2521 v 4.89817 c 0,0 1.47424,1.09953 4.62605,1.09953 3.15181,0 4.62605,-1.09953 4.62605,-1.09953 z"
+       sodipodi:nodetypes="ccczcc" />
+    <path
+       id="path14"
+       style="fill:#4b6e76;stroke-width:0.0529167;stroke-linecap:round;stroke-linejoin:round"
+       d="m 15.34148,0 h -9.2521 v 4.89817 c 0,0 1.47424,1.09953 4.62605,1.09953 3.15181,0 4.62605,-1.09953 4.62605,-1.09953 z"
+       sodipodi:nodetypes="ccczcc" />
+    <path
+       id="rect2"
+       style="fill:#4b6e76;stroke-width:0.0529167;stroke-linecap:round;stroke-linejoin:round"
+       d="m 31.61354,0 h -9.2521 v 4.89817 c 0,0 1.47424,1.09953 4.62605,1.09953 3.15181,0 4.62605,-1.09953 4.62605,-1.09953 z"
+       sodipodi:nodetypes="ccczcc" />
+    <path
+       id="path19"
+       style="fill:#6f8b91;fill-opacity:1;stroke-width:0.0225253;stroke-linecap:round;stroke-linejoin:round"
+       d="m 7.41131,2.3e-4 v 3.73879 c 0,0.36612 0.2943,0.66094 0.66042,0.66094 0.36613,0 0.66095,-0.29482 0.66095,-0.66094 V 2.3e-4 Z m 2.64325,0 v 4.26796 c 0,0.36612 0.29482,0.66094 0.66094,0.66094 0.36613,0 0.66094,-0.29482 0.66094,-0.66094 V 2.3e-4 Z m 2.64325,0 v 3.73879 c 0,0.36612 0.29482,0.66094 0.66094,0.66094 0.36612,0 0.66094,-0.29482 0.66094,-0.66094 V 2.3e-4 Z m 10.98537,0 v 3.73879 c 0,0.36612 0.29483,0.66094 0.66095,0.66094 0.36613,0 0.66094,-0.29482 0.66094,-0.66094 V 2.3e-4 Z m 2.64325,0 v 4.26796 c 0,0.36612 0.29482,0.66094 0.66094,0.66094 0.36613,0 0.66095,-0.29482 0.66095,-0.66094 V 2.3e-4 Z m 2.64377,0 v 3.73879 c 0,0.36612 0.29482,0.66094 0.66094,0.66094 0.36612,0 0.66043,-0.29482 0.66043,-0.66094 V 2.3e-4 Z m 10.98486,0 v 3.73879 c 0,0.36612 0.29482,0.66094 0.66094,0.66094 0.36613,0 0.66094,-0.29482 0.66094,-0.66094 V 2.3e-4 Z m 2.64377,0 v 4.26796 c 0,0.36612 0.29482,0.66094 0.66094,0.66094 0.36613,0 0.66042,-0.29482 0.66042,-0.66094 V 2.3e-4 Z m 2.64324,0 v 3.73879 c 0,0.36612 0.29483,0.66094 0.66095,0.66094 0.36612,0 0.66094,-0.29482 0.66094,-0.66094 V 2.3e-4 Z" />
+  </g>
+</svg>

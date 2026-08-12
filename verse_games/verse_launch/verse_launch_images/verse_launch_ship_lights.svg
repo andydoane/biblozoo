@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="252"
+   height="84"
+   viewBox="0 0 66.675 22.225"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   sodipodi:docname="verse_launch_ship_lights.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="false"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     borderlayer="false"
+     inkscape:zoom="2.4063256"
+     inkscape:cx="122.38576"
+     inkscape:cy="47.58292"
+     inkscape:window-width="2048"
+     inkscape:window-height="1209"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <filter id="vlLightGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.75" result="blur" />
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.396  0 0 0 0 0.859  0 0 0 0 0.757  0 0 0 1 0" result="glowColor" />
+      <feMerge>
+        <feMergeNode in="glowColor" />
+        <feMergeNode in="glowColor" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <style id="vl-light-animation"><![CDATA[
+      #light_1,
+      #light_2,
+      #light_3 {
+        opacity: 0.32;
+        fill: #65dbc1;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      #light_1 { animation: vlLightOne 3s linear infinite; }
+      #light_3 { animation: vlLightThree 3s linear infinite; }
+      #light_2 { animation: vlLightTwo 3s linear infinite; }
+
+      @keyframes vlLightOne {
+        0%, 28% {
+          opacity: 1;
+          filter: url(#vlLightGlow);
+          transform: scale(1.08);
+        }
+        34%, 100% {
+          opacity: 0.32;
+          filter: none;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes vlLightThree {
+        0%, 28% {
+          opacity: 0.32;
+          filter: none;
+          transform: scale(1);
+        }
+        34%, 61% {
+          opacity: 1;
+          filter: url(#vlLightGlow);
+          transform: scale(1.08);
+        }
+        67%, 100% {
+          opacity: 0.32;
+          filter: none;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes vlLightTwo {
+        0%, 61% {
+          opacity: 0.32;
+          filter: none;
+          transform: scale(1);
+        }
+        67%, 94% {
+          opacity: 1;
+          filter: url(#vlLightGlow);
+          transform: scale(1.08);
+        }
+        100% {
+          opacity: 0.32;
+          filter: none;
+          transform: scale(1);
+        }
+      }
+    ]]></style>
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       id="path8"
+       style="fill:#4d727a;stroke-linecap:round;stroke-linejoin:round;fill-opacity:1"
+       d="M 11.113534 5.5567668 C 8.0551483 5.5567668 5.5567668 8.0551483 5.5567668 11.113534 C 5.5567668 14.17192 8.0551483 16.667716 11.113534 16.667716 C 14.17192 16.667716 16.667716 14.17192 16.667716 11.113534 C 16.667716 8.0551483 14.17192 5.5567668 11.113534 5.5567668 z M 33.338017 5.5567668 C 30.279631 5.5567668 27.78125 8.0551483 27.78125 11.113534 C 27.78125 14.17192 30.279631 16.667716 33.338017 16.667716 C 36.396402 16.667716 38.894784 14.17192 38.894784 11.113534 C 38.894784 8.0551483 36.396402 5.5567668 33.338017 5.5567668 z M 55.5625 5.5567668 C 52.504115 5.5567668 50.005733 8.0551483 50.005733 11.113534 C 50.005733 14.17192 52.504115 16.667716 55.5625 16.667716 C 58.620885 16.667716 61.119267 14.17192 61.119267 11.113534 C 61.119267 8.0551483 58.620885 5.5567668 55.5625 5.5567668 z " />
+    <circle
+       style="fill:#65dbc1;fill-opacity:1;stroke:none;stroke-width:1.56158;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"
+       id="light_2"
+       cx="33.337502"
+       cy="11.112242"
+       r="4.2337275" />
+    <circle
+       style="fill:#65dbc1;fill-opacity:1;stroke:none;stroke-width:1.56158;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"
+       id="light_1"
+       cx="11.112494"
+       cy="11.112242"
+       r="4.2337275" />
+    <circle
+       style="fill:#65dbc1;fill-opacity:1;stroke:none;stroke-width:1.56158;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1"
+       id="light_3"
+       cx="55.562508"
+       cy="11.112242"
+       r="4.2337275" />
+  </g>
+</svg>

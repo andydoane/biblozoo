@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="179"
+   height="179"
+   viewBox="-6.3197915 -6.3197915 60 60"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="starGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur1"/>
+      <feColorMatrix in="blur1" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 1 0" result="glow1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4.4" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="glow1"/>
+      </feMerge>
+    </filter>
+
+    <style>
+      .star-wrap {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      .star-glow {
+        fill: #ffd86a;
+        opacity: 0.55;
+        filter: url(#starGlow);
+        animation: glowPulse 1.5s ease-in-out infinite;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      .star-core {
+        fill: #ffc751;
+        animation: starPulse 1.5s ease-in-out infinite;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      .star-highlight {
+        fill: rgba(255,255,255,0.42);
+        animation: highlightPulse 1.5s ease-in-out infinite;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      @keyframes starPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+      }
+
+      @keyframes glowPulse {
+        0%, 100% {
+          opacity: 0.42;
+          transform: scale(0.96);
+        }
+        50% {
+          opacity: 0.95;
+          transform: scale(1.18);
+        }
+      }
+
+      @keyframes highlightPulse {
+        0%, 100% {
+          opacity: 0.22;
+          transform: scale(0.98);
+        }
+        50% {
+          opacity: 0.50;
+          transform: scale(1.04);
+        }
+      }
+    </style>
+  </defs>
+
+  <g id="layer1" class="star-wrap">
+    <path
+      class="star-glow"
+      d="m 23.680173,6.7138012 c 2.79402,-7.5e-6 4.231582,8.0186628 6.492067,9.6604498 2.260305,1.6413 10.33284,0.529665 11.196255,3.185948 0.86337,2.656297 -6.319882,6.502005 -7.183207,9.15843 -0.863423,2.656207 2.687265,9.98673 0.427012,11.628412 -2.26047,1.641698 -8.138092,-3.999232 -10.932112,-3.999232 -2.793998,0 -8.671643,5.64075 -10.931932,3.999187 -2.260493,-1.641532 1.290254,-8.97216 0.426855,-11.628442 C 12.311726,26.062249 5.1285334,22.216496 5.9919258,19.560326 6.8552884,16.903871 14.92777,18.015581 17.18824,16.374131 19.448583,14.732426 20.886175,6.7138012 23.680173,6.7138012 Z" />
+
+    <path
+      class="star-core"
+      id="star"
+      d="m 23.680173,6.7138012 c 2.79402,-7.5e-6 4.231582,8.0186628 6.492067,9.6604498 2.260305,1.6413 10.33284,0.529665 11.196255,3.185948 0.86337,2.656297 -6.319882,6.502005 -7.183207,9.15843 -0.863423,2.656207 2.687265,9.98673 0.427012,11.628412 -2.26047,1.641698 -8.138092,-3.999232 -10.932112,-3.999232 -2.793998,0 -8.671643,5.64075 -10.931932,3.999187 -2.260493,-1.641532 1.290254,-8.97216 0.426855,-11.628442 C 12.311726,26.062249 5.1285334,22.216496 5.9919258,19.560326 6.8552884,16.903871 14.92777,18.015581 17.18824,16.374131 19.448583,14.732426 20.886175,6.7138012 23.680173,6.7138012 Z" />
+
+    <path
+      class="star-highlight"
+      d="m 24.108,9.2 c 2.06,0 3.17,6.03 4.86,7.26 1.78,1.29 7.85,0.48 8.53,2.57 0.67,2.06 -4.79,4.98 -5.48,7.1 -0.69,2.12 2.08,7.59 0.4,8.81 -1.63,1.18 -5.99,-2.95 -8.14,-2.95 -0.42,0 -0.79,-0.05 -1.11,-0.14 1.67,-1.01 4.53,-3.25 5.69,-6.84 1.44,-4.42 -0.55,-10.99 -4.75,-15.81 z" />
+  </g>
+</svg>

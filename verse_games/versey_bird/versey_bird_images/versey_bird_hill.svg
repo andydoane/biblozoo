@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="2400"
+   height="240"
+   viewBox="0 0 635 63.5"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   sodipodi:docname="versey_bird_hill.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="false"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     borderlayer="false"
+     inkscape:zoom="4.8126513"
+     inkscape:cx="0.41557135"
+     inkscape:cy="160.30665"
+     inkscape:window-width="2048"
+     inkscape:window-height="1209"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       d="M 307.30958,0.67749968 C 283.71093,1.8035997 261.27018,11.2138 238.09862,16.613 211.61685,22.7835 186.59606,39.4537 158.69729,37.7796 130.79852,36.1056 107.48616,6.8577997 79.295958,6.0295997 51.10576,5.2014997 26.4377,30.5526 -0.10537055,32.488 c 0,0 -3.90334045,3.743818 -3.90334045,15.506 0,11.762182 3.90334045,15.506 3.90334045,15.506 H 635.10537 c 0,0 8.7856,-1.32398 8.7856,-15.506 0,-14.18202 -8.7856,-15.506 -8.7856,-15.506 -27.3921,1.7048 -52.80234,-13.2421 -79.40142,-15.875 -26.5991,-2.633 -52.87547,-1.7601 -79.40133,0 -26.52587,1.76 -52.22334,13.1612 -79.40133,10.5833 C 369.7233,24.6184 344.89193,2.4427997 317.49996,0.73799968 c -3.424,-0.2131 -6.81912,-0.2214 -10.19037,-0.061 z"
+       fill="#7fb86a"
+       id="path1-8"
+       style="fill:#95d18a;fill-opacity:1;stroke-width:0.264627"
+       clip-path="none"
+       sodipodi:nodetypes="csccczcczcscsscc" />
+  </g>
+</svg>
