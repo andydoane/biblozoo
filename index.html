@@ -1,1 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  />
 
+  <meta
+    name="description"
+    content="Learn and practice Bible verses while caring for your BibloPets."
+  >
+  <meta name="theme-color" content="#7f66c6">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <meta
+    name="apple-mobile-web-app-title"
+    content="BibloZoo"
+  >
+
+  <title>BibloZoo – Verse Memory</title>
+
+  <!-- Local app font -->
+  <link
+    rel="preload"
+    href="./verse_fonts/Baloo2.ttf"
+    as="font"
+    type="font/ttf"
+    crossorigin
+  >
+  <!-- App styles -->
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="profiles.css">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+  <link rel="icon" href="./favicon.ico">
+  <link rel="manifest" href="./site.webmanifest">
+  
+</head>
+<body>
+  <div id="app"></div>
+  <nav id="navBar"></nav>
+
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <div class="dialog">
+      <h3 id="dlgTitle">Notice</h3>
+      <p id="dlgBody">...</p>
+      <div class="row" id="dlgActions"></div>
+    </div>
+  </div>
+<!-- App JavaScript -->
+<script src="profiles.js"></script>
+<script src="app.js"></script>
+<script src="verse_games/registry.js"></script>
+<script src="verse_playground/registry.js"></script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("./service-worker.js", {
+          scope: "./",
+          updateViaCache: "none"
+        })
+        .then((registration) => {
+          console.info(
+            "BibloZoo service worker registered:",
+            registration.scope
+          );
+        })
+        .catch((err) => {
+          console.warn(
+            "BibloZoo service worker registration failed:",
+            err
+          );
+        });
+    });
+  }
+</script>
+</body>
+</html>

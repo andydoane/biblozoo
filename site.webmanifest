@@ -1,0 +1,26 @@
+{
+  "id": "./",
+  "name": "BibloZoo – Verse Memory",
+  "short_name": "BibloZoo",
+  "description": "Learn and practice Bible verses while caring for your BibloPets.",
+  "lang": "en-US",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#7f66c6",
+  "theme_color": "#7f66c6",
+  "icons": [
+    {
+      "src": "./android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
