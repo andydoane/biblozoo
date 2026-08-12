@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verse Munch Soundboard</title>
+  <style>
+    :root {
+      --bg1: #7f66c6;
+      --bg2: #5d49a8;
+      --card: rgba(255,255,255,0.94);
+      --ink: #211a43;
+      --purple: #5f4ab1;
+      --cyan: #40b9c5;
+      --shadow: 0 8px 0 rgba(0,0,0,0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,0.18), transparent 38%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      padding: 18px;
+    }
+
+    main {
+      width: min(100%, 980px);
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      color: white;
+      font-size: clamp(30px, 7vw, 52px);
+      line-height: 1;
+      text-shadow: 0 5px 0 rgba(0,0,0,0.20);
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      color: rgba(255,255,255,0.92);
+      font-weight: 800;
+      line-height: 1.35;
+    }
+
+    .panel {
+      background: var(--card);
+      border-radius: 24px;
+      padding: 14px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    @media (min-width: 760px) {
+      .top-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    label {
+      font-weight: 900;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--purple);
+    }
+
+    .value {
+      min-width: 4.5em;
+      text-align: right;
+      font-weight: 900;
+      color: var(--purple);
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 900;
+      cursor: pointer;
+      color: white;
+      background: var(--purple);
+      box-shadow: 0 4px 0 rgba(0,0,0,0.18);
+    }
+
+    button.secondary {
+      background: #384152;
+    }
+
+    button.good {
+      background: var(--cyan);
+    }
+
+    button.warn {
+      background: #e05276;
+    }
+
+    button:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.18);
+    }
+
+    .sound-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .sound-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(95, 74, 177, 0.10);
+      border: 2px solid rgba(95, 74, 177, 0.12);
+    }
+
+    @media (min-width: 760px) {
+      .sound-row {
+        grid-template-columns: 210px 1fr 84px;
+        align-items: center;
+      }
+    }
+
+    .sound-title {
+      font-weight: 1000;
+      color: var(--purple);
+    }
+
+    .sound-meta {
+      font-size: 12px;
+      font-weight: 800;
+      opacity: 0.68;
+      overflow-wrap: anywhere;
+      margin-top: 2px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 260px;
+      resize: vertical;
+      border-radius: 18px;
+      border: 2px solid rgba(95, 74, 177, 0.25);
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #172033;
+      background: white;
+    }
+
+    .note {
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: rgba(33,26,67,0.78);
+    }
+
+    .status {
+      min-height: 1.4em;
+      font-weight: 900;
+      color: var(--purple);
+    }
+
+    .sequence-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Verse Munch Soundboard</h1>
+  <p class="subtitle">Place this file in the Verse Munch folder next to <strong>index.html</strong>. Adjust volumes, test sounds in game-like groups, then copy the generated <strong>SOUND_TUNING</strong> code into the game file.</p>
+
+  <section class="panel top-grid">
+    <div>
+      <label for="masterVolume">Master volume</label>
+      <div class="range-row">
+        <input id="masterVolume" type="range" min="0" max="1" step="0.01">
+        <span class="value" id="masterValue"></span>
+      </div>
+    </div>
+    <div>
+      <label>Controls</label>
+      <div class="buttons">
+        <button class="good" id="unlockBtn">Unlock / Preload</button>
+        <button class="secondary" id="stopBtn">Stop All</button>
+        <button class="warn" id="resetBtn">Reset Defaults</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <label>Game-like test sequences</label>
+    <div class="buttons sequence-grid">
+      <button data-sequence="correctWord">Correct word bite</button>
+      <button data-sequence="wrongWord">Wrong word reaction</button>
+      <button data-sequence="bonusCorrect">Bonus correct fruit</button>
+      <button data-sequence="bonusWrong">Bonus wrong fruit</button>
+      <button data-sequence="multiplier">2X / 3X milestone</button>
+      <button data-sequence="complete">Bonus complete</button>
+    </div>
+    <p class="note">Sequences help compare relative loudness the way sounds happen in the actual game.</p>
+  </section>
+
+  <section class="panel">
+    <label>Individual sounds</label>
+    <div class="sound-list" id="soundList"></div>
+  </section>
+
+  <section class="panel">
+    <label for="codeOut">Generated code to paste into your game file</label>
+    <textarea id="codeOut" readonly></textarea>
+    <div class="buttons" style="margin-top:10px;">
+      <button class="good" id="copyBtn">Copy Code</button>
+    </div>
+    <p class="note">Replace only the <code>const SOUND_TUNING = { ... };</code> block in your Verse Munch game code.</p>
+  </section>
+</main>
+
+<script>
+(() => {
+  const SOUND_FILES = [
+    { key: "uiTap1", label: "UI Tap 1", src: "../../ui_audio/ui_sound_pop_1.mp3", volumeKey: "uiTap" },
+    { key: "uiTap2", label: "UI Tap 2", src: "../../ui_audio/ui_sound_pop_2.mp3", volumeKey: "uiTap" },
+    { key: "wordTap1", label: "Word/Fruit Tap 1", src: "./verse_munch_sounds/verse_munch_tap_1.mp3", volumeKey: "wordTap" },
+    { key: "wordTap2", label: "Word/Fruit Tap 2", src: "./verse_munch_sounds/verse_munch_tap_2.mp3", volumeKey: "wordTap" },
+    { key: "chew1", label: "Chew 1", src: "./verse_munch_sounds/verse_munch_chew_1.mp3", volumeKey: "chew" },
+    { key: "chew2", label: "Chew 2", src: "./verse_munch_sounds/verse_munch_chew_2.mp3", volumeKey: "chew" },
+    { key: "chew3", label: "Chew 3", src: "./verse_munch_sounds/verse_munch_chew_3.mp3", volumeKey: "chew" },
+    { key: "chomp", label: "Initial Chomp", src: "./verse_munch_sounds/verse_munch_chomp.mp3", volumeKey: "chomp" },
+    { key: "correct", label: "Correct", src: "./verse_munch_sounds/verse_munch_correct.mp3", volumeKey: "correct" },
+    { key: "spew", label: "Spew", src: "./verse_munch_sounds/verse_munch_spew.mp3", volumeKey: "spew" },
+    { key: "dizzy", label: "Dizzy", src: "./verse_munch_sounds/verse_munch_dizzy.mp3", volumeKey: "dizzy" },
+    { key: "streak", label: "Streak", src: "./verse_munch_sounds/verse_munch_streak.mp3", volumeKey: "streak" },
+    { key: "bonusStart", label: "Bonus Start", src: "./verse_munch_sounds/verse_munch_bonus_start.mp3", volumeKey: "bonusStart" },
+    { key: "bonusResult", label: "Bonus Result", src: "./verse_munch_sounds/verse_munch_bonus_result.mp3", volumeKey: "bonusResult" },
+    { key: "wrongFruit", label: "Wrong Fruit", src: "./verse_munch_sounds/verse_munch_wrong_fruit.mp3", volumeKey: "wrongFruit" }
+  ];
+
+  const DEFAULT_TUNING = {
+    masterVolume: 0.90,
+    volumes: {
+    uiTap: 0.45,
+    wordTap: 0.48,
+    chew: 0.58,
+    chomp: 0.50,
+    correct: 0.70,
+    spew: 0.50,
+    dizzy: 0.70,
+    streak: 0.78,
+    bonusStart: 0.82,
+    bonusResult: 0.86,
+    wrongFruit: 0.74
+  }
+  };
+
+  const state = {
+    audioCtx: null,
+    buffers: new Map(),
+    bufferPromises: new Map(),
+    activeSources: new Set(),
+    masterVolume: DEFAULT_TUNING.masterVolume,
+    volumes: { ...DEFAULT_TUNING.volumes }
+  };
+
+  const els = {
+    soundList: document.getElementById("soundList"),
+    masterVolume: document.getElementById("masterVolume"),
+    masterValue: document.getElementById("masterValue"),
+    codeOut: document.getElementById("codeOut"),
+    status: document.getElementById("status"),
+    unlockBtn: document.getElementById("unlockBtn"),
+    stopBtn: document.getElementById("stopBtn"),
+    resetBtn: document.getElementById("resetBtn"),
+    copyBtn: document.getElementById("copyBtn")
+  };
+
+  function getAudioContext() {
+    if (!state.audioCtx) {
+      const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextCtor) {
+        setStatus("Web Audio is not supported in this browser.");
+        return null;
+      }
+      state.audioCtx = new AudioContextCtor();
+    }
+    return state.audioCtx;
+  }
+
+  async function unlockAudio() {
+    const ctx = getAudioContext();
+    if (!ctx) return false;
+
+    try {
+      if (ctx.state === "suspended") await ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.03);
+
+      preloadAll();
+      setStatus("Audio unlocked. Sounds are preloading.");
+      return true;
+    } catch (err) {
+      console.warn(err);
+      setStatus("Audio unlock failed. Try tapping Unlock again.");
+      return false;
+    }
+  }
+
+  function setStatus(message) {
+    els.status.textContent = message || "";
+  }
+
+  function getSound(key) {
+    return SOUND_FILES.find(sound => sound.key === key);
+  }
+
+  async function loadBuffer(sound) {
+    const ctx = getAudioContext();
+    if (!ctx || !sound) return null;
+
+    if (state.buffers.has(sound.key)) return state.buffers.get(sound.key);
+    if (state.bufferPromises.has(sound.key)) return state.bufferPromises.get(sound.key);
+
+    const promise = fetch(sound.src)
+      .then(response => {
+        if (!response.ok) throw new Error(`Unable to load ${sound.src}`);
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
+      .then(buffer => {
+        state.buffers.set(sound.key, buffer);
+        return buffer;
+      })
+      .catch(err => {
+        console.warn(err);
+        setStatus(`Could not load: ${sound.label}`);
+        return null;
+      })
+      .finally(() => {
+        state.bufferPromises.delete(sound.key);
+      });
+
+    state.bufferPromises.set(sound.key, promise);
+    return promise;
+  }
+
+  function preloadAll() {
+    SOUND_FILES.forEach(loadBuffer);
+  }
+
+  function effectiveVolume(volumeKey) {
+    const master = Number(state.masterVolume);
+    const individual = Number(state.volumes[volumeKey]);
+    return clamp(master, 0, 1) * clamp(individual, 0, 1);
+  }
+
+  async function playSound(key, overrideVolumeKey) {
+    const sound = getSound(key);
+    if (!sound) return;
+
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+
+    const buffer = await loadBuffer(sound);
+    if (!buffer) return;
+
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+
+    source.buffer = buffer;
+    gain.gain.value = effectiveVolume(overrideVolumeKey || sound.volumeKey);
+
+    source.connect(gain);
+    gain.connect(ctx.destination);
+
+    source.onended = () => state.activeSources.delete(source);
+    state.activeSources.add(source);
+    source.start(0);
+  }
+
+  function stopAll() {
+    state.activeSources.forEach(source => {
+      try { source.stop(); } catch (err) {}
+    });
+    state.activeSources.clear();
+  }
+
+  function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function playSequence(name) {
+    stopAll();
+
+    if (name === "correctWord") {
+      await playSound("wordTap1");
+      await wait(210);
+      await playSound("chomp");
+      await wait(180);
+      await playSound("chew1");
+      await wait(160);
+      await playSound("chew2");
+      await wait(160);
+      await playSound("chew3");
+      await wait(150);
+      await playSound("correct");
+      return;
+    }
+
+    if (name === "wrongWord") {
+      await playSound("wordTap2");
+      await wait(230);
+      await playSound("chomp");
+      await wait(260);
+      await playSound("dizzy");
+      await wait(380);
+      await playSound("spew");
+      return;
+    }
+
+    if (name === "bonusCorrect") {
+      await playSound("wordTap1");
+      await wait(230);
+      await playSound("chew1");
+      return;
+    }
+
+    if (name === "bonusWrong") {
+      await playSound("wrongFruit");
+      return;
+    }
+
+    if (name === "multiplier") {
+      await playSound("wordTap2");
+      await wait(180);
+      await playSound("streak");
+      return;
+    }
+
+    if (name === "complete") {
+      await playSound("bonusStart");
+      await wait(850);
+      await playSound("bonusResult");
+    }
+  }
+
+  function clamp(value, min, max) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    return Math.max(min, Math.min(max, num));
+  }
+
+  function pct(value) {
+    return `${Math.round(Number(value) * 100)}%`;
+  }
+
+  function renderSoundList() {
+    const volumeKeys = Array.from(new Set(SOUND_FILES.map(sound => sound.volumeKey)));
+
+    els.soundList.innerHTML = volumeKeys.map(volumeKey => {
+      const relatedSounds = SOUND_FILES.filter(sound => sound.volumeKey === volumeKey);
+      const labels = relatedSounds.map(sound => sound.label).join(", ");
+      const current = state.volumes[volumeKey];
+
+      return `
+        <div class="sound-row" data-volume-key="${volumeKey}">
+          <div>
+            <div class="sound-title">${escapeHtml(volumeKey)}</div>
+            <div class="sound-meta">${escapeHtml(labels)}</div>
+          </div>
+          <div class="range-row">
+            <input type="range" min="0" max="1" step="0.01" value="${current}" data-volume-slider="${volumeKey}">
+            <span class="value" data-volume-value="${volumeKey}">${pct(current)}</span>
+          </div>
+          <div class="buttons">
+            ${relatedSounds.map(sound => `<button class="secondary" data-play="${sound.key}">${escapeHtml(shortButtonLabel(sound.label))}</button>`).join("")}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    els.soundList.querySelectorAll("[data-volume-slider]").forEach(slider => {
+      slider.addEventListener("input", () => {
+        const key = slider.dataset.volumeSlider;
+        state.volumes[key] = Number(slider.value);
+        updateUi();
+      });
+    });
+
+    els.soundList.querySelectorAll("[data-play]").forEach(button => {
+      button.addEventListener("click", () => {
+        playSound(button.dataset.play);
+      });
+    });
+  }
+
+  function shortButtonLabel(label) {
+    return label
+      .replace("Word/Fruit ", "")
+      .replace("Initial ", "")
+      .replace("Bonus ", "")
+      .replace("Wrong Fruit", "Wrong")
+      .replace("Correct", "Play");
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function generatedCode() {
+    const entries = Object.keys(state.volumes)
+      .map(key => `      ${key}: ${Number(state.volumes[key]).toFixed(2)}`)
+      .join(",\n");
+
+    return `  const SOUND_TUNING = {
+    masterVolume: ${Number(state.masterVolume).toFixed(2)},
+    volumes: {
+${entries}
+    }
+  };`;
+  }
+
+  function updateUi() {
+    els.masterVolume.value = state.masterVolume;
+    els.masterValue.textContent = pct(state.masterVolume);
+
+    Object.keys(state.volumes).forEach(key => {
+      const value = document.querySelector(`[data-volume-value="${key}"]`);
+      const slider = document.querySelector(`[data-volume-slider="${key}"]`);
+      if (value) value.textContent = pct(state.volumes[key]);
+      if (slider && Number(slider.value) !== Number(state.volumes[key])) {
+        slider.value = state.volumes[key];
+      }
+    });
+
+    els.codeOut.value = generatedCode();
+  }
+
+  els.masterVolume.addEventListener("input", () => {
+    state.masterVolume = Number(els.masterVolume.value);
+    updateUi();
+  });
+
+  els.unlockBtn.addEventListener("click", unlockAudio);
+  els.stopBtn.addEventListener("click", stopAll);
+
+  els.resetBtn.addEventListener("click", () => {
+    stopAll();
+    state.masterVolume = DEFAULT_TUNING.masterVolume;
+    state.volumes = { ...DEFAULT_TUNING.volumes };
+    updateUi();
+    setStatus("Reset to defaults.");
+  });
+
+  els.copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(els.codeOut.value);
+      setStatus("Copied SOUND_TUNING code.");
+    } catch (err) {
+      els.codeOut.select();
+      document.execCommand("copy");
+      setStatus("Copied SOUND_TUNING code.");
+    }
+  });
+
+  document.querySelectorAll("[data-sequence]").forEach(button => {
+    button.addEventListener("click", () => playSequence(button.dataset.sequence));
+  });
+
+  renderSoundList();
+  updateUi();
+})();
+</script>
+</body>
+</html>

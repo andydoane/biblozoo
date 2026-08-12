@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verse Invaders CRT Vanish Tests</title>
+  <style>
+    @font-face {
+      font-family: "Baloo 2";
+      src: url("../../verse_fonts/Baloo2.ttf") format("truetype");
+      font-weight: 400 900;
+      font-style: normal;
+      font-display: block;
+    }
+
+    :root {
+      --bg: #333333;
+      --panel: rgba(255, 255, 255, 0.08);
+      --panel-2: rgba(255, 255, 255, 0.12);
+      --text: #ffffff;
+      --muted: rgba(255, 255, 255, 0.72);
+      --alien-size: clamp(76px, 13vw, 128px);
+      --alien-color: #ffc751;
+      --glow: rgba(255, 255, 255, 0.92);
+      --cyan: rgba(135, 247, 255, 0.72);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top, rgba(255,255,255,0.08), transparent 42%),
+        var(--bg);
+      color: var(--text);
+      font-family: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 22px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(28px, 5vw, 52px);
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .intro {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: clamp(16px, 2.6vw, 22px);
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0 0 18px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font: inherit;
+      font-size: 18px;
+      font-weight: 900;
+      color: #333333;
+      background: #ffffff;
+      box-shadow: 0 5px 0 rgba(0,0,0,0.24);
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.24);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      max-width: 1180px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      padding: 14px;
+      min-height: 270px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      line-height: 1.05;
+      font-weight: 900;
+    }
+
+    .card p {
+      margin: 0 0 10px;
+      min-height: 42px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .stage {
+      height: 154px;
+      border-radius: 20px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.14)),
+        rgba(0,0,0,0.14);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        180deg,
+        rgba(255,255,255,0.045) 0,
+        rgba(255,255,255,0.045) 1px,
+        transparent 1px,
+        transparent 5px
+      );
+      opacity: 0.34;
+      pointer-events: none;
+    }
+
+    .sample {
+      position: relative;
+      width: var(--alien-size);
+      height: var(--alien-size);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform-origin: center center;
+      will-change: transform, opacity, filter;
+      z-index: 2;
+    }
+
+    .sample img {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 3px 0 rgba(0,0,0,0.22));
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .sample::before,
+    .sample::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scaleX(0);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .sample::before {
+      width: 148%;
+      height: 5px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow:
+        0 0 8px rgba(255,255,255,0.9),
+        0 0 18px var(--cyan),
+        0 0 34px var(--cyan);
+      z-index: 5;
+    }
+
+    .sample::after {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #ffffff;
+      box-shadow:
+        0 0 8px rgba(255,255,255,0.95),
+        0 0 22px var(--cyan);
+      z-index: 6;
+    }
+
+    .stage .beam {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 78%;
+      height: 58%;
+      transform: translate(-50%, -50%) scale(0.4, 0.05);
+      border-radius: 999px;
+      opacity: 0;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.38), rgba(135,247,255,0.12) 48%, transparent 72%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .card .replay {
+      margin-top: 10px;
+      width: 100%;
+      font-size: 16px;
+      padding: 8px 12px;
+    }
+
+    .is-playing.v1 .sample { animation: crtVanishClassic 760ms cubic-bezier(0.19, 0.82, 0.2, 1) forwards; }
+    .is-playing.v1 .sample::before { animation: lineClassic 760ms linear forwards; }
+    .is-playing.v1 .sample::after { animation: dotPop 760ms linear forwards; }
+
+    .is-playing.v2 .sample { animation: crtVanishSoft 860ms cubic-bezier(0.2, 0.76, 0.22, 1) forwards; }
+    .is-playing.v2 .sample::before { animation: lineSoft 860ms linear forwards; }
+    .is-playing.v2 .beam { animation: beamSoft 860ms linear forwards; }
+
+    .is-playing.v3 .sample { animation: crtVanishSnap 620ms cubic-bezier(0.18, 0.86, 0.22, 1) forwards; }
+    .is-playing.v3 .sample::before { animation: lineSnap 620ms linear forwards; }
+    .is-playing.v3 .sample::after { animation: dotPopFast 620ms linear forwards; }
+
+    .is-playing.v4 .sample { animation: crtVanishHologram 880ms cubic-bezier(0.22, 0.72, 0.2, 1) forwards; }
+    .is-playing.v4 .sample::before { animation: lineHologram 880ms linear forwards; }
+    .is-playing.v4 .beam { animation: beamHologram 880ms linear forwards; }
+
+    .is-playing.v5 .sample { animation: crtVanishWobble 820ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards; }
+    .is-playing.v5 .sample::before { animation: lineWobble 820ms linear forwards; }
+
+    .is-playing.v6 .sample { animation: crtVanishTinyPop 700ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards; }
+    .is-playing.v6 .sample::before { animation: lineTinyPop 700ms linear forwards; }
+    .is-playing.v6 .sample::after { animation: dotTinyPop 700ms linear forwards; }
+
+    @keyframes crtVanishClassic {
+      0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+      48% { opacity: 1; transform: scale(1.03, 0.18); filter: brightness(1.55) saturate(0.72); }
+      66% { opacity: 0.84; transform: scale(1.16, 0.035); filter: brightness(2.2) saturate(0.45); }
+      82% { opacity: 0.32; transform: scale(0.18, 0.02); filter: brightness(2.6) saturate(0.2); }
+      100% { opacity: 0; transform: scale(0.02, 0.01); filter: brightness(0); }
+    }
+
+    @keyframes lineClassic {
+      0%, 42% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.15); }
+      50% { opacity: 0.94; transform: translate(-50%, -50%) scaleX(0.98); }
+      72% { opacity: 0.88; transform: translate(-50%, -50%) scaleX(0.62); }
+      90% { opacity: 0.38; transform: translate(-50%, -50%) scaleX(0.12); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scaleX(0); }
+    }
+
+    @keyframes crtVanishSoft {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+      38% { opacity: 0.96; transform: translateY(-3px) scale(0.96, 0.42); filter: brightness(1.28) saturate(0.82); }
+      62% { opacity: 0.78; transform: translateY(-8px) scale(0.9, 0.1); filter: brightness(1.75) saturate(0.55); }
+      82% { opacity: 0.32; transform: translateY(-13px) scale(0.52, 0.035); filter: brightness(2.25) saturate(0.35); }
+      100% { opacity: 0; transform: translateY(-18px) scale(0.08, 0.01); filter: brightness(0); }
+    }
+
+    @keyframes lineSoft {
+      0%, 34% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.2); }
+      50% { opacity: 0.62; transform: translate(-50%, -50%) scaleX(0.78); }
+      76% { opacity: 0.52; transform: translate(-50%, -50%) scaleX(0.46); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scaleX(0); }
+    }
+
+    @keyframes beamSoft {
+      0%, 24% { opacity: 0; transform: translate(-50%, -50%) scale(0.4, 0.05); }
+      42% { opacity: 0.34; transform: translate(-50%, -50%) scale(1, 0.16); }
+      72% { opacity: 0.2; transform: translate(-50%, -50%) scale(0.7, 0.08); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.08, 0.02); }
+    }
+
+    @keyframes crtVanishSnap {
+      0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+      18% { opacity: 1; transform: scale(1.04, 1.02); filter: brightness(1.15); }
+      44% { opacity: 0.96; transform: scale(1.12, 0.12); filter: brightness(1.9) saturate(0.55); }
+      68% { opacity: 0.52; transform: scale(0.72, 0.028); filter: brightness(2.4) saturate(0.35); }
+      100% { opacity: 0; transform: scale(0.01, 0.01); filter: brightness(0); }
+    }
+
+    @keyframes lineSnap {
+      0%, 34% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.2); }
+      46% { opacity: 1; transform: translate(-50%, -50%) scaleX(1.06); }
+      70% { opacity: 0.72; transform: translate(-50%, -50%) scaleX(0.38); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scaleX(0); }
+    }
+
+    @keyframes crtVanishHologram {
+      0% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1) hue-rotate(0deg); }
+      26% { opacity: 0.9; transform: translateY(-4px) scale(1.02, 0.78); filter: brightness(1.28) hue-rotate(12deg); }
+      54% { opacity: 0.72; transform: translateY(-10px) scale(0.92, 0.18); filter: brightness(1.8) hue-rotate(26deg) saturate(0.62); }
+      78% { opacity: 0.28; transform: translateY(-19px) scale(0.64, 0.04); filter: brightness(2.4) hue-rotate(40deg) saturate(0.36); }
+      100% { opacity: 0; transform: translateY(-26px) scale(0.1, 0.01); filter: brightness(0); }
+    }
+
+    @keyframes lineHologram {
+      0%, 28% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.2); }
+      50% { opacity: 0.8; transform: translate(-50%, -50%) scaleX(0.92); background: rgba(135,247,255,0.92); }
+      78% { opacity: 0.48; transform: translate(-50%, -50%) scaleX(0.44); background: #ffffff; }
+      100% { opacity: 0; transform: translate(-50%, -50%) scaleX(0); }
+    }
+
+    @keyframes beamHologram {
+      0%, 20% { opacity: 0; transform: translate(-50%, -50%) scale(0.4, 0.05); }
+      42% { opacity: 0.48; transform: translate(-50%, -50%) scale(1.05, 0.22); }
+      70% { opacity: 0.24; transform: translate(-50%, -50%) scale(0.72, 0.08); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.08, 0.02); }
+    }
+
+    @keyframes crtVanishWobble {
+      0% { opacity: 1; transform: scale(1) skewX(0deg); filter: brightness(1); }
+      24% { opacity: 1; transform: scale(1.02, 0.82) skewX(-3deg); filter: brightness(1.18); }
+      42% { opacity: 0.92; transform: scale(1.08, 0.24) skewX(4deg); filter: brightness(1.65) saturate(0.65); }
+      62% { opacity: 0.68; transform: scale(0.94, 0.06) skewX(-2deg); filter: brightness(2.1) saturate(0.45); }
+      82% { opacity: 0.3; transform: scale(0.48, 0.025) skewX(1deg); filter: brightness(2.35) saturate(0.34); }
+      100% { opacity: 0; transform: scale(0.05, 0.01) skewX(0deg); filter: brightness(0); }
+    }
+
+    @keyframes lineWobble {
+      0%, 32% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.18) rotate(0deg); }
+      46% { opacity: 0.9; transform: translate(-50%, -50%) scaleX(0.98) rotate(-1deg); }
+      70% { opacity: 0.66; transform: translate(-50%, -50%) scaleX(0.54) rotate(1deg); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scaleX(0) rotate(0deg); }
+    }
+
+    @keyframes crtVanishTinyPop {
+      0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+      36% { opacity: 1; transform: scale(1.05, 0.22); filter: brightness(1.7) saturate(0.65); }
+      58% { opacity: 0.78; transform: scale(0.92, 0.05); filter: brightness(2.2) saturate(0.42); }
+      78% { opacity: 0.24; transform: scale(0.18, 0.02); filter: brightness(2.7); }
+      88% { opacity: 0.72; transform: scale(0.055); filter: brightness(3); }
+      100% { opacity: 0; transform: scale(0.01); filter: brightness(0); }
+    }
+
+    @keyframes lineTinyPop {
+      0%, 28% { opacity: 0; transform: translate(-50%, -50%) scaleX(0.14); }
+      44% { opacity: 0.88; transform: translate(-50%, -50%) scaleX(0.92); }
+      76% { opacity: 0.36; transform: translate(-50%, -50%) scaleX(0.18); }
+      90%, 100% { opacity: 0; transform: translate(-50%, -50%) scaleX(0); }
+    }
+
+    @keyframes dotPop {
+      0%, 78% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      88% { opacity: 0.86; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.05); }
+    }
+
+    @keyframes dotPopFast {
+      0%, 70% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      84% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.82); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.05); }
+    }
+
+    @keyframes dotTinyPop {
+      0%, 76% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      88% { opacity: 0.92; transform: translate(-50%, -50%) scale(0.7); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0.04); }
+    }
+
+    @media (max-width: 520px) {
+      body { padding: 14px; }
+      .grid { grid-template-columns: 1fr; }
+      .card { min-height: 250px; }
+      .stage { height: 142px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>CRT Vanish Tests</h1>
+  <p class="intro">Drop this file in <strong>verse_games/verse_invaders/</strong>. It uses the local alien SVG asset path.</p>
+
+  <div class="top-actions">
+    <button type="button" id="playAll">Play all</button>
+    <button type="button" id="resetAll">Reset</button>
+  </div>
+
+  <main class="grid" id="grid">
+    <section class="card v1" data-variant="v1">
+      <h2>1. Classic CRT</h2>
+      <p>Squashes into a bright line, then collapses to a tiny dot.</p>
+      <div class="stage"><div class="beam"></div><div class="sample"><img src="./verse_invaders_images/verse_invaders_alien.svg" alt="Alien"></div></div>
+      <button class="replay" type="button">Play 1</button>
+    </section>
+
+    <section class="card v2" data-variant="v2">
+      <h2>2. Soft Hologram Off</h2>
+      <p>Gentler, less flashy, with a slight upward fade.</p>
+      <div class="stage"><div class="beam"></div><div class="sample"><img src="./verse_invaders_images/verse_invaders_alien.svg" alt="Alien"></div></div>
+      <button class="replay" type="button">Play 2</button>
+    </section>
+
+    <section class="card v3" data-variant="v3">
+      <h2>3. Quick Snap Off</h2>
+      <p>Fast and arcade-like. Useful when the next round should feel snappy.</p>
+      <div class="stage"><div class="beam"></div><div class="sample"><img src="./verse_invaders_images/verse_invaders_alien.svg" alt="Alien"></div></div>
+      <button class="replay" type="button">Play 3</button>
+    </section>
+
+    <section class="card v4" data-variant="v4">
+      <h2>4. Cyan Hologram Collapse</h2>
+      <p>A little more sci-fi, with a faint cyan beam/glow.</p>
+      <div class="stage"><div class="beam"></div><div class="sample"><img src="./verse_invaders_images/verse_invaders_alien.svg" alt="Alien"></div></div>
+      <button class="replay" type="button">Play 4</button>
+    </section>
+
+    <section class="card v5" data-variant="v5">
+      <h2>5. Wobbly Tube Off</h2>
+      <p>More old-TV personality, with a slight analog wobble.</p>
+      <div class="stage"><div class="beam"></div><div class="sample"><img src="./verse_invaders_images/verse_invaders_alien.svg" alt="Alien"></div></div>
+      <button class="replay" type="button">Play 5</button>
+    </section>
+
+    <section class="card v6" data-variant="v6">
+      <h2>6. Tiny Dot Pop</h2>
+      <p>Collapses, blinks as a tiny dot, then disappears.</p>
+      <div class="stage"><div class="beam"></div><div class="sample"><img src="./verse_invaders_images/verse_invaders_alien.svg" alt="Alien"></div></div>
+      <button class="replay" type="button">Play 6</button>
+    </section>
+  </main>
+
+  <script>
+    const cards = [...document.querySelectorAll(".card")];
+
+    function replay(card) {
+      card.classList.remove("is-playing");
+      void card.offsetWidth;
+      card.classList.add("is-playing");
+    }
+
+    function reset(card) {
+      card.classList.remove("is-playing");
+    }
+
+    document.querySelectorAll(".replay").forEach((button) => {
+      button.addEventListener("click", () => replay(button.closest(".card")));
+    });
+
+    document.getElementById("playAll").addEventListener("click", () => {
+      cards.forEach((card, index) => {
+        reset(card);
+        setTimeout(() => replay(card), index * 110);
+      });
+    });
+
+    document.getElementById("resetAll").addEventListener("click", () => {
+      cards.forEach(reset);
+    });
+
+    setTimeout(() => {
+      cards.forEach((card, index) => setTimeout(() => replay(card), index * 120));
+    }, 250);
+  </script>
+</body>
+</html>

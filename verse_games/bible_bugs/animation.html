@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bible Bugs Stink Animation Tests</title>
+  <style>
+    :root {
+      --bg: #26342a;
+      --panel: #f7fff0;
+      --green-1: #8fc45f;
+      --green-2: #5fa246;
+      --yellow: #ffe15e;
+      --ink: #203428;
+      --stink-a: #6d7638;
+      --stink-b: #716636;
+      --stink-c: #5d572c;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      padding: 18px;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .hero {
+      border-radius: 28px;
+      padding: 20px;
+      background: linear-gradient(180deg, var(--green-1), var(--green-2));
+      color: var(--yellow);
+      box-shadow: 0 10px 0 rgba(0,0,0,.18), inset 0 3px 0 rgba(255,255,255,.22);
+      text-align: center;
+      text-shadow: 0 4px 0 rgba(47,125,73,.72);
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 7vw, 56px);
+      line-height: .95;
+    }
+
+    .hero p {
+      margin: 0;
+      color: white;
+      text-shadow: 0 2px 0 rgba(0,0,0,.2);
+      font-weight: 800;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin: 18px 0;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 16px;
+      font: inherit;
+      font-weight: 900;
+      color: var(--ink);
+      background: white;
+      box-shadow: 0 5px 0 rgba(0,0,0,.16);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    button:active { transform: translateY(2px); box-shadow: 0 3px 0 rgba(0,0,0,.16); }
+
+    .meter {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      color: white;
+      font-weight: 800;
+    }
+
+    .meter span {
+      background: rgba(0,0,0,.22);
+      border-radius: 999px;
+      padding: 7px 12px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border-radius: 24px;
+      padding: 14px;
+      box-shadow: 0 8px 0 rgba(0,0,0,.15);
+    }
+
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      line-height: 1.05;
+    }
+
+    .card p {
+      margin: 0 0 10px;
+      font-size: 13px;
+      line-height: 1.25;
+      color: #526151;
+      min-height: 48px;
+    }
+
+    .stage {
+      position: relative;
+      height: 210px;
+      border-radius: 20px;
+      overflow: hidden;
+      background: linear-gradient(180deg, #9be1e7, #66bdca);
+      display: grid;
+      place-items: center;
+    }
+
+    .bug {
+      position: relative;
+      z-index: 2;
+      width: 78px;
+      height: 64px;
+      border-radius: 48% 52% 44% 56%;
+      background: radial-gradient(circle at 34% 28%, #9eaa57 0 18%, #6d7638 19% 64%, #4e4b29 65% 100%);
+      box-shadow: 0 7px 0 rgba(0,0,0,.14), 0 0 14px rgba(119,214,75,.5);
+    }
+
+    .bug::before,
+    .bug::after {
+      content: "";
+      position: absolute;
+      top: 18px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff7b4;
+      box-shadow: inset 0 -3px 0 rgba(0,0,0,.12);
+    }
+
+    .bug::before { left: 16px; }
+    .bug::after { right: 16px; }
+
+    .fx-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .badge {
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      z-index: 5;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.82);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .dot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--s, 18px);
+      height: var(--s, 18px);
+      margin-left: calc(var(--s, 18px) / -2);
+      margin-top: calc(var(--s, 18px) / -2);
+      border-radius: 50%;
+      background: var(--c, var(--stink-a));
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .ring {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 44px;
+      height: 44px;
+      margin-left: -22px;
+      margin-top: -22px;
+      border-radius: 50%;
+      border: 4px solid rgba(109,118,56,.55);
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .puff {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: var(--s, 28px);
+      height: var(--s, 28px);
+      margin-left: calc(var(--s, 28px) / -2);
+      margin-top: calc(var(--s, 28px) / -2);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(113,102,54,.65), rgba(113,102,54,.32) 56%, transparent 70%);
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .wisp {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 36px;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(109,118,56,.5);
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    .svgfx {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .svgfx path {
+      fill: none;
+      stroke: rgba(93,87,44,.72);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 40 140;
+      opacity: 0;
+      will-change: stroke-dashoffset, opacity;
+    }
+
+    .blast-dot { animation: blastDot 760ms ease-out forwards; }
+    @keyframes blastDot {
+      0% { opacity: 0; transform: translate(0, 0) scale(.25); }
+      12% { opacity: .88; }
+      100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.35); }
+    }
+
+    .float-dot { animation: floatDot 980ms ease-out forwards; }
+    @keyframes floatDot {
+      0% { opacity: 0; transform: translate(0, 0) scale(.6); }
+      18% { opacity: .75; }
+      100% { opacity: 0; transform: translate(var(--x), calc(var(--y) - 42px)) scale(1.1); }
+    }
+
+    .ring-anim { animation: ringAnim 620ms ease-out forwards; }
+    @keyframes ringAnim {
+      0% { opacity: .8; transform: scale(.25); }
+      100% { opacity: 0; transform: scale(var(--scale, 2.2)); }
+    }
+
+    .puff-anim { animation: puffAnim 860ms ease-out forwards; }
+    @keyframes puffAnim {
+      0% { opacity: 0; transform: translate(0, 0) scale(.35); filter: blur(0); }
+      14% { opacity: .68; }
+      100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.8); filter: blur(5px); }
+    }
+
+    .wisp-anim { animation: wispAnim 920ms ease-out forwards; }
+    @keyframes wispAnim {
+      0% { opacity: 0; transform: translate(0, 0) rotate(var(--r, 0deg)) scaleX(.3); }
+      18% { opacity: .58; }
+      100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r, 0deg)) scaleX(1.7); }
+    }
+
+    .svgfx.go path { animation: svgSwirl 1050ms ease-out forwards; }
+    @keyframes svgSwirl {
+      0% { opacity: 0; stroke-dashoffset: 120; }
+      16% { opacity: .72; }
+      100% { opacity: 0; stroke-dashoffset: -180; }
+    }
+
+    .bug.squash { animation: bugSquash 260ms ease; }
+    @keyframes bugSquash {
+      0%, 100% { transform: scale(1); }
+      35% { transform: scale(1.16, .82); }
+      70% { transform: scale(.92, 1.09); }
+    }
+
+    .note {
+      margin: 18px 0 0;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.14);
+      color: white;
+      line-height: 1.35;
+    }
+
+    code {
+      background: rgba(0,0,0,.22);
+      padding: 2px 5px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>Stink Bug Animation Tests</h1>
+      <p>Tap any test card. Use this in the Bible Bugs folder as <code>animation.html</code>.</p>
+    </section>
+
+    <div class="controls">
+      <button id="playAll">Play All</button>
+      <button id="stressLight">Stress: Simple Circles</button>
+      <button id="stressHeavy">Stress: Heavy Swirls</button>
+      <button id="clearAll">Clear</button>
+    </div>
+
+    <div class="meter">
+      <span id="fps">FPS: --</span>
+      <span id="active">Active particles: 0</span>
+      <span id="hint">Tip: simple solid circles should be safest for mobile.</span>
+    </div>
+
+    <section class="grid" id="grid"></section>
+
+    <p class="note">
+      Performance notes: the first two tests are intentionally simple solid-circle options. They avoid blur and SVG, and only animate <code>transform</code> and <code>opacity</code>. Those are the best candidates if the current post-tap stink animation causes slowdown.
+    </p>
+  </main>
+
+  <script>
+    const tests = [
+      {
+        id: "simple-6",
+        title: "A. 6 solid circles",
+        cost: "Very low",
+        desc: "Six plain circles. No blur, no border, no gradients. Best first candidate.",
+        run(layer) { emitSolidDots(layer, 6, 620, 8, 15, 42); }
+      },
+      {
+        id: "simple-10",
+        title: "B. 10 solid circles",
+        cost: "Low",
+        desc: "A slightly fuller simple circle burst. Still cheap and readable.",
+        run(layer) { emitSolidDots(layer, 10, 760, 8, 18, 58); }
+      },
+      {
+        id: "float-8",
+        title: "C. 8 floating circles",
+        cost: "Low",
+        desc: "Solid dots drift upward like stink bubbles. Cheap but softer than a burst.",
+        run(layer) { emitFloatingDots(layer, 8); }
+      },
+      {
+        id: "rings-3",
+        title: "D. 3 ripple rings",
+        cost: "Low-medium",
+        desc: "Three expanding rings. Clean visual, but borders may cost slightly more.",
+        run(layer) { emitRings(layer, 3); }
+      },
+      {
+        id: "puffs-7",
+        title: "E. 7 soft puffs",
+        cost: "Medium",
+        desc: "Radial puffs with blur. Looks stinkier, but blur can slow older phones.",
+        run(layer) { emitPuffs(layer, 7); }
+      },
+      {
+        id: "wisps-8",
+        title: "F. 8 flat wisps",
+        cost: "Medium",
+        desc: "Flat capsule wisps. No blur, but more shape movement and rotation.",
+        run(layer) { emitWisps(layer, 8); }
+      },
+      {
+        id: "combo-light",
+        title: "G. light combo",
+        cost: "Medium",
+        desc: "Simple circles plus one ripple. A good compromise if A/B feel too plain.",
+        run(layer) { emitSolidDots(layer, 8, 700, 8, 16, 52); emitRings(layer, 1); }
+      },
+      {
+        id: "svg-swirl",
+        title: "H. SVG stink swirls",
+        cost: "High",
+        desc: "Three SVG swirl paths. Pretty, but likely too expensive for gameplay.",
+        run(layer) { emitSvgSwirls(layer); }
+      },
+      {
+        id: "heavy-combo",
+        title: "I. heavy combo",
+        cost: "Very high",
+        desc: "Puffs, wisps, rings, and circles. Useful as a stress comparison.",
+        run(layer) { emitSolidDots(layer, 12, 800, 7, 16, 58); emitPuffs(layer, 8); emitWisps(layer, 8); emitRings(layer, 3); }
+      }
+    ];
+
+    const grid = document.getElementById("grid");
+    const activeEl = document.getElementById("active");
+    const fpsEl = document.getElementById("fps");
+    let activeParticles = 0;
+    let lastFpsTime = performance.now();
+    let frames = 0;
+
+    function buildCards() {
+      grid.innerHTML = tests.map((test) => `
+        <article class="card" data-test="${test.id}">
+          <h2>${test.title}</h2>
+          <p><strong>${test.cost}.</strong> ${test.desc}</p>
+          <div class="stage">
+            <div class="fx-layer"></div>
+            <div class="bug" aria-hidden="true"></div>
+            <div class="badge">tap to play</div>
+          </div>
+        </article>
+      `).join("");
+
+      for (const card of grid.querySelectorAll(".card")) {
+        card.addEventListener("pointerdown", () => playCard(card));
+      }
+    }
+
+    function playCard(card) {
+      const test = tests.find((item) => item.id === card.dataset.test);
+      if (!test) return;
+      const layer = card.querySelector(".fx-layer");
+      const bug = card.querySelector(".bug");
+      clearLayer(layer);
+      bug.classList.remove("squash");
+      void bug.offsetWidth;
+      bug.classList.add("squash");
+      test.run(layer);
+    }
+
+    function rand(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function color(i) {
+      return ["#6d7638", "#716636", "#5d572c"][i % 3];
+    }
+
+    function track(el, life = 1100) {
+      activeParticles += 1;
+      updateActive();
+      window.setTimeout(() => {
+        el.remove();
+        activeParticles = Math.max(0, activeParticles - 1);
+        updateActive();
+      }, life);
+    }
+
+    function updateActive() {
+      activeEl.textContent = `Active particles: ${activeParticles}`;
+    }
+
+    function clearLayer(layer) {
+      if (!layer) return;
+      const count = layer.children.length;
+      activeParticles = Math.max(0, activeParticles - count);
+      layer.innerHTML = "";
+      updateActive();
+    }
+
+    function clearAll() {
+      for (const layer of document.querySelectorAll(".fx-layer")) clearLayer(layer);
+      activeParticles = 0;
+      updateActive();
+    }
+
+    function emitSolidDots(layer, count, life, minSize, maxSize, radius) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = (Math.PI * 2 * i / count) + rand(-0.35, 0.35);
+        const dist = rand(radius * .45, radius);
+        const dot = document.createElement("span");
+        dot.className = "dot blast-dot";
+        dot.style.setProperty("--s", `${rand(minSize, maxSize)}px`);
+        dot.style.setProperty("--c", color(i));
+        dot.style.setProperty("--x", `${Math.cos(angle) * dist}px`);
+        dot.style.setProperty("--y", `${Math.sin(angle) * dist - 14}px`);
+        dot.style.animationDuration = `${life}ms`;
+        layer.appendChild(dot);
+        track(dot, life + 80);
+      }
+    }
+
+    function emitFloatingDots(layer, count) {
+      for (let i = 0; i < count; i += 1) {
+        const dot = document.createElement("span");
+        dot.className = "dot float-dot";
+        dot.style.setProperty("--s", `${rand(9, 18)}px`);
+        dot.style.setProperty("--c", color(i));
+        dot.style.setProperty("--x", `${rand(-44, 44)}px`);
+        dot.style.setProperty("--y", `${rand(-14, 18)}px`);
+        dot.style.animationDelay = `${i * 24}ms`;
+        layer.appendChild(dot);
+        track(dot, 1120 + i * 24);
+      }
+    }
+
+    function emitRings(layer, count) {
+      for (let i = 0; i < count; i += 1) {
+        const ring = document.createElement("span");
+        ring.className = "ring ring-anim";
+        ring.style.setProperty("--scale", `${1.55 + i * .52}`);
+        ring.style.animationDelay = `${i * 70}ms`;
+        layer.appendChild(ring);
+        track(ring, 760 + i * 70);
+      }
+    }
+
+    function emitPuffs(layer, count) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = (Math.PI * 2 * i / count) + rand(-0.5, 0.5);
+        const puff = document.createElement("span");
+        puff.className = "puff puff-anim";
+        puff.style.setProperty("--s", `${rand(24, 46)}px`);
+        puff.style.setProperty("--x", `${Math.cos(angle) * rand(18, 58)}px`);
+        puff.style.setProperty("--y", `${Math.sin(angle) * rand(18, 44) - 18}px`);
+        puff.style.animationDelay = `${i * 28}ms`;
+        layer.appendChild(puff);
+        track(puff, 1040 + i * 28);
+      }
+    }
+
+    function emitWisps(layer, count) {
+      for (let i = 0; i < count; i += 1) {
+        const angle = (Math.PI * 2 * i / count) + rand(-0.35, 0.35);
+        const wisp = document.createElement("span");
+        wisp.className = "wisp wisp-anim";
+        wisp.style.setProperty("--x", `${Math.cos(angle) * rand(28, 62)}px`);
+        wisp.style.setProperty("--y", `${Math.sin(angle) * rand(20, 48) - 24}px`);
+        wisp.style.setProperty("--r", `${rand(-45, 45)}deg`);
+        wisp.style.animationDelay = `${i * 32}ms`;
+        layer.appendChild(wisp);
+        track(wisp, 1080 + i * 32);
+      }
+    }
+
+    function emitSvgSwirls(layer) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "svgfx go");
+      svg.setAttribute("viewBox", "0 0 210 210");
+      svg.innerHTML = `
+        <path style="animation-delay:0ms" d="M105 105 C 64 82, 58 42, 96 36 C 150 28, 162 84, 120 92" />
+        <path style="animation-delay:90ms" d="M105 110 C 144 100, 170 122, 156 154 C 136 196, 76 172, 96 132" />
+        <path style="animation-delay:180ms" d="M104 104 C 82 128, 42 120, 44 82 C 48 44, 102 54, 92 88" />
+      `;
+      layer.appendChild(svg);
+      activeParticles += 3;
+      updateActive();
+      window.setTimeout(() => {
+        svg.remove();
+        activeParticles = Math.max(0, activeParticles - 3);
+        updateActive();
+      }, 1300);
+    }
+
+    document.getElementById("playAll").addEventListener("click", () => {
+      for (const card of grid.querySelectorAll(".card")) playCard(card);
+    });
+
+    document.getElementById("stressLight").addEventListener("click", () => {
+      const cards = [...grid.querySelectorAll(".card")].filter(card => ["simple-6", "simple-10", "float-8"].includes(card.dataset.test));
+      let n = 0;
+      const timer = window.setInterval(() => {
+        for (const card of cards) playCard(card);
+        n += 1;
+        if (n >= 8) window.clearInterval(timer);
+      }, 220);
+    });
+
+    document.getElementById("stressHeavy").addEventListener("click", () => {
+      const cards = [...grid.querySelectorAll(".card")].filter(card => ["svg-swirl", "heavy-combo", "puffs-7"].includes(card.dataset.test));
+      let n = 0;
+      const timer = window.setInterval(() => {
+        for (const card of cards) playCard(card);
+        n += 1;
+        if (n >= 6) window.clearInterval(timer);
+      }, 240);
+    });
+
+    document.getElementById("clearAll").addEventListener("click", clearAll);
+
+    function fpsLoop(now) {
+      frames += 1;
+      if (now - lastFpsTime >= 500) {
+        const fps = Math.round(frames * 1000 / (now - lastFpsTime));
+        fpsEl.textContent = `FPS: ${fps}`;
+        frames = 0;
+        lastFpsTime = now;
+      }
+      requestAnimationFrame(fpsLoop);
+    }
+
+    buildCards();
+    requestAnimationFrame(fpsLoop);
+  </script>
+</body>
+</html>

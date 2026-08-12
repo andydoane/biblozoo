@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 1200 260"
+   preserveAspectRatio="none"
+   width="100%"
+   height="260"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="dino_dash_back_hill.svg"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.76833333"
+     inkscape:cx="534.27332"
+     inkscape:cy="-99.56616"
+     inkscape:current-layer="svg1" />
+  <path
+     d="M 150,8.5559982 C 98.4249,8.8060019 41.0438,83.24378 0,83.24378 c 0,0 -26,0.494152 -26,88.37811 C -26,259.50585 0,260 0,260 h 1200 c 0,0 20,-0.0936 20,-88.37811 0,-88.284547 -20,-88.37811 -20,-88.37811 -50.9902,6.104129 -99.5575,-37.343906 -150,-37.343906 -50.4425,0 -100,24.895938 -150,37.343906 -50,12.447969 -99.5575,37.34391 -150,37.34391 -50.4425,0 -100,-24.895941 -150,-37.34391 -50,-12.447968 -99.5575,-37.343906 -150,-37.343906 -50.4425,0 -99.0098,43.448035 -150,37.343906 C 249.0098,77.139651 201.747,8.3051519 150,8.5559982 Z"
+     fill="#5fa24d"
+     id="path1"
+     style="stroke-width:1.73481"
+     sodipodi:nodetypes="sczcczcsssssss" />
+</svg>

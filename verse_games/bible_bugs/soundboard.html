@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bible Bugs Soundboard</title>
+  <style>
+    :root {
+      --bg: #26352a;
+      --panel: #ffffff;
+      --ink: #243529;
+      --muted: #607062;
+      --green: #7fbb52;
+      --green-dark: #2f7d49;
+      --yellow: #ffe15e;
+      --line: rgba(36, 53, 41, 0.14);
+      --shadow: rgba(0, 0, 0, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { min-height: 100%; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(255, 225, 94, 0.18), transparent 34%),
+        linear-gradient(180deg, #314735 0%, var(--bg) 100%);
+      color: var(--ink);
+      padding: max(18px, env(safe-area-inset-top)) 14px max(22px, env(safe-area-inset-bottom));
+    }
+
+    .wrap {
+      width: min(980px, 100%);
+      margin: 0 auto;
+    }
+
+    header {
+      background: linear-gradient(180deg, #93c961 0%, #64a44b 100%);
+      border-radius: 28px;
+      padding: 22px;
+      color: #fff;
+      box-shadow: 0 10px 0 rgba(0, 0, 0, 0.16);
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(30px, 7vw, 54px);
+      line-height: 0.95;
+      letter-spacing: 0.01em;
+      text-shadow: 0 4px 0 rgba(47, 125, 73, 0.64);
+    }
+
+    header p {
+      margin: 0;
+      max-width: 740px;
+      color: rgba(255,255,255,0.92);
+      font-size: 16px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 7px 11px;
+      background: rgba(255,255,255,0.92);
+      color: var(--green-dark);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    @media (min-width: 860px) {
+      .grid { grid-template-columns: 1fr 1fr; align-items: start; }
+      .wide { grid-column: 1 / -1; }
+    }
+
+    .card {
+      background: var(--panel);
+      border-radius: 24px;
+      padding: 16px;
+      box-shadow: 0 8px 0 var(--shadow);
+    }
+
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      color: var(--green-dark);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0 0;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      background: var(--green);
+      color: white;
+      font: inherit;
+      font-weight: 850;
+      padding: 10px 14px;
+      min-height: 42px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.14);
+      touch-action: manipulation;
+    }
+
+    button.secondary {
+      background: #5f90c9;
+    }
+
+    button.warning {
+      background: #9a7a43;
+    }
+
+    button:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,0.14); }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: minmax(96px, 150px) 1fr 54px auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .slider-row:last-child { border-bottom: 0; }
+
+    .slider-row label {
+      font-weight: 850;
+      color: var(--ink);
+    }
+
+    input[type="range"] { width: 100%; accent-color: var(--green-dark); }
+
+    input[type="number"] {
+      width: 54px;
+      padding: 7px 6px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      font: inherit;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .tiny-btn {
+      min-height: 34px;
+      padding: 7px 10px;
+      font-size: 13px;
+      background: #6c7d70;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 238px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.4;
+      resize: vertical;
+      color: #1f2d23;
+      background: #f7faf6;
+    }
+
+    .note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .event-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .event {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .event strong { display: block; }
+    .event span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+    .delay-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Bible Bugs Soundboard</h1>
+      <p>Place this file beside <strong>game.js</strong> in the Bible Bugs folder. It will try to read the current <strong>SOUND_TUNING</strong> block from game.js, then let you balance the sounds and copy a replacement tuning block.</p>
+      <div class="status">
+        <span class="pill" id="loadStatus">Reading game.js…</span>
+        <span class="pill" id="audioStatus">Audio locked until first tap</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Event Tests</h2>
+        <div class="event-list">
+          <div class="event"><div><strong>UI Tap</strong><span>Shared title/menu pop</span></div><button data-play-event="ui">Play</button></div>
+          <div class="event"><div><strong>Correct Verse Bug</strong><span>Tongue → random pop + correct</span></div><button data-play-event="correct">Play</button></div>
+          <div class="event"><div><strong>Incorrect Verse Bug</strong><span>Tongue → random pop + incorrect</span></div><button data-play-event="incorrect" class="warning">Play</button></div>
+          <div class="event"><div><strong>Bonus Good Bug</strong><span>Tongue → random pop</span></div><button data-play-event="bonusGood">Play</button></div>
+          <div class="event"><div><strong>Stink Bug</strong><span>Tongue → stink bug</span></div><button data-play-event="stink" class="warning">Play</button></div>
+          <div class="event"><div><strong>Streak / Multiplier</strong><span>2x, 3x, tongue upgrade</span></div><button data-play-event="streak" class="secondary">Play</button></div>
+          <div class="event"><div><strong>Bonus Start</strong><span>Bonus popup appears</span></div><button data-play-event="bonusStart" class="secondary">Play</button></div>
+          <div class="event"><div><strong>Bonus End</strong><span>Bonus score reveal appears</span></div><button data-play-event="bonusEnd" class="secondary">Play</button></div>
+        </div>
+
+        <div class="delay-grid">
+          <div class="slider-row">
+            <label for="mainDelay">Verse reach delay</label>
+            <input id="mainDelay" type="range" min="120" max="700" step="10" value="420">
+            <input id="mainDelayNum" type="number" min="120" max="700" step="10" value="420">
+            <span>ms</span>
+          </div>
+          <div class="slider-row">
+            <label for="bonusDelay">Bonus reach delay</label>
+            <input id="bonusDelay" type="range" min="120" max="700" step="10" value="360">
+            <input id="bonusDelayNum" type="number" min="120" max="700" step="10" value="360">
+            <span>ms</span>
+          </div>
+          <div class="slider-row">
+            <label for="stinkDelay">Stink delay</label>
+            <input id="stinkDelay" type="range" min="40" max="500" step="10" value="180">
+            <input id="stinkDelayNum" type="number" min="40" max="500" step="10" value="180">
+            <span>ms</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Individual Sounds</h2>
+        <div class="controls">
+          <button data-play="tongue">Tongue</button>
+          <button data-play-pop>Random Pop</button>
+          <button data-play="correct">Correct</button>
+          <button data-play="incorrect" class="warning">Incorrect</button>
+          <button data-play="streak" class="secondary">Streak</button>
+          <button data-play="bonusStart" class="secondary">Bonus Start</button>
+          <button data-play="bonusEnd" class="secondary">Bonus End</button>
+          <button data-play="stinkBug" class="warning">Stink Bug</button>
+          <button data-play-event="ui">UI Pop</button>
+        </div>
+        <p class="note">Individual buttons play only one sound. Event buttons are better for checking how sounds feel together in the real game timing.</p>
+      </section>
+
+      <section class="card wide">
+        <h2>Volume Balance</h2>
+        <div id="sliders"></div>
+        <div class="controls">
+          <button id="resetBtn" class="warning">Reset to game.js values</button>
+          <button id="copyBtn" class="secondary">Copy Code</button>
+        </div>
+      </section>
+
+      <section class="card wide">
+        <h2>Paste This Into game.js</h2>
+        <textarea id="codeOut" spellcheck="false"></textarea>
+        <p class="note">Replace only the existing <strong>const SOUND_TUNING = { ... };</strong> block in game.js. This soundboard intentionally outputs only that block.</p>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const FALLBACK_TUNING = {
+      masterVolume: 0.90,
+      volumes: {
+        uiTap: 0.42,
+        tongue: 0.48,
+        pop: 0.52,
+        correct: 0.58,
+        incorrect: 0.62,
+        streak: 0.64,
+        bonusStart: 0.70,
+        bonusEnd: 0.72,
+        stinkBug: 0.64
+      }
+    };
+
+    const SOUND_BASE_PATH = "./bible_bugs_sounds/";
+    const UI_SOUND_BASE_PATH = "../../ui_audio/";
+    const SOUND_FILES = {
+      silence: "../../verse_audio/silence.mp3",
+      uiTap1: `${UI_SOUND_BASE_PATH}ui_sound_pop_1.mp3`,
+      uiTap2: `${UI_SOUND_BASE_PATH}ui_sound_pop_2.mp3`,
+      tongue: `${SOUND_BASE_PATH}bible_bugs_tongue.mp3`,
+      pop1: `${SOUND_BASE_PATH}bible_bugs_pop_1.mp3`,
+      pop2: `${SOUND_BASE_PATH}bible_bugs_pop_2.mp3`,
+      pop3: `${SOUND_BASE_PATH}bible_bugs_pop_3.mp3`,
+      pop4: `${SOUND_BASE_PATH}bible_bugs_pop_4.mp3`,
+      pop5: `${SOUND_BASE_PATH}bible_bugs_pop_5.mp3`,
+      correct: `${SOUND_BASE_PATH}bible_bugs_correct.mp3`,
+      incorrect: `${SOUND_BASE_PATH}bible_bugs_incorrect.mp3`,
+      streak: `${SOUND_BASE_PATH}bible_bugs_streak.mp3`,
+      bonusStart: `${SOUND_BASE_PATH}bible_bugs_bonus_start.mp3`,
+      bonusEnd: `${SOUND_BASE_PATH}bible_bugs_bonus_end.mp3`,
+      stinkBug: `${SOUND_BASE_PATH}bible_bugs_stink_bug.mp3`
+    };
+
+    const VOLUME_KEYS = ["masterVolume", "uiTap", "tongue", "pop", "correct", "incorrect", "streak", "bonusStart", "bonusEnd", "stinkBug"];
+    const BUG_POP_SOUND_KEYS = ["pop1", "pop2", "pop3", "pop4", "pop5"];
+    const state = {
+      tuning: cloneTuning(FALLBACK_TUNING),
+      originalTuning: cloneTuning(FALLBACK_TUNING),
+      uiFlip: false,
+      audioCtx: null,
+      silenceAudio: null,
+      buffers: new Map(),
+      bufferPromises: new Map()
+    };
+
+    const loadStatus = document.getElementById("loadStatus");
+    const audioStatus = document.getElementById("audioStatus");
+    const sliders = document.getElementById("sliders");
+    const codeOut = document.getElementById("codeOut");
+
+    init();
+
+    async function init() {
+      renderSliders();
+      wireButtons();
+      syncDelayPair("mainDelay", "mainDelayNum");
+      syncDelayPair("bonusDelay", "bonusDelayNum");
+      syncDelayPair("stinkDelay", "stinkDelayNum");
+      await readTuningFromGameJs();
+      renderSliders();
+      updateCodeOutput();
+    }
+
+    function cloneTuning(tuning) {
+      return JSON.parse(JSON.stringify(tuning));
+    }
+
+    async function readTuningFromGameJs() {
+      try {
+        const response = await fetch("./game.js", { cache: "no-store" });
+        if (!response.ok) throw new Error("game.js not found");
+        const text = await response.text();
+        const parsed = parseSoundTuning(text);
+        if (!parsed) throw new Error("SOUND_TUNING block not found");
+        state.tuning = cloneTuning(parsed);
+        state.originalTuning = cloneTuning(parsed);
+        loadStatus.textContent = "Loaded SOUND_TUNING from game.js";
+      } catch (err) {
+        loadStatus.textContent = "Using fallback defaults — could not read game.js";
+        console.warn(err);
+      }
+    }
+
+    function parseSoundTuning(text) {
+      const masterMatch = text.match(/masterVolume\s*:\s*([0-9.]+)/);
+      const volumesMatch = text.match(/volumes\s*:\s*\{([\s\S]*?)\}\s*\}/);
+      if (!masterMatch || !volumesMatch) return null;
+      const tuning = cloneTuning(FALLBACK_TUNING);
+      tuning.masterVolume = Number(masterMatch[1]);
+      const volumeBody = volumesMatch[1];
+      for (const key of Object.keys(tuning.volumes)) {
+        const re = new RegExp(`${key}\\s*:\\s*([0-9.]+)`);
+        const match = volumeBody.match(re);
+        if (match) tuning.volumes[key] = Number(match[1]);
+      }
+      return tuning;
+    }
+
+    function renderSliders() {
+      sliders.innerHTML = "";
+      for (const key of VOLUME_KEYS) {
+        const value = getVolumeValue(key);
+        const row = document.createElement("div");
+        row.className = "slider-row";
+        row.innerHTML = `
+          <label for="vol-${key}">${labelFor(key)}</label>
+          <input id="vol-${key}" type="range" min="0" max="1" step="0.01" value="${value.toFixed(2)}">
+          <input id="num-${key}" type="number" min="0" max="1" step="0.01" value="${value.toFixed(2)}">
+          <button class="tiny-btn" type="button" data-play-volume="${key}">Play</button>
+        `;
+        sliders.appendChild(row);
+
+        const range = row.querySelector(`#vol-${key}`);
+        const number = row.querySelector(`#num-${key}`);
+        range.addEventListener("input", () => {
+          setVolumeValue(key, Number(range.value));
+          number.value = Number(range.value).toFixed(2);
+          updateCodeOutput();
+        });
+        number.addEventListener("input", () => {
+          const val = clamp01(Number(number.value));
+          setVolumeValue(key, val);
+          range.value = val.toFixed(2);
+          updateCodeOutput();
+        });
+      }
+    }
+
+    function labelFor(key) {
+      const labels = {
+        masterVolume: "Master",
+        uiTap: "UI Tap",
+        tongue: "Tongue",
+        pop: "Bug Pop",
+        correct: "Correct",
+        incorrect: "Incorrect",
+        streak: "Streak",
+        bonusStart: "Bonus Start",
+        bonusEnd: "Bonus End",
+        stinkBug: "Stink Bug"
+      };
+      return labels[key] || key;
+    }
+
+    function getVolumeValue(key) {
+      if (key === "masterVolume") return Number(state.tuning.masterVolume) || 0;
+      return Number(state.tuning.volumes[key]) || 0;
+    }
+
+    function setVolumeValue(key, value) {
+      const safe = clamp01(value);
+      if (key === "masterVolume") {
+        state.tuning.masterVolume = safe;
+      } else {
+        state.tuning.volumes[key] = safe;
+      }
+    }
+
+    function clamp01(value) {
+      if (!Number.isFinite(value)) return 0;
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function finalVolume(volumeKey) {
+      const master = clamp01(Number(state.tuning.masterVolume));
+      const individual = volumeKey === "masterVolume" ? 1 : clamp01(Number(state.tuning.volumes[volumeKey]));
+      return master * individual;
+    }
+
+    function updateCodeOutput() {
+      codeOut.value = `  const SOUND_TUNING = {\n` +
+        `    masterVolume: ${fmt(state.tuning.masterVolume)},\n` +
+        `    volumes: {\n` +
+        `      uiTap: ${fmt(state.tuning.volumes.uiTap)},\n` +
+        `      tongue: ${fmt(state.tuning.volumes.tongue)},\n` +
+        `      pop: ${fmt(state.tuning.volumes.pop)},\n` +
+        `      correct: ${fmt(state.tuning.volumes.correct)},\n` +
+        `      incorrect: ${fmt(state.tuning.volumes.incorrect)},\n` +
+        `      streak: ${fmt(state.tuning.volumes.streak)},\n` +
+        `      bonusStart: ${fmt(state.tuning.volumes.bonusStart)},\n` +
+        `      bonusEnd: ${fmt(state.tuning.volumes.bonusEnd)},\n` +
+        `      stinkBug: ${fmt(state.tuning.volumes.stinkBug)}\n` +
+        `    }\n` +
+        `  };`;
+    }
+
+    function fmt(value) {
+      return clamp01(Number(value)).toFixed(2);
+    }
+
+    function getAudioContext() {
+      if (!state.audioCtx) {
+        const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextCtor) return null;
+        state.audioCtx = new AudioContextCtor();
+      }
+      return state.audioCtx;
+    }
+
+    function ensureSilenceAudio() {
+      if (state.silenceAudio) return state.silenceAudio;
+      state.silenceAudio = new Audio(SOUND_FILES.silence);
+      state.silenceAudio.preload = "auto";
+      state.silenceAudio.loop = false;
+      state.silenceAudio.volume = 0.001;
+      state.silenceAudio.setAttribute("playsinline", "true");
+      return state.silenceAudio;
+    }
+
+    async function unlockAudio() {
+      const ctx = getAudioContext();
+      if (!ctx) return false;
+      try {
+        const silent = ensureSilenceAudio();
+        silent.currentTime = 0;
+        const play = silent.play();
+        if (play && typeof play.catch === "function") play.catch(() => {});
+      } catch (err) {}
+
+      try {
+        if (ctx.state === "suspended") await ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.0001;
+        osc.frequency.value = 440;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.03);
+        audioStatus.textContent = "Audio unlocked";
+        preloadAllSounds();
+        return true;
+      } catch (err) {
+        audioStatus.textContent = "Audio unlock failed";
+        console.warn(err);
+        return false;
+      }
+    }
+
+    async function loadSoundBuffer(key) {
+      const ctx = getAudioContext();
+      const src = SOUND_FILES[key];
+      if (!ctx || !src) return null;
+      if (state.buffers.has(key)) return state.buffers.get(key);
+      if (state.bufferPromises.has(key)) return state.bufferPromises.get(key);
+      const promise = fetch(src)
+        .then((response) => {
+          if (!response.ok) throw new Error(`Could not load ${src}`);
+          return response.arrayBuffer();
+        })
+        .then((arrayBuffer) => ctx.decodeAudioData(arrayBuffer))
+        .then((buffer) => {
+          state.buffers.set(key, buffer);
+          return buffer;
+        })
+        .catch((err) => {
+          console.warn(err);
+          return null;
+        })
+        .finally(() => state.bufferPromises.delete(key));
+      state.bufferPromises.set(key, promise);
+      return promise;
+    }
+
+    function preloadAllSounds() {
+      Object.keys(SOUND_FILES).forEach(loadSoundBuffer);
+    }
+
+    async function playSound(key, volumeKey = key) {
+      await unlockAudio();
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      try {
+        const buffer = await loadSoundBuffer(key);
+        if (!buffer) return;
+        const source = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        source.buffer = buffer;
+        gain.gain.value = finalVolume(volumeKey);
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(0);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+
+    function playUiTap() {
+      const key = state.uiFlip ? "uiTap2" : "uiTap1";
+      state.uiFlip = !state.uiFlip;
+      playSound(key, "uiTap");
+    }
+
+    function playRandomPop() {
+      const key = BUG_POP_SOUND_KEYS[Math.floor(Math.random() * BUG_POP_SOUND_KEYS.length)] || "pop1";
+      playSound(key, "pop");
+    }
+
+    function playEvent(name) {
+      const mainDelay = Number(document.getElementById("mainDelay").value) || 420;
+      const bonusDelay = Number(document.getElementById("bonusDelay").value) || 360;
+      const stinkDelay = Number(document.getElementById("stinkDelay").value) || 180;
+
+      if (name === "ui") {
+        playUiTap();
+        return;
+      }
+
+      if (name === "correct") {
+        playSound("tongue", "tongue");
+        setTimeout(() => { playRandomPop(); playSound("correct", "correct"); }, mainDelay);
+        return;
+      }
+
+      if (name === "incorrect") {
+        playSound("tongue", "tongue");
+        setTimeout(() => { playRandomPop(); playSound("incorrect", "incorrect"); }, mainDelay);
+        return;
+      }
+
+      if (name === "bonusGood") {
+        playSound("tongue", "tongue");
+        setTimeout(playRandomPop, bonusDelay);
+        return;
+      }
+
+      if (name === "stink") {
+        playSound("tongue", "tongue");
+        setTimeout(() => playSound("stinkBug", "stinkBug"), stinkDelay);
+        return;
+      }
+
+      if (name === "streak") playSound("streak", "streak");
+      if (name === "bonusStart") playSound("bonusStart", "bonusStart");
+      if (name === "bonusEnd") playSound("bonusEnd", "bonusEnd");
+    }
+
+    function wireButtons() {
+      document.body.addEventListener("click", (event) => {
+        const direct = event.target.closest("[data-play]");
+        if (direct) {
+          const key = direct.dataset.play;
+          playSound(key, key);
+          return;
+        }
+
+        const pop = event.target.closest("[data-play-pop]");
+        if (pop) {
+          playRandomPop();
+          return;
+        }
+
+        const eventButton = event.target.closest("[data-play-event]");
+        if (eventButton) {
+          playEvent(eventButton.dataset.playEvent);
+          return;
+        }
+
+        const volumeButton = event.target.closest("[data-play-volume]");
+        if (volumeButton) {
+          const key = volumeButton.dataset.playVolume;
+          if (key === "masterVolume") playEvent("correct");
+          else if (key === "uiTap") playUiTap();
+          else if (key === "pop") playRandomPop();
+          else playSound(key, key);
+        }
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        state.tuning = cloneTuning(state.originalTuning);
+        renderSliders();
+        updateCodeOutput();
+      });
+
+      document.getElementById("copyBtn").addEventListener("click", async () => {
+        updateCodeOutput();
+        codeOut.select();
+        try {
+          await navigator.clipboard.writeText(codeOut.value);
+          document.getElementById("copyBtn").textContent = "Copied!";
+          setTimeout(() => document.getElementById("copyBtn").textContent = "Copy Code", 1100);
+        } catch (err) {
+          document.execCommand("copy");
+        }
+      });
+    }
+
+    function syncDelayPair(rangeId, numId) {
+      const range = document.getElementById(rangeId);
+      const num = document.getElementById(numId);
+      range.addEventListener("input", () => { num.value = range.value; });
+      num.addEventListener("input", () => { range.value = num.value; });
+    }
+  </script>
+</body>
+</html>
