@@ -30,7 +30,7 @@ const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
-const APP_VERSION = "1.0.4";
+const APP_VERSION = "1.0.5 Bottom Padding";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const PRIVACY_POLICY_URL = "privacy_policy.html";
 
