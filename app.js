@@ -30,7 +30,7 @@ const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
-const APP_VERSION = "1.0.10 Static Theme Hold";
+const APP_VERSION = "1.0.11 Explicit Fixed Background";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const PRIVACY_POLICY_URL = "privacy_policy.html";
 
@@ -8158,9 +8158,30 @@ function renderNav() {
 }
 
 /* Screen builders */
+function getConcreteAppBackgroundColor(bg) {
+  const value = String(bg || "").trim();
+
+  if (!value || value === "var(--purple)") {
+    return "#7f66c6";
+  }
+
+  if (/^#[0-9a-f]{3,8}$/i.test(value)) {
+    return value;
+  }
+
+  if (/^rgb/i.test(value)) {
+    return value;
+  }
+
+  return "#7f66c6";
+}
+
 function syncAppBackground(bg) {
   const safeBg =
     bg || "var(--purple)";
+
+  const concreteBg =
+    getConcreteAppBackgroundColor(safeBg);
 
   try {
     app?.style?.setProperty(
@@ -8168,22 +8189,30 @@ function syncAppBackground(bg) {
       safeBg
     );
 
+    app.style.backgroundColor =
+      concreteBg;
+
     document.documentElement.style.setProperty(
       "--bg",
       safeBg
     );
+
+    document.documentElement.style.backgroundColor =
+      concreteBg;
 
     document.body.style.setProperty(
       "--bg",
       safeBg
     );
 
+    document.body.style.backgroundColor =
+      concreteBg;
+
     /*
       Do not update <meta name="theme-color"> here.
 
-      iOS/iPadOS standalone mode may use the theme color for the
-      top system/title area. Keep that value static in index.html
-      instead of changing it per screen.
+      Newer iOS/iPadOS appears to sample body/fixed-element
+      background color for the top status/title area instead.
     */
   } catch (err) {
     console.warn(
@@ -8219,6 +8248,8 @@ function makeSlide({ idx, bg, navHidden = false, inner }) {
   s.className = "slide" + (navHidden ? " nav-hidden" : "");
 
   s.style.setProperty("--bg", bg);
+  s.style.backgroundColor =
+    getConcreteAppBackgroundColor(bg);
 
   /*
     Make the old bottom-nav reserve explicit.
