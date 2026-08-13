@@ -7359,6 +7359,14 @@ BibloPet Mastery Backgrounds
   padding-bottom: var(--screenBottomPad);
 }
 
+/*
+  Main Learn-the-Verse pages use the more specific .learn-layout.learn-screen
+  selector, so they need their own late override.
+*/
+.learn-layout.learn-screen {
+  padding-bottom: var(--screenBottomPadLarge);
+}
+
 .learn-instruction-actions.is-split {
   width: min(100%, 560px);
   display: grid;
