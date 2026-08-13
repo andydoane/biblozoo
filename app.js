@@ -30,7 +30,7 @@ const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
-const APP_VERSION = "1.0.9 Black iPad Theme";
+const APP_VERSION = "1.0.10 Static Theme Hold";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const PRIVACY_POLICY_URL = "privacy_policy.html";
 
@@ -8158,30 +8158,9 @@ function renderNav() {
 }
 
 /* Screen builders */
-function getThemeColorForBackground(bg) {
-  const value = String(bg || "").trim();
-
-  if (!value || value === "var(--purple)") {
-    return "#7f66c6";
-  }
-
-  if (/^#[0-9a-f]{3,8}$/i.test(value)) {
-    return value;
-  }
-
-  if (/^rgb/i.test(value)) {
-    return value;
-  }
-
-  return "#7f66c6";
-}
-
 function syncAppBackground(bg) {
   const safeBg =
     bg || "var(--purple)";
-
-  const themeColor =
-    getThemeColorForBackground(safeBg);
 
   try {
     app?.style?.setProperty(
@@ -8199,15 +8178,13 @@ function syncAppBackground(bg) {
       safeBg
     );
 
-    const themeMeta =
-      document.querySelector('meta[name="theme-color"]');
+    /*
+      Do not update <meta name="theme-color"> here.
 
-    if (themeMeta) {
-      themeMeta.setAttribute(
-        "content",
-        themeColor
-      );
-    }
+      iOS/iPadOS standalone mode may use the theme color for the
+      top system/title area. Keep that value static in index.html
+      instead of changing it per screen.
+    */
   } catch (err) {
     console.warn(
       "Could not sync app background",
