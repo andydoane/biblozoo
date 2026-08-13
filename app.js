@@ -30,7 +30,7 @@ const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
-const APP_VERSION = "1.0.7 Todo/Home Polish";
+const APP_VERSION = "1.0.8 Dynamic Theme Color";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const PRIVACY_POLICY_URL = "privacy_policy.html";
 
@@ -1172,7 +1172,7 @@ function getLearnInstructionConfig(key) {
     echo1: {
       image: "verse_echo.png",
       title: "Echo the Verse",
-      subtext: "Repeat after me when each chunk turns green.",
+      subtext: "Repeat after me when each chunk turns yellow.",
       button: "Echo the Verse",
       audio: "instructions_echo1.mp3"
     },
@@ -8158,9 +8158,30 @@ function renderNav() {
 }
 
 /* Screen builders */
+function getThemeColorForBackground(bg) {
+  const value = String(bg || "").trim();
+
+  if (!value || value === "var(--purple)") {
+    return "#7f66c6";
+  }
+
+  if (/^#[0-9a-f]{3,8}$/i.test(value)) {
+    return value;
+  }
+
+  if (/^rgb/i.test(value)) {
+    return value;
+  }
+
+  return "#7f66c6";
+}
+
 function syncAppBackground(bg) {
   const safeBg =
     bg || "var(--purple)";
+
+  const themeColor =
+    getThemeColorForBackground(safeBg);
 
   try {
     app?.style?.setProperty(
@@ -8177,6 +8198,16 @@ function syncAppBackground(bg) {
       "--bg",
       safeBg
     );
+
+    const themeMeta =
+      document.querySelector('meta[name="theme-color"]');
+
+    if (themeMeta) {
+      themeMeta.setAttribute(
+        "content",
+        themeColor
+      );
+    }
   } catch (err) {
     console.warn(
       "Could not sync app background",
