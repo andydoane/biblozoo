@@ -7415,7 +7415,36 @@ BibloPet Mastery Backgrounds
 
 /* Zoo To-Do */
 .todo-dev-page {
+  position: relative;
+  z-index: 1;
   padding-bottom: var(--screenBottomPadLarge);
+}
+
+/*
+  Zoo To-Do uses a green page. Make every possible safe-area/root layer
+  green too, so iOS never shows the default purple behind the top edge.
+*/
+.todo-dev-screen {
+  background: #a7cb6f !important;
+}
+
+.todo-dev-screen::before {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--safeT) + 96px);
+  background: #a7cb6f;
+  pointer-events: none;
+}
+
+html:has(#app .todo-dev-screen),
+body:has(#app .todo-dev-screen),
+#app:has(.todo-dev-screen),
+.slide:has(.todo-dev-screen) {
+  background: #a7cb6f !important;
 }
 
 /* Pet unlock should stay green all the way through the safe area. */
