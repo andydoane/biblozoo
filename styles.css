@@ -13,6 +13,10 @@
   --safeT: env(safe-area-inset-top, 0px);
   --tap: 44px;
 
+  /* Shared bottom spacing after the iOS chin-gap fix. */
+  --screenBottomPad: calc(42px + var(--safeB));
+  --screenBottomPadLarge: calc(58px + var(--safeB));
+
   --purple: #7f66c6;
   --dark: rgba(0, 0, 0, 0.30);
 }
@@ -3236,8 +3240,8 @@ Game Mix Loading Screen
   display: flex;
   flex-direction: column;
 
-  /* top padding + side padding */
-  padding: calc(14px + var(--safeT)) 18px 18px;
+  /* top padding + side padding + shared bottom breathing room */
+  padding: calc(14px + var(--safeT)) 18px var(--screenBottomPad);
 
   /* padding between zones */
   gap: 6px;
@@ -7339,14 +7343,39 @@ BibloPet Mastery Backgrounds
 }
 
 /* =========================
-   Post-iOS chin-gap layout polish
+   Shared post-iOS bottom spacing
    ========================= */
 
 /*
-  After removing the iOS standalone chin-gap trigger, these two screens
-  should keep the fixed screen flush to the bottom and place bottom
-  breathing room inside the actual scroll areas.
+  After removing the iOS standalone chin-gap trigger, screens need their
+  own real bottom breathing room. Tweak these two root variables if needed:
+
+    --screenBottomPad
+    --screenBottomPadLarge
 */
+
+/* Learn instruction cards, including the final “Practice the Verse” screen. */
+.learn-layout-instruction {
+  padding-bottom: var(--screenBottomPad);
+}
+
+.learn-instruction-actions.is-split {
+  width: min(100%, 560px);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-inline: auto;
+}
+
+.learn-instruction-actions.is-split .carousel-main {
+  width: 100%;
+  max-width: none !important;
+}
+
+.learn-instruction-secondary-btn {
+  background: rgba(0, 0, 0, 0.28);
+  color: #ffffff;
+}
 
 /* BibloPet Zoo list */
 .progress-screen {
@@ -7354,7 +7383,7 @@ BibloPet Mastery Backgrounds
 }
 
 .progress-list {
-  padding-bottom: calc(18px + var(--safeB));
+  padding-bottom: var(--screenBottomPadLarge);
 }
 
 /* Individual BibloPet detail page */
@@ -7363,10 +7392,29 @@ BibloPet Mastery Backgrounds
 }
 
 .detail-scroll {
-  padding-bottom: calc(18px + var(--safeB));
+  padding-bottom: var(--screenBottomPadLarge);
 }
 
-/* BibloPet Stats: add a little more bottom breathing room. */
+/* BibloPet Stats */
 .pet-stats-screen {
-  padding-bottom: calc(30px + var(--safeB));
+  padding-bottom: var(--screenBottomPadLarge);
+}
+
+/* Settings */
+.settings-page {
+  padding-bottom: var(--screenBottomPadLarge);
+}
+
+/* Zoo To-Do */
+.todo-dev-page {
+  padding-bottom: var(--screenBottomPadLarge);
+}
+
+/* Pet unlock should stay green all the way through the safe area. */
+.pet-unlock-screen {
+  background: #a7cb6f;
+}
+
+.slide:has(.pet-unlock-screen) {
+  background: #a7cb6f !important;
 }

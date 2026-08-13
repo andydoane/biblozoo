@@ -30,9 +30,9 @@ const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
-const APP_VERSION = "1.0.3";
+const APP_VERSION = "1.0.4";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
-const PRIVACY_POLICY_URL = "https://andydoane.github.io/eatyourbible/pwa/verse/privacy_policy.html";
+const PRIVACY_POLICY_URL = "privacy_policy.html";
 
 // =========================================================
 // DEBUG fallback: lets the app run offline (file://) without fetch()
@@ -9317,14 +9317,6 @@ function screenProfileEditor(idx) {
         ></div>
 
         <div class="profile-editor-actions${isFirst ? " is-first" : ""}">
-          <button
-            class="profile-submit-btn no-zoom"
-            type="submit"
-            data-profile-editor-submit
-          >
-            ${isEdit ? "Save Changes" : "Create"}
-          </button>
-
           ${
             isFirst
               ? `
@@ -9338,6 +9330,14 @@ function screenProfileEditor(idx) {
               `
               : ""
           }
+
+          <button
+            class="profile-submit-btn no-zoom"
+            type="submit"
+            data-profile-editor-submit
+          >
+            ${isEdit ? "Save Changes" : "Create"}
+          </button>
         </div>
       </form>
     </div>
@@ -12096,6 +12096,21 @@ function screenLearnInstruction(idx) {
   const title = cfg?.title || "";
   const subtext = cfg?.subtext || "";
   const button = cfg?.button || "Continue";
+  const isGamesInstruction = State.learnInstructionKey === "games";
+  const actionsClassName =
+    `learn-instruction-actions${isGamesInstruction ? " is-split" : ""}`;
+
+  const homeButtonHtml = isGamesInstruction
+    ? `
+          <button
+            class="carousel-main no-zoom learn-instruction-btn learn-instruction-secondary-btn is-ready"
+            id="btnLearnInstructionHome"
+            type="button"
+          >
+            Home
+          </button>
+      `
+    : "";
 
   const inner = document.createElement("div");
   inner.style.display = "flex";
@@ -12116,7 +12131,9 @@ function screenLearnInstruction(idx) {
         <div class="learn-instruction-title">${title}</div>
         <div class="learn-instruction-subtext">${subtext}</div>
 
-        <div class="learn-instruction-actions">
+        <div class="${actionsClassName}">
+          ${homeButtonHtml}
+
           <button
             class="carousel-main no-zoom learn-instruction-btn ${State.learnInstructionReady ? "is-ready" : "is-waiting"}"
             id="btnLearnInstructionContinue"
@@ -12130,6 +12147,23 @@ function screenLearnInstruction(idx) {
       </div>
     </div>
   `;
+
+  const homeBtn = inner.querySelector("#btnLearnInstructionHome");
+  if (homeBtn) {
+    homeBtn.onclick = () => {
+      try {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+      } catch (err) { }
+
+      State.learnInstructionReady = false;
+      State.learnInstructionAudioStarted = false;
+      State.instructionPlaying = false;
+      State.instructionKey = "";
+
+      go(Screen.TITLE);
+    };
+  }
 
   const btn = inner.querySelector("#btnLearnInstructionContinue");
   if (btn) {

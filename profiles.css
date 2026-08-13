@@ -259,9 +259,9 @@
 }
 
 .profile-import-btn {
-  border: 3px solid rgba(255, 255, 255, 0.82);
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
+  border: 3px dashed rgba(255, 199, 81, 0.95);
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff2a8;
 }
 
 .profile-migration-notice {
@@ -848,7 +848,7 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: calc(14px + var(--safeB));
+  padding-bottom: var(--screenBottomPadLarge, calc(58px + var(--safeB)));
 }
 
 .profile-shell {
