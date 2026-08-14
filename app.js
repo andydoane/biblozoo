@@ -30,7 +30,7 @@ const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
 
-const APP_VERSION = "1.0.11 Explicit Fixed Background";
+const APP_VERSION = "1.0.12 Black Startup Shell";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const PRIVACY_POLICY_URL = "privacy_policy.html";
 
@@ -8161,7 +8161,11 @@ function renderNav() {
 function getConcreteAppBackgroundColor(bg) {
   const value = String(bg || "").trim();
 
-  if (!value || value === "var(--purple)") {
+  if (!value || value === "var(--appShellDefault)") {
+    return "#000000";
+  }
+
+  if (value === "var(--purple)") {
     return "#7f66c6";
   }
 
@@ -8173,12 +8177,12 @@ function getConcreteAppBackgroundColor(bg) {
     return value;
   }
 
-  return "#7f66c6";
+  return "#000000";
 }
 
 function syncAppBackground(bg) {
   const safeBg =
-    bg || "var(--purple)";
+    bg || "var(--appShellDefault)";
 
   const concreteBg =
     getConcreteAppBackgroundColor(safeBg);
