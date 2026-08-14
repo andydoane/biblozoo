@@ -10,7 +10,8 @@
 
   const GAME_THEME = {
     bg: "#7f66c6",
-    accent: "#7f66c6"
+    accent: "#7f66c6",
+    pageBg: "#000000"
   };
 
   const BUILD_AREA = "compact";
@@ -1658,10 +1659,47 @@
 
   function wireGameScreen(){
     document.querySelectorAll("[data-tile-id]").forEach(btn => {
-      btn.addEventListener("click", () => handleTileTap(btn));
-      btn.addEventListener("pointerdown", () => btn.classList.add("is-pressed"));
-      btn.addEventListener("pointerup", () => btn.classList.remove("is-pressed"));
-      btn.addEventListener("pointercancel", () => btn.classList.remove("is-pressed"));
+      let handledByPointer = false;
+
+      btn.addEventListener("pointerdown", (event) => {
+        if (btn.disabled) return;
+
+        handledByPointer = true;
+        btn.classList.add("is-pressed");
+
+        /*
+          Trigger immediately on touch/mouse press instead of waiting
+          for the later click event after release.
+        */
+        event.preventDefault();
+        handleTileTap(btn);
+      });
+
+      btn.addEventListener("pointerup", () => {
+        btn.classList.remove("is-pressed");
+      });
+
+      btn.addEventListener("pointerleave", () => {
+        btn.classList.remove("is-pressed");
+      });
+
+      btn.addEventListener("pointercancel", () => {
+        btn.classList.remove("is-pressed");
+      });
+
+      btn.addEventListener("click", (event) => {
+        /*
+          Pointer users already triggered the tile on pointerdown.
+          Keep click as a keyboard/accessibility fallback.
+        */
+        if (handledByPointer) {
+          handledByPointer = false;
+          event.preventDefault();
+          return;
+        }
+
+        handleTileTap(btn);
+      });
     });
 
     window.VerseGameShell.wireGameMenu({
