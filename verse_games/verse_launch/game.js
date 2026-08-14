@@ -10,7 +10,8 @@
 
   const GAME_THEME = {
     bg: "#7f66c6",
-    accent: "#7f66c6"
+    accent: "#7f66c6",
+    pageBg: "#000000"
   };
 
   const BUILD_AREA = "large";
