@@ -1888,6 +1888,24 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
   }
 
 
+  function markCoverageForPaintSplats(splats, bounds = currentBounds()) {
+    const coveredBefore = state.coveredCells.size;
+
+    for (const splat of splats || []) {
+      markCellsForPaintSplat(splat, bounds);
+    }
+
+    const coveredAdded = state.coveredCells.size - coveredBefore;
+
+    if (coveredAdded > 0) {
+      renderCoverageCells();
+    }
+
+    updateCoverageHud();
+
+    return coveredAdded;
+  }
+
   function updatePaintCoverage() {
     const bounds = currentBounds();
     state.coveredCells = new Set();
@@ -1919,9 +1937,10 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
     const baseAngle = rand(0, Math.PI * 2);
     const circleCount = bonusLight ? 3 : 6;
     const spread = clamp(blob.height * 1.05 + boardMin * 0.045, 58, 150);
+    const newSplats = [];
 
     function pushPaintMark({ x, y, w, h, shape, blobImg = null, opacity = 1, rot = 0 }) {
-      state.paintSplats.push({
+      const splat = {
         xRatio: bounds.width ? clamp(x, 0, bounds.width) / bounds.width : 0.5,
         yRatio: bounds.height ? clamp(y, 0, bounds.height) / bounds.height : 0.5,
         w,
@@ -1932,7 +1951,10 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
         shape,
         blobImg,
         seed: Math.random()
-      });
+      };
+
+      state.paintSplats.push(splat);
+      newSplats.push(splat);
     }
 
     pushPaintMark({
@@ -1964,17 +1986,30 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
       });
     }
 
+    let didTrimSplats = false;
+
     if (state.paintSplats.length > MAX_STATIC_PAINT_SPLATS) {
       state.paintSplats.splice(0, state.paintSplats.length - MAX_STATIC_PAINT_SPLATS);
+      didTrimSplats = true;
     }
 
-    renderStaticPaintSplats();
+    if (didTrimSplats) {
+      renderStaticPaintSplats();
+    } else {
+      drawStaticPaintSplats(newSplats);
+    }
 
     if (updateCoverageScore) {
-      updatePaintCoverage();
+      const coveredAdded = didTrimSplats
+        ? (() => {
+            updatePaintCoverage();
+            return state.coveredCells.size - coveredBefore;
+          })()
+        : markCoverageForPaintSplats(newSplats, bounds);
 
-      const coveredAdded = state.coveredCells.size - coveredBefore;
-      if (showScorePopup) spawnCoverageScorePopup(coveredAdded, center);
+      if (showScorePopup) {
+        spawnCoverageScorePopup(Math.max(0, coveredAdded), center);
+      }
     }
   }
   
@@ -1990,8 +2025,10 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
     const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
     const pixelWidth = Math.max(1, Math.round(width * dpr));
     const pixelHeight = Math.max(1, Math.round(height * dpr));
+    let resized = false;
 
     if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      resized = true;
       canvas.width = pixelWidth;
       canvas.height = pixelHeight;
       canvas.style.width = `${width}px`;
@@ -2003,7 +2040,7 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    return { canvas, ctx, width, height };
+    return { canvas, ctx, width, height, resized };
   }
 
   function paintBlobNoise(seed, index) {
@@ -2108,6 +2145,24 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
     }
 
     ctx.restore();
+  }
+
+  function drawStaticPaintSplats(splats) {
+    if (!splats || !splats.length) return;
+
+    const paint = paintCanvasContext();
+    if (!paint) return;
+
+    if (paint.resized) {
+      renderStaticPaintSplats();
+      return;
+    }
+
+    const { ctx, width, height } = paint;
+
+    for (const splat of splats) {
+      drawCanvasPaintSplat(ctx, splat, width, height);
+    }
   }
 
   function renderStaticPaintSplats() {

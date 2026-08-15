@@ -202,12 +202,9 @@ body{
   color:var(--vsp-white);
 }
 
-.vsp-build.vm-build *{
-  color:var(--vsp-white);
-}
-
 .vsp-build.vm-build .vm-build-text,
 .vsp-build.vm-build .vsp-build-text{
+  color:var(--vsp-white);
   text-shadow:0 2px 0 rgba(0,0,0,.22);
 }
 
