@@ -208,6 +208,29 @@ body{
   text-shadow:0 2px 0 rgba(0,0,0,.22);
 }
 
+.vsp-build.vm-build .vm-build-word,
+.vsp-build.vm-build .vm-build-punct,
+.vsp-build.vm-build .vm-build-space,
+.vsp-build.vm-build .vm-build-meta{
+  color:rgba(255,255,255,.34);
+  opacity:1;
+}
+
+.vsp-build.vm-build .vm-build-word.is-built,
+.vsp-build.vm-build .vm-build-punct.is-built,
+.vsp-build.vm-build .vm-build-space.is-built,
+.vsp-build.vm-build .vm-build-meta.is-built{
+  color:var(--vsp-white);
+  opacity:1;
+}
+
+.vsp-build.vm-build .is-hide-unbuilt .vm-build-word:not(.is-built),
+.vsp-build.vm-build .is-hide-unbuilt .vm-build-punct:not(.is-built),
+.vsp-build.vm-build .is-hide-unbuilt .vm-build-space:not(.is-built),
+.vsp-build.vm-build .is-hide-unbuilt .vm-build-meta:not(.is-built){
+  display:none;
+}
+
 .vsp-build.is-error{
   animation:vspShake .28s ease;
 }
