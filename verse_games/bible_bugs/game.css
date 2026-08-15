@@ -15,8 +15,12 @@
 }
 
 :root {
+  --bb-topbar-bg: #000000;
   --bb-page-bg: #a7cb6f;
   --bb-bg: #333333;
+  --bb-water-top: #9be1e7;
+  --bb-water-mid: #83d1d9;
+  --bb-water-bottom: #66bdca;
   --bb-ink: #243529;
   --bb-green: #a7cb6f;
   --bb-green-dark: #2f7d49;
@@ -37,7 +41,8 @@ body {
 
 body {
   margin: 0;
-  background: var(--bb-page-bg);
+  background: var(--bb-topbar-bg);
+  background-color: var(--bb-topbar-bg);
   color: var(--bb-ink);
   font-family: var(--bb-body-font);
   -webkit-user-select: none;
@@ -52,7 +57,8 @@ body {
   padding: 0;
   display: block;
   overflow: hidden;
-  background: var(--bb-page-bg);
+  background: var(--bb-topbar-bg);
+  background-color: var(--bb-topbar-bg);
   font-family: var(--bb-body-font);
 }
 
@@ -62,8 +68,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bb-bg);
-  background-color: var(--bb-bg);
+  background: var(--bb-topbar-bg);
+  background-color: var(--bb-topbar-bg);
   color: var(--bb-ink);
 }
 
@@ -80,6 +86,15 @@ body {
 .bb-build-wrap {
   flex: 0 0 auto;
   padding: calc(10px + env(safe-area-inset-top)) var(--bb-side) 8px;
+  background:
+    linear-gradient(
+      180deg,
+      var(--bb-topbar-bg) 0,
+      var(--bb-topbar-bg) env(safe-area-inset-top, 0px),
+      var(--bb-water-top) env(safe-area-inset-top, 0px),
+      var(--bb-water-mid) 100%
+    );
+  background-color: var(--bb-water-top);
 }
 
 .bb-build.is-shake {
@@ -91,7 +106,9 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+  background: var(--bb-water-bottom);
+  background-color: var(--bb-water-bottom);
 }
 
 .bb-field {
@@ -100,7 +117,7 @@ body {
   min-height: min(56vh, 320px);
   border-radius: 0;
   overflow: hidden;
-  background: #83d1d9;
+  background: var(--bb-water-mid);
   border: none;
   box-shadow: none;
 }
@@ -1228,7 +1245,7 @@ body {
   }
 
   .bb-field-wrap {
-    padding-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .bb-frog {
