@@ -1045,14 +1045,14 @@ function gameplayShell({ bonus=false }){
 
 
 function renderEndScreen(){
-  const earnedMedalIconHtml = state.completionResult?.newlyCompleted
+  const completeIconHtml = state.completionResult?.newlyCompleted
     ? medalIconHtmlForMode(state.mode)
-    : "";
+    : GAME_ICON_HTML;
 
   window.VerseGameShell.renderCompleteScreen({
     app,
     icon: GAME_ICON,
-    iconHtml: earnedMedalIconHtml,
+    iconHtml: completeIconHtml,
     gameIcon: GAME_ICON,
     mode: state.mode,
     verseId: ctx.verseId,
