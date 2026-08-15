@@ -53,8 +53,8 @@ body {
 }
 
 #app.vm-shell {
-  min-height: 100dvh;
-  height: 100dvh;
+  min-height: 100vh;
+  height: 100vh;
   padding: 0;
   display: block;
   overflow: hidden;
@@ -62,8 +62,8 @@ body {
 
 .fs-shell,
 .fs-mode-shell {
-  min-height: 100dvh;
-  height: 100dvh;
+  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;

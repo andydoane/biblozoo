@@ -9,7 +9,8 @@
 
   const GAME_THEME = {
     bg: "#333333",
-    accent: "#333333"
+    accent: "#333333",
+    pageBg: "#333333"
   };
 
   const BUILD_AREA = "large";
