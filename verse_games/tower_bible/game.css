@@ -44,8 +44,8 @@ body {
 }
 
 #app.vm-shell {
-  min-height: 100vh;
-  height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   padding: 0;
   display: block;
   overflow: hidden;
@@ -53,8 +53,8 @@ body {
 
 .tb-shell,
 .tb-mode-shell {
-  min-height: 100vh;
-  height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
