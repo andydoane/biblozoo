@@ -68,6 +68,12 @@ body{
 .vb2-build-wrap{
   padding: 8px 14px 7px;
   flex: 0 0 auto;
+  background: var(--vb2-sky);
+  background-color: var(--vb2-sky);
+}
+
+.vb2-build.vm-build{
+  box-shadow: none;
 }
 
 .vb2-bonus-score-build {
