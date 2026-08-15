@@ -1552,7 +1552,7 @@ function render(){
     return state.blobs.some(blob =>
       blob.streakReward &&
       blob.streakValue === streakValue &&
-      (blob.state === "live" || blob.state === "spawning")
+      blob.state === "live"
     );
   }
 
@@ -1563,7 +1563,7 @@ function render(){
     const width = Math.min(height * shape.ratio, bounds.width * 0.78);
     const velocityMag = 0.22 * MODE_CONFIG[state.mode].speedMultiplier;
     const angle = rand(0, Math.PI * 2);
-    const existing = state.blobs.filter(blob => blob.state === "live" || blob.state === "spawning");
+    const existing = state.blobs.filter(blob => blob.state === "live");
     const point = safeSpawnPoint({ width, height }, existing);
 
     return {
@@ -1587,7 +1587,8 @@ function render(){
       wobbleSpeed: rand(1.35, 2.35),
       impactX: 0,
       impactY: 0,
-      state: "spawning"
+      state: "live",
+      spawnVisual: true
     };
   }
 
@@ -1598,10 +1599,15 @@ function render(){
     if (![5, 10, 15].includes(streakValue)) return;
     if (hasStreakRewardBlob(streakValue)) return;
 
-    state.blobs.push(makeStreakRewardBlob(streakValue));
+    const blob = makeStreakRewardBlob(streakValue);
+
+    /*
+      Streak reward gets the board to itself.
+    */
+    state.blobs = [blob];
     renderBlobNodes();
     playStreakSound();
-    releaseSpawningBlobsSoon();
+    clearBlobSpawnVisualSoon(blob);
   }
 
 
@@ -2416,7 +2422,7 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
     if (node) setTimeout(() => node.remove(), 720);
   }
 
-  function handleStreakRewardTap(blob) {
+  async function handleStreakRewardTap(blob) {
     if (state.busy) return;
 
     state.busy = true;
@@ -2429,6 +2435,18 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
     spawnParticleBurst(blob);
     removeBlobById(blob.id);
     renderBlobNodes();
+
+    /*
+      After the streak reward is splatted, refill the normal field.
+    */
+    await sleep(CORRECT_REFILL_DELAY_MS);
+
+    if (state.screen !== "game" || state.menuOpen || state.helpOpen) {
+      state.busy = false;
+      return;
+    }
+
+    await refillFieldAfterCorrect();
 
     state.busy = false;
   }
@@ -2566,15 +2584,30 @@ function spawnWrongFaceParticleBurst(){
       return;
     }
 
+    const shouldSpawnStreakReward =
+      wasVerseWordPhase &&
+      state.phase === "words" &&
+      [5, 10, 15].includes(state.correctStreak);
+
     /*
-      Let the splat and paint moment breathe before the next blobs arrive.
+      Let the splat and paint moment breathe before the next blob moment.
+      If a streak reward is due, it appears by itself instead of refilling
+      the normal three-blob field.
     */
     await sleep(CORRECT_REFILL_DELAY_MS);
-    await refillFieldAfterCorrect();
 
-    if (wasVerseWordPhase && state.phase === "words" && [5, 10, 15].includes(state.correctStreak)){
-      spawnStreakRewardBlob(state.correctStreak);
+    if (state.screen !== "game" || state.menuOpen || state.helpOpen) {
+      state.busy = false;
+      return;
     }
+
+    if (shouldSpawnStreakReward){
+      spawnStreakRewardBlob(state.correctStreak);
+      state.busy = false;
+      return;
+    }
+
+    await refillFieldAfterCorrect();
 
     state.busy = false;
   }
