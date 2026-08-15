@@ -15,6 +15,8 @@
 }
 
 :root {
+  --vb2-shell: #333333;
+  --vb2-sky: #a0dce2;
   --vb2-body-font: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --vb2-display-font: "VB2 Titan One", "Baloo 2", system-ui, sans-serif;
 }
@@ -26,7 +28,8 @@ body{
 
 body{
   margin: 0;
-  background: #a0dce2;
+  background: var(--vb2-shell);
+  background-color: var(--vb2-shell);
   font-family: var(--vb2-body-font);
   -webkit-user-select: none;
   user-select: none;
@@ -39,6 +42,8 @@ body{
   padding: 0;
   display: block;
   overflow: hidden;
+  background: var(--vb2-shell);
+  background-color: var(--vb2-shell);
   font-family: var(--vb2-body-font);
 }
 
@@ -46,13 +51,13 @@ body{
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #a0dce2;
+  background: var(--vb2-shell);
   overflow: hidden;
 }
 
 .vb2-stage{
   width: 100%;
-  max-width: 840px;
+  max-width: none;
   margin: 0 auto;
   min-height: 0;
   flex: 1 1 auto;
@@ -126,7 +131,7 @@ body{
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 14px 0;
+  padding: 0;
 }
 
 .vb2-field{
@@ -140,8 +145,8 @@ body{
   flex: 1 1 auto;
   min-height: 280px;
   overflow: hidden;
-  background: #a0dce2;
-  border-radius: 26px;
+  background: var(--vb2-sky);
+  border-radius: 0;
   touch-action: none;
   isolation: isolate;
   box-shadow: inset 0 -8px 0 rgba(0,0,0,0.06);
@@ -642,8 +647,8 @@ body{
   }
 
   .vb2-field-wrap{
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .vb2-menu-pill{
