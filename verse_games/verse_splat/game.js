@@ -1367,20 +1367,6 @@ function render(){
     state.blobs.forEach(blob => updateBlobDom(blob));
   }
 
-  function appendBlobNode(blob){
-    const layer = $("#vspBlobLayer");
-    if (!layer || !blob) return;
-
-    if (document.querySelector(`[data-blob-id="${blob.id}"]`)) {
-      updateBlobDom(blob);
-      return;
-    }
-
-    layer.insertAdjacentHTML("beforeend", blobMarkup(blob));
-    bindBoardMainInteraction();
-    updateBlobDom(blob);
-  }
-
   function clearNormalWordBlobs(){
     const normalBlobIds = state.blobs
       .filter(blob => !blob.streakReward)
@@ -1721,6 +1707,8 @@ function render(){
   }
 
   async function refillFieldAfterCorrect(){
+    if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
+
     const correct = currentCorrectLabel();
     const labels = uniqueLabels([correct, ...decoysForCurrentPhase(correct)]).slice(0, 3);
     const chosenLabels = shuffle(labels).slice(0, 3);
@@ -1728,8 +1716,6 @@ function render(){
     const newColors = randomColorSet(3, existingColors);
 
     for (let i = 0; i < 3; i++){
-      if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
-
       const label = chosenLabels[i] || correct;
       const blob = makeBlob({
         label,
@@ -1738,13 +1724,14 @@ function render(){
       });
 
       state.blobs.push(blob);
-      appendBlobNode(blob);
-      playSpawnPopSoundForCount(1);
-
-      if (i < 2) {
-        await sleep(90);
-      }
     }
+
+    renderBlobNodes();
+    playSpawnPopSoundForCount(3);
+
+    await sleep(290);
+
+    if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
 
     releaseSpawningBlobsSoon(0);
   }
