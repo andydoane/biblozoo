@@ -98,7 +98,7 @@ select {
   background:
     linear-gradient(rgba(0, 0, 0, .08), rgba(0, 0, 0, .08)),
     var(--vl-starfield-main) center center / cover no-repeat,
-    var(--vl-purple);
+    var(--vl-shell);
 }
 
 .vl-mode-shell {
@@ -302,7 +302,7 @@ select {
   background:
     linear-gradient(rgba(0, 0, 0, .06), rgba(0, 0, 0, .06)),
     var(--vl-starfield-main) center center / cover no-repeat,
-    var(--vl-purple);
+    var(--vl-shell);
 }
 
 @media (min-width: 700px) {
