@@ -9,7 +9,8 @@
 
   const GAME_THEME = {
     bg: "#a0dce2",
-    accent: "#40b9c5"
+    accent: "#40b9c5",
+    pageBg: "#a0dce2"
   };
 
   const HELP_OVERLAY_ID = "tbHelpOverlay";
