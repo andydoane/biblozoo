@@ -270,6 +270,11 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const $ = (s, root=document) => root.querySelector(s);
   const escapeHtml = (str) => String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;");
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const afterNextPaint = () => new Promise(resolve => {
+    requestAnimationFrame(() => {
+      window.setTimeout(resolve, 0);
+    });
+  });
 const clamp = window.VerseGameShell.clamp;
   const rand = (min, max) => min + Math.random() * (max - min);
 
@@ -2471,17 +2476,27 @@ function spawnWrongFaceParticleBurst(){
     state.busy = true;
     state.inputLockedUntil = performance.now() + CORRECT_TAP_LOCK_MS;
 
-    playCorrectSound();
-
     /*
-      Build the splat from the tapped blob first, while its DOM position
-      is still available. Then clear the moving word blobs so dropped
-      frames during paint/coverage work are less visible.
+      Frame 0: respond immediately with sound, a quick splat effect,
+      particles, and a cleared board. Static paint, coverage, and build
+      updates wait until after this visual response has a chance to paint.
     */
-    addStaticPaintSplats(blob);
+    playCorrectSound();
     spawnSplatEffect(blob);
     spawnParticleBurst(blob);
     clearNormalWordBlobs();
+
+    await afterNextPaint();
+
+    if (state.screen !== "game" || state.menuOpen || state.helpOpen) {
+      state.busy = false;
+      return;
+    }
+
+    /*
+      Next frame: do the heavier work after the immediate visual response.
+    */
+    addStaticPaintSplats(blob);
 
     state.progressIndex += 1;
     state.wrongCountThisField = 0;
@@ -2500,7 +2515,7 @@ function spawnWrongFaceParticleBurst(){
       return;
     }
 
-    await sleep(110);
+    await sleep(90);
     await refillFieldAfterCorrect();
 
     if (wasVerseWordPhase && state.phase === "words" && [5, 10, 15].includes(state.correctStreak)){
