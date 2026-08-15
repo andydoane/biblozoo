@@ -149,8 +149,26 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   };
 
   const verseSplatSoundCache = new Map();
+  const verseSplatAudioBufferCache = new Map();
+  const verseSplatAudioBufferPromises = new Map();
   const verseSplatLastSoundByGroup = {};
+  const verseSplatLastPlayedAt = {};
+  const VerseSplatAudioContext = window.AudioContext || window.webkitAudioContext;
+  let verseSplatAudioContext = null;
   let verseSplatAudioUnlocked = false;
+
+  const VERSE_SPLAT_SOUND_COOLDOWNS = {
+    uiTap: 80,
+    pop: 90,
+    spawn: 320,
+    correct: 45,
+    correctBonus: 70,
+    wrong: 80,
+    streak: 120,
+    paintScore: 180,
+    start: 180,
+    positive: 120
+  };
 
   function verseSplatSoundSrc(file){
     const value = String(file || "");
@@ -162,6 +180,87 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     return `${VERSE_SPLAT_SOUND_BASE}${value}`;
   }
 
+  function getVerseSplatAudioContext(){
+    if (!VerseSplatAudioContext) return null;
+
+    if (!verseSplatAudioContext){
+      try {
+        verseSplatAudioContext = new VerseSplatAudioContext();
+      } catch (err) {
+        verseSplatAudioContext = null;
+      }
+    }
+
+    return verseSplatAudioContext;
+  }
+
+  function resumeVerseSplatAudioContext(){
+    const ctx = getVerseSplatAudioContext();
+    if (!ctx) return null;
+
+    try {
+      if (ctx.state === "suspended" || ctx.state === "interrupted"){
+        const resumePromise = ctx.resume();
+        if (resumePromise && typeof resumePromise.catch === "function"){
+          resumePromise.catch(() => {});
+        }
+      }
+    } catch (err) {}
+
+    return ctx;
+  }
+
+  function decodeVerseSplatAudioData(ctx, arrayBuffer){
+    return new Promise((resolve, reject) => {
+      try {
+        const data = arrayBuffer.slice(0);
+        const maybePromise = ctx.decodeAudioData(data, resolve, reject);
+
+        if (maybePromise && typeof maybePromise.then === "function"){
+          maybePromise.then(resolve).catch(reject);
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function primeVerseSplatAudioBuffer(file){
+    if (!file) return null;
+
+    const src = verseSplatSoundSrc(file);
+    const ctx = getVerseSplatAudioContext();
+
+    if (!ctx || !src) return null;
+
+    if (verseSplatAudioBufferCache.has(src)){
+      return Promise.resolve(verseSplatAudioBufferCache.get(src));
+    }
+
+    if (verseSplatAudioBufferPromises.has(src)){
+      return verseSplatAudioBufferPromises.get(src);
+    }
+
+    const promise = fetch(src)
+      .then(response => {
+        if (!response.ok) throw new Error(`Unable to load sound: ${src}`);
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => decodeVerseSplatAudioData(ctx, arrayBuffer))
+      .then(buffer => {
+        if (buffer) verseSplatAudioBufferCache.set(src, buffer);
+        return buffer;
+      })
+      .catch(() => {
+        verseSplatAudioBufferPromises.delete(src);
+        return null;
+      });
+
+    verseSplatAudioBufferPromises.set(src, promise);
+
+    return promise;
+  }
+
   function primeVerseSplatSound(file){
     if (!file) return null;
 
@@ -170,16 +269,26 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     if (!verseSplatSoundCache.has(src)){
       const audio = new Audio(src);
       audio.preload = "auto";
+
+      try {
+        audio.load();
+      } catch (err) {}
+
       verseSplatSoundCache.set(src, audio);
     }
+
+    primeVerseSplatAudioBuffer(file);
 
     return verseSplatSoundCache.get(src);
   }
 
   function unlockVerseSplatAudio(){
-    if (verseSplatAudioUnlocked) return;
+    const wasUnlocked = verseSplatAudioUnlocked;
 
     verseSplatAudioUnlocked = true;
+    resumeVerseSplatAudioContext();
+
+    if (wasUnlocked) return;
 
     Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(file => {
       primeVerseSplatSound(file);
@@ -206,11 +315,70 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     return file;
   }
 
-  function playVerseSplatSoundFile(file, volume=1){
+  function claimVerseSplatSoundSlot(cooldownKey, cooldownMs=0){
+    if (!cooldownKey || !cooldownMs) return true;
+
+    const now = performance.now();
+    const last = verseSplatLastPlayedAt[cooldownKey] || 0;
+
+    if (now - last < cooldownMs) return false;
+
+    verseSplatLastPlayedAt[cooldownKey] = now;
+    return true;
+  }
+
+  function playVerseSplatWebAudioBuffer(ctx, buffer, volume=1){
+    if (!ctx || !buffer) return false;
+
+    try {
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+
+      source.buffer = buffer;
+      gain.gain.value = Math.max(0, Math.min(1, volume));
+
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(0);
+
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function playVerseSplatSoundFile(file, volume=1, options={}){
     if (muted || !file) return;
+
+    const src = verseSplatSoundSrc(file);
+    const cooldownKey = options.cooldownKey || src;
+    const cooldownMs = Math.max(0, Number(options.cooldownMs || 0));
 
     try {
       unlockVerseSplatAudio();
+
+      const ctx = resumeVerseSplatAudioContext();
+
+      if (ctx){
+        const buffer = verseSplatAudioBufferCache.get(src);
+
+        if (buffer){
+          if (!claimVerseSplatSoundSlot(cooldownKey, cooldownMs)) return;
+          if (playVerseSplatWebAudioBuffer(ctx, buffer, volume)) return;
+        }
+
+        /*
+          Buffer is still warming up. Start/continue loading it, but skip the
+          HTML Audio clone fallback so gameplay does not hitch while decoding.
+        */
+        primeVerseSplatAudioBuffer(file);
+        return;
+      }
+
+      /*
+        Fallback for browsers without Web Audio support.
+      */
+      if (!claimVerseSplatSoundSlot(cooldownKey, cooldownMs)) return;
 
       const base = primeVerseSplatSound(file);
       if (!base) return;
@@ -226,48 +394,82 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     } catch (err) {}
   }
 
-  function playVerseSplatSoundGroup(groupName, volume=1){
-    playVerseSplatSoundFile(chooseVerseSplatSound(groupName), volume);
+  function playVerseSplatSoundGroup(groupName, volume=1, options={}){
+    const cooldownKey = options.cooldownKey || groupName;
+    const cooldownMs = options.cooldownMs ?? (
+      VERSE_SPLAT_SOUND_COOLDOWNS[cooldownKey] ??
+      VERSE_SPLAT_SOUND_COOLDOWNS[groupName] ??
+      0
+    );
+
+    playVerseSplatSoundFile(chooseVerseSplatSound(groupName), volume, {
+      cooldownKey,
+      cooldownMs
+    });
   }
 
   function playSharedUiPopSound(){
-    playVerseSplatSoundGroup("uiTap", 0.45);
+    playVerseSplatSoundGroup("uiTap", 0.45, { cooldownKey:"uiTap" });
   }
 
   function playPopSound(){
-    playVerseSplatSoundGroup("pop", 0.72);
+    playVerseSplatSoundGroup("pop", 0.72, { cooldownKey:"pop" });
   }
 
   function playCorrectSound(){
-    playVerseSplatSoundGroup("correct", 0.88);
+    const isBonus = state.screen === "bonus";
+
+    playVerseSplatSoundGroup("correct", 0.88, {
+      cooldownKey: isBonus ? "correctBonus" : "correct"
+    });
   }
 
   function playWrongSound(){
-    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.wrong, 0.9);
+    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.wrong, 0.9, {
+      cooldownKey:"wrong",
+      cooldownMs:VERSE_SPLAT_SOUND_COOLDOWNS.wrong
+    });
   }
 
   function playStreakSound(){
-    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.streak, 0.95);
+    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.streak, 0.95, {
+      cooldownKey:"streak",
+      cooldownMs:VERSE_SPLAT_SOUND_COOLDOWNS.streak
+    });
   }
 
   function playPaintScoreSound(){
-    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.paintScore, 0.92);
+    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.paintScore, 0.92, {
+      cooldownKey:"paintScore",
+      cooldownMs:VERSE_SPLAT_SOUND_COOLDOWNS.paintScore
+    });
   }
 
   function playStartSound(){
-    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.start, 0.92);
+    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.start, 0.92, {
+      cooldownKey:"start",
+      cooldownMs:VERSE_SPLAT_SOUND_COOLDOWNS.start
+    });
   }
 
   function playPositiveSound(){
-    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.positive, 0.9);
+    playVerseSplatSoundFile(VERSE_SPLAT_SOUNDS.positive, 0.9, {
+      cooldownKey:"positive",
+      cooldownMs:VERSE_SPLAT_SOUND_COOLDOWNS.positive
+    });
   }
 
   function playSpawnPopSoundForCount(count=1){
-    const total = Math.max(0, Math.min(count, 4));
+    if (count <= 0) return;
 
-    for (let i = 0; i < total; i++){
-      setTimeout(() => playPopSound(), i * 48);
-    }
+    /*
+      One soft spawn sound per spawn sequence. The staggered blobs still appear
+      one at a time, but the audio system only starts one sound.
+    */
+    playVerseSplatSoundGroup("pop", 0.48, {
+      cooldownKey:"spawn",
+      cooldownMs:VERSE_SPLAT_SOUND_COOLDOWNS.spawn
+    });
   }
 
   const $ = (s, root=document) => root.querySelector(s);
@@ -1407,7 +1609,6 @@ function render(){
 
     state.blobs.push(blob);
     appendBlobNode(blob);
-    playSpawnPopSoundForCount(1);
     clearBlobSpawnVisualSoon(blob);
   }
 
@@ -1752,6 +1953,8 @@ function render(){
 
     state.inputLockedUntil = performance.now() + ((labels.length - 1) * CORRECT_REFILL_STAGGER_MS) + BLOB_SPAWN_FADE_MS;
 
+    playSpawnPopSoundForCount(labels.length);
+
     for (let i = 0; i < labels.length; i++){
       if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
 
@@ -1777,6 +1980,8 @@ function render(){
     const chosenLabels = shuffle(labels).slice(0, 3);
     const existingColors = state.blobs.map(blob => blob.color);
     const newColors = randomColorSet(3, existingColors);
+
+    playSpawnPopSoundForCount(chosenLabels.length);
 
     for (let i = 0; i < 3; i++) {
       if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
