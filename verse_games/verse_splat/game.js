@@ -55,6 +55,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const BONUS_RESPAWN_DELAY_MS = 1000;
   const CORRECT_TAP_LOCK_MS = 180;
   const BLOB_SPAWN_RELEASE_MS = 300;
+  const CORRECT_REFILL_DIAGNOSTIC_DELAY_MS = 3000;
   const MAX_STATIC_PAINT_SPLATS = 96;
 
   function coverageGridSize(){
@@ -2513,7 +2514,12 @@ function spawnWrongFaceParticleBurst(){
       return;
     }
 
-    await sleep(90);
+    /*
+      Diagnostic test: leave the board empty for 3 seconds after the splat,
+      paint, coverage, and build work. This separates tap/effect work from
+      blob refill/render/spawn/movement work.
+    */
+    await sleep(CORRECT_REFILL_DIAGNOSTIC_DELAY_MS);
     await refillFieldAfterCorrect();
 
     if (wasVerseWordPhase && state.phase === "words" && [5, 10, 15].includes(state.correctStreak)){
