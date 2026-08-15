@@ -54,8 +54,9 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const BONUS_MASTERPIECE_PAUSE_MS = 2000;
   const BONUS_RESPAWN_DELAY_MS = 1000;
   const CORRECT_TAP_LOCK_MS = 180;
-  const BLOB_SPAWN_RELEASE_MS = 300;
-  const CORRECT_REFILL_DIAGNOSTIC_DELAY_MS = 3000;
+  const CORRECT_REFILL_DELAY_MS = 1000;
+  const CORRECT_REFILL_STAGGER_MS = 160;
+  const BLOB_SPAWN_RELEASE_MS = 220;
   const MAX_STATIC_PAINT_SPLATS = 96;
 
   function coverageGridSize(){
@@ -568,6 +569,16 @@ const shuffle = window.VerseGameShell.shuffle;
         if (blob.state === "spawning"){
           blob.state = "live";
         }
+      }
+    }, delay);
+  }
+
+  function releaseSingleSpawningBlobSoon(blob, delay = BLOB_SPAWN_RELEASE_MS){
+    if (!blob) return;
+
+    window.setTimeout(() => {
+      if (state.blobs.includes(blob) && blob.state === "spawning"){
+        blob.state = "live";
       }
     }, delay);
   }
@@ -1376,6 +1387,29 @@ function render(){
     state.blobs.forEach(blob => updateBlobDom(blob));
   }
 
+  function appendBlobNode(blob){
+    const layer = $("#vspBlobLayer");
+    if (!layer || !blob) return;
+
+    const existing = document.querySelector(`[data-blob-id="${blob.id}"]`);
+
+    if (existing){
+      updateBlobDom(blob);
+      return;
+    }
+
+    layer.insertAdjacentHTML("beforeend", blobMarkup(blob));
+    bindBoardMainInteraction();
+    updateBlobDom(blob);
+  }
+
+  function appendSpawningBlob(blob){
+    state.blobs.push(blob);
+    appendBlobNode(blob);
+    playSpawnPopSoundForCount(1);
+    releaseSingleSpawningBlobSoon(blob);
+  }
+
   function clearNormalWordBlobs(){
     const normalBlobIds = state.blobs
       .filter(blob => !blob.streakReward)
@@ -1701,18 +1735,31 @@ function render(){
   }
 
 
-  function spawnInitialField(){
+  async function spawnInitialField(){
     const correct = currentCorrectLabel();
     const decoys = decoysForCurrentPhase(correct).slice(0, 2);
     const labels = shuffle(uniqueLabels([correct, ...decoys])).slice(0, 3);
+
     state.blobs = [];
-    labels.forEach((label) => {
-      const blob = makeBlob({ label, isCorrect: normalizeWord(label) === normalizeWord(correct) });
-      state.blobs.push(blob);
-    });
     renderBlobNodes();
-    playSpawnPopSoundForCount(labels.length);
-    releaseSpawningBlobsSoon();
+
+    state.inputLockedUntil = performance.now() + ((labels.length - 1) * CORRECT_REFILL_STAGGER_MS) + BLOB_SPAWN_RELEASE_MS;
+
+    for (let i = 0; i < labels.length; i++){
+      if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
+
+      const label = labels[i];
+      const blob = makeBlob({
+        label,
+        isCorrect: normalizeWord(label) === normalizeWord(correct)
+      });
+
+      appendSpawningBlob(blob);
+
+      if (i < labels.length - 1){
+        await sleep(CORRECT_REFILL_STAGGER_MS);
+      }
+    }
   }
 
   async function refillFieldAfterCorrect() {
@@ -1725,6 +1772,8 @@ function render(){
     const newColors = randomColorSet(3, existingColors);
 
     for (let i = 0; i < 3; i++) {
+      if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
+
       const label = chosenLabels[i] || correct;
       const blob = makeBlob({
         label,
@@ -1732,12 +1781,14 @@ function render(){
         preserveColor: newColors[i]
       });
 
-      state.blobs.push(blob);
+      appendSpawningBlob(blob);
+
+      if (i < 2){
+        await sleep(CORRECT_REFILL_STAGGER_MS);
+      }
     }
 
-    renderBlobNodes();
-    playSpawnPopSoundForCount(3);
-    releaseSpawningBlobsSoon();
+    await sleep(BLOB_SPAWN_RELEASE_MS);
   }
 
   function refillFieldAfterSecondWrong(){
@@ -2515,11 +2566,9 @@ function spawnWrongFaceParticleBurst(){
     }
 
     /*
-      Diagnostic test: leave the board empty for 3 seconds after the splat,
-      paint, coverage, and build work. This separates tap/effect work from
-      blob refill/render/spawn/movement work.
+      Let the splat and paint moment breathe before the next blobs arrive.
     */
-    await sleep(CORRECT_REFILL_DIAGNOSTIC_DELAY_MS);
+    await sleep(CORRECT_REFILL_DELAY_MS);
     await refillFieldAfterCorrect();
 
     if (wasVerseWordPhase && state.phase === "words" && [5, 10, 15].includes(state.correctStreak)){
