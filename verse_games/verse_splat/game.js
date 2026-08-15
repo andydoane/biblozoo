@@ -1367,6 +1367,33 @@ function render(){
     state.blobs.forEach(blob => updateBlobDom(blob));
   }
 
+  function appendBlobNode(blob){
+    const layer = $("#vspBlobLayer");
+    if (!layer || !blob) return;
+
+    if (document.querySelector(`[data-blob-id="${blob.id}"]`)) {
+      updateBlobDom(blob);
+      return;
+    }
+
+    layer.insertAdjacentHTML("beforeend", blobMarkup(blob));
+    bindBoardMainInteraction();
+    updateBlobDom(blob);
+  }
+
+  function clearNormalWordBlobs(){
+    const normalBlobIds = state.blobs
+      .filter(blob => !blob.streakReward)
+      .map(blob => blob.id);
+
+    state.blobs = state.blobs.filter(blob => blob.streakReward);
+
+    normalBlobIds.forEach(id => {
+      const node = document.querySelector(`[data-blob-id="${id}"]`);
+      if (node) node.remove();
+    });
+  }
+
   function updateBlobDom(blob){
     const node = document.querySelector(`[data-blob-id="${blob.id}"]`);
     if (!node) return;
@@ -1693,22 +1720,32 @@ function render(){
     releaseSpawningBlobsSoon();
   }
 
-  function refillFieldAfterCorrect(){
-    const survivors = state.blobs.filter(blob => blob.state === "live" && !blob.streakReward);
+  async function refillFieldAfterCorrect(){
     const correct = currentCorrectLabel();
     const labels = uniqueLabels([correct, ...decoysForCurrentPhase(correct)]).slice(0, 3);
     const chosenLabels = shuffle(labels).slice(0, 3);
-    const existingColors = survivors.map(blob => blob.color);
-    allocateLabelsToBlobs(survivors, chosenLabels.slice(0, survivors.length));
-    const needed = 3 - survivors.length;
-    const newColors = randomColorSet(needed, existingColors);
-    for (let i = 0; i < needed; i++){
-      const label = chosenLabels[survivors.length + i] || chosenLabels[i] || correct;
-      state.blobs.push(makeBlob({ label, isCorrect: normalizeWord(label) === normalizeWord(correct), preserveColor:newColors[i] }));
+    const existingColors = state.blobs.map(blob => blob.color);
+    const newColors = randomColorSet(3, existingColors);
+
+    for (let i = 0; i < 3; i++){
+      if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
+
+      const label = chosenLabels[i] || correct;
+      const blob = makeBlob({
+        label,
+        isCorrect: normalizeWord(label) === normalizeWord(correct),
+        preserveColor: newColors[i]
+      });
+
+      state.blobs.push(blob);
+      appendBlobNode(blob);
+      playSpawnPopSoundForCount(1);
+      releaseSpawningBlobsSoon();
+
+      if (i < 2) {
+        await sleep(90);
+      }
     }
-    renderBlobNodes();
-    playSpawnPopSoundForCount(needed);
-    releaseSpawningBlobsSoon();
   }
 
   function refillFieldAfterSecondWrong(){
@@ -2445,11 +2482,19 @@ function spawnWrongFaceParticleBurst(){
 
     state.busy = true;
     state.inputLockedUntil = performance.now() + CORRECT_TAP_LOCK_MS;
+
     playCorrectSound();
+
+    /*
+      Build the splat from the tapped blob first, while its DOM position
+      is still available. Then clear the moving word blobs so dropped
+      frames during paint/coverage work are less visible.
+    */
     addStaticPaintSplats(blob);
     spawnSplatEffect(blob);
     spawnParticleBurst(blob);
-    removeBlobById(blob.id);
+    clearNormalWordBlobs();
+
     state.progressIndex += 1;
     state.wrongCountThisField = 0;
 
@@ -2459,13 +2504,16 @@ function spawnWrongFaceParticleBurst(){
 
     updatePhase();
     appendBuildProgress();
+
     if (state.phase === "complete"){
       await sleep(650);
       await completeMainGame();
       state.busy = false;
       return;
     }
-    refillFieldAfterCorrect();
+
+    await sleep(110);
+    await refillFieldAfterCorrect();
 
     if (wasVerseWordPhase && state.phase === "words" && [5, 10, 15].includes(state.correctStreak)){
       spawnStreakRewardBlob(state.correctStreak);
