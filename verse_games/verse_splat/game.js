@@ -56,7 +56,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const CORRECT_TAP_LOCK_MS = 180;
   const CORRECT_REFILL_DELAY_MS = 1000;
   const CORRECT_REFILL_STAGGER_MS = 160;
-  const BLOB_SPAWN_RELEASE_MS = 220;
+  const BLOB_SPAWN_FADE_MS = 180;
   const MAX_STATIC_PAINT_SPLATS = 96;
 
   function coverageGridSize(){
@@ -563,23 +563,16 @@ const shuffle = window.VerseGameShell.shuffle;
     state.phase = phase === "done" ? "complete" : phase;
   }
 
-  function releaseSpawningBlobsSoon(delay = BLOB_SPAWN_RELEASE_MS){
-    window.setTimeout(() => {
-      for (const blob of state.blobs){
-        if (blob.state === "spawning"){
-          blob.state = "live";
-        }
-      }
-    }, delay);
-  }
-
-  function releaseSingleSpawningBlobSoon(blob, delay = BLOB_SPAWN_RELEASE_MS){
+  function clearBlobSpawnVisualSoon(blob, delay = BLOB_SPAWN_FADE_MS){
     if (!blob) return;
 
     window.setTimeout(() => {
-      if (state.blobs.includes(blob) && blob.state === "spawning"){
-        blob.state = "live";
-      }
+      if (!state.blobs.includes(blob)) return;
+
+      blob.spawnVisual = false;
+
+      const node = document.querySelector(`[data-blob-id="${blob.id}"]`);
+      if (node) node.classList.remove("is-spawning");
     }, delay);
   }
 
@@ -1367,9 +1360,10 @@ function render(){
   function blobMarkup(blob){
     const blobType = blob.blobType || "normal";
     const blobImg = blob.blobImg || BLOB_SHAPES.normal.src;
+    const spawnClass = blob.spawnVisual ? "is-spawning" : "";
 
     return `
-      <div class="vsp-blob vsp-blob--word vsp-blob--${blobType} ${blob.state === 'spawning' ? 'is-spawning' : ''} ${blob.tutorial ? 'is-tutorial' : ''} ${blob.streakReward ? 'is-streak-reward' : ''}" data-blob-id="${blob.id}" role="button" tabindex="0" aria-label="${escapeHtml(blob.label)}" style="width:${blob.width}px;height:${blob.height}px;">
+      <div class="vsp-blob vsp-blob--word vsp-blob--${blobType} ${spawnClass} ${blob.tutorial ? 'is-tutorial' : ''} ${blob.streakReward ? 'is-streak-reward' : ''}" data-blob-id="${blob.id}" role="button" tabindex="0" aria-label="${escapeHtml(blob.label)}" style="width:${blob.width}px;height:${blob.height}px;">
         <div class="vsp-blob-pop">
           <div class="vsp-blob-body" style="--vsp-blob-mask:url('${blobImg}');--vsp-blob-fill:${blob.color};--vsp-blob-text:${blob.textColor};color:${blob.textColor};">
             <span class="vsp-blob-label">${escapeHtml(blob.label)}</span>
@@ -1404,10 +1398,17 @@ function render(){
   }
 
   function appendSpawningBlob(blob){
+    /*
+      The blob is live immediately so movement begins on the first game-loop
+      frame after insertion. spawnVisual is only for the opacity fade.
+    */
+    blob.state = "live";
+    blob.spawnVisual = true;
+
     state.blobs.push(blob);
     appendBlobNode(blob);
     playSpawnPopSoundForCount(1);
-    releaseSingleSpawningBlobSoon(blob);
+    clearBlobSpawnVisualSoon(blob);
   }
 
   function clearNormalWordBlobs(){
@@ -1743,7 +1744,7 @@ function render(){
     state.blobs = [];
     renderBlobNodes();
 
-    state.inputLockedUntil = performance.now() + ((labels.length - 1) * CORRECT_REFILL_STAGGER_MS) + BLOB_SPAWN_RELEASE_MS;
+    state.inputLockedUntil = performance.now() + ((labels.length - 1) * CORRECT_REFILL_STAGGER_MS) + BLOB_SPAWN_FADE_MS;
 
     for (let i = 0; i < labels.length; i++){
       if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
@@ -1788,7 +1789,7 @@ function render(){
       }
     }
 
-    await sleep(BLOB_SPAWN_RELEASE_MS);
+    await sleep(BLOB_SPAWN_FADE_MS);
   }
 
   function refillFieldAfterSecondWrong(){
