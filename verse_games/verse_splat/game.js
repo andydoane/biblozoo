@@ -1711,7 +1711,7 @@ function render(){
     releaseSpawningBlobsSoon();
   }
 
-  async function refillFieldAfterCorrect(){
+  async function refillFieldAfterCorrect() {
     if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
 
     const correct = currentCorrectLabel();
@@ -1720,7 +1720,7 @@ function render(){
     const existingColors = state.blobs.map(blob => blob.color);
     const newColors = randomColorSet(3, existingColors);
 
-    for (let i = 0; i < 3; i++){
+    for (let i = 0; i < 3; i++) {
       const label = chosenLabels[i] || correct;
       const blob = makeBlob({
         label,
@@ -1728,17 +1728,17 @@ function render(){
         preserveColor: newColors[i]
       });
 
+      /*
+        Diagnostic test: correct-refill blobs skip the spawning state so
+        there is no spawn-pop transform animation and no post-spawn hold.
+      */
+      blob.state = "live";
+
       state.blobs.push(blob);
     }
 
     renderBlobNodes();
     playSpawnPopSoundForCount(3);
-
-    await sleep(290);
-
-    if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
-
-    releaseSpawningBlobsSoon(0);
   }
 
   function refillFieldAfterSecondWrong(){
