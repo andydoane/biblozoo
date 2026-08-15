@@ -1740,12 +1740,13 @@ function render(){
       state.blobs.push(blob);
       appendBlobNode(blob);
       playSpawnPopSoundForCount(1);
-      releaseSpawningBlobsSoon();
 
       if (i < 2) {
         await sleep(90);
       }
     }
+
+    releaseSpawningBlobsSoon(0);
   }
 
   function refillFieldAfterSecondWrong(){
@@ -2616,6 +2617,11 @@ function spawnWrongFaceParticleBurst(){
     state.blobs.forEach(blob => {
       if (blob.tutorial){
         blob.wobblePhase += dt * blob.wobbleSpeed * 2.2;
+        updateBlobDom(blob);
+        return;
+      }
+
+      if (blob.state === "spawning") {
         updateBlobDom(blob);
         return;
       }
