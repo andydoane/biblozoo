@@ -54,6 +54,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const BONUS_MASTERPIECE_PAUSE_MS = 2000;
   const BONUS_RESPAWN_DELAY_MS = 1000;
   const CORRECT_TAP_LOCK_MS = 180;
+  const BLOB_SPAWN_RELEASE_MS = 300;
   const MAX_STATIC_PAINT_SPLATS = 96;
 
   function coverageGridSize(){
@@ -560,7 +561,7 @@ const shuffle = window.VerseGameShell.shuffle;
     state.phase = phase === "done" ? "complete" : phase;
   }
 
-  function releaseSpawningBlobsSoon(delay = CORRECT_TAP_LOCK_MS){
+  function releaseSpawningBlobsSoon(delay = BLOB_SPAWN_RELEASE_MS){
     window.setTimeout(() => {
       for (const blob of state.blobs){
         if (blob.state === "spawning"){
@@ -1357,8 +1358,10 @@ function render(){
 
     return `
       <div class="vsp-blob vsp-blob--word vsp-blob--${blobType} ${blob.state === 'spawning' ? 'is-spawning' : ''} ${blob.tutorial ? 'is-tutorial' : ''} ${blob.streakReward ? 'is-streak-reward' : ''}" data-blob-id="${blob.id}" role="button" tabindex="0" aria-label="${escapeHtml(blob.label)}" style="width:${blob.width}px;height:${blob.height}px;">
-        <div class="vsp-blob-body" style="--vsp-blob-mask:url('${blobImg}');--vsp-blob-fill:${blob.color};--vsp-blob-text:${blob.textColor};color:${blob.textColor};">
-          <span class="vsp-blob-label">${escapeHtml(blob.label)}</span>
+        <div class="vsp-blob-pop">
+          <div class="vsp-blob-body" style="--vsp-blob-mask:url('${blobImg}');--vsp-blob-fill:${blob.color};--vsp-blob-text:${blob.textColor};color:${blob.textColor};">
+            <span class="vsp-blob-label">${escapeHtml(blob.label)}</span>
+          </div>
         </div>
       </div>
     `;
@@ -1728,17 +1731,12 @@ function render(){
         preserveColor: newColors[i]
       });
 
-      /*
-        Diagnostic test: correct-refill blobs skip the spawning state so
-        there is no spawn-pop transform animation and no post-spawn hold.
-      */
-      blob.state = "live";
-
       state.blobs.push(blob);
     }
 
     renderBlobNodes();
     playSpawnPopSoundForCount(3);
+    releaseSpawningBlobsSoon();
   }
 
   function refillFieldAfterSecondWrong(){
@@ -2696,7 +2694,9 @@ function spawnWrongFaceParticleBurst(){
   function bonusBlobMarkup(blob) {
     return `
       <div class="vsp-blob vsp-blob--word vsp-blob--compact vsp-bonus-blob" data-bonus-id="${blob.id}" role="button" tabindex="0" aria-label="splat blob" style="width:${blob.width}px;height:${blob.height}px;">
-        <div class="vsp-blob-body" style="--vsp-blob-mask:url('${blob.blobImg}');--vsp-blob-fill:${blob.color};--vsp-blob-text:${blob.textColor};color:${blob.textColor};"></div>
+        <div class="vsp-blob-pop">
+          <div class="vsp-blob-body" style="--vsp-blob-mask:url('${blob.blobImg}');--vsp-blob-fill:${blob.color};--vsp-blob-text:${blob.textColor};color:${blob.textColor};"></div>
+        </div>
       </div>
     `;
   }
