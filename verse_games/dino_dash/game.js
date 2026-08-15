@@ -7,7 +7,11 @@
   const GAME_TITLE = "Dino Dash";
   const GAME_ICON = "🦖";
   const GAME_ICON_HTML = window.VerseGameShell.gameIconImageHtmlForId(GAME_ID, GAME_ICON, `${GAME_TITLE} icon`);
-  const GAME_THEME = { bg: "#333333", accent: "#333333" };
+  const GAME_THEME = {
+    bg: "#333333",
+    accent: "#333333",
+    pageBg: "#333333"
+  };
   const BUILD_AREA = "large";
   const HELP_OVERLAY_ID = "dd2HelpOverlay";
   const MENU_OVERLAY_ID = "dd2GameMenuOverlay";

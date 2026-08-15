@@ -14,6 +14,11 @@
   font-display: swap;
 }
 
+:root {
+  --dd2-shell: #333333;
+  --dd2-sky: #a0dce2;
+}
+
 html,
 body{
   height: 100%;
@@ -21,7 +26,8 @@ body{
 
 body{
   margin: 0;
-  background: #a0dce2;
+  background: var(--dd2-shell);
+  background-color: var(--dd2-shell);
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -33,13 +39,15 @@ body{
   padding: 0;
   display: block;
   overflow: hidden;
+  background: var(--dd2-shell);
+  background-color: var(--dd2-shell);
 }
 
 .dd2-root{
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: #a0dce2;
+  background: var(--dd2-shell);
   overflow: hidden;
 }
 
@@ -56,6 +64,10 @@ body{
 .dd2-build-wrap{
   padding: 8px 14px 7px;
   flex: 0 0 auto;
+}
+
+.dd2-build.vm-build{
+  box-shadow: none;
 }
 
 .dd2-build-text{
@@ -168,7 +180,7 @@ body{
   flex: 1 1 auto;
   min-height: 280px;
   overflow: hidden;
-  background: #a0dce2;
+  background: var(--dd2-sky);
   border-radius: 0;
   touch-action: none;
   isolation: isolate;
