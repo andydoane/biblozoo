@@ -27,6 +27,10 @@
   --vl-pink: #ff8cc8;
   --vl-safe-top: env(safe-area-inset-top, 0px);
   --vl-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --vl-game-top-pad: calc(14px + var(--vl-safe-top));
+  --vl-game-bottom-pad: calc(18px + var(--vl-safe-bottom));
+  --vl-bonus-top-pad: calc(14px + var(--vl-safe-top));
+  --vl-bonus-bottom-pad: calc(18px + var(--vl-safe-bottom));
   --vl-smoke-good: #ffc751;
   --vl-smoke-warn: #ffa351;
   --vl-smoke-bad: #ff5a51;
@@ -264,7 +268,7 @@ select {
 
 .vl-build-wrap {
   flex: 0 0 auto;
-  padding: 8px 14px 8px;
+  padding: var(--vl-game-top-pad) 14px 8px;
 }
 
 .vl-build {
@@ -284,7 +288,7 @@ select {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  padding: 0 0 var(--vl-game-bottom-pad);
 }
 
 .vl-game-board {
@@ -303,7 +307,7 @@ select {
 
 @media (min-width: 700px) {
   .vl-game-wrap {
-    padding: 0 14px 0;
+    padding: 0 14px var(--vl-game-bottom-pad);
   }
 
   .vl-game-board {
@@ -1406,7 +1410,7 @@ select {
   max-width: var(--vl-stage-max);
   margin: 0 auto;
   flex: 0 0 auto;
-  padding: calc(10px + var(--vl-safe-top)) 14px 0;
+  padding: var(--vl-bonus-top-pad) 14px 0;
   display: flex;
   justify-content: flex-start;
   align-items: center;
@@ -1671,7 +1675,7 @@ select {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 18px;
+  bottom: var(--vl-bonus-bottom-pad);
   display: flex;
   justify-content: center;
   gap: 18px;
@@ -1703,7 +1707,7 @@ select {
 .vl-space-status {
   position: absolute;
   right: 14px;
-  top: 14px;
+  top: var(--vl-bonus-top-pad);
   z-index: 8;
   display: flex;
   gap: 8px;
