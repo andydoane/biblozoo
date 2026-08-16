@@ -104,6 +104,7 @@ body {
   width: min(100%, 560px);
 }
 
+#app .vm-complete-medal-pill,
 #app.ghost-writer-mode-select .vm-mode-btn-medal {
   display: none !important;
 }
