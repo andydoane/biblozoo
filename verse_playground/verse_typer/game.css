@@ -103,6 +103,19 @@ body {
   z-index: 1;
 }
 
+#app .vm-complete-medal-pill {
+  display: none !important;
+}
+
+#app .vm-mode-btn-medal {
+  display: none !important;
+}
+
+#gameShellBackBtn,
+#gameShellModeBackBtn {
+  top: calc(18px + env(safe-area-inset-top));
+}
+
 .vt-root {
   position: relative;
   min-height: 100dvh;
