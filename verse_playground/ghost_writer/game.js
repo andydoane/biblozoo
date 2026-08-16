@@ -10,6 +10,7 @@
 
   const GAME_THEME = {
     bg: "linear-gradient(180deg, #101114 0%, #252733 48%, #111217 100%)",
+    pageBg: "#000000",
     accent: "#d8d3ff",
     helpTitleBg: "#252733",
     helpTitleColor: "#ffffff",
@@ -1161,7 +1162,7 @@
       title: GAME_TITLE,
       icon: GAME_ICON,
       iconHtml: GAME_ICON_HTML,
-      debugBadge: "GW 3.2",
+
       helpHtml: helpHtml(),
       helpOverlayId: HELP_OVERLAY_ID,
       startText: "Start",
