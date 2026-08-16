@@ -4254,6 +4254,31 @@ Game Mix Loading Screen
   line-height: 1;
 }
 
+.dialog .row.import-dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dialog .row.import-dialog-actions .dlg-btn {
+  width: 100%;
+  min-width: 0;
+}
+
+.dialog .row.import-dialog-actions .dlg-btn:last-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 380px) {
+  .dialog .row.import-dialog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog .row.import-dialog-actions .dlg-btn:last-child {
+    grid-column: auto;
+  }
+}
+
 /* prevent iOS double-tap zoom on controls */
 .no-zoom {
   touch-action: manipulation;

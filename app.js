@@ -429,7 +429,13 @@ const dlgTitle = document.getElementById("dlgTitle");
 const dlgBody = document.getElementById("dlgBody");
 const dlgActions = document.getElementById("dlgActions");
 
-function showDialog({ title = "Notice", body = "", bodyHtml = "", actions = [] }) {
+function showDialog({
+  title = "Notice",
+  body = "",
+  bodyHtml = "",
+  actions = [],
+  actionsClass = ""
+}) {
   dlgTitle.textContent = title;
 
   if (bodyHtml) {
@@ -438,13 +444,23 @@ function showDialog({ title = "Notice", body = "", bodyHtml = "", actions = [] }
     dlgBody.textContent = body;
   }
 
+  dlgActions.classList.remove("import-dialog-actions");
+
+  if (actionsClass) {
+    dlgActions.classList.add(actionsClass);
+  }
+
   dlgActions.innerHTML = "";
   for (const a of actions) dlgActions.appendChild(a);
   overlay.classList.add("show");
 }
+
 function closeDialog() {
   overlay.classList.remove("show");
-  dlgActions.classList.remove("pet-name-dialog-actions");
+  dlgActions.classList.remove(
+    "pet-name-dialog-actions",
+    "import-dialog-actions"
+  );
 }
 overlay.addEventListener("click", (e) => { if (e.target === overlay) closeDialog(); });
 
@@ -2985,11 +3001,8 @@ function openFamilyImportDialog(
     title: "Import Family Backup",
     body:
       `This backup contains ${backupCount} Zookeeper${backupCount === 1 ? "" : "s"}. You can add them to this device or replace all current family data. Name conflicts will be renamed automatically.`,
+    actionsClass: "import-dialog-actions",
     actions: [
-      dlgBtn("Cancel", {
-        secondary: true,
-        onClick: closeDialog
-      }),
       dlgBtn("Add Zookeepers", {
         onClick: () => {
           closeDialog();
@@ -3008,6 +3021,10 @@ function openFamilyImportDialog(
             onConfirm: restoreFamily
           });
         }
+      }),
+      dlgBtn("Cancel", {
+        secondary: true,
+        onClick: closeDialog
       })
     ]
   });
@@ -3099,51 +3116,57 @@ function openIndividualProfileImportDialog(
     return;
   }
 
-  const actions = [
-    dlgBtn("Cancel", {
-      secondary: true,
-      onClick: closeDialog
-    }),
-    dlgBtn("Add as New", {
-      onClick: () => {
-        closeDialog();
-        runIndividualProfileImportAsNew(
-          importedProfile
-        );
-      }
-    })
-  ];
+  if (!activeProfile) {
+    showDialog({
+      title: "Import Zookeeper Backup",
+      body:
+        `Add ${importedProfile.name} as a new Zookeeper on this device.`,
+      actions: [
+        dlgBtn("Cancel", {
+          secondary: true,
+          onClick: closeDialog
+        }),
+        dlgBtn("Add as New", {
+          onClick: () => {
+            closeDialog();
+            runIndividualProfileImportAsNew(
+              importedProfile
+            );
+          }
+        })
+      ]
+    });
 
-  if (activeProfile) {
-    const replaceLabel =
-      `Replace ${activeProfile.name}`;
-    const replaceBtn = dlgBtn(
-      replaceLabel,
-      {
+    return;
+  }
+
+  showDialog({
+    title: "Import Zookeeper Backup",
+    body:
+      `Add ${importedProfile.name} as a new Zookeeper, or replace only ${activeProfile.name}'s progress. Names and pictures are preserved when adding as new.`,
+    actionsClass: "import-dialog-actions",
+    actions: [
+      dlgBtn("Add as New", {
+        onClick: () => {
+          closeDialog();
+          runIndividualProfileImportAsNew(
+            importedProfile
+          );
+        }
+      }),
+      dlgBtn("Replace Progress", {
         onClick: () => {
           restoreImportedProgressToActiveProfile(
             importedProfile.progress,
             activeProfile
           );
         }
-      }
-    );
-
-    replaceBtn.classList.add(
-      "dlg-btn-ellipsis"
-    );
-    replaceBtn.title = replaceLabel;
-
-    actions.push(replaceBtn);
-  }
-
-  showDialog({
-    title: "Import Zookeeper Backup",
-    body:
-      activeProfile
-        ? `Add ${importedProfile.name} as a new Zookeeper, or replace only ${activeProfile.name}'s progress. Names and pictures are preserved when adding as new.`
-        : `Add ${importedProfile.name} as a new Zookeeper on this device.`,
-    actions
+      }),
+      dlgBtn("Cancel", {
+        secondary: true,
+        onClick: closeDialog
+      })
+    ]
   });
 }
 
