@@ -81,26 +81,36 @@ body{
 }
 
 .scrub-game{
+  --scrub-top-sample-pad: 10px;
+  --scrub-top-chrome: calc(env(safe-area-inset-top, 0px) + var(--scrub-top-sample-pad));
   position: fixed;
   inset: 0;
+  box-sizing: border-box;
   overflow: hidden;
-  background:
-    linear-gradient(
-      to bottom,
-      #000000 0,
-      #000000 env(safe-area-inset-top, 0px),
-      transparent env(safe-area-inset-top, 0px),
-      transparent 100%
-    ),
-    radial-gradient(circle at 12% 10%, rgba(255,199,81,.34), transparent 24%),
-    radial-gradient(circle at 86% 18%, rgba(64,185,197,.34), transparent 26%),
-    linear-gradient(145deg, #7f66c6 0%, #40b9c5 100%);
+  padding-top: var(--scrub-top-chrome);
+  background: #000000;
+  background-color: #000000;
   color: var(--scrub-text);
   touch-action: none;
   user-select: none;
   display: flex;
   justify-content: center;
   align-items: stretch;
+}
+
+.scrub-game::before{
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  top: var(--scrub-top-chrome);
+  bottom: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255,199,81,.34), transparent 24%),
+    radial-gradient(circle at 86% 18%, rgba(64,185,197,.34), transparent 26%),
+    linear-gradient(145deg, #7f66c6 0%, #40b9c5 100%);
 }
 
 
@@ -133,11 +143,12 @@ body{
 
 .scrub-stage{
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 860px;
-  height: calc(100dvh - env(safe-area-inset-top, 0px));
-  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
-  margin: env(safe-area-inset-top, 0px) auto 0;
+  height: 100%;
+  min-height: 0;
+  margin: 0 auto;
   overflow: hidden;
   background: #ffffff;
   box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 18px 48px rgba(0,0,0,.22);
