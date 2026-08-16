@@ -39,7 +39,8 @@ body{
   touch-action: none;
   margin: 0;
   padding: 0;
-  background: linear-gradient(145deg, #7f66c6 0%, #40b9c5 100%);
+  background: #000000;
+  background-color: #000000;
 }
 
 .scripture-scrub-app{
@@ -47,7 +48,8 @@ body{
   width: 100%;
   margin: 0;
   padding: 0;
-  background: linear-gradient(145deg, #7f66c6 0%, #40b9c5 100%);
+  background: #000000;
+  background-color: #000000;
   font-family: "Baloo 2", system-ui, sans-serif;
 }
 
