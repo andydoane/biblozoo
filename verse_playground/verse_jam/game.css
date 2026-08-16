@@ -45,7 +45,8 @@
 html,
 body {
   min-height: 100%;
-  background: var(--vj-page-bg);
+  background: #000000;
+  background-color: #000000;
 }
 
 body {
@@ -67,13 +68,16 @@ body {
   overflow: hidden;
   text-align: initial;
   font-family: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--vj-page-bg);
+  background: #000000;
+  background-color: #000000;
 }
 
-/* Shared title/mode/completion containers should not repaint the gradient.
-   If they repaint it, the same gradient can restart inside the centered
-   container and look like a subtle darker rectangle. */
-.vm-game-screen,
+/* Keep the full shared screen on Verse Jam's gradient, but do not repaint
+   the gradient inside the centered child containers. */
+.vm-game-screen {
+  background: var(--vj-page-bg) !important;
+}
+
 .vm-game-stage,
 .vm-game-center {
   background: transparent !important;
@@ -84,7 +88,7 @@ body {
   min-height: 100svh;
   width: 100%;
   color: var(--vj-text);
-  background: transparent;
+  background: var(--vj-page-bg);
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -123,7 +127,7 @@ body {
   justify-content: center;
   padding: 18px;
   color: var(--vj-text);
-  background: transparent;
+  background: var(--vj-page-bg);
 }
 
 .versejam-headphones-card {
@@ -698,11 +702,11 @@ body {
 
 @media (max-height:600px) {
   .versejam-root {
-    padding: 6px;
+    padding: 6px 6px 12px;
   }
 
   .versejam-stage {
-    min-height: calc(100svh - 12px);
+    min-height: calc(100svh - 18px);
     gap: 6px;
   }
 
