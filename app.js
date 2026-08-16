@@ -1911,13 +1911,11 @@ function createBibloZooProfileSaveData(
   };
 }
 
-function downloadJsonSave(saveData, filenamePrefix) {
+async function shareOrDownloadJsonSave(
+  saveData,
+  filenamePrefix
+) {
   const json = JSON.stringify(saveData, null, 2);
-  const blob = new Blob(
-    [json],
-    { type: "application/json" }
-  );
-  const url = URL.createObjectURL(blob);
 
   const now = new Date();
   const pad = (value) =>
@@ -1933,9 +1931,69 @@ function downloadJsonSave(saveData, filenamePrefix) {
     pad(now.getSeconds())
   ].join("-");
 
+  const filename =
+    `${filenamePrefix}-${dateStamp}.json`;
+
+  const blob = new Blob(
+    [json],
+    { type: "application/json" }
+  );
+
+  const file =
+    typeof File === "function"
+      ? new File(
+        [blob],
+        filename,
+        { type: "application/json" }
+      )
+      : null;
+
+  let canShareFile = false;
+
+  if (
+    file &&
+    typeof navigator.share === "function" &&
+    typeof navigator.canShare === "function"
+  ) {
+    try {
+      canShareFile = navigator.canShare({
+        files: [file]
+      });
+    } catch (err) {
+      canShareFile = false;
+    }
+  }
+
+  if (canShareFile) {
+    try {
+      await navigator.share({
+        files: [file]
+      });
+
+      return {
+        method: "share",
+        filename
+      };
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        return {
+          method: "cancelled",
+          filename
+        };
+      }
+
+      console.warn(
+        "Native backup sharing failed; falling back to download",
+        err
+      );
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
+
   a.href = url;
-  a.download = `${filenamePrefix}-${dateStamp}.json`;
+  a.download = filename;
   a.style.display = "none";
 
   document.body.appendChild(a);
@@ -1945,20 +2003,45 @@ function downloadJsonSave(saveData, filenamePrefix) {
   setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 1000);
+
+  return {
+    method: "download",
+    filename
+  };
 }
 
-function exportSaveData() {
+async function exportSaveData() {
   try {
     const saveData = createBibloZooFamilySaveData();
 
-    downloadJsonSave(
+    const result = await shareOrDownloadJsonSave(
       saveData,
       "biblozoo-family-save"
     );
 
+    if (result.method === "cancelled") {
+      return;
+    }
+
+    if (result.method === "share") {
+      showDialog({
+        title: "Family Backup Shared",
+        body:
+          "Your family backup was handed to your device's share sheet. Choose where you want to save or send the backup file.",
+        actions: [
+          dlgBtn("OK", {
+            onClick: closeDialog
+          })
+        ]
+      });
+
+      return;
+    }
+
     showDialog({
-      title: "Family Backup Exported",
-      body: "All Zookeeper profiles and their progress were saved in one backup file.",
+      title: "Family Backup Download Started",
+      body:
+        "Your browser started downloading the family backup file.",
       actions: [
         dlgBtn("OK", {
           onClick: closeDialog
@@ -1983,26 +2066,46 @@ function exportSaveData() {
   }
 }
 
-function exportActiveProfileSaveData() {
+async function exportActiveProfileSaveData() {
   try {
     const saveData =
       createBibloZooProfileSaveData();
     const profile = saveData.profile;
+
     const safeName = String(profile.name || "zookeeper")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") ||
       "zookeeper";
 
-    downloadJsonSave(
+    const result = await shareOrDownloadJsonSave(
       saveData,
       `biblozoo-${safeName}-save`
     );
 
+    if (result.method === "cancelled") {
+      return;
+    }
+
+    if (result.method === "share") {
+      showDialog({
+        title: `${profile.name} Backup Shared`,
+        body:
+          `${profile.name}'s backup was handed to your device's share sheet. Choose where you want to save or send the backup file.`,
+        actions: [
+          dlgBtn("OK", {
+            onClick: closeDialog
+          })
+        ]
+      });
+
+      return;
+    }
+
     showDialog({
-      title: `${profile.name} Backed Up`,
+      title: `${profile.name} Backup Download Started`,
       body:
-        `${profile.name}'s Zookeeper profile and progress were saved in an individual backup file.`,
+        `Your browser started downloading ${profile.name}'s Zookeeper profile backup.`,
       actions: [
         dlgBtn("OK", {
           onClick: closeDialog
