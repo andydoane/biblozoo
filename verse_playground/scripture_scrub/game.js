@@ -2,8 +2,7 @@
   const app = document.getElementById("app");
 
   if (app) {
-    app.classList.remove("vm-shell");
-    app.classList.add("scripture-scrub-app");
+    app.classList.add("vm-shell", "scripture-scrub-app");
   }
 
   const ctx = await window.VerseGameBridge.getVerseContext();
@@ -27,6 +26,7 @@
 
   const GAME_THEME = {
     bg: SCRUB_GRADIENT,
+    pageBg: "#000000",
     accent: "#40b9c5",
     helpTitleBg: "#40b9c5",
     helpTitleColor: "#ffffff",

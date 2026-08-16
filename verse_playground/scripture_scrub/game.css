@@ -43,11 +43,15 @@ body{
   background-color: #000000;
 }
 
-.scripture-scrub-app{
+#app.vm-shell.scripture-scrub-app{
   min-height: 100dvh;
+  height: 100dvh;
   width: 100%;
   margin: 0;
   padding: 0;
+  display: block;
+  overflow: hidden;
+  text-align: initial;
   background: #000000;
   background-color: #000000;
   font-family: "Baloo 2", system-ui, sans-serif;
@@ -92,17 +96,7 @@ body{
   align-items: stretch;
 }
 
-.scrub-game::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top, 0px);
-  background: #000000;
-  pointer-events: none;
-  z-index: 999;
-}
+
 
 .scrub-menu-button{
   position: absolute;
