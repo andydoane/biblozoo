@@ -92,6 +92,18 @@ body{
   align-items: stretch;
 }
 
+.scrub-game::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: #000000;
+  pointer-events: none;
+  z-index: 999;
+}
+
 .scrub-menu-button{
   position: absolute;
   z-index: 70;
