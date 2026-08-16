@@ -137,7 +137,7 @@ body {
   align-items: center;
   justify-content: center;
   padding:
-    calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+    calc(18px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
   overflow: hidden;
 }
 
@@ -188,7 +188,7 @@ body {
 .ghost-menu-pill {
   position: absolute;
   z-index: 9;
-  top: calc(14px + env(safe-area-inset-top));
+  top: calc(20px + env(safe-area-inset-top));
   left: calc(14px + env(safe-area-inset-left));
   min-width: 58px;
   min-height: 42px;
@@ -221,7 +221,7 @@ body {
   align-items: stretch;
   justify-content: center;
   padding:
-    calc(14px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+    calc(20px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
 }
 
 .ghost-writer-root.is-training-screen .ghost-writer-stage {
@@ -598,7 +598,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
+  padding: calc(16px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
 }
 
 .ghost-playback-root::before {
@@ -725,7 +725,7 @@ body {
   align-items: stretch;
   justify-content: center;
   padding:
-    calc(14px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+    calc(20px + env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
 }
 
 .ghost-writer-root.is-remix-screen .ghost-writer-stage {
