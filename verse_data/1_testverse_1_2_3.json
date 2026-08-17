@@ -3,6 +3,8 @@
   "biblopetDefaultName": "Testy",
   "biblopetFeetFromBottom": "8.3%",
   "verseId": "1_testverse_1_2_3",
+  "ref": "1 Test Verse 1:2-3",
+  "published": false,
   "translation": "ESV",
   "echoParts": [
     "Raiment, chariot, and harvest.",
