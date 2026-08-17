@@ -4703,7 +4703,7 @@ function isDisplayNameBlocked(value) {
 
   return petNameBlocklist.some((blocked) => {
     const cleanBlocked = normalizeNameForBlocklist(blocked);
-    return cleanBlocked && normalized.includes(cleanBlocked);
+    return cleanBlocked && normalized === cleanBlocked;
   });
 }
 
