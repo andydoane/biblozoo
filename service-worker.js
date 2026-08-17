@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Aug_15_c";
+const CACHE_VERSION = "2026_Aug_17_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -120,8 +120,8 @@ async function cacheAllVerseData(cache) {
     const verseUrls =
       Array.isArray(verseList)
         ? verseList
-          .map((item) =>
-            String(item?.id || "").trim()
+          .map((verseId) =>
+            String(verseId || "").trim()
           )
           .filter(Boolean)
           .map((verseId) =>

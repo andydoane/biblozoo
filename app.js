@@ -5671,42 +5671,73 @@ async function loadVerseList() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const json = await res.json();
-    const baseList = Array.isArray(json) ? json.slice() : [];
 
-    const enrichedList = await Promise.all(baseList.map(async (item) => {
-      if (!item?.id) return item;
+    const verseIds = Array.isArray(json)
+      ? [...new Set(
+          json
+            .map((item) => String(item || "").trim())
+            .filter(Boolean)
+        )]
+      : [];
 
-      const alreadyHasPetData =
-        item.biblopetDefaultName &&
-        item.biblopet &&
-        item.biblopetFeetFromBottom;
+    const enrichedList = await Promise.all(
+      verseIds.map(async (verseId) => {
+        try {
+          const verseRes = await fetch(
+            `${DATA_DIR}${verseId}.json`,
+            { cache: "no-store" }
+          );
 
-      if (alreadyHasPetData) {
-        return item;
-      }
+          if (!verseRes.ok) {
+            throw new Error(`HTTP ${verseRes.status}`);
+          }
 
-      try {
-        const verseRes = await fetch(`${DATA_DIR}${item.id}.json`, { cache: "no-store" });
-        if (!verseRes.ok) throw new Error(`HTTP ${verseRes.status}`);
+          const verseJson = await verseRes.json();
 
-        const verseJson = await verseRes.json();
+          if (verseJson.published !== true) {
+            return null;
+          }
 
-        return {
-          ...item,
-          biblopetDefaultName: verseJson.biblopetDefaultName || item.biblopetDefaultName || "",
-          biblopet: verseJson.biblopet || item.biblopet || "",
-          biblopetFeetFromBottom: verseJson.biblopetFeetFromBottom || item.biblopetFeetFromBottom || "0%"
-        };
-      } catch (err) {
-        console.warn(`Could not load default BibloPet data for ${item.id}`, err);
-        return {
-          ...item,
-          biblopetFeetFromBottom: item.biblopetFeetFromBottom || "0%"
-        };
-      }
-    }));
+          const jsonVerseId =
+            String(verseJson.verseId || "").trim();
 
-    VERSE_LIST = enrichedList;
+          if (jsonVerseId !== verseId) {
+            console.warn(
+              `Skipping ${verseId}: verseId does not match its filename`
+            );
+            return null;
+          }
+
+          const ref = String(verseJson.ref || "").trim();
+
+          if (!ref) {
+            console.warn(
+              `Skipping ${verseId}: verse JSON is missing ref`
+            );
+            return null;
+          }
+
+          return {
+            id: verseId,
+            ref,
+            biblopetDefaultName:
+              verseJson.biblopetDefaultName || "",
+            biblopet:
+              verseJson.biblopet || "",
+            biblopetFeetFromBottom:
+              verseJson.biblopetFeetFromBottom || "0%"
+          };
+        } catch (err) {
+          console.warn(
+            `Could not load verse data for ${verseId}`,
+            err
+          );
+          return null;
+        }
+      })
+    );
+
+    VERSE_LIST = enrichedList.filter(Boolean);
 
     VERSE_LIST.sort((a, b) => {
       const refA = String(a?.ref || "");
