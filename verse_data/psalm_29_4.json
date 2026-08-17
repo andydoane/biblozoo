@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐐",
+  "biblopetDefaultName": "Huey",
+  "biblopetFeetFromBottom": "4.9%",
+  "verseId": "psalm_29_4",
+  "translation": "ESV",
+  "echoParts": [
+    "The voice of the Lord",
+    "is powerful",
+    "The voice of the Lord",
+    "is full of majesty"
+  ],
+
+  "verseText": "The voice of the Lord is powerful; the voice of the Lord is full of majesty.",
+   "meaning": "God is so mighty, even his voice is powerful. When God speaks, amazing things happen. God spoke to create the world and Jesus often spoke to do miracles.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "voice", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆" },
+    { "type": "emoji", "word": "powerful", "occurrence": 1, "emoji": "⚡" },
+    { "type": "emoji", "word": "voice", "occurrence": 2, "emoji": "🗣️" },
+    { "type": "emoji", "word": "Lord", "occurrence": 2, "emoji": "👆" },
+    { "type": "emoji", "word": "majesty", "occurrence": 1, "emoji": "👑" },
+    { "type": "underscore", "word": "full", "occurrence": 1 }
+  ]
+}
