@@ -13293,8 +13293,8 @@ function screenPracticeHub(idx) {
       icon: "🎮",
       iconImage: IMG_DIR + "app_icon_controller.png",
       iconAlt: "Games",
-      cardColor: "#7f66c6",
-      cardTextColor: "#ffffff"
+      cardColor: "#ffc751",
+      cardTextColor: "#333333"
     })}
     `
     : `
@@ -13304,8 +13304,8 @@ function screenPracticeHub(idx) {
       icon: "🎮",
       iconImage: IMG_DIR + "app_icon_controller.png",
       iconAlt: "Games",
-      cardColor: "#7f66c6",
-      cardTextColor: "#ffffff"
+      cardColor: "#ffc751",
+      cardTextColor: "#333333"
     })}
 
       ${renderPracticeHubCard({
