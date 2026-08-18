@@ -1439,6 +1439,7 @@ function markZooTodoTutorialPageAudioPlayed(pageNumber) {
 function createEmptyProgress() {
   return {
     version: PROGRESS_VERSION,
+    lastActiveVerseId: "",
     verses: {},
     tutorial: createDefaultTutorialProgress()
   };
@@ -1735,6 +1736,78 @@ function saveProgress(progress) {
     return false;
   }
 }
+
+
+function isVerseAvailableForRestore(verseId) {
+  const cleanVerseId = String(verseId || "").trim();
+
+  return !!cleanVerseId &&
+    VERSE_LIST.some((item) =>
+      String(item?.id || "").trim() === cleanVerseId
+    );
+}
+
+function getRememberedActiveVerseId() {
+  const progress = loadProgress();
+
+  const savedVerseId =
+    String(progress.lastActiveVerseId || "").trim();
+
+  if (isVerseAvailableForRestore(savedVerseId)) {
+    return savedVerseId;
+  }
+
+  let fallbackVerseId = "";
+  let fallbackTime = -1;
+
+  for (
+    const [verseId, verseProgress] of
+    Object.entries(progress.verses || {})
+  ) {
+    if (!verseProgress?.learnCompleted) continue;
+    if (!isVerseAvailableForRestore(verseId)) continue;
+
+    const rawTime = Number(
+      verseProgress.lastPracticedAt ||
+      verseProgress.learnedAt ||
+      0
+    );
+
+    const time =
+      Number.isFinite(rawTime) ? rawTime : 0;
+
+    if (!fallbackVerseId || time > fallbackTime) {
+      fallbackVerseId = verseId;
+      fallbackTime = time;
+    }
+  }
+
+  return fallbackVerseId;
+}
+
+function rememberActiveVerse(verseId) {
+  const cleanVerseId =
+    String(verseId || "").trim();
+
+  if (!getCurrentProgressStorageKey()) {
+    return false;
+  }
+
+  if (!isVerseAvailableForRestore(cleanVerseId)) {
+    return false;
+  }
+
+  const progress = loadProgress();
+
+  if (progress.lastActiveVerseId === cleanVerseId) {
+    return true;
+  }
+
+  progress.lastActiveVerseId = cleanVerseId;
+
+  return saveProgress(progress);
+}
+
 
 function normalizeProgressForProfileMigration(rawProgress) {
   if (
@@ -5627,6 +5700,30 @@ function scheduleSmartLearnTextFit(root) {
 /* =========================
    4. Verse Loading
    ========================= */
+
+⛔⛔⛔
+function clearLoadedVerseSelection() {
+  cfg = null;
+  VERSE_ID = null;
+  VERSE_TEXT = "";
+  VERSE_MEANING = "";
+  ECHO_PARTS = [];
+  HIDE_PLAN = [];
+  TRANSLATION = "";
+  ATTRIBUTION = "";
+  VERSE_REF = "";
+  AUDIO_FILE = "";
+
+  tokens = [];
+  planResolved = [];
+  planMixed = [];
+
+  HAS_VERSE_SELECTION = false;
+  State.hasLearnedVerse = false;
+  State.selectedVerseId = null;
+}
+⛔⛔⛔
+
 async function loadVerse(verseId) {
   let json;
 
@@ -5663,6 +5760,8 @@ async function loadVerse(verseId) {
 
   const verseProgress = getVerseProgress(VERSE_ID);
   State.hasLearnedVerse = !!verseProgress.learnCompleted;
+
+  rememberActiveVerse(VERSE_ID);
 }
 
 async function loadVerseList() {
@@ -8678,12 +8777,20 @@ async function resumePendingBootRoute() {
   const route = State.pendingBootRoute || {};
   State.pendingBootRoute = null;
 
+  const routedVerseId =
+    String(route.verseId || "").trim();
+
+  const verseIdToLoad =
+    routedVerseId ||
+    getRememberedActiveVerseId();
+
   try {
-    if (route.verseId) {
-      await loadVerse(route.verseId);
+    if (verseIdToLoad) {
+      await loadVerse(verseIdToLoad);
       HAS_VERSE_SELECTION = true;
+      State.selectedVerseId = VERSE_ID;
     } else {
-      HAS_VERSE_SELECTION = !!VERSE_ID;
+      clearLoadedVerseSelection();
     }
   } catch (err) {
     console.error(err);
@@ -8943,7 +9050,8 @@ function clearTransientStateForProfileActivation() {
   State.petAnimationVerseId = null;
   State.petAnimationStatus = "";
   State.petAnimationClass = "";
-  State.selectedVerseId = VERSE_ID || null;
+
+  clearLoadedVerseSelection();
 
   titleZooPetVerseId = "";
 }
