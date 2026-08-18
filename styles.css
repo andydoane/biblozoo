@@ -4018,6 +4018,11 @@ Game Mix Loading Screen
   line-height: 1.45;
 }
 
+.learn-verse .learn-token-with-punctuation {
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .learn-verse .hintable:active {
   transform: scale(.99);
 }

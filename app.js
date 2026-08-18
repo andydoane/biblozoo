@@ -7321,7 +7321,18 @@ function hideInfoForToken(tokenIdx) {
   return null;
 }
 
+function isTrailingLearnPunctuation(token) {
+  if (token?.type !== TokenType.PUNCT) {
+    return false;
+  }
 
+  const text = String(token.text || "");
+
+  return (
+    /^[,.;:!?%…)\]}]+(?:["”’]+)?$/.test(text) ||
+    /^[”’]+$/.test(text)
+  );
+}
 
 function verseNode() {
   const p = document.createElement("p");
@@ -7338,6 +7349,31 @@ function verseNode() {
     return span;
   }
 
+  function appendWithTrailingPunctuation(
+    node,
+    tokenIndex
+  ) {
+    const nextToken = tokens[tokenIndex + 1];
+
+    if (!isTrailingLearnPunctuation(nextToken)) {
+      p.appendChild(node);
+      return false;
+    }
+
+    const group = document.createElement("span");
+    group.className =
+      "learn-token-with-punctuation";
+
+    group.appendChild(node);
+    group.appendChild(
+      makeLearnTokenSpan(nextToken.text)
+    );
+
+    p.appendChild(group);
+
+    return true;
+  }
+
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
 
@@ -7347,10 +7383,21 @@ function verseNode() {
     }
 
     if (!isTokenHidden(i)) {
-      if (State.revealedTokenIdx.has(i)) {
-        p.appendChild(makeLearnTokenSpan(t.text, "revealed-word"));
-      } else {
-        p.appendChild(makeLearnTokenSpan(t.text));
+      const visibleSpan =
+        State.revealedTokenIdx.has(i)
+          ? makeLearnTokenSpan(
+            t.text,
+            "revealed-word"
+          )
+          : makeLearnTokenSpan(t.text);
+
+      if (
+        appendWithTrailingPunctuation(
+          visibleSpan,
+          i
+        )
+      ) {
+        i += 1;
       }
 
       continue;
@@ -7367,11 +7414,11 @@ function verseNode() {
           ? ""
           : underscoresForWord(t.text),
       "hintable no-zoom " +
-        (isEmoji
-          ? "emoji"
-          : isImage
-            ? "image"
-            : "underscore")
+      (isEmoji
+        ? "emoji"
+        : isImage
+          ? "image"
+          : "underscore")
     );
 
     if (isImage) {
@@ -7416,7 +7463,10 @@ function verseNode() {
 
       const revealed = document.createElement("span");
       revealed.className = "learn-token revealed-word";
-      revealed.style.setProperty("--token-index", span.style.getPropertyValue("--token-index") || "0");
+      revealed.style.setProperty(
+        "--token-index",
+        span.style.getPropertyValue("--token-index") || "0"
+      );
       revealed.textContent = t.text;
 
       span.replaceWith(revealed);
@@ -7424,7 +7474,14 @@ function verseNode() {
       scheduleSmartLearnTextFit(document);
     };
 
-    p.appendChild(span);
+    if (
+      appendWithTrailingPunctuation(
+        span,
+        i
+      )
+    ) {
+      i += 1;
+    }
   }
 
   return p;
@@ -7434,6 +7491,31 @@ function finalRecallNode(showVerse = false) {
   const p = document.createElement("p");
   p.className = "verse";
 
+  function appendWithTrailingPunctuation(
+    node,
+    tokenIndex
+  ) {
+    const nextToken = tokens[tokenIndex + 1];
+
+    if (!isTrailingLearnPunctuation(nextToken)) {
+      p.appendChild(node);
+      return false;
+    }
+
+    const group = document.createElement("span");
+    group.className =
+      "learn-token-with-punctuation";
+
+    group.appendChild(node);
+    group.appendChild(
+      document.createTextNode(nextToken.text)
+    );
+
+    p.appendChild(group);
+
+    return true;
+  }
+
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
 
@@ -7442,20 +7524,30 @@ function finalRecallNode(showVerse = false) {
       continue;
     }
 
+    let node;
+
     if (showVerse) {
-      p.appendChild(document.createTextNode(t.text));
-      continue;
-    }
-
-    if (t.type === TokenType.WORD) {
+      node = document.createTextNode(t.text);
+    } else if (t.type === TokenType.WORD) {
       const span = document.createElement("span");
-      span.className = "hintable no-zoom underscore";
-      span.textContent = underscoresForWord(t.text);
-      p.appendChild(span);
-      continue;
+      span.className =
+        "hintable no-zoom underscore";
+      span.textContent =
+        underscoresForWord(t.text);
+
+      node = span;
+    } else {
+      node = document.createTextNode(t.text);
     }
 
-    p.appendChild(document.createTextNode(t.text));
+    if (
+      appendWithTrailingPunctuation(
+        node,
+        i
+      )
+    ) {
+      i += 1;
+    }
   }
 
   return p;
