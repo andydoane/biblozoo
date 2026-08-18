@@ -1,0 +1,28 @@
+{
+    "biblopet": "🦤",
+    "biblopetDefaultName": "Albert",
+    "biblopetFeetFromBottom": "3%",
+    "verseId": "john_11_25",
+    "ref": "John 11:25",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Jesus said to her",
+        "I am am the resurrection and the life",
+        "whoever believes in me",
+        "though he die",
+        "yet shall he live"
+    ],
+    "verseText": "Jesus said to her, 'I am the resurrection and the life. Whoever believes in me, though he die, yet shall he live...'",
+    "meaning": "When we believe in Jesus, we have a promise from him. After we die, we'll live forever with him. When he returns, our bodies will be raised to life.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        { "type": "image", "word": "Jesus", "occurrence": 1, "image": "cross" },
+        { "type": "emoji", "word": "her", "occurrence": 1, "emoji": "👩‍🦰" },
+        { "type": "image", "word": "resurrection", "occurrence": 1, "image": "resurrection" },
+        { "type": "underscore", "word": "life", "occurrence": 1 },
+        { "type": "underscore", "word": "believes", "occurrence": 1 },
+        { "type": "emoji", "word": "die", "occurrence": 1, "emoji": "💀" },
+        { "type": "underscore", "word": "live", "occurrence": 1 }
+    ]
+}
