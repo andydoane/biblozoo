@@ -5701,7 +5701,7 @@ function scheduleSmartLearnTextFit(root) {
    4. Verse Loading
    ========================= */
 
-⛔⛔⛔
+
 function clearLoadedVerseSelection() {
   cfg = null;
   VERSE_ID = null;
@@ -5722,7 +5722,6 @@ function clearLoadedVerseSelection() {
   State.hasLearnedVerse = false;
   State.selectedVerseId = null;
 }
-⛔⛔⛔
 
 async function loadVerse(verseId) {
   let json;
