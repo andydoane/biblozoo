@@ -42,7 +42,7 @@ window.EXTERNAL_VERSE_GAMES = [
       description: "Launch the next correct word into the verse.",
       icon: "🚀",
       iconImage: "./verse_images/game_icons/app_icon_chain.png",
-      cardColor: "#7f66c6",
+      cardColor: "#333333",
       cardTextColor: "#ffffff",
       launchUrl: "./verse_games/verse_launch/index.html",
       visibleInCarousel: true,
