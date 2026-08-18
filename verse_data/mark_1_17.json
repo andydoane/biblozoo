@@ -17,7 +17,7 @@
    "meaning": "Jesus called his disciples to follow him. By sharing the good news, they would 'catch' people for God's forever kingdom.",
   "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
   "hidePlan": [
-    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
+    { "type": "image", "word": "Jesus", "occurrence": 1, "image": "cross" },
     { "type": "emoji", "word": "said", "occurrence": 1, "emoji": "🗣️" },
     { "type": "emoji", "word": "follow", "occurrence": 1, "emoji": "🚶🚶" },
     { "type": "emoji", "word": "fishers", "occurrence": 1, "emoji": "🎣" },

@@ -23,6 +23,7 @@ const AUDIO_DIR = "verse_audio/";
 const WORDS_AUDIO_DIR = AUDIO_DIR + "words/";
 const DATA_DIR = "verse_data/";
 const IMG_DIR = "verse_images/";
+const ANDYMOJI_DIR = IMG_DIR + "andymoji/";
 const PET_IMG_DIR = "pet_images/";
 const SETTINGS_GEAR_ICON = IMG_DIR + "settings_gear.png";
 const LOCK_ICON = IMG_DIR + "lock.png";
@@ -1246,6 +1247,78 @@ function preloadLearnInstructionImages() {
   }
 }
 
+const andymojiPreloadPromises = new Map();
+
+function getAndymojiSrc(imageName) {
+  const cleanName =
+    String(imageName || "").trim();
+
+  if (!/^[A-Za-z0-9_-]+$/.test(cleanName)) {
+    return "";
+  }
+
+  return `${ANDYMOJI_DIR}${cleanName}.png`;
+}
+
+function getAndymojiSourcesFromHidePlan(
+  plan = HIDE_PLAN
+) {
+  if (!Array.isArray(plan)) return [];
+
+  return [...new Set(
+    plan
+      .filter((item) =>
+        item?.type === "image"
+      )
+      .map((item) =>
+        getAndymojiSrc(item?.image)
+      )
+      .filter(Boolean)
+  )];
+}
+
+function preloadAndymojiImages(
+  plan = HIDE_PLAN
+) {
+  const sources =
+    getAndymojiSourcesFromHidePlan(plan);
+
+  return Promise.all(
+    sources.map((src) => {
+      if (andymojiPreloadPromises.has(src)) {
+        return andymojiPreloadPromises.get(src);
+      }
+
+      const promise = new Promise((resolve) => {
+        const img = new Image();
+
+        img.onload = () => {
+          resolve(true);
+        };
+
+        img.onerror = () => {
+          andymojiPreloadPromises.delete(src);
+
+          console.warn(
+            `Could not preload Andymoji: ${src}`
+          );
+
+          resolve(false);
+        };
+
+        img.src = src;
+      });
+
+      andymojiPreloadPromises.set(
+        src,
+        promise
+      );
+
+      return promise;
+    })
+  );
+}
+
 function startLearnInstruction(key) {
   State.learnInstructionKey = key;
   State.learnInstructionReady = false;
@@ -1300,7 +1373,7 @@ async function playLearnInstructionAudio() {
   render();
 }
 
-function continueLearnInstruction() {
+async function continueLearnInstruction() {
   const key = State.learnInstructionKey;
 
   State.learnInstructionReady = false;
@@ -1329,6 +1402,7 @@ function continueLearnInstruction() {
   }
 
   if (key === "remove") {
+    await preloadAndymojiImages(HIDE_PLAN);
     goToHideAndStartRound();
     return;
   }
@@ -5748,6 +5822,8 @@ async function loadVerse(verseId) {
   ECHO_PARTS = Array.isArray(json.echoParts) ? json.echoParts : [];
   HIDE_PLAN = Array.isArray(json.hidePlan) ? json.hidePlan : [];
 
+  void preloadAndymojiImages(HIDE_PLAN);
+
   VERSE_REF = verseIdToRef(VERSE_ID, TRANSLATION);
   AUDIO_FILE = `${AUDIO_DIR}${VERSE_ID}.mp3`;
 
@@ -7281,12 +7357,59 @@ function verseNode() {
     }
 
     const info = hideInfoForToken(i);
+    const isEmoji = info?.type === "emoji";
+    const isImage = info?.type === "image";
+
     const span = makeLearnTokenSpan(
-      info?.type === "emoji"
+      isEmoji
         ? (info.emoji || "❓")
-        : underscoresForWord(t.text),
-      "hintable no-zoom " + (info?.type === "emoji" ? "emoji" : "underscore")
+        : isImage
+          ? ""
+          : underscoresForWord(t.text),
+      "hintable no-zoom " +
+        (isEmoji
+          ? "emoji"
+          : isImage
+            ? "image"
+            : "underscore")
     );
+
+    if (isImage) {
+      const src =
+        getAndymojiSrc(info?.image);
+
+      if (src) {
+        const img =
+          document.createElement("img");
+
+        img.className =
+          "learn-word-image";
+        img.alt = "";
+        img.width = 512;
+        img.height = 512;
+        img.draggable = false;
+
+        img.onload = () => {
+          scheduleSmartLearnTextFit(document);
+        };
+
+        img.onerror = () => {
+          span.classList.remove("image");
+          span.classList.add("emoji");
+          span.textContent = "❓";
+
+          scheduleSmartLearnTextFit(document);
+        };
+
+        img.src = src;
+
+        span.appendChild(img);
+      } else {
+        span.classList.remove("image");
+        span.classList.add("emoji");
+        span.textContent = "❓";
+      }
+    }
 
     span.onclick = () => {
       State.revealedTokenIdx.add(i);

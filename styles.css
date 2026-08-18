@@ -4026,6 +4026,22 @@ Game Mix Loading Screen
   background: rgba(0, 0, 0, 0.30);
 }
 
+.learn-verse .hintable.image {
+  padding: 0;
+  margin: 0 0.04em;
+  border: 0;
+  background: transparent;
+  vertical-align: -0.1em;
+  line-height: 1;
+}
+
+.learn-verse .hintable.image .learn-word-image {
+  display: block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+}
+
 .learn-verse .hintable.underscore {
   font-family: "Baloo 2", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   letter-spacing: 0.02em;
