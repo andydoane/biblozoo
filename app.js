@@ -10311,10 +10311,17 @@ function screenTitle(idx) {
     placeholder.selected = !HAS_VERSE_SELECTION;
     versePicker.appendChild(placeholder);
 
+    const progress = loadProgress();
+
     for (const item of VERSE_LIST) {
       const opt = document.createElement("option");
       opt.value = item.id;
-      opt.textContent = item.ref;
+
+      const learned =
+        !!progress.verses?.[item.id]?.learnCompleted;
+
+      opt.textContent =
+        learned ? `✓ ${item.ref}` : item.ref;
 
       if (HAS_VERSE_SELECTION && item.id === VERSE_ID) {
         opt.selected = true;
