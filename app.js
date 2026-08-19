@@ -5130,31 +5130,103 @@ function isVerseMastered(verseProgress) {
   return true;
 }
 
-const BUILTIN_PET_BACKGROUNDS = [
-  { id: "builtin:rainbow", className: "pet-stage-rainbow" },
-  { id: "builtin:stars", className: "pet-stage-stars" },
-  { id: "builtin:clouds", className: "pet-stage-clouds" },
-  { id: "builtin:space", className: "pet-stage-space" },
-  { id: "builtin:aurora-green", className: "pet-stage-aurora-green" },
-  { id: "builtin:aurora-pink", className: "pet-stage-aurora-pink" },
-  { id: "builtin:aurora-ice", className: "pet-stage-aurora-ice" },
-  { id: "builtin:checker-classic", className: "pet-stage-checker-classic" },
-  { id: "builtin:checker-sunset", className: "pet-stage-checker-sunset" },
-  { id: "builtin:checker-mint", className: "pet-stage-checker-mint" },
-  { id: "builtin:checker-night", className: "pet-stage-checker-night" },
-  { id: "builtin:confetti", className: "pet-stage-confetti" },
-  { id: "builtin:sunset", className: "pet-stage-sunset" },
-  { id: "builtin:bubbles", className: "pet-stage-bubbles" },
-  { id: "builtin:lava", className: "pet-stage-lava" },
-  { id: "builtin:water", className: "pet-stage-water" },
-  { id: "builtin:ice", className: "pet-stage-ice" },
-  { id: "builtin:plain", className: "pet-stage-plain" },
-  { id: "builtin:desert", className: "pet-stage-desert" },
-  { id: "builtin:library", className: "pet-stage-library" },
-  { id: "builtin:denim-blue", className: "pet-stage-denim-blue" },
-  { id: "builtin:denim-red", className: "pet-stage-denim-red" },
-  { id: "builtin:denim-green", className: "pet-stage-denim-green" },
-  { id: "builtin:blueprint", className: "pet-stage-blueprint" }
+const LEGACY_PET_BACKGROUND_MIGRATIONS = [
+  {
+    legacyId: "builtin:rainbow",
+    replacementId: "image:rainbow"
+  },
+  {
+    legacyId: "builtin:stars",
+    replacementId: "image:twilight_stars"
+  },
+  {
+    legacyId: "builtin:clouds",
+    replacementId: "image:clouds"
+  },
+  {
+    legacyId: "builtin:space",
+    replacementId: "image:twilight_stars"
+  },
+  {
+    legacyId: "builtin:aurora-green",
+    replacementId: "image:aurora"
+  },
+  {
+    legacyId: "builtin:aurora-pink",
+    replacementId: "image:aurora"
+  },
+  {
+    legacyId: "builtin:aurora-ice",
+    replacementId: "image:aurora"
+  },
+  {
+    legacyId: "builtin:checker-classic",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:checker-sunset",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:checker-mint",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:checker-night",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:confetti",
+    replacementId: "image:confetti"
+  },
+  {
+    legacyId: "builtin:sunset",
+    replacementId: "image:twilight_stars"
+  },
+  {
+    legacyId: "builtin:bubbles",
+    replacementId: "image:bubbles"
+  },
+  {
+    legacyId: "builtin:lava",
+    replacementId: "image:lava"
+  },
+  {
+    legacyId: "builtin:water",
+    replacementId: "image:water"
+  },
+  {
+    legacyId: "builtin:ice",
+    replacementId: "image:snow"
+  },
+  {
+    legacyId: "builtin:plain",
+    replacementId: "image:stone"
+  },
+  {
+    legacyId: "builtin:desert",
+    replacementId: "image:sand"
+  },
+  {
+    legacyId: "builtin:library",
+    replacementId: "image:books"
+  },
+  {
+    legacyId: "builtin:denim-blue",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:denim-red",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:denim-green",
+    replacementId: "image:plaid"
+  },
+  {
+    legacyId: "builtin:blueprint",
+    replacementId: "image:map"
+  }
 ];
 
 let imagePetBackgrounds = [];
@@ -5201,10 +5273,7 @@ function normalizePetBackgroundEntry(value) {
 }
 
 function getPetBackgroundCatalog() {
-  return [
-    ...BUILTIN_PET_BACKGROUNDS,
-    ...imagePetBackgrounds
-  ];
+  return [...imagePetBackgrounds];
 }
 
 async function loadPetBackgroundCatalog() {
@@ -5262,6 +5331,57 @@ async function loadPetBackgroundCatalog() {
   return petBackgroundCatalogLoadPromise;
 }
 
+function getDefaultPetBackgroundId() {
+  const catalog =
+    getPetBackgroundCatalog();
+
+  const rainbow =
+    catalog.find(
+      (background) =>
+        background.id === "image:rainbow"
+    );
+
+  return (
+    rainbow?.id ||
+    catalog[0]?.id ||
+    ""
+  );
+}
+
+function getLegacyPetBackgroundReplacementId(
+  savedId,
+  legacyIndex
+) {
+  const cleanSavedId =
+    String(savedId || "").trim();
+
+  if (
+    cleanSavedId.startsWith("builtin:")
+  ) {
+    const migration =
+      LEGACY_PET_BACKGROUND_MIGRATIONS.find(
+        (item) =>
+          item.legacyId === cleanSavedId
+      );
+
+    return migration?.replacementId || "";
+  }
+
+  if (
+    !cleanSavedId &&
+    Number.isInteger(legacyIndex)
+  ) {
+    return (
+      LEGACY_PET_BACKGROUND_MIGRATIONS[
+        legacyIndex
+      ]?.replacementId ||
+      ""
+    );
+  }
+
+  return "";
+}
+
 function getVerseBackgroundId(verseId) {
   const verseProgress =
     getVerseProgress(verseId);
@@ -5284,17 +5404,24 @@ function getVerseBackgroundId(verseId) {
     return savedId;
   }
 
-  const legacyIndex =
-    Number.isInteger(verseProgress.bgIndex)
-      ? verseProgress.bgIndex
-      : 0;
+  const legacyReplacementId =
+    getLegacyPetBackgroundReplacementId(
+      savedId,
+      verseProgress.bgIndex
+    );
 
-  return (
-    BUILTIN_PET_BACKGROUNDS[
-      legacyIndex
-    ]?.id ||
-    BUILTIN_PET_BACKGROUNDS[0].id
-  );
+  if (
+    legacyReplacementId &&
+    catalog.some(
+      (background) =>
+        background.id ===
+        legacyReplacementId
+    )
+  ) {
+    return legacyReplacementId;
+  }
+
+  return getDefaultPetBackgroundId();
 }
 
 function setVerseBackgroundId(
@@ -5303,7 +5430,8 @@ function setVerseBackgroundId(
 ) {
   const background =
     getPetBackgroundCatalog().find(
-      (item) => item.id === backgroundId
+      (item) =>
+        item.id === backgroundId
     );
 
   if (!background) return;
@@ -5314,16 +5442,7 @@ function setVerseBackgroundId(
       verseProgress.petBackgroundId =
         background.id;
 
-      const legacyIndex =
-        BUILTIN_PET_BACKGROUNDS.findIndex(
-          (item) =>
-            item.id === background.id
-        );
-
-      if (legacyIndex >= 0) {
-        verseProgress.bgIndex =
-          legacyIndex;
-      }
+      delete verseProgress.bgIndex;
     }
   );
 }
@@ -5367,15 +5486,23 @@ function getVerseBackgroundEntry(
     return null;
   }
 
+  const catalog =
+    getPetBackgroundCatalog();
+
   const backgroundId =
     getVerseBackgroundId(verseId);
 
   return (
-    getPetBackgroundCatalog().find(
+    catalog.find(
       (background) =>
         background.id === backgroundId
     ) ||
-    BUILTIN_PET_BACKGROUNDS[0]
+    catalog.find(
+      (background) =>
+        background.id ===
+        getDefaultPetBackgroundId()
+    ) ||
+    null
   );
 }
 
