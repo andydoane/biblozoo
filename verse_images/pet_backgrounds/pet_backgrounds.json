@@ -2,6 +2,66 @@
     "version": 1,
     "backgrounds": [
         {
+            "id": "beach",
+            "file": "beach.jpg",
+            "name": "Beach"
+        },
+        {
+            "id": "desert",
+            "file": "desert.jpg",
+            "name": "Desert"
+        },
+        {
+            "id": "prairie",
+            "file": "prairie.jpg",
+            "name": "Prairie"
+        },
+        {
+            "id": "forest",
+            "file": "forest.jpg",
+            "name": "Forest"
+        },
+        {
+            "id": "mountain",
+            "file": "mountain.jpg",
+            "name": "Mountain"
+        },
+        {
+            "id": "seabed",
+            "file": "seabed.jpg",
+            "name": "Seabed"
+        },
+        {
+            "id": "moon",
+            "file": "moon.jpg",
+            "name": "Moon"
+        },
+        {
+            "id": "swamp",
+            "file": "swamp.jpg",
+            "name": "Swamp"
+        },
+        {
+            "id": "volcano",
+            "file": "volcano.jpg",
+            "name": "Volcano"
+        },
+        {
+            "id": "farm",
+            "file": "farm.jpg",
+            "name": "Farm"
+        },
+        {
+            "id": "dreamscape",
+            "file": "dreamscape.jpg",
+            "name": "Dreamscape"
+        },
+        {
+            "id": "eighties",
+            "file": "eighties.jpg",
+            "name": "Eighties"
+        },
+        {
             "id": "argyle",
             "file": "argyle.jpg",
             "name": "Argyle"
