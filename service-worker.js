@@ -41,6 +41,8 @@ const CORE_PATHS = [
   "./biblopet_name_blocklist.json",
   "./pet_random_names.json",
 
+  "./verse_images/pet_backgrounds/pet_backgrounds.json",
+
   "./profile_pictures/profile_pictures.json",
   "./profile_pictures/profile_picture_fallback.png",
 

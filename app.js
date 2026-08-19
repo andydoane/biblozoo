@@ -24,6 +24,9 @@ const WORDS_AUDIO_DIR = AUDIO_DIR + "words/";
 const DATA_DIR = "verse_data/";
 const IMG_DIR = "verse_images/";
 const ANDYMOJI_DIR = IMG_DIR + "andymoji/";
+const PET_BACKGROUND_DIR = IMG_DIR + "pet_backgrounds/";
+const PET_BACKGROUND_MANIFEST_URL =
+  PET_BACKGROUND_DIR + "pet_backgrounds.json";
 const PET_IMG_DIR = "pet_images/";
 const SETTINGS_GEAR_ICON = IMG_DIR + "settings_gear.png";
 const LOCK_ICON = IMG_DIR + "lock.png";
@@ -5127,54 +5130,279 @@ function isVerseMastered(verseProgress) {
   return true;
 }
 
-function getVerseBackgroundIndex(verseId) {
-  const verseProgress = getVerseProgress(verseId);
-  return Number.isInteger(verseProgress.bgIndex) ? verseProgress.bgIndex : 0;
+const BUILTIN_PET_BACKGROUNDS = [
+  { id: "builtin:rainbow", className: "pet-stage-rainbow" },
+  { id: "builtin:stars", className: "pet-stage-stars" },
+  { id: "builtin:clouds", className: "pet-stage-clouds" },
+  { id: "builtin:space", className: "pet-stage-space" },
+  { id: "builtin:aurora-green", className: "pet-stage-aurora-green" },
+  { id: "builtin:aurora-pink", className: "pet-stage-aurora-pink" },
+  { id: "builtin:aurora-ice", className: "pet-stage-aurora-ice" },
+  { id: "builtin:checker-classic", className: "pet-stage-checker-classic" },
+  { id: "builtin:checker-sunset", className: "pet-stage-checker-sunset" },
+  { id: "builtin:checker-mint", className: "pet-stage-checker-mint" },
+  { id: "builtin:checker-night", className: "pet-stage-checker-night" },
+  { id: "builtin:confetti", className: "pet-stage-confetti" },
+  { id: "builtin:sunset", className: "pet-stage-sunset" },
+  { id: "builtin:bubbles", className: "pet-stage-bubbles" },
+  { id: "builtin:lava", className: "pet-stage-lava" },
+  { id: "builtin:water", className: "pet-stage-water" },
+  { id: "builtin:ice", className: "pet-stage-ice" },
+  { id: "builtin:plain", className: "pet-stage-plain" },
+  { id: "builtin:desert", className: "pet-stage-desert" },
+  { id: "builtin:library", className: "pet-stage-library" },
+  { id: "builtin:denim-blue", className: "pet-stage-denim-blue" },
+  { id: "builtin:denim-red", className: "pet-stage-denim-red" },
+  { id: "builtin:denim-green", className: "pet-stage-denim-green" },
+  { id: "builtin:blueprint", className: "pet-stage-blueprint" }
+];
+
+let imagePetBackgrounds = [];
+let petBackgroundCatalogLoadPromise = null;
+
+function normalizePetBackgroundEntry(value) {
+  const item =
+    typeof value === "string"
+      ? { file: value }
+      : value;
+
+  if (
+    !item ||
+    typeof item !== "object" ||
+    Array.isArray(item)
+  ) {
+    return null;
+  }
+
+  const file = String(item.file || "").trim();
+
+  if (!/^[A-Za-z0-9_-]+\.jpg$/i.test(file)) {
+    return null;
+  }
+
+  const fallbackId =
+    file.replace(/\.jpg$/i, "").toLowerCase();
+
+  const idPart =
+    String(item.id || fallbackId)
+      .trim()
+      .toLowerCase();
+
+  if (!/^[a-z0-9_-]+$/.test(idPart)) {
+    return null;
+  }
+
+  return {
+    id: `image:${idPart}`,
+    name: String(item.name || idPart).trim(),
+    className: "pet-stage-image-bg",
+    imageUrl: `${PET_BACKGROUND_DIR}${file}`
+  };
 }
 
-function setVerseBackgroundIndex(verseId, index) {
-  updateVerseProgress(verseId, (verseProgress) => {
-    verseProgress.bgIndex = index;
-  });
+function getPetBackgroundCatalog() {
+  return [
+    ...BUILTIN_PET_BACKGROUNDS,
+    ...imagePetBackgrounds
+  ];
+}
+
+async function loadPetBackgroundCatalog() {
+  if (petBackgroundCatalogLoadPromise) {
+    return petBackgroundCatalogLoadPromise;
+  }
+
+  petBackgroundCatalogLoadPromise = fetch(
+    PET_BACKGROUND_MANIFEST_URL,
+    { cache: "no-store" }
+  )
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      return res.json();
+    })
+    .then((json) => {
+      const entries = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.backgrounds)
+          ? json.backgrounds
+          : [];
+
+      const seen = new Set();
+
+      imagePetBackgrounds = entries
+        .map(normalizePetBackgroundEntry)
+        .filter((background) => {
+          if (
+            !background ||
+            seen.has(background.id)
+          ) {
+            return false;
+          }
+
+          seen.add(background.id);
+          return true;
+        });
+
+      return getPetBackgroundCatalog();
+    })
+    .catch((err) => {
+      console.warn(
+        "Could not load BibloPet background catalog",
+        err
+      );
+
+      imagePetBackgrounds = [];
+
+      return getPetBackgroundCatalog();
+    });
+
+  return petBackgroundCatalogLoadPromise;
+}
+
+function getVerseBackgroundId(verseId) {
+  const verseProgress =
+    getVerseProgress(verseId);
+
+  const savedId =
+    String(
+      verseProgress.petBackgroundId || ""
+    ).trim();
+
+  const catalog =
+    getPetBackgroundCatalog();
+
+  if (
+    savedId &&
+    catalog.some(
+      (background) =>
+        background.id === savedId
+    )
+  ) {
+    return savedId;
+  }
+
+  const legacyIndex =
+    Number.isInteger(verseProgress.bgIndex)
+      ? verseProgress.bgIndex
+      : 0;
+
+  return (
+    BUILTIN_PET_BACKGROUNDS[
+      legacyIndex
+    ]?.id ||
+    BUILTIN_PET_BACKGROUNDS[0].id
+  );
+}
+
+function setVerseBackgroundId(
+  verseId,
+  backgroundId
+) {
+  const background =
+    getPetBackgroundCatalog().find(
+      (item) => item.id === backgroundId
+    );
+
+  if (!background) return;
+
+  updateVerseProgress(
+    verseId,
+    (verseProgress) => {
+      verseProgress.petBackgroundId =
+        background.id;
+
+      const legacyIndex =
+        BUILTIN_PET_BACKGROUNDS.findIndex(
+          (item) =>
+            item.id === background.id
+        );
+
+      if (legacyIndex >= 0) {
+        verseProgress.bgIndex =
+          legacyIndex;
+      }
+    }
+  );
 }
 
 function cycleVerseBackground(verseId) {
-  const current = getVerseBackgroundIndex(verseId);
-  const TOTAL_BACKGROUNDS = 24;
-  const next = (current + 1) % TOTAL_BACKGROUNDS;
-  setVerseBackgroundIndex(verseId, next);
+  const catalog =
+    getPetBackgroundCatalog();
+
+  if (!catalog.length) return;
+
+  const currentId =
+    getVerseBackgroundId(verseId);
+
+  const currentIndex =
+    catalog.findIndex(
+      (background) =>
+        background.id === currentId
+    );
+
+  const nextIndex =
+    currentIndex >= 0
+      ? (currentIndex + 1) %
+      catalog.length
+      : 0;
+
+  setVerseBackgroundId(
+    verseId,
+    catalog[nextIndex].id
+  );
 }
 
-function getVerseBackgroundClass(verseId, verseProgress) {
-  if (!canUseCustomPetBackgrounds(verseProgress)) return "";
+function getVerseBackgroundEntry(
+  verseId,
+  verseProgress
+) {
+  if (
+    !canUseCustomPetBackgrounds(
+      verseProgress
+    )
+  ) {
+    return null;
+  }
 
-  const bgIndex = getVerseBackgroundIndex(verseId);
+  const backgroundId =
+    getVerseBackgroundId(verseId);
 
-  if (bgIndex === 1) return "pet-stage-stars";
-  if (bgIndex === 2) return "pet-stage-clouds";
-  if (bgIndex === 3) return "pet-stage-space";
-  if (bgIndex === 4) return "pet-stage-aurora-green";
-  if (bgIndex === 5) return "pet-stage-aurora-pink";
-  if (bgIndex === 6) return "pet-stage-aurora-ice";
-  if (bgIndex === 7) return "pet-stage-checker-classic";
-  if (bgIndex === 8) return "pet-stage-checker-sunset";
-  if (bgIndex === 9) return "pet-stage-checker-mint";
-  if (bgIndex === 10) return "pet-stage-checker-night";
-  if (bgIndex === 11) return "pet-stage-confetti";
-  if (bgIndex === 12) return "pet-stage-sunset";
-  if (bgIndex === 13) return "pet-stage-bubbles";
-  if (bgIndex === 14) return "pet-stage-lava";
-  if (bgIndex === 15) return "pet-stage-water";
-  if (bgIndex === 16) return "pet-stage-ice";
-  if (bgIndex === 17) return "pet-stage-plain";
-  if (bgIndex === 18) return "pet-stage-desert";
-  if (bgIndex === 19) return "pet-stage-library";
-  if (bgIndex === 20) return "pet-stage-denim-blue";
-  if (bgIndex === 21) return "pet-stage-denim-red";
-  if (bgIndex === 22) return "pet-stage-denim-green";
-  if (bgIndex === 23) return "pet-stage-blueprint";
+  return (
+    getPetBackgroundCatalog().find(
+      (background) =>
+        background.id === backgroundId
+    ) ||
+    BUILTIN_PET_BACKGROUNDS[0]
+  );
+}
 
-  return "pet-stage-rainbow";
+function getVerseBackgroundClass(
+  verseId,
+  verseProgress
+) {
+  const background =
+    getVerseBackgroundEntry(
+      verseId,
+      verseProgress
+    );
+
+  return background?.className || "";
+}
+
+function getVerseBackgroundImageUrl(
+  verseId,
+  verseProgress
+) {
+  const background =
+    getVerseBackgroundEntry(
+      verseId,
+      verseProgress
+    );
+
+  return background?.imageUrl || "";
 }
 
 const HUNGRY_FOOD_POOL = [
@@ -12081,6 +12309,9 @@ function screenVerseDetail(idx) {
   const petStatus = getBibloPetStatus(verseProgress);
   const petAnimationClass = unlocked ? getBibloPetAnimationClass(verseId, verseProgress) : "";
   const petBackgroundClass = unlocked ? getVerseBackgroundClass(verseId, verseProgress) : "";
+  const petBackgroundImageUrl = unlocked
+    ? getVerseBackgroundImageUrl(verseId, verseProgress)
+    : "";
   const learnStatus = verseProgress.learnCompleted ? "✔" : "";
 
   function gameRow(label, gameId) {
@@ -12189,6 +12420,19 @@ function screenVerseDetail(idx) {
     </div>
   `;
 
+  const petStage =
+    wrap.querySelector(".pet-stage");
+
+  if (
+    petStage &&
+    petBackgroundImageUrl
+  ) {
+    petStage.style.setProperty(
+      "--pet-background-image",
+      `url("${petBackgroundImageUrl}")`
+    );
+  }
+
   const btnChangePetBg = wrap.querySelector("#btnChangePetBg");
   if (btnChangePetBg) {
     btnChangePetBg.onclick = () => {
@@ -12197,7 +12441,7 @@ function screenVerseDetail(idx) {
       if (!canUseCustomPetBackgrounds(verseProgress)) {
         showDialog({
           title: "Locked",
-          body: `Earn 5 total medals on this verse to unlock custom backgrounds for this BibloPet. You currently have ${medalCount}/5.`,
+          body: `Earn 5 total game medals for this verse to unlock custom backgrounds for this BibloPet. You currently have ${medalCount}/5.`,
           actions: [dlgBtn("OK", { onClick: closeDialog })]
         });
         return;
@@ -13752,6 +13996,8 @@ function setupAppUiTapSounds() {
   setupAppUiTapSounds();
 
   await loadVerseList();
+
+  await loadPetBackgroundCatalog();
 
   try {
     await window.BibloZooProfiles

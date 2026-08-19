@@ -6802,6 +6802,14 @@ BibloPet Mastery Backgrounds
   margin-top: 14px;
 }
 
+.pet-stage-image-bg {
+  background-color: #333333;
+  background-image: var(--pet-background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 /* Put pet above decorative background layers */
 .pet-stage[class*="pet-stage-"] .pet-emoji,
 .pet-stage[class*="pet-stage-"] .pet-locked-text {
