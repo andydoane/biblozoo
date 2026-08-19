@@ -1,4 +1,130 @@
 {
     "version": 1,
-    "backgrounds": []
+    "backgrounds": [
+        {
+            "id": "argyle",
+            "file": "argyle.jpg",
+            "name": "Argyle"
+        },
+        {
+            "id": "aurora",
+            "file": "aurora.jpg",
+            "name": "Aurora"
+        },
+        {
+            "id": "books",
+            "file": "books.jpg",
+            "name": "Books"
+        },
+        {
+            "id": "brick",
+            "file": "brick.jpg",
+            "name": "Brick"
+        },
+        {
+            "id": "bubbles",
+            "file": "bubbles.jpg",
+            "name": "Bubbles"
+        },
+        {
+            "id": "clouds",
+            "file": "clouds.jpg",
+            "name": "Clouds"
+        },
+        {
+            "id": "confetti",
+            "file": "confetti.jpg",
+            "name": "Confetti"
+        },
+        {
+            "id": "dirt",
+            "file": "dirt.jpg",
+            "name": "Dirt"
+        },
+        {
+            "id": "grass",
+            "file": "grass.jpg",
+            "name": "Grass"
+        },
+        {
+            "id": "lava",
+            "file": "lava.jpg",
+            "name": "Lava"
+        },
+        {
+            "id": "lightning",
+            "file": "lightning.jpg",
+            "name": "Lightning"
+        },
+        {
+            "id": "map",
+            "file": "map.jpg",
+            "name": "Map"
+        },
+        {
+            "id": "moss",
+            "file": "moss.jpg",
+            "name": "Moss"
+        },
+        {
+            "id": "neon",
+            "file": "neon.jpg",
+            "name": "Neon"
+        },
+        {
+            "id": "plaid",
+            "file": "plaid.jpg",
+            "name": "Plaid"
+        },
+        {
+            "id": "rain",
+            "file": "rain.jpg",
+            "name": "Rain"
+        },
+        {
+            "id": "rainbow",
+            "file": "rainbow.jpg",
+            "name": "Rainbow"
+        },
+        {
+            "id": "rocks",
+            "file": "rocks.jpg",
+            "name": "Rocks"
+        },
+        {
+            "id": "sand",
+            "file": "sand.jpg",
+            "name": "Sand"
+        },
+        {
+            "id": "snow",
+            "file": "snow.jpg",
+            "name": "Snow"
+        },
+        {
+            "id": "stone",
+            "file": "stone.jpg",
+            "name": "Stone"
+        },
+        {
+            "id": "twilight_stars",
+            "file": "twilight_stars.jpg",
+            "name": "Twilight Stars"
+        },
+        {
+            "id": "vines",
+            "file": "vines.jpg",
+            "name": "Vines"
+        },
+        {
+            "id": "water",
+            "file": "water.jpg",
+            "name": "Water"
+        },
+        {
+            "id": "wood",
+            "file": "wood.jpg",
+            "name": "Wood"
+        }
+    ]
 }
