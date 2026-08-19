@@ -122,6 +122,21 @@
             "name": "Water"
         },
         {
+            "id": "jupiter",
+            "file": "jupiter.jpg",
+            "name": "Jupiter"
+        },
+        {
+            "id": "music",
+            "file": "music.jpg",
+            "name": "Music"
+        },
+        {
+            "id": "galaxy",
+            "file": "galaxy.jpg",
+            "name": "Galaxy"
+        },
+        {
             "id": "wood",
             "file": "wood.jpg",
             "name": "Wood"
