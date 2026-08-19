@@ -307,7 +307,7 @@ select {
 
 @media (min-width: 700px) {
   .vl-game-wrap {
-    padding: 0 14px var(--vl-game-bottom-pad);
+    padding: 0 0 var(--vl-game-bottom-pad);
   }
 
   .vl-game-board {
@@ -1535,7 +1535,10 @@ select {
 
   position: absolute;
   left: 50%;
-  bottom: calc(var(--vl-player-rocket-size) * 0.5);
+  bottom: calc(
+    (var(--vl-player-rocket-size) * 0.5) +
+    var(--vl-bonus-bottom-pad)
+  );
   z-index: 5;
   pointer-events: none;
   transform-origin: center center;

@@ -1911,6 +1911,19 @@
   }
 
   function bonusRocketBottomOffsetPx() {
+    const unit = $("#vlPlayerUnit");
+
+    if (unit) {
+      const bottom =
+        parseFloat(
+          getComputedStyle(unit).bottom
+        );
+
+      if (Number.isFinite(bottom)) {
+        return bottom;
+      }
+    }
+
     return bonusRocketVisualSizePx() * 0.5;
   }
 
