@@ -6646,6 +6646,7 @@ function getPlaygroundActivities() {
 const GAME_MIX_STORAGE_KEY = "verseMemoryGameMix";
 const GAME_MIX_VERSION = 2;
 const GAME_MIX_MODES = ["easy", "medium", "hard"];
+const GAME_MIX_PRIORITY_POOL_SIZE = 3;
 const GAME_MIX_LOADING_MIN_MS = 600;
 
 let gameMixLaunchTimer = null;
@@ -6777,7 +6778,60 @@ function pickNextGameMixGame() {
   const eligible = getEligibleGameMixGames();
   const unplayed = eligible.filter(game => !played.has(game.id));
 
-  return pickRandomFromList(unplayed);
+  if (!unplayed.length) return null;
+
+  const verseProgress = getVerseProgress(VERSE_ID);
+
+  const ranked = unplayed
+    .map(game => {
+      const gameProgress =
+        verseProgress?.games?.[game.id];
+
+      const medalStars =
+        getGameStars(game.id, gameProgress);
+
+      const timesPlayedValue =
+        Number(gameProgress?.timesPlayed || 0);
+
+      const lastPlayedAtValue =
+        Number(gameProgress?.lastPlayedAt || 0);
+
+      return {
+        game,
+        medalStars,
+        timesPlayed:
+          Number.isFinite(timesPlayedValue)
+            ? timesPlayedValue
+            : 0,
+        lastPlayedAt:
+          Number.isFinite(lastPlayedAtValue)
+            ? lastPlayedAtValue
+            : 0,
+        tieBreaker: Math.random()
+      };
+    })
+    .sort((a, b) => {
+      if (a.medalStars !== b.medalStars) {
+        return a.medalStars - b.medalStars;
+      }
+
+      if (a.timesPlayed !== b.timesPlayed) {
+        return a.timesPlayed - b.timesPlayed;
+      }
+
+      if (a.lastPlayedAt !== b.lastPlayedAt) {
+        return a.lastPlayedAt - b.lastPlayedAt;
+      }
+
+      return a.tieBreaker - b.tieBreaker;
+    });
+
+  const priorityPool =
+    ranked
+      .slice(0, GAME_MIX_PRIORITY_POOL_SIZE)
+      .map(item => item.game);
+
+  return pickRandomFromList(priorityPool);
 }
 
 function launchGameMixGame(game) {
