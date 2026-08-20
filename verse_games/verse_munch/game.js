@@ -1067,7 +1067,7 @@ function backToMenuFromHelp(){
         handleBonusFoodSelection(bonusChip.dataset.bonusFoodId, bonusChip);
       });
 
-      beltLayer.addEventListener("pointerup", (e) => {
+      beltLayer.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         if (state.paused) return;
 
