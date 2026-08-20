@@ -1,6 +1,30 @@
 (function () {
   let currentGameShellGameId = "";
 
+  // Shared game speed settings
+  const GAME_SPEED_ICON_SRC =
+    "../../verse_images/game_ui/speedometer.png";
+
+  const GAME_SPEED_PRESETS = Object.freeze([
+    {
+      id: "normal",
+      label: "Normal",
+      multiplier: 1
+    },
+    {
+      id: "fast",
+      label: "Fast",
+      multiplier: 1.25
+    },
+    {
+      id: "max",
+      label: "Max",
+      multiplier: 1.5
+    }
+  ]);
+
+  let currentGameSpeedPresetId = "normal";
+
   const MEDAL_ICON_PATHS = Object.freeze({
     easy: "../../verse_images/bronze_medal.png",
     medium: "../../verse_images/silver_medal.png",
@@ -2051,6 +2075,326 @@
     if (petUnlockBtn) petUnlockBtn.onclick = petUnlockAction;
   }
 
+  function getGameSpeedPreset() {
+    return (
+      GAME_SPEED_PRESETS.find(
+        (preset) =>
+          preset.id === currentGameSpeedPresetId
+      ) ||
+      GAME_SPEED_PRESETS[0]
+    );
+  }
+
+  function getGameSpeedMultiplier() {
+    return getGameSpeedPreset().multiplier;
+  }
+
+  function setGameSpeedPreset(presetId) {
+    const nextPreset =
+      GAME_SPEED_PRESETS.find(
+        (preset) =>
+          preset.id === presetId
+      );
+
+    if (!nextPreset) {
+      return getGameSpeedPreset();
+    }
+
+    currentGameSpeedPresetId =
+      nextPreset.id;
+
+    return nextPreset;
+  }
+
+  function resetGameSpeed() {
+    currentGameSpeedPresetId = "normal";
+    return getGameSpeedPreset();
+  }
+
+  function speedControlButtonHtml({
+    id = "verseGameSpeedBtn",
+    className = "",
+    label = "Choose Speed"
+  } = {}) {
+    const classes = [
+      "vm-game-speed-trigger",
+      String(className || "").trim()
+    ].filter(Boolean).join(" ");
+
+    return `
+      <button
+        class="${escapeHtml(classes)}"
+        id="${escapeHtml(id)}"
+        type="button"
+        aria-label="${escapeHtml(label)}"
+        title="${escapeHtml(label)}"
+      >
+        <img
+          class="vm-game-speed-icon"
+          src="${escapeHtml(GAME_SPEED_ICON_SRC)}"
+          alt=""
+          draggable="false"
+        >
+      </button>
+    `;
+  }
+
+  function speedMenuHtml({
+    id = "verseGameSpeedOverlay",
+    title = "Choose Speed",
+    closeText = "Close"
+  } = {}) {
+    const safeId = escapeHtml(id);
+
+    const speedButtons =
+      GAME_SPEED_PRESETS.map(
+        (preset) => `
+          <button
+            class="vm-btn vm-game-menu-btn vm-game-speed-menu-btn"
+            type="button"
+            data-game-speed-preset="${escapeHtml(preset.id)}"
+            aria-pressed="false"
+          >${escapeHtml(preset.label)}</button>
+        `
+      ).join("");
+
+    return `
+      <div
+        class="vm-game-menu-overlay vm-game-speed-overlay"
+        id="${safeId}"
+        aria-hidden="true"
+      >
+        <div
+          class="vm-game-menu-panel vm-game-speed-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label="${escapeHtml(title)}"
+        >
+          <div class="vm-game-menu-header vm-game-speed-header">
+            <div class="vm-game-menu-title vm-game-speed-title">
+              ${escapeHtml(title)}
+            </div>
+          </div>
+
+          <div class="vm-game-menu-actions">
+            ${speedButtons}
+
+            <button
+              class="vm-btn vm-game-menu-btn vm-game-menu-close-btn"
+              id="${safeId}CloseBtn"
+              type="button"
+            >${escapeHtml(closeText)}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function wireSpeedMenu({
+    id = "verseGameSpeedOverlay",
+    buttonId = "",
+    onOpen = null,
+    onClose = null,
+    onChange = null
+  } = {}) {
+    const overlay =
+      document.getElementById(id);
+
+    const trigger =
+      buttonId
+        ? document.getElementById(buttonId)
+        : null;
+
+    const closeBtn =
+      document.getElementById(
+        `${id}CloseBtn`
+      );
+
+    const speedButtons =
+      overlay
+        ? Array.from(
+          overlay.querySelectorAll(
+            "[data-game-speed-preset]"
+          )
+        )
+        : [];
+
+    const syncButtons = () => {
+      const selected =
+        getGameSpeedPreset();
+
+      speedButtons.forEach((button) => {
+        const isSelected =
+          button.dataset.gameSpeedPreset ===
+          selected.id;
+
+        button.classList.toggle(
+          "is-selected",
+          isSelected
+        );
+
+        button.setAttribute(
+          "aria-pressed",
+          isSelected ? "true" : "false"
+        );
+      });
+    };
+
+    const closeMenu = () => {
+      const wasOpen =
+        !!overlay?.classList.contains(
+          "is-open"
+        );
+
+      if (
+        overlay &&
+        overlay.contains(
+          document.activeElement
+        )
+      ) {
+        document.activeElement.blur();
+      }
+
+      if (overlay) {
+        overlay.classList.remove(
+          "is-open"
+        );
+
+        overlay.setAttribute(
+          "aria-hidden",
+          "true"
+        );
+      }
+
+      if (
+        wasOpen &&
+        typeof onClose === "function"
+      ) {
+        onClose();
+      }
+    };
+
+    const openMenu = (event) => {
+      if (event) {
+        if (event.cancelable) {
+          event.preventDefault();
+        }
+
+        event.stopPropagation();
+      }
+
+      if (!overlay) return;
+
+      if (
+        typeof onOpen === "function"
+      ) {
+        const shouldOpen = onOpen();
+
+        if (shouldOpen === false) {
+          return;
+        }
+      }
+
+      syncButtons();
+
+      overlay.classList.add(
+        "is-open"
+      );
+
+      overlay.setAttribute(
+        "aria-hidden",
+        "false"
+      );
+    };
+
+    const choosePreset = (event) => {
+      if (event) {
+        if (event.cancelable) {
+          event.preventDefault();
+        }
+
+        event.stopPropagation();
+      }
+
+      const button =
+        event?.currentTarget;
+
+      if (!button) return;
+
+      const preset =
+        setGameSpeedPreset(
+          button.dataset.gameSpeedPreset
+        );
+
+      syncButtons();
+
+      if (
+        typeof onChange === "function"
+      ) {
+        onChange(preset);
+      }
+
+      closeMenu();
+    };
+
+    const bindTap = (
+      button,
+      handler
+    ) => {
+      if (!button) return;
+
+      let lastTouchAt = 0;
+
+      button.ontouchend = (event) => {
+        lastTouchAt = Date.now();
+
+        if (event.cancelable) {
+          event.preventDefault();
+        }
+
+        event.stopPropagation();
+        handler(event);
+      };
+
+      button.onclick = (event) => {
+        if (
+          Date.now() - lastTouchAt <
+          500
+        ) {
+          return;
+        }
+
+        handler(event);
+      };
+    };
+
+    bindTap(trigger, openMenu);
+    bindTap(closeBtn, closeMenu);
+
+    speedButtons.forEach((button) => {
+      bindTap(
+        button,
+        choosePreset
+      );
+    });
+
+    if (overlay) {
+      overlay.onclick = (event) => {
+        if (event.target === overlay) {
+          closeMenu();
+        }
+      };
+    }
+
+    syncButtons();
+
+    return {
+      open: openMenu,
+      close: closeMenu,
+      syncButtons
+    };
+  }
+
   function gameMenuHtml({
     id = "verseGameMenuOverlay",
     title = "Game Menu",
@@ -2317,6 +2661,11 @@
     wireHelp,
     gameMenuHtml,
     wireGameMenu,
+    speedControlButtonHtml,
+    speedMenuHtml,
+    wireSpeedMenu,
+    getGameSpeedMultiplier,
+    resetGameSpeed,
     gameIconImageHtml,
     gameIconImageHtmlForId,
     medalIconHtml,

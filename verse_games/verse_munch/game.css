@@ -757,7 +757,7 @@ body.vmunch-page-flash-streak-rainbow::before {
 
 .vmunch-overlay-pills{
   display:flex;
-  justify-content:space-between;
+  justify-content:flex-start;
   align-items:center;
   gap:10px;
   padding:0 var(--vmunch-pills-side-padding);
@@ -782,6 +782,11 @@ body.vmunch-page-flash-streak-rainbow::before {
   min-width:44px;
   text-align:center;
   cursor:pointer;
+}
+
+.vmunch-mood-pill {
+  margin-left: auto;
+  min-width: 0;
 }
 
 .vmunch-mood-pill:not(.is-bonus-hud-pill) {

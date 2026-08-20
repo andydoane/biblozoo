@@ -908,7 +908,11 @@
       CONVEYOR_SPEED_SHIP_HEIGHTS_PER_SEC[state.mode] ||
       CONVEYOR_SPEED_SHIP_HEIGHTS_PER_SEC.medium;
 
-    return conveyorShipHeightPx() * shipHeightsPerSecond;
+    return (
+      conveyorShipHeightPx() *
+      shipHeightsPerSecond *
+      window.VerseGameShell.getGameSpeedMultiplier()
+    );
   }
 
   function conveyorShipTopWidthPx() {
@@ -1404,6 +1408,7 @@
         unlockAudio();
         playUiTapSound();
         state.mode = mode;
+        window.VerseGameShell.resetGameSpeed();
         initVerseData();
         state.startTime = performance.now();
         buildChoices();
@@ -1445,7 +1450,16 @@
               <div class="vl-smoke-layer" id="vlSmokeLayer"></div>
               <div class="vl-firework-layer" id="vlFireworkLayer"></div>
               <div class="vl-board-content">
-                <div class="vl-overlay-pills"><button class="vl-pill vl-menu-pill no-zoom" id="vlMenuPill" type="button" aria-label="Game Menu">☰</button></div>
+                <div class="vl-overlay-pills">
+                  <button class="vl-pill vl-menu-pill no-zoom" id="vlMenuPill" type="button" aria-label="Game Menu">☰</button>
+
+                  ${!state.bonusReady
+                    ? window.VerseGameShell.speedControlButtonHtml({
+                        id: "vlSpeedPill",
+                        className: "vl-pill no-zoom"
+                      })
+                    : ""}
+                </div>
                 <div class="vl-launch-area">
                   <div class="vl-flight-space">
                     ${renderCountdownOverlay()}
@@ -1460,6 +1474,9 @@
         </div>
         ${renderHelpOverlay()}
         ${renderGameMenuOverlay()}
+        ${window.VerseGameShell.speedMenuHtml({
+          id: "vlSpeedMenuOverlay"
+        })}
       </div>`;
     wireGameScreen();
     syncGameMenuOpenState();
@@ -1636,6 +1653,36 @@
       }
     });
   }
+
+  window.VerseGameShell.wireSpeedMenu({
+    id: "vlSpeedMenuOverlay",
+    buttonId: "vlSpeedPill",
+
+    onOpen: () => {
+      if (
+        state.busy ||
+        state.bonusReady
+      ) {
+        return false;
+      }
+
+      playUiTapSound();
+      stopConveyorLoop();
+
+      return true;
+    },
+
+    onClose: () => {
+      playUiTapSound();
+
+      if (
+        state.screen === "game" &&
+        !state.bonusReady
+      ) {
+        startConveyorLoop();
+      }
+    }
+  });
 
   function wireBonusMenuOnly() {
     const menuPill = $("#vlMenuPill");

@@ -650,6 +650,7 @@ function renderModeSelect(){
     const runToken = state.runToken;
 
     selectedMode = mode;
+    window.VerseGameShell.resetGameSpeed();
     completed = false;
     completionResult = null;
     bonusRunning = false;
@@ -715,6 +716,12 @@ app.innerHTML = `
 
       <div class="vmunch-overlay-pills">
         <button class="vmunch-pill vmunch-menu-pill" id="vmunchMenuPill" aria-label="Game Menu">☰</button>
+
+        ${window.VerseGameShell.speedControlButtonHtml({
+          id: "vmunchSpeedPill",
+          className: "vmunch-pill"
+        })}
+
         <div class="vmunch-pill vmunch-mood-pill" id="vmunchMoodPill">${escapeHtml(getMoodLabel())}</div>
       </div>
 
@@ -760,6 +767,9 @@ app.innerHTML = `
 
     ${renderHelpOverlay(gameHelpHtml())}
     ${renderGameMenuOverlay()}
+    ${window.VerseGameShell.speedMenuHtml({
+      id: "vmunchSpeedMenuOverlay"
+    })}
   </div>
 `;
 
@@ -861,6 +871,31 @@ function wireCommonNav(){
     onBackFromHelp: () => {
       playUiTapSound();
       setPaused(true, "menu");
+    }
+  });
+
+  window.VerseGameShell.wireSpeedMenu({
+    id: "vmunchSpeedMenuOverlay",
+    buttonId: "vmunchSpeedPill",
+
+    onOpen: () => {
+      if (
+        bonusRunning ||
+        state.bonusPhase ||
+        getCurrentPhase() === "done"
+      ) {
+        return false;
+      }
+
+      playUiTapSound();
+      setPaused(true, "speed");
+
+      return true;
+    },
+
+    onClose: () => {
+      playUiTapSound();
+      setPaused(false, "");
     }
   });
 
@@ -2341,6 +2376,20 @@ function backToMenuFromHelp(){
     updateMoodPill();
   }
 
+  function syncSpeedControlVisibility() {
+    const speedButton =
+      document.getElementById(
+        "vmunchSpeedPill"
+      );
+
+    if (!speedButton) return;
+
+    speedButton.hidden =
+      bonusRunning ||
+      !!state.bonusPhase ||
+      getCurrentPhase() === "done";
+  }
+
 function fitMunchBuildText(){
   if (state.buildFitDone) return;
 
@@ -2839,10 +2888,16 @@ function updateBuildText(){
 
   function getBeltConfig() {
     const chipHeight = 56;
+    const speedMultiplier =
+      window.VerseGameShell
+        .getGameSpeedMultiplier();
 
     if (selectedMode === "hard") {
       return {
-        speed: chipHeight * 4.35,
+        speed:
+          chipHeight *
+          4.35 *
+          speedMultiplier,
         gap: 98,
         minWidth: 92,
         maxCorrectVisible: 1,
@@ -2853,7 +2908,10 @@ function updateBuildText(){
 
     if (selectedMode === "medium") {
       return {
-        speed: chipHeight * 3.35,
+        speed:
+          chipHeight *
+          3.35 *
+          speedMultiplier,
         gap: 92,
         minWidth: 98,
         maxCorrectVisible: 1,
@@ -2863,7 +2921,10 @@ function updateBuildText(){
     }
 
     return {
-      speed: chipHeight * 2.45,
+      speed:
+        chipHeight *
+        2.45 *
+        speedMultiplier,
       gap: 86,
       minWidth: 108,
       maxCorrectVisible: 2,

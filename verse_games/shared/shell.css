@@ -1474,6 +1474,41 @@ button.vm-complete-icon.is-pet-box:focus-visible {
   color: #f2f2f2;
 }
 
+.vm-game-speed-trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vm-game-speed-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.vm-game-speed-header {
+  grid-template-columns: 1fr;
+}
+
+.vm-game-speed-title {
+  grid-column: 1;
+}
+
+.vm-game-speed-menu-btn.is-selected {
+  filter: brightness(0.84);
+  box-shadow:
+    inset 0 0 0 4px
+    rgba(255, 255, 255, 0.72);
+}
+
 @media (min-width: 760px) {
   .vm-game-menu-panel {
     width: min(44vw, 540px);
