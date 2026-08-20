@@ -765,6 +765,7 @@
 
   function startGame(mode) {
     selectedMode = mode;
+    window.VerseGameShell.resetGameSpeed();
     itemsClickBound = false;
     completionMarked = false;
     completionResult = null;
@@ -856,13 +857,23 @@
               </div>
             </div>
             <div class="tt-controls-layer">
-              <button class="tt-corner-pill tt-corner-left" id="ttMenuPill" type="button" aria-label="Game menu">☰</button>
+              <div class="tt-corner-left-group">
+                <button class="tt-corner-pill" id="ttMenuPill" type="button" aria-label="Game menu">☰</button>
+
+                ${window.VerseGameShell.speedControlButtonHtml({
+                  id: "ttSpeedPill",
+                  className: "tt-corner-pill"
+                })}
+              </div>
             </div>
           </div>
         </div>
       </div>
       ${renderHelpOverlay(helpHtml())}
       ${renderGameMenuOverlay()}
+      ${window.VerseGameShell.speedMenuHtml({
+        id: "ttSpeedMenuOverlay"
+      })}
     </div>
   `;
 
@@ -1016,6 +1027,42 @@ In the bonus round, tap as many of the target vehicle as you can.`;
         setPaused(true, "menu");
       }
     });
+    window.VerseGameShell.wireSpeedMenu({
+      id: "ttSpeedMenuOverlay",
+      buttonId: "ttSpeedPill",
+
+      onOpen: () => {
+        if (
+          state.mainDone ||
+          state.bonusRound ||
+          state.bonusIntro
+        ) {
+          return false;
+        }
+
+        playUiTapSound();
+        setPaused(true, "speed");
+
+        return true;
+      },
+
+      onChange: () => {
+        state.lastSpawnAt =
+          performance.now();
+
+        state.nextSpawnDelay =
+          randomSpawnDelay();
+      },
+
+      onClose: () => {
+        playUiTapSound();
+
+        if (!state.mainDone) {
+          setPaused(false, "");
+        }
+      }
+    });
+
   }
 
   function toggleMute(muteBtn, menuMuteBtn) {
@@ -1028,6 +1075,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     if (menuMuteBtn) menuMuteBtn.textContent = muted ? "Unmute" : "Mute";
   }
 
+
+  
   function wireGameInput() {
     if (!resizeBound) {
       window.addEventListener("resize", recalcField);
@@ -2249,7 +2298,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     trafficSpawnTick(now);
 
-    const multiplier = trafficSpeedMultiplier();
+    const multiplier =
+      mainTrafficSpeedMultiplier();
+
     for (const item of state.mainItems) {
 
       item.speed = item.speed || item.baseSpeed;
@@ -2581,6 +2632,17 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
   function finishMainGame() {
     state.mainDone = true;
+
+    const speedButton =
+      document.getElementById(
+        "ttSpeedPill"
+      );
+
+    if (speedButton) {
+      speedButton.style.display =
+        "none";
+    }
+
     state.bonusTruckPending = true;
     state.bonusClearStartedAt = performance.now();
     state.overlayMessage = "";
@@ -2722,8 +2784,18 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       : 1.45;
   }
 
+  function mainTrafficSpeedMultiplier() {
+    return (
+      trafficSpeedMultiplier() *
+      window.VerseGameShell.getGameSpeedMultiplier()
+    );
+  }
+
   function mainSpeedMultiplierForSpacing() {
-    return Math.max(1, trafficSpeedMultiplier());
+    return Math.max(
+      1,
+      mainTrafficSpeedMultiplier()
+    );
   }
 
   function randomSpawnDelay() {
