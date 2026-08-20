@@ -62,6 +62,40 @@
     { id: "yellow-taxi", label: "yellow taxi", src: "./traffic_tap_images/car_1.png" }
   ];
 
+  const STREAK_VEHICLES = [
+    {
+      id: "streak-a",
+      label: "special car",
+      src: "./traffic_tap_images/streak_car_a.png"
+    },
+    {
+      id: "streak-b",
+      label: "special car",
+      src: "./traffic_tap_images/streak_car_b.png"
+    },
+    {
+      id: "streak-c",
+      label: "special car",
+      src: "./traffic_tap_images/streak_car_c.png"
+    },
+    {
+      id: "streak-d",
+      label: "special car",
+      src: "./traffic_tap_images/streak_car_d.png"
+    },
+    {
+      id: "streak-e",
+      label: "special car",
+      src: "./traffic_tap_images/streak_car_e.png"
+    },
+    {
+      id: "streak-f",
+      label: "special car",
+      src: "./traffic_tap_images/streak_car_f.png"
+    }
+  ];
+
+
   const BONUS_RIVALS = VEHICLES;
   const DEFAULT_VEHICLE = VEHICLES[0];
   const RAINBOW_BUS = {
@@ -133,8 +167,13 @@
       .map(vehicle => typeof vehicle === "string" ? "" : vehicle.src)
       .filter(Boolean);
 
+    const streakVehicleSources = STREAK_VEHICLES
+      .map(vehicle => vehicle.src)
+      .filter(Boolean);
+
     return [...new Set([
       ...vehicleSources,
+      ...streakVehicleSources,
       RAINBOW_BUS.src,
       BONUS_TRUCK_ASSETS.front,
       BONUS_TRUCK_ASSETS.trailer,
@@ -262,6 +301,8 @@
     roadCrashUntil: [0, 0],
     effectPopups: [],
     recentCorrectConverted: false,
+    correctStreak: 0,
+    streakVehiclePending: false,
     bonusTargetEmoji: "",
     bonusTargetLabel: "",
     bonusTimeLeft: 0,
@@ -797,6 +838,8 @@
     state.roadCrashUntil = [0, 0];
     state.effectPopups = [];
     state.recentCorrectConverted = false;
+    state.correctStreak = 0;
+    state.streakVehiclePending = false;
     state.bonusTargetEmoji = "";
     state.bonusTargetLabel = "";
     state.bonusTimeLeft = 0;
@@ -2415,6 +2458,16 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     const label = spawnCorrect ? correctLabel : nextDecoyLabel(correctLabel);
     const item = makeMainItem({ road, label, isCorrect: spawnCorrect, delayUsed });
+
+    if (spawnCorrect && state.streakVehiclePending) {
+      const streakVehicle = pickRandom(STREAK_VEHICLES);
+
+      if (streakVehicle) {
+        item.vehicle = streakVehicle;
+        state.streakVehiclePending = false;
+      }
+    }
+
     state.mainItems.push(item);
     state.totalSpawned += 1;
     if (spawnCorrect) state.lastCorrectSpawnAt = now;
@@ -2559,6 +2612,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const y = rect.top - layerRect.top + rect.height / 2;
 
     if (!item.isCorrect) {
+      state.correctStreak = 0;
       item.flashWrongUntil = performance.now() + 280;
       state.buildShakeUntil = performance.now() + 260;
       playGameSound("wrongTap");
@@ -2575,6 +2629,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     const target = currentTargetLabel();
     if (item.label === target) {
+      state.correctStreak += 1;
+
+      if (state.correctStreak % 4 === 0) {
+        state.streakVehiclePending = true;
+      }
+
       const previousPhase = state.phase;
 
       if (state.phase === "words") {

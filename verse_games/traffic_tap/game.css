@@ -33,7 +33,9 @@ body{
 
 #app.vm-shell{
   min-height:100vh;
+  min-height:100dvh;
   height:100vh;
+  height:100dvh;
   padding:0;
   display:block;
   overflow:hidden;
@@ -42,7 +44,9 @@ body{
 .tt-shell,
 .tt-mode-shell{
   min-height:100vh;
+  min-height:100dvh;
   height:100vh;
+  height:100dvh;
   display:flex;
   flex-direction:column;
   overflow:hidden;
@@ -174,7 +178,7 @@ body{
   min-height:0;
   display:flex;
   flex-direction:column;
-  padding:0;
+  padding:0 0 env(safe-area-inset-bottom, 0px);
 }
 
 .tt-field{
