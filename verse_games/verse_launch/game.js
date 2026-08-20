@@ -1652,37 +1652,37 @@
         state.helpBackMode = false;
       }
     });
+
+    window.VerseGameShell.wireSpeedMenu({
+      id: "vlSpeedMenuOverlay",
+      buttonId: "vlSpeedPill",
+
+      onOpen: () => {
+        if (
+          state.busy ||
+          state.bonusReady
+        ) {
+          return false;
+        }
+
+        playUiTapSound();
+        stopConveyorLoop();
+
+        return true;
+      },
+
+      onClose: () => {
+        playUiTapSound();
+
+        if (
+          state.screen === "game" &&
+          !state.bonusReady
+        ) {
+          startConveyorLoop();
+        }
+      }
+    });
   }
-
-  window.VerseGameShell.wireSpeedMenu({
-    id: "vlSpeedMenuOverlay",
-    buttonId: "vlSpeedPill",
-
-    onOpen: () => {
-      if (
-        state.busy ||
-        state.bonusReady
-      ) {
-        return false;
-      }
-
-      playUiTapSound();
-      stopConveyorLoop();
-
-      return true;
-    },
-
-    onClose: () => {
-      playUiTapSound();
-
-      if (
-        state.screen === "game" &&
-        !state.bonusReady
-      ) {
-        startConveyorLoop();
-      }
-    }
-  });
 
   function wireBonusMenuOnly() {
     const menuPill = $("#vlMenuPill");
