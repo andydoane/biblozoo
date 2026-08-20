@@ -242,8 +242,21 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-.tb-corner-left {
+.tb-corner-left-group {
+  position: absolute;
+  top: clamp(10px, 2.5vw, 16px);
   left: clamp(10px, 2.8vw, 18px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.tb-corner-left-group .tb-corner-pill {
+  position: static;
+  top: auto;
+  left: auto;
+  flex: 0 0 auto;
 }
 
 .tb-corner-right {

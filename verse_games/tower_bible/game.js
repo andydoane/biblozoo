@@ -311,6 +311,7 @@
 
   function startGame(mode) {
     selectedMode = mode;
+    window.VerseGameShell.resetGameSpeed();
     completionMarked = false;
     completionResult = null;
     alreadyCompletedForMode = !!window.VerseGameBridge.wasAlreadyCompleted?.(ctx.verseId, GAME_ID, selectedMode);
@@ -357,7 +358,15 @@
               <div class="tb-celebration-layer" id="tbCelebrationLayer"></div>
               <div id="tbDebugLayer" style="position:absolute;left:8px;bottom:8px;z-index:20;pointer-events:none;"></div>
               <div class="tb-controls-layer">
-                <button class="tb-corner-pill tb-corner-left" id="tbMenuPill" type="button" aria-label="Game menu">☰</button>
+                <div class="tb-corner-left-group">
+                  <button class="tb-corner-pill" id="tbMenuPill" type="button" aria-label="Game menu">☰</button>
+
+                  ${window.VerseGameShell.speedControlButtonHtml({
+                    id: "tbSpeedPill",
+                    className: "tb-corner-pill"
+                  })}
+                </div>
+
                 <div class="tb-corner-pill tb-corner-right" id="tbPhasePill"></div>
               </div>
             </div>
@@ -365,6 +374,9 @@
         </div>
         ${renderHelpOverlay(helpHtml())}
         ${renderGameMenuOverlay()}
+        ${window.VerseGameShell.speedMenuHtml({
+          id: "tbSpeedMenuOverlay"
+        })}
       </div>`;
 
     wireCommonNav();
@@ -488,6 +500,44 @@
         setPaused(true, "menu");
       }
     });
+    window.VerseGameShell.wireSpeedMenu({
+      id: "tbSpeedMenuOverlay",
+      buttonId: "tbSpeedPill",
+
+      onOpen: () => {
+        if (
+          state.introActive ||
+          state.collapseTriggered ||
+          state.frenzyActive ||
+          state.done
+        ) {
+          return false;
+        }
+
+        playUiTapSound();
+        setPaused(true, "speed");
+
+        return true;
+      },
+
+      onChange: () => {
+        updateBeltSpeedFromSettings();
+      },
+
+      onClose: () => {
+        playUiTapSound();
+
+        if (
+          !state.introActive &&
+          !state.collapseTriggered &&
+          !state.frenzyActive &&
+          !state.done
+        ) {
+          setPaused(false, "");
+        }
+      }
+    });
+
   }
 
   function wireGameInput() {
@@ -877,6 +927,19 @@
     if (!paused) state.lastTs = performance.now();
   }
 
+  function updateBeltSpeedFromSettings() {
+    const speedInBrickHeights =
+      BELT_SPEED_BRICK_HEIGHTS_PER_SECOND[
+      selectedMode || "easy"
+      ];
+
+    state.beltSpeed =
+      state.brickHeight *
+      speedInBrickHeights *
+      window.VerseGameShell
+        .getGameSpeedMultiplier();
+  }
+
   function recalcField() {
     const field = document.getElementById("tbField");
     if (!field) return;
@@ -899,17 +962,45 @@
     state.guideRightX = state.guideCenterX + state.guideWidth / 2;
     state.towerWidth = Math.min(state.fieldWidth * 0.86, 560);
 
-    const speedInBrickHeights = BELT_SPEED_BRICK_HEIGHTS_PER_SECOND[selectedMode || "easy"];
-    state.beltSpeed = state.brickHeight * speedInBrickHeights;
+    updateBeltSpeedFromSettings();
 
     renderHud();
   }
 
   function renderHud() {
-    const phasePill = document.getElementById("tbPhasePill");
-    if (phasePill) phasePill.textContent = currentPhaseLabel();
+    const phasePill =
+      document.getElementById(
+        "tbPhasePill"
+      );
+
+    if (phasePill) {
+      phasePill.textContent =
+        currentPhaseLabel();
+    }
+
+    syncSpeedControlVisibility();
     renderField();
   }
+
+
+  function syncSpeedControlVisibility() {
+    const speedButton =
+      document.getElementById(
+        "tbSpeedPill"
+      );
+
+    if (!speedButton) return;
+
+    const shouldHide =
+      state.introActive ||
+      state.collapseTriggered ||
+      state.frenzyActive ||
+      state.done;
+
+    speedButton.style.display =
+      shouldHide ? "none" : "";
+  }
+
 
   function currentPhaseLabel() {
     if (state.introActive) return "Watch";
