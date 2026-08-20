@@ -475,9 +475,16 @@
   }
 
   function unlockAudio() {
-    if (audioUnlocked) return Promise.resolve(true);
-
     const ctx = getAudioContext();
+
+    if (
+      audioUnlocked &&
+      ctx &&
+      ctx.state === "running"
+    ) {
+      return Promise.resolve(true);
+    }
+
     const tasks = [];
 
     try {
@@ -489,17 +496,36 @@
       }
 
       silenceAudio.currentTime = 0;
-      tasks.push(silenceAudio.play().catch(() => { }));
+      tasks.push(
+        silenceAudio
+          .play()
+          .catch(() => false)
+      );
     } catch (_) { }
 
     if (ctx) {
-      if (ctx.state === "suspended") {
-        tasks.push(ctx.resume().catch(() => { }));
+      if (
+        ctx.state !== "running" &&
+        ctx.state !== "closed"
+      ) {
+        try {
+          const resumePromise = ctx.resume();
+
+          if (
+            resumePromise &&
+            typeof resumePromise.then === "function"
+          ) {
+            tasks.push(
+              resumePromise.catch(() => false)
+            );
+          }
+        } catch (_) { }
       }
 
       try {
         const source = ctx.createOscillator();
         const gain = ctx.createGain();
+
         gain.gain.value = 0.0001;
         source.connect(gain);
         gain.connect(ctx.destination);
@@ -508,10 +534,19 @@
       } catch (_) { }
     }
 
-    audioUnlocked = true;
-    preloadSoundBuffers();
+    return Promise.all(tasks)
+      .catch(() => [])
+      .then(() => {
+        audioUnlocked =
+          !!ctx &&
+          ctx.state === "running";
 
-    return Promise.all(tasks).then(() => true).catch(() => true);
+        if (audioUnlocked) {
+          preloadSoundBuffers();
+        }
+
+        return audioUnlocked;
+      });
   }
 
   function loadSoundBuffer(key) {
@@ -695,7 +730,8 @@
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        unlockAndTap();
+        unlockAudio();
+        playUiSound();
         renderModeSelect();
       }
     });

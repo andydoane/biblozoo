@@ -1580,13 +1580,27 @@
           <div class="vm-game-stage">
             <div class="vm-game-center">
               <div class="vm-game-icon" aria-hidden="true">🔀</div>
-              <div class="vm-game-title">Loading Game Mix...</div>
+              <div class="vm-game-title">Game Mix</div>
+
+              <div class="vm-game-actions">
+                <button class="vm-btn" id="gameShellMixStartBtn" type="button">
+                  Tap to Start
+                </button>
+              </div>
             </div>
           </div>
         </div>
       `;
 
-      setTimeout(() => onStart(), 0);
+      const mixStartBtn =
+        document.getElementById("gameShellMixStartBtn");
+
+      if (mixStartBtn) {
+        mixStartBtn.onclick = () => {
+          onStart();
+        };
+      }
+
       return;
     }
 
@@ -1662,7 +1676,7 @@
         </div>
       `;
 
-      setTimeout(() => onSelect(mixMode), 0);
+      onSelect(mixMode);
       return;
     }
 

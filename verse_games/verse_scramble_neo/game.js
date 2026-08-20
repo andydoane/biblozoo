@@ -1082,6 +1082,7 @@
       backLabel: "Back to Practice Games",
       onBack: () => window.VerseGameBridge.exitGame(),
       onStart: () => {
+        unlockAudio();
         playUiTapSound();
         setScreen("mode");
       }
