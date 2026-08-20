@@ -3061,17 +3061,28 @@ function updateBuildText(){
     let label = correctLabel;
 
     if (!makeCorrect) {
-      const decoys = getDecoysForPhase(phase, correctLabel, cfg.decoyCount);
+      const decoyLabel =
+        pickBeltDecoy(
+          phase,
+          correctLabel,
+          cfg
+        );
 
-      if (decoys.length) {
-        label = randomFrom(decoys);
+      if (decoyLabel) {
+        label = decoyLabel;
         state.beltForceCorrectIn -= 1;
       } else {
         makeCorrect = true;
-        state.beltForceCorrectIn = getNextCorrectDelay(cfg.correctDelayMode);
+        state.beltForceCorrectIn =
+          getNextCorrectDelay(
+            cfg.correctDelayMode
+          );
       }
     } else {
-      state.beltForceCorrectIn = getNextCorrectDelay(cfg.correctDelayMode);
+      state.beltForceCorrectIn =
+        getNextCorrectDelay(
+          cfg.correctDelayMode
+        );
     }
 
     const width = estimateBeltItemWidth(label, cfg);
@@ -3203,6 +3214,135 @@ function updateBuildText(){
     }
 
     return out.slice(0, count);
+  }
+
+  function getBeltReservedLabelKeys() {
+    const keys = new Set();
+
+    for (const item of state.beltItems) {
+      const key =
+        normalizeWord(item?.label || "");
+
+      if (key) {
+        keys.add(key);
+      }
+    }
+
+    return keys;
+  }
+
+  function pickFreshBeltLabel(
+    labels,
+    reservedKeys
+  ) {
+    const available =
+      (labels || []).filter((label) => {
+        const key =
+          normalizeWord(label);
+
+        return (
+          key &&
+          !reservedKeys.has(key)
+        );
+      });
+
+    return available.length
+      ? randomFrom(available)
+      : "";
+  }
+
+  function pickBeltDecoy(
+    phase,
+    correctLabel,
+    cfg
+  ) {
+    const reservedKeys =
+      getBeltReservedLabelKeys();
+
+    if (
+      phase === "words" &&
+      selectedMode !== "easy"
+    ) {
+      const preferredVerseDecoys =
+        window.VerseGameShell
+          .getVerseWordDecoys({
+            words: state.words,
+            correct: correctLabel,
+            targetIndex:
+              state.progressIndex,
+            count: Math.max(
+              cfg.decoyCount,
+              state.words.length
+            ),
+            avoidNext: 2,
+            fallbackToFun: false
+          });
+
+      let label =
+        pickFreshBeltLabel(
+          preferredVerseDecoys,
+          reservedKeys
+        );
+
+      if (label) {
+        return label;
+      }
+
+      const allVerseDecoys =
+        getDecoysForPhase(
+          phase,
+          correctLabel,
+          Math.max(
+            cfg.decoyCount,
+            state.words.length
+          )
+        );
+
+      label =
+        pickFreshBeltLabel(
+          allVerseDecoys,
+          reservedKeys
+        );
+
+      if (label) {
+        return label;
+      }
+
+      const funDecoys =
+        window.VerseGameShell
+          .getFunWordDecoys(
+            correctLabel,
+            state.words,
+            FUN_DECOYS.length
+          );
+
+      return pickFreshBeltLabel(
+        funDecoys,
+        reservedKeys
+      );
+    }
+
+    const decoys =
+      phase === "words"
+        ? window.VerseGameShell
+          .getFunWordDecoys(
+            correctLabel,
+            state.words,
+            FUN_DECOYS.length
+          )
+        : getDecoysForPhase(
+          phase,
+          correctLabel,
+          Math.max(
+            cfg.decoyCount,
+            24
+          )
+        );
+
+    return pickFreshBeltLabel(
+      decoys,
+      reservedKeys
+    );
   }
 
   function triggerBonusScoreCelebration() {
