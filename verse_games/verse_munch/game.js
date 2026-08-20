@@ -2667,12 +2667,18 @@ function updateBuildText(){
       const pageClass = state.reactionFlash.replace("is-flash-", "vmunch-page-flash-");
 
       if (pageClass.startsWith("vmunch-page-flash-streak")){
-        document.body.classList.add(pageClass);
+        app.classList.add(pageClass);
       }
     }
   }
 
   function clearPageStreakFlash(){
+    app.classList.remove(
+      "vmunch-page-flash-streak-1",
+      "vmunch-page-flash-streak-2",
+      "vmunch-page-flash-streak-rainbow"
+    );
+
     document.body.classList.remove(
       "vmunch-page-flash-streak-1",
       "vmunch-page-flash-streak-2",

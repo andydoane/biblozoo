@@ -111,6 +111,8 @@ body{
 
 .vmunch-root,
 .vmunch-mode-shell{
+  position:relative;
+  z-index:1;
   height:100dvh;
   display:flex;
   flex-direction:column;
@@ -124,15 +126,15 @@ body{
 
 
 
-body.vmunch-page-flash-streak-1{
+#app.vm-shell.vmunch-page-flash-streak-1{
   background:#c9ef63;
 }
 
-body.vmunch-page-flash-streak-2{
+#app.vm-shell.vmunch-page-flash-streak-2{
   background:#40b9c5;
 }
 
-body.vmunch-page-flash-streak-rainbow{
+#app.vm-shell.vmunch-page-flash-streak-rainbow{
   background:linear-gradient(
     90deg,
     #ff5f6d 0%,
@@ -147,9 +149,9 @@ body.vmunch-page-flash-streak-rainbow{
   animation:vmunchRainbowFlashShift 900ms linear infinite;
 }
 
-body.vmunch-page-flash-streak-1::before,
-body.vmunch-page-flash-streak-2::before,
-body.vmunch-page-flash-streak-rainbow::before {
+#app.vm-shell.vmunch-page-flash-streak-1::before,
+#app.vm-shell.vmunch-page-flash-streak-2::before,
+#app.vm-shell.vmunch-page-flash-streak-rainbow::before {
   content: "";
   position: fixed;
   inset: -42vmax;
@@ -161,7 +163,7 @@ body.vmunch-page-flash-streak-rainbow::before {
   animation: vmunchStreakSunburstSpin 1300ms linear infinite;
 }
 
-body.vmunch-page-flash-streak-rainbow::before {
+#app.vm-shell.vmunch-page-flash-streak-rainbow::before {
   opacity: 0.18;
   background: none;
   background-color: #ffffff;
