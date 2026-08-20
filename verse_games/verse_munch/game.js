@@ -3062,8 +3062,14 @@ function updateBuildText(){
 
     if (!makeCorrect) {
       const decoys = getDecoysForPhase(phase, correctLabel, cfg.decoyCount);
-      label = randomFrom(decoys.length ? decoys : FUN_DECOYS);
-      state.beltForceCorrectIn -= 1;
+
+      if (decoys.length) {
+        label = randomFrom(decoys);
+        state.beltForceCorrectIn -= 1;
+      } else {
+        makeCorrect = true;
+        state.beltForceCorrectIn = getNextCorrectDelay(cfg.correctDelayMode);
+      }
     } else {
       state.beltForceCorrectIn = getNextCorrectDelay(cfg.correctDelayMode);
     }
@@ -3144,36 +3150,19 @@ function updateBuildText(){
   }
 
   function getNextCorrectDelay(mode) {
-    const roll = Math.random();
-
     if (mode === "hard") {
-      if (roll < 0.18) return 1;
-      if (roll < 0.58) return 2;
-      return 3;
+      return randomInt(0, 4);
     }
 
     if (mode === "medium") {
-      if (roll < 0.28) return 0;
-      if (roll < 0.72) return 1;
-      return 2;
+      return randomInt(0, 3);
     }
 
-    if (roll < 0.58) return 0;
-    return 1;
+    return randomInt(0, 2);
   }
 
   function getStartingCorrectDelay(mode) {
-    const roll = Math.random();
-
-    if (mode === "hard") {
-      return roll < 0.65 ? 1 : 2;
-    }
-
-    if (mode === "medium") {
-      return roll < 0.75 ? 0 : 1;
-    }
-
-    return 0;
+    return getNextCorrectDelay(mode);
   }
 
   function getDecoysForPhase(phase, correctLabel, count){
@@ -3200,15 +3189,11 @@ function updateBuildText(){
           targetIndex: state.progressIndex,
           count,
           avoidNext: 2,
-          fallbackToFun: true
+          fallbackToFun: false
         }));
 
         if (out.length < count){
-          addDecoys(window.VerseGameShell.getFunWordDecoys(correctLabel, state.words, count));
-        }
-
-        if (out.length < count){
-          addDecoys(FUN_DECOYS);
+          addDecoys(state.words);
         }
       }
     } else if (phase === "book"){
