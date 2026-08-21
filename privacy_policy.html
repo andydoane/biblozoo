@@ -69,10 +69,37 @@
       color: rgba(51, 51, 51, 0.72);
       font-weight: 700;
     }
+
+    .back-to-settings {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: var(--purple);
+      color: #ffffff;
+      font-size: 17px;
+      font-weight: 800;
+      line-height: 1;
+      text-decoration: none;
+    }
+
+    .back-to-settings:active {
+      transform: translateY(1px);
+    }
+
   </style>
 </head>
 <body>
   <main>
+    <a
+      class="back-to-settings"
+      href="./index.html?screen=settings"
+    >
+      ← Back to Settings
+    </a>
+
     <h1>Privacy Policy</h1>
 
     <p class="updated">Last updated: July 3, 2026</p>
