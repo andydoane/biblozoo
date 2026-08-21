@@ -57,7 +57,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const CORRECT_REFILL_DELAY_MS = 1000;
   const CORRECT_REFILL_STAGGER_MS = 160;
   const BLOB_SPAWN_FADE_MS = 180;
-  const MAX_STATIC_PAINT_SPLATS = 96;
+  const MAX_BONUS_STATIC_PAINT_SPLATS = 96;
 
   function coverageGridSize(){
     const opportunities = Math.max(1, state.segments.length || 1);
@@ -2280,8 +2280,15 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
 
     let didTrimSplats = false;
 
-    if (state.paintSplats.length > MAX_STATIC_PAINT_SPLATS) {
-      state.paintSplats.splice(0, state.paintSplats.length - MAX_STATIC_PAINT_SPLATS);
+    if (
+      bonusLight &&
+      state.paintSplats.length > MAX_BONUS_STATIC_PAINT_SPLATS
+    ) {
+      state.paintSplats.splice(
+        0,
+        state.paintSplats.length - MAX_BONUS_STATIC_PAINT_SPLATS
+      );
+
       didTrimSplats = true;
     }
 
