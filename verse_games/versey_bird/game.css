@@ -503,8 +503,8 @@ body{
 
 .vb2-pipe-piece{
   background-image: url("./versey_bird_images/versey_bird_pipe.svg");
-  background-size: 100% auto;
-  background-repeat: repeat-y;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
 }
 
 .vb2-pipe-cap{
