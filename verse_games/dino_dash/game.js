@@ -225,6 +225,7 @@
   let audioPreloadStarted = false;
   let uiPopToggle = false;
   const audioBuffers = new Map();
+  const audioBufferPromises = new Map();
 
   const referenceParts = window.VerseGameShell.parseReferenceParts(ctx.verseRef, ctx.translation, ctx.verseId);
   const buildData = window.VerseGameShell.buildVerseSegments({
@@ -615,22 +616,40 @@
   async function loadSoundBuffer(key, url) {
     if (audioBuffers.has(key)) return audioBuffers.get(key);
 
-    try {
-      const ctx = getAudioContext();
-      if (!ctx) return null;
-
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Could not load ${url}`);
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = await ctx.decodeAudioData(arrayBuffer);
-      audioBuffers.set(key, buffer);
-      return buffer;
-    } catch (err) {
-      console.warn("Dino Dash sound failed to load:", key, err);
-      audioBuffers.set(key, null);
-      return null;
+    if (audioBufferPromises.has(key)) {
+      return audioBufferPromises.get(key);
     }
+
+    const loadPromise = (async () => {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return null;
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Could not load ${url}`);
+
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = await ctx.decodeAudioData(arrayBuffer);
+
+        audioBuffers.set(key, buffer);
+        return buffer;
+      } catch (err) {
+        console.warn(
+          "Dino Dash sound failed to load:",
+          key,
+          err
+        );
+
+        audioBuffers.set(key, null);
+        return null;
+      } finally {
+        audioBufferPromises.delete(key);
+      }
+    })();
+
+    audioBufferPromises.set(key, loadPromise);
+
+    return loadPromise;
   }
 
   async function unlockAudio() {
@@ -679,6 +698,12 @@
 
     source.connect(gain);
     gain.connect(ctx.destination);
+
+    source.onended = () => {
+      try { source.disconnect(); } catch (err) { }
+      try { gain.disconnect(); } catch (err) { }
+    };
+
     source.start(0);
   }
 
@@ -1867,61 +1892,424 @@
     if (backHillB) backHillB.style.transform = `translateX(${backHillW - backHillOffset - hillOverlapPx}px)`;
   }
 
+  const dinoDashLayerNodeCaches = new WeakMap();
+
+  function getDinoDashLayerNodeCache(layer) {
+    let cache = dinoDashLayerNodeCaches.get(layer);
+
+    if (!cache) {
+      cache = new Map();
+      dinoDashLayerNodeCaches.set(layer, cache);
+    }
+
+    return cache;
+  }
+
+  function pruneDinoDashLayerNodes(cache, liveKeys) {
+    for (const [key, node] of cache) {
+      if (liveKeys.has(key)) continue;
+
+      node.remove();
+      cache.delete(key);
+    }
+  }
+
+
   function renderTablets(ts){
     const layer = document.getElementById("dd2Tablets");
     if (!layer) return;
-    layer.innerHTML = state.tablets.map(tablet => {
+
+    const cache = getDinoDashLayerNodeCache(layer);
+    const liveKeys = new Set();
+
+    for (const tablet of state.tablets){
+      const key = `tablet-${tablet.id}`;
+      liveKeys.add(key);
+
       const shape = TABLET_SHAPES[tablet.shapeKey];
       const size = getTabletFontSize(tablet);
-      const cls = tablet.correct ? "is-correct" : "is-decoy";
-      const collected = tablet.collected ? " is-collected" : "";
-      return `
-        <div class="dd2-tablet ${cls}${collected}" style="--x:${tablet.x}px;--y:${tablet.y}px;--w:${tablet.w}px;--h:${tablet.h}px;--img:url('${IMAGE_PATH}${shape.image}');">
-          <div class="dd2-tablet-word" style="--size:${size}px;--text-x:${shape.textX}%;--text-y:${shape.textY}%;">${escapeHtml(tablet.label)}</div>
-        </div>
-      `;
-    }).join("");
+      const cls =
+        tablet.correct
+          ? "is-correct"
+          : "is-decoy";
+
+      let node = cache.get(key);
+
+      if (!node){
+        node = document.createElement("div");
+        node.innerHTML =
+          `<div class="dd2-tablet-word"></div>`;
+
+        layer.appendChild(node);
+        cache.set(key, node);
+      }
+
+      node.className =
+        `dd2-tablet ${cls}${
+          tablet.collected
+            ? " is-collected"
+            : ""
+        }`;
+
+      node.style.setProperty(
+        "--x",
+        `${tablet.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${tablet.y}px`
+      );
+
+      node.style.setProperty(
+        "--w",
+        `${tablet.w}px`
+      );
+
+      node.style.setProperty(
+        "--h",
+        `${tablet.h}px`
+      );
+
+      node.style.setProperty(
+        "--img",
+        `url('${IMAGE_PATH}${shape.image}')`
+      );
+
+      const word = node.firstElementChild;
+
+      if (word){
+        word.textContent = tablet.label;
+
+        word.style.setProperty(
+          "--size",
+          `${size}px`
+        );
+
+        word.style.setProperty(
+          "--text-x",
+          `${shape.textX}%`
+        );
+
+        word.style.setProperty(
+          "--text-y",
+          `${shape.textY}%`
+        );
+      }
+    }
+
+    pruneDinoDashLayerNodes(
+      cache,
+      liveKeys
+    );
   }
 
   function renderObstacles(){
-    const layer = document.getElementById("dd2Obstacles");
+    const layer =
+      document.getElementById(
+        "dd2Obstacles"
+      );
+
     if (!layer) return;
-    layer.innerHTML = state.obstacles.map(item => {
-      if (item.type === "flag"){
-        return `<div class="dd2-flag" style="--x:${item.x}px;--y:${item.y}px;--w:${item.w}px;--h:${item.h}px;background-image:url('${IMAGE_PATH}${item.image}');"></div>`;
+
+    const cache =
+      getDinoDashLayerNodeCache(layer);
+
+    const liveKeys = new Set();
+
+    for (const item of state.obstacles){
+      const key = `obstacle-${item.id}`;
+      liveKeys.add(key);
+
+      let node = cache.get(key);
+
+      if (!node){
+        node = document.createElement("div");
+        layer.appendChild(node);
+        cache.set(key, node);
       }
-      const cls = `dd2-obstacle dd2-obstacle--${item.type} dd2-obstacle--${item.key}${item.hit ? " is-hit" : ""}`;
-      return `<div class="${cls}" style="--x:${item.x}px;--y:${item.y}px;--w:${item.w}px;--h:${item.h}px;background-image:url('${IMAGE_PATH}${item.image}');"></div>`;
-    }).join("");
+
+      if (item.type === "flag"){
+        node.className = "dd2-flag";
+      } else {
+        node.className =
+          `dd2-obstacle ` +
+          `dd2-obstacle--${item.type} ` +
+          `dd2-obstacle--${item.key}` +
+          `${item.hit ? " is-hit" : ""}`;
+      }
+
+      node.style.setProperty(
+        "--x",
+        `${item.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${item.y}px`
+      );
+
+      node.style.setProperty(
+        "--w",
+        `${item.w}px`
+      );
+
+      node.style.setProperty(
+        "--h",
+        `${item.h}px`
+      );
+
+      node.style.backgroundImage =
+        `url('${IMAGE_PATH}${item.image}')`;
+    }
+
+    pruneDinoDashLayerNodes(
+      cache,
+      liveKeys
+    );
   }
 
   function renderTrail(){
-    const layer = document.getElementById("dd2TrailLayer");
+    const layer =
+      document.getElementById(
+        "dd2TrailLayer"
+      );
+
     if (!layer) return;
-    const dots = state.trailDots.map(dot => {
-      const opacity = dot.opacity * Math.max(0, 1 - dot.age / dot.life);
-      return `<div class="dd2-trail-dot" style="--x:${dot.x}px;--y:${dot.y}px;--size:${dot.size}px;--color:${dot.color};opacity:${opacity};"></div>`;
-    }).join("");
-    const sparkles = state.trailSparkles.map(s => {
-      const opacity = s.opacity * Math.max(0, 1 - s.age / s.life);
-      return `<div class="dd2-trail-sparkle" style="--x:${s.x}px;--y:${s.y}px;--size:${s.size}px;--color:${s.color};--rotation:${s.rotation}deg;opacity:${opacity};"></div>`;
-    }).join("");
-    layer.innerHTML = dots + sparkles;
+
+    const cache =
+      getDinoDashLayerNodeCache(layer);
+
+    const liveKeys = new Set();
+
+    for (const dot of state.trailDots){
+      const key = `trail-dot-${dot.id}`;
+      liveKeys.add(key);
+
+      let node = cache.get(key);
+
+      if (!node){
+        node = document.createElement("div");
+        node.className = "dd2-trail-dot";
+
+        layer.appendChild(node);
+        cache.set(key, node);
+      }
+
+      const opacity =
+        dot.opacity *
+        Math.max(
+          0,
+          1 - dot.age / dot.life
+        );
+
+      node.style.setProperty(
+        "--x",
+        `${dot.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${dot.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${dot.size}px`
+      );
+
+      node.style.setProperty(
+        "--color",
+        dot.color
+      );
+
+      node.style.opacity =
+        String(opacity);
+    }
+
+    for (
+      const sparkle
+      of state.trailSparkles
+    ){
+      const key =
+        `trail-sparkle-${sparkle.id}`;
+
+      liveKeys.add(key);
+
+      let node = cache.get(key);
+
+      if (!node){
+        node =
+          document.createElement("div");
+
+        node.className =
+          "dd2-trail-sparkle";
+
+        layer.appendChild(node);
+        cache.set(key, node);
+      }
+
+      const opacity =
+        sparkle.opacity *
+        Math.max(
+          0,
+          1 -
+            sparkle.age /
+            sparkle.life
+        );
+
+      node.style.setProperty(
+        "--x",
+        `${sparkle.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${sparkle.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${sparkle.size}px`
+      );
+
+      node.style.setProperty(
+        "--color",
+        sparkle.color
+      );
+
+      node.style.setProperty(
+        "--rotation",
+        `${sparkle.rotation}deg`
+      );
+
+      node.style.opacity =
+        String(opacity);
+    }
+
+    pruneDinoDashLayerNodes(
+      cache,
+      liveKeys
+    );
   }
 
   function renderParticles(){
-    const layer = document.getElementById("dd2Particles");
+    const layer =
+      document.getElementById(
+        "dd2Particles"
+      );
+
     if (!layer) return;
-    const particles = state.particles.map(p => {
-      const t = p.age / p.life;
-      const opacity = Math.max(0, 1 - t);
-      return `<div class="dd2-particle" style="--x:${p.x}px;--y:${p.y}px;--size:${p.size * (1 + t * 0.3)}px;--color:${p.color};opacity:${opacity};"></div>`;
-    }).join("");
-    const dust = state.dust.map(d => {
-      const opacity = Math.max(0, 1 - d.age / d.life);
-      return `<div class="dd2-dust" style="--x:${d.x}px;--y:${d.y}px;--size:${d.size}px;--color:${d.color};opacity:${opacity};"></div>`;
-    }).join("");
-    layer.innerHTML = particles + dust;
+
+    const cache =
+      getDinoDashLayerNodeCache(layer);
+
+    const liveKeys = new Set();
+
+    for (const particle of state.particles){
+      const key =
+        `particle-${particle.id}`;
+
+      liveKeys.add(key);
+
+      let node = cache.get(key);
+
+      if (!node){
+        node =
+          document.createElement("div");
+
+        node.className =
+          "dd2-particle";
+
+        layer.appendChild(node);
+        cache.set(key, node);
+      }
+
+      const t =
+        particle.age /
+        particle.life;
+
+      const opacity =
+        Math.max(0, 1 - t);
+
+      const size =
+        particle.size *
+        (1 + t * 0.3);
+
+      node.style.setProperty(
+        "--x",
+        `${particle.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${particle.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${size}px`
+      );
+
+      node.style.setProperty(
+        "--color",
+        particle.color
+      );
+
+      node.style.opacity =
+        String(opacity);
+    }
+
+    for (const dust of state.dust){
+      const key = `dust-${dust.id}`;
+      liveKeys.add(key);
+
+      let node = cache.get(key);
+
+      if (!node){
+        node =
+          document.createElement("div");
+
+        node.className = "dd2-dust";
+
+        layer.appendChild(node);
+        cache.set(key, node);
+      }
+
+      const opacity =
+        Math.max(
+          0,
+          1 - dust.age / dust.life
+        );
+
+      node.style.setProperty(
+        "--x",
+        `${dust.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${dust.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${dust.size}px`
+      );
+
+      node.style.setProperty(
+        "--color",
+        dust.color
+      );
+
+      node.style.opacity =
+        String(opacity);
+    }
+
+    pruneDinoDashLayerNodes(
+      cache,
+      liveKeys
+    );
   }
 
   function renderDino(ts){
@@ -2098,23 +2486,57 @@
     const el = document.getElementById("dd2BuildText");
     if (!el) return;
 
-    if (state.phase === "bonusIntro" || state.phase === "bonus" || state.phase === "bonusResult"){
-      const progress = getBonusProgress();
-      const progressPercent = Math.round(progress * 100);
+    if (
+      state.phase === "bonusIntro" ||
+      state.phase === "bonus" ||
+      state.phase === "bonusResult"
+    ){
+      const progress =
+        getBonusProgress();
 
-      el.className = "dd2-build-text vm-build-text dd2-bonus-progress-build";
-      el.style.setProperty("--dd2-bonus-progress", progress);
-      el.innerHTML = `
-        <div class="dd2-bonus-progress" aria-label="Bonus progress ${progressPercent}%">
-          <div class="dd2-bonus-progress-icons">
-            <div class="dd2-bonus-progress-head" aria-hidden="true"></div>
-            <div class="dd2-bonus-progress-flag" aria-hidden="true"></div>
+      const progressPercent =
+        Math.round(progress * 100);
+
+      el.className =
+        "dd2-build-text vm-build-text " +
+        "dd2-bonus-progress-build";
+
+      el.style.setProperty(
+        "--dd2-bonus-progress",
+        progress
+      );
+
+      let progressEl =
+        el.querySelector(
+          ".dd2-bonus-progress"
+        );
+
+      if (!progressEl){
+        el.innerHTML = `
+          <div class="dd2-bonus-progress">
+            <div class="dd2-bonus-progress-icons">
+              <div class="dd2-bonus-progress-head" aria-hidden="true"></div>
+              <div class="dd2-bonus-progress-flag" aria-hidden="true"></div>
+            </div>
+            <div class="dd2-bonus-progress-bar" aria-hidden="true">
+              <div class="dd2-bonus-progress-fill"></div>
+            </div>
           </div>
-          <div class="dd2-bonus-progress-bar" aria-hidden="true">
-            <div class="dd2-bonus-progress-fill"></div>
-          </div>
-        </div>
-      `;
+        `;
+
+        progressEl =
+          el.querySelector(
+            ".dd2-bonus-progress"
+          );
+      }
+
+      if (progressEl){
+        progressEl.setAttribute(
+          "aria-label",
+          `Bonus progress ${progressPercent}%`
+        );
+      }
+
       return;
     }
 
