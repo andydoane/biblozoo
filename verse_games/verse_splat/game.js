@@ -820,11 +820,28 @@ function fitSplatBuildText(){
     if (!build || !text) return;
     if (state.screen !== "game") return;
 
-    const result = window.VerseGameShell.fitBuildTextOnce({
-      buildEl: build,
-      textEl: text,
-      buildArea: BUILD_AREA
-    });
+    const shouldRestoreHardHide =
+      state.mode === "hard" &&
+      text.classList.contains("is-hide-unbuilt");
+
+    if (shouldRestoreHardHide) {
+      text.classList.remove("is-hide-unbuilt");
+    }
+
+    let result = null;
+
+    try {
+      result =
+        window.VerseGameShell.fitBuildTextOnce({
+          buildEl: build,
+          textEl: text,
+          buildArea: BUILD_AREA
+        });
+    } finally {
+      if (shouldRestoreHardHide) {
+        text.classList.add("is-hide-unbuilt");
+      }
+    }
 
     if (result){
       state.buildFitDone = true;

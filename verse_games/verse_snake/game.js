@@ -730,8 +730,7 @@
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        unlockAudio();
-        playUiSound();
+        unlockAndTap();
         renderModeSelect();
       }
     });
