@@ -5069,9 +5069,22 @@ function getBibloPetStatus(verseProgress) {
 }
 
 function getBibloPetStats() {
+  const totalPets =
+    Array.isArray(VERSE_LIST)
+      ? VERSE_LIST.length
+      : 0;
+
+  const trackedGameCount =
+    getTrackedGameIds().length;
+
   const stats = {
-    totalVerses: Array.isArray(VERSE_LIST) ? VERSE_LIST.length : 0,
+    totalPets,
     unlocked: 0,
+    medalsEarned: 0,
+    medalsPossible:
+      totalPets *
+      trackedGameCount *
+      3,
     happy: 0,
     hungry: 0,
     sleeping: 0
@@ -5080,14 +5093,24 @@ function getBibloPetStats() {
   if (!Array.isArray(VERSE_LIST)) return stats;
 
   for (const item of VERSE_LIST) {
-    const verseProgress = getVerseProgress(item.id);
-    const unlocked = isBibloPetUnlocked(verseProgress);
+    const verseProgress =
+      getVerseProgress(item.id);
+
+    stats.medalsEarned +=
+      getVerseCompletedMedalCount(
+        verseProgress
+      );
+
+    const unlocked =
+      isBibloPetUnlocked(verseProgress);
 
     if (!unlocked) continue;
 
     stats.unlocked += 1;
 
-    const status = getBibloPetStatus(verseProgress);
+    const status =
+      getBibloPetStatus(verseProgress);
+
     if (status === "happy") stats.happy += 1;
     if (status === "hungry") stats.hungry += 1;
     if (status === "sleeping") stats.sleeping += 1;
@@ -12495,6 +12518,28 @@ function screenVerseDetail(idx) {
     : "";
   const learnStatus = verseProgress.learnCompleted ? "✔" : "";
 
+  const medalProgressEarned =
+    getVerseCompletedMedalCount(
+      verseProgress
+    );
+
+  const medalProgressPossible =
+    getTrackedGameIds().length * 3;
+
+  const medalProgressPercent =
+    medalProgressPossible > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            (
+              medalProgressEarned /
+              medalProgressPossible
+            ) * 100
+          )
+        )
+      : 0;
+
   function gameRow(label, gameId) {
     const progressDisplay = getVerseDetailProgressDisplay(gameId, verseProgress.games[gameId]);
 
@@ -12593,6 +12638,27 @@ function screenVerseDetail(idx) {
             `
       : ""
     }
+
+        <div class="detail-medal-progress">
+          <div class="detail-medal-progress-label">
+            Medal Progress: ${medalProgressEarned} out of ${medalProgressPossible}
+          </div>
+
+          <div
+            class="detail-medal-progress-track"
+            role="progressbar"
+            aria-label="Medal progress"
+            aria-valuemin="0"
+            aria-valuemax="${medalProgressPossible}"
+            aria-valuenow="${medalProgressEarned}"
+          >
+            <div
+              class="detail-medal-progress-fill"
+              style="width:${medalProgressPercent}%"
+            ></div>
+          </div>
+        </div>
+
 
         <div class="detail-section">
           ${getVerseDetailGames().map(game => gameRow(game.label, game.id)).join("")}
@@ -12969,15 +13035,15 @@ function screenPetStats(idx) {
 
       <div class="pet-stats-grid">
         <div class="pet-stats-card">
-          <div class="pet-stats-emoji">📖</div>
-          <div class="pet-stats-value">${stats.totalVerses}</div>
-          <div class="pet-stats-label">Total Verses</div>
+          <div class="pet-stats-emoji">🐾</div>
+          <div class="pet-stats-value">${stats.unlocked}/${stats.totalPets}</div>
+          <div class="pet-stats-label">Unlocked pets</div>
         </div>
 
         <div class="pet-stats-card">
-          <div class="pet-stats-emoji">🐾</div>
-          <div class="pet-stats-value">${stats.unlocked}</div>
-          <div class="pet-stats-label">Unlocked Pets</div>
+          <div class="pet-stats-emoji">🏅</div>
+          <div class="pet-stats-value">${stats.medalsEarned}/${stats.medalsPossible}</div>
+          <div class="pet-stats-label">Medals earned</div>
         </div>
 
         <div class="pet-stats-card">
