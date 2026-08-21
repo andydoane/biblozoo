@@ -502,9 +502,16 @@ body{
 }
 
 .vb2-pipe-piece{
-  background-image: url("./versey_bird_images/versey_bird_pipe.svg");
-  background-size: 100% 100%;
+  background-image: linear-gradient(
+    90deg,
+    #63bc6b 0%,
+    #63bc6b 84.8%,
+    #46aa61 84.8%,
+    #46aa61 100%
+  );
+  background-size: 85% 100%;
   background-repeat: no-repeat;
+  background-position: center;
 }
 
 .vb2-pipe-cap{
