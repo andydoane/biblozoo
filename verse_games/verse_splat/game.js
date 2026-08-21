@@ -58,6 +58,19 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const CORRECT_REFILL_STAGGER_MS = 160;
   const BLOB_SPAWN_FADE_MS = 180;
   const MAX_BONUS_STATIC_PAINT_SPLATS = 96;
+  const MASTERPIECE_PRIZE_IMAGES = [
+    "./verse_splat_images/masterpiece_1.png",
+    "./verse_splat_images/masterpiece_2.png",
+    "./verse_splat_images/masterpiece_3.png",
+    "./verse_splat_images/masterpiece_4.png",
+    "./verse_splat_images/masterpiece_5.png",
+    "./verse_splat_images/masterpiece_6.png",
+    "./verse_splat_images/masterpiece_7.png",
+    "./verse_splat_images/masterpiece_8.png",
+    "./verse_splat_images/masterpiece_9.png",
+    "./verse_splat_images/masterpiece_10.png",
+    "./verse_splat_images/masterpiece_11.png"
+  ];
 
   function coverageGridSize(){
     const opportunities = Math.max(1, state.segments.length || 1);
@@ -649,6 +662,7 @@ const MODE_CONFIG = {
     coverageResultRafId: 0,
     coverageResultTimers: [],
     coverageResultContinuePending: false,
+    coverageResultPrizeSrc: "",
 
     medalAlreadyEarned: false,
     medalMessage: "",
@@ -746,6 +760,7 @@ const shuffle = window.VerseGameShell.shuffle;
     state.coverageResultRafId = 0;
     state.coverageResultTimers = [];
     state.coverageResultContinuePending = false;
+    state.coverageResultPrizeSrc = "";
     state.medalAlreadyEarned = false;
     state.medalMessage = "";
     state.medalSubmessage = "";
@@ -1114,6 +1129,33 @@ function gameplayShell({ bonus=false }){
     const barPercent = clamp(state.coverageResultBarPercent, 0, percent);
     const cardClass = coverageResultCardClass(percent);
     const showCard = state.coverageResultPhase === "card";
+    const showPrize = state.coverageResultPhase === "prize";
+
+    if (
+      showPrize &&
+      state.coverageResultPrizeSrc
+    ) {
+      return `
+        <div
+          class="vsp-masterpiece-prize-screen"
+          id="vspCoverageResultScreen"
+        >
+          <button
+            class="vsp-masterpiece-prize-button"
+            data-action="coverage-result-continue"
+            type="button"
+            aria-label="Continue to bonus round"
+          >
+            <img
+              class="vsp-masterpiece-prize-image"
+              src="${escapeHtml(state.coverageResultPrizeSrc)}"
+              alt="Masterpiece prize"
+              draggable="false"
+            >
+          </button>
+        </div>
+      `;
+    }
 
     return `
       <div class="vsp-coverage-result-screen" id="vspCoverageResultScreen">
@@ -1128,7 +1170,11 @@ function gameplayShell({ bonus=false }){
           ${showCard ? `
             <button class="vsp-coverage-result-card ${cardClass}" data-action="coverage-result-continue" type="button">
               <div class="vsp-coverage-result-card-message">${coverageResultMessage(percent)}</div>
-              <div class="vsp-coverage-result-card-copy">Tap to Continue</div>
+              <div class="vsp-coverage-result-card-copy">${
+                percent === 100
+                  ? "Tap to view your prize"
+                  : "Tap to Continue"
+              }</div>
             </button>
           ` : ""}
         </div>
@@ -1202,6 +1248,29 @@ function gameplayShell({ bonus=false }){
     state.coverageResultBarPercent = 0;
     state.coverageResultPhase = "bar";
     state.coverageResultContinuePending = false;
+    state.coverageResultPrizeSrc = "";
+
+    if (
+      state.coverageResultPercent === 100 &&
+      MASTERPIECE_PRIZE_IMAGES.length
+    ) {
+      const prizeIndex =
+        Math.floor(
+          Math.random() *
+          MASTERPIECE_PRIZE_IMAGES.length
+        );
+
+      state.coverageResultPrizeSrc =
+        MASTERPIECE_PRIZE_IMAGES[prizeIndex] ||
+        MASTERPIECE_PRIZE_IMAGES[0];
+
+      if (state.coverageResultPrizeSrc) {
+        const prizeImage = new Image();
+        prizeImage.decoding = "async";
+        prizeImage.src =
+          state.coverageResultPrizeSrc;
+      }
+    }
 
     playPaintScoreSound();
     setScreen("coverage_result");
@@ -1209,7 +1278,25 @@ function gameplayShell({ bonus=false }){
 
   async function continueAfterCoverageResult() {
     if (state.coverageResultContinuePending) return;
-    if (state.coverageResultPhase !== "card") return;
+
+    if (
+      state.coverageResultPhase === "card" &&
+      state.coverageResultPercent === 100 &&
+      state.coverageResultPrizeSrc
+    ) {
+      playPopSound();
+
+      state.coverageResultPhase = "prize";
+      render();
+      return;
+    }
+
+    if (
+      state.coverageResultPhase !== "card" &&
+      state.coverageResultPhase !== "prize"
+    ) {
+      return;
+    }
 
     playPopSound();
 
