@@ -1112,12 +1112,6 @@
     state.spawnCooldown = bonusOnly ? getBonusPatternSpacingSeconds() : getPatternSpacingSeconds();
   }
 
-  state.spawnCooldown = bonusOnly
-    ? getBonusPatternSpacingSeconds()
-    : state.doubleJumpSignSpawned && state.obstacles.some(item => item.key === "double-jump-sign")
-      ? getPatternSpacingSeconds() * 1.35
-      : getPatternSpacingSeconds();
-
   function getPatternSpacingSeconds(){
     const speedU = Math.max(1, getActiveWorldSpeedU());
     return getDifficulty().patternGapU / speedU;
