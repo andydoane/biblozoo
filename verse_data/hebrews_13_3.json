@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐈‍⬛",
+  "biblopetDefaultName": "Archie",
+  "biblopetFeetFromBottom": "20.10%",
+  "verseId": "hebrews_13_3",
+  "ref": "Hebrews 13:3",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Remember those who are in prison",
+    "as though in prison with them",
+    "and those who are mistreated",
+    "since you also are in the body."
+  ],
+  "verseText": "Remember those who are in prison, as though in prison with them, and those who are mistreated, since you also are in the body.",
+  "meaning": "God calls us to remember and care about people who are imprisoned or mistreated, feeling their suffering as if it were happening to us.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Remember", "occurrence": 1, "emoji": "🧠" },
+    { "type": "underscore", "word": "with", "occurrence": 1 },
+    { "type": "emoji", "word": "prison", "occurrence": 1, "emoji": "⛓️" },
+    { "type": "underscore", "word": "those", "occurrence": 1 },
+    { "type": "emoji", "word": "prison", "occurrence": 2, "emoji": "⛓️" },
+    { "type": "emoji", "word": "mistreated", "occurrence": 1, "emoji": "😢" },
+    { "type": "emoji", "word": "body", "occurrence": 1, "emoji": "🧍" }
+  ]
+}

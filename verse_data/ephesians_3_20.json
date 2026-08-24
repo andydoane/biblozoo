@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐩",
+  "biblopetDefaultName": "Barnaby",
+  "biblopetFeetFromBottom": "14.60%",
+  "verseId": "ephesians_3_20",
+  "ref": "Ephesians 3:20",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Now to him",
+    "who is able",
+    "to do far more abundantly",
+    "than all that we ask or think"
+  ],
+  "verseText": "Now to him who is able to do far more abundantly than all that we ask or think.",
+  "meaning": "God is able to do way more than we could ever even think about asking for. His power is beyond our wildest imaginations!",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "able", "occurrence": 1, "emoji": "💪" },
+    { "type": "underscore", "word": "all", "occurrence": 1 },
+    { "type": "underscore", "word": "far", "occurrence": 1 },
+    { "type": "emoji", "word": "more", "occurrence": 1, "emoji": "➕" },
+    { "type": "underscore", "word": "abundantly", "occurrence": 1 },
+    { "type": "emoji", "word": "ask", "occurrence": 1, "emoji": "🙋" },
+    { "type": "emoji", "word": "think", "occurrence": 1, "emoji": "🧠" }
+  ]
+}

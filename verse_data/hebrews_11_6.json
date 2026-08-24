@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦀",
+  "biblopetDefaultName": "Ralph",
+  "biblopetFeetFromBottom": "29.30%",
+  "verseId": "hebrews_11_6",
+  "ref": "Hebrews 11:6",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "And without faith",
+    "it is impossible to please him",
+    "for whoever would draw near to God",
+    "must believe that he exists",
+    "and that he rewards those who seek him."
+  ],
+  "verseText": "And without faith it is impossible to please him, for whoever would draw near to God must believe that he exists and that he rewards those who seek him.",
+  "meaning": "If we don't have faith in God, it doesn't matter how good we try to be. The only way to please God is to put our faith and trust in his Son Jesus.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "faith", "occurrence": 1, "emoji": "🙏" },
+    { "type": "emoji", "word": "impossible", "occurrence": 1, "emoji": "🚫" },
+    { "type": "emoji", "word": "please", "occurrence": 1, "emoji": "😊" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "underscore", "word": "believe", "occurrence": 1 },
+    { "type": "emoji", "word": "rewards", "occurrence": 1, "emoji": "🏆" },
+    { "type": "emoji", "word": "seek", "occurrence": 1, "emoji": "🔎" }
+  ]
+}

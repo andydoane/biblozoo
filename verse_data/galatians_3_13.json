@@ -1,0 +1,29 @@
+{
+  "biblopet": "🐙",
+  "biblopetDefaultName": "Rambo",
+  "biblopetFeetFromBottom": "16.20%",
+  "verseId": "galatians_3_13",
+  "ref": "Galatians 3:13",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Christ redeemed us",
+    "from the curse of the law",
+    "by becoming a curse for us",
+    "for it is written",
+    "'Cursed is everyone",
+    "who is hanged on a tree'"
+  ],
+  "verseText": "Christ redeemed us from the curse of the law by becoming a curse for us – for it is written, 'Cursed is everyone who is hanged on a tree.'",
+  "meaning": "Sin's curse is death. Jesus redeemed us (paid the price to rescue us) from sin's dreadful curse by suffering the curse of death in our place on the cross.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "image", "word": "Christ", "occurrence": 1, "image": "cross" },
+    { "type": "underscore", "word": "redeemed", "occurrence": 1 },
+    { "type": "emoji", "word": "curse", "occurrence": 1, "emoji": "☠️" },
+    { "type": "image", "word": "law", "occurrence": 1, "image": "tablet" },
+    { "type": "underscore", "word": "becoming", "occurrence": 1 },
+    { "type": "emoji", "word": "cursed", "occurrence": 1, "emoji": "☠️" },
+    { "type": "emoji", "word": "tree", "occurrence": 1, "emoji": "🌲" }
+  ]
+}

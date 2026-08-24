@@ -1,0 +1,28 @@
+{
+  "biblopet": "🐘",
+  "biblopetDefaultName": "Buffy",
+  "biblopetFeetFromBottom": "23.20%",
+  "verseId": "acts_1_8",
+  "ref": "Acts 1:8",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "But you will receive power",
+    "when the Holy Spirit has come upon you",
+    "and you will be my witnesses",
+    "in Jerusalem and in all Judea and Samaria",
+    "and to the end of the earth."
+  ],
+  "verseText": "But you will receive power when the Holy Spirit has come upon you, and you will be my witnesses in Jerusalem and in all Judea and Samaria, and to the end of the earth.",
+  "meaning": "Jesus promised that the Holy Spirit would give us power to share the good news, beginning nearby and spreading through the whole world.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "receive", "occurrence": 1, "emoji": "🙌" },
+    { "type": "emoji", "word": "power", "occurrence": 1, "emoji": "⚡" },
+    { "type": "emoji", "word": "holy", "occurrence": 1, "emoji": "✨" },
+    { "type": "image", "word": "Spirit", "occurrence": 1, "image": "soul" },
+    { "type": "emoji", "word": "witnesses", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "Jerusalem", "occurrence": 1, "emoji": "🏙️" },
+    { "type": "underscore", "word": "Judea", "occurrence": 1 }
+  ]
+}

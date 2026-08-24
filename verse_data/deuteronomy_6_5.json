@@ -1,0 +1,28 @@
+{
+  "biblopet": "🐵",
+  "biblopetDefaultName": "Glumbo",
+  "biblopetFeetFromBottom": "30.40%",
+  "verseId": "deuteronomy_6_5",
+  "ref": "Deuteronomy 6:5",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "You shall love",
+    "the Lord your God",
+    "with all your heart",
+    "and with all your soul",
+    "and with all your might."
+  ],
+  "verseText": "You shall love the Lord your God with all your heart and with all your soul and with all your might.",
+  "meaning": "God commands us to love him completely, giving every part of ourselves to him.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "🙏" },
+    { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" },
+    { "type": "image", "word": "soul", "occurrence": 1, "image": "soul" },
+    { "type": "emoji", "word": "might", "occurrence": 1, "emoji": "💪" }
+  ]
+}

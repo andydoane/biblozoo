@@ -1,0 +1,25 @@
+{
+  "biblopet": "🦉",
+  "biblopetDefaultName": "Stella",
+  "biblopetFeetFromBottom": "8.90%",
+  "verseId": "isaiah_45_5",
+  "ref": "Isaiah 45:5",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "I am the Lord",
+    "and there is no other",
+    "besides me there is no God."
+  ],
+  "verseText": "I am the Lord, and there is no other, besides me there is no God.",
+  "meaning": "The Bible lists the names of many different gods. But there is only one God who exists: the Lord, the God of the Bible.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "underscore", "word": "I", "occurrence": 1 },
+    { "type": "emoji", "word": "no", "occurrence": 1, "emoji": "🚫" },
+    { "type": "underscore", "word": "other", "occurrence": 1 },
+    { "type": "underscore", "word": "besides", "occurrence": 1 },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" }
+  ]
+}

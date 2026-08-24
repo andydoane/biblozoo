@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐟",
+  "biblopetDefaultName": "Waldo",
+  "biblopetFeetFromBottom": "24.20%",
+  "verseId": "1_timothy_1_15",
+  "ref": "1 Timothy 1:15",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Christ Jesus",
+    "came into the world",
+    "to save sinners",
+    "of whom I am the foremost"
+  ],
+  "verseText": "Christ Jesus came into the world to save sinners, of whom I am the foremost.",
+  "meaning": "Paul believed he was the foremost sinner, the worst sinner in the world. And he believed that Jesus could even save a sinner such as him.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Christ", "occurrence": 1, "emoji": "✝️" },
+    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "came", "occurrence": 1, "emoji": "➡️" },
+    { "type": "emoji", "word": "world", "occurrence": 1, "emoji": "🌎" },
+    { "type": "emoji", "word": "save", "occurrence": 1, "emoji": "🛟" },
+    { "type": "emoji", "word": "sinners", "occurrence": 1, "emoji": "👎" },
+    { "type": "underscore", "word": "foremost", "occurrence": 1 }
+  ]
+}

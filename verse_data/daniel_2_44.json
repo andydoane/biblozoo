@@ -1,0 +1,27 @@
+{
+  "biblopet": "🦣",
+  "biblopetDefaultName": "Lester",
+  "biblopetFeetFromBottom": "4.80%",
+  "verseId": "daniel_2_44",
+  "ref": "Daniel 2:44",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "And in the days of those kings",
+    "the God of heaven",
+    "will set up a kingdom",
+    "that shall never be destroyed"
+  ],
+  "verseText": "And in the days of those kings the God of heaven will set up a kingdom that shall never be destroyed.",
+  "meaning": "Earthly kingdoms do not last forever. But Jesus' kingdom will last forever, and no one will ever be able to destroy it.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "days", "occurrence": 1, "emoji": "📅" },
+    { "type": "emoji", "word": "kings", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "☁️" },
+    { "type": "emoji", "word": "kingdom", "occurrence": 1, "emoji": "🏰" },
+    { "type": "emoji", "word": "never", "occurrence": 1, "emoji": "🚫" },
+    { "type": "emoji", "word": "destroyed", "occurrence": 1, "emoji": "💥" }
+  ]
+}

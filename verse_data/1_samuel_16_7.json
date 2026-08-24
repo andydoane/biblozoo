@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐧",
+  "biblopetDefaultName": "Zello",
+  "biblopetFeetFromBottom": "20.3%",
+  "verseId": "1_samuel_16_7",
+  "ref": "1 Samuel 16:7",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "For the Lord sees",
+    "not as man sees",
+    "man looks on the outward appearance",
+    "but the Lord looks on the heart"
+  ],
+  "verseText": "For the Lord sees not as man sees: man looks on the outward appearance, but the Lord looks on the heart.",
+  "meaning": "People often judge by what they can see on the outside, but the Lord sees what is really in a person's heart.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "sees", "occurrence": 1, "emoji": "👀" },
+    { "type": "emoji", "word": "man", "occurrence": 1, "emoji": "🧍" },
+    { "type": "emoji", "word": "looks", "occurrence": 1, "emoji": "👀" },
+    { "type": "underscore", "word": "outward", "occurrence": 1 },
+    { "type": "emoji", "word": "appearance", "occurrence": 1, "emoji": "🪞" },
+    { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" }
+  ]
+}

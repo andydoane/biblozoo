@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐕",
+  "biblopetDefaultName": "Sally",
+  "biblopetFeetFromBottom": "13.70%",
+  "verseId": "acts_5_29",
+  "ref": "Acts 5:29",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "But Peter",
+    "and the apostles answered",
+    "We must obey God",
+    "rather than men"
+  ],
+  "verseText": "But Peter and the apostles answered, 'We must obey God rather than men.'",
+  "meaning": "Peter and the apostles knew that obeying God is more important than obeying people, even when it brings trouble into our lives.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "underscore", "word": "Peter", "occurrence": 1 },
+    { "type": "emoji", "word": "apostles", "occurrence": 1, "emoji": "👥" },
+    { "type": "emoji", "word": "answered", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "underscore", "word": "obey", "occurrence": 1 },
+    { "type": "underscore", "word": "must", "occurrence": 1 },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "men", "occurrence": 1, "emoji": "👨" }
+  ]
+}

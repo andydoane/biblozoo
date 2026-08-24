@@ -1,0 +1,28 @@
+{
+  "biblopet": "🪼",
+  "biblopetDefaultName": "Herbie",
+  "biblopetFeetFromBottom": "23.00%",
+  "verseId": "galatians_5_22_23",
+  "ref": "Galatians 5:22-23",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "But the fruit of the Spirit",
+    "is love, joy, peace,",
+    "patience, kindness, goodness,",
+    "faithfulness, gentleness, self-control."
+  ],
+  "verseText": "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control.",
+  "meaning": "When the Holy Spirit lives inside us, he grows good things in our lives, just like a fruit tree grows delicious fruit.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "fruit", "occurrence": 1, "emoji": "🍎" },
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "joy", "occurrence": 1, "emoji": "😄" },
+    { "type": "emoji", "word": "peace", "occurrence": 1, "emoji": "✌️" },
+    { "type": "emoji", "word": "patience", "occurrence": 1, "emoji": "🕜" },
+    { "type": "emoji", "word": "kindness,", "occurrence": 1, "emoji": "🤝" },
+    { "type": "emoji", "word": "goodness", "occurrence": 1, "emoji": "👍" },
+    { "type": "emoji", "word": "self-control", "occurrence": 1, "emoji": "🎮" }
+  ]
+}

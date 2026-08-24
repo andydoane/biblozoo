@@ -1,0 +1,62 @@
+{
+  "biblopet": "🦙",
+  "biblopetDefaultName": "Goldy",
+  "biblopetFeetFromBottom": "13.70%",
+  "verseId": "1_corinthians_11_26",
+  "ref": "1 Corinthians 11:26",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "For as often as you eat this bread",
+    "and drink the cup",
+    "you proclaim the Lord's death",
+    "until he comes"
+  ],
+  "verseText": "For as often as you eat this bread and drink the cup, you proclaim the Lord’s death until he comes.",
+  "meaning": "This verse explains why we celebrate the Lord's Supper. We eat bread and drink the cup to proclaim the good news of Jesus's death for our sins.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "eat",
+      "occurrence": 1,
+      "emoji": "🍽️"
+    },
+    {
+      "type": "emoji",
+      "word": "bread",
+      "occurrence": 1,
+      "emoji": "🍞"
+    },
+    {
+      "type": "emoji",
+      "word": "drink",
+      "occurrence": 1,
+      "emoji": "🥤"
+    },
+    {
+      "type": "emoji",
+      "word": "cup",
+      "occurrence": 1,
+      "emoji": "🥛"
+    },
+    {
+      "type": "emoji",
+      "word": "proclaim",
+      "occurrence": 1,
+      "emoji": "📣"
+    },
+    {
+      "type": "emoji",
+      "word": "Lord's",
+      "occurrence": 1,
+      "emoji": "👑"
+    },
+    {
+      "type": "emoji",
+      "word": "death",
+      "occurrence": 1,
+      "emoji": "✝️"
+    }
+  ]
+}

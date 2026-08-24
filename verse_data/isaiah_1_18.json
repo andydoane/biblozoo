@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐁",
+  "biblopetDefaultName": "Chester",
+  "biblopetFeetFromBottom": "14.60%",
+  "verseId": "isaiah_1_18",
+  "ref": "Isaiah 1:18",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Though your sins are like scarlet",
+    "they shall be as white as snow",
+    "though they are red like crimson",
+    "they shall become like wool."
+  ],
+  "verseText": "Though your sins are like scarlet, they shall be as white as snow, though they are red like crimson, they shall become like wool.",
+  "meaning": "The price of sin is deep and serious: forever death! But even the filthiest sinner can be washed clean through Jesus' blood.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "sins", "occurrence": 1, "emoji": "👎" },
+    { "type": "emoji", "word": "scarlet", "occurrence": 1, "emoji": "🔴" },
+    { "type": "emoji", "word": "white", "occurrence": 1, "emoji": "⚪" },
+    { "type": "emoji", "word": "snow", "occurrence": 1, "emoji": "❄️" },
+    { "type": "emoji", "word": "red", "occurrence": 1, "emoji": "🔴" },
+    { "type": "underscore", "word": "crimson", "occurrence": 1 },
+    { "type": "emoji", "word": "wool", "occurrence": 1, "emoji": "🐑" }
+  ]
+}

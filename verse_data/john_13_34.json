@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦏",
+  "biblopetDefaultName": "Penelope",
+  "biblopetFeetFromBottom": "26.20%",
+  "verseId": "john_13_34",
+  "ref": "John 13:34",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "A new commandment",
+    "I give to you",
+    "that you love one another",
+    "just as I have loved you",
+    "you also are to love one another."
+  ],
+  "verseText": "A new commandment I give to you, that you love one another: just as I have loved you, you also are to love one another.",
+  "meaning": "Jesus commands us to love each other like he loved us, and he loved us enough to give his life in our place.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "underscore", "word": "new", "occurrence": 1 },
+    { "type": "image", "word": "commandment", "occurrence": 1, "image": "tablet" },
+    { "type": "emoji", "word": "give", "occurrence": 1, "emoji": "🎁" },
+    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "another", "occurrence": 1, "emoji": "👥" },
+    { "type": "emoji", "word": "loved", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "another", "occurrence": 1, "emoji": "👥" }
+  ]
+}
