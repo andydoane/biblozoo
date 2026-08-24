@@ -1069,6 +1069,32 @@ function overlayMarkup(){
   return "";
 }
 
+  function coverageGridMarkup() {
+    const grid = coverageGridSize();
+    let html = "";
+
+    for (let row = 0; row < grid.rows; row++) {
+      for (let col = 0; col < grid.cols; col++) {
+        const key = coverageCellKey(col, row);
+        const coveredClass =
+          state.coveredCells.has(key)
+            ? " is-covered"
+            : "";
+
+        html += `
+        <span
+          class="vsp-grid-cell${coveredClass}"
+          data-coverage-cell="${key}"
+          aria-hidden="true"
+        ></span>
+      `;
+      }
+    }
+
+    return html;
+  }
+
+
 function gameplayShell({ bonus=false }){
     return `
       <div class="${bonus ? 'vsp-bonus-screen' : 'vsp-game-screen'}">
@@ -1094,8 +1120,15 @@ function gameplayShell({ bonus=false }){
               ${bonus ? `<div class="vsp-bonus-timer-chip" id="vspBonusTimerChip">Time ${Math.ceil(state.bonusRemainingMs / 1000)}</div>` : `<div class="vsp-coverage-chip" id="vspCoverageChip">Painted ${state.coveredCells.size}/${coverageGridTotal()}</div>`}
             </div>
             <div class="vsp-board-main" id="vspBoardMain">
-              ${bonus ? "" : `<div class="vsp-grid-layer" id="vspGridLayer" style="--vsp-grid-cols:${coverageGridSize().cols};--vsp-grid-rows:${coverageGridSize().rows};"></div>`}
-              ${bonus ? "" : `<div class="vsp-coverage-layer" id="vspCoverageLayer"></div>`}
+              ${bonus ? "" : `
+                <div
+                  class="vsp-coverage-layer"
+                  id="vspCoverageLayer"
+                  style="--vsp-grid-cols:${coverageGridSize().cols};--vsp-grid-rows:${coverageGridSize().rows};"
+                >
+                  ${coverageGridMarkup()}
+                </div>
+              `}
               <div class="vsp-paint-layer" id="vspPaintLayer">
                 <canvas class="vsp-paint-canvas" id="vspPaintCanvas"></canvas>
               </div>
@@ -2243,22 +2276,18 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
     const layer = $("#vspCoverageLayer");
     if (!layer) return;
 
-    const grid = coverageGridSize();
+    const cells =
+      layer.querySelectorAll(".vsp-grid-cell");
 
-    layer.innerHTML = Array.from(state.coveredCells).map((key) => {
-      const [col, row] = key.split(",").map(Number);
+    cells.forEach((cell) => {
+      const key =
+        cell.dataset.coverageCell || "";
 
-      return `
-        <span class="vsp-coverage-cell"
-          style="
-            left:${((col / grid.cols) * 100).toFixed(3)}%;
-            top:${((row / grid.rows) * 100).toFixed(3)}%;
-            width:${(100 / grid.cols).toFixed(3)}%;
-            height:${(100 / grid.rows).toFixed(3)}%;
-          ">
-        </span>
-      `;
-    }).join("");
+      cell.classList.toggle(
+        "is-covered",
+        state.coveredCells.has(key)
+      );
+    });
   }
 
   function updateCoverageHud() {

@@ -289,18 +289,24 @@ body{
 .vsp-menu-pill:active{transform:translateY(1px)}
 .vsp-board-main{position:absolute;inset:0;min-height:0;touch-action:none}
 
-.vsp-grid-layer,.vsp-coverage-layer,.vsp-paint-layer,.vsp-back-effect-layer,.vsp-blob-layer,.vsp-effect-layer,.vsp-flash-layer,.vsp-front-effect-layer{position:absolute;inset:0}
-.vsp-grid-layer{
+.vsp-coverage-layer,.vsp-paint-layer,.vsp-back-effect-layer,.vsp-blob-layer,.vsp-effect-layer,.vsp-flash-layer,.vsp-front-effect-layer{position:absolute;inset:0}
+
+.vsp-coverage-layer{
   z-index:0;
   pointer-events:none;
-  background-image:
-    linear-gradient(to right, rgba(0,0,0,.10) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0,0,0,.10) 1px, transparent 1px);
-  background-size:
-    calc(100% / var(--vsp-grid-cols)) calc(100% / var(--vsp-grid-rows)),
-    calc(100% / var(--vsp-grid-cols)) calc(100% / var(--vsp-grid-rows));
+  display:grid;
+  grid-template-columns:
+    repeat(
+      var(--vsp-grid-cols),
+      minmax(0, 1fr)
+    );
+  grid-template-rows:
+    repeat(
+      var(--vsp-grid-rows),
+      minmax(0, 1fr)
+    );
 }
-.vsp-coverage-layer{z-index:0;pointer-events:none}
+
 .vsp-paint-layer{z-index:1;pointer-events:none}
 
 .vsp-paint-canvas {
@@ -503,11 +509,23 @@ body{
 }
 
 
-.vsp-coverage-cell {
-  position: absolute;
-  display: block;
-  background: rgba(127, 102, 198, .12);
-  box-shadow: inset 0 0 0 1px rgba(127, 102, 198, .18);
+.vsp-grid-cell {
+  display:block;
+  min-width:0;
+  min-height:0;
+  box-sizing:border-box;
+  border-left:
+    1px solid rgba(0,0,0,.10);
+  border-top:
+    1px solid rgba(0,0,0,.10);
+}
+
+.vsp-grid-cell.is-covered {
+  background:
+    rgba(127,102,198,.12);
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(127,102,198,.18);
 }
 
 .vsp-static-paint-splat {
