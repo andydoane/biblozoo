@@ -33,6 +33,10 @@ const LOCK_ICON = IMG_DIR + "lock.png";
 const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
+const BLANK_MEDAL_ICON = IMG_DIR + "blank_medal.png";
+const PET_STATUS_HAPPY_ICON = IMG_DIR + "pet_status_happy.png";
+const PET_STATUS_HUNGRY_ICON = IMG_DIR + "pet_status_hungry.png";
+const PET_STATUS_ASLEEP_ICON = IMG_DIR + "pet_status_asleep.png";
 
 const APP_VERSION = "1.0.12 Black Startup Shell";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
@@ -5018,14 +5022,40 @@ function getRandomPetName() {
   return petRandomNames[Math.floor(Math.random() * petRandomNames.length)];
 }
 
-function getBibloPetStatusEmoji(verseProgress) {
-  const status = getBibloPetStatus(verseProgress);
-
-  if (status === "happy") return "😀";
-  if (status === "hungry") return "🤤";
-  if (status === "sleeping") return "😴";
+function getBibloPetStatusImageSrcForStatus(status) {
+  if (status === "happy") return PET_STATUS_HAPPY_ICON;
+  if (status === "hungry") return PET_STATUS_HUNGRY_ICON;
+  if (status === "sleeping") return PET_STATUS_ASLEEP_ICON;
 
   return "";
+}
+
+function bibloPetStatusImageHtml(
+  statusOrProgress,
+  className = "pet-status-img"
+) {
+  const status =
+    typeof statusOrProgress === "string"
+      ? statusOrProgress
+      : getBibloPetStatus(statusOrProgress);
+
+  const src =
+    getBibloPetStatusImageSrcForStatus(
+      status
+    );
+
+  if (!src) return "";
+
+  return `
+    <img
+      class="${escapeHtml(className)}"
+      src="${escapeHtml(src)}"
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+      onerror="this.style.display='none'"
+    >
+  `;
 }
 
 function getBibloPetStatusText(verseProgress) {
@@ -12346,7 +12376,12 @@ function screenProgress(idx) {
     const petVisual = unlocked
       ? bibloPetVisualHtml(item.id, petEmoji)
       : lockIconHtml("lock-icon-progress");
-    const statusEmoji = unlocked ? getBibloPetStatusEmoji(verseProgress) : "";
+    const statusVisual = unlocked
+      ? bibloPetStatusImageHtml(
+          verseProgress,
+          "pet-status-img pet-status-img-list"
+        )
+      : "";
 
     return `
       <div class="progress-row" data-verse-id="${item.id}">
@@ -12354,7 +12389,7 @@ function screenProgress(idx) {
         <div class="progress-row-main">
           <div class="progress-row-ref">${item.ref}</div>
         </div>
-        <div class="progress-row-status">${statusEmoji}</div>
+        <div class="progress-row-status">${statusVisual}</div>
       </div>
     `;
   }).join("");
@@ -12508,7 +12543,12 @@ function screenVerseDetail(idx) {
   const petEmoji = unlocked ? getBibloPetEmojiForVerseId(verseId) : "";
   const petDisplayName = unlocked ? getBibloPetDisplayNameForVerseId(verseId) : "";
   const petNameButtonText = hasCustomPetNameForVerseId(verseId) ? "Rename Pet" : "Name Pet";
-  const statusEmoji = unlocked ? getBibloPetStatusEmoji(verseProgress) : lockIconHtml("lock-icon-status");
+  const statusVisual = unlocked
+    ? bibloPetStatusImageHtml(
+        verseProgress,
+        "pet-status-img pet-status-img-detail"
+      )
+    : lockIconHtml("lock-icon-status");
   const statusText = getBibloPetStatusText(verseProgress);
   const petStatus = getBibloPetStatus(verseProgress);
   const petAnimationClass = unlocked ? getBibloPetAnimationClass(verseId, verseProgress) : "";
@@ -12621,7 +12661,7 @@ function screenVerseDetail(idx) {
 
         <div class="pet-status-card">
           <div class="pet-status-label">BibloPet Status:</div>
-          <div class="pet-status-emoji">${statusEmoji}</div>
+          <div class="pet-status-visual">${statusVisual}</div>
         </div>
 
         <div class="pet-helper-text">${statusText}</div>
@@ -12640,8 +12680,17 @@ function screenVerseDetail(idx) {
     }
 
         <div class="detail-medal-progress">
+          <img
+            class="detail-medal-progress-icon"
+            src="${BLANK_MEDAL_ICON}"
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            onerror="this.style.display='none'"
+          >
+
           <div class="detail-medal-progress-label">
-            Medal Progress: ${medalProgressEarned} out of ${medalProgressPossible}
+            ${medalProgressEarned} out of ${medalProgressPossible}
           </div>
 
           <div
@@ -13042,24 +13091,33 @@ function screenPetStats(idx) {
 
         <div class="pet-stats-card">
           <div class="pet-stats-emoji">🏅</div>
-          <div class="pet-stats-value">${stats.medalsEarned}/${stats.medalsPossible}</div>
+          <div class="pet-stats-value">${stats.medalsEarned}</div>
           <div class="pet-stats-label">Medals earned</div>
         </div>
 
         <div class="pet-stats-card">
-          <div class="pet-stats-emoji">😀</div>
+          ${bibloPetStatusImageHtml(
+            "happy",
+            "pet-stats-status-img"
+          )}
           <div class="pet-stats-value">${stats.happy}</div>
           <div class="pet-stats-label">Happy</div>
         </div>
 
         <div class="pet-stats-card">
-          <div class="pet-stats-emoji">🤤</div>
+          ${bibloPetStatusImageHtml(
+            "hungry",
+            "pet-stats-status-img"
+          )}
           <div class="pet-stats-value">${stats.hungry}</div>
           <div class="pet-stats-label">Hungry</div>
         </div>
 
         <div class="pet-stats-card">
-          <div class="pet-stats-emoji">😴</div>
+          ${bibloPetStatusImageHtml(
+            "sleeping",
+            "pet-stats-status-img"
+          )}
           <div class="pet-stats-value">${stats.sleeping}</div>
           <div class="pet-stats-label">Asleep</div>
         </div>
