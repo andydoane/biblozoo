@@ -1254,6 +1254,28 @@ function preloadLearnInstructionImages() {
   }
 }
 
+const preloadedZooTodoChromeImages = new Map();
+
+function preloadZooTodoChromeImages() {
+  const sources = [
+    `${IMG_DIR}clipboard_clip.png`,
+    `${IMG_DIR}clipboard_title.png`
+  ];
+
+  for (const src of sources) {
+    if (preloadedZooTodoChromeImages.has(src)) continue;
+
+    const img = new Image();
+    img.src = src;
+
+    preloadedZooTodoChromeImages.set(src, img);
+
+    if (typeof img.decode === "function") {
+      img.decode().catch(() => { });
+    }
+  }
+}
+
 const andymojiPreloadPromises = new Map();
 
 function getAndymojiSrc(imageName) {
@@ -11666,6 +11688,44 @@ function playZooTodoTutorialPageAudio(pageNumber) {
   }
 }
 
+function refreshZooTodoTutorialPage(rootEl) {
+  const paperBody =
+    rootEl?.querySelector?.("[data-todo-paper-body]");
+
+  if (!paperBody) {
+    render();
+    return;
+  }
+
+  const pageNumber =
+    getZooTodoTutorialPageNumber();
+
+  paperBody.innerHTML =
+    renderZooTodoTutorialHtml();
+
+  bindZooTodoTutorial(rootEl);
+
+  if (State.screen === Screen.TODO_DEV) {
+    playZooTodoTutorialPageAudio(
+      pageNumber
+    );
+  }
+
+  requestAnimationFrame(() => {
+    if (
+      State.screen !== Screen.TODO_DEV ||
+      !rootEl?.isConnected
+    ) {
+      return;
+    }
+
+    equalizeZooTodoTutorialClipboardPages(
+      rootEl
+    );
+  });
+}
+
+
 function bindZooTodoTutorial(rootEl) {
   rootEl.querySelectorAll("[data-tutorial-next]").forEach((btn) => {
     btn.onclick = (e) => {
@@ -11675,14 +11735,14 @@ function bindZooTodoTutorial(rootEl) {
 
       if (nextPage === 2) {
         State.todoTutorialPage = 2;
-        render();
+        refreshZooTodoTutorialPage(rootEl);
         return;
       }
 
       if (nextPage === 3) {
         State.todoTutorialPage = 3;
         markTutorialStep(TUTORIAL_STEPS.CHOOSE_VERSE);
-        render();
+        refreshZooTodoTutorialPage(rootEl);
       }
     };
   });
@@ -12311,7 +12371,9 @@ function screenTodoDev(idx) {
             onerror="this.style.display='none'"
           >
 
-          ${paperBodyHtml}
+          <div data-todo-paper-body>
+            ${paperBodyHtml}
+          </div>
         </div>
       </section>
     </main>
@@ -14297,6 +14359,7 @@ function setupAppUiTapSounds() {
 
 (async function init() {
   preloadLearnInstructionImages();
+  preloadZooTodoChromeImages();
   loadPetNameBlocklist();
   setupAppUiTapSounds();
 
