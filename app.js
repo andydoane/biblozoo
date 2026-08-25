@@ -8576,24 +8576,44 @@ async function startHideRound() {
   State.sayVerseStartedAt = performance.now();
   State.sayVerseDurationMs = durationMs;
 
-  const animate = () => {
-    const pct = getSayVersePct();
-    const currentBar = document.getElementById("sayVerseBar");
+  const promptFadeMs = Math.min(360, durationMs);
+  const promptHoldMs = Math.max(
+    0,
+    durationMs - promptFadeMs
+  );
 
-    if (currentBar) {
-      currentBar.style.width = (pct * 100) + "%";
-    }
+  await new Promise(
+    r => setTimeout(r, promptHoldMs)
+  );
 
-    if (pct > 0 && State.sayVerseActive && State.screen === Screen.HIDE) {
-      requestAnimationFrame(animate);
-    }
-  };
+  if (
+    State.screen !== Screen.HIDE ||
+    !State.sayVerseActive
+  ) {
+    return;
+  }
 
-  requestAnimationFrame(animate);
+  const sayVersePrompt =
+    document.querySelector(
+      ".learn-say-verse-prompt"
+    );
 
-  await new Promise(r => setTimeout(r, durationMs));
+  if (sayVersePrompt) {
+    sayVersePrompt.classList.add(
+      "is-finishing"
+    );
+  }
 
-  if (State.screen !== Screen.HIDE) return;
+  await new Promise(
+    r => setTimeout(r, promptFadeMs)
+  );
+
+  if (
+    State.screen !== Screen.HIDE ||
+    !State.sayVerseActive
+  ) {
+    return;
+  }
 
   State.sayVerseActive = false;
   State.sayVerseStartedAt = 0;
@@ -13632,12 +13652,14 @@ function screenHide(idx) {
   const hideBottomHtml = State.sayVerseActive
     ? `
       <div class="learn-progress-action-slot">
-        <div class="learn-bottom-progress" aria-label="Time remaining">
-          <div
-            class="learn-bottom-progress-bar"
-            id="sayVerseBar"
-            style="width:${getSayVersePct() * 100}%"
-          ></div>
+        <div
+          class="learn-say-verse-prompt"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="learn-say-verse-prompt-text">
+            Say the Verse Out Loud
+          </div>
         </div>
       </div>
     `

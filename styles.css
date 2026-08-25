@@ -4189,6 +4189,52 @@ Game Mix Loading Screen
   transition: width 120ms linear;
 }
 
+.learn-say-verse-prompt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 360ms ease;
+}
+
+.learn-say-verse-prompt.is-finishing {
+  opacity: 0;
+}
+
+.learn-say-verse-prompt-text {
+  color: #ffffff;
+  font-size: clamp(24px, 5.6vw, 40px);
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  text-wrap: balance;
+  animation:
+    learnSayVerseBreathe 1800ms ease-in-out infinite;
+}
+
+@keyframes learnSayVerseBreathe {
+
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.985);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .learn-say-verse-prompt-text {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------- Overlay modal ---------- */
 .overlay {
   position: fixed;
