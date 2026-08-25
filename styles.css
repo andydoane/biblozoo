@@ -5376,6 +5376,7 @@ BibloPet Unlock Screen
 }
 
 .pet-unlock-screen.is-box-ready:not(.is-opening):not(.is-revealed) .pet-unlock-box-button {
+  transform-origin: center center;
   animation: petUnlockBoxWiggle 1500ms ease-in-out infinite;
 }
 
