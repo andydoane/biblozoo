@@ -656,7 +656,7 @@ async function startTutorialPracticeMode() {
     }
 
     State.tutorialPracticeMode = true;
-    go(Screen.PRACTICE_HUB);
+    go(Screen.PRACTICE);
   } catch (err) {
     console.error(err);
     showDialog({
