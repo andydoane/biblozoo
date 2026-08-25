@@ -1198,7 +1198,9 @@ function getLearnInstructionConfig(key) {
       title: "Echo the Verse",
       subtext: "Repeat after me when each chunk turns yellow.",
       button: "Echo the Verse",
-      audio: "instructions_echo1.mp3"
+      audio: State.learnLevel === "pretty_well"
+        ? "instructions_echo_pretty_well.mp3"
+        : "instructions_echo1.mp3"
     },
     remove: {
       image: "verse_remove.png",
