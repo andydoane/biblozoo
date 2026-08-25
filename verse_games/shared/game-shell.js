@@ -1579,7 +1579,9 @@
         <div class="vm-game-screen"${styleVarsHtml(theme)}>
           <div class="vm-game-stage">
             <div class="vm-game-center">
-              <div class="vm-game-icon" aria-hidden="true">🔀</div>
+              <div class="vm-game-icon" aria-hidden="true">
+                ${iconHtml || escapeHtml(icon)}
+              </div>
               <div class="vm-game-title">Game Mix</div>
 
               <div class="vm-game-actions">
