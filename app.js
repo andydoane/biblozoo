@@ -13653,7 +13653,7 @@ function screenHide(idx) {
     ? `
       <div class="learn-progress-action-slot">
         <div
-          class="learn-say-verse-prompt"
+          class="learn-say-verse-prompt${State.hideTransitionPhase === "in" ? " is-waiting-for-verse" : ""}"
           role="status"
           aria-live="polite"
         >

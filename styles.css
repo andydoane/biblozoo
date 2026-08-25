@@ -4202,6 +4202,15 @@ Game Mix Loading Screen
   opacity: 0;
 }
 
+.learn-say-verse-prompt.is-waiting-for-verse {
+  opacity: 0;
+  transition: none;
+}
+
+.learn-say-verse-prompt.is-waiting-for-verse .learn-say-verse-prompt-text {
+  animation: none;
+}
+
 .learn-say-verse-prompt-text {
   color: #ffffff;
   font-size: clamp(24px, 5.6vw, 40px);
