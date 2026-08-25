@@ -5954,6 +5954,10 @@ function getChunkVisibleCount(learnParts) {
 
   if (!count) return 0;
 
+  if (State.chunkAutoStarting) {
+    return 0;
+  }
+
   if (State.chunkRunning) {
     return Math.max(0, Math.min(count, State.chunkIndex + 1));
   }
@@ -6002,6 +6006,10 @@ function learnChunkStageHtml(learnParts, visibleCount = 0) {
 }
 
 function getEchoChunkStateClass(index) {
+  if (State.echoAutoStarting) {
+    return "is-future";
+  }
+
   if (!State.echoRunning && !State.echoDone) {
     return "is-future";
   }
@@ -8375,6 +8383,10 @@ function goToChunksAndStart() {
 
 
 function goToEchoAndStart() {
+  State.echoDone = false;
+  State.echoRunning = false;
+  State.echoIndex = 0;
+  State.echoSpeaking = false;
   State.echoAutoStarting = true;
   State.echoAutoFallbackReady = false;
 
