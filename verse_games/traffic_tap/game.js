@@ -257,6 +257,9 @@
   let resizeBound = false;
   let endScreenUnlockTimer = 0;
   let itemsClickBound = false;
+  const bonusItemNodes = new Map();
+  let bonusItemsLayerInitialized = false;
+  let roadRenderKey = "";
 
   const verseMeta = parseVerseMeta(ctx.verseId || "", ctx.verseRef || "");
   const buildData = window.VerseGameShell.buildVerseSegments({
@@ -870,6 +873,9 @@
     state.awaitingBonusStart = false;
     state.awaitingBonusItemId = 0;
 
+    bonusItemNodes.clear();
+    bonusItemsLayerInitialized = false;
+    roadRenderKey = "";
     itemsClickBound = false;
 
     app.innerHTML = `
@@ -1280,9 +1286,17 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     build.classList.toggle("is-pop", state.buildPopUntil > now);
 
     if (state.bonusShowScore) {
-      clearBuildTextFit(text);
-      text.className = "tt-build-text vm-build-text";
-      text.innerHTML = `
+      const resultsRenderKey = [
+        "results",
+        state.bonusScore,
+        state.bonusCorrectHits,
+        state.bonusBestStreak
+      ].join(":");
+
+      if (text.dataset.ttBonusRenderKey !== resultsRenderKey) {
+        clearBuildTextFit(text);
+        text.className = "tt-build-text vm-build-text";
+        text.innerHTML = `
       <div class="tt-bonus-build">
         <div class="tt-bonus-build-copy">Bonus Complete!</div>
         <div class="tt-bonus-build-score is-results">
@@ -1292,23 +1306,56 @@ In the bonus round, tap as many of the target vehicle as you can.`;
         </div>
       </div>
     `;
+
+        text.dataset.ttBonusRenderKey = resultsRenderKey;
+      }
+
       return;
     }
 
     if (state.bonusRound) {
-      clearBuildTextFit(text);
-      text.className = "tt-build-text vm-build-text";
-      text.innerHTML = `
+      const targetVehicle =
+        state.bonusTargetEmoji || DEFAULT_VEHICLE;
+
+      const targetKey =
+        typeof targetVehicle === "string"
+          ? targetVehicle
+          : (targetVehicle?.id || targetVehicle?.src || "");
+
+      const bonusRenderKey = `bonus:${targetKey}`;
+
+      if (text.dataset.ttBonusRenderKey !== bonusRenderKey) {
+        clearBuildTextFit(text);
+        text.className = "tt-build-text vm-build-text";
+        text.innerHTML = `
       <div class="tt-bonus-build">
         <div class="tt-bonus-score-hud">
-          <span class="tt-bonus-score-target">${vehicleImgHtml(state.bonusTargetEmoji || DEFAULT_VEHICLE, "tt-bonus-target-img")}</span>
+          <span class="tt-bonus-score-target">${vehicleImgHtml(targetVehicle, "tt-bonus-target-img")}</span>
           <span class="tt-bonus-score-times">×</span>
           <span class="tt-bonus-score-badge">${state.bonusScore}</span>
         </div>
       </div>
     `;
+
+        text.dataset.ttBonusRenderKey = bonusRenderKey;
+      }
+
+      const scoreBadge =
+        text.querySelector(".tt-bonus-score-badge");
+
+      const scoreText = String(state.bonusScore);
+
+      if (
+        scoreBadge &&
+        scoreBadge.textContent !== scoreText
+      ) {
+        scoreBadge.textContent = scoreText;
+      }
+
       return;
     }
+
+    delete text.dataset.ttBonusRenderKey;
 
 
 
@@ -1371,7 +1418,6 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function renderField() {
     renderRoads();
     renderItems();
-    renderEffects();
     renderBonus();
     renderOverlays();
   }
@@ -1381,46 +1427,132 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const marks = document.getElementById("ttRoadMarks");
     if (!roads || !marks) return;
 
+    const now = performance.now();
+    const topIsCrashing = state.roadCrashUntil[0] > now;
+    const bottomIsCrashing = state.roadCrashUntil[1] > now;
+    const nextRoadRenderKey = [
+      state.roadHeight,
+      state.gapHeight,
+      topIsCrashing ? 1 : 0,
+      bottomIsCrashing ? 1 : 0
+    ].join("|");
+
+    if (nextRoadRenderKey === roadRenderKey) return;
+    roadRenderKey = nextRoadRenderKey;
+
     const top = 0;
     const bottom = state.roadHeight + state.gapHeight;
+
     roads.innerHTML = `
-    <div class="tt-road top ${state.roadCrashUntil[0] > performance.now() ? "is-crashing" : ""}" style="top:${top}px;height:${state.roadHeight}px"></div>
-    <div class="tt-road bottom ${state.roadCrashUntil[1] > performance.now() ? "is-crashing" : ""}" style="top:${bottom}px;height:${state.roadHeight}px"></div>
+    <div class="tt-road top ${topIsCrashing ? "is-crashing" : ""}" style="top:${top}px;height:${state.roadHeight}px"></div>
+    <div class="tt-road bottom ${bottomIsCrashing ? "is-crashing" : ""}" style="top:${bottom}px;height:${state.roadHeight}px"></div>
   `;
+
     marks.innerHTML = `
     <div class="tt-road top" style="top:${top}px;height:${state.roadHeight}px"><div class="tt-road-center-line"></div></div>
     <div class="tt-road bottom" style="top:${bottom}px;height:${state.roadHeight}px"><div class="tt-road-center-line"></div></div>
   `;
   }
 
+  function createBonusItemNode(layer, item) {
+    const root = document.createElement("div");
+    root.className = "tt-item";
+    root.style.setProperty("--tt-item-w", `${item.width}px`);
+    root.style.setProperty("--tt-item-h", `${item.height}px`);
+    root.style.setProperty("--tt-car-size", `${item.carSize}px`);
+    root.style.setProperty("--tt-car-hit-h", `${item.carHitHeight}px`);
+    root.style.setProperty(
+      "--tt-car-center-y",
+      `${item.slot === "lower" ? 72 : 24}%`
+    );
+    root.style.setProperty("--tt-item-tilt", "0deg");
+
+    const unit = document.createElement("div");
+    unit.className = "tt-unit";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tt-car-btn tt-hit-btn";
+    button.dataset.itemId = String(item.id);
+    button.setAttribute("aria-label", vehicleLabel(item.vehicle));
+    button.innerHTML = vehicleImgHtml(item.vehicle);
+
+    unit.appendChild(button);
+    root.appendChild(unit);
+    layer.appendChild(root);
+
+    const entry = { root, unit };
+    bonusItemNodes.set(item.id, entry);
+
+    return entry;
+  }
+
+  function renderBonusItems(layer) {
+    if (!bonusItemsLayerInitialized) {
+      layer.innerHTML = "";
+      bonusItemNodes.clear();
+      bonusItemsLayerInitialized = true;
+    }
+
+    const now = performance.now();
+    const activeIds = new Set();
+
+    for (const item of state.bonusItems) {
+      activeIds.add(item.id);
+
+      const entry =
+        bonusItemNodes.get(item.id) ||
+        createBonusItemNode(layer, item);
+
+      const y = roadTopY(item.road);
+
+      entry.root.style.transform =
+        `translate3d(${item.x}px, ${y}px, 0)`;
+
+      entry.root.classList.toggle(
+        "is-flipped",
+        item.direction > 0
+      );
+
+      entry.root.classList.toggle(
+        "is-crashing",
+        !!item.removeAt
+      );
+
+      entry.root.classList.toggle(
+        "is-exiting",
+        !!state.bonusEnding
+      );
+
+      entry.unit.classList.toggle(
+        "is-wrong",
+        item.flashWrongUntil > now
+      );
+
+      entry.unit.classList.toggle(
+        "is-vanish",
+        item.vanishUntil > now
+      );
+    }
+
+    for (const [itemId, entry] of bonusItemNodes) {
+      if (activeIds.has(itemId)) continue;
+
+      entry.root.remove();
+      bonusItemNodes.delete(itemId);
+    }
+  }
+
   function renderItems() {
     const layer = document.getElementById("ttItemsLayer");
     if (!layer) return;
     if (state.bonusRound) {
-      const html = state.bonusItems.map(item => {
-        const y = roadTopY(item.road);
-        const cls = [
-          "tt-item",
-          item.direction > 0 ? "is-flipped" : "",
-          item.removeAt ? "is-crashing" : "",
-          state.bonusEnding ? "is-exiting" : ""
-        ];
-        const unitCls = ["tt-unit"];
-        if (item.flashWrongUntil > performance.now()) unitCls.push("is-wrong");
-        if (item.vanishUntil > performance.now()) unitCls.push("is-vanish");
-
-        return `
-        <div class="${cls.filter(Boolean).join(" ")}" style="transform:translate3d(${item.x}px, ${y}px, 0);--tt-item-w:${item.width}px;--tt-item-h:${item.height}px;--tt-car-size:${item.carSize}px;--tt-car-hit-h:${item.carHitHeight}px;--tt-car-center-y:${item.slot === "lower" ? 72 : 24}%;--tt-item-tilt:0deg;">
-          <div class="${unitCls.join(" ")}">
-            <button type="button" class="tt-car-btn tt-hit-btn" data-item-id="${item.id}" aria-label="${escapeHtml(vehicleLabel(item.vehicle))}">${vehicleImgHtml(item.vehicle)}</button>
-          </div>
-        </div>
-      `;
-      }).join("");
-
-      layer.innerHTML = html;
+      renderBonusItems(layer);
       return;
     }
+
+    bonusItemsLayerInitialized = false;
+    bonusItemNodes.clear();
 
     const html = state.mainItems.map(item => {
       const y = roadTopY(item.road);
@@ -2163,7 +2295,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     if (!layer) return;
 
     if (!state.bonusIntro && !state.bonusEnding) {
-      layer.innerHTML = "";
+      if (layer.firstChild) {
+        layer.innerHTML = "";
+      }
       return;
     }
 
@@ -2898,7 +3032,23 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function addPopup(x, y, text, good) {
-    state.effectPopups.push({ x, y, text, good, until: performance.now() + 620 });
+    const layer =
+      document.getElementById("ttEffectsLayer");
+
+    if (!layer) return;
+
+    const el = document.createElement("div");
+    el.className =
+      `tt-popup ${good ? "good" : "bad"}`;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.textContent = text;
+
+    layer.appendChild(el);
+
+    window.setTimeout(() => {
+      el.remove();
+    }, 620);
   }
 
   function showPhaseOverlay(text) {
