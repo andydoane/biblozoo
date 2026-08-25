@@ -13827,6 +13827,19 @@ function screenFinalRecall(idx) {
   const btnFinalGames = inner.querySelector("#btnFinalGames");
   if (btnFinalGames) {
     btnFinalGames.onclick = () => {
+      if (isTutorialActive()) {
+        State.hasLearnedVerse = true;
+
+        if (VERSE_ID) {
+          markLearnCompleted(VERSE_ID);
+        }
+
+        State.todoTutorialJustFinishedLearn = true;
+        markTutorialLearnDone(VERSE_ID);
+        go(Screen.TODO_DEV);
+        return;
+      }
+
       startLearnInstruction("games");
     };
   }
