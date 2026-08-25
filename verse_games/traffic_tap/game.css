@@ -250,8 +250,10 @@ body{
   will-change:transform;
 }
 
-.tt-road.top .tt-road-center-line{ animation:ttRoadDriftLeft 1.2s linear infinite; }
-.tt-road.bottom .tt-road-center-line{ animation:ttRoadDriftRight 1.2s linear infinite; }
+.tt-road.top .tt-road-center-line,
+.tt-road.bottom .tt-road-center-line{
+  animation:none;
+}
 
 .tt-road.is-crashing{ animation:ttRoadFlash 320ms ease; }
 
