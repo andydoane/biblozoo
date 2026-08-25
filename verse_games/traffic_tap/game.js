@@ -2610,8 +2610,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const rect = tappedEl.getBoundingClientRect();
     const x = rect.left - layerRect.left + rect.width / 2;
     const y = rect.top - layerRect.top + rect.height / 2;
+    const target = currentTargetLabel();
 
-    if (!item.isCorrect) {
+    if (item.label !== target) {
       state.correctStreak = 0;
       item.flashWrongUntil = performance.now() + 280;
       state.buildShakeUntil = performance.now() + 260;
@@ -2627,7 +2628,6 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     state.buildPopUntil = performance.now() + 200;
     startSuccessLaunch(item);
 
-    const target = currentTargetLabel();
     if (item.label === target) {
       state.correctStreak += 1;
 
@@ -2657,10 +2657,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function convertOtherCorrectCopies(chosenRoad, previousTarget) {
+    const nextTarget = currentTargetLabel();
+
     for (const item of state.mainItems) {
       if (!item.isCorrect || item.road === chosenRoad || item.label !== previousTarget || item.crashing) continue;
       item.isCorrect = false;
-      item.label = nextDecoyLabel(previousTarget);
+      item.label = nextDecoyLabel(nextTarget || previousTarget);
       item.styleClass = DECOY_CLASSES[(item.id + 1) % DECOY_CLASSES.length];
       item.bonkUntil = performance.now() + 260;
     }
