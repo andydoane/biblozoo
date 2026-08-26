@@ -2707,7 +2707,6 @@
     state.frenzyInputLockedUntil = now + longestDelay + 430;
 
     if (!state.progress.length) {
-      state.frenzyActive = false;
       state.frenzyDropDelays = {};
       state.frenzyDropMotion = {};
       state.overlayMessage = "";
@@ -2797,6 +2796,18 @@
     const direction =
       Math.random() < 0.5 ? "from-left" : "from-right";
 
+    const petHeight = brick * 2;
+
+    const petAspectRatio =
+      pet?.preloadedImage?.naturalWidth > 0 &&
+      pet?.preloadedImage?.naturalHeight > 0
+        ? pet.preloadedImage.naturalWidth /
+          pet.preloadedImage.naturalHeight
+        : 1;
+
+    const petWidth =
+      petHeight * petAspectRatio;
+
     const laneBottom =
       clamp(state.fieldWidth * 0.055, 24, 42);
 
@@ -2833,6 +2844,8 @@
             --tb-streak-pet-ground:${groundHeight.toFixed(1)}px;
             --tb-streak-pet-feet-from-bottom:${pet.feetFromBottom};
             --tb-streak-pet-travel:${state.fieldWidth.toFixed(1)}px;
+            --tb-streak-pet-height:${petHeight.toFixed(1)}px;
+            --tb-streak-pet-width:${petWidth.toFixed(1)}px;
           "
           aria-hidden="true"
         >

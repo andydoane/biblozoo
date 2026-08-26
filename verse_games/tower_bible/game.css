@@ -856,7 +856,8 @@ body {
   position: absolute;
   left: 0;
   bottom: var(--tb-streak-pet-ground, 120px);
-  width: clamp(110px, 22vw, 180px);
+  width: var(--tb-streak-pet-width, 116px);
+  height: var(--tb-streak-pet-height, 116px);
   z-index: 2;
   pointer-events: none;
   user-select: none;
@@ -878,6 +879,7 @@ body {
 
 .tb-streak-pet-motion {
   width: 100%;
+  height: 100%;
   transform-origin: center bottom;
   will-change: transform;
   animation: tbStreakPetHop var(--tb-streak-duration, 3200ms) linear both;
@@ -885,6 +887,7 @@ body {
 
 .tb-streak-pet-rotator {
   width: 100%;
+  height: 100%;
   transform-origin: center bottom;
   will-change: transform;
   animation: tbStreakPetNod var(--tb-streak-duration, 3200ms) linear both;
@@ -893,7 +896,8 @@ body {
 .tb-streak-pet-img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
   user-select: none;
   -webkit-user-select: none;
