@@ -177,6 +177,20 @@
   let preparedStreakPetPromise = null;
   let lastStreakPetVerseId = "";
 
+  const conveyorBrickNodes = new Map();
+  let conveyorChromeInitialized = false;
+  let conveyorGeometryKey = "";
+  let conveyorGroundNode = null;
+  let conveyorLaneNode = null;
+  let conveyorTuftLeftNode = null;
+  let conveyorTuftMidNode = null;
+  let conveyorTuftRightNode = null;
+
+  let guideWrapNode = null;
+
+  let enteringBrickNode = null;
+  let enteringBrickNodeId = 0;
+
   let audioCtx = null;
   let masterGain = null;
   let silenceAudioEl = null;
@@ -1144,8 +1158,16 @@
       );
 
     if (phasePill) {
-      phasePill.textContent =
+      const nextPhaseLabel =
         currentPhaseLabel();
+
+      if (
+        phasePill.textContent !==
+        nextPhaseLabel
+      ) {
+        phasePill.textContent =
+          nextPhaseLabel;
+      }
     }
 
     syncSpeedControlVisibility();
@@ -1167,8 +1189,16 @@
       state.frenzyActive ||
       state.done;
 
-    speedButton.style.display =
+    const nextDisplay =
       shouldHide ? "none" : "";
+
+    if (
+      speedButton.style.display !==
+      nextDisplay
+    ) {
+      speedButton.style.display =
+        nextDisplay;
+    }
   }
 
 
@@ -1233,36 +1263,92 @@
   }
 
   function renderGuide(layer) {
-    if (state.introActive && !state.introGuideVisible) {
-      layer.innerHTML = "";
+    const shouldHide =
+      state.introActive &&
+      !state.introGuideVisible;
+
+    if (shouldHide) {
+      if (layer.style.display !== "none") {
+        layer.style.display = "none";
+      }
+
       return;
     }
 
-    const laneBottom = clamp(state.fieldWidth * 0.055, 24, 42);
-    const groundHeight = laneBottom + state.laneHeight;
-    const laneTop = state.fieldHeight - groundHeight;
-    const indicatorHeight = state.laneHeight * 0.25;
-    const revealClass = state.introActive &&
-      state.introGuideVisible &&
-      performance.now() - state.introGuidePoppedAt < 900
-      ? " is-intro-reveal"
-      : "";
+    if (layer.style.display) {
+      layer.style.display = "";
+    }
 
-    layer.innerHTML = `
-      <div class="tb-center-indicator-wrap${revealClass}" style="left:${state.guideCenterX}px;top:${laneTop}px;height:${groundHeight}px;--tb-indicator-height:${indicatorHeight}px;">
-        <img
-          class="tb-center-indicator tb-center-indicator-top"
-          src="tower_bible_images/tower_bible_center_indicator.svg"
-          alt=""
-          aria-hidden="true"
-        >
-        <img
-          class="tb-center-indicator tb-center-indicator-bottom"
-          src="tower_bible_images/tower_bible_center_indicator.svg"
-          alt=""
-          aria-hidden="true"
-        >
-      </div>`;
+    if (
+      !guideWrapNode ||
+      !guideWrapNode.isConnected ||
+      !layer.contains(guideWrapNode)
+    ) {
+      layer.innerHTML = `
+        <div class="tb-center-indicator-wrap">
+          <img
+            class="tb-center-indicator tb-center-indicator-top"
+            src="tower_bible_images/tower_bible_center_indicator.svg"
+            alt=""
+            aria-hidden="true"
+          >
+          <img
+            class="tb-center-indicator tb-center-indicator-bottom"
+            src="tower_bible_images/tower_bible_center_indicator.svg"
+            alt=""
+            aria-hidden="true"
+          >
+        </div>`;
+
+      guideWrapNode =
+        layer.querySelector(
+          ".tb-center-indicator-wrap"
+        );
+    }
+
+    if (!guideWrapNode) return;
+
+    const laneBottom =
+      clamp(
+        state.fieldWidth * 0.055,
+        24,
+        42
+      );
+
+    const groundHeight =
+      laneBottom + state.laneHeight;
+
+    const laneTop =
+      state.fieldHeight - groundHeight;
+
+    const indicatorHeight =
+      state.laneHeight * 0.25;
+
+    const shouldReveal =
+      state.introActive &&
+      state.introGuideVisible &&
+      performance.now() -
+        state.introGuidePoppedAt <
+        900;
+
+    guideWrapNode.classList.toggle(
+      "is-intro-reveal",
+      shouldReveal
+    );
+
+    guideWrapNode.style.left =
+      `${state.guideCenterX}px`;
+
+    guideWrapNode.style.top =
+      `${laneTop}px`;
+
+    guideWrapNode.style.height =
+      `${groundHeight}px`;
+
+    guideWrapNode.style.setProperty(
+      "--tb-indicator-height",
+      `${indicatorHeight}px`
+    );
   }
 
   function renderOverlayMessage(layer) {
@@ -1347,14 +1433,17 @@
     layer.innerHTML = `<div class="tb-center-overlay-msg${toneClass}" style="opacity:${opacity.toFixed(3)};transform:translate(-50%, ${y.toFixed(1)}%) scale(${scale.toFixed(3)}) rotate(${rot.toFixed(1)}deg);background-position:${bgPos};">${formatOverlayMessage(message)}</div>`;
   }
 
-  function renderConveyor(layer) {
-    const laneBottom = clamp(state.fieldWidth * 0.055, 24, 42);
-    const groundHeight = laneBottom + state.laneHeight;
-    const tuftHeight = state.brickHeight * 0.42;
-    const rightBrickEdge = state.fieldWidth * 0.5 + (state.towerWidth * 0.76) * 0.5;
+  function ensureConveyorChrome(layer) {
+    if (
+      conveyorChromeInitialized &&
+      conveyorLaneNode?.isConnected &&
+      layer.contains(conveyorLaneNode)
+    ) {
+      return;
+    }
 
-    let html = `
-      <div class="tb-conveyor-ground" style="height:${groundHeight}px;">
+    layer.innerHTML = `
+      <div class="tb-conveyor-ground">
         <div class="tb-grass-overlay"></div>
       </div>
 
@@ -1363,7 +1452,6 @@
         src="tower_bible_images/tower_bible_grass_tuft_1.svg"
         alt=""
         aria-hidden="true"
-        style="left:${-tuftHeight * 0.5}px;bottom:${groundHeight - 1}px;height:${tuftHeight}px;"
       >
 
       <img
@@ -1371,7 +1459,6 @@
         src="tower_bible_images/tower_bible_grass_tuft_2.svg"
         alt=""
         aria-hidden="true"
-        style="left:${rightBrickEdge + tuftHeight}px;bottom:${groundHeight - 1}px;height:${tuftHeight}px;"
       >
 
       <img
@@ -1379,74 +1466,363 @@
         src="tower_bible_images/tower_bible_grass_tuft_1.svg"
         alt=""
         aria-hidden="true"
-        style="right:${-tuftHeight * 0.5}px;bottom:${groundHeight - 1}px;height:${tuftHeight}px;"
       >
+
+      <div class="tb-conveyor-lane"></div>
     `;
 
-    if (!state.introActive) {
-      html += `
-        <div class="tb-conveyor-lane" style="left:${state.lanePadX}px;right:${state.lanePadX}px;bottom:0;height:${groundHeight}px;">
-      `;
+    conveyorGroundNode =
+      layer.querySelector(
+        ".tb-conveyor-ground"
+      );
 
-      for (const brick of state.stream) {
-        const tappable = isBrickTappable(brick) && !state.collapseTriggered && !state.enteringBrick;
-        const classes = ["tb-choice-brick"];
-        if (brick.kind === "book") classes.push("is-book");
-        if (brick.kind === "reference") classes.push("is-ref");
-        if (brick.flashWrong) classes.push("is-wrong");
-        html += `
-          <button class="${classes.join(" ")}" data-id="${brick.id}" style="left:${Math.round(brick.left)}px;width:${state.brickWidth}px;height:${state.brickHeight}px;font-size:${brick.fontSize}px;" aria-label="${brick.isCorrect ? "Correct brick" : "Brick"}">${escapeHtml(brick.label)}</button>`;
+    conveyorLaneNode =
+      layer.querySelector(
+        ".tb-conveyor-lane"
+      );
+
+    conveyorTuftLeftNode =
+      layer.querySelector(
+        ".tb-grass-tuft-left"
+      );
+
+    conveyorTuftMidNode =
+      layer.querySelector(
+        ".tb-grass-tuft-mid"
+      );
+
+    conveyorTuftRightNode =
+      layer.querySelector(
+        ".tb-grass-tuft-right"
+      );
+
+    conveyorBrickNodes.clear();
+    conveyorGeometryKey = "";
+    conveyorChromeInitialized = true;
+
+    const activateBrick = (e) => {
+      if (
+        e.type === "click" &&
+        e.detail !== 0
+      ) {
+        return;
       }
 
-      html += `
-        </div>`;
+      const el =
+        e.target?.closest?.("[data-id]");
+
+      if (
+        !el ||
+        !layer.contains(el)
+      ) {
+        return;
+      }
+
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+
+      e.stopPropagation();
+
+      const id =
+        Number(el.dataset.id);
+
+      if (!Number.isFinite(id)) return;
+
+      handleBrickTap(id);
+    };
+
+    layer.onpointerdown = activateBrick;
+    layer.onclick = activateBrick;
+  }
+
+  function createConveyorBrickNode(brick) {
+    if (!conveyorLaneNode) return null;
+
+    const el =
+      document.createElement("button");
+
+    el.type = "button";
+    el.className = "tb-choice-brick";
+    el.dataset.id = String(brick.id);
+
+    conveyorLaneNode.appendChild(el);
+    conveyorBrickNodes.set(brick.id, el);
+
+    return el;
+  }
+
+  function renderConveyor(layer) {
+    ensureConveyorChrome(layer);
+
+    if (
+      !conveyorGroundNode ||
+      !conveyorLaneNode ||
+      !conveyorTuftLeftNode ||
+      !conveyorTuftMidNode ||
+      !conveyorTuftRightNode
+    ) {
+      return;
     }
 
-    layer.innerHTML = html;
+    const laneBottom =
+      clamp(
+        state.fieldWidth * 0.055,
+        24,
+        42
+      );
 
-    if (state.introActive) return;
+    const groundHeight =
+      laneBottom + state.laneHeight;
 
-    layer.querySelectorAll("[data-id]").forEach((el) => {
-      const id = Number(el.dataset.id);
-      const brick = state.stream.find((b) => b.id === id);
-      if (!brick) return;
-      const onActivate = (e) => {
-        if (e) {
-          if (e.cancelable) e.preventDefault();
-          e.stopPropagation();
-        }
-        handleBrickTap(id);
-      };
-      el.onclick = onActivate;
-      el.onpointerdown = onActivate;
-    });
+    const tuftHeight =
+      state.brickHeight * 0.42;
+
+    const rightBrickEdge =
+      state.fieldWidth * 0.5 +
+      (state.towerWidth * 0.76) * 0.5;
+
+    const geometryKey = [
+      groundHeight.toFixed(2),
+      tuftHeight.toFixed(2),
+      rightBrickEdge.toFixed(2),
+      state.lanePadX.toFixed(2)
+    ].join("|");
+
+    if (
+      geometryKey !==
+      conveyorGeometryKey
+    ) {
+      conveyorGeometryKey = geometryKey;
+
+      conveyorGroundNode.style.height =
+        `${groundHeight}px`;
+
+      conveyorTuftLeftNode.style.left =
+        `${-tuftHeight * 0.5}px`;
+
+      conveyorTuftLeftNode.style.bottom =
+        `${groundHeight - 1}px`;
+
+      conveyorTuftLeftNode.style.height =
+        `${tuftHeight}px`;
+
+      conveyorTuftMidNode.style.left =
+        `${rightBrickEdge + tuftHeight}px`;
+
+      conveyorTuftMidNode.style.bottom =
+        `${groundHeight - 1}px`;
+
+      conveyorTuftMidNode.style.height =
+        `${tuftHeight}px`;
+
+      conveyorTuftRightNode.style.right =
+        `${-tuftHeight * 0.5}px`;
+
+      conveyorTuftRightNode.style.bottom =
+        `${groundHeight - 1}px`;
+
+      conveyorTuftRightNode.style.height =
+        `${tuftHeight}px`;
+
+      conveyorLaneNode.style.left =
+        `${state.lanePadX}px`;
+
+      conveyorLaneNode.style.right =
+        `${state.lanePadX}px`;
+
+      conveyorLaneNode.style.bottom =
+        "0";
+
+      conveyorLaneNode.style.height =
+        `${groundHeight}px`;
+    }
+
+    const nextLaneDisplay =
+      state.introActive ? "none" : "";
+
+    if (
+      conveyorLaneNode.style.display !==
+      nextLaneDisplay
+    ) {
+      conveyorLaneNode.style.display =
+        nextLaneDisplay;
+    }
+
+    const activeIds = new Set();
+
+    for (const brick of state.stream) {
+      activeIds.add(brick.id);
+
+      const el =
+        conveyorBrickNodes.get(brick.id) ||
+        createConveyorBrickNode(brick);
+
+      if (!el) continue;
+
+      el.style.left =
+        `${Math.round(brick.left)}px`;
+
+      const sizeKey = [
+        state.brickWidth.toFixed(2),
+        state.brickHeight.toFixed(2),
+        Number(brick.fontSize).toFixed(2)
+      ].join("|");
+
+      if (
+        el.dataset.tbSizeKey !==
+        sizeKey
+      ) {
+        el.dataset.tbSizeKey = sizeKey;
+
+        el.style.width =
+          `${state.brickWidth}px`;
+
+        el.style.height =
+          `${state.brickHeight}px`;
+
+        el.style.fontSize =
+          `${brick.fontSize}px`;
+      }
+
+      el.classList.toggle(
+        "is-book",
+        brick.kind === "book"
+      );
+
+      el.classList.toggle(
+        "is-ref",
+        brick.kind === "reference"
+      );
+
+      el.classList.toggle(
+        "is-wrong",
+        !!brick.flashWrong
+      );
+
+      const nextLabel =
+        String(brick.label || "");
+
+      if (
+        el.textContent !== nextLabel
+      ) {
+        el.textContent = nextLabel;
+      }
+
+      const nextAriaLabel =
+        brick.isCorrect
+          ? "Correct brick"
+          : "Brick";
+
+      if (
+        el.getAttribute("aria-label") !==
+        nextAriaLabel
+      ) {
+        el.setAttribute(
+          "aria-label",
+          nextAriaLabel
+        );
+      }
+    }
+
+    for (
+      const [brickId, el]
+      of conveyorBrickNodes
+    ) {
+      if (activeIds.has(brickId)) {
+        continue;
+      }
+
+      el.remove();
+      conveyorBrickNodes.delete(brickId);
+    }
   }
 
   function renderEnteringBrick(layer) {
     const e = state.enteringBrick;
+
     if (!e) {
-      layer.innerHTML = "";
+      if (enteringBrickNode) {
+        enteringBrickNode.remove();
+        enteringBrickNode = null;
+        enteringBrickNodeId = 0;
+      }
+
       return;
     }
 
-    const cls = ["tb-enter-brick", e.textureClass || "tb-texture-normal"];
-    if (e.kind === "book") cls.push("book");
-    if (e.kind === "reference") cls.push("ref");
+    if (
+      !enteringBrickNode ||
+      !enteringBrickNode.isConnected ||
+      enteringBrickNodeId !== e.id
+    ) {
+      layer.innerHTML = "";
 
-    layer.innerHTML = `
-      <div class="${cls.join(" ")}"
-           style="
-             left:${e.left}px;
-             bottom:${e.bottom}px;
-             width:${e.width}px;
-             height:${e.height}px;
-             font-size:${e.fontSize}px;
-             transform:translateX(0) rotate(${e.rot}deg);
-             opacity:1;
-           ">
-        ${escapeHtml(e.label)}
-      </div>
-    `;
+      enteringBrickNode =
+        document.createElement("div");
+
+      enteringBrickNodeId = e.id;
+
+      layer.appendChild(
+        enteringBrickNode
+      );
+    }
+
+    const cls = [
+      "tb-enter-brick",
+      e.textureClass ||
+        "tb-texture-normal"
+    ];
+
+    if (e.kind === "book") {
+      cls.push("book");
+    }
+
+    if (e.kind === "reference") {
+      cls.push("ref");
+    }
+
+    const nextClassName =
+      cls.join(" ");
+
+    if (
+      enteringBrickNode.className !==
+      nextClassName
+    ) {
+      enteringBrickNode.className =
+        nextClassName;
+    }
+
+    const nextLabel =
+      String(e.label || "");
+
+    if (
+      enteringBrickNode.textContent !==
+      nextLabel
+    ) {
+      enteringBrickNode.textContent =
+        nextLabel;
+    }
+
+    enteringBrickNode.style.left =
+      `${e.left}px`;
+
+    enteringBrickNode.style.bottom =
+      `${e.bottom}px`;
+
+    enteringBrickNode.style.width =
+      `${e.width}px`;
+
+    enteringBrickNode.style.height =
+      `${e.height}px`;
+
+    enteringBrickNode.style.fontSize =
+      `${e.fontSize}px`;
+
+    enteringBrickNode.style.transform =
+      `translateX(0) rotate(${e.rot}deg)`;
+
+    enteringBrickNode.style.opacity = "1";
   }
 
   function renderTower(layer) {
