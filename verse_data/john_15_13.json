@@ -1,0 +1,55 @@
+{
+    "biblopet": "🐆",
+    "biblopetDefaultName": "Jeebee",
+    "biblopetFeetFromBottom": "9.1%",
+    "verseId": "john_15_13",
+    "ref": "John 15:13",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Greater love",
+        "has no one than this",
+        "that someone lay down his life",
+        "for his friends."
+    ],
+    "verseText": "Greater love has no one than this, that someone lay down his life for his friends.",
+    "meaning": "The greatest love is shown by giving up your life for someone else. Jesus showed this perfect love when he died in our place on the cross.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "underscore",
+            "word": "Greater",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "love",
+            "occurrence": 1,
+            "emoji": "❤️"
+        },
+        {
+            "type": "emoji",
+            "word": "someone",
+            "occurrence": 1,
+            "emoji": "👤"
+        },
+        {
+            "type": "emoji",
+            "word": "lay",
+            "occurrence": 1,
+            "emoji": "⬇👇"
+        },
+        {
+            "type": "emoji",
+            "word": "life",
+            "occurrence": 1,
+            "emoji": "🌱"
+        },
+        {
+            "type": "emoji",
+            "word": "friends",
+            "occurrence": 1,
+            "emoji": "🧑‍🤝‍🧑"
+        }
+    ]
+}
