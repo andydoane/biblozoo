@@ -1,0 +1,56 @@
+{
+    "biblopet": "🦊",
+    "biblopetDefaultName": "Squeaky",
+    "biblopetFeetFromBottom": "9.6%",
+    "verseId": "john_5_39",
+    "ref": "John 5:39",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "You search the Scriptures",
+        "because you think that in them",
+        "you have eternal life",
+        "and it is they",
+        "that bear witness about me."
+    ],
+    "verseText": "You search the Scriptures because you think that in them you have eternal life; and it is they that bear witness about me.",
+    "meaning": "The Scriptures (the Bible) point us to Jesus. The goal of reading the Bible is to know him, because he's the only one who can give us eternal life.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "search",
+            "occurrence": 1,
+            "emoji": "🔎"
+        },
+        {
+            "type": "emoji",
+            "word": "Scriptures",
+            "occurrence": 1,
+            "emoji": "📖"
+        },
+        {
+            "type": "emoji",
+            "word": "think",
+            "occurrence": 1,
+            "emoji": "🧠"
+        },
+        {
+            "type": "emoji",
+            "word": "eternal",
+            "occurrence": 1,
+            "emoji": "♾️"
+        },
+        {
+            "type": "emoji",
+            "word": "life",
+            "occurrence": 1,
+            "emoji": "🌱"
+        },
+        {
+            "type": "underscore",
+            "word": "witness",
+            "occurrence": 1
+        }
+    ]
+}
