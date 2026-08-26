@@ -15,6 +15,10 @@
 
   const HELP_OVERLAY_ID = "tbHelpOverlay";
 
+  const STREAK_PET_VERSE_LIST_URL = "../../verse_data/verse_list.json";
+  const STREAK_PET_DATA_DIR = "../../verse_data/";
+  const STREAK_PET_IMAGE_DIR = "../../pet_images/";
+
   const BOOKS = window.VerseGameShell.getBibleBookDecoys();
 
   const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
@@ -126,6 +130,7 @@
 
   const STREAK_CELEBRATION_TUNING = {
     milestones: [5, 10, 15, 20],
+    petDuration: 3200,
     colors: {
       rainbow: ["#ff5a51", "#ffa351", "#ffc751", "#a7cb6f", "#40b9c5", "#7f66c6", "#ff7ad9"],
       yellowStar: ["#ffc751", "#ffe27a"],
@@ -166,6 +171,11 @@
   let completionResult = null;
   let resizeBound = false;
   let endScreenUnlockTimer = 0;
+
+  let streakPetCatalogPromise = null;
+  let preparedStreakPet = null;
+  let preparedStreakPetPromise = null;
+  let lastStreakPetVerseId = "";
 
   let audioCtx = null;
   let masterGain = null;
@@ -259,6 +269,166 @@
     correctStreak: 0,
     streakMilestonesShown: {}
   };
+
+  function normalizeStreakPetFeetFromBottom(value) {
+    const raw = String(value ?? "").trim();
+    const match = raw.match(/^(-?\d+(?:\.\d+)?)%$/);
+
+    if (!match) return "0%";
+
+    const amount = Number.parseFloat(match[1]);
+
+    if (!Number.isFinite(amount)) return "0%";
+
+    return `${clamp(amount, 0, 100)}%`;
+  }
+
+  function loadStreakPetVerseIds() {
+    if (streakPetCatalogPromise) {
+      return streakPetCatalogPromise;
+    }
+
+    streakPetCatalogPromise = fetch(STREAK_PET_VERSE_LIST_URL)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(
+            `Could not load BibloPet verse list: ${response.status}`
+          );
+        }
+
+        return response.json();
+      })
+      .then(data => {
+        if (!Array.isArray(data)) return [];
+
+        return data.filter(
+          verseId =>
+            typeof verseId === "string" &&
+            verseId.trim()
+        );
+      })
+      .catch(err => {
+        console.warn(
+          "Could not prepare Tower of Bible streak pets",
+          err
+        );
+
+        return [];
+      });
+
+    return streakPetCatalogPromise;
+  }
+
+  function preloadStreakPetImage(src) {
+    return new Promise(resolve => {
+      const img = new Image();
+
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.decoding = "async";
+      img.src = src;
+    });
+  }
+
+  async function buildPreparedStreakPet() {
+    const verseIds = await loadStreakPetVerseIds();
+
+    if (!verseIds.length) return null;
+
+    let candidates = verseIds.filter(
+      verseId => verseId !== lastStreakPetVerseId
+    );
+
+    if (!candidates.length) {
+      candidates = [...verseIds];
+    } else {
+      candidates = [...candidates];
+    }
+
+    const attempts = Math.min(8, candidates.length);
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const randomIndex =
+        Math.floor(Math.random() * candidates.length);
+
+      const verseId =
+        candidates.splice(randomIndex, 1)[0];
+
+      try {
+        const response = await fetch(
+          `${STREAK_PET_DATA_DIR}${verseId}.json`
+        );
+
+        if (!response.ok) continue;
+
+        const verseData = await response.json();
+
+        if (verseData?.published === false) continue;
+
+        const imageSrc =
+          `${STREAK_PET_IMAGE_DIR}pet_${verseId}.png`;
+
+        const preloadedImage =
+          await preloadStreakPetImage(imageSrc);
+
+        if (!preloadedImage) continue;
+
+        return {
+          verseId,
+          imageSrc,
+          preloadedImage,
+          feetFromBottom:
+            normalizeStreakPetFeetFromBottom(
+              verseData?.biblopetFeetFromBottom
+            )
+        };
+      } catch (err) {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  function prepareNextStreakPet() {
+    if (preparedStreakPet) {
+      return Promise.resolve(preparedStreakPet);
+    }
+
+    if (preparedStreakPetPromise) {
+      return preparedStreakPetPromise;
+    }
+
+    preparedStreakPetPromise =
+      buildPreparedStreakPet()
+        .then(pet => {
+          preparedStreakPet = pet;
+          return pet;
+        })
+        .finally(() => {
+          preparedStreakPetPromise = null;
+        });
+
+    return preparedStreakPetPromise;
+  }
+
+  function takePreparedStreakPet() {
+    const pet = preparedStreakPet;
+
+    if (!pet) {
+      prepareNextStreakPet();
+      return null;
+    }
+
+    preparedStreakPet = null;
+    lastStreakPetVerseId = pet.verseId;
+
+    prepareNextStreakPet();
+
+    return pet;
+  }
+
+  prepareNextStreakPet();
 
   renderIntro();
 
@@ -2619,33 +2789,72 @@
     const layer = document.getElementById("tbCelebrationLayer");
     if (!layer) return;
 
-    const config = STREAK_CELEBRATION_TUNING.byStreak[streak];
-    if (!config) return;
-
     playGameSound("streak");
 
     const brick = Math.max(36, state.brickHeight || 58);
-    const duration = config.duration;
+    const duration = STREAK_CELEBRATION_TUNING.petDuration;
+    const pet = takePreparedStreakPet();
+    const direction =
+      Math.random() < 0.5 ? "from-left" : "from-right";
+
+    const laneBottom =
+      clamp(state.fieldWidth * 0.055, 24, 42);
+
+    const groundHeight =
+      laneBottom + state.laneHeight;
+
     const group = document.createElement("div");
-    group.className = `tb-streak-celebration is-streak-${streak}`;
-    group.style.setProperty("--tb-streak-duration", `${duration}ms`);
-    group.style.setProperty("--tb-brick-height", `${brick}px`);
+
+    group.className =
+      `tb-streak-celebration is-streak-${streak}`;
+
+    group.style.setProperty(
+      "--tb-streak-duration",
+      `${duration}ms`
+    );
+
+    group.style.setProperty(
+      "--tb-brick-height",
+      `${brick}px`
+    );
 
     group.innerHTML = `
-      <div class="tb-streak-text" style="font-size:${clamp(brick * 0.58, 30, 58).toFixed(1)}px;">
+      <div
+        class="tb-streak-text"
+        style="font-size:${clamp(brick * 0.58, 30, 58).toFixed(1)}px;"
+      >
         ${streak} IN A ROW!
       </div>
-      <div class="tb-confetti-shower">
-        ${renderStreakConfetti(streak, config, brick)}
-      </div>
-      ${renderStreakFireworks(streak, config, brick)}
+
+      ${pet ? `
+        <div
+          class="tb-streak-pet-visitor ${direction}"
+          style="
+            --tb-streak-pet-ground:${groundHeight.toFixed(1)}px;
+            --tb-streak-pet-feet-from-bottom:${pet.feetFromBottom};
+            --tb-streak-pet-travel:${state.fieldWidth.toFixed(1)}px;
+          "
+          aria-hidden="true"
+        >
+          <div class="tb-streak-pet-motion">
+            <div class="tb-streak-pet-rotator">
+              <img
+                class="tb-streak-pet-img"
+                src="${escapeHtml(pet.imageSrc)}"
+                alt=""
+                draggable="false"
+              >
+            </div>
+          </div>
+        </div>
+      ` : ""}
     `;
 
     layer.appendChild(group);
 
     window.setTimeout(() => {
       group.remove();
-    }, duration + 900);
+    }, duration + 300);
   }
 
   function renderStreakConfetti(streak, config, brick) {
