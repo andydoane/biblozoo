@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BibloZoo Verse Asset Tester</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #11151b;
+      --panel: #1a2029;
+      --panel-2: #212936;
+      --text: #eef3f8;
+      --muted: #a8b3c2;
+      --border: #364152;
+      --good: #5fd38d;
+      --bad: #ff7d7d;
+      --warn: #f4cc67;
+      --accent: #7ec8ff;
+      --shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f4f7fb;
+        --panel: #ffffff;
+        --panel-2: #f7f9fc;
+        --text: #1b2430;
+        --muted: #667386;
+        --border: #d6dde7;
+        --good: #167a45;
+        --bad: #bc3030;
+        --warn: #8a6500;
+        --accent: #126bb0;
+        --shadow: 0 10px 30px rgba(40,60,90,.10);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+
+    .page {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0 56px;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 6px; font-size: clamp(26px, 4vw, 40px); line-height: 1.1; }
+    h2 { margin-bottom: 14px; font-size: 20px; }
+    h3 { margin-bottom: 10px; font-size: 16px; }
+
+    .subhead { color: var(--muted); margin-bottom: 22px; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .control-group { min-width: 0; }
+    label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    select, input[type="file"] {
+      width: 100%;
+      min-height: 42px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 8px 10px;
+    }
+
+    .btn {
+      min-height: 42px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 8px 13px;
+      font-weight: 700;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn.primary {
+      background: var(--accent);
+      color: #07131c;
+      border-color: transparent;
+    }
+
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .chip, .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .status.good, .chip.good { color: var(--good); }
+    .status.bad, .chip.bad { color: var(--bad); }
+    .status.warn, .chip.warn { color: var(--warn); }
+    .status.checking { color: var(--muted); }
+
+    .error-box {
+      display: none;
+      border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--border));
+      background: color-mix(in srgb, var(--bad) 10%, var(--panel));
+      color: var(--bad);
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin-top: 12px;
+      white-space: pre-wrap;
+    }
+    .error-box.show { display: block; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .meta-item {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      min-width: 0;
+    }
+    .meta-item .k {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      font-weight: 800;
+    }
+    .meta-item .v {
+      margin-top: 3px;
+      overflow-wrap: anywhere;
+      font-weight: 700;
+    }
+
+    .verse-copy {
+      font-size: 18px;
+      line-height: 1.7;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      white-space: pre-wrap;
+    }
+
+    .asset-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--panel-2);
+    }
+
+    .asset-preview {
+      min-height: 230px;
+      display: grid;
+      place-items: center;
+      padding: 14px;
+      background:
+        linear-gradient(45deg, rgba(127,127,127,.08) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(127,127,127,.08) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(127,127,127,.08) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(127,127,127,.08) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+    }
+
+    .asset-preview img {
+      display: block;
+      max-width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+    }
+
+    .asset-missing {
+      display: none;
+      text-align: center;
+      color: var(--bad);
+      font-weight: 800;
+    }
+    .asset-missing .fallback-emoji {
+      display: block;
+      font-size: 64px;
+      line-height: 1;
+      margin-bottom: 10px;
+    }
+
+    .asset-info {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .file-path {
+      color: var(--muted);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
+      margin-top: 7px;
+    }
+
+    .audio-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .audio-row {
+      display: grid;
+      grid-template-columns: auto minmax(120px, .6fr) minmax(180px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+    }
+    .audio-row:first-child { border-top: 0; }
+
+    .audio-label { font-weight: 800; }
+    .audio-text { color: var(--muted); overflow-wrap: anywhere; }
+
+    #sharedAudio {
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      vertical-align: middle;
+      padding: 10px 8px;
+      border-top: 1px solid var(--border);
+    }
+    th {
+      border-top: 0;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .replacement {
+      display: inline-flex;
+      min-width: 56px;
+      min-height: 48px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 5px 10px;
+      background: var(--panel-2);
+    }
+
+    .replacement.emoji { font-size: 30px; }
+    .replacement.underscore {
+      font: 800 22px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 2px;
+    }
+    .replacement img {
+      display: block;
+      max-width: 64px;
+      max-height: 64px;
+      object-fit: contain;
+    }
+
+    .hide-preview-token {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+      border-radius: 8px;
+      padding: 0 5px;
+      margin: 0 1px;
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    }
+    .hide-preview-token img {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      vertical-align: middle;
+    }
+    .hide-preview-token.emoji { font-size: 23px; line-height: 1.2; }
+    .hide-preview-token.underscore {
+      font: 800 17px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .echo-list {
+      margin: 0;
+      padding-left: 22px;
+    }
+    .echo-list li { margin: 5px 0; }
+
+    details { margin-top: 10px; }
+    summary { cursor: pointer; font-weight: 800; }
+    pre {
+      max-height: 440px;
+      overflow: auto;
+      padding: 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 820px) {
+      .controls { grid-template-columns: 1fr; }
+      .grid-2, .meta-grid { grid-template-columns: 1fr 1fr; }
+      .audio-row { grid-template-columns: auto 1fr auto; }
+      .audio-text { grid-column: 2 / -1; }
+    }
+
+    @media (max-width: 560px) {
+      .page { width: min(100% - 18px, 1180px); padding-top: 16px; }
+      .grid-2, .meta-grid { grid-template-columns: 1fr; }
+      .audio-row { grid-template-columns: 1fr auto; }
+      .audio-text { grid-column: 1 / -1; }
+      .panel { padding: 14px; }
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 660px; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header>
+      <h1>BibloZoo Verse Asset Tester</h1>
+      <p class="subhead">
+        Load any verse from <code>verse_data/verse_list.json</code> and verify its JSON, pet art,
+        profile picture, audio files, and hide-plan replacements in one place.
+      </p>
+    </header>
+
+    <section class="panel">
+      <div class="controls">
+        <div class="control-group">
+          <label for="verseSelect">Verse from verse_list.json</label>
+          <select id="verseSelect">
+            <option value="">Loading verse list…</option>
+          </select>
+        </div>
+
+        <button class="btn" id="reloadBtn" type="button">Reload</button>
+        <button class="btn primary" id="checkAllBtn" type="button">Check all assets</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <label for="jsonFileInput">Optional: test a JSON file not yet in verse_list.json</label>
+        <input id="jsonFileInput" type="file" accept=".json,application/json">
+      </div>
+
+      <div class="summary" id="summary"></div>
+      <div class="error-box" id="errorBox"></div>
+    </section>
+
+    <div id="content" hidden>
+      <section class="panel">
+        <h2>Verse JSON</h2>
+        <div class="meta-grid" id="metaGrid"></div>
+
+        <h3 style="margin-top:16px">Verse text</h3>
+        <div class="verse-copy" id="verseText"></div>
+
+        <h3 style="margin-top:16px">Meaning</h3>
+        <div id="meaning"></div>
+
+        <h3 style="margin-top:16px">Echo parts</h3>
+        <ol class="echo-list" id="echoList"></ol>
+
+        <details>
+          <summary>Raw JSON</summary>
+          <pre id="rawJson"></pre>
+        </details>
+      </section>
+
+      <section class="panel">
+        <h2>Pet &amp; Profile Art</h2>
+        <div class="grid-2">
+          <article class="asset-card">
+            <div class="asset-preview">
+              <img id="petImage" alt="BibloPet image">
+              <div class="asset-missing" id="petMissing">
+                <span class="fallback-emoji" id="petEmojiFallback">🐾</span>
+                Pet image missing
+              </div>
+            </div>
+            <div class="asset-info">
+              <strong>Pet image</strong>
+              <span class="status checking" id="petStatus">Checking…</span>
+              <div class="file-path" id="petPath"></div>
+            </div>
+          </article>
+
+          <article class="asset-card">
+            <div class="asset-preview">
+              <img id="profileImage" alt="Profile picture">
+              <div class="asset-missing" id="profileMissing">Profile picture missing</div>
+            </div>
+            <div class="asset-info">
+              <strong>Profile picture</strong>
+              <span class="status checking" id="profileStatus">Checking…</span>
+              <div class="file-path" id="profilePath"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Audio</h2>
+        <div class="audio-toolbar">
+          <button class="btn" id="playEchoBtn" type="button">Play echo parts in order</button>
+          <button class="btn" id="stopAudioBtn" type="button">Stop audio</button>
+        </div>
+        <div id="audioRows"></div>
+        <audio id="sharedAudio" controls preload="metadata"></audio>
+      </section>
+
+      <section class="panel">
+        <h2>Hide Plan</h2>
+        <p class="footer-note">
+          “Target check” verifies that the requested occurrence of each word actually exists in <code>verseText</code>.
+          Image replacements also verify the matching <code>verse_images/andymoji/*.png</code> file.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Word</th>
+                <th>Occurrence</th>
+                <th>Type</th>
+                <th>Replacement</th>
+                <th>Target check</th>
+                <th>Asset</th>
+              </tr>
+            </thead>
+            <tbody id="hidePlanBody"></tbody>
+          </table>
+        </div>
+
+        <h3 style="margin-top:18px">Replacement preview</h3>
+        <div class="verse-copy" id="hidePreview"></div>
+      </section>
+    </div>
+  </main>
+
+<script>
+(() => {
+  "use strict";
+
+  // This utility lives in /utilities/, so all project paths are one level up.
+  const ROOT = "../";
+  const DATA_DIR = ROOT + "verse_data/";
+  const AUDIO_DIR = ROOT + "verse_audio/";
+  const PET_DIR = ROOT + "pet_images/";
+  const PROFILE_DIR = ROOT + "profile_pictures/";
+  const ANDYMOJI_DIR = ROOT + "verse_images/andymoji/";
+
+  const verseSelect = document.getElementById("verseSelect");
+  const reloadBtn = document.getElementById("reloadBtn");
+  const checkAllBtn = document.getElementById("checkAllBtn");
+  const jsonFileInput = document.getElementById("jsonFileInput");
+  const errorBox = document.getElementById("errorBox");
+  const content = document.getElementById("content");
+  const summary = document.getElementById("summary");
+  const metaGrid = document.getElementById("metaGrid");
+  const verseTextEl = document.getElementById("verseText");
+  const meaningEl = document.getElementById("meaning");
+  const echoList = document.getElementById("echoList");
+  const rawJson = document.getElementById("rawJson");
+  const petImage = document.getElementById("petImage");
+  const petMissing = document.getElementById("petMissing");
+  const petEmojiFallback = document.getElementById("petEmojiFallback");
+  const petStatus = document.getElementById("petStatus");
+  const petPath = document.getElementById("petPath");
+  const profileImage = document.getElementById("profileImage");
+  const profileMissing = document.getElementById("profileMissing");
+  const profileStatus = document.getElementById("profileStatus");
+  const profilePath = document.getElementById("profilePath");
+  const audioRows = document.getElementById("audioRows");
+  const sharedAudio = document.getElementById("sharedAudio");
+  const playEchoBtn = document.getElementById("playEchoBtn");
+  const stopAudioBtn = document.getElementById("stopAudioBtn");
+  const hidePlanBody = document.getElementById("hidePlanBody");
+  const hidePreview = document.getElementById("hidePreview");
+
+  let currentVerse = null;
+  let currentSourceLabel = "";
+  let expectedAssets = [];
+  let echoPlaylist = [];
+  let playlistAbortToken = 0;
+
+  function showError(message) {
+    errorBox.textContent = message || "";
+    errorBox.classList.toggle("show", Boolean(message));
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function setStatus(el, state, text) {
+    el.className = "status " + state;
+    el.textContent = text;
+    el.dataset.state = state;
+    updateSummary();
+  }
+
+  function assetEntry(id, label, url, statusEl) {
+    return { id, label, url, statusEl };
+  }
+
+  function updateSummary() {
+    if (!currentVerse) {
+      summary.innerHTML = "";
+      return;
+    }
+
+    const statusEls = expectedAssets
+      .map(a => a.statusEl)
+      .filter(Boolean);
+
+    const good = statusEls.filter(el => el.dataset.state === "good").length;
+    const bad = statusEls.filter(el => el.dataset.state === "bad").length;
+    const checking = statusEls.filter(el =>
+      !el.dataset.state || el.dataset.state === "checking"
+    ).length;
+
+    const jsonIssues = validateJson(currentVerse).length;
+    const hideIssues = validateHidePlan(currentVerse).filter(x => !x.ok).length;
+
+    const pieces = [
+      `<span class="chip ${jsonIssues ? "bad" : "good"}">JSON: ${jsonIssues ? jsonIssues + " issue" + (jsonIssues === 1 ? "" : "s") : "OK"}</span>`,
+      `<span class="chip ${hideIssues ? "bad" : "good"}">Hide plan: ${hideIssues ? hideIssues + " issue" + (hideIssues === 1 ? "" : "s") : "OK"}</span>`,
+      `<span class="chip good">Assets found: ${good}</span>`
+    ];
+
+    if (bad) pieces.push(`<span class="chip bad">Assets missing: ${bad}</span>`);
+    if (checking) pieces.push(`<span class="chip warn">Checking: ${checking}</span>`);
+
+    summary.innerHTML = pieces.join("");
+  }
+
+  function validateJson(json) {
+    const issues = [];
+    if (!json || typeof json !== "object" || Array.isArray(json)) {
+      return ["Root value is not a JSON object."];
+    }
+
+    if (!String(json.verseId || "").trim()) issues.push("Missing verseId.");
+    if (!String(json.ref || "").trim()) issues.push("Missing ref.");
+    if (!String(json.verseText || "").trim()) issues.push("Missing verseText.");
+    if (!String(json.translation || "").trim()) issues.push("Missing translation.");
+    if (!Array.isArray(json.echoParts)) issues.push("echoParts is not an array.");
+    if (!Array.isArray(json.hidePlan)) issues.push("hidePlan is not an array.");
+    if (!String(json.biblopet || "").trim()) issues.push("Missing biblopet.");
+    return issues;
+  }
+
+  function findWordSpans(text, word) {
+    const source = String(text ?? "");
+    const needle = String(word ?? "").trim();
+    if (!needle) return [];
+
+    // Prefer Unicode-aware "whole word/phrase" matching.
+    try {
+      const pattern = `(?<![\\p{L}\\p{N}])${escapeRegExp(needle)}(?![\\p{L}\\p{N}])`;
+      const re = new RegExp(pattern, "giu");
+      return Array.from(source.matchAll(re)).map(m => ({
+        start: m.index,
+        end: m.index + m[0].length,
+        match: m[0]
+      }));
+    } catch (err) {
+      // Compatibility fallback.
+      const spans = [];
+      const haystack = source.toLocaleLowerCase();
+      const target = needle.toLocaleLowerCase();
+      let from = 0;
+      while (true) {
+        const index = haystack.indexOf(target, from);
+        if (index < 0) break;
+        spans.push({ start: index, end: index + needle.length, match: source.slice(index, index + needle.length) });
+        from = index + Math.max(1, needle.length);
+      }
+      return spans;
+    }
+  }
+
+  function validateHidePlan(json) {
+    const text = String(json?.verseText || "");
+    const plan = Array.isArray(json?.hidePlan) ? json.hidePlan : [];
+
+    return plan.map((item, index) => {
+      const word = String(item?.word || "").trim();
+      const occurrence = Number(item?.occurrence);
+      const spans = findWordSpans(text, word);
+      const type = String(item?.type || "").trim();
+      const issues = [];
+
+      if (!word) issues.push("Missing word");
+      if (!Number.isInteger(occurrence) || occurrence < 1) issues.push("Invalid occurrence");
+      if (!["emoji", "image", "underscore"].includes(type)) issues.push("Unknown type");
+      if (type === "emoji" && !String(item?.emoji || "").trim()) issues.push("Missing emoji");
+      if (type === "image" && !String(item?.image || "").trim()) issues.push("Missing image name");
+      if (Number.isInteger(occurrence) && occurrence >= 1 && spans.length < occurrence) {
+        issues.push(`Found ${spans.length}, needs occurrence ${occurrence}`);
+      }
+
+      return {
+        index,
+        ok: issues.length === 0,
+        issues,
+        spans,
+        span: Number.isInteger(occurrence) && occurrence >= 1 ? spans[occurrence - 1] || null : null
+      };
+    });
+  }
+
+  function makeMetaItem(key, value) {
+    return `
+      <div class="meta-item">
+        <div class="k">${escapeHtml(key)}</div>
+        <div class="v">${escapeHtml(value === undefined ? "—" : value)}</div>
+      </div>
+    `;
+  }
+
+  function renderJson(json) {
+    metaGrid.innerHTML = [
+      makeMetaItem("Reference", json.ref || "—"),
+      makeMetaItem("Verse ID", json.verseId || "—"),
+      makeMetaItem("Translation", json.translation || "—"),
+      makeMetaItem("Published", String(json.published ?? "—")),
+      makeMetaItem("BibloPet", `${json.biblopet || "—"} ${json.biblopetDefaultName || ""}`.trim()),
+      makeMetaItem("Feet from bottom", json.biblopetFeetFromBottom || "—"),
+      makeMetaItem("Echo parts", Array.isArray(json.echoParts) ? json.echoParts.length : "Invalid"),
+      makeMetaItem("Hide-plan items", Array.isArray(json.hidePlan) ? json.hidePlan.length : "Invalid")
+    ].join("");
+
+    verseTextEl.textContent = json.verseText || "";
+    meaningEl.textContent = json.meaning || "—";
+
+    echoList.innerHTML = "";
+    const parts = Array.isArray(json.echoParts) ? json.echoParts : [];
+    if (!parts.length) {
+      echoList.innerHTML = `<li class="empty">No echo parts.</li>`;
+    } else {
+      parts.forEach(part => {
+        const li = document.createElement("li");
+        li.textContent = part;
+        echoList.appendChild(li);
+      });
+    }
+
+    rawJson.textContent = JSON.stringify(json, null, 2);
+  }
+
+  function probeImage(imgEl, missingEl, statusEl, url, fallbackEmoji = "") {
+    return new Promise(resolve => {
+      setStatus(statusEl, "checking", "Checking…");
+      imgEl.style.display = "block";
+      missingEl.style.display = "none";
+      imgEl.removeAttribute("src");
+
+      const done = (ok) => {
+        imgEl.onload = null;
+        imgEl.onerror = null;
+
+        if (ok) {
+          imgEl.style.display = "block";
+          missingEl.style.display = "none";
+          setStatus(statusEl, "good", "Found");
+        } else {
+          imgEl.style.display = "none";
+          missingEl.style.display = "block";
+          if (fallbackEmoji) petEmojiFallback.textContent = fallbackEmoji;
+          setStatus(statusEl, "bad", "Missing");
+        }
+        resolve(ok);
+      };
+
+      imgEl.onload = () => done(true);
+      imgEl.onerror = () => done(false);
+      imgEl.src = url + (url.includes("?") ? "&" : "?") + "qa=" + Date.now();
+    });
+  }
+
+  function probeAudio(url, statusEl) {
+    return new Promise(resolve => {
+      setStatus(statusEl, "checking", "Checking…");
+      const audio = new Audio();
+      let finished = false;
+      const timeout = setTimeout(() => finish(null), 7000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        audio.onloadedmetadata = null;
+        audio.oncanplay = null;
+        audio.onerror = null;
+        try {
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+        } catch (err) {}
+      }
+
+      function finish(ok) {
+        if (finished) return;
+        finished = true;
+        cleanup();
+
+        if (ok === true) setStatus(statusEl, "good", "Found");
+        else if (ok === false) setStatus(statusEl, "bad", "Missing");
+        else setStatus(statusEl, "warn", "No response");
+
+        resolve(ok);
+      }
+
+      audio.preload = "metadata";
+      audio.onloadedmetadata = () => finish(true);
+      audio.oncanplay = () => finish(true);
+      audio.onerror = () => finish(false);
+      audio.src = url + (url.includes("?") ? "&" : "?") + "qa=" + Date.now();
+      try { audio.load(); } catch (err) { finish(null); }
+    });
+  }
+
+  function renderArt(json) {
+    const verseId = String(json.verseId || "").trim();
+    const petUrl = `${PET_DIR}pet_${verseId}.png`;
+    const profileUrl = `${PROFILE_DIR}profile_picture_${verseId}.png`;
+
+    petPath.textContent = petUrl;
+    profilePath.textContent = profileUrl;
+    petEmojiFallback.textContent = json.biblopet || "🐾";
+
+    expectedAssets.push(assetEntry("pet", "Pet image", petUrl, petStatus));
+    expectedAssets.push(assetEntry("profile", "Profile picture", profileUrl, profileStatus));
+
+    probeImage(petImage, petMissing, petStatus, petUrl, json.biblopet || "🐾");
+    probeImage(profileImage, profileMissing, profileStatus, profileUrl);
+  }
+
+  function audioFileSpecs(json) {
+    const verseId = String(json.verseId || "").trim();
+    const parts = Array.isArray(json.echoParts) ? json.echoParts : [];
+    const specs = [
+      { kind: "Full verse", text: json.verseText || "", file: `${verseId}.mp3` },
+      { kind: "Reference", text: json.ref || "", file: `${verseId}_ref.mp3` }
+    ];
+
+    parts.forEach((text, index) => {
+      const suffix = String.fromCharCode("a".charCodeAt(0) + index);
+      specs.push({
+        kind: `Echo ${suffix.toUpperCase()}`,
+        text,
+        file: `${verseId}${suffix}.mp3`,
+        isEcho: true
+      });
+    });
+
+    return specs;
+  }
+
+  function playAudio(url, button) {
+    playlistAbortToken++;
+    document.querySelectorAll("[data-audio-play]").forEach(btn => {
+      btn.textContent = "Play";
+    });
+
+    sharedAudio.pause();
+    sharedAudio.src = url;
+    sharedAudio.currentTime = 0;
+    sharedAudio.play().catch(err => {
+      showError(`Could not play audio:\n${url}\n\n${err.message || err}`);
+    });
+
+    if (button) button.textContent = "Playing…";
+    sharedAudio.onended = () => {
+      if (button) button.textContent = "Play";
+    };
+  }
+
+  function renderAudio(json) {
+    audioRows.innerHTML = "";
+    echoPlaylist = [];
+    const specs = audioFileSpecs(json);
+
+    specs.forEach((spec, index) => {
+      const url = AUDIO_DIR + spec.file;
+      const row = document.createElement("div");
+      row.className = "audio-row";
+
+      const playBtn = document.createElement("button");
+      playBtn.className = "btn";
+      playBtn.type = "button";
+      playBtn.textContent = "Play";
+      playBtn.dataset.audioPlay = "1";
+      playBtn.addEventListener("click", () => playAudio(url, playBtn));
+
+      const label = document.createElement("div");
+      label.className = "audio-label";
+      label.textContent = spec.kind;
+
+      const detail = document.createElement("div");
+      detail.className = "audio-text";
+      detail.innerHTML = `${escapeHtml(spec.text)}<div class="file-path">${escapeHtml(url)}</div>`;
+
+      const status = document.createElement("span");
+      status.className = "status checking";
+      status.textContent = "Checking…";
+      status.dataset.state = "checking";
+
+      row.append(playBtn, label, detail, status);
+      audioRows.appendChild(row);
+
+      expectedAssets.push(assetEntry(`audio-${index}`, spec.kind, url, status));
+      probeAudio(url, status);
+
+      if (spec.isEcho) echoPlaylist.push(url);
+    });
+
+    playEchoBtn.disabled = echoPlaylist.length === 0;
+  }
+
+  async function playPlaylist(urls) {
+    if (!urls.length) return;
+    const myToken = ++playlistAbortToken;
+    showError("");
+
+    for (const url of urls) {
+      if (myToken !== playlistAbortToken) return;
+
+      await new Promise(resolve => {
+        sharedAudio.onended = resolve;
+        sharedAudio.onerror = () => {
+          showError(`Could not play playlist item:\n${url}`);
+          resolve();
+        };
+        sharedAudio.pause();
+        sharedAudio.src = url;
+        sharedAudio.currentTime = 0;
+        sharedAudio.play().catch(err => {
+          showError(`Could not play audio:\n${url}\n\n${err.message || err}`);
+          resolve();
+        });
+      });
+    }
+  }
+
+  function makeReplacementNode(item, word) {
+    if (item.type === "emoji") {
+      return `<span class="hide-preview-token emoji" title="${escapeHtml(word)}">${escapeHtml(item.emoji || "❓")}</span>`;
+    }
+
+    if (item.type === "image") {
+      const name = String(item.image || "").trim();
+      const src = `${ANDYMOJI_DIR}${encodeURIComponent(name)}.png`;
+      return `<span class="hide-preview-token" title="${escapeHtml(word)}"><img src="${escapeHtml(src)}" alt="${escapeHtml(name)}"></span>`;
+    }
+
+    const count = Math.max(3, Math.min(12, String(word || "").length));
+    return `<span class="hide-preview-token underscore" title="${escapeHtml(word)}">${"_".repeat(count)}</span>`;
+  }
+
+  function renderHidePreview(json, validations) {
+    const text = String(json.verseText || "");
+    const plan = Array.isArray(json.hidePlan) ? json.hidePlan : [];
+
+    const replacements = validations
+      .map((validation, index) => ({
+        validation,
+        item: plan[index],
+        span: validation.span
+      }))
+      .filter(x => x.validation.ok && x.span)
+      .sort((a, b) => a.span.start - b.span.start);
+
+    // Prevent overlapping replacements from producing malformed preview output.
+    const usable = [];
+    let lastEnd = -1;
+    for (const entry of replacements) {
+      if (entry.span.start < lastEnd) continue;
+      usable.push(entry);
+      lastEnd = entry.span.end;
+    }
+
+    let cursor = 0;
+    let html = "";
+
+    usable.forEach(entry => {
+      html += escapeHtml(text.slice(cursor, entry.span.start));
+      html += makeReplacementNode(entry.item, entry.span.match);
+      cursor = entry.span.end;
+    });
+
+    html += escapeHtml(text.slice(cursor));
+    hidePreview.innerHTML = html || `<span class="empty">No preview available.</span>`;
+  }
+
+  function renderHidePlan(json) {
+    hidePlanBody.innerHTML = "";
+    const plan = Array.isArray(json.hidePlan) ? json.hidePlan : [];
+    const validations = validateHidePlan(json);
+
+    if (!plan.length) {
+      hidePlanBody.innerHTML = `<tr><td colspan="7" class="empty">No hide-plan items.</td></tr>`;
+      hidePreview.textContent = json.verseText || "";
+      return;
+    }
+
+    plan.forEach((item, index) => {
+      const validation = validations[index];
+      const tr = document.createElement("tr");
+
+      let replacementHtml = "";
+      let assetCellHtml = `<span class="status good">N/A</span>`;
+
+      if (item.type === "emoji") {
+        replacementHtml = `<span class="replacement emoji">${escapeHtml(item.emoji || "❓")}</span>`;
+      } else if (item.type === "image") {
+        const imageName = String(item.image || "").trim();
+        const url = `${ANDYMOJI_DIR}${encodeURIComponent(imageName)}.png`;
+        const assetStatusId = `hideAssetStatus${index}`;
+
+        replacementHtml = `
+          <span class="replacement">
+            <img id="hideImage${index}" src="${escapeHtml(url)}" alt="${escapeHtml(imageName)}">
+          </span>
+          <div class="file-path">${escapeHtml(url)}</div>
+        `;
+        assetCellHtml = `<span class="status checking" id="${assetStatusId}">Checking…</span>`;
+      } else if (item.type === "underscore") {
+        const count = Math.max(3, Math.min(12, String(item.word || "").length));
+        replacementHtml = `<span class="replacement underscore">${"_".repeat(count)}</span>`;
+      } else {
+        replacementHtml = `<span class="replacement">Unknown type</span>`;
+      }
+
+      const targetHtml = validation.ok
+        ? `<span class="status good">Found</span>`
+        : `<span class="status bad" title="${escapeHtml(validation.issues.join("; "))}">${escapeHtml(validation.issues.join("; "))}</span>`;
+
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td><strong>${escapeHtml(item.word || "—")}</strong></td>
+        <td>${escapeHtml(item.occurrence ?? "—")}</td>
+        <td>${escapeHtml(item.type || "—")}</td>
+        <td>${replacementHtml}</td>
+        <td>${targetHtml}</td>
+        <td>${assetCellHtml}</td>
+      `;
+      hidePlanBody.appendChild(tr);
+
+      if (item.type === "image") {
+        const imageName = String(item.image || "").trim();
+        const url = `${ANDYMOJI_DIR}${encodeURIComponent(imageName)}.png`;
+        const img = document.getElementById(`hideImage${index}`);
+        const status = document.getElementById(`hideAssetStatus${index}`);
+
+        expectedAssets.push(assetEntry(`hide-${index}`, `Hide image ${imageName}`, url, status));
+
+        setStatus(status, "checking", "Checking…");
+        img.onload = () => setStatus(status, "good", "Found");
+        img.onerror = () => {
+          setStatus(status, "bad", "Missing");
+          img.style.display = "none";
+        };
+
+        // The row HTML already assigned src; force a cache-busted retry for QA.
+        img.src = url + "?qa=" + Date.now();
+      }
+    });
+
+    renderHidePreview(json, validations);
+  }
+
+  function renderJsonIssues(json) {
+    const issues = validateJson(json);
+    if (!issues.length) return;
+
+    showError("JSON checks:\n• " + issues.join("\n• "));
+  }
+
+  function setQueryVerse(verseId) {
+    if (!verseId || !history.replaceState) return;
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set("verse", verseId);
+      history.replaceState(null, "", url);
+    } catch (err) {}
+  }
+
+  async function loadVerseById(verseId, { updateQuery = true } = {}) {
+    if (!verseId) return;
+
+    showError("");
+    content.hidden = true;
+    summary.innerHTML = `<span class="chip warn">Loading ${escapeHtml(verseId)}…</span>`;
+
+    try {
+      const response = await fetch(`${DATA_DIR}${encodeURIComponent(verseId)}.json`, {
+        cache: "no-store"
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const json = await response.json();
+      currentSourceLabel = `${DATA_DIR}${verseId}.json`;
+      if (updateQuery) setQueryVerse(verseId);
+      loadVerseObject(json);
+    } catch (err) {
+      showError(
+        `Could not load ${DATA_DIR}${verseId}.json\n\n${err.message || err}\n\n` +
+        `If you opened this utility with file://, serve the repo with a local web server or use the JSON file picker above.`
+      );
+      summary.innerHTML = `<span class="chip bad">Verse load failed</span>`;
+    }
+  }
+
+  function loadVerseObject(json) {
+    playlistAbortToken++;
+    sharedAudio.pause();
+    sharedAudio.removeAttribute("src");
+    expectedAssets = [];
+    echoPlaylist = [];
+    currentVerse = json;
+
+    renderJson(json);
+    renderArt(json);
+    renderAudio(json);
+    renderHidePlan(json);
+    renderJsonIssues(json);
+
+    content.hidden = false;
+    updateSummary();
+
+    const verseId = String(json?.verseId || "").trim();
+    if (verseId && Array.from(verseSelect.options).some(o => o.value === verseId)) {
+      verseSelect.value = verseId;
+    }
+  }
+
+  async function checkAllAssets() {
+    if (!currentVerse) return;
+
+    const json = currentVerse;
+    const verseId = String(json.verseId || "").trim();
+
+    await Promise.all([
+      probeImage(
+        petImage,
+        petMissing,
+        petStatus,
+        `${PET_DIR}pet_${verseId}.png`,
+        json.biblopet || "🐾"
+      ),
+      probeImage(
+        profileImage,
+        profileMissing,
+        profileStatus,
+        `${PROFILE_DIR}profile_picture_${verseId}.png`
+      ),
+      ...expectedAssets
+        .filter(a => a.id.startsWith("audio-"))
+        .map(a => probeAudio(a.url, a.statusEl))
+    ]);
+
+    // Hide-plan image <img> elements already self-check; trigger fresh requests.
+    (Array.isArray(json.hidePlan) ? json.hidePlan : []).forEach((item, index) => {
+      if (item.type !== "image") return;
+      const name = String(item.image || "").trim();
+      const img = document.getElementById(`hideImage${index}`);
+      const status = document.getElementById(`hideAssetStatus${index}`);
+      if (!img || !status) return;
+
+      setStatus(status, "checking", "Checking…");
+      img.style.display = "";
+      img.onload = () => setStatus(status, "good", "Found");
+      img.onerror = () => {
+        setStatus(status, "bad", "Missing");
+        img.style.display = "none";
+      };
+      img.src = `${ANDYMOJI_DIR}${encodeURIComponent(name)}.png?qa=${Date.now()}`;
+    });
+  }
+
+  async function loadVerseList() {
+    showError("");
+    verseSelect.innerHTML = `<option value="">Loading verse list…</option>`;
+
+    try {
+      const response = await fetch(`${DATA_DIR}verse_list.json`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const list = await response.json();
+      if (!Array.isArray(list)) throw new Error("verse_list.json is not an array.");
+
+      verseSelect.innerHTML = `<option value="">Choose a verse…</option>`;
+      list.forEach(verseId => {
+        const option = document.createElement("option");
+        option.value = verseId;
+        option.textContent = verseId;
+        verseSelect.appendChild(option);
+      });
+
+      const requested = new URLSearchParams(location.search).get("verse");
+      const first = requested && list.includes(requested) ? requested : list[0];
+
+      if (first) {
+        verseSelect.value = first;
+        await loadVerseById(first, { updateQuery: !requested });
+      }
+    } catch (err) {
+      verseSelect.innerHTML = `<option value="">Could not load verse list</option>`;
+      showError(
+        `Could not load ${DATA_DIR}verse_list.json\n\n${err.message || err}\n\n` +
+        `This page is designed to live in /utilities/ on the BibloZoo site. ` +
+        `You can still test a single JSON with the file picker.`
+      );
+    }
+  }
+
+  verseSelect.addEventListener("change", () => {
+    if (verseSelect.value) loadVerseById(verseSelect.value);
+  });
+
+  reloadBtn.addEventListener("click", () => {
+    if (verseSelect.value) {
+      loadVerseById(verseSelect.value, { updateQuery: false });
+    } else {
+      loadVerseList();
+    }
+  });
+
+  checkAllBtn.addEventListener("click", checkAllAssets);
+
+  jsonFileInput.addEventListener("change", async () => {
+    const file = jsonFileInput.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      currentSourceLabel = file.name;
+      showError("");
+      loadVerseObject(json);
+    } catch (err) {
+      showError(`Could not parse ${file.name}\n\n${err.message || err}`);
+    }
+  });
+
+  playEchoBtn.addEventListener("click", () => {
+    if (echoPlaylist.length) playPlaylist(echoPlaylist);
+  });
+
+  stopAudioBtn.addEventListener("click", () => {
+    playlistAbortToken++;
+    sharedAudio.pause();
+    sharedAudio.currentTime = 0;
+    document.querySelectorAll("[data-audio-play]").forEach(btn => {
+      btn.textContent = "Play";
+    });
+  });
+
+  loadVerseList();
+})();
+</script>
+</body>
+</html>
