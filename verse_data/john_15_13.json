@@ -29,6 +29,12 @@
         },
         {
             "type": "emoji",
+            "word": "no",
+            "occurrence": 1,
+            "emoji": "🚫"
+        },
+        {
+            "type": "emoji",
             "word": "someone",
             "occurrence": 1,
             "emoji": "👤"
