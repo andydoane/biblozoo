@@ -197,6 +197,40 @@
       background: var(--panel-2);
     }
 
+.asset-preview {
+  position: relative;
+}
+
+.pet-image-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.pet-feet-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: red;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 0 2px rgba(255, 0, 0, 0.8);
+}
+
+.pet-feet-line::after {
+  content: attr(data-label);
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 0, 0, 0.85);
+  color: white;
+  font: 700 11px/1.3 system-ui, sans-serif;
+}
+
     .asset-preview {
       min-height: 230px;
       display: grid;
@@ -440,7 +474,11 @@
         <div class="grid-2">
           <article class="asset-card">
             <div class="asset-preview">
-              <img id="petImage" alt="BibloPet image">
+              <div class="pet-image-wrap">
+                <img id="petImage" alt="BibloPet image">
+                <div class="pet-feet-line" id="petFeetLine" data-label="" hidden></div>
+              </div>
+
               <div class="asset-missing" id="petMissing">
                 <span class="fallback-emoji" id="petEmojiFallback">🐾</span>
                 Pet image missing
@@ -545,6 +583,7 @@
   const stopAudioBtn = document.getElementById("stopAudioBtn");
   const hidePlanBody = document.getElementById("hidePlanBody");
   const hidePreview = document.getElementById("hidePreview");
+  const petFeetLine = document.getElementById("petFeetLine");
 
   let currentVerse = null;
   let currentSourceLabel = "";
@@ -805,6 +844,18 @@
     petPath.textContent = petUrl;
     profilePath.textContent = profileUrl;
     petEmojiFallback.textContent = json.biblopet || "🐾";
+
+    const feetFromBottom = String(json.biblopetFeetFromBottom || "").trim();
+
+    if (/^\d+(?:\.\d+)?%$/.test(feetFromBottom)) {
+      petFeetLine.hidden = false;
+      petFeetLine.style.bottom = feetFromBottom;
+      petFeetLine.dataset.label = `Feet: ${feetFromBottom}`;
+    } else {
+      petFeetLine.hidden = true;
+      petFeetLine.style.bottom = "";
+      petFeetLine.dataset.label = "";
+    }
 
     expectedAssets.push(assetEntry("pet", "Pet image", petUrl, petStatus));
     expectedAssets.push(assetEntry("profile", "Profile picture", profileUrl, profileStatus));
