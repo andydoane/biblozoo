@@ -1,0 +1,55 @@
+{
+    "biblopet": "🦐",
+    "biblopetDefaultName": "Rudy",
+    "biblopetFeetFromBottom": "4.2%",
+    "verseId": "john_14_6",
+    "ref": "John 14:6",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Jesus said to him",
+        "I am the way and the truth and the life.",
+        "No one comes to the Father",
+        "except through me."
+    ],
+    "verseText": "Jesus said to him, 'I am the way, and the truth, and the life. No one comes to the Father except through me.'",
+    "meaning": "The only way we can be part of the forever kingdom of God the Father is through Jesus. Because he died and rose again, we can have eternal life.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "image",
+            "word": "Jesus",
+            "occurrence": 1,
+            "image": "cross"
+        },
+        {
+            "type": "emoji",
+            "word": "way",
+            "occurrence": 1,
+            "emoji": "🛣️"
+        },
+        {
+            "type": "emoji",
+            "word": "truth",
+            "occurrence": 1,
+            "emoji": "📘"
+        },
+        {
+            "type": "emoji",
+            "word": "life",
+            "occurrence": 1,
+            "emoji": "🌱"
+        },
+        {
+            "type": "emoji",
+            "word": "comes",
+            "occurrence": 1,
+            "emoji": "➡️"
+        },
+        {
+            "type": "underscore",
+            "word": "Father",
+            "occurrence": 1
+        }
+    ]
+}
