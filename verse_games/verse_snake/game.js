@@ -278,7 +278,7 @@
 
   const TAIL_LENGTH_TUNING = {
     defaultHeads: 10.75,
-    maxBonusHeads: 15.75
+    maxBonusHeads: 24.25
   };
 
   const ORB_TUNING = {
