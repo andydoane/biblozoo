@@ -1157,6 +1157,17 @@
             </button>
           </div>
 
+          <div class="dd2-diagnostic-actions">
+            <button
+              id="dd2DiagnosticCopy"
+              type="button"
+              class="dd2-diagnostic-primary"
+              ${previous ? "" : "disabled"}
+            >
+              Copy Previous Run Report
+            </button>
+          </div>
+
           <div class="dd2-diagnostic-last-run">
             <h2>Previous Run</h2>
 
@@ -1173,15 +1184,7 @@
               placeholder="No report yet."
             >${escapeHtml(previousText)}</textarea>
 
-            <div class="dd2-diagnostic-report-actions">
-              <button
-                id="dd2DiagnosticCopy"
-                type="button"
-                ${previous ? "" : "disabled"}
-              >
-                Copy Report
-              </button>
-
+             <div class="dd2-diagnostic-report-actions">
               <button
                 id="dd2DiagnosticClear"
                 type="button"
