@@ -191,6 +191,21 @@
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
+  const astroDom = {
+    stage: null,
+    layer: null,
+    unit: null,
+    rocket: null,
+    moon: null,
+    trail: null,
+    starCount: null,
+    landingOverlay: null
+  };
+
+  const astroAsteroidNodes = new Map();
+  const astroStarNodes = new Map();
+  const astroProjectileNodes = new Map();
+
   const astroInput = {
     leftKey: false,
     rightKey: false,
@@ -869,11 +884,23 @@
   }
 
   function syncAstroLandingOverlay() {
-    const overlay = document.getElementById("vlLandingOverlay");
+    const overlay =
+      astroDom.landingOverlay ||
+      document.getElementById("vlLandingOverlay");
+
     if (!overlay) return;
 
-    overlay.classList.toggle("is-visible", !!state.astroLandingMessageVisible);
-    overlay.setAttribute("aria-hidden", state.astroLandingMessageVisible ? "false" : "true");
+    overlay.classList.toggle(
+      "is-visible",
+      !!state.astroLandingMessageVisible
+    );
+
+    overlay.setAttribute(
+      "aria-hidden",
+      state.astroLandingMessageVisible
+        ? "false"
+        : "true"
+    );
   }
 
   function getPreviewChoice(offset) {
@@ -1514,6 +1541,9 @@
 
   function renderAsteroidGame() {
     const rocket = getBonusRocket();
+
+    clearAstroDomCache();
+
     app.innerHTML = `
       <div class="vl-asteroid-screen">
         <div class="vl-bonus-topbar">
@@ -1549,6 +1579,7 @@
     wireBonusMenuOnly();
     syncGameMenuOpenState();
     wireAstroControls();
+    cacheAstroDomRefs();
   }
 
   function renderEnd() {
@@ -2963,85 +2994,348 @@
     startAstroLoop();
   }
 
-  function renderAstroEntities() {
-    const stage = $("#vlAstroStage");
-    const layer = $("#vlSpaceLayer");
-    const unit = $("#vlPlayerUnit");
-    syncAstroLandingOverlay();
-    const rocket = $("#vlPlayerRocket");
-    const moon = $("#vlMoon");
-    const trail = $("#vlPlayerTrail");
-    if (!stage || !layer || !unit || !rocket || !moon || !trail) return;
+  function clearAstroDomCache() {
+    astroDom.stage = null;
+    astroDom.layer = null;
+    astroDom.unit = null;
+    astroDom.rocket = null;
+    astroDom.moon = null;
+    astroDom.trail = null;
+    astroDom.starCount = null;
+    astroDom.landingOverlay = null;
+
+    astroAsteroidNodes.clear();
+    astroStarNodes.clear();
+    astroProjectileNodes.clear();
+  }
+
+  function cacheAstroDomRefs() {
+    astroDom.stage =
+      document.getElementById(
+        "vlAstroStage"
+      );
+
+    astroDom.layer =
+      document.getElementById(
+        "vlSpaceLayer"
+      );
+
+    astroDom.unit =
+      document.getElementById(
+        "vlPlayerUnit"
+      );
+
+    astroDom.rocket =
+      document.getElementById(
+        "vlPlayerRocket"
+      );
+
+    astroDom.moon =
+      document.getElementById(
+        "vlMoon"
+      );
+
+    astroDom.trail =
+      document.getElementById(
+        "vlPlayerTrail"
+      );
+
+    astroDom.starCount =
+      document.getElementById(
+        "vlStarCount"
+      );
+
+    astroDom.landingOverlay =
+      document.getElementById(
+        "vlLandingOverlay"
+      );
+
+    return astroDom;
+  }
+
+  function getAstroDomRefs() {
+    if (
+      !astroDom.stage ||
+      !astroDom.stage.isConnected
+    ) {
+      cacheAstroDomRefs();
+    }
+
+    return astroDom;
+  }
+
+  function syncAstroUpgradeUi() {
+    const {
+      unit,
+      rocket,
+      trail,
+      starCount
+    } = getAstroDomRefs();
+
+    if (
+      !unit ||
+      !rocket ||
+      !trail
+    ) {
+      return;
+    }
 
     syncBonusRocketUpgrade();
 
-    const rect = stage.getBoundingClientRect();
-    const leftPx = rect.width * state.astroPlayerX;
+    const nextRocketSrc =
+      getBonusRocket().src;
 
-    rocket.src = getBonusRocket().src;
-
-    const trailVars = bonusTrailVarsForStarCount(state.astroStarCount);
-    renderPlayerParticleTrail(trail, trailVars);
-    trail.classList.toggle("is-rainbow", !!trailVars.rainbow);
-
-    unit.classList.toggle("is-rainbow-rocket", state.bonusRocketColorKey === "rainbow");
-    unit.classList.toggle("is-blaster-active", bonusBlasterActive());
-
-    unit.style.left = `${leftPx}px`;
-    unit.style.transform = `translateX(-50%) translateY(${-state.astroPlayerLiftPx}px) rotate(${state.astroPlayerTilt + state.astroSpinDeg}deg) scale(${state.astroPlayerScale})`;
-
-    layer.querySelectorAll(".vl-asteroid, .vl-star, .vl-astro-projectile").forEach(n => n.remove());
-
-    const drainOpacity = state.astroDrainPhase
-      ? Math.max(0, 1 - state.astroDrainFadeMs / 1300)
-      : 1;
-
-    state.astroStars.forEach(star => {
-      const img = document.createElement("img");
-      img.className = "vl-star";
-      img.src = STAR_IMAGE_SRC;
-      img.style.width = `${star.size}px`;
-      img.style.height = `${star.size}px`;
-      img.style.left = `${rect.width * star.x - star.size / 2}px`;
-      img.style.top = `${star.yPx}px`;
-      img.style.transform = `rotate(${star.rot}deg)`;
-      img.style.opacity = drainOpacity;
-      layer.appendChild(img);
-    });
-
-    state.astroProjectiles.forEach(projectile => {
-      const shot = document.createElement("div");
-      shot.className = "vl-astro-projectile";
-      shot.style.width = `${projectile.size}px`;
-      shot.style.height = `${projectile.size}px`;
-      shot.style.left = `${rect.width * projectile.x - projectile.size / 2}px`;
-      shot.style.top = `${projectile.yPx - projectile.size / 2}px`;
-      shot.style.setProperty("--vl-projectile-color", projectile.color);
-      shot.style.opacity = drainOpacity;
-      layer.appendChild(shot);
-    });
-
-
-    state.astroAsteroids.forEach(ast => {
-      const img = document.createElement("img");
-      img.className = "vl-asteroid";
-      img.src = ASTEROID_IMAGE_SRC;
-      img.style.width = `${ast.size}px`;
-      img.style.height = `${ast.size}px`;
-      img.style.left = `${rect.width * ast.x - ast.size / 2}px`;
-      img.style.top = `${ast.yPx}px`;
-      img.style.transform = `rotate(${ast.rot}deg)`;
-      img.style.opacity = drainOpacity;
-      layer.appendChild(img);
-    });
-
-    const starCount = document.getElementById("vlStarCount");
-    if (starCount) {
-      starCount.textContent = String(state.astroStarCount);
+    if (
+      rocket.getAttribute("src") !==
+      nextRocketSrc
+    ) {
+      rocket.setAttribute(
+        "src",
+        nextRocketSrc
+      );
     }
 
-    moon.style.top = `${state.astroMoonY}px`;
-    moon.classList.toggle("is-visible", !!state.astroMoonVisible);
+    const trailVars =
+      bonusTrailVarsForStarCount(
+        state.astroStarCount
+      );
+
+    renderPlayerParticleTrail(
+      trail,
+      trailVars
+    );
+
+    trail.classList.toggle(
+      "is-rainbow",
+      !!trailVars.rainbow
+    );
+
+    unit.classList.toggle(
+      "is-rainbow-rocket",
+      state.bonusRocketColorKey ===
+        "rainbow"
+    );
+
+    unit.classList.toggle(
+      "is-blaster-active",
+      bonusBlasterActive()
+    );
+
+    if (starCount) {
+      const nextCount =
+        String(state.astroStarCount);
+
+      if (
+        starCount.textContent !==
+        nextCount
+      ) {
+        starCount.textContent =
+          nextCount;
+      }
+    }
+  }
+
+  function syncAstroEntityNodes(
+    items,
+    nodeMap,
+    layer,
+    createNode,
+    updateNode
+  ) {
+    const liveIds = new Set();
+
+    items.forEach((item) => {
+      liveIds.add(item.id);
+
+      let node =
+        nodeMap.get(item.id);
+
+      if (
+        !node ||
+        !node.isConnected ||
+        !layer.contains(node)
+      ) {
+        node = createNode(item);
+
+        nodeMap.set(
+          item.id,
+          node
+        );
+
+        layer.appendChild(node);
+      }
+
+      updateNode(node, item);
+    });
+
+    nodeMap.forEach(
+      (node, id) => {
+        if (liveIds.has(id)) {
+          return;
+        }
+
+        node.remove();
+        nodeMap.delete(id);
+      }
+    );
+  }
+
+  function renderAstroEntities() {
+    const {
+      stage,
+      layer,
+      unit,
+      moon
+    } = getAstroDomRefs();
+
+    if (
+      !stage ||
+      !layer ||
+      !unit ||
+      !moon
+    ) {
+      return;
+    }
+
+    const rect =
+      stage.getBoundingClientRect();
+
+    const leftPx =
+      rect.width * state.astroPlayerX;
+
+    unit.style.left =
+      `${leftPx}px`;
+
+    unit.style.transform =
+      `translateX(-50%) translateY(${-state.astroPlayerLiftPx}px) rotate(${state.astroPlayerTilt + state.astroSpinDeg}deg) scale(${state.astroPlayerScale})`;
+
+    const drainOpacity =
+      state.astroDrainPhase
+        ? Math.max(
+            0,
+            1 -
+              state.astroDrainFadeMs /
+                1300
+          )
+        : 1;
+
+    syncAstroEntityNodes(
+      state.astroStars,
+      astroStarNodes,
+      layer,
+      (star) => {
+        const img =
+          document.createElement("img");
+
+        img.className = "vl-star";
+        img.src = STAR_IMAGE_SRC;
+        img.alt = "";
+
+        img.style.width =
+          `${star.size}px`;
+
+        img.style.height =
+          `${star.size}px`;
+
+        return img;
+      },
+      (img, star) => {
+        img.style.left =
+          `${rect.width * star.x - star.size / 2}px`;
+
+        img.style.top =
+          `${star.yPx}px`;
+
+        img.style.transform =
+          `rotate(${star.rot}deg)`;
+
+        img.style.opacity =
+          drainOpacity;
+      }
+    );
+
+    syncAstroEntityNodes(
+      state.astroProjectiles,
+      astroProjectileNodes,
+      layer,
+      (projectile) => {
+        const shot =
+          document.createElement("div");
+
+        shot.className =
+          "vl-astro-projectile";
+
+        shot.style.width =
+          `${projectile.size}px`;
+
+        shot.style.height =
+          `${projectile.size}px`;
+
+        shot.style.setProperty(
+          "--vl-projectile-color",
+          projectile.color
+        );
+
+        return shot;
+      },
+      (shot, projectile) => {
+        shot.style.left =
+          `${rect.width * projectile.x - projectile.size / 2}px`;
+
+        shot.style.top =
+          `${projectile.yPx - projectile.size / 2}px`;
+
+        shot.style.opacity =
+          drainOpacity;
+      }
+    );
+
+    syncAstroEntityNodes(
+      state.astroAsteroids,
+      astroAsteroidNodes,
+      layer,
+      (asteroid) => {
+        const img =
+          document.createElement("img");
+
+        img.className =
+          "vl-asteroid";
+
+        img.src =
+          ASTEROID_IMAGE_SRC;
+
+        img.alt = "";
+
+        img.style.width =
+          `${asteroid.size}px`;
+
+        img.style.height =
+          `${asteroid.size}px`;
+
+        return img;
+      },
+      (img, asteroid) => {
+        img.style.left =
+          `${rect.width * asteroid.x - asteroid.size / 2}px`;
+
+        img.style.top =
+          `${asteroid.yPx}px`;
+
+        img.style.transform =
+          `rotate(${asteroid.rot}deg)`;
+
+        img.style.opacity =
+          drainOpacity;
+      }
+    );
+
+    moon.style.top =
+      `${state.astroMoonY}px`;
+
+    moon.classList.toggle(
+      "is-visible",
+      !!state.astroMoonVisible
+    );
   }
 
 
@@ -3190,7 +3484,7 @@
     const previousRocketKey = bonusRocketKeyForStarCount(state.astroStarCount);
 
     state.astroStarCount += ASTEROID_SHOT_STAR_REWARD;
-    syncBonusRocketUpgrade();
+    syncAstroUpgradeUi();
     spawnAsteroidPopBurst(stageRect, asteroid);
 
     const nextRocketKey = bonusRocketKeyForStarCount(state.astroStarCount);
@@ -3296,7 +3590,7 @@
 
     state.astroStarCount += 1;
     state.astroStars = state.astroStars.filter(item => item.id !== star.id);
-    syncBonusRocketUpgrade();
+    syncAstroUpgradeUi();
     spawnStarCollectBurst(stageRect, star);
 
     const nextRocketKey = bonusRocketKeyForStarCount(state.astroStarCount);
@@ -3384,17 +3678,26 @@
     const dtMs = Math.min(34, ts - state.astroLastTs);
     state.astroLastTs = ts;
 
-    const stage = $("#vlAstroStage");
+    const stage =
+      getAstroDomRefs().stage;
+
     if (!stage) {
-      state.astroRaf = requestAnimationFrame(astroTick);
+      state.astroRaf =
+        requestAnimationFrame(
+          astroTick
+        );
+
       return;
     }
 
-    const rect = stage.getBoundingClientRect();
+    const rect =
+      stage.getBoundingClientRect();
     if (state.menuOpen || state.helpOpen) {
       state.astroLastTs = ts;
-      renderAstroEntities();
-      state.astroRaf = requestAnimationFrame(astroTick);
+      state.astroRaf =
+        requestAnimationFrame(
+          astroTick
+        );
       return;
     }
     const dtSec = dtMs / 1000;
@@ -3469,6 +3772,7 @@
         state.astroDrainFadeMs = 0;
         state.astroLandingMessageVisible = true;
         state.astroMoveDir = 0;
+        syncAstroLandingOverlay();
         playGameSound("landingStart");
       }
     } else {
@@ -3511,6 +3815,7 @@
           state.astroLandingPhase = true;
           state.astroLandingMessageVisible = false;
           state.astroMoveDir = 0;
+          syncAstroLandingOverlay();
         }
       } else {
         const targetX = 0.5;
@@ -3568,6 +3873,9 @@
     state.astroLandingPhase = false;
     state.astroPlayerLiftPx = 0;
     state.astroPlayerScale = 1;
+
+    syncAstroUpgradeUi();
+    syncAstroLandingOverlay();
 
     renderAstroEntities();
     resetMoonOffscreen();
