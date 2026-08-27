@@ -236,6 +236,7 @@
     disableEffects: false,
     simpleBuild: false,
     disableBackground: false,
+    staticBackground: false,
     simpleCharacter: false,
     showHud: false
   };
@@ -500,6 +501,10 @@
 
     if (options.disableBackground) {
       enabled.push("no background");
+    }
+
+    if (options.staticBackground) {
+      enabled.push("static background");
     }
 
     if (options.simpleCharacter) {
@@ -1196,6 +1201,21 @@
           <label class="dd2-diagnostic-option">
             <input
               type="checkbox"
+              id="dd2DiagnosticStaticBackground"
+              ${diagnosticOptions.staticBackground ? "checked" : ""}
+            >
+            <span>
+              <strong>Static background</strong>
+              <small>
+                Keeps the real ground and hills visible but stops them from scrolling.
+              </small>
+            </span>
+          </label>
+
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
               id="dd2DiagnosticCharacter"
               ${diagnosticOptions.simpleCharacter ? "checked" : ""}
             >
@@ -1338,6 +1358,12 @@
               !!document
                 .getElementById(
                   "dd2DiagnosticBackground"
+                )?.checked,
+
+            staticBackground:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticStaticBackground"
                 )?.checked,
 
             simpleCharacter:
@@ -2997,6 +3023,14 @@
     ) {
       return;
     }
+
+    if (
+      diagnosticOptions.staticBackground &&
+      field.dataset.dd2StaticBackgroundRendered === "true"
+    ) {
+      return;
+    }
+
     field.style.setProperty("--dd2-ground-x", `${state.worldX}px`);
     field.style.setProperty("--dd2-hill-x", `${state.hillX}px`);
     field.style.setProperty("--dd2-back-hill-x", `${state.backHillX}px`);
@@ -3016,6 +3050,10 @@
     const backHillB = document.getElementById("dd2BackHillB");
     if (backHillA) backHillA.style.transform = `translateX(${-backHillOffset}px)`;
     if (backHillB) backHillB.style.transform = `translateX(${backHillW - backHillOffset - hillOverlapPx}px)`;
+
+    if (diagnosticOptions.staticBackground) {
+      field.dataset.dd2StaticBackgroundRendered = "true";
+    }
   }
 
   const dinoDashLayerNodeCaches = new WeakMap();
