@@ -245,10 +245,21 @@ body{
   z-index: 2;
   top: auto;
   height: var(--dd2-ground-h);
+  overflow: hidden;
+}
+
+.dd2-ground-track{
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--dd2-ground-track-w, 200%);
+  height: 100%;
   background-image: url("./dino_dash_images/dino_dash_ground.png");
   background-repeat: repeat-x;
   background-size: auto 100%;
-  background-position: var(--dd2-ground-x) 100%;
+  background-position: 0 100%;
+  transform: translateX(0);
+  pointer-events: none;
 }
 
 .dd2-menu-pill{

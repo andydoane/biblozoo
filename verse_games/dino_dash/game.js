@@ -72,6 +72,7 @@
   const FLYING_WORD_TRAVEL_SECONDS = 3.0;
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
   const TABLET_HEIGHT_U = 0.52;
+  const GROUND_IMAGE_ASPECT = 1371 / 147;
   const TABLET_FLOAT_AMPLITUDE_U = 0.075;
   const TABLET_FLOAT_RATE = 2.15;
   const FLAG_FINISH_SECONDS = 30;
@@ -1538,7 +1539,9 @@
                 <div class="dd2-hill-strip" id="dd2HillA"></div>
                 <div class="dd2-hill-strip" id="dd2HillB"></div>
               </div>
-              <div class="dd2-ground" id="dd2Ground"></div>
+              <div class="dd2-ground" id="dd2Ground">
+                <div class="dd2-ground-track" id="dd2GroundTrack"></div>
+              </div>
               <button class="dd2-menu-pill" id="dd2MenuPill" aria-label="Game Menu">☰</button>
               ${diagnosticHudHtml}
               <div class="dd2-trail-layer" id="dd2TrailLayer"></div>
@@ -2039,7 +2042,19 @@
       flagSpawnX: width + unit * 2.05
     };
 
+    const groundTileW =
+      Math.max(
+        1,
+        Math.ceil(
+          groundH * GROUND_IMAGE_ASPECT
+        )
+      );
+
     field.style.setProperty("--dd2-ground-h", `${groundH}px`);
+    field.style.setProperty(
+      "--dd2-ground-track-w",
+      `${Math.ceil(width + groundTileW + 2)}px`
+    );
     field.style.setProperty("--dd2-hill-h", `${hillH}px`);
     field.style.setProperty("--dd2-back-hill-h", `${backHillH}px`);
     field.style.setProperty("--dd2-hill-w", `${Math.ceil(hillH * 10 + 4)}px`);
@@ -3085,10 +3100,29 @@
       !freezeGround ||
       field.dataset.dd2StaticGroundRendered !== "true"
     ) {
-      field.style.setProperty(
-        "--dd2-ground-x",
-        `${state.worldX}px`
-      );
+      const groundTileW =
+        Math.max(
+          1,
+          Math.ceil(
+            state.layout.groundH *
+            GROUND_IMAGE_ASPECT
+          )
+        );
+
+      const groundOffset =
+        ((-state.worldX % groundTileW) +
+          groundTileW) %
+        groundTileW;
+
+      const groundTrack =
+        document.getElementById(
+          "dd2GroundTrack"
+        );
+
+      if (groundTrack) {
+        groundTrack.style.transform =
+          `translateX(${-groundOffset}px)`;
+      }
 
       if (freezeGround) {
         field.dataset.dd2StaticGroundRendered =
