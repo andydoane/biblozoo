@@ -1,0 +1,61 @@
+{
+    "biblopet": "🦚",
+    "biblopetDefaultName": "Fluffy",
+    "biblopetFeetFromBottom": "15.4%",
+    "verseId": "lamentations_3_22",
+    "ref": "Lamentations 3:22",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "The steadfast love of the Lord",
+        "never ceases",
+        "his mercies",
+        "never come to an end."
+    ],
+    "verseText": "The steadfast love of the Lord never ceases; his mercies never come to an end...",
+    "meaning": "God's love is steadfast: faithful and never-stopping. His mercy (love we don't deserve) will never, ever stop.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "underscore",
+            "word": "steadfast",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "love",
+            "occurrence": 1,
+            "emoji": "❤️"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "mercies",
+            "occurrence": 1,
+            "emoji": "🎁"
+        },
+        {
+            "type": "emoji",
+            "word": "never",
+            "occurrence": 1,
+            "emoji": "🚫"
+        },
+        {
+            "type": "emoji",
+            "word": "come",
+            "occurrence": 1,
+            "emoji": "➡️"
+        },
+        {
+            "type": "emoji",
+            "word": "never",
+            "occurrence": 2,
+            "emoji": "🚫"
+        }
+    ]
+}
