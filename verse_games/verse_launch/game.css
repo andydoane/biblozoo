@@ -1531,7 +1531,6 @@ select {
 
 .vl-player-unit {
   --vl-player-rocket-size: clamp(78px, 9.5vw, 104px);
-  --vl-rainbow-rocket-scale: 1.31;
 
   position: absolute;
   left: 50%;
@@ -1577,14 +1576,6 @@ select {
   display: block;
   filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .28));
 }
-
-.vl-player-unit.is-rainbow-rocket .vl-player-rocket-img {
-  width: calc(var(--vl-player-rocket-size) * var(--vl-rainbow-rocket-scale));
-  height: calc(var(--vl-player-rocket-size) * var(--vl-rainbow-rocket-scale));
-  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, .28));
-}
-
-
 
 .vl-player-particle-trail {
   position: absolute;
