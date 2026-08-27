@@ -89,7 +89,7 @@ window.EXTERNAL_VERSE_GAMES = [
     enabled: true,
     manifest: {
       id: "verse_snake",
-      title: "Verse Snake",
+      title: "Scripture Snake",
       description: "Steer a snake to eat the words.",
       icon: "🐍",
       iconImage: "./verse_images/game_icons/app_icon_verse_snake.png",

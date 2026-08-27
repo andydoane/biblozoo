@@ -4,7 +4,7 @@
   const ctx = await window.VerseGameBridge.getVerseContext();
 
   const GAME_ID = "verse_snake";
-  const GAME_TITLE = "Verse Snake";
+  const GAME_TITLE = "Scripture Snake";
   const GAME_ICON = "🐍";
   const GAME_ICON_HTML = window.VerseGameShell.gameIconImageHtmlForId(GAME_ID, GAME_ICON, `${GAME_TITLE} icon`);
   const HELP_OVERLAY_ID = "vslHelpOverlay";
@@ -324,6 +324,7 @@
   const BOOST_TUNING = {
     durationMs: 2000,
     cooldownMs: 4000,
+    minCooldownMs: 2000,
     speedMultiplier: 2.00,
     doubleTapWindowMs: 380,
     doubleTapMinGapMs: 40,
@@ -416,6 +417,7 @@
     boostCooldownUntil: 0,
     boostStartedAt: 0,
     boostCooldownStartedAt: 0,
+    boostCooldownDurationMs: BOOST_TUNING.cooldownMs,
     boostReadySoundPlayed: true,
     lastTapAt: 0,
     lastTapX: 0,
@@ -435,6 +437,7 @@
     referenceLabel: "",
     referenceMeta: null,
     segments: [],
+    buildSegments: [],
     progressIndex: 0,
     encounter: null,
     targets: [],
@@ -450,7 +453,7 @@
     return `
       <p>Guide the snake by pointing where you want it to slither.</p>
       <p>Follow the arrow to the words and eat the correct one.</p>
-      <p>Double tap for a speed boost. Eat fruit to change color. Eat orbs to grow your tail.</p>
+      <p>Double tap for a speed boost. Eat fruit to change color. Eat orbs to grow your tail. The longer your tail gets, the faster your speed boost recharges.</p>
     `;
   }
 
@@ -982,6 +985,8 @@
     state.boostCooldownUntil = 0;
     state.boostStartedAt = 0;
     state.boostCooldownStartedAt = 0;
+    state.boostCooldownDurationMs =
+      BOOST_TUNING.cooldownMs;
     state.boostReadySoundPlayed = true;
     orbToneIndex = 0;
     state.lastTapAt = 0;
@@ -998,6 +1003,7 @@
     state.head.speed = getCurrentSpeed();
     state.trail = [];
     state.snakeBonusLengthHeads = 0;
+    state.buildSegments = [];
     state.progressIndex = 0;
     state.encounter = null;
     state.targets = [];
@@ -1007,6 +1013,74 @@
     state.lastSpawnAngle = -Math.PI / 2;
     const miniLayer = document.getElementById("vslMiniSnakeLayer");
     if (miniLayer) miniLayer.innerHTML = "";
+  }
+
+  function getVerseBuildDisplayWords(verseText) {
+    const original =
+      String(verseText || "");
+
+    const normalized = original
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[–—−]/g, "-");
+
+    const wordPattern =
+      /[A-Za-z0-9]+(?:'[A-Za-z0-9]+)?(?:,[0-9]{3})*/g;
+
+    const matches =
+      [...normalized.matchAll(wordPattern)];
+
+    return matches.map(
+      (match, index) => {
+        const start =
+          match.index ?? 0;
+
+        const end =
+          start + match[0].length;
+
+        const nextStart =
+          index + 1 < matches.length
+            ? matches[index + 1].index
+            : original.length;
+
+        const previousEnd =
+          index > 0
+            ? (matches[index - 1].index ?? 0) +
+              matches[index - 1][0].length
+            : 0;
+
+        const before =
+          original.slice(
+            previousEnd,
+            start
+          );
+
+        const after =
+          original.slice(
+            end,
+            nextStart
+          );
+
+        const leading =
+          index === 0 ||
+          /\s/.test(before)
+            ? before.match(
+                /[^\sA-Za-z0-9]+$/
+              )?.[0] || ""
+            : "";
+
+        const trailing =
+          after.match(
+            /^[^\sA-Za-z0-9]+/
+          )?.[0] || "";
+
+        return (
+          leading +
+          original.slice(start, end) +
+          trailing
+        );
+      }
+    );
   }
 
   function initializeGame(){
@@ -1025,11 +1099,25 @@
       buildArea: "compact"
     });
 
+    const displayWords =
+      getVerseBuildDisplayWords(
+        ctx.verseText || ""
+      );
+
     state.words = buildData.words;
     state.bookLabel = buildData.bookLabel;
     state.referenceLabel = buildData.referenceLabel;
     state.referenceMeta = refParts;
     state.segments = buildData.segments;
+
+    state.buildSegments =
+      state.segments.map(
+        (segment, index) =>
+          index < state.words.length
+            ? displayWords[index] ||
+              segment
+            : segment
+      );
 
     state.snakeBonusLengthHeads = 0;
     syncSnakeLengthFromHeads(true);
@@ -1156,13 +1244,19 @@
   }
 
   function growSnakeByHeadLengths(amountHeads) {
-    const amount = Math.max(0, Number(amountHeads) || 0);
+    const amount = Math.max(
+      0,
+      Number(amountHeads) || 0
+    );
+
     state.snakeBonusLengthHeads = clamp(
       state.snakeBonusLengthHeads + amount,
       0,
       TAIL_LENGTH_TUNING.maxBonusHeads
     );
+
     syncSnakeLengthFromHeads(false);
+    shortenCurrentBoostCooldownForGrowth();
   }
 
   function resetSnakeBonusLength() {
@@ -1244,6 +1338,65 @@
     state.rafId = requestAnimationFrame(tick);
   }
 
+  function getCurrentBoostCooldownMs() {
+    const growthProgress = clamp(
+      state.snakeBonusLengthHeads /
+        Math.max(
+          0.001,
+          TAIL_LENGTH_TUNING.maxBonusHeads
+        ),
+      0,
+      1
+    );
+
+    return (
+      BOOST_TUNING.cooldownMs -
+      (
+        BOOST_TUNING.cooldownMs -
+        BOOST_TUNING.minCooldownMs
+      ) *
+      growthProgress
+    );
+  }
+
+  function shortenCurrentBoostCooldownForGrowth(
+    now = performance.now()
+  ) {
+    const nextDuration =
+      getCurrentBoostCooldownMs();
+
+    const currentDuration =
+      state.boostCooldownDurationMs ||
+      BOOST_TUNING.cooldownMs;
+
+    if (
+      nextDuration >= currentDuration
+    ) {
+      return;
+    }
+
+    state.boostCooldownDurationMs =
+      nextDuration;
+
+    if (now < state.boostActiveUntil) {
+      state.boostCooldownUntil =
+        state.boostActiveUntil +
+        nextDuration;
+
+      return;
+    }
+
+    if (now < state.boostCooldownUntil) {
+      const cooldownStart =
+        state.boostActiveUntil ||
+        state.boostCooldownStartedAt;
+
+      state.boostCooldownUntil =
+        cooldownStart +
+        nextDuration;
+    }
+  }
+
   function isBoostActive(now = performance.now()) {
     return now < state.boostActiveUntil;
   }
@@ -1276,13 +1429,34 @@
   }
 
   function activateBoost(now = performance.now()) {
-    if (!state.running || state.paused || completed) return;
+    if (
+      !state.running ||
+      state.paused ||
+      completed
+    ) {
+      return;
+    }
+
     if (!isBoostReady(now)) return;
 
+    const cooldownMs =
+      getCurrentBoostCooldownMs();
+
     state.boostStartedAt = now;
-    state.boostActiveUntil = now + BOOST_TUNING.durationMs;
+
+    state.boostActiveUntil =
+      now + BOOST_TUNING.durationMs;
+
     state.boostCooldownStartedAt = now;
-    state.boostCooldownUntil = now + BOOST_TUNING.durationMs + BOOST_TUNING.cooldownMs;
+
+    state.boostCooldownDurationMs =
+      cooldownMs;
+
+    state.boostCooldownUntil =
+      now +
+      BOOST_TUNING.durationMs +
+      cooldownMs;
+
     state.boostReadySoundPlayed = false;
 
     playGameSound("boostStart");
@@ -1294,8 +1468,23 @@
     }
 
     if (now < state.boostCooldownUntil) {
-      const cooldownStart = state.boostActiveUntil || state.boostCooldownStartedAt;
-      return clamp((now - cooldownStart) / BOOST_TUNING.cooldownMs, 0, 1);
+      const cooldownStart =
+        state.boostActiveUntil ||
+        state.boostCooldownStartedAt;
+
+      const cooldownDuration =
+        Math.max(
+          1,
+          state.boostCooldownDurationMs ||
+            BOOST_TUNING.cooldownMs
+        );
+
+      return clamp(
+        (now - cooldownStart) /
+          cooldownDuration,
+        0,
+        1
+      );
     }
 
     return 1;
@@ -2766,9 +2955,22 @@
 
     if (!track) return;
 
-    const current = getCurrentCorrectLabel();
-    const built = state.segments.slice(0, state.progressIndex);
-    const maxContextWords = Math.min(built.length, 14);
+    const current =
+      getCurrentCorrectLabel();
+
+    const buildSegments =
+      state.buildSegments.length
+        ? state.buildSegments
+        : state.segments;
+
+    const built =
+      buildSegments.slice(
+        0,
+        state.progressIndex
+      );
+
+    const maxContextWords =
+      Math.min(built.length, 14);
 
     const currentHtml = current
       ? buildCurrentPromptHtml(current)
