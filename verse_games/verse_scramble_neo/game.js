@@ -499,10 +499,15 @@
     return state.activeProfileReward;
   }
 
+
   function queueProfileRewardForCurrentStreak() {
     if (
       state.streak <= 0 ||
-      state.streak % 5 !== 0
+
+      /*
+      Edit this next line to change streak threshold
+    */
+      state.streak % 20 !== 0
     ) {
       return;
     }
