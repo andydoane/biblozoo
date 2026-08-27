@@ -772,3 +772,37 @@ body{
 .dd2-diagnostic-no-effects .dd2-dino {
   will-change: auto !important;
 }
+
+/*
+  Diagnostic test:
+  remove only the continuously scrolling scenery.
+*/
+.dd2-diagnostic-no-background .dd2-back-hills,
+.dd2-diagnostic-no-background .dd2-hills,
+.dd2-diagnostic-no-background .dd2-ground {
+  display: none !important;
+}
+
+.dd2-diagnostic-no-background .dd2-field {
+  background: var(--dd2-sky);
+}
+
+
+/*
+  Diagnostic test:
+  replace the animated inline SVG dinosaur
+  with one plain non-composited circle.
+*/
+.dd2-diagnostic-simple-character .dd2-dino {
+  background: #333333;
+  border-radius: 50%;
+  will-change: auto !important;
+  animation: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+.dd2-diagnostic-simple-character .dd2-dino svg,
+.dd2-diagnostic-simple-character .dd2-dino img {
+  display: none !important;
+}

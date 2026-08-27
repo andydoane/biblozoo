@@ -235,6 +235,8 @@
     disableParticles: false,
     disableEffects: false,
     simpleBuild: false,
+    disableBackground: false,
+    simpleCharacter: false,
     showHud: false
   };
 
@@ -496,6 +498,14 @@
       enabled.push("simple build");
     }
 
+    if (options.disableBackground) {
+      enabled.push("no background");
+    }
+
+    if (options.simpleCharacter) {
+      enabled.push("simple character");
+    }
+
     return enabled.length
       ? enabled.join(" + ")
       : "baseline";
@@ -623,6 +633,42 @@
     };
   }
 
+  function getDiagnosticMemorySnapshot() {
+    const memory =
+      performance &&
+      performance.memory;
+
+    if (!memory) {
+      return {
+        available: false
+      };
+    }
+
+    const toMb = value => {
+      const bytes = Number(value);
+
+      if (!Number.isFinite(bytes)) {
+        return null;
+      }
+
+      return Math.round(
+        bytes / 1024 / 1024 * 10
+      ) / 10;
+    };
+
+    return {
+      available: true,
+      source: "performance.memory",
+      usedJSHeapMB:
+        toMb(memory.usedJSHeapSize),
+      totalJSHeapMB:
+        toMb(memory.totalJSHeapSize),
+      jsHeapLimitMB:
+        toMb(memory.jsHeapSizeLimit)
+    };
+  }
+
+
   function makeDiagnosticSnapshot(
     ts
   ){
@@ -660,6 +706,9 @@
 
       streak:
         state.streak,
+
+      memory:
+        getDiagnosticMemorySnapshot(),
 
       current:
         counts,
@@ -1128,6 +1177,35 @@
           <label class="dd2-diagnostic-option">
             <input
               type="checkbox"
+              id="dd2DiagnosticBackground"
+              ${diagnosticOptions.disableBackground ? "checked" : ""}
+            >
+            <span>
+              <strong>Disable scrolling background</strong>
+              <small>
+                Replaces the moving ground and hills with the plain sky.
+              </small>
+            </span>
+          </label>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticCharacter"
+              ${diagnosticOptions.simpleCharacter ? "checked" : ""}
+            >
+            <span>
+              <strong>Simple character</strong>
+              <small>
+                Replaces the animated dinosaur SVG with a plain circle.
+              </small>
+            </span>
+          </label>
+
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
               id="dd2DiagnosticHud"
               ${diagnosticOptions.showHud ? "checked" : ""}
             >
@@ -1262,6 +1340,18 @@
                   "dd2DiagnosticSimpleBuild"
                 )?.checked,
 
+            disableBackground:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticBackground"
+                )?.checked,
+
+            simpleCharacter:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticCharacter"
+                )?.checked,
+
             showHud:
               !!document
                 .getElementById(
@@ -1341,10 +1431,19 @@
     startDiagnosticRun(mode);
     preloadSounds();
 
-    const diagnosticRootClass =
+    const diagnosticRootClass = [
       diagnosticOptions.disableEffects
         ? " dd2-diagnostic-no-effects"
-        : "";
+        : "",
+
+      diagnosticOptions.disableBackground
+        ? " dd2-diagnostic-no-background"
+        : "",
+
+      diagnosticOptions.simpleCharacter
+        ? " dd2-diagnostic-simple-character"
+        : ""
+    ].join("");
 
     const diagnosticHudHtml =
       diagnosticOptions.showHud
@@ -2898,6 +2997,12 @@
   function renderWorld(){
     const field = document.getElementById("dd2Field");
     if (!field || !state.layout) return;
+
+    if (
+      diagnosticOptions.disableBackground
+    ) {
+      return;
+    }
     field.style.setProperty("--dd2-ground-x", `${state.worldX}px`);
     field.style.setProperty("--dd2-hill-x", `${state.hillX}px`);
     field.style.setProperty("--dd2-back-hill-x", `${state.backHillX}px`);
@@ -3343,6 +3448,46 @@
     const el = document.getElementById("dd2Dino");
     if (!el || !state.layout) return;
 
+    if (
+      diagnosticOptions.simpleCharacter
+    ) {
+      const circleSize =
+        Math.max(
+          24,
+          state.layout.dinoH * 0.58
+        );
+
+      el.style.setProperty(
+        "--dino-w",
+        `${circleSize}px`
+      );
+
+      el.style.setProperty(
+        "--dino-h",
+        `${circleSize}px`
+      );
+
+      el.style.left =
+        `${state.dinoX}px`;
+
+      el.style.top =
+        `${state.dinoY}px`;
+
+      el.style.transform =
+        "translate(-50%, -50%)";
+
+      el.classList.remove(
+        "is-airborne"
+      );
+
+      el.classList.toggle(
+        "is-hidden",
+        state.dinoHidden
+      );
+
+      return;
+    }
+
     if (state.paused){
       if (!state.pausedRenderTs) state.pausedRenderTs = ts || performance.now();
       ts = state.pausedRenderTs;
@@ -3741,7 +3886,16 @@
 
   function renderDinoAsset(){
     const el = document.getElementById("dd2Dino");
-    if (!el || !dinoSvgText) return;
+    if (!el) return;
+
+    if (
+      diagnosticOptions.simpleCharacter
+    ) {
+      el.innerHTML = "";
+      return;
+    }
+
+    if (!dinoSvgText) return;
     const parser = new DOMParser();
     const doc = parser.parseFromString(dinoSvgText, "image/svg+xml");
     const svg = doc.documentElement;
