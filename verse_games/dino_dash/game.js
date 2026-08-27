@@ -237,6 +237,8 @@
     simpleBuild: false,
     disableBackground: false,
     staticBackground: false,
+    staticHills: false,
+    staticGround: false,
     simpleCharacter: false,
     showHud: false
   };
@@ -505,6 +507,14 @@
 
     if (options.staticBackground) {
       enabled.push("static background");
+    }
+
+    if (options.staticHills) {
+      enabled.push("static hills");
+    }
+
+    if (options.staticGround) {
+      enabled.push("static ground");
     }
 
     if (options.simpleCharacter) {
@@ -1212,6 +1222,33 @@
             </span>
           </label>
 
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticStaticHills"
+              ${diagnosticOptions.staticHills ? "checked" : ""}
+            >
+            <span>
+              <strong>Static hills</strong>
+              <small>
+                Freezes the front and back hills while the ground keeps scrolling.
+              </small>
+            </span>
+          </label>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticStaticGround"
+              ${diagnosticOptions.staticGround ? "checked" : ""}
+            >
+            <span>
+              <strong>Static ground</strong>
+              <small>
+                Freezes the ground while the front and back hills keep scrolling.
+              </small>
+            </span>
+          </label>
 
           <label class="dd2-diagnostic-option">
             <input
@@ -1364,6 +1401,18 @@
               !!document
                 .getElementById(
                   "dd2DiagnosticStaticBackground"
+                )?.checked,
+
+            staticHills:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticStaticHills"
+                )?.checked,
+
+            staticGround:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticStaticGround"
                 )?.checked,
 
             simpleCharacter:
@@ -3024,16 +3073,44 @@
       return;
     }
 
+    const freezeGround =
+      diagnosticOptions.staticBackground ||
+      diagnosticOptions.staticGround;
+
+    const freezeHills =
+      diagnosticOptions.staticBackground ||
+      diagnosticOptions.staticHills;
+
     if (
-      diagnosticOptions.staticBackground &&
-      field.dataset.dd2StaticBackgroundRendered === "true"
+      !freezeGround ||
+      field.dataset.dd2StaticGroundRendered !== "true"
+    ) {
+      field.style.setProperty(
+        "--dd2-ground-x",
+        `${state.worldX}px`
+      );
+
+      if (freezeGround) {
+        field.dataset.dd2StaticGroundRendered =
+          "true";
+      }
+    }
+
+    if (
+      freezeHills &&
+      field.dataset.dd2StaticHillsRendered === "true"
     ) {
       return;
     }
 
-    field.style.setProperty("--dd2-ground-x", `${state.worldX}px`);
-    field.style.setProperty("--dd2-hill-x", `${state.hillX}px`);
-    field.style.setProperty("--dd2-back-hill-x", `${state.backHillX}px`);
+    field.style.setProperty(
+      "--dd2-hill-x",
+      `${state.hillX}px`
+    );
+    field.style.setProperty(
+      "--dd2-back-hill-x",
+      `${state.backHillX}px`
+    );
 
     const hillOverlapPx = 2;
 
@@ -3051,8 +3128,8 @@
     if (backHillA) backHillA.style.transform = `translateX(${-backHillOffset}px)`;
     if (backHillB) backHillB.style.transform = `translateX(${backHillW - backHillOffset - hillOverlapPx}px)`;
 
-    if (diagnosticOptions.staticBackground) {
-      field.dataset.dd2StaticBackgroundRendered = "true";
+    if (freezeHills) {
+      field.dataset.dd2StaticHillsRendered = "true";
     }
   }
 
