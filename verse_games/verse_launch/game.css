@@ -11,7 +11,7 @@
   src: url("./verse_launch_fonts/Orbitron.ttf") format("truetype");
   font-weight: 700 900;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 
 :root {
