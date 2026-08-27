@@ -98,6 +98,7 @@ select{ font:inherit; }
 }
 
 .vsn-game-wrap{
+  position:relative;
   flex:1 1 auto;
   min-height:0;
   padding:0 12px calc(12px + var(--vsn-safe-bottom));
@@ -337,6 +338,315 @@ select{ font:inherit; }
 
 .vsn-magnet:disabled{
   cursor:default;
+}
+
+.vsn-profile-magnet{
+  background:transparent;
+  text-shadow:none;
+  filter:drop-shadow(0 5px 5px rgba(0,0,0,.18));
+}
+
+.vsn-profile-magnet-frame{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+  background:#ffffff;
+  border:clamp(3px, .55vw, 6px) solid var(--profile-border);
+  box-shadow:
+    0 5px 0 rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.75);
+  overflow:hidden;
+  pointer-events:none;
+}
+
+.vsn-profile-magnet.is-circle .vsn-profile-magnet-frame{
+  border-radius:50%;
+}
+
+.vsn-profile-magnet.is-rounded .vsn-profile-magnet-frame{
+  border-radius:22%;
+}
+
+.vsn-profile-magnet-img{
+  display:block;
+  width:95%;
+  height:95%;
+  object-fit:contain;
+  user-select:none;
+  pointer-events:none;
+}
+
+.vsn-profile-magnet.is-profile-collected{
+  pointer-events:none;
+  animation:
+    vsnProfileMagnetCollect
+    220ms
+    cubic-bezier(.2,1.35,.3,1)
+    both;
+}
+
+@keyframes vsnProfileMagnetCollect{
+  0%{
+    opacity:1;
+    transform:
+      rotate(var(--magnet-rot))
+      scale(1);
+  }
+
+  55%{
+    opacity:1;
+    transform:
+      rotate(var(--magnet-rot))
+      scale(1.18);
+  }
+
+  100%{
+    opacity:0;
+    transform:
+      rotate(var(--magnet-rot))
+      scale(.22);
+  }
+}
+
+.vsn-firework-layer{
+  position:absolute;
+  inset:0;
+  z-index:50;
+  pointer-events:none;
+  overflow:visible;
+}
+
+.vsn-firework{
+  position:absolute;
+  left:0;
+  top:0;
+  width:1px;
+  height:1px;
+  pointer-events:none;
+}
+
+.vsn-firework-ray,
+.vsn-firework-dot,
+.vsn-firework-spark,
+.vsn-firework-center{
+  position:absolute;
+  left:0;
+  top:0;
+  pointer-events:none;
+  will-change:transform, opacity;
+}
+
+.vsn-firework-ray{
+  height:var(--fw-thickness);
+  width:var(--fw-length);
+  border-radius:999px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--fw-color) 28%,
+      var(--fw-color) 76%,
+      transparent 100%
+    );
+  transform-origin:0% 50%;
+  opacity:0;
+  animation:
+    vsnFireworkRay
+    var(--fw-duration)
+    cubic-bezier(.1,.76,.2,1)
+    forwards;
+  animation-delay:var(--fw-delay);
+}
+
+.vsn-firework-ray.is-short{
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--fw-color) 16%,
+      var(--fw-color) 100%
+    );
+}
+
+.vsn-firework-dot{
+  width:var(--fw-dot-size);
+  height:var(--fw-dot-size);
+  margin-left:
+    calc(var(--fw-dot-size) / -2);
+  margin-top:
+    calc(var(--fw-dot-size) / -2);
+  border-radius:999px;
+  background:var(--fw-color);
+  opacity:0;
+  transform-origin:center center;
+  animation:
+    vsnFireworkDot
+    var(--fw-duration)
+    cubic-bezier(.13,.74,.22,1)
+    forwards;
+  animation-delay:var(--fw-delay);
+}
+
+.vsn-firework-spark{
+  width:var(--fw-dot-size);
+  height:var(--fw-dot-size);
+  margin-left:
+    calc(var(--fw-dot-size) / -2);
+  margin-top:
+    calc(var(--fw-dot-size) / -2);
+  background:var(--fw-color);
+  clip-path:
+    polygon(
+      50% 0%,
+      62% 38%,
+      100% 50%,
+      62% 62%,
+      50% 100%,
+      38% 62%,
+      0% 50%,
+      38% 38%
+    );
+  opacity:0;
+  transform-origin:center center;
+  animation:
+    vsnFireworkSpark
+    var(--fw-duration)
+    ease-out
+    forwards;
+  animation-delay:var(--fw-delay);
+}
+
+.vsn-firework-center{
+  border-radius:999px;
+  background:#ffffff;
+  box-shadow:
+    0 0 var(--vsn-fw-glow-small, 10px) #ffffff,
+    0 0 var(--vsn-fw-glow-large, 24px) var(--fw-color);
+  animation:
+    vsnFireworkCenter
+    var(--fw-duration)
+    ease-out
+    forwards;
+}
+
+@keyframes vsnFireworkRay{
+  0%{
+    opacity:0;
+    transform:
+      rotate(var(--fw-angle))
+      translateX(
+        calc(var(--fw-start) * .14)
+      )
+      scaleX(.12)
+      scaleY(.55);
+  }
+
+  14%{
+    opacity:1;
+  }
+
+  55%{
+    opacity:.82;
+  }
+
+  78%{
+    opacity:.34;
+  }
+
+  100%{
+    opacity:0;
+    transform:
+      rotate(var(--fw-angle))
+      translateX(var(--fw-start))
+      scaleX(1)
+      scaleY(1);
+  }
+}
+
+@keyframes vsnFireworkDot{
+  0%{
+    opacity:0;
+    transform:
+      rotate(var(--fw-angle))
+      translateX(
+        calc(var(--fw-distance) * .08)
+      )
+      scale(.32);
+  }
+
+  18%{
+    opacity:1;
+  }
+
+  58%{
+    opacity:.72;
+  }
+
+  82%{
+    opacity:.28;
+  }
+
+  100%{
+    opacity:0;
+    transform:
+      rotate(var(--fw-angle))
+      translateX(var(--fw-distance))
+      scale(1.08);
+  }
+}
+
+@keyframes vsnFireworkSpark{
+  0%{
+    opacity:0;
+    transform:
+      rotate(var(--fw-angle))
+      translateX(
+        calc(var(--fw-distance) * .08)
+      )
+      rotate(45deg)
+      scale(.2);
+  }
+
+  22%{
+    opacity:1;
+  }
+
+  58%{
+    opacity:.72;
+  }
+
+  82%{
+    opacity:.28;
+  }
+
+  100%{
+    opacity:0;
+    transform:
+      rotate(var(--fw-angle))
+      translateX(var(--fw-distance))
+      rotate(135deg)
+      scale(1.08);
+  }
+}
+
+@keyframes vsnFireworkCenter{
+  0%{
+    opacity:0;
+    transform:scale(.2);
+  }
+
+  12%{
+    opacity:1;
+    transform:scale(1.15);
+  }
+
+  100%{
+    opacity:0;
+    transform:scale(.36);
+  }
 }
 
 

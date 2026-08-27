@@ -60,6 +60,34 @@
   const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
   const DIGITS = "0123456789".split("");
 
+  const PROFILE_PICTURE_LIST_URL =
+    "../../verse_data/verse_list.json";
+
+  const PROFILE_PICTURE_DIR =
+    "../../profile_pictures/";
+
+  const PROFILE_PICTURE_FALLBACK_SRC =
+    `${PROFILE_PICTURE_DIR}profile_picture_fallback.png`;
+
+  const PROFILE_MAGNET_COLORS = [
+    "#ff5a51",
+    "#ffa351",
+    "#ffc751",
+    "#a7cb6f",
+    "#40b9c5",
+    "#7f66c6"
+  ];
+
+  const PROFILE_FIREWORK_TUNING = {
+    duration: 430,
+    sizeScale: 1.24,
+    mainRays: 12,
+    shortRays: 6,
+    sparkles: 8,
+    rayThicknessScale: 0.11,
+    rainbowChance: 0.5
+  };
+
   let selectedMode = null;
   let muted = false;
   let easyHintTimer = null;
@@ -69,6 +97,9 @@
   let audioUnlocked = false;
   let currentCorrectMelody = [];
   let uiSoundFlip = false;
+  let profilePictureVerseIds = [];
+  let profilePictureCatalogPromise = null;
+  let lastProfileRewardVerseId = "";
 
   const uiSoundBuffers = new Map();
   const uiSoundBufferPromises = new Map();
@@ -103,6 +134,8 @@
     targetsCompleted: 0,
     streak: 0,
     bestStreak: 0,
+    profileRewardQueue: 0,
+    activeProfileReward: null,
     showingInstruction: false,
     instructionToken: 0,
     bonusActive: false,
@@ -199,15 +232,253 @@
     return min + Math.random() * (max - min);
   }
 
+  function loadProfilePictureCatalog() {
+    if (profilePictureCatalogPromise) {
+      return profilePictureCatalogPromise;
+    }
+
+    profilePictureCatalogPromise = fetch(
+      PROFILE_PICTURE_LIST_URL,
+      { cache: "no-store" }
+    )
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(
+            `Unable to load profile pictures: ${response.status}`
+          );
+        }
+
+        return response.json();
+      })
+      .then(list => {
+        profilePictureVerseIds =
+          Array.isArray(list)
+            ? list
+              .map(item =>
+                String(item || "").trim()
+              )
+              .filter(Boolean)
+            : [];
+
+        return profilePictureVerseIds;
+      })
+      .catch(() => {
+        profilePictureVerseIds = [];
+        return profilePictureVerseIds;
+      });
+
+    return profilePictureCatalogPromise;
+  }
+
+  function chooseProfileRewardVerseId() {
+    const fallbackVerseId =
+      String(ctx.verseId || "").trim();
+
+    const catalog =
+      profilePictureVerseIds.length
+        ? profilePictureVerseIds
+        : fallbackVerseId
+          ? [fallbackVerseId]
+          : [];
+
+    if (!catalog.length) return "";
+
+    const nonRepeating =
+      catalog.length > 1
+        ? catalog.filter(
+            verseId =>
+              verseId !==
+              lastProfileRewardVerseId
+          )
+        : catalog;
+
+    const verseId =
+      randomItem(
+        nonRepeating.length
+          ? nonRepeating
+          : catalog
+      ) ||
+      fallbackVerseId;
+
+    lastProfileRewardVerseId = verseId;
+
+    return verseId;
+  }
+
+  function makeProfileRewardMagnet() {
+    const verseId =
+      chooseProfileRewardVerseId();
+
+    if (!verseId) return null;
+
+    const borderColor =
+      randomItem(PROFILE_MAGNET_COLORS) ||
+      "#7f66c6";
+
+    const profileSrc =
+      `${PROFILE_PICTURE_DIR}profile_picture_${verseId}.png`;
+
+    const preload = new Image();
+    preload.src = profileSrc;
+
+    return {
+      id: `vsn_tile_${state.tileSeed++}`,
+      char: "",
+      source: "profile-reward",
+      isProfileReward: true,
+      profileSrc,
+      profileShape:
+        Math.random() < 0.5
+          ? "circle"
+          : "rounded",
+      profileBorderColor: borderColor,
+      color: borderColor,
+      shade: darkenHexColor(
+        borderColor,
+        30
+      ),
+      rotation:
+        Math.round(
+          Math.random() * 34 - 17
+        )
+    };
+  }
+
+  function ensureActiveProfileReward() {
+    if (state.profileRewardQueue <= 0) {
+      return null;
+    }
+
+    if (!state.activeProfileReward) {
+      state.activeProfileReward =
+        makeProfileRewardMagnet();
+    }
+
+    return state.activeProfileReward;
+  }
+
+  function queueProfileRewardForCurrentStreak() {
+    if (
+      state.streak <= 0 ||
+      state.streak % 5 !== 0
+    ) {
+      return;
+    }
+
+    state.profileRewardQueue += 1;
+    ensureActiveProfileReward();
+  }
+
+  void loadProfilePictureCatalog();
+
   function bonusBaseTimeMs() {
-    if (selectedMode === "easy") return 10000;
-    if (selectedMode === "medium") return 7500;
-    return 5000;
+    const roundIndex =
+      Math.max(
+        0,
+        state.bonusRound - 1
+      );
+
+    if (selectedMode === "easy") {
+      return 10000;
+    }
+
+    if (selectedMode === "medium") {
+      return Math.max(
+        4600,
+        6000 - roundIndex * 350
+      );
+    }
+
+    return Math.max(
+      3100,
+      4000 - roundIndex * 225
+    );
   }
 
   function bonusTimeWithWiggle() {
-    const base = bonusBaseTimeMs();
-    return Math.round(base + randomBetween(-600, 600));
+    const base =
+      bonusBaseTimeMs();
+
+    const wiggle =
+      selectedMode === "easy"
+        ? 600
+        : selectedMode === "medium"
+          ? 300
+          : 200;
+
+    return Math.round(
+      base +
+      randomBetween(
+        -wiggle,
+        wiggle
+      )
+    );
+  }
+
+  function bonusNearMatchCounts() {
+    if (selectedMode === "medium") {
+      return {
+        sameLetterWrongColor: 18,
+        sameColorWrongLetter: 24
+      };
+    }
+
+    if (selectedMode === "hard") {
+      return {
+        sameLetterWrongColor: 28,
+        sameColorWrongLetter: 36
+      };
+    }
+
+    return {
+      sameLetterWrongColor: 8,
+      sameColorWrongLetter: 12
+    };
+  }
+
+  function bonusPointerWanderDelayMs() {
+    if (selectedMode === "easy") {
+      return randomBetween(
+        650,
+        1150
+      );
+    }
+
+    if (selectedMode === "medium") {
+      return randomBetween(
+        500,
+        850
+      );
+    }
+
+    return randomBetween(
+      380,
+      650
+    );
+  }
+
+  function bonusPointerFinalMoveMs() {
+    if (selectedMode === "easy") {
+      return 520;
+    }
+
+    if (selectedMode === "medium") {
+      return 360;
+    }
+
+    return 260;
+  }
+
+  function bonusPointerTapMs() {
+    if (selectedMode === "easy") {
+      return 360;
+    }
+
+    if (selectedMode === "medium") {
+      return 240;
+    }
+
+    return 180;
   }
 
 
@@ -731,6 +1002,8 @@
     state.targetsCompleted = 0;
     state.streak = 0;
     state.bestStreak = 0;
+    state.profileRewardQueue = 0;
+    state.activeProfileReward = null;
     state.showingInstruction = false;
     state.instructionToken += 1;
     state.bonusActive = false;
@@ -801,20 +1074,44 @@
     return getPlayableText(state.segments[index] || "", "word").length;
   }
 
-  function isShortVerseWord(index) {
-    const count = playableLetterCountAt(index);
-    return count > 0 && count <= 2;
-  }
-
   function endsWithStrongBreak(text) {
     return /[.!?;:]["'”’)\]]*$/.test(String(text || "").trim());
   }
 
-  function groupCanAcceptPreviousShort(group, index) {
-    return group &&
-      group.startIndex + group.segmentCount === index &&
-      isVerseWordIndex(group.startIndex) &&
-      group.segmentCount < 2;
+  function canPairVerseWords(startIndex) {
+    const nextIndex =
+      startIndex + 1;
+
+    if (
+      !isVerseWordIndex(startIndex) ||
+      !isVerseWordIndex(nextIndex)
+    ) {
+      return false;
+    }
+
+    const currentText =
+      state.segments[startIndex] ||
+      "";
+
+    if (endsWithStrongBreak(currentText)) {
+      return false;
+    }
+
+    const currentCount =
+      playableLetterCountAt(
+        startIndex
+      );
+
+    const nextCount =
+      playableLetterCountAt(
+        nextIndex
+      );
+
+    return (
+      currentCount > 0 &&
+      nextCount > 0 &&
+      currentCount + nextCount <= 7
+    );
   }
 
   function buildTargetGroups() {
@@ -822,50 +1119,56 @@
     let index = 0;
 
     while (index < state.segments.length) {
-      const phase = currentPhase(index);
+      const phase =
+        currentPhase(index);
 
       if (phase !== "words") {
-        const nextIndex = index + 1;
-        const nextPhase = nextIndex < state.segments.length
-          ? currentPhase(nextIndex)
-          : "";
+        const nextIndex =
+          index + 1;
 
-        if (phase === "book" && nextPhase === "reference") {
+        const nextPhase =
+          nextIndex < state.segments.length
+            ? currentPhase(nextIndex)
+            : "";
+
+        if (
+          phase === "book" &&
+          nextPhase === "reference"
+        ) {
           groups.push({
             startIndex: index,
             segmentCount: 2,
             kind: "book-reference"
           });
+
           index += 2;
           continue;
         }
 
-        groups.push({ startIndex: index, segmentCount: 1 });
+        groups.push({
+          startIndex: index,
+          segmentCount: 1
+        });
+
         index += 1;
         continue;
       }
 
-      if (isShortVerseWord(index)) {
-        const currentText = state.segments[index] || "";
-        const nextIndex = index + 1;
-        const hasNextVerseWord = isVerseWordIndex(nextIndex);
-        const shouldPairForward = hasNextVerseWord && !endsWithStrongBreak(currentText);
+      if (canPairVerseWords(index)) {
+        groups.push({
+          startIndex: index,
+          segmentCount: 2
+        });
 
-        if (shouldPairForward) {
-          groups.push({ startIndex: index, segmentCount: 2 });
-          index += 2;
-          continue;
-        }
-
-        const previousGroup = groups[groups.length - 1];
-        if (groupCanAcceptPreviousShort(previousGroup, index)) {
-          previousGroup.segmentCount += 1;
-          index += 1;
-          continue;
-        }
+        index += 2;
+        continue;
       }
 
-      groups.push({ startIndex: index, segmentCount: 1 });
+      groups.push({
+        startIndex: index,
+        segmentCount: 1
+      });
+
       index += 1;
     }
 
@@ -946,6 +1249,15 @@
     state.letterIndex = 0;
     currentCorrectMelody = chooseCorrectMelodyForLength(state.currentTarget.playableText.length);
     state.tiles = makeTilesForTarget(state.currentTarget);
+
+    const profileReward =
+      ensureActiveProfileReward();
+
+    if (profileReward) {
+      state.tiles.push(
+        profileReward
+      );
+    }
   }
 
   function setScreen(screen){
@@ -1318,17 +1630,41 @@
     const desiredTotal = 110;
     const nonTargetLetters = LETTERS.filter(ch => ch !== state.bonusTargetLetter);
     const nonTargetColors = MAGNET_COLORS.filter(color => color !== state.bonusTargetColor);
+    const nearMatchCounts = bonusNearMatchCounts();
+
+    const sameLetterWrongColorEnd =
+      nearMatchCounts.sameLetterWrongColor;
+
+    const sameColorWrongLetterEnd =
+      sameLetterWrongColorEnd +
+      nearMatchCounts.sameColorWrongLetter;
 
     for (let i = 0; i < desiredTotal - 1; i++) {
       let char;
       let color;
 
-      if (i < 8 && nonTargetColors.length) {
-        char = state.bonusTargetLetter;
-        color = randomItem(nonTargetColors);
-      } else if (i < 20 && nonTargetLetters.length) {
-        char = randomItem(nonTargetLetters);
-        color = state.bonusTargetColor;
+      if (
+        i < sameLetterWrongColorEnd &&
+        nonTargetColors.length
+      ) {
+        char =
+          state.bonusTargetLetter;
+
+        color =
+          randomItem(
+            nonTargetColors
+          );
+      } else if (
+        i < sameColorWrongLetterEnd &&
+        nonTargetLetters.length
+      ) {
+        char =
+          randomItem(
+            nonTargetLetters
+          );
+
+        color =
+          state.bonusTargetColor;
       } else {
         char = randomItem(LETTERS);
         color = randomItem(MAGNET_COLORS);
@@ -1448,7 +1784,9 @@
       if (decoys.length) {
         movePointerToButton(pointer, board, randomItem(decoys), false);
       }
-      await sleep(randomBetween(650, 1150));
+      await sleep(
+        bonusPointerWanderDelayMs()
+      );
     }
 
     if (!isCurrentBonusToken(token) || state.bonusStage !== "round") return;
@@ -1457,12 +1795,18 @@
     if (!targetBtn) return;
 
     movePointerToButton(pointer, board, targetBtn, true);
-    await sleep(520);
+
+    await sleep(
+      bonusPointerFinalMoveMs()
+    );
 
     if (!isCurrentBonusToken(token) || state.bonusStage !== "round") return;
 
     pointer.classList.add("is-tapping");
-    await sleep(360);
+
+    await sleep(
+      bonusPointerTapMs()
+    );
 
     if (!isCurrentBonusToken(token) || state.bonusStage !== "round") return;
     resolveBonusRound("pointer", targetBtn);
@@ -1516,6 +1860,49 @@
     pointer.style.top = `${y}px`;
   }
 
+  function renderScrambleTileHtml(tile) {
+    if (tile.isProfileReward) {
+      const shapeClass =
+        tile.profileShape === "circle"
+          ? "is-circle"
+          : "is-rounded";
+
+      return `
+        <button
+          class="vsn-magnet vsn-profile-magnet ${shapeClass} no-zoom is-spawning"
+          type="button"
+          id="${tile.id}"
+          data-tile-id="${tile.id}"
+          data-profile-reward="1"
+          style="--magnet-color:${tile.color}; --magnet-shade:${tile.shade}; --magnet-rot:${tile.rotation}deg; --profile-border:${tile.profileBorderColor};"
+          aria-label="Streak reward profile magnet"
+        >
+          <span class="vsn-profile-magnet-frame">
+            <img
+              class="vsn-profile-magnet-img"
+              src="${escapeHtml(tile.profileSrc)}"
+              alt=""
+              draggable="false"
+              onerror="this.onerror=null;this.src='${PROFILE_PICTURE_FALLBACK_SRC}';"
+            >
+          </span>
+        </button>
+      `;
+    }
+
+    return `
+      <button
+        class="vsn-magnet no-zoom is-spawning"
+        type="button"
+        id="${tile.id}"
+        data-tile-id="${tile.id}"
+        data-char="${escapeHtml(tile.char)}"
+        style="--magnet-color:${tile.color}; --magnet-shade:${tile.shade}; --magnet-rot:${tile.rotation}deg;"
+        aria-label="Letter ${escapeHtml(tile.char)}"
+      >${escapeHtml(tile.char)}</button>
+    `;
+  }
+
   function renderGame(){
     const buildRender = renderBuildText();
     const rootBonusClass = state.bonusActive ? "vsn-bonus-active" : "";
@@ -1536,17 +1923,7 @@
           ? renderBonusFindHtml()
           : state.bonusStage === "final"
             ? renderBonusFinalHtml()
-            : state.tiles.map(tile => `
-                  <button
-                    class="vsn-magnet no-zoom is-spawning"
-                    type="button"
-                    id="${tile.id}"
-                    data-tile-id="${tile.id}"
-                    data-char="${escapeHtml(tile.char)}"
-                    style="--magnet-color:${tile.color}; --magnet-shade:${tile.shade}; --magnet-rot:${tile.rotation}deg;"
-                    aria-label="Letter ${escapeHtml(tile.char)}"
-                  >${escapeHtml(tile.char)}</button>
-                `).join("");
+            : state.tiles.map(renderScrambleTileHtml).join("");
 
     app.innerHTML = `
       <div class="vsn-root vsn-mode-${selectedMode || "easy"} ${rootBonusClass}">
@@ -1571,6 +1948,12 @@
               ${renderBonusPointerHtml()}
               ${renderBonusResultHtml()}
             </div>
+
+            <div
+              class="vsn-firework-layer"
+              id="vsnFireworkLayer"
+              aria-hidden="true"
+            ></div>
           </div>
         </div>
         ${renderHelpOverlay()}
@@ -1770,6 +2153,309 @@
     return state.tiles.find(tile => tile.id === tileId);
   }
 
+  function collectProfileRewardMagnet(
+    btn,
+    tile
+  ) {
+    if (
+      !btn ||
+      !tile ||
+      !tile.isProfileReward
+    ) {
+      return;
+    }
+
+    const gameWrap =
+      document.querySelector(
+        ".vsn-game-wrap"
+      );
+
+    const btnRect =
+      btn.getBoundingClientRect();
+
+    const wrapRect =
+      gameWrap
+        ? gameWrap.getBoundingClientRect()
+        : null;
+
+    btn.classList.add(
+      "is-used",
+      "is-profile-collected"
+    );
+
+    btn.disabled = true;
+
+    state.tiles =
+      state.tiles.filter(
+        item =>
+          item.id !== tile.id
+      );
+
+    state.profileRewardQueue =
+      Math.max(
+        0,
+        state.profileRewardQueue - 1
+      );
+
+    state.activeProfileReward = null;
+
+    playGameSound("wordComplete");
+
+    if (gameWrap && wrapRect) {
+      spawnProfileFireworkAt({
+        x:
+          btnRect.left -
+          wrapRect.left +
+          btnRect.width * 0.5,
+        y:
+          btnRect.top -
+          wrapRect.top +
+          btnRect.height * 0.5,
+        baseSize:
+          Math.max(
+            btnRect.width,
+            btnRect.height
+          ) *
+          PROFILE_FIREWORK_TUNING.sizeScale,
+        accentColor:
+          tile.profileBorderColor
+      });
+    }
+
+    ensureActiveProfileReward();
+
+    window.setTimeout(() => {
+      btn.remove();
+    }, 240);
+  }
+
+  function spawnProfileFireworkAt({
+    x,
+    y,
+    baseSize,
+    accentColor
+  }) {
+    const layer =
+      document.getElementById(
+        "vsnFireworkLayer"
+      );
+
+    if (!layer) return;
+
+    const colors =
+      Math.random() <
+      PROFILE_FIREWORK_TUNING.rainbowChance
+        ? PROFILE_MAGNET_COLORS
+        : [
+            accentColor ||
+              randomItem(
+                PROFILE_MAGNET_COLORS
+              ) ||
+              "#7f66c6",
+            "#ffffff"
+          ];
+
+    const duration =
+      PROFILE_FIREWORK_TUNING.duration;
+
+    const rayThickness =
+      Math.max(
+        3,
+        baseSize *
+          PROFILE_FIREWORK_TUNING
+            .rayThicknessScale
+      );
+
+    const wrapper =
+      document.createElement("div");
+
+    wrapper.className =
+      "vsn-firework";
+
+    wrapper.style.transform =
+      `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
+
+    wrapper.style.setProperty(
+      "--vsn-fw-glow-small",
+      `${(baseSize * 0.13).toFixed(1)}px`
+    );
+
+    wrapper.style.setProperty(
+      "--vsn-fw-glow-large",
+      `${(baseSize * 0.34).toFixed(1)}px`
+    );
+
+    const centerSize =
+      rayThickness * 2.4;
+
+    let html = `
+      <span
+        class="vsn-firework-center"
+        style="
+          width:${centerSize.toFixed(1)}px;
+          height:${centerSize.toFixed(1)}px;
+          margin-left:${(-centerSize / 2).toFixed(1)}px;
+          margin-top:${(-centerSize / 2).toFixed(1)}px;
+          --fw-color:${colors[0] || "#ffffff"};
+          --fw-duration:${duration}ms;
+        "
+      ></span>
+    `;
+
+    const appendRaySet = (
+      count,
+      isMain
+    ) => {
+      const angleOffset =
+        Math.random() * 360;
+
+      for (
+        let i = 0;
+        i < count;
+        i += 1
+      ) {
+        const spread =
+          360 /
+          Math.max(1, count);
+
+        const angle =
+          angleOffset +
+          spread * i +
+          (-4 + Math.random() * 8);
+
+        const length =
+          isMain
+            ? baseSize *
+              (
+                0.72 +
+                Math.random() * 0.32
+              )
+            : baseSize *
+              (
+                0.34 +
+                Math.random() * 0.24
+              );
+
+        const start =
+          baseSize *
+          (
+            isMain
+              ? 0.06 +
+                Math.random() * 0.10
+              : 0.03 +
+                Math.random() * 0.10
+          );
+
+        const thickness =
+          rayThickness *
+          (
+            isMain
+              ? 0.72 +
+                Math.random() * 0.40
+              : 0.46 +
+                Math.random() * 0.34
+          );
+
+        const delay =
+          isMain
+            ? Math.random() * 35
+            : 20 +
+              Math.random() * 70;
+
+        const color =
+          colors[
+            i % colors.length
+          ];
+
+        html += `
+          <span
+            class="vsn-firework-ray ${isMain ? "is-main" : "is-short"}"
+            style="
+              --fw-angle:${angle.toFixed(1)}deg;
+              --fw-length:${length.toFixed(1)}px;
+              --fw-start:${start.toFixed(1)}px;
+              --fw-thickness:${thickness.toFixed(1)}px;
+              --fw-color:${color};
+              --fw-duration:${duration}ms;
+              --fw-delay:${delay.toFixed(0)}ms;
+              filter:drop-shadow(0 0 ${(thickness * 1.7).toFixed(1)}px ${color});
+            "
+          ></span>
+        `;
+      }
+    };
+
+    appendRaySet(
+      PROFILE_FIREWORK_TUNING.mainRays,
+      true
+    );
+
+    appendRaySet(
+      PROFILE_FIREWORK_TUNING.shortRays,
+      false
+    );
+
+    for (
+      let i = 0;
+      i <
+      PROFILE_FIREWORK_TUNING.sparkles;
+      i += 1
+    ) {
+      const angle =
+        Math.random() * 360;
+
+      const distance =
+        baseSize *
+        (
+          0.45 +
+          Math.random() * 0.83
+        );
+
+      const size =
+        rayThickness *
+        (
+          0.72 +
+          Math.random() * 0.83
+        );
+
+      const color =
+        Math.random() < 0.22
+          ? "#ffffff"
+          : randomItem(colors);
+
+      const delay =
+        40 +
+        Math.random() * 90;
+
+      const cls =
+        Math.random() < 0.45
+          ? "vsn-firework-spark"
+          : "vsn-firework-dot";
+
+      html += `
+        <span
+          class="${cls}"
+          style="
+            --fw-angle:${angle.toFixed(1)}deg;
+            --fw-distance:${distance.toFixed(1)}px;
+            --fw-dot-size:${size.toFixed(1)}px;
+            --fw-color:${color};
+            --fw-duration:${duration}ms;
+            --fw-delay:${delay.toFixed(0)}ms;
+            filter:drop-shadow(0 0 ${(size * 1.8).toFixed(1)}px ${color});
+          "
+        ></span>
+      `;
+    }
+
+    wrapper.innerHTML = html;
+    layer.appendChild(wrapper);
+
+    window.setTimeout(() => {
+      wrapper.remove();
+    }, duration + 220);
+  }
+
   function expectedChar(){
     const target = state.currentTarget;
     if (!target) return "";
@@ -1869,8 +2555,28 @@
     if (state.busy || state.menuOpen || state.helpOpen || state.completed) return;
 
     const tile = tileObjectForButton(btn);
-    const expected = expectedChar();
-    if (!tile || !expected || btn.classList.contains("is-used")) return;
+
+    if (
+      !tile ||
+      btn.classList.contains(
+        "is-used"
+      )
+    ) {
+      return;
+    }
+
+    if (tile.isProfileReward) {
+      collectProfileRewardMagnet(
+        btn,
+        tile
+      );
+      return;
+    }
+
+    const expected =
+      expectedChar();
+
+    if (!expected) return;
 
     if (tile.char === expected){
       playGameSound("correctLetter");
@@ -1879,6 +2585,9 @@
       state.correctLetters += 1;
       state.streak += 1;
       state.bestStreak = Math.max(state.bestStreak, state.streak);
+
+      queueProfileRewardForCurrentStreak();
+
       state.letterIndex += 1;
 
       btn.classList.add("is-correct", "is-used");
@@ -1957,9 +2666,27 @@
     const buttons = Array.from(field.querySelectorAll(".vsn-magnet"));
     const byId = new Map(buttons.map(btn => [btn.dataset.tileId, btn]));
 
-    const targetTiles = state.tiles.filter(tile => tile.source === "target" || tile.source === "bonus-target");
-    const decoyTiles = state.tiles.filter(tile => tile.source === "decoy" || tile.source === "bonus-decoy");
-    const ordered = shuffle(targetTiles).concat(shuffle(decoyTiles));
+    const priorityTiles =
+      state.tiles.filter(
+        tile =>
+          tile.source === "target" ||
+          tile.source === "bonus-target" ||
+          tile.source === "profile-reward"
+      );
+
+    const decoyTiles =
+      state.tiles.filter(
+        tile =>
+          tile.source === "decoy" ||
+          tile.source === "bonus-decoy"
+      );
+
+    const ordered =
+      shuffle(priorityTiles)
+        .concat(
+          shuffle(decoyTiles)
+        );
+
     const placed = [];
     const isHard = selectedMode === "hard";
 
@@ -1977,7 +2704,15 @@
       const gap = Math.max(4, Math.min(10, rect.width * 0.012));
       const maxX = Math.max(0, rect.width - bw - 4);
       const maxY = Math.max(0, rect.height - bh - 4);
-      const tries = tile.source === "target" ? 360 : (isHard ? 90 : 180);
+      const isPriorityTile =
+        tile.source === "target" ||
+        tile.source === "bonus-target" ||
+        tile.source === "profile-reward";
+
+      const tries =
+        isPriorityTile
+          ? 360
+          : (isHard ? 90 : 180);
       let chosen = null;
 
       for (let i = 0; i < tries; i++){
