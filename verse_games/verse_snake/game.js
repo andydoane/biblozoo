@@ -278,7 +278,9 @@
 
   const TAIL_LENGTH_TUNING = {
     defaultHeads: 10.75,
-    maxBonusHeads: 24.25
+    maxBonusHeads: 24.25,
+    sampleSpacingHeadRatio: 0.14,
+    minSampleSpacingPx: 4
   };
 
   const ORB_TUNING = {
@@ -363,6 +365,12 @@
   ];
 
   const bacteriaSvgCache = new Map();
+
+  let fruitNode = null;
+  let fruitImageNode = null;
+  let fruitImageSrc = "";
+
+  let bonusScoreTextNode = null;
 
   let selectedMode = null;
   let muted = false;
@@ -1220,7 +1228,6 @@
 
       updateCamera();
       updatePatternLayer();
-      updateBuildHudShift();
       drawSnake();
       renderMiniSnakes();
       renderTargets();
@@ -1346,6 +1353,48 @@
     }
   }
 
+  function recordPlayerTrailPoint() {
+    const currentX = state.head.x;
+    const currentY = state.head.y;
+
+    if (!state.trail.length) {
+      state.trail.push({
+        x: currentX,
+        y: currentY
+      });
+
+      return;
+    }
+
+    const headPoint = state.trail[0];
+
+    headPoint.x = currentX;
+    headPoint.y = currentY;
+
+    const previousSample = state.trail[1];
+
+    const sampleSpacing = Math.max(
+      TAIL_LENGTH_TUNING.minSampleSpacingPx,
+      getSnakeHeadSize() *
+        TAIL_LENGTH_TUNING.sampleSpacingHeadRatio
+    );
+
+    if (
+      !previousSample ||
+      Math.hypot(
+        currentX - previousSample.x,
+        currentY - previousSample.y
+      ) >= sampleSpacing
+    ) {
+      state.trail.splice(1, 0, {
+        x: currentX,
+        y: currentY
+      });
+    }
+
+    trimTrail();
+  }
+
   function updateMotion(dt){
     const now = performance.now();
 
@@ -1363,8 +1412,7 @@
     state.head.x += Math.cos(state.head.angle) * state.head.speed * (dt / 1000);
     state.head.y += Math.sin(state.head.angle) * state.head.speed * (dt / 1000);
 
-    state.trail.unshift({ x: state.head.x, y: state.head.y });
-    trimTrail();
+    recordPlayerTrailPoint();
   }
 
   function updateYuckMotion(dt, now) {
@@ -1383,25 +1431,37 @@
       state.head.y += Math.sin(state.head.angle) * getCurrentSpeed() * 0.32 * (dt / 1000);
     }
 
-    state.trail.unshift({ x: state.head.x, y: state.head.y });
-    trimTrail();
+    recordPlayerTrailPoint();
   }
 
   function trimTrail(){
-    let total = 0;
-    const trimmed = [];
+    if (state.trail.length <= 1) return;
 
-    for (let i = 0; i < state.trail.length; i++){
+    let total = 0;
+    let keepLength = state.trail.length;
+
+    for (
+      let i = 1;
+      i < state.trail.length;
+      i++
+    ){
       const p = state.trail[i];
-      trimmed.push(p);
-      if (i > 0){
-        const prev = state.trail[i - 1];
-        total += Math.hypot(p.x - prev.x, p.y - prev.y);
+      const prev = state.trail[i - 1];
+
+      total += Math.hypot(
+        p.x - prev.x,
+        p.y - prev.y
+      );
+
+      if (total >= state.snakeLengthPx) {
+        keepLength = i + 1;
+        break;
       }
-      if (total >= state.snakeLengthPx) break;
     }
 
-    state.trail = trimmed;
+    if (keepLength < state.trail.length) {
+      state.trail.length = keepLength;
+    }
   }
 
   function updateCamera(){
@@ -1965,8 +2025,7 @@
     state.head.x += Math.cos(state.head.angle) * speed * seconds;
     state.head.y += Math.sin(state.head.angle) * speed * seconds;
 
-    state.trail.unshift({ x: state.head.x, y: state.head.y });
-    trimTrail();
+    recordPlayerTrailPoint();
   }
 
   function isPlayerSnakeOffscreen() {
@@ -2137,22 +2196,33 @@
   }
 
   function trimMiniSnakeTrail(snake) {
+    if (snake.trail.length <= 1) return;
+
     let total = 0;
-    const trimmed = [];
+    let keepLength = snake.trail.length;
 
-    for (let i = 0; i < snake.trail.length; i++) {
+    for (
+      let i = 1;
+      i < snake.trail.length;
+      i++
+    ) {
       const p = snake.trail[i];
-      trimmed.push(p);
+      const prev = snake.trail[i - 1];
 
-      if (i > 0) {
-        const prev = snake.trail[i - 1];
-        total += Math.hypot(p.x - prev.x, p.y - prev.y);
+      total += Math.hypot(
+        p.x - prev.x,
+        p.y - prev.y
+      );
+
+      if (total >= snake.lengthPx) {
+        keepLength = i + 1;
+        break;
       }
-
-      if (total >= snake.lengthPx) break;
     }
 
-    snake.trail = trimmed;
+    if (keepLength < snake.trail.length) {
+      snake.trail.length = keepLength;
+    }
   }
 
   function isMiniSnakeTooFar(snake) {
@@ -2625,23 +2695,65 @@
   }
 
   function updateBonusHud(ts = performance.now()) {
-    const line = document.getElementById("vslBuildLine");
-    const track = document.getElementById("vslBuildTrack");
+    const line =
+      document.getElementById(
+        "vslBuildLine"
+      );
+
+    const track =
+      document.getElementById(
+        "vslBuildTrack"
+      );
+
     if (!track) return;
 
-    if (line) {
+    if (
+      line &&
+      !line.classList.contains("is-bonus")
+    ) {
       line.classList.add("is-bonus");
     }
 
-    track.innerHTML = `
-      <span class="vsl-bonus-score" id="vslBuildPrompt">
-        <img class="vsl-bonus-score-icon" src="${BONUS_SNAKE_ICON_ASSET}" alt="" aria-hidden="true">
-        <span class="vsl-bonus-score-text">x ${state.bonusScore}</span>
-      </span>
-    `;
+    if (
+      !bonusScoreTextNode ||
+      !bonusScoreTextNode.isConnected ||
+      !track.contains(bonusScoreTextNode)
+    ) {
+      track.innerHTML = `
+        <span class="vsl-bonus-score" id="vslBuildPrompt">
+          <img class="vsl-bonus-score-icon" src="${BONUS_SNAKE_ICON_ASSET}" alt="" aria-hidden="true">
+          <span class="vsl-bonus-score-text"></span>
+        </span>
+      `;
 
-    track.style.setProperty("--vsl-build-shift", "0px");
-    updateBuildHudShift();
+      bonusScoreTextNode =
+        track.querySelector(
+          ".vsl-bonus-score-text"
+        );
+    }
+
+    const nextScore =
+      `x ${state.bonusScore}`;
+
+    if (
+      bonusScoreTextNode &&
+      bonusScoreTextNode.textContent !==
+        nextScore
+    ) {
+      bonusScoreTextNode.textContent =
+        nextScore;
+    }
+
+    if (
+      track.style.getPropertyValue(
+        "--vsl-build-shift"
+      ) !== "0px"
+    ) {
+      track.style.setProperty(
+        "--vsl-build-shift",
+        "0px"
+      );
+    }
   }
 
   function updateBuildHud() {
@@ -3072,27 +3184,86 @@
   }
 
   function renderFruit(){
-    const layer = document.getElementById("vslFruitLayer");
+    const layer =
+      document.getElementById(
+        "vslFruitLayer"
+      );
+
     if (!layer) return;
-    layer.innerHTML = "";
-    if (!state.fruit) return;
 
-    const el = document.createElement("div");
-    el.className = "vsl-fruit";
+    if (!state.fruit) {
+      if (
+        fruitNode &&
+        fruitNode.isConnected &&
+        fruitNode.style.display !== "none"
+      ) {
+        fruitNode.style.display = "none";
+      }
 
-    const img = document.createElement("img");
-    img.className = "vsl-fruit-img";
-    img.src = state.fruit.image;
-    img.alt = "";
-    img.setAttribute("aria-hidden", "true");
+      return;
+    }
 
-    el.appendChild(img);
+    if (
+      !fruitNode ||
+      !fruitNode.isConnected ||
+      !layer.contains(fruitNode)
+    ) {
+      fruitNode =
+        document.createElement("div");
 
-    const p = worldToScreen(state.fruit);
-    const bob = Math.sin(state.fruit.phase * 2.2) * getSnakeHeadSize() * 0.09;
-    el.style.transform = `translate(${p.x.toFixed(1)}px, ${(p.y + bob).toFixed(1)}px) translate(-50%, -50%)`;
+      fruitNode.className =
+        "vsl-fruit";
 
-    layer.appendChild(el);
+      fruitImageNode =
+        document.createElement("img");
+
+      fruitImageNode.className =
+        "vsl-fruit-img";
+
+      fruitImageNode.alt = "";
+      fruitImageNode.setAttribute(
+        "aria-hidden",
+        "true"
+      );
+
+      fruitNode.appendChild(
+        fruitImageNode
+      );
+
+      layer.appendChild(fruitNode);
+
+      fruitImageSrc = "";
+    }
+
+    if (
+      fruitNode.style.display === "none"
+    ) {
+      fruitNode.style.display = "";
+    }
+
+    if (
+      fruitImageNode &&
+      fruitImageSrc !== state.fruit.image
+    ) {
+      fruitImageSrc =
+        state.fruit.image;
+
+      fruitImageNode.src =
+        fruitImageSrc;
+    }
+
+    const p =
+      worldToScreen(state.fruit);
+
+    const bob =
+      Math.sin(
+        state.fruit.phase * 2.2
+      ) *
+      getSnakeHeadSize() *
+      0.09;
+
+    fruitNode.style.transform =
+      `translate(${p.x.toFixed(1)}px, ${(p.y + bob).toFixed(1)}px) translate(-50%, -50%)`;
   }
 
   function renderArrow(){
