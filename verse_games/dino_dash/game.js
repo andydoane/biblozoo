@@ -1103,6 +1103,17 @@
     app.innerHTML = `
       <div class="dd2-diagnostic-screen">
         <div class="dd2-diagnostic-card">
+          <div class="dd2-diagnostic-actions">
+            <button
+              id="dd2DiagnosticCopy"
+              type="button"
+              class="dd2-diagnostic-primary"
+              ${previous ? "" : "disabled"}
+            >
+              Copy Previous Run Report
+            </button>
+          </div>
+
           <h1>Dino Dash Diagnostic Test</h1>
 
           <p class="dd2-diagnostic-mode">
@@ -1110,12 +1121,6 @@
             <strong>${escapeHtml(
               String(mode || "")
             )}</strong>
-          </p>
-
-          <p class="dd2-diagnostic-note">
-            For useful A/B tests, turn on only one test switch at a time.
-            Leave every test switch off for the baseline run.
-            Reporting is always active.
           </p>
 
           <label class="dd2-diagnostic-option">
@@ -1232,17 +1237,6 @@
               class="dd2-diagnostic-primary"
             >
               Start Test
-            </button>
-          </div>
-
-          <div class="dd2-diagnostic-actions">
-            <button
-              id="dd2DiagnosticCopy"
-              type="button"
-              class="dd2-diagnostic-primary"
-              ${previous ? "" : "disabled"}
-            >
-              Copy Previous Run Report
             </button>
           </div>
 
