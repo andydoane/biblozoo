@@ -228,6 +228,10 @@
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
 
+  const groundImage = new Image();
+  groundImage.src =
+    `${IMAGE_PATH}dino_dash_ground.png`;
+
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:dino_dash:v1";
 
@@ -1540,7 +1544,11 @@
                 <div class="dd2-hill-strip" id="dd2HillB"></div>
               </div>
               <div class="dd2-ground" id="dd2Ground">
-                <div class="dd2-ground-track" id="dd2GroundTrack"></div>
+                <canvas
+                  class="dd2-ground-canvas"
+                  id="dd2GroundCanvas"
+                  aria-hidden="true"
+                ></canvas>
               </div>
               <button class="dd2-menu-pill" id="dd2MenuPill" aria-label="Game Menu">☰</button>
               ${diagnosticHudHtml}
@@ -2042,19 +2050,7 @@
       flagSpawnX: width + unit * 2.05
     };
 
-    const groundTileW =
-      Math.max(
-        1,
-        Math.ceil(
-          groundH * GROUND_IMAGE_ASPECT
-        )
-      );
-
     field.style.setProperty("--dd2-ground-h", `${groundH}px`);
-    field.style.setProperty(
-      "--dd2-ground-track-w",
-      `${Math.ceil(width + groundTileW + 2)}px`
-    );
     field.style.setProperty("--dd2-hill-h", `${hillH}px`);
     field.style.setProperty("--dd2-back-hill-h", `${backHillH}px`);
     field.style.setProperty("--dd2-hill-w", `${Math.ceil(hillH * 10 + 4)}px`);
@@ -3078,6 +3074,122 @@
     renderFlash(ts);
   }
 
+  function renderGroundCanvas() {
+    const canvas =
+      document.getElementById(
+        "dd2GroundCanvas"
+      );
+
+    if (
+      !canvas ||
+      !state.layout ||
+      !groundImage.complete ||
+      !groundImage.naturalWidth ||
+      !groundImage.naturalHeight
+    ) {
+      return false;
+    }
+
+    const cssWidth =
+      Math.max(
+        1,
+        Math.ceil(state.layout.width)
+      );
+
+    const cssHeight =
+      Math.max(
+        1,
+        Math.ceil(state.layout.groundH)
+      );
+
+    const pixelRatio =
+      Math.min(
+        1.5,
+        Math.max(
+          1,
+          Number(window.devicePixelRatio) ||
+          1
+        )
+      );
+
+    const pixelWidth =
+      Math.max(
+        1,
+        Math.round(
+          cssWidth * pixelRatio
+        )
+      );
+
+    const pixelHeight =
+      Math.max(
+        1,
+        Math.round(
+          cssHeight * pixelRatio
+        )
+      );
+
+    if (
+      canvas.width !== pixelWidth ||
+      canvas.height !== pixelHeight
+    ) {
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+    }
+
+    const context =
+      canvas.getContext("2d");
+
+    if (!context) {
+      return false;
+    }
+
+    context.setTransform(
+      pixelRatio,
+      0,
+      0,
+      pixelRatio,
+      0,
+      0
+    );
+
+    context.clearRect(
+      0,
+      0,
+      cssWidth,
+      cssHeight
+    );
+
+    const groundTileW =
+      Math.max(
+        1,
+        Math.ceil(
+          state.layout.groundH *
+          GROUND_IMAGE_ASPECT
+        )
+      );
+
+    const groundOffset =
+      ((-state.worldX % groundTileW) +
+        groundTileW) %
+      groundTileW;
+
+    for (
+      let x = -groundOffset;
+      x < cssWidth;
+      x += groundTileW
+    ) {
+      context.drawImage(
+        groundImage,
+        x,
+        0,
+        groundTileW,
+        cssHeight
+      );
+    }
+
+    return true;
+  }
+
   function renderWorld(){
     const field = document.getElementById("dd2Field");
     if (!field || !state.layout) return;
@@ -3100,31 +3212,13 @@
       !freezeGround ||
       field.dataset.dd2StaticGroundRendered !== "true"
     ) {
-      const groundTileW =
-        Math.max(
-          1,
-          Math.ceil(
-            state.layout.groundH *
-            GROUND_IMAGE_ASPECT
-          )
-        );
+      const groundRendered =
+        renderGroundCanvas();
 
-      const groundOffset =
-        ((-state.worldX % groundTileW) +
-          groundTileW) %
-        groundTileW;
-
-      const groundTrack =
-        document.getElementById(
-          "dd2GroundTrack"
-        );
-
-      if (groundTrack) {
-        groundTrack.style.transform =
-          `translateX(${-groundOffset}px)`;
-      }
-
-      if (freezeGround) {
+      if (
+        freezeGround &&
+        groundRendered
+      ) {
         field.dataset.dd2StaticGroundRendered =
           "true";
       }
