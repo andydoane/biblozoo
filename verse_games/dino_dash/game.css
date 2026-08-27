@@ -211,7 +211,6 @@ body{
   height: var(--dd2-back-hill-h);
   bottom: calc(var(--dd2-ground-h) - 2px);
   overflow: hidden;
-  transform: translateZ(0);
 }
 
 .dd2-hills{
@@ -220,7 +219,6 @@ body{
   height: var(--dd2-hill-h);
   bottom: calc(var(--dd2-ground-h) - 2px);
   overflow: hidden;
-  transform: translateZ(0);
 }
 
 .dd2-back-hill-strip,
@@ -231,7 +229,6 @@ body{
   background-repeat: no-repeat;
   background-size: 100% 100%;
   background-position: 0 100%;
-  will-change: transform;
 }
 
 .dd2-back-hill-strip{
