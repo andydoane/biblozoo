@@ -100,6 +100,8 @@
   let profilePictureVerseIds = [];
   let profilePictureCatalogPromise = null;
   let lastProfileRewardVerseId = "";
+  let queuedProfileReward = null;
+  let queuedProfileRewardPromise = null;
 
   const uiSoundBuffers = new Map();
   const uiSoundBufferPromises = new Map();
@@ -305,38 +307,66 @@
     return verseId;
   }
 
-  function makeProfileRewardMagnet() {
-    const verseId =
-      chooseProfileRewardVerseId();
+  function preloadProfileRewardImage(src) {
+    return new Promise(resolve => {
+      const img = new Image();
 
-    if (!verseId) return null;
+      const finishLoaded = async () => {
+        try {
+          if (
+            typeof img.decode ===
+            "function"
+          ) {
+            await img.decode();
+          }
+        } catch (err) {
+          /*
+            The load event already confirmed
+            the image file is usable.
+          */
+        }
 
+        resolve(img);
+      };
+
+      img.onload = finishLoaded;
+
+      img.onerror = () => {
+        resolve(null);
+      };
+
+      img.src = src;
+    });
+  }
+
+  function makePreparedProfileReward(
+    verseId,
+    profileSrc,
+    preloadedImage
+  ) {
     const borderColor =
-      randomItem(PROFILE_MAGNET_COLORS) ||
+      randomItem(
+        PROFILE_MAGNET_COLORS
+      ) ||
       "#7f66c6";
 
-    const profileSrc =
-      `${PROFILE_PICTURE_DIR}profile_picture_${verseId}.png`;
-
-    const preload = new Image();
-    preload.src = profileSrc;
-
     return {
-      id: `vsn_tile_${state.tileSeed++}`,
-      char: "",
-      source: "profile-reward",
-      isProfileReward: true,
+      verseId,
       profileSrc,
+      preloadedImage,
       profileShape:
         Math.random() < 0.5
           ? "circle"
           : "rounded",
-      profileBorderColor: borderColor,
-      color: borderColor,
-      shade: darkenHexColor(
+      profileBorderColor:
         borderColor,
-        30
-      ),
+      color:
+        borderColor,
+      shade:
+        darkenHexColor(
+          borderColor,
+          30
+        ),
       rotation:
         Math.round(
           Math.random() * 34 - 17
@@ -344,15 +374,127 @@
     };
   }
 
-  function ensureActiveProfileReward() {
-    if (state.profileRewardQueue <= 0) {
+  async function preloadNextProfileReward() {
+    if (queuedProfileReward) {
+      return queuedProfileReward;
+    }
+
+    if (queuedProfileRewardPromise) {
+      return queuedProfileRewardPromise;
+    }
+
+    queuedProfileRewardPromise =
+      (async () => {
+        await loadProfilePictureCatalog();
+
+        const verseId =
+          chooseProfileRewardVerseId();
+
+        if (!verseId) {
+          return null;
+        }
+
+        let profileSrc =
+          `${PROFILE_PICTURE_DIR}profile_picture_${verseId}.png`;
+
+        let preloadedImage =
+          await preloadProfileRewardImage(
+            profileSrc
+          );
+
+        if (!preloadedImage) {
+          profileSrc =
+            PROFILE_PICTURE_FALLBACK_SRC;
+
+          preloadedImage =
+            await preloadProfileRewardImage(
+              profileSrc
+            );
+        }
+
+        if (!preloadedImage) {
+          return null;
+        }
+
+        queuedProfileReward =
+          makePreparedProfileReward(
+            verseId,
+            profileSrc,
+            preloadedImage
+          );
+
+        return queuedProfileReward;
+      })();
+
+    try {
+      return await queuedProfileRewardPromise;
+    } finally {
+      queuedProfileRewardPromise = null;
+    }
+  }
+
+  function makeProfileRewardMagnet(
+    preparedReward
+  ) {
+    if (
+      !preparedReward ||
+      !preparedReward.profileSrc
+    ) {
       return null;
     }
 
-    if (!state.activeProfileReward) {
-      state.activeProfileReward =
-        makeProfileRewardMagnet();
+    return {
+      id:
+        `vsn_tile_${state.tileSeed++}`,
+      char: "",
+      source: "profile-reward",
+      isProfileReward: true,
+      ...preparedReward
+    };
+  }
+
+  function ensureActiveProfileReward() {
+    if (
+      state.profileRewardQueue <= 0
+    ) {
+      return null;
     }
+
+    if (state.activeProfileReward) {
+      return state.activeProfileReward;
+    }
+
+    if (!queuedProfileReward) {
+      /*
+        Never create an unready reward.
+        If loading is unusually slow,
+        it can appear on a later set
+        instead of visibly popping in.
+      */
+      void preloadNextProfileReward();
+      return null;
+    }
+
+    const nextReward =
+      makeProfileRewardMagnet(
+        queuedProfileReward
+      );
+
+    if (!nextReward) {
+      return null;
+    }
+
+    state.activeProfileReward =
+      nextReward;
+
+    queuedProfileReward = null;
+
+    /*
+      The current queued picture has
+      just been promoted. Immediately
+      begin preparing the next one.
+    */
+    void preloadNextProfileReward();
 
     return state.activeProfileReward;
   }
@@ -369,7 +511,12 @@
     ensureActiveProfileReward();
   }
 
-  void loadProfilePictureCatalog();
+  /*
+    Start preparing the first possible
+    streak reward while the player is
+    still on the title/mode screens.
+  */
+  void preloadNextProfileReward();
 
   function bonusBaseTimeMs() {
     const roundIndex =
@@ -1420,6 +1567,9 @@
         await waitForMagnetFont();
         selectedMode = mode;
         initVerseData();
+
+        await preloadNextProfileReward();
+
         state.startTime = performance.now();
         state.showingInstruction = true;
         state.instructionToken += 1;
