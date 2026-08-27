@@ -227,6 +227,48 @@
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
 
+  const DIAGNOSTIC_STORAGE_KEY =
+    "biblozooDebug:dino_dash:v1";
+
+  let diagnosticOptions = {
+    render30fps: false,
+    disableParticles: false,
+    disableEffects: false,
+    simpleBuild: false,
+    showHud: false
+  };
+
+  const diagnosticState = {
+    active: false,
+    record: null,
+    lastHeartbeatAt: 0,
+    lastHudAt: 0,
+    lastRenderAt: 0,
+
+    frameWindowStartedAt: 0,
+    frameCount: 0,
+    frameTotalMs: 0,
+    frameMaxMs: 0,
+    framesOver33: 0,
+    framesOver50: 0,
+    framesOver100: 0,
+
+    renderCount: 0,
+    skippedRenderCount: 0,
+    buildUpdates: 0,
+
+    maxCounts: {
+      tablets: 0,
+      obstacles: 0,
+      particles: 0,
+      dust: 0,
+      trailDots: 0,
+      trailSparkles: 0,
+      fieldDomNodes: 0,
+      totalDomNodes: 0
+    }
+  };
+
   const referenceParts = window.VerseGameShell.parseReferenceParts(ctx.verseRef, ctx.translation, ctx.verseId);
   const buildData = window.VerseGameShell.buildVerseSegments({
     verseText: ctx.verseText || "",
@@ -358,6 +400,10 @@
   }
 
   function renderModeSelect(){
+    markDiagnosticRunClean(
+      "returned-to-mode-select"
+    );
+
     stopLoop();
     cleanupResize();
     state.phase = "mode";
@@ -377,9 +423,908 @@
       onSelect: mode => {
         playUiSound();
         unlockAudio();
-        startGame(mode);
+        renderDiagnosticSelect(mode);
       }
     });
+  }
+
+  function readDiagnosticReport(){
+    try {
+      const raw =
+        localStorage.getItem(
+          DIAGNOSTIC_STORAGE_KEY
+        );
+
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw);
+
+      return parsed &&
+        typeof parsed === "object"
+          ? parsed
+          : null;
+    } catch (err) {
+      console.warn(
+        "Could not read Dino Dash diagnostic report",
+        err
+      );
+
+      return null;
+    }
+  }
+
+  function writeDiagnosticReport(){
+    if (
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        DIAGNOSTIC_STORAGE_KEY,
+        JSON.stringify(
+          diagnosticState.record
+        )
+      );
+    } catch (err) {
+      console.warn(
+        "Could not save Dino Dash diagnostic report",
+        err
+      );
+    }
+  }
+
+  function diagnosticTestLabel(
+    options = diagnosticOptions
+  ){
+    const enabled = [];
+
+    if (options.render30fps) {
+      enabled.push("30fps render");
+    }
+
+    if (options.disableParticles) {
+      enabled.push("no particles");
+    }
+
+    if (options.disableEffects) {
+      enabled.push("no CSS effects");
+    }
+
+    if (options.simpleBuild) {
+      enabled.push("simple build");
+    }
+
+    return enabled.length
+      ? enabled.join(" + ")
+      : "baseline";
+  }
+
+  function getDiagnosticCounts(){
+    const field =
+      document.getElementById(
+        "dd2Field"
+      );
+
+    return {
+      tablets:
+        state.tablets.length,
+      obstacles:
+        state.obstacles.length,
+      particles:
+        state.particles.length,
+      dust:
+        state.dust.length,
+      trailDots:
+        state.trailDots.length,
+      trailSparkles:
+        state.trailSparkles.length,
+      fieldDomNodes:
+        field
+          ? field.getElementsByTagName(
+              "*"
+            ).length
+          : 0,
+      totalDomNodes:
+        document.getElementsByTagName(
+          "*"
+        ).length
+    };
+  }
+
+  function updateDiagnosticMaximums(
+    counts
+  ){
+    for (
+      const key
+      of Object.keys(
+        diagnosticState.maxCounts
+      )
+    ){
+      diagnosticState.maxCounts[key] =
+        Math.max(
+          diagnosticState
+            .maxCounts[key] || 0,
+          Number(counts[key]) || 0
+        );
+    }
+  }
+
+  function resetDiagnosticFrameWindow(
+    ts
+  ){
+    diagnosticState
+      .frameWindowStartedAt =
+      ts || performance.now();
+
+    diagnosticState.frameCount = 0;
+    diagnosticState.frameTotalMs = 0;
+    diagnosticState.frameMaxMs = 0;
+    diagnosticState.framesOver33 = 0;
+    diagnosticState.framesOver50 = 0;
+    diagnosticState.framesOver100 = 0;
+  }
+
+  function getDiagnosticFrameSummary(
+    ts
+  ){
+    const now =
+      ts || performance.now();
+
+    const elapsedMs =
+      Math.max(
+        1,
+        now -
+          diagnosticState
+            .frameWindowStartedAt
+      );
+
+    const count =
+      diagnosticState.frameCount;
+
+    return {
+      fps:
+        Math.round(
+          (
+            count * 1000 /
+            elapsedMs
+          ) * 10
+        ) / 10,
+
+      averageMs:
+        count
+          ? Math.round(
+              (
+                diagnosticState
+                  .frameTotalMs /
+                count
+              ) * 10
+            ) / 10
+          : 0,
+
+      maxMs:
+        Math.round(
+          diagnosticState
+            .frameMaxMs * 10
+        ) / 10,
+
+      over33:
+        diagnosticState
+          .framesOver33,
+
+      over50:
+        diagnosticState
+          .framesOver50,
+
+      over100:
+        diagnosticState
+          .framesOver100
+    };
+  }
+
+  function makeDiagnosticSnapshot(
+    ts
+  ){
+    const counts =
+      getDiagnosticCounts();
+
+    updateDiagnosticMaximums(
+      counts
+    );
+
+    return {
+      at:
+        new Date().toISOString(),
+
+      elapsedSeconds:
+        diagnosticState.record
+          ? Math.round(
+              (
+                Date.now() -
+                diagnosticState
+                  .record
+                  .startedAtEpoch
+              ) / 100
+            ) / 10
+          : 0,
+
+      phase:
+        state.phase,
+
+      progressIndex:
+        state.progressIndex,
+
+      wordCount:
+        state.verseWords.length,
+
+      streak:
+        state.streak,
+
+      current:
+        counts,
+
+      maximum:
+        {
+          ...diagnosticState
+            .maxCounts
+        },
+
+      frames:
+        getDiagnosticFrameSummary(
+          ts
+        ),
+
+      renderCount:
+        diagnosticState
+          .renderCount,
+
+      skippedRenderCount:
+        diagnosticState
+          .skippedRenderCount,
+
+      buildUpdates:
+        diagnosticState
+          .buildUpdates
+    };
+  }
+
+  function saveDiagnosticHeartbeat(
+    ts,
+    force = false
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    const now =
+      ts || performance.now();
+
+    if (
+      !force &&
+      now -
+        diagnosticState
+          .lastHeartbeatAt <
+        2000
+    ) {
+      return;
+    }
+
+    const snapshot =
+      makeDiagnosticSnapshot(now);
+
+    diagnosticState
+      .record
+      .snapshots
+      .push(snapshot);
+
+    if (
+      diagnosticState
+        .record
+        .snapshots
+        .length > 12
+    ){
+      diagnosticState
+        .record
+        .snapshots
+        .splice(
+          0,
+          diagnosticState
+            .record
+            .snapshots
+            .length - 12
+        );
+    }
+
+    diagnosticState
+      .record
+      .lastHeartbeatAt =
+      snapshot.at;
+
+    diagnosticState
+      .record
+      .lastSnapshot =
+      snapshot;
+
+    diagnosticState
+      .lastHeartbeatAt =
+      now;
+
+    writeDiagnosticReport();
+
+    resetDiagnosticFrameWindow(
+      now
+    );
+  }
+
+  function updateDiagnosticHud(ts){
+    if (
+      !diagnosticOptions.showHud
+    ) {
+      return;
+    }
+
+    const hud =
+      document.getElementById(
+        "dd2DiagnosticHud"
+      );
+
+    if (!hud) return;
+
+    if (
+      ts -
+        diagnosticState
+          .lastHudAt <
+      1000
+    ) {
+      return;
+    }
+
+    diagnosticState.lastHudAt =
+      ts;
+
+    const counts =
+      getDiagnosticCounts();
+
+    updateDiagnosticMaximums(
+      counts
+    );
+
+    const frames =
+      getDiagnosticFrameSummary(
+        ts
+      );
+
+    hud.textContent =
+      `TEST ${diagnosticTestLabel()}\n` +
+      `WORD ${Math.min(
+        state.progressIndex,
+        state.verseWords.length
+      )}/${state.verseWords.length}\n` +
+      `FPS ${frames.fps}  AVG ${frames.averageMs}ms  MAX ${frames.maxMs}ms\n` +
+      `TAB ${counts.tablets}  OBS ${counts.obstacles}\n` +
+      `PART ${counts.particles}  DUST ${counts.dust}\n` +
+      `TRAIL ${counts.trailDots}  SPARK ${counts.trailSparkles}\n` +
+      `DOM ${counts.fieldDomNodes} field / ${counts.totalDomNodes} total`;
+  }
+
+  function diagnosticTick(
+    ts,
+    rawFrameMs
+  ){
+    if (
+      !diagnosticState.active
+    ) {
+      return;
+    }
+
+    if (
+      rawFrameMs > 0
+    ){
+      diagnosticState.frameCount += 1;
+
+      diagnosticState
+        .frameTotalMs +=
+        rawFrameMs;
+
+      diagnosticState
+        .frameMaxMs =
+        Math.max(
+          diagnosticState
+            .frameMaxMs,
+          rawFrameMs
+        );
+
+      if (rawFrameMs > 33) {
+        diagnosticState
+          .framesOver33 += 1;
+      }
+
+      if (rawFrameMs > 50) {
+        diagnosticState
+          .framesOver50 += 1;
+      }
+
+      if (rawFrameMs > 100) {
+        diagnosticState
+          .framesOver100 += 1;
+      }
+    }
+
+    updateDiagnosticHud(ts);
+
+    saveDiagnosticHeartbeat(
+      ts
+    );
+  }
+
+  function startDiagnosticRun(mode){
+    diagnosticState.active =
+      true;
+
+    diagnosticState.record = {
+      version: 1,
+      gameId: GAME_ID,
+      verseId: ctx.verseId,
+      verseRef: ctx.verseRef,
+      mode,
+      test:
+        diagnosticTestLabel(),
+      options: {
+        ...diagnosticOptions
+      },
+      cleanExit: false,
+      status: "running",
+      startedAt:
+        new Date().toISOString(),
+      startedAtEpoch:
+        Date.now(),
+      lastHeartbeatAt: null,
+      lastSnapshot: null,
+      snapshots: [],
+      errors: []
+    };
+
+    diagnosticState
+      .lastHeartbeatAt = 0;
+
+    diagnosticState
+      .lastHudAt = 0;
+
+    diagnosticState
+      .lastRenderAt = 0;
+
+    diagnosticState
+      .renderCount = 0;
+
+    diagnosticState
+      .skippedRenderCount = 0;
+
+    diagnosticState
+      .buildUpdates = 0;
+
+    diagnosticState.maxCounts = {
+      tablets: 0,
+      obstacles: 0,
+      particles: 0,
+      dust: 0,
+      trailDots: 0,
+      trailSparkles: 0,
+      fieldDomNodes: 0,
+      totalDomNodes: 0
+    };
+
+    resetDiagnosticFrameWindow(
+      performance.now()
+    );
+
+    writeDiagnosticReport();
+  }
+
+  function markDiagnosticRunClean(
+    status = "clean-exit"
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    saveDiagnosticHeartbeat(
+      performance.now(),
+      true
+    );
+
+    diagnosticState
+      .record
+      .cleanExit = true;
+
+    diagnosticState
+      .record
+      .status = status;
+
+    diagnosticState
+      .record
+      .endedAt =
+      new Date().toISOString();
+
+    writeDiagnosticReport();
+
+    diagnosticState.active =
+      false;
+  }
+
+  function recordDiagnosticError(
+    type,
+    message
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    diagnosticState
+      .record
+      .errors
+      .push({
+        at:
+          new Date().toISOString(),
+        type:
+          String(type || "error"),
+        message:
+          String(message || "")
+            .slice(0, 1000)
+      });
+
+    if (
+      diagnosticState
+        .record
+        .errors
+        .length > 10
+    ){
+      diagnosticState
+        .record
+        .errors
+        .shift();
+    }
+
+    writeDiagnosticReport();
+  }
+
+  window.addEventListener(
+    "error",
+    event => {
+      recordDiagnosticError(
+        "error",
+        event?.message ||
+          "Unknown window error"
+      );
+    }
+  );
+
+  window.addEventListener(
+    "unhandledrejection",
+    event => {
+      const reason =
+        event?.reason;
+
+      recordDiagnosticError(
+        "unhandledrejection",
+        reason?.stack ||
+          reason?.message ||
+          String(reason || "")
+      );
+    }
+  );
+
+  function renderDiagnosticSelect(
+    mode
+  ){
+    stopLoop();
+    cleanupResize();
+
+    selectedMode = mode;
+    state.phase = "diagnostic";
+
+    const previous =
+      readDiagnosticReport();
+
+    const previousText =
+      previous
+        ? JSON.stringify(
+            previous,
+            null,
+            2
+          )
+        : "";
+
+    const previousStatus =
+      !previous
+        ? "No previous diagnostic run is saved."
+        : previous.cleanExit
+          ? `Previous run ended cleanly: ${previous.status || "complete"}.`
+          : "Previous run did NOT report a clean exit. If Dino Dash disappeared, the data below is the final saved heartbeat before WebKit was killed.";
+
+    app.innerHTML = `
+      <div class="dd2-diagnostic-screen">
+        <div class="dd2-diagnostic-card">
+          <h1>Dino Dash Diagnostic Test</h1>
+
+          <p class="dd2-diagnostic-mode">
+            Difficulty:
+            <strong>${escapeHtml(
+              String(mode || "")
+            )}</strong>
+          </p>
+
+          <p class="dd2-diagnostic-note">
+            For useful A/B tests, turn on only one test switch at a time.
+            Leave every test switch off for the baseline run.
+            Reporting is always active.
+          </p>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2Diagnostic30fps"
+              ${diagnosticOptions.render30fps ? "checked" : ""}
+            >
+            <span>
+              <strong>30 FPS DOM rendering</strong>
+              <small>
+                Physics and gameplay still update normally.
+              </small>
+            </span>
+          </label>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticParticles"
+              ${diagnosticOptions.disableParticles ? "checked" : ""}
+            >
+            <span>
+              <strong>Disable particles</strong>
+              <small>
+                Removes dust, bursts, streak dots, and sparkles.
+              </small>
+            </span>
+          </label>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticEffects"
+              ${diagnosticOptions.disableEffects ? "checked" : ""}
+            >
+            <span>
+              <strong>Disable CSS effects</strong>
+              <small>
+                Removes filters, drop-shadows, will-change, and decorative object animations.
+              </small>
+            </span>
+          </label>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticSimpleBuild"
+              ${diagnosticOptions.simpleBuild ? "checked" : ""}
+            >
+            <span>
+              <strong>Simple progress display</strong>
+              <small>
+                Replaces the full verse build with a plain counter.
+              </small>
+            </span>
+          </label>
+
+          <label class="dd2-diagnostic-option">
+            <input
+              type="checkbox"
+              id="dd2DiagnosticHud"
+              ${diagnosticOptions.showHud ? "checked" : ""}
+            >
+            <span>
+              <strong>Show live HUD</strong>
+              <small>
+                Optional. The black-box report works even when this is off.
+              </small>
+            </span>
+          </label>
+
+          <div class="dd2-diagnostic-actions">
+            <button
+              id="dd2DiagnosticBack"
+              type="button"
+              class="dd2-diagnostic-secondary"
+            >
+              Back
+            </button>
+
+            <button
+              id="dd2DiagnosticStart"
+              type="button"
+              class="dd2-diagnostic-primary"
+            >
+              Start Test
+            </button>
+          </div>
+
+          <div class="dd2-diagnostic-last-run">
+            <h2>Previous Run</h2>
+
+            <p>
+              ${escapeHtml(
+                previousStatus
+              )}
+            </p>
+
+            <textarea
+              id="dd2DiagnosticReport"
+              readonly
+              spellcheck="false"
+              placeholder="No report yet."
+            >${escapeHtml(previousText)}</textarea>
+
+            <div class="dd2-diagnostic-report-actions">
+              <button
+                id="dd2DiagnosticCopy"
+                type="button"
+                ${previous ? "" : "disabled"}
+              >
+                Copy Report
+              </button>
+
+              <button
+                id="dd2DiagnosticClear"
+                type="button"
+                ${previous ? "" : "disabled"}
+              >
+                Clear Report
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const back =
+      document.getElementById(
+        "dd2DiagnosticBack"
+      );
+
+    const start =
+      document.getElementById(
+        "dd2DiagnosticStart"
+      );
+
+    const copy =
+      document.getElementById(
+        "dd2DiagnosticCopy"
+      );
+
+    const clear =
+      document.getElementById(
+        "dd2DiagnosticClear"
+      );
+
+    const report =
+      document.getElementById(
+        "dd2DiagnosticReport"
+      );
+
+    if (back){
+      back.addEventListener(
+        "click",
+        () => {
+          playUiSound();
+          renderModeSelect();
+        }
+      );
+    }
+
+    if (start){
+      start.addEventListener(
+        "click",
+        () => {
+          diagnosticOptions = {
+            render30fps:
+              !!document
+                .getElementById(
+                  "dd2Diagnostic30fps"
+                )?.checked,
+
+            disableParticles:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticParticles"
+                )?.checked,
+
+            disableEffects:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticEffects"
+                )?.checked,
+
+            simpleBuild:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticSimpleBuild"
+                )?.checked,
+
+            showHud:
+              !!document
+                .getElementById(
+                  "dd2DiagnosticHud"
+                )?.checked
+          };
+
+          playUiSound();
+          startGame(mode);
+        }
+      );
+    }
+
+    if (copy && report){
+      copy.addEventListener(
+        "click",
+        async () => {
+          if (!report.value) return;
+
+          try {
+            await navigator
+              .clipboard
+              .writeText(
+                report.value
+              );
+
+            copy.textContent =
+              "Copied!";
+          } catch (err) {
+            report.focus();
+            report.select();
+
+            try {
+              document.execCommand(
+                "copy"
+              );
+
+              copy.textContent =
+                "Copied!";
+            } catch (copyErr) {
+              copy.textContent =
+                "Select + Copy";
+            }
+          }
+        }
+      );
+    }
+
+    if (clear){
+      clear.addEventListener(
+        "click",
+        () => {
+          try {
+            localStorage.removeItem(
+              DIAGNOSTIC_STORAGE_KEY
+            );
+          } catch (err) {
+            // Diagnostic cleanup only.
+          }
+
+          renderDiagnosticSelect(
+            mode
+          );
+        }
+      );
+    }
   }
 
   function startGame(mode){
@@ -390,10 +1335,21 @@
     completed = false;
     completionResult = null;
     resetStateForRun();
+    startDiagnosticRun(mode);
     preloadSounds();
 
+    const diagnosticRootClass =
+      diagnosticOptions.disableEffects
+        ? " dd2-diagnostic-no-effects"
+        : "";
+
+    const diagnosticHudHtml =
+      diagnosticOptions.showHud
+        ? `<pre class="dd2-diagnostic-hud" id="dd2DiagnosticHud"></pre>`
+        : "";
+
     app.innerHTML = `
-      <div class="dd2-root">
+      <div class="dd2-root${diagnosticRootClass}">
         <div class="dd2-stage">
           <div class="dd2-build-wrap">
             <div class="dd2-build vm-build vm-build--${BUILD_AREA}" id="dd2Build">
@@ -413,6 +1369,7 @@
               </div>
               <div class="dd2-ground" id="dd2Ground"></div>
               <button class="dd2-menu-pill" id="dd2MenuPill" aria-label="Game Menu">☰</button>
+              ${diagnosticHudHtml}
               <div class="dd2-trail-layer" id="dd2TrailLayer"></div>
               <div class="dd2-particles" id="dd2Particles"></div>
               <div class="dd2-tablets" id="dd2Tablets"></div>
@@ -752,6 +1709,11 @@
       },
       onExit: () => {
         playUiSound();
+
+        markDiagnosticRunClean(
+          "exited-game"
+        );
+
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => setPaused(true, "menu"),
@@ -950,16 +1912,65 @@
       return;
     }
 
-    if (!state.lastTs) state.lastTs = ts;
-    const dt = Math.min(0.033, Math.max(0, (ts - state.lastTs) / 1000));
+    const rawFrameMs =
+      state.lastTs
+        ? Math.max(
+            0,
+            ts - state.lastTs
+          )
+        : 0;
+
+    if (!state.lastTs) {
+      state.lastTs = ts;
+    }
+
+    const dt =
+      Math.min(
+        0.033,
+        Math.max(
+          0,
+          (ts - state.lastTs) /
+            1000
+        )
+      );
+
     state.lastTs = ts;
 
     if (!state.paused){
       update(dt, ts);
     }
 
-    render(ts);
-    state.rafId = requestAnimationFrame(tick);
+    diagnosticTick(
+      ts,
+      rawFrameMs
+    );
+
+    const renderInterval =
+      1000 / 30;
+
+    const shouldRender =
+      !diagnosticOptions.render30fps ||
+      !diagnosticState.lastRenderAt ||
+      ts -
+        diagnosticState
+          .lastRenderAt >=
+        renderInterval;
+
+    if (shouldRender){
+      render(ts);
+
+      diagnosticState
+        .lastRenderAt = ts;
+
+      diagnosticState
+        .renderCount += 1;
+    } else {
+      diagnosticState
+        .skippedRenderCount += 1;
+    }
+
+    state.rafId =
+      requestAnimationFrame(tick);
   }
 
   function update(dt, ts){
@@ -1707,6 +2718,13 @@
   }
 
   function updateTrail(dt){
+    if (
+      diagnosticOptions.disableParticles
+    ){
+      clearTrail();
+      return;
+    }
+
     const level = getTrailLevel();
     if (level <= 0 || !state.layout || state.dinoHidden){
       clearTrail();
@@ -1792,6 +2810,12 @@
   }
 
   function addDust(x, y, count){
+    if (
+      diagnosticOptions.disableParticles
+    ) {
+      return;
+    }
+
     for (let i = 0; i < count; i += 1){
       state.dust.push({
         id: state.nextParticleId++,
@@ -1808,6 +2832,12 @@
   }
 
   function addParticleBurst(x, y, colors, count, minSizeU, maxSizeU){
+    if (
+      diagnosticOptions.disableParticles
+    ) {
+      return;
+    }
+
     for (let i = 0; i < count; i += 1){
       const angle = Math.random() * Math.PI * 2;
       const speed = randomBetween(1.0, 3.2) * state.layout.unit;
@@ -2481,6 +3511,13 @@
     if (!el) return;
 
     if (
+      diagnosticState.active
+    ){
+      diagnosticState
+        .buildUpdates += 1;
+    }
+
+    if (
       state.phase === "bonusIntro" ||
       state.phase === "bonus" ||
       state.phase === "bonusResult"
@@ -2535,6 +3572,43 @@
     }
 
 
+
+    if (
+      diagnosticOptions.simpleBuild
+    ){
+      const phase =
+        getCurrentPhase();
+
+      const wordProgress =
+        Math.min(
+          state.progressIndex,
+          state.verseWords.length
+        );
+
+      el.className =
+        "dd2-build-text " +
+        "vm-build-text " +
+        "dd2-diagnostic-simple-build";
+
+      if (phase === "words"){
+        el.textContent =
+          `${wordProgress} / ` +
+          `${state.verseWords.length} words`;
+      } else if (phase === "book"){
+        el.textContent =
+          "Book";
+      } else if (
+        phase === "reference"
+      ){
+        el.textContent =
+          "Reference";
+      } else {
+        el.textContent =
+          "Verse complete";
+      }
+
+      return;
+    }
 
     const buildRender = window.VerseGameShell.renderBuildProgressHtml({
       verseText: ctx.verseText || "",
@@ -2592,6 +3666,10 @@
     completed = true;
     state.running = false;
     stopLoop();
+
+    markDiagnosticRunClean(
+      "completed-round"
+    );
 
     try {
       completionResult = await window.VerseGameBridge.completeGameRun({
