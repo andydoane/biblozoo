@@ -1,0 +1,63 @@
+{
+    "biblopet": "🫏",
+    "biblopetDefaultName": "Lumpy",
+    "biblopetFeetFromBottom": "30.1%",
+    "verseId": "john_6_35",
+    "ref": "John 6:35",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Jesus said to them",
+        "'I am the bread of life",
+        "whoever comes to me shall not hunger",
+        "and whoever believes in me",
+        "shall never thirst.'"
+    ],
+    "verseText": "Jesus said to them, 'I am the bread of life; whoever comes to me shall not hunger, and whoever believes in me shall never thirst.'",
+    "meaning": "Like bread and water give our bodies what they need to live, Jesus gives our souls what they need to live forever.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "Jesus",
+            "occurrence": 1,
+            "emoji": "✝️"
+        },
+        {
+            "type": "emoji",
+            "word": "bread",
+            "occurrence": 1,
+            "emoji": "🍞"
+        },
+        {
+            "type": "emoji",
+            "word": "life",
+            "occurrence": 1,
+            "emoji": "🌱"
+        },
+        {
+            "type": "emoji",
+            "word": "comes",
+            "occurrence": 1,
+            "emoji": "➡️"
+        },
+        {
+            "type": "emoji",
+            "word": "hunger",
+            "occurrence": 1,
+            "emoji": "🍽️"
+        },
+        {
+            "type": "emoji",
+            "word": "believes",
+            "occurrence": 1,
+            "emoji": "🙏"
+        },
+        {
+            "type": "emoji",
+            "word": "thirst",
+            "occurrence": 1,
+            "emoji": "💧"
+        }
+    ]
+}
