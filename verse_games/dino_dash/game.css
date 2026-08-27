@@ -584,9 +584,12 @@ body{
 
 .dd2-diagnostic-screen {
   box-sizing: border-box;
-  min-height: 100dvh;
+  height: 100dvh;
   padding: 18px;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
   background: #333333;
   color: #333333;
   font-family: "Baloo 2", system-ui, sans-serif;
