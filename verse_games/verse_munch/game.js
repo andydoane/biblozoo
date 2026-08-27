@@ -2483,6 +2483,13 @@ function updateBuildText(){
       }
 
       layer.innerHTML = state.bonusFoodItems.map((item) => {
+        const waveY =
+          getBeltWaveOffsetPx(
+            item,
+            ts,
+            7
+          );
+
         const classes = [
           "vmunch-bonus-food-chip",
           item.isTarget ? "is-target" : "",
@@ -2494,7 +2501,7 @@ function updateBuildText(){
             class="${classes}"
             type="button"
             data-bonus-food-id="${item.id}"
-            style="--x:${item.x}px;--size:${item.size}px;--tilt:${item.tilt}deg;"
+            style="--x:${item.x}px;--size:${item.size}px;--tilt:${item.tilt}deg;--wave-y:${waveY.toFixed(1)}px;"
             aria-label="${escapeHtml(item.fruit.label)}"
           >
             <img
@@ -2521,6 +2528,13 @@ function updateBuildText(){
     }
 
     layer.innerHTML = state.beltItems.map((item) => {
+      const waveY =
+        getBeltWaveOffsetPx(
+          item,
+          ts,
+          5
+        );
+
       const isWrong = item.wrongUntil && ts < item.wrongUntil;
       const isHidden = item.tapped && !isWrong;
       const classes = [
@@ -2535,7 +2549,7 @@ function updateBuildText(){
           class="${classes}"
           type="button"
           data-item-id="${item.id}"
-          style="--x:${item.x}px;width:${item.width}px;"
+          style="--x:${item.x}px;--wave-y:${waveY.toFixed(1)}px;width:${item.width}px;"
           aria-label="${escapeHtml(item.label)}"
         >${escapeHtml(item.label)}</button>
       `;
@@ -2646,6 +2660,95 @@ function updateBuildText(){
     }).join("");
   }
 
+  function getPageStreakThemeColor(pageClass) {
+    if (
+      pageClass ===
+      "vmunch-page-flash-streak-1"
+    ) {
+      return "#c9ef63";
+    }
+
+    if (
+      pageClass ===
+      "vmunch-page-flash-streak-2"
+    ) {
+      return "#40b9c5";
+    }
+
+    if (
+      pageClass ===
+      "vmunch-page-flash-streak-rainbow"
+    ) {
+      return "#ff79c6";
+    }
+
+    return GAME_THEME.bg;
+  }
+
+  function syncPageStreakFlash(pageClass = "") {
+    const previousClass =
+      app.dataset.vmunchPageFlashClass ||
+      "";
+
+    if (previousClass === pageClass) {
+      return;
+    }
+
+    const streakClasses = [
+      "vmunch-page-flash-streak-1",
+      "vmunch-page-flash-streak-2",
+      "vmunch-page-flash-streak-rainbow"
+    ];
+
+    [
+      document.documentElement,
+      document.body,
+      app
+    ].forEach(element => {
+      element.classList.remove(
+        ...streakClasses
+      );
+
+      if (pageClass) {
+        element.classList.add(
+          pageClass
+        );
+      }
+    });
+
+    const themeColor =
+      getPageStreakThemeColor(
+        pageClass
+      );
+
+    let themeMeta =
+      document.querySelector(
+        'meta[name="theme-color"]'
+      );
+
+    if (!themeMeta) {
+      themeMeta =
+        document.createElement("meta");
+
+      themeMeta.setAttribute(
+        "name",
+        "theme-color"
+      );
+
+      document.head.appendChild(
+        themeMeta
+      );
+    }
+
+    themeMeta.setAttribute(
+      "content",
+      themeColor
+    );
+
+    app.dataset.vmunchPageFlashClass =
+      pageClass;
+  }
+
   function renderReactionFlash(ts){
     const root = document.querySelector(".vmunch-root, .vmunch-mode-shell");
 
@@ -2659,31 +2762,37 @@ function updateBuildText(){
       );
     }
 
-    clearPageStreakFlash();
+    const streakActiveUntil = Math.max(
+      state.reactionFlashUntil,
+      state.streakSunburstUntil
+    );
 
-    const streakActiveUntil = Math.max(state.reactionFlashUntil, state.streakSunburstUntil);
+    let pageClass = "";
 
-    if (state.reactionFlash && ts < streakActiveUntil){
-      const pageClass = state.reactionFlash.replace("is-flash-", "vmunch-page-flash-");
+    if (
+      state.reactionFlash &&
+      ts < streakActiveUntil
+    ) {
+      const candidate =
+        state.reactionFlash.replace(
+          "is-flash-",
+          "vmunch-page-flash-"
+        );
 
-      if (pageClass.startsWith("vmunch-page-flash-streak")){
-        app.classList.add(pageClass);
+      if (
+        candidate.startsWith(
+          "vmunch-page-flash-streak"
+        )
+      ) {
+        pageClass = candidate;
       }
     }
+
+    syncPageStreakFlash(pageClass);
   }
 
   function clearPageStreakFlash(){
-    app.classList.remove(
-      "vmunch-page-flash-streak-1",
-      "vmunch-page-flash-streak-2",
-      "vmunch-page-flash-streak-rainbow"
-    );
-
-    document.body.classList.remove(
-      "vmunch-page-flash-streak-1",
-      "vmunch-page-flash-streak-2",
-      "vmunch-page-flash-streak-rainbow"
-    );
+    syncPageStreakFlash("");
   }
 
   function renderStreakSunburst(ts){
@@ -2892,6 +3001,28 @@ function updateBuildText(){
     }
   }
 
+  function getBeltWaveOffsetPx(
+    item,
+    ts,
+    amplitude
+  ) {
+    const phase =
+      Number.isFinite(item.wavePhase)
+        ? item.wavePhase
+        : 0;
+
+    const rate =
+      Number.isFinite(item.waveRate)
+        ? item.waveRate
+        : 1;
+
+    const seconds = ts / 1000;
+
+    return Math.sin(
+      seconds * Math.PI * rate + phase
+    ) * amplitude;
+  }
+
   function getBeltConfig() {
     const chipHeight = 56;
     const speedMultiplier =
@@ -2979,7 +3110,7 @@ function updateBuildText(){
   function spawnBonusFoodItem(cfg) {
     if (!state.bonusTargetFruit) return;
 
-    const beltWidth = getBonusBeltWidth();
+    const beltWidth = getBeltWidth();
     const forceTarget = state.bonusNonTargetStreak >= BONUS_FORCE_TARGET_AFTER;
     const makeTarget = forceTarget || Math.random() < BONUS_TARGET_CHANCE;
 
@@ -3006,16 +3137,30 @@ function updateBuildText(){
       x,
       size: cfg.size + Math.random() * 8,
       tilt: -8 + Math.random() * 16,
+      wavePhase: Math.random() * Math.PI * 2,
+      waveRate: 0.88 + Math.random() * 0.24,
       tapped: false
     });
   }
 
-  function getBonusBeltWidth() {
-    const layer = document.getElementById("vmunchBeltLayer");
-    if (!layer) return state.fieldWidth || 360;
+  function getBeltWidth() {
+    const layer =
+      document.getElementById(
+        "vmunchBeltLayer"
+      );
 
-    const rect = layer.getBoundingClientRect();
-    return rect.width || state.fieldWidth || 360;
+    if (!layer) {
+      return state.fieldWidth || 360;
+    }
+
+    const rect =
+      layer.getBoundingClientRect();
+
+    return (
+      rect.width ||
+      state.fieldWidth ||
+      360
+    );
   }
 
   function updateBelt(dt) {
@@ -3042,11 +3187,20 @@ function updateBuildText(){
   }
 
   function shouldAddBeltItem(cfg) {
-    if (!state.fieldWidth) return false;
+    const beltWidth = getBeltWidth();
+
+    if (!beltWidth) return false;
     if (!state.beltItems.length) return true;
 
-    const rightEdge = Math.max(...state.beltItems.map(item => item.x + item.width));
-    return rightEdge < state.fieldWidth + cfg.gap;
+    const rightEdge =
+      Math.max(
+        ...state.beltItems.map(
+          item => item.x + item.width
+        )
+      );
+
+    return rightEdge <
+      beltWidth + cfg.gap;
   }
 
   function spawnBeltItem(cfg) {
@@ -3054,9 +3208,17 @@ function updateBuildText(){
     if (phase === "done") return;
 
     const correctLabel = getCurrentCorrectLabel();
-    const visibleCorrectCount = state.beltItems.filter(item => {
-      return item.isCorrect && !item.tapped && item.x + item.width > 0 && item.x < state.fieldWidth;
-    }).length;
+    const beltWidth = getBeltWidth();
+
+    const visibleCorrectCount =
+      state.beltItems.filter(item => {
+        return (
+          item.isCorrect &&
+          !item.tapped &&
+          item.x + item.width > 0 &&
+          item.x < beltWidth
+        );
+      }).length;
 
     let makeCorrect = false;
 
@@ -3094,9 +3256,13 @@ function updateBuildText(){
     const width = estimateBeltItemWidth(label, cfg);
     const currentRightEdge = state.beltItems.length
       ? Math.max(...state.beltItems.map(item => item.x + item.width))
-      : state.fieldWidth + 18;
+      : beltWidth + 18;
 
-    const x = Math.max(state.fieldWidth + 18, currentRightEdge + cfg.gap);
+    const x = Math.max(
+      beltWidth + 18,
+      currentRightEdge + cfg.gap
+    );
+
     const foods = shuffle(FOOD_EMOJIS);
 
     state.beltItems.push({
@@ -3107,6 +3273,8 @@ function updateBuildText(){
       food: foods[0],
       x,
       width,
+      wavePhase: Math.random() * Math.PI * 2,
+      waveRate: 0.88 + Math.random() * 0.24,
       tapped: false,
       wrongUntil: 0,
       removeAt: 0

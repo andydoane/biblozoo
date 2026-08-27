@@ -126,14 +126,20 @@ body{
 
 
 
+html.vmunch-page-flash-streak-1,
+body.vmunch-page-flash-streak-1,
 #app.vm-shell.vmunch-page-flash-streak-1{
   background:#c9ef63;
 }
 
+html.vmunch-page-flash-streak-2,
+body.vmunch-page-flash-streak-2,
 #app.vm-shell.vmunch-page-flash-streak-2{
   background:#40b9c5;
 }
 
+html.vmunch-page-flash-streak-rainbow,
+body.vmunch-page-flash-streak-rainbow,
 #app.vm-shell.vmunch-page-flash-streak-rainbow{
   background:linear-gradient(
     90deg,
@@ -918,9 +924,11 @@ body{
 
 .vmunch-belt-shell {
   position: relative;
-  width: min(100%, 760px);
+  width: 100vw;
   min-height: var(--vmunch-carousel-shell-min-height);
-  overflow: hidden;
+  overflow: visible;
+  -webkit-clip-path: inset(-34px 0 -34px 0);
+  clip-path: inset(-34px 0 -34px 0);
 }
 
 .vmunch-belt-track {
@@ -951,7 +959,10 @@ body{
   font-weight: 900;
   line-height: 1;
   cursor: pointer;
-  transform: translate(var(--x), -50%);
+  transform: translate(
+    var(--x),
+    calc(-50% + var(--wave-y, 0px))
+  );
   touch-action: manipulation;
   white-space: nowrap;
   overflow: visible;
@@ -1001,7 +1012,10 @@ body{
   background: transparent;
   box-shadow: none;
   cursor: pointer;
-  transform: translate(var(--x), -50%) rotate(var(--tilt));
+  transform: translate(
+    var(--x),
+    calc(-50% + var(--wave-y, 0px))
+  ) rotate(var(--tilt));
   touch-action: manipulation;
   pointer-events: auto;
   will-change: transform;
@@ -1182,23 +1196,51 @@ body{
 
 @keyframes vmunchBeltWrong {
   0% {
-    transform: translate(var(--x), -50%) scale(1);
+    transform:
+      translate(
+        var(--x),
+        calc(-50% + var(--wave-y, 0px))
+      )
+      scale(1);
   }
 
   20% {
-    transform: translate(calc(var(--x) - 7px), -50%) rotate(-2deg) scale(1.02);
+    transform:
+      translate(
+        calc(var(--x) - 7px),
+        calc(-50% + var(--wave-y, 0px))
+      )
+      rotate(-2deg)
+      scale(1.02);
   }
 
   42% {
-    transform: translate(calc(var(--x) + 7px), -50%) rotate(2deg) scale(1.02);
+    transform:
+      translate(
+        calc(var(--x) + 7px),
+        calc(-50% + var(--wave-y, 0px))
+      )
+      rotate(2deg)
+      scale(1.02);
   }
 
   64% {
-    transform: translate(calc(var(--x) - 4px), -50%) rotate(-1deg) scale(1.01);
+    transform:
+      translate(
+        calc(var(--x) - 4px),
+        calc(-50% + var(--wave-y, 0px))
+      )
+      rotate(-1deg)
+      scale(1.01);
   }
 
   100% {
-    transform: translate(var(--x), -50%) scale(1);
+    transform:
+      translate(
+        var(--x),
+        calc(-50% + var(--wave-y, 0px))
+      )
+      scale(1);
   }
 }
 
