@@ -1,0 +1,27 @@
+{
+  "biblopet": "🦓",
+  "biblopetDefaultName": "Prickles",
+  "biblopetFeetFromBottom": "24.3%",
+  "verseId": "matthew_18_3",
+  "ref": "Matthew 18:3",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Truly, I say to you",
+    "unless you turn",
+    "and become like children",
+    "you will never enter",
+    "the kingdom of heaven."
+  ],
+  "verseText": "Truly, I say to you, unless you turn and become like children, you will never enter the kingdom of heaven.",
+  "meaning": "In order to enter God's kingdom, we must trust in Jesus as much as a child trusts in their parents.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "turn", "occurrence": 1, "emoji": "↩️" },
+    { "type": "underscore", "word": "become", "occurrence": 1 },
+    { "type": "emoji", "word": "children", "occurrence": 1, "emoji": "🧒👦" },
+    { "type": "emoji", "word": "enter", "occurrence": 1, "emoji": "➡️🚪" },
+    { "type": "emoji", "word": "kingdom", "occurrence": 1, "emoji": "🏰" },
+    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "☁️" }
+  ]
+}
