@@ -1,0 +1,26 @@
+{
+  "biblopet": "🐛",
+  "biblopetDefaultName": "Miles",
+  "biblopetFeetFromBottom": "23.5%",
+  "verseId": "matthew_24_44",
+  "ref": "Matthew 24:44",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Therefore you also must be ready",
+    "for the Son of Man",
+    "is coming at an hour",
+    "you do not expect."
+  ],
+  "verseText": "Therefore you also must be ready, for the Son of Man is coming at an hour you do not expect.",
+  "meaning": "Because Jesus can return at any moment, we must always be ready. And the way to be ready is to trust in him to save us.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "ready", "occurrence": 1, "emoji": "✅" },
+    { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
+    { "type": "emoji", "word": "Man", "occurrence": 1, "emoji": "🧍" },
+    { "type": "emoji", "word": "coming", "occurrence": 1, "emoji": "➡️" },
+    { "type": "emoji", "word": "hour", "occurrence": 1, "emoji": "🕐" },
+    { "type": "emoji", "word": "expect", "occurrence": 1, "emoji": "👀" }
+  ]
+}
