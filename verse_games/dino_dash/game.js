@@ -2154,7 +2154,7 @@
     );
 
     const renderInterval =
-      1000 / 30;
+      30;
 
     const shouldRender =
       !diagnosticOptions.render30fps ||
