@@ -437,6 +437,10 @@ body{
   filter: drop-shadow(0 5px 0 rgba(0,0,0,0.12));
 }
 
+.dd2-obstacle--ground.is-flipped{
+  transform: translate(-50%, -50%) scaleX(-1);
+}
+
 .dd2-obstacle--bee{
   animation: dd2BeeWiggle 560ms ease-in-out infinite;
 }

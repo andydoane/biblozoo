@@ -109,6 +109,7 @@
   const ADAPTIVE_RENDER_MODERATE_WINDOW_MS = 3000;
   const ADAPTIVE_RENDER_MODERATE_COUNT = 3;
   const ADAPTIVE_RENDER_STABLE_MS = 20000;
+  const ADAPTIVE_RENDER_POST_DROP_GRACE_MS = 2000;
   const ADAPTIVE_RENDER_IGNORE_GAP_MS = 1000;
 
   const DINO_COLORS = [
@@ -2348,6 +2349,17 @@
         ts;
     }
 
+    const inPostDropGrace =
+      !adaptiveRenderState.locked30 &&
+      adaptiveRenderState.entered30At &&
+      ts -
+        adaptiveRenderState.entered30At <
+        ADAPTIVE_RENDER_POST_DROP_GRACE_MS;
+
+    if (inPostDropGrace) {
+      return;
+    }
+
     if (
       rawFrameMs >=
       ADAPTIVE_RENDER_SERIOUS_STALL_MS &&
@@ -2829,6 +2841,7 @@
       type: "ground",
       key: data.key,
       image: data.image,
+      flipped: Math.random() < 0.5,
       x: layout.spawnX,
       y,
       w,
@@ -3786,6 +3799,7 @@
           `dd2-obstacle ` +
           `dd2-obstacle--${item.type} ` +
           `dd2-obstacle--${item.key}` +
+          `${item.flipped ? " is-flipped" : ""}` +
           `${item.hit ? " is-hit" : ""}`;
       }
 
