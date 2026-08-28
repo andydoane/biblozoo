@@ -269,6 +269,9 @@
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:dino_dash:v1";
 
+  const DIAGNOSTIC_TESTING_ENABLED =
+    false;
+
   const adaptiveRenderState = {
     mode: "60fps",
     locked30: false,
@@ -478,7 +481,13 @@
       onSelect: mode => {
         playUiSound();
         unlockAudio();
-        renderDiagnosticSelect(mode);
+
+        if (DIAGNOSTIC_TESTING_ENABLED) {
+          renderDiagnosticSelect(mode);
+          return;
+        }
+
+        startGame(mode);
       }
     });
   }
@@ -1553,7 +1562,14 @@
     completed = false;
     completionResult = null;
     resetStateForRun();
-    startDiagnosticRun(mode);
+
+    if (DIAGNOSTIC_TESTING_ENABLED) {
+      startDiagnosticRun(mode);
+    } else {
+      diagnosticState.active = false;
+      diagnosticState.record = null;
+    }
+
     preloadSounds();
 
     const diagnosticRootClass = [
