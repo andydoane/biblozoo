@@ -103,6 +103,14 @@
   const FLAG_FINISH_SECONDS = 30;
   const FLAG_CLEAR_RUNWAY_SECONDS = 1.55;
 
+  const ADAPTIVE_RENDER_INTERVAL_MS = 30;
+  const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
+  const ADAPTIVE_RENDER_MODERATE_STALL_MS = 40;
+  const ADAPTIVE_RENDER_MODERATE_WINDOW_MS = 3000;
+  const ADAPTIVE_RENDER_MODERATE_COUNT = 3;
+  const ADAPTIVE_RENDER_STABLE_MS = 20000;
+  const ADAPTIVE_RENDER_IGNORE_GAP_MS = 1000;
+
   const DINO_COLORS = [
     { name: "yellow", primary: "#ffc751", secondary: "#a68235" },
     { name: "red", primary: "#ff5a51", secondary: "#a63b35" },
@@ -259,6 +267,16 @@
 
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:dino_dash:v1";
+
+  const adaptiveRenderState = {
+    mode: "60fps",
+    locked30: false,
+    recoveredOnce: false,
+    pressureEvents: 0,
+    entered30At: 0,
+    stableSince: 0,
+    moderateStalls: []
+  };
 
   let diagnosticOptions = {
     render30fps: false,
@@ -770,6 +788,11 @@
           ts
         ),
 
+      adaptiveRender:
+        getAdaptiveRenderDiagnosticSummary(
+          ts
+        ),
+
       renderCount:
         diagnosticState
           .renderCount,
@@ -980,6 +1003,7 @@
       lastHeartbeatAt: null,
       lastSnapshot: null,
       snapshots: [],
+      renderModeEvents: [],
       errors: []
     };
 
@@ -1607,6 +1631,8 @@
   }
 
   function resetStateForRun(){
+    resetAdaptiveRenderState();
+
     state.running = true;
     state.paused = false;
     state.pauseReason = "";
@@ -2099,6 +2125,324 @@
     state.dinoHidden = false;
   }
 
+  function resetAdaptiveRenderState() {
+    adaptiveRenderState.mode =
+      "60fps";
+
+    adaptiveRenderState.locked30 =
+      false;
+
+    adaptiveRenderState.recoveredOnce =
+      false;
+
+    adaptiveRenderState.pressureEvents =
+      0;
+
+    adaptiveRenderState.entered30At =
+      0;
+
+    adaptiveRenderState.stableSince =
+      0;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    diagnosticState.lastRenderAt =
+      0;
+  }
+
+  function recordAdaptiveRenderEvent(
+    type,
+    reason,
+    rawFrameMs = null
+  ) {
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record ||
+      !Array.isArray(
+        diagnosticState
+          .record
+          .renderModeEvents
+      )
+    ) {
+      return;
+    }
+
+    const startedAtEpoch =
+      diagnosticState
+        .record
+        .startedAtEpoch;
+
+    diagnosticState
+      .record
+      .renderModeEvents
+      .push({
+        at:
+          new Date().toISOString(),
+
+        elapsedSeconds:
+          startedAtEpoch
+            ? Math.round(
+              (
+                Date.now() -
+                startedAtEpoch
+              ) / 100
+            ) / 10
+            : null,
+
+        type,
+        reason,
+
+        mode:
+          adaptiveRenderState.mode,
+
+        locked30:
+          adaptiveRenderState
+            .locked30,
+
+        frameMs:
+          Number.isFinite(
+            rawFrameMs
+          )
+            ? Math.round(
+              rawFrameMs * 10
+            ) / 10
+            : null
+      });
+  }
+
+  function enterAdaptive30fps(
+    ts,
+    reason,
+    rawFrameMs
+  ) {
+    if (
+      adaptiveRenderState.mode ===
+      "30fps"
+    ) {
+      return;
+    }
+
+    adaptiveRenderState
+      .pressureEvents += 1;
+
+    adaptiveRenderState.mode =
+      "30fps";
+
+    adaptiveRenderState.entered30At =
+      ts;
+
+    adaptiveRenderState.stableSince =
+      ts;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    if (
+      adaptiveRenderState
+        .recoveredOnce
+    ) {
+      adaptiveRenderState.locked30 =
+        true;
+    }
+
+    recordAdaptiveRenderEvent(
+      adaptiveRenderState.locked30
+        ? "lock-30fps"
+        : "drop-30fps",
+      reason,
+      rawFrameMs
+    );
+  }
+
+  function updateAdaptiveRenderMode(
+    ts,
+    rawFrameMs
+  ) {
+    if (
+      diagnosticOptions.render30fps ||
+      state.paused ||
+      rawFrameMs <= 0
+    ) {
+      return;
+    }
+
+    if (
+      rawFrameMs >=
+      ADAPTIVE_RENDER_IGNORE_GAP_MS
+    ) {
+      adaptiveRenderState
+        .moderateStalls
+        .length = 0;
+
+      adaptiveRenderState.stableSince =
+        ts;
+
+      return;
+    }
+
+    if (
+      adaptiveRenderState.mode ===
+      "60fps"
+    ) {
+      const moderateStalls =
+        adaptiveRenderState
+          .moderateStalls;
+
+      const cutoff =
+        ts -
+        ADAPTIVE_RENDER_MODERATE_WINDOW_MS;
+
+      while (
+        moderateStalls.length &&
+        moderateStalls[0] < cutoff
+      ) {
+        moderateStalls.shift();
+      }
+
+      if (
+        rawFrameMs >=
+        ADAPTIVE_RENDER_MODERATE_STALL_MS
+      ) {
+        moderateStalls.push(ts);
+      }
+
+      if (
+        rawFrameMs >=
+        ADAPTIVE_RENDER_SERIOUS_STALL_MS
+      ) {
+        enterAdaptive30fps(
+          ts,
+          "serious-stall",
+          rawFrameMs
+        );
+
+        return;
+      }
+
+      if (
+        moderateStalls.length >=
+        ADAPTIVE_RENDER_MODERATE_COUNT
+      ) {
+        enterAdaptive30fps(
+          ts,
+          "repeated-slow-frames",
+          rawFrameMs
+        );
+      }
+
+      return;
+    }
+
+    if (
+      rawFrameMs > 33
+    ) {
+      adaptiveRenderState.stableSince =
+        ts;
+    } else if (
+      !adaptiveRenderState.stableSince
+    ) {
+      adaptiveRenderState.stableSince =
+        ts;
+    }
+
+    if (
+      rawFrameMs >=
+      ADAPTIVE_RENDER_SERIOUS_STALL_MS &&
+      !adaptiveRenderState.locked30
+    ) {
+      adaptiveRenderState
+        .pressureEvents += 1;
+
+      adaptiveRenderState.locked30 =
+        true;
+
+      recordAdaptiveRenderEvent(
+        "lock-30fps",
+        "stall-while-reduced",
+        rawFrameMs
+      );
+
+      return;
+    }
+
+    if (
+      adaptiveRenderState.locked30 ||
+      !adaptiveRenderState.stableSince
+    ) {
+      return;
+    }
+
+    if (
+      ts -
+      adaptiveRenderState
+        .stableSince <
+      ADAPTIVE_RENDER_STABLE_MS
+    ) {
+      return;
+    }
+
+    adaptiveRenderState.mode =
+      "60fps";
+
+    adaptiveRenderState
+      .recoveredOnce = true;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    recordAdaptiveRenderEvent(
+      "recover-60fps",
+      "20-seconds-stable"
+    );
+  }
+
+  function getAdaptiveRenderDiagnosticSummary(
+    ts
+  ) {
+    const forced30 =
+      diagnosticOptions.render30fps;
+
+    return {
+      mode:
+        forced30
+          ? "forced-30fps"
+          : adaptiveRenderState.mode,
+
+      adaptiveMode:
+        adaptiveRenderState.mode,
+
+      locked30:
+        adaptiveRenderState.locked30,
+
+      recoveredOnce:
+        adaptiveRenderState
+          .recoveredOnce,
+
+      pressureEvents:
+        adaptiveRenderState
+          .pressureEvents,
+
+      stableSeconds:
+        adaptiveRenderState.mode ===
+          "30fps" &&
+          adaptiveRenderState.stableSince
+          ? Math.round(
+            Math.max(
+              0,
+              ts -
+              adaptiveRenderState
+                .stableSince
+            ) / 100
+          ) / 10
+          : null
+    };
+  }
+
+
   function startLoop(){
     stopLoop();
     state.running = true;
@@ -2148,16 +2492,26 @@
       update(dt, ts);
     }
 
+    updateAdaptiveRenderMode(
+      ts,
+      rawFrameMs
+    );
+
     diagnosticTick(
       ts,
       rawFrameMs
     );
 
     const renderInterval =
-      30;
+      ADAPTIVE_RENDER_INTERVAL_MS;
+
+    const reduceRenderRate =
+      diagnosticOptions.render30fps ||
+      adaptiveRenderState.mode ===
+        "30fps";
 
     const shouldRender =
-      !diagnosticOptions.render30fps ||
+      !reduceRenderRate ||
       !diagnosticState.lastRenderAt ||
       ts -
         diagnosticState
