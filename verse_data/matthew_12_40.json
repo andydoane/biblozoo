@@ -1,0 +1,29 @@
+{
+  "biblopet": "🐖",
+  "biblopetDefaultName": "Jefferson",
+  "biblopetFeetFromBottom": "23.1%",
+  "verseId": "matthew_12_40",
+  "ref": "Matthew 12:40",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "For just as Jonah",
+    "was three days and three nights",
+    "in the belly of the great fish",
+    "so will the Son of Man",
+    "be three days and three nights",
+    "in the heart of the earth."
+  ],
+  "verseText": "For just as Jonah was three days and three nights in the belly of the great fish, so will the Son of Man be three days and three nights in the heart of the earth.",
+  "meaning": "Jesus compared what would happen to him with Jonah. Just as Jonah was inside the fish for three days and nights, Jesus would rise from the dead on the third day.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "underscore", "word": "Jonah", "occurrence": 1 },
+    { "type": "emoji", "word": "days", "occurrence": 1, "emoji": "☀️" },
+    { "type": "emoji", "word": "nights", "occurrence": 1, "emoji": "🌙" },
+    { "type": "emoji", "word": "belly", "occurrence": 1, "emoji": "🫃" },
+    { "type": "emoji", "word": "fish", "occurrence": 1, "emoji": "🐟" },
+    { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" },
+    { "type": "emoji", "word": "earth", "occurrence": 1, "emoji": "🌍" }
+  ]
+}
