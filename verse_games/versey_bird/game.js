@@ -88,6 +88,26 @@
   const WORD_CLOUD_RENDER_HEIGHT_U = 1.00;
   const WORD_CLOUD_TEXT_HEIGHT_RATIO = 0.30;
   const LIGHTNING_PARTICLE_IMAGE = "versey_bird_lightning.svg";
+
+  const IMAGE_PREFETCH_GROUPS = [
+    [
+      "versey_bird_hill.svg",
+      "versey_bird_ground_small.png",
+      "versey_bird_cloud_compact.svg",
+      "versey_bird_cloud_normal.svg",
+      "versey_bird_cloud_long.svg"
+    ],
+    [
+      "versey_bird_bee.svg",
+      "versey_bird_boulder.png",
+      "versey_bird_lightning.svg"
+    ],
+    [
+      "versey_bird_pipe_cap.svg",
+      "versey_bird_score_pipe.png"
+    ]
+  ];
+
   const PARTICLE_COLORS = {
     rainbow: [
       "#ff5a51",
@@ -318,6 +338,7 @@
   ensureSilenceAudio();
   renderIntro();
   preloadBirdSvg();
+  void preloadGameImageAssets();
 
   function getAudioContext() {
     if (!audioCtx) {
@@ -342,6 +363,10 @@
   }
 
   async function unlockAudio() {
+    if (audioUnlocked) {
+      return true;
+    }
+
     const ctx = getAudioContext();
     if (!ctx) return false;
 
@@ -369,6 +394,20 @@
       osc.frequency.value = 440;
       osc.connect(gain);
       gain.connect(ctx.destination);
+
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+        } catch (err) {
+          // Audio cleanup only.
+        }
+
+        try {
+          gain.disconnect();
+        } catch (err) {
+          // Audio cleanup only.
+        }
+      };
 
       osc.start();
       osc.stop(ctx.currentTime + 0.03);
@@ -449,6 +488,20 @@
       source.buffer = buffer;
       source.connect(gain);
       gain.connect(ctx.destination);
+
+      source.onended = () => {
+        try {
+          source.disconnect();
+        } catch (err) {
+          // Audio cleanup only.
+        }
+
+        try {
+          gain.disconnect();
+        } catch (err) {
+          // Audio cleanup only.
+        }
+      };
 
       source.start(0);
     } catch (err) {
@@ -2446,6 +2499,85 @@
     state.flashColor = color;
     state.flashUntil = performance.now() + ms;
   }
+
+  function waitForImagePrefetchTurn(
+    delayMs = 100
+  ) {
+    return new Promise(resolve => {
+      if (
+        typeof window.requestIdleCallback ===
+        "function"
+      ) {
+        window.requestIdleCallback(
+          () => resolve(),
+          {
+            timeout: 300
+          }
+        );
+        return;
+      }
+
+      window.setTimeout(
+        resolve,
+        delayMs
+      );
+    });
+  }
+
+  async function prefetchImageAsset(
+    filename
+  ) {
+    try {
+      const response =
+        await fetch(
+          `${IMAGE_PATH}${filename}`,
+          {
+            cache: "force-cache"
+          }
+        );
+
+      if (!response.ok) {
+        return;
+      }
+
+      await response.blob();
+    } catch (err) {
+      // Asset can still load normally
+      // later if prefetching fails.
+    }
+  }
+
+  async function preloadGameImageAssets() {
+    for (
+      let groupIndex = 0;
+      groupIndex <
+      IMAGE_PREFETCH_GROUPS.length;
+      groupIndex += 1
+    ) {
+      const group =
+        IMAGE_PREFETCH_GROUPS[
+        groupIndex
+        ];
+
+      for (const filename of group) {
+        await waitForImagePrefetchTurn();
+
+        await prefetchImageAsset(
+          filename
+        );
+      }
+
+      if (
+        groupIndex <
+        IMAGE_PREFETCH_GROUPS.length - 1
+      ) {
+        await waitForImagePrefetchTurn(
+          250
+        );
+      }
+    }
+  }
+
 
   async function preloadBirdSvg(){
     try{

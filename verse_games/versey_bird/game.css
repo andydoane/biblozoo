@@ -192,7 +192,6 @@ body{
   background-repeat: no-repeat;
   background-position: center;
   opacity: var(--opacity);
-  filter: blur(0.1px);
 }
 
 .vb2-hills{
@@ -201,7 +200,6 @@ body{
   height: var(--vb2-hill-h);
   bottom: calc(var(--vb2-ground-h) - 2px);
   overflow: hidden;
-  transform: translateZ(0);
 }
 
 .vb2-hill-strip{
@@ -213,14 +211,13 @@ body{
   background-repeat: no-repeat;
   background-size: 100% 100%;
   background-position: 0 100%;
-  will-change: transform;
 }
 
 .vb2-ground{
   z-index: 3;
   top: auto;
   height: var(--vb2-ground-h);
-  background-image: url("./versey_bird_images/versey_bird_ground.png");
+  background-image: url("./versey_bird_images/versey_bird_ground_small.png");
   background-repeat: repeat-x;
   background-size: auto 100%;
   background-position: var(--vb2-ground-x) 100%;
