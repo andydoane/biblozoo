@@ -72,7 +72,6 @@
   const FLYING_WORD_TRAVEL_SECONDS = 3.0;
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
   const TABLET_HEIGHT_U = 0.52;
-  const GROUND_IMAGE_ASPECT = 1371 / 147;
   const TABLET_FLOAT_AMPLITUDE_U = 0.075;
   const TABLET_FLOAT_RATE = 2.15;
   const FLAG_FINISH_SECONDS = 30;
@@ -230,7 +229,7 @@
 
   const groundImage = new Image();
   groundImage.src =
-    `${IMAGE_PATH}dino_dash_ground.png`;
+    `${IMAGE_PATH}dino_dash_ground_small.png`;
 
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:dino_dash:v1";
@@ -3164,7 +3163,8 @@
         1,
         Math.ceil(
           state.layout.groundH *
-          GROUND_IMAGE_ASPECT
+          groundImage.naturalWidth /
+          groundImage.naturalHeight
         )
       );
 
