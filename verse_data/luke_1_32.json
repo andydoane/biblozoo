@@ -1,7 +1,7 @@
 {
   "biblopet": "🐌",
   "biblopetDefaultName": "Wheezy",
-  "biblopetFeetFromBottom": "⚠️⚠️⚠️",
+  "biblopetFeetFromBottom": "31.4%",
   "verseId": "luke_1_32",
   "ref": "Luke 1:32",
   "published": true,
@@ -16,11 +16,11 @@
   "meaning": "Jesus would be great and be called the Son of the Most High. God would give him the throne promised through King David.",
   "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
   "hidePlan": [
-    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "🌟" },
+    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "👍" },
     { "type": "emoji", "word": "called", "occurrence": 1, "emoji": "🗣️" },
     { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "🙏" },
+    { "type": "underscore", "word": "Lord", "occurrence": 1 },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
     { "type": "emoji", "word": "throne", "occurrence": 1, "emoji": "👑" },
     { "type": "underscore", "word": "David", "occurrence": 1 }
   ]
