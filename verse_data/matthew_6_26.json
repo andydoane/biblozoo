@@ -1,0 +1,29 @@
+{
+  "biblopet": "🐊",
+  "biblopetDefaultName": "Morty",
+  "biblopetFeetFromBottom": "15.7%",
+  "verseId": "matthew_6_26",
+  "ref": "Matthew 6:26",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "Look at the birds of the air",
+    "they neither sow nor reap",
+    "nor gather into barns",
+    "and yet your heavenly Father feeds them",
+    "Are you not",
+    "of more value than they?"
+  ],
+  "verseText": "Look at the birds of the air: they neither sow nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not of more value than they?",
+  "meaning": "Birds aren’t farmers. They must rely on God to take care of their needs. We can trust our heavenly Father to care for us because we are even more valuable to him.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "birds", "occurrence": 1, "emoji": "🦜" },
+    { "type": "emoji", "word": "sow", "occurrence": 1, "emoji": "🌱" },
+    { "type": "emoji", "word": "reap", "occurrence": 1, "emoji": "🌾" },
+    { "type": "emoji", "word": "barns", "occurrence": 1, "emoji": "🏠" },
+    { "type": "emoji", "word": "Father", "occurrence": 1, "emoji": "👨" },
+    { "type": "emoji", "word": "feeds", "occurrence": 1, "emoji": "🍽️" },
+    { "type": "emoji", "word": "value", "occurrence": 1, "emoji": "💰" }
+  ]
+}
