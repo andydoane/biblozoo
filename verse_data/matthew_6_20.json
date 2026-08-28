@@ -1,0 +1,28 @@
+{
+  "biblopet": "🦇",
+  "biblopetDefaultName": "Wade",
+  "biblopetFeetFromBottom": "4.9%",
+  "verseId": "matthew_6_20",
+  "ref": "Matthew 6:20",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "But lay up for yourselves",
+    "treasures in heaven",
+    "where neither moth nor rust destroys",
+    "and where thieves do not",
+    "break in and steal."
+  ],
+  "verseText": "But lay up for yourselves treasures in heaven, where neither moth nor rust destroys and where thieves do not break in and steal.",
+  "meaning": "We should value treasures that last forever (like eternal life in God’s kingdom) instead of earthly things that can be ruined, stolen, or lost.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "treasures", "occurrence": 1, "emoji": "🪎" },
+    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "☁️" },
+    { "type": "emoji", "word": "moth", "occurrence": 1, "emoji": "🦋" },
+    { "type": "underscore", "word": "rust", "occurrence": 1 },
+    { "type": "emoji", "word": "destroys", "occurrence": 1, "emoji": "💥" },
+    { "type": "emoji", "word": "thieves", "occurrence": 1, "emoji": "🥷" },
+    { "type": "emoji", "word": "steal", "occurrence": 1, "emoji": "🫱💰" }
+  ]
+}
