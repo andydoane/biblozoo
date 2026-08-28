@@ -1,0 +1,27 @@
+{
+  "biblopet": "🐌",
+  "biblopetDefaultName": "Wheezy",
+  "biblopetFeetFromBottom": "⚠️⚠️⚠️",
+  "verseId": "luke_1_32",
+  "ref": "Luke 1:32",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "He will be great",
+    "and will be called the Son of the Most High",
+    "And the Lord God will give to him",
+    "the throne of his father David,"
+  ],
+  "verseText": "He will be great and will be called the Son of the Most High. And the Lord God will give to him the throne of his father David,",
+  "meaning": "Jesus would be great and be called the Son of the Most High. God would give him the throne promised through King David.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "🌟" },
+    { "type": "emoji", "word": "called", "occurrence": 1, "emoji": "🗣️" },
+    { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
+    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
+    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "🙏" },
+    { "type": "emoji", "word": "throne", "occurrence": 1, "emoji": "👑" },
+    { "type": "underscore", "word": "David", "occurrence": 1 }
+  ]
+}
