@@ -64,6 +64,32 @@
   };
   const DINO_IMAGE_CANDIDATES = ["dino_dash_dinosaur.svg", "dino_dash_dinosuar.svg"];
 
+  const IMAGE_PREFETCH_GROUPS = [
+    [
+      "dino_dash_back_hill.svg",
+      "dino_dash_hill.svg",
+      "dino_dash_tablet_compact.png",
+      "dino_dash_tablet_normal.png",
+      "dino_dash_tablet_long.png"
+    ],
+    [
+      "dino_dash_ground_gap.png",
+      "dino_dash_bones.png",
+      "dino_dash_crate.png",
+      "dino_dash_cactus.png",
+      "dino_dash_boulder.png",
+      "dino_dash_stump.png",
+      "dino_dash_bee.svg",
+      "dino_dash_bird.svg",
+      "dino_dash_double_jump.png"
+    ],
+    [
+      "dino_dash_flag.png",
+      "dino_dash_dinosaur_head.png",
+      "dino_dash_flag_small.png"
+    ]
+  ];
+
   const TARGET_FIELD_UNITS_WIDE = 4.35;
   const MIN_UNIT = 76;
   const MAX_UNIT = 184;
@@ -361,6 +387,7 @@
 
   renderIntro();
   preloadDinoSvg();
+  void preloadGameImageAssets();
 
   function introHelpHtml(){
     return `
@@ -4106,6 +4133,84 @@
       onChangeVerse: () => window.VerseGameBridge.returnToTitle()
     });
   }
+
+  function waitForImagePrefetchTurn(
+    delayMs = 100
+  ) {
+    return new Promise(resolve => {
+      if (
+        typeof window.requestIdleCallback ===
+        "function"
+      ) {
+        window.requestIdleCallback(
+          () => resolve(),
+          {
+            timeout: 300
+          }
+        );
+        return;
+      }
+
+      window.setTimeout(
+        resolve,
+        delayMs
+      );
+    });
+  }
+
+  async function prefetchImageAsset(
+    filename
+  ) {
+    try {
+      const response =
+        await fetch(
+          `${IMAGE_PATH}${filename}`,
+          {
+            cache: "force-cache"
+          }
+        );
+
+      if (!response.ok) {
+        return;
+      }
+
+      await response.blob();
+    } catch (err) {
+      // Asset can still load normally
+      // later if prefetching fails.
+    }
+  }
+
+  async function preloadGameImageAssets() {
+    for (
+      let groupIndex = 0;
+      groupIndex <
+      IMAGE_PREFETCH_GROUPS.length;
+      groupIndex += 1
+    ) {
+      const group =
+        IMAGE_PREFETCH_GROUPS[
+        groupIndex
+        ];
+
+      for (const filename of group) {
+        await waitForImagePrefetchTurn();
+        await prefetchImageAsset(
+          filename
+        );
+      }
+
+      if (
+        groupIndex <
+        IMAGE_PREFETCH_GROUPS.length - 1
+      ) {
+        await waitForImagePrefetchTurn(
+          250
+        );
+      }
+    }
+  }
+
 
   async function preloadDinoSvg(){
     for (const filename of DINO_IMAGE_CANDIDATES){
