@@ -20,7 +20,7 @@
     { "type": "emoji", "word": "birds", "occurrence": 1, "emoji": "🦜" },
     { "type": "emoji", "word": "sow", "occurrence": 1, "emoji": "🌱" },
     { "type": "emoji", "word": "reap", "occurrence": 1, "emoji": "🌾" },
-    { "type": "emoji", "word": "barns", "occurrence": 1, "emoji": "🏠" },
+    { "type": "image", "word": "barns", "occurrence": 1, "image": "barn" },
     { "type": "emoji", "word": "Father", "occurrence": 1, "emoji": "👨" },
     { "type": "emoji", "word": "feeds", "occurrence": 1, "emoji": "🍽️" },
     { "type": "emoji", "word": "value", "occurrence": 1, "emoji": "💰" }
