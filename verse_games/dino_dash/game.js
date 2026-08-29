@@ -98,6 +98,10 @@
   const FLYING_WORD_TRAVEL_SECONDS = 3.0;
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
   const TABLET_HEIGHT_U = 0.52;
+
+  const TABLET_FONT_HEIGHT_RATIO = 0.47;
+  const TABLET_FONT_PREFERRED_MIN_SCALE = 0.90;
+
   const TABLET_FLOAT_AMPLITUDE_U = 0.075;
   const TABLET_FLOAT_RATE = 2.15;
   const FLAG_FINISH_SECONDS = 30;
@@ -4198,10 +4202,87 @@
         ? VERSE_PAIR_MIXED_FOLLOW_SECONDS
         : VERSE_PAIR_FOLLOW_SECONDS;
 
-    const desiredGap =
+  function getVersePairGapX(
+    lead,
+    follower
+  ) {
+    const mixed =
+      lead.correct !==
+      follower.correct;
+
+    const followSeconds =
+      mixed
+        ? VERSE_PAIR_MIXED_FOLLOW_SECONDS
+        : VERSE_PAIR_FOLLOW_SECONDS;
+
+    const unit =
+      state.layout.unit;
+
+    const worldSpeed =
       getActiveWorldSpeedU() *
-      state.layout.unit *
-      followSeconds;
+      unit;
+
+    /*
+      Reconstruct the exact spacing
+      that TWO COMPACT tablets would
+      receive under the old system.
+    */
+    const compactWidth =
+      TABLET_HEIGHT_U *
+      unit *
+      TABLET_SHAPES
+        .compact
+        .aspect;
+
+    const oldCompactCenterGap =
+      Math.max(
+        worldSpeed *
+          followSeconds,
+
+        compactWidth +
+          unit *
+          VERSE_PAIR_MIN_GAP_U
+      );
+
+    /*
+      Convert that old center spacing
+      into the visible EMPTY space
+      between the tablet edges.
+
+      This is our fairness standard.
+    */
+    const targetVisibleGap =
+      Math.max(
+        0,
+        oldCompactCenterGap -
+        compactWidth
+      );
+
+    /*
+      Now add whatever half-widths
+      the REAL pair happens to have.
+
+      compact + compact:
+        unchanged from today
+
+      compact + long:
+        centers move farther apart
+
+      long + long:
+        centers move farther apart
+
+      In every case the visible empty
+      gap between edges stays the same.
+    */
+    return (
+      (
+        lead.w +
+        follower.w
+      ) *
+      0.5 +
+      targetVisibleGap
+    );
+  }
 
     const minimumGap =
       (
@@ -4447,7 +4528,10 @@
       state.progressIndex
   ){
     const shapeKey =
-      getTabletShapeKey(label);
+      getTabletShapeKey(
+        label,
+        phase
+      );
 
     const shape =
       TABLET_SHAPES[shapeKey];
@@ -4958,20 +5042,140 @@
     return Math.random() < getDifficulty().topWordChance ? "top" : "middle";
   }
 
-  function getTabletShapeKey(label){
-    const len = String(label || "").length;
-    if (len <= 4) return "compact";
-    if (len <= 9) return "normal";
+  function getTabletShapeKey(
+    label,
+    phase = "words"
+  ){
+    const text =
+      String(label || "");
+
+    /*
+      Keep book/reference sizing exactly
+      as it behaved before this patch.
+    */
+    if (phase !== "words"){
+      const len = text.length;
+
+      if (len <= 4) {
+        return "compact";
+      }
+
+      if (len <= 9) {
+        return "normal";
+      }
+
+      return "long";
+    }
+
+    const visualWeight =
+      getTextVisualWeight(text);
+
+    const shapeOrder = [
+      "compact",
+      "normal"
+    ];
+
+    for (
+      const shapeKey
+      of shapeOrder
+    ){
+      const shape =
+        TABLET_SHAPES[
+          shapeKey
+        ];
+
+      /*
+        Because every tablet has
+        exactly the same height,
+        we can compare everything
+        as a ratio of tablet height.
+
+        We choose the smallest tablet
+        that can hold this particular
+        word without shrinking below
+        90% of the normal font size.
+      */
+      const safeWidthInHeights =
+        shape.aspect *
+        shape.textWidth;
+
+      const neededWidthInHeights =
+        visualWeight *
+        TABLET_FONT_HEIGHT_RATIO *
+        TABLET_FONT_PREFERRED_MIN_SCALE;
+
+      if (
+        neededWidthInHeights <=
+        safeWidthInHeights
+      ){
+        return shapeKey;
+      }
+    }
+
     return "long";
   }
 
   function getTabletFontSize(tablet){
-    const label = String(tablet.label || "");
-    const targetSize = clamp(tablet.h * 0.54, 17, 40);
-    const textSafeWidth = tablet.w * TABLET_SHAPES[tablet.shapeKey].textWidth;
-    const visualWeight = getTextVisualWeight(label);
-    const fittedSize = textSafeWidth / Math.max(1, visualWeight);
-    return clamp(Math.min(targetSize, fittedSize), 12, targetSize);
+    const label =
+      String(
+        tablet.label || ""
+      );
+
+    const targetSize =
+      clamp(
+        tablet.h *
+        TABLET_FONT_HEIGHT_RATIO,
+        17,
+        40
+      );
+
+    const textSafeWidth =
+      tablet.w *
+      TABLET_SHAPES[
+        tablet.shapeKey
+      ].textWidth;
+
+    const visualWeight =
+      getTextVisualWeight(
+        label
+      );
+
+    const fittedSize =
+      textSafeWidth /
+      Math.max(
+        1,
+        visualWeight
+      );
+
+    const preferredMinSize =
+      targetSize *
+      TABLET_FONT_PREFERRED_MIN_SCALE;
+
+    /*
+      Normal verse words should almost
+      always land between 90% and 100%
+      of target because shape selection
+      uses the same threshold.
+
+      Keep the old deeper-fit fallback
+      only for unusually long labels,
+      so text can never overflow.
+    */
+    if (
+      fittedSize >=
+      preferredMinSize
+    ){
+      return Math.min(
+        targetSize,
+        fittedSize
+      );
+    }
+
+    return clamp(
+      fittedSize,
+      12,
+      targetSize
+    );
   }
 
   function getTextVisualWeight(label){
