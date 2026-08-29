@@ -492,6 +492,7 @@
     );
   } else {
     renderIntro();
+    void warmBonusDisplayFont();
     preloadDinoSvg();
     void preloadGameImageAssets();
   }
@@ -549,8 +550,12 @@
       getHalfwayFeedEchoParts();
 
     const halfwayPartCount =
-      Math.ceil(
-        parts.length / 2
+      clamp(
+        Math.ceil(
+          parts.length * 0.60
+        ),
+        1,
+        parts.length - 1
       );
 
     const halfwayWordCount =
@@ -2857,6 +2862,11 @@
   function enterBonusIntroPhase(){
     state.phase = "bonusIntro";
     state.phaseStartedAt = performance.now();
+
+    lockLongVerseBonus30fps(
+      state.phaseStartedAt
+    );
+
     clearMovingItems();
     state.spawnCooldown = 0.35;
     state.bonusDistanceU = 0;
@@ -3396,7 +3406,11 @@
       .moderateStalls
       .length = 0;
 
+    const seriousStall =
+      reason === "serious-stall";
+
     if (
+      seriousStall ||
       adaptiveRenderState
         .recoveredOnce
     ) {
@@ -3412,6 +3426,49 @@
       rawFrameMs
     );
   }
+
+    function lockLongVerseBonus30fps(
+    ts
+  ) {
+    if (
+      state.verseWords.length <
+      LONG_VERSE_MIN_WORDS
+    ) {
+      return;
+    }
+
+    const alreadyLocked =
+      adaptiveRenderState.mode ===
+        "30fps" &&
+      adaptiveRenderState.locked30;
+
+    adaptiveRenderState.mode =
+      "30fps";
+
+    adaptiveRenderState.locked30 =
+      true;
+
+    adaptiveRenderState.entered30At =
+      ts;
+
+    adaptiveRenderState.stableSince =
+      ts;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    diagnosticState.lastRenderAt = 0;
+
+    if (!alreadyLocked) {
+      recordAdaptiveRenderEvent(
+        "lock-30fps",
+        "long-verse-bonus"
+      );
+    }
+  }
+
+
 
   function updateAdaptiveRenderMode(
     ts,
@@ -3875,9 +3932,28 @@
     const d = getDifficulty();
 
     if (state.phase === "fall"){
-      state.dinoVY += layout.unit * 13.0 * dt;
-      state.dinoY += state.dinoVY * dt;
-      state.dinoAngle += 420 * dt;
+      const fallLeftSpeed =
+        getActiveWorldSpeedU() *
+        layout.unit *
+        1.25;
+
+      state.dinoVY +=
+        layout.unit *
+        13.0 *
+        dt;
+
+      state.dinoY +=
+        state.dinoVY *
+        dt;
+
+      state.dinoX -=
+        fallLeftSpeed *
+        dt;
+
+      state.dinoAngle +=
+        420 *
+        dt;
+
       return;
     }
 
@@ -5519,7 +5595,12 @@
           `dd2-obstacle--${item.type} ` +
           `dd2-obstacle--${item.key}` +
           `${item.flipped ? " is-flipped" : ""}` +
-          `${item.hit ? " is-hit" : ""}`;
+          `${
+            item.hit &&
+            item.type !== "gap"
+              ? " is-hit"
+              : ""
+          }`;
       }
 
       node.style.setProperty(
@@ -5933,18 +6014,10 @@
           state.introStartedAt
         ) / 1000;
 
-      layer.innerHTML =
-        INTRO_WORDS
-          .map(
-            (word, index) =>
-              renderFlyingWord(
-                INTRO_WORDS,
-                word,
-                index,
-                elapsed
-              )
-          )
-          .join("");
+      renderIntroFlyingWords(
+        layer,
+        elapsed
+      );
 
       return;
     }
@@ -5973,6 +6046,199 @@
       layer.innerHTML = "";
     }
   }
+
+    function renderIntroFlyingWords(
+    layer,
+    elapsed
+  ) {
+    let nodes =
+      Array.from(
+        layer.querySelectorAll(
+          "[data-dd2-intro-word]"
+        )
+      );
+
+    if (
+      nodes.length !==
+      INTRO_WORDS.length
+    ) {
+      layer.innerHTML = "";
+
+      nodes =
+        INTRO_WORDS.map(
+          (word, index) => {
+            const node =
+              document.createElement(
+                "div"
+              );
+
+            node.className =
+              "dd2-flying-word" +
+              (
+                word.line === 0
+                  ? " is-first-phrase"
+                  : " is-second-phrase"
+              );
+
+            node.dataset.dd2IntroWord =
+              String(index);
+
+            node.textContent =
+              word.text;
+
+            node.style.opacity =
+              "0";
+
+            layer.appendChild(
+              node
+            );
+
+            return node;
+          }
+        );
+    }
+
+    INTRO_WORDS.forEach(
+      (word, index) => {
+        const node =
+          nodes[index];
+
+        if (!node) return;
+
+        const layout =
+          state.layout;
+
+        const t =
+          elapsed -
+          word.delay;
+
+        const travel =
+          FLYING_WORD_TRAVEL_SECONDS;
+
+        const baseSize =
+          layout.unit * 0.22;
+
+        const widthCap =
+          layout.width * 0.055;
+
+        const size =
+          clamp(
+            Math.min(
+              baseSize,
+              widthCap
+            ),
+            18,
+            44
+          );
+
+        const wordW =
+          getFlyingWordWidth(
+            word,
+            size
+          );
+
+        const lineOffset =
+          getFlyingWordLineOffset(
+            INTRO_WORDS,
+            index,
+            size
+          );
+
+        const startX =
+          layout.width +
+          wordW * 0.5 +
+          layout.unit * 0.40 +
+          lineOffset;
+
+        const endX =
+          -(
+            wordW * 0.5 +
+            layout.unit * 0.25
+          );
+
+        const progress =
+          clamp(
+            t / travel,
+            0,
+            1
+          );
+
+        const x =
+          startX +
+          (
+            endX -
+            startX
+          ) *
+          progress;
+
+        const baseY =
+          word.line === 0
+            ? layout.playTop +
+              (
+                layout.groundTop -
+                layout.playTop
+              ) *
+              0.34
+            : layout.playTop +
+              (
+                layout.groundTop -
+                layout.playTop
+              ) *
+              0.62;
+
+        const y =
+          baseY +
+          Math.sin(
+            (
+              t * 4.6
+            ) +
+            index
+          ) *
+          layout.unit *
+          0.07;
+
+        const tilt =
+          Math.sin(
+            (
+              t * 3.4
+            ) +
+            index
+          ) *
+          3.5;
+
+        const opacity =
+          t < 0 ||
+          t > travel
+            ? 0
+            : 1;
+
+        node.style.setProperty(
+          "--x",
+          `${x}px`
+        );
+
+        node.style.setProperty(
+          "--y",
+          `${y}px`
+        );
+
+        node.style.setProperty(
+          "--tilt",
+          `${tilt}deg`
+        );
+
+        node.style.setProperty(
+          "--size",
+          `${size}px`
+        );
+
+        node.style.opacity =
+          String(opacity);
+      }
+    );
+  }
+
+
 
   function renderBonusFlyingWords(
     layer,
@@ -6572,9 +6838,13 @@
     }
 
     try {
+      const warmupText =
+        "TAP TO JUMP COLLECT THE CORRECT WORDS " +
+        "BONUS ROUND SEE HOW LONG YOU CAN LAST";
+
       await document.fonts.load(
         '34px "DD2 Titan One"',
-        "BONUS ROUND SEE HOW LONG YOU CAN LAST"
+        warmupText
       );
 
       const probe =
@@ -6583,7 +6853,7 @@
         );
 
       probe.textContent =
-        "BONUS ROUND SEE HOW LONG YOU CAN LAST";
+        warmupText;
 
       probe.style.position =
         "fixed";
