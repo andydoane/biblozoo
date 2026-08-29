@@ -175,6 +175,12 @@
   const FLYING_WORD_TRAVEL_SECONDS = 3.0;
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
 
+  const TARGET_VERSE_WAVES = 20;
+  const VERSE_PAIR_FOLLOW_SECONDS = 0.62;
+  const VERSE_PAIR_MIN_GAP_U = 0.34;
+  const VERSE_PAIR_VERTICAL_OFFSET_U = 0.52;
+  const VERSE_PAIR_OBSTACLE_EXTRA_U = 2.4;
+
   const ADAPTIVE_RENDER_INTERVAL_MS = 30;
   const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
   const ADAPTIVE_RENDER_MODERATE_STALL_MS = 40;
@@ -353,8 +359,10 @@
     nextBirdTrailId: 1,
     obstacleCloudCountdown: 0,
     wordCloud: null,
+    wordCloudFollower: null,
     nextCloudId: 1,
     cloudCooldown: 0,
+    pairWaveAccumulator: 0,
     spawnHistory: [],
     forceCorrectNext: false,
     progressIndex: 0,
@@ -754,8 +762,10 @@
     state.nextBirdTrailId = 1;
     state.obstacleCloudCountdown = getNextObstacleCloudCountdown();
     state.wordCloud = null;
+    state.wordCloudFollower = null;
     state.nextCloudId = 1;
     state.cloudCooldown = 0;
+    state.pairWaveAccumulator = 0;
     state.spawnHistory = [];
     state.forceCorrectNext = false;
     state.progressIndex = 0;
@@ -789,6 +799,7 @@
     state.phaseStartedAt = performance.now();
     state.introStartedAt = state.phaseStartedAt;
     state.wordCloud = null;
+    state.wordCloudFollower = null;
     state.bonusPipes = [];
     state.birdHidden = false;
     clearBirdTrail();
@@ -799,6 +810,7 @@
     state.phase = "verse";
     state.phaseStartedAt = performance.now();
     state.wordCloud = null;
+    state.wordCloudFollower = null;
     state.obstacles = [];
     state.beeTrailDots = [];
     state.obstacleCloudCountdown = getNextObstacleCloudCountdown();
@@ -811,6 +823,7 @@
     state.phaseStartedAt = performance.now();
     state.bonusIntroUnlockAt = 0;
     state.wordCloud = null;
+    state.wordCloudFollower = null;
     state.obstacles = [];
     state.beeTrailDots = [];
     state.bonusPipes = [];
@@ -2530,74 +2543,318 @@
     });
   }
 
-  function updateVerseCloud(dt, ts){
-    const layout = state.layout;
+  function getVersePairFrequency() {
+    const wordCount = state.words.length;
 
-    if (!state.wordCloud){
-      state.cloudCooldown = Math.max(0, state.cloudCooldown - dt);
-      if (state.cloudCooldown <= 0 && getCurrentPhase() !== "done"){
-        spawnVerseCloud();
-      }
-      return;
+    if (wordCount <= TARGET_VERSE_WAVES) {
+      return 0;
     }
 
-    const cloud = state.wordCloud;
-    cloud.x -= getWorldSpeed() * dt;
+    const targetWaves =
+      Math.max(
+        TARGET_VERSE_WAVES,
+        Math.ceil(wordCount / 2)
+      );
 
-    if (!cloud.collected && circlesOverlap(state.birdX, state.birdY, layout.birdRadius, cloud.x, cloud.y, cloud.hitRadius)){
-      if (cloud.correct){
-        collectCorrectCloud(cloud, ts);
-      } else {
-        collectDecoyCloud(cloud, ts);
-      }
-    }
+    const pairWaves =
+      Math.max(
+        0,
+        wordCount - targetWaves
+      );
 
-    const cloudRightEdge = cloud.x + cloud.w * 0.5;
-
-    if (cloudRightEdge <= 0){
-      if (!cloud.collected && cloud.correct){
-        missCorrectCloud(ts);
-      }
-      state.wordCloud = null;
-      state.cloudCooldown = 0.18;
-    }
+    return clamp(
+      pairWaves /
+      Math.max(1, targetWaves),
+      0,
+      1
+    );
   }
 
-  function spawnVerseCloud(){
-    const phase = getCurrentPhase();
-    if (phase === "done"){
-      enterBonusIntroPhase();
-      return;
+  function shouldSpawnPairedVerseWave(
+    phase
+  ) {
+    if (
+      phase !== "words" ||
+      state.progressIndex + 1 >=
+      state.words.length
+    ) {
+      return false;
     }
 
-    const correctLabel = getCurrentCorrectLabel();
-    const shouldBeCorrect = chooseCorrectOrDecoy();
-    const decoys = getDecoysForPhase(phase, correctLabel, 4);
-    const label = (shouldBeCorrect || decoys.length === 0)
-      ? correctLabel
-      : decoys[Math.floor(Math.random() * decoys.length)];
-    const isCorrectCloud = label === correctLabel;
+    const frequency =
+      getVersePairFrequency();
 
-    const shapeKey = getCloudShapeKey(label);
-    const shape = CLOUD_SHAPES[shapeKey];
+    if (frequency <= 0) {
+      return false;
+    }
+
+    state.pairWaveAccumulator +=
+      frequency;
+
+    if (
+      state.pairWaveAccumulator < 1
+    ) {
+      return false;
+    }
+
+    state.pairWaveAccumulator -= 1;
+    return true;
+  }
+
+  function getActiveVerseClouds() {
+    const clouds = [];
+
+    if (state.wordCloud) {
+      clouds.push(state.wordCloud);
+    }
+
+    if (state.wordCloudFollower) {
+      clouds.push(
+        state.wordCloudFollower
+      );
+    }
+
+    return clouds;
+  }
+
+  function hasActiveVerseClouds() {
+    return Boolean(
+      state.wordCloud ||
+      state.wordCloudFollower
+    );
+  }
+
+  function removeVerseCloudById(
+    cloudId
+  ) {
+    if (
+      state.wordCloud &&
+      state.wordCloud.id === cloudId
+    ) {
+      state.wordCloud = null;
+      return true;
+    }
+
+    if (
+      state.wordCloudFollower &&
+      state.wordCloudFollower.id ===
+      cloudId
+    ) {
+      state.wordCloudFollower = null;
+      return true;
+    }
+
+    return false;
+  }
+
+  function isVerseCloudCurrentlyCorrect(
+    cloud
+  ) {
+    return Boolean(
+      cloud &&
+      cloud.correct &&
+      cloud.targetProgressIndex ===
+      state.progressIndex
+    );
+  }
+
+  function getNearestVerseLaneIndex(y) {
+    const lanes =
+      state.layout?.lanes || [];
+
+    if (!lanes.length) {
+      return 0;
+    }
+
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+
+    lanes.forEach(
+      (laneY, index) => {
+        const distance =
+          Math.abs(laneY - y);
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = index;
+        }
+      }
+    );
+
+    return bestIndex;
+  }
+
+  function createVerseCloud({
+    phase,
+    targetProgressIndex,
+    shouldBeCorrect,
+    followCloud = null,
+    excludedLabels = []
+  }) {
     const layout = state.layout;
-    const h = shape.heightU * layout.unit;
-    const w = h * shape.aspect;
-    const laneIndex = Math.floor(Math.random() * layout.lanes.length);
-    const laneY = layout.lanes[laneIndex];
-    const hitPadding = getDifficulty().hitPaddingU * layout.unit;
-    const baseHitRadius = Math.max(w * 0.34, h * 0.54) + hitPadding;
-    const hitRadius = isCorrectCloud
-      ? baseHitRadius
-      : baseHitRadius * DECOY_CLOUD_HITBOX_SCALE;
 
-    state.wordCloud = {
+    const correctLabel =
+      state.segments[
+      targetProgressIndex
+      ] || "";
+
+    let label = correctLabel;
+    let isCorrectCloud = true;
+
+    if (!shouldBeCorrect) {
+      const excluded =
+        new Set(
+          excludedLabels
+            .map(normalizeWord)
+            .filter(Boolean)
+        );
+
+      const decoys =
+        getDecoysForPhase(
+          phase,
+          correctLabel,
+          8,
+          targetProgressIndex
+        ).filter(candidate => {
+          return !excluded.has(
+            normalizeWord(candidate)
+          );
+        });
+
+      if (decoys.length) {
+        label =
+          decoys[
+          Math.floor(
+            Math.random() *
+            decoys.length
+          )
+          ];
+
+        isCorrectCloud = false;
+      }
+    }
+
+    const shapeKey =
+      getCloudShapeKey(label);
+
+    const shape =
+      CLOUD_SHAPES[shapeKey];
+
+    const h =
+      shape.heightU * layout.unit;
+
+    const w =
+      h * shape.aspect;
+
+    let x =
+      layout.cloudSpawnX;
+
+    let y;
+    let laneIndex;
+
+    const minY =
+      layout.playTop + h * 0.52;
+
+    const maxY =
+      layout.playBottom - h * 0.28;
+
+    if (followCloud) {
+      const desiredGap =
+        getWorldSpeed() *
+        VERSE_PAIR_FOLLOW_SECONDS;
+
+      const minimumGap =
+        (followCloud.w + w) * 0.5 +
+        layout.unit *
+        VERSE_PAIR_MIN_GAP_U;
+
+      x =
+        followCloud.x +
+        Math.max(
+          desiredGap,
+          minimumGap
+        );
+
+      const topLane =
+        layout.lanes[0];
+
+      const bottomLane =
+        layout.lanes[
+        layout.lanes.length - 1
+        ];
+
+      let direction;
+
+      if (
+        followCloud.y <=
+        topLane + layout.unit * 0.18
+      ) {
+        direction = 1;
+      } else if (
+        followCloud.y >=
+        bottomLane - layout.unit * 0.18
+      ) {
+        direction = -1;
+      } else {
+        direction =
+          Math.random() < 0.5
+            ? -1
+            : 1;
+      }
+
+      y = clamp(
+        followCloud.y +
+        direction *
+        layout.unit *
+        VERSE_PAIR_VERTICAL_OFFSET_U,
+        minY,
+        maxY
+      );
+
+      laneIndex =
+        getNearestVerseLaneIndex(y);
+    } else {
+      laneIndex =
+        Math.floor(
+          Math.random() *
+          layout.lanes.length
+        );
+
+      y = clamp(
+        layout.lanes[laneIndex],
+        minY,
+        maxY
+      );
+    }
+
+    const hitPadding =
+      getDifficulty().hitPaddingU *
+      layout.unit;
+
+    const baseHitRadius =
+      Math.max(
+        w * 0.34,
+        h * 0.54
+      ) + hitPadding;
+
+    const hitRadius =
+      isCorrectCloud
+        ? baseHitRadius
+        : baseHitRadius *
+        DECOY_CLOUD_HITBOX_SCALE;
+
+    return {
       id: state.nextCloudId++,
       label,
       phase,
       correct: isCorrectCloud,
-      x: layout.cloudSpawnX,
-      y: clamp(laneY, layout.playTop + h * 0.52, layout.playBottom - h * 0.28),
+      targetProgressIndex:
+        isCorrectCloud
+          ? targetProgressIndex
+          : -1,
+      resolvedCorrect: null,
+      x,
+      y,
       laneIndex,
       w,
       h,
@@ -2608,9 +2865,153 @@
       collected: false,
       collectAt: 0
     };
-
-    tickObstacleCloudRhythm();
   }
+
+  function updateVerseCloud(dt, ts) {
+    const layout = state.layout;
+
+    if (!hasActiveVerseClouds()) {
+      state.cloudCooldown = Math.max(0, state.cloudCooldown - dt);
+
+      if (
+        state.cloudCooldown <= 0 &&
+        getCurrentPhase() !== "done"
+      ) {
+        spawnVerseCloud();
+      }
+
+      return;
+    }
+
+    const speed =
+      getWorldSpeed();
+
+    const clouds =
+      getActiveVerseClouds();
+
+    for (const cloud of clouds) {
+      cloud.x -= speed * dt;
+
+      if (
+        !cloud.collected &&
+        circlesOverlap(
+          state.birdX,
+          state.birdY,
+          layout.birdRadius,
+          cloud.x,
+          cloud.y,
+          cloud.hitRadius
+        )
+      ) {
+        if (
+          isVerseCloudCurrentlyCorrect(
+            cloud
+          )
+        ) {
+          collectCorrectCloud(
+            cloud,
+            ts
+          );
+        } else {
+          collectDecoyCloud(
+            cloud,
+            ts
+          );
+        }
+      }
+    }
+
+    let removedCloud = false;
+
+    for (
+      const cloud
+      of getActiveVerseClouds()
+    ) {
+      const cloudRightEdge =
+        cloud.x + cloud.w * 0.5;
+
+      if (cloudRightEdge > 0) {
+        continue;
+      }
+
+      if (
+        !cloud.collected &&
+        isVerseCloudCurrentlyCorrect(
+          cloud
+        )
+      ) {
+        missCorrectCloud(ts);
+      }
+
+      removedCloud =
+        removeVerseCloudById(
+          cloud.id
+        ) || removedCloud;
+    }
+
+    if (
+      removedCloud &&
+      !hasActiveVerseClouds()
+    ) {
+      state.cloudCooldown = 0.18;
+    }
+  }
+
+  function spawnVerseCloud() {
+    const phase = getCurrentPhase();
+
+    if (phase === "done") {
+      enterBonusIntroPhase();
+      return;
+    }
+
+    const pairedWave =
+      shouldSpawnPairedVerseWave(
+        phase
+      );
+
+    const leadTargetIndex =
+      state.progressIndex;
+
+    const leadCloud =
+      createVerseCloud({
+        phase,
+        targetProgressIndex:
+          leadTargetIndex,
+        shouldBeCorrect:
+          chooseCorrectOrDecoy()
+      });
+
+    state.wordCloud = leadCloud;
+    state.wordCloudFollower = null;
+
+    if (pairedWave) {
+      const followerTargetIndex =
+        state.progressIndex +
+        (leadCloud.correct ? 1 : 0);
+
+      state.wordCloudFollower =
+        createVerseCloud({
+          phase,
+          targetProgressIndex:
+            followerTargetIndex,
+          shouldBeCorrect:
+            chooseCorrectOrDecoy(),
+          followCloud:
+            leadCloud,
+          excludedLabels: [
+            leadCloud.label
+          ]
+        });
+    }
+
+    tickObstacleCloudRhythm(
+      pairedWave
+        ? VERSE_PAIR_OBSTACLE_EXTRA_U
+        : 0
+    );
+  }
+
 
   function getNextObstacleCloudCountdown() {
     const difficulty = getDifficulty();
@@ -2625,49 +3026,97 @@
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
-  function tickObstacleCloudRhythm() {
-    if (state.phase !== "verse" || !state.layout) return;
-
-    state.obstacleCloudCountdown -= 1;
-    if (state.obstacleCloudCountdown > 0) return;
-
-    if (!hasRecentObstacleNearSpawn()) {
-      spawnObstacle();
+  function tickObstacleCloudRhythm(
+    extraSpawnOffsetU = 0
+  ) {
+    if (
+      state.phase !== "verse" ||
+      !state.layout
+    ) {
+      return;
     }
 
-    state.obstacleCloudCountdown = getNextObstacleCloudCountdown();
+    state.obstacleCloudCountdown -= 1;
+
+    if (
+      state.obstacleCloudCountdown > 0
+    ) {
+      return;
+    }
+
+    if (!hasRecentObstacleNearSpawn()) {
+      spawnObstacle(
+        extraSpawnOffsetU
+      );
+    }
+
+    state.obstacleCloudCountdown =
+      getNextObstacleCloudCountdown();
   }
 
   function hasRecentObstacleNearSpawn() {
     if (!state.layout) return true;
-    const minX = state.layout.width - state.layout.unit * 0.15;
-    return state.obstacles.some(obstacle => !obstacle.hit && obstacle.x > minX);
+
+    const minX =
+      state.layout.width -
+      state.layout.unit * 0.15;
+
+    return state.obstacles.some(
+      obstacle =>
+        !obstacle.hit &&
+        obstacle.x > minX
+    );
   }
 
-  function spawnObstacle() {
+  function spawnObstacle(
+    extraSpawnOffsetU = 0
+  ) {
     if (!state.layout) return;
 
-    const difficulty = getDifficulty();
-    const type = Math.random() < difficulty.obstacleBeeChance ? "bee" : "boulder";
+    const difficulty =
+      getDifficulty();
+
+    const type =
+      Math.random() <
+        difficulty.obstacleBeeChance
+        ? "bee"
+        : "boulder";
 
     if (type === "bee") {
-      spawnBeeObstacle();
+      spawnBeeObstacle(
+        extraSpawnOffsetU
+      );
     } else {
-      spawnBoulderObstacle();
+      spawnBoulderObstacle(
+        extraSpawnOffsetU
+      );
     }
   }
 
-  function spawnBoulderObstacle() {
+  function spawnBoulderObstacle(
+    extraSpawnOffsetU = 0
+  ) {
     const layout = state.layout;
     const h = layout.unit;
     const w = h * 1.48;
-    const bottomY = layout.groundY + h * 0.135;
-    const y = bottomY - h * 0.5;
+
+    const bottomY =
+      layout.groundY +
+      h * 0.135;
+
+    const y =
+      bottomY - h * 0.5;
 
     state.obstacles.push({
       id: state.nextObstacleId++,
       type: "boulder",
-      x: layout.width + layout.unit * 4.0,
+      x:
+        layout.width +
+        layout.unit *
+        (
+          4.0 +
+          extraSpawnOffsetU
+        ),
       y,
       baseY: y,
       w,
@@ -2679,17 +3128,29 @@
     });
   }
 
-  function spawnBeeObstacle() {
+  function spawnBeeObstacle(
+    extraSpawnOffsetU = 0
+  ) {
     const layout = state.layout;
     const h = layout.unit;
     const w = h * 1.02;
-    const laneIndex = chooseBeeLaneIndex();
-    const baseY = layout.lanes[laneIndex];
+
+    const laneIndex =
+      chooseBeeLaneIndex();
+
+    const baseY =
+      layout.lanes[laneIndex];
 
     state.obstacles.push({
       id: state.nextObstacleId++,
       type: "bee",
-      x: layout.width + layout.unit * 4.2,
+      x:
+        layout.width +
+        layout.unit *
+        (
+          4.2 +
+          extraSpawnOffsetU
+        ),
       y: baseY,
       baseY,
       laneIndex,
@@ -2697,7 +3158,9 @@
       h,
       hitRadius: h * 0.38,
       age: 0,
-      wavePhase: Math.random() * Math.PI * 2,
+      wavePhase:
+        Math.random() *
+        Math.PI * 2,
       trailCooldown: 0,
       hit: false,
       hitAt: 0
@@ -2706,17 +3169,46 @@
 
   function chooseBeeLaneIndex() {
     const layout = state.layout;
+
     if (!layout) return 1;
 
-    const lanes = layout.lanes.map((_, index) => index);
-    const cloudLaneIndex = state.wordCloud && Number.isFinite(state.wordCloud.laneIndex)
-      ? state.wordCloud.laneIndex
-      : -1;
+    const lanes =
+      layout.lanes.map(
+        (_, index) => index
+      );
 
-    const openLanes = lanes.filter(index => index !== cloudLaneIndex);
-    const choices = openLanes.length ? openLanes : lanes;
-    return choices[Math.floor(Math.random() * choices.length)];
+    const occupiedCloudLanes =
+      new Set(
+        getActiveVerseClouds()
+          .map(
+            cloud =>
+              cloud.laneIndex
+          )
+          .filter(
+            Number.isFinite
+          )
+      );
+
+    const openLanes =
+      lanes.filter(index => {
+        return !occupiedCloudLanes.has(
+          index
+        );
+      });
+
+    const choices =
+      openLanes.length
+        ? openLanes
+        : lanes;
+
+    return choices[
+      Math.floor(
+        Math.random() *
+        choices.length
+      )
+    ];
   }
+
 
   function updateObstacles(dt, ts) {
     const layout = state.layout;
@@ -2844,56 +3336,111 @@
     return total;
   }
 
-  function collectCorrectCloud(cloud, ts){
+  function collectCorrectCloud(cloud, ts) {
     cloud.collected = true;
     cloud.collectAt = ts;
+    cloud.resolvedCorrect = true;
 
-    const previousTrailLevel = getBirdTrailLevel();
+    const previousTrailLevel =
+      getBirdTrailLevel();
 
     state.streak += 1;
-    state.bestStreak = Math.max(state.bestStreak, state.streak);
+
+    state.bestStreak =
+      Math.max(
+        state.bestStreak,
+        state.streak
+      );
+
     state.progressIndex += 1;
 
-    const nextTrailLevel = getBirdTrailLevel();
+    const nextTrailLevel =
+      getBirdTrailLevel();
 
     playGameSound("correct");
-    if (nextTrailLevel > previousTrailLevel) {
+
+    if (
+      nextTrailLevel >
+      previousTrailLevel
+    ) {
       playGameSound("streak");
     }
 
     addCorrectCloudBurst(cloud);
-    flash("rgba(120, 220, 190, 0.25)", 110);
+
+    flash(
+      "rgba(120, 220, 190, 0.25)",
+      110
+    );
+
     updateBuildText();
 
     setTimeout(() => {
-      if (state.wordCloud && state.wordCloud.id === cloud.id){
-        state.wordCloud = null;
-        state.cloudCooldown = getDifficulty().cloudGapU / Math.max(1, getVerseWorldSpeedU());
-        if (getCurrentPhase() === "done"){
+      if (
+        !removeVerseCloudById(
+          cloud.id
+        )
+      ) {
+        return;
+      }
+
+      if (!hasActiveVerseClouds()) {
+        state.cloudCooldown =
+          getDifficulty().cloudGapU /
+          Math.max(
+            1,
+            getVerseWorldSpeedU()
+          );
+
+        if (
+          getCurrentPhase() ===
+          "done"
+        ) {
           enterBonusIntroPhase();
         }
       }
     }, 220);
   }
 
-  function collectDecoyCloud(cloud, ts){
+  function collectDecoyCloud(cloud, ts) {
     cloud.collected = true;
     cloud.collectAt = ts;
+    cloud.resolvedCorrect = false;
+
     state.streak = 0;
+
     clearBirdTrail();
-    state.birdSpinUntil = ts + 620;
-    state.shakeUntil = ts + 260;
+
+    state.birdSpinUntil =
+      ts + 620;
+
+    state.shakeUntil =
+      ts + 260;
+
     playGameSound("wrong");
+
     addWrongCloudBurst(cloud);
-    flash("rgba(255, 90, 81, 0.25)", 130);
+
+    flash(
+      "rgba(255, 90, 81, 0.25)",
+      130
+    );
 
     setTimeout(() => {
-      if (state.wordCloud && state.wordCloud.id === cloud.id){
-        state.wordCloud = null;
+      if (
+        !removeVerseCloudById(
+          cloud.id
+        )
+      ) {
+        return;
+      }
+
+      if (!hasActiveVerseClouds()) {
         state.cloudCooldown = 0.24;
       }
     }, 230);
   }
+
 
   function missCorrectCloud(ts){
     playGameSound("wrong");
@@ -3029,7 +3576,8 @@
       "vb2-poof vb2-poof--image",
       "vb2-bird-trail-dot",
       "vb2-bird-trail-sparkle",
-      "vb2-bee-trail-dot"
+      "vb2-bee-trail-dot",
+      "vb2-cloud-token"
     ]);
 
   function getVerseyBirdLayerNodeCache(
@@ -3493,56 +4041,152 @@
   }
 
   function renderWordCloud(ts) {
-    const layer = document.getElementById("vb2WordClouds");
-    if (!layer || !state.layout) return;
+    const layer =
+      document.getElementById(
+        "vb2WordClouds"
+      );
 
-    if (!state.wordCloud) {
-      if (layer.innerHTML) {
-        layer.innerHTML = "";
-        delete layer.dataset.cloudRenderKey;
-      }
+    if (!layer || !state.layout) {
       return;
     }
 
-    const cloud = state.wordCloud;
-    const shape = CLOUD_SHAPES[cloud.shapeKey];
-    const collectedClass = cloud.collected ? " vb2-collected" : "";
-    const correctnessClass = cloud.correct ? " is-correct" : " is-decoy";
-    const renderKey = [
-      cloud.id,
-      cloud.label,
-      cloud.shapeKey,
-      cloud.correct ? "correct" : "decoy",
-      cloud.collected ? "collected" : "active"
-    ].join("|");
+    const cache =
+      getVerseyBirdLayerNodeCache(
+        layer
+      );
 
-    let token = layer.firstElementChild;
+    const liveKeys =
+      new Set();
 
-    if (!token || layer.dataset.cloudRenderKey !== renderKey) {
-      layer.dataset.cloudRenderKey = renderKey;
-      layer.innerHTML = `
-        <div class="vb2-cloud-token${correctnessClass}${collectedClass}">
-          <div class="vb2-cloud-word">${escapeHtml(cloud.label)}</div>
-        </div>
-      `;
-      token = layer.firstElementChild;
+    for (
+      const cloud
+      of getActiveVerseClouds()
+    ) {
+      const shape =
+        CLOUD_SHAPES[
+        cloud.shapeKey
+        ];
+
+      const key =
+        `word-cloud:${cloud.id}`;
+
+      liveKeys.add(key);
+
+      const token =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          "vb2-cloud-token"
+        );
+
+      let wordNode =
+        token.firstElementChild;
+
+      if (!wordNode) {
+        wordNode =
+          document.createElement(
+            "div"
+          );
+
+        wordNode.className =
+          "vb2-cloud-word";
+
+        token.appendChild(
+          wordNode
+        );
+      }
+
+      if (
+        wordNode.textContent !==
+        cloud.label
+      ) {
+        wordNode.textContent =
+          cloud.label;
+      }
+
+      const visuallyCorrect =
+        cloud.collected
+          ? cloud.resolvedCorrect ===
+          true
+          : isVerseCloudCurrentlyCorrect(
+            cloud
+          );
+
+      token.className =
+        "vb2-cloud-token" +
+        (
+          visuallyCorrect
+            ? " is-correct"
+            : " is-decoy"
+        ) +
+        (
+          cloud.collected
+            ? " vb2-collected"
+            : ""
+        );
+
+      const wordSize =
+        getWordFontSize(cloud);
+
+      const danceDelay =
+        cloud.collected
+          ? "0ms"
+          : `${-(
+            (
+              ts +
+              cloud.id * 389
+            ) %
+            3600
+          )
+          }ms`;
+
+      token.style.left =
+        `${cloud.x}px`;
+
+      token.style.top =
+        `${cloud.y}px`;
+
+      token.style.setProperty(
+        "--cloud-w",
+        `${cloud.w}px`
+      );
+
+      token.style.setProperty(
+        "--cloud-h",
+        `${cloud.h}px`
+      );
+
+      token.style.setProperty(
+        "--cloud-img",
+        `url('${IMAGE_PATH}${shape.image}')`
+      );
+
+      token.style.setProperty(
+        "--text-x",
+        `${cloud.textX}%`
+      );
+
+      token.style.setProperty(
+        "--text-y",
+        `${cloud.textY}%`
+      );
+
+      token.style.setProperty(
+        "--word-size",
+        `${wordSize}px`
+      );
+
+      token.style.animationDelay =
+        danceDelay;
     }
 
-    if (!token) return;
-
-    const wordSize = getWordFontSize(cloud);
-    const danceDelay = cloud.collected ? "0ms" : `${-((ts + cloud.id * 389) % 3600)}ms`;
-
-    token.style.left = `${cloud.x}px`;
-    token.style.top = `${cloud.y}px`;
-    token.style.setProperty("--cloud-w", `${cloud.w}px`);
-    token.style.setProperty("--cloud-h", `${cloud.h}px`);
-    token.style.setProperty("--cloud-img", `url('${IMAGE_PATH}${shape.image}')`);
-    token.style.setProperty("--text-x", `${cloud.textX}%`);
-    token.style.setProperty("--text-y", `${cloud.textY}%`);
-    token.style.setProperty("--word-size", `${wordSize}px`);
-    token.style.animationDelay = danceDelay;
+    removeStaleVerseyBirdLayerNodes(
+      cache,
+      liveKeys
+    );
   }
+
   
   function renderObstacles() {
     const layer =
@@ -4457,7 +5101,12 @@
     return state.segments[state.progressIndex] || "";
   }
 
-  function getDecoysForPhase(phase, correctLabel, count){
+  function getDecoysForPhase(
+    phase,
+    correctLabel,
+    count,
+    targetIndex = state.progressIndex
+  ){
     const out = new Set();
 
     if (phase === "words"){
@@ -4472,7 +5121,7 @@
         const verseDecoys = window.VerseGameShell.getVerseWordDecoys({
           words: state.words,
           correct: correctLabel,
-          targetIndex: state.progressIndex,
+          targetIndex,
           count,
           avoidNext: 2,
           fallbackToFun: true
