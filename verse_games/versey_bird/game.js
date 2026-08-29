@@ -277,10 +277,37 @@
     mode: "60fps",
     locked30: false,
     recoveredOnce: false,
+    pressureEvents: 0,
     entered30At: 0,
     stableSince: 0,
     moderateStalls: [],
     lastRenderAt: 0
+  };
+
+  const DIAGNOSTIC_STORAGE_KEY =
+    "biblozooDebug:versey_bird:v1";
+
+  const DIAGNOSTIC_HEARTBEAT_MS =
+    2000;
+
+  const DIAGNOSTIC_MAX_SNAPSHOTS =
+    12;
+
+  const diagnosticState = {
+    active: false,
+    record: null,
+    lastHeartbeatAt: 0,
+
+    frameWindowStartedAt: 0,
+    frameCount: 0,
+    frameTotalMs: 0,
+    frameMaxMs: 0,
+    framesOver33: 0,
+    framesOver50: 0,
+    framesOver100: 0,
+
+    renderCount: 0,
+    skippedRenderCount: 0
   };
 
   const state = {
@@ -355,6 +382,7 @@
 
   setupReferenceSegments();
   ensureSilenceAudio();
+  installDiagnosticErrorHandlers();
   renderIntro();
   preloadBirdSvg();
   void preloadGameImageAssets();
@@ -597,6 +625,8 @@
         renderModeSelect();
       }
     });
+
+    installDiagnosticCopyButton();
   }
 
   function renderModeSelect(){
@@ -633,6 +663,7 @@
     completed = false;
     completionResult = null;
     resetStateForRun();
+    startDiagnosticRun(mode);
 
     app.innerHTML = `
       <div class="vb2-root">
@@ -821,6 +852,11 @@
     if (state.resultShown) return;
     state.resultShown = true;
     state.phase = "bonusResult";
+
+    finishDiagnosticRun(
+      "completed-round"
+    );
+
     state.running = false;
     stopLoop();
 
@@ -1085,6 +1121,677 @@
     state.birdAngle = 0;
   }
 
+  function readDiagnosticReport(){
+    try {
+      const raw =
+        localStorage.getItem(
+          DIAGNOSTIC_STORAGE_KEY
+        );
+
+      if (!raw) return null;
+
+      return JSON.parse(raw);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function writeDiagnosticReport(){
+    if (
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        DIAGNOSTIC_STORAGE_KEY,
+        JSON.stringify(
+          diagnosticState.record
+        )
+      );
+    } catch (err) {
+      // Diagnostics must never
+      // interfere with gameplay.
+    }
+  }
+
+  function resetDiagnosticFrameWindow(
+    ts
+  ){
+    diagnosticState
+      .frameWindowStartedAt = ts;
+
+    diagnosticState.frameCount = 0;
+    diagnosticState.frameTotalMs = 0;
+    diagnosticState.frameMaxMs = 0;
+    diagnosticState.framesOver33 = 0;
+    diagnosticState.framesOver50 = 0;
+    diagnosticState.framesOver100 = 0;
+  }
+
+  function startDiagnosticRun(mode){
+    const now =
+      performance.now();
+
+    diagnosticState.active = true;
+    diagnosticState.renderCount = 0;
+    diagnosticState.skippedRenderCount = 0;
+    diagnosticState.lastHeartbeatAt =
+      now;
+
+    resetDiagnosticFrameWindow(
+      now
+    );
+
+    diagnosticState.record = {
+      version: 1,
+      gameId: GAME_ID,
+      verseId: ctx.verseId,
+      verseRef: ctx.verseRef,
+      mode,
+      cleanExit: false,
+      status: "running",
+
+      startedAt:
+        new Date().toISOString(),
+
+      startedAtEpoch:
+        Date.now(),
+
+      lastHeartbeatAt: null,
+      lastSnapshot: null,
+      snapshots: [],
+      renderModeEvents: [],
+      errors: []
+    };
+
+    writeDiagnosticReport();
+  }
+
+  function getDiagnosticFrameSummary(
+    ts
+  ){
+    const elapsedMs =
+      Math.max(
+        1,
+        ts -
+          diagnosticState
+            .frameWindowStartedAt
+      );
+
+    const frameCount =
+      diagnosticState.frameCount;
+
+    const fps =
+      frameCount
+        ? frameCount /
+          (
+            elapsedMs /
+            1000
+          )
+        : 0;
+
+    const averageMs =
+      frameCount
+        ? diagnosticState
+            .frameTotalMs /
+          frameCount
+        : 0;
+
+    return {
+      fps:
+        Math.round(
+          fps * 10
+        ) / 10,
+
+      averageMs:
+        Math.round(
+          averageMs * 10
+        ) / 10,
+
+      maxMs:
+        Math.round(
+          diagnosticState
+            .frameMaxMs *
+          10
+        ) / 10,
+
+      over33:
+        diagnosticState
+          .framesOver33,
+
+      over50:
+        diagnosticState
+          .framesOver50,
+
+      over100:
+        diagnosticState
+          .framesOver100
+    };
+  }
+
+  function getDiagnosticCounts(){
+    const field =
+      document.getElementById(
+        "vb2Field"
+      );
+
+    return {
+      backgroundClouds:
+        state.bgClouds.length,
+
+      poofs:
+        state.poofs.length,
+
+      obstacles:
+        state.obstacles.length,
+
+      beeTrailDots:
+        state.beeTrailDots.length,
+
+      birdTrailDots:
+        state.birdTrailDots.length,
+
+      birdTrailSparkles:
+        state
+          .birdTrailSparkles
+          .length,
+
+      bonusPipes:
+        state.bonusPipes.length,
+
+      fieldDomNodes:
+        field
+          ? field
+              .querySelectorAll("*")
+              .length
+          : 0,
+
+      totalDomNodes:
+        app
+          ? app
+              .querySelectorAll("*")
+              .length
+          : 0
+    };
+  }
+
+  function getAdaptiveRenderDiagnosticSummary(
+    ts
+  ){
+    return {
+      mode:
+        adaptiveRenderState.mode,
+
+      locked30:
+        adaptiveRenderState.locked30,
+
+      recoveredOnce:
+        adaptiveRenderState
+          .recoveredOnce,
+
+      pressureEvents:
+        adaptiveRenderState
+          .pressureEvents,
+
+      stableSeconds:
+        adaptiveRenderState.mode ===
+          "30fps" &&
+        adaptiveRenderState.stableSince
+          ? Math.round(
+              Math.max(
+                0,
+                ts -
+                  adaptiveRenderState
+                    .stableSince
+              ) / 100
+            ) / 10
+          : null
+    };
+  }
+
+  function saveDiagnosticHeartbeat(
+    ts,
+    force = false
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    if (
+      !force &&
+      ts -
+        diagnosticState
+          .lastHeartbeatAt <
+        DIAGNOSTIC_HEARTBEAT_MS
+    ) {
+      return;
+    }
+
+    diagnosticState.lastHeartbeatAt =
+      ts;
+
+    const startedAtEpoch =
+      diagnosticState
+        .record
+        .startedAtEpoch;
+
+    const snapshot = {
+      at:
+        new Date().toISOString(),
+
+      elapsedSeconds:
+        startedAtEpoch
+          ? Math.round(
+              (
+                Date.now() -
+                startedAtEpoch
+              ) / 100
+            ) / 10
+          : null,
+
+      phase:
+        state.phase,
+
+      progressIndex:
+        state.progressIndex,
+
+      wordCount:
+        state.words.length,
+
+      streak:
+        state.streak,
+
+      pipesCleared:
+        state.pipesCleared,
+
+      current:
+        getDiagnosticCounts(),
+
+      frames:
+        getDiagnosticFrameSummary(
+          ts
+        ),
+
+      adaptiveRender:
+        getAdaptiveRenderDiagnosticSummary(
+          ts
+        ),
+
+      renderCount:
+        diagnosticState
+          .renderCount,
+
+      skippedRenderCount:
+        diagnosticState
+          .skippedRenderCount
+    };
+
+    diagnosticState
+      .record
+      .lastHeartbeatAt =
+        snapshot.at;
+
+    diagnosticState
+      .record
+      .lastSnapshot =
+        snapshot;
+
+    diagnosticState
+      .record
+      .snapshots
+      .push(snapshot);
+
+    while (
+      diagnosticState
+        .record
+        .snapshots
+        .length >
+      DIAGNOSTIC_MAX_SNAPSHOTS
+    ) {
+      diagnosticState
+        .record
+        .snapshots
+        .shift();
+    }
+
+    writeDiagnosticReport();
+
+    resetDiagnosticFrameWindow(
+      ts
+    );
+  }
+
+  function diagnosticTick(
+    ts,
+    rawFrameMs
+  ){
+    if (
+      !diagnosticState.active
+    ) {
+      return;
+    }
+
+    if (rawFrameMs > 0) {
+      diagnosticState.frameCount +=
+        1;
+
+      diagnosticState
+        .frameTotalMs +=
+          rawFrameMs;
+
+      diagnosticState.frameMaxMs =
+        Math.max(
+          diagnosticState
+            .frameMaxMs,
+          rawFrameMs
+        );
+
+      if (rawFrameMs > 33) {
+        diagnosticState
+          .framesOver33 += 1;
+      }
+
+      if (rawFrameMs > 50) {
+        diagnosticState
+          .framesOver50 += 1;
+      }
+
+      if (rawFrameMs > 100) {
+        diagnosticState
+          .framesOver100 += 1;
+      }
+    }
+
+    saveDiagnosticHeartbeat(
+      ts
+    );
+  }
+
+  function recordAdaptiveRenderEvent(
+    type,
+    reason,
+    rawFrameMs = null
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    const startedAtEpoch =
+      diagnosticState
+        .record
+        .startedAtEpoch;
+
+    diagnosticState
+      .record
+      .renderModeEvents
+      .push({
+        at:
+          new Date().toISOString(),
+
+        elapsedSeconds:
+          startedAtEpoch
+            ? Math.round(
+                (
+                  Date.now() -
+                    startedAtEpoch
+                ) / 100
+              ) / 10
+            : null,
+
+        type,
+        reason,
+
+        phase:
+          state.phase,
+
+        pipesCleared:
+          state.pipesCleared,
+
+        mode:
+          adaptiveRenderState.mode,
+
+        locked30:
+          adaptiveRenderState
+            .locked30,
+
+        frameMs:
+          Number.isFinite(
+            rawFrameMs
+          )
+            ? Math.round(
+                rawFrameMs * 10
+              ) / 10
+            : null
+      });
+
+    writeDiagnosticReport();
+  }
+
+  function finishDiagnosticRun(
+    status
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    saveDiagnosticHeartbeat(
+      performance.now(),
+      true
+    );
+
+    diagnosticState
+      .record
+      .cleanExit = true;
+
+    diagnosticState
+      .record
+      .status = status;
+
+    diagnosticState
+      .record
+      .endedAt =
+        new Date().toISOString();
+
+    writeDiagnosticReport();
+
+    diagnosticState.active =
+      false;
+  }
+
+  function recordDiagnosticError(
+    type,
+    message
+  ){
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    diagnosticState
+      .record
+      .errors
+      .push({
+        at:
+          new Date().toISOString(),
+
+        type,
+
+        message:
+          String(
+            message ||
+            "Unknown error"
+          ).slice(
+            0,
+            500
+          ),
+
+        phase:
+          state.phase,
+
+        pipesCleared:
+          state.pipesCleared
+      });
+
+    writeDiagnosticReport();
+  }
+
+  function installDiagnosticErrorHandlers(){
+    window.addEventListener(
+      "error",
+      event => {
+        recordDiagnosticError(
+          "error",
+          event.message ||
+            event.error?.message
+        );
+      }
+    );
+
+    window.addEventListener(
+      "unhandledrejection",
+      event => {
+        recordDiagnosticError(
+          "unhandledrejection",
+          event.reason?.message ||
+            event.reason
+        );
+      }
+    );
+  }
+
+  async function copyDiagnosticText(
+    text
+  ){
+    if (
+      navigator.clipboard &&
+      navigator.clipboard.writeText
+    ) {
+      await navigator.clipboard
+        .writeText(text);
+
+      return;
+    }
+
+    const textarea =
+      document.createElement(
+        "textarea"
+      );
+
+    textarea.value = text;
+    textarea.readOnly = true;
+
+    textarea.style.position =
+      "fixed";
+
+    textarea.style.opacity =
+      "0";
+
+    document.body.appendChild(
+      textarea
+    );
+
+    textarea.select();
+
+    document.execCommand(
+      "copy"
+    );
+
+    textarea.remove();
+  }
+
+  function installDiagnosticCopyButton(){
+    const report =
+      readDiagnosticReport();
+
+    if (!report) return;
+
+    const actions =
+      app.querySelector(
+        ".vm-game-actions"
+      );
+
+    if (
+      !actions ||
+      document.getElementById(
+        "vb2CopyDebugReport"
+      )
+    ) {
+      return;
+    }
+
+    const button =
+      document.createElement(
+        "button"
+      );
+
+    button.id =
+      "vb2CopyDebugReport";
+
+    button.type =
+      "button";
+
+    button.className =
+      "vm-btn vm-btn-secondary";
+
+    button.textContent =
+      "Copy Bird Debug Report";
+
+    button.addEventListener(
+      "click",
+      async () => {
+        const latest =
+          localStorage.getItem(
+            DIAGNOSTIC_STORAGE_KEY
+          );
+
+        if (!latest) {
+          return;
+        }
+
+        const originalText =
+          button.textContent;
+
+        try {
+          await copyDiagnosticText(
+            latest
+          );
+
+          button.textContent =
+            "Copied!";
+        } catch (err) {
+          button.textContent =
+            "Copy failed";
+        }
+
+        window.setTimeout(
+          () => {
+            button.textContent =
+              originalText;
+          },
+          1400
+        );
+      }
+    );
+
+    actions.appendChild(
+      button
+    );
+  }
+
+
   function resetAdaptiveRenderState() {
     adaptiveRenderState.mode =
       "60fps";
@@ -1094,6 +1801,9 @@
 
     adaptiveRenderState.recoveredOnce =
       false;
+
+    adaptiveRenderState.pressureEvents =
+      0;
 
     adaptiveRenderState.entered30At =
       0;
@@ -1110,7 +1820,9 @@
   }
 
   function enterAdaptive30fps(
-    ts
+    ts,
+    reason,
+    rawFrameMs
   ) {
     if (
       adaptiveRenderState.mode ===
@@ -1118,6 +1830,9 @@
     ) {
       return;
     }
+
+    adaptiveRenderState
+      .pressureEvents += 1;
 
     adaptiveRenderState.mode =
       "30fps";
@@ -1139,6 +1854,14 @@
       adaptiveRenderState.locked30 =
         true;
     }
+
+    recordAdaptiveRenderEvent(
+      adaptiveRenderState.locked30
+        ? "lock-30fps"
+        : "drop-30fps",
+      reason,
+      rawFrameMs
+    );
   }
 
   function updateAdaptiveRenderMode(
@@ -1196,7 +1919,12 @@
         rawFrameMs >=
         ADAPTIVE_RENDER_SERIOUS_STALL_MS
       ) {
-        enterAdaptive30fps(ts);
+        enterAdaptive30fps(
+          ts,
+          "serious-stall",
+          rawFrameMs
+        );
+
         return;
       }
 
@@ -1204,7 +1932,11 @@
         moderateStalls.length >=
         ADAPTIVE_RENDER_MODERATE_COUNT
       ) {
-        enterAdaptive30fps(ts);
+        enterAdaptive30fps(
+          ts,
+          "repeated-slow-frames",
+          rawFrameMs
+        );
       }
 
       return;
@@ -1238,8 +1970,17 @@
       ADAPTIVE_RENDER_SERIOUS_STALL_MS &&
       !adaptiveRenderState.locked30
     ) {
+      adaptiveRenderState
+        .pressureEvents += 1;
+
       adaptiveRenderState.locked30 =
         true;
+
+      recordAdaptiveRenderEvent(
+        "lock-30fps",
+        "stall-while-reduced",
+        rawFrameMs
+      );
 
       return;
     }
@@ -1269,6 +2010,11 @@
     adaptiveRenderState
       .moderateStalls
       .length = 0;
+
+    recordAdaptiveRenderEvent(
+      "recover-60fps",
+      "20-seconds-stable"
+    );
   }
 
   function shouldRenderAdaptiveFrame(
@@ -1361,11 +2107,31 @@
       rawFrameMs
     );
 
+    const shouldRender =
+      shouldRenderAdaptiveFrame(
+        ts
+      );
+
     if (
-      shouldRenderAdaptiveFrame(ts)
+      diagnosticState.active
     ) {
+      if (shouldRender) {
+        diagnosticState
+          .renderCount += 1;
+      } else {
+        diagnosticState
+          .skippedRenderCount += 1;
+      }
+    }
+
+    if (shouldRender) {
       render(ts);
     }
+
+    diagnosticTick(
+      ts,
+      rawFrameMs
+    );
 
     state.rafId =
       requestAnimationFrame(tick);
