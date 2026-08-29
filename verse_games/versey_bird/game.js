@@ -183,6 +183,8 @@
   const ADAPTIVE_RENDER_STABLE_MS = 20000;
   const ADAPTIVE_RENDER_POST_DROP_GRACE_MS = 2000;
   const ADAPTIVE_RENDER_IGNORE_GAP_MS = 1000;
+  const ADAPTIVE_RENDER_STARTUP_GRACE_MS = 2000;
+  const ADAPTIVE_RENDER_PROACTIVE_LOCK_MS = 120000;
 
   const BONUS_WORDS = [
     { text: "BONUS", line: 0, delay: 0.15 },
@@ -1864,6 +1866,42 @@
     );
   }
 
+  function lockAdaptive30fpsProactively(
+    ts
+  ) {
+    if (
+      adaptiveRenderState.locked30
+    ) {
+      return;
+    }
+
+    adaptiveRenderState.mode =
+      "30fps";
+
+    adaptiveRenderState.locked30 =
+      true;
+
+    adaptiveRenderState.entered30At =
+      ts;
+
+    adaptiveRenderState.stableSince =
+      ts;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    recordAdaptiveRenderEvent(
+      "lock-30fps",
+      `proactive-${
+        Math.round(
+          ADAPTIVE_RENDER_PROACTIVE_LOCK_MS /
+          1000
+        )
+      }-seconds`
+    );
+  }
+
   function updateAdaptiveRenderMode(
     ts,
     rawFrameMs
@@ -1871,6 +1909,33 @@
     if (
       state.paused ||
       rawFrameMs <= 0
+    ) {
+      return;
+    }
+
+    const runElapsedMs =
+      state.startTs
+        ? Math.max(
+            0,
+            ts - state.startTs
+          )
+        : 0;
+
+    if (
+      runElapsedMs >=
+        ADAPTIVE_RENDER_PROACTIVE_LOCK_MS &&
+      !adaptiveRenderState.locked30
+    ) {
+      lockAdaptive30fpsProactively(
+        ts
+      );
+
+      return;
+    }
+
+    if (
+      runElapsedMs <
+      ADAPTIVE_RENDER_STARTUP_GRACE_MS
     ) {
       return;
     }
@@ -2051,6 +2116,7 @@
     stopLoop();
     state.running = true;
     state.lastTs = 0;
+    state.startTs = performance.now();
     state.rafId = requestAnimationFrame(tick);
   }
 
