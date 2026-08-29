@@ -103,6 +103,29 @@
   const FLAG_FINISH_SECONDS = 30;
   const FLAG_CLEAR_RUNWAY_SECONDS = 1.55;
 
+  const LONG_VERSE_MIN_WORDS = 25;
+  const TARGET_VERSE_TABLET_WAVES = 20;
+
+  const VERSE_PAIR_FOLLOW_SECONDS = 0.72;
+  const VERSE_PAIR_MIXED_FOLLOW_SECONDS = 0.95;
+  const VERSE_PAIR_MIN_GAP_U = 0.16;
+
+  const HALFWAY_FEED_SETTLE_MS = 720;
+  const HALFWAY_FEED_BLACK_FADE_MS = 320;
+  const HALFWAY_FEED_BLACK_HOLD_MS = 140;
+  const HALFWAY_FEED_SCENE_FADE_MS = 420;
+  const HALFWAY_FEED_MESSAGE_MS = 4000;
+  const HALFWAY_FEED_TAP_COOLDOWN_MS = 650;
+  const HALFWAY_FEED_FINAL_HOLD_MS = 1500;
+  const HALFWAY_FEED_RESUME_FADE_MS = 360;
+
+  const HALFWAY_FEED_IMAGES = [
+    "dino_dash_hungry.png",
+    "dino_dash_steak_1.png",
+    "dino_dash_steak_2.png",
+    "dino_dash_steak_3.png"
+  ];
+
   const ADAPTIVE_RENDER_INTERVAL_MS = 30;
   const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
   const ADAPTIVE_RENDER_MODERATE_STALL_MS = 40;
@@ -261,6 +284,7 @@
   let uiPopToggle = false;
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
+  const halfwayFeedImagePreloads = [];
 
   const groundImage = new Image();
   groundImage.src =
@@ -268,6 +292,9 @@
 
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:dino_dash:v1";
+
+  const HALFWAY_FEED_STORAGE_KEY =
+    "biblozoo:dino_dash:halfway_feed:v1";
 
   const DIAGNOSTIC_TESTING_ENABLED =
     false;
@@ -376,6 +403,11 @@
     nextTrailId: 1,
     spawnCooldown: 0,
     spawnPause: 0,
+    pairWaveAccumulator: 0,
+    halfwayFeedComplete: false,
+    halfwayFeedPending: false,
+    halfwayFeedReadyAt: 0,
+    halfwayFeedExitSpeed: 0,
     doubleJumpSignSpawned: false,
     fallStartedAt: 0,
     respawnAt: 0,
@@ -407,9 +439,43 @@
     resultShown: false
   };
 
-  renderIntro();
-  preloadDinoSvg();
-  void preloadGameImageAssets();
+  const halfwayFeedImagesReady =
+    preloadHalfwayFeedImages();
+
+  const halfwayFeedCheckpoint =
+    readHalfwayFeedCheckpoint();
+
+  if (halfwayFeedCheckpoint) {
+    selectedMode =
+      halfwayFeedCheckpoint.mode;
+
+    restoreHalfwayFeedCheckpoint(
+      halfwayFeedCheckpoint
+    );
+
+    state.phase = "feed";
+
+    if (
+      halfwayFeedCheckpoint
+        .diagnosticActive
+    ) {
+      resumeDiagnosticRunAfterHalfwayFeed(
+        selectedMode
+      );
+    } else {
+      diagnosticState.active = false;
+      diagnosticState.record = null;
+    }
+
+    void renderHalfwayFeedInterlude(
+      halfwayFeedCheckpoint,
+      halfwayFeedImagesReady
+    );
+  } else {
+    renderIntro();
+    preloadDinoSvg();
+    void preloadGameImageAssets();
+  }
 
   function introHelpHtml(){
     return `
@@ -434,6 +500,857 @@
       Missing a correct word resets your streak in Medium and Hard only.
     `;
   }
+
+  function getHalfwayFeedEchoParts() {
+    if (!Array.isArray(ctx.echoParts)) {
+      return [];
+    }
+
+    return ctx.echoParts
+      .map(part =>
+        String(part || "").trim()
+      )
+      .filter(Boolean);
+  }
+
+  function isHalfwayFeedEligible() {
+    return (
+      state.verseWords.length >=
+      LONG_VERSE_MIN_WORDS &&
+      getHalfwayFeedEchoParts().length >= 2
+    );
+  }
+
+  function getHalfwayFeedProgressIndex() {
+    if (!isHalfwayFeedEligible()) {
+      return 0;
+    }
+
+    const parts =
+      getHalfwayFeedEchoParts();
+
+    const halfwayPartCount =
+      Math.ceil(
+        parts.length / 2
+      );
+
+    const halfwayWordCount =
+      parts
+        .slice(
+          0,
+          halfwayPartCount
+        )
+        .reduce(
+          (total, part) => {
+            const partBuild =
+              window.VerseGameShell
+                .buildVerseSegments({
+                  verseText: part,
+                  book: "",
+                  reference: "",
+                  buildArea: "none"
+                });
+
+            return (
+              total +
+              (
+                Array.isArray(
+                  partBuild.words
+                )
+                  ? partBuild.words.length
+                  : 0
+              )
+            );
+          },
+          0
+        );
+
+    return clamp(
+      halfwayWordCount,
+      0,
+      state.verseWords.length
+    );
+  }
+
+  function shouldQueueHalfwayFeed() {
+    if (
+      state.phase !== "verse" ||
+      state.halfwayFeedComplete ||
+      state.halfwayFeedPending ||
+      !isHalfwayFeedEligible()
+    ) {
+      return false;
+    }
+
+    const target =
+      getHalfwayFeedProgressIndex();
+
+    return (
+      target > 0 &&
+      state.progressIndex >= target
+    );
+  }
+
+  function buildHalfwayFeedCheckpoint() {
+    return {
+      version: 1,
+      stage: "feed",
+      verseId: ctx.verseId,
+      mode: selectedMode,
+      savedAt: Date.now(),
+
+      progressIndex:
+        state.progressIndex,
+
+      streak:
+        state.streak,
+
+      bestStreak:
+        state.bestStreak,
+
+      pairWaveAccumulator:
+        state.pairWaveAccumulator,
+
+      spawnHistory:
+        state.spawnHistory.slice(-10),
+
+      forceCorrectNext:
+        state.forceCorrectNext,
+
+      dinoColorIndex:
+        state.dinoColorIndex,
+
+      streakSpeedBoostU:
+        state.streakSpeedBoostU,
+
+      muted,
+
+      diagnosticActive:
+        diagnosticState.active === true,
+
+      diagnosticOptions: {
+        ...diagnosticOptions
+      }
+    };
+  }
+
+  function saveHalfwayFeedCheckpoint(
+    checkpoint
+  ) {
+    try {
+      sessionStorage.setItem(
+        HALFWAY_FEED_STORAGE_KEY,
+        JSON.stringify(checkpoint)
+      );
+
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function readHalfwayFeedCheckpoint() {
+    try {
+      const raw =
+        sessionStorage.getItem(
+          HALFWAY_FEED_STORAGE_KEY
+        );
+
+      if (!raw) {
+        return null;
+      }
+
+      const checkpoint =
+        JSON.parse(raw);
+
+      const ageMs =
+        Date.now() -
+        Number(
+          (
+            checkpoint &&
+            checkpoint.savedAt
+          ) ||
+          0
+        );
+
+      const valid =
+        checkpoint &&
+        checkpoint.version === 1 &&
+        checkpoint.stage === "feed" &&
+        checkpoint.verseId ===
+        ctx.verseId &&
+        Boolean(
+          DIFFICULTY[
+          checkpoint.mode
+          ]
+        ) &&
+        ageMs >= 0 &&
+        ageMs <=
+        30 * 60 * 1000;
+
+      if (!valid) {
+        sessionStorage.removeItem(
+          HALFWAY_FEED_STORAGE_KEY
+        );
+
+        return null;
+      }
+
+      return checkpoint;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function clearHalfwayFeedCheckpoint() {
+    try {
+      sessionStorage.removeItem(
+        HALFWAY_FEED_STORAGE_KEY
+      );
+    } catch (err) {
+      // Best effort only.
+    }
+  }
+
+  function restoreHalfwayFeedCheckpoint(
+    checkpoint
+  ) {
+    const rawProgress =
+      Math.floor(
+        Number(
+          checkpoint.progressIndex
+        )
+      );
+
+    state.progressIndex =
+      Number.isFinite(rawProgress)
+        ? clamp(
+          rawProgress,
+          0,
+          state.buildSegments.length
+        )
+        : 0;
+
+    state.streak =
+      Math.max(
+        0,
+        Math.floor(
+          Number(
+            checkpoint.streak
+          ) || 0
+        )
+      );
+
+    state.bestStreak =
+      Math.max(
+        state.streak,
+        Math.floor(
+          Number(
+            checkpoint.bestStreak
+          ) || 0
+        )
+      );
+
+    state.pairWaveAccumulator =
+      clamp(
+        Number(
+          checkpoint
+            .pairWaveAccumulator
+        ) || 0,
+        0,
+        0.9999
+      );
+
+    state.spawnHistory =
+      Array.isArray(
+        checkpoint.spawnHistory
+      )
+        ? checkpoint.spawnHistory
+          .filter(
+            value =>
+              value === true ||
+              value === false
+          )
+          .slice(-10)
+        : [];
+
+    state.forceCorrectNext =
+      checkpoint.forceCorrectNext ===
+      true;
+
+    const rawColorIndex =
+      Math.floor(
+        Number(
+          checkpoint.dinoColorIndex
+        )
+      );
+
+    const colorIndex =
+      Number.isFinite(rawColorIndex)
+        ? (
+          (
+            rawColorIndex %
+            DINO_COLORS.length
+          ) +
+          DINO_COLORS.length
+        ) %
+        DINO_COLORS.length
+        : 0;
+
+    state.dinoColorIndex =
+      colorIndex;
+
+    state.dinoColor =
+      DINO_COLORS[colorIndex];
+
+    state.streakSpeedBoostU =
+      Math.max(
+        0,
+        Number(
+          checkpoint
+            .streakSpeedBoostU
+        ) || 0
+      );
+
+    muted =
+      checkpoint.muted === true;
+
+    if (
+      checkpoint.diagnosticActive &&
+      checkpoint.diagnosticOptions &&
+      typeof checkpoint
+        .diagnosticOptions === "object"
+    ) {
+      diagnosticOptions = {
+        ...diagnosticOptions,
+        ...checkpoint
+          .diagnosticOptions
+      };
+    }
+
+    state.doubleJumpSignSpawned = true;
+    state.halfwayFeedComplete = true;
+    state.halfwayFeedPending = false;
+    state.halfwayFeedReadyAt = 0;
+    state.halfwayFeedExitSpeed = 0;
+  }
+
+  function halfwayFeedScreenHtml() {
+    return `
+      <div
+        class="dd2-feed-screen"
+        id="dd2FeedScreen"
+      >
+        <button
+          class="dd2-feed-tap-target"
+          id="dd2FeedTapTarget"
+          type="button"
+          aria-label="Dino is hungry"
+          disabled
+        >
+          <div
+            class="dd2-feed-art"
+            aria-hidden="true"
+          >
+            <img
+              class="dd2-feed-image dd2-feed-dino"
+              src="${IMAGE_PATH}dino_dash_hungry.png"
+              alt=""
+              draggable="false"
+            >
+
+            <img
+              class="dd2-feed-image dd2-feed-steak"
+              data-dd2-steak="1"
+              src="${IMAGE_PATH}dino_dash_steak_1.png"
+              alt=""
+              draggable="false"
+            >
+
+            <img
+              class="dd2-feed-image dd2-feed-steak"
+              data-dd2-steak="2"
+              src="${IMAGE_PATH}dino_dash_steak_2.png"
+              alt=""
+              draggable="false"
+            >
+
+            <img
+              class="dd2-feed-image dd2-feed-steak"
+              data-dd2-steak="3"
+              src="${IMAGE_PATH}dino_dash_steak_3.png"
+              alt=""
+              draggable="false"
+            >
+          </div>
+
+          <div
+            class="dd2-feed-message"
+            id="dd2FeedMessage"
+            aria-live="polite"
+          >
+            This is a long verse. Dino is hungry!
+          </div>
+        </button>
+      </div>
+    `;
+  }
+
+  async function renderHalfwayFeedInterlude(
+    checkpoint,
+    imagesReady = Promise.resolve()
+  ) {
+    stopLoop();
+    cleanupResize();
+
+    state.field = null;
+    state.phase = "feed";
+
+    let blackout =
+      document.getElementById(
+        "dd2ReloadFirstPaint"
+      );
+
+    if (!blackout) {
+      blackout =
+        document.createElement(
+          "div"
+        );
+
+      blackout.id =
+        "dd2ReloadFirstPaint";
+
+      blackout.className =
+        "dd2-reload-first-paint";
+
+      blackout.setAttribute(
+        "aria-hidden",
+        "true"
+      );
+
+      app.appendChild(
+        blackout
+      );
+    }
+
+    try {
+      await imagesReady;
+    } catch (err) {
+      // Normal image loading remains
+      // available as a fallback.
+    }
+
+    if (
+      !document.getElementById(
+        "dd2FeedScreen"
+      )
+    ) {
+      app.insertAdjacentHTML(
+        "beforeend",
+        halfwayFeedScreenHtml()
+      );
+    }
+
+    const screen =
+      document.getElementById(
+        "dd2FeedScreen"
+      );
+
+    const target =
+      document.getElementById(
+        "dd2FeedTapTarget"
+      );
+
+    const message =
+      document.getElementById(
+        "dd2FeedMessage"
+      );
+
+    const steaks =
+      Array.from(
+        document.querySelectorAll(
+          "[data-dd2-steak]"
+        )
+      );
+
+    if (
+      !screen ||
+      !target ||
+      !message ||
+      steaks.length !== 3
+    ) {
+      return;
+    }
+
+    target.disabled = true;
+
+    let feedReady = false;
+    let tapCount = 0;
+    let lastAcceptedTapAt = 0;
+
+    await new Promise(resolve => {
+      window.setTimeout(
+        resolve,
+        HALFWAY_FEED_BLACK_HOLD_MS
+      );
+    });
+
+    requestAnimationFrame(() => {
+      screen.classList.add(
+        "is-visible"
+      );
+
+      blackout.classList.add(
+        "is-leaving"
+      );
+    });
+
+    window.setTimeout(
+      () => {
+        blackout.remove();
+
+        document.documentElement
+          .classList.remove(
+            "dd2-midpoint-black"
+          );
+
+        recordHalfwayFeedDiagnosticEvent(
+          "feed-visible"
+        );
+      },
+      HALFWAY_FEED_SCENE_FADE_MS +
+      80
+    );
+
+    window.setTimeout(
+      () => {
+        void preloadDinoSvg();
+        void preloadGameImageAssets();
+      },
+      HALFWAY_FEED_SCENE_FADE_MS +
+      300
+    );
+
+    window.setTimeout(
+      () => {
+        if (
+          !document.body.contains(
+            target
+          )
+        ) {
+          return;
+        }
+
+        feedReady = true;
+        target.disabled = false;
+
+        target.setAttribute(
+          "aria-label",
+          "Tap to feed Dino"
+        );
+
+        message.textContent =
+          "Tap to feed Dino.";
+      },
+      HALFWAY_FEED_SCENE_FADE_MS +
+      HALFWAY_FEED_MESSAGE_MS
+    );
+
+    target.addEventListener(
+      "click",
+      () => {
+        if (!feedReady) {
+          return;
+        }
+
+        const now =
+          performance.now();
+
+        if (
+          now -
+          lastAcceptedTapAt <
+          HALFWAY_FEED_TAP_COOLDOWN_MS
+        ) {
+          return;
+        }
+
+        lastAcceptedTapAt = now;
+
+        const audioReady =
+          audioUnlocked
+            ? Promise.resolve()
+            : unlockAudio();
+
+        tapCount += 1;
+
+        const steak =
+          steaks[
+          tapCount - 1
+          ];
+
+        if (steak) {
+          steak.classList.add(
+            "is-fed"
+          );
+        }
+
+        const tapSound =
+          tapCount >= 3
+            ? "streak"
+            : "correct";
+
+        void Promise
+          .resolve(audioReady)
+          .then(
+            () => {
+              playSound(
+                tapSound
+              );
+            }
+          );
+
+        if (tapCount < 3) {
+          return;
+        }
+
+        feedReady = false;
+        target.disabled = true;
+
+        recordHalfwayFeedDiagnosticEvent(
+          "feed-complete"
+        );
+
+        window.setTimeout(
+          () => {
+            const resumeBlackout =
+              document.createElement(
+                "div"
+              );
+
+            resumeBlackout.className =
+              "dd2-feed-blackout";
+
+            resumeBlackout.setAttribute(
+              "aria-hidden",
+              "true"
+            );
+
+            document.body.appendChild(
+              resumeBlackout
+            );
+
+            requestAnimationFrame(
+              () => {
+                resumeBlackout
+                  .classList.add(
+                    "is-visible"
+                  );
+
+                window.setTimeout(
+                  () => {
+                    startGame(
+                      checkpoint.mode,
+                      checkpoint
+                    );
+
+                    requestAnimationFrame(
+                      () => {
+                        requestAnimationFrame(
+                          () => {
+                            resumeBlackout
+                              .classList
+                              .remove(
+                                "is-visible"
+                              );
+
+                            window.setTimeout(
+                              () => {
+                                resumeBlackout
+                                  .remove();
+                              },
+                              HALFWAY_FEED_RESUME_FADE_MS +
+                              80
+                            );
+                          }
+                        );
+                      }
+                    );
+                  },
+                  HALFWAY_FEED_RESUME_FADE_MS
+                );
+              }
+            );
+          },
+          HALFWAY_FEED_FINAL_HOLD_MS
+        );
+      }
+    );
+  }
+
+  function beginHalfwayFeedExit() {
+    if (
+      state.phase !== "verse" ||
+      state.halfwayFeedComplete ||
+      !isHalfwayFeedEligible() ||
+      !state.layout
+    ) {
+      return;
+    }
+
+    state.halfwayFeedPending = false;
+    state.halfwayFeedComplete = true;
+    state.halfwayFeedReadyAt = 0;
+
+    state.halfwayFeedExitSpeed =
+      Math.max(
+        1,
+        getActiveWorldSpeedU() *
+        state.layout.unit
+      );
+
+    state.phase = "feedExit";
+    state.phaseStartedAt =
+      performance.now();
+
+    clearMovingItems();
+    clearTrail();
+
+    state.flashUntil = 0;
+    state.shakeUntil = 0;
+
+    const menuButton =
+      document.getElementById(
+        "dd2MenuPill"
+      );
+
+    if (menuButton) {
+      menuButton.hidden = true;
+    }
+
+    recordHalfwayFeedDiagnosticEvent(
+      "exit-start"
+    );
+  }
+
+  function updateHalfwayFeedExit(
+    dt,
+    ts
+  ) {
+    if (!state.layout) {
+      return;
+    }
+
+    updateDino(
+      dt,
+      ts
+    );
+
+    state.dinoX +=
+      state.halfwayFeedExitSpeed *
+      dt;
+
+    const dinoLeft =
+      state.dinoX -
+      state.layout.dinoW * 0.5;
+
+    if (
+      dinoLeft >
+      state.layout.width
+    ) {
+      beginHalfwayFeedReload();
+    }
+  }
+
+  function beginHalfwayFeedReload() {
+    if (
+      state.phase !== "feedExit"
+    ) {
+      return;
+    }
+
+    const checkpoint =
+      buildHalfwayFeedCheckpoint();
+
+    if (
+      !saveHalfwayFeedCheckpoint(
+        checkpoint
+      )
+    ) {
+      recordHalfwayFeedDiagnosticEvent(
+        "checkpoint-save-failed"
+      );
+
+      state.phase = "verse";
+      state.halfwayFeedExitSpeed = 0;
+      state.spawnPause = 0;
+      state.spawnCooldown = 0.8;
+
+      resetDino();
+
+      const menuButton =
+        document.getElementById(
+          "dd2MenuPill"
+        );
+
+      if (menuButton) {
+        menuButton.hidden = false;
+      }
+
+      return;
+    }
+
+    state.phase = "feedReload";
+
+    recordHalfwayFeedDiagnosticEvent(
+      "blackout-start"
+    );
+
+    stopLoop();
+    cleanupResize();
+
+    const blackout =
+      document.createElement(
+        "div"
+      );
+
+    blackout.className =
+      "dd2-feed-blackout";
+
+    blackout.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    document.body.appendChild(
+      blackout
+    );
+
+    requestAnimationFrame(() => {
+      blackout.classList.add(
+        "is-visible"
+      );
+
+      window.setTimeout(
+        () => {
+          saveDiagnosticHeartbeat(
+            performance.now(),
+            true
+          );
+
+          recordHalfwayFeedDiagnosticEvent(
+            "reload-start"
+          );
+
+          state.field = null;
+
+          window.location.reload();
+        },
+        HALFWAY_FEED_BLACK_FADE_MS +
+        HALFWAY_FEED_BLACK_HOLD_MS
+      );
+    });
+  }
+
 
   function renderIntro(){
     stopLoop();
@@ -1014,6 +1931,7 @@
       lastSnapshot: null,
       snapshots: [],
       renderModeEvents: [],
+      halfwayFeedEvents: [],
       errors: []
     };
 
@@ -1052,6 +1970,139 @@
 
     writeDiagnosticReport();
   }
+
+  function recordHalfwayFeedDiagnosticEvent(
+    type
+  ) {
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    if (
+      !Array.isArray(
+        diagnosticState
+          .record
+          .halfwayFeedEvents
+      )
+    ) {
+      diagnosticState
+        .record
+        .halfwayFeedEvents = [];
+    }
+
+    const startedAtEpoch =
+      diagnosticState
+        .record
+        .startedAtEpoch;
+
+    diagnosticState
+      .record
+      .halfwayFeedEvents
+      .push({
+        at:
+          new Date().toISOString(),
+
+        elapsedSeconds:
+          startedAtEpoch
+            ? Math.round(
+              (
+                Date.now() -
+                startedAtEpoch
+              ) /
+              100
+            ) /
+            10
+            : null,
+
+        type,
+
+        phase:
+          state.phase,
+
+        progressIndex:
+          state.progressIndex,
+
+        wordCount:
+          state.verseWords.length
+      });
+
+    writeDiagnosticReport();
+  }
+
+  function resumeDiagnosticRunAfterHalfwayFeed(
+    mode
+  ) {
+    const report =
+      readDiagnosticReport();
+
+    if (
+      !report ||
+      report.gameId !== GAME_ID ||
+      report.verseId !== ctx.verseId ||
+      report.mode !== mode ||
+      report.status !== "running"
+    ) {
+      startDiagnosticRun(mode);
+      return;
+    }
+
+    diagnosticState.active = true;
+    diagnosticState.record = report;
+
+    const snapshot =
+      report.lastSnapshot || {};
+
+    diagnosticState.renderCount =
+      Number(
+        snapshot.renderCount
+      ) || 0;
+
+    diagnosticState.skippedRenderCount =
+      Number(
+        snapshot.skippedRenderCount
+      ) || 0;
+
+    diagnosticState.buildUpdates =
+      Number(
+        snapshot.buildUpdates
+      ) || 0;
+
+    diagnosticState.maxCounts = {
+      tablets: 0,
+      obstacles: 0,
+      particles: 0,
+      dust: 0,
+      trailDots: 0,
+      trailSparkles: 0,
+      fieldDomNodes: 0,
+      totalDomNodes: 0,
+      ...(
+        snapshot.maximum ||
+        {}
+      )
+    };
+
+    const now =
+      performance.now();
+
+    diagnosticState.lastHeartbeatAt =
+      now;
+
+    diagnosticState.lastHudAt = 0;
+    diagnosticState.lastRenderAt = 0;
+
+    resetDiagnosticFrameWindow(
+      now
+    );
+
+    recordHalfwayFeedDiagnosticEvent(
+      "reload-complete"
+    );
+  }
+
 
   function markDiagnosticRunClean(
     status = "clean-exit"
@@ -1554,7 +2605,10 @@
     }
   }
 
-  function startGame(mode){
+  function startGame(
+    mode,
+    resumeCheckpoint = null
+  ){
     stopLoop();
     cleanupResize();
 
@@ -1563,7 +2617,27 @@
     completionResult = null;
     resetStateForRun();
 
-    if (DIAGNOSTIC_TESTING_ENABLED) {
+    if (resumeCheckpoint) {
+      restoreHalfwayFeedCheckpoint(
+        resumeCheckpoint
+      );
+
+      if (
+        resumeCheckpoint
+          .diagnosticActive
+      ) {
+        if (!diagnosticState.active) {
+          resumeDiagnosticRunAfterHalfwayFeed(
+            mode
+          );
+        }
+      } else {
+        diagnosticState.active = false;
+        diagnosticState.record = null;
+      }
+    } else if (
+      DIAGNOSTIC_TESTING_ENABLED
+    ) {
       startDiagnosticRun(mode);
     } else {
       diagnosticState.active = false;
@@ -1643,7 +2717,22 @@
     installResize();
     recalcLayout();
     renderDinoAsset();
-    enterIntroPhase();
+
+    if (resumeCheckpoint) {
+      resetDino();
+      enterVersePhase();
+
+      state.spawnCooldown = 0.8;
+
+      clearHalfwayFeedCheckpoint();
+
+      recordHalfwayFeedDiagnosticEvent(
+        "game-resume"
+      );
+    } else {
+      enterIntroPhase();
+    }
+
     startLoop();
   }
 
@@ -1686,6 +2775,11 @@
     state.nextTrailId = 1;
     state.spawnCooldown = 0.4;
     state.spawnPause = 0;
+    state.pairWaveAccumulator = 0;
+    state.halfwayFeedComplete = false;
+    state.halfwayFeedPending = false;
+    state.halfwayFeedReadyAt = 0;
+    state.halfwayFeedExitSpeed = 0;
     state.doubleJumpSignSpawned = false;
     state.fallStartedAt = 0;
     state.respawnAt = 0;
@@ -2011,7 +3105,15 @@
     state.lastInputAt = now;
     if (state.paused) return;
 
-    if (["intro", "verse", "bonusIntro", "bonus"].includes(state.phase)){
+    if (
+      [
+        "intro",
+        "verse",
+        "feedExit",
+        "bonusIntro",
+        "bonus"
+      ].includes(state.phase)
+    ){
       jump();
     }
   }
@@ -2027,7 +3129,12 @@
 
     state.dinoVY = (state.jumpsUsed === 0 ? getDifficulty().jumpU : getDifficulty().doubleJumpU) * state.layout.unit;
     state.jumpsUsed += 1;
-    addJumpDust();
+
+    if (
+      state.phase !== "feedExit"
+    ) {
+      addJumpDust();
+    }
   }
 
   function maybeStartBackflip() {
@@ -2566,6 +3673,17 @@
   function update(dt, ts){
     if (!state.layout) return;
 
+    if (
+      state.phase === "feedExit"
+    ) {
+      updateHalfwayFeedExit(
+        dt,
+        ts
+      );
+
+      return;
+    }
+
     updateStreakSpeedBoost(dt);
     updateWorldScroll(dt);
     updateDino(dt, ts);
@@ -2579,12 +3697,36 @@
     }
 
     if (state.phase === "verse"){
-      updateSpawn(dt, false);
+      if (
+        !state.halfwayFeedPending
+      ) {
+        updateSpawn(
+          dt,
+          false
+        );
+      }
+
       updateTablets(dt, ts);
       updateObstacles(dt, ts);
-      if (getCurrentPhase() === "done" && state.tablets.length === 0 && state.obstacles.length === 0){
+
+      if (
+        state.halfwayFeedPending &&
+        ts >=
+          state.halfwayFeedReadyAt
+      ) {
+        beginHalfwayFeedExit();
+        return;
+      }
+
+      if (
+        getCurrentPhase() ===
+          "done" &&
+        state.tablets.length === 0 &&
+        state.obstacles.length === 0
+      ){
         enterBonusIntroPhase();
       }
+
       return;
     }
 
@@ -2678,7 +3820,12 @@
       state.dinoBackflipDuration = 0;
       if (!wasGrounded){
         state.landingSquashUntil = ts + 160;
-        addLandingDust();
+
+        if (
+          state.phase !== "feedExit"
+        ) {
+          addLandingDust();
+        }
       }
     }
 
@@ -2726,39 +3873,400 @@
     return Math.max(d.bonusMinPatternSeconds || 1.15, variedSeconds);
   }
 
+  function getVerseTabletPairFrequency() {
+    const wordCount =
+      state.verseWords.length;
+
+    if (
+      wordCount <
+      LONG_VERSE_MIN_WORDS ||
+      wordCount <=
+      TARGET_VERSE_TABLET_WAVES
+    ) {
+      return 0;
+    }
+
+    const targetWaves =
+      Math.max(
+        TARGET_VERSE_TABLET_WAVES,
+        Math.ceil(
+          wordCount / 2
+        )
+      );
+
+    const pairWaves =
+      wordCount -
+      targetWaves;
+
+    return clamp(
+      pairWaves /
+      targetWaves,
+      0,
+      1
+    );
+  }
+
+  function canSpawnVerseTabletPair() {
+    if (
+      getCurrentPhase() !== "words" ||
+      state.forceCorrectNext ||
+      state.progressIndex + 1 >=
+      state.verseWords.length
+    ) {
+      return false;
+    }
+
+    if (
+      !state.halfwayFeedComplete &&
+      isHalfwayFeedEligible()
+    ) {
+      const midpoint =
+        getHalfwayFeedProgressIndex();
+
+      if (
+        state.progressIndex <
+        midpoint &&
+        state.progressIndex + 1 >=
+        midpoint
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function shouldSpawnVerseTabletPair() {
+    if (
+      !canSpawnVerseTabletPair()
+    ) {
+      return false;
+    }
+
+    const frequency =
+      getVerseTabletPairFrequency();
+
+    if (frequency <= 0) {
+      return false;
+    }
+
+    state.pairWaveAccumulator +=
+      frequency;
+
+    if (
+      state.pairWaveAccumulator <
+      1
+    ) {
+      return false;
+    }
+
+    state.pairWaveAccumulator -= 1;
+
+    return true;
+  }
+
+  function createTabletChoiceForTargetIndex(
+    targetIndex,
+    options = {}
+  ) {
+    const correctLabel =
+      state.verseWords[
+      targetIndex
+      ] || "";
+
+    const excluded =
+      new Set(
+        (
+          options.excludeLabels ||
+          []
+        )
+          .map(normalizeWord)
+          .filter(Boolean)
+      );
+
+    const decoys =
+      getDecoysForPhase(
+        "words",
+        correctLabel,
+        6,
+        targetIndex
+      )
+        .filter(
+          label =>
+            !excluded.has(
+              normalizeWord(label)
+            )
+        );
+
+    const shouldBeCorrect =
+      chooseCorrectOrDecoy({
+        canSpawnDecoy:
+          decoys.length > 0
+      });
+
+    const label =
+      shouldBeCorrect ||
+        !decoys.length
+        ? correctLabel
+        : decoys[
+        Math.floor(
+          Math.random() *
+          decoys.length
+        )
+        ];
+
+    return {
+      label,
+      correct:
+        label === correctLabel,
+      targetProgressIndex:
+        targetIndex
+    };
+  }
+
+  function chooseVersePairLanes(
+    leadCorrect,
+    followerCorrect
+  ) {
+    if (
+      leadCorrect &&
+      followerCorrect
+    ) {
+      return [
+        "middle",
+        "middle"
+      ];
+    }
+
+    if (
+      !leadCorrect &&
+      !followerCorrect
+    ) {
+      const lane =
+        Math.random() < 0.55
+          ? "ground"
+          : "middle";
+
+      return [
+        lane,
+        lane
+      ];
+    }
+
+    const correctLane =
+      Math.random() < 0.5
+        ? "ground"
+        : "middle";
+
+    const decoyLane =
+      correctLane === "ground"
+        ? "middle"
+        : "ground";
+
+    return leadCorrect
+      ? [
+        correctLane,
+        decoyLane
+      ]
+      : [
+        decoyLane,
+        correctLane
+      ];
+  }
+
+  function getVersePairGapX(
+    lead,
+    follower
+  ) {
+    const mixed =
+      lead.correct !==
+      follower.correct;
+
+    const followSeconds =
+      mixed
+        ? VERSE_PAIR_MIXED_FOLLOW_SECONDS
+        : VERSE_PAIR_FOLLOW_SECONDS;
+
+    const desiredGap =
+      getActiveWorldSpeedU() *
+      state.layout.unit *
+      followSeconds;
+
+    const minimumGap =
+      (
+        lead.w +
+        follower.w
+      ) *
+      0.5 +
+      state.layout.unit *
+      VERSE_PAIR_MIN_GAP_U;
+
+    return Math.max(
+      desiredGap,
+      minimumGap
+    );
+  }
+
+  function spawnVerseTabletPair() {
+    if (
+      !canSpawnVerseTabletPair()
+    ) {
+      spawnTabletForPhase(
+        "words"
+      );
+
+      return;
+    }
+
+    const leadTarget =
+      state.progressIndex;
+
+    const leadChoice =
+      createTabletChoiceForTargetIndex(
+        leadTarget
+      );
+
+    const followerTarget =
+      leadTarget +
+      (
+        leadChoice.correct
+          ? 1
+          : 0
+      );
+
+    const followerChoice =
+      createTabletChoiceForTargetIndex(
+        followerTarget,
+        {
+          excludeLabels: [
+            leadChoice.label
+          ]
+        }
+      );
+
+    const lanes =
+      chooseVersePairLanes(
+        leadChoice.correct,
+        followerChoice.correct
+      );
+
+    const lead =
+      spawnTablet(
+        leadChoice.label,
+        leadChoice.correct,
+        "words",
+        lanes[0],
+        0,
+        leadChoice
+          .targetProgressIndex
+      );
+
+    const follower =
+      spawnTablet(
+        followerChoice.label,
+        followerChoice.correct,
+        "words",
+        lanes[1],
+        0,
+        followerChoice
+          .targetProgressIndex
+      );
+
+    if (
+      !lead ||
+      !follower
+    ) {
+      return;
+    }
+
+    follower.x =
+      lead.x +
+      getVersePairGapX(
+        lead,
+        follower
+      );
+  }
+
+
   function spawnVersePattern(){
     const phase = getCurrentPhase();
     if (phase === "done") return;
 
     if (shouldForceStandaloneDecoy()){
-      spawnTabletForPhase(phase, { forceDecoy: true });
+      spawnTabletForPhase(
+        phase,
+        {
+          forceDecoy: true
+        }
+      );
+
       return;
     }
 
-    const d = getDifficulty();
-    const pairedRoll = Math.random();
-    const obstacleRoll = Math.random();
+    const d =
+      getDifficulty();
 
-    if (pairedRoll < d.pairedChance){
-      if (Math.random() < 0.45){
-        const obstacle = spawnGroundObstacle();
-        spawnCorrectTablet(chooseAirWordLane(), getObstaclePairWordOffset(obstacle));
-      } else if (Math.random() < 0.50){
-        spawnGapObstacle();
-        spawnCorrectTablet(chooseAirWordLane());
-      } else {
-        spawnAirObstacle();
-        spawnCorrectTablet("ground");
-      }
-      return;
-    }
+    const obstacleWordRoll =
+      Math.random();
 
-    if (obstacleRoll < d.obstacleChance){
+    const obstacleRoll =
+      Math.random();
+
+    const wantsObstacleWordPattern =
+      obstacleWordRoll <
+      d.pairedChance;
+
+    const wantsObstacleOnly =
+      !wantsObstacleWordPattern &&
+      obstacleRoll <
+        d.obstacleChance;
+
+    if (wantsObstacleOnly){
       spawnRandomObstacleOnly();
       return;
     }
 
-    spawnTabletForPhase(phase);
+    if (
+      phase === "words" &&
+      shouldSpawnVerseTabletPair()
+    ){
+      spawnVerseTabletPair();
+      return;
+    }
+
+    if (wantsObstacleWordPattern){
+      if (Math.random() < 0.45){
+        const obstacle =
+          spawnGroundObstacle();
+
+        spawnCorrectTablet(
+          chooseAirWordLane(),
+          getObstaclePairWordOffset(
+            obstacle
+          )
+        );
+      } else if (
+        Math.random() < 0.50
+      ){
+        spawnGapObstacle();
+
+        spawnCorrectTablet(
+          chooseAirWordLane()
+        );
+      } else {
+        spawnAirObstacle();
+
+        spawnCorrectTablet(
+          "ground"
+        );
+      }
+
+      return;
+    }
+
+    spawnTabletForPhase(
+      phase
+    );
   }
 
   function spawnBonusPattern(){
@@ -2818,31 +4326,68 @@
     rememberSpawn(true);
   }
 
-  function spawnTablet(label, correct, phase, lane, xOffset = 0){
-    const shapeKey = getTabletShapeKey(label);
-    const shape = TABLET_SHAPES[shapeKey];
-    const layout = state.layout;
-    const h = TABLET_HEIGHT_U * layout.unit;
-    const w = h * shape.aspect;
-    const y = lane === "ground" ? layout.lanes.ground : lane === "top" ? layout.lanes.top : layout.lanes.middle;
+  function spawnTablet(
+    label,
+    correct,
+    phase,
+    lane,
+    xOffset = 0,
+    targetProgressIndex =
+      state.progressIndex
+  ){
+    const shapeKey =
+      getTabletShapeKey(label);
 
-    state.tablets.push({
+    const shape =
+      TABLET_SHAPES[shapeKey];
+
+    const layout =
+      state.layout;
+
+    const h =
+      TABLET_HEIGHT_U *
+      layout.unit;
+
+    const w =
+      h * shape.aspect;
+
+    const y =
+      lane === "ground"
+        ? layout.lanes.ground
+        : lane === "top"
+          ? layout.lanes.top
+          : layout.lanes.middle;
+
+    const tablet = {
       id: state.nextItemId++,
       label,
       correct,
       phase,
       lane,
-      x: layout.spawnX + xOffset,
+      targetProgressIndex,
+      x:
+        layout.spawnX +
+        xOffset,
       y,
       baseY: y,
-      age: Math.random() * 10,
-      wavePhase: Math.random() * Math.PI * 2,
+      age:
+        Math.random() * 10,
+      wavePhase:
+        Math.random() *
+        Math.PI * 2,
       w,
       h,
       shapeKey,
       collected: false,
-      collectAt: 0
-    });
+      collectAt: 0,
+      expired: false
+    };
+
+    state.tablets.push(
+      tablet
+    );
+
+    return tablet;
   }
 
   function spawnGroundObstacle(){
@@ -2957,26 +4502,113 @@
   }
 
   function updateTablets(dt, ts){
-    const speed = getActiveWorldSpeedU() * state.layout.unit;
-    for (const tablet of state.tablets){
+    const speed =
+      getActiveWorldSpeedU() *
+      state.layout.unit;
+
+    for (
+      const tablet
+      of state.tablets
+    ){
+      const targetProgressIndex =
+        Number.isFinite(
+          tablet.targetProgressIndex
+        )
+          ? tablet.targetProgressIndex
+          : state.progressIndex;
+
+      if (
+        tablet.correct &&
+        targetProgressIndex <
+          state.progressIndex
+      ) {
+        tablet.expired = true;
+        continue;
+      }
+
       tablet.age += dt;
       tablet.x -= speed * dt;
-      tablet.y = tablet.baseY + Math.sin(tablet.age * TABLET_FLOAT_RATE + tablet.wavePhase) * state.layout.unit * TABLET_FLOAT_AMPLITUDE_U;
 
-      if (!tablet.collected && rectsOverlap(getDinoHitbox(), getTabletHitbox(tablet))){
-        if (tablet.correct) collectCorrectTablet(tablet, ts);
-        else collectDecoyTablet(tablet, ts);
+      tablet.y =
+        tablet.baseY +
+        Math.sin(
+          tablet.age *
+            TABLET_FLOAT_RATE +
+          tablet.wavePhase
+        ) *
+        state.layout.unit *
+        TABLET_FLOAT_AMPLITUDE_U;
+
+      if (
+        !tablet.collected &&
+        rectsOverlap(
+          getDinoHitbox(),
+          getTabletHitbox(
+            tablet
+          )
+        )
+      ){
+        if (!tablet.correct) {
+          collectDecoyTablet(
+            tablet,
+            ts
+          );
+        } else if (
+          targetProgressIndex ===
+          state.progressIndex
+        ) {
+          collectCorrectTablet(
+            tablet,
+            ts
+          );
+        }
       }
     }
 
-    state.tablets = state.tablets.filter(tablet => {
-      if (tablet.collected) return ts - tablet.collectAt < 150;
-      if (tablet.x < state.layout.offscreenX){
-        if (tablet.correct) missCorrectTablet(ts);
-        return false;
-      }
-      return true;
-    });
+    state.tablets =
+      state.tablets.filter(
+        tablet => {
+          if (tablet.expired) {
+            return false;
+          }
+
+          if (tablet.collected) {
+            return (
+              ts -
+                tablet.collectAt <
+              150
+            );
+          }
+
+          if (
+            tablet.x <
+            state.layout.offscreenX
+          ){
+            const targetProgressIndex =
+              Number.isFinite(
+                tablet
+                  .targetProgressIndex
+              )
+                ? tablet
+                    .targetProgressIndex
+                : state.progressIndex;
+
+            if (
+              tablet.correct &&
+              targetProgressIndex ===
+                state.progressIndex
+            ) {
+              missCorrectTablet(
+                ts
+              );
+            }
+
+            return false;
+          }
+
+          return true;
+        }
+      );
   }
 
   function updateObstacles(dt, ts){
@@ -3023,6 +4655,24 @@
     state.streak += 1;
     state.bestStreak = Math.max(state.bestStreak, state.streak);
     state.progressIndex += 1;
+
+    if (
+      shouldQueueHalfwayFeed()
+    ) {
+      state.halfwayFeedPending =
+        true;
+
+      state.halfwayFeedReadyAt =
+        ts +
+        HALFWAY_FEED_SETTLE_MS;
+
+      state.spawnPause =
+        Math.max(
+          state.spawnPause,
+          2
+        );
+    }
+
     addParticleBurst(tablet.x, tablet.y, PARTICLE_COLORS.rainbow, 18, 0.06, 0.18);
     if (getTrailLevel() > oldLevel){
       playSound("streak");
@@ -3235,7 +4885,13 @@
     return "";
   }
 
-  function getDecoysForPhase(phase, correctLabel, count){
+  function getDecoysForPhase(
+    phase,
+    correctLabel,
+    count,
+    targetIndex =
+      state.progressIndex
+  ){
     const out = [];
     const seen = new Set([normalizeWord(correctLabel)]);
 
@@ -3256,7 +4912,7 @@
         add(window.VerseGameShell.getVerseWordDecoys({
           words: state.verseWords,
           correct: correctLabel,
-          targetIndex: state.progressIndex,
+          targetIndex,
           count,
           avoidNext: 2,
           fallbackToFun: true
@@ -4463,6 +6119,8 @@
     state.running = false;
     stopLoop();
 
+    clearHalfwayFeedCheckpoint();
+
     markDiagnosticRunClean(
       "completed-round"
     );
@@ -4517,6 +6175,96 @@
       onChangeVerse: () => window.VerseGameBridge.returnToTitle()
     });
   }
+
+  function preloadDecodedFeedImage(
+    filename
+  ) {
+    const image =
+      new Image();
+
+    image.decoding =
+      "async";
+
+    halfwayFeedImagePreloads.push(
+      image
+    );
+
+    return new Promise(resolve => {
+      let settled = false;
+
+      const finish =
+        success => {
+          if (settled) return;
+
+          settled = true;
+          resolve(success);
+        };
+
+      image.onload =
+        async () => {
+          if (
+            typeof image.decode ===
+            "function"
+          ) {
+            try {
+              await image.decode();
+            } catch (err) {
+              // Loaded image remains
+              // usable.
+            }
+          }
+
+          finish(true);
+        };
+
+      image.onerror =
+        () => {
+          finish(false);
+        };
+
+      image.src =
+        `${IMAGE_PATH}${filename}`;
+
+      if (
+        image.complete &&
+        image.naturalWidth > 0
+      ) {
+        if (
+          typeof image.decode ===
+          "function"
+        ) {
+          image.decode()
+            .then(
+              () => finish(true)
+            )
+            .catch(
+              () => finish(true)
+            );
+        } else {
+          finish(true);
+        }
+      }
+    });
+  }
+
+  function preloadHalfwayFeedImages() {
+    if (
+      state.verseWords.length <
+      LONG_VERSE_MIN_WORDS
+    ) {
+      return Promise.resolve([]);
+    }
+
+    return Promise.all(
+      HALFWAY_FEED_IMAGES.map(
+        filename =>
+          preloadDecodedFeedImage(
+            filename
+          )
+      )
+    );
+  }
+
 
   function waitForImagePrefetchTurn(
     delayMs = 100

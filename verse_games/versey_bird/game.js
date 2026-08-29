@@ -1615,8 +1615,6 @@
         renderModeSelect();
       }
     });
-
-    installDiagnosticCopyButton();
   }
 
   function renderModeSelect(){

@@ -6,11 +6,101 @@
   <meta name="theme-color" content="#333333">
   <title>Dino Dash</title>
 
+  <style>
+    html.dd2-midpoint-black,
+    html.dd2-midpoint-black body,
+    html.dd2-midpoint-black #app {
+      background: #000000 !important;
+      background-color: #000000 !important;
+    }
+
+    .dd2-reload-first-paint {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      background: #000000;
+    }
+  </style>
+
+  <script>
+    (function () {
+      const key =
+        "biblozoo:dino_dash:halfway_feed:v1";
+
+      try {
+        const raw =
+          sessionStorage.getItem(key);
+
+        if (!raw) return;
+
+        const checkpoint =
+          JSON.parse(raw);
+
+        const verseId =
+          new URLSearchParams(
+            window.location.search
+          ).get("verseId") || "";
+
+        const ageMs =
+          Date.now() -
+          Number(
+            (
+              checkpoint &&
+              checkpoint.savedAt
+            ) ||
+            0
+          );
+
+        if (
+          checkpoint &&
+          checkpoint.version === 1 &&
+          checkpoint.stage === "feed" &&
+          checkpoint.verseId === verseId &&
+          ageMs >= 0 &&
+          ageMs <= 30 * 60 * 1000
+        ) {
+          document.documentElement
+            .classList.add(
+              "dd2-midpoint-black"
+            );
+        }
+      } catch (err) {
+        // Normal startup can continue.
+      }
+    })();
+  </script>
+
   <link rel="stylesheet" href="../shared/shell.css">
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
   <div id="app" class="vm-shell"></div>
+
+  <script>
+    (function () {
+      if (
+        !document.documentElement
+          .classList.contains(
+            "dd2-midpoint-black"
+          )
+      ) {
+        return;
+      }
+
+      const app =
+        document.getElementById("app");
+
+      if (!app) return;
+
+      app.innerHTML = `
+        <div
+          class="dd2-reload-first-paint"
+          id="dd2ReloadFirstPaint"
+          aria-hidden="true"
+        ></div>
+      `;
+    })();
+  </script>
 
   <script src="../shared/bridge.js"></script>
   <script src="../shared/game-shell.js"></script>
