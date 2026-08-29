@@ -180,6 +180,7 @@
   const VERSE_PAIR_MIN_GAP_U = 0.34;
   const VERSE_PAIR_VERTICAL_OFFSET_U = 0.52;
   const VERSE_PAIR_OBSTACLE_EXTRA_U = 2.4;
+  const VERSE_PAIR_BEE_GUARD_GAP_U = 0.85;
 
   const ADAPTIVE_RENDER_INTERVAL_MS = 30;
   const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
@@ -294,6 +295,9 @@
 
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:versey_bird:v1";
+
+  const DIAGNOSTIC_PREVIOUS_STORAGE_KEY =
+    "biblozooDebug:versey_bird:previous:v1";
 
   const DIAGNOSTIC_HEARTBEAT_MS =
     2000;
@@ -672,6 +676,7 @@
     selectedMode = mode;
     completed = false;
     completionResult = null;
+    clearVerseyBirdLayerNodePools();
     resetStateForRun();
     startDiagnosticRun(mode);
 
@@ -1136,11 +1141,14 @@
     state.birdAngle = 0;
   }
 
-  function readDiagnosticReport(){
+  function readDiagnosticReport(
+    storageKey =
+      DIAGNOSTIC_STORAGE_KEY
+  ){
     try {
       const raw =
         localStorage.getItem(
-          DIAGNOSTIC_STORAGE_KEY
+          storageKey
         );
 
       if (!raw) return null;
@@ -1148,6 +1156,27 @@
       return JSON.parse(raw);
     } catch (err) {
       return null;
+    }
+  }
+
+  function archiveCurrentDiagnosticReport(){
+    try {
+      const current =
+        localStorage.getItem(
+          DIAGNOSTIC_STORAGE_KEY
+        );
+
+      if (!current) {
+        return;
+      }
+
+      localStorage.setItem(
+        DIAGNOSTIC_PREVIOUS_STORAGE_KEY,
+        current
+      );
+    } catch (err) {
+      // Diagnostics must never
+      // interfere with gameplay.
     }
   }
 
@@ -1186,6 +1215,8 @@
   }
 
   function startDiagnosticRun(mode){
+    archiveCurrentDiagnosticReport();
+
     const now =
       performance.now();
 
@@ -1727,84 +1758,99 @@
     textarea.remove();
   }
 
-  function installDiagnosticCopyButton(){
-    const report =
-      readDiagnosticReport();
-
-    if (!report) return;
-
+  function installDiagnosticCopyButton() {
     const actions =
       app.querySelector(
         ".vm-game-actions"
       );
 
-    if (
-      !actions ||
-      document.getElementById(
-        "vb2CopyDebugReport"
-      )
-    ) {
+    if (!actions) {
       return;
     }
 
-    const button =
-      document.createElement(
-        "button"
+    const installCopyButton = (
+      id,
+      label,
+      storageKey
+    ) => {
+      if (
+        document.getElementById(id) ||
+        !readDiagnosticReport(storageKey)
+      ) {
+        return;
+      }
+
+      const button =
+        document.createElement(
+          "button"
+        );
+
+      button.id = id;
+
+      button.type =
+        "button";
+
+      button.className =
+        "vm-btn vm-btn-secondary";
+
+      button.textContent =
+        label;
+
+      button.addEventListener(
+        "click",
+        async () => {
+          const reportText =
+            localStorage.getItem(
+              storageKey
+            );
+
+          if (!reportText) {
+            return;
+          }
+
+          const originalText =
+            button.textContent;
+
+          try {
+            await copyDiagnosticText(
+              reportText
+            );
+
+            button.textContent =
+              "Copied!";
+          } catch (err) {
+            button.textContent =
+              "Copy failed";
+          }
+
+          window.setTimeout(
+            () => {
+              button.textContent =
+                originalText;
+            },
+            1400
+          );
+        }
       );
 
-    button.id =
-      "vb2CopyDebugReport";
+      actions.appendChild(
+        button
+      );
+    };
 
-    button.type =
-      "button";
-
-    button.className =
-      "vm-btn vm-btn-secondary";
-
-    button.textContent =
-      "Copy Bird Debug Report";
-
-    button.addEventListener(
-      "click",
-      async () => {
-        const latest =
-          localStorage.getItem(
-            DIAGNOSTIC_STORAGE_KEY
-          );
-
-        if (!latest) {
-          return;
-        }
-
-        const originalText =
-          button.textContent;
-
-        try {
-          await copyDiagnosticText(
-            latest
-          );
-
-          button.textContent =
-            "Copied!";
-        } catch (err) {
-          button.textContent =
-            "Copy failed";
-        }
-
-        window.setTimeout(
-          () => {
-            button.textContent =
-              originalText;
-          },
-          1400
-        );
-      }
+    installCopyButton(
+      "vb2CopyDebugReport",
+      "Copy Bird Debug Report",
+      DIAGNOSTIC_STORAGE_KEY
     );
 
-    actions.appendChild(
-      button
+    installCopyButton(
+      "vb2CopyPreviousDebugReport",
+      "Copy Previous Bird Report",
+      DIAGNOSTIC_PREVIOUS_STORAGE_KEY
     );
   }
+
 
 
   function resetAdaptiveRenderState() {
@@ -2624,6 +2670,44 @@
     );
   }
 
+  function getPairedWaveRightEdge() {
+    let rightEdge = null;
+
+    const leadCloud =
+      state.wordCloud;
+
+    if (
+      leadCloud &&
+      leadCloud.pairedWave
+    ) {
+      rightEdge =
+        leadCloud.x +
+        leadCloud.w * 0.5;
+    }
+
+    const followerCloud =
+      state.wordCloudFollower;
+
+    if (
+      followerCloud &&
+      followerCloud.pairedWave
+    ) {
+      const followerRightEdge =
+        followerCloud.x +
+        followerCloud.w * 0.5;
+
+      rightEdge =
+        rightEdge === null
+          ? followerRightEdge
+          : Math.max(
+              rightEdge,
+              followerRightEdge
+            );
+    }
+
+    return rightEdge;
+  }
+
   function removeVerseCloudById(
     cloudId
   ) {
@@ -2982,6 +3066,9 @@
           chooseCorrectOrDecoy()
       });
 
+    leadCloud.pairedWave =
+      pairedWave;
+
     state.wordCloud = leadCloud;
     state.wordCloudFollower = null;
 
@@ -2990,7 +3077,7 @@
         state.progressIndex +
         (leadCloud.correct ? 1 : 0);
 
-      state.wordCloudFollower =
+      const followerCloud =
         createVerseCloud({
           phase,
           targetProgressIndex:
@@ -3003,6 +3090,12 @@
             leadCloud.label
           ]
         });
+
+      followerCloud.pairedWave =
+        true;
+
+      state.wordCloudFollower =
+        followerCloud;
     }
 
     tickObstacleCloudRhythm(
@@ -3217,6 +3310,9 @@
     const speed = getWorldSpeed();
     const beeSpeed = speed * 1.5;
 
+    const pairedWaveRightEdge =
+      getPairedWaveRightEdge();
+
     for (const obstacle of state.obstacles) {
       obstacle.age += dt;
 
@@ -3231,6 +3327,26 @@
         const extraLift = obstacle.hit ? -hitElapsed * layout.unit * 1.15 : 0;
 
         obstacle.x -= currentBeeSpeed * dt;
+
+        if (
+          !obstacle.hit &&
+          pairedWaveRightEdge !== null &&
+          obstacle.x >
+            pairedWaveRightEdge
+        ) {
+          const minimumBeeX =
+            pairedWaveRightEdge +
+            obstacle.w * 0.5 +
+            layout.unit *
+              VERSE_PAIR_BEE_GUARD_GAP_U;
+
+          obstacle.x =
+            Math.max(
+              obstacle.x,
+              minimumBeeX
+            );
+        }
+
         obstacle.y = obstacle.baseY
           + Math.sin(obstacle.age * waveRate + obstacle.wavePhase) * amplitude
           + wildWiggle
@@ -3579,6 +3695,17 @@
       "vb2-bee-trail-dot",
       "vb2-cloud-token"
     ]);
+
+  function clearVerseyBirdLayerNodePools() {
+    for (
+      const pool
+      of verseyBirdLayerNodePools.values()
+    ) {
+      pool.length = 0;
+    }
+
+    verseyBirdLayerNodePools.clear();
+  }
 
   function getVerseyBirdLayerNodeCache(
     layer
