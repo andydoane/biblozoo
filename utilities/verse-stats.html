@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BibloZoo Verse Stats</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #11151b;
+            --panel: #1a2029;
+            --panel-2: #212936;
+            --text: #eef3f8;
+            --muted: #a8b3c2;
+            --border: #364152;
+            --good: #5fd38d;
+            --bad: #ff7d7d;
+            --warn: #f4cc67;
+            --accent: #7ec8ff;
+            --shadow: 0 10px 30px rgba(0, 0, 0, .22);
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f4f7fb;
+                --panel: #ffffff;
+                --panel-2: #f7f9fc;
+                --text: #1b2430;
+                --muted: #667386;
+                --border: #d6dde7;
+                --good: #167a45;
+                --bad: #bc3030;
+                --warn: #8a6500;
+                --accent: #126bb0;
+                --shadow: 0 10px 30px rgba(40, 60, 90, .10);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        button {
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .page {
+            width: min(1180px, calc(100% - 28px));
+            margin: 0 auto;
+            padding: 28px 0 56px;
+        }
+
+        h1,
+        h2,
+        h3,
+        p {
+            margin-top: 0;
+        }
+
+        h1 {
+            margin-bottom: 6px;
+            font-size: clamp(26px, 4vw, 40px);
+            line-height: 1.1;
+        }
+
+        h2 {
+            margin-bottom: 14px;
+            font-size: 20px;
+        }
+
+        h3 {
+            margin: 22px 0 8px;
+            font-size: 16px;
+        }
+
+        .subhead {
+            color: var(--muted);
+            margin-bottom: 18px;
+            max-width: 900px;
+        }
+
+        .utility-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .btn {
+            min-height: 42px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--panel-2);
+            color: var(--text);
+            padding: 8px 13px;
+            font-weight: 700;
+        }
+
+        .btn:hover {
+            border-color: var(--accent);
+        }
+
+        .btn.primary {
+            background: var(--accent);
+            color: #07131c;
+            border-color: transparent;
+        }
+
+        .btn.active {
+            background: var(--accent);
+            color: #07131c;
+            border-color: transparent;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            margin-bottom: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .actions,
+        .sort-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .actions {
+            margin-top: 12px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .status.good {
+            color: var(--good);
+        }
+
+        .status.bad {
+            color: var(--bad);
+        }
+
+        .status.warn {
+            color: var(--warn);
+        }
+
+        .status.checking {
+            color: var(--muted);
+        }
+
+        .error-box {
+            display: none;
+            border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--border));
+            background: color-mix(in srgb, var(--bad) 10%, var(--panel));
+            color: var(--bad);
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-top: 12px;
+            white-space: pre-wrap;
+        }
+
+        .error-box.show {
+            display: block;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .stat {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            min-width: 0;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 800;
+        }
+
+        .stat-value {
+            margin-top: 3px;
+            font-size: 24px;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .note,
+        .footer-note {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .note {
+            margin-bottom: 10px;
+        }
+
+        .footer-note {
+            margin-top: 8px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            vertical-align: top;
+            padding: 10px 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        th {
+            border-top: 0;
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        th.number,
+        td.number {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        details {
+            margin-top: 8px;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: 800;
+        }
+
+        .verse-list {
+            margin: 8px 0 0;
+            padding-left: 22px;
+        }
+
+        .verse-list li {
+            margin-bottom: 10px;
+        }
+
+        .verse-meta {
+            display: block;
+            color: var(--muted);
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+
+        .problem-list {
+            color: var(--bad);
+            margin-top: 8px;
+        }
+
+        .sort-label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        @media (max-width: 560px) {
+            .page {
+                width: min(100% - 18px, 1180px);
+                padding-top: 16px;
+            }
+
+            .panel {
+                padding: 14px;
+            }
+
+            table {
+                min-width: 660px;
+            }
+
+            .utility-nav .btn {
+                flex: 1 1 auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="page">
+        <header>
+            <h1>BibloZoo Verse Stats</h1>
+            <p class="subhead">
+                Automatically analyze the verse JSON files in <code>verse_data</code> for verse length,
+                word length, and word frequency statistics.
+            </p>
+        </header>
+
+        <nav class="utility-nav" aria-label="BibloZoo utilities">
+            <button class="btn" type="button" onclick="location.href='./'">Verse Asset Tester</button>
+            <button class="btn active" type="button" aria-current="page">Verse Stats</button>
+        </nav>
+
+        <section class="panel">
+            <h2>Load verse statistics</h2>
+            <p class="note">
+                This page first asks GitHub for the JSON filenames currently in <code>/verse_data</code>,
+                excluding <code>verse_list.json</code>, then loads those files directly from BibloZoo.
+                If the GitHub directory lookup is unavailable, it falls back to <code>verse_list.json</code>.
+            </p>
+
+            <div class="actions">
+                <button class="btn primary" id="reloadButton" type="button">Reload verse stats</button>
+                <span class="status checking" id="status">Loading…</span>
+            </div>
+
+            <div class="error-box" id="errorBox"></div>
+        </section>
+
+        <section class="panel" id="overviewSection" hidden>
+            <h2>Overview</h2>
+            <div class="grid" id="overviewStats"></div>
+
+            <details id="problemFilesDetails" hidden>
+                <summary>Files skipped or missing valid verseText</summary>
+                <div class="problem-list" id="problemFiles"></div>
+            </details>
+        </section>
+
+        <section class="panel" id="verseStatsSection" hidden>
+            <h2>Verse word-count stats</h2>
+            <div class="grid" id="verseStats"></div>
+
+            <h3>Frequency list: verse word counts</h3>
+            <p class="note">Open any row to see exactly which verses have that word count.</p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="number">Word count</th>
+                            <th class="number">Number of verses</th>
+                            <th>Plain English and matching verses</th>
+                        </tr>
+                    </thead>
+                    <tbody id="verseFrequencyBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel" id="wordStatsSection" hidden>
+            <h2>Individual word-length stats</h2>
+            <div class="grid" id="wordStats"></div>
+
+            <h3>Frequency list: word lengths</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="number">Word length</th>
+                            <th class="number">Number of words</th>
+                            <th>Plain English</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wordLengthFrequencyBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel" id="wordFrequencySection" hidden>
+            <h2>Individual word frequency</h2>
+            <p class="note">This list uses the same normalized words as the word-length stats.</p>
+
+            <div class="sort-controls" aria-label="Word frequency sort controls">
+                <span class="sort-label">Sort words by:</span>
+                <button class="btn active" type="button" data-sort="alphabetical">Alphabetical</button>
+                <button class="btn" type="button" data-sort="frequency">Frequency</button>
+                <button class="btn" type="button" data-sort="length">Word length</button>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="number">Frequency</th>
+                            <th>Word</th>
+                            <th class="number">Length</th>
+                        </tr>
+                    </thead>
+                    <tbody id="wordFrequencyBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <p class="footer-note">
+            Counting rules match the original stats utility: capitalization does not matter; punctuation is ignored;
+            apostrophes are removed from contractions; hyphenated words count as one word and the hyphen is included
+            in word length. Nothing is uploaded.
+        </p>
+    </main>
+
+    <script>
+        (() => {
+            "use strict";
+
+            const DATA_DIR = "../verse_data/";
+            const GITHUB_VERSE_DATA_API =
+                "https://api.github.com/repos/andydoane/biblozoo/contents/verse_data?ref=main";
+
+            const reloadButton = document.getElementById("reloadButton");
+            const statusBox = document.getElementById("status");
+            const errorBox = document.getElementById("errorBox");
+
+            const overviewSection = document.getElementById("overviewSection");
+            const verseStatsSection = document.getElementById("verseStatsSection");
+            const wordStatsSection = document.getElementById("wordStatsSection");
+            const wordFrequencySection = document.getElementById("wordFrequencySection");
+
+            const overviewStats = document.getElementById("overviewStats");
+            const verseStats = document.getElementById("verseStats");
+            const wordStats = document.getElementById("wordStats");
+            const verseFrequencyBody = document.getElementById("verseFrequencyBody");
+            const wordLengthFrequencyBody = document.getElementById("wordLengthFrequencyBody");
+            const wordFrequencyBody = document.getElementById("wordFrequencyBody");
+            const problemFilesDetails = document.getElementById("problemFilesDetails");
+            const problemFiles = document.getElementById("problemFiles");
+
+            let currentWordFrequencyRows = [];
+            let currentWordSort = "alphabetical";
+
+            reloadButton.addEventListener("click", loadStats);
+
+            document.querySelectorAll("[data-sort]").forEach(button => {
+                button.addEventListener("click", () => {
+                    currentWordSort = button.dataset.sort;
+
+                    document.querySelectorAll("[data-sort]").forEach(item => {
+                        item.classList.toggle("active", item === button);
+                    });
+
+                    renderWordFrequencyTable(currentWordFrequencyRows, currentWordSort);
+                });
+            });
+
+            async function discoverVerseJsonFiles() {
+                try {
+                    const response = await fetch(GITHUB_VERSE_DATA_API, { cache: "no-store" });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const entries = await response.json();
+                    if (!Array.isArray(entries)) {
+                        throw new Error("GitHub directory response was not an array.");
+                    }
+
+                    const files = entries
+                        .filter(entry =>
+                            entry &&
+                            entry.type === "file" &&
+                            typeof entry.name === "string" &&
+                            entry.name.toLowerCase().endsWith(".json") &&
+                            entry.name !== "verse_list.json"
+                        )
+                        .map(entry => entry.name)
+                        .sort((a, b) => a.localeCompare(b));
+
+                    if (!files.length) {
+                        throw new Error("No verse JSON files were found.");
+                    }
+
+                    return {
+                        files,
+                        usedFallback: false
+                    };
+                } catch (apiError) {
+                    const response = await fetch(`${DATA_DIR}verse_list.json`, { cache: "no-store" });
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `GitHub directory lookup failed (${apiError.message || apiError}), ` +
+                            `and verse_list.json fallback failed (HTTP ${response.status}).`
+                        );
+                    }
+
+                    const list = await response.json();
+                    if (!Array.isArray(list)) {
+                        throw new Error("verse_list.json is not an array.");
+                    }
+
+                    return {
+                        files: list.map(verseId => `${verseId}.json`),
+                        usedFallback: true
+                    };
+                }
+            }
+
+            async function loadStats() {
+                clearResults();
+                showError("");
+                setStatus("checking", "Finding verse JSON files…");
+
+                try {
+                    const discovery = await discoverVerseJsonFiles();
+                    const files = discovery.files;
+
+                    setStatus("checking", `Loading ${files.length} verse JSON files…`);
+
+                    const results = await Promise.all(files.map(async fileName => {
+                        try {
+                            const response = await fetch(`${DATA_DIR}${encodeURIComponent(fileName)}`, {
+                                cache: "no-store"
+                            });
+
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                            return {
+                                ok: true,
+                                fileName,
+                                data: await response.json()
+                            };
+                        } catch (error) {
+                            return {
+                                ok: false,
+                                fileName,
+                                error: error.message || String(error)
+                            };
+                        }
+                    }));
+
+                    const verseWordCounts = [];
+                    const allWordLengths = [];
+                    const problemFileMessages = [];
+                    const verseRecordsByWordCount = new Map();
+                    const wordFrequencyMap = new Map();
+
+                    let parsedFileCount = 0;
+                    let validVerseCount = 0;
+
+                    for (const result of results) {
+                        if (!result.ok) {
+                            problemFileMessages.push(
+                                `${result.fileName}: could not load or parse JSON (${result.error})`
+                            );
+                            continue;
+                        }
+
+                        parsedFileCount++;
+                        const data = result.data;
+
+                        if (!data || typeof data.verseText !== "string" || !data.verseText.trim()) {
+                            problemFileMessages.push(
+                                `${result.fileName}: missing or empty verseText field`
+                            );
+                            continue;
+                        }
+
+                        const words = extractWords(data.verseText);
+
+                        if (!words.length) {
+                            problemFileMessages.push(
+                                `${result.fileName}: verseText did not contain any countable words`
+                            );
+                            continue;
+                        }
+
+                        validVerseCount++;
+                        const wordCount = words.length;
+                        verseWordCounts.push(wordCount);
+
+                        const verseRecord = {
+                            fileName: result.fileName,
+                            verseId:
+                                typeof data.verseId === "string" && data.verseId.trim()
+                                    ? data.verseId.trim()
+                                    : result.fileName.replace(/\.json$/i, ""),
+                            ref:
+                                typeof data.ref === "string" && data.ref.trim()
+                                    ? data.ref.trim()
+                                    : "",
+                            translation:
+                                typeof data.translation === "string" && data.translation.trim()
+                                    ? data.translation.trim()
+                                    : "",
+                            verseText: data.verseText,
+                            wordCount
+                        };
+
+                        if (!verseRecordsByWordCount.has(wordCount)) {
+                            verseRecordsByWordCount.set(wordCount, []);
+                        }
+
+                        verseRecordsByWordCount.get(wordCount).push(verseRecord);
+
+                        for (const word of words) {
+                            allWordLengths.push(word.length);
+                            wordFrequencyMap.set(word, (wordFrequencyMap.get(word) || 0) + 1);
+                        }
+                    }
+
+                    if (!validVerseCount) {
+                        renderProblemFiles(problemFileMessages);
+                        throw new Error("No valid verseText fields were found in the verse JSON files.");
+                    }
+
+                    currentWordFrequencyRows = Array.from(wordFrequencyMap.entries()).map(
+                        ([word, frequency]) => ({
+                            word,
+                            frequency,
+                            length: word.length
+                        })
+                    );
+
+                    renderStats(overviewStats, [
+                        ["Verse JSON files found", files.length],
+                        ["Files parsed as JSON", parsedFileCount],
+                        ["Valid verseText fields", validVerseCount],
+                        ["Skipped/problem files", files.length - validVerseCount],
+                        ["Total words counted", allWordLengths.length],
+                        ["Unique words counted", currentWordFrequencyRows.length]
+                    ]);
+
+                    renderStats(verseStats, [
+                        ["Average words per verse", formatNumber(average(verseWordCounts))],
+                        ["Median words per verse", formatNumber(median(verseWordCounts))],
+                        ["Shortest verse word count", Math.min(...verseWordCounts)],
+                        ["Longest verse word count", Math.max(...verseWordCounts)]
+                    ]);
+
+                    renderStats(wordStats, [
+                        ["Average individual word length", formatNumber(average(allWordLengths))],
+                        ["Median individual word length", formatNumber(median(allWordLengths))],
+                        ["Shortest word length", Math.min(...allWordLengths)],
+                        ["Longest word length", Math.max(...allWordLengths)]
+                    ]);
+
+                    renderVerseFrequencyTable({
+                        frequencyMap: makeFrequencyMap(verseWordCounts),
+                        recordsByWordCount: verseRecordsByWordCount
+                    });
+
+                    renderFrequencyTable({
+                        tbody: wordLengthFrequencyBody,
+                        frequencyMap: makeFrequencyMap(allWordLengths),
+                        labelSingular: "word",
+                        labelPlural: "words",
+                        unitSingular: "letter",
+                        unitPlural: "letters"
+                    });
+
+                    currentWordSort = "alphabetical";
+
+                    document.querySelectorAll("[data-sort]").forEach(button => {
+                        button.classList.toggle("active", button.dataset.sort === currentWordSort);
+                    });
+
+                    renderWordFrequencyTable(currentWordFrequencyRows, currentWordSort);
+                    renderProblemFiles(problemFileMessages);
+
+                    overviewSection.hidden = false;
+                    verseStatsSection.hidden = false;
+                    wordStatsSection.hidden = false;
+                    wordFrequencySection.hidden = false;
+
+                    setStatus(
+                        discovery.usedFallback ? "warn" : "good",
+                        `Analyzed ${validVerseCount} verses from ${files.length} JSON files` +
+                        (discovery.usedFallback ? " (using verse_list.json fallback)." : ".")
+                    );
+                } catch (error) {
+                    setStatus("bad", "Verse stats could not be loaded.");
+                    showError(error.message || String(error));
+                }
+            }
+
+            function clearResults() {
+                overviewSection.hidden = true;
+                verseStatsSection.hidden = true;
+                wordStatsSection.hidden = true;
+                wordFrequencySection.hidden = true;
+
+                overviewStats.innerHTML = "";
+                verseStats.innerHTML = "";
+                wordStats.innerHTML = "";
+                verseFrequencyBody.innerHTML = "";
+                wordLengthFrequencyBody.innerHTML = "";
+                wordFrequencyBody.innerHTML = "";
+                problemFiles.innerHTML = "";
+                problemFilesDetails.hidden = true;
+
+                currentWordFrequencyRows = [];
+                currentWordSort = "alphabetical";
+            }
+
+            function extractWords(text) {
+                return text
+                    .toLowerCase()
+                    .match(/[a-z0-9]+(?:['’][a-z0-9]+)*(?:-[a-z0-9]+)*/gi)
+                    ?.map(word => word.replace(/['’]/g, "")) || [];
+            }
+
+            function average(numbers) {
+                if (!numbers.length) return 0;
+                return numbers.reduce((sum, value) => sum + value, 0) / numbers.length;
+            }
+
+            function median(numbers) {
+                if (!numbers.length) return 0;
+
+                const sorted = [...numbers].sort((a, b) => a - b);
+                const middle = Math.floor(sorted.length / 2);
+
+                if (sorted.length % 2 === 1) return sorted[middle];
+                return (sorted[middle - 1] + sorted[middle]) / 2;
+            }
+
+            function makeFrequencyMap(numbers) {
+                const map = new Map();
+
+                for (const number of numbers) {
+                    map.set(number, (map.get(number) || 0) + 1);
+                }
+
+                return map;
+            }
+
+            function renderStats(container, items) {
+                container.innerHTML = items.map(([label, value]) => `
+      <div class="stat">
+        <div class="stat-label">${escapeHtml(label)}</div>
+        <div class="stat-value">${escapeHtml(value)}</div>
+      </div>
+    `).join("");
+            }
+
+            function renderVerseFrequencyTable({ frequencyMap, recordsByWordCount }) {
+                const rows = Array.from(frequencyMap.entries()).sort((a, b) => a[0] - b[0]);
+
+                verseFrequencyBody.innerHTML = rows.map(([wordCount, verseCount]) => {
+                    const itemLabel = verseCount === 1 ? "verse" : "verses";
+                    const unitLabel = wordCount === 1 ? "word" : "words";
+
+                    const records = [...(recordsByWordCount.get(wordCount) || [])]
+                        .sort((a, b) =>
+                            (a.ref || a.verseId).localeCompare(b.ref || b.verseId) ||
+                            a.fileName.localeCompare(b.fileName)
+                        );
+
+                    return `
+        <tr>
+          <td class="number">${wordCount}</td>
+          <td class="number">${verseCount}</td>
+          <td>
+            <div>
+              There ${verseCount === 1 ? "is" : "are"} ${verseCount}
+              ${itemLabel} with ${wordCount} ${unitLabel}.
+            </div>
+
+            <details>
+              <summary>Show matching ${itemLabel}</summary>
+              <ol class="verse-list">
+                ${records.map(record => `
+                  <li>
+                    <span class="verse-meta">${escapeHtml(formatVerseLabel(record))}</span>
+                    <span>${escapeHtml(record.verseText)}</span>
+                  </li>
+                `).join("")}
+              </ol>
+            </details>
+          </td>
+        </tr>
+      `;
+                }).join("");
+            }
+
+            function renderFrequencyTable({
+                tbody,
+                frequencyMap,
+                labelSingular,
+                labelPlural,
+                unitSingular,
+                unitPlural
+            }) {
+                const rows = Array.from(frequencyMap.entries()).sort((a, b) => a[0] - b[0]);
+
+                tbody.innerHTML = rows.map(([value, count]) => {
+                    const itemLabel = count === 1 ? labelSingular : labelPlural;
+                    const unitLabel = value === 1 ? unitSingular : unitPlural;
+
+                    return `
+        <tr>
+          <td class="number">${value}</td>
+          <td class="number">${count}</td>
+          <td>
+            There ${count === 1 ? "is" : "are"} ${count}
+            ${itemLabel} with ${value} ${unitLabel}.
+          </td>
+        </tr>
+      `;
+                }).join("");
+            }
+
+            function renderWordFrequencyTable(rows, sortMode) {
+                const sortedRows = [...rows];
+
+                if (sortMode === "frequency") {
+                    sortedRows.sort(
+                        (a, b) => b.frequency - a.frequency || a.word.localeCompare(b.word)
+                    );
+                } else if (sortMode === "length") {
+                    sortedRows.sort(
+                        (a, b) => a.length - b.length || a.word.localeCompare(b.word)
+                    );
+                } else {
+                    sortedRows.sort((a, b) => a.word.localeCompare(b.word));
+                }
+
+                wordFrequencyBody.innerHTML = sortedRows.map(row => `
+      <tr>
+        <td class="number">${row.frequency}</td>
+        <td>${escapeHtml(row.word)}</td>
+        <td class="number">${row.length}</td>
+      </tr>
+    `).join("");
+            }
+
+            function renderProblemFiles(messages) {
+                if (!messages.length) {
+                    problemFilesDetails.hidden = true;
+                    problemFiles.innerHTML = "";
+                    return;
+                }
+
+                problemFilesDetails.hidden = false;
+                problemFiles.innerHTML = `
+      <ul>
+        ${messages.map(message => `<li>${escapeHtml(message)}</li>`).join("")}
+      </ul>
+    `;
+            }
+
+            function formatVerseLabel(record) {
+                const pieces = [record.ref || record.verseId];
+
+                if (record.translation) pieces.push(record.translation);
+                pieces.push(record.fileName);
+
+                return pieces.join(" • ");
+            }
+
+            function formatNumber(number) {
+                return Number.isInteger(number) ? String(number) : number.toFixed(2);
+            }
+
+            function setStatus(state, message) {
+                statusBox.className = `status ${state}`;
+                statusBox.textContent = message;
+            }
+
+            function showError(message) {
+                errorBox.textContent = message || "";
+                errorBox.classList.toggle("show", Boolean(message));
+            }
+
+            function escapeHtml(value) {
+                return String(value ?? "")
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;");
+            }
+
+            loadStats();
+        })();
+    </script>
+</body>
+
+</html>
