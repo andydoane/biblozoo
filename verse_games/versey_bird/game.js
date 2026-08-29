@@ -185,12 +185,23 @@
   const VERSE_PAIR_BEE_LEAD_SPAWN_U = 0.8;
 
   const HALFWAY_NAP_MIN_WORDS = 25;
+
+  const HALFWAY_NAP_BLACK_FADE_MS = 320;
+  const HALFWAY_NAP_BLACK_HOLD_MS = 140;
+  const HALFWAY_NAP_SCENE_FADE_MS = 420;
+
   const HALFWAY_NAP_REST_MS = 4000;
   const HALFWAY_NAP_TAP_COOLDOWN_MS = 450;
   const HALFWAY_NAP_REQUIRED_TAPS = 3;
   const HALFWAY_NAP_WAKE_HOLD_MS = 1500;
-  const HALFWAY_NAP_FADE_MS = 360;
+  const HALFWAY_NAP_FADE_MS = 420;
+
+  const HALFWAY_NAP_Z_FIRST_DELAY_MS = 650;
+  const HALFWAY_NAP_Z_GAP_MIN_MS = 2100;
+  const HALFWAY_NAP_Z_GAP_RANDOM_MS = 1000;
+
   const BONUS_INTRO_AFTER_FINAL_CLOUD_MS = 850;
+  const BONUS_SCORE_PREP_LEAD_MS = 250;
   const HALFWAY_NAP_SLEEP_IMAGE =
     "versey_bird_sleeping.png";
   const HALFWAY_NAP_AWAKE_IMAGE =
@@ -296,6 +307,7 @@
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
   const halfwayNapImagePreloads = [];
+  let halfwayNapBonusWarmupStarted = false;
 
   const adaptiveRenderState = {
     mode: "60fps",
@@ -705,6 +717,14 @@
             alt="Versey Bird sleeping in a nest"
           >
 
+          <span
+            class="vb2-nap-z"
+            id="vb2NapZ"
+            aria-hidden="true"
+          >
+            Z
+          </span>
+
           <div
             class="vb2-nap-message"
             id="vb2NapMessage"
@@ -722,8 +742,75 @@
     `;
   }
 
-  function renderHalfwayNapInterlude(
-    checkpoint
+  function startHalfwayNapZAnimation(
+    z
+  ) {
+    if (!z) {
+      return () => { };
+    }
+
+    let stopped = false;
+    let timerId = 0;
+
+    const run = () => {
+      if (
+        stopped ||
+        !document.body.contains(z)
+      ) {
+        return;
+      }
+
+      z.style.setProperty(
+        "--z-drift",
+        `${Math.round(
+          randomBetween(-8, 12)
+        )}px`
+      );
+
+      z.classList.remove(
+        "is-floating"
+      );
+
+      void z.offsetWidth;
+
+      z.classList.add(
+        "is-floating"
+      );
+
+      timerId =
+        window.setTimeout(
+          run,
+          HALFWAY_NAP_Z_GAP_MIN_MS +
+          Math.random() *
+          HALFWAY_NAP_Z_GAP_RANDOM_MS
+        );
+    };
+
+    timerId =
+      window.setTimeout(
+        run,
+        HALFWAY_NAP_Z_FIRST_DELAY_MS
+      );
+
+    return () => {
+      stopped = true;
+
+      window.clearTimeout(
+        timerId
+      );
+
+      z.classList.remove(
+        "is-floating"
+      );
+
+      z.style.opacity = "0";
+    };
+  }
+
+
+  async function renderHalfwayNapInterlude(
+    checkpoint,
+    imagesReady = Promise.resolve()
   ) {
     stopLoop();
     cleanupResize();
@@ -731,13 +818,49 @@
     state.field = null;
     state.phase = "nap";
 
+    let blackout =
+      document.getElementById(
+        "vb2ReloadFirstPaint"
+      );
+
+    if (!blackout) {
+      blackout =
+        document.createElement(
+          "div"
+        );
+
+      blackout.id =
+        "vb2ReloadFirstPaint";
+
+      blackout.className =
+        "vb2-reload-first-paint";
+
+      blackout.setAttribute(
+        "aria-hidden",
+        "true"
+      );
+
+      app.appendChild(
+        blackout
+      );
+    }
+
+    try {
+      await imagesReady;
+    } catch (err) {
+      // The normal image elements can
+      // still load as a fallback.
+    }
+
     if (
       !document.getElementById(
         "vb2NapScreen"
       )
     ) {
-      app.innerHTML =
-        halfwayNapScreenHtml();
+      app.insertAdjacentHTML(
+        "beforeend",
+        halfwayNapScreenHtml()
+      );
     }
 
     const screen =
@@ -760,6 +883,11 @@
         "vb2NapMessage"
       );
 
+    const z =
+      document.getElementById(
+        "vb2NapZ"
+      );
+
     if (
       !screen ||
       !target ||
@@ -776,6 +904,53 @@
     let wakeReady = false;
     let tapCount = 0;
     let lastAcceptedTapAt = 0;
+    let stopZAnimation =
+      () => { };
+
+    await new Promise(resolve => {
+      window.setTimeout(
+        resolve,
+        HALFWAY_NAP_BLACK_HOLD_MS
+      );
+    });
+
+    requestAnimationFrame(() => {
+      screen.classList.add(
+        "is-visible"
+      );
+
+      blackout.classList.add(
+        "is-leaving"
+      );
+    });
+
+    window.setTimeout(
+      () => {
+        blackout.remove();
+
+        document.documentElement
+          .classList.remove(
+            "vb2-midpoint-black"
+          );
+
+        recordHalfwayNapDiagnosticEvent(
+          "nap-visible"
+        );
+      },
+      HALFWAY_NAP_SCENE_FADE_MS +
+      80
+    );
+
+    stopZAnimation =
+      startHalfwayNapZAnimation(z);
+
+    window.setTimeout(
+      () => {
+        void warmHalfwayNapBonusAssets();
+      },
+      HALFWAY_NAP_SCENE_FADE_MS +
+      300
+    );
 
     window.setTimeout(
       () => {
@@ -804,6 +979,7 @@
           </span>
         `;
       },
+      HALFWAY_NAP_SCENE_FADE_MS +
       HALFWAY_NAP_REST_MS
     );
 
@@ -835,7 +1011,7 @@
 
         const tapSound =
           tapCount >=
-          HALFWAY_NAP_REQUIRED_TAPS
+            HALFWAY_NAP_REQUIRED_TAPS
             ? "streak"
             : "correct";
 
@@ -872,7 +1048,7 @@
         wakeReady = false;
         target.disabled = true;
 
-        void preloadBirdSvg();
+        stopZAnimation();
 
         bird.src =
           `${IMAGE_PATH}` +
@@ -916,6 +1092,7 @@
       }
     );
   }
+
 
   function beginHalfwayNapExit() {
     if (
@@ -1039,34 +1216,58 @@
 
     state.phase = "napReload";
 
-    saveDiagnosticHeartbeat(
-      performance.now(),
-      true
-    );
-
     recordHalfwayNapDiagnosticEvent(
-      "reload-start"
+      "blackout-start"
     );
 
     stopLoop();
     cleanupResize();
-    clearVerseyBirdLayerNodePools();
 
-    state.field = null;
+    const blackout =
+      document.createElement(
+        "div"
+      );
 
-    app.innerHTML =
-      halfwayNapScreenHtml();
+    blackout.className =
+      "vb2-nap-blackout";
 
-    requestAnimationFrame(
-      () => {
-        requestAnimationFrame(
-          () => {
-            window.location.reload();
-          }
-        );
-      }
+    blackout.setAttribute(
+      "aria-hidden",
+      "true"
     );
+
+    app.appendChild(
+      blackout
+    );
+
+    requestAnimationFrame(() => {
+      blackout.classList.add(
+        "is-visible"
+      );
+
+      window.setTimeout(
+        () => {
+          saveDiagnosticHeartbeat(
+            performance.now(),
+            true
+          );
+
+          recordHalfwayNapDiagnosticEvent(
+            "reload-start"
+          );
+
+          clearVerseyBirdLayerNodePools();
+
+          state.field = null;
+
+          window.location.reload();
+        },
+        HALFWAY_NAP_BLACK_FADE_MS +
+        HALFWAY_NAP_BLACK_HOLD_MS
+      );
+    });
   }
+
 
 
   const state = {
@@ -1146,7 +1347,9 @@
 
   setupReferenceSegments();
   installDiagnosticErrorHandlers();
-  preloadHalfwayNapImages();
+
+  const halfwayNapImagesReady =
+    preloadHalfwayNapImages();
 
   const halfwayNapCheckpoint =
     readHalfwayNapCheckpoint();
@@ -1168,8 +1371,9 @@
       selectedMode
     );
 
-    renderHalfwayNapInterlude(
-      halfwayNapCheckpoint
+    void renderHalfwayNapInterlude(
+      halfwayNapCheckpoint,
+      halfwayNapImagesReady
     );
   } else {
     ensureSilenceAudio();
@@ -4499,17 +4703,46 @@
           getCurrentPhase() ===
           "done"
         ) {
-          window.setTimeout(
+          const bonusStillReady =
             () => {
-              if (
+              return (
                 state.phase ===
                   "verse" &&
                 getCurrentPhase() ===
                   "done" &&
                 !hasActiveVerseClouds()
+              );
+            };
+
+          const scorePrepDelay =
+            Math.max(
+              0,
+              BONUS_INTRO_AFTER_FINAL_CLOUD_MS -
+                BONUS_SCORE_PREP_LEAD_MS
+            );
+
+          window.setTimeout(
+            () => {
+              if (
+                !bonusStillReady()
               ) {
-                enterBonusIntroPhase();
+                return;
               }
+
+              renderBonusScoreBuild();
+            },
+            scorePrepDelay
+          );
+
+          window.setTimeout(
+            () => {
+              if (
+                !bonusStillReady()
+              ) {
+                return;
+              }
+
+              enterBonusIntroPhase();
             },
             BONUS_INTRO_AFTER_FINAL_CLOUD_MS
           );
@@ -5616,12 +5849,27 @@
     }
 
     if (state.phase === "bonusIntro"){
-      const elapsed = (ts - state.phaseStartedAt) / 1000;
-      layer.innerHTML = BONUS_WORDS.map((word, index) => renderFlyingIntroWord(BONUS_WORDS, word, index, elapsed)).join("");
+      const elapsed =
+        (
+          ts -
+          state.phaseStartedAt
+        ) /
+        1000;
+
+      renderBonusFlyingWords(
+        layer,
+        elapsed
+      );
+
       return;
     }
 
-    layer.innerHTML = "";
+    if (layer.childElementCount) {
+      layer.innerHTML = "";
+    }
+
+    delete layer.dataset
+      .vb2BonusBuilt;
   }
 
   function isFlyingMessageComplete(words, elapsed) {
@@ -5658,32 +5906,227 @@
     return offset;
   }
 
-  function renderFlyingIntroWord(words, word, index, elapsed) {
-    const layout = state.layout;
-    const t = elapsed - word.delay;
-    const travel = FLYING_WORD_TRAVEL_SECONDS;
-    const size = clamp(layout.unit * 0.42, 18, 34);
-    const wordW = getFlyingWordWidth(word, size);
-    const lineOffset = getFlyingWordLineOffset(words, index, size);
-    const startX = layout.width + wordW * 0.5 + layout.unit * 0.65 + lineOffset;
-    const endX = -(wordW * 0.5 + layout.unit * 0.25);
-    const progress = clamp(t / travel, 0, 1);
-    const x = startX + (endX - startX) * progress;
-    const baseY = word.line === 0
-      ? layout.playTop + (layout.playBottom - layout.playTop) * 0.32
-      : layout.playTop + (layout.playBottom - layout.playTop) * 0.60;
-    const y = baseY + Math.sin((t * 5.4) + index) * layout.unit * 0.18;
-    const tilt = Math.sin((t * 4.2) + index) * 5;
-    const opacity = t < 0 || t > travel ? 0 : 1;
+  function getFlyingWordFrame(
+    words,
+    word,
+    index,
+    elapsed
+  ) {
+    const layout =
+      state.layout;
 
-    const phraseClass = word.line === 0 ? " is-first-phrase" : " is-second-phrase";
+    const t =
+      elapsed - word.delay;
+
+    const travel =
+      FLYING_WORD_TRAVEL_SECONDS;
+
+    const size =
+      clamp(
+        layout.unit * 0.42,
+        18,
+        34
+      );
+
+    const wordW =
+      getFlyingWordWidth(
+        word,
+        size
+      );
+
+    const lineOffset =
+      getFlyingWordLineOffset(
+        words,
+        index,
+        size
+      );
+
+    const startX =
+      layout.width +
+      wordW * 0.5 +
+      layout.unit * 0.65 +
+      lineOffset;
+
+    const endX =
+      -(
+        wordW * 0.5 +
+        layout.unit * 0.25
+      );
+
+    const progress =
+      clamp(
+        t / travel,
+        0,
+        1
+      );
+
+    const x =
+      startX +
+      (
+        endX - startX
+      ) *
+      progress;
+
+    const baseY =
+      word.line === 0
+        ? layout.playTop +
+        (
+          layout.playBottom -
+          layout.playTop
+        ) *
+        0.32
+        : layout.playTop +
+        (
+          layout.playBottom -
+          layout.playTop
+        ) *
+        0.60;
+
+    const y =
+      baseY +
+      Math.sin(
+        t * 5.4 +
+        index
+      ) *
+      layout.unit *
+      0.18;
+
+    const tilt =
+      Math.sin(
+        t * 4.2 +
+        index
+      ) *
+      5;
+
+    const opacity =
+      t < 0 ||
+        t > travel
+        ? 0
+        : 1;
+
+    const phraseClass =
+      word.line === 0
+        ? " is-first-phrase"
+        : " is-second-phrase";
+
+    return {
+      x,
+      y,
+      tilt,
+      size,
+      opacity,
+      phraseClass
+    };
+  }
+
+  function renderFlyingIntroWord(
+    words,
+    word,
+    index,
+    elapsed
+  ) {
+    const frame =
+      getFlyingWordFrame(
+        words,
+        word,
+        index,
+        elapsed
+      );
 
     return `
-      <div class="vb2-flying-word${phraseClass}" style="--x:${x}px; --y:${y}px; --tilt:${tilt}deg; --size:${size}px; opacity:${opacity};">
+      <div
+        class="vb2-flying-word${frame.phraseClass}"
+        style="
+          --x:${frame.x}px;
+          --y:${frame.y}px;
+          --tilt:${frame.tilt}deg;
+          --size:${frame.size}px;
+          opacity:${frame.opacity};
+        "
+      >
         ${escapeHtml(word.text)}
       </div>
     `;
   }
+
+  function renderBonusFlyingWords(
+    layer,
+    elapsed
+  ) {
+    if (
+      layer.dataset.vb2BonusBuilt !==
+      "1"
+    ) {
+      layer.innerHTML =
+        BONUS_WORDS.map(
+          (word, index) => {
+            const phraseClass =
+              word.line === 0
+                ? " is-first-phrase"
+                : " is-second-phrase";
+
+            return `
+              <div
+                class="vb2-flying-word${phraseClass}"
+                data-vb2-bonus-word="${index}"
+                style="opacity:0;"
+              >
+                ${escapeHtml(word.text)}
+              </div>
+            `;
+          }
+        ).join("");
+
+      layer.dataset.vb2BonusBuilt =
+        "1";
+    }
+
+    const nodes =
+      layer.querySelectorAll(
+        "[data-vb2-bonus-word]"
+      );
+
+    BONUS_WORDS.forEach(
+      (word, index) => {
+        const node =
+          nodes[index];
+
+        if (!node) return;
+
+        const frame =
+          getFlyingWordFrame(
+            BONUS_WORDS,
+            word,
+            index,
+            elapsed
+          );
+
+        node.style.setProperty(
+          "--x",
+          `${frame.x}px`
+        );
+
+        node.style.setProperty(
+          "--y",
+          `${frame.y}px`
+        );
+
+        node.style.setProperty(
+          "--tilt",
+          `${frame.tilt}deg`
+        );
+
+        node.style.setProperty(
+          "--size",
+          `${frame.size}px`
+        );
+
+        node.style.opacity =
+          `${frame.opacity}`;
+      }
+    );
+  }
+
 
   function renderFlash(ts){
     const flash = document.getElementById("vb2Flash");
@@ -5948,41 +6391,184 @@
     state.flashUntil = performance.now() + ms;
   }
 
+  function preloadDecodedImageAsset(
+    filename
+  ) {
+    const image = new Image();
+
+    halfwayNapImagePreloads.push(
+      image
+    );
+
+    image.decoding = "async";
+
+    return new Promise(resolve => {
+      let settled = false;
+
+      const finish = success => {
+        if (settled) return;
+
+        settled = true;
+        resolve(success);
+      };
+
+      image.onload = async () => {
+        if (
+          typeof image.decode ===
+          "function"
+        ) {
+          try {
+            await image.decode();
+          } catch (err) {
+            // The loaded image is still
+            // usable if decode() rejects.
+          }
+        }
+
+        finish(true);
+      };
+
+      image.onerror = () => {
+        finish(false);
+      };
+
+      image.src =
+        `${IMAGE_PATH}${filename}`;
+
+      if (
+        image.complete &&
+        image.naturalWidth > 0
+      ) {
+        if (
+          typeof image.decode ===
+          "function"
+        ) {
+          image.decode()
+            .then(
+              () => finish(true)
+            )
+            .catch(
+              () => finish(true)
+            );
+        } else {
+          finish(true);
+        }
+      }
+    });
+  }
+
   function preloadHalfwayNapImages() {
     if (
       state.words.length <
       HALFWAY_NAP_MIN_WORDS
     ) {
+      return Promise.resolve([]);
+    }
+
+    return Promise.all([
+      preloadDecodedImageAsset(
+        HALFWAY_NAP_SLEEP_IMAGE
+      ),
+      preloadDecodedImageAsset(
+        HALFWAY_NAP_AWAKE_IMAGE
+      )
+    ]);
+  }
+
+  async function warmBonusDisplayFont() {
+    if (
+      !document.fonts ||
+      typeof document.fonts.load !==
+      "function"
+    ) {
       return;
     }
 
-    const filenames = [
-      HALFWAY_NAP_SLEEP_IMAGE,
-      HALFWAY_NAP_AWAKE_IMAGE
-    ];
-
-    for (const filename of filenames) {
-      const image = new Image();
-
-      image.decoding = "async";
-      image.src =
-        `${IMAGE_PATH}${filename}`;
-
-      halfwayNapImagePreloads.push(
-        image
+    try {
+      await document.fonts.load(
+        '34px "VB2 Titan One"',
+        "BONUS ROUND WATCH OUT FOR THE PIPES"
       );
 
-      if (
-        typeof image.decode ===
-        "function"
-      ) {
-        image.decode().catch(() => {
-          // Loading normally later is
-          // still a safe fallback.
-        });
-      }
+      const probe =
+        document.createElement(
+          "span"
+        );
+
+      probe.textContent =
+        "BONUS ROUND WATCH OUT FOR THE PIPES";
+
+      probe.style.position =
+        "fixed";
+
+      probe.style.left =
+        "-10000px";
+
+      probe.style.top =
+        "-10000px";
+
+      probe.style.whiteSpace =
+        "nowrap";
+
+      probe.style.fontFamily =
+        '"VB2 Titan One"';
+
+      probe.style.fontSize =
+        "34px";
+
+      probe.style.lineHeight =
+        "1";
+
+      document.body.appendChild(
+        probe
+      );
+
+      void probe.getBoundingClientRect();
+
+      probe.remove();
+    } catch (err) {
+      // Bonus can still load normally.
     }
   }
+
+  async function warmHalfwayNapBonusAssets() {
+    if (
+      halfwayNapBonusWarmupStarted
+    ) {
+      return;
+    }
+
+    halfwayNapBonusWarmupStarted = true;
+
+    await waitForImagePrefetchTurn(
+      300
+    );
+
+    await warmBonusDisplayFont();
+
+    await waitForImagePrefetchTurn(
+      250
+    );
+
+    await preloadDecodedImageAsset(
+      "versey_bird_score_pipe.png"
+    );
+
+    await waitForImagePrefetchTurn(
+      250
+    );
+
+    await preloadDecodedImageAsset(
+      "versey_bird_pipe_cap.svg"
+    );
+
+    await waitForImagePrefetchTurn(
+      250
+    );
+
+    await preloadBirdSvg();
+  }
+
 
 
   function waitForImagePrefetchTurn(
@@ -6169,32 +6755,102 @@
   }
 
   function renderBonusScoreBuild() {
-    const el = document.getElementById("vb2BuildText");
-    const build = document.getElementById("vb2Build");
+    const el =
+      document.getElementById(
+        "vb2BuildText"
+      );
+
+    const build =
+      document.getElementById(
+        "vb2Build"
+      );
+
     if (!el) return;
 
-    const buildH = build ? build.getBoundingClientRect().height : 72;
-    const pipeH = clamp(buildH - 8, 42, 74);
-    const fontSize = pipeH * 0.75;
+    const buildH =
+      build
+        ? build
+          .getBoundingClientRect()
+          .height
+        : 72;
 
-    el.className = "vb2-build-text vm-build-text vb2-bonus-score-build";
-    el.innerHTML = `
-      <div class="vb2-bonus-pipe-score"
-           style="
-             --bonus-pipe-h:${pipeH}px;
-             --bonus-score-font:${fontSize}px;
-           "
-           aria-label="Pipes cleared ${state.pipesCleared}">
-        <img
-          class="vb2-bonus-pipe-score-img"
-          src="${IMAGE_PATH}versey_bird_score_pipe.png"
-          alt=""
-          aria-hidden="true"
+    const pipeH =
+      clamp(
+        buildH - 8,
+        42,
+        74
+      );
+
+    const fontSize =
+      pipeH * 0.75;
+
+    el.className =
+      "vb2-build-text " +
+      "vm-build-text " +
+      "vb2-bonus-score-build";
+
+    let score =
+      el.querySelector(
+        ".vb2-bonus-pipe-score"
+      );
+
+    if (!score) {
+      el.innerHTML = `
+        <div
+          class="vb2-bonus-pipe-score"
+          aria-label="Pipes cleared 0"
         >
-        <div class="vb2-bonus-pipe-score-number">${state.pipesCleared}</div>
-      </div>
-    `;
+          <img
+            class="vb2-bonus-pipe-score-img"
+            src="${IMAGE_PATH}versey_bird_score_pipe.png"
+            alt=""
+            aria-hidden="true"
+          >
+
+          <div
+            class="vb2-bonus-pipe-score-number"
+          >
+            0
+          </div>
+        </div>
+      `;
+
+      score =
+        el.querySelector(
+          ".vb2-bonus-pipe-score"
+        );
+    }
+
+    if (!score) return;
+
+    score.style.setProperty(
+      "--bonus-pipe-h",
+      `${pipeH}px`
+    );
+
+    score.style.setProperty(
+      "--bonus-score-font",
+      `${fontSize}px`
+    );
+
+    score.setAttribute(
+      "aria-label",
+      `Pipes cleared ${state.pipesCleared}`
+    );
+
+    const number =
+      score.querySelector(
+        ".vb2-bonus-pipe-score-number"
+      );
+
+    if (number) {
+      number.textContent =
+        String(
+          state.pipesCleared
+        );
+    }
   }
+
 
 
   function updateBuildText(){

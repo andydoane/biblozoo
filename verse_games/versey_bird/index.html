@@ -6,11 +6,21 @@
   <meta name="theme-color" content="#333333">
   <title>Versey Bird</title>
 
-  <link rel="stylesheet" href="../shared/shell.css">
-  <link rel="stylesheet" href="./game.css">
-</head>
-<body>
-  <div id="app" class="vm-shell"></div>
+  <style>
+    html.vb2-midpoint-black,
+    html.vb2-midpoint-black body,
+    html.vb2-midpoint-black #app {
+      background: #000000 !important;
+      background-color: #000000 !important;
+    }
+
+    .vb2-reload-first-paint {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      background: #000000;
+    }
+  </style>
 
   <script>
     (function () {
@@ -38,54 +48,53 @@
           );
 
         if (
-          !checkpoint ||
-          checkpoint.stage !== "nap" ||
-          checkpoint.verseId !== verseId ||
-          ageMs < 0 ||
-          ageMs > 30 * 60 * 1000
+          checkpoint &&
+          checkpoint.version === 1 &&
+          checkpoint.stage === "nap" &&
+          checkpoint.verseId === verseId &&
+          ageMs >= 0 &&
+          ageMs <= 30 * 60 * 1000
         ) {
-          return;
+          document.documentElement
+            .classList.add(
+              "vb2-midpoint-black"
+            );
         }
-
-        const app =
-          document.getElementById("app");
-
-        if (!app) return;
-
-        app.innerHTML = `
-          <div
-            class="vb2-nap-screen"
-            id="vb2NapScreen"
-          >
-            <button
-              class="vb2-nap-tap-target"
-              id="vb2NapTapTarget"
-              type="button"
-              aria-label="Versey Bird is sleeping"
-              disabled
-            >
-              <img
-                class="vb2-nap-bird"
-                id="vb2NapBird"
-                src="./versey_bird_images/versey_bird_sleeping.png"
-                alt="Versey Bird sleeping in a nest"
-              >
-
-              <div
-                class="vb2-nap-message"
-                id="vb2NapMessage"
-                aria-live="polite"
-              >
-                <span>This is a long verse!</span>
-                <span>Versey Bird needs a quick nap!</span>
-              </div>
-            </button>
-          </div>
-        `;
       } catch (err) {
-        // Normal game startup will
-        // handle any invalid state.
+        // Normal startup can continue.
       }
+    })();
+  </script>
+
+  <link rel="stylesheet" href="../shared/shell.css">
+  <link rel="stylesheet" href="./game.css">
+</head>
+<body>
+  <div id="app" class="vm-shell"></div>
+
+  <script>
+    (function () {
+      if (
+        !document.documentElement
+          .classList.contains(
+            "vb2-midpoint-black"
+          )
+      ) {
+        return;
+      }
+
+      const app =
+        document.getElementById("app");
+
+      if (!app) return;
+
+      app.innerHTML = `
+          <div
+            class="vb2-reload-first-paint"
+            id="vb2ReloadFirstPaint"
+            aria-hidden="true"
+          ></div>
+        `;
     })();
   </script>
 

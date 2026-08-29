@@ -645,12 +645,37 @@ body{
   cursor: pointer;
 }
 
+.vb2-nap-blackout {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 320ms ease;
+}
+
+.vb2-nap-blackout.is-visible {
+  opacity: 1;
+}
+
+.vb2-reload-first-paint {
+  transition:
+    opacity 420ms ease;
+}
+
+.vb2-reload-first-paint.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .vb2-nap-screen {
   position: fixed;
   inset: 0;
   z-index: 1000;
   overflow: hidden;
-  opacity: 1;
+  opacity: 0;
   background:
     linear-gradient(to bottom,
       #40b9c5 0%,
@@ -658,7 +683,11 @@ body{
       #a7cb6f 33.333%,
       #a7cb6f 100%);
   transition:
-    opacity 360ms ease;
+    opacity 420ms ease;
+}
+
+.vb2-nap-screen.is-visible {
+  opacity: 1;
 }
 
 .vb2-nap-screen.is-leaving {
@@ -704,6 +733,63 @@ body{
   transform-origin: center;
   pointer-events: none;
   user-select: none;
+}
+
+.vb2-nap-z {
+  position: absolute;
+  z-index: 2;
+  left:
+    calc(50% + min(16vw, 118px));
+  top:
+    max(6dvh,
+      calc(env(safe-area-inset-top) + 28px));
+  color: #7f66c6;
+  font-family:
+    var(--vb2-body-font);
+  font-size:
+    clamp(28px, 7vw, 54px);
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform:
+    translate3d(0, 0, 0) scale(0.82) rotate(-7deg);
+}
+
+.vb2-nap-z.is-floating {
+  animation:
+    vb2NapZFloat 1350ms ease-out both;
+}
+
+@keyframes vb2NapZFloat {
+  0% {
+    opacity: 0;
+    transform:
+      translate3d(0, 0, 0) scale(0.82) rotate(-7deg);
+  }
+
+  18% {
+    opacity: 0.95;
+  }
+
+  72% {
+    opacity: 0.82;
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate3d(var(--z-drift, 0px),
+        -72px,
+        0) scale(1.18) rotate(8deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vb2-nap-z.is-floating {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 .vb2-nap-message {
