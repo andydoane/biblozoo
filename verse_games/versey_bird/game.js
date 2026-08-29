@@ -167,6 +167,7 @@
       image: "versey_bird_cloud_long.svg",
       aspect: 560 / 225,
       heightU: WORD_CLOUD_RENDER_HEIGHT_U,
+      visualScale: 1.15,
       textX: 49.5,
       textY: 55.4
     }
@@ -184,11 +185,12 @@
   const VERSE_PAIR_BEE_LEAD_SPAWN_U = 0.8;
 
   const HALFWAY_NAP_MIN_WORDS = 25;
-  const HALFWAY_NAP_REST_MS = 2400;
+  const HALFWAY_NAP_REST_MS = 4000;
   const HALFWAY_NAP_TAP_COOLDOWN_MS = 450;
   const HALFWAY_NAP_REQUIRED_TAPS = 3;
-  const HALFWAY_NAP_WAKE_HOLD_MS = 650;
+  const HALFWAY_NAP_WAKE_HOLD_MS = 1500;
   const HALFWAY_NAP_FADE_MS = 360;
+  const BONUS_INTRO_AFTER_FINAL_CLOUD_MS = 850;
   const HALFWAY_NAP_SLEEP_IMAGE =
     "versey_bird_sleeping.png";
   const HALFWAY_NAP_AWAKE_IMAGE =
@@ -293,6 +295,7 @@
   let lastFlapSound = "";
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
+  const halfwayNapImagePreloads = [];
 
   const adaptiveRenderState = {
     mode: "60fps",
@@ -811,9 +814,10 @@
           return;
         }
 
-        if (!audioUnlocked) {
-          void unlockAudio();
-        }
+        const audioReady =
+          audioUnlocked
+            ? Promise.resolve(true)
+            : unlockAudio();
 
         const now =
           performance.now();
@@ -828,6 +832,24 @@
 
         lastAcceptedTapAt = now;
         tapCount += 1;
+
+        const tapSound =
+          tapCount >=
+          HALFWAY_NAP_REQUIRED_TAPS
+            ? "streak"
+            : "correct";
+
+        void audioReady.then(
+          unlocked => {
+            if (!unlocked) {
+              return;
+            }
+
+            playGameSound(
+              tapSound
+            );
+          }
+        );
 
         if (
           tapCount <
@@ -926,10 +948,7 @@
 
     clearBirdTrail();
 
-    state.birdVY = 0;
-    state.birdAngle = 0;
     state.birdSpinUntil = 0;
-    state.birdFlapUntil = 0;
     state.flashUntil = 0;
     state.shakeUntil = 0;
 
@@ -952,11 +971,11 @@
       return;
     }
 
+    updateBird(dt, false);
+
     state.birdX +=
       state.halfwayNapExitSpeed *
       dt;
-
-    state.birdAngle = 0;
 
     const birdLeft =
       state.birdX -
@@ -1127,6 +1146,7 @@
 
   setupReferenceSegments();
   installDiagnosticErrorHandlers();
+  preloadHalfwayNapImages();
 
   const halfwayNapCheckpoint =
     readHalfwayNapCheckpoint();
@@ -1848,7 +1868,13 @@
 
     if (state.paused) return;
 
-    if (state.phase === "intro" || state.phase === "verse" || state.phase === "bonusIntro" || state.phase === "bonus"){
+    if (
+      state.phase === "intro" ||
+      state.phase === "verse" ||
+      state.phase === "napExit" ||
+      state.phase === "bonusIntro" ||
+      state.phase === "bonus"
+    ){
       flap();
     }
   }
@@ -1857,7 +1883,13 @@
     if (!state.layout) return;
     state.birdVY = getDifficulty().flapU * state.layout.unit;
     state.birdFlapUntil = performance.now() + 160;
-    addFlapTrail();
+
+    if (
+      state.phase !== "napExit"
+    ) {
+      addFlapTrail();
+    }
+
     playRandomFlapSound();
 
     if (getBirdTrailLevel() >= 4){
@@ -3722,8 +3754,16 @@
     const shape =
       CLOUD_SHAPES[shapeKey];
 
-    const h =
+    const baseH =
       shape.heightU * layout.unit;
+
+    const visualScale =
+      Number(
+        shape.visualScale
+      ) || 1;
+
+    const h =
+      baseH * visualScale;
 
     const w =
       h * shape.aspect;
@@ -3840,6 +3880,7 @@
       laneIndex,
       w,
       h,
+      fontReferenceH: baseH,
       shapeKey,
       textX: shape.textX,
       textY: shape.textY,
@@ -4458,7 +4499,20 @@
           getCurrentPhase() ===
           "done"
         ) {
-          enterBonusIntroPhase();
+          window.setTimeout(
+            () => {
+              if (
+                state.phase ===
+                  "verse" &&
+                getCurrentPhase() ===
+                  "done" &&
+                !hasActiveVerseClouds()
+              ) {
+                enterBonusIntroPhase();
+              }
+            },
+            BONUS_INTRO_AFTER_FINAL_CLOUD_MS
+          );
         }
       }
     }, 220);
@@ -5656,7 +5710,14 @@
   }
 
   function getWordFontSize(cloud) {
-    return cloud.h * WORD_CLOUD_TEXT_HEIGHT_RATIO;
+    const fontReferenceH =
+      cloud.fontReferenceH ||
+      cloud.h;
+
+    return (
+      fontReferenceH *
+      WORD_CLOUD_TEXT_HEIGHT_RATIO
+    );
   }
 
   function addFlapTrail(){
@@ -5886,6 +5947,43 @@
     state.flashColor = color;
     state.flashUntil = performance.now() + ms;
   }
+
+  function preloadHalfwayNapImages() {
+    if (
+      state.words.length <
+      HALFWAY_NAP_MIN_WORDS
+    ) {
+      return;
+    }
+
+    const filenames = [
+      HALFWAY_NAP_SLEEP_IMAGE,
+      HALFWAY_NAP_AWAKE_IMAGE
+    ];
+
+    for (const filename of filenames) {
+      const image = new Image();
+
+      image.decoding = "async";
+      image.src =
+        `${IMAGE_PATH}${filename}`;
+
+      halfwayNapImagePreloads.push(
+        image
+      );
+
+      if (
+        typeof image.decode ===
+        "function"
+      ) {
+        image.decode().catch(() => {
+          // Loading normally later is
+          // still a safe fallback.
+        });
+      }
+    }
+  }
+
 
   function waitForImagePrefetchTurn(
     delayMs = 100
