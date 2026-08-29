@@ -32,6 +32,7 @@
       return {
         verseId: "",
         verseText: "",
+        echoParts: [],
         verseRef: params.ref || "",
         translation: params.translation || "",
         attribution: ""
@@ -47,6 +48,10 @@
       return {
         verseId: json.verseId || verseId,
         verseText: json.verseText || "",
+        echoParts:
+          Array.isArray(json.echoParts)
+            ? json.echoParts
+            : [],
         verseRef: params.ref || "",
         translation: json.translation || params.translation || "",
         attribution: json.attribution || ""
@@ -57,6 +62,7 @@
       return {
         verseId,
         verseText: "",
+        echoParts: [],
         verseRef: params.ref || "",
         translation: params.translation || "",
         attribution: ""

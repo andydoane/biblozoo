@@ -645,6 +645,138 @@ body{
   cursor: pointer;
 }
 
+.vb2-nap-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  opacity: 1;
+  background:
+    linear-gradient(to bottom,
+      #40b9c5 0%,
+      #40b9c5 33.333%,
+      #a7cb6f 33.333%,
+      #a7cb6f 100%);
+  transition:
+    opacity 360ms ease;
+}
+
+.vb2-nap-screen.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vb2-nap-tap-target {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color:
+    transparent;
+}
+
+.vb2-nap-tap-target:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.vb2-nap-bird {
+  position: absolute;
+  left: 50%;
+  top: max(2dvh,
+      env(safe-area-inset-top));
+  width: min(72vw, 540px);
+  height: min(50dvh, 540px);
+  object-fit: contain;
+  transform:
+    translateX(-50%) scale(1);
+  transform-origin: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.vb2-nap-message {
+  position: absolute;
+  left: 50%;
+  bottom: max(8dvh,
+      calc(env(safe-area-inset-bottom) + 24px));
+  width: min(88vw, 760px);
+  min-height: 25dvh;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #ffffff;
+  font-family:
+    var(--vb2-body-font);
+  font-size:
+    clamp(34px, 6.8vw, 72px);
+  font-weight: 900;
+  line-height: 1.12;
+  pointer-events: none;
+}
+
+.vb2-nap-message span {
+  display: block;
+}
+
+.vb2-nap-bird.is-pop {
+  animation:
+    vb2NapPop 220ms ease-out;
+}
+
+.vb2-nap-bird.is-awake {
+  animation:
+    vb2NapAwakePop 360ms ease-out;
+}
+
+@keyframes vb2NapPop {
+  0% {
+    transform:
+      translateX(-50%) scale(1);
+  }
+
+  48% {
+    transform:
+      translateX(-50%) scale(1.055);
+  }
+
+  100% {
+    transform:
+      translateX(-50%) scale(1);
+  }
+}
+
+@keyframes vb2NapAwakePop {
+  0% {
+    transform:
+      translateX(-50%) scale(0.96);
+  }
+
+  52% {
+    transform:
+      translateX(-50%) scale(1.09);
+  }
+
+  100% {
+    transform:
+      translateX(-50%) scale(1);
+  }
+}
+
 @media (max-height: 690px){
   .vb2-build-wrap{
     padding-top: 8px;

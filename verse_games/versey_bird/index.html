@@ -12,6 +12,83 @@
 <body>
   <div id="app" class="vm-shell"></div>
 
+  <script>
+    (function () {
+      const key =
+        "biblozoo:versey_bird:halfway_nap:v1";
+
+      try {
+        const raw =
+          sessionStorage.getItem(key);
+
+        if (!raw) return;
+
+        const checkpoint =
+          JSON.parse(raw);
+
+        const verseId =
+          new URLSearchParams(
+            window.location.search
+          ).get("verseId") || "";
+
+        const ageMs =
+          Date.now() -
+          Number(
+            checkpoint?.savedAt || 0
+          );
+
+        if (
+          !checkpoint ||
+          checkpoint.stage !== "nap" ||
+          checkpoint.verseId !== verseId ||
+          ageMs < 0 ||
+          ageMs > 30 * 60 * 1000
+        ) {
+          return;
+        }
+
+        const app =
+          document.getElementById("app");
+
+        if (!app) return;
+
+        app.innerHTML = `
+          <div
+            class="vb2-nap-screen"
+            id="vb2NapScreen"
+          >
+            <button
+              class="vb2-nap-tap-target"
+              id="vb2NapTapTarget"
+              type="button"
+              aria-label="Versey Bird is sleeping"
+              disabled
+            >
+              <img
+                class="vb2-nap-bird"
+                id="vb2NapBird"
+                src="./versey_bird_images/versey_bird_sleeping.png"
+                alt="Versey Bird sleeping in a nest"
+              >
+
+              <div
+                class="vb2-nap-message"
+                id="vb2NapMessage"
+                aria-live="polite"
+              >
+                <span>This is a long verse!</span>
+                <span>Versey Bird needs a quick nap!</span>
+              </div>
+            </button>
+          </div>
+        `;
+      } catch (err) {
+        // Normal game startup will
+        // handle any invalid state.
+      }
+    })();
+  </script>
+
   <script src="../shared/bridge.js"></script>
   <script src="../shared/game-shell.js"></script>
   <script src="./game.js"></script>

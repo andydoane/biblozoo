@@ -183,6 +183,17 @@
   const VERSE_PAIR_OBSTACLE_EXTRA_U = 2.4;
   const VERSE_PAIR_BEE_LEAD_SPAWN_U = 0.8;
 
+  const HALFWAY_NAP_MIN_WORDS = 25;
+  const HALFWAY_NAP_REST_MS = 2400;
+  const HALFWAY_NAP_TAP_COOLDOWN_MS = 450;
+  const HALFWAY_NAP_REQUIRED_TAPS = 3;
+  const HALFWAY_NAP_WAKE_HOLD_MS = 650;
+  const HALFWAY_NAP_FADE_MS = 360;
+  const HALFWAY_NAP_SLEEP_IMAGE =
+    "versey_bird_sleeping.png";
+  const HALFWAY_NAP_AWAKE_IMAGE =
+    "versey_bird_awake.png";
+
   const ADAPTIVE_RENDER_INTERVAL_MS = 30;
   const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
   const ADAPTIVE_RENDER_MODERATE_STALL_MS = 40;
@@ -303,6 +314,9 @@
   const FRESH_REPLAY_STORAGE_KEY =
     "biblozooDebug:versey_bird:fresh_replay:v1";
 
+  const HALFWAY_NAP_STORAGE_KEY =
+    "biblozoo:versey_bird:halfway_nap:v1";
+
   const DIAGNOSTIC_HEARTBEAT_MS =
     2000;
 
@@ -356,6 +370,688 @@
     }
   }
 
+  function getHalfwayNapEchoParts() {
+    if (!Array.isArray(ctx.echoParts)) {
+      return [];
+    }
+
+    return ctx.echoParts
+      .map(part =>
+        String(part || "").trim()
+      )
+      .filter(Boolean);
+  }
+
+  function isHalfwayNapEligible() {
+    return (
+      state.words.length >=
+      HALFWAY_NAP_MIN_WORDS &&
+      getHalfwayNapEchoParts().length >= 2
+    );
+  }
+
+  function getHalfwayNapProgressIndex() {
+    if (!isHalfwayNapEligible()) {
+      return 0;
+    }
+
+    const parts =
+      getHalfwayNapEchoParts();
+
+    const halfwayPartCount =
+      Math.ceil(
+        parts.length / 2
+      );
+
+    const halfwayWordCount =
+      parts
+        .slice(
+          0,
+          halfwayPartCount
+        )
+        .reduce(
+          (total, part) =>
+            total +
+            tokenizeVerse(part).length,
+          0
+        );
+
+    const prefixSegments =
+      Math.max(
+        0,
+        state.segments.length -
+        state.words.length
+      );
+
+    return clamp(
+      prefixSegments +
+      halfwayWordCount,
+      prefixSegments,
+      state.segments.length
+    );
+  }
+
+  function pairedWaveWouldCrossHalfwayNap() {
+    if (
+      !isHalfwayNapEligible() ||
+      state.halfwayNapComplete
+    ) {
+      return false;
+    }
+
+    const halfwayProgressIndex =
+      getHalfwayNapProgressIndex();
+
+    return (
+      halfwayProgressIndex > 0 &&
+      state.progressIndex <
+      halfwayProgressIndex &&
+      state.progressIndex + 1 >=
+      halfwayProgressIndex
+    );
+  }
+
+  function shouldQueueHalfwayNap() {
+    if (
+      state.phase !== "verse" ||
+      state.halfwayNapComplete ||
+      state.halfwayNapPending ||
+      !isHalfwayNapEligible()
+    ) {
+      return false;
+    }
+
+    const halfwayProgressIndex =
+      getHalfwayNapProgressIndex();
+
+    return (
+      halfwayProgressIndex > 0 &&
+      state.progressIndex >=
+      halfwayProgressIndex
+    );
+  }
+
+  function buildHalfwayNapCheckpoint() {
+    return {
+      version: 1,
+      stage: "nap",
+      verseId: ctx.verseId,
+      mode: selectedMode,
+      savedAt: Date.now(),
+      progressIndex:
+        state.progressIndex,
+      streak:
+        state.streak,
+      bestStreak:
+        state.bestStreak,
+      pairWaveAccumulator:
+        state.pairWaveAccumulator,
+      spawnHistory:
+        state.spawnHistory.slice(-10),
+      forceCorrectNext:
+        state.forceCorrectNext,
+      birdColorCycleIndex:
+        state.birdColorCycleIndex,
+      streakSpeedBoostU:
+        state.streakSpeedBoostU,
+      muted
+    };
+  }
+
+  function saveHalfwayNapCheckpoint(
+    checkpoint
+  ) {
+    try {
+      sessionStorage.setItem(
+        HALFWAY_NAP_STORAGE_KEY,
+        JSON.stringify(checkpoint)
+      );
+
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function readHalfwayNapCheckpoint() {
+    try {
+      const raw =
+        sessionStorage.getItem(
+          HALFWAY_NAP_STORAGE_KEY
+        );
+
+      if (!raw) {
+        return null;
+      }
+
+      const checkpoint =
+        JSON.parse(raw);
+
+      const ageMs =
+        Date.now() -
+        Number(
+          checkpoint?.savedAt || 0
+        );
+
+      const valid =
+        checkpoint &&
+        checkpoint.version === 1 &&
+        checkpoint.stage === "nap" &&
+        checkpoint.verseId ===
+        ctx.verseId &&
+        Boolean(
+          DIFFICULTY[
+          checkpoint.mode
+          ]
+        ) &&
+        ageMs >= 0 &&
+        ageMs <=
+        30 * 60 * 1000;
+
+      if (!valid) {
+        sessionStorage.removeItem(
+          HALFWAY_NAP_STORAGE_KEY
+        );
+
+        return null;
+      }
+
+      return checkpoint;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function clearHalfwayNapCheckpoint() {
+    try {
+      sessionStorage.removeItem(
+        HALFWAY_NAP_STORAGE_KEY
+      );
+    } catch (err) {
+      // Best effort only.
+    }
+  }
+
+  function restoreHalfwayNapCheckpoint(
+    checkpoint
+  ) {
+    const progressIndex =
+      Math.floor(
+        Number(
+          checkpoint.progressIndex
+        )
+      );
+
+    state.progressIndex =
+      Number.isFinite(progressIndex)
+        ? clamp(
+          progressIndex,
+          0,
+          state.segments.length
+        )
+        : 0;
+
+    state.streak =
+      Math.max(
+        0,
+        Math.floor(
+          Number(
+            checkpoint.streak
+          ) || 0
+        )
+      );
+
+    state.bestStreak =
+      Math.max(
+        state.streak,
+        Math.floor(
+          Number(
+            checkpoint.bestStreak
+          ) || 0
+        )
+      );
+
+    state.pairWaveAccumulator =
+      clamp(
+        Number(
+          checkpoint
+            .pairWaveAccumulator
+        ) || 0,
+        0,
+        0.9999
+      );
+
+    state.spawnHistory =
+      Array.isArray(
+        checkpoint.spawnHistory
+      )
+        ? checkpoint.spawnHistory
+          .filter(
+            value =>
+              value === true ||
+              value === false
+          )
+          .slice(-10)
+        : [];
+
+    state.forceCorrectNext =
+      checkpoint.forceCorrectNext ===
+      true;
+
+    const rawColorIndex =
+      Math.floor(
+        Number(
+          checkpoint
+            .birdColorCycleIndex
+        )
+      );
+
+    const colorIndex =
+      Number.isFinite(
+        rawColorIndex
+      )
+        ? (
+          (
+            rawColorIndex %
+            BIRD_COLORS.length
+          ) +
+          BIRD_COLORS.length
+        ) %
+        BIRD_COLORS.length
+        : 0;
+
+    state.birdColorCycleIndex =
+      colorIndex;
+
+    state.birdColor =
+      BIRD_COLORS[colorIndex];
+
+    state.streakSpeedBoostU =
+      Math.max(
+        0,
+        Number(
+          checkpoint
+            .streakSpeedBoostU
+        ) || 0
+      );
+
+    muted =
+      checkpoint.muted === true;
+
+    state.halfwayNapComplete = true;
+    state.halfwayNapPending = false;
+    state.halfwayNapExitSpeed = 0;
+  }
+
+  function halfwayNapScreenHtml(
+    awake = false
+  ) {
+    const image =
+      awake
+        ? HALFWAY_NAP_AWAKE_IMAGE
+        : HALFWAY_NAP_SLEEP_IMAGE;
+
+    return `
+      <div
+        class="vb2-nap-screen"
+        id="vb2NapScreen"
+      >
+        <button
+          class="vb2-nap-tap-target"
+          id="vb2NapTapTarget"
+          type="button"
+          aria-label="Versey Bird is sleeping"
+          disabled
+        >
+          <img
+            class="vb2-nap-bird"
+            id="vb2NapBird"
+            src="${IMAGE_PATH}${image}"
+            alt="Versey Bird sleeping in a nest"
+          >
+
+          <div
+            class="vb2-nap-message"
+            id="vb2NapMessage"
+            aria-live="polite"
+          >
+            <span>
+              This is a long verse!
+            </span>
+            <span>
+              Versey Bird needs a quick nap!
+            </span>
+          </div>
+        </button>
+      </div>
+    `;
+  }
+
+  function renderHalfwayNapInterlude(
+    checkpoint
+  ) {
+    stopLoop();
+    cleanupResize();
+
+    state.field = null;
+    state.phase = "nap";
+
+    if (
+      !document.getElementById(
+        "vb2NapScreen"
+      )
+    ) {
+      app.innerHTML =
+        halfwayNapScreenHtml();
+    }
+
+    const screen =
+      document.getElementById(
+        "vb2NapScreen"
+      );
+
+    const target =
+      document.getElementById(
+        "vb2NapTapTarget"
+      );
+
+    const bird =
+      document.getElementById(
+        "vb2NapBird"
+      );
+
+    const message =
+      document.getElementById(
+        "vb2NapMessage"
+      );
+
+    if (
+      !screen ||
+      !target ||
+      !bird ||
+      !message
+    ) {
+      return;
+    }
+
+    target.disabled = true;
+
+    let wakeReady = false;
+    let tapCount = 0;
+    let lastAcceptedTapAt = 0;
+
+    window.setTimeout(
+      () => {
+        if (
+          !document.body.contains(
+            target
+          )
+        ) {
+          return;
+        }
+
+        wakeReady = true;
+        target.disabled = false;
+
+        target.setAttribute(
+          "aria-label",
+          "Tap to wake up Versey Bird"
+        );
+
+        message.innerHTML = `
+          <span>
+            Alright, tap to wake up
+          </span>
+          <span>
+            Versey Bird!
+          </span>
+        `;
+      },
+      HALFWAY_NAP_REST_MS
+    );
+
+    target.addEventListener(
+      "click",
+      () => {
+        if (!wakeReady) {
+          return;
+        }
+
+        const now =
+          performance.now();
+
+        if (
+          now -
+          lastAcceptedTapAt <
+          HALFWAY_NAP_TAP_COOLDOWN_MS
+        ) {
+          return;
+        }
+
+        lastAcceptedTapAt = now;
+        tapCount += 1;
+
+        if (
+          tapCount <
+          HALFWAY_NAP_REQUIRED_TAPS
+        ) {
+          bird.classList.remove(
+            "is-pop",
+            "is-awake"
+          );
+
+          void bird.offsetWidth;
+
+          bird.classList.add(
+            "is-pop"
+          );
+
+          return;
+        }
+
+        wakeReady = false;
+        target.disabled = true;
+
+        void unlockAudio();
+        void preloadBirdSvg();
+
+        bird.src =
+          `${IMAGE_PATH}` +
+          HALFWAY_NAP_AWAKE_IMAGE;
+
+        bird.alt =
+          "Versey Bird awake in a nest";
+
+        bird.classList.remove(
+          "is-pop"
+        );
+
+        void bird.offsetWidth;
+
+        bird.classList.add(
+          "is-awake"
+        );
+
+        recordHalfwayNapDiagnosticEvent(
+          "wake-complete"
+        );
+
+        window.setTimeout(
+          () => {
+            screen.classList.add(
+              "is-leaving"
+            );
+
+            window.setTimeout(
+              () => {
+                startGame(
+                  checkpoint.mode,
+                  checkpoint
+                );
+              },
+              HALFWAY_NAP_FADE_MS
+            );
+          },
+          HALFWAY_NAP_WAKE_HOLD_MS
+        );
+      }
+    );
+  }
+
+  function beginHalfwayNapExit() {
+    if (
+      state.phase !== "verse" ||
+      state.halfwayNapComplete ||
+      !isHalfwayNapEligible() ||
+      !state.layout
+    ) {
+      return;
+    }
+
+    state.halfwayNapPending = false;
+    state.halfwayNapComplete = true;
+
+    state.halfwayNapExitSpeed =
+      Math.max(
+        1,
+        getWorldSpeed()
+      );
+
+    state.phase = "napExit";
+    state.phaseStartedAt =
+      performance.now();
+
+    state.wordCloud = null;
+    state.wordCloudFollower = null;
+    state.obstacles = [];
+    state.beeTrailDots = [];
+    state.poofs = [];
+
+    clearBirdTrail();
+
+    state.birdVY = 0;
+    state.birdAngle = 0;
+    state.birdSpinUntil = 0;
+    state.birdFlapUntil = 0;
+    state.flashUntil = 0;
+    state.shakeUntil = 0;
+
+    const menuButton =
+      document.getElementById(
+        "vb2MenuPill"
+      );
+
+    if (menuButton) {
+      menuButton.hidden = true;
+    }
+
+    recordHalfwayNapDiagnosticEvent(
+      "exit-start"
+    );
+  }
+
+  function updateHalfwayNapExit(dt) {
+    if (!state.layout) {
+      return;
+    }
+
+    state.birdX +=
+      state.halfwayNapExitSpeed *
+      dt;
+
+    state.birdAngle = 0;
+
+    const birdLeft =
+      state.birdX -
+      state.layout.birdW * 0.5;
+
+    if (
+      birdLeft >
+      state.layout.width
+    ) {
+      beginHalfwayNapReload();
+    }
+  }
+
+  function beginHalfwayNapReload() {
+    if (
+      state.phase !== "napExit"
+    ) {
+      return;
+    }
+
+    const checkpoint =
+      buildHalfwayNapCheckpoint();
+
+    if (
+      !saveHalfwayNapCheckpoint(
+        checkpoint
+      )
+    ) {
+      recordHalfwayNapDiagnosticEvent(
+        "checkpoint-save-failed"
+      );
+
+      state.phase = "verse";
+      state.halfwayNapExitSpeed = 0;
+
+      state.birdX =
+        state.layout.birdX;
+
+      state.birdY =
+        state.layout.playTop +
+        (
+          state.layout.playBottom -
+          state.layout.playTop
+        ) *
+        0.48;
+
+      state.birdVY = 0;
+      state.cloudCooldown = 0.9;
+
+      const menuButton =
+        document.getElementById(
+          "vb2MenuPill"
+        );
+
+      if (menuButton) {
+        menuButton.hidden = false;
+      }
+
+      return;
+    }
+
+    state.phase = "napReload";
+
+    saveDiagnosticHeartbeat(
+      performance.now(),
+      true
+    );
+
+    recordHalfwayNapDiagnosticEvent(
+      "reload-start"
+    );
+
+    stopLoop();
+    cleanupResize();
+    clearVerseyBirdLayerNodePools();
+
+    state.field = null;
+
+    app.innerHTML =
+      halfwayNapScreenHtml();
+
+    requestAnimationFrame(
+      () => {
+        requestAnimationFrame(
+          () => {
+            window.location.reload();
+          }
+        );
+      }
+    );
+  }
+
 
   const state = {
     running: false,
@@ -402,6 +1098,9 @@
     nextCloudId: 1,
     cloudCooldown: 0,
     pairWaveAccumulator: 0,
+    halfwayNapComplete: false,
+    halfwayNapPending: false,
+    halfwayNapExitSpeed: 0,
     spawnHistory: [],
     forceCorrectNext: false,
     progressIndex: 0,
@@ -430,20 +1129,43 @@
   };
 
   setupReferenceSegments();
-  ensureSilenceAudio();
   installDiagnosticErrorHandlers();
+
+  const halfwayNapCheckpoint =
+    readHalfwayNapCheckpoint();
 
   const freshReplayRequested =
     consumeFreshDocumentReplay();
 
-  if (freshReplayRequested) {
-    renderModeSelect();
-  } else {
-    renderIntro();
-  }
+  if (halfwayNapCheckpoint) {
+    selectedMode =
+      halfwayNapCheckpoint.mode;
 
-  preloadBirdSvg();
-  void preloadGameImageAssets();
+    restoreHalfwayNapCheckpoint(
+      halfwayNapCheckpoint
+    );
+
+    state.phase = "nap";
+
+    resumeDiagnosticRunAfterHalfwayNap(
+      selectedMode
+    );
+
+    renderHalfwayNapInterlude(
+      halfwayNapCheckpoint
+    );
+  } else {
+    ensureSilenceAudio();
+
+    if (freshReplayRequested) {
+      renderModeSelect();
+    } else {
+      renderIntro();
+    }
+
+    preloadBirdSvg();
+    void preloadGameImageAssets();
+  }
 
   function getAudioContext() {
     if (!audioCtx) {
@@ -713,7 +1435,10 @@
     });
   }
 
-  function startGame(mode){
+  function startGame(
+    mode,
+    resumeCheckpoint = null
+  ){
     stopLoop();
     cleanupResize();
 
@@ -722,7 +1447,20 @@
     completionResult = null;
     clearVerseyBirdLayerNodePools();
     resetStateForRun();
-    startDiagnosticRun(mode);
+
+    if (resumeCheckpoint) {
+      restoreHalfwayNapCheckpoint(
+        resumeCheckpoint
+      );
+
+      if (!diagnosticState.active) {
+        resumeDiagnosticRunAfterHalfwayNap(
+          mode
+        );
+      }
+    } else {
+      startDiagnosticRun(mode);
+    }
 
     app.innerHTML = `
       <div class="vb2-root">
@@ -770,7 +1508,36 @@
     installResize();
     recalcLayout();
     renderBirdAsset();
-    enterIntroPhase();
+
+    if (resumeCheckpoint) {
+      enterVersePhase();
+
+      state.cloudCooldown = 0.9;
+
+      state.birdVY =
+        getDifficulty().flapU *
+        state.layout.unit *
+        0.28;
+
+      const diagnosticNow =
+        performance.now();
+
+      diagnosticState.lastHeartbeatAt =
+        diagnosticNow;
+
+      resetDiagnosticFrameWindow(
+        diagnosticNow
+      );
+
+      clearHalfwayNapCheckpoint();
+
+      recordHalfwayNapDiagnosticEvent(
+        "game-resume"
+      );
+    } else {
+      enterIntroPhase();
+    }
+
     startLoop();
   }
 
@@ -815,6 +1582,9 @@
     state.nextCloudId = 1;
     state.cloudCooldown = 0;
     state.pairWaveAccumulator = 0;
+    state.halfwayNapComplete = false;
+    state.halfwayNapPending = false;
+    state.halfwayNapExitSpeed = 0;
     state.spawnHistory = [];
     state.forceCorrectNext = false;
     state.progressIndex = 0;
@@ -1293,6 +2063,7 @@
       lastSnapshot: null,
       snapshots: [],
       renderModeEvents: [],
+      halfwayNapEvents: [],
       errors: []
     };
 
@@ -1665,6 +2436,114 @@
     writeDiagnosticReport();
   }
 
+  function recordHalfwayNapDiagnosticEvent(
+    type
+  ) {
+    if (
+      !diagnosticState.active ||
+      !diagnosticState.record
+    ) {
+      return;
+    }
+
+    if (
+      !Array.isArray(
+        diagnosticState
+          .record
+          .halfwayNapEvents
+      )
+    ) {
+      diagnosticState
+        .record
+        .halfwayNapEvents = [];
+    }
+
+    const startedAtEpoch =
+      diagnosticState
+        .record
+        .startedAtEpoch;
+
+    diagnosticState
+      .record
+      .halfwayNapEvents
+      .push({
+        at:
+          new Date().toISOString(),
+
+        elapsedSeconds:
+          startedAtEpoch
+            ? Math.round(
+              (
+                Date.now() -
+                startedAtEpoch
+              ) / 100
+            ) / 10
+            : null,
+
+        type,
+
+        phase:
+          state.phase,
+
+        progressIndex:
+          state.progressIndex,
+
+        wordCount:
+          state.words.length
+      });
+
+    writeDiagnosticReport();
+  }
+
+  function resumeDiagnosticRunAfterHalfwayNap(
+    mode
+  ) {
+    const report =
+      readDiagnosticReport();
+
+    if (
+      !report ||
+      report.gameId !== GAME_ID ||
+      report.verseId !== ctx.verseId ||
+      report.status !== "running"
+    ) {
+      startDiagnosticRun(mode);
+      return;
+    }
+
+    diagnosticState.active = true;
+    diagnosticState.record = report;
+
+    const lastSnapshot =
+      report.lastSnapshot || {};
+
+    diagnosticState.renderCount =
+      Number(
+        lastSnapshot.renderCount
+      ) || 0;
+
+    diagnosticState.skippedRenderCount =
+      Number(
+        lastSnapshot
+          .skippedRenderCount
+      ) || 0;
+
+    const now =
+      performance.now();
+
+    diagnosticState.lastHeartbeatAt =
+      now;
+
+    resetDiagnosticFrameWindow(
+      now
+    );
+
+    recordHalfwayNapDiagnosticEvent(
+      "reload-complete"
+    );
+  }
+
+  
   function finishDiagnosticRun(
     status
   ){
@@ -2313,6 +3192,11 @@
   function update(dt, ts){
     if (!state.layout) return;
 
+    if (state.phase === "napExit") {
+      updateHalfwayNapExit(dt);
+      return;
+    }
+
     updateStreakSpeedBoost(dt);
     updateWorldScroll(dt);
     updateBackgroundClouds(dt);
@@ -2675,6 +3559,13 @@
       return false;
     }
 
+    if (
+      state.halfwayNapPending ||
+      pairedWaveWouldCrossHalfwayNap()
+    ) {
+      return false;
+    }
+
     const frequency =
       getVersePairFrequency();
 
@@ -2965,6 +3856,11 @@
     const layout = state.layout;
 
     if (!hasActiveVerseClouds()) {
+      if (state.halfwayNapPending) {
+        beginHalfwayNapExit();
+        return;
+      }
+
       state.cloudCooldown = Math.max(0, state.cloudCooldown - dt);
 
       if (
@@ -3514,6 +4410,10 @@
 
     state.progressIndex += 1;
 
+    if (shouldQueueHalfwayNap()) {
+      state.halfwayNapPending = true;
+    }
+
     const nextTrailLevel =
       getBirdTrailLevel();
 
@@ -3545,6 +4445,11 @@
       }
 
       if (!hasActiveVerseClouds()) {
+        if (state.halfwayNapPending) {
+          beginHalfwayNapExit();
+          return;
+        }
+
         state.cloudCooldown =
           getDifficulty().cloudGapU /
           Math.max(
