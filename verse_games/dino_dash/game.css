@@ -789,17 +789,24 @@ body{
 }
 
 .dd2-feed-screen {
+  --dd2-feed-art-h:
+    min(56dvh, 620px);
+  --dd2-feed-bottom-pad:
+    max(
+      10px,
+      calc(
+        env(safe-area-inset-bottom) +
+        8px
+      )
+    );
+
   position: fixed;
   inset: 0;
   z-index: 1000;
   overflow: hidden;
   opacity: 0;
-  background:
-    linear-gradient(to bottom,
-      #a0dce2 0%,
-      #a0dce2 64%,
-      #a7cb6f 64%,
-      #a7cb6f 100%);
+  background: #1a1a1a;
+  background-color: #1a1a1a;
   transition:
     opacity 420ms ease;
 }
@@ -836,13 +843,13 @@ body{
 .dd2-feed-art {
   position: absolute;
   left: 50%;
-  top:
-    max(1dvh,
-      env(safe-area-inset-top));
+  top: auto;
+  bottom:
+    var(--dd2-feed-bottom-pad);
   width:
-    min(86vw, 580px);
+    min(92vw, 620px);
   height:
-    min(58dvh, 620px);
+    var(--dd2-feed-art-h);
   transform:
     translateX(-50%);
   pointer-events: none;
@@ -925,12 +932,20 @@ body{
 .dd2-feed-message {
   position: absolute;
   left: 50%;
+  top:
+    env(safe-area-inset-top);
   bottom:
-    max(5dvh,
-      calc(env(safe-area-inset-bottom) + 18px));
+    calc(
+      var(--dd2-feed-art-h) +
+      var(--dd2-feed-bottom-pad)
+    );
   width:
     min(90vw, 760px);
-  min-height: 24dvh;
+  min-height: 0;
+  box-sizing: border-box;
+  padding:
+    clamp(18px, 4dvh, 42px)
+    4vw;
   transform:
     translateX(-50%);
   display: flex;
@@ -945,9 +960,11 @@ body{
     system-ui,
     sans-serif;
   font-size:
-    clamp(30px,
+    clamp(
+      30px,
       6.5vw,
-      64px);
+      64px
+    );
   font-weight: 900;
   line-height: 1.08;
   pointer-events: none;

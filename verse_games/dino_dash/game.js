@@ -106,9 +106,9 @@
   const LONG_VERSE_MIN_WORDS = 25;
   const TARGET_VERSE_TABLET_WAVES = 20;
 
-  const VERSE_PAIR_FOLLOW_SECONDS = 0.72;
-  const VERSE_PAIR_MIXED_FOLLOW_SECONDS = 0.95;
-  const VERSE_PAIR_MIN_GAP_U = 0.16;
+  const VERSE_PAIR_FOLLOW_SECONDS = 1.00;
+  const VERSE_PAIR_MIXED_FOLLOW_SECONDS = 1.22;
+  const VERSE_PAIR_MIN_GAP_U = 0.38;
 
   const HALFWAY_FEED_SETTLE_MS = 720;
   const HALFWAY_FEED_BLACK_FADE_MS = 320;
@@ -119,11 +119,27 @@
   const HALFWAY_FEED_FINAL_HOLD_MS = 1500;
   const HALFWAY_FEED_RESUME_FADE_MS = 360;
 
+  const BONUS_INTRO_AFTER_FINAL_TABLET_MS = 850;
+  const BONUS_PROGRESS_PREP_LEAD_MS = 250;
+
   const HALFWAY_FEED_IMAGES = [
     "dino_dash_hungry.png",
     "dino_dash_steak_1.png",
     "dino_dash_steak_2.png",
     "dino_dash_steak_3.png"
+  ];
+
+  const HALFWAY_FEED_RESUME_IMAGES = [
+    "dino_dash_back_hill.svg",
+    "dino_dash_hill.svg",
+    "dino_dash_ground_small.png",
+    "dino_dash_ground_gap.png",
+    "dino_dash_tablet_compact.png",
+    "dino_dash_tablet_normal.png",
+    "dino_dash_tablet_long.png",
+    "dino_dash_dinosaur_head.png",
+    "dino_dash_flag_small.png",
+    "dino_dash_flag.png"
   ];
 
   const ADAPTIVE_RENDER_INTERVAL_MS = 30;
@@ -285,6 +301,7 @@
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
   const halfwayFeedImagePreloads = [];
+  let halfwayFeedResumeWarmupPromise = null;
 
   const groundImage = new Image();
   groundImage.src =
@@ -376,6 +393,8 @@
     phaseStartedAt: 0,
     introStartedAt: 0,
     bonusStartedAt: 0,
+    bonusIntroReadyAt: 0,
+    bonusProgressPrepared: false,
     dinoColor: DINO_COLORS[0],
     dinoColorIndex: 0,
     dinoX: 0,
@@ -1022,14 +1041,18 @@
       80
     );
 
-    window.setTimeout(
-      () => {
-        void preloadDinoSvg();
-        void preloadGameImageAssets();
-      },
-      HALFWAY_FEED_SCENE_FADE_MS +
-      300
-    );
+    const resumeAssetsReady =
+      new Promise(resolve => {
+        window.setTimeout(
+          () => {
+            void warmHalfwayFeedResumeAssets()
+              .then(resolve)
+              .catch(() => resolve(false));
+          },
+          HALFWAY_FEED_SCENE_FADE_MS +
+          300
+        );
+      });
 
     window.setTimeout(
       () => {
@@ -1121,7 +1144,14 @@
         );
 
         window.setTimeout(
-          () => {
+          async () => {
+            try {
+              await resumeAssetsReady;
+            } catch (err) {
+              // Normal loading remains
+              // available as a fallback.
+            }
+
             const resumeBlackout =
               document.createElement(
                 "div"
@@ -2748,6 +2778,8 @@
     state.phaseStartedAt = 0;
     state.introStartedAt = 0;
     state.bonusStartedAt = 0;
+    state.bonusIntroReadyAt = 0;
+    state.bonusProgressPrepared = false;
     state.layout = null;
     state.dinoColorIndex = Math.floor(Math.random() * DINO_COLORS.length);
     state.dinoColor = DINO_COLORS[state.dinoColorIndex];
@@ -3720,11 +3752,52 @@
 
       if (
         getCurrentPhase() ===
-          "done" &&
-        state.tablets.length === 0 &&
-        state.obstacles.length === 0
-      ){
-        enterBonusIntroPhase();
+        "done"
+      ) {
+        if (
+          !state.bonusIntroReadyAt
+        ) {
+          state.bonusIntroReadyAt =
+            ts +
+            BONUS_INTRO_AFTER_FINAL_TABLET_MS;
+        }
+
+        const fieldClear =
+          state.tablets.length === 0 &&
+          state.obstacles.length === 0;
+
+        if (fieldClear) {
+          const prepAt =
+            state.bonusIntroReadyAt -
+            BONUS_PROGRESS_PREP_LEAD_MS;
+
+          if (
+            !state.bonusProgressPrepared &&
+            ts >= prepAt
+          ) {
+            renderBonusProgressBuild();
+
+            state.bonusProgressPrepared =
+              true;
+
+            if (
+              ts >=
+              state.bonusIntroReadyAt
+            ) {
+              state.bonusIntroReadyAt =
+                ts +
+                BONUS_PROGRESS_PREP_LEAD_MS;
+            }
+          }
+
+          if (
+            state.bonusProgressPrepared &&
+            ts >=
+              state.bonusIntroReadyAt
+          ) {
+            enterBonusIntroPhase();
+          }
+        }
       }
 
       return;
@@ -4024,53 +4097,15 @@
     };
   }
 
-  function chooseVersePairLanes(
-    leadCorrect,
-    followerCorrect
-  ) {
-    if (
-      leadCorrect &&
-      followerCorrect
-    ) {
-      return [
-        "middle",
-        "middle"
-      ];
-    }
-
-    if (
-      !leadCorrect &&
-      !followerCorrect
-    ) {
-      const lane =
-        Math.random() < 0.55
-          ? "ground"
-          : "middle";
-
-      return [
-        lane,
-        lane
-      ];
-    }
-
-    const correctLane =
-      Math.random() < 0.5
-        ? "ground"
-        : "middle";
-
-    const decoyLane =
-      correctLane === "ground"
-        ? "middle"
-        : "ground";
-
-    return leadCorrect
+  function chooseVersePairLanes() {
+    return Math.random() < 0.5
       ? [
-        correctLane,
-        decoyLane
+        "ground",
+        "middle"
       ]
       : [
-        decoyLane,
-        correctLane
+        "middle",
+        "ground"
       ];
   }
 
@@ -4655,6 +4690,18 @@
     state.streak += 1;
     state.bestStreak = Math.max(state.bestStreak, state.streak);
     state.progressIndex += 1;
+
+    if (
+      getCurrentPhase() ===
+        "done"
+    ) {
+      state.bonusIntroReadyAt =
+        ts +
+        BONUS_INTRO_AFTER_FINAL_TABLET_MS;
+
+      state.bonusProgressPrepared =
+        false;
+    }
 
     if (
       shouldQueueHalfwayFeed()
@@ -5867,22 +5914,255 @@
   }
 
   function renderFlyingWords(ts){
-    const layer = document.getElementById("dd2IntroLayer");
-    if (!layer || !state.layout) return;
+    const layer =
+      document.getElementById(
+        "dd2IntroLayer"
+      );
+
+    if (
+      !layer ||
+      !state.layout
+    ) {
+      return;
+    }
 
     if (state.phase === "intro"){
-      const elapsed = (ts - state.introStartedAt) / 1000;
-      layer.innerHTML = INTRO_WORDS.map((word, index) => renderFlyingWord(INTRO_WORDS, word, index, elapsed)).join("");
+      const elapsed =
+        (
+          ts -
+          state.introStartedAt
+        ) / 1000;
+
+      layer.innerHTML =
+        INTRO_WORDS
+          .map(
+            (word, index) =>
+              renderFlyingWord(
+                INTRO_WORDS,
+                word,
+                index,
+                elapsed
+              )
+          )
+          .join("");
+
       return;
     }
 
-    if (state.phase === "bonusIntro"){
-      const elapsed = (ts - state.phaseStartedAt) / 1000;
-      layer.innerHTML = BONUS_WORDS.map((word, index) => renderFlyingWord(BONUS_WORDS, word, index, elapsed)).join("");
+    if (
+      state.phase ===
+      "bonusIntro"
+    ){
+      const elapsed =
+        (
+          ts -
+          state.phaseStartedAt
+        ) / 1000;
+
+      renderBonusFlyingWords(
+        layer,
+        elapsed
+      );
+
       return;
     }
 
-    layer.innerHTML = "";
+    if (
+      layer.childElementCount
+    ) {
+      layer.innerHTML = "";
+    }
+  }
+
+  function renderBonusFlyingWords(
+    layer,
+    elapsed
+  ) {
+    let nodes =
+      Array.from(
+        layer.querySelectorAll(
+          "[data-dd2-bonus-word]"
+        )
+      );
+
+    if (
+      nodes.length !==
+      BONUS_WORDS.length
+    ) {
+      layer.innerHTML = "";
+
+      nodes =
+        BONUS_WORDS.map(
+          (word, index) => {
+            const node =
+              document.createElement(
+                "div"
+              );
+
+            node.className =
+              "dd2-flying-word" +
+              (
+                word.line === 0
+                  ? " is-first-phrase"
+                  : " is-second-phrase"
+              );
+
+            node.dataset.dd2BonusWord =
+              String(index);
+
+            node.textContent =
+              word.text;
+
+            node.style.opacity =
+              "0";
+
+            layer.appendChild(
+              node
+            );
+
+            return node;
+          }
+        );
+    }
+
+    BONUS_WORDS.forEach(
+      (word, index) => {
+        const node =
+          nodes[index];
+
+        if (!node) return;
+
+        const layout =
+          state.layout;
+
+        const t =
+          elapsed -
+          word.delay;
+
+        const travel =
+          FLYING_WORD_TRAVEL_SECONDS;
+
+        const baseSize =
+          layout.unit * 0.22;
+
+        const widthCap =
+          layout.width * 0.055;
+
+        const size =
+          clamp(
+            Math.min(
+              baseSize,
+              widthCap
+            ),
+            18,
+            44
+          );
+
+        const wordW =
+          getFlyingWordWidth(
+            word,
+            size
+          );
+
+        const lineOffset =
+          getFlyingWordLineOffset(
+            BONUS_WORDS,
+            index,
+            size
+          );
+
+        const startX =
+          layout.width +
+          wordW * 0.5 +
+          layout.unit * 0.40 +
+          lineOffset;
+
+        const endX =
+          -(
+            wordW * 0.5 +
+            layout.unit * 0.25
+          );
+
+        const progress =
+          clamp(
+            t / travel,
+            0,
+            1
+          );
+
+        const x =
+          startX +
+          (
+            endX -
+            startX
+          ) *
+          progress;
+
+        const baseY =
+          word.line === 0
+            ? layout.playTop +
+              (
+                layout.groundTop -
+                layout.playTop
+              ) *
+              0.34
+            : layout.playTop +
+              (
+                layout.groundTop -
+                layout.playTop
+              ) *
+              0.62;
+
+        const y =
+          baseY +
+          Math.sin(
+            (
+              t * 4.6
+            ) +
+            index
+          ) *
+          layout.unit *
+          0.07;
+
+        const tilt =
+          Math.sin(
+            (
+              t * 3.4
+            ) +
+            index
+          ) *
+          3.5;
+
+        const opacity =
+          t < 0 ||
+          t > travel
+            ? 0
+            : 1;
+
+        node.style.setProperty(
+          "--x",
+          `${x}px`
+        );
+
+        node.style.setProperty(
+          "--y",
+          `${y}px`
+        );
+
+        node.style.setProperty(
+          "--tilt",
+          `${tilt}deg`
+        );
+
+        node.style.setProperty(
+          "--size",
+          `${size}px`
+        );
+
+        node.style.opacity =
+          String(opacity);
+      }
+    );
   }
 
   function renderFlyingWord(words, word, index, elapsed){
@@ -5958,6 +6238,65 @@
     return Math.round(getBonusProgress() * 100);
   }
 
+  function renderBonusProgressBuild() {
+    const el =
+      document.getElementById(
+        "dd2BuildText"
+      );
+
+    if (!el) return;
+
+    const progress =
+      getBonusProgress();
+
+    const progressPercent =
+      Math.round(
+        progress * 100
+      );
+
+    el.className =
+      "dd2-build-text vm-build-text " +
+      "dd2-bonus-progress-build";
+
+    el.style.setProperty(
+      "--dd2-bonus-progress",
+      progress
+    );
+
+    let progressEl =
+      el.querySelector(
+        ".dd2-bonus-progress"
+      );
+
+    if (!progressEl) {
+      el.innerHTML = `
+        <div class="dd2-bonus-progress">
+          <div class="dd2-bonus-progress-icons">
+            <div class="dd2-bonus-progress-head" aria-hidden="true"></div>
+            <div class="dd2-bonus-progress-flag" aria-hidden="true"></div>
+          </div>
+          <div class="dd2-bonus-progress-bar" aria-hidden="true">
+            <div class="dd2-bonus-progress-fill"></div>
+          </div>
+        </div>
+      `;
+
+      progressEl =
+        el.querySelector(
+          ".dd2-bonus-progress"
+        );
+    }
+
+    if (progressEl) {
+      progressEl.setAttribute(
+        "aria-label",
+        `Bonus progress ${progressPercent}%`
+      );
+    }
+  }
+
+
+
   function updateBuildText(){
     const el = document.getElementById("dd2BuildText");
     if (!el) return;
@@ -5974,52 +6313,7 @@
       state.phase === "bonus" ||
       state.phase === "bonusResult"
     ){
-      const progress =
-        getBonusProgress();
-
-      const progressPercent =
-        Math.round(progress * 100);
-
-      el.className =
-        "dd2-build-text vm-build-text " +
-        "dd2-bonus-progress-build";
-
-      el.style.setProperty(
-        "--dd2-bonus-progress",
-        progress
-      );
-
-      let progressEl =
-        el.querySelector(
-          ".dd2-bonus-progress"
-        );
-
-      if (!progressEl){
-        el.innerHTML = `
-          <div class="dd2-bonus-progress">
-            <div class="dd2-bonus-progress-icons">
-              <div class="dd2-bonus-progress-head" aria-hidden="true"></div>
-              <div class="dd2-bonus-progress-flag" aria-hidden="true"></div>
-            </div>
-            <div class="dd2-bonus-progress-bar" aria-hidden="true">
-              <div class="dd2-bonus-progress-fill"></div>
-            </div>
-          </div>
-        `;
-
-        progressEl =
-          el.querySelector(
-            ".dd2-bonus-progress"
-          );
-      }
-
-      if (progressEl){
-        progressEl.setAttribute(
-          "aria-label",
-          `Bonus progress ${progressPercent}%`
-        );
-      }
-
+      renderBonusProgressBuild();
       return;
     }
 
@@ -6154,14 +6448,17 @@
     stopLoop();
     cleanupResize();
 
-    const earnedMedalIconHtml = completionResult?.newlyCompleted
-      ? medalIconHtmlForMode(selectedMode)
-      : "";
+    const completeIconHtml =
+      completionResult?.newlyCompleted
+        ? medalIconHtmlForMode(
+          selectedMode
+        )
+        : GAME_ICON_HTML;
 
     window.VerseGameShell.renderCompleteScreen({
       app,
       icon: GAME_ICON,
-      iconHtml: earnedMedalIconHtml,
+      iconHtml: completeIconHtml,
       gameIcon: GAME_ICON,
       mode: selectedMode,
       verseId: ctx.verseId,
@@ -6264,6 +6561,102 @@
       )
     );
   }
+
+  async function warmBonusDisplayFont() {
+    if (
+      !document.fonts ||
+      typeof document.fonts.load !==
+      "function"
+    ) {
+      return;
+    }
+
+    try {
+      await document.fonts.load(
+        '34px "DD2 Titan One"',
+        "BONUS ROUND SEE HOW LONG YOU CAN LAST"
+      );
+
+      const probe =
+        document.createElement(
+          "span"
+        );
+
+      probe.textContent =
+        "BONUS ROUND SEE HOW LONG YOU CAN LAST";
+
+      probe.style.position =
+        "fixed";
+
+      probe.style.left =
+        "-10000px";
+
+      probe.style.top =
+        "-10000px";
+
+      probe.style.whiteSpace =
+        "nowrap";
+
+      probe.style.fontFamily =
+        '"DD2 Titan One"';
+
+      probe.style.fontSize =
+        "34px";
+
+      probe.style.lineHeight =
+        "1";
+
+      document.body.appendChild(
+        probe
+      );
+
+      void probe.getBoundingClientRect();
+
+      probe.remove();
+    } catch (err) {
+      // Bonus can still load normally.
+    }
+  }
+
+  function warmHalfwayFeedResumeAssets() {
+    if (
+      halfwayFeedResumeWarmupPromise
+    ) {
+      return halfwayFeedResumeWarmupPromise;
+    }
+
+    halfwayFeedResumeWarmupPromise =
+      (async () => {
+        await preloadDinoSvg();
+
+        for (
+          const filename
+          of HALFWAY_FEED_RESUME_IMAGES
+        ) {
+          await waitForImagePrefetchTurn(
+            90
+          );
+
+          await preloadDecodedFeedImage(
+            filename
+          );
+        }
+
+        await waitForImagePrefetchTurn(
+          160
+        );
+
+        await warmBonusDisplayFont();
+
+        await preloadGameImageAssets();
+
+        return true;
+      })()
+        .catch(() => false);
+
+    return halfwayFeedResumeWarmupPromise;
+  }
+
 
 
   function waitForImagePrefetchTurn(
