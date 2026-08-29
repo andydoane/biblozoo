@@ -730,12 +730,7 @@
             id="vb2NapMessage"
             aria-live="polite"
           >
-            <span>
-              This is a long verse!
-            </span>
-            <span>
-              Versey Bird needs a quick nap!
-            </span>
+            This is a long verse! Versey Bird needs a quick nap!
           </div>
         </button>
       </div>
@@ -970,14 +965,8 @@
           "Tap to wake up Versey Bird"
         );
 
-        message.innerHTML = `
-          <span>
-            Alright, tap to wake up
-          </span>
-          <span>
-            Versey Bird!
-          </span>
-        `;
+        message.textContent =
+          "Tap to wake up Versey Bird!";
       },
       HALFWAY_NAP_SCENE_FADE_MS +
       HALFWAY_NAP_REST_MS
@@ -1938,14 +1927,17 @@
     stopLoop();
     cleanupResize();
 
-    const earnedMedalIconHtml = completionResult?.newlyCompleted
-      ? medalIconHtmlForMode(selectedMode)
-      : "";
+    const completeIconHtml =
+      completionResult?.newlyCompleted
+        ? medalIconHtmlForMode(
+            selectedMode
+          )
+        : GAME_ICON_HTML;
 
     window.VerseGameShell.renderCompleteScreen({
       app,
       icon: GAME_ICON,
-      iconHtml: earnedMedalIconHtml,
+      iconHtml: completeIconHtml,
       gameIcon: GAME_ICON,
       mode: selectedMode,
       verseId: ctx.verseId,
@@ -5489,18 +5481,6 @@
       const wordSize =
         getWordFontSize(cloud);
 
-      const danceDelay =
-        cloud.collected
-          ? "0ms"
-          : `${-(
-            (
-              ts +
-              cloud.id * 389
-            ) %
-            3600
-          )
-          }ms`;
-
       token.style.left =
         `${cloud.x}px`;
 
@@ -5536,9 +5516,6 @@
         "--word-size",
         `${wordSize}px`
       );
-
-      token.style.animationDelay =
-        danceDelay;
     }
 
     removeStaleVerseyBirdLayerNodes(

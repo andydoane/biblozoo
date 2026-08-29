@@ -319,29 +319,6 @@ body{
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  animation: vb2CloudHappyDance 3600ms ease-in-out infinite;
-}
-
-@keyframes vb2CloudHappyDance {
-  0% {
-    transform: translate(-50%, -50%) rotate(0deg) scale(1);
-  }
-
-  25% {
-    transform: translate(-50%, -50%) rotate(-1.4deg) scale(1.012);
-  }
-
-  50% {
-    transform: translate(-50%, -50%) rotate(0deg) scale(1);
-  }
-
-  75% {
-    transform: translate(-50%, -50%) rotate(1.4deg) scale(1.012);
-  }
-
-  100% {
-    transform: translate(-50%, -50%) rotate(0deg) scale(1);
-  }
 }
 
 .vb2-cloud-token.is-correct.vb2-collected{
@@ -723,8 +700,8 @@ body{
 .vb2-nap-bird {
   position: absolute;
   left: 50%;
-  top: max(2dvh,
-      env(safe-area-inset-top));
+  top: max(5dvh,
+      calc(env(safe-area-inset-top) + 10px));
   width: min(72vw, 540px);
   height: min(50dvh, 540px);
   object-fit: contain;
@@ -741,8 +718,8 @@ body{
   left:
     calc(50% + min(16vw, 118px));
   top:
-    max(6dvh,
-      calc(env(safe-area-inset-top) + 28px));
+    max(9dvh,
+      calc(env(safe-area-inset-top) + 40px));
   color: #7f66c6;
   font-family:
     var(--vb2-body-font);
@@ -805,6 +782,8 @@ body{
   align-items: center;
   justify-content: center;
   text-align: center;
+  text-wrap: balance;
+  white-space: normal;
   color: #ffffff;
   font-family:
     var(--vb2-body-font);
@@ -815,9 +794,6 @@ body{
   pointer-events: none;
 }
 
-.vb2-nap-message span {
-  display: block;
-}
 
 .vb2-nap-bird.is-pop {
   animation:
