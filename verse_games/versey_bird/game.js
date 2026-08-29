@@ -176,8 +176,8 @@
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
 
   const TARGET_VERSE_WAVES = 20;
-  const VERSE_PAIR_FOLLOW_SECONDS = 1.24;
-  const VERSE_PAIR_MIN_GAP_U = 0.68;
+  const VERSE_PAIR_FOLLOW_SECONDS = 0.93;
+  const VERSE_PAIR_MIN_GAP_U = 0.51;
   const VERSE_PAIR_VERTICAL_OFFSET_U = 0.52;
   const VERSE_PAIR_OBSTACLE_EXTRA_U = 2.4;
   const VERSE_PAIR_BEE_LEAD_SPAWN_U = 0.8;
@@ -299,6 +299,9 @@
   const DIAGNOSTIC_PREVIOUS_STORAGE_KEY =
     "biblozooDebug:versey_bird:previous:v1";
 
+  const FRESH_REPLAY_STORAGE_KEY =
+    "biblozooDebug:versey_bird:fresh_replay:v1";
+
   const DIAGNOSTIC_HEARTBEAT_MS =
     2000;
 
@@ -321,6 +324,37 @@
     renderCount: 0,
     skippedRenderCount: 0
   };
+
+  function requestFreshDocumentReplay() {
+    try {
+      sessionStorage.setItem(
+        FRESH_REPLAY_STORAGE_KEY,
+        "1"
+      );
+    } catch (err) {
+      // Best effort only.
+    }
+
+    window.location.reload();
+  }
+
+  function consumeFreshDocumentReplay() {
+    try {
+      const requested =
+        sessionStorage.getItem(
+          FRESH_REPLAY_STORAGE_KEY
+        ) === "1";
+
+      sessionStorage.removeItem(
+        FRESH_REPLAY_STORAGE_KEY
+      );
+
+      return requested;
+    } catch (err) {
+      return false;
+    }
+  }
+
 
   const state = {
     running: false,
@@ -397,7 +431,16 @@
   setupReferenceSegments();
   ensureSilenceAudio();
   installDiagnosticErrorHandlers();
-  renderIntro();
+
+  const freshReplayRequested =
+    consumeFreshDocumentReplay();
+
+  if (freshReplayRequested) {
+    renderModeSelect();
+  } else {
+    renderIntro();
+  }
+
   preloadBirdSvg();
   void preloadGameImageAssets();
 
@@ -919,7 +962,7 @@
       gameMessage: `Finished ${ctx.verseRef || "the verse"}`,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onPlayAgain: renderModeSelect,
+      onPlayAgain: requestFreshDocumentReplay,
       onMoreGames: () => window.VerseGameBridge.exitGame(),
       onChangeVerse: () => window.VerseGameBridge.returnToTitle()
     });
@@ -1908,7 +1951,11 @@
       .moderateStalls
       .length = 0;
 
+    const seriousStall =
+      reason === "serious-stall";
+
     if (
+      seriousStall ||
       adaptiveRenderState
         .recoveredOnce
     ) {
