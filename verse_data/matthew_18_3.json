@@ -18,6 +18,7 @@
   "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
   "hidePlan": [
     { "type": "emoji", "word": "turn", "occurrence": 1, "emoji": "↩️" },
+    { "type": "emoji", "word": "say", "occurrence": 1, "emoji": "🗣️" },
     { "type": "underscore", "word": "become", "occurrence": 1 },
     { "type": "emoji", "word": "children", "occurrence": 1, "emoji": "🧒👦" },
     { "type": "emoji", "word": "enter", "occurrence": 1, "emoji": "➡️🚪" },
