@@ -416,18 +416,10 @@
           0
         );
 
-    const prefixSegments =
-      Math.max(
-        0,
-        state.segments.length -
-        state.words.length
-      );
-
     return clamp(
-      prefixSegments +
       halfwayWordCount,
-      prefixSegments,
-      state.segments.length
+      0,
+      state.words.length
     );
   }
 
@@ -774,6 +766,8 @@
       return;
     }
 
+    ensureSilenceAudio();
+
     target.disabled = true;
 
     let wakeReady = false;
@@ -817,6 +811,10 @@
           return;
         }
 
+        if (!audioUnlocked) {
+          void unlockAudio();
+        }
+
         const now =
           performance.now();
 
@@ -852,7 +850,6 @@
         wakeReady = false;
         target.disabled = true;
 
-        void unlockAudio();
         void preloadBirdSvg();
 
         bird.src =
