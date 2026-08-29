@@ -175,6 +175,15 @@
   const FLYING_WORD_TRAVEL_SECONDS = 3.0;
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
 
+  const ADAPTIVE_RENDER_INTERVAL_MS = 30;
+  const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
+  const ADAPTIVE_RENDER_MODERATE_STALL_MS = 40;
+  const ADAPTIVE_RENDER_MODERATE_WINDOW_MS = 3000;
+  const ADAPTIVE_RENDER_MODERATE_COUNT = 3;
+  const ADAPTIVE_RENDER_STABLE_MS = 20000;
+  const ADAPTIVE_RENDER_POST_DROP_GRACE_MS = 2000;
+  const ADAPTIVE_RENDER_IGNORE_GAP_MS = 1000;
+
   const BONUS_WORDS = [
     { text: "BONUS", line: 0, delay: 0.15 },
     { text: "ROUND", line: 0, delay: 0.65 },
@@ -263,6 +272,16 @@
   let lastFlapSound = "";
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
+
+  const adaptiveRenderState = {
+    mode: "60fps",
+    locked30: false,
+    recoveredOnce: false,
+    entered30At: 0,
+    stableSince: 0,
+    moderateStalls: [],
+    lastRenderAt: 0
+  };
 
   const state = {
     running: false,
@@ -666,6 +685,8 @@
   }
 
   function resetStateForRun(){
+    resetAdaptiveRenderState();
+
     state.running = true;
     state.paused = false;
     state.pauseReason = "";
@@ -1064,6 +1085,222 @@
     state.birdAngle = 0;
   }
 
+  function resetAdaptiveRenderState() {
+    adaptiveRenderState.mode =
+      "60fps";
+
+    adaptiveRenderState.locked30 =
+      false;
+
+    adaptiveRenderState.recoveredOnce =
+      false;
+
+    adaptiveRenderState.entered30At =
+      0;
+
+    adaptiveRenderState.stableSince =
+      0;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    adaptiveRenderState.lastRenderAt =
+      0;
+  }
+
+  function enterAdaptive30fps(
+    ts
+  ) {
+    if (
+      adaptiveRenderState.mode ===
+      "30fps"
+    ) {
+      return;
+    }
+
+    adaptiveRenderState.mode =
+      "30fps";
+
+    adaptiveRenderState.entered30At =
+      ts;
+
+    adaptiveRenderState.stableSince =
+      ts;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+
+    if (
+      adaptiveRenderState
+        .recoveredOnce
+    ) {
+      adaptiveRenderState.locked30 =
+        true;
+    }
+  }
+
+  function updateAdaptiveRenderMode(
+    ts,
+    rawFrameMs
+  ) {
+    if (
+      state.paused ||
+      rawFrameMs <= 0
+    ) {
+      return;
+    }
+
+    if (
+      rawFrameMs >=
+      ADAPTIVE_RENDER_IGNORE_GAP_MS
+    ) {
+      adaptiveRenderState
+        .moderateStalls
+        .length = 0;
+
+      adaptiveRenderState.stableSince =
+        ts;
+
+      return;
+    }
+
+    if (
+      adaptiveRenderState.mode ===
+      "60fps"
+    ) {
+      const moderateStalls =
+        adaptiveRenderState
+          .moderateStalls;
+
+      const cutoff =
+        ts -
+        ADAPTIVE_RENDER_MODERATE_WINDOW_MS;
+
+      while (
+        moderateStalls.length &&
+        moderateStalls[0] < cutoff
+      ) {
+        moderateStalls.shift();
+      }
+
+      if (
+        rawFrameMs >=
+        ADAPTIVE_RENDER_MODERATE_STALL_MS
+      ) {
+        moderateStalls.push(ts);
+      }
+
+      if (
+        rawFrameMs >=
+        ADAPTIVE_RENDER_SERIOUS_STALL_MS
+      ) {
+        enterAdaptive30fps(ts);
+        return;
+      }
+
+      if (
+        moderateStalls.length >=
+        ADAPTIVE_RENDER_MODERATE_COUNT
+      ) {
+        enterAdaptive30fps(ts);
+      }
+
+      return;
+    }
+
+    if (
+      rawFrameMs > 33
+    ) {
+      adaptiveRenderState.stableSince =
+        ts;
+    } else if (
+      !adaptiveRenderState.stableSince
+    ) {
+      adaptiveRenderState.stableSince =
+        ts;
+    }
+
+    const inPostDropGrace =
+      !adaptiveRenderState.locked30 &&
+      adaptiveRenderState.entered30At &&
+      ts -
+      adaptiveRenderState.entered30At <
+      ADAPTIVE_RENDER_POST_DROP_GRACE_MS;
+
+    if (inPostDropGrace) {
+      return;
+    }
+
+    if (
+      rawFrameMs >=
+      ADAPTIVE_RENDER_SERIOUS_STALL_MS &&
+      !adaptiveRenderState.locked30
+    ) {
+      adaptiveRenderState.locked30 =
+        true;
+
+      return;
+    }
+
+    if (
+      adaptiveRenderState.locked30 ||
+      !adaptiveRenderState.stableSince
+    ) {
+      return;
+    }
+
+    if (
+      ts -
+      adaptiveRenderState
+        .stableSince <
+      ADAPTIVE_RENDER_STABLE_MS
+    ) {
+      return;
+    }
+
+    adaptiveRenderState.mode =
+      "60fps";
+
+    adaptiveRenderState.recoveredOnce =
+      true;
+
+    adaptiveRenderState
+      .moderateStalls
+      .length = 0;
+  }
+
+  function shouldRenderAdaptiveFrame(
+    ts
+  ) {
+    if (
+      adaptiveRenderState.mode !==
+      "30fps"
+    ) {
+      adaptiveRenderState.lastRenderAt =
+        ts;
+
+      return true;
+    }
+
+    if (
+      !adaptiveRenderState.lastRenderAt ||
+      ts -
+      adaptiveRenderState
+        .lastRenderAt >=
+      ADAPTIVE_RENDER_INTERVAL_MS
+    ) {
+      adaptiveRenderState.lastRenderAt =
+        ts;
+
+      return true;
+    }
+
+    return false;
+  }
+
+
   function startLoop(){
     stopLoop();
     state.running = true;
@@ -1086,17 +1323,52 @@
       return;
     }
 
-    if (!state.lastTs) state.lastTs = ts;
-    const dt = Math.min(0.033, Math.max(0, (ts - state.lastTs) / 1000));
+    const previousTs =
+      state.lastTs;
+
+    if (!state.lastTs) {
+      state.lastTs = ts;
+    }
+
+    const rawFrameMs =
+      previousTs
+        ? Math.max(
+            0,
+            ts - previousTs
+          )
+        : 0;
+
+    const dt =
+      Math.min(
+        0.033,
+        Math.max(
+          0,
+          (
+            ts -
+            state.lastTs
+          ) / 1000
+        )
+      );
+
     state.lastTs = ts;
 
     if (!state.paused) {
       update(dt, ts);
     }
 
-    render(ts);
+    updateAdaptiveRenderMode(
+      ts,
+      rawFrameMs
+    );
 
-    state.rafId = requestAnimationFrame(tick);
+    if (
+      shouldRenderAdaptiveFrame(ts)
+    ) {
+      render(ts);
+    }
+
+    state.rafId =
+      requestAnimationFrame(tick);
   }
 
   function update(dt, ts){
@@ -1910,118 +2182,401 @@
     renderHillStrips();
   }
 
-  function renderBackgroundClouds() {
-    const layer = document.getElementById("vb2BgClouds");
-    if (!layer || !state.layout) return;
+  const verseyBirdLayerNodeCaches =
+    new WeakMap();
 
-    layer.innerHTML = state.bgClouds.map(cloud => {
-      const shape = CLOUD_SHAPES[cloud.shapeKey];
-      return `
-        <div class="vb2-bg-cloud"
-             style="
-               --x:${cloud.x}px;
-               --y:${cloud.y}px;
-               --w:${cloud.w}px;
-               --h:${cloud.h}px;
-               --opacity:${cloud.opacity};
-               --cloud-img:url('${IMAGE_PATH}${shape.image}');
-             ">
-        </div>
-      `;
-    }).join("");
+  function getVerseyBirdLayerNodeCache(
+    layer
+  ) {
+    let cache =
+      verseyBirdLayerNodeCaches.get(
+        layer
+      );
+
+    if (!cache) {
+      cache = new Map();
+
+      verseyBirdLayerNodeCaches.set(
+        layer,
+        cache
+      );
+    }
+
+    return cache;
   }
 
-  function renderPoofs(){
-    const layer = document.getElementById("vb2Poofs");
-    if (!layer || !state.layout) return;
+  function getOrCreateVerseyBirdLayerNode(
+    layer,
+    cache,
+    key,
+    className
+  ) {
+    let node = cache.get(key);
 
-    layer.innerHTML = state.poofs.map(poof => {
-      const p = clamp(poof.age / poof.life, 0, 1);
-      const grow = Number.isFinite(poof.grow) ? poof.grow : 0.65;
-      const size = poof.size * (1 + p * grow);
-      const opacity = (poof.opacity || 1) * (1 - p);
-      const rotation = poof.rotation || 0;
+    if (!node) {
+      node =
+        document.createElement("div");
 
-      if (poof.image) {
-        return `
-          <div class="vb2-poof vb2-poof--image"
-               style="
-                 left:${poof.x}px;
-                 top:${poof.y}px;
-                 width:${size}px;
-                 height:${size}px;
-                 opacity:${opacity};
-                 transform: translate(-50%, -50%) rotate(${rotation}deg);
-                 --poof-img:url('${IMAGE_PATH}${poof.image}');
-               ">
-          </div>
-        `;
+      node.className = className;
+
+      layer.appendChild(node);
+      cache.set(key, node);
+    }
+
+    return node;
+  }
+
+  function removeStaleVerseyBirdLayerNodes(
+    cache,
+    liveKeys
+  ) {
+    for (
+      const [key, node]
+      of cache
+    ) {
+      if (liveKeys.has(key)) {
+        continue;
       }
 
-      const color = poof.color || "rgba(255,255,255,0.78)";
-      const ringColor = poof.ringColor || "rgba(255,255,255,0.30)";
-
-      return `
-        <div class="vb2-poof"
-             style="
-               left:${poof.x}px;
-               top:${poof.y}px;
-               width:${size}px;
-               height:${size}px;
-               opacity:${opacity};
-               --poof-color:${color};
-               --poof-ring-color:${ringColor};
-             ">
-        </div>
-      `;
-    }).join("");
+      node.remove();
+      cache.delete(key);
+    }
   }
 
-  function renderBirdTrail() {
-    const layer = document.getElementById("vb2BirdTrailLayer");
-    if (!layer || !state.layout) return;
 
-    if (!state.birdTrailDots.length && !state.birdTrailSparkles.length) {
-      if (layer.innerHTML) layer.innerHTML = "";
+  function renderBackgroundClouds() {
+    const layer =
+      document.getElementById(
+        "vb2BgClouds"
+      );
+
+    if (!layer || !state.layout) {
       return;
     }
 
-    const dotsHtml = state.birdTrailDots.map(dot => {
-      const p = clamp(dot.age / dot.life, 0, 1);
-      const size = dot.size * (1 - p * 0.32);
-      const opacity = dot.opacity * (1 - p);
-      return `
-        <div class="vb2-bird-trail-dot"
-             style="
-               --x:${dot.x}px;
-               --y:${dot.y}px;
-               --size:${size}px;
-               --trail-color:${dot.color};
-               opacity:${opacity};
-             ">
-        </div>
-      `;
-    }).join("");
+    const cache =
+      getVerseyBirdLayerNodeCache(
+        layer
+      );
 
-    const sparklesHtml = state.birdTrailSparkles.map(sparkle => {
-      const p = clamp(sparkle.age / sparkle.life, 0, 1);
-      const size = sparkle.size * (1 - p * 0.18);
-      const opacity = sparkle.opacity * (1 - p);
-      return `
-        <div class="vb2-bird-trail-sparkle"
-             style="
-               --x:${sparkle.x}px;
-               --y:${sparkle.y}px;
-               --size:${size}px;
-               --sparkle-color:${sparkle.color};
-               --rotation:${sparkle.rotation}deg;
-               opacity:${opacity};
-             ">
-        </div>
-      `;
-    }).join("");
+    const liveKeys = new Set();
 
-    layer.innerHTML = dotsHtml + sparklesHtml;
+    for (const cloud of state.bgClouds) {
+      const shape =
+        CLOUD_SHAPES[cloud.shapeKey];
+
+      const key =
+        `bg-cloud:${cloud.id}`;
+
+      liveKeys.add(key);
+
+      const node =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          "vb2-bg-cloud"
+        );
+
+      if (
+        node.dataset.shapeKey !==
+        cloud.shapeKey
+      ) {
+        node.dataset.shapeKey =
+          cloud.shapeKey;
+
+        node.style.setProperty(
+          "--cloud-img",
+          `url('${IMAGE_PATH}${shape.image}')`
+        );
+      }
+
+      node.style.setProperty(
+        "--x",
+        `${cloud.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${cloud.y}px`
+      );
+
+      node.style.setProperty(
+        "--w",
+        `${cloud.w}px`
+      );
+
+      node.style.setProperty(
+        "--h",
+        `${cloud.h}px`
+      );
+
+      node.style.setProperty(
+        "--opacity",
+        `${cloud.opacity}`
+      );
+    }
+
+    removeStaleVerseyBirdLayerNodes(
+      cache,
+      liveKeys
+    );
+  }
+
+  function renderPoofs() {
+    const layer =
+      document.getElementById(
+        "vb2Poofs"
+      );
+
+    if (!layer || !state.layout) {
+      return;
+    }
+
+    const cache =
+      getVerseyBirdLayerNodeCache(
+        layer
+      );
+
+    const liveKeys = new Set();
+
+    for (const poof of state.poofs) {
+      const key =
+        `poof:${poof.id}`;
+
+      liveKeys.add(key);
+
+      const node =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          poof.image
+            ? "vb2-poof vb2-poof--image"
+            : "vb2-poof"
+        );
+
+      const p =
+        clamp(
+          poof.age / poof.life,
+          0,
+          1
+        );
+
+      const grow =
+        Number.isFinite(poof.grow)
+          ? poof.grow
+          : 0.65;
+
+      const size =
+        poof.size *
+        (1 + p * grow);
+
+      const opacity =
+        (poof.opacity || 1) *
+        (1 - p);
+
+      node.style.left =
+        `${poof.x}px`;
+
+      node.style.top =
+        `${poof.y}px`;
+
+      node.style.width =
+        `${size}px`;
+
+      node.style.height =
+        `${size}px`;
+
+      node.style.opacity =
+        `${opacity}`;
+
+      if (poof.image) {
+        const rotation =
+          poof.rotation || 0;
+
+        node.style.transform =
+          `translate(-50%, -50%) ` +
+          `rotate(${rotation}deg)`;
+
+        if (
+          node.dataset.poofImage !==
+          poof.image
+        ) {
+          node.dataset.poofImage =
+            poof.image;
+
+          node.style.setProperty(
+            "--poof-img",
+            `url('${IMAGE_PATH}${poof.image}')`
+          );
+        }
+      } else {
+        const color =
+          poof.color ||
+          "rgba(255,255,255,0.78)";
+
+        const ringColor =
+          poof.ringColor ||
+          "rgba(255,255,255,0.30)";
+
+        node.style.setProperty(
+          "--poof-color",
+          color
+        );
+
+        node.style.setProperty(
+          "--poof-ring-color",
+          ringColor
+        );
+      }
+    }
+
+    removeStaleVerseyBirdLayerNodes(
+      cache,
+      liveKeys
+    );
+  }
+
+  function renderBirdTrail() {
+    const layer =
+      document.getElementById(
+        "vb2BirdTrailLayer"
+      );
+
+    if (!layer || !state.layout) {
+      return;
+    }
+
+    const cache =
+      getVerseyBirdLayerNodeCache(
+        layer
+      );
+
+    const liveKeys = new Set();
+
+    for (
+      const dot
+      of state.birdTrailDots
+    ) {
+      const key =
+        `trail-dot:${dot.id}`;
+
+      liveKeys.add(key);
+
+      const node =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          "vb2-bird-trail-dot"
+        );
+
+      const p =
+        clamp(
+          dot.age / dot.life,
+          0,
+          1
+        );
+
+      const size =
+        dot.size *
+        (1 - p * 0.32);
+
+      const opacity =
+        dot.opacity *
+        (1 - p);
+
+      node.style.setProperty(
+        "--x",
+        `${dot.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${dot.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${size}px`
+      );
+
+      node.style.setProperty(
+        "--trail-color",
+        dot.color
+      );
+
+      node.style.opacity =
+        `${opacity}`;
+    }
+
+    for (
+      const sparkle
+      of state.birdTrailSparkles
+    ) {
+      const key =
+        `trail-sparkle:${sparkle.id}`;
+
+      liveKeys.add(key);
+
+      const node =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          "vb2-bird-trail-sparkle"
+        );
+
+      const p =
+        clamp(
+          sparkle.age /
+          sparkle.life,
+          0,
+          1
+        );
+
+      const size =
+        sparkle.size *
+        (1 - p * 0.18);
+
+      const opacity =
+        sparkle.opacity *
+        (1 - p);
+
+      node.style.setProperty(
+        "--x",
+        `${sparkle.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${sparkle.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${size}px`
+      );
+
+      node.style.setProperty(
+        "--sparkle-color",
+        sparkle.color
+      );
+
+      node.style.setProperty(
+        "--rotation",
+        `${sparkle.rotation}deg`
+      );
+
+      node.style.opacity =
+        `${opacity}`;
+    }
+
+    removeStaleVerseyBirdLayerNodes(
+      cache,
+      liveKeys
+    );
   }
 
   function renderWordCloud(ts) {
@@ -2076,70 +2631,272 @@
     token.style.animationDelay = danceDelay;
   }
   
-
   function renderObstacles() {
-    const layer = document.getElementById("vb2Obstacles");
-    if (!layer || !state.layout) return;
+    const layer =
+      document.getElementById(
+        "vb2Obstacles"
+      );
 
-    const dotsHtml = state.beeTrailDots.map(dot => {
-      const p = clamp(dot.age / dot.life, 0, 1);
-      const opacity = 0.50 * (1 - p);
-      const size = dot.size * (1 - p * 0.10);
-      return `
-        <div class="vb2-bee-trail-dot"
-             style="
-               --x:${dot.x}px;
-               --y:${dot.y}px;
-               --size:${size}px;
-               opacity:${opacity};
-             ">
-        </div>
-      `;
-    }).join("");
+    if (!layer || !state.layout) {
+      return;
+    }
 
-    const obstacleHtml = state.obstacles.map(obstacle => {
-      const hitClass = obstacle.hit ? " is-hit" : "";
-      return `
-        <div class="vb2-obstacle vb2-obstacle--${obstacle.type}${hitClass}"
-             style="
-               --x:${obstacle.x}px;
-               --y:${obstacle.y}px;
-               --w:${obstacle.w}px;
-               --h:${obstacle.h}px;
-             ">
-        </div>
-      `;
-    }).join("");
+    const cache =
+      getVerseyBirdLayerNodeCache(
+        layer
+      );
 
-    layer.innerHTML = dotsHtml + obstacleHtml;
+    const liveKeys = new Set();
+
+    for (
+      const dot
+      of state.beeTrailDots
+    ) {
+      const key =
+        `bee-trail:${dot.id}`;
+
+      liveKeys.add(key);
+
+      const node =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          "vb2-bee-trail-dot"
+        );
+
+      const p =
+        clamp(
+          dot.age / dot.life,
+          0,
+          1
+        );
+
+      const opacity =
+        0.50 * (1 - p);
+
+      const size =
+        dot.size *
+        (1 - p * 0.10);
+
+      node.style.setProperty(
+        "--x",
+        `${dot.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${dot.y}px`
+      );
+
+      node.style.setProperty(
+        "--size",
+        `${size}px`
+      );
+
+      node.style.opacity =
+        `${opacity}`;
+    }
+
+    for (
+      const obstacle
+      of state.obstacles
+    ) {
+      const key =
+        `obstacle:${obstacle.id}`;
+
+      liveKeys.add(key);
+
+      const node =
+        getOrCreateVerseyBirdLayerNode(
+          layer,
+          cache,
+          key,
+          `vb2-obstacle ` +
+          `vb2-obstacle--${obstacle.type}`
+        );
+
+      node.classList.toggle(
+        "is-hit",
+        obstacle.hit
+      );
+
+      node.style.setProperty(
+        "--x",
+        `${obstacle.x}px`
+      );
+
+      node.style.setProperty(
+        "--y",
+        `${obstacle.y}px`
+      );
+
+      node.style.setProperty(
+        "--w",
+        `${obstacle.w}px`
+      );
+
+      node.style.setProperty(
+        "--h",
+        `${obstacle.h}px`
+      );
+    }
+
+    removeStaleVerseyBirdLayerNodes(
+      cache,
+      liveKeys
+    );
   }
 
-  function renderPipes(){
-    const layer = document.getElementById("vb2Pipes");
-    if (!layer || !state.layout) return;
+  function renderPipes() {
+    const layer =
+      document.getElementById(
+        "vb2Pipes"
+      );
+
+    if (!layer || !state.layout) {
+      return;
+    }
+
+    const cache =
+      getVerseyBirdLayerNodeCache(
+        layer
+      );
+
+    const liveKeys = new Set();
 
     const layout = state.layout;
     const capH = layout.pipeCapH;
-    const pieces = [];
 
-    for (const pipe of state.bonusPipes){
-      const gapTop = pipe.gapY - pipe.gap * 0.5;
-      const gapBottom = pipe.gapY + pipe.gap * 0.5;
-      const topPieceH = Math.max(0, gapTop + 2);
-      const bottomPieceTop = gapBottom - 2;
-      const bottomPieceH = Math.max(layout.pipeMinH, layout.groundY - bottomPieceTop + 4);
-      const capOverlap = Math.max(1, layout.unit * 0.035);
+    for (
+      const pipe
+      of state.bonusPipes
+    ) {
+      const key =
+        `pipe:${pipe.id}`;
 
-      pieces.push(`
-        <div class="vb2-pipe-piece" style="--x:${pipe.x}px; --pipe-w:${layout.pipeW}px; top:0px; height:${topPieceH}px;"></div>
-        <div class="vb2-pipe-cap vb2-pipe-cap--top" style="--x:${pipe.x}px; --pipe-w:${layout.pipeW}px; top:${gapTop - capH + capOverlap}px; height:${capH}px;"></div>
-        <div class="vb2-pipe-piece" style="--x:${pipe.x}px; --pipe-w:${layout.pipeW}px; top:${bottomPieceTop}px; height:${bottomPieceH}px;"></div>
-        <div class="vb2-pipe-cap vb2-pipe-cap--bottom" style="--x:${pipe.x}px; --pipe-w:${layout.pipeW}px; top:${gapBottom - capOverlap}px; height:${capH}px;"></div>
-      `);
+      liveKeys.add(key);
+
+      let pair = cache.get(key);
+
+      if (!pair) {
+        pair =
+          document.createElement(
+            "div"
+          );
+
+        pair.className =
+          "vb2-pipe-pair";
+
+        pair.innerHTML = `
+          <div class="vb2-pipe-piece"></div>
+          <div class="vb2-pipe-cap vb2-pipe-cap--top"></div>
+          <div class="vb2-pipe-piece"></div>
+          <div class="vb2-pipe-cap vb2-pipe-cap--bottom"></div>
+        `;
+
+        layer.appendChild(pair);
+        cache.set(key, pair);
+      }
+
+      const topPiece =
+        pair.children[0];
+
+      const topCap =
+        pair.children[1];
+
+      const bottomPiece =
+        pair.children[2];
+
+      const bottomCap =
+        pair.children[3];
+
+      const gapTop =
+        pipe.gapY -
+        pipe.gap * 0.5;
+
+      const gapBottom =
+        pipe.gapY +
+        pipe.gap * 0.5;
+
+      const topPieceH =
+        Math.max(
+          0,
+          gapTop + 2
+        );
+
+      const bottomPieceTop =
+        gapBottom - 2;
+
+      const bottomPieceH =
+        Math.max(
+          layout.pipeMinH,
+          layout.groundY -
+          bottomPieceTop +
+          4
+        );
+
+      const capOverlap =
+        Math.max(
+          1,
+          layout.unit * 0.035
+        );
+
+      const pipeNodes = [
+        topPiece,
+        topCap,
+        bottomPiece,
+        bottomCap
+      ];
+
+      for (const node of pipeNodes) {
+        node.style.setProperty(
+          "--x",
+          `${pipe.x}px`
+        );
+
+        node.style.setProperty(
+          "--pipe-w",
+          `${layout.pipeW}px`
+        );
+      }
+
+      topPiece.style.top =
+        "0px";
+
+      topPiece.style.height =
+        `${topPieceH}px`;
+
+      topCap.style.top =
+        `${gapTop -
+        capH +
+        capOverlap
+        }px`;
+
+      topCap.style.height =
+        `${capH}px`;
+
+      bottomPiece.style.top =
+        `${bottomPieceTop}px`;
+
+      bottomPiece.style.height =
+        `${bottomPieceH}px`;
+
+      bottomCap.style.top =
+        `${gapBottom -
+        capOverlap
+        }px`;
+
+      bottomCap.style.height =
+        `${capH}px`;
     }
 
-    layer.innerHTML = pieces.join("");
+    removeStaleVerseyBirdLayerNodes(
+      cache,
+      liveKeys
+    );
   }
+
 
   function renderBird(ts){
     const bird = document.getElementById("vb2Bird");

@@ -254,6 +254,7 @@ body{
 
 .vb2-obstacle {
   position: absolute;
+  z-index: 1;
   left: var(--x);
   top: var(--y);
   width: var(--w);
@@ -302,6 +303,7 @@ body{
 
 .vb2-bee-trail-dot {
   position: absolute;
+  z-index: 0;
   left: var(--x);
   top: var(--y);
   width: var(--size);
@@ -414,6 +416,7 @@ body{
 
 .vb2-bird-trail-dot {
   position: absolute;
+  z-index: 0;
   left: var(--x);
   top: var(--y);
   width: var(--size);
@@ -427,6 +430,7 @@ body{
 
 .vb2-bird-trail-sparkle {
   position: absolute;
+  z-index: 1;
   left: var(--x);
   top: var(--y);
   width: var(--size);
