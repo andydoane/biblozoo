@@ -176,11 +176,11 @@
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
 
   const TARGET_VERSE_WAVES = 20;
-  const VERSE_PAIR_FOLLOW_SECONDS = 0.62;
-  const VERSE_PAIR_MIN_GAP_U = 0.34;
+  const VERSE_PAIR_FOLLOW_SECONDS = 1.24;
+  const VERSE_PAIR_MIN_GAP_U = 0.68;
   const VERSE_PAIR_VERTICAL_OFFSET_U = 0.52;
   const VERSE_PAIR_OBSTACLE_EXTRA_U = 2.4;
-  const VERSE_PAIR_BEE_GUARD_GAP_U = 0.85;
+  const VERSE_PAIR_BEE_LEAD_SPAWN_U = 0.8;
 
   const ADAPTIVE_RENDER_INTERVAL_MS = 30;
   const ADAPTIVE_RENDER_SERIOUS_STALL_MS = 75;
@@ -2670,44 +2670,6 @@
     );
   }
 
-  function getPairedWaveRightEdge() {
-    let rightEdge = null;
-
-    const leadCloud =
-      state.wordCloud;
-
-    if (
-      leadCloud &&
-      leadCloud.pairedWave
-    ) {
-      rightEdge =
-        leadCloud.x +
-        leadCloud.w * 0.5;
-    }
-
-    const followerCloud =
-      state.wordCloudFollower;
-
-    if (
-      followerCloud &&
-      followerCloud.pairedWave
-    ) {
-      const followerRightEdge =
-        followerCloud.x +
-        followerCloud.w * 0.5;
-
-      rightEdge =
-        rightEdge === null
-          ? followerRightEdge
-          : Math.max(
-              rightEdge,
-              followerRightEdge
-            );
-    }
-
-    return rightEdge;
-  }
-
   function removeVerseCloudById(
     cloudId
   ) {
@@ -3066,9 +3028,6 @@
           chooseCorrectOrDecoy()
       });
 
-    leadCloud.pairedWave =
-      pairedWave;
-
     state.wordCloud = leadCloud;
     state.wordCloudFollower = null;
 
@@ -3077,7 +3036,7 @@
         state.progressIndex +
         (leadCloud.correct ? 1 : 0);
 
-      const followerCloud =
+      state.wordCloudFollower =
         createVerseCloud({
           phase,
           targetProgressIndex:
@@ -3090,12 +3049,6 @@
             leadCloud.label
           ]
         });
-
-      followerCloud.pairedWave =
-        true;
-
-      state.wordCloudFollower =
-        followerCloud;
     }
 
     tickObstacleCloudRhythm(
@@ -3234,16 +3187,21 @@
     const baseY =
       layout.lanes[laneIndex];
 
+    const pairedWaveBee =
+      extraSpawnOffsetU > 0;
+
+    const spawnX =
+      pairedWaveBee
+        ? layout.width +
+          layout.unit *
+          VERSE_PAIR_BEE_LEAD_SPAWN_U
+        : layout.width +
+          layout.unit * 4.2;
+
     state.obstacles.push({
       id: state.nextObstacleId++,
       type: "bee",
-      x:
-        layout.width +
-        layout.unit *
-        (
-          4.2 +
-          extraSpawnOffsetU
-        ),
+      x: spawnX,
       y: baseY,
       baseY,
       laneIndex,
@@ -3310,9 +3268,6 @@
     const speed = getWorldSpeed();
     const beeSpeed = speed * 1.5;
 
-    const pairedWaveRightEdge =
-      getPairedWaveRightEdge();
-
     for (const obstacle of state.obstacles) {
       obstacle.age += dt;
 
@@ -3327,25 +3282,6 @@
         const extraLift = obstacle.hit ? -hitElapsed * layout.unit * 1.15 : 0;
 
         obstacle.x -= currentBeeSpeed * dt;
-
-        if (
-          !obstacle.hit &&
-          pairedWaveRightEdge !== null &&
-          obstacle.x >
-            pairedWaveRightEdge
-        ) {
-          const minimumBeeX =
-            pairedWaveRightEdge +
-            obstacle.w * 0.5 +
-            layout.unit *
-              VERSE_PAIR_BEE_GUARD_GAP_U;
-
-          obstacle.x =
-            Math.max(
-              obstacle.x,
-              minimumBeeX
-            );
-        }
 
         obstacle.y = obstacle.baseY
           + Math.sin(obstacle.age * waveRate + obstacle.wavePhase) * amplitude
