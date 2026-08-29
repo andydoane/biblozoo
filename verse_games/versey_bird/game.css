@@ -319,7 +319,6 @@ body{
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
-  filter: drop-shadow(0 7px 0 rgba(0,0,0,0.10));
   animation: vb2CloudHappyDance 3600ms ease-in-out infinite;
 }
 

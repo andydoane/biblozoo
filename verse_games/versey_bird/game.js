@@ -176,6 +176,7 @@
   const FLYING_MESSAGE_GRACE_SECONDS = 0.25;
 
   const TARGET_VERSE_WAVES = 20;
+  const BASE_VERSE_DECOY_CHANCE = 0.28;
   const VERSE_PAIR_FOLLOW_SECONDS = 0.93;
   const VERSE_PAIR_MIN_GAP_U = 0.51;
   const VERSE_PAIR_VERTICAL_OFFSET_U = 0.52;
@@ -3396,6 +3397,58 @@
     flash("rgba(255, 90, 81, 0.25)", 130);
   }
 
+  function getVerseLengthDecoyScale() {
+    if (
+      getCurrentPhase() !== "words"
+    ) {
+      return 1;
+    }
+
+    const wordCount =
+      state.words.length;
+
+    if (
+      wordCount <=
+      TARGET_VERSE_WAVES
+    ) {
+      return 1;
+    }
+
+    const targetWaves =
+      Math.max(
+        TARGET_VERSE_WAVES,
+        Math.ceil(
+          wordCount / 2
+        )
+      );
+
+    const baselineExpectedWaves =
+      TARGET_VERSE_WAVES /
+      (
+        1 -
+        BASE_VERSE_DECOY_CHANCE
+      );
+
+    const desiredCorrectChance =
+      clamp(
+        targetWaves /
+        baselineExpectedWaves,
+        0,
+        1
+      );
+
+    const desiredDecoyChance =
+      1 -
+      desiredCorrectChance;
+
+    return clamp(
+      desiredDecoyChance /
+      BASE_VERSE_DECOY_CHANCE,
+      0,
+      1
+    );
+  }
+
   function chooseCorrectOrDecoy(){
     if (state.forceCorrectNext){
       state.forceCorrectNext = false;
@@ -3407,13 +3460,21 @@
     const decoyRun = countRun(false);
     const correctRun = countRun(true);
 
-    let decoyChance = 0.28;
+    let decoyChance =
+      BASE_VERSE_DECOY_CHANCE;
+
     if (decoyRun >= 2) decoyChance = 0;
     else if (correctRun >= 4) decoyChance = 0.62;
     else if (correctRun >= 3) decoyChance = 0.42;
     else if (history.length >= 3 && !history.includes(false)) decoyChance = 0.48;
 
-    const isDecoy = Math.random() < decoyChance;
+    decoyChance *=
+      getVerseLengthDecoyScale();
+
+    const isDecoy =
+      Math.random() <
+      decoyChance;
+
     const isCorrect = !isDecoy;
     rememberSpawn(isCorrect);
     return isCorrect;
