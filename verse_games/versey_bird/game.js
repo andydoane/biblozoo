@@ -3017,6 +3017,21 @@
   const verseyBirdLayerNodeCaches =
     new WeakMap();
 
+  const verseyBirdLayerNodePools =
+    new Map();
+
+  const VERSEY_BIRD_NODE_POOL_LIMIT =
+    64;
+
+  const VERSEY_BIRD_POOLABLE_CLASSES =
+    new Set([
+      "vb2-poof",
+      "vb2-poof vb2-poof--image",
+      "vb2-bird-trail-dot",
+      "vb2-bird-trail-sparkle",
+      "vb2-bee-trail-dot"
+    ]);
+
   function getVerseyBirdLayerNodeCache(
     layer
   ) {
@@ -3037,6 +3052,26 @@
     return cache;
   }
 
+  function getVerseyBirdLayerNodePool(
+    className
+  ) {
+    let pool =
+      verseyBirdLayerNodePools.get(
+        className
+      );
+
+    if (!pool) {
+      pool = [];
+
+      verseyBirdLayerNodePools.set(
+        className,
+        pool
+      );
+    }
+
+    return pool;
+  }
+
   function getOrCreateVerseyBirdLayerNode(
     layer,
     cache,
@@ -3046,10 +3081,36 @@
     let node = cache.get(key);
 
     if (!node) {
-      node =
-        document.createElement("div");
+      const isPoolable =
+        VERSEY_BIRD_POOLABLE_CLASSES.has(
+          className
+        );
 
-      node.className = className;
+      if (isPoolable) {
+        const pool =
+          getVerseyBirdLayerNodePool(
+            className
+          );
+
+        node =
+          pool.pop() ||
+          null;
+      }
+
+      if (!node) {
+        node =
+          document.createElement("div");
+      }
+
+      node.className =
+        className;
+
+      if (isPoolable) {
+        node.dataset.vb2PoolClass =
+          className;
+      } else {
+        delete node.dataset.vb2PoolClass;
+      }
 
       layer.appendChild(node);
       cache.set(key, node);
@@ -3070,8 +3131,28 @@
         continue;
       }
 
+      const poolClass =
+        node.dataset.vb2PoolClass ||
+        "";
+
       node.remove();
       cache.delete(key);
+
+      if (!poolClass) {
+        continue;
+      }
+
+      const pool =
+        getVerseyBirdLayerNodePool(
+          poolClass
+        );
+
+      if (
+        pool.length <
+        VERSEY_BIRD_NODE_POOL_LIMIT
+      ) {
+        pool.push(node);
+      }
     }
   }
 

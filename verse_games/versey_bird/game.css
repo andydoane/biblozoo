@@ -263,7 +263,6 @@ body{
   background-repeat: no-repeat;
   background-size: contain;
   background-position: center;
-  will-change: left, top, transform;
 }
 
 .vb2-obstacle--bee {
@@ -324,7 +323,6 @@ body{
   background-position: center;
   filter: drop-shadow(0 7px 0 rgba(0,0,0,0.10));
   animation: vb2CloudHappyDance 3600ms ease-in-out infinite;
-  will-change: transform;
 }
 
 @keyframes vb2CloudHappyDance {
@@ -396,7 +394,6 @@ body{
   transform: translate(-50%, -50%);
   background: var(--poof-color, rgba(255,255,255,0.78));
   box-shadow: 0 0 0 2px var(--poof-ring-color, rgba(255,255,255,0.30)) inset;
-  will-change: left, top, width, height, opacity;
 }
 
 .vb2-poof--image {
@@ -407,7 +404,6 @@ body{
   background-repeat: no-repeat;
   background-position: center;
   box-shadow: none;
-  will-change: left, top, width, height, opacity, transform;
 }
 
 .vb2-bird-trail-layer {
@@ -425,7 +421,6 @@ body{
   transform: translate(-50%, -50%);
   background: var(--trail-color);
   box-shadow: 0 0 8px var(--trail-color);
-  will-change: left, top, width, height, opacity;
 }
 
 .vb2-bird-trail-sparkle {
@@ -448,7 +443,6 @@ body{
       2% 35%,
       39% 34%);
   filter: drop-shadow(0 0 6px var(--sparkle-color));
-  will-change: left, top, width, height, opacity, transform;
 }
 
 .vb2-bird-layer{
