@@ -267,12 +267,10 @@ body{
 
 .vb2-obstacle--bee {
   background-image: url("./versey_bird_images/versey_bird_bee.svg");
-  filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.10));
 }
 
 .vb2-obstacle--boulder {
   background-image: url("./versey_bird_images/versey_bird_boulder.png");
-  filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.12));
 }
 
 .vb2-obstacle.is-hit {

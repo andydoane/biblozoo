@@ -2459,14 +2459,14 @@
     state.birdTrailCooldown -= dt;
     if (state.birdTrailCooldown <= 0) {
       addBirdTrailDot(level);
-      state.birdTrailCooldown = level >= 3 ? 0.034 : 0.044;
+      state.birdTrailCooldown = level >= 3 ? 0.068 : 0.088;
     }
 
     if (level >= 2) {
       state.birdSparkleCooldown -= dt;
       if (state.birdSparkleCooldown <= 0) {
         addBirdTrailSparkle(level);
-        state.birdSparkleCooldown = level >= 4 ? 0.075 : 0.13;
+        state.birdSparkleCooldown = level >= 4 ? 0.150 : 0.260;
       }
     }
 
@@ -2748,7 +2748,7 @@
 
         if (!obstacle.hit && obstacle.trailCooldown <= 0) {
           addBeeTrailDot(obstacle);
-          obstacle.trailCooldown = 0.045;
+          obstacle.trailCooldown = 0.090;
         }
       } else {
         obstacle.x -= speed * dt;
