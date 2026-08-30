@@ -282,6 +282,16 @@
     { key: "bird", image: "dino_dash_bird.svg", heightU: 0.60, speedMult: 1.25 }
   ];
 
+  const GAMEPLAY_OBSTACLE_IMAGES = [
+    "dino_dash_ground_gap.png",
+    ...GROUND_OBSTACLES.map(
+      item => item.image
+    ),
+    ...AIR_OBSTACLES.map(
+      item => item.image
+    )
+  ];
+
   const PARTICLE_COLORS = {
     rainbow: ["#ff5a51", "#ff9f43", "#ffc751", "#7ed957", "#38bdf8", "#7f66c6", "#ff7ab6"],
     white: ["rgba(255,255,255,0.96)", "rgba(245,252,255,0.92)"],
@@ -308,6 +318,7 @@
   const audioBufferPromises = new Map();
   const halfwayFeedImagePreloads = [];
   let halfwayFeedResumeWarmupPromise = null;
+  let gameplayObstacleWarmupPromise = null;
 
   const groundImage = new Image();
   groundImage.src =
@@ -466,6 +477,8 @@
 
   const halfwayFeedImagesReady =
     preloadHalfwayFeedImages();
+
+  void warmGameplayObstacleImages();
 
   const halfwayFeedCheckpoint =
     readHalfwayFeedCheckpoint();
@@ -4750,26 +4763,91 @@
     return 1;
   }
 
-  function updateTablets(dt, ts){
+  function getTabletTargetProgressIndex(
+    tablet
+  ) {
+    return Number.isFinite(
+      tablet &&
+      tablet.targetProgressIndex
+    )
+      ? tablet.targetProgressIndex
+      : state.progressIndex;
+  }
+
+  function retireFutureTargetTablets() {
+    for (
+      const tablet
+      of state.tablets
+    ) {
+      if (
+        tablet.collected ||
+        tablet.expired
+      ) {
+        continue;
+      }
+
+      const targetProgressIndex =
+        getTabletTargetProgressIndex(
+          tablet
+        );
+
+      if (
+        targetProgressIndex >
+        state.progressIndex
+      ) {
+        tablet.expired = true;
+      }
+    }
+  }
+
+
+
+  function updateTablets(dt, ts) {
     const speed =
       getActiveWorldSpeedU() *
       state.layout.unit;
 
+    /*
+      Freeze progress eligibility for
+      this physics update.
+
+      Collecting one tablet may advance
+      state.progressIndex, but a follower
+      for the next word cannot become
+      active until the next update.
+    */
+    const progressAtUpdateStart =
+      state.progressIndex;
+
+    const dinoHitbox =
+      getDinoHitbox();
+
+    const dinoLeft =
+      dinoHitbox.x -
+      dinoHitbox.w * 0.5;
+
     for (
       const tablet
       of state.tablets
-    ){
-      const targetProgressIndex =
-        Number.isFinite(
-          tablet.targetProgressIndex
-        )
-          ? tablet.targetProgressIndex
-          : state.progressIndex;
+    ) {
+      if (tablet.expired) {
+        continue;
+      }
 
+      const targetProgressIndex =
+        getTabletTargetProgressIndex(
+          tablet
+        );
+
+      /*
+        Once progress has moved beyond
+        the choice this tablet belonged
+        to, it is stale — whether it was
+        correct or a decoy.
+      */
       if (
-        tablet.correct &&
         targetProgressIndex <
-          state.progressIndex
+        state.progressIndex
       ) {
         tablet.expired = true;
         continue;
@@ -4782,31 +4860,66 @@
         tablet.baseY +
         Math.sin(
           tablet.age *
-            TABLET_FLOAT_RATE +
+          TABLET_FLOAT_RATE +
           tablet.wavePhase
         ) *
         state.layout.unit *
         TABLET_FLOAT_AMPLITUDE_U;
 
+      const tabletHitbox =
+        getTabletHitbox(
+          tablet
+        );
+
+      const activeAtUpdateStart =
+        targetProgressIndex ===
+        progressAtUpdateStart &&
+        state.progressIndex ===
+        progressAtUpdateStart;
+
+      /*
+        A correct tablet is officially
+        missed as soon as its collision
+        box has completely passed Dino,
+        instead of waiting until it
+        leaves the whole screen.
+
+        That lets dependent follower
+        tablets retire before they can
+        become confusing/inert.
+      */
       if (
         !tablet.collected &&
+        tablet.correct &&
+        activeAtUpdateStart &&
+        tabletHitbox.x +
+        tabletHitbox.w * 0.5 <
+        dinoLeft
+      ) {
+        tablet.expired = true;
+
+        missCorrectTablet(
+          ts
+        );
+
+        continue;
+      }
+
+      if (
+        !tablet.collected &&
+        activeAtUpdateStart &&
         rectsOverlap(
-          getDinoHitbox(),
-          getTabletHitbox(
-            tablet
-          )
+          dinoHitbox,
+          tabletHitbox
         )
-      ){
-        if (!tablet.correct) {
-          collectDecoyTablet(
+      ) {
+        if (tablet.correct) {
+          collectCorrectTablet(
             tablet,
             ts
           );
-        } else if (
-          targetProgressIndex ===
-          state.progressIndex
-        ) {
-          collectCorrectTablet(
+        } else {
+          collectDecoyTablet(
             tablet,
             ts
           );
@@ -4824,7 +4937,7 @@
           if (tablet.collected) {
             return (
               ts -
-                tablet.collectAt <
+              tablet.collectAt <
               150
             );
           }
@@ -4832,20 +4945,22 @@
           if (
             tablet.x <
             state.layout.offscreenX
-          ){
+          ) {
             const targetProgressIndex =
-              Number.isFinite(
+              getTabletTargetProgressIndex(
                 tablet
-                  .targetProgressIndex
-              )
-                ? tablet
-                    .targetProgressIndex
-                : state.progressIndex;
+              );
 
+            /*
+              Defensive fallback.
+              Normally a current correct
+              tablet is already caught by
+              the passed-Dino test above.
+            */
             if (
               tablet.correct &&
               targetProgressIndex ===
-                state.progressIndex
+              state.progressIndex
             ) {
               missCorrectTablet(
                 ts
@@ -4962,7 +5077,10 @@
       state.shakeUntil = ts + 220;
       flash("rgba(255, 199, 81, 0.24)", 120);
     }
+
     state.forceCorrectNext = true;
+
+    retireFutureTargetTablets();
   }
 
   function hitObstacle(item, ts){
@@ -7034,7 +7152,8 @@
   }
 
   function preloadDecodedFeedImage(
-    filename
+    filename,
+    keepAlive = true
   ) {
     const image =
       new Image();
@@ -7042,9 +7161,11 @@
     image.decoding =
       "async";
 
-    halfwayFeedImagePreloads.push(
-      image
-    );
+    if (keepAlive) {
+      halfwayFeedImagePreloads.push(
+        image
+      );
+    }
 
     return new Promise(resolve => {
       let settled = false;
@@ -7183,6 +7304,38 @@
     }
   }
 
+  function warmGameplayObstacleImages() {
+    if (
+      gameplayObstacleWarmupPromise
+    ) {
+      return gameplayObstacleWarmupPromise;
+    }
+
+    gameplayObstacleWarmupPromise =
+      (async () => {
+        for (
+          const filename
+          of GAMEPLAY_OBSTACLE_IMAGES
+        ) {
+          await waitForImagePrefetchTurn(
+            70
+          );
+
+          await preloadDecodedFeedImage(
+            filename,
+            false
+          );
+        }
+
+        return true;
+      })()
+        .catch(() => false);
+
+    return gameplayObstacleWarmupPromise;
+  }
+
+
+
   function warmHalfwayFeedResumeAssets() {
     if (
       halfwayFeedResumeWarmupPromise
@@ -7193,6 +7346,8 @@
     halfwayFeedResumeWarmupPromise =
       (async () => {
         await preloadDinoSvg();
+
+        await warmGameplayObstacleImages();
 
         for (
           const filename

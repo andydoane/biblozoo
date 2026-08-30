@@ -109,6 +109,12 @@
     ]
   ];
 
+  const GAMEPLAY_OBSTACLE_IMAGES = [
+    "versey_bird_bee.svg",
+    "versey_bird_boulder.png",
+    "versey_bird_lightning.svg"
+  ];
+
   const PARTICLE_COLORS = {
     rainbow: [
       "#ff5a51",
@@ -310,6 +316,7 @@
   const soundBufferPromises = new Map();
   const halfwayNapImagePreloads = [];
   let halfwayNapBonusWarmupStarted = false;
+  let gameplayObstacleWarmupPromise = null;
 
   const adaptiveRenderState = {
     mode: "60fps",
@@ -1091,7 +1098,14 @@
         );
 
         window.setTimeout(
-          () => {
+          async () => {
+            try {
+              await warmGameplayObstacleImages();
+            } catch (err) {
+              // Normal loading remains
+              // available as a fallback.
+            }
+
             screen.classList.add(
               "is-leaving"
             );
@@ -1387,6 +1401,8 @@
 
   const halfwayNapImagesReady =
     preloadHalfwayNapImages();
+
+  void warmGameplayObstacleImages();
 
   const halfwayNapCheckpoint =
     readHalfwayNapCheckpoint();
@@ -3982,6 +3998,35 @@
     );
   }
 
+  function retireFutureTargetVerseClouds() {
+    const futureCloudIds =
+      getActiveVerseClouds()
+        .filter(cloud => {
+          return (
+            cloud &&
+            !cloud.collected &&
+            Number.isFinite(
+              cloud.targetProgressIndex
+            ) &&
+            cloud.targetProgressIndex >
+            state.progressIndex
+          );
+        })
+        .map(
+          cloud => cloud.id
+        );
+
+    for (
+      const cloudId
+      of futureCloudIds
+    ) {
+      removeVerseCloudById(
+        cloudId
+      );
+    }
+  }
+
+
   function getNearestVerseLaneIndex(y) {
     const lanes =
       state.layout?.lanes || [];
@@ -4180,10 +4225,7 @@
       label,
       phase,
       correct: isCorrectCloud,
-      targetProgressIndex:
-        isCorrectCloud
-          ? targetProgressIndex
-          : -1,
+      targetProgressIndex,
       resolvedCorrect: null,
       x,
       y,
@@ -4209,7 +4251,11 @@
         return;
       }
 
-      state.cloudCooldown = Math.max(0, state.cloudCooldown - dt);
+      state.cloudCooldown =
+        Math.max(
+          0,
+          state.cloudCooldown - dt
+        );
 
       if (
         state.cloudCooldown <= 0 &&
@@ -4224,14 +4270,52 @@
     const speed =
       getWorldSpeed();
 
+    const progressAtUpdateStart =
+      state.progressIndex;
+
+    let removedCloud = false;
+
     const clouds =
       getActiveVerseClouds();
 
     for (const cloud of clouds) {
+      const targetProgressIndex =
+        Number.isFinite(
+          cloud.targetProgressIndex
+        )
+          ? cloud.targetProgressIndex
+          : state.progressIndex;
+
+      /*
+        An uncollected choice for an
+        already-completed word is stale.
+        Retire it rather than allowing
+        it to remain interactive.
+      */
+      if (
+        !cloud.collected &&
+        targetProgressIndex <
+        state.progressIndex
+      ) {
+        removedCloud =
+          removeVerseCloudById(
+            cloud.id
+          ) || removedCloud;
+
+        continue;
+      }
+
       cloud.x -= speed * dt;
+
+      const activeAtUpdateStart =
+        targetProgressIndex ===
+        progressAtUpdateStart &&
+        state.progressIndex ===
+        progressAtUpdateStart;
 
       if (
         !cloud.collected &&
+        activeAtUpdateStart &&
         circlesOverlap(
           state.birdX,
           state.birdY,
@@ -4241,11 +4325,7 @@
           cloud.hitRadius
         )
       ) {
-        if (
-          isVerseCloudCurrentlyCorrect(
-            cloud
-          )
-        ) {
+        if (cloud.correct) {
           collectCorrectCloud(
             cloud,
             ts
@@ -4259,26 +4339,96 @@
       }
     }
 
-    let removedCloud = false;
+    /*
+      A correct cloud is missed as soon
+      as its collision circle has fully
+      passed Bird.
+
+      Previously we waited until the
+      cloud was all the way offscreen,
+      which left a long period where a
+      future follower could reach Bird
+      before its prerequisite miss had
+      been resolved.
+    */
+    const birdHitLeft =
+      state.birdX -
+      layout.birdRadius;
 
     for (
       const cloud
       of getActiveVerseClouds()
     ) {
+      const targetProgressIndex =
+        Number.isFinite(
+          cloud.targetProgressIndex
+        )
+          ? cloud.targetProgressIndex
+          : state.progressIndex;
+
+      const currentAtUpdateStart =
+        cloud.correct &&
+        targetProgressIndex ===
+        progressAtUpdateStart &&
+        state.progressIndex ===
+        progressAtUpdateStart;
+
+      if (
+        !cloud.collected &&
+        currentAtUpdateStart &&
+        cloud.x +
+        cloud.hitRadius <
+        birdHitLeft
+      ) {
+        missCorrectCloud(
+          ts
+        );
+
+        removedCloud =
+          removeVerseCloudById(
+            cloud.id
+          ) || removedCloud;
+      }
+    }
+
+    /*
+      Everything else can continue
+      visually scrolling until it has
+      actually left the screen.
+    */
+    for (
+      const cloud
+      of getActiveVerseClouds()
+    ) {
       const cloudRightEdge =
-        cloud.x + cloud.w * 0.5;
+        cloud.x +
+        cloud.w * 0.5;
 
       if (cloudRightEdge > 0) {
         continue;
       }
 
+      const targetProgressIndex =
+        Number.isFinite(
+          cloud.targetProgressIndex
+        )
+          ? cloud.targetProgressIndex
+          : state.progressIndex;
+
+      const currentAtUpdateStart =
+        cloud.correct &&
+        targetProgressIndex ===
+        progressAtUpdateStart &&
+        state.progressIndex ===
+        progressAtUpdateStart;
+
       if (
         !cloud.collected &&
-        isVerseCloudCurrentlyCorrect(
-          cloud
-        )
+        currentAtUpdateStart
       ) {
-        missCorrectCloud(ts);
+        missCorrectCloud(
+          ts
+        );
       }
 
       removedCloud =
@@ -4906,7 +5056,10 @@
       state.shakeUntil = ts + 220;
       flash("rgba(255, 199, 81, 0.24)", 120);
     }
+
     state.forceCorrectNext = true;
+
+    retireFutureTargetVerseClouds();
   }
 
   function updateBonusPipes(dt, ts){
@@ -5170,6 +5323,70 @@
     }
   }
 
+  function getPixelSnappedCloudBox(
+    cloud
+  ) {
+    const pixelRatio =
+      Math.max(
+        1,
+        Number(
+          window.devicePixelRatio
+        ) || 1
+      );
+
+    const snap =
+      value =>
+        Math.round(
+          value * pixelRatio
+        ) /
+        pixelRatio;
+
+    const width =
+      snap(
+        cloud.w
+      );
+
+    const height =
+      snap(
+        cloud.h
+      );
+
+    /*
+      Snap the rendered top-left edge,
+      then reconstruct the center used
+      by translate(-50%, -50%).
+
+      That keeps both edges aligned to
+      the physical pixel grid rather
+      than merely rounding the center.
+    */
+    const left =
+      snap(
+        cloud.x -
+        cloud.w * 0.5
+      );
+
+    const top =
+      snap(
+        cloud.y -
+        cloud.h * 0.5
+      );
+
+    return {
+      x:
+        left +
+        width * 0.5,
+
+      y:
+        top +
+        height * 0.5,
+
+      w: width,
+      h: height
+    };
+  }
+
+
 
   function renderBackgroundClouds() {
     const layer =
@@ -5218,24 +5435,29 @@
         );
       }
 
+      const renderBox =
+        getPixelSnappedCloudBox(
+          cloud
+        );
+
       node.style.setProperty(
         "--x",
-        `${cloud.x}px`
+        `${renderBox.x}px`
       );
 
       node.style.setProperty(
         "--y",
-        `${cloud.y}px`
+        `${renderBox.y}px`
       );
 
       node.style.setProperty(
         "--w",
-        `${cloud.w}px`
+        `${renderBox.w}px`
       );
 
       node.style.setProperty(
         "--h",
-        `${cloud.h}px`
+        `${renderBox.h}px`
       );
 
       node.style.setProperty(
@@ -5595,20 +5817,25 @@
       const wordSize =
         getWordFontSize(cloud);
 
+      const renderBox =
+        getPixelSnappedCloudBox(
+          cloud
+        );
+
       token.style.left =
-        `${cloud.x}px`;
+        `${renderBox.x}px`;
 
       token.style.top =
-        `${cloud.y}px`;
+        `${renderBox.y}px`;
 
       token.style.setProperty(
         "--cloud-w",
-        `${cloud.w}px`
+        `${renderBox.w}px`
       );
 
       token.style.setProperty(
         "--cloud-h",
-        `${cloud.h}px`
+        `${renderBox.h}px`
       );
 
       token.style.setProperty(
@@ -6483,13 +6710,16 @@
   }
 
   function preloadDecodedImageAsset(
-    filename
+    filename,
+    keepAlive = true
   ) {
     const image = new Image();
 
-    halfwayNapImagePreloads.push(
-      image
-    );
+    if (keepAlive) {
+      halfwayNapImagePreloads.push(
+        image
+      );
+    }
 
     image.decoding = "async";
 
@@ -6565,6 +6795,38 @@
       )
     ]);
   }
+
+  function warmGameplayObstacleImages() {
+    if (
+      gameplayObstacleWarmupPromise
+    ) {
+      return gameplayObstacleWarmupPromise;
+    }
+
+    gameplayObstacleWarmupPromise =
+      (async () => {
+        for (
+          const filename
+          of GAMEPLAY_OBSTACLE_IMAGES
+        ) {
+          await waitForImagePrefetchTurn(
+            70
+          );
+
+          await preloadDecodedImageAsset(
+            filename,
+            false
+          );
+        }
+
+        return true;
+      })()
+        .catch(() => false);
+
+    return gameplayObstacleWarmupPromise;
+  }
+
+
 
   async function warmBonusDisplayFont() {
     if (
