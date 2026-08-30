@@ -861,9 +861,17 @@ body{
     padding-right: 0;
   }
 
-  .vb2-menu-pill{
+  .vb2-menu-pill,
+  .vb2-speed-pill{
     top: 10px;
+  }
+
+  .vb2-menu-pill{
     left: 10px;
+  }
+
+  .vb2-speed-pill{
+    left: 62px;
   }
 }
 
@@ -879,6 +887,10 @@ body{
 
   .vb2-menu-pill {
     left: 10px;
+  }
+
+  .vb2-speed-pill {
+    left: 62px;
   }
 }
 
