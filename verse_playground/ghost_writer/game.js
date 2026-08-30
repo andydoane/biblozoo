@@ -550,6 +550,29 @@
     minSize: .32
   };
 
+  /*
+    Letters and numbers are drawn by
+    the child at different absolute
+    sizes during training.
+
+    A wide guide such as W has to be
+    displayed smaller to fit the same
+    square training box.
+
+    In playback, absolute training size
+    should not determine letter height.
+    Preserve the child's SHAPE and
+    width-to-height ratio instead.
+  */
+  const GLYPH_NORMALIZATION = {
+    alphaNumericHeight: .88,
+    sideBearing: .18,
+    minAspect: .28,
+    maxAspect: 1.60,
+    minWidthUnits: .42,
+    maxWidthUnits: 1.62
+  };
+
   const CENTERED_TRAINING_GUIDES = new Set([".", ",", ":", ";", "'", '"', "-"]);
 
   const GUIDE_RENDER_PROFILES = {
@@ -2872,12 +2895,92 @@
     return stored || null;
   }
 
+  function getNormalizedGlyphAspect(
+    glyph
+  ) {
+    if (!glyph) {
+      return .72;
+    }
+
+    const bounds =
+      glyph.bounds ||
+      computeBounds(
+        glyph.strokes
+      );
+
+    /*
+      Width divided by height removes
+      the accidental absolute size of
+      the child's training drawing.
+
+      A small W and a large W still
+      have essentially the same shape
+      ratio.
+    */
+    return clamp(
+      bounds.width /
+        Math.max(
+          .08,
+          bounds.height
+        ),
+
+      GLYPH_NORMALIZATION
+        .minAspect,
+
+      GLYPH_NORMALIZATION
+        .maxAspect
+    );
+  }
+
+
   function glyphWidthUnits(char) {
-    if (/\s/.test(char)) return .38;
-    const glyph = getGlyph(char);
-    if (!glyph) return .65;
-    const minimum = isSymbolChar(char) ? .20 : .42;
-    return clamp(glyph.widthRatio + .16, minimum, .98);
+    if (/\s/.test(char)) {
+      return .38;
+    }
+
+    const glyph =
+      getGlyph(char);
+
+    if (!glyph) {
+      return .65;
+    }
+
+    if (
+      isAlphaNumericChar(char)
+    ) {
+      const aspect =
+        getNormalizedGlyphAspect(
+          glyph
+        );
+
+      const normalizedWidth =
+        aspect *
+        GLYPH_NORMALIZATION
+          .alphaNumericHeight;
+
+      return clamp(
+        normalizedWidth +
+          GLYPH_NORMALIZATION
+            .sideBearing,
+
+        GLYPH_NORMALIZATION
+          .minWidthUnits,
+
+        GLYPH_NORMALIZATION
+          .maxWidthUnits
+      );
+    }
+
+    /*
+      Punctuation keeps its existing
+      sizing behavior and specialized
+      render profiles.
+    */
+    return clamp(
+      glyph.widthRatio + .16,
+      .20,
+      .98
+    );
   }
 
   function getGlyphRenderProfile(char) {
@@ -2905,6 +3008,83 @@
       yOffset: profile.yOffset || 0
     };
   }
+
+  function getGlyphRenderScale(
+    glyph,
+    bounds,
+    fontSize,
+    profileInfo
+  ) {
+    const widthScale =
+      profileInfo.usableW /
+      Math.max(
+        .04,
+        bounds.width
+      );
+
+    const fullHeightScale =
+      profileInfo.usableH /
+      Math.max(
+        .04,
+        bounds.height
+      );
+
+    /*
+      Keep punctuation exactly on its
+      existing width/height fitting
+      system.
+    */
+    if (
+      !isAlphaNumericChar(
+        glyph?.char
+      )
+    ) {
+      return Math.min(
+        widthScale,
+        fullHeightScale
+      );
+    }
+
+    /*
+      Letters and numbers receive a
+      shared nominal cap height.
+
+      Their recorded width-to-height
+      ratio is preserved, so W remains
+      wider than A without remaining
+      artificially shorter than A.
+    */
+    const targetHeight =
+      Math.min(
+        profileInfo.usableH,
+        fontSize *
+        GLYPH_NORMALIZATION
+          .alphaNumericHeight
+      );
+
+    const normalizedHeightScale =
+      targetHeight /
+      Math.max(
+        .04,
+        bounds.height
+      );
+
+    /*
+      Width remains a safety ceiling.
+      Normally glyphWidthUnits() has
+      already allocated enough room
+      for the normalized shape.
+
+      This protects the layout from an
+      unusually extreme drawing.
+    */
+    return Math.min(
+      widthScale,
+      normalizedHeightScale
+    );
+  }
+
+
 
   function getGlyphBaseYForProfile(baselineY, fontSize, usableH, drawH, profileInfo) {
     const align = profileInfo?.verticalAlign || "normal";
@@ -3368,14 +3548,29 @@
     const jitterOn = options.jitter === "on";
     const wobbleOn = options.wobble === "on";
 
-    const bounds = glyph.bounds || computeBounds(glyph.strokes);
-    const profileInfo = getGlyphUsableArea(glyph.char, fontSize, cellW);
-    const usableH = profileInfo.usableH;
-    const usableW = profileInfo.usableW;
-    const scale = Math.min(
-      usableW / Math.max(.04, bounds.width),
-      usableH / Math.max(.04, bounds.height)
-    );
+    const bounds =
+      glyph.bounds ||
+      computeBounds(
+        glyph.strokes
+      );
+
+    const profileInfo =
+      getGlyphUsableArea(
+        glyph.char,
+        fontSize,
+        cellW
+      );
+
+    const usableH =
+      profileInfo.usableH;
+
+    const scale =
+      getGlyphRenderScale(
+        glyph,
+        bounds,
+        fontSize,
+        profileInfo
+      );
 
     const drawW = bounds.width * scale;
     const drawH = bounds.height * scale;
@@ -5611,13 +5806,23 @@
     const jitterOn = options.jitter === "on";
     const wobbleOn = options.wobble === "on";
 
-    const profileInfo = getGlyphUsableArea(glyph.char, fontSize, cellW);
-    const usableH = profileInfo.usableH;
-    const usableW = profileInfo.usableW;
-    const scale = Math.min(
-      usableW / Math.max(.04, glyphBounds.width),
-      usableH / Math.max(.04, glyphBounds.height)
-    );
+    const profileInfo =
+      getGlyphUsableArea(
+        glyph.char,
+        fontSize,
+        cellW
+      );
+
+    const usableH =
+      profileInfo.usableH;
+
+    const scale =
+      getGlyphRenderScale(
+        glyph,
+        glyphBounds,
+        fontSize,
+        profileInfo
+      );
 
     const drawW = glyphBounds.width * scale;
     const drawH = glyphBounds.height * scale;
