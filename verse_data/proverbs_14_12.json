@@ -1,0 +1,56 @@
+{
+    "biblopet": "🐃",
+    "biblopetDefaultName": "Bluto",
+    "biblopetFeetFromBottom": "26.1%",
+    "verseId": "proverbs_14_12",
+    "ref": "Proverbs 14:12",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "There is a way",
+        "that seems right to a man",
+        "but its end",
+        "is the way to death."
+    ],
+    "verseText": "There is a way that seems right to a man, but its end is the way to death.",
+    "meaning": "We shouldn't trust in ourselves to figure out what's right. We need God's Word to show us the way that leads to eternal life.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "way",
+            "occurrence": 1,
+            "emoji": "🛣️"
+        },
+        {
+            "type": "emoji",
+            "word": "right",
+            "occurrence": 1,
+            "emoji": "✅"
+        },
+        {
+            "type": "emoji",
+            "word": "man",
+            "occurrence": 1,
+            "emoji": "🧍"
+        },
+        {
+            "type": "emoji",
+            "word": "end",
+            "occurrence": 1,
+            "emoji": "🏁"
+        },
+        {
+            "type": "emoji",
+            "word": "way",
+            "occurrence": 2,
+            "emoji": "🛣️"
+        },
+        {
+            "type": "emoji",
+            "word": "death",
+            "occurrence": 1,
+            "emoji": "💀"
+        }
+    ]
+}
