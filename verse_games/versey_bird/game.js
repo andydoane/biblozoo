@@ -15,6 +15,7 @@
   const BUILD_AREA = "compact";
   const HELP_OVERLAY_ID = "vb2HelpOverlay";
   const MENU_OVERLAY_ID = "vb2GameMenuOverlay";
+  const SPEED_MENU_OVERLAY_ID = "vb2SpeedMenuOverlay";
   const IMAGE_PATH = "./versey_bird_images/";
   const SOUND_BASE_PATH = "./versey_bird_sounds/";
   const UI_SOUND_BASE_PATH = "../../ui_audio/";
@@ -298,6 +299,7 @@
   let completed = false;
   let completionResult = null;
   let muted = false;
+  let gameSpeedPresetId = "normal";
   let birdSvgText = "";
   let audioCtx = null;
   let silenceAudio = null;
@@ -501,6 +503,10 @@
         state.birdColorCycleIndex,
       streakSpeedBoostU:
         state.streakSpeedBoostU,
+
+      speedPresetId:
+        gameSpeedPresetId,
+
       muted
     };
   }
@@ -684,6 +690,30 @@
 
     muted =
       checkpoint.muted === true;
+
+    const restoredSpeedPresetId =
+      [
+        "normal",
+        "fast",
+        "max"
+      ].includes(
+        String(
+          checkpoint.speedPresetId ||
+          ""
+        )
+      )
+        ? String(
+          checkpoint.speedPresetId
+        )
+        : "normal";
+
+    gameSpeedPresetId =
+      restoredSpeedPresetId;
+
+    window.VerseGameShell
+      .setGameSpeedPreset(
+        restoredSpeedPresetId
+      );
 
     state.halfwayNapComplete = true;
     state.halfwayNapPending = false;
@@ -1123,8 +1153,17 @@
         "vb2MenuPill"
       );
 
+    const speedButton =
+      document.getElementById(
+        "vb2SpeedPill"
+      );
+
     if (menuButton) {
       menuButton.hidden = true;
+    }
+
+    if (speedButton) {
+      speedButton.hidden = true;
     }
 
     recordHalfwayNapDiagnosticEvent(
@@ -1196,8 +1235,17 @@
           "vb2MenuPill"
         );
 
+      const speedButton =
+        document.getElementById(
+          "vb2SpeedPill"
+        );
+
       if (menuButton) {
         menuButton.hidden = false;
+      }
+
+      if (speedButton) {
+        speedButton.hidden = false;
       }
 
       return;
@@ -1656,6 +1704,14 @@
     clearVerseyBirdLayerNodePools();
     resetStateForRun();
 
+    if (!resumeCheckpoint) {
+      gameSpeedPresetId =
+        "normal";
+
+      window.VerseGameShell
+        .resetGameSpeed();
+    }
+
     if (resumeCheckpoint) {
       restoreHalfwayNapCheckpoint(
         resumeCheckpoint
@@ -1690,6 +1746,11 @@
 
               <button class="vb2-menu-pill" id="vb2MenuPill" aria-label="Game Menu">☰</button>
 
+              ${window.VerseGameShell.speedControlButtonHtml({
+                id: "vb2SpeedPill",
+                className: "vb2-speed-pill"
+              })}
+
               <div class="vb2-poofs" id="vb2Poofs"></div>
               <div class="vb2-word-clouds" id="vb2WordClouds"></div>
               <div class="vb2-obstacles" id="vb2Obstacles"></div>
@@ -1706,6 +1767,10 @@
 
         ${renderHelpOverlay(gameHelpHtml())}
         ${renderGameMenuOverlay()}
+
+        ${window.VerseGameShell.speedMenuHtml({
+          id: SPEED_MENU_OVERLAY_ID
+        })}
       </div>
     `;
 
@@ -2015,6 +2080,41 @@
         void unlockAudio();
         playUiTapSound();
         setPaused(true, "menu");
+      }
+    });
+
+    window.VerseGameShell.wireSpeedMenu({
+      id: SPEED_MENU_OVERLAY_ID,
+      buttonId: "vb2SpeedPill",
+
+      onOpen: () => {
+        void unlockAudio();
+        playUiTapSound();
+
+        setPaused(
+          true,
+          "speed"
+        );
+
+        return true;
+      },
+
+      onChange: preset => {
+        gameSpeedPresetId =
+          String(
+            preset?.id ||
+            "normal"
+          );
+      },
+
+      onClose: () => {
+        void unlockAudio();
+        playUiTapSound();
+
+        setPaused(
+          false,
+          ""
+        );
       }
     });
   }
@@ -3491,8 +3591,24 @@
   }
 
   function getVerseWorldSpeedU() {
-    const d = getDifficulty();
-    return d.worldSpeedU + (state.streakSpeedBoostU || 0);
+    const d =
+      getDifficulty();
+
+    const baseSpeedU =
+      d.worldSpeedU +
+      (
+        state.streakSpeedBoostU ||
+        0
+      );
+
+    const speedMultiplier =
+      window.VerseGameShell
+        .getGameSpeedMultiplier();
+
+    return (
+      baseSpeedU *
+      speedMultiplier
+    );
   }
 
   function updateWorldScroll(dt){
@@ -6979,9 +7095,23 @@
   }
 
   function getBonusSpeed(){
-    const d = getDifficulty();
-    const speedU = d.bonusStartSpeedU + state.bonusElapsed * d.bonusRampU;
-    return speedU * state.layout.unit;
+    const d =
+      getDifficulty();
+
+    const baseSpeedU =
+      d.bonusStartSpeedU +
+      state.bonusElapsed *
+      d.bonusRampU;
+
+    const speedMultiplier =
+      window.VerseGameShell
+        .getGameSpeedMultiplier();
+
+    return (
+      baseSpeedU *
+      speedMultiplier *
+      state.layout.unit
+    );
   }
 
   function getBonusGap(){
