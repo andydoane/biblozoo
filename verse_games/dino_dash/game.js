@@ -4202,19 +4202,6 @@
         ? VERSE_PAIR_MIXED_FOLLOW_SECONDS
         : VERSE_PAIR_FOLLOW_SECONDS;
 
-  function getVersePairGapX(
-    lead,
-    follower
-  ) {
-    const mixed =
-      lead.correct !==
-      follower.correct;
-
-    const followSeconds =
-      mixed
-        ? VERSE_PAIR_MIXED_FOLLOW_SECONDS
-        : VERSE_PAIR_FOLLOW_SECONDS;
-
     const unit =
       state.layout.unit;
 
@@ -4237,11 +4224,11 @@
     const oldCompactCenterGap =
       Math.max(
         worldSpeed *
-          followSeconds,
+        followSeconds,
 
         compactWidth +
-          unit *
-          VERSE_PAIR_MIN_GAP_U
+        unit *
+        VERSE_PAIR_MIN_GAP_U
       );
 
     /*
@@ -4259,20 +4246,8 @@
       );
 
     /*
-      Now add whatever half-widths
-      the REAL pair happens to have.
-
-      compact + compact:
-        unchanged from today
-
-      compact + long:
-        centers move farther apart
-
-      long + long:
-        centers move farther apart
-
-      In every case the visible empty
-      gap between edges stays the same.
+      Add the real tablet half-widths
+      around that same visible gap.
     */
     return (
       (
@@ -4281,21 +4256,6 @@
       ) *
       0.5 +
       targetVisibleGap
-    );
-  }
-
-    const minimumGap =
-      (
-        lead.w +
-        follower.w
-      ) *
-      0.5 +
-      state.layout.unit *
-      VERSE_PAIR_MIN_GAP_U;
-
-    return Math.max(
-      desiredGap,
-      minimumGap
     );
   }
 
