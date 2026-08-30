@@ -255,13 +255,16 @@ body{
   pointer-events: none;
 }
 
-.dd2-menu-pill{
+.dd2-menu-pill,
+.dd2-speed-pill{
   position: absolute;
   z-index: 30;
   top: 16px;
-  left: 14px;
   min-width: 44px;
+  width: 44px;
   min-height: 36px;
+  height: 36px;
+  padding: 0;
   border: none;
   border-radius: 999px;
   background: rgba(255,255,255,0.95);
@@ -272,6 +275,14 @@ body{
   cursor: pointer;
   box-shadow: 0 4px 0 rgba(0,0,0,0.18);
   pointer-events: auto;
+}
+
+.dd2-menu-pill{
+  left: 14px;
+}
+
+.dd2-speed-pill{
+  left: 66px;
 }
 
 .dd2-trail-layer{

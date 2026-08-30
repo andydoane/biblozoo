@@ -15,6 +15,7 @@
   const BUILD_AREA = "large";
   const HELP_OVERLAY_ID = "dd2HelpOverlay";
   const MENU_OVERLAY_ID = "dd2GameMenuOverlay";
+  const SPEED_MENU_OVERLAY_ID = "dd2SpeedMenuOverlay";
   const IMAGE_PATH = "./dino_dash_images/";
   const SOUND_BASE_PATH = "./dino_dash_sounds/";
   const UI_SOUND_BASE_PATH = "../../ui_audio/";
@@ -80,8 +81,7 @@
       "dino_dash_boulder.png",
       "dino_dash_stump.png",
       "dino_dash_bee.svg",
-      "dino_dash_bird.svg",
-      "dino_dash_double_jump.png"
+      "dino_dash_bird.svg"
     ],
     [
       "dino_dash_flag.png",
@@ -100,7 +100,7 @@
   const TABLET_HEIGHT_U = 0.52;
 
   const TABLET_FONT_HEIGHT_RATIO = 0.47;
-  const TABLET_FONT_PREFERRED_MIN_SCALE = 0.90;
+  const TABLET_FONT_PREFERRED_MIN_SCALE = 0.98;
 
   const TABLET_FLOAT_AMPLITUDE_U = 0.075;
   const TABLET_FLOAT_RATE = 2.15;
@@ -176,24 +176,25 @@
   const DINO_SECONDARY_PART_IDS = ["spine"];
 
   const INTRO_WORDS = [
-    { text: "TAP", line: 0, delay: 0.15 },
-    { text: "TO", line: 0, delay: 0.55 },
-    { text: "JUMP", line: 0, delay: 0.95 },
-    { text: "COLLECT", line: 1, delay: 2.05 },
-    { text: "THE", line: 1, delay: 2.45 },
-    { text: "CORRECT", line: 1, delay: 2.85 },
-    { text: "WORDS", line: 1, delay: 3.35 }
+    { text: "COLLECT", line: 0, delay: 0.15 },
+    { text: "THE", line: 0, delay: 0.50 },
+    { text: "CORRECT", line: 0, delay: 0.85 },
+    { text: "WORDS", line: 0, delay: 1.20 },
+
+    { text: "TAP", line: 1, delay: 1.95 },
+    { text: "TWICE", line: 1, delay: 2.30 },
+    { text: "TO", line: 1, delay: 2.65 },
+    { text: "DOUBLE", line: 1, delay: 3.00 },
+    { text: "JUMP", line: 1, delay: 3.35 }
   ];
 
   const BONUS_WORDS = [
-    { text: "BONUS", line: 0, delay: 0.15 },
-    { text: "ROUND", line: 0, delay: 0.65 },
-    { text: "SEE", line: 1, delay: 1.45 },
-    { text: "HOW", line: 1, delay: 1.85 },
-    { text: "LONG", line: 1, delay: 2.25 },
-    { text: "YOU", line: 1, delay: 2.65 },
-    { text: "CAN", line: 1, delay: 3.05 },
-    { text: "LAST", line: 1, delay: 3.45 }
+    { text: "SEE", line: 1, delay: 0.15 },
+    { text: "HOW", line: 1, delay: 0.55 },
+    { text: "LONG", line: 1, delay: 0.95 },
+    { text: "YOU", line: 1, delay: 1.35 },
+    { text: "CAN", line: 1, delay: 1.75 },
+    { text: "LAST", line: 1, delay: 2.15 }
   ];
 
   const DIFFICULTY = {
@@ -297,6 +298,7 @@
   let completed = false;
   let completionResult = null;
   let muted = false;
+  let gameSpeedPresetId = "normal";
   let dinoSvgText = "";
   let audioCtx = null;
   let audioUnlocked = false;
@@ -653,6 +655,9 @@
 
       muted,
 
+      speedPresetId:
+        gameSpeedPresetId,
+
       diagnosticActive:
         diagnosticState.active === true,
 
@@ -842,6 +847,30 @@
 
     muted =
       checkpoint.muted === true;
+
+    const restoredSpeedPresetId =
+      [
+        "normal",
+        "fast",
+        "max"
+      ].includes(
+        String(
+          checkpoint.speedPresetId ||
+          ""
+        )
+      )
+        ? String(
+          checkpoint.speedPresetId
+        )
+        : "normal";
+
+    gameSpeedPresetId =
+      restoredSpeedPresetId;
+
+    window.VerseGameShell
+      .setGameSpeedPreset(
+        restoredSpeedPresetId
+      );
 
     if (
       checkpoint.diagnosticActive &&
@@ -1262,8 +1291,17 @@
         "dd2MenuPill"
       );
 
+    const speedButton =
+      document.getElementById(
+        "dd2SpeedPill"
+      );
+
     if (menuButton) {
       menuButton.hidden = true;
+    }
+
+    if (speedButton) {
+      speedButton.hidden = true;
     }
 
     recordHalfwayFeedDiagnosticEvent(
@@ -1331,8 +1369,17 @@
           "dd2MenuPill"
         );
 
+      const speedButton =
+        document.getElementById(
+          "dd2SpeedPill"
+        );
+
       if (menuButton) {
         menuButton.hidden = false;
+      }
+
+      if (speedButton) {
+        speedButton.hidden = false;
       }
 
       return;
@@ -2656,6 +2703,14 @@
     completionResult = null;
     resetStateForRun();
 
+    if (!resumeCheckpoint) {
+      gameSpeedPresetId =
+        "normal";
+
+      window.VerseGameShell
+        .resetGameSpeed();
+    }
+
     if (resumeCheckpoint) {
       restoreHalfwayFeedCheckpoint(
         resumeCheckpoint
@@ -2731,6 +2786,12 @@
                 ></canvas>
               </div>
               <button class="dd2-menu-pill" id="dd2MenuPill" aria-label="Game Menu">☰</button>
+
+              ${window.VerseGameShell.speedControlButtonHtml({
+                id: "dd2SpeedPill",
+                className: "dd2-speed-pill"
+              })}
+
               ${diagnosticHudHtml}
               <div class="dd2-trail-layer" id="dd2TrailLayer"></div>
               <div class="dd2-particles" id="dd2Particles"></div>
@@ -2746,6 +2807,10 @@
 
         ${renderHelpOverlay(gameHelpHtml())}
         ${renderGameMenuOverlay()}
+
+        ${window.VerseGameShell.speedMenuHtml({
+          id: SPEED_MENU_OVERLAY_ID
+        })}
       </div>
     `;
 
@@ -3110,6 +3175,37 @@
       onOpen: () => setPaused(true, "menu"),
       onClose: () => setPaused(false, ""),
       onBackFromHelp: () => setPaused(true, "menu")
+    });
+
+    window.VerseGameShell.wireSpeedMenu({
+      id: SPEED_MENU_OVERLAY_ID,
+      buttonId: "dd2SpeedPill",
+
+      onOpen: () => {
+        playUiSound();
+        setPaused(
+          true,
+          "speed"
+        );
+
+        return true;
+      },
+
+      onChange: preset => {
+        gameSpeedPresetId =
+          String(
+            preset?.id ||
+            "normal"
+          );
+      },
+
+      onClose: () => {
+        playUiSound();
+        setPaused(
+          false,
+          ""
+        );
+      }
     });
   }
 
@@ -4004,8 +4100,6 @@
 
     if (bonusOnly){
       spawnBonusPattern();
-    } else if (!state.doubleJumpSignSpawned){
-      spawnDoubleJumpSign();
     } else {
       spawnVersePattern();
     }
@@ -5224,11 +5318,47 @@
   }
 
   function getActiveWorldSpeedU(){
+    const speedMultiplier =
+      window.VerseGameShell
+        .getGameSpeedMultiplier();
+
     if (state.phase === "bonus"){
-      const elapsed = Math.max(0, (performance.now() - state.bonusStartedAt) / 1000);
-      return getDifficulty().bonusStartSpeedU + elapsed * getDifficulty().bonusRampU;
+      const elapsed =
+        Math.max(
+          0,
+          (
+            performance.now() -
+            state.bonusStartedAt
+          ) /
+          1000
+        );
+
+      const baseSpeed =
+        getDifficulty()
+          .bonusStartSpeedU +
+        elapsed *
+        getDifficulty()
+          .bonusRampU;
+
+      return (
+        baseSpeed *
+        speedMultiplier
+      );
     }
-    return getDifficulty().worldSpeedU + (state.phase === "verse" ? state.streakSpeedBoostU : 0);
+
+    const baseSpeed =
+      getDifficulty()
+        .worldSpeedU +
+      (
+        state.phase === "verse"
+          ? state.streakSpeedBoostU
+          : 0
+      );
+
+    return (
+      baseSpeed *
+      speedMultiplier
+    );
   }
 
   function isDinoGrounded(){
@@ -7003,8 +7133,9 @@
 
     try {
       const warmupText =
-        "TAP TO JUMP COLLECT THE CORRECT WORDS " +
-        "BONUS ROUND SEE HOW LONG YOU CAN LAST";
+        "COLLECT THE CORRECT WORDS " +
+        "TAP TWICE TO DOUBLE JUMP " +
+        "SEE HOW LONG YOU CAN LAST";
 
       await document.fonts.load(
         '34px "DD2 Titan One"',

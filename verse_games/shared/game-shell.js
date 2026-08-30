@@ -2681,6 +2681,7 @@
     speedMenuHtml,
     wireSpeedMenu,
     getGameSpeedMultiplier,
+    setGameSpeedPreset,
     resetGameSpeed,
     gameIconImageHtml,
     gameIconImageHtmlForId,
