@@ -1,0 +1,55 @@
+{
+    "biblopet": "🐝",
+    "biblopetDefaultName": "Rudy",
+    "biblopetFeetFromBottom": "20.5%",
+    "verseId": "philippians_2_8",
+    "ref": "Philippians 2:8",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "And being found in human form",
+        "he humbled himself",
+        "by becoming obedient",
+        "to the point of death",
+        "even death on a cross."
+    ],
+    "verseText": "And being found in human form, he humbled himself by becoming obedient to the point of death, even death on a cross.",
+    "meaning": "Though Jesus deserved to be treated like a king, he chose to become a lowly human and suffer the dreadful death of the cross in order to save us.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "human",
+            "occurrence": 1,
+            "emoji": "🧍"
+        },
+        {
+            "type": "underscore",
+            "word": "humbled",
+            "occurrence": 1
+        },
+        {
+            "type": "underscore",
+            "word": "obedient",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "death",
+            "occurrence": 1,
+            "emoji": "💀"
+        },
+        {
+            "type": "emoji",
+            "word": "death",
+            "occurrence": 2,
+            "emoji": "💀"
+        },
+        {
+            "type": "image",
+            "word": "cross",
+            "occurrence": 1,
+            "image": "cross"
+        }
+    ]
+}
