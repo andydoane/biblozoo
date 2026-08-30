@@ -1,0 +1,49 @@
+{
+    "biblopet": "🐨",
+    "biblopetDefaultName": "Plinko",
+    "biblopetFeetFromBottom": "25.2%",
+    "verseId": "psalm_115_3",
+    "ref": "Psalm 115:3",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Our God",
+        "is in the heavens",
+        "he does all",
+        "that he pleases."
+    ],
+    "verseText": "Our God is in the heavens; he does all that he pleases.",
+    "meaning": "God is the Maker of everything and the King of the Universe. He has the power to do whatever he wants.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 1,
+            "image": "god_crown"
+        },
+        {
+            "type": "emoji",
+            "word": "heavens",
+            "occurrence": 1,
+            "emoji": "☁️"
+        },
+        {
+            "type": "emoji",
+            "word": "does",
+            "occurrence": 1,
+            "emoji": "🛠️"
+        },
+        {
+            "type": "underscore",
+            "word": "all",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "pleases",
+            "occurrence": 1,
+            "emoji": "😊"
+        }
+    ]
+}
