@@ -2074,16 +2074,84 @@
     }
 
     playGood();
+
     state.challengeFlash = choice;
     state.challengeBad = false;
     state.challengeInputIndex += 1;
 
-    if (state.challengeInputIndex >= challenge.expected.length) {
-      await finishChallenge(challenge);
+    const flashInputIndex =
+      state.challengeInputIndex;
+
+    /*
+      Render the green confirmation
+      immediately.
+    */
+    drawChallenge();
+
+    if (
+      state.challengeInputIndex >=
+      challenge.expected.length
+    ) {
+      /*
+        Let the final key flash briefly
+        before beginning the success
+        sequence.
+      */
+      await sleep(260);
+
+      if (
+        state.screen !== "challenge" ||
+        state.currentChallenge !==
+          challenge
+      ) {
+        return;
+      }
+
+      state.challengeFlash = "";
+      state.challengeBad = false;
+
+      drawChallenge();
+
+      await finishChallenge(
+        challenge
+      );
+
       return;
     }
 
-    drawChallenge();
+    /*
+      For ordinary letters, clear the
+      flash after the same short visual
+      beat.
+
+      If the player types another
+      letter before then, the input
+      index changes and this older
+      reset cannot erase the newer
+      flash.
+    */
+    void sleep(260).then(
+      () => {
+        if (
+          state.screen !==
+            "challenge" ||
+          state.currentChallenge !==
+            challenge ||
+          state.challengeInputIndex !==
+            flashInputIndex ||
+          state.challengeFlash !==
+            choice ||
+          state.challengeBad
+        ) {
+          return;
+        }
+
+        state.challengeFlash = "";
+        state.challengeBad = false;
+
+        drawChallenge();
+      }
+    );
   }
 
   async function finishChallenge(challenge) {

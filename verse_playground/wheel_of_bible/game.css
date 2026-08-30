@@ -1344,7 +1344,18 @@ button.wob-ref-group {
   width: clamp(116px, 34vw, 230px);
   height: auto;
   display: block;
-  margin: 0 auto;
+  box-sizing: content-box;
+
+  /*
+    Give WebKit a transparent buffer
+    for the 9px drop shadow so the
+    bottom edge cannot be clipped.
+    The negative margin preserves the
+    existing layout spacing.
+  */
+  padding-bottom: 12px;
+  margin: 0 auto -12px;
+
   filter: drop-shadow(0 9px 0 rgba(0, 0, 0, .20));
   animation: wobPrizePop 520ms cubic-bezier(.18, 1.45, .28, 1) both;
 }

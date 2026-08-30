@@ -2360,16 +2360,51 @@
     renderCurrentItem();
 
     trackedTimeout(() => {
-      if (!isLiveRun(runToken) || state.currentItem !== item) return;
+      if (!isLiveRun(runToken)) return;
 
-      const travelLayer = document.getElementById("vtTravelLayer");
-
-      if ((!state.acceptingInput && state.transitionLocked) || travelLayer?.classList.contains("is-exiting")) return;
-
+      /*
+        The keyboard flash is visual
+        feedback only. Clear it even if
+        the caterpillar has already
+        started its exit transition.
+      */
       state.keyFlash = "";
+      state.keyFlashBad = false;
+
+      renderKeyboard(
+        state.currentItem?.kind === "reference"
+          ? "numbers"
+          : "letters"
+      );
+
+      /*
+        Everything below belongs to the
+        word that originally received
+        this keypress.
+      */
+      if (state.currentItem !== item) {
+        return;
+      }
+
+      const travelLayer =
+        document.getElementById(
+          "vtTravelLayer"
+        );
+
+      if (
+        (
+          !state.acceptingInput &&
+          state.transitionLocked
+        ) ||
+        travelLayer?.classList.contains(
+          "is-exiting"
+        )
+      ) {
+        return;
+      }
+
       state.justTypedIndex = -1;
       state.justTypedSegmentIndex = -1;
-      renderKeyboard(item.kind === "reference" ? "numbers" : "letters");
       renderCurrentItem();
     }, 260, runToken);
 

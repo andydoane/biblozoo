@@ -2355,7 +2355,7 @@
 
     app.innerHTML = rootHtml(`
       <div class="ghost-card ghost-ready-card">
-        <div class="ghost-ready-icon" aria-hidden="true">👻</div>
+        <div class="ghost-ready-icon" aria-hidden="true">${GAME_ICON_HTML}</div>
         <div class="ghost-ready-title">The ghost learned your handwriting!</div>
         <div class="ghost-ready-sub">Now it can write the whole verse and reference.</div>
         <div class="ghost-ready-actions">
@@ -2476,7 +2476,10 @@
           </div>
 
           <div class="ghost-remix-section">
-            <div class="ghost-section-title">👻 Ghost Effect</div>
+            <div class="ghost-section-title">
+  <span class="ghost-section-icon" aria-hidden="true">${GAME_ICON_HTML}</span>
+  Ghost Effect
+</div>
             <div class="ghost-options">
               ${selectOptionHtml("ghostVaporSelect", "Ghost Trail", state.remix.vapor || "normal", VAPOR_LEVELS)}
               ${selectOptionHtml("ghostSpeedSelect", "Ghost Speed", state.remix.speed, SPEEDS)}
@@ -2527,7 +2530,10 @@
           </div>
 
           <div class="ghost-remix-section">
-            <div class="ghost-section-title">👻 Ghost Effect</div>
+            <div class="ghost-section-title">
+  <span class="ghost-section-icon" aria-hidden="true">${GAME_ICON_HTML}</span>
+  Ghost Effect
+</div>
             <div class="ghost-options">
               ${selectOptionHtml("ghostToolSelect", "Writing Tool", state.remix.tool || "pencil", PLAYBACK_TOOLS)}
               ${selectOptionHtml("ghostVaporSelect", "Ghost Trail", state.remix.vapor || "normal", VAPOR_LEVELS)}

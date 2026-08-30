@@ -569,9 +569,43 @@ body {
 }
 
 .ghost-ready-icon {
-  font-size: clamp(74px, 20vw, 128px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
   filter: drop-shadow(0 7px 0 rgba(0, 0, 0, .22));
+}
+
+.ghost-ready-icon .vm-game-icon-img {
+  display: block;
+  width: clamp(92px, 34vw, 180px);
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.ghost-ready-icon .vm-game-icon-fallback {
+  font-size: clamp(74px, 20vw, 128px);
+}
+
+.ghost-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15em;
+  height: 1.15em;
+  flex: 0 0 auto;
+}
+
+.ghost-section-icon .vm-game-icon-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ghost-section-icon .vm-game-icon-fallback {
+  font-size: 1em;
 }
 
 .ghost-ready-title {
