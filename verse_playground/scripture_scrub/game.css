@@ -437,24 +437,12 @@ body{
   --scrub-glow-pad: clamp(38px, 8vw, 82px);
   position: absolute;
   z-index: 3;
-  opacity: 0;
+  visibility: hidden;
   box-sizing: content-box;
   padding: var(--scrub-glow-pad);
   margin: 0;
   pointer-events: none;
   color: #eafffb;
-  text-shadow:
-    0 0 5px rgba(234, 255, 251, 1),
-    0 0 16px rgba(64, 185, 197, .95),
-    0 0 32px rgba(127, 102, 198, .68),
-    0 0 46px rgba(167, 203, 111, .26);
-  filter: brightness(1.25) saturate(1.2);
-  -webkit-mask-image: linear-gradient(transparent, transparent);
-  mask-image: linear-gradient(transparent, transparent);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
 }
 
 .scrub-round-glow #scrubGlowVerseText,
@@ -462,11 +450,6 @@ body{
 .scrub-round-glow #scrubGlowVerseText .scrub-token-word.is-special,
 .scrub-round-glow #scrubGlowVerseText .scrub-token-punct {
   color: #eafffb;
-  text-shadow:
-    0 0 5px rgba(234, 255, 251, 1),
-    0 0 16px rgba(64, 185, 197, .95),
-    0 0 34px rgba(127, 102, 198, .72),
-    0 0 54px rgba(167, 203, 111, .32);
 }
 
 .scrub-round-glow .scrub-ref-pill {
@@ -536,22 +519,13 @@ body{
   --scrub-rainbow-pad: clamp(38px, 8vw, 82px);
   position: absolute;
   z-index: 3;
-  opacity: 0;
+  visibility: hidden;
   box-sizing: content-box;
   padding: var(--scrub-rainbow-pad);
   margin: 0;
   pointer-events: none;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  text-shadow:
-    0 4px 0 rgba(0, 0, 0, .32),
-    0 0 10px rgba(255, 255, 255, .18);
-  -webkit-mask-image: linear-gradient(transparent, transparent);
-  mask-image: linear-gradient(transparent, transparent);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
 }
 
 .scrub-round-rainbow #scrubGlowVerseText,
@@ -565,9 +539,6 @@ body{
 .scrub-round-rainbow .scrub-rainbow-letter {
   color: var(--scrub-rainbow-letter-color);
   -webkit-text-fill-color: var(--scrub-rainbow-letter-color);
-  text-shadow:
-    0 4px 0 rgba(0, 0, 0, .32),
-    0 0 8px rgba(255, 255, 255, .18);
 }
 
 .scrub-round-rainbow .scrub-ref-pill {

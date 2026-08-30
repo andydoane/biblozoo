@@ -111,6 +111,16 @@
   const BIBLE_REVEAL_COMPLETION_THRESHOLD = 0.96;
   const ROUND_ASSET_LOOKAHEAD_COUNT = 2;
 
+  /*
+    Glow/Rainbow use this canvas only
+    to measure completion.
+
+    It is never shown to the player,
+    so it does not need Retina/DPR-2
+    resolution.
+  */
+  const GLOW_TRACKING_DPR = 1;
+
   const ROUNDS = [
     {
       id: "mud",
@@ -355,6 +365,7 @@
   let coverCtx = null;
   let clearMaskCanvas = null;
   let clearMaskCtx = null;
+  let clearMaskDpr = 1;
   let dpr = 1;
   let pointerDown = false;
   let lastPoint = null;
@@ -370,6 +381,7 @@
   let glowMaskCtx = null;
   let glowTextCanvas = null;
   let glowTextCtx = null;
+  let glowRenderGeometry = null;
   let glowMaskApplyAnimationFrame = null;
   let glowTrailSpots = [];
   let glowTrailAnimationFrame = null;
@@ -2256,18 +2268,79 @@
   }
 
   function setupClearMask(width, height) {
-    clearMaskCanvas = document.createElement("canvas");
-    clearMaskCanvas.width = coverCanvas.width;
-    clearMaskCanvas.height = coverCanvas.height;
+    const round =
+      roundConfig();
 
-    clearMaskCtx = clearMaskCanvas.getContext("2d", { willReadFrequently: true });
+    const isGlowRound =
+      round?.kind === "glow" ||
+      round?.kind === "rainbow";
+
+    clearMaskDpr =
+      isGlowRound
+        ? GLOW_TRACKING_DPR
+        : dpr;
+
+    clearMaskCanvas =
+      document.createElement(
+        "canvas"
+      );
+
+    clearMaskCanvas.width =
+      Math.max(
+        1,
+        Math.round(
+          width *
+          clearMaskDpr
+        )
+      );
+
+    clearMaskCanvas.height =
+      Math.max(
+        1,
+        Math.round(
+          height *
+          clearMaskDpr
+        )
+      );
+
+    clearMaskCtx =
+      clearMaskCanvas.getContext(
+        "2d",
+        {
+          willReadFrequently: true
+        }
+      );
+
     if (!clearMaskCtx) return;
 
-    clearMaskCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    clearMaskCtx.globalCompositeOperation = "source-over";
-    clearMaskCtx.clearRect(0, 0, width, height);
-    clearMaskCtx.fillStyle = "#000000";
-    clearMaskCtx.fillRect(0, 0, width, height);
+    clearMaskCtx.setTransform(
+      clearMaskDpr,
+      0,
+      0,
+      clearMaskDpr,
+      0,
+      0
+    );
+
+    clearMaskCtx.globalCompositeOperation =
+      "source-over";
+
+    clearMaskCtx.clearRect(
+      0,
+      0,
+      width,
+      height
+    );
+
+    clearMaskCtx.fillStyle =
+      "#000000";
+
+    clearMaskCtx.fillRect(
+      0,
+      0,
+      width,
+      height
+    );
   }
 
   function eraseClearMask(x, y, radius) {
@@ -2494,6 +2567,7 @@
 
   function setupGlowRound(round, width, height) {
     glowTargetRects = [];
+    glowRenderGeometry = null;
     rainbowLastBurstAt = 0;
     rainbowLastBurstPoint = null;
 
@@ -2507,6 +2581,7 @@
     setupGlowMask();
     renderGlowTextCanvas(round);
     refreshGlowTargetRects();
+    refreshGlowRenderGeometry();
     applyGlowMask();
 
     requestAnimationFrame(() => {
@@ -2515,6 +2590,7 @@
       setupGlowMask();
       renderGlowTextCanvas(round);
       refreshGlowTargetRects();
+      refreshGlowRenderGeometry();
       applyGlowMask();
       updateProgress(0);
     });
@@ -2525,6 +2601,7 @@
       setupGlowMask();
       renderGlowTextCanvas(round);
       refreshGlowTargetRects();
+      refreshGlowRenderGeometry();
       applyGlowMask();
     }, 180);
 
@@ -2577,7 +2654,11 @@
     glowMaskCanvas.width = Math.max(1, Math.round(rect.width * dpr));
     glowMaskCanvas.height = Math.max(1, Math.round(rect.height * dpr));
 
-    glowMaskCtx = glowMaskCanvas.getContext("2d", { willReadFrequently: true });
+    glowMaskCtx =
+      glowMaskCanvas.getContext(
+        "2d"
+      );
+
     if (!glowMaskCtx) return;
 
     glowMaskCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2645,6 +2726,113 @@
 
     glowTargetRects = targets;
   }
+  function refreshGlowRenderGeometry() {
+    const glow =
+      document.getElementById(
+        "scrubGlowVerseText"
+      );
+
+    if (
+      !stageEl ||
+      !coverCanvas ||
+      !glow
+    ) {
+      glowRenderGeometry = null;
+      return null;
+    }
+
+    const stageRect =
+      stageEl.getBoundingClientRect();
+
+    const glowRect =
+      glow.getBoundingClientRect();
+
+    const canvasRect =
+      coverCanvas
+        .getBoundingClientRect();
+
+    if (
+      !stageRect.width ||
+      !stageRect.height ||
+      !glowRect.width ||
+      !glowRect.height ||
+      !canvasRect.width ||
+      !canvasRect.height
+    ) {
+      glowRenderGeometry = null;
+      return null;
+    }
+
+    glowRenderGeometry = {
+      stageWidth:
+        stageRect.width,
+
+      stageHeight:
+        stageRect.height,
+
+      glowX:
+        glowRect.left -
+        stageRect.left,
+
+      glowY:
+        glowRect.top -
+        stageRect.top,
+
+      glowWidth:
+        glowRect.width,
+
+      glowHeight:
+        glowRect.height,
+
+      canvasLeft:
+        canvasRect.left,
+
+      canvasTop:
+        canvasRect.top,
+
+      canvasWidth:
+        canvasRect.width,
+
+      canvasHeight:
+        canvasRect.height
+    };
+
+    return glowRenderGeometry;
+  }
+
+
+  function getGlowCanvasPoint(
+    event
+  ) {
+    const geometry =
+      glowRenderGeometry ||
+      refreshGlowRenderGeometry();
+
+    if (!geometry) {
+      return getCanvasPoint(
+        event
+      );
+    }
+
+    return {
+      x:
+        clamp(
+          event.clientX -
+          geometry.canvasLeft,
+          0,
+          geometry.canvasWidth
+        ),
+
+      y:
+        clamp(
+          event.clientY -
+          geometry.canvasTop,
+          0,
+          geometry.canvasHeight
+        )
+    };
+  }
+
 
   function wireGlowReveal(round) {
     coverCanvas.onpointerdown = (event) => {
@@ -2654,9 +2842,13 @@
       event.preventDefault();
       syncGlowVerseLayer();
       refreshGlowTargetRects();
+      refreshGlowRenderGeometry();
 
       pointerDown = true;
-      lastPoint = getCanvasPoint(event);
+      lastPoint =
+        getGlowCanvasPoint(
+          event
+        );
       coverCanvas.setPointerCapture?.(event.pointerId);
 
       revealGlowAt(lastPoint.x, lastPoint.y, currentBrushRadius(round), round);
@@ -2668,8 +2860,17 @@
 
       event.preventDefault();
 
-      const point = getCanvasPoint(event);
-      revealGlowLine(lastPoint || point, point, currentBrushRadius(round), round);
+      const point =
+        getGlowCanvasPoint(
+          event
+        );
+
+      revealGlowLine(
+        lastPoint || point,
+        point,
+        currentBrushRadius(round),
+        round
+      );
       lastPoint = point;
 
       scheduleCoverageCheck(round);
@@ -2713,17 +2914,29 @@
   }
 
   function revealGlowAt(x, y, radius, round) {
-    const glow = document.getElementById("scrubGlowVerseText");
+    if (
+      !glowMaskCtx ||
+      !glowMaskCanvas
+    ) {
+      return;
+    }
 
-    if (!glowMaskCtx || !glowMaskCanvas || !stageEl || !glow) return;
+    const geometry =
+      glowRenderGeometry ||
+      refreshGlowRenderGeometry();
 
-    const stageRect = stageEl.getBoundingClientRect();
-    const glowRect = glow.getBoundingClientRect();
+    if (!geometry) return;
 
-    const localX = x - (glowRect.left - stageRect.left);
-    const localY = y - (glowRect.top - stageRect.top);
+    const localX =
+      x -
+      geometry.glowX;
 
-    const revealRadius = radius * 1.18;
+    const localY =
+      y -
+      geometry.glowY;
+
+    const revealRadius =
+      radius * 1.18;
 
     glowMaskCtx.save();
     glowMaskCtx.globalCompositeOperation = "source-over";
@@ -2756,12 +2969,42 @@
   }
 
   function scheduleGlowMaskApply() {
-    if (glowMaskApplyAnimationFrame) return;
+    if (
+      glowMaskApplyAnimationFrame
+    ) {
+      return;
+    }
 
-    glowMaskApplyAnimationFrame = requestAnimationFrame((now) => {
-      glowMaskApplyAnimationFrame = null;
-      renderGlowCanvasFrame(now);
-    });
+    glowMaskApplyAnimationFrame =
+      requestAnimationFrame(
+        (now) => {
+          glowMaskApplyAnimationFrame =
+            null;
+
+          renderGlowCanvasFrame(
+            now
+          );
+
+          /*
+            The same RAF now owns both
+            the reveal mask and all
+            transient trail animation.
+
+            Never render the entire
+            special-round canvas twice
+            for one visual frame.
+          */
+          if (
+            pointerDown &&
+            (
+              glowTrailSpots.length ||
+              rainbowTrailParticles.length
+            )
+          ) {
+            scheduleGlowMaskApply();
+          }
+        }
+      );
   }
 
   function flushGlowMaskApply() {
@@ -2922,37 +3165,80 @@
   }
 
 
-  function renderGlowCanvasFrame(now = performance.now()) {
-    if (!coverCtx || !stageEl) return;
+  function renderGlowCanvasFrame(
+    now = performance.now()
+  ) {
+    if (!coverCtx) return;
 
-    const stageRect = stageEl.getBoundingClientRect();
+    const geometry =
+      glowRenderGeometry ||
+      refreshGlowRenderGeometry();
+
+    if (!geometry) return;
 
     coverCtx.save();
-    coverCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    coverCtx.clearRect(0, 0, stageRect.width, stageRect.height);
-    coverCtx.globalCompositeOperation = "source-over";
+
+    coverCtx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    coverCtx.clearRect(
+      0,
+      0,
+      geometry.stageWidth,
+      geometry.stageHeight
+    );
+
+    coverCtx.globalCompositeOperation =
+      "source-over";
+
     coverCtx.globalAlpha = 1;
 
-    const glow = document.getElementById("scrubGlowVerseText");
-    const glowRect = glow?.getBoundingClientRect?.();
+    if (
+      glowTextCanvas &&
+      glowMaskCanvas
+    ) {
+      coverCtx.drawImage(
+        glowTextCanvas,
+        geometry.glowX,
+        geometry.glowY,
+        geometry.glowWidth,
+        geometry.glowHeight
+      );
 
-    if (glowTextCanvas && glowMaskCanvas && glowRect?.width && glowRect?.height) {
-      const x = glowRect.left - stageRect.left;
-      const y = glowRect.top - stageRect.top;
+      coverCtx.globalCompositeOperation =
+        "destination-in";
 
-      coverCtx.drawImage(glowTextCanvas, x, y, glowRect.width, glowRect.height);
+      coverCtx.drawImage(
+        glowMaskCanvas,
+        geometry.glowX,
+        geometry.glowY,
+        geometry.glowWidth,
+        geometry.glowHeight
+      );
 
-      coverCtx.globalCompositeOperation = "destination-in";
-      coverCtx.drawImage(glowMaskCanvas, x, y, glowRect.width, glowRect.height);
-
-      coverCtx.globalCompositeOperation = "source-over";
+      coverCtx.globalCompositeOperation =
+        "source-over";
     }
 
-    drawGlowTrailParticlesOnCanvas(now);
-    drawRainbowParticlesOnCanvas(now);
+    drawGlowTrailParticlesOnCanvas(
+      now
+    );
+
+    drawRainbowParticlesOnCanvas(
+      now
+    );
 
     coverCtx.globalAlpha = 1;
-    coverCtx.globalCompositeOperation = "source-over";
+
+    coverCtx.globalCompositeOperation =
+      "source-over";
+
     coverCtx.restore();
   }
 
@@ -3026,9 +3312,7 @@
       glowTrailSpots.splice(0, glowTrailSpots.length - 18);
     }
 
-    if (!glowTrailAnimationFrame) {
-      glowTrailAnimationFrame = requestAnimationFrame(drawGlowTrailFrame);
-    }
+    scheduleGlowMaskApply();
   }
 
   function drawGlowTrailFrame(now) {
@@ -3112,9 +3396,7 @@
       rainbowTrailParticles.splice(0, rainbowTrailParticles.length - 54);
     }
 
-    if (!rainbowTrailAnimationFrame) {
-      rainbowTrailAnimationFrame = requestAnimationFrame(drawRainbowTrailFrame);
-    }
+    scheduleGlowMaskApply();
   }
   
   function drawRainbowTrailFrame(now) {
@@ -3141,41 +3423,229 @@
 
 
   function measureGlowClearedRatio() {
-    if (!clearMaskCanvas || !clearMaskCtx || !glowTargetRects.length) {
+    if (
+      !clearMaskCanvas ||
+      !clearMaskCtx ||
+      !glowTargetRects.length
+    ) {
       return measureClearedRatio();
     }
 
-    const width = clearMaskCanvas.width;
-    const height = clearMaskCanvas.height;
-    if (!width || !height) return 0;
+    const width =
+      clearMaskCanvas.width;
 
-    const step = Math.max(3, Math.round(5 * dpr));
+    const height =
+      clearMaskCanvas.height;
+
+    if (!width || !height) {
+      return 0;
+    }
+
+    const scale =
+      clearMaskDpr;
+
+    /*
+      Only read the bounding area that
+      actually contains verse text.
+
+      The original code copied the
+      entire full-screen tracking
+      canvas into JavaScript.
+    */
+    const minLeft =
+      Math.min(
+        ...glowTargetRects.map(
+          target => target.left
+        )
+      );
+
+    const minTop =
+      Math.min(
+        ...glowTargetRects.map(
+          target => target.top
+        )
+      );
+
+    const maxRight =
+      Math.max(
+        ...glowTargetRects.map(
+          target =>
+            target.left +
+            target.width
+        )
+      );
+
+    const maxBottom =
+      Math.max(
+        ...glowTargetRects.map(
+          target =>
+            target.top +
+            target.height
+        )
+      );
+
+    const readLeft =
+      Math.max(
+        0,
+        Math.floor(
+          minLeft * scale
+        )
+      );
+
+    const readTop =
+      Math.max(
+        0,
+        Math.floor(
+          minTop * scale
+        )
+      );
+
+    const readRight =
+      Math.min(
+        width,
+        Math.ceil(
+          maxRight * scale
+        )
+      );
+
+    const readBottom =
+      Math.min(
+        height,
+        Math.ceil(
+          maxBottom * scale
+        )
+      );
+
+    const readWidth =
+      Math.max(
+        1,
+        readRight -
+        readLeft
+      );
+
+    const readHeight =
+      Math.max(
+        1,
+        readBottom -
+        readTop
+      );
+
+    const step =
+      Math.max(
+        3,
+        Math.round(
+          5 * scale
+        )
+      );
+
     let total = 0;
     let cleared = 0;
 
     try {
-      const data = clearMaskCtx.getImageData(0, 0, width, height).data;
+      const data =
+        clearMaskCtx
+          .getImageData(
+            readLeft,
+            readTop,
+            readWidth,
+            readHeight
+          )
+          .data;
 
-      glowTargetRects.forEach((target) => {
-        const left = Math.max(0, Math.round(target.left * dpr));
-        const top = Math.max(0, Math.round(target.top * dpr));
-        const right = Math.min(width, Math.round((target.left + target.width) * dpr));
-        const bottom = Math.min(height, Math.round((target.top + target.height) * dpr));
+      glowTargetRects.forEach(
+        target => {
+          const left =
+            Math.max(
+              readLeft,
+              Math.round(
+                target.left *
+                scale
+              )
+            );
 
-        for (let y = top; y < bottom; y += step) {
-          for (let x = left; x < right; x += step) {
-            total += 1;
-            const alpha = data[((y * width + x) * 4) + 3];
-            if (alpha < 24) cleared += 1;
+          const top =
+            Math.max(
+              readTop,
+              Math.round(
+                target.top *
+                scale
+              )
+            );
+
+          const right =
+            Math.min(
+              readRight,
+              Math.round(
+                (
+                  target.left +
+                  target.width
+                ) *
+                scale
+              )
+            );
+
+          const bottom =
+            Math.min(
+              readBottom,
+              Math.round(
+                (
+                  target.top +
+                  target.height
+                ) *
+                scale
+              )
+            );
+
+          for (
+            let y = top;
+            y < bottom;
+            y += step
+          ) {
+            for (
+              let x = left;
+              x < right;
+              x += step
+            ) {
+              total += 1;
+
+              const localX =
+                x - readLeft;
+
+              const localY =
+                y - readTop;
+
+              const alpha =
+                data[
+                (
+                  (
+                    localY *
+                    readWidth +
+                    localX
+                  ) *
+                  4
+                ) +
+                3
+                ];
+
+              if (alpha < 24) {
+                cleared += 1;
+              }
+            }
           }
         }
-      });
+      );
     } catch (err) {
-      console.warn("Scripture Scrub: glow coverage check failed", err);
+      console.warn(
+        "Scripture Scrub: glow coverage check failed",
+        err
+      );
+
       return 0;
     }
 
-    return total ? cleared / total : 0;
+    return total
+      ? cleared / total
+      : 0;
   }
 
   function clearGlowCover() {
