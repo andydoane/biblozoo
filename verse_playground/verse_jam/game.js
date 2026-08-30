@@ -1998,7 +1998,7 @@
               <div class="versejam-board-content">
                 <div class="versejam-overlay-pills">
                   <button class="versejam-pill no-zoom" id="versejamMenuPill" type="button" aria-label="Game Menu">☰</button>
-                  <div class="versejam-pill versejam-round-pill" id="versejamRoundPill">${escapeHtml(currentRound().name)}</div>
+                  <div class="versejam-pill versejam-round-pill" id="versejamRoundPill">Groovy Score ${Math.max(0, state.groovyScore)}</div>
                 </div>
                 <div class="versejam-main-area" id="versejamMainArea"></div>
               </div>
@@ -2583,8 +2583,14 @@
       state.acceptingInput = false;
 
       if (groovy) {
-        state.groovyScore += groovyPoints;
-        showGroovySplash(groovyPoints);
+        state.groovyScore +=
+          groovyPoints;
+
+        updateRoundPill();
+
+        showGroovySplash(
+          groovyPoints
+        );
       }
 
       await sleep(groovy ? 560 : 260);
@@ -2664,8 +2670,18 @@
   }
 
   function updateRoundPill() {
-    const pill = document.getElementById("versejamRoundPill");
-    if (pill) pill.textContent = currentRound().name;
+    const pill =
+      document.getElementById(
+        "versejamRoundPill"
+      );
+
+    if (!pill) return;
+
+    pill.textContent =
+      `Groovy Score ${Math.max(
+        0,
+        state.groovyScore
+      )}`;
   }
 
   function playEndingSting(startAt = audioCtx?.currentTime || 0) {
