@@ -1,0 +1,55 @@
+{
+    "biblopet": "🦎",
+    "biblopetDefaultName": "Grizz",
+    "biblopetFeetFromBottom": "8.7%",
+    "verseId": "proverbs_16_16",
+    "ref": "Proverbs 16:16",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "How much better",
+        "to get wisdom than gold",
+        "To get understanding",
+        "is to be chosen",
+        "rather than silver."
+    ],
+    "verseText": "How much better to get wisdom than gold! To get understanding is to be chosen rather than silver.",
+    "meaning": "Knowing the truth and wisdom of God is a priceless treasure. It is more valuable than any amount of gold or silver.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "underscore",
+            "word": "better",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "wisdom",
+            "occurrence": 1,
+            "emoji": "🦉"
+        },
+        {
+            "type": "emoji",
+            "word": "gold",
+            "occurrence": 1,
+            "emoji": "🥇"
+        },
+        {
+            "type": "emoji",
+            "word": "understanding",
+            "occurrence": 1,
+            "emoji": "🧠"
+        },
+        {
+            "type": "underscore",
+            "word": "chosen",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "silver",
+            "occurrence": 1,
+            "emoji": "🥈"
+        }
+    ]
+}
