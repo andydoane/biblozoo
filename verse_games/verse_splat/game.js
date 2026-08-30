@@ -1117,7 +1117,7 @@ function gameplayShell({ bonus=false }){
           <div class="vsp-board" id="vspBoard">
             <div class="vsp-board-topbar">
               <button class="vsp-menu-pill" id="vspMenuPill" data-action="open-menu" aria-label="Open game menu" type="button">☰</button>
-              ${bonus ? `<div class="vsp-bonus-timer-chip" id="vspBonusTimerChip">Time ${Math.ceil(state.bonusRemainingMs / 1000)}</div>` : `<div class="vsp-coverage-chip" id="vspCoverageChip">Painted ${state.coveredCells.size}/${coverageGridTotal()}</div>`}
+              ${bonus ? `<div class="vsp-bonus-timer-chip" id="vspBonusTimerChip">Time ${Math.ceil(state.bonusRemainingMs / 1000)}</div>` : `<div class="vsp-coverage-chip" id="vspCoverageChip">${coveragePercentScore()}%</div>`}
             </div>
             <div class="vsp-board-main" id="vspBoardMain">
               ${bonus ? "" : `
@@ -2291,9 +2291,13 @@ function viewportCenterPx(layerSelector="#vspFrontEffectLayer"){
   }
 
   function updateCoverageHud() {
-    const chip = $("#vspCoverageChip");
+    const chip =
+      $("#vspCoverageChip");
+
     if (!chip) return;
-    chip.textContent = `Painted ${state.coveredCells.size}/${coverageGridTotal()}`;
+
+    chip.textContent =
+      `${coveragePercentScore()}%`;
   }
 
   function coverageScorePopupClass(added) {

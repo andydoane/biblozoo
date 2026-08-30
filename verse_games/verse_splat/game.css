@@ -285,7 +285,17 @@ body{
   line-height:1;
 }
 .vsp-bonus-timer-chip,
-.vsp-coverage-chip{margin-left:auto}
+.vsp-coverage-chip{
+  margin-left:auto;
+}
+
+.vsp-coverage-chip{
+  font-family:
+    var(--vsp-font-display);
+  font-weight:400;
+  font-size:18px;
+  letter-spacing:.01em;
+}
 .vsp-menu-pill:active{transform:translateY(1px)}
 .vsp-board-main{position:absolute;inset:0;min-height:0;touch-action:none}
 
