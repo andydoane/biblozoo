@@ -1241,7 +1241,7 @@ const LEARN_INSTRUCTION_KEYS = [
   "games"
 ];
 
-const preloadedInstructionImages = new Set();
+const preloadedInstructionImages = new Map();
 
 function preloadLearnInstructionImages() {
   for (const key of LEARN_INSTRUCTION_KEYS) {
@@ -1252,10 +1252,31 @@ function preloadLearnInstructionImages() {
     if (preloadedInstructionImages.has(src)) continue;
 
     const img = new Image();
+    img.decoding = "async";
     img.src = src;
 
-    preloadedInstructionImages.add(src);
+    preloadedInstructionImages.set(src, img);
+
+    if (typeof img.decode === "function") {
+      img.decode().catch(() => { });
+    }
   }
+}
+
+function updateLearnInstructionReadyUi(root = document) {
+  const ready = !!State.learnInstructionReady;
+
+  root
+    .querySelectorAll(".learn-instruction-btn")
+    .forEach((btn) => {
+      btn.disabled = !ready;
+      btn.setAttribute(
+        "aria-disabled",
+        ready ? "false" : "true"
+      );
+      btn.classList.toggle("is-ready", ready);
+      btn.classList.toggle("is-waiting", !ready);
+    });
 }
 
 const preloadedZooTodoChromeImages = new Map();
@@ -1375,7 +1396,7 @@ async function playLearnInstructionAudio() {
   State.instructionPlaying = true;
   State.instructionKey = State.learnInstructionKey;
   State.audioMode = "instruction";
-  render();
+  updateLearnInstructionReadyUi();
 
   setAudioSrc(`${AUDIO_DIR}${cfg.audio}`);
   audioEl.currentTime = 0;
@@ -1384,8 +1405,10 @@ async function playLearnInstructionAudio() {
     await safePlay();
   } catch (e) {
     State.instructionPlaying = false;
+    State.instructionKey = "";
+    State.audioMode = null;
     State.learnInstructionReady = true;
-    render();
+    updateLearnInstructionReadyUi();
     return;
   }
 
@@ -1403,7 +1426,7 @@ async function playLearnInstructionAudio() {
   State.instructionKey = "";
   State.audioMode = null;
   State.learnInstructionReady = true;
-  render();
+  updateLearnInstructionReadyUi();
 }
 
 async function continueLearnInstruction() {
@@ -6061,6 +6084,24 @@ function learnEchoStageHtml(learnParts) {
   `;
 }
 
+function updateEchoStageState(root = document) {
+  const stateClasses = [
+    "is-future",
+    "is-listening",
+    "is-echoing",
+    "is-completed"
+  ];
+
+  root
+    .querySelectorAll(".learn-screen-echo .learn-echo-piece")
+    .forEach((piece, index) => {
+      piece.classList.remove(...stateClasses);
+      piece.classList.add(
+        getEchoChunkStateClass(index)
+      );
+    });
+}
+
 function getSmartLearnLineHeight(textLength, stageRatio) {
   if (stageRatio > 1.35) {
     if (textLength <= 90) return 1.10;
@@ -7558,18 +7599,30 @@ function go(nextScreen) {
   }
 
 
-  // On the next frame, slide to the new screen
+  // Give the freshly-built incoming slide one committed frame at its
+  // offscreen starting position before moving it. Older WebKit can
+  // otherwise coalesce both transform states and skip the visible slide.
   requestAnimationFrame(() => {
-    State.slideX = toIdx;
-    updateSlideTransforms();
+    requestAnimationFrame(() => {
+      if (
+        !State.isSliding ||
+        State.transitionFromIdx !== fromIdx ||
+        State.transitionToIdx !== toIdx
+      ) {
+        return;
+      }
 
-    setTimeout(() => {
-      State.isSliding = false;
-      State.transitionFromIdx = null;
-      State.transitionToIdx = null;
-      State.forceSlideForward = false;
-      render();
-    }, 340);
+      State.slideX = toIdx;
+      updateSlideTransforms();
+
+      setTimeout(() => {
+        State.isSliding = false;
+        State.transitionFromIdx = null;
+        State.transitionToIdx = null;
+        State.forceSlideForward = false;
+        render();
+      }, 340);
+    });
   });
 }
 
@@ -8790,7 +8843,12 @@ async function runEchoSequence() {
   State.echoSpeaking = false;
   State.echoIndex = 0;
   State.audioMode = "echo";
-  render();
+
+  if (document.querySelector(".learn-screen-echo #btnEcho")) {
+    render();
+  } else {
+    updateEchoStageState();
+  }
 
   try {
     const learnParts = getLearnAudioParts();
@@ -8805,7 +8863,8 @@ async function runEchoSequence() {
       audioEl.currentTime = 0;
 
       State.echoIndex = i;
-      render();
+      State.echoSpeaking = false;
+      updateEchoStageState();
 
       try {
         await safePlay();
@@ -8829,7 +8888,7 @@ async function runEchoSequence() {
       if (my !== echoCancelToken) return;
 
       State.echoSpeaking = true;
-      render();
+      updateEchoStageState();
 
       // Give the child time to repeat: duration × 1.25 (fallback 2s if unknown)
       const d = await waitForDuration();
@@ -8839,7 +8898,7 @@ async function runEchoSequence() {
       if (my !== echoCancelToken) return;
 
       State.echoSpeaking = false;
-      render();
+      updateEchoStageState();
     }
 
     // restore main verse audio for later
@@ -8849,6 +8908,7 @@ async function runEchoSequence() {
     State.echoRunning = false;
     State.echoSpeaking = false;
     State.audioMode = null;
+    updateEchoStageState();
 
     startLearnInstruction("remove");
     return;
@@ -8857,7 +8917,14 @@ async function runEchoSequence() {
     if (my === echoCancelToken) {
       State.echoRunning = false;
       State.echoSpeaking = false;
-      render();
+
+      if (State.audioMode === "echo") {
+        State.audioMode = null;
+      }
+
+      if (State.screen === Screen.ECHO) {
+        render();
+      }
     }
   }
 }
@@ -13303,6 +13370,8 @@ function screenLearnInstruction(idx) {
           class="learn-instruction-image"
           src="${IMG_DIR}${image}"
           alt=""
+          loading="eager"
+          decoding="sync"
           draggable="false"
           onerror="this.style.display='none'">
 
@@ -13495,34 +13564,37 @@ function screenChunks(idx) {
   inner.style.height = "100%";
 
   const learnParts = getLearnAudioParts();
-  const chunkText = learnParts[State.chunkIndex]?.text || VERSE_TEXT;
   const isChunkSlideExiting = State.screen !== Screen.CHUNKS;
 
-  let coachText = "Listen carefully as each chunk plays.";
   let buttonLabel = "▶ Start";
 
-  if (isChunkSlideExiting) {
-    coachText = "Listen carefully as each chunk plays.";
-  } else if (State.instructionPlaying && State.instructionKey === "chunks1") {
-    coachText = "Let's break the verse down into bite sized chunks.";
-  } else if (State.instructionPlaying && State.instructionKey === "chunks2") {
-    coachText = "Let's do that one more time.";
-    buttonLabel = "One More Time";
-  } else if (State.instructionPlaying && State.instructionKey === "echo1") {
-    coachText = "Now echo the verse after me.";
-    buttonLabel = "Echo the Verse";
-  } else if (State.chunkRunning) {
-    coachText = "Listen carefully as each chunk plays.";
-  } else if (State.chunkPassCount === 1) {
-    coachText = "Listen through the chunks one more time.";
+  if (State.chunkPassCount === 1) {
     buttonLabel = "One More Time";
   } else if (State.chunkPassCount >= 2) {
-    coachText = "Tap the button to echo the verse.";
     buttonLabel = "Echo the Verse";
   }
 
+  const showChunkAction = !(
+    isChunkSlideExiting ||
+    State.chunkRunning ||
+    State.instructionPlaying ||
+    (State.chunkAutoStarting && !State.chunkAutoFallbackReady)
+  );
+
+  const chunkBottomHtml = showChunkAction
+    ? `
+      <div class="learn-coach learn-bottom-zone">
+        <div class="coach-actions">
+          <button class="carousel-main no-zoom" id="btnChunks" style="max-width:520px;">
+            ${buttonLabel}
+          </button>
+        </div>
+      </div>
+    `
+    : "";
+
   inner.innerHTML = `
-    <div class="learn-layout learn-screen learn-screen-chunks learn-layout-coach-centered">
+    <div class="learn-layout learn-screen learn-screen-chunks learn-layout-coach-centered${showChunkAction ? "" : " learn-screen-stage-expanded"}">
       <div class="learn-ref learn-instruction-line">
         ${learnInstructionLineHtml("Listen for each chunk.")}
       </div>
@@ -13531,27 +13603,7 @@ function screenChunks(idx) {
         ${learnChunkStageHtml(learnParts, getChunkVisibleCount(learnParts))}
       </div>
 
-      <div class="learn-coach learn-bottom-zone">
-        <div>
-          <div class="coach-text">${coachText}</div>
-        </div>
-
-        <div class="coach-actions">
-          ${(
-      isChunkSlideExiting ||
-      State.chunkRunning ||
-      State.instructionPlaying ||
-      (State.chunkAutoStarting && !State.chunkAutoFallbackReady)
-    )
-      ? ``
-      : `
-                <button class="carousel-main no-zoom" id="btnChunks" style="max-width:520px;">
-                  ${buttonLabel}
-                </button>
-              `
-    }
-        </div>
-      </div>
+      ${chunkBottomHtml}
     </div>
   `;
 
@@ -13577,10 +13629,31 @@ function screenEcho(idx) {
   inner.style.display = "flex";
   inner.style.flexDirection = "column";
   inner.style.height = "100%";
+
   const learnParts = getLearnAudioParts();
+  const isEchoSlideExiting = State.screen !== Screen.ECHO;
+
+  const showEchoAction = !(
+    isEchoSlideExiting ||
+    State.echoRunning ||
+    State.instructionPlaying ||
+    (State.echoAutoStarting && !State.echoAutoFallbackReady)
+  );
+
+  const echoBottomHtml = showEchoAction
+    ? `
+      <div class="learn-coach learn-bottom-zone">
+        <div class="coach-actions">
+          <button class="carousel-main no-zoom" id="btnEcho" style="max-width:520px;">
+            ${State.echoDone ? (hideWordsPerRound() === 2 ? "Remove Words" : "Remove a Word") : "▶ Start Echo"}
+          </button>
+        </div>
+      </div>
+    `
+    : "";
 
   inner.innerHTML = `
-    <div class="learn-layout learn-screen learn-screen-echo learn-layout-coach-centered">
+    <div class="learn-layout learn-screen learn-screen-echo learn-layout-coach-centered${showEchoAction ? "" : " learn-screen-stage-expanded"}">
       <div class="learn-ref learn-instruction-line">
         ${learnInstructionLineHtml("Echo each chunk after it turns yellow.")}
       </div>
@@ -13589,22 +13662,7 @@ function screenEcho(idx) {
         ${learnEchoStageHtml(learnParts)}
       </div>
 
-      <div class="learn-coach learn-bottom-zone">
-        <div class="coach-actions">
-          ${(
-      State.echoRunning ||
-      State.instructionPlaying ||
-      (State.echoAutoStarting && !State.echoAutoFallbackReady)
-    )
-      ? ``
-      : `
-                <button class="carousel-main no-zoom" id="btnEcho" style="max-width:520px;">
-                  ${State.echoDone ? (hideWordsPerRound() === 2 ? "Remove Words" : "Remove a Word") : "▶ Start Echo"}
-                </button>
-              `
-    }
-        </div>
-      </div>
+      ${echoBottomHtml}
     </div>
   `;
 

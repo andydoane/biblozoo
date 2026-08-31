@@ -3711,11 +3711,11 @@ Game Mix Loading Screen
   max-width: 100%;
   color: rgba(255, 255, 255, 0.22);
   opacity: 0;
-  transform: translateY(0.12em) scale(0.98);
+  transform: none;
   transition:
     color 180ms ease,
-    opacity 180ms ease,
-    transform 180ms ease;
+    opacity 180ms ease;
+  text-shadow: none;
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
@@ -3727,20 +3727,20 @@ Game Mix Loading Screen
 .learn-echo-piece.is-listening {
   color: #ffffff;
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: none;
 }
 
 .learn-echo-piece.is-echoing {
   color: #ffc751;
   opacity: 1;
-  transform: translateY(0) scale(1);
-  text-shadow: 0 0 0.35em rgba(255, 199, 81, 0.38);
+  transform: none;
+  text-shadow: none;
 }
 
 .learn-echo-piece.is-completed {
   color: rgba(255, 255, 255, 0.42);
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: none;
 }
 
 @media (max-height: 700px) {
@@ -7016,6 +7016,15 @@ BibloPet Mastery Backgrounds
 */
 .learn-layout.learn-screen {
   padding-bottom: var(--screenBottomPadLarge);
+}
+
+/*
+  Chunks / Echo have no bottom control while they are actively running.
+  Let the dark stage use that space; normal button states keep the larger
+  shared bottom breathing room.
+*/
+.learn-layout.learn-screen.learn-screen-stage-expanded {
+  padding-bottom: calc(14px + var(--safeB));
 }
 
 .learn-instruction-actions.is-split {
