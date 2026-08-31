@@ -547,6 +547,34 @@
     );
   }
 
+  const BONUS_POINTER_CHEAT_CHANCE = 0.5;
+
+  const BONUS_POINTER_CHEAT_TIME_MULTIPLIER = {
+    easy: 0.75,
+    medium: 0.82,
+    hard: 0.88
+  };
+
+  function bonusPointerCheatMultiplier() {
+    const playerIsAhead =
+      state.bonusPlayerWins >
+      state.bonusPointerWins;
+
+    if (
+      !playerIsAhead ||
+      Math.random() >=
+        BONUS_POINTER_CHEAT_CHANCE
+    ) {
+      return 1;
+    }
+
+    return (
+      BONUS_POINTER_CHEAT_TIME_MULTIPLIER[
+        selectedMode
+      ] || 1
+    );
+  }
+
   function bonusTimeWithWiggle() {
     const base =
       bonusBaseTimeMs();
@@ -558,12 +586,18 @@
           ? 300
           : 200;
 
+    const cheatMultiplier =
+      bonusPointerCheatMultiplier();
+
     return Math.round(
-      base +
-      randomBetween(
-        -wiggle,
-        wiggle
-      )
+      (
+        base +
+        randomBetween(
+          -wiggle,
+          wiggle
+        )
+      ) *
+      cheatMultiplier
     );
   }
 
