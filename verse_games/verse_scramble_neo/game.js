@@ -2173,7 +2173,7 @@
 
   function renderEnd(){
     const earnedMedalIconHtml = state.completionResult?.alreadyCompleted
-      ? ""
+      ? GAME_ICON_HTML
       : medalIconHtmlForMode(selectedMode);
 
     window.VerseGameShell.renderCompleteScreen({

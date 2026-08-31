@@ -387,7 +387,7 @@
 
     const earnedMedalIconHtml = completionResult?.newlyCompleted
       ? medalIconHtmlForMode(selectedMode)
-      : "";
+      : GAME_ICON_HTML;
 
     window.VerseGameShell.renderCompleteScreen({
       app,

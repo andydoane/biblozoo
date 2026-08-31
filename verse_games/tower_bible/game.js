@@ -579,7 +579,7 @@
 
     const earnedMedalIconHtml = completionResult?.newlyCompleted
       ? medalIconHtmlForMode(selectedMode)
-      : "";
+      : GAME_ICON_HTML;
 
     const gameMessage = completionResult?.alreadyCompleted
       ? "Tower rebuilt!"
