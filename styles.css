@@ -7024,7 +7024,11 @@ BibloPet Mastery Backgrounds
   shared bottom breathing room.
 */
 .learn-layout.learn-screen.learn-screen-stage-expanded {
-  padding-bottom: calc(14px + var(--safeB));
+  padding-bottom: var(--safeB);
+}
+
+.learn-layout.learn-screen.learn-screen-stage-expanded .learn-stage {
+  margin-bottom: clamp(14px, 3.5vw, 28px);
 }
 
 .learn-instruction-actions.is-split {
