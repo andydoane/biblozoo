@@ -1282,6 +1282,17 @@
     }
   }
 
+  function roundAdvanceAfterCorrectMs() {
+    if (verseWords.length >= 40) {
+      return (
+        CORRECT_HIT_IMPACT_DELAY_MS +
+        STRONG_ALIEN_BURST_LIFE_MS
+      );
+    }
+
+    return ROUND_ADVANCE_AFTER_CORRECT_MS;
+  }
+
   function handleCorrectHit(target) {
     state.streak += 1;
     state.buttonsLocked = true;
@@ -1305,7 +1316,7 @@
       renderDynamic();
     });
 
-    scheduleAction(ROUND_ADVANCE_AFTER_CORRECT_MS, () => {
+    scheduleAction(roundAdvanceAfterCorrectMs(), () => {
       if (state.builtCount >= state.queue.length) startBonusIntro();
       else spawnRound();
     });
@@ -2228,7 +2239,49 @@
     const usableDistance = Math.max(180, state.bottomZoneY + 28);
     const cfg = state.modeTiming[selectedMode] || state.modeTiming.easy;
     const streakRamp = Math.max(0, state.streak);
-    const roundSeconds = clamp(cfg.start + streakRamp * cfg.step, 2.2, 5.4);
+    const wordCount = verseWords.length;
+    const isVerseWordPhase = getCurrentPhase() === "words";
+
+    /*
+      Easy normally has no streak speed ramp. On long verses, give it
+      a gentle one so confident play shortens the run, just like the
+      harder modes already do.
+    */
+    const effectiveStart =
+      selectedMode === "easy"
+        ? Math.min(cfg.start, 5.4)
+        : cfg.start;
+
+    const effectiveStep =
+      selectedMode === "easy" &&
+      isVerseWordPhase &&
+      wordCount >= 25
+        ? -0.05
+        : cfg.step;
+
+    const baseRoundSeconds = clamp(
+      effectiveStart + streakRamp * effectiveStep,
+      2.2,
+      5.4
+    );
+
+    /*
+      Short verses keep their existing pace.
+      25–39 words are about 10% faster.
+      40+ words are about 15% faster.
+    */
+    const longVerseTimeMultiplier =
+      isVerseWordPhase && wordCount >= 40
+        ? 0.87
+        : isVerseWordPhase && wordCount >= 25
+          ? 0.91
+          : 1;
+
+    const roundSeconds = clamp(
+      baseRoundSeconds * longVerseTimeMultiplier,
+      2.2,
+      5.4
+    );
 
     return usableDistance / roundSeconds;
   }

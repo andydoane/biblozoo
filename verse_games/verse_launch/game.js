@@ -954,10 +954,26 @@
 
   function randomConveyorCorrectDelay() {
     const roll = Math.random();
+    const wordCount = state.words.length;
+    const isVerseWordPhase = currentPhase() === "words";
 
-    // Number of forced decoys before the correct word can spawn.
-    // 0 = correct can be the next new UFO.
-    // 3 = longest wait, used rarely.
+    /*
+      Long verses get the correct UFO sooner so the overall run
+      does not grow as dramatically with verse length.
+    */
+    if (isVerseWordPhase && wordCount >= 40) {
+      if (roll < 0.70) return 0;
+      if (roll < 0.95) return 1;
+      return 2;
+    }
+
+    if (isVerseWordPhase && wordCount >= 25) {
+      if (roll < 0.60) return 0;
+      if (roll < 0.90) return 1;
+      return 2;
+    }
+
+    // Normal pacing.
     if (roll < 0.40) return 0;
     if (roll < 0.75) return 1;
     if (roll < 0.95) return 2;

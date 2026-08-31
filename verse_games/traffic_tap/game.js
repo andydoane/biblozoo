@@ -2581,6 +2581,33 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       ? randomSpawnDelay()
       : mainBlockedSpawnRetryDelay();
   }
+  function mainCorrectSpawnTuning() {
+    if (state.phase !== "words") {
+      return {
+        chance: 0.48,
+        forceAfterMs: 2600
+      };
+    }
+
+    if (verseWords.length >= 40) {
+      return {
+        chance: 0.68,
+        forceAfterMs: 1750
+      };
+    }
+
+    if (verseWords.length >= 25) {
+      return {
+        chance: 0.60,
+        forceAfterMs: 2000
+      };
+    }
+
+    return {
+      chance: 0.48,
+      forceAfterMs: 2600
+    };
+  }
 
   function spawnMainItem(road, now, delayUsed) {
     const correctLabel = currentTargetLabel();
@@ -2588,7 +2615,14 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     const roadHasCorrect = state.mainItems.some(item => item.road === road && item.isCorrect && !item.crashing);
     const shouldTryCorrect = !roadHasCorrect && canSpawnCorrect(now);
-    const spawnCorrect = shouldTryCorrect && (Math.random() < 0.48 || now - state.lastCorrectSpawnAt > 2600);
+    const correctSpawnTuning = mainCorrectSpawnTuning();
+
+    const spawnCorrect =
+      shouldTryCorrect &&
+      (
+        Math.random() < correctSpawnTuning.chance ||
+        now - state.lastCorrectSpawnAt > correctSpawnTuning.forceAfterMs
+      );
 
     const label = spawnCorrect ? correctLabel : nextDecoyLabel(correctLabel);
     const item = makeMainItem({ road, label, isCorrect: spawnCorrect, delayUsed });
