@@ -7020,10 +7020,12 @@ BibloPet Mastery Backgrounds
 
 /*
   Chunks / Echo have no bottom control while they are actively running.
-  Keep the expanded stage, but reserve a real non-shrinking bottom spacer
-  equal to the Learn screen's horizontal outside padding.
+  Size the expanded layout to the real dynamic PWA viewport, then reserve
+  a non-shrinking bottom spacer equal to the horizontal outside padding.
 */
 .learn-layout.learn-screen.learn-screen-stage-expanded {
+  height: 100vh;
+  height: 100dvh;
   padding-bottom: var(--safeB);
   gap: 0;
 }
