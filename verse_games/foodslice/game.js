@@ -2198,14 +2198,43 @@
     return pickCorrectOrDecoy(correct, wrongs);
   }
 
+  function getActiveDecoyTuning() {
+    if (state.phase !== "words") {
+      return DECOY_TUNING;
+    }
+
+    const wordCount = state.wordEntries.length;
+
+    if (wordCount >= 40) {
+      return {
+        ...DECOY_TUNING,
+        baseCorrectChance: 0.76,
+        softLimitCorrectChance: 0.60,
+        hardLimitCorrectStreak: 5
+      };
+    }
+
+    if (wordCount >= 25) {
+      return {
+        ...DECOY_TUNING,
+        baseCorrectChance: 0.70,
+        softLimitCorrectChance: 0.50,
+        hardLimitCorrectStreak: 4
+      };
+    }
+
+    return DECOY_TUNING;
+  }
+
   function pickCorrectOrDecoy(correct, wrongPool) {
     const wrongs = (wrongPool || []).filter(Boolean);
-    const mustUseCorrect = state.wrongStreak >= DECOY_TUNING.maxWrongChoicesInRow;
-    const mustUseDecoy = state.correctChoiceStreak >= DECOY_TUNING.hardLimitCorrectStreak && wrongs.length > 0;
+    const tuning = getActiveDecoyTuning();
+    const mustUseCorrect = state.wrongStreak >= tuning.maxWrongChoicesInRow;
+    const mustUseDecoy = state.correctChoiceStreak >= tuning.hardLimitCorrectStreak && wrongs.length > 0;
 
-    let correctChance = DECOY_TUNING.baseCorrectChance;
-    if (state.correctChoiceStreak >= DECOY_TUNING.softLimitCorrectStreak) {
-      correctChance = DECOY_TUNING.softLimitCorrectChance;
+    let correctChance = tuning.baseCorrectChance;
+    if (state.correctChoiceStreak >= tuning.softLimitCorrectStreak) {
+      correctChance = tuning.softLimitCorrectChance;
     }
 
     const useCorrect = !mustUseDecoy && (

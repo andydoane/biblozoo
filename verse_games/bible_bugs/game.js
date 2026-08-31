@@ -1156,6 +1156,48 @@
     }
   }
 
+  function getLongVerseStreakSpeedMultiplier() {
+    if (
+      state.phase !== "words" ||
+      buildData.words.length < 25
+    ) {
+      return 1;
+    }
+
+    if (state.currentStreak >= 9) {
+      return 1.16;
+    }
+
+    if (state.currentStreak >= 6) {
+      return 1.10;
+    }
+
+    if (state.currentStreak >= 3) {
+      return 1.05;
+    }
+
+    return 1;
+  }
+
+  function getMainEatDurationMs(isCorrect) {
+    if (
+      !isCorrect ||
+      state.phase !== "words"
+    ) {
+      return MAIN_EAT_MS;
+    }
+
+    if (buildData.words.length >= 40) {
+      return 330;
+    }
+
+    if (buildData.words.length >= 25) {
+      return 360;
+    }
+
+    return MAIN_EAT_MS;
+  }
+
   function spawnWave() {
     updatePhase();
 
@@ -1167,7 +1209,10 @@
     const now = performance.now();
     const choices = getChoices();
     const timing = MODE_TIMING[selectedMode] || MODE_TIMING.medium;
-    const fallMs = timing.fallSeconds * 1000;
+    const fallSpeedMultiplier = getLongVerseStreakSpeedMultiplier();
+    const fallMs =
+      (timing.fallSeconds * 1000) /
+      fallSpeedMultiplier;
     const shuffledLanes = shell.shuffle(LANES);
     const shuffledBugImages = shell.shuffle(VERSE_BUG_IMAGE_PATHS);
     const staggerMs = 145;
@@ -1235,9 +1280,21 @@
       maybePlayTongueUpgradeSound(state.currentStreak, tongueStreak);
     }
 
-    fireTongueToBug(bug, now, MAIN_EAT_MS, false, tongueStreak);
+    const mainEatMs =
+      getMainEatDurationMs(bug.correct);
 
-    scheduleAction(MAIN_EAT_MS, () => finishMainEat(bug));
+    fireTongueToBug(
+      bug,
+      now,
+      mainEatMs,
+      false,
+      tongueStreak
+    );
+
+    scheduleAction(
+      mainEatMs,
+      () => finishMainEat(bug)
+    );
   }
 
   function finishMainEat(bug) {

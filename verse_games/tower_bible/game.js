@@ -1111,6 +1111,30 @@
     if (!paused) state.lastTs = performance.now();
   }
 
+  function getLongVerseBeltSpeedMultiplier() {
+    if (wordEntries.length < 25) {
+      return 1;
+    }
+
+    const longVerseBaselineBoost = 0.05;
+
+    let streakBoost = 0;
+
+    if (state.correctStreak >= 9) {
+      streakBoost = 0.15;
+    } else if (state.correctStreak >= 6) {
+      streakBoost = 0.10;
+    } else if (state.correctStreak >= 3) {
+      streakBoost = 0.05;
+    }
+
+    return (
+      1 +
+      longVerseBaselineBoost +
+      streakBoost
+    );
+  }
+
   function updateBeltSpeedFromSettings() {
     const speedInBrickHeights =
       BELT_SPEED_BRICK_HEIGHTS_PER_SECOND[
@@ -1121,7 +1145,8 @@
       state.brickHeight *
       speedInBrickHeights *
       window.VerseGameShell
-        .getGameSpeedMultiplier();
+        .getGameSpeedMultiplier() *
+      getLongVerseBeltSpeedMultiplier();
   }
 
   function recalcField() {
@@ -3146,6 +3171,7 @@
 
   function registerCorrectStreak() {
     state.correctStreak += 1;
+    updateBeltSpeedFromSettings();
 
     const streak = state.correctStreak;
     if (!STREAK_CELEBRATION_TUNING.milestones.includes(streak)) return;
@@ -3158,6 +3184,7 @@
   function resetCorrectStreak() {
     state.correctStreak = 0;
     state.streakMilestonesShown = {};
+    updateBeltSpeedFromSettings();
   }
 
   function triggerStreakCelebration(streak) {
