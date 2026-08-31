@@ -1,0 +1,61 @@
+{
+    "biblopet": "🐑",
+    "biblopetDefaultName": "Barkley",
+    "biblopetFeetFromBottom": "27.1%",
+    "verseId": "psalm_24_8",
+    "ref": "Psalm 24:8",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Who is this King of glory?",
+        "The Lord, strong and mighty,",
+        "the Lord, mighty in battle!"
+    ],
+    "verseText": "Who is this King of glory? The Lord, strong and mighty, the Lord, mighty in battle!",
+    "meaning": "The Lord God is the glorious King of the Universe. He is strong, powerful, and mighty. No enemy stands a chance against him in battle.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "King",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "glory",
+            "occurrence": 1,
+            "emoji": "🙌"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👆"
+        },
+        {
+            "type": "emoji",
+            "word": "strong",
+            "occurrence": 1,
+            "emoji": "💪"
+        },
+        {
+            "type": "emoji",
+            "word": "mighty",
+            "occurrence": 1,
+            "emoji": "⚡"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 2,
+            "emoji": "👆"
+        },
+        {
+            "type": "emoji",
+            "word": "battle",
+            "occurrence": 1,
+            "emoji": "⚔️"
+        }
+    ]
+}
