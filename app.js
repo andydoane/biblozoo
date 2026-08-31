@@ -13591,7 +13591,9 @@ function screenChunks(idx) {
         </div>
       </div>
     `
-    : "";
+    : `
+      <div class="learn-stage-bottom-spacer" aria-hidden="true"></div>
+    `;
 
   inner.innerHTML = `
     <div class="learn-layout learn-screen learn-screen-chunks learn-layout-coach-centered${showChunkAction ? "" : " learn-screen-stage-expanded"}">
@@ -13650,7 +13652,9 @@ function screenEcho(idx) {
         </div>
       </div>
     `
-    : "";
+    : `
+      <div class="learn-stage-bottom-spacer" aria-hidden="true"></div>
+    `;
 
   inner.innerHTML = `
     <div class="learn-layout learn-screen learn-screen-echo learn-layout-coach-centered${showEchoAction ? "" : " learn-screen-stage-expanded"}">

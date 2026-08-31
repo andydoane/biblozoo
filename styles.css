@@ -7020,15 +7020,29 @@ BibloPet Mastery Backgrounds
 
 /*
   Chunks / Echo have no bottom control while they are actively running.
-  Let the dark stage use that space; normal button states keep the larger
-  shared bottom breathing room.
+  Keep the expanded stage, but reserve a real non-shrinking bottom spacer
+  equal to the Learn screen's horizontal outside padding.
 */
 .learn-layout.learn-screen.learn-screen-stage-expanded {
   padding-bottom: var(--safeB);
+  gap: 0;
 }
 
 .learn-layout.learn-screen.learn-screen-stage-expanded .learn-stage {
-  margin-bottom: clamp(14px, 3.5vw, 28px);
+  margin-top: clamp(8px, 1.8vh, 16px);
+  margin-bottom: 0;
+}
+
+.learn-stage-bottom-spacer {
+  flex: 0 0 clamp(14px, 3.5vw, 28px);
+  width: 100%;
+  min-height: 0;
+}
+
+@media (max-height: 700px) {
+  .learn-layout.learn-screen.learn-screen-stage-expanded .learn-stage {
+    margin-top: 8px;
+  }
 }
 
 .learn-instruction-actions.is-split {
