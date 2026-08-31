@@ -1,0 +1,63 @@
+{
+    "biblopet": "🦃",
+    "biblopetDefaultName": "Stafford",
+    "biblopetFeetFromBottom": "22.4%",
+    "verseId": "psalm_27_1",
+    "ref": "Psalm 27:1",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "The Lord is my light",
+        "and my salvation",
+        "whom shall I fear?",
+        "The Lord is the stronghold of my life",
+        "of whom shall I be afraid?"
+    ],
+    "verseText": "The Lord is my light and my salvation; whom shall I fear? The Lord is the stronghold of my life; of whom shall I be afraid?",
+    "meaning": "The Lord God guides, saves, and protects his people. He is like a strong castle we can hide in for safety. Because of him, we have no reason to fear.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "light",
+            "occurrence": 1,
+            "emoji": "💡"
+        },
+        {
+            "type": "emoji",
+            "word": "salvation",
+            "occurrence": 1,
+            "emoji": "🛟"
+        },
+        {
+            "type": "emoji",
+            "word": "fear",
+            "occurrence": 1,
+            "emoji": "😨"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 2,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "stronghold",
+            "occurrence": 1,
+            "emoji": "🏰"
+        },
+        {
+            "type": "emoji",
+            "word": "afraid",
+            "occurrence": 1,
+            "emoji": "😟"
+        }
+    ]
+}
