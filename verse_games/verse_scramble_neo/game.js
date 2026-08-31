@@ -1293,10 +1293,18 @@
         nextIndex
       );
 
+    const pairLetterLimit =
+      state.words.length >= 40
+        ? 10
+        : state.words.length >= 25
+          ? 9
+          : 7;
+
     return (
       currentCount > 0 &&
       nextCount > 0 &&
-      currentCount + nextCount <= 7
+      currentCount + nextCount <=
+        pairLetterLimit
     );
   }
 

@@ -439,6 +439,7 @@
     segments: [],
     buildSegments: [],
     progressIndex: 0,
+    correctStreak: 0,
     encounter: null,
     targets: [],
     escapingTargets: [],
@@ -1005,6 +1006,7 @@
     state.snakeBonusLengthHeads = 0;
     state.buildSegments = [];
     state.progressIndex = 0;
+    state.correctStreak = 0;
     state.encounter = null;
     state.targets = [];
     state.escapingTargets = [];
@@ -1213,7 +1215,45 @@
 
   function getSpawnDistanceScale() {
     const visualScale = getVisualScale();
-    return GAMEPLAY_SCALE_TUNING.spawnDistanceMinScale + (1 - GAMEPLAY_SCALE_TUNING.spawnDistanceMinScale) * visualScale;
+
+    const visualDistanceScale =
+      GAMEPLAY_SCALE_TUNING.spawnDistanceMinScale +
+      (1 - GAMEPLAY_SCALE_TUNING.spawnDistanceMinScale) *
+      visualScale;
+
+    if (
+      getCurrentPhase() !== "words" ||
+      state.words.length < 25
+    ) {
+      return visualDistanceScale;
+    }
+
+    const streak = state.correctStreak;
+
+    let longVerseMultiplier;
+
+    if (state.words.length >= 40) {
+      if (streak >= 6) {
+        longVerseMultiplier = 0.80;
+      } else if (streak >= 3) {
+        longVerseMultiplier = 0.82;
+      } else {
+        longVerseMultiplier = 0.84;
+      }
+    } else {
+      if (streak >= 6) {
+        longVerseMultiplier = 0.86;
+      } else if (streak >= 3) {
+        longVerseMultiplier = 0.88;
+      } else {
+        longVerseMultiplier = 0.90;
+      }
+    }
+
+    return (
+      visualDistanceScale *
+      longVerseMultiplier
+    );
   }
 
   function getWorldSpeedMultiplier() {
@@ -2753,6 +2793,7 @@
       y: target.y
     });
 
+    state.correctStreak += 1;
     state.progressIndex += 1;
     state.targets = [];
     state.encounter = null;
@@ -2769,6 +2810,7 @@
 
   function handleWrongTarget(target, ts){
     playGameSound("wrongWord");
+    state.correctStreak = 0;
     target.hit = true;
     target.wrongHitUntil = ts + 320;
 
