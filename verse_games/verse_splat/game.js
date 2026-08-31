@@ -57,6 +57,35 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const CORRECT_REFILL_DELAY_MS = 1000;
   const CORRECT_REFILL_STAGGER_MS = 160;
   const BLOB_SPAWN_FADE_MS = 180;
+
+  function getCorrectRefillDelayMs() {
+    const wordCount = state.words.length;
+
+    if (wordCount >= 40) {
+      return 550;
+    }
+
+    if (wordCount >= 25) {
+      return 750;
+    }
+
+    return CORRECT_REFILL_DELAY_MS;
+  }
+
+  function getCorrectRefillStaggerMs() {
+    const wordCount = state.words.length;
+
+    if (wordCount >= 40) {
+      return 110;
+    }
+
+    if (wordCount >= 25) {
+      return 140;
+    }
+
+    return CORRECT_REFILL_STAGGER_MS;
+  }
+
   const MAX_BONUS_STATIC_PAINT_SPLATS = 96;
   const MASTERPIECE_PRIZE_IMAGES = [
     "./verse_splat_images/masterpiece_1.png",
@@ -2133,7 +2162,7 @@ function render(){
       appendSpawningBlob(blob);
 
       if (i < 2){
-        await sleep(CORRECT_REFILL_STAGGER_MS);
+        await sleep(getCorrectRefillStaggerMs());
       }
     }
 
@@ -2940,10 +2969,14 @@ function spawnWrongFaceParticleBurst(){
 
     /*
       Let the splat and paint moment breathe before the next blob moment.
-      If a streak reward is due, it appears by itself instead of refilling
-      the normal three-blob field.
+      Keep the full pause for streak rewards, but shorten ordinary refills
+      on longer verses.
     */
-    await sleep(CORRECT_REFILL_DELAY_MS);
+    await sleep(
+      shouldSpawnStreakReward
+        ? CORRECT_REFILL_DELAY_MS
+        : getCorrectRefillDelayMs()
+    );
 
     if (state.screen !== "game" || state.menuOpen || state.helpOpen) {
       state.busy = false;

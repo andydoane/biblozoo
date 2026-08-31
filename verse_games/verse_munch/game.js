@@ -69,6 +69,11 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
   const BONUS_TARGET_CHANCE = 0.4;
   const BONUS_FORCE_TARGET_AFTER = 2;
 
+  const LONG_VERSE_MIN_WORDS = 25;
+  const VERY_LONG_VERSE_MIN_WORDS = 40;
+  const LONG_VERSE_QUICK_BITE_CHANCE = 0.70;
+  const VERY_LONG_VERSE_QUICK_BITE_CHANCE = 0.85;
+
   const SOUND_BASE_PATH = "./verse_munch_sounds/";
   const UI_SOUND_BASE_PATH = "../../ui_audio/";
 
@@ -1606,6 +1611,35 @@ function backToMenuFromHelp(){
     return true;
   }
 
+  function shouldUseQuickCorrectBite(isCorrect) {
+    if (!isCorrect) return false;
+    if (getCurrentPhase() !== "words") return false;
+
+    const wordCount = state.words.length;
+
+    if (wordCount < LONG_VERSE_MIN_WORDS) {
+      return false;
+    }
+
+    /*
+      Keep the opening and final verse words on the full personality
+      sequence so long verses still begin and end with the normal feel.
+    */
+    if (
+      state.progressIndex === 0 ||
+      state.progressIndex >= wordCount - 1
+    ) {
+      return false;
+    }
+
+    const quickBiteChance =
+      wordCount >= VERY_LONG_VERSE_MIN_WORDS
+        ? VERY_LONG_VERSE_QUICK_BITE_CHANCE
+        : LONG_VERSE_QUICK_BITE_CHANCE;
+
+    return Math.random() < quickBiteChance;
+  }
+
   async function handleBeltItemSelection(itemId) {
     if (!state.running || state.inputLocked || !state.beltItems.length) return;
 
@@ -1636,10 +1670,17 @@ function backToMenuFromHelp(){
       startY: feedPoint.y
     };
 
-    if (!await playWordFeedAnimation(feedItem, runToken)) return;
-    if (!await playMouthClosedReceiveAnimation(runToken)) return;
-    if (!await playChewAnimation(runToken)) return;
-    if (!await playAnticipationAnimation(runToken)) return;
+    const useQuickCorrectBite =
+      shouldUseQuickCorrectBite(isCorrect);
+
+    if (useQuickCorrectBite) {
+      if (!await playQuickCorrectBiteAnimation(feedItem, runToken)) return;
+    } else {
+      if (!await playWordFeedAnimation(feedItem, runToken)) return;
+      if (!await playMouthClosedReceiveAnimation(runToken)) return;
+      if (!await playChewAnimation(runToken)) return;
+      if (!await playAnticipationAnimation(runToken)) return;
+    }
 
     if (isCorrect) {
       const nextStreak = state.streak + 1;
@@ -1730,6 +1771,67 @@ function backToMenuFromHelp(){
     }
 
     return await waitSeconds(launchDuration * 0.84, runToken);
+  }
+
+  async function playQuickCorrectBiteAnimation(item, runToken) {
+    if (!isActiveRun(runToken)) return false;
+
+    const startPoint = {
+      x: Number.isFinite(item.startX)
+        ? item.startX
+        : getFoodStartPoint().x,
+      y: Number.isFinite(item.startY)
+        ? item.startY
+        : getFoodStartPoint().y
+    };
+
+    const mouth = getMouthPoint();
+    const flightDuration = 0.24;
+
+    state.flyingFood = {
+      emoji: item.food,
+      label: item.label,
+      startX: startPoint.x,
+      startY: startPoint.y,
+      endX: mouth.x,
+      endY: mouth.y,
+      x: startPoint.x,
+      y: startPoint.y,
+      startScale: 1,
+      endScale: 0.42,
+      scale: 1,
+      elapsed: 0,
+      duration: flightDuration,
+      active: true
+    };
+
+    state.feedingWord = null;
+    state.flyingLetters = [];
+
+    state.faceDisplay = getOpenMouthFace();
+    state.faceClasses = new Set(["is-open"]);
+
+    renderFrame(performance.now());
+
+    if (!await waitSeconds(flightDuration, runToken)) {
+      return false;
+    }
+
+    if (!isActiveRun(runToken)) {
+      return false;
+    }
+
+    state.flyingFood = null;
+    state.faceDisplay = "😬";
+    state.faceClasses = new Set();
+
+    playGameSound("chomp");
+    spawnChewCrumbs(false);
+    playChewSound();
+
+    renderFrame(performance.now());
+
+    return await waitSeconds(0.08, runToken);
   }
 
   async function playWordFeedAnimation(item, runToken) {
@@ -3335,15 +3437,28 @@ function updateBuildText(){
   }
 
   function getNextCorrectDelay(mode) {
+    const useVeryLongVersePacing =
+      getCurrentPhase() === "words" &&
+      state.words.length >= VERY_LONG_VERSE_MIN_WORDS;
+
     if (mode === "hard") {
-      return randomInt(0, 4);
+      return randomInt(
+        0,
+        useVeryLongVersePacing ? 2 : 4
+      );
     }
 
     if (mode === "medium") {
-      return randomInt(0, 3);
+      return randomInt(
+        0,
+        useVeryLongVersePacing ? 2 : 3
+      );
     }
 
-    return randomInt(0, 2);
+    return randomInt(
+      0,
+      useVeryLongVersePacing ? 1 : 2
+    );
   }
 
   function getStartingCorrectDelay(mode) {
