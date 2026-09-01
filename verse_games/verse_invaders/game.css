@@ -495,7 +495,11 @@ body {
   font-size: clamp(18px, 3.8vw, 32px);
   line-height: 1.06;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.20);
-  word-break: break-word;
+  word-break: normal;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  -webkit-hyphens: manual;
+  hyphens: manual;
 }
 
 .vinv-entity.is-bonus-alien .vinv-word {

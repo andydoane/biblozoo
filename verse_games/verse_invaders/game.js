@@ -2149,6 +2149,69 @@
     `;
   }
 
+  const BALANCED_WORD_HYPHEN_MIN_LETTERS = 9;
+
+  function renderAlienWordLabel(label) {
+    const text = String(label || "");
+
+    /*
+      Leave short words, multi-word labels, and words that already
+      contain a real hyphen completely unchanged.
+    */
+    if (
+      text.length < BALANCED_WORD_HYPHEN_MIN_LETTERS ||
+      text.includes("-") ||
+      text.includes("\u00AD") ||
+      text.includes(" ")
+    ) {
+      return escapeHtml(text);
+    }
+
+    /*
+      Separate simple leading/trailing punctuation from the word
+      so punctuation does not affect the balancing point.
+    */
+    const match =
+      text.match(
+        /^([^A-Za-z]*)([A-Za-z]+)([^A-Za-z]*)$/
+      );
+
+    if (!match) {
+      return escapeHtml(text);
+    }
+
+    const before = match[1];
+    const word = match[2];
+    const after = match[3];
+
+    if (
+      word.length <
+      BALANCED_WORD_HYPHEN_MIN_LETTERS
+    ) {
+      return escapeHtml(text);
+    }
+
+    /*
+      Put one invisible soft hyphen near the exact center.
+      It appears as a real hyphen only if the browser needs
+      to wrap the word onto two lines.
+    */
+    const splitIndex =
+      Math.ceil(word.length / 2);
+
+    return (
+      escapeHtml(before) +
+      escapeHtml(
+        word.slice(0, splitIndex)
+      ) +
+      "&shy;" +
+      escapeHtml(
+        word.slice(splitIndex)
+      ) +
+      escapeHtml(after)
+    );
+  }
+
   function renderEntityHtml(entity, now = performance.now()) {
     const className = getEntityClassName(entity);
 
@@ -2161,7 +2224,7 @@
           <div class="vinv-alien">
             ${renderAlienHtml(entity.color, entity.color.alienAlt, "", entity.blinkDelay, entity.partDelay)}
           </div>
-          <div class="vinv-word" style="color:${entity.color.hex}">${escapeHtml(entity.label)}</div>
+          <div class="vinv-word" style="color:${entity.color.hex}">${renderAlienWordLabel(entity.label)}</div>
         </div>
     `;
   }
