@@ -615,29 +615,56 @@
         return;
       }
 
-      const hasCue = !!document.getElementById("versejamCueButton");
-      const hasWordButtons = !!document.querySelector(".versejam-word-btn");
-      const hasIntro = !!document.getElementById("versejamIntroStack");
-      const isInAllowedQuietMoment = (
-        state.phase === "intro" ||
-        state.phase === "round_transition"
-      );
+      const hasWordButtons =
+        !!document.querySelector(
+          ".versejam-word-btn"
+        );
 
+      const hasScoreScreen =
+        !!document.querySelector(
+          ".versejam-score-screen"
+        );
+
+      /*
+        Word buttons and the score screen are legitimate
+        states where the game may wait indefinitely for
+        the player.
+
+        Intro/countdown/spawn/transition states can also
+        be quiet for several beats, so give those a much
+        longer recovery window.
+
+        A TAP cue by itself is NOT considered healthy.
+        If TAP is visible but every gameplay button is
+        gone, the watchdog should eventually recover.
+      */
       if (
-        state.acceptingInput ||
-        state.busy ||
-        hasCue ||
         hasWordButtons ||
-        hasIntro ||
-        isInAllowedQuietMoment
+        hasScoreScreen
       ) {
         noteGameplayActivity();
         return;
       }
 
-      const quietMs = performance.now() - lastGameplayActivityAt;
+      const isInLongTimedTransition = (
+        state.phase === "intro" ||
+        state.phase === "spawn_chunk" ||
+        state.phase === "countdown" ||
+        state.phase === "round_transition"
+      );
 
-      if (quietMs < 2200) return;
+      const quietMs =
+        performance.now() -
+        lastGameplayActivityAt;
+
+      const recoveryDelayMs =
+        isInLongTimedTransition
+          ? 8000
+          : 2200;
+
+      if (quietMs < recoveryDelayMs) {
+        return;
+      }
 
       recoverStuckGameplay();
     }, 700);
@@ -1157,14 +1184,23 @@
   }
 
   function isExpectedFillerTap(button) {
-    if (!isRhythmFillerButton(button)) return false;
+    if (!isRhythmFillerButton(button)) {
+      return false;
+    }
 
-    const expectedOrder = getExpectedSequenceOrder();
+    const expectedOrder =
+      getExpectedSequenceOrder();
 
-    // Filler buttons are playful rhythm hits. If the next expected item
-    // is any filler, allow any remaining filler button.
-    return state.currentButtons.some(item =>
-      isRhythmFillerButton(item) && item.sequenceOrder === expectedOrder
+    /*
+      Require the filler that was actually tapped
+      to occupy the next rhythm position.
+
+      This prevents two-filler phrases from accepting
+      a later filler first and stranding the earlier one.
+    */
+    return (
+      button.sequenceOrder ===
+      expectedOrder
     );
   }
 
@@ -2253,8 +2289,86 @@
     noteGameplayActivity();
 
     if (!state.currentButtons.length) {
-      await handleRoundOrEnd(flowId);
-      return;
+      const phase = getPhase();
+
+      /*
+        If word-chunk bookkeeping ever drifts out
+        of sync, realign chunkIndex to the chunk
+        that actually contains the current word.
+      */
+      if (
+        phase === "words" &&
+        state.progressIndex <
+          state.words.length
+      ) {
+        const groups =
+          buildChunkWordGroups();
+
+        const recoveredChunkIndex =
+          groups.findIndex(group =>
+            state.progressIndex >=
+              group.start &&
+            state.progressIndex <
+              group.start +
+              group.count
+          );
+
+        if (
+          recoveredChunkIndex >= 0
+        ) {
+          state.chunkIndex =
+            recoveredChunkIndex;
+
+          state.currentButtons =
+            makeChunkButtons();
+
+          state.currentRhythmOffsets =
+            makeCurrentRhythmOffsets(
+              state.currentButtons
+            );
+        }
+      }
+
+      /*
+        Last-resort safety net:
+        if unfinished content still exists but
+        no playable group could be built, present
+        the current segment as a simple one-hit
+        recovery prompt instead of soft-locking.
+      */
+      if (
+        !state.currentButtons.length &&
+        state.progressIndex <
+          state.segments.length
+      ) {
+        const fallbackButton =
+          makeButtonForSegment(
+            state.progressIndex
+          );
+
+        if (fallbackButton) {
+          state.currentButtons = [
+            {
+              ...fallbackButton,
+              sequenceOrder: 0,
+              rhythmOffset: 0,
+              visualOrder: 0
+            }
+          ];
+
+          state.currentRhythmOffsets =
+            [0];
+
+          console.warn(
+            "Verse Jam: recovered an empty playable group."
+          );
+        }
+      }
+
+      if (!state.currentButtons.length) {
+        await handleRoundOrEnd(flowId);
+        return;
+      }
     }
 
     const area = document.getElementById("versejamMainArea");
@@ -2993,7 +3107,7 @@
     if (!area) return;
 
     // Keep the drum beat running while this screen is visible.
-    // The watchdog treats busy as an intentional waiting state.
+    // The watchdog recognizes the score screen as an intentional waiting state.
     state.busy = true;
     state.acceptingInput = false;
     noteGameplayActivity();
