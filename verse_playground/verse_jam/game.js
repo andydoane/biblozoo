@@ -2302,6 +2302,117 @@
     await runEchoCountdown(flowId);
   }
 
+  function getRestBeatsAfterButton(button) {
+    const orderedButtons =
+      [...state.currentButtons].sort(
+        (a, b) => {
+          const aOrder =
+            Number.isFinite(a.sequenceOrder)
+              ? a.sequenceOrder
+              : 0;
+
+          const bOrder =
+            Number.isFinite(b.sequenceOrder)
+              ? b.sequenceOrder
+              : 0;
+
+          return aOrder - bOrder;
+        }
+      );
+
+    const buttonIndex =
+      orderedButtons.findIndex(
+        item => item.id === button.id
+      );
+
+    /*
+      Never show a pause marker on the final
+      button of the phrase. Any trailing rest
+      after the phrase is not useful to the player.
+    */
+    if (
+      buttonIndex < 0 ||
+      buttonIndex >= orderedButtons.length - 1
+    ) {
+      return 0;
+    }
+
+    const currentButton =
+      orderedButtons[buttonIndex];
+
+    const nextButton =
+      orderedButtons[buttonIndex + 1];
+
+    const currentOffset =
+      Number.isFinite(currentButton.rhythmOffset)
+        ? currentButton.rhythmOffset
+        : state.currentRhythmOffsets[
+        buttonIndex
+        ];
+
+    const nextOffset =
+      Number.isFinite(nextButton.rhythmOffset)
+        ? nextButton.rhythmOffset
+        : state.currentRhythmOffsets[
+        buttonIndex + 1
+        ];
+
+    if (
+      !Number.isFinite(currentOffset) ||
+      !Number.isFinite(nextOffset)
+    ) {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      Math.round(
+        nextOffset -
+        currentOffset -
+        1
+      )
+    );
+  }
+
+  function appendRestBeatDots(
+    buttonElement,
+    button
+  ) {
+    const restBeats =
+      getRestBeatsAfterButton(button);
+
+    if (restBeats <= 0) {
+      return;
+    }
+
+    const dots =
+      document.createElement("span");
+
+    dots.className =
+      "versejam-rest-beats";
+
+    dots.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    for (
+      let i = 0;
+      i < restBeats;
+      i += 1
+    ) {
+      const dot =
+        document.createElement("span");
+
+      dot.className =
+        "versejam-rest-beat-dot";
+
+      dots.appendChild(dot);
+    }
+
+    buttonElement.appendChild(dots);
+  }
+
   function spawnButton(button) {
     const stack = document.getElementById("versejamWordStack") || document.getElementById("versejamButtonStack");
     if (!stack) return;
@@ -2314,6 +2425,11 @@
     btn.type = "button";
     btn.textContent = button.label;
     btn.dataset.segmentIndex = String(button.segmentIndex);
+
+    appendRestBeatDots(
+      btn,
+      button
+    );
 
     btn.style.order = String(
       Number.isFinite(button.visualOrder)

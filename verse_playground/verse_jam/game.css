@@ -419,6 +419,34 @@ body {
   pointer-events: none;
 }
 
+.versejam-rest-beats {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.versejam-rest-beat-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 999px;
+  background: #ffe27a;
+  box-shadow:
+    0 0 10px rgba(255, 226, 122, .55);
+}
+
+.versejam-word-btn.is-clap-button .versejam-rest-beat-dot,
+.versejam-word-btn.is-sound-bit-button .versejam-rest-beat-dot {
+  background: #333333;
+  box-shadow: none;
+}
+
 .versejam-word-btn.is-spawning {
   animation: vj-button-in 240ms cubic-bezier(.2, 1.4, .35, 1) both;
 }
