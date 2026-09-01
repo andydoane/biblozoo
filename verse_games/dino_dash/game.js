@@ -101,6 +101,7 @@
 
   const TABLET_FONT_HEIGHT_RATIO = 0.47;
   const TABLET_FONT_PREFERRED_MIN_SCALE = 0.98;
+  const TABLET_TEXT_FIT_SAFETY = 0.96;
 
   const TABLET_FLOAT_AMPLITUDE_U = 0.075;
   const TABLET_FLOAT_RATE = 2.15;
@@ -5301,11 +5302,17 @@
         40
       );
 
+    const textFitSafety =
+      tablet.phase === "words"
+        ? TABLET_TEXT_FIT_SAFETY
+        : 1;
+
     const textSafeWidth =
       tablet.w *
       TABLET_SHAPES[
         tablet.shapeKey
-      ].textWidth;
+      ].textWidth *
+      textFitSafety;
 
     const visualWeight =
       getTextVisualWeight(
