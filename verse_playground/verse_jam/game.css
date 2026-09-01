@@ -313,7 +313,23 @@ body {
   font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
   font-weight: 400;
   letter-spacing: .025em;
-  background: rgba(141, 247, 255, .92);
+  color: #271841;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, .45);
+  background:
+    linear-gradient(
+      90deg,
+      #ff7ad9,
+      #ffe27a,
+      #8df7ff,
+      #9dff8d,
+      #ff7ad9
+    );
+  background-size: 260% 100%;
+  background-position: 50% 50%;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, .22),
+    0 0 0 3px rgba(255, 255, 255, .22),
+    inset 0 -4px 0 rgba(0, 0, 0, .12);
 }
 
 .versejam-main-area {

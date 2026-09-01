@@ -1998,7 +1998,7 @@
               <div class="versejam-board-content">
                 <div class="versejam-overlay-pills">
                   <button class="versejam-pill no-zoom" id="versejamMenuPill" type="button" aria-label="Game Menu">☰</button>
-                  <div class="versejam-pill versejam-round-pill" id="versejamRoundPill">Groovy Score ${Math.max(0, state.groovyScore)}</div>
+                  <div class="versejam-pill versejam-round-pill" id="versejamRoundPill">GROOVY: ${Math.max(0, state.groovyScore)}</div>
                 </div>
                 <div class="versejam-main-area" id="versejamMainArea"></div>
               </div>
@@ -2678,7 +2678,7 @@
     if (!pill) return;
 
     pill.textContent =
-      `Groovy Score ${Math.max(
+      `GROOVY: ${Math.max(
         0,
         state.groovyScore
       )}`;
