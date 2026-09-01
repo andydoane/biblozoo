@@ -833,7 +833,7 @@ function renderHelpOverlay(body){
 function renderGameMenuOverlay(){
   return window.VerseGameShell.gameMenuHtml({
     id: "vmunchGameMenuOverlay",
-    title: "Game Menu",
+
     muted,
     showModeSelect: true
   });

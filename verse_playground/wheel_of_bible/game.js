@@ -753,7 +753,7 @@
   }
 
   function renderHelpOverlay() { return shell().helpOverlayHtml ? shell().helpOverlayHtml({ id: HELP_OVERLAY_ID, title: "How to Play", body: helpHtml() }) : ""; }
-  function renderGameMenuOverlay() { return shell().gameMenuHtml ? shell().gameMenuHtml({ id: MENU_OVERLAY_ID, title: "Wheel of Bible Menu", muted, showModeSelect: false, exitText: "Exit Playground" }) : ""; }
+  function renderGameMenuOverlay() { return shell().gameMenuHtml ? shell().gameMenuHtml({ id: MENU_OVERLAY_ID, muted, showModeSelect: false, exitText: "Exit Playground" }) : ""; }
 
   function wireGameMenu() {
     if (!shell().wireGameMenu) return;

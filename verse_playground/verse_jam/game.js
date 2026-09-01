@@ -2031,7 +2031,7 @@
   function renderGameMenuOverlay() {
     return window.VerseGameShell.gameMenuHtml({
       id: "verseJamGameMenuOverlay",
-      title: "Verse Jam Menu",
+
       muted,
       showModeSelect: true
     });

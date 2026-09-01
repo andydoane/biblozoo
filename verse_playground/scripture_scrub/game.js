@@ -1269,7 +1269,7 @@
 
         ${window.VerseGameShell.gameMenuHtml({
       id: MENU_OVERLAY_ID,
-      title: "Scripture Scrub",
+
       muted,
       howToText: "How to Play",
       exitText: "Back to Playground",

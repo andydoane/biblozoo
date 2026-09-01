@@ -2413,7 +2413,7 @@
 
   function gameMenuHtml({
     id = "verseGameMenuOverlay",
-    title = "Game Menu",
+    title = "Menu",
     muted = false,
     howToText = "How to Play",
     modeSelectText = "Mode Select",

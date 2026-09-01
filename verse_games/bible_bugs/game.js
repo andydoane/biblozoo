@@ -604,7 +604,7 @@
   function renderGameMenuOverlay() {
     return shell.gameMenuHtml({
       id: GAME_MENU_ID,
-      title: "Game Menu",
+
       muted,
       showModeSelect: true
     });

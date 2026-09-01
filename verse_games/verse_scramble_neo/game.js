@@ -2232,7 +2232,7 @@
   function renderGameMenuOverlay(){
     return window.VerseGameShell.gameMenuHtml({
       id: "vsnGameMenuOverlay",
-      title: "Game Menu",
+  
       muted,
       showModeSelect: true
     });

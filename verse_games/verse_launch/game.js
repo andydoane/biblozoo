@@ -840,7 +840,7 @@
   function renderGameMenuOverlay() {
     return window.VerseGameShell.gameMenuHtml({
       id: "vlGameMenuOverlay",
-      title: "Game Menu",
+
       muted,
       showModeSelect: true
     });

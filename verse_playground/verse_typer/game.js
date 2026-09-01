@@ -1087,7 +1087,7 @@
   function renderGameMenuOverlay() {
     return window.VerseGameShell.gameMenuHtml({
       id: "verseTyperGameMenuOverlay",
-      title: "Verse Typer Menu",
+
       muted,
       showModeSelect: true,
       exitText: "Exit Playground"

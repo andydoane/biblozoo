@@ -1267,7 +1267,7 @@
         ${shell().helpOverlayHtml ? shell().helpOverlayHtml({ id: HELP_OVERLAY_ID, title: "How to Play", body: helpHtml(), closeText: "Close" }) : ""}
         ${shell().gameMenuHtml ? shell().gameMenuHtml({
       id: MENU_OVERLAY_ID,
-      title: "Ghost Writer Menu",
+
       muted,
       showModeSelect: true,
       exitText: "Back to Playground",
