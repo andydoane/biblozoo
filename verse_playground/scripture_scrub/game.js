@@ -254,6 +254,8 @@
   const MOWED_GRASS_BG_IMAGE = "scripture_scrub_grass_bg_2.jpg";
   const MOWER_IMAGE = "scripture_scrub_mower.png";
   const CHALKBOARD_BG_IMAGE = "scripture_scrub_chalkboard.jpg";
+  const NOTEBOOK_BG_IMAGE = "scripture_scrub_notebook_paper_bg.png";
+  const BIBLE_IMAGE = "scripture_scrub_bible.png";
   const LEAF_IMAGES = [
     "scripture_scrub_leaf_orange_1.png",
     "scripture_scrub_leaf_orange_2.png",
@@ -353,6 +355,8 @@
   let mowedGrassImage = null;
   let mowerImage = null;
   let chalkboardImage = null;
+  let notebookPaperImage = null;
+  let bibleImage = null;
   let leafImages = [];
   let cookieImages = [];
   let paintBlobImages = [];
@@ -957,12 +961,41 @@
   async function loadImageAsset(fileName, label) {
     return new Promise((resolve) => {
       const img = new Image();
+
       img.decoding = "async";
-      img.onload = () => resolve(img);
+
+      img.onload = async () => {
+        /*
+          Loading the file and decoding it are not always
+          the same moment on iOS/WebKit.
+
+          Wait for decode when supported so preloaded
+          round art is ready to paint immediately.
+        */
+        if (typeof img.decode === "function") {
+          try {
+            await img.decode();
+          } catch (err) {
+            /*
+              Older WebKit can reject decode() even when
+              the image loaded successfully. In that case
+              keep the successfully loaded image.
+            */
+          }
+        }
+
+        resolve(img);
+      };
+
       img.onerror = () => {
-        console.warn(`Scripture Scrub: could not load ${label}`, fileName);
+        console.warn(
+          `Scripture Scrub: could not load ${label}`,
+          fileName
+        );
+
         resolve(null);
       };
+
       img.src = `${IMAGE_BASE}${fileName}`;
     });
   }
@@ -982,6 +1015,20 @@
 
   async function loadChalkboardImage() {
     return loadImageAsset(CHALKBOARD_BG_IMAGE, "chalkboard background image");
+  }
+
+  async function loadNotebookPaperImage() {
+    return loadImageAsset(
+      NOTEBOOK_BG_IMAGE,
+      "notebook paper background image"
+    );
+  }
+
+  async function loadBibleImage() {
+    return loadImageAsset(
+      BIBLE_IMAGE,
+      "hidden Bible image"
+    );
   }
 
   async function loadLeafImages() {
@@ -1054,6 +1101,18 @@
   async function ensureRoundAssets(round) {
     const jobs = [];
 
+    if (round?.id === "stickers") {
+      jobs.push(
+        loadRoundAssetOnce(
+          "notebookPaperImage",
+          loadNotebookPaperImage,
+          (value) => {
+            notebookPaperImage = value || null;
+          }
+        )
+      );
+    }
+
     if (round?.id === "paint") {
       jobs.push(loadRoundAssetOnce("paintBlobImages", loadPaintBlobImages, (value) => {
         paintBlobImages = Array.isArray(value) ? value : [];
@@ -1061,9 +1120,28 @@
     }
 
     if (round?.id === "leaves") {
-      jobs.push(loadRoundAssetOnce("leafImages", loadLeafImages, (value) => {
-        leafImages = Array.isArray(value) ? value : [];
-      }));
+      jobs.push(
+        loadRoundAssetOnce(
+          "grassCoverImage",
+          loadGrassBackgroundImage,
+          (value) => {
+            grassCoverImage = value || null;
+          }
+        )
+      );
+
+      jobs.push(
+        loadRoundAssetOnce(
+          "leafImages",
+          loadLeafImages,
+          (value) => {
+            leafImages =
+              Array.isArray(value)
+                ? value
+                : [];
+          }
+        )
+      );
     }
 
     if (round?.id === "cookies") {
@@ -1090,6 +1168,18 @@
       jobs.push(loadRoundAssetOnce("mowerImage", loadMowerImage, (value) => {
         mowerImage = value || null;
       }));
+    }
+
+    if (round?.id === "archaeology") {
+      jobs.push(
+        loadRoundAssetOnce(
+          "bibleImage",
+          loadBibleImage,
+          (value) => {
+            bibleImage = value || null;
+          }
+        )
+      );
     }
 
     await Promise.all(jobs);
@@ -5109,7 +5199,9 @@
     const img = document.createElement("img");
     img.className = "scrub-bible-target";
     img.id = "scrubBibleTarget";
-    img.src = IMAGE_BASE + "scripture_scrub_bible.png";
+    img.src =
+      bibleImage?.src ||
+      `${IMAGE_BASE}${BIBLE_IMAGE}`;
     img.alt = "Hidden Bible";
     img.style.left = `${x}px`;
     img.style.top = `${y}px`;
