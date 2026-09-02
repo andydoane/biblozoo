@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<!-- saved from url=(0059)https://andydoane.github.io/eatyourbible/animals/floor.html -->
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BibloPet Feet Position Helper</title>
+    <style>
+        :root {
+            --purple: #7f66c6;
+            --teal: #40b9c5;
+            --red: #ff5a51;
+            --yellow: #ffc751;
+            --green: #a7cb6f;
+            --ink: #2f2554;
+            --muted: #6f6790;
+            --panel: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 18px;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--purple);
+            color: #fff;
+        }
+
+        .page {
+            width: min(100%, 1100px);
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(28px, 5vw, 48px);
+            line-height: 1;
+        }
+
+        .sub {
+            margin: 0 0 18px;
+            opacity: .92;
+            font-weight: 650;
+            line-height: 1.35;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(300px, 390px);
+            gap: 14px;
+            align-items: start;
+        }
+
+        .panel {
+            background: var(--panel);
+            color: var(--ink);
+            border-radius: 24px;
+            padding: 16px;
+            box-shadow: 0 8px 0 rgba(0, 0, 0, .2);
+        }
+
+        .panel h2 {
+            margin: 0 0 12px;
+            font-size: 22px;
+            line-height: 1.1;
+        }
+
+        .upload {
+            border: 3px dashed rgba(127, 102, 198, .35);
+            border-radius: 20px;
+            padding: 18px;
+            text-align: center;
+            background: #f7f4ff;
+            margin-bottom: 14px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            max-width: 420px;
+            color: var(--ink);
+            font: inherit;
+            font-weight: 700;
+        }
+
+        .image-wrap {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+            border-radius: 20px;
+            overflow: hidden;
+            background:
+                linear-gradient(45deg, #e9e9e9 25%, transparent 25%),
+                linear-gradient(-45deg, #e9e9e9 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #e9e9e9 75%),
+                linear-gradient(-45deg, transparent 75%, #e9e9e9 75%);
+            background-size: 24px 24px;
+            background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: crosshair;
+            isolation: isolate;
+        }
+
+        .image-wrap.empty {
+            cursor: default;
+            background: #f2f2f2;
+        }
+
+        .placeholder {
+            color: var(--muted);
+            font-weight: 850;
+            text-align: center;
+            padding: 22px;
+            line-height: 1.35;
+        }
+
+        #petImage {
+            display: block;
+            max-width: 100%;
+            max-height: 70vh;
+            width: auto;
+            height: auto;
+            user-select: none;
+            -webkit-user-drag: none;
+            z-index: 1;
+        }
+
+        .marker-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--red);
+            z-index: 2;
+            pointer-events: none;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, .75);
+            display: none;
+        }
+
+        .marker-dot {
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            background: var(--red);
+            border: 3px solid #fff;
+            z-index: 3;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, .35);
+            display: none;
+        }
+
+        .result-big {
+            font-size: clamp(34px, 8vw, 54px);
+            font-weight: 950;
+            line-height: 1;
+            color: var(--purple);
+            margin: 8px 0 4px;
+        }
+
+        .result-label {
+            color: var(--muted);
+            font-weight: 800;
+            line-height: 1.25;
+            margin-bottom: 12px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 12px 0;
+        }
+
+        .stat {
+            background: #f5f2ff;
+            border-radius: 16px;
+            padding: 10px;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.15;
+        }
+
+        .stat-value {
+            color: var(--ink);
+            font-size: 18px;
+            font-weight: 900;
+            line-height: 1.2;
+            margin-top: 3px;
+        }
+
+        .field {
+            margin: 12px 0;
+        }
+
+        label {
+            display: block;
+            font-weight: 900;
+            margin-bottom: 6px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 14px;
+            padding: 11px 12px;
+            font: inherit;
+            font-weight: 750;
+            color: var(--ink);
+        }
+
+        .code {
+            background: #f2f2f2;
+            color: #302a45;
+            border-radius: 16px;
+            padding: 12px;
+            font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            white-space: pre-wrap;
+            overflow: auto;
+            margin-top: 10px;
+            min-height: 56px;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 14px;
+            font: inherit;
+            font-weight: 950;
+            color: #fff;
+            background: var(--purple);
+            cursor: pointer;
+            box-shadow: 0 4px 0 rgba(0, 0, 0, .22);
+        }
+
+        button.secondary {
+            background: var(--teal);
+        }
+
+        button:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, .22);
+        }
+
+        button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .note {
+            margin: 12px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.35;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, .78);
+            color: #fff;
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-weight: 850;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 180ms ease;
+            z-index: 10;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        @media (max-width:850px) {
+            body {
+                padding: 14px;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .image-wrap {
+                min-height: 260px;
+            }
+        }
+
+        @media (max-width:430px) {
+            .buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="page">
+        <h1>BibloPet Feet Position Helper</h1>
+        <p class="sub">
+            Upload a transparent pet PNG, click where the pet’s feet touch the ground, and copy the JSON line into that
+            verse file.
+        </p>
+
+        <section class="layout">
+            <div class="panel">
+                <h2>1. Upload and click the feet</h2>
+
+                <div class="upload">
+                    <input id="fileInput" type="file" accept="image/*">
+                </div>
+
+                <div class="image-wrap empty" id="imageWrap">
+                    <div class="placeholder" id="placeholder">
+                        Upload a pet image, then click the point where the feet should touch the ground.
+                    </div>
+                    <img id="petImage" alt="" hidden="">
+                    <div class="marker-line" id="markerLine"></div>
+                    <div class="marker-dot" id="markerDot"></div>
+                </div>
+            </div>
+
+            <aside class="panel">
+                <h2>2. Copy the result</h2>
+
+                <div class="result-big" id="feetResult">—</div>
+                <div class="result-label">feet up from bottom</div>
+
+                <div class="stat-grid">
+                    <div class="stat">
+                        <div class="stat-label">From bottom</div>
+                        <div class="stat-value" id="fromBottomStat">—</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">From top</div>
+                        <div class="stat-value" id="fromTopStat">—</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Image width</div>
+                        <div class="stat-value" id="widthStat">—</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Image height</div>
+                        <div class="stat-value" id="heightStat">—</div>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="fieldName">JSON field name</label>
+                    <input id="fieldName" type="text" value="biblopetFeetFromBottom">
+                </div>
+
+                <label>JSON line</label>
+                <div class="code" id="jsonOutput">Click the feet point first.</div>
+
+                <label style="margin-top:12px;">CSS variable line</label>
+                <div class="code" id="cssOutput">Click the feet point first.</div>
+
+                <div class="buttons">
+                    <button id="copyJsonBtn" disabled="">Copy JSON</button>
+                    <button id="copyCssBtn" class="secondary" disabled="">Copy CSS</button>
+                </div>
+
+                <p class="note">
+                    Use the “from bottom” value. Example: if the feet are 11.3% up from the bottom, this gives
+                    <strong>"11.3%"</strong>, not 88.7%.
+                </p>
+            </aside>
+        </section>
+    </main>
+
+    <div class="toast" id="toast">Copied!</div>
+
+    <script>
+        const fileInput = document.getElementById("fileInput");
+        const imageWrap = document.getElementById("imageWrap");
+        const placeholder = document.getElementById("placeholder");
+        const petImage = document.getElementById("petImage");
+        const markerLine = document.getElementById("markerLine");
+        const markerDot = document.getElementById("markerDot");
+
+        const feetResult = document.getElementById("feetResult");
+        const fromBottomStat = document.getElementById("fromBottomStat");
+        const fromTopStat = document.getElementById("fromTopStat");
+        const widthStat = document.getElementById("widthStat");
+        const heightStat = document.getElementById("heightStat");
+        const fieldName = document.getElementById("fieldName");
+        const jsonOutput = document.getElementById("jsonOutput");
+        const cssOutput = document.getElementById("cssOutput");
+        const copyJsonBtn = document.getElementById("copyJsonBtn");
+        const copyCssBtn = document.getElementById("copyCssBtn");
+        const toast = document.getElementById("toast");
+
+        let currentPercentFromBottom = null;
+        let currentPercentFromTop = null;
+
+        function formatPercent(value) {
+            return `${Number(value).toFixed(1).replace(/\.0$/, "")}%`;
+        }
+
+        function updateOutputs() {
+            if (currentPercentFromBottom === null) {
+                return;
+            }
+
+            const bottomText = formatPercent(currentPercentFromBottom);
+            const topText = formatPercent(currentPercentFromTop);
+            const name = fieldName.value.trim() || "biblopetFeetFromBottom";
+
+            feetResult.textContent = bottomText;
+            fromBottomStat.textContent = bottomText;
+            fromTopStat.textContent = topText;
+            widthStat.textContent = `${petImage.naturalWidth}px`;
+            heightStat.textContent = `${petImage.naturalHeight}px`;
+
+            jsonOutput.textContent = `"${name}": "${bottomText}",`;
+            cssOutput.textContent = `--${name}: ${bottomText};`;
+
+            copyJsonBtn.disabled = false;
+            copyCssBtn.disabled = false;
+        }
+
+        function showToast(message = "Copied!") {
+            toast.textContent = message;
+            toast.classList.add("show");
+            setTimeout(() => toast.classList.remove("show"), 1100);
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast("Copied!");
+            } catch (err) {
+                showToast("Copy failed");
+            }
+        }
+
+        fileInput.addEventListener("change", () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+
+            petImage.onload = () => {
+                imageWrap.classList.remove("empty");
+                placeholder.hidden = true;
+                petImage.hidden = false;
+
+                markerLine.style.display = "none";
+                markerDot.style.display = "none";
+                currentPercentFromBottom = null;
+                currentPercentFromTop = null;
+
+                feetResult.textContent = "—";
+                fromBottomStat.textContent = "—";
+                fromTopStat.textContent = "—";
+                widthStat.textContent = `${petImage.naturalWidth}px`;
+                heightStat.textContent = `${petImage.naturalHeight}px`;
+                jsonOutput.textContent = "Click the feet point first.";
+                cssOutput.textContent = "Click the feet point first.";
+                copyJsonBtn.disabled = true;
+                copyCssBtn.disabled = true;
+            };
+
+            petImage.src = url;
+        });
+
+        imageWrap.addEventListener("click", (event) => {
+            if (petImage.hidden) return;
+
+            const imgRect = petImage.getBoundingClientRect();
+
+            const insideX = event.clientX >= imgRect.left && event.clientX <= imgRect.right;
+            const insideY = event.clientY >= imgRect.top && event.clientY <= imgRect.bottom;
+
+            if (!insideX || !insideY) {
+                return;
+            }
+
+            const yWithinRenderedImage = event.clientY - imgRect.top;
+            const percentFromTop = (yWithinRenderedImage / imgRect.height) * 100;
+            const percentFromBottom = 100 - percentFromTop;
+
+            currentPercentFromTop = percentFromTop;
+            currentPercentFromBottom = percentFromBottom;
+
+            const wrapRect = imageWrap.getBoundingClientRect();
+            const yInWrap = event.clientY - wrapRect.top;
+            const xInWrap = event.clientX - wrapRect.left;
+
+            markerLine.style.top = `${yInWrap}px`;
+            markerLine.style.display = "block";
+
+            markerDot.style.left = `${xInWrap}px`;
+            markerDot.style.top = `${yInWrap}px`;
+            markerDot.style.display = "block";
+
+            updateOutputs();
+        });
+
+        fieldName.addEventListener("input", updateOutputs);
+
+        copyJsonBtn.addEventListener("click", () => {
+            if (copyJsonBtn.disabled) return;
+            copyText(jsonOutput.textContent);
+        });
+
+        copyCssBtn.addEventListener("click", () => {
+            if (copyCssBtn.disabled) return;
+            copyText(cssOutput.textContent);
+        });
+    </script>
+
+
+</body>
+
+</html>
