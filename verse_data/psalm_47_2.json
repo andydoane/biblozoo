@@ -1,0 +1,57 @@
+{
+    "biblopet": "🪳",
+    "biblopetDefaultName": "Swiper",
+    "biblopetFeetFromBottom": "22%",
+    "verseId": "psalm_47_2",
+    "ref": "Psalm 47:2",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "For the Lord",
+        "the Most High",
+        "is to be feared",
+        "a great king",
+        "over all the earth."
+    ],
+    "verseText": "For the Lord, the Most High, is to be feared, a great king over all the earth.",
+    "meaning": "The Lord God is our Creator and the Most High King of the Universe. He is awesome, deserving of a 'wow' kind of fear.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "image",
+            "word": "Lord",
+            "occurrence": 1,
+            "image": "god_crown"
+        },
+        {
+            "type": "emoji",
+            "word": "High",
+            "occurrence": 1,
+            "emoji": "⬆️"
+        },
+        {
+            "type": "emoji",
+            "word": "feared",
+            "occurrence": 1,
+            "emoji": "😨"
+        },
+        {
+            "type": "emoji",
+            "word": "great",
+            "occurrence": 1,
+            "emoji": "👍"
+        },
+        {
+            "type": "image",
+            "word": "king",
+            "occurrence": 1,
+            "image": "throne"
+        },
+        {
+            "type": "emoji",
+            "word": "earth",
+            "occurrence": 1,
+            "emoji": "🌍"
+        }
+    ]
+}
