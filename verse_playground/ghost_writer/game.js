@@ -733,7 +733,7 @@
   let trainingResizeRaf = 0;
   let playbackState = null;
   let builtInPunctuationGlyphs = {};
-  const openingSingleQuoteGlyphCache = new WeakMap();
+  const openingQuoteGlyphCache = new WeakMap();
   const backgroundImageCache = new Map();
   const borderDoodleImageCache = new Map();
   const tintedBorderDoodleCache = new Map();
@@ -1749,10 +1749,32 @@
   function seedBuiltInPunctuationGlyphsForBeginner() {
     if (selectedMode !== "beginner") return;
 
-    for (const char of PUNCTUATION_RECORDER_CHARS) {
-      if (!String(state.fullText || "").includes(char)) continue;
+    const fullText =
+      String(state.fullText || "");
 
-      const list = getBuiltInPunctuationGlyphList(char);
+    for (const char of PUNCTUATION_RECORDER_CHARS) {
+      const neededForText =
+        fullText.includes(char);
+
+      /*
+        Verse JSON uses single quotes around quoted
+        speech. If any single quote exists, also seed
+        the prerecorded double-quote glyph so visual
+        quotation marks can use it.
+      */
+      const neededForConvertedQuotes =
+        char === "\"" &&
+        fullText.includes("'");
+
+      if (
+        !neededForText &&
+        !neededForConvertedQuotes
+      ) {
+        continue;
+      }
+
+      const list =
+        getBuiltInPunctuationGlyphList(char);
 
       if (list.length) {
         state.glyphs.set(char, list);
@@ -2897,9 +2919,13 @@
     /*
       Advanced mode keeps its existing behavior.
 
-      In Beginner, use a private curly-opening-quote
-      character only as an internal layout marker.
-      The actual verse text remains unchanged.
+      Beginner visually converts paired single
+      quotation marks from the verse JSON into
+      double quotation marks.
+
+      Apostrophes remain apostrophes.
+
+      The actual verse text is never changed.
     */
     if (
       selectedMode !== "beginner" ||
@@ -2910,6 +2936,8 @@
 
     const chars =
       Array.from(value);
+
+    let insideSingleQuote = false;
 
     return chars
       .map((char, index) => {
@@ -2930,33 +2958,59 @@
           /[A-Za-z0-9]/.test(next);
 
         /*
-          DON'T
-              ^ previous is a letter:
-                keep normal apostrophe
-
-          JESUS'
-               ^ next is not a letter:
-                 keep normal closing quote/apostrophe
-
-          'LOVE
-          HE SAID, 'LOVE
-                   ^ next is a letter and the
-                     previous character is not:
-                     treat as an opening quote
+          GOD'S / DON'T
+              ^ character on both sides:
+                this is an apostrophe
         */
-        if (
-          nextIsWordCharacter &&
-          !previousIsWordCharacter
-        ) {
-          return "‘";
+        const isInternalApostrophe =
+          previousIsWordCharacter &&
+          nextIsWordCharacter;
+
+        if (isInternalApostrophe) {
+          return char;
         }
 
+        /*
+          Outside a quotation, a single quote
+          immediately before a word begins quoted
+          speech.
+
+          Use “ only as a private render marker.
+        */
+        if (
+          !insideSingleQuote &&
+          nextIsWordCharacter
+        ) {
+          insideSingleQuote = true;
+          return "“";
+        }
+
+        /*
+          Once quoted speech has begun, the next
+          non-apostrophe single quote closes it.
+
+          This still works when punctuation comes
+          immediately before the closing quote:
+
+          HOUSEHOLD.'
+                    ^
+        */
+        if (insideSingleQuote) {
+          insideSingleQuote = false;
+          return "”";
+        }
+
+        /*
+          A remaining unmatched mark, such as a
+          possessive ending apostrophe, stays an
+          apostrophe.
+        */
         return char;
       })
       .join("");
   }
 
-  function getMirroredOpeningSingleQuoteGlyph(
+  function getMirroredOpeningQuoteGlyph(
     glyph
   ) {
     if (
@@ -2967,7 +3021,7 @@
     }
 
     const cached =
-      openingSingleQuoteGlyphCache.get(
+      openingQuoteGlyphCache.get(
         glyph
       );
 
@@ -2982,8 +3036,8 @@
     /*
       Mirror around the glyph's own horizontal
       center rather than around the whole cell.
-      That preserves its existing size, spacing,
-      and placement.
+      This preserves its size, spacing, stroke
+      timing, and placement.
     */
     const mirrorAxis =
       bounds.minX +
@@ -3010,7 +3064,7 @@
       }
     };
 
-    openingSingleQuoteGlyphCache.set(
+    openingQuoteGlyphCache.set(
       glyph,
       mirroredGlyph
     );
@@ -3019,19 +3073,29 @@
   }
 
   function getGlyph(char, variantKey = 0) {
-    const isOpeningSingleQuote =
+    const isOpeningDoubleQuote =
       selectedMode === "beginner" &&
-      char === "‘";
+      char === "“";
+
+    const isClosingDoubleQuote =
+      selectedMode === "beginner" &&
+      char === "”";
+
+    const isConvertedDoubleQuote =
+      isOpeningDoubleQuote ||
+      isClosingDoubleQuote;
 
     /*
-      Opening single quotes still use the exact
-      same recorded apostrophe/closing-quote
-      glyph. They just receive a mirrored copy
-      at render time.
+      Both private quote markers use the real
+      prerecorded double-quote glyph.
+
+      The closing quote uses its recorded
+      orientation. The opening quote receives
+      the mirrored version.
     */
     const lookupChar =
-      isOpeningSingleQuote
-        ? "'"
+      isConvertedDoubleQuote
+        ? "\""
         : char;
 
     const stored =
@@ -3061,10 +3125,10 @@
     }
 
     if (
-      isOpeningSingleQuote &&
+      isOpeningDoubleQuote &&
       glyph
     ) {
-      return getMirroredOpeningSingleQuoteGlyph(
+      return getMirroredOpeningQuoteGlyph(
         glyph
       );
     }

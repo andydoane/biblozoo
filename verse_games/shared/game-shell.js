@@ -31,6 +31,14 @@
     hard: "../../verse_images/gold_medal.png"
   });
 
+  const PLAYGROUND_GAME_IDS = Object.freeze([
+    "ghost_writer",
+    "scripture_scrub",
+    "verse_jam",
+    "verse_typer",
+    "wheel_of_bible"
+  ]);
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -1795,6 +1803,7 @@
     const safeVerseId = String(params.verseId || params.todoVerseId || "").trim();
     const safeGameId = String(gameId || currentGameShellGameId || "").trim();
 
+    if (PLAYGROUND_GAME_IDS.includes(safeGameId)) return "";
     if (!safeVerseId || !safeGameId) return "";
 
     const status = getCompletionStatusFromBridge({
