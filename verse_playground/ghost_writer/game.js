@@ -733,6 +733,7 @@
   let trainingResizeRaf = 0;
   let playbackState = null;
   let builtInPunctuationGlyphs = {};
+  const openingSingleQuoteGlyphCache = new WeakMap();
   const backgroundImageCache = new Map();
   const borderDoodleImageCache = new Map();
   const tintedBorderDoodleCache = new Map();
@@ -2889,16 +2890,186 @@
     }
   }
 
+  function getGhostWriterLayoutText(text) {
+    const value =
+      String(text || "");
 
-  function getGlyph(char, variantKey = 0) {
-    const stored = state.glyphs.get(char);
+    /*
+      Advanced mode keeps its existing behavior.
 
-    if (Array.isArray(stored)) {
-      if (!stored.length) return null;
-      return stored[getGlyphVariationIndex(char, variantKey, stored.length)] || stored[0] || null;
+      In Beginner, use a private curly-opening-quote
+      character only as an internal layout marker.
+      The actual verse text remains unchanged.
+    */
+    if (
+      selectedMode !== "beginner" ||
+      !value.includes("'")
+    ) {
+      return value;
     }
 
-    return stored || null;
+    const chars =
+      Array.from(value);
+
+    return chars
+      .map((char, index) => {
+        if (char !== "'") {
+          return char;
+        }
+
+        const previous =
+          chars[index - 1] || "";
+
+        const next =
+          chars[index + 1] || "";
+
+        const previousIsWordCharacter =
+          /[A-Za-z0-9]/.test(previous);
+
+        const nextIsWordCharacter =
+          /[A-Za-z0-9]/.test(next);
+
+        /*
+          DON'T
+              ^ previous is a letter:
+                keep normal apostrophe
+
+          JESUS'
+               ^ next is not a letter:
+                 keep normal closing quote/apostrophe
+
+          'LOVE
+          HE SAID, 'LOVE
+                   ^ next is a letter and the
+                     previous character is not:
+                     treat as an opening quote
+        */
+        if (
+          nextIsWordCharacter &&
+          !previousIsWordCharacter
+        ) {
+          return "‘";
+        }
+
+        return char;
+      })
+      .join("");
+  }
+
+  function getMirroredOpeningSingleQuoteGlyph(
+    glyph
+  ) {
+    if (
+      !glyph ||
+      !Array.isArray(glyph.strokes)
+    ) {
+      return glyph;
+    }
+
+    const cached =
+      openingSingleQuoteGlyphCache.get(
+        glyph
+      );
+
+    if (cached) {
+      return cached;
+    }
+
+    const bounds =
+      glyph.bounds ||
+      computeBounds(glyph.strokes);
+
+    /*
+      Mirror around the glyph's own horizontal
+      center rather than around the whole cell.
+      That preserves its existing size, spacing,
+      and placement.
+    */
+    const mirrorAxis =
+      bounds.minX +
+      bounds.maxX;
+
+    const strokes =
+      glyph.strokes.map((stroke) =>
+        (stroke || []).map((point) => ({
+          ...point,
+          x: clamp(
+            mirrorAxis -
+            Number(point.x),
+            0,
+            1
+          )
+        }))
+      );
+
+    const mirroredGlyph = {
+      ...glyph,
+      strokes,
+      bounds: {
+        ...bounds
+      }
+    };
+
+    openingSingleQuoteGlyphCache.set(
+      glyph,
+      mirroredGlyph
+    );
+
+    return mirroredGlyph;
+  }
+
+  function getGlyph(char, variantKey = 0) {
+    const isOpeningSingleQuote =
+      selectedMode === "beginner" &&
+      char === "‘";
+
+    /*
+      Opening single quotes still use the exact
+      same recorded apostrophe/closing-quote
+      glyph. They just receive a mirrored copy
+      at render time.
+    */
+    const lookupChar =
+      isOpeningSingleQuote
+        ? "'"
+        : char;
+
+    const stored =
+      state.glyphs.get(lookupChar);
+
+    let glyph = null;
+
+    if (Array.isArray(stored)) {
+      if (!stored.length) {
+        return null;
+      }
+
+      glyph =
+        stored[
+          getGlyphVariationIndex(
+            lookupChar,
+            variantKey,
+            stored.length
+          )
+        ] ||
+        stored[0] ||
+        null;
+    } else {
+      glyph =
+        stored ||
+        null;
+    }
+
+    if (
+      isOpeningSingleQuote &&
+      glyph
+    ) {
+      return getMirroredOpeningSingleQuoteGlyph(
+        glyph
+      );
+    }
+
+    return glyph;
   }
 
   function getNormalizedGlyphAspect(
@@ -3456,7 +3627,10 @@
       appendItems([item], item.w);
     };
 
-    const tokens = String(text || "").match(/\n|\s+|\S+/g) || [];
+    const tokens =
+      getGhostWriterLayoutText(text)
+        .match(/\n|\s+|\S+/g) ||
+      [];
 
     for (const token of tokens) {
       if (token === "\n") {
