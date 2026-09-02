@@ -1,0 +1,62 @@
+{
+    "biblopet": "🦖",
+    "biblopetDefaultName": "Plato",
+    "biblopetFeetFromBottom": "18.7%",
+    "verseId": "psalm_98_4",
+    "ref": "Psalm 98:4",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Make a joyful noise to the Lord",
+        "all the earth",
+        "break forth into joyous song",
+        "and sing praises!"
+    ],
+    "verseText": "Make a joyful noise to the Lord, all the earth; break forth into joyous song and sing praises!",
+    "meaning": "God made us to worship him and enjoy his goodness. We can give him praise by joyfully singing about his greatness.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "joyful",
+            "occurrence": 1,
+            "emoji": "😄"
+        },
+        {
+            "type": "emoji",
+            "word": "noise",
+            "occurrence": 1,
+            "emoji": "🔊"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "earth",
+            "occurrence": 1,
+            "emoji": "🌍"
+        },
+        {
+            "type": "emoji",
+            "word": "song",
+            "occurrence": 1,
+            "emoji": "🎵"
+        },
+        {
+            "type": "emoji",
+            "word": "sing",
+            "occurrence": 1,
+            "emoji": "🎤"
+        },
+        {
+            "type": "emoji",
+            "word": "praises",
+            "occurrence": 1,
+            "emoji": "🙌"
+        }
+    ]
+}
