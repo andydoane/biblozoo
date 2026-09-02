@@ -1,0 +1,54 @@
+{
+    "biblopet": "🐓",
+    "biblopetDefaultName": "Sandra",
+    "biblopetFeetFromBottom": "3.6%",
+    "verseId": "psalm_96_5",
+    "ref": "Psalm 96:5",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "For all the gods",
+        "of the peoples",
+        "are worthless idols",
+        "but the Lord made the heavens"
+    ],
+    "verseText": "For all the gods of the peoples are worthless idols, but the Lord made the heavens.",
+    "meaning": "The Lord God is the one and only true God. He created the universe. All other gods are worthless. Because they aren't real, they can't do anything.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "idols",
+            "occurrence": 1,
+            "emoji": "🗿"
+        },
+        {
+            "type": "underscore",
+            "word": "gods",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "peoples",
+            "occurrence": 1,
+            "emoji": "👥"
+        },
+        {
+            "type": "underscore",
+            "word": "worthless",
+            "occurrence": 1
+        },
+        {
+            "type": "image",
+            "word": "Lord",
+            "occurrence": 1,
+            "image": "god_crown"
+        },
+        {
+            "type": "emoji",
+            "word": "heavens",
+            "occurrence": 1,
+            "emoji": "☁️"
+        }
+    ]
+}
