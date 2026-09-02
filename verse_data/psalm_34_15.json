@@ -1,0 +1,54 @@
+{
+    "biblopet": "🦕",
+    "biblopetDefaultName": "Blubber",
+    "biblopetFeetFromBottom": "11.6%",
+    "verseId": "psalm_34_15",
+    "ref": "Psalm 34:15",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "The eyes of the Lord",
+        "are toward the righteous",
+        "and his ears",
+        "toward their cry."
+    ],
+    "verseText": "The eyes of the Lord are toward the righteous and his ears toward their cry.",
+    "meaning": "The Lord God fills heaven and earth. He is always near to us when we are in trouble. He sees and hears everything.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "eyes",
+            "occurrence": 1,
+            "emoji": "👀"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "underscore",
+            "word": "righteous",
+            "occurrence": 1
+        },
+        {
+            "type": "underscore",
+            "word": "toward",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "ears",
+            "occurrence": 1,
+            "emoji": "👂"
+        },
+        {
+            "type": "emoji",
+            "word": "cry",
+            "occurrence": 1,
+            "emoji": "😭"
+        }
+    ]
+}
