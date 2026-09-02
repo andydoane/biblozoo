@@ -50,6 +50,23 @@
             line-height: 1.35;
         }
 
+                .utility-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .utility-nav button {
+            box-shadow: none;
+            border: 2px solid rgba(255, 255, 255, .65);
+        }
+
+        .utility-nav button.active {
+            background: var(--teal);
+            border-color: #fff;
+        }
+
         .layout {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(300px, 390px);
@@ -327,6 +344,12 @@
             Upload a transparent pet PNG, click where the pet’s feet touch the ground, and copy the JSON line into that
             verse file.
         </p>
+
+        <nav class="utility-nav" aria-label="BibloZoo utilities">
+            <button type="button" onclick="location.href='./'">Verse Asset Tester</button>
+            <button type="button" onclick="location.href='verse-stats.html'">Verse Stats</button>
+            <button class="active" type="button" aria-current="page">Pet Feet Helper</button>
+        </nav>
 
         <section class="layout">
             <div class="panel">
