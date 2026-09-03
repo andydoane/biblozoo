@@ -1,0 +1,60 @@
+{
+    "biblopet": "🪃",
+    "biblopetDefaultName": "Blizz",
+    "biblopetFeetFromBottom": "4.5%",
+    "verseId": "john_14_16",
+    "ref": "John 14:16",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "And I will ask the Father",
+        "and he will give you",
+        "another Helper",
+        "to be with you forever."
+    ],
+    "verseText": "And I will ask the Father, and he will give you another Helper, to be with you forever.",
+    "meaning": "Jesus knew he would return to heaven and leave his disciples. So promised that the Father would give his followers another Helper, the Holy Spirit, who would always be with them.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "ask",
+            "occurrence": 1,
+            "emoji": "🙋"
+        },
+        {
+            "type": "underscore",
+            "word": "Father",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "give",
+            "occurrence": 1,
+            "emoji": "🎁"
+        },
+        {
+            "type": "emoji",
+            "word": "another",
+            "occurrence": 1,
+            "emoji": "➕"
+        },
+        {
+            "type": "emoji",
+            "word": "Helper",
+            "occurrence": 1,
+            "emoji": "🤝"
+        },
+        {
+            "type": "underscore",
+            "word": "with",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "forever",
+            "occurrence": 1,
+            "emoji": "♾️"
+        }
+    ]
+}
