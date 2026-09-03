@@ -1,0 +1,57 @@
+{
+    "biblopet": "🐪",
+    "biblopetDefaultName": "Caesar",
+    "biblopetFeetFromBottom": "4.2%",
+    "verseId": "romans_3_10_11",
+    "ref": "Romans 3:10-11",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "As it is written",
+        "'None is righteous",
+        "no, not one",
+        "no one understands",
+        "no one seeks for God.'"
+    ],
+    "verseText": "As it is written: 'None is righteous, no, not one; no one understands; no one seeks for God.'",
+    "meaning": "It is written in many places in the Bible that no one is truly righteous. Nobody is perfect. Nobody always does what God says is right. That's why we need Jesus to save us.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "written",
+            "occurrence": 1,
+            "emoji": "📝"
+        },
+        {
+            "type": "underscore",
+            "word": "righteous",
+            "occurrence": 1
+        },
+        { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
+        {
+            "type": "emoji",
+            "word": "one",
+            "occurrence": 1,
+            "emoji": "1️⃣"
+        },
+        {
+            "type": "emoji",
+            "word": "understands",
+            "occurrence": 1,
+            "emoji": "🧠"
+        },
+        {
+            "type": "emoji",
+            "word": "seeks",
+            "occurrence": 1,
+            "emoji": "🔎"
+        },
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 1,
+            "image": "god_crown"
+        }
+    ]
+}
