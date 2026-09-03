@@ -1,0 +1,53 @@
+{
+    "biblopet": "🌟",
+    "biblopetDefaultName": "Sparky",
+    "biblopetFeetFromBottom": "15.2%",
+    "verseId": "philippians_4_13",
+    "ref": "Philippians 4:13",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "I can do all things",
+        "through him",
+        "who strengthens me."
+    ],
+    "verseText": "I can do all things through him who strengthens me.",
+    "meaning": "Paul wrote these words. He experienced both good times and bad. But he trusted Christ Jesus to give him strength to face every situation and do what God called him to do.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "do",
+            "occurrence": 1,
+            "emoji": "🛠️"
+        },
+        {
+            "type": "emoji",
+            "word": "I",
+            "occurrence": 1,
+            "emoji": "👁️"
+        },
+        {
+            "type": "underscore",
+            "word": "all",
+            "occurrence": 1
+        },
+        {
+            "type": "underscore",
+            "word": "things",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "him",
+            "occurrence": 1,
+            "emoji": "✝️"
+        },
+        {
+            "type": "emoji",
+            "word": "strengthens",
+            "occurrence": 1,
+            "emoji": "💪"
+        }
+    ]
+}
