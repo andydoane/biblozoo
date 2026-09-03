@@ -1,0 +1,64 @@
+{
+    "biblopet": "🍀",
+    "biblopetDefaultName": "Bubbles",
+    "biblopetFeetFromBottom": "11.1%",
+    "verseId": "isaiah_41_10",
+    "ref": "Isaiah 41:10",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "fear not, for I am with you",
+        "be not dismayed",
+        "for I am your God",
+        "I will strengthen you",
+        "I will help you",
+        "I will uphold you",
+        "with my righteous right hand."
+    ],
+    "verseText": "Fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you, I will uphold you with my righteous right hand.",
+    "meaning": "If we trust in Jesus, we can trust that God will always be with us. No matter what troubles we face, we have no reason to fear. Our mighty God is always near to give us what we need.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "fear",
+            "occurrence": 1,
+            "emoji": "😨"
+        },
+        {
+            "type": "underscore",
+            "word": "dismayed",
+            "occurrence": 1
+        },
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 1,
+            "image": "god_crown"
+        },
+        {
+            "type": "emoji",
+            "word": "strengthen",
+            "occurrence": 1,
+            "emoji": "💪"
+        },
+        {
+            "type": "emoji",
+            "word": "help",
+            "occurrence": 1,
+            "emoji": "🤝"
+        },
+        {
+            "type": "emoji",
+            "word": "uphold",
+            "occurrence": 1,
+            "emoji": "🙌"
+        },
+        {
+            "type": "emoji",
+            "word": "hand",
+            "occurrence": 1,
+            "emoji": "✋"
+        }
+    ]
+}
