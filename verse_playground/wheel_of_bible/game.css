@@ -80,7 +80,6 @@ body {
    App frame / shared layout
    ========================= */
 .wob-root {
-  position: relative;
   min-height: 100dvh;
   height: 100dvh;
   width: 100%;
@@ -90,30 +89,6 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
-}
-
-/*
-  Permanent black header band behind
-  the Menu and Bible Bux controls.
-
-  The main content already begins
-  54px + safe-area below the top, so
-  the band ends at that same boundary.
-*/
-.wob-root::before {
-  content: "";
-  position: absolute;
-  z-index: 20;
-  top: 0;
-  left: 0;
-  right: 0;
-  height:
-    calc(
-      54px +
-      env(safe-area-inset-top)
-    );
-  background: #000000;
-  pointer-events: none;
 }
 
 .wob-stage {
