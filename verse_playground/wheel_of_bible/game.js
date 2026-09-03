@@ -86,6 +86,7 @@
   ];
 
   const NORMAL_ROUND_MIN_SELECTED = 6;
+  const NORMAL_ROUND_MAX_SELECTED = 10;
   const NORMAL_ROUND_UNIQUE_RATIO = 0.55;
   const FINAL_ROUND_HIDE_RATIO = 0.5;
   const FINAL_ROUND_SECONDS = 60;
@@ -125,6 +126,12 @@
   let sleepIds = [];
   let finalTimerId = null;
   let currentFitRaf = 0;
+
+  let smartVerseRowsCacheKey = "";
+  let smartVerseRowsCacheValue = null;
+
+  let verseBoardFitCacheKey = "";
+  let verseBoardFitCacheValue = null;
 
   const state = {
     screen: "intro",
@@ -186,6 +193,53 @@
     if (!Number.isFinite(n)) return min;
     return Math.max(min, Math.min(max, n));
   }
+
+  function wireTapDownButton(
+    button,
+    handler
+  ) {
+    if (
+      !button ||
+      typeof handler !== "function"
+    ) {
+      return;
+    }
+
+    /*
+      Physical touch/mouse input activates as
+      soon as the pointer goes down.
+
+      The click listener below is retained only
+      for keyboard activation such as Enter or
+      Space, whose generated click has detail 0.
+    */
+    button.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (
+          event.button !== undefined &&
+          event.button !== 0
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        handler(event);
+      }
+    );
+
+    button.addEventListener(
+      "click",
+      (event) => {
+        if (event.detail !== 0) {
+          return;
+        }
+
+        handler(event);
+      }
+    );
+  }
+
 
   const sleep = (ms) => new Promise(resolve => {
     const id = setTimeout(() => {
@@ -342,13 +396,22 @@
   function normalRoundTarget() {
     if (DEBUG_ONE_SPIN_ROUND) return 1;
 
-    const total = state.uniqueLetters.length || 0;
-    if (!total) return NORMAL_ROUND_MIN_SELECTED;
+    const total =
+      state.uniqueLetters.length || 0;
+
+    if (!total) {
+      return NORMAL_ROUND_MIN_SELECTED;
+    }
+
     return Math.min(
       total,
+      NORMAL_ROUND_MAX_SELECTED,
       Math.max(
         NORMAL_ROUND_MIN_SELECTED,
-        Math.ceil(total * NORMAL_ROUND_UNIQUE_RATIO)
+        Math.ceil(
+          total *
+          NORMAL_ROUND_UNIQUE_RATIO
+        )
       )
     );
   }
@@ -1012,7 +1075,27 @@
       </div>
     `, { status: "Choose Letter", rootClass: "is-select-screen" });
     wireGameMenu();
-    document.querySelectorAll("[data-letter]").forEach(btn => btn.addEventListener("click", () => handleLetterChoice(btn.dataset.letter || "")));
+    document
+      .querySelectorAll(
+        "[data-letter]"
+      )
+      .forEach(btn => {
+        wireTapDownButton(
+          btn,
+          () => {
+            /*
+              Disable immediately so there is
+              visible feedback even if the next
+              screen still needs a moment to draw.
+            */
+            btn.disabled = true;
+
+            void handleLetterChoice(
+              btn.dataset.letter || ""
+            );
+          }
+        );
+      });
   }
 
   function countUnrevealedLetter(letter) {
@@ -1059,16 +1142,73 @@
     fitVerseBoardSoon();
     await sleep(80);
 
-    const tiles = Array.from(document.querySelectorAll(`.wob-tile[data-normalized="${letter}"]`));
-    const delayMs = tiles.length > 18 ? 55 : 85;
+    const tiles =
+      Array.from(
+        document.querySelectorAll(
+          `.wob-tile[data-normalized="${letter}"]`
+        )
+      );
 
-    for (let i = 0; i < tiles.length; i += 1) {
+    /*
+      Measure every matching tile together before
+      changing any of them.
+
+      This avoids alternating DOM writes and
+      getBoundingClientRect() reads throughout
+      the reveal animation.
+    */
+    const card =
+      document.querySelector(
+        ".wob-card"
+      );
+
+    const cardBox =
+      card?.getBoundingClientRect();
+
+    const tileMoneyPositions =
+      cardBox
+        ? tiles.map(tile => {
+            const box =
+              tile.getBoundingClientRect();
+
+            return {
+              x:
+                box.left +
+                box.width / 2 -
+                cardBox.left,
+              y:
+                box.top -
+                cardBox.top
+            };
+          })
+        : [];
+
+    const delayMs =
+      tiles.length > 18
+        ? 55
+        : 85;
+
+    for (
+      let i = 0;
+      i < tiles.length;
+      i += 1
+    ) {
       const tile = tiles[i];
       tile.textContent = letter;
       tile.classList.remove("is-hidden");
       tile.classList.add("is-pop-revealed");
       playPop(i);
-      showFloatingMoneyAtElement(tile, formatMoney(perLetter));
+      if (tileMoneyPositions[i]) {
+        showFloatingMoneyAtPosition(
+          tileMoneyPositions[i],
+          formatMoney(perLetter)
+        );
+      } else {
+        showFloatingMoneyAtElement(
+          tile,
+          formatMoney(perLetter)
+        );
+      }
       await sleep(delayMs);
     }
 
@@ -1100,6 +1240,51 @@
     card.appendChild(el);
     setTimeout(() => el.remove(), 950);
   }
+
+  function showFloatingMoneyAtPosition(
+    position,
+    text
+  ) {
+    const card =
+      document.querySelector(
+        ".wob-card"
+      );
+
+    if (!card || !position) {
+      return;
+    }
+
+    const x =
+      Number(position.x);
+
+    const y =
+      Number(position.y);
+
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y)
+    ) {
+      return;
+    }
+
+    const el =
+      document.createElement("div");
+
+    el.className =
+      "wob-floating-money is-tile-money";
+
+    el.textContent = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+
+    card.appendChild(el);
+
+    setTimeout(
+      () => el.remove(),
+      900
+    );
+  }
+
 
   function showFloatingMoneyAtElement(targetEl, text) {
     const card = document.querySelector(".wob-card");
@@ -1906,11 +2091,20 @@
 
     wireGameMenu();
 
-    document.querySelectorAll("[data-choice]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        handleChallengeChoice(btn.dataset.choice || "");
+    document
+      .querySelectorAll(
+        "[data-choice]"
+      )
+      .forEach(btn => {
+        wireTapDownButton(
+          btn,
+          () => {
+            void handleChallengeChoice(
+              btn.dataset.choice || ""
+            );
+          }
+        );
       });
-    });
 
     document
       .getElementById("challengeHintButton")
@@ -2474,12 +2668,49 @@
   }
 
   function chooseSmartVerseRows(words) {
-    const cleanWords = words.filter(Boolean);
-    if (!cleanWords.length) return [];
+    const cleanWords =
+      words.filter(Boolean);
 
-    const box = smartAvailableBoxEstimate();
-    const refUnits = smartReferenceUnits();
-    const minLineUnits = smartMinimumLineUnits();
+    if (!cleanWords.length) {
+      return [];
+    }
+
+    const box =
+      smartAvailableBoxEstimate();
+
+    /*
+      The verse itself and the available viewport
+      do not change as we move between the Wheel
+      screens.
+
+      Reuse the expensive smart row plan instead
+      of recalculating it every time the verse
+      board is rebuilt.
+    */
+    const cacheKey =
+      JSON.stringify([
+        Math.round(box.width),
+        Math.round(box.height),
+        String(state.verseRef || ""),
+        String(state.verseText || ""),
+        USE_SMART_HYPHENATION_PLANNER
+      ]);
+
+    if (
+      smartVerseRowsCacheKey ===
+        cacheKey &&
+      Array.isArray(
+        smartVerseRowsCacheValue
+      )
+    ) {
+      return smartVerseRowsCacheValue;
+    }
+
+    const refUnits =
+      smartReferenceUnits();
+
+    const minLineUnits =
+      smartMinimumLineUnits();
 
     const variants = [
       {
@@ -2536,7 +2767,24 @@
       }
     }
 
-    return best?.rows || [smartLayoutPiecesForWords(cleanWords, { allowHyphenation: false })];
+    const rows =
+      best?.rows ||
+      [
+        smartLayoutPiecesForWords(
+          cleanWords,
+          {
+            allowHyphenation: false
+          }
+        )
+      ];
+
+    smartVerseRowsCacheKey =
+      cacheKey;
+
+    smartVerseRowsCacheValue =
+      rows;
+
+    return rows;
   }
 
   function smartVerseRowsHtml(options = {}) {
@@ -2620,6 +2868,47 @@
       board.style.setProperty("--wob-line-gap", `${lineGap}px`);
     };
 
+    /*
+      Smart-row boards repeatedly return at the
+      same dimensions during normal gameplay.
+
+      Reuse the fitted tile size instead of
+      performing dozens of DOM overflow checks
+      every time the board comes back.
+    */
+    const fitCacheKey =
+      isSmartRows
+        ? JSON.stringify([
+          Math.round(fitWidth),
+          Math.round(fitHeight),
+          String(
+            state.verseRef || ""
+          ),
+          String(
+            state.verseText || ""
+          ),
+          document.fonts?.status ||
+          "unknown"
+        ])
+        : "";
+
+    if (
+      isSmartRows &&
+      verseBoardFitCacheKey ===
+      fitCacheKey &&
+      verseBoardFitCacheValue
+    ) {
+      apply(
+        verseBoardFitCacheValue
+          .tileSize,
+        verseBoardFitCacheValue
+          .lineGap
+      );
+
+      return;
+    }
+
+
     const overflows = () => {
       const rowOver = Array.from(board.querySelectorAll(".wob-verse-row, .wob-ref-board"))
         .some(item => item.scrollWidth > item.clientWidth + 2);
@@ -2667,7 +2956,24 @@
       if (size <= 13) break;
     }
 
-    apply(Math.max(13, size), Math.max(4, lineGap));
+    const finalTileSize =
+      Math.max(13, size);
+
+    const finalLineGap =
+      Math.max(4, lineGap);
+
+    apply(
+      finalTileSize,
+      finalLineGap
+    );
+
+    verseBoardFitCacheKey =
+      fitCacheKey;
+
+    verseBoardFitCacheValue = {
+      tileSize: finalTileSize,
+      lineGap: finalLineGap
+    };
   }
   window.addEventListener("resize", fitVerseBoardSoon);
   window.addEventListener("orientationchange", () => setTimeout(fitVerseBoardSoon, 250));
@@ -2794,7 +3100,21 @@
 
     document.getElementById("wobFinalModal")?.remove();
     document.querySelector(".wob-card")?.appendChild(modal);
-    modal.querySelectorAll("[data-final-choice]").forEach(btn => btn.addEventListener("click", () => handleFinalChoice(btn.dataset.finalChoice || "")));
+    modal
+      .querySelectorAll(
+        "[data-final-choice]"
+      )
+      .forEach(btn => {
+        wireTapDownButton(
+          btn,
+          () => {
+            void handleFinalChoice(
+              btn.dataset.finalChoice ||
+                ""
+            );
+          }
+        );
+      });
   }
 
   function finalWordHtml(active) {
