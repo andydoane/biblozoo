@@ -1,0 +1,62 @@
+{
+    "biblopet": "🦌",
+    "biblopetDefaultName": "Hank",
+    "biblopetFeetFromBottom": "14.4%",
+    "verseId": "romans_10_15",
+    "ref": "Romans 10:15",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "And how are they to preach",
+        "unless they are sent?",
+        "As it is written",
+        "'How beautiful are the feet",
+        "of those who preach the good news!'"
+    ],
+    "verseText": "And how are they to preach unless they are sent? As it is written, 'How beautiful are the feet of those who preach the good news!'",
+    "meaning": "People need to believe the good news of Jesus to be saved. That means it's our job to tell others about Jesus. It's a beautiful thing when we use our feet to go and tell others about Jesus.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "preach",
+            "occurrence": 1,
+            "emoji": "🗣️"
+        },
+        {
+            "type": "emoji",
+            "word": "sent",
+            "occurrence": 1,
+            "emoji": "➡️"
+        },
+        {
+            "type": "emoji",
+            "word": "written",
+            "occurrence": 1,
+            "emoji": "📝"
+        },
+        {
+            "type": "underscore",
+            "word": "beautiful",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "feet",
+            "occurrence": 1,
+            "emoji": "👣"
+        },
+        {
+            "type": "emoji",
+            "word": "preach",
+            "occurrence": 2,
+            "emoji": "🗣️"
+        },
+        {
+            "type": "emoji",
+            "word": "news",
+            "occurrence": 1,
+            "emoji": "📰"
+        }
+    ]
+}
