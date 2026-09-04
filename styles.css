@@ -3666,7 +3666,10 @@ Game Mix Loading Screen
   transform: none;
   transition:
     opacity 180ms ease;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+  -webkit-hyphens: none;
+  hyphens: none;
   text-wrap: balance;
 }
 
@@ -3716,7 +3719,10 @@ Game Mix Loading Screen
     color 180ms ease,
     opacity 180ms ease;
   text-shadow: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+  -webkit-hyphens: none;
+  hyphens: none;
   text-wrap: balance;
 }
 
