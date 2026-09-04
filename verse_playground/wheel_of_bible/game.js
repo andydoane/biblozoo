@@ -3149,7 +3149,35 @@
     const active = state.finalActiveWord; if (!active || state.finalTimeLeft <= 0) return;
     const choice = normalizeLetters(letter).charAt(0); const expected = active.expected[state.finalInputIndex]; if (!expected) return;
     if (choice !== expected) {
-      state.finalLetterStreak = 0; state.finalFlash = choice; state.finalBad = true; playBad(); renderFinalModal(); await sleep(260); state.finalFlash = ""; state.finalBad = false; renderFinalModal(); return;
+      state.finalLetterStreak = 0;
+      state.finalFlash = choice;
+      state.finalBad = true;
+
+      playBad();
+      renderFinalModal();
+
+      await sleep(260);
+
+      /*
+        The 60-second timer may have expired while
+        the wrong-answer flash was being shown.
+
+        Do not recreate the final modal if the
+        final round has already ended or moved on
+        to a different word.
+      */
+      if (
+        state.screen !== "finalRound" ||
+        state.finalTimeLeft <= 0 ||
+        state.finalActiveWord !== active
+      ) {
+        return;
+      }
+
+      state.finalFlash = "";
+      state.finalBad = false;
+      renderFinalModal();
+      return;
     }
     state.finalLetterStreak += 1; const earned = state.finalLetterStreak * 100; state.finalCash += earned; state.finalInputIndex += 1; state.finalFlash = choice; state.finalBad = false; updateHud(); playGood();
     if (state.finalInputIndex >= active.expected.length) {
