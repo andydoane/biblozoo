@@ -1,0 +1,29 @@
+{
+  "biblopet": "🚀",
+  "biblopetDefaultName": "Pippin",
+  "biblopetFeetFromBottom": "⚠️⚠️⚠️",
+  "verseId": "ephesians_2_8_9",
+  "ref": "Ephesians 2:8-9",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "For by grace you have been saved",
+    "through faith",
+    "And this is not your own doing",
+    "it is the gift of God",
+    "not a result of works",
+    "so that no one may boast."
+  ],
+  "verseText": "For by grace you have been saved through faith. And this is not your own doing; it is the gift of God, not a result of works, so that no one may boast.",
+  "meaning": "Our salvation (being saved from sin) is not something we can earn by being good. It's not something we can brag about. It's a free gift from God. And that gift was paid for by Jesus when he died on the cross in our place. ",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "grace", "occurrence": 1, "emoji": "💝" },
+    { "type": "emoji", "word": "saved", "occurrence": 1, "emoji": "🛟" },
+    { "type": "emoji", "word": "faith", "occurrence": 1, "emoji": "🙏" },
+    { "type": "emoji", "word": "gift", "occurrence": 1, "emoji": "🎁" },
+    { "type": "image", "word": "God", "occurrence": 1, "image": "god_crown" },
+    { "type": "emoji", "word": "works", "occurrence": 1, "emoji": "🛠️" },
+    { "type": "underscore", "word": "boast", "occurrence": 1 }
+  ]
+}
