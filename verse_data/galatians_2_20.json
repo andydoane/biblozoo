@@ -1,0 +1,25 @@
+{
+  "biblopet": "🍉",
+  "biblopetDefaultName": "Zippy",
+  "biblopetFeetFromBottom": "⚠️⚠️⚠️",
+  "verseId": "galatians_2_20",
+  "ref": "Galatians 2:20",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "I have been crucified with Christ",
+    "It is no longer I who live",
+    "but Christ who lives in me."
+  ],
+  "verseText": "I have been crucified with Christ. It is no longer I who live, but Christ who lives in me.",
+  "meaning": "When we believe in Jesus, we share in his death and life. His death on a cross was our death for our sins. And his new life on the third day means our forever life in his kingdom.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "crucified", "occurrence": 1, "emoji": "💀" },
+    { "type": "image", "word": "Christ", "occurrence": 1, "image": "cross" },
+    { "type": "emoji", "underscore ": "longer", "occurrence": 1 },
+    { "type": "emoji", "word": "live", "occurrence": 1, "emoji": "🌱" },
+    { "type": "image", "word": "Christ", "occurrence": 2, "image": "cross" },
+    { "type": "emoji", "word": "lives", "occurrence": 1, "emoji": "🌱" }
+  ]
+}
