@@ -12,14 +12,14 @@
     "Christ died for us."
   ],
   "verseText": "But God shows his love for us in that while we were still sinners, Christ died for us.",
-  "meaning": "God showed how deeply he loves us by sending Christ to die for us even while we were still sinners.",
+  "meaning": "The cross of Jesus shows us exactly how much God loves us. Jesus was willing to suffer the worst even though we were sinners.",
   "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
   "hidePlan": [
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "🙏" },
+    { "type": "image", "word": "God", "occurrence": 1, "image": "god_crown" },
     { "type": "emoji", "word": "shows", "occurrence": 1, "emoji": "👀" },
     { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
-    { "type": "underscore", "word": "sinners", "occurrence": 1 },
-    { "type": "emoji", "word": "Christ", "occurrence": 1, "emoji": "✝️" },
-    { "type": "image", "word": "died", "occurrence": 1, "image": "cross" }
+     { "type": "emoji", "word": "sinners", "occurrence": 1, "emoji": "👎" }, 
+    { "type": "image", "word": "Christ", "occurrence": 1, "image": "cross" },
+    { "type": "emoji", "word": "died", "occurrence": 1, "emoji": "☠️" }
   ]
 }
