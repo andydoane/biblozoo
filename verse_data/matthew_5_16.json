@@ -1,0 +1,28 @@
+{
+  "biblopet": "🥁",
+  "biblopetDefaultName": "Biscuit",
+  "biblopetFeetFromBottom": "12.3%",
+  "verseId": "matthew_5_16",
+  "ref": "Matthew 5:16",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "In the same way",
+    "let your light shine before others",
+    "so that they may see your good works",
+    "and give glory to your Father",
+    "who is in heaven."
+  ],
+  "verseText": "In the same way, let your light shine before others, so that they may see your good works and give glory to your Father who is in heaven.",
+  "meaning": "Jesus tells us to live in a way that shines God's goodness to others like a light in the darkness. When others see God's children obeying their Father in heaven, they will give glory to him.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "light", "occurrence": 1, "emoji": "💡" },
+    { "type": "emoji", "word": "shine", "occurrence": 1, "emoji": "✨" },
+    { "type": "emoji", "word": "see", "occurrence": 1, "emoji": "👀" },
+    { "type": "emoji", "word": "works", "occurrence": 1, "emoji": "🛠️" },
+    { "type": "emoji", "word": "glory", "occurrence": 1, "emoji": "🙌" },
+    { "type": "emoji", "word": "Father", "occurrence": 1, "emoji": "👨" },
+    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "☁️" }
+  ]
+}
