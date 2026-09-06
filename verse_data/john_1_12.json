@@ -13,7 +13,7 @@
         "to become children of God."
     ],
     "verseText": "But to all who did receive him, who believed in his name, he gave the right to become children of God,",
-    "meaning": "Everyone who receives Jesus and believes in him is given the wonderful privilege of becoming one of God's children.",
+    "meaning": "When we believe that Jesus is the Son of God and trust in him to save us, we are adopted as children into God's forever family.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         {
@@ -23,16 +23,15 @@
             "emoji": "🤲"
         },
         {
-            "type": "emoji",
+            "type": "underscore",
             "word": "believed",
-            "occurrence": 1,
-            "emoji": "🙏"
+            "occurrence": 1
         },
         {
             "type": "emoji",
             "word": "name",
             "occurrence": 1,
-            "emoji": "🏷️"
+            "emoji": "📝"
         },
         {
             "type": "emoji",
@@ -41,10 +40,9 @@
             "emoji": "🎁"
         },
         {
-            "type": "emoji",
+            "type": "underscore",
             "word": "right",
-            "occurrence": 1,
-            "emoji": "✅"
+            "occurrence": 1
         },
         {
             "type": "image",
@@ -53,10 +51,10 @@
             "image": "baby"
         },
         {
-            "type": "emoji",
+            "type": "image",
             "word": "God",
             "occurrence": 1,
-            "emoji": "🙏"
+            "image": "god_crown"
         }
     ]
 }
