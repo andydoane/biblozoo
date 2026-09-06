@@ -1,0 +1,29 @@
+{
+  "biblopet": "🏕️",
+  "biblopetDefaultName": "Fizz",
+  "biblopetFeetFromBottom": "10.5%",
+  "verseId": "2_timothy_3_16_17",
+  "ref": "2 Timothy 3:16-17",
+  "published": true,
+  "translation": "ESV",
+  "echoParts": [
+    "All Scripture is breathed out by God",
+    "and profitable for teaching",
+    "for reproof, for correction",
+    "and for training in righteousness",
+    "that the man of God may be complete",
+    "equipped for every good work."
+  ],
+  "verseText": "All Scripture is breathed out by God and profitable for teaching, for reproof, for correction, and for training in righteousness, that the man of God may be complete, equipped for every good work.",
+  "meaning": "The Bible comes from God. It helps us learn what is true, correct what is wrong, and grow in right living. By reading, believing, and following God's Word, we can be prepared for any good thing God wants us to do.",
+  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "hidePlan": [
+    { "type": "emoji", "word": "Scripture", "occurrence": 1, "emoji": "📖" },
+    { "type": "imahe", "word": "God", "occurrence": 1, "emoji": "god_crown" },
+    { "type": "emoji", "word": "teaching", "occurrence": 1, "emoji": "🧑‍🏫" },
+    { "type": "emoji", "word": "correction", "occurrence": 1, "emoji": "✏️" },
+    { "type": "emoji", "word": "training", "occurrence": 1, "emoji": "🏋️" },
+    { "type": "underscore", "word": "righteousness", "occurrence": 1 },
+    { "type": "emoji", "word": "equipped", "occurrence": 1, "emoji": "🧰" }
+  ]
+}
