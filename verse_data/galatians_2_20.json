@@ -17,7 +17,7 @@
   "hidePlan": [
     { "type": "emoji", "word": "crucified", "occurrence": 1, "emoji": "💀" },
     { "type": "image", "word": "Christ", "occurrence": 1, "image": "cross" },
-    { "type": "emoji", "underscore ": "longer", "occurrence": 1 },
+{ "type": "underscore", "word": "longer", "occurrence": 1 },
     { "type": "emoji", "word": "live", "occurrence": 1, "emoji": "🌱" },
     { "type": "image", "word": "Christ", "occurrence": 2, "image": "cross" },
     { "type": "emoji", "word": "lives", "occurrence": 1, "emoji": "🌱" }
