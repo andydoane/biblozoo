@@ -18,11 +18,7 @@
     "meaning": "Even when we face scary times, God tells us to be strong and courageous. We don't need to be scared beacause the Lord God has promised to be with us wherever we go.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
-        {
-            "type": "underscore",
-            "word": "commanded",
-            "occurrence": 1
-        },
+        { "type": "image", "word": "commanded", "occurrence": 1, "image": "tablet" }, 
         {
             "type": "emoji",
             "word": "strong",
@@ -47,16 +43,14 @@
             "occurrence": 1
         },
         {
-            "type": "emoji",
+            "type": "underscore",
             "word": "Lord",
-            "occurrence": 1,
-            "emoji": "👑"
-        },
+            "occurrence": 1
         {
-            "type": "emoji",
+            "type": "image",
             "word": "God",
             "occurrence": 1,
-            "emoji": "🙏"
+            "image": "god_crown"
         }
     ]
 }
