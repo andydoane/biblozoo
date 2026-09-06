@@ -1,0 +1,50 @@
+{
+    "biblopet": "🎵",
+    "biblopetDefaultName": "Gizmo",
+    "biblopetFeetFromBottom": "12.3%",
+    "verseId": "psalm_119_105",
+    "ref": "Psalm 119:105",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Your word is a lamp",
+        "to my feet",
+        "and a light",
+        "to my path."
+    ],
+    "verseText": "Your word is a lamp to my feet and a light to my path.",
+    "meaning": "God's Word shows us how to live. Like a lamp, it helps us to see the right way to live in this dark and sinful world..",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "word",
+            "occurrence": 1,
+            "emoji": "📖"
+        },
+        {
+            "type": "emoji",
+            "word": "lamp",
+            "occurrence": 1,
+            "emoji": "🕯️"
+        },
+        {
+            "type": "emoji",
+            "word": "feet",
+            "occurrence": 1,
+            "emoji": "🦶"
+        },
+        {
+            "type": "emoji",
+            "word": "light",
+            "occurrence": 1,
+            "emoji": "💡"
+        },
+        {
+            "type": "emoji",
+            "word": "path",
+            "occurrence": 1,
+            "emoji": "🛤️"
+        }
+    ]
+}

@@ -1,0 +1,60 @@
+{
+    "biblopet": "🛼",
+    "biblopetDefaultName": "Patches",
+    "biblopetFeetFromBottom": "⚠️⚠️⚠️",
+    "verseId": "psalm_91_1",
+    "ref": "Psalm 91:1",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "He who dwells in the shelter",
+        "of the Most High",
+        "will abide in the shadow",
+        "of the Almighty."
+    ],
+    "verseText": "He who dwells in the shelter of the Most High will abide in the shadow of the Almighty.",
+    "meaning": "Those who trust in God are safe with him. He shelters his people and keeps them near under his strong protection.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "underscore",
+            "word": "dwells",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "shelter",
+            "occurrence": 1,
+            "emoji": "⛺"
+        },
+        {
+            "type": "emoji",
+            "word": "Most",
+            "occurrence": 1,
+            "emoji": "⬆️"
+        },
+        {
+            "type": "emoji",
+            "word": "High",
+            "occurrence": 1,
+            "emoji": "☁️"
+        },
+        {
+            "type": "underscore",
+            "word": "abide",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "shadow",
+            "occurrence": 1,
+            "emoji": "🌑"
+        },
+        {
+            "type": "emoji",
+            "word": "Almighty",
+            "occurrence": 1,
+            "emoji": "💪"
+        }
+    ]
+}

@@ -1,0 +1,64 @@
+{
+    "biblopet": "🍄",
+    "biblopetDefaultName": "Doodle",
+    "biblopetFeetFromBottom": "23.1%",
+    "verseId": "matthew_11_28_29",
+    "ref": "Matthew 11:28-29",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Come to me",
+        "all who labor and are heavy laden",
+        "and I will give you rest",
+        "Take my yoke upon you",
+        "and learn from me",
+        "for I am gentle and lowly in heart",
+        "and you will find rest for your souls."
+    ],
+    "verseText": "Come to me, all who labor and are heavy laden, and I will give you rest. Take my yoke upon you, and learn from me, for I am gentle and lowly in heart, and you will find rest for your souls.",
+    "meaning": "Jesus invites tired and burdened people to come to him. He gives true rest, teaches us gently, and cares for our souls.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "Come",
+            "occurrence": 1,
+            "emoji": "➡️"
+        },
+        {
+            "type": "emoji",
+            "word": "labor",
+            "occurrence": 1,
+            "emoji": "🛠️"
+        },
+        {
+            "type": "emoji",
+            "word": "heavy",
+            "occurrence": 1,
+            "emoji": "🪨"
+        },
+        {
+            "type": "emoji",
+            "word": "rest",
+            "occurrence": 1,
+            "emoji": "🛏️"
+        },
+        {
+            "type": "underscore",
+            "word": "yoke",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "gentle",
+            "occurrence": 1,
+            "emoji": "😊"
+        },
+        {
+            "type": "image",
+            "word": "souls",
+            "occurrence": 1,
+            "image": "soul"
+        }
+    ]
+}

@@ -1,0 +1,54 @@
+{
+    "biblopet": "🪁",
+    "biblopetDefaultName": "Snickers",
+    "biblopetFeetFromBottom": "19.1%",
+    "verseId": "psalm_46_1",
+    "ref": "Psalm 46:1",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "God is our refuge and strength",
+        "a very present help",
+        "in trouble."
+    ],
+    "verseText": "God is our refuge and strength, a very present help in trouble.",
+    "meaning": "God is a safe refuge for his people. He gives strength and help when trouble comes and is always near when we need him.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "God",
+            "occurrence": 1,
+            "emoji": "🙏"
+        },
+        {
+            "type": "emoji",
+            "word": "refuge",
+            "occurrence": 1,
+            "emoji": "⛺"
+        },
+        {
+            "type": "emoji",
+            "word": "strength",
+            "occurrence": 1,
+            "emoji": "💪"
+        },
+        {
+            "type": "underscore",
+            "word": "present",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "help",
+            "occurrence": 1,
+            "emoji": "🤝"
+        },
+        {
+            "type": "emoji",
+            "word": "trouble",
+            "occurrence": 1,
+            "emoji": "😟"
+        }
+    ]
+}

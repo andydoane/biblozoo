@@ -1,0 +1,62 @@
+{
+    "biblopet": "🌈",
+    "biblopetDefaultName": "Pebble",
+    "biblopetFeetFromBottom": "3.8%",
+    "verseId": "joshua_1_9",
+    "ref": "Joshua 1:9",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Have I not commanded you?",
+        "Be strong and courageous",
+        "Do not be frightened",
+        "and do not be dismayed",
+        "for the Lord your God is with you",
+        "wherever you go."
+    ],
+    "verseText": "Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go.",
+    "meaning": "Even when we face scary times, God tells us to be strong and courageous. We don't need to be scared beacause the Lord God has promised to be with us wherever we go.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "underscore",
+            "word": "commanded",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "strong",
+            "occurrence": 1,
+            "emoji": "💪"
+        },
+        {
+            "type": "emoji",
+            "word": "courageous",
+            "occurrence": 1,
+            "emoji": "🦁"
+        },
+        {
+            "type": "emoji",
+            "word": "frightened",
+            "occurrence": 1,
+            "emoji": "😨"
+        },
+        {
+            "type": "underscore",
+            "word": "dismayed",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "God",
+            "occurrence": 1,
+            "emoji": "🙏"
+        }
+    ]
+}

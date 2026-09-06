@@ -1,0 +1,62 @@
+{
+    "biblopet": "🎲",
+    "biblopetDefaultName": "Pogo",
+    "biblopetFeetFromBottom": "16.3%",
+    "verseId": "john_1_12",
+    "ref": "John 1:12",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "But to all who did receive him",
+        "who believed in his name",
+        "he gave the right",
+        "to become children of God."
+    ],
+    "verseText": "But to all who did receive him, who believed in his name, he gave the right to become children of God,",
+    "meaning": "Everyone who receives Jesus and believes in him is given the wonderful privilege of becoming one of God's children.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "receive",
+            "occurrence": 1,
+            "emoji": "🤲"
+        },
+        {
+            "type": "emoji",
+            "word": "believed",
+            "occurrence": 1,
+            "emoji": "🙏"
+        },
+        {
+            "type": "emoji",
+            "word": "name",
+            "occurrence": 1,
+            "emoji": "🏷️"
+        },
+        {
+            "type": "emoji",
+            "word": "gave",
+            "occurrence": 1,
+            "emoji": "🎁"
+        },
+        {
+            "type": "emoji",
+            "word": "right",
+            "occurrence": 1,
+            "emoji": "✅"
+        },
+        {
+            "type": "image",
+            "word": "children",
+            "occurrence": 1,
+            "image": "baby"
+        },
+        {
+            "type": "emoji",
+            "word": "God",
+            "occurrence": 1,
+            "emoji": "🙏"
+        }
+    ]
+}

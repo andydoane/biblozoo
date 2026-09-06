@@ -1,0 +1,62 @@
+{
+    "biblopet": "🎨",
+    "biblopetDefaultName": "Tumbles",
+    "biblopetFeetFromBottom": "7.4%",
+    "verseId": "philippians_4_6",
+    "ref": "Philippians 4:6",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "do not be anxious about anything",
+        "but in everything",
+        "by prayer and supplication",
+        "with thanksgiving",
+        "let your requests be made known to God."
+    ],
+    "verseText": "do not be anxious about anything, but in everything by prayer and supplication with thanksgiving let your requests be made known to God.",
+    "meaning": "Whenever we are tempted to worry, we should bring our worries to God in prayer. When we pray to God for help, we should give thanks for the many ways he cares for us.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "anxious",
+            "occurrence": 1,
+            "emoji": "😟"
+        },
+        {
+            "type": "emoji",
+            "word": "prayer",
+            "occurrence": 1,
+            "emoji": "🙏"
+        },
+        {
+            "type": "underscore",
+            "word": "supplication",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "thanksgiving",
+            "occurrence": 1,
+            "emoji": "🦃"
+        },
+        {
+            "type": "emoji",
+            "word": "requests",
+            "occurrence": 1,
+            "emoji": "📝"
+        },
+        {
+            "type": "emoji",
+            "word": "known",
+            "occurrence": 1,
+            "emoji": "🧠"
+        },
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 1,
+            "image": "god_crown"
+        }
+    ]
+}

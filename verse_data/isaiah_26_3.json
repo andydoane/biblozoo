@@ -1,0 +1,54 @@
+{
+    "biblopet": "🧁",
+    "biblopetDefaultName": "Twinkle",
+    "biblopetFeetFromBottom": "8.3%",
+    "verseId": "isaiah_26_3",
+    "ref": "Isaiah 26:3",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "You keep him in perfect peace",
+        "whose mind is stayed on you",
+        "because he trusts in you."
+    ],
+    "verseText": "You keep him in perfect peace whose mind is stayed on you, because he trusts in you.",
+    "meaning": "God gives perfect peace to those who keep their minds focused on him and trust him.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "keep",
+            "occurrence": 1,
+            "emoji": "🤲"
+        },
+        {
+            "type": "emoji",
+            "word": "perfect",
+            "occurrence": 1,
+            "emoji": "✨"
+        },
+        {
+            "type": "emoji",
+            "word": "peace",
+            "occurrence": 1,
+            "emoji": "🕊️"
+        },
+        {
+            "type": "emoji",
+            "word": "mind",
+            "occurrence": 1,
+            "emoji": "🧠"
+        },
+        {
+            "type": "underscore",
+            "word": "stayed",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "trusts",
+            "occurrence": 1,
+            "emoji": "🙏"
+        }
+    ]
+}

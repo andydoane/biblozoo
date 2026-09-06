@@ -1,0 +1,62 @@
+{
+    "biblopet": "🥨",
+    "biblopetDefaultName": "Spout",
+    "biblopetFeetFromBottom": "28.9%",
+    "verseId": "2_corinthians_5_17",
+    "ref": "2 Corinthians 5:17",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Therefore, if anyone is in Christ",
+        "he is a new creation",
+        "The old has passed away",
+        "behold, the new has come."
+    ],
+    "verseText": "Therefore, if anyone is in Christ, he is a new creation. The old has passed away; behold, the new has come.",
+    "meaning": "When we believe in person, we are made like new. Not only are our sins forgiven, God's Holy Spirit gives us power to live a brand new life",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "image",
+            "word": "Christ",
+            "occurrence": 1,
+            "image": "cross"
+        },
+        {
+            "type": "emoji",
+            "word": "new",
+            "occurrence": 1,
+            "emoji": "🆕"
+        },
+        {
+            "type": "emoji",
+            "word": "creation",
+            "occurrence": 1,
+            "emoji": "🌱"
+        },
+        {
+            "type": "emoji",
+            "word": "old",
+            "occurrence": 1,
+            "emoji": "⌛"
+        },
+        {
+            "type": "emoji",
+            "word": "passed",
+            "occurrence": 1,
+            "emoji": "🪦"
+        },
+        {
+            "type": "emoji",
+            "word": "new",
+            "occurrence": 2,
+            "emoji": "🆕"
+        },
+        {
+            "type": "emoji",
+            "word": "come",
+            "occurrence": 1,
+            "emoji": "⬇️"
+        }
+    ]
+}

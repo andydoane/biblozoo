@@ -1,0 +1,41 @@
+{
+    "biblopet": "🧸",
+    "biblopetDefaultName": "Tinker",
+    "biblopetFeetFromBottom": "13.8%",
+    "verseId": "1_peter_5_7",
+    "ref": "1 Peter 5:7",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "casting all your anxieties on him",
+        "because he cares for you."
+    ],
+    "verseText": "casting all your anxieties on him, because he cares for you.",
+    "meaning": "God invites us to give him all our worries because he truly cares for us and does not want us to carry them alone.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "casting",
+            "occurrence": 1,
+            "emoji": "🎣"
+        },
+        {
+            "type": "underscore",
+            "word": "anxieties",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "him",
+            "occurrence": 1,
+            "emoji": "🙏"
+        },
+        {
+            "type": "emoji",
+            "word": "cares",
+            "occurrence": 1,
+            "emoji": "❤️"
+        }
+    ]
+}

@@ -1,0 +1,62 @@
+{
+    "biblopet": "🔔",
+    "biblopetDefaultName": "Pickles",
+    "biblopetFeetFromBottom": "5.1%",
+    "verseId": "psalm_121_1_2",
+    "ref": "Psalm 121:1-2",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "I lift up my eyes to the hills",
+        "From where does my help come?",
+        "My help comes from the Lord",
+        "who made heaven and earth."
+    ],
+    "verseText": "I lift up my eyes to the hills. From where does my help come? My help comes from the Lord, who made heaven and earth.",
+    "meaning": "Our help comes from the Lord, the powerful God who created heaven and earth. We can look to him and trust him to care for us.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "eyes",
+            "occurrence": 1,
+            "emoji": "👀"
+        },
+        {
+            "type": "emoji",
+            "word": "hills",
+            "occurrence": 1,
+            "emoji": "⛰️"
+        },
+        {
+            "type": "emoji",
+            "word": "help",
+            "occurrence": 1,
+            "emoji": "🤝"
+        },
+        {
+            "type": "emoji",
+            "word": "help",
+            "occurrence": 2,
+            "emoji": "🤝"
+        },
+        {
+            "type": "emoji",
+            "word": "Lord",
+            "occurrence": 1,
+            "emoji": "👑"
+        },
+        {
+            "type": "emoji",
+            "word": "heaven",
+            "occurrence": 1,
+            "emoji": "☁️"
+        },
+        {
+            "type": "emoji",
+            "word": "earth",
+            "occurrence": 1,
+            "emoji": "🌍"
+        }
+    ]
+}

@@ -1,0 +1,62 @@
+{
+    "biblopet": "🥝",
+    "biblopetDefaultName": "Buttons",
+    "biblopetFeetFromBottom": "⚠️⚠️⚠️",
+    "verseId": "2_timothy_1_7",
+    "ref": "2 Timothy 1:7",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "for God gave us",
+        "a spirit not of fear",
+        "but of power",
+        "and love",
+        "and self-control."
+    ],
+    "verseText": "for God gave us a spirit not of fear but of power and love and self-control.",
+    "meaning": "God does not want his people to be ruled by fear. He gives them strength, love, and self-control to live for him.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "God",
+            "occurrence": 1,
+            "emoji": "🙏"
+        },
+        {
+            "type": "emoji",
+            "word": "gave",
+            "occurrence": 1,
+            "emoji": "🎁"
+        },
+        {
+            "type": "image",
+            "word": "spirit",
+            "occurrence": 1,
+            "image": "soul"
+        },
+        {
+            "type": "emoji",
+            "word": "fear",
+            "occurrence": 1,
+            "emoji": "😨"
+        },
+        {
+            "type": "emoji",
+            "word": "power",
+            "occurrence": 1,
+            "emoji": "💪"
+        },
+        {
+            "type": "emoji",
+            "word": "love",
+            "occurrence": 1,
+            "emoji": "❤️"
+        },
+        {
+            "type": "underscore",
+            "word": "self-control",
+            "occurrence": 1
+        }
+    ]
+}

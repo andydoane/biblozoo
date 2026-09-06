@@ -1,0 +1,50 @@
+{
+    "biblopet": "🧩",
+    "biblopetDefaultName": "Waffles",
+    "biblopetFeetFromBottom": "13.2%",
+    "verseId": "romans_12_2",
+    "ref": "Romans 12:2",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "Do not be conformed",
+        "to this world",
+        "but be transformed",
+        "by the renewal",
+        "of your mind."
+    ],
+    "verseText": "Do not be conformed to this world, but be transformed by the renewal of your mind.",
+    "meaning": "God calls us not to copy the sinful ways of the people of this world. Instead, we should let his Holy Spirit renew us, changing the way we think and act.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
+        {
+            "type": "underscore",
+            "word": "conformed",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "world",
+            "occurrence": 1,
+            "emoji": "🌍"
+        },
+        {
+            "type": "emoji",
+            "word": "transformed",
+            "occurrence": 1,
+            "emoji": "🔄️"
+        },
+        {
+            "type": "underscore",
+            "word": "renewal",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "mind",
+            "occurrence": 1,
+            "emoji": "🧠"
+        }
+    ]
+}
