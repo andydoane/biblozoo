@@ -12,20 +12,20 @@
         "in trouble."
     ],
     "verseText": "God is our refuge and strength, a very present help in trouble.",
-    "meaning": "God is a safe refuge for his people. He gives strength and help when trouble comes and is always near when we need him.",
+    "meaning": "God is our refuge. He's like a strong castle we can hide in whenever trouble comes. And whenever we cry out to him for help, he's always nearby.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         {
-            "type": "emoji",
+            "type": "image",
             "word": "God",
             "occurrence": 1,
-            "emoji": "🙏"
+            "image": "god_crown"
         },
         {
             "type": "emoji",
             "word": "refuge",
             "occurrence": 1,
-            "emoji": "⛺"
+            "emoji": "🏰"
         },
         {
             "type": "emoji",
@@ -48,7 +48,7 @@
             "type": "emoji",
             "word": "trouble",
             "occurrence": 1,
-            "emoji": "😟"
+            "emoji": "😧"
         }
     ]
 }
