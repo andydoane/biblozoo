@@ -12,7 +12,7 @@
         "because he trusts in you."
     ],
     "verseText": "You keep him in perfect peace whose mind is stayed on you, because he trusts in you.",
-    "meaning": "God gives perfect peace to those who keep their minds focused on him and trust him.",
+    "meaning": "Keeping our minds 'stayed' on God means to keep our thoughts focused on who he is, what he's done, and what he wants us to do. When we do this, we can enjoy peace, even in times of trouble.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         {
@@ -25,13 +25,13 @@
             "type": "emoji",
             "word": "perfect",
             "occurrence": 1,
-            "emoji": "✨"
+            "emoji": "🌟"
         },
         {
             "type": "emoji",
             "word": "peace",
             "occurrence": 1,
-            "emoji": "🕊️"
+            "emoji": "✌️"
         },
         {
             "type": "emoji",
@@ -45,10 +45,9 @@
             "occurrence": 1
         },
         {
-            "type": "emoji",
+            "type": "underscore",
             "word": "trusts",
-            "occurrence": 1,
-            "emoji": "🙏"
+            "occurrence": 1
         }
     ]
 }
