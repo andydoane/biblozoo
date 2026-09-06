@@ -7,11 +7,12 @@
     "published": true,
     "translation": "ESV",
     "echoParts": [
-        "casting all your anxieties on him",
+        "Casting all your anxieties",
+        "on him",
         "because he cares for you."
     ],
     "verseText": "casting all your anxieties on him, because he cares for you.",
-    "meaning": "God invites us to give him all our worries because he truly cares for us and does not want us to carry them alone.",
+    "meaning": "Whenever something makes us feel anxious or worried, we should cast (or give) those worries to God. Like a loving Father he cares for us and helps us in times of trouble.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         {
@@ -20,22 +21,19 @@
             "occurrence": 1,
             "emoji": "🎣"
         },
+ { "type": "emoji", "word": "anxieties", "occurrence": 1, "emoji": "😧" }, 
         {
-            "type": "underscore",
-            "word": "anxieties",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
+            "type": "image",
             "word": "him",
             "occurrence": 1,
-            "emoji": "🙏"
+            "image": "god_crown"
         },
+         { "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" }, 
         {
             "type": "emoji",
             "word": "cares",
             "occurrence": 1,
-            "emoji": "❤️"
+            "emoji": "🤗"
         }
     ]
 }
