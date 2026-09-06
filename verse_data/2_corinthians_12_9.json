@@ -16,12 +16,45 @@
     "meaning": "We aren't saved by how good or powerful we are. God's grace is sufficient (enough) to save even the weakest of sinners.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
-{ "type": "emoji", "word": "said", "occurrence": 1, "emoji": "🗣️" },
-{ "type": "underscore", "word": "me", "occurrence": 1 },
-{ "type": "underscore", "word": "grace", "occurrence": 1 },
-{ "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" },
-{ "type": "emoji", "word": "power", "occurrence": 1, "emoji": "⚡" },
-{ "type": "emoji", "word": "perfect", "occurrence": 1, "emoji": "⭐" },
-{ "type": "underscore", "word": "weakness", "occurrence": 1 }
+        {
+            "type": "emoji",
+            "word": "said",
+            "occurrence": 1,
+            "emoji": "🗣️"
+        },
+        {
+            "type": "underscore",
+            "word": "me",
+            "occurrence": 1
+        },
+        {
+            "type": "underscore",
+            "word": "grace",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "you",
+            "occurrence": 1,
+            "emoji": "🫵"
+        },
+        {
+            "type": "emoji",
+            "word": "power",
+            "occurrence": 1,
+            "emoji": "⚡"
+        },
+        {
+            "type": "emoji",
+            "word": "perfect",
+            "occurrence": 1,
+            "emoji": "🌟"
+        },
+        {
+            "type": "emoji",
+            "word": "weakness",
+            "occurrence": 1,
+            "emoji": "🥴"
+        }
     ]
 }
