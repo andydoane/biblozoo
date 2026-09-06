@@ -7,8 +7,8 @@
     "published": true,
     "translation": "ESV",
     "echoParts": [
-        "Come to me",
-        "all who labor and are heavy laden",
+        "Come to me all who labor",
+        "and are heavy laden",
         "and I will give you rest",
         "Take my yoke upon you",
         "and learn from me",
@@ -16,7 +16,7 @@
         "and you will find rest for your souls."
     ],
     "verseText": "Come to me, all who labor and are heavy laden, and I will give you rest. Take my yoke upon you, and learn from me, for I am gentle and lowly in heart, and you will find rest for your souls.",
-    "meaning": "Jesus invites tired and burdened people to come to him. He gives true rest, teaches us gently, and cares for our souls.",
+    "meaning": "We can never work our way to heaven by being good. Instead, we can rest in Jesus, trusting that he did the work for us. Because he died for our sins and rose again, we can enjoy forever rest in God's kingdom.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         {
@@ -49,10 +49,9 @@
             "occurrence": 1
         },
         {
-            "type": "emoji",
+            "type": "underscore",
             "word": "gentle",
-            "occurrence": 1,
-            "emoji": "😊"
+            "occurrence": 1
         },
         {
             "type": "image",
