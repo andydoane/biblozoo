@@ -13,7 +13,7 @@
         "who made heaven and earth."
     ],
     "verseText": "I lift up my eyes to the hills. From where does my help come? My help comes from the Lord, who made heaven and earth.",
-    "meaning": "Our help comes from the Lord, the powerful God who created heaven and earth. We can look to him and trust him to care for us.",
+    "meaning":"When hard times come, we can look up to God for help. Since He made the whole world, He is strong enough to fix any problem!",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         {
@@ -41,10 +41,10 @@
             "emoji": "🤝"
         },
         {
-            "type": "emoji",
+            "type": "image",
             "word": "Lord",
             "occurrence": 1,
-            "emoji": "👑"
+            "image": "god_crow "
         },
         {
             "type": "emoji",
