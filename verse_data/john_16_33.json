@@ -1,0 +1,62 @@
+{
+    "biblopet": "🪻",
+    "biblopetDefaultName": "Scooter",
+    "biblopetFeetFromBottom": "7.8%",
+    "verseId": "john_16_33.json",
+    "ref": "John 16:33",
+    "published": true,
+    "translation": "ESV",
+    "echoParts": [
+        "I have said these things to you",
+        "that in me you may have peace.",
+        "In the world you will have tribulation.",
+        "But take heart",
+        "I have overcome the world."
+    ],
+    "verseText": "I have said these things to you, that in me you may have peace. In the world you will have tribulation. But take heart; I have overcome the world.",
+    "meaning": "Jesus promised that his disciples would face tribulations (times of trouble) in this world. But we can have peace in our hearts, knowing that Jesus has earned us a place in God's forever kingdom.",
+    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "hidePlan": [
+        {
+            "type": "emoji",
+            "word": "said",
+            "occurrence": 1,
+            "emoji": "🗣️"
+        },
+        {
+            "type": "emoji",
+            "word": "peace",
+            "occurrence": 1,
+            "emoji": "✌️"
+        },
+        {
+            "type": "emoji",
+            "word": "world",
+            "occurrence": 1,
+            "emoji": "🌍"
+        },
+        {
+            "type": "emoji",
+            "word": "tribulation",
+            "occurrence": 1,
+            "emoji": "😱"
+        },
+        {
+            "type": "emoji",
+            "word": "heart",
+            "occurrence": 1,
+            "emoji": "❤️"
+        },
+        {
+            "type": "underscore",
+            "word": "overcome",
+            "occurrence": 1
+        },
+        {
+            "type": "emoji",
+            "word": "world",
+            "occurrence": 2,
+            "emoji": "🌍"
+        }
+    ]
+}
