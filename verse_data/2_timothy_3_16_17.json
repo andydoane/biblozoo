@@ -19,7 +19,7 @@
   "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
   "hidePlan": [
     { "type": "emoji", "word": "Scripture", "occurrence": 1, "emoji": "📖" },
-    { "type": "imahe", "word": "God", "occurrence": 1, "emoji": "god_crown" },
+    { "type": "image", "word": "God", "occurrence": 1, "image": "god_crown" },
     { "type": "emoji", "word": "teaching", "occurrence": 1, "emoji": "🧑‍🏫" },
     { "type": "emoji", "word": "correction", "occurrence": 1, "emoji": "✏️" },
     { "type": "emoji", "word": "training", "occurrence": 1, "emoji": "🏋️" },
