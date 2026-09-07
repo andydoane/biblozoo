@@ -15,7 +15,7 @@
         "wherever you go."
     ],
     "verseText": "Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go.",
-    "meaning": "Even when we face scary times, God tells us to be strong and courageous. We don't need to be scared beacause the Lord God has promised to be with us wherever we go.",
+    "meaning": "Even when we face scary times, God tells us to be strong and courageous. We don't need to be scared because the Lord God has promised to be with us wherever we go.",
     "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
     "hidePlan": [
         { "type": "image", "word": "commanded", "occurrence": 1, "image": "tablet" }, 
@@ -46,6 +46,7 @@
             "type": "underscore",
             "word": "Lord",
             "occurrence": 1
+        },
         {
             "type": "image",
             "word": "God",
