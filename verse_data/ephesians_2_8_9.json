@@ -20,7 +20,7 @@
   "hidePlan": [
     { "type": "emoji", "word": "grace", "occurrence": 1, "emoji": "💝" },
     { "type": "emoji", "word": "saved", "occurrence": 1, "emoji": "🛟" },
-    { "type": "underscore", "word": "faith", "occurrence": 1" },
+    { "type": "underscore", "word": "faith", "occurrence": 1},
     { "type": "emoji", "word": "gift", "occurrence": 1, "emoji": "🎁" },
     { "type": "image", "word": "God", "occurrence": 1, "image": "god_crown" },
     { "type": "emoji", "word": "works", "occurrence": 1, "emoji": "🛠️" },
