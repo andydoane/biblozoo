@@ -1531,7 +1531,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
       entry.unit.classList.toggle(
         "is-vanish",
-        item.vanishUntil > now
+        item.vanishUntil > now ||
+        !!item.removeAt
       );
     }
 
@@ -2785,14 +2786,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       item.flashWrongUntil = performance.now() + 280;
       state.buildShakeUntil = performance.now() + 260;
       playGameSound("wrongTap");
-      addPopup(x, y, "✖", false);
       crashRoad(item.road, item.id);
       return;
     }
 
     playGameSound("correctTap");
     playZoomSound();
-    addPopup(x, y, "✔", true);
     state.buildPopUntil = performance.now() + 200;
     startSuccessLaunch(item);
 

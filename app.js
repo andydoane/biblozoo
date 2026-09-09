@@ -10367,7 +10367,8 @@ function screenProfileWelcome(idx) {
           "(prefers-reduced-motion: reduce)"
         )?.matches;
 
-      const holdMs = reduceMotion ? 250 : 950;
+      // Tweak this if you want to shorten or lengthen the splash display time
+      const holdMs = reduceMotion ? 250 : 1600;
       const fadeMs = reduceMotion ? 0 : 420;
 
       State.profileWelcomeTimer = setTimeout(() => {
