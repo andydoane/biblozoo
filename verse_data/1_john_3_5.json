@@ -21,7 +21,7 @@
     { "type": "emoji", "word": "sin", "occurrence": 1, "emoji": "👎" },
     { "type": "emoji", "word": "no", "occurrence": 1, "emoji": "🚫" },
     { "type": "underscore", "word": "order", "occurrence": 1 },
-    { "type": "underscore", "word": "appeared", "occurrence": 1 },
+    { "type": "emoji", "word": "appeared", "occurrence": 1, "emoji": "👀" },
     { "type": "underscore", "word": "away", "occurrence": 1 }
   ]
 }

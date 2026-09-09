@@ -24,7 +24,7 @@
     { "type": "emoji", "word": "buried", "occurrence": 1, "emoji": "🪦" },
     { "type": "emoji", "word": "raised", "occurrence": 1, "emoji": "⬆️" },
     { "type": "emoji", "word": "third", "occurrence": 1, "emoji": "3️⃣" },
-        { "type": "underscore", "word": "accordance", "occurrence": 1 }
+    { "type": "underscore", "word": "accordance", "occurrence": 1 }
   ]
 }
 

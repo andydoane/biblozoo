@@ -20,7 +20,7 @@
     { "type": "emoji", "word": "God's", "occurrence": 1, "emoji": "👑" },
     { "type": "emoji", "word": "temple", "occurrence": 1, "emoji": "🏛️" },
     { "type": "emoji", "word": "God's", "occurrence": 2, "emoji": "👑" },
-  { "type": "image", "word": "Spirit", "occurrence": 1, "image": "soul" },
+    { "type": "image", "word": "Spirit", "occurrence": 1, "image": "soul" },
     { "type": "emoji", "word": "dwells", "occurrence": 1, "emoji": "🏠" }
   ]
 }

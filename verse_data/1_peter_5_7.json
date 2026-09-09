@@ -21,14 +21,24 @@
             "occurrence": 1,
             "emoji": "🎣"
         },
- { "type": "emoji", "word": "anxieties", "occurrence": 1, "emoji": "😧" }, 
+        {
+            "type": "emoji",
+            "word": "anxieties",
+            "occurrence": 1,
+            "emoji": "😧"
+        },
         {
             "type": "image",
             "word": "him",
             "occurrence": 1,
             "image": "god_crown"
         },
-         { "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" }, 
+        {
+            "type": "emoji",
+            "word": "you",
+            "occurrence": 1,
+            "emoji": "🫵"
+        },
         {
             "type": "emoji",
             "word": "cares",

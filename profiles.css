@@ -47,6 +47,17 @@
   transform: scale(1.015);
 }
 
+.profile-welcome-splash-animals {
+  display: block;
+  width: min(88vw, 620px);
+  max-width: 100%;
+  height: auto;
+  margin-bottom: clamp(8px, 1.8vh, 14px);
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
 .profile-welcome-splash-text {
   margin-bottom: clamp(12px, 3vh, 24px);
   font-size: clamp(30px, 8vw, 58px);
@@ -338,6 +349,42 @@
   font-size: clamp(15px, 3.8vw, 19px);
   font-weight: 900;
   line-height: 1;
+}
+
+.profile-avatar-count-above {
+  margin: clamp(12px, 2vh, 18px) auto 0;
+}
+
+.profile-avatar-count-above + .profile-avatar-controls {
+  margin-top: clamp(8px, 1.4vh, 12px);
+}
+
+.profile-avatar-random {
+  min-width: 0;
+  min-height: 50px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 18px;
+  background: #ffc751;
+  color: #333333;
+  font: inherit;
+  font-size: clamp(17px, 4vw, 21px);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+}
+
+.profile-avatar-random:active {
+  transform: translateY(3px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.profile-avatar-random:disabled {
+  opacity: 0.35;
+  cursor: default;
+  transform: none;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.16);
 }
 
 .profile-name-label {

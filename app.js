@@ -79,6 +79,7 @@ const DEBUG_VERSE_JSON = {
 /* Pick your actual filenames in verse_images/ (safe defaults) */
 const INTRO_LOGO = IMG_DIR + "eyb_logo_1.png";
 const TITLE_LOGO = IMG_DIR + "title_biblozoo.png";
+const TITLE_ANIMALS = IMG_DIR + "title_biblozoo_animals.png";
 const TITLE_FACE_FRONT = IMG_DIR + "brain_face_front.svg";
 const TITLE_FACE_BACK = IMG_DIR + "brain_face_back.svg";
 const TITLE_BIBLE = IMG_DIR + "brain_bible.svg";
@@ -6396,14 +6397,88 @@ async function loadVerseList() {
 
     VERSE_LIST = enrichedList.filter(Boolean);
 
-    VERSE_LIST.sort((a, b) => {
-      const refA = String(a?.ref || "");
-      const refB = String(b?.ref || "");
+    const getVerseReferenceSortParts =
+      (value) => {
+        const ref =
+          String(value || "").trim();
 
-      return refA.localeCompare(refB, undefined, {
-        numeric: true,
-        sensitivity: "base"
-      });
+        /*
+          Separate a leading numbered-book prefix
+          from the actual alphabetic book name.
+
+          Examples:
+          1 Chronicles 16:11
+            -> Chronicles / 1 / 16:11
+
+          2 Timothy 3:16
+            -> Timothy / 2 / 3:16
+
+          Romans 8:28
+            -> Romans / 0 / 8:28
+        */
+        const match =
+          ref.match(
+            /^(?:(\d+)\s+)?(.+?)\s+(\d.*)$/
+          );
+
+        if (!match) {
+          return {
+            book: ref,
+            bookNumber: 0,
+            passage: ""
+          };
+        }
+
+        return {
+          book: match[2],
+          bookNumber:
+            Number(match[1] || 0),
+          passage: match[3]
+        };
+      };
+
+    VERSE_LIST.sort((a, b) => {
+      const partsA =
+        getVerseReferenceSortParts(
+          a?.ref
+        );
+
+      const partsB =
+        getVerseReferenceSortParts(
+          b?.ref
+        );
+
+      const bookCompare =
+        partsA.book.localeCompare(
+          partsB.book,
+          undefined,
+          {
+            sensitivity: "base"
+          }
+        );
+
+      if (bookCompare !== 0) {
+        return bookCompare;
+      }
+
+      if (
+        partsA.bookNumber !==
+        partsB.bookNumber
+      ) {
+        return (
+          partsA.bookNumber -
+          partsB.bookNumber
+        );
+      }
+
+      return partsA.passage.localeCompare(
+        partsB.passage,
+        undefined,
+        {
+          numeric: true,
+          sensitivity: "base"
+        }
+      );
     });
   } catch (err) {
     console.warn("Could not load verse_list.json", err);
@@ -9426,9 +9501,95 @@ function getProfileEditorAvatarVerseId() {
   );
 }
 
+let profilePictureRandomBag = [];
+
+function refillProfilePictureRandomBag() {
+  const catalog =
+    getProfilePictureCatalogForUi();
+
+  if (!catalog.length) {
+    profilePictureRandomBag = [];
+    return;
+  }
+
+  const currentIndex =
+    normalizeProfilePictureIndex();
+
+  profilePictureRandomBag =
+    catalog
+      .map((_, index) => index)
+      .filter(
+        (index) =>
+          index !== currentIndex
+      );
+
+  for (
+    let i =
+      profilePictureRandomBag.length - 1;
+    i > 0;
+    i -= 1
+  ) {
+    const j =
+      Math.floor(
+        Math.random() * (i + 1)
+      );
+
+    [
+      profilePictureRandomBag[i],
+      profilePictureRandomBag[j]
+    ] = [
+        profilePictureRandomBag[j],
+        profilePictureRandomBag[i]
+      ];
+  }
+}
+
+function selectRandomProfilePicture() {
+  const catalog =
+    getProfilePictureCatalogForUi();
+
+  if (!catalog.length) {
+    return "";
+  }
+
+  if (catalog.length === 1) {
+    setProfilePictureIndex(0);
+    State.profilePictureSelectionChanged =
+      true;
+
+    return getSelectedProfilePictureVerseId();
+  }
+
+  if (!profilePictureRandomBag.length) {
+    refillProfilePictureRandomBag();
+  }
+
+  const nextIndex =
+    profilePictureRandomBag.pop();
+
+  if (!Number.isFinite(nextIndex)) {
+    return getSelectedProfilePictureVerseId();
+  }
+
+  setProfilePictureIndex(nextIndex);
+
+  State.profilePictureSelectionChanged =
+    true;
+
+  return getSelectedProfilePictureVerseId();
+}
+
+
 function selectAdjacentProfilePicture(offset) {
   const catalog = getProfilePictureCatalogForUi();
   if (!catalog.length) return "";
+
+  /*
+    Manual arrow browsing starts a fresh Random
+    cycle from whichever picture the player
+    chooses.
+  */
+  profilePictureRandomBag = [];
 
   const numericOffset = Number(offset);
   const safeOffset =
@@ -9475,6 +9636,7 @@ function resetProfileEditorState() {
   State.profileEditorImportedProgress = null;
   State.profileEditorImportedProgressLabel = "";
   State.profilePictureIndex = 0;
+  profilePictureRandomBag = [];
 }
 
 function getProfileEditorValidation() {
@@ -10161,6 +10323,15 @@ function screenProfileWelcome(idx) {
 
   wrap.innerHTML = `
     <div class="profile-welcome-splash">
+      <img
+        class="profile-welcome-splash-animals"
+        src="${escapeHtml(TITLE_ANIMALS)}"
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+        onerror="this.style.display='none'"
+      >
+
       <div class="profile-welcome-splash-text">
         Welcome to
       </div>
@@ -10383,6 +10554,23 @@ function screenProfileEditor(idx) {
           )}
         </div>
 
+        ${
+          isAdd
+            ? `
+              <div
+                class="profile-avatar-count profile-avatar-count-above"
+                aria-live="polite"
+              >
+                ${
+                  catalog.length
+                    ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length} VERSES`
+                    : "Picture unavailable"
+                }
+              </div>
+            `
+            : ""
+        }
+
         <div
           class="profile-avatar-controls"
           aria-label="Choose a profile picture"
@@ -10397,13 +10585,31 @@ function screenProfileEditor(idx) {
             ${SVG_BACK}
           </button>
 
-          <div class="profile-avatar-count" aria-live="polite">
-            ${
-              catalog.length
-                ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length}`
-                : "Picture unavailable"
-            }
-          </div>
+          ${
+            isAdd
+              ? `
+                <button
+                  class="profile-avatar-random no-zoom"
+                  type="button"
+                  data-profile-picture-random
+                  ${arrowsDisabled ? "disabled" : ""}
+                >
+                  Random
+                </button>
+              `
+              : `
+                <div
+                  class="profile-avatar-count"
+                  aria-live="polite"
+                >
+                  ${
+                    catalog.length
+                      ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length}`
+                      : "Picture unavailable"
+                  }
+                </div>
+              `
+          }
 
           <button
             class="profile-avatar-arrow no-zoom"
@@ -10481,6 +10687,9 @@ function screenProfileEditor(idx) {
   const previousBtn = wrap.querySelector(
     "[data-profile-picture-prev]"
   );
+  const randomBtn = wrap.querySelector(
+    "[data-profile-picture-random]"
+  );
   const nextBtn = wrap.querySelector(
     "[data-profile-picture-next]"
   );
@@ -10511,6 +10720,19 @@ function screenProfileEditor(idx) {
       render();
     };
   }
+
+  if (randomBtn) {
+    randomBtn.onclick = () => {
+      if (input) {
+        State.profileEditorName =
+          input.value;
+      }
+
+      selectRandomProfilePicture();
+      render();
+    };
+  }
+
 
   if (nextBtn) {
     nextBtn.onclick = () => {
