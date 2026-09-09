@@ -11361,10 +11361,20 @@ function screenTitle(idx) {
       const learned =
         !!progress.verses?.[item.id]?.learnCompleted;
 
-      opt.textContent =
-        learned ? `✓ ${item.ref}` : item.ref;
+      const selected =
+        HAS_VERSE_SELECTION &&
+        item.id === VERSE_ID;
 
-      if (HAS_VERSE_SELECTION && item.id === VERSE_ID) {
+      const selectedMark =
+        selected ? "▶ " : "";
+
+      const learnedMark =
+        learned ? " ✔" : "";
+
+      opt.textContent =
+        `${selectedMark}${item.ref}${learnedMark}`;
+
+      if (selected) {
         opt.selected = true;
       }
 
