@@ -11365,14 +11365,11 @@ function screenTitle(idx) {
         HAS_VERSE_SELECTION &&
         item.id === VERSE_ID;
 
-      const selectedMark =
-        selected ? "▶ " : "";
-
       const learnedMark =
         learned ? " ✔" : "";
 
       opt.textContent =
-        `${selectedMark}${item.ref}${learnedMark}`;
+        `${item.ref}${learnedMark}`;
 
       if (selected) {
         opt.selected = true;
