@@ -9244,6 +9244,23 @@ function syncAppBackground(bg) {
   const concreteBg =
     getConcreteAppBackgroundColor(safeBg);
 
+  /*
+    Keep the underlying iOS/app shell black
+    throughout the Learn flow.
+
+    The individual Learn slide keeps its own
+    visible purple background. This only prevents
+    a previous screen color, especially the green
+    Zoo To-Do tutorial, from being sampled by iOS
+    for the status/safe-area region.
+  */
+  const shellBg = (
+    State.screen === Screen.LEARN_LEVEL ||
+    isLearnFlowScreen(State.screen)
+  )
+    ? "#000000"
+    : concreteBg;
+
   try {
     app?.style?.setProperty(
       "--bg",
@@ -9251,7 +9268,7 @@ function syncAppBackground(bg) {
     );
 
     app.style.backgroundColor =
-      concreteBg;
+      shellBg;
 
     document.documentElement.style.setProperty(
       "--bg",
@@ -9259,7 +9276,7 @@ function syncAppBackground(bg) {
     );
 
     document.documentElement.style.backgroundColor =
-      concreteBg;
+      shellBg;
 
     document.body.style.setProperty(
       "--bg",
@@ -9267,7 +9284,7 @@ function syncAppBackground(bg) {
     );
 
     document.body.style.backgroundColor =
-      concreteBg;
+      shellBg;
 
     /*
       Do not update <meta name="theme-color"> here.
