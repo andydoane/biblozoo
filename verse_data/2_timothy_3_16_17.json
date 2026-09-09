@@ -18,12 +18,46 @@
   "meaning": "The Bible comes from God. It helps us learn what is true, correct what is wrong, and grow in right living. By reading, believing, and following God's Word, we can be prepared for any good thing God wants us to do.",
   "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
   "hidePlan": [
-    { "type": "emoji", "word": "Scripture", "occurrence": 1, "emoji": "📖" },
-    { "type": "image", "word": "God", "occurrence": 1, "image": "god_crown" },
-    { "type": "emoji", "word": "teaching", "occurrence": 1, "emoji": "🧑‍🏫" },
-    { "type": "emoji", "word": "correction", "occurrence": 1, "emoji": "✏️" },
-    { "type": "emoji", "word": "training", "occurrence": 1, "emoji": "🏋️" },
-    { "type": "underscore", "word": "righteousness", "occurrence": 1 },
-    { "type": "emoji", "word": "equipped", "occurrence": 1, "emoji": "🧰" }
+    {
+      "type": "emoji",
+      "word": "Scripture",
+      "occurrence": 1,
+      "emoji": "📖"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "teaching",
+      "occurrence": 1,
+      "emoji": "🧑‍🏫"
+    },
+    {
+      "type": "emoji",
+      "word": "correction",
+      "occurrence": 1,
+      "emoji": "✏️"
+    },
+    {
+      "type": "emoji",
+      "word": "training",
+      "occurrence": 1,
+      "emoji": "🏋️"
+    },
+    {
+      "type": "underscore",
+      "word": "righteousness",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "equipped",
+      "occurrence": 1,
+      "emoji": "🧰"
+    }
   ]
 }

@@ -10563,7 +10563,7 @@ function screenProfileEditor(idx) {
               >
                 ${
                   catalog.length
-                    ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length} VERSES`
+                    ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length}`
                     : "Picture unavailable"
                 }
               </div>
