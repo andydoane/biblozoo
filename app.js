@@ -7277,6 +7277,63 @@ function bindLongPress(element, {
   }, true);
 }
 
+const preloadedPracticeMenuImages =
+  new Map();
+
+function preloadPracticeMenuImage(src) {
+  const safeSrc =
+    String(src || "").trim();
+
+  if (
+    !safeSrc ||
+    preloadedPracticeMenuImages.has(
+      safeSrc
+    )
+  ) {
+    return;
+  }
+
+  const img =
+    new Image();
+
+  img.decoding = "async";
+  img.src = safeSrc;
+
+  preloadedPracticeMenuImages.set(
+    safeSrc,
+    img
+  );
+
+  if (
+    typeof img.decode === "function"
+  ) {
+    img.decode().catch(() => { });
+  }
+}
+
+function preloadPracticeHubImages() {
+  [
+    IMG_DIR + "app_icon_controller.png",
+    IMG_DIR + "app_icon_slide.png"
+  ].forEach(
+    preloadPracticeMenuImage
+  );
+}
+
+function preloadPracticeListImages() {
+  const items = [
+    ...getPracticeGames(),
+    ...getPlaygroundActivities()
+  ];
+
+  items.forEach((item) => {
+    preloadPracticeMenuImage(
+      item?.iconImage
+    );
+  });
+}
+
+
 function renderPracticeCardIcon({ icon = "🎮", iconImage = "", iconAlt = "", title = "Practice Game" } = {}) {
   const safeIcon = escapeHtml(icon || "🎮");
   const safeIconImage = escapeHtml(iconImage || "");
@@ -7291,7 +7348,7 @@ function renderPracticeCardIcon({ icon = "🎮", iconImage = "", iconAlt = "", t
       class="practice-game-icon-img"
       src="${safeIconImage}"
       alt="${safeIconAlt}"
-      loading="lazy"
+      loading="eager"
       decoding="async"
       draggable="false"
       onerror="this.hidden=true; this.nextElementSibling.hidden=false;"
@@ -7695,6 +7752,45 @@ function go(nextScreen) {
         State.transitionFromIdx = null;
         State.transitionToIdx = null;
         State.forceSlideForward = false;
+
+        /*
+          Practice menu screens are already fully
+          rendered in their arrived position.
+
+          Keep that existing DOM instead of
+          destroying and recreating it after the
+          slide animation. Rebuilding these screens
+          can make WebKit briefly repaint/redecode
+          their card images.
+        */
+        const keepArrivedPracticeScreen =
+          nextScreen ===
+            Screen.PRACTICE_HUB ||
+          nextScreen ===
+            Screen.PRACTICE ||
+          nextScreen ===
+            Screen.PLAYGROUND;
+
+        if (keepArrivedPracticeScreen) {
+          const outgoingSlide =
+            Array.from(
+              app.children
+            ).find(
+              (child) =>
+                child.classList.contains(
+                  "slide"
+                ) &&
+                Number(
+                  child.dataset.idx
+                ) === fromIdx
+            );
+
+          outgoingSlide?.remove();
+
+          renderNav();
+          return;
+        }
+
         render();
       }, 340);
     });
@@ -11108,6 +11204,8 @@ function screenTitleSequence(idx) {
 }
 
 function screenTitle(idx) {
+  preloadPracticeHubImages();
+
   const wrap = document.createElement("div");
   wrap.className = "title-screen";
   const tutorialActive = isTutorialActive();
@@ -14251,6 +14349,9 @@ function screenPracticeGate(idx) {
 }
 
 function screenPracticeHub(idx) {
+  preloadPracticeHubImages();
+  preloadPracticeListImages();
+
   const wrap = document.createElement("div");
   wrap.className = "title-screen practice-screen";
 
