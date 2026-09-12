@@ -58,6 +58,9 @@ const REQUIRE_STANDALONE_PWA = true;
 const BROWSER_VERSION_URL =
   "https://andydoane.github.io/eatyourbible/pwa/verse";
 
+const BIBLOZOO_INSTALL_URL =
+  "https://andydoane.github.io/biblozoo";
+
 const DEBUG_VERSE_JSON = {
   "verseId": "john_3_16",
   "translation": "ESV",
@@ -15168,6 +15171,89 @@ function renderInstallGate() {
   }
 }
 
+async function copyBibloZooInstallUrl(button) {
+  let copied = false;
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(
+        BIBLOZOO_INSTALL_URL
+      );
+
+      copied = true;
+    }
+  } catch (err) {
+    console.warn(
+      "Could not use Clipboard API for BibloZoo URL",
+      err
+    );
+  }
+
+  /*
+    Fallback for browsers/WebKit versions where the
+    modern Clipboard API is unavailable or blocked.
+  */
+  if (!copied) {
+    const textarea =
+      document.createElement("textarea");
+
+    textarea.value =
+      BIBLOZOO_INSTALL_URL;
+
+    textarea.setAttribute(
+      "readonly",
+      ""
+    );
+
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    textarea.style.fontSize = "16px";
+
+    document.body.appendChild(
+      textarea
+    );
+
+    textarea.focus();
+    textarea.select();
+
+    textarea.setSelectionRange(
+      0,
+      textarea.value.length
+    );
+
+    try {
+      copied =
+        document.execCommand("copy");
+    } catch (err) {
+      console.warn(
+        "Could not copy BibloZoo URL",
+        err
+      );
+    }
+
+    textarea.remove();
+  }
+
+  if (!button) return;
+
+  const originalLabel =
+    "Copy BibloZoo URL";
+
+  button.textContent =
+    copied
+      ? "Copied!"
+      : "Copy failed";
+
+  window.setTimeout(() => {
+    if (button.isConnected) {
+      button.textContent =
+        originalLabel;
+    }
+  }, 1600);
+}
+
+
 function renderInstallInstructions(
   platform
 ) {
@@ -15191,8 +15277,10 @@ function renderInstallInstructions(
           class="install-gate-back install-gate-back-top no-zoom"
           type="button"
           data-install-back
+          aria-label="Back"
+          title="Back"
         >
-          ← Back
+          ${SVG_BACK}
         </button>
 
         <img
@@ -15215,8 +15303,24 @@ function renderInstallInstructions(
                       ${index + 1}.
                     </div>
 
-                    <div class="install-gate-step-text">
-                      ${step}
+                    <div class="install-gate-step-content">
+                      <div class="install-gate-step-text">
+                        ${step}
+                      </div>
+
+                      ${
+                        /^Open BibloZoo in /i.test(step)
+                          ? `
+                              <button
+                                class="install-gate-copy-url no-zoom"
+                                type="button"
+                                data-copy-biblozoo-url
+                              >
+                                Copy BibloZoo URL
+                              </button>
+                            `
+                          : ""
+                      }
                     </div>
                   </div>
                 `
@@ -15236,6 +15340,19 @@ function renderInstallInstructions(
       </main>
     </div>
   `;
+
+  app
+    .querySelectorAll(
+      "[data-copy-biblozoo-url]"
+    )
+    .forEach((button) => {
+      button.onclick = () => {
+        copyBibloZooInstallUrl(
+          button
+        );
+      };
+    });
+
 
   app
     .querySelectorAll(
