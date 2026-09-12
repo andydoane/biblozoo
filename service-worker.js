@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Sep_08_a";
+const CACHE_VERSION = "2026_Sep_11_install_gate_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -52,6 +52,12 @@ const CORE_PATHS = [
   "./verse_images/title_biblozoo.png",
   "./verse_images/title_biblozoo_animals.png",
   "./verse_images/settings_gear.png",
+
+  "./verse_images/icon_apple.png",
+  "./verse_images/icon_android.png",
+  "./verse_images/icon_windows.png",
+  "./verse_images/icon_browser.png",
+
 
   "./android-chrome-192x192.png",
   "./android-chrome-512x512.png",

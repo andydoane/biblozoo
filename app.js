@@ -51,6 +51,13 @@ const DEBUG_MODE = false;
 // Temporary: set to false to bring back the “Let’s Memorize God’s Word!” animation screen.
 const SKIP_TITLE_SEQUENCE = true;
 
+// Master switch for the browser/install gate.
+// Set to false to let BibloZoo run in an ordinary browser tab.
+const REQUIRE_STANDALONE_PWA = true;
+
+const BROWSER_VERSION_URL =
+  "https://andydoane.github.io/eatyourbible/pwa/verse";
+
 const DEBUG_VERSE_JSON = {
   "verseId": "john_3_16",
   "translation": "ESV",
@@ -14815,10 +14822,445 @@ function setupAppUiTapSounds() {
 }
 
 /* =========================
+   Standalone PWA Install Gate
+   ========================= */
+
+function isRunningStandalonePwa() {
+  const standaloneDisplayMode =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(
+      "(display-mode: standalone)"
+    ).matches;
+
+  const fullscreenDisplayMode =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(
+      "(display-mode: fullscreen)"
+    ).matches;
+
+  const iosStandalone =
+    window.navigator.standalone === true;
+
+  return (
+    standaloneDisplayMode ||
+    fullscreenDisplayMode ||
+    iosStandalone
+  );
+}
+
+function detectInstallPlatform() {
+  const ua =
+    navigator.userAgent || "";
+
+  const platform =
+    navigator.userAgentData?.platform ||
+    navigator.platform ||
+    "";
+
+  const maxTouchPoints =
+    navigator.maxTouchPoints || 0;
+
+  /*
+    Modern iPadOS may identify itself as a Mac.
+    Touch support lets us distinguish an iPad from
+    an actual Mac before checking macOS below.
+  */
+  const isIPadOS =
+    /^Mac/i.test(platform) &&
+    maxTouchPoints > 1;
+
+  if (
+    /iPhone|iPad|iPod/i.test(ua) ||
+    isIPadOS
+  ) {
+    return "ios";
+  }
+
+  if (/Android/i.test(ua)) {
+    return "android";
+  }
+
+  if (
+    /Windows/i.test(ua) ||
+    /^Win/i.test(platform) ||
+    /Windows/i.test(platform)
+  ) {
+    return "windows";
+  }
+
+  if (
+    /Macintosh|Mac OS X/i.test(ua) ||
+    /^Mac/i.test(platform) ||
+    /macOS/i.test(platform)
+  ) {
+    return "macos";
+  }
+
+  return "unknown";
+}
+
+function getInstallPlatformData(platform) {
+  const platformData = {
+    ios: {
+      icon:
+        `${IMG_DIR}icon_apple.png`,
+      buttonLabel:
+        "Install on iPhone / iPad",
+      title:
+        "Install on iPhone / iPad",
+      alreadyInstalled:
+        "Open BibloZoo from your Home Screen.",
+      steps: [
+        "Open BibloZoo in Safari.",
+        "Tap the Share button — the square with an arrow pointing up. If you don’t see it, tap More first, then tap Share.",
+        "Choose Add to Home Screen. You may need to tap More or scroll through the Share menu to find it.",
+        "Turn on Open as Web App, then tap Add.",
+        "Return to your Home Screen and open BibloZoo."
+      ]
+    },
+
+    android: {
+      icon:
+        `${IMG_DIR}icon_android.png`,
+      buttonLabel:
+        "Install on Android",
+      title:
+        "Install on Android",
+      alreadyInstalled:
+        "Open BibloZoo from your Home Screen.",
+      steps: [
+        "Open BibloZoo in Google Chrome.",
+        "Tap the three-dot menu next to the address bar.",
+        "Choose the option to install BibloZoo. It may be called Install and create shortcut, Install app, or Add to Home screen.",
+        "Tap Install and follow the prompts.",
+        "Return to your Home Screen and open BibloZoo."
+      ]
+    },
+
+    windows: {
+      icon:
+        `${IMG_DIR}icon_windows.png`,
+      buttonLabel:
+        "Install on Windows",
+      title:
+        "Install on Windows",
+      alreadyInstalled:
+        "Open BibloZoo from the Start menu or taskbar.",
+      steps: [
+        "Open BibloZoo in Microsoft Edge.",
+        "Look for the Install App button in the address bar and click it.",
+        "If you don’t see it, open the three-dot menu and choose More tools → Apps → Install this site as an app.",
+        "Click Install.",
+        "Open BibloZoo from the Start menu or taskbar."
+      ]
+    },
+
+    macos: {
+      icon:
+        `${IMG_DIR}icon_apple.png`,
+      buttonLabel:
+        "Install on Mac",
+      title:
+        "Install on Mac",
+      alreadyInstalled:
+        "Open BibloZoo from the Dock or Spotlight.",
+      steps: [
+        "Open BibloZoo in Safari.",
+        "Click the Share button in the Safari toolbar.",
+        "Choose Add to Dock.",
+        "Click Add.",
+        "Open BibloZoo from your Dock or Spotlight."
+      ]
+    }
+  };
+
+  return platformData[platform] || null;
+}
+
+function prepareInstallGateShell() {
+  const themeColor =
+    document.querySelector(
+      'meta[name="theme-color"]'
+    );
+
+  if (themeColor) {
+    themeColor.setAttribute(
+      "content",
+      "#7f66c6"
+    );
+  }
+
+  document.documentElement.classList.add(
+    "install-gate-mode"
+  );
+
+  document.body.classList.add(
+    "install-gate-mode"
+  );
+
+  app.classList.add(
+    "install-gate-mode"
+  );
+
+  navBar.style.display = "none";
+  navBar.innerHTML = "";
+}
+
+function installGatePlatformCardHtml(
+  platform
+) {
+  const data =
+    getInstallPlatformData(platform);
+
+  if (!data) return "";
+
+  return `
+    <button
+      class="install-gate-card no-zoom"
+      type="button"
+      data-install-platform="${platform}"
+      aria-label="${data.buttonLabel}"
+    >
+      <img
+        class="install-gate-card-icon"
+        src="${data.icon}"
+        alt=""
+        draggable="false"
+      >
+
+      <span class="install-gate-card-copy">
+        <span>${data.buttonLabel}</span>
+      </span>
+    </button>
+  `;
+}
+
+function renderInstallGate() {
+  prepareInstallGateShell();
+
+  const detectedPlatform =
+    detectInstallPlatform();
+
+  /*
+    Normally only the detected platform is shown.
+
+    If detection genuinely fails, show all choices
+    rather than preventing the user from installing.
+  */
+  const platformKeys =
+    detectedPlatform === "unknown"
+      ? [
+        "ios",
+        "android",
+        "windows",
+        "macos"
+      ]
+      : [detectedPlatform];
+
+  const detectedData =
+    getInstallPlatformData(
+      detectedPlatform
+    );
+
+  const alreadyInstalledText =
+    detectedData?.alreadyInstalled ||
+    "Open BibloZoo from the app icon you installed on your device.";
+
+  app.innerHTML = `
+    <div class="install-gate-root">
+      <main class="install-gate-page">
+
+        <img
+          class="install-gate-logo"
+          src="${TITLE_LOGO}"
+          alt="BibloZoo"
+          draggable="false"
+        >
+
+        <section class="install-gate-intro-card">
+          <p>
+            BibloZoo works best when installed on your device.
+          </p>
+
+          <p>
+            Install BibloZoo to get the full app experience.
+          </p>
+        </section>
+
+        ${detectedPlatform === "unknown"
+      ? `
+              <div class="install-gate-unknown-note">
+                Choose your device:
+              </div>
+            `
+      : ""
+    }
+
+        <div class="install-gate-actions">
+          ${platformKeys
+      .map(
+        installGatePlatformCardHtml
+      )
+      .join("")
+    }
+
+          <button
+            class="install-gate-card no-zoom"
+            id="installGateBrowserButton"
+            type="button"
+          >
+            <img
+              class="install-gate-card-icon"
+              src="${IMG_DIR}icon_browser.png"
+              alt=""
+              draggable="false"
+            >
+
+            <span class="install-gate-card-copy">
+              <span>
+                Use Browser Version
+              </span>
+
+              <small>
+                Fewer features
+              </small>
+            </span>
+          </button>
+        </div>
+
+        <section class="install-gate-already-card">
+          <div class="install-gate-already-title">
+            Already installed?
+          </div>
+
+          <div>
+            ${alreadyInstalledText}
+          </div>
+        </section>
+
+      </main>
+    </div>
+  `;
+
+  app
+    .querySelectorAll(
+      "[data-install-platform]"
+    )
+    .forEach((button) => {
+      button.onclick = () => {
+        renderInstallInstructions(
+          button.dataset.installPlatform
+        );
+      };
+    });
+
+  const browserButton =
+    document.getElementById(
+      "installGateBrowserButton"
+    );
+
+  if (browserButton) {
+    browserButton.onclick = () => {
+      window.location.assign(
+        BROWSER_VERSION_URL
+      );
+    };
+  }
+}
+
+function renderInstallInstructions(
+  platform
+) {
+  const data =
+    getInstallPlatformData(platform);
+
+  if (!data) {
+    renderInstallGate();
+    return;
+  }
+
+  prepareInstallGateShell();
+
+  app.innerHTML = `
+    <div class="install-gate-root">
+      <main
+        class="install-gate-page install-gate-detail-page"
+      >
+
+        <button
+          class="install-gate-back install-gate-back-top no-zoom"
+          type="button"
+          data-install-back
+        >
+          ← Back
+        </button>
+
+        <img
+          class="install-gate-detail-icon"
+          src="${data.icon}"
+          alt=""
+          draggable="false"
+        >
+
+        <div class="install-gate-detail-title">
+          ${data.title}
+        </div>
+
+        <div class="install-gate-steps">
+          ${data.steps
+      .map(
+        (step, index) => `
+                  <div class="install-gate-step">
+                    <div class="install-gate-step-number">
+                      ${index + 1}.
+                    </div>
+
+                    <div class="install-gate-step-text">
+                      ${step}
+                    </div>
+                  </div>
+                `
+      )
+      .join("")
+    }
+        </div>
+
+        <button
+          class="install-gate-back install-gate-back-bottom no-zoom"
+          type="button"
+          data-install-back
+        >
+          Back
+        </button>
+
+      </main>
+    </div>
+  `;
+
+  app
+    .querySelectorAll(
+      "[data-install-back]"
+    )
+    .forEach((button) => {
+      button.onclick = () => {
+        renderInstallGate();
+      };
+    });
+}
+
+/* =========================
    8. App Bootstrap
    ========================= */
 
 (async function init() {
+  if (
+    REQUIRE_STANDALONE_PWA &&
+    !isRunningStandalonePwa()
+  ) {
+    renderInstallGate();
+    return;
+  }
+
   preloadLearnInstructionImages();
   preloadZooTodoChromeImages();
   loadPetNameBlocklist();
