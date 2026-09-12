@@ -14951,7 +14951,7 @@ function getInstallPlatformData(platform) {
         "Open BibloZoo from the Start menu or taskbar.",
       steps: [
         "Open BibloZoo in Microsoft Edge.",
-        "Look for the Install App button in the address bar and click it.",
+        "Look for the Install App button (usually at the right end of the address bar) and click it.",
         "If you don’t see it, open the three-dot menu and choose More tools → Apps → Install this site as an app.",
         "Click Install.",
         "Open BibloZoo from the Start menu or taskbar."
