@@ -54,6 +54,8 @@ const SKIP_TITLE_SEQUENCE = true;
 // Master switch for the browser/install gate.
 // Set to false to let BibloZoo run in an ordinary browser tab.
 const REQUIRE_STANDALONE_PWA = true;
+const IS_NATIVE_CAPACITOR =
+  !!window.Capacitor?.isNativePlatform?.();
 
 const BROWSER_VERSION_URL =
   "https://andydoane.github.io/eatyourbible/pwa/verse";
@@ -15372,6 +15374,7 @@ function renderInstallInstructions(
 (async function init() {
   if (
     REQUIRE_STANDALONE_PWA &&
+    !IS_NATIVE_CAPACITOR &&
     !isRunningStandalonePwa()
   ) {
     renderInstallGate();
