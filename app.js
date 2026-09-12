@@ -14915,10 +14915,10 @@ function getInstallPlatformData(platform) {
         "Open BibloZoo from your Home Screen.",
       steps: [
         "Open BibloZoo in Safari.",
-        "Tap the Share button — the square with an arrow pointing up. If you don’t see it, tap More first, then tap Share.",
+        "Tap the Share button — the square with an arrow pointing up. If you don’t see it, try tapping the button with the three dots at the bottom of the screen.",
         "Choose Add to Home Screen. You may need to tap More or scroll through the Share menu to find it.",
         "Turn on Open as Web App, then tap Add.",
-        "Return to your Home Screen and open BibloZoo."
+        "Return to your Home Screen. You should see an icon forBibloZoo."
       ]
     },
 
