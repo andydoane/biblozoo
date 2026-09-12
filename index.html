@@ -60,7 +60,13 @@
 <script src="verse_playground/registry.js"></script>
 
 <script>
-  if ("serviceWorker" in navigator) {
+    const isNativeCapacitor =
+    !!window.Capacitor?.isNativePlatform?.();
+
+  if (
+    !isNativeCapacitor &&
+    "serviceWorker" in navigator
+  ) {
     window.addEventListener("load", () => {
       navigator.serviceWorker
         .register("./service-worker.js", {
