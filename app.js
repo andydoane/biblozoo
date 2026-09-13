@@ -1077,7 +1077,24 @@ function preloadUiTapSoundBuffers() {
 }
 
 async function unlockAppAudio() {
-  if (appAudioUnlocked) return true;
+  const existingCtx = getAppAudioContext();
+
+  if (
+    appAudioUnlocked &&
+    existingCtx &&
+    existingCtx.state === "running"
+  ) {
+    return true;
+  }
+
+  if (
+    appAudioUnlocked &&
+    existingCtx &&
+    existingCtx.state !== "running"
+  ) {
+    appAudioUnlocked = false;
+  }
+
   if (appAudioUnlockPromise) return appAudioUnlockPromise;
 
   appAudioUnlockPromise = (async () => {
@@ -14829,11 +14846,17 @@ function setupAppUiTapSounds() {
       ctx.resume().catch(() => { });
     }
 
-    unlockAppAudio();
+    const unlockPromise = unlockAppAudio();
     preloadUiTapSoundBuffers();
 
     if (uiTapBuffers.length) {
-      playUiTapSound({ force: true });
+      void unlockPromise.then((unlocked) => {
+        if (unlocked) {
+          playUiTapSound({ force: true });
+        } else {
+          playUiTapFallbackNow();
+        }
+      });
     } else {
       playUiTapFallbackNow();
     }
