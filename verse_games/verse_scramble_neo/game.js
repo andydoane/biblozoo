@@ -846,7 +846,18 @@
 
     const promise = fetch(url)
       .then(response => {
-        if (!response.ok) throw new Error(`Unable to load UI sound: ${key}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Unable to load UI sound: ${key}`
+          );
+        }
         return response.arrayBuffer();
       })
       .then(arrayBuffer => {

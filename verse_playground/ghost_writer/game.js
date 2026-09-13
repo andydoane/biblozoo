@@ -885,7 +885,14 @@
         try {
           const response = await fetch(src, { cache: "force-cache" });
 
-          if (!response.ok) {
+          const isCapacitorLocalResponse =
+            window.location.protocol === "capacitor:" &&
+            response.status === 0;
+
+          if (
+            !response.ok &&
+            !isCapacitorLocalResponse
+          ) {
             throw new Error(`HTTP ${response.status}`);
           }
 

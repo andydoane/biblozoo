@@ -397,7 +397,18 @@
 
     zoomAudioLoadPromise = fetch(ZOOM_AUDIO_FILE)
       .then(response => {
-        if (!response.ok) throw new Error(`Could not load ${ZOOM_AUDIO_FILE}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Could not load ${ZOOM_AUDIO_FILE}`
+          );
+        }
         return response.arrayBuffer();
       })
       .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
@@ -461,7 +472,16 @@
 
     const promise = fetch(src)
       .then(response => {
-        if (!response.ok) throw new Error(`Could not load ${src}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(`Could not load ${src}`);
+        }
         return response.arrayBuffer();
       })
       .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
