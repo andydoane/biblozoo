@@ -1041,7 +1041,17 @@ function preloadUiTapSoundBuffers() {
       UI_TAP_SOUND_FILES.map(async (src) => {
         try {
           const res = await fetch(src, { cache: "force-cache" });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          const isCapacitorLocalResponse =
+            IS_NATIVE_CAPACITOR &&
+            res.status === 0;
+
+          if (
+            !res.ok &&
+            !isCapacitorLocalResponse
+          ) {
+            throw new Error(`HTTP ${res.status}`);
+          }
 
           const arrayBuffer = await res.arrayBuffer();
           return await decodeAudioDataCompat(ctx, arrayBuffer);
@@ -14768,6 +14778,10 @@ function getUiTapSoundTarget(eventTarget) {
 function setupAppUiTapSounds() {
   if (appUiTapSoundsBound) return;
   appUiTapSoundsBound = true;
+
+  // Start preparing the real MP3 tap sounds before
+  // the user's first interaction.
+  void preloadUiTapSoundBuffers();
 
   function handleUiTapGesture(event) {
     if (event.button !== undefined && event.button !== 0) return;

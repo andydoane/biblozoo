@@ -192,6 +192,8 @@
   let lastFoodSliceTouchEnd = 0;
   let endScreenUnlockTimer = 0;
 
+
+
   const state = {
     running: false,
     paused: false,
@@ -251,6 +253,7 @@
 
   state.wordEntries = state.buildData.words.map((word) => ({ display: word }));
   state.buildSizeClass = state.buildData.buildSizeClass;
+
 
   renderIntro();
 
@@ -2388,7 +2391,19 @@
 
     const promise = fetch(src)
       .then(response => {
-        if (!response.ok) throw new Error(`Unable to load sound: ${src}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Unable to load sound: ${src}`
+          );
+        }
+
         return response.arrayBuffer();
       })
       .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
