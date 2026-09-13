@@ -63,6 +63,122 @@ const BROWSER_VERSION_URL =
 const BIBLOZOO_INSTALL_URL =
   "https://andydoane.github.io/biblozoo";
 
+const APP_PAGE_TRANSITION_MS = 300;
+let appPageTransitionStarted = false;
+
+
+function getAppPageTransitionDelayMs() {
+  try {
+    return window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+      ? 0
+      : APP_PAGE_TRANSITION_MS;
+  } catch (err) {
+    return APP_PAGE_TRANSITION_MS;
+  }
+}
+
+function setAppPageTransitionChromeBlack(isBlack) {
+  const elements = [
+    document.documentElement,
+    document.body
+  ];
+
+  for (const element of elements) {
+    element.classList.toggle(
+      "page-transition-chrome-black",
+      isBlack
+    );
+  }
+}
+
+function revealAppPageWhenReady() {
+  const app = document.getElementById("app");
+  let revealed = false;
+  let observer = null;
+
+  const reveal = () => {
+    if (revealed) return;
+    revealed = true;
+
+    if (observer) {
+      observer.disconnect();
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.add(
+          "page-transition-ready"
+        );
+
+        const transitionDelay =
+          getAppPageTransitionDelayMs();
+
+        if (transitionDelay === 0) {
+          setAppPageTransitionChromeBlack(false);
+        } else {
+          window.setTimeout(() => {
+            setAppPageTransitionChromeBlack(false);
+          }, transitionDelay);
+        }
+      });
+    });
+  };
+
+  const appHasContent = () =>
+    !app ||
+    app.childElementCount > 0 ||
+    String(app.textContent || "").trim();
+
+  if (appHasContent()) {
+    reveal();
+    return;
+  }
+
+  observer = new MutationObserver(() => {
+    if (appHasContent()) {
+      reveal();
+    }
+  });
+
+  observer.observe(app, {
+    childList: true,
+    subtree: true
+  });
+
+  window.setTimeout(reveal, 1200);
+}
+
+function navigateToExternalPage(href) {
+  if (appPageTransitionStarted) return;
+
+  appPageTransitionStarted = true;
+
+  setAppPageTransitionChromeBlack(true);
+
+  const beginPageFade = () => {
+    document.body.classList.remove(
+      "page-transition-ready"
+    );
+
+    window.setTimeout(() => {
+      window.location.href = href;
+    }, getAppPageTransitionDelayMs());
+  };
+
+  if (IS_NATIVE_CAPACITOR) {
+    beginPageFade();
+  } else {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(beginPageFade);
+    });
+  }
+}
+
+setAppPageTransitionChromeBlack(true);
+revealAppPageWhenReady();
+
 const DEBUG_VERSE_JSON = {
   "verseId": "john_3_16",
   "translation": "ESV",
@@ -8019,7 +8135,9 @@ function launchExternalGame(manifest, options = {}) {
 
   appendZooTodoLaunchParams(params);
 
-  window.location.href = `${manifest.launchUrl}?${params.toString()}`;
+  navigateToExternalPage(
+  `${manifest.launchUrl}?${params.toString()}`
+);
 }
 
 function launchExternalPlaygroundActivity(manifest) {
@@ -8039,7 +8157,9 @@ function launchExternalPlaygroundActivity(manifest) {
 
   appendZooTodoLaunchParams(params);
 
-  window.location.href = `${manifest.launchUrl}?${params.toString()}`;
+  navigateToExternalPage(
+  `${manifest.launchUrl}?${params.toString()}`
+);
 }
 
 function practiceRun() {

@@ -1,5 +1,121 @@
 (function(){
   const PROFILE_PROGRESS_STORAGE_KEY_BASE = "biblozooPwaProgress";
+  const PAGE_TRANSITION_MS = 300;
+
+  let pageTransitionStarted = false;
+  
+
+  function getPageTransitionDelayMs(){
+    try {
+      return window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches
+        ? 0
+        : PAGE_TRANSITION_MS;
+    } catch (err) {
+      return PAGE_TRANSITION_MS;
+    }
+  }
+
+  function setPageTransitionChromeBlack(isBlack) {
+    const elements = [
+      document.documentElement,
+      document.body
+    ];
+
+    for (const element of elements) {
+      element.classList.toggle(
+        "page-transition-chrome-black",
+        isBlack
+      );
+    }
+  }
+
+  function revealPageWhenReady(){
+    const app = document.getElementById("app");
+    let revealed = false;
+    let observer = null;
+
+    const reveal = () => {
+      if (revealed) return;
+      revealed = true;
+
+      if (observer) {
+        observer.disconnect();
+      }
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.body.classList.add(
+            "page-transition-ready"
+          );
+
+          const transitionDelay =
+            getPageTransitionDelayMs();
+
+          if (transitionDelay === 0) {
+            setPageTransitionChromeBlack(false);
+          } else {
+            window.setTimeout(() => {
+              setPageTransitionChromeBlack(false);
+            }, transitionDelay);
+          }
+        });
+      });
+    };
+
+    const appHasContent = () =>
+      !app ||
+      app.childElementCount > 0 ||
+      String(app.textContent || "").trim();
+
+    if (appHasContent()) {
+      reveal();
+      return;
+    }
+
+    observer = new MutationObserver(() => {
+      if (appHasContent()) {
+        reveal();
+      }
+    });
+
+    observer.observe(app, {
+      childList: true,
+      subtree: true
+    });
+
+    window.setTimeout(reveal, 1200);
+  }
+
+  function navigateWithTransition(href){
+    if (pageTransitionStarted) return;
+
+    pageTransitionStarted = true;
+
+    setPageTransitionChromeBlack(true);
+
+    const beginPageFade = () => {
+      document.body.classList.remove(
+        "page-transition-ready"
+      );
+
+      window.setTimeout(() => {
+        window.location.href = href;
+      }, getPageTransitionDelayMs());
+    };
+
+    if (window.location.protocol === "capacitor:") {
+      beginPageFade();
+    } else {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(beginPageFade);
+      });
+    }
+  }
+
+  setPageTransitionChromeBlack(true);
+  revealPageWhenReady();
 
   function getParams(){
     const params = new URLSearchParams(window.location.search);
@@ -475,7 +591,7 @@ function markCompleted(payload){
       screen: "title"
     });
 
-    window.location.href = target.href;
+    navigateWithTransition(target.href);
   }
 
   function openZooTodo() {
@@ -485,7 +601,7 @@ function markCompleted(payload){
       screen: "todo_dev"
     });
 
-    window.location.href = target.href;
+    navigateWithTransition(target.href);
   }
 
   function openPetUnlock(){
@@ -499,7 +615,7 @@ function markCompleted(payload){
       petUnlock: true
     });
 
-    window.location.href = target.href;
+    navigateWithTransition(target.href);
   }
 
   function clearGameMixState(){
@@ -524,7 +640,7 @@ function markCompleted(payload){
       target.searchParams.set("completedGameId", safeGameId);
     }
 
-    window.location.href = target.href;
+    navigateWithTransition(target.href);
   }
 
   function endGameMix(){
@@ -550,7 +666,7 @@ function markCompleted(payload){
       target.searchParams.set("completedGameId", safeGameId);
     }
 
-    window.location.href = target.href;
+    navigateWithTransition(target.href);
   }
 
 function exitGame(){
@@ -574,10 +690,12 @@ function exitGame(){
       saveProgress(progress);
     }
 
-    window.location.href = target.href;
+    navigateWithTransition(target.href);
   } catch (err) {
     console.warn("Could not resolve return target", err);
-    window.location.href = buildFallbackReturnUrl();
+    navigateWithTransition(
+  buildFallbackReturnUrl()
+);
   }
 }
 
