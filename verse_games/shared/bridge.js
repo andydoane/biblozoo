@@ -3,6 +3,30 @@
   const PAGE_TRANSITION_MS = 300;
 
   let pageTransitionStarted = false;
+
+  function setExternalPwaThemeColor() {
+    if (window.location.protocol === "capacitor:") {
+      return;
+    }
+
+    let themeColor = document.querySelector(
+      'meta[name="theme-color"]'
+    );
+
+    if (!themeColor) {
+      themeColor = document.createElement("meta");
+      themeColor.setAttribute(
+        "name",
+        "theme-color"
+      );
+      document.head.appendChild(themeColor);
+    }
+
+    themeColor.setAttribute(
+      "content",
+      "#000000"
+    );
+  }
   
 
   function getPageTransitionDelayMs(){
@@ -114,6 +138,7 @@
     }
   }
 
+  setExternalPwaThemeColor();
   setPageTransitionChromeBlack(true);
   revealPageWhenReady();
 

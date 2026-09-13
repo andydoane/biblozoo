@@ -65,6 +65,15 @@ body.page-transition-ready::after {
     visibility 0s linear 300ms;
 }
 
+@media (display-mode: standalone) {
+  html,
+  body,
+  #app {
+    background: #000000 !important;
+    background-color: #000000 !important;
+  }
+}
+
 html.page-transition-chrome-black,
 body.page-transition-chrome-black {
   background-color: #000000 !important;
