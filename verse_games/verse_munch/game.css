@@ -26,7 +26,7 @@
   --vmunch-display-font: "Titan One", "Baloo 2", system-ui, sans-serif;
 
   --vmunch-side-padding:14px;
-  --vmunch-build-top-padding:12px;
+  --vmunch-build-top-padding:calc(12px + env(safe-area-inset-top, 0px));
   --vmunch-build-bottom-padding:10px;
   --vmunch-pills-side-padding:14px;
   --vmunch-nav-side-padding:14px;
@@ -122,6 +122,43 @@ body{
 .vmunch-root,
 .vmunch-mode-shell{
   transition:background-color 120ms ease;
+}
+
+.vmunch-root{
+  background:
+    radial-gradient(circle at top, rgba(255,255,255,0.16), transparent 36%),
+    linear-gradient(180deg, var(--vmunch-bg-1) 0%, var(--vmunch-bg-2) 100%);
+}
+
+#app.vm-shell.vmunch-page-flash-streak-1 .vmunch-root,
+#app.vm-shell.vmunch-page-flash-streak-2 .vmunch-root,
+#app.vm-shell.vmunch-page-flash-streak-rainbow .vmunch-root{
+  background:transparent;
+}
+
+@media (display-mode: standalone) {
+  #app.vm-shell.vmunch-page-flash-streak-1{
+    background:#c9ef63 !important;
+  }
+
+  #app.vm-shell.vmunch-page-flash-streak-2{
+    background:#40b9c5 !important;
+  }
+
+  #app.vm-shell.vmunch-page-flash-streak-rainbow{
+    background:linear-gradient(
+      90deg,
+      #ff5f6d 0%,
+      #ffb347 18%,
+      #fff36d 36%,
+      #6fe36c 54%,
+      #55c7ff 72%,
+      #b57cff 88%,
+      #ff79c6 100%
+    ) !important;
+    background-size:250% 250% !important;
+    animation:vmunchRainbowFlashShift 900ms linear infinite;
+  }
 }
 
 

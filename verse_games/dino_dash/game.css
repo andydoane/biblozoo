@@ -62,7 +62,7 @@ body{
 }
 
 .dd2-build-wrap{
-  padding: 8px 14px 7px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 7px;
   flex: 0 0 auto;
   background: var(--dd2-sky);
   background-color: var(--dd2-sky);
