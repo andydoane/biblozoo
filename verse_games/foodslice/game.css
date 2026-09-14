@@ -121,7 +121,7 @@ body {
 
 .fs-build-wrap {
   flex: 0 0 auto;
-  padding: 12px var(--fs-side) 10px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) var(--fs-side) 10px;
 }
 
 .fs-build.is-shake {
