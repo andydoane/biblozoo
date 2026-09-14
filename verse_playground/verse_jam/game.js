@@ -3460,7 +3460,7 @@
       theme: GAME_THEME,
       onPlayAgain: () => setScreen("mode"),
       onMoreGames: () => window.VerseGameBridge.exitGame(),
-      onChangeVerse: () => window.VerseGameBridge.returnToTitle()
+      onChangeVerse: () => window.VerseGameBridge.returnToVersePicker()
     });
 
     wireUiTapButtons(app);

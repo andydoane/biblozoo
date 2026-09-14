@@ -1451,7 +1451,7 @@ function renderEndScreen(){
     },
     onChangeVerse: () => {
       playSharedUiPopSound();
-      window.VerseGameBridge.returnToTitle();
+      window.VerseGameBridge.returnToVersePicker();
     }
   });
 }

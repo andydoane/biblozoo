@@ -619,6 +619,19 @@ function markCompleted(payload){
     navigateWithTransition(target.href);
   }
 
+  function returnToVersePicker(){
+    const target = buildParentAppUrl({
+      screen: "new_verse_picker"
+    });
+
+    target.searchParams.set(
+      "changeVerse",
+      "1"
+    );
+
+    navigateWithTransition(target.href);
+  }
+
   function openZooTodo() {
     // While Zoo To-Do is still hidden behind the Coming Soon page,
     // return testers directly to the real clipboard prototype.
@@ -733,6 +746,7 @@ function exitGame(){
     markVersePracticed,
     completeGameRun,
     returnToTitle,
+    returnToVersePicker,
     openZooTodo,
     openPetUnlock,
     openPetUnlockFromMix,

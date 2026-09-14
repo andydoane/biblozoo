@@ -417,7 +417,7 @@
       onChangeVerse: () => {
         void unlockAudio();
         playUiTapSound();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }

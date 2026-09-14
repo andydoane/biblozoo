@@ -2039,7 +2039,7 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: requestFreshDocumentReplay,
       onMoreGames: () => window.VerseGameBridge.exitGame(),
-      onChangeVerse: () => window.VerseGameBridge.returnToTitle()
+      onChangeVerse: () => window.VerseGameBridge.returnToVersePicker()
     });
   }
 

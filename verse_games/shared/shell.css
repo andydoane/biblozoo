@@ -401,7 +401,7 @@ body.page-transition-chrome-black {
 
 .vm-complete-medal-pill {
   position: absolute;
-  top: 18px;
+  top: calc(14px + env(safe-area-inset-top));
   right: 18px;
   z-index: 8;
   display: inline-flex;
@@ -651,7 +651,7 @@ button.vm-complete-icon.is-pet-box:focus-visible {
 
 @media (max-height: 620px) {
   .vm-complete-medal-pill {
-    top: 14px;
+    top: calc(14px + env(safe-area-inset-top));
     right: 12px;
     padding: 6px 9px;
     gap: 3px;

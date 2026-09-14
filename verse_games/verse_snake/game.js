@@ -2932,7 +2932,7 @@
       },
       onChangeVerse: () => {
         unlockAndTap();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }

@@ -2121,7 +2121,7 @@
       },
       onChangeVerse: () => {
         playUiTapAndUnlock();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }

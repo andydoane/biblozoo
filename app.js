@@ -12797,18 +12797,39 @@ function getUnlearnedVerseListItems() {
   });
 }
 
-function newVersePickerCardHtml(item) {
+function newVersePickerCardHtml(
+  item,
+  { changeVerseMode = false } = {}
+) {
   const verseId = item?.id || "";
   const ref = item?.ref || verseId;
   const petEmoji = getBibloPetEmojiForVerseId(verseId);
+  const learned =
+    !!getVerseProgress(verseId)?.learnCompleted;
+
+  const actionLabel =
+    changeVerseMode ? "Select" : "Learn";
 
   return `
     <button
       class="new-verse-card no-zoom"
       type="button"
       data-new-verse-id="${escapeHtml(verseId)}"
-      aria-label="Learn ${escapeHtml(ref)}"
+      aria-label="${actionLabel} ${escapeHtml(ref)}${learned ? ", learned" : ""}"
     >
+      ${
+        changeVerseMode && learned
+          ? `
+            <div
+              class="new-verse-card-learned"
+              aria-hidden="true"
+            >
+              ✅
+            </div>
+          `
+          : ""
+      }
+
       <div class="new-verse-card-pet" aria-hidden="true">
         ${bibloPetVisualHtml(verseId, petEmoji)}
       </div>
@@ -12818,6 +12839,36 @@ function newVersePickerCardHtml(item) {
       </div>
     </button>
   `;
+}
+
+async function selectVerseAndReturnHome(verseId) {
+  if (!verseId) return;
+
+  State.activeTodo = null;
+  State.selectedVerseId = verseId;
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("v", verseId);
+    url.searchParams.delete("changeVerse");
+    url.searchParams.delete("screen");
+    history.replaceState(null, "", url.toString());
+
+    await loadVerse(verseId);
+    HAS_VERSE_SELECTION = true;
+    State.titleOptionIndex = 0;
+
+    resetLearn(false);
+    go(Screen.TITLE);
+  } catch (err) {
+    console.error(err);
+
+    showDialog({
+      title: "Verse JSON not found",
+      body: `Could not load ${DATA_DIR}${verseId}.json`,
+      actions: [dlgBtn("OK", { onClick: closeDialog })]
+    });
+  }
 }
 
 async function startLearningNewVerse(verseId) {
@@ -12859,16 +12910,28 @@ function screenNewVersePicker(idx) {
   const wrap = document.createElement("div");
   wrap.className = "title-screen practice-screen new-verse-picker-screen";
 
-  const unlearnedItems = getUnlearnedVerseListItems();
+  const changeVerseMode =
+    new URLSearchParams(
+      window.location.search
+    ).get("changeVerse") === "1";
 
-  const cardsHtml = unlearnedItems.length
+  const verseItems = changeVerseMode
+    ? (Array.isArray(VERSE_LIST) ? VERSE_LIST : [])
+    : getUnlearnedVerseListItems();
+
+  const cardsHtml = verseItems.length
     ? `
       <div class="practice-pick-heading">
-        Choose a New Verse
+        ${changeVerseMode ? "Choose a Verse" : "Choose a New Verse"}
       </div>
 
       <div class="new-verse-grid">
-        ${unlearnedItems.map(newVersePickerCardHtml).join("")}
+        ${verseItems.map((item) =>
+          newVersePickerCardHtml(
+            item,
+            { changeVerseMode }
+          )
+        ).join("")}
       </div>
     `
     : `
@@ -12882,7 +12945,9 @@ function screenNewVersePicker(idx) {
     <div class="title-content practice-content">
       <div class="practice-title-row">
         ${homePillHtml()}
-        <h2 id="newVersePickerTitle">New Verse</h2>
+        <h2 id="newVersePickerTitle">
+          ${changeVerseMode ? "Change Verse" : "New Verse"}
+        </h2>
         <div class="practice-title-spacer" aria-hidden="true"></div>
       </div>
 
@@ -12903,6 +12968,12 @@ function screenNewVersePicker(idx) {
       e.stopPropagation();
 
       const verseId = btn.getAttribute("data-new-verse-id") || "";
+
+      if (changeVerseMode) {
+        await selectVerseAndReturnHome(verseId);
+        return;
+      }
+
       await startLearningNewVerse(verseId);
     };
   });

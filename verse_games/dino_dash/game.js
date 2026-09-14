@@ -7164,7 +7164,7 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: renderModeSelect,
       onMoreGames: () => window.VerseGameBridge.exitGame(),
-      onChangeVerse: () => window.VerseGameBridge.returnToTitle()
+      onChangeVerse: () => window.VerseGameBridge.returnToVersePicker()
     });
   }
 

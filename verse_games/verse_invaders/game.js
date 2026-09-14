@@ -1885,7 +1885,7 @@
       },
       onChangeVerse: () => {
         playUiTapSound();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }
