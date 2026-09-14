@@ -176,7 +176,14 @@ body {
 }
 
 .wob-menu-pill {
-  min-width: 48px;
+  width: 58px;
+  min-width: 58px;
+  min-height: 42px;
+  padding: 0;
+  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   pointer-events: auto;
 }
