@@ -365,7 +365,6 @@
               <div class="fs-banner-layer" id="fsBannerLayer"></div>
               <div class="fs-controls-layer">
                 <button class="fs-corner-pill fs-corner-left" id="fsMenuPill" type="button" aria-label="Game menu">☰</button>
-                <div class="fs-corner-pill fs-corner-right" id="fsPhasePill"></div>
               </div>
             </div>
           </div>
@@ -639,10 +638,6 @@
   }
 
   function renderHud() {
-    const phasePill = document.getElementById("fsPhasePill");
-    if (phasePill) {
-      phasePill.textContent = state.bonusRound ? `🍽️ ${state.bonusCount}` : getPhaseLabel();
-    }
     renderBuildArea();
     renderField();
   }
