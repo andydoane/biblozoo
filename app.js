@@ -3828,10 +3828,11 @@ function openRestoreProgressDialog(
 
 
 function generateResetMathQuestion() {
-  // Two-digit number plus one-digit number.
-  // Keep the answer two digits too, so the confirmation stays simple.
-  const a = Math.floor(Math.random() * 80) + 10; // 10–89
-  const b = Math.floor(Math.random() * 9) + 1;   // 1–9
+  // Two-digit number that never ends in zero, plus 5 through 15.
+  const a =
+    (Math.floor(Math.random() * 8) + 1) * 10 +
+    (Math.floor(Math.random() * 9) + 1); // 11–89, never ends in 0
+  const b = Math.floor(Math.random() * 11) + 5;  // 5–15
 
   return {
     question: `${a} + ${b}`,
@@ -7790,8 +7791,8 @@ function screenToIndex(screen) {
     Screen.PROFILE_WELCOME,
     Screen.PROFILE_PICKER,
     Screen.PROFILE_EDITOR,
-    Screen.PROFILE_MANAGE,
     Screen.TITLE,
+    Screen.PROFILE_MANAGE,
     Screen.SETTINGS,
     Screen.TODO,
     Screen.TODO_DEV,
@@ -14880,7 +14881,7 @@ function render() {
 
   const uniq = Array.from(new Set(indicesToRender.filter(i => i !== null && i >= 0)));
   for (const idx of uniq) {
-    const screen = ["intro", "title_sequence", "profile_welcome", "profile_picker", "profile_editor", "profile_manage", "title", "settings", "todo", "todo_dev", "new_verse_picker", "progress", "pet_stats", "verse_detail", "learn_level", "practice_gate", "learn_instruction", "listen", "meaning", "chunks", "echo", "hide", "final_recall", "celebration", "pet_unlock", "practice_hub", "practice", "playground", "game_mix_finished"][idx];
+    const screen = ["intro", "title_sequence", "profile_welcome", "profile_picker", "profile_editor", "title", "profile_manage", "settings", "todo", "todo_dev", "new_verse_picker", "progress", "pet_stats", "verse_detail", "learn_level", "practice_gate", "learn_instruction", "listen", "meaning", "chunks", "echo", "hide", "final_recall", "celebration", "pet_unlock", "practice_hub", "practice", "playground", "game_mix_finished"][idx];
     let slide = null;
     if (screen === Screen.INTRO) slide = screenIntro(idx);
     if (screen === Screen.TITLE_SEQUENCE) slide = screenTitleSequence(idx);
