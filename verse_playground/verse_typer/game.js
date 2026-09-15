@@ -87,6 +87,13 @@
   const UI_POP_SOUND_VOLUME = 0.12;
   const IS_NATIVE_CAPACITOR =
     window.location.protocol === "capacitor:";
+
+  if (IS_NATIVE_CAPACITOR) {
+    document.documentElement.classList.add(
+      "vt-native-capacitor"
+    );
+  }
+
   const COCOON_IMAGE_FILE = "./verse_typer_images/cocoon.png";
   const BUTTERFLY_IMAGE_FILE = "./verse_typer_images/butterfly.svg";
   const BUTTERFLY_FLAPS_TO_FINISH = 5;

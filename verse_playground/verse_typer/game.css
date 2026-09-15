@@ -145,6 +145,11 @@ body {
     linear-gradient(180deg, #ffe483 0%, #f7cf5d 42%, #8fcf5d 100%);
 }
 
+html.vt-native-capacitor .vm-game-screen::before,
+html.vt-native-capacitor .vt-root::before {
+  top: 0;
+}
+
 .vt-stage {
   position: relative;
   z-index: 1;
