@@ -4527,8 +4527,9 @@ Game Mix Loading Screen
 }
 
 .learn-level-btn-title {
-  font-size: clamp(1.1rem, 2vw, 1.5rem);
-  font-weight: 800;
+  font-size: clamp(26px, 7vw, 40px);
+  font-weight: 900;
+  line-height: 1;
 }
 
 .learn-level-btn-desc {

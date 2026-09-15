@@ -6889,7 +6889,17 @@ function getSelectedProfilePictureVerseId() {
 }
 
 const TITLE_OPTIONS = [
-  { id: "learn", label: "Learn the Verse", action: () => go(Screen.LEARN_LEVEL) },
+  {
+    id: "learn",
+    label: "Learn the Verse",
+    action: () => {
+      State.learnLevel = "not_at_all";
+      State.learnStartScreen = Screen.LISTEN;
+
+      resetLearn(false);
+      startLearnInstruction("listen");
+    }
+  },
   {
     id: "practice", label: "Practice", action: () => {
       if (State.hasLearnedVerse) go(Screen.PRACTICE_HUB);
@@ -11542,7 +11552,11 @@ function screenTitle(idx) {
       }
 
       if (action === "learn") {
-        go(Screen.LEARN_LEVEL);
+        State.learnLevel = "not_at_all";
+        State.learnStartScreen = Screen.LISTEN;
+
+        resetLearn(false);
+        startLearnInstruction("listen");
         return;
       }
 
