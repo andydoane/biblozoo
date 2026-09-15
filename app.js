@@ -5974,21 +5974,30 @@ function clearPetAnimationCycle() {
   State.petAnimActionClass = "";
 }
 
-async function playVerseDetailListen() {
+async function playVerseDetailListen(verseId) {
+  const verseRefAudioFile =
+    `${AUDIO_DIR}${verseId}_ref.mp3`;
+
+  const verseAudioFile =
+    `${AUDIO_DIR}${verseId}.mp3`;
+
   try {
-    setAudioSrc(refAudioFile());
+    setAudioSrc(verseRefAudioFile);
     audioEl.currentTime = 0;
     await safePlay();
     await waitForAudioEnd();
 
-    setAudioSrc(AUDIO_FILE);
+    setAudioSrc(verseAudioFile);
     audioEl.currentTime = 0;
     await safePlay();
     await waitForAudioEnd();
-
-    setAudioSrc(AUDIO_FILE);
   } catch (err) {
-    console.warn("Verse detail listen failed", err);
+    console.warn(
+      "Verse detail listen failed",
+      err
+    );
+  } finally {
+    setAudioSrc(AUDIO_FILE);
   }
 }
 
@@ -13499,23 +13508,12 @@ function screenVerseDetail(idx) {
   const btnDetailListen = wrap.querySelector("#btnDetailListen");
   if (btnDetailListen) {
     btnDetailListen.onclick = () => {
-      const verseAudioFile = `${AUDIO_DIR}${verseId}.mp3`;
-
       try {
         audioEl.pause();
         audioEl.currentTime = 0;
       } catch (e) { }
 
-      setAudioSrc(verseAudioFile);
-      audioEl.currentTime = 0;
-
-      safePlay().catch(() => {
-        showDialog({
-          title: "Verse audio missing",
-          body: `Couldn't play: ${verseAudioFile}`,
-          actions: [dlgBtn("OK", { onClick: closeDialog })]
-        });
-      });
+      void playVerseDetailListen(verseId);
     };
   }
 
