@@ -349,8 +349,11 @@ Learn Instruction Screens
 }
 
 .learn-instruction-actions .carousel-main {
-  width: min(100%, 520px);
+  width: auto;
+  max-width: min(100%, 520px);
   flex: 0 0 auto;
+  padding-left: clamp(24px, 7vw, 44px);
+  padding-right: clamp(24px, 7vw, 44px);
   font-size: clamp(20px, 4.8vw, 32px);
   line-height: 1.05;
 }
@@ -4483,6 +4486,15 @@ Game Mix Loading Screen
   justify-content: center;
   min-height: 70vh;
   text-align: center;
+}
+
+.learn-level-content > h2 {
+  width: 100%;
+  margin: clamp(4px, 1vh, 10px) 0;
+  font-size: clamp(28px, 7.2vw, 54px);
+  font-weight: 900;
+  line-height: 1.05;
+  text-wrap: balance;
 }
 
 .learn-level-stack {
