@@ -940,7 +940,7 @@ html.bb-native-capacitor .bb-build-wrap {
   display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.74);
+  background: transparent;
   text-align: center;
   padding: clamp(18px, 5vw, 34px);
 }
