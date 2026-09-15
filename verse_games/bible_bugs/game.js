@@ -9,6 +9,15 @@
   const HELP_OVERLAY_ID = "bbHelpOverlay";
   const GAME_MENU_ID = "bbGameMenuOverlay";
 
+  const IS_NATIVE_CAPACITOR =
+    window.location.protocol === "capacitor:";
+
+  if (IS_NATIVE_CAPACITOR) {
+    document.documentElement.classList.add(
+      "bb-native-capacitor"
+    );
+  }
+
   const GAME_THEME = {
     bg: "#a7cb6f",
     pageBg: "#a7cb6f",
