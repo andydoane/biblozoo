@@ -145,6 +145,11 @@ body {
     linear-gradient(180deg, #ffe483 0%, #f7cf5d 42%, #8fcf5d 100%);
 }
 
+html.vt-native-capacitor .vm-game-screen::before,
+html.vt-native-capacitor .vt-root::before {
+  top: 0;
+}
+
 .vt-stage {
   position: relative;
   z-index: 1;
@@ -159,7 +164,7 @@ body {
 .vt-topbar {
   position: absolute;
   z-index: 12;
-  top: calc(12px + env(safe-area-inset-top));
+  top: 12px;
   left: 12px;
   right: 12px;
   display: flex;
@@ -183,7 +188,14 @@ body {
 }
 
 .vt-menu-pill {
-  min-width: 48px;
+  width: 58px;
+  min-width: 58px;
+  min-height: 42px;
+  padding: 0;
+  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   pointer-events: auto;
 }

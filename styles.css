@@ -41,6 +41,52 @@ body {
   color: #fff;
 }
 
+/* ---------- Page transition cover ---------- */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #000000;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 300ms ease-in-out,
+    visibility 0s linear 0s;
+}
+
+body.page-transition-ready::after {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 300ms ease-in-out,
+    visibility 0s linear 300ms;
+}
+
+@media (display-mode: standalone) {
+  html,
+  body,
+  #app {
+    background: #000000 !important;
+    background-color: #000000 !important;
+  }
+}
+
+html.page-transition-chrome-black,
+body.page-transition-chrome-black {
+  background-color: #000000 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  body::after,
+  body.page-transition-ready::after {
+    transition: none;
+  }
+}
+
 #app {
   position: fixed;
   top: 0;
@@ -303,8 +349,11 @@ Learn Instruction Screens
 }
 
 .learn-instruction-actions .carousel-main {
-  width: min(100%, 520px);
+  width: auto;
+  max-width: min(100%, 520px);
   flex: 0 0 auto;
+  padding-left: clamp(24px, 7vw, 44px);
+  padding-right: clamp(24px, 7vw, 44px);
   font-size: clamp(20px, 4.8vw, 32px);
   line-height: 1.05;
 }
@@ -1169,6 +1218,7 @@ New Verse Picker
 }
 
 .new-verse-card {
+  position: relative;
   min-width: 0;
   min-height: clamp(190px, 30vw, 260px);
   border: 8px solid #ffffff;
@@ -1186,6 +1236,16 @@ New Verse Picker
   justify-content: center;
   gap: clamp(10px, 2.4vw, 18px);
   text-align: center;
+}
+
+.new-verse-card-learned {
+  position: absolute;
+  top: clamp(10px, 2.4vw, 16px);
+  right: clamp(10px, 2.4vw, 16px);
+  z-index: 2;
+  font-size: clamp(22px, 5.5vw, 30px);
+  line-height: 1;
+  pointer-events: none;
 }
 
 .new-verse-card:active {
@@ -2314,6 +2374,53 @@ Settings Screen
 
 .settings-card-danger .settings-card-title {
   color: #ff5a51;
+}
+
+.privacy-policy-shell {
+  gap: clamp(16px, 4vw, 24px);
+}
+
+.privacy-policy-page .settings-heading {
+  font-size: clamp(28px, 7.5vw, 54px);
+}
+
+.privacy-policy-card {
+  color: #333333;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.privacy-policy-card h2 {
+  margin: 26px 0 8px;
+  color: #66529e;
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.privacy-policy-card p {
+  margin: 0 0 14px;
+  font-size: clamp(16px, 4vw, 19px);
+}
+
+.privacy-policy-card ul {
+  margin: 0 0 16px;
+  padding-left: 24px;
+  font-size: clamp(16px, 4vw, 19px);
+}
+
+.privacy-policy-card li {
+  margin: 6px 0;
+}
+
+.privacy-policy-updated {
+  opacity: 0.68;
+  font-weight: 800;
+}
+
+.privacy-policy-card a {
+  color: var(--purple);
+  font-weight: 900;
 }
 
 .settings-info-dialog {
@@ -4428,6 +4535,15 @@ Game Mix Loading Screen
   text-align: center;
 }
 
+.learn-level-content > h2 {
+  width: 100%;
+  margin: clamp(4px, 1vh, 10px) 0;
+  font-size: clamp(28px, 7.2vw, 54px);
+  font-weight: 900;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
 .learn-level-stack {
   display: flex;
   flex-direction: column;
@@ -4458,8 +4574,9 @@ Game Mix Loading Screen
 }
 
 .learn-level-btn-title {
-  font-size: clamp(1.1rem, 2vw, 1.5rem);
-  font-weight: 800;
+  font-size: clamp(26px, 7vw, 40px);
+  font-weight: 900;
+  line-height: 1;
 }
 
 .learn-level-btn-desc {

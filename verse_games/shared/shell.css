@@ -32,6 +32,52 @@ body {
   overflow: hidden;
 }
 
+/* ---------- Shared page transition cover ---------- */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: #000000;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    opacity 300ms ease-in-out,
+    visibility 0s linear 0s;
+}
+
+body.page-transition-ready::after {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 300ms ease-in-out,
+    visibility 0s linear 300ms;
+}
+
+@media (display-mode: standalone) {
+  html,
+  body,
+  #app.vm-shell {
+    background: #000000 !important;
+    background-color: #000000 !important;
+  }
+}
+
+html.page-transition-chrome-black,
+body.page-transition-chrome-black {
+  background-color: #000000 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  body::after,
+  body.page-transition-ready::after {
+    transition: none;
+  }
+}
+
 .vm-shell {
   min-height: 100vh;
   height: 100vh;
@@ -355,7 +401,7 @@ body {
 
 .vm-complete-medal-pill {
   position: absolute;
-  top: 18px;
+  top: calc(14px + env(safe-area-inset-top));
   right: 18px;
   z-index: 8;
   display: inline-flex;
@@ -605,7 +651,7 @@ button.vm-complete-icon.is-pet-box:focus-visible {
 
 @media (max-height: 620px) {
   .vm-complete-medal-pill {
-    top: 14px;
+    top: calc(14px + env(safe-area-inset-top));
     right: 12px;
     padding: 6px 9px;
     gap: 3px;

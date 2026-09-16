@@ -1602,7 +1602,17 @@
 
       try {
         const res = await fetch(`${SOUND_BIT_BASE_URL}${sound.filename}`, { cache: "force-cache" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          res.status === 0;
+
+        if (
+          !res.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(`HTTP ${res.status}`);
+        }
 
         const arrayBuffer = await res.arrayBuffer();
         soundBitBuffers[sound.filename] = await audioCtx.decodeAudioData(arrayBuffer);
@@ -1624,7 +1634,17 @@
 
       try {
         const res = await fetch(url, { cache: "force-cache" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          res.status === 0;
+
+        if (
+          !res.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(`HTTP ${res.status}`);
+        }
 
         const arrayBuffer = await res.arrayBuffer();
         uiTapBuffers[index] = await audioCtx.decodeAudioData(arrayBuffer);
@@ -3440,7 +3460,7 @@
       theme: GAME_THEME,
       onPlayAgain: () => setScreen("mode"),
       onMoreGames: () => window.VerseGameBridge.exitGame(),
-      onChangeVerse: () => window.VerseGameBridge.returnToTitle()
+      onChangeVerse: () => window.VerseGameBridge.returnToVersePicker()
     });
 
     wireUiTapButtons(app);

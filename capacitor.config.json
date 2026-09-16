@@ -1,5 +1,6 @@
 {
   "appId": "com.andydoane.biblozoo",
   "appName": "BibloZoo",
-  "webDir": "dist"
+  "webDir": "dist",
+  "backgroundColor": "#000000"
 }

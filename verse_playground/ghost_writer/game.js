@@ -8,6 +8,15 @@
   const HELP_OVERLAY_ID = "ghostWriterHelpOverlay";
   const MENU_OVERLAY_ID = "ghostWriterGameMenuOverlay";
 
+  const IS_NATIVE_CAPACITOR =
+    window.location.protocol === "capacitor:";
+
+  if (IS_NATIVE_CAPACITOR) {
+    document.documentElement.classList.add(
+      "gw-native-capacitor"
+    );
+  }
+
   const GAME_THEME = {
     bg: "linear-gradient(180deg, #101114 0%, #252733 48%, #111217 100%)",
     pageBg: "#000000",
@@ -885,7 +894,14 @@
         try {
           const response = await fetch(src, { cache: "force-cache" });
 
-          if (!response.ok) {
+          const isCapacitorLocalResponse =
+            window.location.protocol === "capacitor:" &&
+            response.status === 0;
+
+          if (
+            !response.ok &&
+            !isCapacitorLocalResponse
+          ) {
             throw new Error(`HTTP ${response.status}`);
           }
 

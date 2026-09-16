@@ -40,7 +40,7 @@ const PET_STATUS_ASLEEP_ICON = IMG_DIR + "pet_status_asleep.png";
 
 const APP_VERSION = "1.0.12 Black Startup Shell";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
-const PRIVACY_POLICY_URL = "privacy_policy.html";
+
 
 // =========================================================
 // DEBUG fallback: lets the app run offline (file://) without fetch()
@@ -54,12 +54,130 @@ const SKIP_TITLE_SEQUENCE = true;
 // Master switch for the browser/install gate.
 // Set to false to let BibloZoo run in an ordinary browser tab.
 const REQUIRE_STANDALONE_PWA = true;
+const IS_NATIVE_CAPACITOR =
+  !!window.Capacitor?.isNativePlatform?.();
 
 const BROWSER_VERSION_URL =
   "https://andydoane.github.io/eatyourbible/pwa/verse";
 
 const BIBLOZOO_INSTALL_URL =
   "https://andydoane.github.io/biblozoo";
+
+const APP_PAGE_TRANSITION_MS = 300;
+let appPageTransitionStarted = false;
+
+
+function getAppPageTransitionDelayMs() {
+  try {
+    return window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches
+      ? 0
+      : APP_PAGE_TRANSITION_MS;
+  } catch (err) {
+    return APP_PAGE_TRANSITION_MS;
+  }
+}
+
+function setAppPageTransitionChromeBlack(isBlack) {
+  const elements = [
+    document.documentElement,
+    document.body
+  ];
+
+  for (const element of elements) {
+    element.classList.toggle(
+      "page-transition-chrome-black",
+      isBlack
+    );
+  }
+}
+
+function revealAppPageWhenReady() {
+  const app = document.getElementById("app");
+  let revealed = false;
+  let observer = null;
+
+  const reveal = () => {
+    if (revealed) return;
+    revealed = true;
+
+    if (observer) {
+      observer.disconnect();
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.add(
+          "page-transition-ready"
+        );
+
+        const transitionDelay =
+          getAppPageTransitionDelayMs();
+
+        if (transitionDelay === 0) {
+          setAppPageTransitionChromeBlack(false);
+        } else {
+          window.setTimeout(() => {
+            setAppPageTransitionChromeBlack(false);
+          }, transitionDelay);
+        }
+      });
+    });
+  };
+
+  const appHasContent = () =>
+    !app ||
+    app.childElementCount > 0 ||
+    String(app.textContent || "").trim();
+
+  if (appHasContent()) {
+    reveal();
+    return;
+  }
+
+  observer = new MutationObserver(() => {
+    if (appHasContent()) {
+      reveal();
+    }
+  });
+
+  observer.observe(app, {
+    childList: true,
+    subtree: true
+  });
+
+  window.setTimeout(reveal, 1200);
+}
+
+function navigateToExternalPage(href) {
+  if (appPageTransitionStarted) return;
+
+  appPageTransitionStarted = true;
+
+  setAppPageTransitionChromeBlack(true);
+
+  const beginPageFade = () => {
+    document.body.classList.remove(
+      "page-transition-ready"
+    );
+
+    window.setTimeout(() => {
+      window.location.href = href;
+    }, getAppPageTransitionDelayMs());
+  };
+
+  if (IS_NATIVE_CAPACITOR) {
+    beginPageFade();
+  } else {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(beginPageFade);
+    });
+  }
+}
+
+setAppPageTransitionChromeBlack(true);
+revealAppPageWhenReady();
 
 const DEBUG_VERSE_JSON = {
   "verseId": "john_3_16",
@@ -1039,7 +1157,17 @@ function preloadUiTapSoundBuffers() {
       UI_TAP_SOUND_FILES.map(async (src) => {
         try {
           const res = await fetch(src, { cache: "force-cache" });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+          const isCapacitorLocalResponse =
+            IS_NATIVE_CAPACITOR &&
+            res.status === 0;
+
+          if (
+            !res.ok &&
+            !isCapacitorLocalResponse
+          ) {
+            throw new Error(`HTTP ${res.status}`);
+          }
 
           const arrayBuffer = await res.arrayBuffer();
           return await decodeAudioDataCompat(ctx, arrayBuffer);
@@ -1065,7 +1193,24 @@ function preloadUiTapSoundBuffers() {
 }
 
 async function unlockAppAudio() {
-  if (appAudioUnlocked) return true;
+  const existingCtx = getAppAudioContext();
+
+  if (
+    appAudioUnlocked &&
+    existingCtx &&
+    existingCtx.state === "running"
+  ) {
+    return true;
+  }
+
+  if (
+    appAudioUnlocked &&
+    existingCtx &&
+    existingCtx.state !== "running"
+  ) {
+    appAudioUnlocked = false;
+  }
+
   if (appAudioUnlockPromise) return appAudioUnlockPromise;
 
   appAudioUnlockPromise = (async () => {
@@ -3683,10 +3828,11 @@ function openRestoreProgressDialog(
 
 
 function generateResetMathQuestion() {
-  // Two-digit number plus one-digit number.
-  // Keep the answer two digits too, so the confirmation stays simple.
-  const a = Math.floor(Math.random() * 80) + 10; // 10–89
-  const b = Math.floor(Math.random() * 9) + 1;   // 1–9
+  // Two-digit number that never ends in zero, plus 5 through 15.
+  const a =
+    (Math.floor(Math.random() * 8) + 1) * 10 +
+    (Math.floor(Math.random() * 9) + 1); // 11–89, never ends in 0
+  const b = Math.floor(Math.random() * 11) + 5;  // 5–15
 
   return {
     question: `${a} + ${b}`,
@@ -4189,54 +4335,9 @@ function openEraseAllFamilyDataDialog() {
 }
 
 function openPrivacyPolicy() {
-  showDialog({
-    title: "Privacy Policy",
-    body: "This will open the full privacy policy page.",
-    actions: [
-      dlgBtn("Cancel", {
-        secondary: true,
-        onClick: closeDialog
-      }),
-      dlgBtn("Open", {
-        onClick: () => {
-          closeDialog();
-
-          try {
-            window.open(PRIVACY_POLICY_URL, "_blank", "noopener,noreferrer");
-          } catch (err) {
-            window.location.href = PRIVACY_POLICY_URL;
-          }
-        }
-      })
-    ]
-  });
+  go(Screen.PRIVACY);
 }
 
-function showStoredDataDialog() {
-  showDialog({
-    title: "What Data Is Stored?",
-    bodyHtml: `
-      <div class="settings-info-dialog">
-        <p>
-          Verse Memory stores progress only on this device.
-        </p>
-
-        <ul>
-          <li>Learned verses</li>
-          <li>Game medals and progress</li>
-          <li>BibloPet unlocks and pet names</li>
-          <li>BibloPet backgrounds</li>
-          <li>Recent practice timestamps</li>
-        </ul>
-
-        <p>
-          The app does not require an account, does not show ads, and does not use analytics in this version.
-        </p>
-      </div>
-    `,
-    actions: [dlgBtn("OK", { onClick: closeDialog })]
-  });
-}
 
 function showCreditsDialog() {
   showDialog({
@@ -5828,21 +5929,30 @@ function clearPetAnimationCycle() {
   State.petAnimActionClass = "";
 }
 
-async function playVerseDetailListen() {
+async function playVerseDetailListen(verseId) {
+  const verseRefAudioFile =
+    `${AUDIO_DIR}${verseId}_ref.mp3`;
+
+  const verseAudioFile =
+    `${AUDIO_DIR}${verseId}.mp3`;
+
   try {
-    setAudioSrc(refAudioFile());
+    setAudioSrc(verseRefAudioFile);
     audioEl.currentTime = 0;
     await safePlay();
     await waitForAudioEnd();
 
-    setAudioSrc(AUDIO_FILE);
+    setAudioSrc(verseAudioFile);
     audioEl.currentTime = 0;
     await safePlay();
     await waitForAudioEnd();
-
-    setAudioSrc(AUDIO_FILE);
   } catch (err) {
-    console.warn("Verse detail listen failed", err);
+    console.warn(
+      "Verse detail listen failed",
+      err
+    );
+  } finally {
+    setAudioSrc(AUDIO_FILE);
   }
 }
 
@@ -6508,6 +6618,7 @@ const Screen = {
   PROFILE_MANAGE: "profile_manage",
   TITLE: "title",
   SETTINGS: "settings",
+  PRIVACY: "privacy",
   TODO: "todo",
   TODO_DEV: "todo_dev",
   NEW_VERSE_PICKER: "new_verse_picker",
@@ -6734,7 +6845,17 @@ function getSelectedProfilePictureVerseId() {
 }
 
 const TITLE_OPTIONS = [
-  { id: "learn", label: "Learn the Verse", action: () => go(Screen.LEARN_LEVEL) },
+  {
+    id: "learn",
+    label: "Learn the Verse",
+    action: () => {
+      State.learnLevel = "not_at_all";
+      State.learnStartScreen = Screen.LISTEN;
+
+      resetLearn(false);
+      startLearnInstruction("listen");
+    }
+  },
   {
     id: "practice", label: "Practice", action: () => {
       if (State.hasLearnedVerse) go(Screen.PRACTICE_HUB);
@@ -7645,9 +7766,10 @@ function screenToIndex(screen) {
     Screen.PROFILE_WELCOME,
     Screen.PROFILE_PICKER,
     Screen.PROFILE_EDITOR,
-    Screen.PROFILE_MANAGE,
     Screen.TITLE,
+    Screen.PROFILE_MANAGE,
     Screen.SETTINGS,
+    Screen.PRIVACY,
     Screen.TODO,
     Screen.TODO_DEV,
     Screen.NEW_VERSE_PICKER,
@@ -7990,7 +8112,9 @@ function launchExternalGame(manifest, options = {}) {
 
   appendZooTodoLaunchParams(params);
 
-  window.location.href = `${manifest.launchUrl}?${params.toString()}`;
+  navigateToExternalPage(
+  `${manifest.launchUrl}?${params.toString()}`
+);
 }
 
 function launchExternalPlaygroundActivity(manifest) {
@@ -8010,7 +8134,9 @@ function launchExternalPlaygroundActivity(manifest) {
 
   appendZooTodoLaunchParams(params);
 
-  window.location.href = `${manifest.launchUrl}?${params.toString()}`;
+  navigateToExternalPage(
+  `${manifest.launchUrl}?${params.toString()}`
+);
 }
 
 function practiceRun() {
@@ -9197,6 +9323,7 @@ function renderNav() {
     State.screen !== Screen.PROFILE_MANAGE &&
     State.screen !== Screen.TITLE &&
     State.screen !== Screen.SETTINGS &&
+    State.screen !== Screen.PRIVACY &&
     State.screen !== Screen.TODO &&
     State.screen !== Screen.TODO_DEV &&
     State.screen !== Screen.NEW_VERSE_PICKER &&
@@ -11383,7 +11510,11 @@ function screenTitle(idx) {
       }
 
       if (action === "learn") {
-        go(Screen.LEARN_LEVEL);
+        State.learnLevel = "not_at_all";
+        State.learnStartScreen = Screen.LISTEN;
+
+        resetLearn(false);
+        startLearnInstruction("listen");
         return;
       }
 
@@ -11573,10 +11704,6 @@ function screenSettings(idx) {
               Privacy Policy
             </button>
 
-            <button class="settings-action no-zoom" type="button" data-settings-action="stored-data">
-              What Data Is Stored?
-            </button>
-
             <button class="settings-action no-zoom" type="button" data-settings-action="credits">
               Credits
             </button>
@@ -11645,11 +11772,6 @@ function screenSettings(idx) {
         return;
       }
 
-      if (action === "stored-data") {
-        showStoredDataDialog();
-        return;
-      }
-
       if (action === "credits") {
         showCreditsDialog();
         return;
@@ -11672,6 +11794,130 @@ function screenSettings(idx) {
   });
 
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
+}
+
+function screenPrivacyPolicy(idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "settings-screen privacy-policy-screen";
+
+  wrap.innerHTML = `
+    <div class="settings-page privacy-policy-page">
+      <div class="settings-shell privacy-policy-shell">
+        <div class="settings-header">
+          <button
+            class="screen-title-pill no-zoom"
+            type="button"
+            data-privacy-back
+            aria-label="Back to Settings"
+          >
+            ${SVG_BACK}
+          </button>
+
+          <h1 class="settings-heading">Privacy Policy</h1>
+
+          <div
+            class="settings-header-spacer"
+            aria-hidden="true"
+          ></div>
+        </div>
+
+        <section class="settings-card privacy-policy-card">
+          <p class="privacy-policy-updated">
+            Last updated: September 15, 2026
+          </p>
+
+          <p>
+            BibloZoo is designed to keep your information private.
+            The app does not require an account, does not show ads,
+            and does not use analytics or tracking software in this
+            version.
+          </p>
+
+          <h2>Information Stored on Your Device</h2>
+
+          <p>
+            BibloZoo stores information locally so it can remember
+            your family’s progress. This may include:
+          </p>
+
+          <ul>
+            <li>Zookeeper profile names and profile pictures</li>
+            <li>Learned verses and memorization progress</li>
+            <li>Game progress and medals</li>
+            <li>BibloPet unlocks, names, and backgrounds</li>
+            <li>Recent practice activity</li>
+          </ul>
+
+          <p>
+            This locally stored app data is not automatically sent
+            to us.
+          </p>
+
+          <h2>Internet Use</h2>
+
+          <p>
+            The packaged app is designed to use content included
+            with the app. If you use BibloZoo as a website or
+            installed web app, your browser connects to the website
+            host to download BibloZoo and its updates.
+          </p>
+
+          <p>
+            The web hosting provider may process standard technical
+            information associated with web requests according to
+            its own privacy practices. BibloZoo itself does not use
+            advertising, analytics, or tracking services in this
+            version.
+          </p>
+
+          <h2>Backups</h2>
+
+          <p>
+            BibloZoo can export and import a family backup when you
+            choose to use those features. Backup files are created
+            or opened only at your direction. BibloZoo does not
+            automatically upload your backups to a server.
+          </p>
+
+          <h2>Deleting Your Data</h2>
+
+          <p>
+            You can reset a Zookeeper’s progress or erase all
+            locally stored family data from Settings.
+          </p>
+
+          <h2>Contact</h2>
+
+          <p>
+            If you have questions about this Privacy Policy, contact:
+          </p>
+
+          <p>
+            <a href="mailto:${escapeHtml(SUPPORT_EMAIL)}">
+              ${escapeHtml(SUPPORT_EMAIL)}
+            </a>
+          </p>
+        </section>
+      </div>
+    </div>
+  `;
+
+  const backBtn =
+    wrap.querySelector("[data-privacy-back]");
+
+  if (backBtn) {
+    backBtn.onclick = (e) => {
+      e.stopPropagation();
+      go(Screen.SETTINGS);
+    };
+  }
+
+  return makeSlide({
+    idx,
+    bg: "var(--purple)",
+    navHidden: true,
+    inner: wrap
+  });
 }
 
 const TODO_ROW_ICON_COLORS = [
@@ -12648,18 +12894,39 @@ function getUnlearnedVerseListItems() {
   });
 }
 
-function newVersePickerCardHtml(item) {
+function newVersePickerCardHtml(
+  item,
+  { changeVerseMode = false } = {}
+) {
   const verseId = item?.id || "";
   const ref = item?.ref || verseId;
   const petEmoji = getBibloPetEmojiForVerseId(verseId);
+  const learned =
+    !!getVerseProgress(verseId)?.learnCompleted;
+
+  const actionLabel =
+    changeVerseMode ? "Select" : "Learn";
 
   return `
     <button
       class="new-verse-card no-zoom"
       type="button"
       data-new-verse-id="${escapeHtml(verseId)}"
-      aria-label="Learn ${escapeHtml(ref)}"
+      aria-label="${actionLabel} ${escapeHtml(ref)}${learned ? ", learned" : ""}"
     >
+      ${
+        changeVerseMode && learned
+          ? `
+            <div
+              class="new-verse-card-learned"
+              aria-hidden="true"
+            >
+              ✅
+            </div>
+          `
+          : ""
+      }
+
       <div class="new-verse-card-pet" aria-hidden="true">
         ${bibloPetVisualHtml(verseId, petEmoji)}
       </div>
@@ -12669,6 +12936,36 @@ function newVersePickerCardHtml(item) {
       </div>
     </button>
   `;
+}
+
+async function selectVerseAndReturnHome(verseId) {
+  if (!verseId) return;
+
+  State.activeTodo = null;
+  State.selectedVerseId = verseId;
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("v", verseId);
+    url.searchParams.delete("changeVerse");
+    url.searchParams.delete("screen");
+    history.replaceState(null, "", url.toString());
+
+    await loadVerse(verseId);
+    HAS_VERSE_SELECTION = true;
+    State.titleOptionIndex = 0;
+
+    resetLearn(false);
+    go(Screen.TITLE);
+  } catch (err) {
+    console.error(err);
+
+    showDialog({
+      title: "Verse JSON not found",
+      body: `Could not load ${DATA_DIR}${verseId}.json`,
+      actions: [dlgBtn("OK", { onClick: closeDialog })]
+    });
+  }
 }
 
 async function startLearningNewVerse(verseId) {
@@ -12710,16 +13007,28 @@ function screenNewVersePicker(idx) {
   const wrap = document.createElement("div");
   wrap.className = "title-screen practice-screen new-verse-picker-screen";
 
-  const unlearnedItems = getUnlearnedVerseListItems();
+  const changeVerseMode =
+    new URLSearchParams(
+      window.location.search
+    ).get("changeVerse") === "1";
 
-  const cardsHtml = unlearnedItems.length
+  const verseItems = changeVerseMode
+    ? (Array.isArray(VERSE_LIST) ? VERSE_LIST : [])
+    : getUnlearnedVerseListItems();
+
+  const cardsHtml = verseItems.length
     ? `
       <div class="practice-pick-heading">
-        Choose a New Verse
+        ${changeVerseMode ? "Choose a Verse" : "Choose a New Verse"}
       </div>
 
       <div class="new-verse-grid">
-        ${unlearnedItems.map(newVersePickerCardHtml).join("")}
+        ${verseItems.map((item) =>
+          newVersePickerCardHtml(
+            item,
+            { changeVerseMode }
+          )
+        ).join("")}
       </div>
     `
     : `
@@ -12733,7 +13042,9 @@ function screenNewVersePicker(idx) {
     <div class="title-content practice-content">
       <div class="practice-title-row">
         ${homePillHtml()}
-        <h2 id="newVersePickerTitle">New Verse</h2>
+        <h2 id="newVersePickerTitle">
+          ${changeVerseMode ? "Change Verse" : "New Verse"}
+        </h2>
         <div class="practice-title-spacer" aria-hidden="true"></div>
       </div>
 
@@ -12754,6 +13065,12 @@ function screenNewVersePicker(idx) {
       e.stopPropagation();
 
       const verseId = btn.getAttribute("data-new-verse-id") || "";
+
+      if (changeVerseMode) {
+        await selectVerseAndReturnHome(verseId);
+        return;
+      }
+
       await startLearningNewVerse(verseId);
     };
   });
@@ -13278,23 +13595,12 @@ function screenVerseDetail(idx) {
   const btnDetailListen = wrap.querySelector("#btnDetailListen");
   if (btnDetailListen) {
     btnDetailListen.onclick = () => {
-      const verseAudioFile = `${AUDIO_DIR}${verseId}.mp3`;
-
       try {
         audioEl.pause();
         audioEl.currentTime = 0;
       } catch (e) { }
 
-      setAudioSrc(verseAudioFile);
-      audioEl.currentTime = 0;
-
-      safePlay().catch(() => {
-        showDialog({
-          title: "Verse audio missing",
-          body: `Couldn't play: ${verseAudioFile}`,
-          actions: [dlgBtn("OK", { onClick: closeDialog })]
-        });
-      });
+      void playVerseDetailListen(verseId);
     };
   }
 
@@ -13657,7 +13963,6 @@ function screenLearnLevel(idx) {
   wrap.innerHTML = `
     ${homePillHtml()}
     <div class="title-content learn-level-content">
-      <h2>Before we get started...</h2>
       <h2>How well do you know this verse?</h2>
 
       <div class="learn-level-stack">
@@ -14660,7 +14965,7 @@ function render() {
 
   const uniq = Array.from(new Set(indicesToRender.filter(i => i !== null && i >= 0)));
   for (const idx of uniq) {
-    const screen = ["intro", "title_sequence", "profile_welcome", "profile_picker", "profile_editor", "profile_manage", "title", "settings", "todo", "todo_dev", "new_verse_picker", "progress", "pet_stats", "verse_detail", "learn_level", "practice_gate", "learn_instruction", "listen", "meaning", "chunks", "echo", "hide", "final_recall", "celebration", "pet_unlock", "practice_hub", "practice", "playground", "game_mix_finished"][idx];
+    const screen = ["intro", "title_sequence", "profile_welcome", "profile_picker", "profile_editor", "title", "profile_manage", "settings", "privacy", "todo", "todo_dev", "new_verse_picker", "progress", "pet_stats", "verse_detail", "learn_level", "practice_gate", "learn_instruction", "listen", "meaning", "chunks", "echo", "hide", "final_recall", "celebration", "pet_unlock", "practice_hub", "practice", "playground", "game_mix_finished"][idx];
     let slide = null;
     if (screen === Screen.INTRO) slide = screenIntro(idx);
     if (screen === Screen.TITLE_SEQUENCE) slide = screenTitleSequence(idx);
@@ -14670,6 +14975,7 @@ function render() {
     if (screen === Screen.PROFILE_MANAGE) slide = screenProfileManage(idx);
     if (screen === Screen.TITLE) slide = screenTitle(idx);
     if (screen === Screen.SETTINGS) slide = screenSettings(idx);
+    if (screen === Screen.PRIVACY) slide = screenPrivacyPolicy(idx);
     if (screen === Screen.TODO) slide = screenTodo(idx);
     if (screen === Screen.TODO_DEV) slide = screenTodoDev(idx);
     if (screen === Screen.NEW_VERSE_PICKER) slide = screenNewVersePicker(idx);
@@ -14767,6 +15073,10 @@ function setupAppUiTapSounds() {
   if (appUiTapSoundsBound) return;
   appUiTapSoundsBound = true;
 
+  // Start preparing the real MP3 tap sounds before
+  // the user's first interaction.
+  void preloadUiTapSoundBuffers();
+
   function handleUiTapGesture(event) {
     if (event.button !== undefined && event.button !== 0) return;
 
@@ -14813,11 +15123,17 @@ function setupAppUiTapSounds() {
       ctx.resume().catch(() => { });
     }
 
-    unlockAppAudio();
+    const unlockPromise = unlockAppAudio();
     preloadUiTapSoundBuffers();
 
     if (uiTapBuffers.length) {
-      playUiTapSound({ force: true });
+      void unlockPromise.then((unlocked) => {
+        if (unlocked) {
+          playUiTapSound({ force: true });
+        } else {
+          playUiTapFallbackNow();
+        }
+      });
     } else {
       playUiTapFallbackNow();
     }
@@ -15372,6 +15688,7 @@ function renderInstallInstructions(
 (async function init() {
   if (
     REQUIRE_STANDALONE_PWA &&
+    !IS_NATIVE_CAPACITOR &&
     !isRunningStandalonePwa()
   ) {
     renderInstallGate();

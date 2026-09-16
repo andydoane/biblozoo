@@ -9,6 +9,15 @@
   const HELP_OVERLAY_ID = "bbHelpOverlay";
   const GAME_MENU_ID = "bbGameMenuOverlay";
 
+  const IS_NATIVE_CAPACITOR =
+    window.location.protocol === "capacitor:";
+
+  if (IS_NATIVE_CAPACITOR) {
+    document.documentElement.classList.add(
+      "bb-native-capacitor"
+    );
+  }
+
   const GAME_THEME = {
     bg: "#a7cb6f",
     pageBg: "#a7cb6f",
@@ -333,7 +342,19 @@
 
     const promise = fetch(src)
       .then((response) => {
-        if (!response.ok) throw new Error(`Unable to load sound: ${src}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Unable to load sound: ${src}`
+          );
+        }
+
         return response.arrayBuffer();
       })
       .then((arrayBuffer) => ctx.decodeAudioData(arrayBuffer))
@@ -2109,7 +2130,7 @@
       },
       onChangeVerse: () => {
         playUiTapAndUnlock();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }

@@ -3053,7 +3053,17 @@
         if (!ctx) return null;
 
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`Could not load ${url}`);
+
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(`Could not load ${url}`);
+        }
 
         const arrayBuffer = await response.arrayBuffer();
         const buffer = await ctx.decodeAudioData(arrayBuffer);
@@ -7154,7 +7164,7 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: renderModeSelect,
       onMoreGames: () => window.VerseGameBridge.exitGame(),
-      onChangeVerse: () => window.VerseGameBridge.returnToTitle()
+      onChangeVerse: () => window.VerseGameBridge.returnToVersePicker()
     });
   }
 

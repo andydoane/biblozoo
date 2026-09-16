@@ -97,6 +97,14 @@ body {
   background-color: var(--bb-water-top);
 }
 
+html.bb-native-capacitor .bb-build-wrap {
+  background:
+    linear-gradient(180deg,
+      var(--bb-water-top) 0%,
+      var(--bb-water-mid) 100%);
+  background-color: var(--bb-water-top);
+}
+
 .bb-build.is-shake {
   animation: bbShake 280ms ease;
 }
@@ -932,7 +940,7 @@ body {
   display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.74);
+  background: transparent;
   text-align: center;
   padding: clamp(18px, 5vw, 34px);
 }
@@ -1267,6 +1275,9 @@ body {
   }
 }
 
+html.bb-native-capacitor .bb-field-wrap {
+  padding-bottom: 0;
+}
 
 #bbGameMenuOverlay,
 #bbHelpOverlay {

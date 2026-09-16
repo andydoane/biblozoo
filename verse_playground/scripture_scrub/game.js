@@ -546,7 +546,17 @@
 
     const promise = fetch(url)
       .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          res.status === 0;
+
+        if (
+          !res.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
         return res.arrayBuffer();
       })
       .then((arrayBuffer) => ctx.decodeAudioData(arrayBuffer))

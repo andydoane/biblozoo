@@ -390,7 +390,19 @@
 
     const promise = fetch(src)
       .then(response => {
-        if (!response.ok) throw new Error(`Unable to load sound: ${src}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Unable to load sound: ${src}`
+          );
+        }
+
         return response.arrayBuffer();
       })
       .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
@@ -1629,7 +1641,7 @@
       },
       onChangeVerse: () => {
         playUiTapSound();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }

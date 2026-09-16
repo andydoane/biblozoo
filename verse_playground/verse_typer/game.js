@@ -67,7 +67,9 @@
   let gameAssetPreloadPromise = null;
 
   const imagePreloadCache = new Map();
-  const uiPopAudioEls = [];
+  const uiPopAudioBuffers = [];
+  const uiPopAudioBufferPromises = [];
+  let uiPopAudioCtx = null;
   let uiPopFlip = false;
 
   const ENTER_INPUT_MS = 400;
@@ -82,7 +84,16 @@
     "../../ui_audio/ui_sound_pop_1.mp3",
     "../../ui_audio/ui_sound_pop_2.mp3"
   ];
-  const UI_POP_SOUND_VOLUME = 0.48;
+  const UI_POP_SOUND_VOLUME = 0.12;
+  const IS_NATIVE_CAPACITOR =
+    window.location.protocol === "capacitor:";
+
+  if (IS_NATIVE_CAPACITOR) {
+    document.documentElement.classList.add(
+      "vt-native-capacitor"
+    );
+  }
+
   const COCOON_IMAGE_FILE = "./verse_typer_images/cocoon.png";
   const BUTTERFLY_IMAGE_FILE = "./verse_typer_images/butterfly.svg";
   const BUTTERFLY_FLAPS_TO_FINISH = 5;
@@ -465,33 +476,142 @@
     return audioUnlockPromise;
   }
 
-  function uiPopAudioForIndex(index) {
+  function getUiPopAudioContext() {
+    if (IS_NATIVE_CAPACITOR) {
+      createAudio();
+      return audioCtx;
+    }
+
+    if (uiPopAudioCtx) {
+      return uiPopAudioCtx;
+    }
+
+    const AudioCtor = audioContextConstructor();
+    if (!AudioCtor) return null;
+
+    uiPopAudioCtx = new AudioCtor();
+    return uiPopAudioCtx;
+  }
+
+  function decodeUiPopAudioData(ctx, arrayBuffer) {
+    return new Promise((resolve, reject) => {
+      try {
+        const data = arrayBuffer.slice(0);
+
+        const maybePromise = ctx.decodeAudioData(
+          data,
+          resolve,
+          reject
+        );
+
+        if (
+          maybePromise &&
+          typeof maybePromise.then === "function"
+        ) {
+          maybePromise
+            .then(resolve)
+            .catch(reject);
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function loadUiPopSoundBuffer(
+    index,
+    targetCtx
+  ) {
     const src = UI_POP_SOUND_FILES[index];
-    if (!src) return null;
+    if (!src) {
+      return Promise.resolve(null);
+    }
 
-    if (uiPopAudioEls[index]) return uiPopAudioEls[index];
+    if (uiPopAudioBuffers[index]) {
+      return Promise.resolve(
+        uiPopAudioBuffers[index]
+      );
+    }
 
-    const audio = document.createElement("audio");
-    audio.preload = "auto";
-    audio.playsInline = true;
-    audio.setAttribute("playsinline", "");
-    audio.src = src;
-    audio.volume = UI_POP_SOUND_VOLUME;
-    audio.style.display = "none";
+    if (uiPopAudioBufferPromises[index]) {
+      return uiPopAudioBufferPromises[index];
+    }
 
-    document.body.appendChild(audio);
-    uiPopAudioEls[index] = audio;
+    if (!targetCtx) {
+      return Promise.resolve(null);
+    }
 
-    return audio;
+    const promise = fetch(
+      src,
+      { cache: "force-cache" }
+    )
+      .then(response => {
+        const isCapacitorLocalResponse =
+          window.location.protocol ===
+          "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Unable to load UI sound: ${src}`
+          );
+        }
+
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer =>
+        decodeUiPopAudioData(
+          targetCtx,
+          arrayBuffer
+        )
+      )
+      .then(buffer => {
+        uiPopAudioBufferPromises[index] =
+          null;
+
+        if (buffer) {
+          uiPopAudioBuffers[index] =
+            buffer;
+        }
+
+        return buffer;
+      })
+      .catch(() => {
+        uiPopAudioBufferPromises[index] =
+          null;
+        return null;
+      });
+
+    uiPopAudioBufferPromises[index] =
+      promise;
+
+    return promise;
   }
 
   function preloadUiPopSounds() {
-    UI_POP_SOUND_FILES.forEach((_, index) => {
-      const audio = uiPopAudioForIndex(index);
-      try {
-        audio?.load();
-      } catch (err) { }
-    });
+    const targetCtx =
+      IS_NATIVE_CAPACITOR
+        ? audioCtx
+        : uiPopAudioCtx;
+
+    if (
+      !targetCtx ||
+      targetCtx.state !== "running"
+    ) {
+      return;
+    }
+
+    UI_POP_SOUND_FILES.forEach(
+      (_, index) => {
+        void loadUiPopSoundBuffer(
+          index,
+          targetCtx
+        );
+      }
+    );
   }
 
   function playUiPopSound() {
@@ -500,17 +620,87 @@
     const index = uiPopFlip ? 1 : 0;
     uiPopFlip = !uiPopFlip;
 
-    const audio = uiPopAudioForIndex(index);
-    if (!audio) return;
+    const targetCtx =
+      getUiPopAudioContext();
+
+    if (!targetCtx) return;
+
+    const playBuffer = () => {
+      void loadUiPopSoundBuffer(
+        index,
+        targetCtx
+      ).then(buffer => {
+        if (
+          !buffer ||
+          muted ||
+          targetCtx.state !== "running"
+        ) {
+          return;
+        }
+
+        try {
+          const source =
+            targetCtx.createBufferSource();
+
+          const gain =
+            targetCtx.createGain();
+
+          source.buffer = buffer;
+          gain.gain.value =
+            UI_POP_SOUND_VOLUME;
+
+          source.connect(gain);
+          gain.connect(
+            targetCtx.destination
+          );
+
+          source.start(0);
+        } catch (err) {
+          // UI sound should never break gameplay.
+        }
+      });
+    };
+
+    if (IS_NATIVE_CAPACITOR) {
+      void unlockAudio().then(
+        (unlocked) => {
+          if (unlocked) {
+            playBuffer();
+          }
+        }
+      );
+
+      return;
+    }
 
     try {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.volume = UI_POP_SOUND_VOLUME;
+      if (targetCtx.state === "running") {
+        playBuffer();
+        return;
+      }
 
-      const playPromise = audio.play();
-      if (playPromise?.catch) {
-        playPromise.catch(() => { });
+      const resumePromise =
+        targetCtx.resume?.();
+
+      if (
+        resumePromise &&
+        typeof resumePromise.then ===
+        "function"
+      ) {
+        resumePromise
+          .then(() => {
+            if (
+              targetCtx.state ===
+              "running"
+            ) {
+              playBuffer();
+            }
+          })
+          .catch(() => { });
+      } else if (
+        targetCtx.state === "running"
+      ) {
+        playBuffer();
       }
     } catch (err) {
       // UI sound should never break gameplay.
@@ -2798,7 +2988,7 @@
         unlockAudio();
       },
       onMoreGames: () => window.VerseGameBridge.exitGame(),
-      onChangeVerse: () => window.VerseGameBridge.returnToTitle()
+      onChangeVerse: () => window.VerseGameBridge.returnToVersePicker()
     });
 
     wireShellUiPopSounds();

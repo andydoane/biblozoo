@@ -573,7 +573,16 @@
 
     const promise = fetch(src)
       .then((res) => {
-        if (!res.ok) throw new Error(`Sound not found: ${src}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          res.status === 0;
+
+        if (
+          !res.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(`Sound not found: ${src}`);
+        }
         return res.arrayBuffer();
       })
       .then((arrayBuffer) => ctx.decodeAudioData(arrayBuffer))
@@ -673,8 +682,11 @@
   }
 
   function unlockAndTap() {
-    unlockAudio();
-    playUiTapSound();
+    void unlockAudio().then((unlocked) => {
+      if (unlocked) {
+        playUiTapSound();
+      }
+    });
   }
 
   function stopLoop(){
@@ -2920,7 +2932,7 @@
       },
       onChangeVerse: () => {
         unlockAndTap();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }

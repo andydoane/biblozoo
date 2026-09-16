@@ -238,6 +238,7 @@ body {
 
 .versejam-build-wrap {
   flex: 0 0 auto;
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .versejam-build {

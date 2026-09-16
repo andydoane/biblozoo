@@ -128,8 +128,8 @@ select{ font:inherit; }
   min-height:42px;
   border:0;
   border-radius:999px;
-  background:#ffffff;
-  color:var(--vsn-purple);
+  background:#333333;
+  color:#ffffff;
   font-size:24px;
   font-weight:900;
   line-height:1;
@@ -900,9 +900,9 @@ select{ font:inherit; }
   .vsn-game-wrap{ padding-left:8px; padding-right:8px; }
   .vsn-fridge-board{ border-radius:22px; }
   .vsn-menu-pill{
-    min-width:50px;
-    min-height:38px;
-    font-size:21px;
+    min-width:58px;
+    min-height:42px;
+    font-size:24px;
   }
   .vsn-target-note{
     width:fit-content;

@@ -608,7 +608,7 @@
       },
       onChangeVerse: () => {
         playUiTapSound();
-        window.VerseGameBridge.returnToTitle();
+        window.VerseGameBridge.returnToVersePicker();
       }
     });
   }
@@ -1007,7 +1007,18 @@
 
     const promise = fetch(url)
       .then((response) => {
-        if (!response.ok) throw new Error(`Unable to load sound: ${url} (${response.status})`);
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `Unable to load sound: ${url} (${response.status})`
+          );
+        }
         return response.arrayBuffer();
       })
       .then((arrayBuffer) => {

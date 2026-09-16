@@ -66,7 +66,7 @@ body{
 }
 
 .vb2-build-wrap{
-  padding: 8px 14px 7px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 7px;
   flex: 0 0 auto;
   background: var(--vb2-sky);
   background-color: var(--vb2-sky);
@@ -852,7 +852,7 @@ body{
 
 @media (max-height: 690px){
   .vb2-build-wrap{
-    padding-top: 8px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
     padding-bottom: 7px;
   }
 

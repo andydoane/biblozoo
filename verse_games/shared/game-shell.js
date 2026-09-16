@@ -2041,7 +2041,7 @@
 
     const changeVerseAction = typeof onChangeVerse === "function"
       ? onChangeVerse
-      : () => window.VerseGameBridge?.returnToTitle?.();
+      : () => window.VerseGameBridge?.returnToVersePicker?.();
 
     const moreGamesAction = typeof onMoreGames === "function"
       ? onMoreGames

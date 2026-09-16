@@ -131,7 +131,8 @@ body{
 
 .vsl-build-shell{
   flex: 0 0 auto;
-  padding-block: max(0.45rem, env(safe-area-inset-top));
+  padding-top: max(0.45rem, env(safe-area-inset-top));
+  padding-bottom: 0.45rem;
   padding-inline: 0;
   background: #090c14;
 }
@@ -416,7 +417,7 @@ body{
 .vsl-overlay-pills{
   position: absolute;
   z-index: 20;
-  top: max(0.65rem, env(safe-area-inset-top));
+  top: 0.65rem;
   left: max(0.65rem, env(safe-area-inset-left));
   right: max(0.65rem, env(safe-area-inset-right));
   display: flex;
@@ -1016,7 +1017,8 @@ button.vsl-pill{
 
 @media (max-height: 620px){
   .vsl-build-shell{
-    padding-block: 0.25rem;
+    padding-top: max(0.25rem, env(safe-area-inset-top));
+    padding-bottom: 0.25rem;
   }
 
   .vsl-build-line{

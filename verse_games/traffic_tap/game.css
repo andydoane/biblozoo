@@ -145,7 +145,7 @@ body{
 
 .tt-build-wrap{
   flex:0 0 auto;
-  padding:12px var(--tt-side) 10px;
+  padding:calc(12px + env(safe-area-inset-top, 0px)) var(--tt-side) 10px;
 }
 
 .tt-build {

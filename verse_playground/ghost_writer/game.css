@@ -1121,6 +1121,17 @@ body {
   }
 }
 
+html.gw-native-capacitor .vm-game-screen::before,
+html.gw-native-capacitor .ghost-writer-root::before,
+html.gw-native-capacitor .ghost-writer-root::after,
+html.gw-native-capacitor .ghost-playback-root::before {
+  top: 0;
+}
+
+.vm-game-back-pill {
+  top: calc(20px + env(safe-area-inset-top));
+}
+
 @media (max-height:700px) {
   .ghost-writer-stage {
     gap: 8px;
