@@ -102,8 +102,8 @@
     paint: 0.95,
     fog: 0.92,
     chalkboard: 0.95,
-    glow: 0.98,
-    rainbow: 0.98,
+    glow: 0.95,
+    rainbow: 0.95,
     mower: 0.95,
     archaeology: 0.95
   };
@@ -411,8 +411,9 @@
   let lastProgressToneStep = 0;
   let lastProgressToneAt = -Infinity;
   let generatedTonePrimed = false;
-  let mowerSoundAudio = null;
-  let mowerSoundFrame = null;
+  let mowerSoundSource = null;
+  let mowerSoundGain = null;
+  let mowerSoundGeneration = 0;
 
   const parsedRef = window.VerseGameShell.parseReferenceParts(
     ctx.verseRef,
@@ -822,65 +823,108 @@
     }
   }
 
-  function startMowerSound(duration) {
+  async function startMowerSound(duration) {
     stopMowerSound();
 
     if (muted || !SOUND_FILES.mower) return;
 
-    try {
-      mowerSoundAudio = new Audio(SOUND_FILES.mower);
-      mowerSoundAudio.loop = true;
-      mowerSoundAudio.volume = 0;
-      mowerSoundAudio.currentTime = 0;
+    const generation = ++mowerSoundGeneration;
 
-      const startedAt = performance.now();
+    try {
+      if (!audioUnlocked) {
+        await unlockAudio();
+      }
+
+      const ctx = getAudioContext();
+      if (!ctx || muted) return;
+
+      if (ctx.state === "suspended") {
+        await ctx.resume().catch(() => { });
+      }
+
+      const buffer = await loadSoundBuffer("mower");
+
+      if (
+        !buffer ||
+        muted ||
+        generation !== mowerSoundGeneration
+      ) {
+        return;
+      }
+
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+
+      const now = ctx.currentTime;
+      const durationSeconds = Math.max(
+        0.05,
+        duration / 1000
+      );
+      const endAt = now + durationSeconds;
+      const fadeInEnd =
+        now + Math.min(0.12, durationSeconds * 0.12);
+      const fadeOutStart =
+        now + durationSeconds * 0.65;
       const maxVolume = soundVolume("mower");
 
-      const updateMowerVolume = () => {
-        if (!mowerSoundAudio) return;
+      source.buffer = buffer;
+      source.loop = true;
 
-        const elapsed = performance.now() - startedAt;
-        const progress = clamp(elapsed / Math.max(1, duration), 0, 1);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(
+        maxVolume,
+        fadeInEnd
+      );
+      gain.gain.setValueAtTime(
+        maxVolume,
+        fadeOutStart
+      );
+      gain.gain.linearRampToValueAtTime(
+        0.0001,
+        endAt
+      );
 
-        let envelope = 1;
-        if (progress < 0.18) {
-          envelope = progress / 0.18;
-        } else if (progress > 0.72) {
-          envelope = Math.max(0, (1 - progress) / 0.28);
+      source.connect(gain);
+      gain.connect(ctx.destination);
+
+      mowerSoundSource = source;
+      mowerSoundGain = gain;
+
+      source.onended = () => {
+        if (mowerSoundSource === source) {
+          mowerSoundSource = null;
+          mowerSoundGain = null;
         }
-
-        mowerSoundAudio.volume = clamp(maxVolume * envelope, 0, maxVolume);
-
-        if (progress < 1 && mowerSoundAudio) {
-          mowerSoundFrame = requestAnimationFrame(updateMowerVolume);
-          return;
-        }
-
-        stopMowerSound();
       };
 
-      mowerSoundAudio.play().then(() => {
-        updateMowerVolume();
-      }).catch((err) => {
-        console.warn("Scripture Scrub: mower sound could not start", err);
-        stopMowerSound();
-      });
+      source.start(now);
+      source.stop(endAt);
     } catch (err) {
-      console.warn("Scripture Scrub: mower sound failed", err);
+      console.warn(
+        "Scripture Scrub: mower sound failed",
+        err
+      );
       stopMowerSound();
     }
   }
 
   function stopMowerSound() {
-    if (mowerSoundFrame) {
-      cancelAnimationFrame(mowerSoundFrame);
-      mowerSoundFrame = null;
+    mowerSoundGeneration += 1;
+
+    if (mowerSoundSource) {
+      try {
+        mowerSoundSource.stop();
+      } catch (err) {
+        // The source may already have stopped naturally.
+      }
+
+      mowerSoundSource.disconnect();
+      mowerSoundSource = null;
     }
 
-    if (mowerSoundAudio) {
-      mowerSoundAudio.pause();
-      mowerSoundAudio.currentTime = 0;
-      mowerSoundAudio = null;
+    if (mowerSoundGain) {
+      mowerSoundGain.disconnect();
+      mowerSoundGain = null;
     }
   }
 

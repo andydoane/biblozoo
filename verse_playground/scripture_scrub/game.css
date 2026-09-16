@@ -904,6 +904,15 @@ body{
   --scrub-chip-shadow: rgba(51, 37, 96, .44);
 }
 
+.scrub-stage-archaeology #scrubVerseText,
+.scrub-stage-archaeology #scrubGlowVerseText {
+  visibility: hidden;
+}
+
+.scrub-stage-archaeology:not(.scrub-round-complete) .scrub-ref-pill {
+  visibility: hidden;
+}
+
 @keyframes scrubInstructionPop {
   0% {
     opacity: 0;
@@ -1118,6 +1127,11 @@ body{
   cursor: pointer;
   pointer-events: auto;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  outline: none;
   will-change: transform, opacity;
   perspective: 700px;
   box-sizing: border-box;
