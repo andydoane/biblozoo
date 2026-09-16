@@ -44,6 +44,7 @@
 
   const SILENCE_AUDIO_FILE = "../../verse_audio/silence.mp3";
   const WEB_AUDIO_MASTER_VOLUME = 0.82;
+  const KEYWORD_LETTER_VOLUME = 0.48;
 
   const WORD_COLORS = [
     "#ffc751", "#a7cb6f", "#40b9c5", "#ff9e3d",
@@ -160,6 +161,8 @@
     nextPrize: null,
     currentChallenge: null,
     challengeInputIndex: 0,
+    challengeMelody: [],
+    challengeMelodyStep: 0,
     challengeFlash: "",
     challengeBad: false,
     challengeHintCount: 0,
@@ -703,6 +706,142 @@
   }
   function playBeep(index = 0) { playTone({ midi: 67 + (index % 3) * 4, duration: .10, volume: .24 }); }
   function playGood() { playTone({ midi: 72, duration: .10, volume: .28 }); setTimeout(() => playTone({ midi: 79, duration: .14, volume: .22 }), 70); }
+  
+  function keywordMelodyPoolsForLength(length) {
+    const pools = {
+      1: [
+        [67],
+        [72],
+        [64],
+        [60],
+        [69]
+      ],
+
+      2: [
+        [60, 67],
+        [64, 67],
+        [67, 72],
+        [72, 67],
+        [60, 64]
+      ],
+
+      3: [
+        [60, 64, 67],
+        [67, 69, 72],
+        [72, 67, 64],
+        [60, 62, 64],
+        [64, 67, 72]
+      ],
+
+      4: [
+        [60, 62, 64, 67],
+        [60, 64, 67, 72],
+        [67, 69, 67, 72],
+        [64, 67, 69, 67],
+        [72, 69, 67, 64]
+      ],
+
+      5: [
+        [60, 62, 64, 67, 72],
+        [60, 64, 67, 69, 72],
+        [67, 69, 72, 69, 67],
+        [64, 67, 69, 67, 72],
+        [72, 69, 67, 64, 60]
+      ],
+
+      6: [
+        [60, 62, 64, 67, 69, 72],
+        [60, 64, 67, 72, 67, 72],
+        [67, 69, 72, 69, 67, 64],
+        [64, 67, 69, 72, 69, 67],
+        [72, 69, 67, 64, 62, 60]
+      ],
+
+      7: [
+        [60, 62, 64, 67, 69, 72, 67],
+        [60, 64, 67, 69, 72, 69, 67],
+        [60, 62, 65, 62, 69, 69, 67],
+        [64, 67, 69, 67, 64, 67, 72],
+        [72, 69, 67, 64, 60, 64, 67]
+      ],
+
+      8: [
+        [60, 62, 64, 67, 69, 72, 69, 67],
+        [60, 64, 67, 72, 67, 69, 67, 72],
+        [67, 69, 72, 71, 72, 69, 67, 64],
+        [64, 67, 69, 72, 69, 67, 64, 60],
+        [72, 69, 67, 64, 60, 62, 64, 67]
+      ],
+
+      9: [
+        [60, 62, 64, 67, 69, 72, 69, 67, 64],
+        [60, 64, 67, 72, 69, 67, 64, 67, 72],
+        [67, 69, 72, 71, 72, 69, 67, 64, 60],
+        [64, 67, 69, 72, 69, 67, 64, 62, 60],
+        [72, 69, 67, 64, 60, 62, 64, 67, 72]
+      ],
+
+      10: [
+        [60, 62, 64, 67, 69, 72, 69, 67, 64, 60],
+        [60, 64, 67, 72, 69, 67, 64, 67, 69, 72],
+        [67, 69, 72, 71, 72, 69, 67, 64, 62, 60],
+        [64, 67, 69, 72, 71, 72, 69, 67, 64, 67],
+        [72, 69, 67, 64, 60, 62, 64, 67, 69, 72]
+      ]
+    };
+
+    return pools[length] || [];
+  }
+
+  function chooseKeywordMelodyForLength(length) {
+    const cappedLength = clamp(
+      Math.max(1, length || 1),
+      1,
+      10
+    );
+
+    const pool =
+      keywordMelodyPoolsForLength(cappedLength);
+
+    if (!pool.length) {
+      return [
+        60, 62, 64, 67, 69,
+        72, 69, 67, 64, 60
+      ];
+    }
+
+    return pool[
+      Math.floor(Math.random() * pool.length)
+    ].slice();
+  }
+
+  function playKeywordChallengeLetterSound() {
+    const melody = state.challengeMelody;
+
+    if (
+      !Array.isArray(melody) ||
+      !melody.length
+    ) {
+      playGood();
+      return;
+    }
+
+    const midi =
+      melody[
+      state.challengeMelodyStep %
+      melody.length
+      ] || 60;
+
+    state.challengeMelodyStep += 1;
+
+    playTone({
+      midi,
+      duration: 0.13,
+      volume: KEYWORD_LETTER_VOLUME,
+      type: "triangle"
+    });
+  }
+  
   function playBad() { playTone({ midi: 43, duration: .13, volume: .32, type: "sine" }); setTimeout(() => playTone({ midi: 38, duration: .12, volume: .24, type: "sine" }), 58); }
   function playPop(i = 0) { playTone({ midi: 64 + (i % 5) * 2, duration: .08, volume: .18 }); }
   function playPrize() { playTone({ midi: 72, duration: .10, volume: .25 }); setTimeout(() => playTone({ midi: 76, duration: .10, volume: .24 }), 70); setTimeout(() => playTone({ midi: 84, duration: .18, volume: .28 }), 145); }
@@ -1983,6 +2122,16 @@
     state.screen = "challenge";
     state.currentChallenge = challenge;
     state.challengeInputIndex = challengePrefilledCount(challenge);
+
+    state.challengeMelody =
+      challenge.type === "word" &&
+      challenge.word?.isKeyword
+        ? chooseKeywordMelodyForLength(
+            challenge.expected?.length || 1
+          )
+        : [];
+
+    state.challengeMelodyStep = 0;
     state.challengeFlash = "";
     state.challengeBad = false;
     state.challengeWrongCount = 0;
@@ -2268,7 +2417,14 @@
       return;
     }
 
-    playGood();
+    if (
+      challenge.type === "word" &&
+      challenge.word?.isKeyword
+    ) {
+      playKeywordChallengeLetterSound();
+    } else {
+      playGood();
+    }
 
     state.challengeFlash = choice;
     state.challengeBad = false;
