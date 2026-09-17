@@ -5592,6 +5592,18 @@
     cleanupRound();
     void markVersePracticed();
 
+    try {
+      window.VerseGameBridge.markPlaygroundCompleted?.({
+        verseId: ctx.verseId,
+        activityId: GAME_ID
+      });
+    } catch (err) {
+      console.warn(
+        "Scripture Scrub could not mark Playground completion",
+        err
+      );
+    }
+
     window.VerseGameShell.renderCompleteScreen({
       app,
       title: "Great Scrubbing!",

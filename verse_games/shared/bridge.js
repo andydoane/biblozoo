@@ -411,6 +411,79 @@ function markCompleted(payload){
     return { ok: true, verseId: safeVerseId };
   }
   
+  function markPlaygroundCompleted({
+    verseId = "",
+    activityId = ""
+  } = {}) {
+    const safeVerseId =
+      String(verseId || "").trim();
+
+    const safeActivityId =
+      String(activityId || "").trim();
+
+    if (!safeVerseId || !safeActivityId) {
+      return {
+        ok: false,
+        verseId: safeVerseId,
+        activityId: safeActivityId,
+        alreadyCompleted: false,
+        newlyCompleted: false
+      };
+    }
+
+    const loaded = loadProgress();
+
+    if (!loaded.ok || !loaded.progress) {
+      console.warn(
+        "markPlaygroundCompleted aborted because progress could not be loaded safely."
+      );
+
+      return {
+        ok: false,
+        verseId: safeVerseId,
+        activityId: safeActivityId,
+        alreadyCompleted: false,
+        newlyCompleted: false
+      };
+    }
+
+    const progress = loaded.progress;
+
+    if (!progress.verses[safeVerseId]) {
+      progress.verses[safeVerseId] = {
+        learnCompleted: false,
+        games: {}
+      };
+    }
+
+    const verseProgress =
+      progress.verses[safeVerseId];
+
+    if (
+      !verseProgress.playground ||
+      typeof verseProgress.playground !== "object" ||
+      Array.isArray(verseProgress.playground)
+    ) {
+      verseProgress.playground = {};
+    }
+
+    const alreadyCompleted =
+      verseProgress.playground[safeActivityId] === true;
+
+    verseProgress.playground[safeActivityId] = true;
+    verseProgress.lastPracticedAt = Date.now();
+
+    saveProgress(progress);
+
+    return {
+      ok: true,
+      verseId: safeVerseId,
+      activityId: safeActivityId,
+      alreadyCompleted,
+      newlyCompleted: !alreadyCompleted
+    };
+  }
+
   function wasAlreadyCompleted(verseId, gameId, mode){
     if (!verseId || !gameId || !mode) return false;
 
@@ -744,6 +817,7 @@ function exitGame(){
     getGameCompletionStatus,
     markCompleted,
     markVersePracticed,
+    markPlaygroundCompleted,
     completeGameRun,
     returnToTitle,
     returnToVersePicker,

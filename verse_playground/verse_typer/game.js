@@ -2957,8 +2957,20 @@
     stopAllAudio();
 
     try {
-      window.VerseGameBridge.markVersePracticed?.({ verseId: ctx.verseId });
-    } catch (err) { }
+      window.VerseGameBridge.markVersePracticed?.({
+        verseId: ctx.verseId
+      });
+
+      window.VerseGameBridge.markPlaygroundCompleted?.({
+        verseId: ctx.verseId,
+        activityId: GAME_ID
+      });
+    } catch (err) {
+      console.warn(
+        "Verse Typer could not mark Playground completion",
+        err
+      );
+    }
 
     await sleep(260, runToken);
     if (state.runToken !== runToken) return;

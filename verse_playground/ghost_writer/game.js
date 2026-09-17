@@ -2462,6 +2462,18 @@
         if (markPractice && !state.practiceMarked) {
           state.practiceMarked = true;
           await markVersePracticed();
+
+          try {
+            window.VerseGameBridge.markPlaygroundCompleted?.({
+              verseId: ctx.verseId,
+              activityId: GAME_ID
+            });
+          } catch (err) {
+            console.warn(
+              "Ghost Writer could not mark Playground completion",
+              err
+            );
+          }
         }
 
         showPlaybackRemixButton();

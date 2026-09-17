@@ -3108,6 +3108,18 @@
     state.busy = false;
     state.completed = true;
 
+    try {
+      window.VerseGameBridge.markPlaygroundCompleted?.({
+        verseId: ctx.verseId,
+        activityId: GAME_ID
+      });
+    } catch (err) {
+      console.warn(
+        "Verse Jam could not mark Playground completion",
+        err
+      );
+    }
+
     stopRun();
     playCompletionArpeggio();
 

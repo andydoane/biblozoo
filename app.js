@@ -30,6 +30,7 @@ const PET_BACKGROUND_MANIFEST_URL =
 const PET_IMG_DIR = "pet_images/";
 const SETTINGS_GEAR_ICON = IMG_DIR + "settings_gear.png";
 const LOCK_ICON = IMG_DIR + "lock.png";
+const CHECKMARK_ICON = IMG_DIR + "checkmark.png";
 const BRONZE_MEDAL_ICON = IMG_DIR + "bronze_medal.png";
 const SILVER_MEDAL_ICON = IMG_DIR + "silver_medal.png";
 const GOLD_MEDAL_ICON = IMG_DIR + "gold_medal.png";
@@ -13417,6 +13418,37 @@ function screenVerseDetail(idx) {
         )
       : 0;
 
+  const playgroundActivities =
+    getPlaygroundActivities();
+
+  const playgroundProgressEarned =
+    playgroundActivities.reduce(
+      (total, activity) =>
+        total + (
+          verseProgress.playground?.[activity.id]
+            ? 1
+            : 0
+        ),
+      0
+    );
+
+  const playgroundProgressPossible =
+    playgroundActivities.length;
+
+  const playgroundProgressPercent =
+    playgroundProgressPossible > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            (
+              playgroundProgressEarned /
+              playgroundProgressPossible
+            ) * 100
+          )
+        )
+      : 0;
+
   function gameRow(label, gameId) {
     const progressDisplay = getVerseDetailProgressDisplay(gameId, verseProgress.games[gameId]);
 
@@ -13424,6 +13456,40 @@ function screenVerseDetail(idx) {
       <div class="detail-row">
         <div class="detail-label">${label}</div>
         <div class="detail-stars detail-medals">${progressDisplay}</div>
+      </div>
+    `;
+  }
+
+  function playgroundRow(activity) {
+    const completed =
+      !!verseProgress.playground?.[activity.id];
+
+    return `
+      <div class="detail-row">
+        <div class="detail-label">${activity.title}</div>
+
+        <div class="detail-stars detail-medals">
+          <span
+            class="detail-medal-slot ${completed ? "earned" : "unearned"}"
+            aria-label="${activity.title} ${completed ? "completed" : "not completed"}"
+            title="${activity.title} ${completed ? "completed" : "not completed"}"
+          >
+            ${
+              completed
+                ? `
+                  <img
+                    class="detail-medal-img"
+                    src="${CHECKMARK_ICON}"
+                    alt=""
+                    aria-hidden="true"
+                    draggable="false"
+                    onerror="this.style.display='none'"
+                  >
+                `
+                : lockIconHtml("lock-icon-medal-lock")
+            }
+          </span>
+        </div>
       </div>
     `;
   }
@@ -13548,6 +13614,39 @@ function screenVerseDetail(idx) {
 
         <div class="detail-section">
           ${getVerseDetailGames().map(game => gameRow(game.label, game.id)).join("")}
+        </div>
+
+        <div class="detail-medal-progress">
+          <img
+            class="detail-medal-progress-icon"
+            src="${IMG_DIR}app_icon_slide.png"
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            onerror="this.style.display='none'"
+          >
+
+          <div class="detail-medal-progress-label">
+            ${playgroundProgressEarned} out of ${playgroundProgressPossible}
+          </div>
+
+          <div
+            class="detail-medal-progress-track"
+            role="progressbar"
+            aria-label="Playground progress"
+            aria-valuemin="0"
+            aria-valuemax="${playgroundProgressPossible}"
+            aria-valuenow="${playgroundProgressEarned}"
+          >
+            <div
+              class="detail-medal-progress-fill"
+              style="width:${playgroundProgressPercent}%"
+            ></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          ${playgroundActivities.map(activity => playgroundRow(activity)).join("")}
         </div>
       </div>
     </div>

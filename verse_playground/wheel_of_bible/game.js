@@ -3472,7 +3472,23 @@
   }
 
   async function renderComplete() {
-    if (state.completed) return; state.completed = true; await markVersePracticed();
+    if (state.completed) return;
+
+    state.completed = true;
+    await markVersePracticed();
+
+    try {
+      bridge().markPlaygroundCompleted?.({
+        verseId: ctx.verseId,
+        activityId: GAME_ID
+      });
+    } catch (err) {
+      console.warn(
+        "Wheel of Bible could not mark Playground completion",
+        err
+      );
+    }
+
     const statsText = `${formatMoney(totalCash())} earned • ${state.finalFilledTileKeys.size} final letters filled`;
     if (shell().renderCompleteScreen) {
       shell().renderCompleteScreen({
