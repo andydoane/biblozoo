@@ -10789,7 +10789,7 @@ function screenProfileEditor(idx) {
         </div>
 
         ${
-          isAdd
+          isAdd || isEdit
             ? `
               <div
                 class="profile-avatar-count profile-avatar-count-above"
@@ -10820,7 +10820,7 @@ function screenProfileEditor(idx) {
           </button>
 
           ${
-            isAdd
+              isAdd || isEdit
               ? `
                 <button
                   class="profile-avatar-random no-zoom"
