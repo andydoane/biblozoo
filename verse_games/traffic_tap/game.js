@@ -1766,11 +1766,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     requestAnimationFrame(() => {
       if (cloud) cloud.classList.add("is-live");
+
       burst.querySelectorAll(".tt-crash-particle").forEach((particle) => {
-        const delay = Number.parseInt(particle.style.getPropertyValue("--tt-delay"), 10) || 0;
-        window.setTimeout(() => {
-          particle.classList.add("is-live");
-        }, delay);
+        particle.classList.add("is-live");
       });
     });
 
@@ -2117,10 +2115,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const item = state.bonusItems.find(x => x.id === itemId);
     if (!item || item.removeAt || item.vanishUntil) return;
 
-    const layerRect = document.getElementById("ttField")?.getBoundingClientRect();
-    const rect = tappedEl.getBoundingClientRect();
-    const x = rect.left - layerRect.left + rect.width / 2;
-    const y = rect.top - layerRect.top + rect.height / 2;
+    const x = item.x + (item.width / 2);
+    const carCenterPct =
+      item.slot === "lower" ? 0.72 : 0.24;
+    const y =
+      roadTopY(item.road) +
+      (item.height * carCenterPct);
 
     if (item.isRainbowBonus) {
       const now = performance.now();
