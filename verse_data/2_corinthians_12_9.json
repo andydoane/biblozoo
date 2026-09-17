@@ -5,27 +5,22 @@
     "verseId": "2_corinthians_12_9",
     "ref": "2 Corinthians 12:9",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "But he said to me",
+        "But He said to me",
         "My grace is sufficient for you",
-        "for my power",
-        "is made perfect in weakness."
+        "for My power",
+        "is perfected in weakness"
     ],
-    "verseText": "But he said to me, 'My grace is sufficient for you, for my power is made perfect in weakness.'",
+    "verseText": "But He said to me, “My grace is sufficient for you, for My power is perfected in weakness.”",
     "meaning": "We aren't saved by how good or powerful we are. God's grace is sufficient (enough) to save even the weakest of sinners.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
             "word": "said",
             "occurrence": 1,
             "emoji": "🗣️"
-        },
-        {
-            "type": "underscore",
-            "word": "me",
-            "occurrence": 1
         },
         {
             "type": "underscore",
@@ -46,7 +41,7 @@
         },
         {
             "type": "emoji",
-            "word": "perfect",
+            "word": "perfected",
             "occurrence": 1,
             "emoji": "🌟"
         },

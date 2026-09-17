@@ -5,23 +5,58 @@
   "verseId": "ephesians_3_20",
   "ref": "Ephesians 3:20",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Now to him",
-    "who is able",
-    "to do far more abundantly",
-    "than all that we ask or think"
+    "Now to Him who is able",
+    "to do immeasurably more",
+    "than all we ask or imagine",
+    "according to His power",
+    "that is at work within us"
   ],
-  "verseText": "Now to him who is able to do far more abundantly than all that we ask or think.",
+  "verseText": "Now to Him who is able to do immeasurably more than all we ask or imagine, according to His power that is at work within us...",
   "meaning": "God is able to do way more than we could ever even think about asking for. His power is beyond our wildest imaginations!",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "able", "occurrence": 1, "emoji": "💪" },
-    { "type": "underscore", "word": "all", "occurrence": 1 },
-    { "type": "underscore", "word": "far", "occurrence": 1 },
-    { "type": "emoji", "word": "more", "occurrence": 1, "emoji": "➕" },
-    { "type": "underscore", "word": "abundantly", "occurrence": 1 },
-    { "type": "emoji", "word": "ask", "occurrence": 1, "emoji": "🙋" },
-    { "type": "emoji", "word": "think", "occurrence": 1, "emoji": "🧠" }
+    {
+      "type": "image",
+      "word": "Him",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "able",
+      "occurrence": 1,
+      "emoji": "💪"
+    },
+    {
+      "type": "underscore",
+      "word": "immeasurably",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "more",
+      "occurrence": 1,
+      "emoji": "➕"
+    },
+    {
+      "type": "emoji",
+      "word": "ask",
+      "occurrence": 1,
+      "emoji": "🙋"
+    },
+    {
+      "type": "emoji",
+      "word": "imagine",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "emoji",
+      "word": "power",
+      "occurrence": 1,
+      "emoji": "⚡"
+    }
   ]
 }

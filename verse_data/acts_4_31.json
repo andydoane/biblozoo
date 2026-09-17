@@ -5,27 +5,21 @@
   "verseId": "acts_4_31",
   "ref": "Acts 4:31",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "And they were all filled",
     "with the Holy Spirit",
-    "and continued to speak",
-    "the word of God with boldness"
+    "and spoke the word of God",
+    "boldly"
   ],
-  "verseText": "And they were all filled with the Holy Spirit and continued to speak the word of God with boldness.",
+  "verseText": "...and they were all filled with the Holy Spirit and spoke the word of God boldly.",
   "meaning": "God fills the believers with his Holy Spirit. He gives us courage to bravely share the good news with others.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
       "type": "underscore",
       "word": "filled",
       "occurrence": 1
-    },
-    {
-      "type": "emoji",
-      "word": "holy",
-      "occurrence": 1,
-      "emoji": "😇"
     },
     {
       "type": "image",
@@ -35,7 +29,7 @@
     },
     {
       "type": "emoji",
-      "word": "speak",
+      "word": "spoke",
       "occurrence": 1,
       "emoji": "🗣️"
     },
@@ -46,14 +40,14 @@
       "emoji": "📖"
     },
     {
-      "type": "emoji",
+      "type": "image",
       "word": "God",
       "occurrence": 1,
-      "emoji": "👑"
+      "image": "god_crown"
     },
     {
       "type": "emoji",
-      "word": "boldness",
+      "word": "boldly",
       "occurrence": 1,
       "emoji": "💪"
     }

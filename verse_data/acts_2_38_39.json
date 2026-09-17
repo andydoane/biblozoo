@@ -5,24 +5,58 @@
   "verseId": "acts_2_38_39",
   "ref": "Acts 2:38-39",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "You will receive the gift",
+    "you will receive the gift",
     "of the Holy Spirit",
-    "For the promise is for you",
-    "and for your children",
-    "and for all who are far off"
+    "This promise belongs to you",
+    "and your children",
+    "and to all who are far off"
   ],
-  "verseText": "You will receive the gift of the Holy Spirit. For the promise is for you and for your children and for all who are far off...",
+  "verseText": "...you will receive the gift of the Holy Spirit. This promise belongs to you and your children and to all who are far off...",
   "meaning": "The Holy Spirit is God's gift to his people. His promise is for all who believe: young and old, near and far.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "receive", "occurrence": 1, "emoji": "🤲" },
-    { "type": "emoji", "word": "gift", "occurrence": 1, "emoji": "🎁" },
-    { "type": "emoji", "word": "holy", "occurrence": 1, "emoji": "✨" },
-    { "type": "image", "word": "Spirit", "occurrence": 1, "image": "soul" },
-    { "type": "emoji", "word": "promise", "occurrence": 1, "emoji": "🤝" },
-    { "type": "emoji", "word": "children", "occurrence": 1, "emoji": "👩‍👦" },
-    { "type": "underscore", "word": "far", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "receive",
+      "occurrence": 1,
+      "emoji": "🤲"
+    },
+    {
+      "type": "emoji",
+      "word": "gift",
+      "occurrence": 1,
+      "emoji": "🎁"
+    },
+    {
+      "type": "emoji",
+      "word": "Holy",
+      "occurrence": 1,
+      "emoji": "✨"
+    },
+    {
+      "type": "image",
+      "word": "Spirit",
+      "occurrence": 1,
+      "image": "soul"
+    },
+    {
+      "type": "emoji",
+      "word": "promise",
+      "occurrence": 1,
+      "emoji": "🤝"
+    },
+    {
+      "type": "emoji",
+      "word": "children",
+      "occurrence": 1,
+      "emoji": "👩‍👦"
+    },
+    {
+      "type": "underscore",
+      "word": "far",
+      "occurrence": 1
+    }
   ]
 }

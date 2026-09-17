@@ -5,26 +5,57 @@
   "verseId": "deuteronomy_10_17",
   "ref": "Deuteronomy 10:17",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "For the Lord your God",
+    "For the LORD your God",
     "is God of gods",
     "and Lord of lords",
-    "the great, the mighty",
-    "and the awesome God"
+    "the great, mighty",
+    "and awesome God..."
   ],
-
-  "verseText": "For the Lord your God is God of gods and Lord of lords, the great, the mighty, and the awesome God...",
-   "meaning": "The Lord God is powerful and awesome. He's the one true God in charge of everything and everyone.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "For the LORD your God is God of gods and Lord of lords, the great, mighty, and awesome God...",
+  "meaning": "The Lord God is powerful and awesome. He's the one true God in charge of everything and everyone.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "mighty", "occurrence": 1, "emoji": "💪" },
-    { "type": "emoji", "word": "awesome", "occurrence": 1, "emoji": "😮" },
-    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
-    { "type": "underscore", "word": "gods", "occurrence": 1 },
-    { "type": "underscore", "word": "lords", "occurrence": 1 },
-    { "type": "underscore", "word": "Lord", "occurrence": 1 }
+    {
+      "type": "underscore",
+      "word": "LORD",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 2,
+      "image": "god_crown"
+    },
+    {
+      "type": "underscore",
+      "word": "Lord",
+      "occurrence": 2
+    },
+    {
+      "type": "emoji",
+      "word": "mighty",
+      "occurrence": 1,
+      "emoji": "💪"
+    },
+    {
+      "type": "emoji",
+      "word": "awesome",
+      "occurrence": 1,
+      "emoji": "😮"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 3,
+      "image": "god_crown"
+    }
   ]
 }

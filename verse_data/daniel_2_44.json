@@ -5,23 +5,52 @@
   "verseId": "daniel_2_44",
   "ref": "Daniel 2:44",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "And in the days of those kings",
+    "In the days of those kings",
     "the God of heaven",
     "will set up a kingdom",
-    "that shall never be destroyed"
+    "that will never be destroyed..."
   ],
-  "verseText": "And in the days of those kings the God of heaven will set up a kingdom that shall never be destroyed.",
+  "verseText": "In the days of those kings, the God of heaven will set up a kingdom that will never be destroyed...",
   "meaning": "Earthly kingdoms do not last forever. But Jesus' kingdom will last forever, and no one will ever be able to destroy it.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "days", "occurrence": 1, "emoji": "📅" },
-    { "type": "emoji", "word": "kings", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "☁️" },
-    { "type": "emoji", "word": "kingdom", "occurrence": 1, "emoji": "🏰" },
-    { "type": "emoji", "word": "never", "occurrence": 1, "emoji": "🚫" },
-    { "type": "emoji", "word": "destroyed", "occurrence": 1, "emoji": "💥" }
+    {
+      "type": "emoji",
+      "word": "kings",
+      "occurrence": 1,
+      "emoji": "👑"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "heaven",
+      "occurrence": 1,
+      "emoji": "☁️"
+    },
+    {
+      "type": "emoji",
+      "word": "kingdom",
+      "occurrence": 1,
+      "emoji": "🏰"
+    },
+    {
+      "type": "emoji",
+      "word": "never",
+      "occurrence": 1,
+      "emoji": "🚫"
+    },
+    {
+      "type": "emoji",
+      "word": "destroyed",
+      "occurrence": 1,
+      "emoji": "💥"
+    }
   ]
 }

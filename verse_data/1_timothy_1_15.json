@@ -5,16 +5,17 @@
   "verseId": "1_timothy_1_15",
   "ref": "1 Timothy 1:15",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Christ Jesus",
-    "came into the world",
+    "This is a trustworthy saying",
+    "worthy of full acceptance",
+    "Christ Jesus came into the world",
     "to save sinners",
-    "of whom I am the foremost"
+    "of whom I am the worst"
   ],
-  "verseText": "Christ Jesus came into the world to save sinners, of whom I am the foremost.",
+  "verseText": "This is a trustworthy saying, worthy of full acceptance: Christ Jesus came into the world to save sinners, of whom I am the worst.",
   "meaning": "Paul believed he was the foremost sinner, the worst sinner in the world. And he believed that Jesus could even save a sinner such as him.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
       "type": "image",
@@ -23,10 +24,15 @@
       "image": "cross"
     },
     {
+      "type": "underscore",
+      "word": "acceptance",
+      "occurrence": 1
+    },
+    {
       "type": "emoji",
-      "word": "came",
+      "word": "saying",
       "occurrence": 1,
-      "emoji": "➡️"
+      "emoji": "💬"
     },
     {
       "type": "emoji",
@@ -48,7 +54,7 @@
     },
     {
       "type": "underscore",
-      "word": "foremost",
+      "word": "worst",
       "occurrence": 1
     }
   ]

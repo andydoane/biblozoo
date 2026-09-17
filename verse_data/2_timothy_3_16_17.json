@@ -5,18 +5,18 @@
   "verseId": "2_timothy_3_16_17",
   "ref": "2 Timothy 3:16-17",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "All Scripture is breathed out by God",
-    "and profitable for teaching",
-    "for reproof, for correction",
+    "All Scripture is God-breathed",
+    "and is useful for instruction",
+    "for conviction, for correction",
     "and for training in righteousness",
-    "that the man of God may be complete",
-    "equipped for every good work."
+    "so that the man of God may be complete",
+    "fully equipped for every good work"
   ],
-  "verseText": "All Scripture is breathed out by God and profitable for teaching, for reproof, for correction, and for training in righteousness, that the man of God may be complete, equipped for every good work.",
+  "verseText": "All Scripture is God-breathed and is useful for instruction, for conviction, for correction, and for training in righteousness, so that the man of God may be complete, fully equipped for every good work.",
   "meaning": "The Bible comes from God. It helps us learn what is true, correct what is wrong, and grow in right living. By reading, believing, and following God's Word, we can be prepared for any good thing God wants us to do.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
       "type": "emoji",
@@ -32,7 +32,7 @@
     },
     {
       "type": "emoji",
-      "word": "teaching",
+      "word": "instruction",
       "occurrence": 1,
       "emoji": "🧑‍🏫"
     },

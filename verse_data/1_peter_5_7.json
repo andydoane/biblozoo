@@ -5,45 +5,45 @@
     "verseId": "1_peter_5_7",
     "ref": "1 Peter 5:7",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "Casting all your anxieties",
-        "on him",
-        "because he cares for you."
+        "Cast all your anxiety",
+        "on Him",
+        "because He cares for you"
     ],
-    "verseText": "Casting all your anxieties on him, because he cares for you.",
+    "verseText": "Cast all your anxiety on Him, because He cares for you.",
     "meaning": "Whenever something makes us feel anxious or worried, we should cast (or give) those worries to God. Like a loving Father he cares for us and helps us in times of trouble.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
-            "word": "casting",
+            "word": "Cast",
             "occurrence": 1,
             "emoji": "🎣"
         },
         {
             "type": "emoji",
-            "word": "anxieties",
+            "word": "anxiety",
             "occurrence": 1,
             "emoji": "😧"
         },
         {
             "type": "image",
-            "word": "him",
+            "word": "Him",
             "occurrence": 1,
             "image": "god_crown"
-        },
-        {
-            "type": "emoji",
-            "word": "you",
-            "occurrence": 1,
-            "emoji": "🫵"
         },
         {
             "type": "emoji",
             "word": "cares",
             "occurrence": 1,
             "emoji": "🤗"
+        },
+        {
+            "type": "emoji",
+            "word": "you",
+            "occurrence": 1,
+            "emoji": "🫵"
         }
     ]
 }

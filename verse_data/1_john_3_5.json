@@ -5,23 +5,58 @@
   "verseId": "1_john_3_5",
   "ref": "1 John 3:5",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "You know that he appeared",
-    "in order to take away sins",
-    "and in him there is no sin"
+    "But you know",
+    "that Christ appeared",
+    "to take away sins",
+    "and in Him",
+    "there is no sin"
   ],
-
-  "verseText": "You know that he appeared in order to take away sins, and in him there is no sin.",
-   "meaning": "The reason Jesus came to earth was to take away our sins. And during his life on earth, he never sinned, not even once.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "But you know that Christ appeared to take away sins, and in Him there is no sin.",
+  "meaning": "The reason Jesus came to earth was to take away our sins. And during his life on earth, he never sinned, not even once.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "know", "occurrence": 1, "emoji": "🧠" },
-    { "type": "emoji", "word": "sins", "occurrence": 1, "emoji": "👎" },
-    { "type": "emoji", "word": "sin", "occurrence": 1, "emoji": "👎" },
-    { "type": "emoji", "word": "no", "occurrence": 1, "emoji": "🚫" },
-    { "type": "underscore", "word": "order", "occurrence": 1 },
-    { "type": "emoji", "word": "appeared", "occurrence": 1, "emoji": "👀" },
-    { "type": "underscore", "word": "away", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "know",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "image",
+      "word": "Christ",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "emoji",
+      "word": "appeared",
+      "occurrence": 1,
+      "emoji": "👀"
+    },
+    {
+      "type": "underscore",
+      "word": "away",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "sins",
+      "occurrence": 1,
+      "emoji": "👎"
+    },
+    {
+      "type": "emoji",
+      "word": "no",
+      "occurrence": 1,
+      "emoji": "🚫"
+    },
+    {
+      "type": "emoji",
+      "word": "sin",
+      "occurrence": 1,
+      "emoji": "👎"
+    }
   ]
 }

@@ -5,23 +5,50 @@
   "verseId": "acts_5_29",
   "ref": "Acts 5:29",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "But Peter",
-    "and the apostles answered",
+    "and the other apostles replied",
     "We must obey God",
     "rather than men"
   ],
-  "verseText": "But Peter and the apostles answered, 'We must obey God rather than men.'",
+  "verseText": "But Peter and the other apostles replied, “We must obey God rather than men.”",
   "meaning": "Peter and the apostles knew that obeying God is more important than obeying people, even when it brings trouble into our lives.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "underscore", "word": "Peter", "occurrence": 1 },
-    { "type": "emoji", "word": "apostles", "occurrence": 1, "emoji": "👥" },
-    { "type": "emoji", "word": "answered", "occurrence": 1, "emoji": "🗣️" },
-    { "type": "underscore", "word": "obey", "occurrence": 1 },
-    { "type": "underscore", "word": "must", "occurrence": 1 },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "men", "occurrence": 1, "emoji": "👨" }
+    {
+      "type": "underscore",
+      "word": "Peter",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "apostles",
+      "occurrence": 1,
+      "emoji": "👥"
+    },
+    {
+      "type": "emoji",
+      "word": "replied",
+      "occurrence": 1,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "underscore",
+      "word": "obey",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "men",
+      "occurrence": 1,
+      "emoji": "👨"
+    }
   ]
 }

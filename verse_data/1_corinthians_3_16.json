@@ -5,22 +5,52 @@
   "verseId": "1_corinthians_3_16",
   "ref": "1 Corinthians 3:16",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "Do you not know",
-    "that you are God's temple",
-    "and that God's Spirit",
+    "that you yourselves are God’s temple",
+    "and that God’s Spirit",
     "dwells in you?"
   ],
-  "verseText": "Do you not know that you are God's temple and that God's Spirit dwells in you?",
+  "verseText": "Do you not know that you yourselves are God’s temple, and that God’s Spirit dwells in you?",
   "meaning": "In the Old Testament, God's Spirit dwelt in the temple building. But now, because of Jesus, God's Spirit dwells in anyone who believes in Jesus.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "know", "occurrence": 1, "emoji": "🧠" },
-    { "type": "emoji", "word": "God's", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "temple", "occurrence": 1, "emoji": "🏛️" },
-    { "type": "emoji", "word": "God's", "occurrence": 2, "emoji": "👑" },
-    { "type": "image", "word": "Spirit", "occurrence": 1, "image": "soul" },
-    { "type": "emoji", "word": "dwells", "occurrence": 1, "emoji": "🏠" }
+    {
+      "type": "emoji",
+      "word": "know",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "image",
+      "word": "God’s",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "temple",
+      "occurrence": 1,
+      "emoji": "🏛️"
+    },
+    {
+      "type": "image",
+      "word": "God’s",
+      "occurrence": 2,
+      "image": "god_crown"
+    },
+    {
+      "type": "image",
+      "word": "Spirit",
+      "occurrence": 1,
+      "image": "soul"
+    },
+    {
+      "type": "emoji",
+      "word": "dwells",
+      "occurrence": 1,
+      "emoji": "🏠"
+    }
   ]
 }
