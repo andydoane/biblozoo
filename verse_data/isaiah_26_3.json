@@ -5,15 +5,16 @@
     "verseId": "isaiah_26_3",
     "ref": "Isaiah 26:3",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "You keep him in perfect peace",
-        "whose mind is stayed on you",
-        "because he trusts in you."
+        "You will keep",
+        "in perfect peace",
+        "the steadfast of mind",
+        "because he trusts in You"
     ],
-    "verseText": "You keep him in perfect peace whose mind is stayed on you, because he trusts in you.",
+    "verseText": "You will keep in perfect peace the steadfast of mind, because he trusts in You.",
     "meaning": "Keeping our minds 'stayed' on God means to keep our thoughts focused on who he is, what he's done, and what he wants us to do. When we do this, we can enjoy peace, even in times of trouble.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -34,15 +35,15 @@
             "emoji": "✌️"
         },
         {
+            "type": "underscore",
+            "word": "steadfast",
+            "occurrence": 1
+        },
+        {
             "type": "emoji",
             "word": "mind",
             "occurrence": 1,
             "emoji": "🧠"
-        },
-        {
-            "type": "underscore",
-            "word": "stayed",
-            "occurrence": 1
         },
         {
             "type": "underscore",

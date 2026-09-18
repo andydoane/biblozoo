@@ -5,23 +5,57 @@
   "verseId": "isaiah_1_18",
   "ref": "Isaiah 1:18",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "Though your sins are like scarlet",
-    "they shall be as white as snow",
-    "though they are red like crimson",
-    "they shall become like wool."
+    "they will be as white as snow",
+    "though they are as red as crimson",
+    "they will become like wool"
   ],
-  "verseText": "Though your sins are like scarlet, they shall be as white as snow, though they are red like crimson, they shall become like wool.",
+  "verseText": "Though your sins are like scarlet, they will be as white as snow; though they are as red as crimson, they will become like wool.",
   "meaning": "The price of sin is deep and serious: forever death! But even the filthiest sinner can be washed clean through Jesus' blood.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "sins", "occurrence": 1, "emoji": "👎" },
-    { "type": "emoji", "word": "scarlet", "occurrence": 1, "emoji": "🔴" },
-    { "type": "emoji", "word": "white", "occurrence": 1, "emoji": "⚪" },
-    { "type": "emoji", "word": "snow", "occurrence": 1, "emoji": "❄️" },
-    { "type": "emoji", "word": "red", "occurrence": 1, "emoji": "🔴" },
-    { "type": "underscore", "word": "crimson", "occurrence": 1 },
-    { "type": "emoji", "word": "wool", "occurrence": 1, "emoji": "🐑" }
+    {
+      "type": "emoji",
+      "word": "sins",
+      "occurrence": 1,
+      "emoji": "👎"
+    },
+    {
+      "type": "emoji",
+      "word": "scarlet",
+      "occurrence": 1,
+      "emoji": "🔴"
+    },
+    {
+      "type": "emoji",
+      "word": "white",
+      "occurrence": 1,
+      "emoji": "⚪"
+    },
+    {
+      "type": "emoji",
+      "word": "snow",
+      "occurrence": 1,
+      "emoji": "❄️"
+    },
+    {
+      "type": "emoji",
+      "word": "red",
+      "occurrence": 1,
+      "emoji": "🔴"
+    },
+    {
+      "type": "underscore",
+      "word": "crimson",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "wool",
+      "occurrence": 1,
+      "emoji": "🐑"
+    }
   ]
 }

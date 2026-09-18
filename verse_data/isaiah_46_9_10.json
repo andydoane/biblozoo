@@ -5,24 +5,57 @@
   "verseId": "isaiah_46_9_10",
   "ref": "Isaiah 46:9-10",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "I am God",
-    "and there is none like me",
-    "declaring the end",
-    "from the beginning"
+    "and there is none like Me",
+    "I declare the end",
+    "from the beginning",
+    "and from ancient times",
+    "what is still to come"
   ],
-
-  "verseText": "I am God, and there is none like me, declaring the end from the beginning...",
-   "meaning": "No one is like God. He knows every single thing that will happen in the future.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "I am God, and there is none like Me. I declare the end from the beginning, and from ancient times what is still to come.",
+  "meaning": "No one is like God. He knows every single thing that will happen in the future.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "I", "occurrence": 1, "emoji": "👁️" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "☝️" },
-    { "type": "emoji", "word": "none", "occurrence": 1, "emoji": "🚫" },
-    { "type": "emoji", "word": "declaring", "occurrence": 1, "emoji": "🗣️" },
-    { "type": "underscore", "word": "end", "occurrence": 1 },
-    { "type": "underscore", "word": "beginning", "occurrence": 1 },
-    { "type": "underscore", "word": "me", "occurrence": 1 }
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "none",
+      "occurrence": 1,
+      "emoji": "🚫"
+    },
+    {
+      "type": "emoji",
+      "word": "declare",
+      "occurrence": 1,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "underscore",
+      "word": "end",
+      "occurrence": 1
+    },
+    {
+      "type": "underscore",
+      "word": "beginning",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "times",
+      "occurrence": 1,
+      "emoji": "⏳"
+    },
+    {
+      "type": "underscore",
+      "word": "come",
+      "occurrence": 1
+    }
   ]
 }

@@ -5,23 +5,57 @@
   "verseId": "hebrews_13_3",
   "ref": "Hebrews 13:3",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Remember those who are in prison",
-    "as though in prison with them",
+    "Remember those in prison",
+    "as if you were bound with them",
     "and those who are mistreated",
-    "since you also are in the body."
+    "as if you were suffering with them"
   ],
-  "verseText": "Remember those who are in prison, as though in prison with them, and those who are mistreated, since you also are in the body.",
+  "verseText": "Remember those in prison as if you were bound with them, and those who are mistreated as if you were suffering with them.",
   "meaning": "God calls us to remember and care about people who are imprisoned or mistreated, feeling their suffering as if it were happening to us.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "Remember", "occurrence": 1, "emoji": "🧠" },
-    { "type": "underscore", "word": "with", "occurrence": 1 },
-    { "type": "emoji", "word": "prison", "occurrence": 1, "emoji": "⛓️" },
-    { "type": "underscore", "word": "those", "occurrence": 1 },
-    { "type": "emoji", "word": "prison", "occurrence": 2, "emoji": "⛓️" },
-    { "type": "emoji", "word": "mistreated", "occurrence": 1, "emoji": "😢" },
-    { "type": "emoji", "word": "body", "occurrence": 1, "emoji": "🧍" }
+    {
+      "type": "emoji",
+      "word": "Remember",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "emoji",
+      "word": "prison",
+      "occurrence": 1,
+      "emoji": "皿"
+    },
+    {
+      "type": "emoji",
+      "word": "bound",
+      "occurrence": 1,
+      "emoji": "⛓️"
+    },
+    {
+      "type": "underscore",
+      "word": "them",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "mistreated",
+      "occurrence": 1,
+      "emoji": "😢"
+    },
+    {
+      "type": "emoji",
+      "word": "suffering",
+      "occurrence": 1,
+      "emoji": "😣"
+    },
+    {
+      "type": "emoji",
+      "word": "you",
+      "occurrence": 1,
+      "emoji": "🫵"
+    }
   ]
 }

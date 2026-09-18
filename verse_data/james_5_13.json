@@ -5,25 +5,51 @@
   "verseId": "james_5_13",
   "ref": "James 5:13",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Is anyone",
-    "among you suffering?",
-    "Let him pray.",
+    "Is any one of you suffering?",
+    "He should pray.",
     "Is anyone cheerful?",
-    "Let him sing praise."
+    "He should sing praises."
   ],
-
-  "verseText": "Is anyone among you suffering? Let him pray. Is anyone cheerful? Let him sing praise.",
-   "meaning": "Whenever trouble comes, our first step should be to pray to God for help.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "Is any one of you suffering? He should pray. Is anyone cheerful? He should sing praises.",
+  "meaning": "Whenever trouble comes, our first step should be to pray to God for help.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "suffering", "occurrence": 1, "emoji": "🤕" },
-    { "type": "emoji", "word": "cheerful", "occurrence": 1, "emoji": "😁" },
-    { "type": "emoji", "word": "sing", "occurrence": 1, "emoji": "🎵" },
-    { "type": "emoji", "word": "praise", "occurrence": 1, "emoji": "🙌" },
-    { "type": "emoji", "word": "pray", "occurrence": 1, "emoji": "🙏" },
-    { "type": "underscore", "word": "anyone", "occurrence": 1 },
-    { "type": "underscore", "word": "anyone", "occurrence": 2 }
+    {
+      "type": "emoji",
+      "word": "suffering",
+      "occurrence": 1,
+      "emoji": "🤕"
+    },
+    {
+      "type": "emoji",
+      "word": "pray",
+      "occurrence": 1,
+      "emoji": "🙏"
+    },
+    {
+      "type": "emoji",
+      "word": "cheerful",
+      "occurrence": 1,
+      "emoji": "😁"
+    },
+    {
+      "type": "underscore",
+      "word": "anyone",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "sing",
+      "occurrence": 1,
+      "emoji": "🎵"
+    },
+    {
+      "type": "emoji",
+      "word": "praises",
+      "occurrence": 1,
+      "emoji": "🙌"
+    }
   ]
 }
