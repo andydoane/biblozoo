@@ -5,26 +5,58 @@
   "verseId": "genesis_50_20",
   "ref": "Genesis 50:20",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "As for you",
-    "you meant evil against me",
-    "but God meant it for good",
-    "to bring it about",
-    "that many people",
-    "should be kept alive"
+    "what you intended against me for evil",
+    "God intended for good",
+    "in order to accomplish a day like this",
+    "to preserve the lives",
+    "of many people"
   ],
-
-  "verseText": "As for you, you meant evil against me, but God meant it for good, to bring it about that many people should be kept alive...",
-   "meaning": "Joseph's brothers had an evil plan to hurt Joseph. But God had a good plan the whole time, to use Joseph to save many people",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "As for you, what you intended against me for evil, God intended for good, in order to accomplish a day like this—to preserve the lives of many people.",
+  "meaning": "Joseph's brothers had an evil plan to hurt Joseph. But God had a good plan the whole time, to use Joseph to save many people",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "evil", "occurrence": 1, "emoji": "👺" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "☝️" },
-    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "people", "occurrence": 1, "emoji": "👥👥" },
-    { "type": "underscore", "word": "you", "occurrence": 1 },
-    { "type": "underscore", "word": "alive", "occurrence": 1 },
-    { "type": "underscore", "word": "me", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "evil",
+      "occurrence": 1,
+      "emoji": "👺"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "good",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "underscore",
+      "word": "accomplish",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "preserve",
+      "occurrence": 1,
+      "emoji": "🛟"
+    },
+    {
+      "type": "underscore",
+      "word": "lives",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "people",
+      "occurrence": 1,
+      "emoji": "👥👥"
+    }
   ]
 }

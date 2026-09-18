@@ -5,24 +5,59 @@
   "verseId": "galatians_5_22_23",
   "ref": "Galatians 5:22-23",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "But the fruit of the Spirit",
-    "is love, joy, peace,",
-    "patience, kindness, goodness,",
-    "faithfulness, gentleness, self-control."
+    "is love, joy, peace",
+    "patience, kindness, goodness",
+    "faithfulness, gentleness",
+    "and self-control"
   ],
-  "verseText": "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control.",
+  "verseText": "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.",
   "meaning": "When the Holy Spirit lives inside us, he grows good things in our lives, just like a fruit tree grows delicious fruit.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "fruit", "occurrence": 1, "emoji": "🍎" },
-    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
-    { "type": "emoji", "word": "joy", "occurrence": 1, "emoji": "😄" },
-    { "type": "emoji", "word": "peace", "occurrence": 1, "emoji": "✌️" },
-    { "type": "emoji", "word": "patience", "occurrence": 1, "emoji": "🕜" },
-    { "type": "emoji", "word": "kindness,", "occurrence": 1, "emoji": "🤝" },
-    { "type": "emoji", "word": "goodness", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "self-control", "occurrence": 1, "emoji": "🎮" }
+    {
+      "type": "emoji",
+      "word": "fruit",
+      "occurrence": 1,
+      "emoji": "🍎"
+    },
+    {
+      "type": "emoji",
+      "word": "love",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "emoji",
+      "word": "joy",
+      "occurrence": 1,
+      "emoji": "😄"
+    },
+    {
+      "type": "emoji",
+      "word": "peace",
+      "occurrence": 1,
+      "emoji": "✌️"
+    },
+    {
+      "type": "emoji",
+      "word": "patience",
+      "occurrence": 1,
+      "emoji": "🕜"
+    },
+    {
+      "type": "emoji",
+      "word": "kindness",
+      "occurrence": 1,
+      "emoji": "🤝"
+    },
+    {
+      "type": "emoji",
+      "word": "self-control",
+      "occurrence": 1,
+      "emoji": "🎮"
+    }
   ]
 }

@@ -5,23 +5,51 @@
   "verseId": "hebrews_10_19",
   "ref": "Hebrews 10:19",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "We have confidence",
+    "Therefore, brothers",
+    "since we have confidence",
     "to enter the Most Holy Place",
     "by the blood of Jesus"
   ],
-
-  "verseText": "We have confidence to enter the Most Holy Place by the blood of Jesus...",
-   "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to him anytime.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "Therefore, brothers, since we have confidence to enter the Most Holy Place by the blood of Jesus,",
+  "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to him anytime.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "blood", "occurrence": 1, "emoji": "🩸" },
-    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
-    { "type": "emoji", "word": "holy", "occurrence": 1, "emoji": "😇" },
-    { "type": "emoji", "word": "enter", "occurrence": 1, "emoji": "➡️🚪" },
-    { "type": "underscore", "word": "most", "occurrence": 1 },
-    { "type": "underscore", "word": "place", "occurrence": 1 },
-    { "type": "underscore", "word": "confidence", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "brothers",
+      "occurrence": 1,
+      "emoji": "👨‍🦰👱‍♂️"
+    },
+    {
+      "type": "underscore",
+      "word": "confidence",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "enter",
+      "occurrence": 1,
+      "emoji": "➡️🚪"
+    },
+    {
+      "type": "emoji",
+      "word": "Holy",
+      "occurrence": 1,
+      "emoji": "😇"
+    },
+    {
+      "type": "emoji",
+      "word": "blood",
+      "occurrence": 1,
+      "emoji": "🩸"
+    },
+    {
+      "type": "image",
+      "word": "Jesus",
+      "occurrence": 1,
+      "image": "cross"
+    }
   ]
 }

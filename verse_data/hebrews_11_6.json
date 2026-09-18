@@ -5,24 +5,59 @@
   "verseId": "hebrews_11_6",
   "ref": "Hebrews 11:6",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "And without faith",
-    "it is impossible to please him",
-    "for whoever would draw near to God",
-    "must believe that he exists",
-    "and that he rewards those who seek him."
+    "it is impossible to please God",
+    "For anyone who approaches Him",
+    "must believe that He exists",
+    "and that He rewards",
+    "those who earnestly seek Him"
   ],
-  "verseText": "And without faith it is impossible to please him, for whoever would draw near to God must believe that he exists and that he rewards those who seek him.",
+  "verseText": "And without faith it is impossible to please God. For anyone who approaches Him must believe that He exists and that He rewards those who earnestly seek Him.",
   "meaning": "If we don't have faith in God, it doesn't matter how good we try to be. The only way to please God is to put our faith and trust in his Son Jesus.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "faith", "occurrence": 1, "emoji": "🙏" },
-    { "type": "emoji", "word": "impossible", "occurrence": 1, "emoji": "🚫" },
-    { "type": "emoji", "word": "please", "occurrence": 1, "emoji": "😊" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
-    { "type": "underscore", "word": "believe", "occurrence": 1 },
-    { "type": "emoji", "word": "rewards", "occurrence": 1, "emoji": "🏆" },
-    { "type": "emoji", "word": "seek", "occurrence": 1, "emoji": "🔎" }
+    {
+      "type": "emoji",
+      "word": "faith",
+      "occurrence": 1,
+      "emoji": "🙏"
+    },
+    {
+      "type": "emoji",
+      "word": "impossible",
+      "occurrence": 1,
+      "emoji": "🚫"
+    },
+    {
+      "type": "emoji",
+      "word": "please",
+      "occurrence": 1,
+      "emoji": "😊"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "underscore",
+      "word": "believe",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "rewards",
+      "occurrence": 1,
+      "emoji": "🏆"
+    },
+    {
+      "type": "emoji",
+      "word": "seek",
+      "occurrence": 1,
+      "emoji": "🔎"
+    }
   ]
 }
