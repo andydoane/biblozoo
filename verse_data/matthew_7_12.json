@@ -5,29 +5,58 @@
   "verseId": "matthew_7_12",
   "ref": "Matthew 7:12",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "So whatever you wish",
-    "that others",
-    "would do to you,",
-    "do also to them."
+    "In everything, then",
+    "do to others",
+    "as you would have them",
+    "do to you",
+    "For this is the essence",
+    "of the Law and the Prophets"
   ],
-
-  "verseText": "So whatever you wish that others would do to you, do also to them.",
-   "meaning": "This verse is another way to say the second Great Commandment: 'Love your neighbor as you love yourself.'",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“In everything, then, do to others as you would have them do to you. For this is the essence of the Law and the Prophets.”",
+  "meaning": "This verse is another way to say the second Great Commandment: 'Love your neighbor as you love yourself.'",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "wish", "occurrence": 1, "emoji": "🌠" },
-    { "type": "emoji", "word": "you", "occurrence": 1, "emoji": "🫵" },
-    { "type": "emoji", "word": "whatever", "occurrence": 1, "emoji": "🤷‍♂️" },
-    { "type": "underscore", "word": "others", "occurrence": 1 },
-    { "type": "underscore", "word": "also", "occurrence": 1 },
-    { "type": "underscore", "word": "them", "occurrence": 1 },
-    { "type": "underscore", "word": "do", "occurrence": 1 }
+    {
+      "type": "image",
+      "word": "everything",
+      "occurrence": 1,
+      "image": "arrows"
+    },
+    {
+      "type": "underscore",
+      "word": "do",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "others",
+      "occurrence": 1,
+      "emoji": "👥"
+    },
+    {
+      "type": "emoji",
+      "word": "you",
+      "occurrence": 1,
+      "emoji": "🫵"
+    },
+    {
+      "type": "underscore",
+      "word": "essence",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "Law",
+      "occurrence": 1,
+      "image": "tablet"
+    },
+    {
+      "type": "emoji",
+      "word": "Prophets",
+      "occurrence": 1,
+      "emoji": "📜"
+    }
   ]
 }
-
-
-
-
-    

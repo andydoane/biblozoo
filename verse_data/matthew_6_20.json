@@ -5,24 +5,58 @@
   "verseId": "matthew_6_20",
   "ref": "Matthew 6:20",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "But lay up for yourselves",
+    "But store up for yourselves",
     "treasures in heaven",
-    "where neither moth nor rust destroys",
+    "where moth and rust",
+    "do not destroy",
     "and where thieves do not",
-    "break in and steal."
+    "break in and steal"
   ],
-  "verseText": "But lay up for yourselves treasures in heaven, where neither moth nor rust destroys and where thieves do not break in and steal.",
+  "verseText": "“But store up for yourselves treasures in heaven, where moth and rust do not destroy, and where thieves do not break in and steal.”",
   "meaning": "We should value treasures that last forever (like eternal life in God’s kingdom) instead of earthly things that can be ruined, stolen, or lost.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "treasures", "occurrence": 1, "emoji": "🪎" },
-    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "☁️" },
-    { "type": "emoji", "word": "moth", "occurrence": 1, "emoji": "🦋" },
-    { "type": "underscore", "word": "rust", "occurrence": 1 },
-    { "type": "emoji", "word": "destroys", "occurrence": 1, "emoji": "💥" },
-    { "type": "emoji", "word": "thieves", "occurrence": 1, "emoji": "🥷" },
-    { "type": "emoji", "word": "steal", "occurrence": 1, "emoji": "🫱💰" }
+    {
+      "type": "underscore",
+      "word": "store",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "treasures",
+      "occurrence": 1,
+      "image": "treasure"
+    },
+    {
+      "type": "emoji",
+      "word": "heaven",
+      "occurrence": 1,
+      "emoji": "☁️"
+    },
+    {
+      "type": "emoji",
+      "word": "moth",
+      "occurrence": 1,
+      "emoji": "🦋"
+    },
+    {
+      "type": "underscore",
+      "word": "rust",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "thieves",
+      "occurrence": 1,
+      "emoji": "🥷"
+    },
+    {
+      "type": "image",
+      "word": "steal",
+      "occurrence": 1,
+      "image": "steal"
+    }
   ]
 }

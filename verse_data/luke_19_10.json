@@ -5,21 +5,52 @@
   "verseId": "luke_19_10",
   "ref": "Luke 19:10",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "For the Son of Man",
     "came to seek",
-    "and to save the lost."
+    "and to save",
+    "the lost"
   ],
-  "verseText": "For the Son of Man came to seek and to save the lost.",
+  "verseText": "“For the Son of Man came to seek and to save the lost.”",
   "meaning": "Jesus, the Son of Man, is describing his mission. He came to look for lost sinners and to save them.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
-    { "type": "emoji", "word": "Man", "occurrence": 1, "emoji": "🧍" },
-    { "type": "emoji", "word": "came", "occurrence": 1, "emoji": "➡️" },
-    { "type": "emoji", "word": "seek", "occurrence": 1, "emoji": "🔎" },
-    { "type": "emoji", "word": "save", "occurrence": 1, "emoji": "🛟" },
-    { "type": "emoji", "word": "lost", "occurrence": 1, "emoji": "🧭" }
+    {
+      "type": "image",
+      "word": "Son",
+      "occurrence": 1,
+      "image": "baby"
+    },
+    {
+      "type": "emoji",
+      "word": "Man",
+      "occurrence": 1,
+      "emoji": "🧍"
+    },
+    {
+      "type": "emoji",
+      "word": "came",
+      "occurrence": 1,
+      "emoji": "➡️"
+    },
+    {
+      "type": "emoji",
+      "word": "seek",
+      "occurrence": 1,
+      "emoji": "🔎"
+    },
+    {
+      "type": "emoji",
+      "word": "save",
+      "occurrence": 1,
+      "emoji": "🛟"
+    },
+    {
+      "type": "emoji",
+      "word": "lost",
+      "occurrence": 1,
+      "emoji": "😔❓"
+    }
   ]
 }

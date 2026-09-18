@@ -5,16 +5,16 @@
     "verseId": "john_15_13",
     "ref": "John 15:13",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "Greater love",
         "has no one than this",
-        "that someone lay down his life",
-        "for his friends."
+        "that he lay down his life",
+        "for his friends"
     ],
-    "verseText": "Greater love has no one than this, that someone lay down his life for his friends.",
+    "verseText": "Greater love has no one than this, that he lay down his life for his friends.",
     "meaning": "The greatest love is shown by giving up your life for someone else. Jesus showed this perfect love when he died in our place on the cross.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "underscore",
@@ -35,15 +35,9 @@
         },
         {
             "type": "emoji",
-            "word": "someone",
+            "word": "down",
             "occurrence": 1,
-            "emoji": "👤"
-        },
-        {
-            "type": "emoji",
-            "word": "lay",
-            "occurrence": 1,
-            "emoji": "⬇👇"
+            "emoji": "⬇️"
         },
         {
             "type": "emoji",

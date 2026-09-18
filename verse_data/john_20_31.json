@@ -5,24 +5,58 @@
   "verseId": "john_20_31",
   "ref": "John 20:31",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "But these are written",
     "so that you may believe",
     "that Jesus is the Christ",
-    "the Son of God"
+    "the Son of God",
+    "and that by believing",
+    "you may have life in His name"
   ],
-
-  "verseText": "But these are written so that you may believe that Jesus is the Christ, the Son of God...",
-   "meaning": "John wrote a book describing many of Jesus' miracles. He wrote it so that people would believe that Jesus was the Christ, the savior sent to rescue us from our sins.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "But these are written so that you may believe that Jesus is the Christ, the Son of God, and that by believing you may have life in His name.",
+  "meaning": "John wrote a book describing many of Jesus' miracles. He wrote it so that people would believe that Jesus was the Christ, the savior sent to rescue us from our sins.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "written", "occurrence": 1, "emoji": "📝" },
-    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
-    { "type": "emoji", "word": "son", "occurrence": 1, "emoji": "👨‍🍼" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
-    { "type": "underscore", "word": "Christ", "occurrence": 1 },
-    { "type": "underscore", "word": "you", "occurrence": 1 },
-    { "type": "underscore", "word": "believe", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "written",
+      "occurrence": 1,
+      "emoji": "📝"
+    },
+    {
+      "type": "underscore",
+      "word": "believe",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "Jesus",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "underscore",
+      "word": "Christ",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "Son",
+      "occurrence": 1,
+      "image": "baby"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "life",
+      "occurrence": 1,
+      "emoji": "🌱"
+    }
   ]
 }

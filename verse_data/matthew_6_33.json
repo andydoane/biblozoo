@@ -5,17 +5,17 @@
     "verseId": "matthew_6_33",
     "ref": "Matthew 6:33",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "But seek first",
         "the kingdom of God",
-        "and his righteousness",
+        "and His righteousness",
         "and all these things",
-        "will be added to you."
+        "will be added unto you"
     ],
-    "verseText": "But seek first the kingdom of God and his righteousness, and all these things will be added to you.",
+    "verseText": "“But seek first the kingdom of God and His righteousness, and all these things will be added unto you.”",
     "meaning": "There are many things in life to think about and worry about. But Jesus teaches us to put God's kingdom and what is right before everything else, trusting God to take care of what we need.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -36,11 +36,6 @@
             "emoji": "🏰"
         },
         {
-            "type": "underscore",
-            "word": "things",
-            "occurrence": 1
-        },
-        {
             "type": "image",
             "word": "God",
             "occurrence": 1,
@@ -49,6 +44,11 @@
         {
             "type": "underscore",
             "word": "righteousness",
+            "occurrence": 1
+        },
+        {
+            "type": "underscore",
+            "word": "things",
             "occurrence": 1
         },
         {

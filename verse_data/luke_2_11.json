@@ -5,28 +5,50 @@
   "verseId": "luke_2_11",
   "ref": "Luke 2:11",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-  "For unto you",
-  "is born this day",
-  "in the city of David",
-  "a savior",
-  "who is Christ the Lord."
-],
-
-  "verseText": "For unto you is born this day in the city of David a Savior, who is Christ the Lord.",
+    "Today in the city of David",
+    "a Savior has been born to you",
+    "He is Christ the Lord"
+  ],
+  "verseText": "“Today in the city of David a Savior has been born to you. He is Christ the Lord!”",
   "meaning": "This is how the angels let the shepherds know that Jesus the savior was born in Bethlehem.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "born",  "occurrence": 1, "emoji": "👶" },
-    { "type": "emoji", "word": "savior",    "occurrence": 1, "emoji": "🦸" },
-    { "type": "emoji", "word": "city",    "occurrence": 1, "emoji": "🏢" },
-    { "type": "emoji", "word": "christ",   "occurrence": 1, "emoji": "✝️" },
-    { "type": "emoji", "word": "you",  "occurrence": 1, "emoji": "🫵" },
-    { "type": "emoji", "word": "lord",  "occurrence": 1, "emoji": "👑" },
-        { "type": "emoji", "word": "day",  "occurrence": 1, "emoji": "📅" },
-
-    { "type": "underscore", "word": "david",  "occurrence": 1 },
-    { "type": "underscore", "word": "For",   "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "Today",
+      "occurrence": 1,
+      "emoji": "📅"
+    },
+    {
+      "type": "underscore",
+      "word": "David",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "Savior",
+      "occurrence": 1,
+      "emoji": "🦸"
+    },
+    {
+      "type": "emoji",
+      "word": "born",
+      "occurrence": 1,
+      "emoji": "👶"
+    },
+    {
+      "type": "image",
+      "word": "Christ",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "image",
+      "word": "Lord",
+      "occurrence": 1,
+      "image": "god_crown"
+    }
   ]
 }

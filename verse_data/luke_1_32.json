@@ -5,24 +5,57 @@
   "verseId": "luke_1_32",
   "ref": "Luke 1:32",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "He will be great",
     "and will be called",
-    "the Son of the Most High",
-    "And the Lord God will give to him",
-    "the throne of his father David"
+    "the Son of the Most High", 
+    "The Lord God will give Him",
+    "the throne of His father David"
   ],
-  "verseText": "He will be great and will be called the Son of the Most High. And the Lord God will give to him the throne of his father David.",
+  "verseText": "“He will be great and will be called the Son of the Most High. The Lord God will give Him the throne of His father David,”",
   "meaning": "God promised David his family would rule over God's people forever. God kept that promise by sending Jesus to be born into David's family.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "called", "occurrence": 1, "emoji": "🗣️" },
-    { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
-    { "type": "underscore", "word": "Lord", "occurrence": 1 },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
-    { "type": "emoji", "word": "throne", "occurrence": 1, "emoji": "👑" },
-    { "type": "underscore", "word": "David", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "great",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "emoji",
+      "word": "called",
+      "occurrence": 1,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "image",
+      "word": "Son",
+      "occurrence": 1,
+      "image": "baby"
+    },
+    {
+      "type": "underscore",
+      "word": "Lord",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "throne",
+      "occurrence": 1,
+      "emoji": "👑"
+    },
+    {
+      "type": "underscore",
+      "word": "David",
+      "occurrence": 1
+    }
   ]
 }

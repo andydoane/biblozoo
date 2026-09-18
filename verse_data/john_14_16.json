@@ -5,16 +5,17 @@
     "verseId": "john_14_16",
     "ref": "John 14:16",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "And I will ask the Father",
-        "and he will give you",
-        "another Helper",
-        "to be with you forever."
+        "and He will give you",
+        "another Advocate",
+        "to be with you forever",
+        "the Spirit of truth"
     ],
-    "verseText": "And I will ask the Father, and he will give you another Helper, to be with you forever.",
+    "verseText": "And I will ask the Father, and He will give you another Advocate to be with you forever — the Spirit of truth...",
     "meaning": "Jesus knew he would return to heaven and leave his disciples. So promised that the Father would give his followers another Helper, the Holy Spirit, who would always be with them.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -35,26 +36,26 @@
         },
         {
             "type": "emoji",
-            "word": "another",
-            "occurrence": 1,
-            "emoji": "➕"
-        },
-        {
-            "type": "emoji",
-            "word": "Helper",
+            "word": "Advocate",
             "occurrence": 1,
             "emoji": "🤝"
-        },
-        {
-            "type": "underscore",
-            "word": "with",
-            "occurrence": 1
         },
         {
             "type": "emoji",
             "word": "forever",
             "occurrence": 1,
             "emoji": "♾️"
+        },
+        {
+            "type": "image",
+            "word": "Spirit",
+            "occurrence": 1,
+            "image": "soul"
+        },
+        {
+            "type": "underscore",
+            "word": "truth",
+            "occurrence": 1
         }
     ]
 }

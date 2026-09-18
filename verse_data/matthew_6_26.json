@@ -5,24 +5,60 @@
   "verseId": "matthew_6_26",
   "ref": "Matthew 6:26",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "Look at the birds of the air",
-    "they neither sow nor reap",
-    "nor gather into barns",
+    "They do not sow or reap",
+    "or gather into barns",
     "and yet your heavenly Father feeds them",
-    "Are you not of more value than they?"
+    "Are you not much more",
+    "valuable than they?"
   ],
-  "verseText": "Look at the birds of the air: they neither sow nor reap nor gather into barns, and yet your heavenly Father feeds them. Are you not of more value than they?",
+  "verseText": "“Look at the birds of the air: They do not sow or reap or gather into barns, and yet your heavenly Father feeds them. Are you not much more valuable than they?”",
   "meaning": "Birds aren’t farmers. They must rely on God to take care of their needs. We can trust our heavenly Father to care for us because we are even more valuable to him.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "birds", "occurrence": 1, "emoji": "🦜" },
-    { "type": "emoji", "word": "sow", "occurrence": 1, "emoji": "🌱" },
-    { "type": "emoji", "word": "reap", "occurrence": 1, "emoji": "🌾" },
-    { "type": "image", "word": "barns", "occurrence": 1, "image": "barn" },
-    { "type": "emoji", "word": "Father", "occurrence": 1, "emoji": "👨" },
-    { "type": "emoji", "word": "feeds", "occurrence": 1, "emoji": "🍽️" },
-    { "type": "emoji", "word": "value", "occurrence": 1, "emoji": "💰" }
+    {
+      "type": "emoji",
+      "word": "birds",
+      "occurrence": 1,
+      "emoji": "🦜"
+    },
+    {
+      "type": "emoji",
+      "word": "sow",
+      "occurrence": 1,
+      "emoji": "🌱"
+    },
+    {
+      "type": "emoji",
+      "word": "reap",
+      "occurrence": 1,
+      "emoji": "🌾"
+    },
+    {
+      "type": "image",
+      "word": "barns",
+      "occurrence": 1,
+      "image": "barn"
+    },
+    {
+      "type": "emoji",
+      "word": "Father",
+      "occurrence": 1,
+      "emoji": "👨"
+    },
+    {
+      "type": "emoji",
+      "word": "feeds",
+      "occurrence": 1,
+      "emoji": "🍽️"
+    },
+    {
+      "type": "emoji",
+      "word": "valuable",
+      "occurrence": 1,
+      "emoji": "💎"
+    }
   ]
 }

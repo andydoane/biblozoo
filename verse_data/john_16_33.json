@@ -5,21 +5,23 @@
     "verseId": "john_16_33",
     "ref": "John 16:33",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "I have said these things to you",
-        "that in me you may have peace.",
-        "In the world you will have tribulation.",
-        "But take heart",
-        "I have overcome the world."
+        "I have told you these things",
+        "so that in Me",
+        "you may have peace",
+        "In the world",
+        "you will have tribulation",
+        "But take courage",
+        "I have overcome the world"
     ],
-    "verseText": "I have said these things to you, that in me you may have peace. In the world you will have tribulation. But take heart; I have overcome the world.",
+    "verseText": "I have told you these things so that in Me you may have peace. In the world you will have tribulation. But take courage; I have overcome the world!",
     "meaning": "Jesus promised that his disciples would face tribulations (times of trouble) in this world. But we can have peace in our hearts, knowing that Jesus has earned us a place in God's forever kingdom.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
-            "word": "said",
+            "word": "told",
             "occurrence": 1,
             "emoji": "🗣️"
         },
@@ -43,9 +45,9 @@
         },
         {
             "type": "emoji",
-            "word": "heart",
+            "word": "courage",
             "occurrence": 1,
-            "emoji": "❤️"
+            "emoji": "💪"
         },
         {
             "type": "underscore",

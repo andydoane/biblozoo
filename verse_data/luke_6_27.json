@@ -5,26 +5,54 @@
   "verseId": "luke_6_27",
   "ref": "Luke 6:27",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "But I say",
-    "to you who hear",
+    "But to those of you",
+    "who will listen",
+    "I say",
     "Love your enemies",
-    "Do good",
-    "to those who hate you."
+    "do good",
+    "to those who hate you"
   ],
-
-  "verseText": "But I say to you who hear, 'Love your enemies. Do good to those who hate you...'",
-   "meaning": "When someone hurts us, we feel like getting revenge. But Jesus wants us to love them instead.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“But to those of you who will listen, I say: Love your enemies, do good to those who hate you,”",
+  "meaning": "When someone hurts us, we feel like getting revenge. But Jesus wants us to love them instead.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "say", "occurrence": 1, "emoji": "🗣️" },
-    { "type": "emoji", "word": "hear", "occurrence": 1, "emoji": "👂" },
-    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
-    { "type": "emoji", "word": "enemies", "occurrence": 1, "emoji": "👿" },
-    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "hate", "occurrence": 1, "emoji": "😡" },
-    { "type": "underscore", "word": "those", "occurrence": 1 },
-    { "type": "underscore", "word": "you", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "listen",
+      "occurrence": 1,
+      "emoji": "👂"
+    },
+    {
+      "type": "emoji",
+      "word": "say",
+      "occurrence": 1,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "emoji",
+      "word": "Love",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "emoji",
+      "word": "enemies",
+      "occurrence": 1,
+      "emoji": "😠"
+    },
+    {
+      "type": "emoji",
+      "word": "good",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "emoji",
+      "word": "hate",
+      "occurrence": 1,
+      "emoji": "😡"
+    }
   ]
 }

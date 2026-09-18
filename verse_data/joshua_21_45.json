@@ -5,27 +5,52 @@
   "verseId": "joshua_21_45",
   "ref": "Joshua 21:45",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Not one word",
-    "of all the good promises",
-    "that the Lord had made",
+    "Not one",
+    "of all the LORD’s good promises",
     "to the house of Israel",
     "had failed",
-    "All came to pass"
+    "everything was fulfilled"
   ],
-
-  "verseText": "Not one word of all the good promises that the Lord had made to the house of Israel had failed; all came to pass.",
+  "verseText": "Not one of all the LORD’s good promises to the house of Israel had failed; everything was fulfilled.",
   "meaning": "God kept all the promises he made to the Israelites. And he keeps all the promises he makes to us.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "word", "occurrence": 1, "emoji": "✍️" },
-    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "promises", "occurrence": 1, "emoji": "🤞" },
-    { "type": "emoji", "word": "house", "occurrence": 1, "emoji": "🏠" },
-    { "type": "emoji", "word": "failed", "occurrence": 1, "emoji": "❌" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "one", "occurrence": 1, "emoji": "1️⃣" },
-    { "type": "underscore", "word": "Israel", "occurrence": 1 }
+    {
+      "type": "image",
+      "word": "LORD’s",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "good",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "emoji",
+      "word": "promises",
+      "occurrence": 1,
+      "emoji": "🤞"
+    },
+    {
+      "type": "underscore",
+      "word": "Israel",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "failed",
+      "occurrence": 1,
+      "emoji": "❌"
+    },
+    {
+      "type": "emoji",
+      "word": "fulfilled",
+      "occurrence": 1,
+      "emoji": "✅"
+    }
   ]
 }
