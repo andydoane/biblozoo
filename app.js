@@ -6023,6 +6023,23 @@ function verseIdToRef(verseId, translation) {
   return `${book} ${chapter}:${versePart}${t}`;
 }
 
+function getLearnTranslationName() {
+  const translation =
+    String(TRANSLATION || "")
+      .trim()
+      .toUpperCase();
+
+  if (translation === "ESV") {
+    return "English Standard Version";
+  }
+
+  if (translation === "BSB") {
+    return "Berean Standard Bible";
+  }
+
+  return translation;
+}
+
 function getTitleSubtitle() {
   if (!HAS_VERSE_SELECTION) {
     return "Choose a verse to begin";
@@ -8585,7 +8602,10 @@ function refAudioFile() {
 
 function getLearnAudioParts() {
   const parts = [
-    { text: VERSE_REF, file: refAudioFile() }
+    {
+      text: verseIdToRef(VERSE_ID, ""),
+      file: refAudioFile()
+    }
   ];
 
   if (ECHO_PARTS.length) {
@@ -14255,32 +14275,44 @@ function screenListen(idx) {
 
       <div class="learn-verse learn-stage learn-stage-card learn-stage-smart ${listenDisplayFitClass}">
         ${smartLearnTextHtml({
-      title: hasHeardVerse ? VERSE_REF : "",
+      title: hasHeardVerse ? verseIdToRef(VERSE_ID, "") : "",
       body: listenDisplayText,
       extraClass: hasHeardVerse ? "smart-learn-text-verse" : "smart-learn-text-placeholder"
     })}
       </div>
 
       <div class="learn-coach learn-bottom-zone">
-        <div class="coach-actions">
-          ${(
-      isListenSlideExiting ||
-      State.listenPlaying ||
-      State.instructionPlaying ||
-      (State.listenAutoStarting && !State.listenAutoFallbackReady)
-    )
-      ? ``
-      : `
-                <button class="carousel-main no-zoom" id="btnListenPlay" style="max-width:520px;">
-                  ${State.listenDone
-        ? "What It Means"
-        : State.listenAutoFallbackReady
-          ? "Tap to Play Verse"
-          : "🔊 Read it to me"
-      }
-                </button>
+        <div>
+          ${
+            hasHeardVerse && getLearnTranslationName()
+              ? `
+                <div class="coach-text">
+                  ${escapeHtml(getLearnTranslationName())}
+                </div>
               `
-    }
+              : ``
+          }
+
+          <div class="coach-actions">
+            ${(
+        isListenSlideExiting ||
+        State.listenPlaying ||
+        State.instructionPlaying ||
+        (State.listenAutoStarting && !State.listenAutoFallbackReady)
+      )
+        ? ``
+        : `
+                  <button class="carousel-main no-zoom" id="btnListenPlay" style="max-width:520px;">
+                    ${State.listenDone
+          ? "What It Means"
+          : State.listenAutoFallbackReady
+            ? "Tap to Play Verse"
+            : "🔊 Read it to me"
+        }
+                  </button>
+                `
+      }
+          </div>
         </div>
       </div>
     </div>
@@ -14548,7 +14580,7 @@ function screenHide(idx) {
           data-smart-learn-text
           data-smart-fit-text="${escapeHtml(VERSE_TEXT)}"
         >
-          <div class="smart-learn-title">${escapeHtml(VERSE_REF)}</div>
+          <div class="smart-learn-title">${escapeHtml(verseIdToRef(VERSE_ID, ""))}</div>
           <div class="smart-learn-body" id="verseStage"></div>
         </div>
 
@@ -14647,7 +14679,7 @@ function screenFinalRecall(idx) {
           data-smart-learn-text
           data-smart-fit-text="${escapeHtml(VERSE_TEXT)}"
         >
-          <div class="smart-learn-title">${escapeHtml(VERSE_REF)}</div>
+          <div class="smart-learn-title">${escapeHtml(verseIdToRef(VERSE_ID, ""))}</div>
           <div class="smart-learn-body" id="finalRecallStage"></div>
         </div>
       </div>
