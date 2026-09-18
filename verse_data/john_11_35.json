@@ -5,15 +5,15 @@
   "verseId": "john_11_35",
   "ref": "John 11:35",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "Jesus",
-    "wept"
+    "wept."
   ],
 
   "verseText": "Jesus wept.",
-   "meaning": "At Lazarus' tomb, Jesus cried.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+   "meaning": "When Jesus went to the tomb of his friend Lazarus, the people cried and Jesus cried with them.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
     { "type": "emoji", "word": "wept", "occurrence": 1, "emoji": "😢" }

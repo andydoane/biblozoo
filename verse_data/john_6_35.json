@@ -5,17 +5,18 @@
     "verseId": "john_6_35",
     "ref": "John 6:35",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "Jesus said to them",
-        "'I am the bread of life",
-        "whoever comes to me shall not hunger",
-        "and whoever believes in me",
-        "shall never thirst.'"
+        "Jesus answered,",
+        "“I am the bread of life.",
+        "Whoever comes to Me",
+        "will never hunger,",
+        "and whoever believes in Me",
+        "will never thirst.”"
     ],
-    "verseText": "Jesus said to them, 'I am the bread of life; whoever comes to me shall not hunger, and whoever believes in me shall never thirst.'",
+    "verseText": "Jesus answered, “I am the bread of life. Whoever comes to Me will never hunger, and whoever believes in Me will never thirst.”",
     "meaning": "Like bread and water give our bodies what they need to live, Jesus gives our souls what they need to live forever.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "image",
