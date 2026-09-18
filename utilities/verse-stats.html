@@ -339,9 +339,8 @@
         <section class="panel">
             <h2>Load verse statistics</h2>
             <p class="note">
-                This page first asks GitHub for the JSON filenames currently in <code>/verse_data</code>,
-                excluding <code>verse_list.json</code>, then loads those files directly from BibloZoo.
-                If the GitHub directory lookup is unavailable, it falls back to <code>verse_list.json</code>.
+                This page uses the local <code>verse_data/verse_list.json</code> included with BibloZoo,
+                then loads and analyzes each verse JSON file listed there.
             </p>
 
             <div class="actions">
@@ -439,8 +438,6 @@
             "use strict";
 
             const DATA_DIR = "../verse_data/";
-            const GITHUB_VERSE_DATA_API =
-                "https://api.github.com/repos/andydoane/biblozoo/contents/verse_data?ref=main";
 
             const reloadButton = document.getElementById("reloadButton");
             const statusBox = document.getElementById("status");
@@ -477,55 +474,38 @@
                 });
             });
 
-            async function discoverVerseJsonFiles() {
-                try {
-                    const response = await fetch(GITHUB_VERSE_DATA_API, { cache: "no-store" });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+             async function discoverVerseJsonFiles() {
+                const response = await fetch(
+                    `${DATA_DIR}verse_list.json`,
+                    { cache: "no-store" }
+                );
 
-                    const entries = await response.json();
-                    if (!Array.isArray(entries)) {
-                        throw new Error("GitHub directory response was not an array.");
-                    }
-
-                    const files = entries
-                        .filter(entry =>
-                            entry &&
-                            entry.type === "file" &&
-                            typeof entry.name === "string" &&
-                            entry.name.toLowerCase().endsWith(".json") &&
-                            entry.name !== "verse_list.json"
-                        )
-                        .map(entry => entry.name)
-                        .sort((a, b) => a.localeCompare(b));
-
-                    if (!files.length) {
-                        throw new Error("No verse JSON files were found.");
-                    }
-
-                    return {
-                        files,
-                        usedFallback: false
-                    };
-                } catch (apiError) {
-                    const response = await fetch(`${DATA_DIR}verse_list.json`, { cache: "no-store" });
-
-                    if (!response.ok) {
-                        throw new Error(
-                            `GitHub directory lookup failed (${apiError.message || apiError}), ` +
-                            `and verse_list.json fallback failed (HTTP ${response.status}).`
-                        );
-                    }
-
-                    const list = await response.json();
-                    if (!Array.isArray(list)) {
-                        throw new Error("verse_list.json is not an array.");
-                    }
-
-                    return {
-                        files: list.map(verseId => `${verseId}.json`),
-                        usedFallback: true
-                    };
+                if (!response.ok) {
+                    throw new Error(
+                        `Could not load local verse_list.json (HTTP ${response.status}).`
+                    );
                 }
+
+                const list = await response.json();
+
+                if (!Array.isArray(list)) {
+                    throw new Error(
+                        "Local verse_list.json is not an array."
+                    );
+                }
+
+                const files = list
+                    .map(verseId => String(verseId || "").trim())
+                    .filter(Boolean)
+                    .map(verseId => `${verseId}.json`);
+
+                if (!files.length) {
+                    throw new Error(
+                        "Local verse_list.json does not contain any verses."
+                    );
+                }
+
+                return files;
             }
 
             async function loadStats() {
@@ -534,8 +514,7 @@
                 setStatus("checking", "Finding verse JSON files…");
 
                 try {
-                    const discovery = await discoverVerseJsonFiles();
-                    const files = discovery.files;
+                    const files = await discoverVerseJsonFiles();
 
                     setStatus("checking", `Loading ${files.length} verse JSON files…`);
 
@@ -696,9 +675,8 @@
                     wordFrequencySection.hidden = false;
 
                     setStatus(
-                        discovery.usedFallback ? "warn" : "good",
-                        `Analyzed ${validVerseCount} verses from ${files.length} JSON files` +
-                        (discovery.usedFallback ? " (using verse_list.json fallback)." : ".")
+                        "good",
+                        `Analyzed ${validVerseCount} verses from ${files.length} JSON files in local verse_list.json.`
                     );
                 } catch (error) {
                     setStatus("bad", "Verse stats could not be loaded.");

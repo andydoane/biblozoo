@@ -27,6 +27,7 @@ const runtimeDirs = [
     "pet_images",
     "profile_pictures",
     "ui_audio",
+    "utilities",
     "verse_audio",
     "verse_data",
     "verse_fonts",
