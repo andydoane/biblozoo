@@ -4347,7 +4347,7 @@ function showCreditsDialog() {
       <div class="settings-info-dialog">
         <p>
           <strong>Bible translation credits:</strong><br>
-          Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.
+          The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.
         </p>
 
         <p>
@@ -6923,6 +6923,7 @@ const BUILTIN_PRACTICE_GAMES = [];
 const HIDDEN_PRACTICE_GAME_ID = "dino_dash_2";
 const HIDDEN_PRACTICE_LONG_PRESS_MS = 2000;
 const HIDDEN_LEARN_COMPLETE_LONG_PRESS_MS = 2000;
+const HIDDEN_UTILITIES_LONG_PRESS_MS = 2000;
 
 function getExternalPracticeGames() {
   const list = Array.isArray(window.EXTERNAL_VERSE_GAMES) ? window.EXTERNAL_VERSE_GAMES : [];
@@ -11746,6 +11747,39 @@ function screenSettings(idx) {
   `;
 
   bindHomePill(wrap);
+
+  const settingsHeading =
+    wrap.querySelector(".settings-heading");
+
+  bindLongPress(settingsHeading, {
+    delay: HIDDEN_UTILITIES_LONG_PRESS_MS,
+    onLongPress: () => {
+      const returnTo =
+        getReturnToScreenUrl("settings");
+
+      try {
+        sessionStorage.setItem(
+          "biblozooUtilitiesReturnTo",
+          returnTo
+        );
+      } catch (err) {
+        console.warn(
+          "Could not save Utilities return target",
+          err
+        );
+      }
+
+      const utilitiesUrl =
+        new URL(
+          "utilities/index.html",
+          window.location.href
+        );
+
+      navigateToExternalPage(
+        utilitiesUrl.href
+      );
+    }
+  });
 
   wrap.querySelectorAll("[data-settings-action]").forEach((btn) => {
     btn.onclick = (e) => {

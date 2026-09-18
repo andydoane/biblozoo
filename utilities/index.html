@@ -555,6 +555,7 @@
     </header>
 
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
+      <button class="btn" type="button" onclick="const returnTo=sessionStorage.getItem('biblozooUtilitiesReturnTo')||'../index.html';sessionStorage.removeItem('biblozooUtilitiesReturnTo');location.href=returnTo;">Back to BibloZoo</button>
       <button class="btn primary" type="button" aria-current="page">Verse Asset Tester</button>
       <button class="btn" type="button" onclick="location.href='verse-stats.html'">Verse Stats</button>
       <button class="btn" type="button" onclick="location.href='floor.html'">Pet Feet Helper</button>
