@@ -1354,8 +1354,19 @@
           const list = await response.json();
           if (!Array.isArray(list)) throw new Error("verse_list.json is not an array.");
 
+          const sortedList = [...list].sort((a, b) =>
+            String(a).localeCompare(
+              String(b),
+              undefined,
+              {
+                numeric: true,
+                sensitivity: "base"
+              }
+            )
+          );
+
           verseSelect.innerHTML = `<option value="">Choose a verse…</option>`;
-          list.forEach(verseId => {
+          sortedList.forEach(verseId => {
             const option = document.createElement("option");
             option.value = verseId;
             option.textContent = verseId;
@@ -1363,7 +1374,10 @@
           });
 
           const requested = new URLSearchParams(location.search).get("verse");
-          const first = requested && list.includes(requested) ? requested : list[0];
+          const first =
+            requested && sortedList.includes(requested)
+              ? requested
+              : sortedList[0];
 
           if (first) {
             verseSelect.value = first;
