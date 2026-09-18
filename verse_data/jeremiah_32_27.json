@@ -5,24 +5,50 @@
   "verseId": "jeremiah_32_27",
   "ref": "Jeremiah 32:27",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Behold",
-    "I am the Lord",
+    "Behold, I am the LORD",
     "the God of all flesh",
-    "Is anything too hard for me?"
+    "Is anything",
+    "too difficult for Me?"
   ],
-
-  "verseText": "Behold, I am the Lord, the God of all flesh. Is anything too hard for me?",
-   "meaning": "God is all-powerful. Nothing is too hard for him to do.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "Behold, I am the LORD, the God of all flesh. Is anything too difficult for Me?",
+  "meaning": "God is all-powerful. Nothing is too hard for him to do.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "Behold", "occurrence": 1, "emoji": "📣" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆👑" },
-    { "type": "emoji", "word": "flesh", "occurrence": 1, "emoji": "🥩" },
-    { "type": "emoji", "word": "hard", "occurrence": 1, "emoji": "🏋️" },
-    { "type": "underscore", "word": "God", "occurrence": 1 },
-    { "type": "underscore", "word": "me", "occurrence": 1 },
-    { "type": "underscore", "word": "anything", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "Behold",
+      "occurrence": 1,
+      "emoji": "📣"
+    },
+    {
+      "type": "underscore",
+      "word": "LORD",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "flesh",
+      "occurrence": 1,
+      "emoji": "🥩"
+    },
+    {
+      "type": "underscore",
+      "word": "anything",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "difficult",
+      "occurrence": 1,
+      "emoji": "🏋️"
+    }
   ]
 }

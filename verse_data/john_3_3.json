@@ -5,29 +5,58 @@
   "verseId": "john_3_3",
   "ref": "John 3:3",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Jesus answered him",
-    "Truly, truly, I say to you",
-    "unless one is born again",
-    "he cannot see the kingdom of God"
+    "Jesus replied",
+    "Truly, truly, I tell you",
+    "no one can see",
+    "the kingdom of God",
+    "unless he is born again"
   ],
-
-  "verseText": "Jesus answered him, 'Truly, truly, I say to you, unless one is born again he cannot see the kingdom of God.'",
-   "meaning": "Our spirits (or souls) are born dead in sin. In order to believe and join God's kingdom, we need God's Spirit to bring our spirits to life.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "Jesus replied, “Truly, truly, I tell you, no one can see the kingdom of God unless he is born again.”",
+  "meaning": "Our spirits (or souls) are born dead in sin. In order to believe and join God's kingdom, we need God's Spirit to bring our spirits to life.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "say", "occurrence": 1, "emoji": "💬" },
-    { "type": "emoji", "word": "born", "occurrence": 1, "emoji": "👩‍🍼" },
-    { "type": "emoji", "word": "see", "occurrence": 1, "emoji": "👀" },
-    { "type": "emoji", "word": "kingdom", "occurrence": 1, "emoji": "🏰" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👆" },
-    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
-    { "type": "underscore", "word": "truly", "occurrence": 1 }
+    {
+      "type": "image",
+      "word": "Jesus",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "underscore",
+      "word": "Truly",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "tell",
+      "occurrence": 1,
+      "emoji": "💬"
+    },
+    {
+      "type": "emoji",
+      "word": "see",
+      "occurrence": 1,
+      "emoji": "👀"
+    },
+    {
+      "type": "emoji",
+      "word": "kingdom",
+      "occurrence": 1,
+      "emoji": "🏰"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "born",
+      "occurrence": 1,
+      "emoji": "👩‍🍼"
+    }
   ]
 }
-
-
-
-
-
