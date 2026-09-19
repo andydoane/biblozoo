@@ -2201,9 +2201,13 @@
       return DECOY_TUNING;
     }
 
-    const wordCount = state.wordEntries.length;
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          state.wordEntries.length
+        );
 
-    if (wordCount >= 40) {
+    if (verseLengthTier === "veryLong") {
       return {
         ...DECOY_TUNING,
         baseCorrectChance: 0.76,
@@ -2212,7 +2216,7 @@
       };
     }
 
-    if (wordCount >= 25) {
+    if (verseLengthTier === "long") {
       return {
         ...DECOY_TUNING,
         baseCorrectChance: 0.70,

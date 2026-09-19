@@ -59,13 +59,17 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const BLOB_SPAWN_FADE_MS = 180;
 
   function getCorrectRefillDelayMs() {
-    const wordCount = state.words.length;
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          state.words.length
+        );
 
-    if (wordCount >= 40) {
+    if (verseLengthTier === "veryLong") {
       return 550;
     }
 
-    if (wordCount >= 25) {
+    if (verseLengthTier === "long") {
       return 750;
     }
 
@@ -73,13 +77,17 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function getCorrectRefillStaggerMs() {
-    const wordCount = state.words.length;
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          state.words.length
+        );
 
-    if (wordCount >= 40) {
+    if (verseLengthTier === "veryLong") {
       return 110;
     }
 
-    if (wordCount >= 25) {
+    if (verseLengthTier === "long") {
       return 140;
     }
 

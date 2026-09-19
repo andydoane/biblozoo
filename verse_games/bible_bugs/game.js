@@ -1179,9 +1179,14 @@
   }
 
   function getLongVerseStreakSpeedMultiplier() {
+    const verseLengthTier =
+      shell.getVerseLengthTier(
+        buildData.words.length
+      );
+
     if (
       state.phase !== "words" ||
-      buildData.words.length < 25
+      verseLengthTier === "normal"
     ) {
       return 1;
     }
@@ -1209,11 +1214,16 @@
       return MAIN_EAT_MS;
     }
 
-    if (buildData.words.length >= 40) {
+    const verseLengthTier =
+      shell.getVerseLengthTier(
+        buildData.words.length
+      );
+
+    if (verseLengthTier === "veryLong") {
       return 330;
     }
 
-    if (buildData.words.length >= 25) {
+    if (verseLengthTier === "long") {
       return 360;
     }
 

@@ -28,8 +28,6 @@
     encounterMaxDistanceScreens: 1.1,
     patternScrollFactor: 1,
     fruitChance: 0.62,
-    longVerseMinWords: 28,
-    veryLongVerseMinWords: 32,
     longVerseSpawnScale: {
       start: 0.64,
       end: 0.56
@@ -1287,10 +1285,15 @@
     const wordCount =
       state.words.length;
 
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          wordCount
+        );
+
     if (
       getCurrentPhase() !== "words" ||
-      wordCount <
-        SLITHER_TUNING.longVerseMinWords
+      verseLengthTier === "normal"
     ) {
       return visualDistanceScale;
     }
@@ -1304,8 +1307,7 @@
       );
 
     const distanceRange =
-      wordCount >=
-        SLITHER_TUNING.veryLongVerseMinWords
+      verseLengthTier === "veryLong"
         ? SLITHER_TUNING.veryLongVerseSpawnScale
         : SLITHER_TUNING.longVerseSpawnScale;
 

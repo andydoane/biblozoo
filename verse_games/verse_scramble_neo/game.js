@@ -1304,10 +1304,16 @@
         nextIndex
       );
 
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          state.words.length
+        );
+
     const pairLetterLimit =
-      state.words.length >= 40
+      verseLengthTier === "veryLong"
         ? 10
-        : state.words.length >= 25
+        : verseLengthTier === "long"
           ? 9
           : 7;
 

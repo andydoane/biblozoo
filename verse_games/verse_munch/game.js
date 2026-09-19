@@ -70,8 +70,6 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
   const BONUS_TARGET_CHANCE = 0.4;
   const BONUS_FORCE_TARGET_AFTER = 2;
 
-  const LONG_VERSE_MIN_WORDS = 25;
-  const VERY_LONG_VERSE_MIN_WORDS = 40;
   const LONG_VERSE_QUICK_BITE_CHANCE = 0.70;
   const VERY_LONG_VERSE_QUICK_BITE_CHANCE = 0.85;
 
@@ -1629,9 +1627,16 @@ function backToMenuFromHelp(){
     if (!isCorrect) return false;
     if (getCurrentPhase() !== "words") return false;
 
-    const wordCount = state.words.length;
+    const wordCount =
+      state.words.length;
 
-    if (wordCount < LONG_VERSE_MIN_WORDS) {
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          wordCount
+        );
+
+    if (verseLengthTier === "normal") {
       return false;
     }
 
@@ -1647,7 +1652,7 @@ function backToMenuFromHelp(){
     }
 
     const quickBiteChance =
-      wordCount >= VERY_LONG_VERSE_MIN_WORDS
+      verseLengthTier === "veryLong"
         ? VERY_LONG_VERSE_QUICK_BITE_CHANCE
         : LONG_VERSE_QUICK_BITE_CHANCE;
 
@@ -3480,7 +3485,10 @@ function updateBuildText(){
   function getNextCorrectDelay(mode) {
     const useVeryLongVersePacing =
       getCurrentPhase() === "words" &&
-      state.words.length >= VERY_LONG_VERSE_MIN_WORDS;
+      window.VerseGameShell
+        .getVerseLengthTier(
+          state.words.length
+        ) === "veryLong";
 
     if (mode === "hard") {
       return randomInt(

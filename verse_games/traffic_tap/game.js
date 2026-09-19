@@ -2610,14 +2610,20 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       };
     }
 
-    if (verseWords.length >= 40) {
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          verseWords.length
+        );
+
+    if (verseLengthTier === "veryLong") {
       return {
         chance: 0.68,
         forceAfterMs: 1750
       };
     }
 
-    if (verseWords.length >= 25) {
+    if (verseLengthTier === "long") {
       return {
         chance: 0.60,
         forceAfterMs: 2000

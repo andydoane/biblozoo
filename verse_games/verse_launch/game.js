@@ -973,13 +973,25 @@
       Long verses get the correct UFO sooner so the overall run
       does not grow as dramatically with verse length.
     */
-    if (isVerseWordPhase && wordCount >= 40) {
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          wordCount
+        );
+
+    if (
+      isVerseWordPhase &&
+      verseLengthTier === "veryLong"
+    ) {
       if (roll < 0.70) return 0;
       if (roll < 0.95) return 1;
       return 2;
     }
 
-    if (isVerseWordPhase && wordCount >= 25) {
+    if (
+      isVerseWordPhase &&
+      verseLengthTier === "long"
+    ) {
       if (roll < 0.60) return 0;
       if (roll < 0.90) return 1;
       return 2;

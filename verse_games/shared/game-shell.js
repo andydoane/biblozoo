@@ -23,6 +23,39 @@
     }
   ]);
 
+  const VERSE_LENGTH_THRESHOLDS =
+    Object.freeze({
+      long: 28,
+      veryLong: 32
+    });
+
+  function getVerseLengthTier(
+    wordCount = 0
+  ) {
+    const words =
+      Math.max(
+        0,
+        Number(wordCount) || 0
+      );
+
+    if (
+      words >=
+      VERSE_LENGTH_THRESHOLDS.veryLong
+    ) {
+      return "veryLong";
+    }
+
+    if (
+      words >=
+      VERSE_LENGTH_THRESHOLDS.long
+    ) {
+      return "long";
+    }
+
+    return "normal";
+  }
+
+
   let currentGameSpeedPresetId = "normal";
 
   const MEDAL_ICON_PATHS = Object.freeze({
@@ -2677,6 +2710,7 @@
     countBuildTextLines,
     buildTextOverflows,
     getPhaseForProgress,
+    getVerseLengthTier,
     titleCaseBookFromSlug,
     parseReferenceParts,
     getReferenceDecoys,

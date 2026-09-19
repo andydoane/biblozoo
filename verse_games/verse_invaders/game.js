@@ -1295,7 +1295,13 @@
   }
 
   function roundAdvanceAfterCorrectMs() {
-    if (verseWords.length >= 40) {
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          verseWords.length
+        );
+
+    if (verseLengthTier === "veryLong") {
       return (
         CORRECT_HIT_IMPACT_DELAY_MS +
         STRONG_ALIEN_BURST_LIFE_MS
@@ -2316,6 +2322,11 @@
     const streakRamp = Math.max(0, state.streak);
     const wordCount = verseWords.length;
     const isVerseWordPhase = getCurrentPhase() === "words";
+    const verseLengthTier =
+      window.VerseGameShell
+        .getVerseLengthTier(
+          wordCount
+        );
 
     /*
       Easy normally has no streak speed ramp. On long verses, give it
@@ -2330,7 +2341,7 @@
     const effectiveStep =
       selectedMode === "easy" &&
       isVerseWordPhase &&
-      wordCount >= 25
+      verseLengthTier !== "normal"
         ? -0.05
         : cfg.step;
 
@@ -2341,14 +2352,16 @@
     );
 
     /*
-      Short verses keep their existing pace.
-      25–39 words are about 10% faster.
-      40+ words are about 15% faster.
+      Normal verses keep their existing pace.
+      Long verses are about 10% faster.
+      Very long verses are about 15% faster.
     */
     const longVerseTimeMultiplier =
-      isVerseWordPhase && wordCount >= 40
+      isVerseWordPhase &&
+      verseLengthTier === "veryLong"
         ? 0.87
-        : isVerseWordPhase && wordCount >= 25
+        : isVerseWordPhase &&
+          verseLengthTier === "long"
           ? 0.91
           : 1;
 
