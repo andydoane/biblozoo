@@ -23,10 +23,10 @@
       "occurrence": 1
     },
     {
-      "type": "emoji",
+      "type": "image",
       "word": "walls",
       "occurrence": 1,
-      "emoji": "🧱"
+      "image": "wall"
     },
     {
       "type": "emoji",

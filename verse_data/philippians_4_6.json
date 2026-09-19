@@ -47,10 +47,10 @@
             "emoji": "🚫"
         },
         {
-            "type": "emoji",
-            "word": "requests",
+            "type": "image",
+            "word": "everything",
             "occurrence": 1,
-            "emoji": "📝"
+            "image": "arrows"
         },
         {
             "type": "image",

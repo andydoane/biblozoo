@@ -22,9 +22,10 @@
       "emoji": "😀"
     },
     {
-      "type": "underscore",
+      "type": "image",
       "word": "all",
-      "occurrence": 1
+      "occurrence": 1,
+      "image": "arrows"
     },
     {
       "type": "emoji",

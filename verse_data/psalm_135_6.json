@@ -24,9 +24,10 @@
       "image": "god_crown"
     },
     {
-      "type": "underscore",
-      "word": "does",
-      "occurrence": 1
+      "type": "image",
+      "word": "all",
+      "occurrence": 1,
+      "image": "arrows"
     },
     {
       "type": "emoji",

@@ -24,9 +24,10 @@
             "emoji": "🙋"
         },
         {
-            "type": "underscore",
+            "type": "image",
             "word": "Father",
-            "occurrence": 1
+            "occurrence": 1,
+            "image": "father"
         },
         {
             "type": "emoji",

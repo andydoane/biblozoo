@@ -47,9 +47,10 @@
       "emoji": "🌍🏳️"
     },
     {
-      "type": "underscore",
+      "type": "image",
       "word": "name",
-      "occurrence": 1
+      "occurrence": 1,
+      "image": "name"
     },
     {
       "type": "underscore",
