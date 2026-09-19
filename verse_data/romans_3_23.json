@@ -5,24 +5,50 @@
   "verseId": "romans_3_23",
   "ref": "Romans 3:23",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "for all have sinned",
     "and fall short",
     "of the glory",
     "of God"
   ],
-
-  "verseText": "For all have sinned and fall short of the glory of God.",
-   "meaning": "God is gloriously sinless and perfect. All human beings have sinned – we miss the mark of perfect obedience.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“for all have sinned and fall short of the glory of God,”",
+  "meaning": "God is gloriously sinless and perfect. All human beings have sinned – we miss the mark of perfect obedience.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
-    { "type": "emoji", "word": "sinned", "occurrence": 1, "emoji": "👎" },
-    { "type": "emoji", "word": "glory", "occurrence": 1, "emoji": "🙌" },
-    { "type": "emoji", "word": "god", "occurrence": 1, "emoji": "👑" },
-    { "type": "underscore", "word": "fall", "occurrence": 1 },
-    { "type": "underscore", "word": "all", "occurrence": 1 },
-    { "type": "underscore", "word": "short", "occurrence": 1 }
+    {
+      "type": "image",
+      "word": "all",
+      "occurrence": 1,
+      "image": "arrows"
+    },
+    {
+      "type": "emoji",
+      "word": "sinned",
+      "occurrence": 1,
+      "emoji": "👎"
+    },
+    {
+      "type": "underscore",
+      "word": "fall",
+      "occurrence": 1
+    },
+    {
+      "type": "underscore",
+      "word": "short",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "glory",
+      "occurrence": 1,
+      "emoji": "🙌"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    }
   ]
 }

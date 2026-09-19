@@ -5,24 +5,60 @@
   "verseId": "matthew_28_19",
   "ref": "Matthew 28:19",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Go therefore and make disciples",
+    "Therefore go and make disciples",
     "of all nations",
-    "baptizing them in the name",
-    "of the Father and of the Son",
+    "baptizing them",
+    "in the name of the Father",
+    "and of the Son",
     "and of the Holy Spirit"
   ],
-  "verseText": "Go therefore and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit…",
+  "verseText": "“Therefore go and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit,”",
   "meaning": "This is the Great Commission: the mission Jesus gave to his followers. Our job is to be disciples who go and make new disciples all over the world.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "Go", "occurrence": 1, "emoji": "🏃‍♂️" },
-    { "type": "emoji", "word": "disciples", "occurrence": 1, "emoji": "👥" },
-    { "type": "emoji", "word": "nations", "occurrence": 1, "emoji": "🌍" },
-    { "type": "emoji", "word": "baptizing", "occurrence": 1, "emoji": "💧" },
-    { "type": "underscore", "word": "Father", "occurrence": 1 },
-    { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
-    { "type": "image", "word": "Spirit", "occurrence": 1, "image": "soul" }
+    {
+      "type": "emoji",
+      "word": "go",
+      "occurrence": 1,
+      "emoji": "🏃‍♂️"
+    },
+    {
+      "type": "emoji",
+      "word": "disciples",
+      "occurrence": 1,
+      "emoji": "👥"
+    },
+    {
+      "type": "emoji",
+      "word": "nations",
+      "occurrence": 1,
+      "emoji": "🌍"
+    },
+    {
+      "type": "emoji",
+      "word": "baptizing",
+      "occurrence": 1,
+      "emoji": "💧"
+    },
+    {
+      "type": "image",
+      "word": "Father",
+      "occurrence": 1,
+      "image": "father"
+    },
+    {
+      "type": "image",
+      "word": "Son",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "image",
+      "word": "Spirit",
+      "occurrence": 1,
+      "image": "soul"
+    }
   ]
 }

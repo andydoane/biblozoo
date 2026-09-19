@@ -5,21 +5,20 @@
     "verseId": "proverbs_16_16",
     "ref": "Proverbs 16:16",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "How much better",
-        "to get wisdom than gold",
-        "To get understanding",
-        "is to be chosen",
-        "rather than silver."
+        "to acquire wisdom than gold",
+        "To gain understanding",
+        "is more desirable than silver"
     ],
-    "verseText": "How much better to get wisdom than gold! To get understanding is to be chosen rather than silver.",
+    "verseText": "“How much better to acquire wisdom than gold! To gain understanding is more desirable than silver.”",
     "meaning": "Knowing the truth and wisdom of God is a priceless treasure. It is more valuable than any amount of gold or silver.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "underscore",
-            "word": "better",
+            "word": "acquire",
             "occurrence": 1
         },
         {
@@ -29,10 +28,15 @@
             "emoji": "🦉"
         },
         {
-            "type": "emoji",
+            "type": "image",
             "word": "gold",
             "occurrence": 1,
-            "emoji": "🥇"
+            "image": "gold"
+        },
+        {
+            "type": "underscore",
+            "word": "gain",
+            "occurrence": 1
         },
         {
             "type": "emoji",
@@ -41,15 +45,10 @@
             "emoji": "🧠"
         },
         {
-            "type": "underscore",
-            "word": "chosen",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
+            "type": "image",
             "word": "silver",
             "occurrence": 1,
-            "emoji": "🥈"
+            "image": "silver"
         }
     ]
 }

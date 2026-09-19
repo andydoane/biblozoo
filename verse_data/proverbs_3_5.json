@@ -5,25 +5,50 @@
   "verseId": "proverbs_3_5",
   "ref": "Proverbs 3:5",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Trust in the Lord",
+    "Trust in the LORD",
     "with all your heart",
-    "and do not lean",
+    "and lean not",
     "on your own understanding"
   ],
-
-  "verseText": "Trust in the Lord with all your heart, and do not lean on your own understanding.",
-   "meaning": "Rather than trusting in what we think is right and true, we should trust totally in what God thinks is right and true",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“Trust in the LORD with all your heart, and lean not on your own understanding;”",
+  "meaning": "Rather than trusting in what we think is right and true, we should trust totally in what God thinks is right and true",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-      { "type": "underscore", "word": "trust", "occurrence": 1 },
-      { "type": "underscore", "word": "all", "occurrence": 1 },
-      { "type": "underscore", "word": "lean", "occurrence": 1 },
-      { "type": "underscore", "word": "own", "occurrence": 1 },
-      { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆" },
-      { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" },
-      { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
-      { "type": "emoji", "word": "understanding", "occurrence": 1, "emoji": "🧠" }
+    {
+      "type": "underscore",
+      "word": "Trust",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "heart",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "underscore",
+      "word": "lean",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "all",
+      "occurrence": 1,
+      "image": "arrows"
+    },
+    {
+      "type": "emoji",
+      "word": "understanding",
+      "occurrence": 1,
+      "emoji": "🧠"
+    }
   ]
 }

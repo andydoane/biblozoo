@@ -5,22 +5,22 @@
     "verseId": "psalm_103_19",
     "ref": "Psalm 103:19",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "The Lord has established",
-        "his throne in the heavens",
-        "and his kingdom",
-        "rules over all."
+        "The LORD has established",
+        "His throne in heaven",
+        "and His kingdom",
+        "rules over all"
     ],
-    "verseText": "The Lord has established his throne in the heavens, and his kingdom rules over all.",
+    "verseText": "“The LORD has established His throne in heaven, and His kingdom rules over all.”",
     "meaning": "The Lord God is the King of all creation. In heaven, he sits on his throne and rules over everything he has made.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
-            "type": "emoji",
-            "word": "Lord",
+            "type": "image",
+            "word": "LORD",
             "occurrence": 1,
-            "emoji": "👑"
+            "image": "god_crown"
         },
         {
             "type": "underscore",
@@ -35,7 +35,7 @@
         },
         {
             "type": "emoji",
-            "word": "heavens",
+            "word": "heaven",
             "occurrence": 1,
             "emoji": "☁️"
         },

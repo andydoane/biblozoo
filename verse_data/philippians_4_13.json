@@ -5,15 +5,15 @@
     "verseId": "philippians_4_13",
     "ref": "Philippians 4:13",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "I can do all things",
-        "through him",
-        "who strengthens me."
+        "through Christ",
+        "who gives me strength"
     ],
-    "verseText": "I can do all things through him who strengthens me.",
+    "verseText": "“I can do all things through Christ who gives me strength.”",
     "meaning": "Paul wrote these words. He experienced both good times and bad. But he trusted Christ Jesus to give him strength to face every situation and do what God called him to do.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -22,15 +22,10 @@
             "emoji": "🛠️"
         },
         {
-            "type": "emoji",
-            "word": "I",
-            "occurrence": 1,
-            "emoji": "👁️"
-        },
-        {
-            "type": "underscore",
+            "type": "image",
             "word": "all",
-            "occurrence": 1
+            "occurrence": 1,
+            "image": "arrows"
         },
         {
             "type": "underscore",
@@ -38,14 +33,20 @@
             "occurrence": 1
         },
         {
-            "type": "emoji",
-            "word": "him",
+            "type": "image",
+            "word": "Christ",
             "occurrence": 1,
-            "emoji": "✝️"
+            "image": "cross"
         },
         {
             "type": "emoji",
-            "word": "strengthens",
+            "word": "gives",
+            "occurrence": 1,
+            "emoji": "🎁"
+        },
+        {
+            "type": "emoji",
+            "word": "strength",
             "occurrence": 1,
             "emoji": "💪"
         }

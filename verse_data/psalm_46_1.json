@@ -5,15 +5,15 @@
     "verseId": "psalm_46_1",
     "ref": "Psalm 46:1",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "God is our refuge and strength",
-        "a very present help",
-        "in trouble."
+        "an ever-present help",
+        "in times of trouble"
     ],
-    "verseText": "God is our refuge and strength, a very present help in trouble.",
+    "verseText": "“God is our refuge and strength, an ever-present help in times of trouble.”",
     "meaning": "God is our refuge. He's like a strong castle we can hide in whenever trouble comes. And whenever we cry out to him for help, he's always nearby.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "image",
@@ -35,7 +35,7 @@
         },
         {
             "type": "underscore",
-            "word": "present",
+            "word": "ever-present",
             "occurrence": 1
         },
         {

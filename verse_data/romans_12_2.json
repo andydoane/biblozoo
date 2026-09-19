@@ -5,18 +5,21 @@
     "verseId": "romans_12_2",
     "ref": "Romans 12:2",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "Do not be conformed",
         "to this world",
         "but be transformed",
-        "by the renewal of your mind."
+        "by the renewing of your mind",
+        "Then you will be able",
+        "to test and approve",
+        "what is the good, pleasing,",
+        "and perfect will of God"
     ],
-    "verseText": "Do not be conformed to this world, but be transformed by the renewal of your mind.",
+    "verseText": "“Do not be conformed to this world, but be transformed by the renewing of your mind. Then you will be able to test and approve what is the good, pleasing, and perfect will of God.”",
     "meaning": "God doesn't want us to conform to (or copy) the sinful ways of the people of this world. Instead, we should let his Holy Spirit renew us, changing the way we think and act.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
-        { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
         {
             "type": "underscore",
             "word": "conformed",
@@ -35,15 +38,28 @@
             "emoji": "🔄️"
         },
         {
-            "type": "underscore",
-            "word": "renewal",
-            "occurrence": 1
+            "type": "emoji",
+            "word": "renewing",
+            "occurrence": 1,
+            "emoji": "🔄️"
         },
         {
             "type": "emoji",
             "word": "mind",
             "occurrence": 1,
             "emoji": "🧠"
+        },
+        {
+            "type": "emoji",
+            "word": "perfect",
+            "occurrence": 1,
+            "emoji": "🌟"
+        },
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 1,
+            "image": "god_crown"
         }
     ]
 }

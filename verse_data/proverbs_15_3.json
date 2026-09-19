@@ -5,24 +5,51 @@
   "verseId": "proverbs_15_3",
   "ref": "Proverbs 15:3",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "The eyes of the Lord",
+    "The eyes of the LORD",
     "are in every place",
-    "keeping watch",
-    "on the evil and the good."
+    "observing the evil",
+    "and the good"
   ],
-
-  "verseText": "The eyes of the Lord are in every place, keeping watch on the evil and the good.",
-   "meaning": "God sees everything we do. He knows about our secret sins. And he notices when we do good, even if no one else is watching.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“The eyes of the LORD are in every place, observing the evil and the good.”",
+  "meaning": "God sees everything we do. He knows about our secret sins. And he notices when we do good, even if no one else is watching.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "eyes", "occurrence": 1, "emoji": "👀" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "evil", "occurrence": 1, "emoji": "👎" },
-    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "watch", "occurrence": 1, "emoji": "🔎" },
-    { "type": "underscore", "word": "every", "occurrence": 1 },
-    { "type": "underscore", "word": "place", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "eyes",
+      "occurrence": 1,
+      "emoji": "👀"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "underscore",
+      "word": "place",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "observing",
+      "occurrence": 1,
+      "emoji": "🔎"
+    },
+    {
+      "type": "emoji",
+      "word": "evil",
+      "occurrence": 1,
+      "emoji": "😡"
+    },
+    {
+      "type": "emoji",
+      "word": "good",
+      "occurrence": 1,
+      "emoji": "👍"
+    }
   ]
 }

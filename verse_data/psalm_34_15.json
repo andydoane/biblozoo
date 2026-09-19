@@ -5,16 +5,16 @@
     "verseId": "psalm_34_15",
     "ref": "Psalm 34:15",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "The eyes of the Lord",
-        "are toward the righteous",
-        "and his ears",
-        "toward their cry."
+        "The eyes of the LORD",
+        "are on the righteous",
+        "and His ears",
+        "are inclined to their cry"
     ],
-    "verseText": "The eyes of the Lord are toward the righteous and his ears toward their cry.",
+    "verseText": "“The eyes of the LORD are on the righteous, and His ears are inclined to their cry.”",
     "meaning": "The Lord God fills heaven and earth. He is always near to us when we are in trouble. He sees and hears everything.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -23,10 +23,10 @@
             "emoji": "👀"
         },
         {
-            "type": "emoji",
-            "word": "Lord",
+            "type": "image",
+            "word": "LORD",
             "occurrence": 1,
-            "emoji": "👑"
+            "image": "god_crown"
         },
         {
             "type": "underscore",
@@ -34,15 +34,15 @@
             "occurrence": 1
         },
         {
-            "type": "underscore",
-            "word": "toward",
-            "occurrence": 1
-        },
-        {
             "type": "emoji",
             "word": "ears",
             "occurrence": 1,
             "emoji": "👂"
+        },
+        {
+            "type": "underscore",
+            "word": "inclined",
+            "occurrence": 1
         },
         {
             "type": "emoji",

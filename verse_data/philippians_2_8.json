@@ -5,23 +5,29 @@
     "verseId": "philippians_2_8",
     "ref": "Philippians 2:8",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "And being found in human form",
-        "he humbled himself",
-        "by becoming obedient",
-        "to the point of death",
-        "even death on a cross."
+        "And being found",
+        "in appearance as a man",
+        "He humbled Himself",
+        "and became obedient to death",
+        "even death on a cross"
     ],
-    "verseText": "And being found in human form, he humbled himself by becoming obedient to the point of death, even death on a cross.",
+    "verseText": "“And being found in appearance as a man, He humbled Himself and became obedient to death — even death on a cross.”",
     "meaning": "Though Jesus deserved to be treated like a king, he chose to become a lowly human and suffer the dreadful death of the cross in order to save us.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
-            "word": "human",
+            "word": "man",
             "occurrence": 1,
             "emoji": "🧍"
+        },
+        {
+            "type": "emoji",
+            "word": "found",
+            "occurrence": 1,
+            "emoji": "🔎"
         },
         {
             "type": "underscore",
@@ -41,9 +47,9 @@
         },
         {
             "type": "emoji",
-            "word": "death",
-            "occurrence": 2,
-            "emoji": "💀"
+            "word": "appearance",
+            "occurrence": 1,
+            "emoji": "👀"
         },
         {
             "type": "image",

@@ -5,23 +5,51 @@
   "verseId": "psalm_119_36",
   "ref": "Psalm 119:36",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Incline my heart",
-    "to your testimonies",
-    "and not to selfish gain"
+    "Turn my heart",
+    "to Your testimonies",
+    "and not",
+    "to covetous gain"
   ],
-
-  "verseText": "Incline my heart to your testimonies, and not to selfish gain!",
+  "verseText": "Turn my heart to Your testimonies and not to covetous gain.",
   "meaning": "We need God to help our hearts love his word more than money or selfish things.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "heart", "occurrence": 1, "emoji": "❤️" },
-    { "type": "emoji", "word": "testimonies", "occurrence": 1, "emoji": "🗣️" },
-    { "type": "emoji", "word": "gain", "occurrence": 1, "emoji": "💰" },
-    { "type": "emoji", "word": "not", "occurrence": 1, "emoji": "🚫" },
-    { "type": "underscore", "word": "selfish", "occurrence": 1 },
-    { "type": "underscore", "word": "incline", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "Turn",
+      "occurrence": 1,
+      "emoji": "↩️"
+    },
+    {
+      "type": "emoji",
+      "word": "heart",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "emoji",
+      "word": "testimonies",
+      "occurrence": 1,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "emoji",
+      "word": "not",
+      "occurrence": 1,
+      "emoji": "🚫"
+    },
+    {
+      "type": "underscore",
+      "word": "covetous",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "gain",
+      "occurrence": 1,
+      "emoji": "💰"
+    }
   ]
 }
-

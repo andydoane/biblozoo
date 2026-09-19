@@ -5,21 +5,26 @@
     "verseId": "psalm_47_2",
     "ref": "Psalm 47:2",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "For the Lord",
-        "the Most High",
-        "is to be feared",
-        "a great king",
-        "over all the earth."
+        "How awesome",
+        "is the LORD Most High",
+        "the great King",
+        "over all the earth"
     ],
-    "verseText": "For the Lord, the Most High, is to be feared, a great king over all the earth.",
+    "verseText": "“How awesome is the LORD Most High, the great King over all the earth!”",
     "meaning": "The Lord God is our Creator and the Most High King of the Universe. He is awesome, deserving of a 'wow' kind of fear.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
+            "type": "emoji",
+            "word": "awesome",
+            "occurrence": 1,
+            "emoji": "🤩"
+        },
+        {
             "type": "image",
-            "word": "Lord",
+            "word": "LORD",
             "occurrence": 1,
             "image": "god_crown"
         },
@@ -31,21 +36,15 @@
         },
         {
             "type": "emoji",
-            "word": "feared",
-            "occurrence": 1,
-            "emoji": "😨"
-        },
-        {
-            "type": "emoji",
             "word": "great",
             "occurrence": 1,
             "emoji": "👍"
         },
         {
-            "type": "image",
-            "word": "king",
+            "type": "emoji",
+            "word": "King",
             "occurrence": 1,
-            "image": "throne"
+            "emoji": "👑"
         },
         {
             "type": "emoji",

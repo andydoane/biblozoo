@@ -5,16 +5,16 @@
     "verseId": "proverbs_17_17",
     "ref": "Proverbs 17:17",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "A friend loves",
         "at all times",
         "and a brother",
-        "is born for adversity."
+        "is born for adversity"
     ],
-    "verseText": "A friend loves at all times, and a brother is born for adversity.",
+    "verseText": "“A friend loves at all times, and a brother is born for adversity.”",
     "meaning": "A true friend is like a brother who sticks with you in adversity (tough times of trouble). And the greatest friend of all was Jesus, who gave his life for us.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -35,10 +35,9 @@
             "emoji": "⏰"
         },
         {
-            "type": "emoji",
+            "type": "underscore",
             "word": "brother",
-            "occurrence": 1,
-            "emoji": "👦🤝👦"
+            "occurrence": 1
         },
         {
             "type": "image",
@@ -47,9 +46,10 @@
             "image": "baby"
         },
         {
-            "type": "underscore",
+            "type": "emoji",
             "word": "adversity",
-            "occurrence": 1
+            "occurrence": 1,
+            "emoji": "🤕"
         }
     ]
 }

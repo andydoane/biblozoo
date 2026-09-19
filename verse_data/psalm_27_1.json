@@ -5,23 +5,23 @@
     "verseId": "psalm_27_1",
     "ref": "Psalm 27:1",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "The Lord is my light",
+        "The LORD is my light",
         "and my salvation",
         "whom shall I fear?",
-        "The Lord is the stronghold of my life",
-        "of whom shall I be afraid?"
+        "The LORD is the stronghold of my life",
+        "whom shall I dread?"
     ],
-    "verseText": "The Lord is my light and my salvation; whom shall I fear? The Lord is the stronghold of my life; of whom shall I be afraid?",
+    "verseText": "“The LORD is my light and my salvation— whom shall I fear? The LORD is the stronghold of my life— whom shall I dread?”",
     "meaning": "The Lord God guides, saves, and protects his people. He is like a strong castle we can hide in for safety. Because of him, we have no reason to fear.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
-            "type": "emoji",
-            "word": "Lord",
+            "type": "image",
+            "word": "LORD",
             "occurrence": 1,
-            "emoji": "👑"
+            "image": "god_crown"
         },
         {
             "type": "emoji",
@@ -42,10 +42,10 @@
             "emoji": "😨"
         },
         {
-            "type": "emoji",
-            "word": "Lord",
+            "type": "image",
+            "word": "LORD",
             "occurrence": 2,
-            "emoji": "👑"
+            "image": "god_crown"
         },
         {
             "type": "emoji",
@@ -55,7 +55,7 @@
         },
         {
             "type": "emoji",
-            "word": "afraid",
+            "word": "dread",
             "occurrence": 1,
             "emoji": "😟"
         }

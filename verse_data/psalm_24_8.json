@@ -5,15 +5,15 @@
     "verseId": "psalm_24_8",
     "ref": "Psalm 24:8",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
-        "Who is this King of glory?",
-        "The Lord, strong and mighty,",
-        "the Lord, mighty in battle!"
+        "Who is this King of Glory",
+        "The LORD strong and mighty",
+        "the LORD mighty in battle"
     ],
-    "verseText": "Who is this King of glory? The Lord, strong and mighty, the Lord, mighty in battle!",
+    "verseText": "“Who is this King of Glory? The LORD strong and mighty, the LORD mighty in battle.”",
     "meaning": "The Lord God is the glorious King of the Universe. He is strong, powerful, and mighty. No enemy stands a chance against him in battle.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",
@@ -23,15 +23,15 @@
         },
         {
             "type": "emoji",
-            "word": "glory",
+            "word": "Glory",
             "occurrence": 1,
             "emoji": "🙌"
         },
         {
-            "type": "emoji",
-            "word": "Lord",
+            "type": "image",
+            "word": "LORD",
             "occurrence": 1,
-            "emoji": "👆"
+            "image": "god_crown"
         },
         {
             "type": "emoji",
@@ -46,10 +46,10 @@
             "emoji": "⚡"
         },
         {
-            "type": "emoji",
-            "word": "Lord",
+            "type": "image",
+            "word": "LORD",
             "occurrence": 2,
-            "emoji": "👆"
+            "image": "god_crown"
         },
         {
             "type": "emoji",

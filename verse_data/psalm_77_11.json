@@ -5,26 +5,51 @@
   "verseId": "psalm_77_11",
   "ref": "Psalm 77:11",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
     "I will remember",
-    "the deeds of the Lord",
+    "the works of the LORD",
     "yes, I will remember",
-    "your wonders of old"
+    "Your wonders of old"
   ],
-
-  "verseText": "I will remember the deeds of the Lord; yes, I will remember your wonders of old.",
-   "meaning": "God has done many wonderful things in the past to rescue his people. It is good for us to look back and remember them.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“I will remember the works of the LORD; yes, I will remember Your wonders of old.”",
+  "meaning": "God has done many wonderful things in the past to rescue his people. It is good for us to look back and remember them.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "I", "occurrence": 1, "emoji": "👁️" },
-    { "type": "emoji", "word": "old", "occurrence": 1, "emoji": "🕰️" },
-    { "type": "emoji", "word": "remember", "occurrence": 1, "emoji": "🧠" },
-    { "type": "emoji", "word": "remember", "occurrence": 2, "emoji": "🧠" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "wonders", "occurrence": 1, "emoji": "✨" },
-    { "type": "underscore", "word": "deeds", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "remember",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "underscore",
+      "word": "works",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "remember",
+      "occurrence": 2,
+      "emoji": "🧠"
+    },
+    {
+      "type": "emoji",
+      "word": "wonders",
+      "occurrence": 1,
+      "emoji": "✨"
+    },
+    {
+      "type": "emoji",
+      "word": "old",
+      "occurrence": 1,
+      "emoji": "🕰️"
+    }
   ]
 }
-
-

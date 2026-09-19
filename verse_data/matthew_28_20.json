@@ -5,24 +5,49 @@
   "verseId": "matthew_28_20",
   "ref": "Matthew 28:20",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "And behold",
-    "I am with you",
-    "always",
-    "to the end of the age"
+    "And surely",
+    "I am with you always",
+    "even to the end",
+    "of the age"
   ],
-
-  "verseText": "And behold, I am with you always, to the end of the age.",
-   "meaning": "This is a promise to us from Jesus. He will always be with us, until the end of time.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“And surely I am with you always, even to the end of the age.”",
+  "meaning": "This is a promise to us from Jesus. He will always be with us, until the end of time.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "behold", "occurrence": 1, "emoji": "🗣️💬" },
-    { "type": "emoji", "word": "I", "occurrence": 1, "emoji": "👁️" },
-    { "type": "emoji", "word": "to", "occurrence": 1, "emoji": "2️⃣" },
-    { "type": "emoji", "word": "age", "occurrence": 1, "emoji": "🕝" },
-    { "type": "emoji", "word": "always", "occurrence": 1, "emoji": "♾️" },
-    { "type": "underscore", "word": "end", "occurrence": 1 },
-    { "type": "underscore", "word": "with", "occurrence": 1 }
+    {
+      "type": "underscore",
+      "word": "surely",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "with",
+      "occurrence": 1,
+      "image": "friends"
+    },
+    {
+      "type": "emoji",
+      "word": "always",
+      "occurrence": 1,
+      "emoji": "♾️"
+    },
+    {
+      "type": "underscore",
+      "word": "even",
+      "occurrence": 1
+    },
+    {
+      "type": "underscore",
+      "word": "end",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "age",
+      "occurrence": 1,
+      "emoji": "🕧"
+    }
   ]
 }

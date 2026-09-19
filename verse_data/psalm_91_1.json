@@ -5,16 +5,16 @@
     "verseId": "psalm_91_1",
     "ref": "Psalm 91:1",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "He who dwells in the shelter",
         "of the Most High",
         "will abide in the shadow",
-        "of the Almighty."
+        "of the Almighty"
     ],
-    "verseText": "He who dwells in the shelter of the Most High will abide in the shadow of the Almighty.",
+    "verseText": "“He who dwells in the shelter of the Most High will abide in the shadow of the Almighty.”",
     "meaning": "Those who trust in God are safe with him, like a person finding shelter and shade inside a house. God keeps them near under his strong protection.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "underscore",

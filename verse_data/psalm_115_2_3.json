@@ -1,0 +1,63 @@
+{
+    "biblopet": "🐨",
+    "biblopetDefaultName": "Plinko",
+    "biblopetFeetFromBottom": "25.2%",
+    "verseId": "psalm_115_2_3",
+    "ref": "Psalm 115:2-3",
+    "published": true,
+    "translation": "BSB",
+    "echoParts": [
+        "Why should the nations say",
+        "“Where is their God?”",
+        "Our God is in heaven",
+        "He does",
+        "as He pleases"
+    ],
+    "verseText": "Why should the nations say, “Where is their God?” Our God is in heaven; He does as He pleases.",
+    "meaning": "God is the Maker of everything and the King of the Universe. He has the power to do whatever he wants.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+    "hidePlan": [
+        {
+            "type": "image",
+            "word": "nations",
+            "occurrence": 1,
+            "image": "flags"
+        },
+        {
+            "type": "emoji",
+            "word": "Where",
+            "occurrence": 1,
+            "emoji": "🔎"
+        },
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 1,
+            "image": "god_crown"
+        },
+        {
+            "type": "image",
+            "word": "God",
+            "occurrence": 2,
+            "image": "god_crown"
+        },
+        {
+            "type": "emoji",
+            "word": "heaven",
+            "occurrence": 1,
+            "emoji": "☁️"
+        },
+        {
+            "type": "emoji",
+            "word": "does",
+            "occurrence": 1,
+            "emoji": "🛠️"
+        },
+        {
+            "type": "emoji",
+            "word": "pleases",
+            "occurrence": 1,
+            "emoji": "😊"
+        }
+    ]
+}

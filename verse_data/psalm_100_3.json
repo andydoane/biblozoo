@@ -5,24 +5,58 @@
   "verseId": "psalm_100_3",
   "ref": "Psalm 100:3",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Know that the Lord",
-    "he is God",
-    "It is he who made us",
-    "and we are his"
+    "Know that the LORD is God",
+    "It is He who made us",
+    "and we are His",
+    "we are His people",
+    "and the sheep of His pasture"
   ],
-
-  "verseText": "Know that the Lord, he is God! It is he who made us and we are his...",
-   "meaning": "The Lord God is the one who made us. And because he made us, we belong to him.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“Know that the LORD is God. It is He who made us, and we are His; we are His people, and the sheep of His pasture.”",
+  "meaning": "The Lord God is the one who made us. And because he made us, we belong to him.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "know", "occurrence": 1, "emoji": "🧠" },
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "made", "occurrence": 1, "emoji": "🔨" },
-    { "type": "underscore", "word": "he", "occurrence": 1 },
-    { "type": "underscore", "word": "we", "occurrence": 1 },
-    { "type": "underscore", "word": "us", "occurrence": 1 },
-    { "type": "underscore", "word": "Lord", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "Know",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "underscore",
+      "word": "LORD",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "made",
+      "occurrence": 1,
+      "emoji": "🔨"
+    },
+    {
+      "type": "emoji",
+      "word": "people",
+      "occurrence": 1,
+      "emoji": "👥"
+    },
+    {
+      "type": "emoji",
+      "word": "sheep",
+      "occurrence": 1,
+      "emoji": "🐑"
+    },
+    {
+      "type": "image",
+      "word": "pasture",
+      "occurrence": 1,
+      "image": "pasture"
+    }
   ]
 }

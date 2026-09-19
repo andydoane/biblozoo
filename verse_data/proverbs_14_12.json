@@ -5,16 +5,16 @@
     "verseId": "proverbs_14_12",
     "ref": "Proverbs 14:12",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "There is a way",
         "that seems right to a man",
         "but its end",
-        "is the way to death."
+        "is the way of death"
     ],
-    "verseText": "There is a way that seems right to a man, but its end is the way to death.",
+    "verseText": "“There is a way that seems right to a man, but its end is the way of death.”",
     "meaning": "We shouldn't trust in ourselves to figure out what's right. We need God's Word to show us the way that leads to eternal life.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
             "type": "emoji",

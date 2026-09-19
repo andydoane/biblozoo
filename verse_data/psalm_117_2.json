@@ -5,25 +5,57 @@
   "verseId": "psalm_117_2",
   "ref": "Psalm 117:2",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "For great",
-    "is his steadfast love",
+    "For great is His loving devotion",
     "toward us",
-    "and the faithfulness of the Lord",
-    "endures forever"
+    "and the faithfulness of the LORD",
+    "endures forever",
+    "Hallelujah"
   ],
-
-  "verseText": "For great is his steadfast love toward us, and the faithfulness of the Lord endures forever.",
-   "meaning": "God loves his people with a never-stopping love. We can trust him to always keep his promises.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“For great is His loving devotion toward us, and the faithfulness of the LORD endures forever. Hallelujah!”",
+  "meaning": "God loves his people with a never-stopping love. We can trust him to always keep his promises.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "great", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" },
-    { "type": "emoji", "word": "faithfulness", "occurrence": 1, "emoji": "🤞" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆👑" },
-    { "type": "emoji", "word": "forever", "occurrence": 1, "emoji": "♾️" },
-    { "type": "emoji", "word": "steadfast", "occurrence": 1, "emoji": "🚫🛑" },
-    { "type": "underscore", "word": "endures", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "great",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "emoji",
+      "word": "loving",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "underscore",
+      "word": "devotion",
+      "occurrence": 1
+    },
+    {
+      "type": "underscore",
+      "word": "faithfulness",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "forever",
+      "occurrence": 1,
+      "emoji": "♾️"
+    },
+    {
+      "type": "emoji",
+      "word": "Hallelujah",
+      "occurrence": 1,
+      "emoji": "🙌"
+    }
   ]
 }

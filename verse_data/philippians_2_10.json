@@ -5,26 +5,58 @@
   "verseId": "philippians_2_10",
   "ref": "Philippians 2:10",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-  "So that at the name of Jesus",
-  "every knee should bow",
-  "in heaven and on earth",
-  "and under the earth"
-],
-
-  "verseText": "So that at the name of Jesus every knee should bow, in heaven and on earth and under the earth...",
+    "...that at the name of Jesus",
+    "every knee should bow",
+    "in heaven and on earth",
+    "and under the earth..."
+  ],
+  "verseText": "“...that at the name of Jesus every knee should bow, in heaven and on earth and under the earth...”",
   "meaning": "One day, every human being who has ever lived will bow down before king King Jesus.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "earth", "occurrence": 2, "emoji": "🌍" },
-    { "type": "emoji", "word": "knee", "occurrence": 1, "emoji": "🦵" },
-    { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },
-    { "type": "emoji", "word": "heaven", "occurrence": 1, "emoji": "🌤️" },
-    { "type": "emoji", "word": "bow", "occurrence": 1, "emoji": "🙇" },
-    { "type": "emoji", "word": "name", "occurrence": 1, "emoji": "📝" },
-    { "type": "emoji", "word": "earth", "occurrence": 1, "emoji": "🌎" },
-    { "type": "emoji", "word": "under", "occurrence": 1, "emoji": "⬇️" },
-    { "type": "underscore", "word": "should", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "name",
+      "occurrence": 1,
+      "emoji": "📝"
+    },
+    {
+      "type": "image",
+      "word": "Jesus",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "emoji",
+      "word": "knee",
+      "occurrence": 1,
+      "emoji": "🦵"
+    },
+    {
+      "type": "image",
+      "word": "bow",
+      "occurrence": 1,
+      "image": "bowing"
+    },
+    {
+      "type": "emoji",
+      "word": "heaven",
+      "occurrence": 1,
+      "emoji": "🌤️"
+    },
+    {
+      "type": "emoji",
+      "word": "earth",
+      "occurrence": 1,
+      "emoji": "🌎"
+    },
+    {
+      "type": "emoji",
+      "word": "under",
+      "occurrence": 1,
+      "emoji": "⬇️"
+    }
   ]
 }

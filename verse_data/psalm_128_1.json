@@ -5,22 +5,49 @@
   "verseId": "psalm_128_1",
   "ref": "Psalm 128:1",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Blessed is everyone",
-    "who fears the Lord",
-    "who walks in his ways"
+    "Blessed are all",
+    "who fear the LORD",
+    "who walk in His ways"
   ],
-
-  "verseText": "Blessed is everyone who fears the Lord, who walks in his ways!",
-   "meaning": "We are blessed and truly happy when we have a fearful respect of God's power and live life God's way.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“A song of ascents. Blessed are all who fear the LORD, who walk in His ways!”",
+  "meaning": "We are blessed and truly happy when we have a fearful respect of God's power and live life God's way.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "blessed", "occurrence": 1, "emoji": "😀" },
-    { "type": "emoji", "word": "everyone", "occurrence": 1, "emoji": "👨‍👩‍👧‍👦" },
-    { "type": "emoji", "word": "fears", "occurrence": 1, "emoji": "😨" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "walks", "occurrence": 1, "emoji": "👣" },
-    { "type": "underscore", "word": "ways", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "Blessed",
+      "occurrence": 1,
+      "emoji": "😀"
+    },
+    {
+      "type": "underscore",
+      "word": "all",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "fear",
+      "occurrence": 1,
+      "emoji": "😨"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "walk",
+      "occurrence": 1,
+      "emoji": "🚶‍♂️‍➡️"
+    },
+    {
+      "type": "underscore",
+      "word": "ways",
+      "occurrence": 1
+    }
   ]
 }

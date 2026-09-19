@@ -5,25 +5,51 @@
   "verseId": "psalm_136_1",
   "ref": "Psalm 136:1",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "Give thanks to the Lord",
-    "for he is good",
-    "for his steadfast love",
+    "Give thanks to the LORD",
+    "for He is good",
+    "His loving devotion",
     "endures forever"
   ],
-
-  "verseText": "Give thanks to the Lord for he is good, for his steadfast love endures forever.",
-   "meaning": "These are two reasons to praise God: he is good and he loves us with a steadfast, never-stopping kind of love.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“Give thanks to the LORD, for He is good. His loving devotion endures forever.”",
+  "meaning": "These are two reasons to praise God: he is good and he loves us with a steadfast, never-stopping kind of love.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "give", "occurrence": 1, "emoji": "🎁" },
-    { "type": "emoji", "word": "thanks", "occurrence": 1, "emoji": "🙏" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "☝️" },
-    { "type": "emoji", "word": "good", "occurrence": 1, "emoji": "👍" },
-    { "type": "emoji", "word": "for", "occurrence": 1, "emoji": "4️⃣" },
-    { "type": "emoji", "word": "steadfast", "occurrence": 1, "emoji": "🚫🛑" },
-        { "type": "emoji", "word": "forever", "occurrence": 1, "emoji": "♾️" },
-    { "type": "emoji", "word": "love", "occurrence": 1, "emoji": "❤️" }
+    {
+      "type": "emoji",
+      "word": "thanks",
+      "occurrence": 1,
+      "emoji": "🙏"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "good",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "emoji",
+      "word": "loving",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "underscore",
+      "word": "devotion",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "forever",
+      "occurrence": 1,
+      "emoji": "♾️"
+    }
   ]
 }

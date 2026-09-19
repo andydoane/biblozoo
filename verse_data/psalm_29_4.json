@@ -5,24 +5,52 @@
   "verseId": "psalm_29_4",
   "ref": "Psalm 29:4",
   "published": true,
-  "translation": "ESV",
+  "translation": "BSB",
   "echoParts": [
-    "The voice of the Lord",
+    "The voice of the LORD",
     "is powerful",
-    "The voice of the Lord",
-    "is full of majesty"
+    "the voice of the LORD",
+    "is majestic"
   ],
-
-  "verseText": "The voice of the Lord is powerful; the voice of the Lord is full of majesty.",
-   "meaning": "God is so mighty, even his voice is powerful. When God speaks, amazing things happen. God spoke to create the world and Jesus often spoke to do miracles.",
-  "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+  "verseText": "“The voice of the LORD is powerful; the voice of the LORD is majestic.”",
+  "meaning": "God is so mighty, even his voice is powerful. When God speaks, amazing things happen. God spoke to create the world and Jesus often spoke to do miracles.",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
-    { "type": "emoji", "word": "voice", "occurrence": 1, "emoji": "🗣️" },
-    { "type": "emoji", "word": "Lord", "occurrence": 1, "emoji": "👆" },
-    { "type": "emoji", "word": "powerful", "occurrence": 1, "emoji": "⚡" },
-    { "type": "emoji", "word": "voice", "occurrence": 2, "emoji": "🗣️" },
-    { "type": "emoji", "word": "Lord", "occurrence": 2, "emoji": "👆" },
-    { "type": "emoji", "word": "majesty", "occurrence": 1, "emoji": "👑" },
-    { "type": "underscore", "word": "full", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "voice",
+      "occurrence": 1,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "powerful",
+      "occurrence": 1,
+      "emoji": "⚡"
+    },
+    {
+      "type": "emoji",
+      "word": "voice",
+      "occurrence": 2,
+      "emoji": "🗣️"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 2,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "majestic",
+      "occurrence": 1,
+      "emoji": "👑"
+    }
   ]
 }

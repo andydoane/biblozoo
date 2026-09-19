@@ -5,23 +5,17 @@
     "verseId": "psalm_96_5",
     "ref": "Psalm 96:5",
     "published": true,
-    "translation": "ESV",
+    "translation": "BSB",
     "echoParts": [
         "For all the gods",
-        "of the peoples",
-        "are worthless idols",
-        "but the Lord made the heavens"
+        "of the nations are idols",
+        "but it is the LORD",
+        "who made the heavens"
     ],
-    "verseText": "For all the gods of the peoples are worthless idols, but the Lord made the heavens.",
+    "verseText": "“For all the gods of the nations are idols, but it is the LORD who made the heavens.”",
     "meaning": "The Lord God is the one and only true God. He created the universe. All other gods are worthless. Because they aren't real, they can't do anything.",
-    "attribution": "Scripture quotations are from The ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.",
+    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "idols",
-            "occurrence": 1,
-            "emoji": "🗿"
-        },
         {
             "type": "underscore",
             "word": "gods",
@@ -29,20 +23,27 @@
         },
         {
             "type": "emoji",
-            "word": "peoples",
+            "word": "nations",
             "occurrence": 1,
             "emoji": "👥"
         },
         {
-            "type": "underscore",
-            "word": "worthless",
-            "occurrence": 1
+            "type": "emoji",
+            "word": "idols",
+            "occurrence": 1,
+            "emoji": "🗿"
         },
         {
             "type": "image",
-            "word": "Lord",
+            "word": "LORD",
             "occurrence": 1,
             "image": "god_crown"
+        },
+        {
+            "type": "emoji",
+            "word": "made",
+            "occurrence": 1,
+            "emoji": "🛠️"
         },
         {
             "type": "emoji",
