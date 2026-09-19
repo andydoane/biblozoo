@@ -122,7 +122,15 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
 
   const STREAK_ACCESSORY_MIN = 6;
   const STREAK_RAINBOW_MIN = 12;
-  const STREAK_ACCESSORY_FACES = ["😎", "🥸"];
+
+  const STREAK_ACCESSORY_FACES = [
+    "😎",
+    "🥸",
+    "🤡",
+    "🥷",
+    "🏴‍☠️",
+    "🦷"
+  ];
   const EMOTION_FACE = {
     "-3":"😡",
     "-2":"😠",
@@ -167,6 +175,10 @@ const FACE_MAP = {
   // streak rewards
   "😎":"munch_glasses.png",
   "🥸":"munch_mustache.png",
+  "🤡":"munch_clown.png",
+  "🥷":"munch_hero.png",
+  "🏴‍☠️":"munch_pirate.png",
+  "🦷":"munch_teeth.png",
 
   // mouth open (all map to same)
   "😄":"munch_mouth_open.png",
@@ -373,6 +385,7 @@ const FACE_MAP = {
     progressIndex:0,
     streak:0,
     streakAccessoryFace:"",
+    lastStreakAccessoryFace:"",
     emotionLevel:0,
     carouselItems:[],
     carouselIndex:0,
@@ -687,6 +700,7 @@ function renderModeSelect(){
     state.progressIndex = 0;
     state.streak = 0;
     state.streakAccessoryFace = "";
+    state.lastStreakAccessoryFace = "";
     state.buildFitDone = false;
     state.emotionLevel = 0;
     state.faceBase = getEmotionFace();
@@ -1742,9 +1756,15 @@ function backToMenuFromHelp(){
       if (!await playWrongWordReaction(item.label, runToken, useDizzyWrongReaction)) return;
       if (!isActiveRun(runToken)) return;
 
+      if (state.streakAccessoryFace) {
+        state.lastStreakAccessoryFace =
+          state.streakAccessoryFace;
+      }
+
       state.streak = 0;
+      state.streakAccessoryFace = "";
       state.emotionLevel = clamp(state.emotionLevel - 1, -3, 3);
-      state.faceBase = getEmotionFace();
+      state.faceBase = getPersistentFace();
       state.faceDisplay = state.faceBase;
       state.faceClasses = new Set();
       state.buildShakeUntil = performance.now() + 280;
@@ -3983,6 +4003,21 @@ function spawnChewCrumbs(isSecondary = false){
     return EMOTION_FACE[String(state.emotionLevel)] || "😐";
   }
 
+  function pickNextStreakAccessoryFace() {
+    const pool =
+      STREAK_ACCESSORY_FACES.filter(
+        (face) =>
+          face !==
+          state.lastStreakAccessoryFace
+      );
+
+    return randomFrom(
+      pool.length
+        ? pool
+        : STREAK_ACCESSORY_FACES
+    );
+  }
+
   function getPersistentFace(){
     if (
       state.streak >=
@@ -3997,9 +4032,7 @@ function spawnChewCrumbs(isSecondary = false){
     ) {
       if (!state.streakAccessoryFace) {
         state.streakAccessoryFace =
-          randomFrom(
-            STREAK_ACCESSORY_FACES
-          );
+          pickNextStreakAccessoryFace();
       }
 
       return state.streakAccessoryFace;
