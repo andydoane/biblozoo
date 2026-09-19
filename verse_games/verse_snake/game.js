@@ -28,15 +28,15 @@
     encounterMaxDistanceScreens: 1.1,
     patternScrollFactor: 1,
     fruitChance: 0.62,
-    longVerseMinWords: 25,
-    veryLongVerseMinWords: 40,
+    longVerseMinWords: 28,
+    veryLongVerseMinWords: 32,
     longVerseSpawnScale: {
-      start: 0.88,
-      end: 0.84
+      start: 0.64,
+      end: 0.56
     },
     veryLongVerseSpawnScale: {
-      start: 0.82,
-      end: 0.78
+      start: 0.56,
+      end: 0.48
     }
   };
 
