@@ -119,6 +119,10 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
   const HAPPY_REACTIONS = ["😋","☺️","😁"];
   const SAD_REACTIONS = ["🤮","🤢","😵‍💫"];
   const ANTICIPATION_FACES = ["😕","🫤","😐"];
+
+  const STREAK_ACCESSORY_MIN = 6;
+  const STREAK_RAINBOW_MIN = 12;
+  const STREAK_ACCESSORY_FACES = ["😎", "🥸"];
   const EMOTION_FACE = {
     "-3":"😡",
     "-2":"😠",
@@ -157,8 +161,12 @@ const FACE_MAP = {
   // positives
   "☺️":"munch_positive_1.png",
   "😋":"munch_positive_2.png",
-  "🌈": "verse_munch_rainbow_eyes.svg",
+  "🌈":"verse_munch_rainbow_eyes.svg",
   "🤩":"munch_positive_3.png",
+
+  // streak rewards
+  "😎":"munch_glasses.png",
+  "🥸":"munch_mustache.png",
 
   // mouth open (all map to same)
   "😄":"munch_mouth_open.png",
@@ -364,6 +372,7 @@ const FACE_MAP = {
     referenceMeta:null,
     progressIndex:0,
     streak:0,
+    streakAccessoryFace:"",
     emotionLevel:0,
     carouselItems:[],
     carouselIndex:0,
@@ -677,6 +686,7 @@ function renderModeSelect(){
     state.pauseReason = "";
     state.progressIndex = 0;
     state.streak = 0;
+    state.streakAccessoryFace = "";
     state.buildFitDone = false;
     state.emotionLevel = 0;
     state.faceBase = getEmotionFace();
@@ -1707,14 +1717,19 @@ function backToMenuFromHelp(){
 
       playGameSound("correct");
 
-      if (!await playReactionAnimation(true, runToken, streakTier)) return;
+      if (!await playReactionAnimation(
+        true,
+        runToken,
+        streakTier,
+        nextStreak
+      )) return;
       if (!isActiveRun(runToken)) return;
 
       state.progressIndex += 1;
       state.streak += 1;
 
       state.emotionLevel = clamp(state.emotionLevel + 1, -3, 3);
-      state.faceBase = getEmotionFace();
+      state.faceBase = getPersistentFace();
       state.faceDisplay = state.faceBase;
       state.faceClasses = new Set();
 
@@ -2215,7 +2230,12 @@ function backToMenuFromHelp(){
     return true;
   }
 
-  async function playReactionAnimation(isCorrect, runToken, streakTier = 0) {
+  async function playReactionAnimation(
+    isCorrect,
+    runToken,
+    streakTier = 0,
+    streakValue = 0
+  ) {
     if (!isActiveRun(runToken)) return false;
 
     const reactionDuration = getTiming().reaction;
@@ -2235,8 +2255,16 @@ function backToMenuFromHelp(){
         playGameSound("streak");
 
         if (streakTier >= 3) {
-          state.faceDisplay = "🌈";
-          state.faceClasses = new Set(["is-react-victory-wiggle"]);
+          state.faceDisplay =
+            streakValue >=
+              STREAK_RAINBOW_MIN
+              ? "🌈"
+              : "😁";
+
+          state.faceClasses =
+            new Set([
+              "is-react-victory-wiggle"
+            ]);
         } else if (streakTier === 2) {
           state.faceDisplay = "😁";
           state.faceClasses = new Set(["is-react-hop"]);
@@ -3953,6 +3981,31 @@ function spawnChewCrumbs(isSecondary = false){
 
   function getEmotionFace(){
     return EMOTION_FACE[String(state.emotionLevel)] || "😐";
+  }
+
+  function getPersistentFace(){
+    if (
+      state.streak >=
+      STREAK_RAINBOW_MIN
+    ) {
+      return "🌈";
+    }
+
+    if (
+      state.streak >=
+      STREAK_ACCESSORY_MIN
+    ) {
+      if (!state.streakAccessoryFace) {
+        state.streakAccessoryFace =
+          randomFrom(
+            STREAK_ACCESSORY_FACES
+          );
+      }
+
+      return state.streakAccessoryFace;
+    }
+
+    return getEmotionFace();
   }
 
   function getMoodLabel(){
