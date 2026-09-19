@@ -23,11 +23,12 @@
             "occurrence": 1,
             "emoji": "🤲"
         },
-        {
-            "type": "underscore",
-            "word": "believed",
-            "occurrence": 1
-        },
+    {
+        "type": "image",
+        "word": "believed",
+        "occurrence": 1,
+        "image": "believe"
+    },
         {
             "type": "emoji",
             "word": "gave",

@@ -25,9 +25,10 @@
       "emoji": "📝"
     },
     {
-      "type": "underscore",
-      "word": "believe",
-      "occurrence": 1
+      "type": "image",
+      "word": "believes",
+      "occurrence": 1,
+      "image": "believe"
     },
     {
       "type": "image",

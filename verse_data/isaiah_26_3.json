@@ -45,10 +45,11 @@
             "occurrence": 1,
             "emoji": "🧠"
         },
-        {
-            "type": "underscore",
-            "word": "trusts",
-            "occurrence": 1
-        }
+    {
+        "type": "image",
+        "word": "trusts",
+        "occurrence": 1,
+        "image": "believe"
+    }
     ]
 }

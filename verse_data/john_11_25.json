@@ -41,11 +41,12 @@
             "word": "Whoever",
             "occurrence": 1
         },
-        {
-            "type": "underscore",
-            "word": "believes",
-            "occurrence": 1
-        },
+    {
+        "type": "image",
+        "word": "believes",
+        "occurrence": 1,
+        "image": "believe"
+    },
         {
             "type": "underscore",
             "word": "live",

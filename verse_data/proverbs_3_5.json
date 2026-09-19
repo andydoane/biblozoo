@@ -17,9 +17,10 @@
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
-      "type": "underscore",
+      "type": "image",
       "word": "Trust",
-      "occurrence": 1
+      "occurrence": 1,
+      "image": "believe"
     },
     {
       "type": "image",

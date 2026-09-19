@@ -48,12 +48,12 @@
             "occurrence": 1,
             "emoji": "🍽️"
         },
-        {
-            "type": "emoji",
-            "word": "believes",
-            "occurrence": 1,
-            "emoji": "🙏"
-        },
+    {
+        "type": "image",
+        "word": "believes",
+        "occurrence": 1,
+        "image": "believe"
+    },
         {
             "type": "emoji",
             "word": "thirst",

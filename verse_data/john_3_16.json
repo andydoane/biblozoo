@@ -42,9 +42,10 @@
       "emoji": "🌍"
     },
     {
-      "type": "underscore",
+      "type": "image",
       "word": "believes",
-      "occurrence": 1
+      "occurrence": 1,
+      "image": "believe"
     },
     {
       "type": "emoji",
