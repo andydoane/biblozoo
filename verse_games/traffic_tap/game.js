@@ -3039,10 +3039,50 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       : 1.45;
   }
 
+  const STREAK_SPEED_MAX_MULTIPLIER = 1.25;
+
+  function getStreakSpeedMultiplier(streak) {
+    const value =
+      Math.max(
+        0,
+        Number(streak) || 0
+      );
+
+    if (value >= 9) {
+      return STREAK_SPEED_MAX_MULTIPLIER;
+    }
+
+    if (value >= 6) {
+      return (
+        1 +
+        (
+          STREAK_SPEED_MAX_MULTIPLIER - 1
+        ) *
+        (2 / 3)
+      );
+    }
+
+    if (value >= 3) {
+      return (
+        1 +
+        (
+          STREAK_SPEED_MAX_MULTIPLIER - 1
+        ) *
+        (1 / 3)
+      );
+    }
+
+    return 1;
+  }
+
   function mainTrafficSpeedMultiplier() {
     return (
       trafficSpeedMultiplier() *
-      window.VerseGameShell.getGameSpeedMultiplier()
+      window.VerseGameShell
+        .getGameSpeedMultiplier() *
+      getStreakSpeedMultiplier(
+        state.correctStreak
+      )
     );
   }
 

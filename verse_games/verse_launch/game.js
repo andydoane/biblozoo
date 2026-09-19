@@ -936,11 +936,47 @@
 // Conveyor Belt Speed
   const CONVEYOR_LIGHTS_ONLY_TRAVELED_THRESHOLD = 0.5;
   const CONVEYOR_SHIP_HEIGHT_MULTIPLIER = 2.10;
+  const STREAK_SPEED_MAX_MULTIPLIER = 1.25;
+
   const CONVEYOR_SPEED_SHIP_HEIGHTS_PER_SEC = {
     easy: 1.20,
     medium: 1.50,
     hard: 1.80
   };
+
+  function getStreakSpeedMultiplier(streak) {
+    const value =
+      Math.max(
+        0,
+        Number(streak) || 0
+      );
+
+    if (value >= 9) {
+      return STREAK_SPEED_MAX_MULTIPLIER;
+    }
+
+    if (value >= 6) {
+      return (
+        1 +
+        (
+          STREAK_SPEED_MAX_MULTIPLIER - 1
+        ) *
+        (2 / 3)
+      );
+    }
+
+    if (value >= 3) {
+      return (
+        1 +
+        (
+          STREAK_SPEED_MAX_MULTIPLIER - 1
+        ) *
+        (1 / 3)
+      );
+    }
+
+    return 1;
+  }
 
   function conveyorSpeedPxPerSec() {
     const shipHeightsPerSecond =
@@ -950,7 +986,11 @@
     return (
       conveyorShipHeightPx() *
       shipHeightsPerSecond *
-      window.VerseGameShell.getGameSpeedMultiplier()
+      window.VerseGameShell
+        .getGameSpeedMultiplier() *
+      getStreakSpeedMultiplier(
+        state.correctStreak
+      )
     );
   }
 

@@ -3145,11 +3145,51 @@ function updateBuildText(){
     ) * amplitude;
   }
 
+  const STREAK_SPEED_MAX_MULTIPLIER = 1.25;
+
+  function getStreakSpeedMultiplier(streak) {
+    const value =
+      Math.max(
+        0,
+        Number(streak) || 0
+      );
+
+    if (value >= 9) {
+      return STREAK_SPEED_MAX_MULTIPLIER;
+    }
+
+    if (value >= 6) {
+      return (
+        1 +
+        (
+          STREAK_SPEED_MAX_MULTIPLIER - 1
+        ) *
+        (2 / 3)
+      );
+    }
+
+    if (value >= 3) {
+      return (
+        1 +
+        (
+          STREAK_SPEED_MAX_MULTIPLIER - 1
+        ) *
+        (1 / 3)
+      );
+    }
+
+    return 1;
+  }
+
   function getBeltConfig() {
     const chipHeight = 56;
+
     const speedMultiplier =
       window.VerseGameShell
-        .getGameSpeedMultiplier();
+        .getGameSpeedMultiplier() *
+      getStreakSpeedMultiplier(
+        state.streak
+      );
 
     if (selectedMode === "hard") {
       return {
