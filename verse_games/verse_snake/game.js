@@ -8,6 +8,7 @@
   const GAME_ICON = "🐍";
   const GAME_ICON_HTML = window.VerseGameShell.gameIconImageHtmlForId(GAME_ID, GAME_ICON, `${GAME_TITLE} icon`);
   const HELP_OVERLAY_ID = "vslHelpOverlay";
+  const SPEED_MENU_OVERLAY_ID = "vslSpeedMenuOverlay";
 
   const GAME_THEME = {
     bg: "#333333",
@@ -26,7 +27,17 @@
     wrongFleeMaxScreenDistance: 1.22,
     encounterMaxDistanceScreens: 1.1,
     patternScrollFactor: 1,
-    fruitChance: 0.62
+    fruitChance: 0.62,
+    longVerseMinWords: 25,
+    veryLongVerseMinWords: 40,
+    longVerseSpawnScale: {
+      start: 0.88,
+      end: 0.84
+    },
+    veryLongVerseSpawnScale: {
+      start: 0.82,
+      end: 0.78
+    }
   };
 
   const FRUIT_IMAGES = [
@@ -326,6 +337,7 @@
     cooldownMs: 4000,
     minCooldownMs: 2000,
     speedMultiplier: 2.00,
+    maxCombinedSpeedMultiplier: 2.50,
     doubleTapWindowMs: 380,
     doubleTapMinGapMs: 40,
     doubleTapMaxMovePx: 110,
@@ -786,6 +798,7 @@
 
   function renderGameScreen(){
     stopLoop();
+    window.VerseGameShell.resetGameSpeed();
     resetStateForRun();
 
     app.innerHTML = `
@@ -802,7 +815,15 @@
               <div class="vsl-pattern-layer" id="vslPatternLayer"></div>
 
               <div class="vsl-overlay-pills">
-                <button class="vsl-pill vsl-menu-pill no-zoom" id="vslMenuPill" aria-label="Game Menu" type="button">☰</button>
+                <div class="vsl-overlay-left-group">
+                  <button class="vsl-pill vsl-menu-pill no-zoom" id="vslMenuPill" aria-label="Game Menu" type="button">☰</button>
+
+                  ${window.VerseGameShell.speedControlButtonHtml({
+                    id: "vslSpeedPill",
+                    className: "vsl-pill no-zoom"
+                  })}
+                </div>
+
                 <div class="vsl-boost-meter is-ready" id="vslBoostMeter" aria-label="Speed boost ready">
                   <span class="vsl-boost-icon" aria-hidden="true">⚡</span>
                   <span class="vsl-boost-track" aria-hidden="true">
@@ -837,6 +858,9 @@
 
         ${renderHelpOverlay()}
         ${renderGameMenuOverlay()}
+        ${window.VerseGameShell.speedMenuHtml({
+          id: SPEED_MENU_OVERLAY_ID
+        })}
       </div>
     `;
 
@@ -905,6 +929,8 @@
 
       field.addEventListener("pointerdown", (e) => {
         if (state.paused) return;
+        if (e.target.closest(".vsl-overlay-pills")) return;
+
         e.preventDefault();
         unlockAudio();
         field.setPointerCapture?.(e.pointerId);
@@ -958,6 +984,31 @@
       onBackFromHelp: () => {
         unlockAndTap();
         setPaused(true, "menu");
+      }
+    });
+
+    window.VerseGameShell.wireSpeedMenu({
+      id: SPEED_MENU_OVERLAY_ID,
+      buttonId: "vslSpeedPill",
+
+      onOpen: () => {
+        if (
+          state.bonusActive ||
+          state.bonusEnding ||
+          completed
+        ) {
+          return false;
+        }
+
+        unlockAndTap();
+        setPaused(true, "speed");
+
+        return true;
+      },
+
+      onClose: () => {
+        unlockAndTap();
+        setPaused(false, "");
       }
     });
   }
@@ -1233,34 +1284,38 @@
       (1 - GAMEPLAY_SCALE_TUNING.spawnDistanceMinScale) *
       visualScale;
 
+    const wordCount =
+      state.words.length;
+
     if (
       getCurrentPhase() !== "words" ||
-      state.words.length < 25
+      wordCount <
+        SLITHER_TUNING.longVerseMinWords
     ) {
       return visualDistanceScale;
     }
 
-    const streak = state.correctStreak;
+    const verseProgress =
+      clamp(
+        state.progressIndex /
+          Math.max(1, wordCount - 1),
+        0,
+        1
+      );
 
-    let longVerseMultiplier;
+    const distanceRange =
+      wordCount >=
+        SLITHER_TUNING.veryLongVerseMinWords
+        ? SLITHER_TUNING.veryLongVerseSpawnScale
+        : SLITHER_TUNING.longVerseSpawnScale;
 
-    if (state.words.length >= 40) {
-      if (streak >= 6) {
-        longVerseMultiplier = 0.80;
-      } else if (streak >= 3) {
-        longVerseMultiplier = 0.82;
-      } else {
-        longVerseMultiplier = 0.84;
-      }
-    } else {
-      if (streak >= 6) {
-        longVerseMultiplier = 0.86;
-      } else if (streak >= 3) {
-        longVerseMultiplier = 0.88;
-      } else {
-        longVerseMultiplier = 0.90;
-      }
-    }
+    const longVerseMultiplier =
+      distanceRange.start +
+      (
+        distanceRange.end -
+        distanceRange.start
+      ) *
+      verseProgress;
 
     return (
       visualDistanceScale *
@@ -1571,19 +1626,69 @@
     );
   }
 
+  function getSnakeGameSpeedMultiplier() {
+    if (
+      state.bonusActive ||
+      state.bonusEnding
+    ) {
+      return 1;
+    }
+
+    return window.VerseGameShell
+      .getGameSpeedMultiplier();
+  }
+
   function getCurrentSpeed(){
-    const baseSpeed = SLITHER_TUNING.speeds[selectedMode] || SLITHER_TUNING.speeds.medium;
-    const boostMultiplier = isBoostActive() ? BOOST_TUNING.speedMultiplier : 1;
-    return baseSpeed * getSpeedScale() * getWorldSpeedMultiplier() * boostMultiplier;
+    const baseSpeed =
+      SLITHER_TUNING.speeds[selectedMode] ||
+      SLITHER_TUNING.speeds.medium;
+
+    const gameSpeedMultiplier =
+      getSnakeGameSpeedMultiplier();
+
+    const boostMultiplier =
+      isBoostActive()
+        ? BOOST_TUNING.speedMultiplier
+        : 1;
+
+    const combinedSpeedMultiplier =
+      Math.min(
+        gameSpeedMultiplier *
+          boostMultiplier,
+        BOOST_TUNING
+          .maxCombinedSpeedMultiplier
+      );
+
+    return (
+      baseSpeed *
+      getSpeedScale() *
+      getWorldSpeedMultiplier() *
+      combinedSpeedMultiplier
+    );
   }
 
   function getCurrentTurnRate(){
-    return SLITHER_TUNING.turnRate[selectedMode] || SLITHER_TUNING.turnRate.medium;
+    const baseTurnRate =
+      SLITHER_TUNING.turnRate[selectedMode] ||
+      SLITHER_TUNING.turnRate.medium;
+
+    return (
+      baseTurnRate *
+      getSnakeGameSpeedMultiplier()
+    );
   }
 
   function getWrongFleeSpeed() {
-    const baseSpeed = SLITHER_TUNING.wrongFleeSpeeds[selectedMode] || SLITHER_TUNING.wrongFleeSpeeds.medium;
-    return baseSpeed * getSpeedScale() * getWorldSpeedMultiplier();
+    const baseSpeed =
+      SLITHER_TUNING.wrongFleeSpeeds[selectedMode] ||
+      SLITHER_TUNING.wrongFleeSpeeds.medium;
+
+    return (
+      baseSpeed *
+      getSpeedScale() *
+      getWorldSpeedMultiplier() *
+      getSnakeGameSpeedMultiplier()
+    );
   }
 
   function seedTrail(){
@@ -2164,6 +2269,16 @@
     state.bonusStartedAt = now;
     state.bonusEndsAt = now + BONUS_TUNING.durationMs;
     state.bonusScore = 0;
+
+    const speedButton =
+      document.getElementById(
+        "vslSpeedPill"
+      );
+
+    if (speedButton) {
+      speedButton.style.display =
+        "none";
+    }
 
     state.encounter = null;
     state.targets = [];
@@ -2770,7 +2885,11 @@
   function updateEscapingTargets(dt, ts) {
     if (!state.escapingTargets.length) return;
 
-    const speed = DECOY_ESCAPE_TUNING.speedPxPerSecond * getSpeedScale() * getWorldSpeedMultiplier();
+    const speed =
+      DECOY_ESCAPE_TUNING.speedPxPerSecond *
+      getSpeedScale() *
+      getWorldSpeedMultiplier() *
+      getSnakeGameSpeedMultiplier();
     const seconds = dt / 1000;
 
     for (const target of state.escapingTargets) {
