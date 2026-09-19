@@ -3145,7 +3145,7 @@ function updateBuildText(){
     ) * amplitude;
   }
 
-  const STREAK_SPEED_MAX_MULTIPLIER = 1.25;
+  const STREAK_SPEED_MAX_MULTIPLIER = 1.5;
 
   function getStreakSpeedMultiplier(streak) {
     const value =
