@@ -65,6 +65,7 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
 
   const BONUS_INTRO_DURATION = 2.4;
   const BONUS_PLAY_DURATION = 20;
+  const BONUS_END_SPEED_MULTIPLIER = 1.5;
   const BONUS_SCORE_CONTINUE_ARM_DELAY = 0.55;
   const BONUS_TARGET_CHANCE = 0.4;
   const BONUS_FORCE_TARGET_AFTER = 2;
@@ -404,6 +405,7 @@ const FACE_MAP = {
     bonusFoodItems:[],
     bonusFoodNextId:1,
     bonusFoodSpawnTimer:0,
+    bonusElapsed:0,
     bonusNonTargetStreak:0,
     bonusFeedQueue:[],
     bonusEating:false,
@@ -2372,6 +2374,7 @@ function backToMenuFromHelp(){
     if (!isActiveRun(runToken)) return false;
 
     state.bonusPhase = "playing";
+    state.bonusElapsed = 0;
     state.bonusIntroText = "";
     state.flyingFood = null;
     state.hitWord = null;
@@ -3187,6 +3190,12 @@ function updateBuildText(){
   function updateBonusFoodBelt(dt) {
     if (state.bonusPhase !== "playing") return;
 
+    state.bonusElapsed =
+      Math.min(
+        BONUS_PLAY_DURATION,
+        state.bonusElapsed + dt
+      );
+
     const cfg = getBonusFoodBeltConfig();
 
     for (const item of state.bonusFoodItems) {
@@ -3207,11 +3216,31 @@ function updateBuildText(){
     }
   }
 
+  function getBonusSpeedMultiplier() {
+    const progress =
+      clamp(
+        state.bonusElapsed /
+          BONUS_PLAY_DURATION,
+        0,
+        1
+      );
+
+    return (
+      1 +
+      (
+        BONUS_END_SPEED_MULTIPLIER - 1
+      ) *
+      progress
+    );
+  }
+
   function getBonusFoodBeltConfig() {
     const hardModeBeltSpeed = 56 * 4.35;
 
     return {
-      speed: hardModeBeltSpeed,
+      speed:
+        hardModeBeltSpeed *
+        getBonusSpeedMultiplier(),
       gap: 70,
       size: clamp(state.fieldWidth * 0.13, 58, 86)
     };

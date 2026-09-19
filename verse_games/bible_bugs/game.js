@@ -67,6 +67,7 @@
   const LANES = [0.18, 0.50, 0.82];
   const BONUS_SECONDS = 20;
   const BONUS_MAX_BUGS = 3;
+  const BONUS_END_SPAWN_RATE_MULTIPLIER = 1.5;
 
   const MODE_TIMING = {
     easy: { fallSeconds: 6.8, nextDelay: 0, reactionMs: 620, missDelay: 520 },
@@ -1752,6 +1753,40 @@
     return state.bonusBugs.length + Math.max(0, Number(state.bonusSpawnPendingCount) || 0);
   }
 
+  function getBonusSpawnRateMultiplier(
+    now = performance.now()
+  ) {
+    if (
+      !state.bonusMode ||
+      !state.bonusEndsAt
+    ) {
+      return 1;
+    }
+
+    const totalMs =
+      BONUS_SECONDS * 1000;
+
+    const remainingMs =
+      shell.clamp(
+        state.bonusEndsAt - now,
+        0,
+        totalMs
+      );
+
+    const progress =
+      1 -
+      remainingMs / totalMs;
+
+    return (
+      1 +
+      (
+        BONUS_END_SPAWN_RATE_MULTIPLIER -
+        1
+      ) *
+      progress
+    );
+  }
+
   function scheduleBonusSpawn(delayMs = 0) {
     if (!state.bonusMode || state.done) return;
     if (performance.now() >= state.bonusEndsAt) return;
@@ -1759,7 +1794,17 @@
 
     state.bonusSpawnPendingCount += 1;
 
-    scheduleAction(delayMs, () => {
+    const spawnRateMultiplier =
+      getBonusSpawnRateMultiplier();
+
+    const adjustedDelayMs =
+      Math.max(
+        0,
+        Number(delayMs) || 0
+      ) /
+      spawnRateMultiplier;
+
+    scheduleAction(adjustedDelayMs, () => {
       state.bonusSpawnPendingCount = Math.max(0, state.bonusSpawnPendingCount - 1);
 
       if (!state.bonusMode || state.done || state.paused) return;
