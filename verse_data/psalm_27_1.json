@@ -29,12 +29,12 @@
             "occurrence": 1,
             "emoji": "💡"
         },
-        {
-            "type": "emoji",
-            "word": "salvation",
-            "occurrence": 1,
-            "emoji": "🛟"
-        },
+    {
+        "type": "image",
+        "word": "salvation",
+        "occurrence": 1,
+        "image": "superhero"
+    },
         {
             "type": "emoji",
             "word": "fear",

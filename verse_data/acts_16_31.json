@@ -41,10 +41,10 @@
       "image": "cross"
     },
     {
-      "type": "emoji",
+      "type": "image",
       "word": "saved",
       "occurrence": 1,
-      "emoji": "🛟"
+      "image": "superhero"
     },
     {
       "type": "emoji",

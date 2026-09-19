@@ -41,10 +41,10 @@
       "emoji": "🔎"
     },
     {
-      "type": "emoji",
+      "type": "image",
       "word": "save",
       "occurrence": 1,
-      "emoji": "🛟"
+      "image": "superhero"
     },
     {
       "type": "emoji",
