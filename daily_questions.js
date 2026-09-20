@@ -47,6 +47,7 @@
     new Set(DAILY_PET_QUESTION_VERSE_IDS);
 
   let appApi = null;
+  let pendingOffer = null;
 
   function initialize(api) {
     appApi =
@@ -61,6 +62,12 @@
   function isFeatureEnabled() {
     return (
       appApi?.isEnabled?.() === true
+    );
+  }
+
+  function isDebugEnabled() {
+    return (
+      appApi?.isDebugEnabled?.() === true
     );
   }
 
@@ -446,22 +453,160 @@
     );
   }
 
-  window.BibloZooDailyQuestions =
-    Object.freeze({
-      version: MODULE_VERSION,
-      getAllowedVerseIds,
-      isAllowedVerseId,
-      normalizeReflection,
-      getLocalDayKey,
-      createDefaultDailyProgress,
-      normalizeDailyProgress
-    });
+  function hasCompletedToday(
+    date = new Date()
+  ) {
+    const dailyProgress =
+      normalizeDailyProgress(
+        appApi?.getDailyProgress?.()
+      );
+
+    return (
+      dailyProgress.lastCompletedDay ===
+      getLocalDayKey(date)
+    );
+  }
+
+  function shouldOfferToday(
+    date = new Date()
+  ) {
+    if (!isFeatureEnabled()) {
+      return false;
+    }
+
+    if (isDebugEnabled()) {
+      return true;
+    }
+
+    return !hasCompletedToday(date);
+  }
+
+  function prepareStartupOffer({
+    allowOffer = false
+  } = {}) {
+    pendingOffer = null;
+
+    if (!allowOffer) {
+      return null;
+    }
+
+    if (!shouldOfferToday()) {
+      return null;
+    }
+
+    const verse =
+      chooseDailyQuestionVerse();
+
+    if (!verse) {
+      return null;
+    }
+
+    pendingOffer = {
+      verseId: verse.id,
+      verse
+    };
+
+    return pendingOffer;
+  }
+
+  function getPendingOffer() {
+    return pendingOffer;
+  }
+
+  function clearPendingOffer() {
+    pendingOffer = null;
+  }
+
+  function markSessionCompleted(
+    verseId,
+    date = new Date()
+  ) {
+    if (!isFeatureEnabled()) {
+      return null;
+    }
+
+    const cleanVerseId =
+      String(verseId || "").trim();
+
+    if (
+      !cleanVerseId ||
+      !isAllowedVerseId(cleanVerseId)
+    ) {
+      return null;
+    }
+
+    const safeDate =
+      date instanceof Date &&
+        !Number.isNaN(date.getTime())
+        ? date
+        : new Date();
+
+    const completedAt =
+      safeDate.getTime();
+
+    const updateDailyProgress =
+      appApi?.updateDailyProgress;
+
+    if (
+      typeof updateDailyProgress !==
+      "function"
+    ) {
+      return null;
+    }
+
+    const updatedProgress =
+      updateDailyProgress(
+        (dailyQuestions) => {
+          dailyQuestions.lastCompletedDay =
+            getLocalDayKey(safeDate);
+
+          dailyQuestions.lastCompletedAt =
+            completedAt;
+
+          dailyQuestions.lastVerseId =
+            cleanVerseId;
+
+          if (
+            !dailyQuestions.byVerse ||
+            typeof dailyQuestions.byVerse !==
+            "object" ||
+            Array.isArray(
+              dailyQuestions.byVerse
+            )
+          ) {
+            dailyQuestions.byVerse = {};
+          }
+
+          const verseProgress =
+            normalizeDailyVerseProgress(
+              dailyQuestions.byVerse[
+              cleanVerseId
+              ]
+            );
+
+          verseProgress.lastAskedAt =
+            completedAt;
+
+          verseProgress.sessionsCompleted +=
+            1;
+
+          dailyQuestions.byVerse[
+            cleanVerseId
+          ] = verseProgress;
+        }
+      );
+
+    clearPendingOffer();
+
+    return updatedProgress;
+  }
 
   window.BibloZooDailyQuestions =
     Object.freeze({
       version: MODULE_VERSION,
       initialize,
       isFeatureEnabled,
+      isDebugEnabled,
       getAllowedVerseIds,
       isAllowedVerseId,
       normalizeReflection,
@@ -469,7 +614,13 @@
       createDefaultDailyProgress,
       normalizeDailyProgress,
       getEligibleVerses,
-      chooseDailyQuestionVerse
+      chooseDailyQuestionVerse,
+      hasCompletedToday,
+      shouldOfferToday,
+      prepareStartupOffer,
+      getPendingOffer,
+      clearPendingOffer,
+      markSessionCompleted
     });
 
 

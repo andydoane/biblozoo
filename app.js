@@ -4900,7 +4900,10 @@ window.BibloZooDailyQuestions
       isBibloPetUnlocked,
 
     getDailyProgress:
-      getDailyQuestionsProgress
+      getDailyQuestionsProgress,
+
+    updateDailyProgress:
+      updateDailyQuestionsProgress
   });
 
 function getVerseListItemById(verseId) {
@@ -10126,6 +10129,31 @@ function captureBootRouteFromUrl() {
   };
 }
 
+function isNormalDailyQuestionBootRoute(
+  route
+) {
+  if (
+    !route ||
+    typeof route !== "object"
+  ) {
+    return false;
+  }
+
+  return !(
+    String(route.verseId || "").trim() ||
+    String(route.screen || "").trim() ||
+    String(route.petUnlock || "").trim() ||
+    route.tutorialPractice ||
+    route.mixNext ||
+    String(
+      route.completedGameId || ""
+    ).trim() ||
+    route.mixPetUnlock ||
+    route.internalReturn ||
+    String(route.profileId || "").trim()
+  );
+}
+
 function clearInternalReturnIdentityParams() {
   try {
     const url = new URL(window.location.href);
@@ -10263,6 +10291,14 @@ async function resumePendingBootRoute() {
   } else if (route.screen === "settings") {
     setScreen(Screen.SETTINGS);
   } else {
+    window.BibloZooDailyQuestions
+      ?.prepareStartupOffer?.({
+        allowOffer:
+          isNormalDailyQuestionBootRoute(
+            route
+          )
+      });
+
     setScreen(Screen.TITLE);
   }
 
@@ -10410,6 +10446,9 @@ function stopProfileTransitionAudio() {
 
 function clearTransientStateForProfileActivation() {
   stopProfileTransitionAudio();
+
+  window.BibloZooDailyQuestions
+    ?.clearPendingOffer?.();
 
   const pendingRoute = State.pendingBootRoute;
   const preserveGameMix = !!(
