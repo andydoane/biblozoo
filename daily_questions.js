@@ -61,6 +61,7 @@
   });
 
   let dailySession = null;
+  let rewardGameRuntime = null;
 
   let debugRotationIndex = -1;
 
@@ -760,6 +761,8 @@
   }
 
   function clearOfferState() {
+    stopRewardGame();
+
     pendingOffer = null;
     acceptedOffer = null;
     dailySession = null;
@@ -956,6 +959,8 @@
   }
 
   function clearSessionState() {
+    stopRewardGame();
+
     acceptedOffer = null;
     dailySession = null;
   }
@@ -974,6 +979,787 @@
     return session.questionIndex === 1
       ? session.reflection?.meaning || null
       : session.reflection?.recall || null;
+  }
+
+  function stopRewardGame() {
+    const runtime =
+      rewardGameRuntime;
+
+    if (!runtime) {
+      return;
+    }
+
+    rewardGameRuntime = null;
+    runtime.running = false;
+
+    if (runtime.rafId) {
+      cancelAnimationFrame(
+        runtime.rafId
+      );
+
+      runtime.rafId = 0;
+    }
+  }
+
+  function createRewardGamePegs(
+    width,
+    height
+  ) {
+    const pegs = [];
+    const rows = 6;
+    const spacing =
+      width / 6;
+
+    const topY =
+      Math.max(
+        62,
+        height * 0.15
+      );
+
+    const bottomY =
+      height * 0.68;
+
+    for (
+      let row = 0;
+      row < rows;
+      row += 1
+    ) {
+      const isOffsetRow =
+        row % 2 === 1;
+
+      const columns =
+        isOffsetRow ? 4 : 5;
+
+      const y =
+        topY +
+        (
+          (bottomY - topY) *
+          row /
+          (rows - 1)
+        );
+
+      for (
+        let column = 0;
+        column < columns;
+        column += 1
+      ) {
+        const x =
+          spacing *
+          (
+            column +
+            1 +
+            (isOffsetRow ? 0.5 : 0)
+          );
+
+        pegs.push({
+          x,
+          y,
+          radius:
+            Math.max(
+              5,
+              Math.min(
+                8,
+                width * 0.018
+              )
+            )
+        });
+      }
+    }
+
+    return pegs;
+  }
+
+  function setRewardCatcherX(
+    runtime,
+    nextX
+  ) {
+    if (!runtime) {
+      return;
+    }
+
+    const halfWidth =
+      runtime.catcherWidth / 2;
+
+    const safeX =
+      Math.max(
+        halfWidth,
+        Math.min(
+          runtime.width - halfWidth,
+          Number(nextX) ||
+          runtime.width / 2
+        )
+      );
+
+    runtime.catcherX = safeX;
+
+    runtime.catcher.style.left =
+      `${safeX}px`;
+  }
+
+  function resetRewardSnack(
+    runtime
+  ) {
+    if (!runtime) {
+      return;
+    }
+
+    const radius =
+      Math.max(
+        15,
+        Math.min(
+          21,
+          runtime.width * 0.052
+        )
+      );
+
+    runtime.snack = {
+      x:
+        runtime.width *
+        (
+          0.24 +
+          Math.random() * 0.52
+        ),
+      y: radius + 8,
+      vx:
+        (
+          Math.random() - 0.5
+        ) * 42,
+      vy: 12,
+      radius,
+      active: true
+    };
+
+    runtime.respawnAt = 0;
+  }
+
+  function updateRewardSnackPhysics(
+    runtime,
+    dt,
+    now
+  ) {
+    if (
+      !runtime ||
+      runtime.caughtAt
+    ) {
+      return;
+    }
+
+    const snack =
+      runtime.snack;
+
+    if (!snack?.active) {
+      if (
+        runtime.respawnAt &&
+        now >= runtime.respawnAt
+      ) {
+        resetRewardSnack(
+          runtime
+        );
+      }
+
+      return;
+    }
+
+    snack.vy =
+      Math.min(
+        108,
+        snack.vy +
+        62 * dt
+      );
+
+    snack.x +=
+      snack.vx * dt;
+
+    snack.y +=
+      snack.vy * dt;
+
+    if (
+      snack.x - snack.radius < 0
+    ) {
+      snack.x =
+        snack.radius;
+
+      snack.vx =
+        Math.abs(
+          snack.vx
+        ) * 0.72;
+    } else if (
+      snack.x + snack.radius >
+      runtime.width
+    ) {
+      snack.x =
+        runtime.width -
+        snack.radius;
+
+      snack.vx =
+        -Math.abs(
+          snack.vx
+        ) * 0.72;
+    }
+
+    for (
+      const peg of runtime.pegs
+    ) {
+      const dx =
+        snack.x - peg.x;
+
+      const dy =
+        snack.y - peg.y;
+
+      const minDistance =
+        snack.radius +
+        peg.radius;
+
+      const distanceSquared =
+        dx * dx +
+        dy * dy;
+
+      if (
+        distanceSquared >=
+        minDistance * minDistance
+      ) {
+        continue;
+      }
+
+      const distance =
+        Math.sqrt(
+          distanceSquared
+        ) || 0.001;
+
+      const nx =
+        dx / distance;
+
+      const ny =
+        dy / distance;
+
+      const overlap =
+        minDistance -
+        distance;
+
+      snack.x +=
+        nx * overlap;
+
+      snack.y +=
+        ny * overlap;
+
+      const velocityAlongNormal =
+        snack.vx * nx +
+        snack.vy * ny;
+
+      if (
+        velocityAlongNormal < 0
+      ) {
+        const restitution =
+          0.68;
+
+        const impulse =
+          (
+            1 +
+            restitution
+          ) *
+          velocityAlongNormal;
+
+        snack.vx -=
+          impulse * nx;
+
+        snack.vy -=
+          impulse * ny;
+
+        snack.vx +=
+          (
+            nx >= 0
+              ? 1
+              : -1
+          ) * 5;
+      }
+    }
+
+    snack.vx =
+      Math.max(
+        -125,
+        Math.min(
+          125,
+          snack.vx
+        )
+      );
+
+    snack.vy =
+      Math.max(
+        -92,
+        Math.min(
+          108,
+          snack.vy
+        )
+      );
+
+    const catcherTop =
+      runtime.height -
+      runtime.catcherHeight -
+      8;
+
+    const catchHalfWidth =
+      Math.min(
+        runtime.width * 0.27,
+        Math.max(
+          72,
+          runtime.catcherWidth *
+          0.72
+        )
+      );
+
+    const reachedCatcher =
+      snack.y +
+      snack.radius >=
+      catcherTop + 4;
+
+    const insideCatchZone =
+      Math.abs(
+        snack.x -
+        runtime.catcherX
+      ) <=
+      catchHalfWidth +
+      snack.radius;
+
+    if (
+      reachedCatcher &&
+      insideCatchZone &&
+      snack.y -
+      snack.radius <
+      runtime.height
+    ) {
+      snack.active = false;
+      runtime.caughtAt = now;
+
+      runtime.catcher.classList.add(
+        "is-catching"
+      );
+
+      return;
+    }
+
+    if (
+      snack.y -
+      snack.radius >
+      runtime.height
+    ) {
+      snack.active = false;
+
+      runtime.respawnAt =
+        now + 360;
+    }
+  }
+
+  function drawRewardGame(
+    runtime
+  ) {
+    if (!runtime?.ctx) {
+      return;
+    }
+
+    const ctx =
+      runtime.ctx;
+
+    ctx.setTransform(
+      runtime.dpr,
+      0,
+      0,
+      runtime.dpr,
+      0,
+      0
+    );
+
+    ctx.clearRect(
+      0,
+      0,
+      runtime.width,
+      runtime.height
+    );
+
+    ctx.fillStyle =
+      "rgba(255, 255, 255, 0.78)";
+
+    for (
+      const peg of runtime.pegs
+    ) {
+      ctx.beginPath();
+
+      ctx.arc(
+        peg.x,
+        peg.y,
+        peg.radius,
+        0,
+        Math.PI * 2
+      );
+
+      ctx.fill();
+    }
+
+    const snack =
+      runtime.snack;
+
+    if (!snack?.active) {
+      return;
+    }
+
+    ctx.font =
+      `${Math.round(
+        snack.radius * 2.25
+      )}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(
+      runtime.snackEmoji,
+      snack.x,
+      snack.y
+    );
+  }
+
+  function finishRewardGame(
+    runtime
+  ) {
+    if (
+      rewardGameRuntime !==
+      runtime
+    ) {
+      return;
+    }
+
+    stopRewardGame();
+
+    if (
+      !dailySession ||
+      dailySession !==
+        runtime.session ||
+      dailySession.phase !==
+        SESSION_PHASES.REWARD_GAME
+    ) {
+      return;
+    }
+
+    dailySession.rewardComplete =
+      true;
+
+    dailySession.phase =
+      SESSION_PHASES.REWARD_DONE;
+
+    appApi?.renderApp?.();
+  }
+
+  function runRewardGameFrame(
+    runtime,
+    now
+  ) {
+    if (
+      !runtime?.running ||
+      rewardGameRuntime !==
+        runtime
+    ) {
+      return;
+    }
+
+    const elapsed =
+      Math.max(
+        0.001,
+        Math.min(
+          0.032,
+          (
+            now -
+            runtime.lastFrameAt
+          ) / 1000
+        )
+      );
+
+    runtime.lastFrameAt = now;
+
+    const substep =
+      elapsed / 2;
+
+    updateRewardSnackPhysics(
+      runtime,
+      substep,
+      now
+    );
+
+    updateRewardSnackPhysics(
+      runtime,
+      substep,
+      now
+    );
+
+    drawRewardGame(
+      runtime
+    );
+
+    if (
+      runtime.caughtAt &&
+      now -
+      runtime.caughtAt >=
+      420
+    ) {
+      finishRewardGame(
+        runtime
+      );
+
+      return;
+    }
+
+    runtime.rafId =
+      requestAnimationFrame(
+        (nextNow) => {
+          runRewardGameFrame(
+            runtime,
+            nextNow
+          );
+        }
+      );
+  }
+
+  function startRewardGame(
+    rootEl
+  ) {
+    stopRewardGame();
+
+    if (
+      !rootEl ||
+      !dailySession ||
+      dailySession.phase !==
+        SESSION_PHASES.REWARD_GAME
+    ) {
+      return;
+    }
+
+    const stage =
+      rootEl.querySelector(
+        "[data-daily-pachinko-stage]"
+      );
+
+    const canvas =
+      rootEl.querySelector(
+        "[data-daily-pachinko-canvas]"
+      );
+
+    const catcher =
+      rootEl.querySelector(
+        "[data-daily-pachinko-catcher]"
+      );
+
+    if (
+      !stage ||
+      !canvas ||
+      !catcher
+    ) {
+      return;
+    }
+
+    const width =
+      stage.clientWidth;
+
+    const height =
+      stage.clientHeight;
+
+    if (
+      width < 80 ||
+      height < 180
+    ) {
+      requestAnimationFrame(
+        () => {
+          if (
+            rootEl.isConnected &&
+            dailySession?.phase ===
+              SESSION_PHASES.REWARD_GAME
+          ) {
+            startRewardGame(
+              rootEl
+            );
+          }
+        }
+      );
+
+      return;
+    }
+
+    const ctx =
+      canvas.getContext("2d");
+
+    if (!ctx) {
+      return;
+    }
+
+    const dpr =
+      Math.max(
+        1,
+        Math.min(
+          2,
+          window.devicePixelRatio ||
+          1
+        )
+      );
+
+    canvas.width =
+      Math.round(
+        width * dpr
+      );
+
+    canvas.height =
+      Math.round(
+        height * dpr
+      );
+
+    const runtime = {
+      running: true,
+      rafId: 0,
+      lastFrameAt:
+        performance.now(),
+      width,
+      height,
+      dpr,
+      ctx,
+      stage,
+      canvas,
+      catcher,
+      catcherX:
+        width / 2,
+      catcherWidth:
+        Math.max(
+          96,
+          catcher.offsetWidth
+        ),
+      catcherHeight:
+        Math.max(
+          72,
+          catcher.offsetHeight
+        ),
+      dragging: false,
+      pegs:
+        createRewardGamePegs(
+          width,
+          height
+        ),
+      snack: null,
+      snackEmoji:
+        String(
+          dailySession.snack ||
+          "🍎"
+        ).trim() ||
+        "🍎",
+      respawnAt: 0,
+      caughtAt: 0,
+      session:
+        dailySession
+    };
+
+    rewardGameRuntime =
+      runtime;
+
+    setRewardCatcherX(
+      runtime,
+      width / 2
+    );
+
+    resetRewardSnack(
+      runtime
+    );
+
+    const moveCatcher =
+      (event) => {
+        const rect =
+          stage.getBoundingClientRect();
+
+        setRewardCatcherX(
+          runtime,
+          event.clientX -
+          rect.left
+        );
+      };
+
+    stage.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (
+          rewardGameRuntime !==
+          runtime
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+
+        runtime.dragging = true;
+
+        try {
+          stage.setPointerCapture(
+            event.pointerId
+          );
+        } catch (err) { }
+
+        moveCatcher(
+          event
+        );
+      }
+    );
+
+    stage.addEventListener(
+      "pointermove",
+      (event) => {
+        if (
+          !runtime.dragging ||
+          rewardGameRuntime !==
+            runtime
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+
+        moveCatcher(
+          event
+        );
+      }
+    );
+
+    const endDrag =
+      (event) => {
+        if (
+          rewardGameRuntime !==
+          runtime
+        ) {
+          return;
+        }
+
+        runtime.dragging = false;
+
+        try {
+          stage.releasePointerCapture(
+            event.pointerId
+          );
+        } catch (err) { }
+      };
+
+    stage.addEventListener(
+      "pointerup",
+      endDrag
+    );
+
+    stage.addEventListener(
+      "pointercancel",
+      endDrag
+    );
+
+    drawRewardGame(
+      runtime
+    );
+
+    runtime.rafId =
+      requestAnimationFrame(
+        (now) => {
+          runRewardGameFrame(
+            runtime,
+            now
+          );
+        }
+      );
   }
 
   function renderScreen(idx) {
@@ -1206,14 +1992,143 @@
             <div
               class="daily-reward-intro-instruction"
             >
-              Tilt to feed ${escapeHtml(
+              Drag to feed ${escapeHtml(
                 session.petName
               )}.
             </div>
           </div>
 
+          <div
+            class="daily-reward-intro-actions"
+          >
+            <button
+              class="daily-reward-intro-start no-zoom"
+              type="button"
+              data-daily-reward-start
+            >
+              Start Feeding
+            </button>
+
+            <button
+              class="daily-reward-intro-back no-zoom"
+              type="button"
+              data-daily-session-back
+            >
+              Back to My Zoo
+            </button>
+          </div>
+        </div>
+      `;
+    } else if (
+      session.phase ===
+        SESSION_PHASES.REWARD_GAME
+    ) {
+      const profilePictureHtml =
+        typeof appApi
+          ?.profilePictureHtml ===
+          "function"
+          ? appApi.profilePictureHtml(
+            session.verseId,
+            {
+              className:
+                "daily-pachinko-pet-avatar",
+              alt: ""
+            }
+          )
+          : "";
+
+      wrap.innerHTML = `
+        <div
+          class="daily-pachinko-shell"
+          data-daily-session-phase="${escapeHtml(
+            session.phase
+          )}"
+        >
+          <div
+            class="daily-pachinko-title"
+          >
+            Feed ${escapeHtml(
+              session.petName
+            )}!
+          </div>
+
+          <div
+            class="daily-pachinko-instruction"
+          >
+            Drag ${escapeHtml(
+              session.petName
+            )} left and right to catch the snack.
+          </div>
+
+          <div
+            class="daily-pachinko-stage"
+            data-daily-pachinko-stage
+            aria-label="Drag the BibloPet left and right to catch the falling snack"
+          >
+            <canvas
+              class="daily-pachinko-canvas"
+              data-daily-pachinko-canvas
+              aria-hidden="true"
+            ></canvas>
+
+            <div
+              class="daily-pachinko-catcher"
+              data-daily-pachinko-catcher
+              aria-hidden="true"
+            >
+              ${profilePictureHtml}
+            </div>
+          </div>
+
           <button
-            class="daily-reward-intro-back no-zoom"
+            class="daily-pachinko-back no-zoom"
+            type="button"
+            data-daily-session-back
+          >
+            Back to My Zoo
+          </button>
+        </div>
+      `;
+    } else if (
+      session.phase ===
+        SESSION_PHASES.REWARD_DONE
+    ) {
+      wrap.innerHTML = `
+        <div
+          class="daily-reward-done-shell"
+          data-daily-session-phase="${escapeHtml(
+            session.phase
+          )}"
+        >
+          <div
+            class="daily-reward-done-card"
+          >
+            <div
+              class="daily-reward-done-snack"
+              aria-hidden="true"
+            >
+              ${escapeHtml(
+                session.snack || "🍎"
+              )}
+            </div>
+
+            <div
+              class="daily-reward-done-title"
+            >
+              Caught it!
+            </div>
+
+            <div
+              class="daily-reward-done-note"
+            >
+              ${escapeHtml(
+                session.petName
+              )} got the snack.
+            </div>
+          </div>
+
+          <button
+            class="daily-reward-done-back no-zoom"
             type="button"
             data-daily-session-back
           >
@@ -1640,6 +2555,35 @@
         };
     }
 
+    const rewardStartButton =
+      wrap.querySelector(
+        "[data-daily-reward-start]"
+      );
+
+    if (rewardStartButton) {
+      rewardStartButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (
+            !dailySession ||
+            dailySession.phase !==
+              SESSION_PHASES.REWARD_INTRO
+          ) {
+            return;
+          }
+
+          dailySession.rewardComplete =
+            false;
+
+          dailySession.phase =
+            SESSION_PHASES.REWARD_GAME;
+
+          appApi?.renderApp?.();
+        };
+    }
+
     const checkVerseButton =
       wrap.querySelector(
         "[data-daily-check-verse]"
@@ -1753,6 +2697,28 @@
             }
           }
         };
+    }
+
+    if (
+      session?.phase ===
+        SESSION_PHASES.REWARD_GAME
+    ) {
+      requestAnimationFrame(
+        () => {
+          if (
+            wrap.isConnected &&
+            dailySession === session &&
+            dailySession.phase ===
+              SESSION_PHASES.REWARD_GAME
+          ) {
+            startRewardGame(
+              wrap
+            );
+          }
+        }
+      );
+    } else {
+      stopRewardGame();
     }
 
     return appApi.makeSlide({
