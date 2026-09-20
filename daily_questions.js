@@ -51,6 +51,17 @@
 
   let acceptedOffer = null;
 
+  const SESSION_PHASES = Object.freeze({
+    QUESTION: "question",
+    VERSE: "verse",
+    REFLECTION: "reflection",
+    REWARD_INTRO: "reward_intro",
+    REWARD_GAME: "reward_game",
+    REWARD_DONE: "reward_done"
+  });
+
+  let dailySession = null;
+
   let debugRotationIndex = -1;
 
   const LATER_STORAGE_PREFIX =
@@ -650,13 +661,92 @@
     acceptedOffer = null;
   }
 
+  function createSessionFromOffer(offer) {
+    const verseId =
+      String(
+        offer?.verseId || ""
+      ).trim();
+
+    const verse =
+      offer?.verse;
+
+    if (
+      !verseId ||
+      !verse ||
+      typeof verse !== "object"
+    ) {
+      return null;
+    }
+
+    const reflection =
+      normalizeReflection(
+        verse.reflection
+      );
+
+    if (!reflection) {
+      return null;
+    }
+
+    const petName =
+      String(
+        appApi?.getPetName?.(
+          verseId
+        ) ||
+        verse.biblopetDefaultName ||
+        "BibloPet"
+      ).trim() ||
+      "BibloPet";
+
+    return {
+      verseId,
+      verseRef:
+        String(
+          verse.ref || ""
+        ).trim(),
+      verseText:
+        String(
+          verse.verseText || ""
+        ).trim(),
+      translation:
+        String(
+          verse.translation || ""
+        ).trim(),
+      petName,
+      reflection,
+      phase:
+        SESSION_PHASES.QUESTION,
+      questionIndex: 0,
+      selectedAnswer: null,
+      answered: false,
+      answerCorrect: false,
+      usedVerseHelp: false,
+      snack: "",
+      rewardComplete: false
+    };
+  }
+
   function acceptPendingOffer() {
     if (!pendingOffer) {
       return null;
     }
 
-    acceptedOffer =
+    const nextOffer =
       pendingOffer;
+
+    const nextSession =
+      createSessionFromOffer(
+        nextOffer
+      );
+
+    if (!nextSession) {
+      return null;
+    }
+
+    acceptedOffer =
+      nextOffer;
+
+    dailySession =
+      nextSession;
 
     pendingOffer = null;
 
@@ -670,6 +760,7 @@
   function clearOfferState() {
     pendingOffer = null;
     acceptedOffer = null;
+    dailySession = null;
     debugRotationIndex = -1;
   }
 
@@ -837,9 +928,15 @@
           event.preventDefault();
           event.stopPropagation();
 
-          acceptPendingOffer();
+          const accepted =
+            acceptPendingOffer();
 
-          appApi?.renderApp?.();
+          if (!accepted) {
+            return;
+          }
+
+          appApi
+            ?.goToDailySession?.();
         };
     }
 
@@ -854,6 +951,143 @@
           appApi?.renderApp?.();
         };
     }
+  }
+
+  function clearSessionState() {
+    acceptedOffer = null;
+    dailySession = null;
+  }
+
+  function renderScreen(idx) {
+    if (
+      !isFeatureEnabled() ||
+      typeof appApi?.makeSlide !==
+      "function"
+    ) {
+      return null;
+    }
+
+    const wrap =
+      document.createElement("div");
+
+    wrap.className =
+      "daily-question-session";
+
+    const session =
+      dailySession;
+
+    if (!session) {
+      wrap.innerHTML = `
+        <div
+          class="daily-question-session-card"
+        >
+          <div
+            class="daily-question-session-title"
+          >
+            No Daily Question Ready
+          </div>
+
+          <button
+            class="daily-question-session-back no-zoom"
+            type="button"
+            data-daily-session-back
+          >
+            Back to My Zoo
+          </button>
+        </div>
+      `;
+    } else {
+      const profilePictureHtml =
+        typeof appApi
+          ?.profilePictureHtml ===
+          "function"
+          ? appApi.profilePictureHtml(
+            session.verseId,
+            {
+              className:
+                "daily-question-session-avatar",
+              alt: ""
+            }
+          )
+          : "";
+
+      wrap.innerHTML = `
+        <div
+          class="daily-question-session-card"
+          data-daily-session-phase="${escapeHtml(
+        session.phase
+      )}"
+        >
+          ${profilePictureHtml}
+
+          <div
+            class="daily-question-session-kicker"
+          >
+            Daily Question
+          </div>
+
+          <div
+            class="daily-question-session-title"
+          >
+            ${escapeHtml(
+        session.petName
+      )} is ready!
+          </div>
+
+          ${session.verseRef
+          ? `
+                <div
+                  class="daily-question-session-ref"
+                >
+                  ${escapeHtml(
+            session.verseRef
+          )}
+                </div>
+              `
+          : ""
+        }
+
+          <div
+            class="daily-question-session-note"
+          >
+            The Daily Session screen is ready.
+            The question interface comes next.
+          </div>
+
+          <button
+            class="daily-question-session-back no-zoom"
+            type="button"
+            data-daily-session-back
+          >
+            Back to My Zoo
+          </button>
+        </div>
+      `;
+    }
+
+    const backButton =
+      wrap.querySelector(
+        "[data-daily-session-back]"
+      );
+
+    if (backButton) {
+      backButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          clearSessionState();
+
+          appApi?.goToTitle?.();
+        };
+    }
+
+    return appApi.makeSlide({
+      idx,
+      bg: "var(--purple)",
+      navHidden: true,
+      inner: wrap
+    });
   }
 
   function markSessionCompleted(
@@ -966,6 +1200,7 @@
       clearOfferState,
       renderTitleOffer,
       bindTitleOffer,
+      renderScreen,
       markSessionCompleted
     });
 

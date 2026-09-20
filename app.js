@@ -4916,7 +4916,15 @@ window.BibloZooDailyQuestions
       profilePictureVisualHtml,
 
     renderApp:
-      render
+      render,
+
+    makeSlide,
+
+    goToDailySession: () =>
+      go(Screen.DAILY_SESSION),
+
+    goToTitle: () =>
+      go(Screen.TITLE)
   });
 
 function getVerseListItemById(verseId) {
@@ -6802,6 +6810,7 @@ const Screen = {
   PROFILE_EDITOR: "profile_editor",
   PROFILE_MANAGE: "profile_manage",
   TITLE: "title",
+  DAILY_SESSION: "daily_session",
   SETTINGS: "settings",
   PRIVACY: "privacy",
   TODO: "todo",
@@ -6826,6 +6835,40 @@ const Screen = {
   PLAYGROUND: "playground",
   GAME_MIX_FINISHED: "game_mix_finished"
 };
+
+const SCREEN_ORDER = Object.freeze([
+  Screen.INTRO,
+  Screen.TITLE_SEQUENCE,
+  Screen.PROFILE_WELCOME,
+  Screen.PROFILE_PICKER,
+  Screen.PROFILE_EDITOR,
+  Screen.TITLE,
+  Screen.DAILY_SESSION,
+  Screen.PROFILE_MANAGE,
+  Screen.SETTINGS,
+  Screen.PRIVACY,
+  Screen.TODO,
+  Screen.TODO_DEV,
+  Screen.NEW_VERSE_PICKER,
+  Screen.PROGRESS,
+  Screen.PET_STATS,
+  Screen.VERSE_DETAIL,
+  Screen.LEARN_LEVEL,
+  Screen.PRACTICE_GATE,
+  Screen.LEARN_INSTRUCTION,
+  Screen.LISTEN,
+  Screen.MEANING,
+  Screen.CHUNKS,
+  Screen.ECHO,
+  Screen.HIDE,
+  Screen.FINAL_RECALL,
+  Screen.CELEBRATION,
+  Screen.PET_UNLOCK,
+  Screen.PRACTICE_HUB,
+  Screen.PRACTICE,
+  Screen.PLAYGROUND,
+  Screen.GAME_MIX_FINISHED
+]);
 
 function isLearnFlowScreen(screen) {
   return (
@@ -7946,40 +7989,7 @@ function startListenInstructionIfNeeded() {
 
 /* Slide navigation */
 function screenToIndex(screen) {
-  // order matters for sliding
-  const order = [
-    Screen.INTRO,
-    Screen.TITLE_SEQUENCE,
-    Screen.PROFILE_WELCOME,
-    Screen.PROFILE_PICKER,
-    Screen.PROFILE_EDITOR,
-    Screen.TITLE,
-    Screen.PROFILE_MANAGE,
-    Screen.SETTINGS,
-    Screen.PRIVACY,
-    Screen.TODO,
-    Screen.TODO_DEV,
-    Screen.NEW_VERSE_PICKER,
-    Screen.PROGRESS,
-    Screen.PET_STATS,
-    Screen.VERSE_DETAIL,
-    Screen.LEARN_LEVEL,
-    Screen.PRACTICE_GATE,
-    Screen.LEARN_INSTRUCTION,
-    Screen.LISTEN,
-    Screen.MEANING,
-    Screen.CHUNKS,
-    Screen.ECHO,
-    Screen.HIDE,
-    Screen.FINAL_RECALL,
-    Screen.CELEBRATION,
-    Screen.PET_UNLOCK,
-    Screen.PRACTICE_HUB,
-    Screen.PRACTICE,
-    Screen.PLAYGROUND,
-    Screen.GAME_MIX_FINISHED
-  ];
-  return order.indexOf(screen);
+  return SCREEN_ORDER.indexOf(screen);
 }
 
 function go(nextScreen) {
@@ -9512,6 +9522,7 @@ function renderNav() {
     State.screen !== Screen.PROFILE_EDITOR &&
     State.screen !== Screen.PROFILE_MANAGE &&
     State.screen !== Screen.TITLE &&
+    State.screen !== Screen.DAILY_SESSION &&
     State.screen !== Screen.SETTINGS &&
     State.screen !== Screen.PRIVACY &&
     State.screen !== Screen.TODO &&
@@ -15376,7 +15387,8 @@ function render() {
 
   const uniq = Array.from(new Set(indicesToRender.filter(i => i !== null && i >= 0)));
   for (const idx of uniq) {
-    const screen = ["intro", "title_sequence", "profile_welcome", "profile_picker", "profile_editor", "title", "profile_manage", "settings", "privacy", "todo", "todo_dev", "new_verse_picker", "progress", "pet_stats", "verse_detail", "learn_level", "practice_gate", "learn_instruction", "listen", "meaning", "chunks", "echo", "hide", "final_recall", "celebration", "pet_unlock", "practice_hub", "practice", "playground", "game_mix_finished"][idx];
+    const screen =
+      SCREEN_ORDER[idx];
     let slide = null;
     if (screen === Screen.INTRO) slide = screenIntro(idx);
     if (screen === Screen.TITLE_SEQUENCE) slide = screenTitleSequence(idx);
@@ -15385,6 +15397,12 @@ function render() {
     if (screen === Screen.PROFILE_EDITOR) slide = screenProfileEditor(idx);
     if (screen === Screen.PROFILE_MANAGE) slide = screenProfileManage(idx);
     if (screen === Screen.TITLE) slide = screenTitle(idx);
+    if (screen === Screen.DAILY_SESSION) {
+      slide =
+        window.BibloZooDailyQuestions
+          ?.renderScreen?.(idx) ||
+        null;
+    }
     if (screen === Screen.SETTINGS) slide = screenSettings(idx);
     if (screen === Screen.PRIVACY) slide = screenPrivacyPolicy(idx);
     if (screen === Screen.TODO) slide = screenTodo(idx);
