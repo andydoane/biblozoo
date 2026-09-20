@@ -48,6 +48,10 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // Set DEBUG_MODE = false when you’re ready to remove this.
 // =========================================================
 const DEBUG_MODE = false;
+const FEATURES = Object.freeze({
+  DAILY_PET_QUESTIONS: false,
+  DAILY_PET_QUESTIONS_DEBUG: false
+});
 
 // Temporary: set to false to bring back the “Let’s Memorize God’s Word!” animation screen.
 const SKIP_TITLE_SEQUENCE = true;
