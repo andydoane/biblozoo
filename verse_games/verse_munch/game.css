@@ -972,6 +972,17 @@ body.vmunch-page-flash-streak-rainbow,
   position: absolute;
   inset: 0;
   pointer-events: auto;
+  opacity: 1;
+  transition:
+    opacity
+    var(--vmunch-belt-fade, 0.16s)
+    ease;
+  will-change: opacity;
+}
+
+.vmunch-belt-track.is-obscured {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .vmunch-belt-track::before {

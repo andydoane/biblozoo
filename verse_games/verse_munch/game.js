@@ -73,6 +73,8 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
   const LONG_VERSE_QUICK_BITE_CHANCE = 0.70;
   const VERY_LONG_VERSE_QUICK_BITE_CHANCE = 0.85;
 
+  const BELT_FADE_SECONDS = 0.16;
+
   const SOUND_BASE_PATH = "./verse_munch_sounds/";
   const UI_SOUND_BASE_PATH = "../../ui_audio/";
 
@@ -393,6 +395,7 @@ const FACE_MAP = {
     beltNextId:1,
     beltForceCorrectIn:0,
     beltHidden:false,
+    beltObscured:false,
     inputLocked:false,
     faceBase:"😐",
     faceDisplay:"😐",
@@ -743,6 +746,7 @@ function renderModeSelect(){
     state.beltNextId = 1;
     state.beltForceCorrectIn = 0;
     state.beltHidden = false;
+    state.beltObscured = false;
     state.inputLocked = false;
     resetBeltForCurrentStep();
 
@@ -798,7 +802,7 @@ app.innerHTML = `
 
             <div class="vmunch-carousel-zone">
               <div class="vmunch-belt-shell">
-                <div class="vmunch-belt-track" id="vmunchBeltLayer" aria-label="Moving word choices"></div>
+                <div class="vmunch-belt-track" id="vmunchBeltLayer" style="--vmunch-belt-fade:${BELT_FADE_SECONDS}s;" aria-label="Moving word choices"></div>
               </div>
             </div>
           </div>
@@ -1045,6 +1049,7 @@ function setPaused(paused, reason = ""){
     state.faceClasses = new Set();
     state.beltItems = [];
     state.beltHidden = false;
+    state.beltObscured = false;
   }
 
 function openGameMenu(){
@@ -1700,7 +1705,7 @@ function backToMenuFromHelp(){
 
     item.tapped = true;
     state.inputLocked = true;
-    state.beltHidden = true;
+    state.beltObscured = true;
     state.faceClasses = new Set();
     state.feedbackBadge = "";
     state.feedbackType = "";
@@ -1748,6 +1753,7 @@ function backToMenuFromHelp(){
       state.faceClasses = new Set();
 
       if (getCurrentPhase() === "done") {
+        state.beltObscured = false;
         state.beltHidden = true;
         await finishRun(runToken);
         return;
@@ -1772,8 +1778,43 @@ function backToMenuFromHelp(){
 
     state.feedingWord = null;
     state.flyingLetters = [];
-    state.beltHidden = false;
+
     resetBeltForCurrentStep();
+    primeBeltForCurrentStep();
+
+    /*
+      Render the newly prepared belt while it is still invisible.
+      Waiting one frame ensures the fade-in starts from opacity 0.
+    */
+    renderFrame(performance.now());
+
+    if (!await waitSeconds(0, runToken)) {
+      return;
+    }
+
+    if (!isActiveRun(runToken)) {
+      return;
+    }
+
+    state.beltObscured = false;
+    renderFrame(performance.now());
+
+    /*
+      Keep input locked until the belt has finished fading back in.
+    */
+    if (
+      !await waitSeconds(
+        BELT_FADE_SECONDS,
+        runToken
+      )
+    ) {
+      return;
+    }
+
+    if (!isActiveRun(runToken)) {
+      return;
+    }
+
     state.inputLocked = false;
     state.idleTimer = getIdleDelay();
     renderFrame(performance.now());
@@ -2646,6 +2687,12 @@ function updateBuildText(){
     const layer = document.getElementById("vmunchBeltLayer");
     if (!layer) return;
 
+    layer.classList.toggle(
+      "is-obscured",
+      state.beltObscured &&
+      state.bonusPhase !== "playing"
+    );
+
     if (state.bonusPhase === "playing") {
       if (!state.bonusFoodItems.length) {
         layer.innerHTML = "";
@@ -2687,7 +2734,7 @@ function updateBuildText(){
       return;
     }
 
-    if (state.inputLocked || bonusRunning || state.beltHidden) {
+    if (bonusRunning || state.beltHidden) {
       layer.innerHTML = "";
       return;
     }
@@ -3171,6 +3218,49 @@ function updateBuildText(){
     }
   }
 
+  function primeBeltForCurrentStep() {
+    if (getCurrentPhase() === "done") return;
+
+    const cfg = getBeltConfig();
+    const beltWidth = getBeltWidth();
+
+    if (!beltWidth) return;
+
+    let nextX = 18;
+    let guard = 0;
+
+    const targetRightEdge =
+      beltWidth +
+      cfg.gap * 3 +
+      cfg.minWidth;
+
+    while (
+      nextX < targetRightEdge &&
+      guard < 12
+    ) {
+      const previousCount =
+        state.beltItems.length;
+
+      spawnBeltItem(cfg);
+
+      const item =
+        state.beltItems[
+        previousCount
+        ];
+
+      if (!item) break;
+
+      item.x = nextX;
+
+      nextX +=
+        item.width +
+        cfg.gap;
+
+      guard += 1;
+    }
+  }
+
+
   function getBeltWaveOffsetPx(
     item,
     ts,
@@ -3400,12 +3490,15 @@ function updateBuildText(){
   }
 
   function updateBelt(dt) {
-    if (state.inputLocked || bonusRunning || state.beltHidden) return;
+    if (bonusRunning || state.beltHidden) return;
     if (getCurrentPhase() === "done") return;
 
     const cfg = getBeltConfig();
     const now = performance.now();
 
+    /*
+      Existing choices keep traveling while the belt is faded.
+    */
     for (const item of state.beltItems) {
       item.x -= cfg.speed * dt;
     }
@@ -3414,6 +3507,18 @@ function updateBuildText(){
       if (item.removeAt && now > item.removeAt) return false;
       return item.x + item.width > -24;
     });
+
+    /*
+      Do not create new choices while an answer is resolving.
+      Until progressIndex changes, newly spawned choices would still
+      belong to the previous target word.
+    */
+    if (
+      state.inputLocked ||
+      state.beltObscured
+    ) {
+      return;
+    }
 
     let guard = 0;
     while (shouldAddBeltItem(cfg) && guard < 4) {
