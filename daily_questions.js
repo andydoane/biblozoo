@@ -958,6 +958,22 @@
     dailySession = null;
   }
 
+  function getSessionQuestion(
+    session
+  ) {
+    if (
+      !session ||
+      session.phase !==
+        SESSION_PHASES.QUESTION
+    ) {
+      return null;
+    }
+
+    return session.questionIndex === 1
+      ? session.reflection?.meaning || null
+      : session.reflection?.recall || null;
+  }
+
   function renderScreen(idx) {
     if (
       !isFeatureEnabled() ||
@@ -979,10 +995,10 @@
     if (!session) {
       wrap.innerHTML = `
         <div
-          class="daily-question-session-card"
+          class="daily-question-session-empty"
         >
           <div
-            class="daily-question-session-title"
+            class="daily-question-session-empty-title"
           >
             No Daily Question Ready
           </div>
@@ -997,6 +1013,11 @@
         </div>
       `;
     } else {
+      const question =
+        getSessionQuestion(
+          session
+        );
+
       const profilePictureHtml =
         typeof appApi
           ?.profilePictureHtml ===
@@ -1011,58 +1032,158 @@
           )
           : "";
 
-      wrap.innerHTML = `
-        <div
-          class="daily-question-session-card"
-          data-daily-session-phase="${escapeHtml(
-        session.phase
-      )}"
-        >
-          ${profilePictureHtml}
-
+      if (!question) {
+        wrap.innerHTML = `
           <div
-            class="daily-question-session-kicker"
+            class="daily-question-session-empty"
           >
-            Daily Question
-          </div>
+            <div
+              class="daily-question-session-empty-title"
+            >
+              Question unavailable
+            </div>
 
-          <div
-            class="daily-question-session-title"
-          >
-            ${escapeHtml(
-        session.petName
-      )} is ready!
+            <button
+              class="daily-question-session-back no-zoom"
+              type="button"
+              data-daily-session-back
+            >
+              Back to My Zoo
+            </button>
           </div>
+        `;
+      } else {
+        const questionNumber =
+          session.questionIndex === 1
+            ? 2
+            : 1;
 
-          ${session.verseRef
-          ? `
-                <div
-                  class="daily-question-session-ref"
+        const choiceButtons =
+          question.choices
+            .map(
+              (choice, index) => `
+                <button
+                  class="daily-question-choice no-zoom${
+                    session.selectedAnswer ===
+                    index
+                      ? " is-selected"
+                      : ""
+                  }"
+                  type="button"
+                  data-daily-question-choice="${index}"
+                  aria-pressed="${
+                    session.selectedAnswer ===
+                    index
+                      ? "true"
+                      : "false"
+                  }"
                 >
                   ${escapeHtml(
-            session.verseRef
-          )}
-                </div>
+                    choice
+                  )}
+                </button>
               `
-          : ""
-        }
+            )
+            .join("");
 
+        wrap.innerHTML = `
           <div
-            class="daily-question-session-note"
+            class="daily-question-session-shell"
+            data-daily-session-phase="${escapeHtml(
+              session.phase
+            )}"
+            data-daily-question-number="${questionNumber}"
           >
-            The Daily Session screen is ready.
-            The question interface comes next.
-          </div>
+            <button
+              class="daily-question-session-back no-zoom"
+              type="button"
+              data-daily-session-back
+            >
+              Back to My Zoo
+            </button>
 
-          <button
-            class="daily-question-session-back no-zoom"
-            type="button"
-            data-daily-session-back
-          >
-            Back to My Zoo
-          </button>
-        </div>
-      `;
+            <div
+              class="daily-question-pet"
+            >
+              ${profilePictureHtml}
+
+              <div
+                class="daily-question-wonders"
+              >
+                ${escapeHtml(
+                  session.petName
+                )} wonders...
+              </div>
+            </div>
+
+            <div
+              class="daily-question-card"
+            >
+              <div
+                class="daily-question-ref-pill"
+              >
+                ${escapeHtml(
+                  session.verseRef
+                )}
+              </div>
+
+              <div
+                class="daily-question-text"
+              >
+                ${escapeHtml(
+                  question.question
+                )}
+              </div>
+
+              <div
+                class="daily-question-choices"
+                role="group"
+                aria-label="Answer choices"
+              >
+                ${choiceButtons}
+              </div>
+
+              <div
+                class="daily-question-help"
+              >
+                <div
+                  class="daily-question-help-label"
+                >
+                  Not sure?
+                </div>
+
+                <button
+                  class="daily-question-check-verse no-zoom"
+                  type="button"
+                  data-daily-check-verse
+                >
+                  Check the verse
+                </button>
+              </div>
+            </div>
+
+            ${
+              questionNumber === 1
+                ? `
+                  <button
+                    class="daily-question-preview-next no-zoom"
+                    type="button"
+                    data-daily-question-preview-next
+                    ${
+                      session.selectedAnswer ===
+                      null
+                        ? "disabled"
+                        : ""
+                    }
+                  >
+                    Next Question
+                  </button>
+                `
+                : ""
+            }
+          </div>
+        `;
+      }
     }
 
     const backButton =
@@ -1079,6 +1200,95 @@
           clearSessionState();
 
           appApi?.goToTitle?.();
+        };
+    }
+
+    wrap
+      .querySelectorAll(
+        "[data-daily-question-choice]"
+      )
+      .forEach((button) => {
+        button.onclick =
+          (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!dailySession) {
+              return;
+            }
+
+            const selectedIndex =
+              Number(
+                button.getAttribute(
+                  "data-daily-question-choice"
+                )
+              );
+
+            if (
+              !Number.isInteger(
+                selectedIndex
+              ) ||
+              selectedIndex < 0 ||
+              selectedIndex > 2
+            ) {
+              return;
+            }
+
+            dailySession.selectedAnswer =
+              selectedIndex;
+
+            dailySession.answered =
+              false;
+
+            dailySession.answerCorrect =
+              false;
+
+            appApi?.renderApp?.();
+          };
+      });
+
+    const nextQuestionButton =
+      wrap.querySelector(
+        "[data-daily-question-preview-next]"
+      );
+
+    if (nextQuestionButton) {
+      nextQuestionButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (
+            !dailySession ||
+            dailySession.questionIndex !==
+              0 ||
+            dailySession.selectedAnswer ===
+              null
+          ) {
+            return;
+          }
+
+          dailySession.questionIndex = 1;
+          dailySession.selectedAnswer =
+            null;
+          dailySession.answered = false;
+          dailySession.answerCorrect =
+            false;
+
+          appApi?.renderApp?.();
+        };
+    }
+
+    const checkVerseButton =
+      wrap.querySelector(
+        "[data-daily-check-verse]"
+      );
+
+    if (checkVerseButton) {
+      checkVerseButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
         };
     }
 
