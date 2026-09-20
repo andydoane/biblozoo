@@ -1058,31 +1058,106 @@
             ? 2
             : 1;
 
+        const headingText =
+          session.answered
+            ? (
+              session.answerCorrect
+                ? "Correct!"
+                : "Nice try!"
+            )
+            : `${session.petName} wonders...`;
+
+        const headingClass =
+          session.answered
+            ? (
+              session.answerCorrect
+                ? " is-correct"
+                : " is-nice-try"
+            )
+            : "";
+
         const choiceButtons =
           question.choices
             .map(
-              (choice, index) => `
-                <button
-                  class="daily-question-choice no-zoom${
-                    session.selectedAnswer ===
-                    index
-                      ? " is-selected"
-                      : ""
-                  }"
-                  type="button"
-                  data-daily-question-choice="${index}"
-                  aria-pressed="${
-                    session.selectedAnswer ===
-                    index
-                      ? "true"
-                      : "false"
-                  }"
-                >
-                  ${escapeHtml(
-                    choice
-                  )}
-                </button>
-              `
+              (choice, index) => {
+                const isSelected =
+                  session.selectedAnswer ===
+                  index;
+
+                const isCorrectChoice =
+                  session.answered &&
+                  index === question.answer;
+
+                const isIncorrectSelected =
+                  session.answered &&
+                  isSelected &&
+                  index !== question.answer;
+
+                const isDimmed =
+                  session.answered &&
+                  !isCorrectChoice &&
+                  !isIncorrectSelected;
+
+                const stateClass = [
+                  isCorrectChoice
+                    ? " is-correct"
+                    : "",
+                  isIncorrectSelected
+                    ? " is-incorrect"
+                    : "",
+                  isDimmed
+                    ? " is-dimmed"
+                    : ""
+                ].join("");
+
+                const marker =
+                  isCorrectChoice
+                    ? "✓"
+                    : (
+                      isIncorrectSelected
+                        ? "×"
+                        : ""
+                    );
+
+                return `
+                  <button
+                    class="daily-question-choice no-zoom${stateClass}"
+                    type="button"
+                    data-daily-question-choice="${index}"
+                    aria-pressed="${
+                      isSelected
+                        ? "true"
+                        : "false"
+                    }"
+                    ${
+                      session.answered
+                        ? "disabled"
+                        : ""
+                    }
+                  >
+                    <span
+                      class="daily-question-choice-label"
+                    >
+                      ${escapeHtml(
+                        choice
+                      )}
+                    </span>
+
+                    ${
+                      marker
+                        ? `
+                          <span
+                            class="daily-question-choice-marker"
+                            aria-hidden="true"
+                          >
+                            ${marker}
+                          </span>
+                        `
+                        : ""
+                    }
+                  </button>
+                `;
+              }
             )
             .join("");
 
@@ -1108,11 +1183,12 @@
               ${profilePictureHtml}
 
               <div
-                class="daily-question-wonders"
+                class="daily-question-wonders${headingClass}"
+                aria-live="polite"
               >
                 ${escapeHtml(
-                  session.petName
-                )} wonders...
+                  headingText
+                )}
               </div>
             </div>
 
@@ -1163,20 +1239,15 @@
             </div>
 
             ${
+              session.answered &&
               questionNumber === 1
                 ? `
                   <button
-                    class="daily-question-preview-next no-zoom"
+                    class="daily-question-feedback-next no-zoom"
                     type="button"
-                    data-daily-question-preview-next
-                    ${
-                      session.selectedAnswer ===
-                      null
-                        ? "disabled"
-                        : ""
-                    }
+                    data-daily-question-next
                   >
-                    Next Question
+                    Next
                   </button>
                 `
                 : ""
@@ -1213,7 +1284,19 @@
             event.preventDefault();
             event.stopPropagation();
 
-            if (!dailySession) {
+            if (
+              !dailySession ||
+              dailySession.answered
+            ) {
+              return;
+            }
+
+            const currentQuestion =
+              getSessionQuestion(
+                dailySession
+              );
+
+            if (!currentQuestion) {
               return;
             }
 
@@ -1237,11 +1320,11 @@
             dailySession.selectedAnswer =
               selectedIndex;
 
-            dailySession.answered =
-              false;
+            dailySession.answered = true;
 
             dailySession.answerCorrect =
-              false;
+              selectedIndex ===
+              currentQuestion.answer;
 
             appApi?.renderApp?.();
           };
@@ -1249,7 +1332,7 @@
 
     const nextQuestionButton =
       wrap.querySelector(
-        "[data-daily-question-preview-next]"
+        "[data-daily-question-next]"
       );
 
     if (nextQuestionButton) {
@@ -1262,8 +1345,7 @@
             !dailySession ||
             dailySession.questionIndex !==
               0 ||
-            dailySession.selectedAnswer ===
-              null
+            !dailySession.answered
           ) {
             return;
           }
