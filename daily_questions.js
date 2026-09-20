@@ -720,6 +720,7 @@
       answered: false,
       answerCorrect: false,
       usedVerseHelp: false,
+      verseAudioPlaying: false,
       snack: "",
       rewardComplete: false
     };
@@ -1009,6 +1010,88 @@
             data-daily-session-back
           >
             Back to My Zoo
+          </button>
+        </div>
+      `;
+    } else if (
+      session.phase ===
+        SESSION_PHASES.VERSE
+    ) {
+      wrap.innerHTML = `
+        <div
+          class="daily-question-verse-shell"
+          data-daily-session-phase="${escapeHtml(
+            session.phase
+          )}"
+        >
+          <div
+            class="daily-question-verse-card"
+          >
+            <div
+              class="daily-question-verse-kicker"
+            >
+              Check the Verse
+            </div>
+
+            <div
+              class="daily-question-verse-ref"
+            >
+              ${escapeHtml(
+                session.verseRef
+              )}
+            </div>
+
+            <div
+              class="daily-question-verse-text"
+            >
+              ${escapeHtml(
+                session.verseText
+              )}
+            </div>
+
+            ${
+              session.translation
+                ? `
+                  <div
+                    class="daily-question-verse-translation"
+                  >
+                    ${escapeHtml(
+                      session.translation
+                    )}
+                  </div>
+                `
+                : ""
+            }
+
+            <button
+              class="daily-question-verse-listen no-zoom"
+              type="button"
+              data-daily-verse-listen
+              ${
+                session.verseAudioPlaying
+                  ? "disabled"
+                  : ""
+              }
+            >
+              ${
+                session.verseAudioPlaying
+                  ? "Listening..."
+                  : "Listen to the Verse"
+              }
+            </button>
+          </div>
+
+          <button
+            class="daily-question-verse-back no-zoom"
+            type="button"
+            data-daily-verse-back
+            ${
+              session.verseAudioPlaying
+                ? "disabled"
+                : ""
+            }
+          >
+            Back to the Question
           </button>
         </div>
       `;
@@ -1371,6 +1454,108 @@
         (event) => {
           event.preventDefault();
           event.stopPropagation();
+
+          if (!dailySession) {
+            return;
+          }
+
+          dailySession.usedVerseHelp =
+            true;
+
+          dailySession.phase =
+            SESSION_PHASES.VERSE;
+
+          appApi?.renderApp?.();
+        };
+    }
+
+    const verseBackButton =
+      wrap.querySelector(
+        "[data-daily-verse-back]"
+      );
+
+    if (verseBackButton) {
+      verseBackButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (
+            !dailySession ||
+            dailySession.verseAudioPlaying
+          ) {
+            return;
+          }
+
+          dailySession.phase =
+            SESSION_PHASES.QUESTION;
+
+          appApi?.renderApp?.();
+        };
+    }
+
+    const verseListenButton =
+      wrap.querySelector(
+        "[data-daily-verse-listen]"
+      );
+
+    if (verseListenButton) {
+      verseListenButton.onclick =
+        async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (
+            !dailySession ||
+            dailySession.phase !==
+              SESSION_PHASES.VERSE ||
+            dailySession.verseAudioPlaying
+          ) {
+            return;
+          }
+
+          const playVerseAudio =
+            window.playVerseDetailListen;
+
+          if (
+            typeof playVerseAudio !==
+              "function"
+          ) {
+            console.warn(
+              "Daily Question verse audio is unavailable"
+            );
+            return;
+          }
+
+          const verseId =
+            dailySession.verseId;
+
+          dailySession.verseAudioPlaying =
+            true;
+
+          appApi?.renderApp?.();
+
+          try {
+            await playVerseAudio(
+              verseId
+            );
+          } finally {
+            if (
+              dailySession &&
+              dailySession.verseId ===
+                verseId
+            ) {
+              dailySession.verseAudioPlaying =
+                false;
+
+              if (
+                dailySession.phase ===
+                  SESSION_PHASES.VERSE
+              ) {
+                appApi?.renderApp?.();
+              }
+            }
+          }
         };
     }
 
