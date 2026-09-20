@@ -57,11 +57,95 @@
       .has(cleanVerseId);
   }
 
+  function normalizeQuestion(rawQuestion) {
+    if (
+      !rawQuestion ||
+      typeof rawQuestion !== "object"
+    ) {
+      return null;
+    }
+
+    const question =
+      String(rawQuestion.question || "").trim();
+
+    const choices =
+      Array.isArray(rawQuestion.choices)
+        ? rawQuestion.choices.map((choice) =>
+          String(choice || "").trim()
+        )
+        : [];
+
+    const answer =
+      rawQuestion.answer;
+
+    if (!question) {
+      return null;
+    }
+
+    if (
+      choices.length !== 3 ||
+      choices.some((choice) => !choice)
+    ) {
+      return null;
+    }
+
+    if (
+      !Number.isInteger(answer) ||
+      answer < 0 ||
+      answer > 2
+    ) {
+      return null;
+    }
+
+    return {
+      question,
+      choices,
+      answer
+    };
+  }
+
+  function normalizeReflection(rawReflection) {
+    if (
+      !rawReflection ||
+      typeof rawReflection !== "object"
+    ) {
+      return null;
+    }
+
+    const recall =
+      normalizeQuestion(rawReflection.recall);
+
+    const meaning =
+      normalizeQuestion(rawReflection.meaning);
+
+    const applicationPrompt =
+      String(
+        rawReflection.application?.prompt || ""
+      ).trim();
+
+    if (
+      !recall ||
+      !meaning ||
+      !applicationPrompt
+    ) {
+      return null;
+    }
+
+    return {
+      recall,
+      meaning,
+      application: {
+        prompt: applicationPrompt
+      }
+    };
+  }
+
   window.BibloZooDailyQuestions =
     Object.freeze({
       version: MODULE_VERSION,
       getAllowedVerseIds,
-      isAllowedVerseId
+      isAllowedVerseId,
+      normalizeReflection
     });
 
 })();

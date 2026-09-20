@@ -6520,6 +6520,19 @@ async function loadVerseList() {
           return {
             id: verseId,
             ref,
+            translation:
+              String(
+                verseJson.translation || ""
+              ).trim(),
+            verseText:
+              String(
+                verseJson.verseText || ""
+              ).trim(),
+            reflection:
+              window.BibloZooDailyQuestions
+                ?.normalizeReflection?.(
+                  verseJson.reflection
+                ) || null,
             biblopetDefaultName:
               verseJson.biblopetDefaultName || "",
             biblopet:
