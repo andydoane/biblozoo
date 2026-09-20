@@ -73,7 +73,7 @@ const FUN_DECOYS = window.VerseGameShell.getFunDecoys();
   const LONG_VERSE_QUICK_BITE_CHANCE = 0.70;
   const VERY_LONG_VERSE_QUICK_BITE_CHANCE = 0.85;
 
-  const BELT_FADE_SECONDS = 0.16;
+  const BELT_FADE_SECONDS = 0.64;
 
   const SOUND_BASE_PATH = "./verse_munch_sounds/";
   const UI_SOUND_BASE_PATH = "../../ui_audio/";
