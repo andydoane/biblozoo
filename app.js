@@ -50,7 +50,7 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const DEBUG_MODE = false;
 const FEATURES = Object.freeze({
   DAILY_PET_QUESTIONS: true,
-  DAILY_PET_QUESTIONS_DEBUG: false
+  DAILY_PET_QUESTIONS_DEBUG: true
 });
 
 // Temporary: set to false to bring back the “Let’s Memorize God’s Word!” animation screen.
@@ -7108,6 +7108,7 @@ const HIDDEN_PRACTICE_GAME_ID = "dino_dash_2";
 const HIDDEN_PRACTICE_LONG_PRESS_MS = 2000;
 const HIDDEN_LEARN_COMPLETE_LONG_PRESS_MS = 2000;
 const HIDDEN_UTILITIES_LONG_PRESS_MS = 2000;
+const HIDDEN_DAILY_QUESTION_LONG_PRESS_MS = 2000;
 
 function getExternalPracticeGames() {
   const list = Array.isArray(window.EXTERNAL_VERSE_GAMES) ? window.EXTERNAL_VERSE_GAMES : [];
@@ -11764,6 +11765,41 @@ function screenTitle(idx) {
       e.stopPropagation();
       go(Screen.PROGRESS);
     };
+
+    bindLongPress(titleZooStrip, {
+      delay:
+        HIDDEN_DAILY_QUESTION_LONG_PRESS_MS,
+
+      shouldStart: () =>
+        FEATURES
+          .DAILY_PET_QUESTIONS === true &&
+        FEATURES
+          .DAILY_PET_QUESTIONS_DEBUG === true,
+
+      onLongPress: () => {
+        const offer =
+          window.BibloZooDailyQuestions
+            ?.prepareForcedDebugOffer?.();
+
+        if (!offer) {
+          showDialog({
+            title:
+              "No Daily Question Available",
+            body:
+              "Unlock one of the four Daily Question BibloPets first.",
+            actions: [
+              dlgBtn("OK", {
+                onClick: closeDialog
+              })
+            ]
+          });
+
+          return;
+        }
+
+        render();
+      }
+    });
   }
 
   const titleZooVisitBtn = wrap.querySelector("#titleZooVisitBtn");

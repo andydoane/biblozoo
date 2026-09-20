@@ -51,6 +51,8 @@
 
   let acceptedOffer = null;
 
+  let debugRotationIndex = -1;
+
   const LATER_STORAGE_PREFIX =
     "biblozooDailyQuestionLater";
 
@@ -467,6 +469,95 @@
     );
   }
 
+  function chooseNextDebugVerse() {
+    if (
+      !isFeatureEnabled() ||
+      !isDebugEnabled()
+    ) {
+      return null;
+    }
+
+    const eligibleVerses =
+      getEligibleVerses();
+
+    if (!eligibleVerses.length) {
+      return null;
+    }
+
+    const eligibleById =
+      new Map(
+        eligibleVerses.map(
+          (verse) => [
+            verse.id,
+            verse
+          ]
+        )
+      );
+
+    const verseCount =
+      DAILY_PET_QUESTION_VERSE_IDS
+        .length;
+
+    for (
+      let offset = 1;
+      offset <= verseCount;
+      offset += 1
+    ) {
+      const nextIndex =
+        (
+          debugRotationIndex +
+          offset +
+          verseCount
+        ) % verseCount;
+
+      const verseId =
+        DAILY_PET_QUESTION_VERSE_IDS[
+        nextIndex
+        ];
+
+      const verse =
+        eligibleById.get(verseId);
+
+      if (!verse) {
+        continue;
+      }
+
+      debugRotationIndex =
+        nextIndex;
+
+      return verse;
+    }
+
+    return null;
+  }
+
+  function prepareForcedDebugOffer() {
+    if (
+      !isFeatureEnabled() ||
+      !isDebugEnabled()
+    ) {
+      return null;
+    }
+
+    pendingOffer = null;
+    acceptedOffer = null;
+
+    const verse =
+      chooseNextDebugVerse();
+
+    if (!verse) {
+      return null;
+    }
+
+    pendingOffer = {
+      verseId: verse.id,
+      verse,
+      debugForced: true
+    };
+
+    return pendingOffer;
+  }
+
   function hasCompletedToday(
     date = new Date()
   ) {
@@ -579,6 +670,7 @@
   function clearOfferState() {
     pendingOffer = null;
     acceptedOffer = null;
+    debugRotationIndex = -1;
   }
 
   function prepareStartupOffer({
@@ -595,7 +687,10 @@
       return null;
     }
 
-    if (wasDismissedForSession()) {
+    if (
+      !isDebugEnabled() &&
+      wasDismissedForSession()
+    ) {
       return null;
     }
 
@@ -860,6 +955,7 @@
       getEligibleVerses,
       chooseDailyQuestionVerse,
       hasCompletedToday,
+      prepareForcedDebugOffer,
       shouldOfferToday,
       prepareStartupOffer,
       getPendingOffer,
