@@ -3,33 +3,65 @@
    ========================================================= */
 
 (function () {
-    "use strict";
+  "use strict";
 
-    /*
-      The Daily Pet Questions feature will live in this module.
-  
-      app.js will remain responsible for:
-        - global app navigation
-        - profile progress storage
-        - shared verse/audio helpers
-        - deciding whether the feature is enabled
-  
-      This file will eventually handle:
-        - daily question eligibility
-        - question session state
-        - title-screen question offer
-        - question and verse-help screens
-        - "Something to Chew On"
-        - snack reward
-        - feeding game
-        - debug testing helpers
-    */
+  /*
+    The Daily Pet Questions feature will live in this module.
 
-    const MODULE_VERSION = 1;
+    app.js will remain responsible for:
+      - global app navigation
+      - profile progress storage
+      - shared verse/audio helpers
+      - deciding whether the feature is enabled
 
-    window.BibloZooDailyQuestions =
-        Object.freeze({
-            version: MODULE_VERSION
-        });
+    This file will eventually handle:
+      - daily question eligibility
+      - question session state
+      - title-screen question offer
+      - question and verse-help screens
+      - "Something to Chew On"
+      - snack reward
+      - feeding game
+      - debug testing helpers
+  */
+
+  const MODULE_VERSION = 1;
+
+  /*
+    Version 1 / initial testing allowlist.
+
+    Only these verses may participate in Daily Pet Questions.
+    Additional verses can be added later without changing the
+    rest of the feature.
+  */
+  const DAILY_PET_QUESTION_VERSE_IDS =
+    Object.freeze([
+      "genesis_1_1",
+      "john_3_16",
+      "romans_6_23",
+      "psalm_23_4"
+    ]);
+
+  const DAILY_PET_QUESTION_VERSE_ID_SET =
+    new Set(DAILY_PET_QUESTION_VERSE_IDS);
+
+  function getAllowedVerseIds() {
+    return [...DAILY_PET_QUESTION_VERSE_IDS];
+  }
+
+  function isAllowedVerseId(verseId) {
+    const cleanVerseId =
+      String(verseId || "").trim();
+
+    return DAILY_PET_QUESTION_VERSE_ID_SET
+      .has(cleanVerseId);
+  }
+
+  window.BibloZooDailyQuestions =
+    Object.freeze({
+      version: MODULE_VERSION,
+      getAllowedVerseIds,
+      isAllowedVerseId
+    });
 
 })();
