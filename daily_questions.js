@@ -26,6 +26,7 @@
   */
 
   const MODULE_VERSION = 1;
+  const DAILY_PROGRESS_VERSION = 1;
 
   /*
     Version 1 / initial testing allowlist.
@@ -140,12 +141,138 @@
     };
   }
 
+  function getLocalDayKey(date = new Date()) {
+    const safeDate =
+      date instanceof Date &&
+        !Number.isNaN(date.getTime())
+        ? date
+        : new Date();
+
+    const year =
+      safeDate.getFullYear();
+
+    const month =
+      String(safeDate.getMonth() + 1)
+        .padStart(2, "0");
+
+    const day =
+      String(safeDate.getDate())
+        .padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function normalizeDailyVerseProgress(
+    rawVerseProgress
+  ) {
+    const raw =
+      rawVerseProgress &&
+        typeof rawVerseProgress === "object" &&
+        !Array.isArray(rawVerseProgress)
+        ? rawVerseProgress
+        : {};
+
+    const lastAskedAt =
+      Number(raw.lastAskedAt);
+
+    const sessionsCompleted =
+      Number(raw.sessionsCompleted);
+
+    return {
+      lastAskedAt:
+        Number.isFinite(lastAskedAt) &&
+          lastAskedAt > 0
+          ? lastAskedAt
+          : 0,
+      sessionsCompleted:
+        Number.isFinite(sessionsCompleted) &&
+          sessionsCompleted > 0
+          ? Math.floor(sessionsCompleted)
+          : 0
+    };
+  }
+
+  function createDefaultDailyProgress(
+    overrides = {}
+  ) {
+    const raw =
+      overrides &&
+        typeof overrides === "object" &&
+        !Array.isArray(overrides)
+        ? overrides
+        : {};
+
+    const rawLastCompletedDay =
+      String(
+        raw.lastCompletedDay || ""
+      ).trim();
+
+    const lastCompletedDay =
+      /^\d{4}-\d{2}-\d{2}$/.test(
+        rawLastCompletedDay
+      )
+        ? rawLastCompletedDay
+        : "";
+
+    const lastCompletedAt =
+      Number(raw.lastCompletedAt);
+
+    const byVerse = {};
+
+    if (
+      raw.byVerse &&
+      typeof raw.byVerse === "object" &&
+      !Array.isArray(raw.byVerse)
+    ) {
+      for (
+        const [verseId, verseProgress] of
+        Object.entries(raw.byVerse)
+      ) {
+        const cleanVerseId =
+          String(verseId || "").trim();
+
+        if (!cleanVerseId) continue;
+
+        byVerse[cleanVerseId] =
+          normalizeDailyVerseProgress(
+            verseProgress
+          );
+      }
+    }
+
+    return {
+      version: DAILY_PROGRESS_VERSION,
+      lastCompletedDay,
+      lastCompletedAt:
+        Number.isFinite(lastCompletedAt) &&
+          lastCompletedAt > 0
+          ? lastCompletedAt
+          : 0,
+      lastVerseId:
+        String(
+          raw.lastVerseId || ""
+        ).trim(),
+      byVerse
+    };
+  }
+
+  function normalizeDailyProgress(
+    rawProgress
+  ) {
+    return createDefaultDailyProgress(
+      rawProgress
+    );
+  }
+
   window.BibloZooDailyQuestions =
     Object.freeze({
       version: MODULE_VERSION,
       getAllowedVerseIds,
       isAllowedVerseId,
-      normalizeReflection
+      normalizeReflection,
+      getLocalDayKey,
+      createDefaultDailyProgress,
+      normalizeDailyProgress
     });
 
 })();

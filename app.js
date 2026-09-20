@@ -1727,12 +1727,80 @@ function markZooTodoTutorialPageAudioPlayed(pageNumber) {
   });
 }
 
+
+function createDefaultDailyQuestionsProgress() {
+  const creator =
+    window.BibloZooDailyQuestions
+      ?.createDefaultDailyProgress;
+
+  if (typeof creator === "function") {
+    return creator();
+  }
+
+  return {
+    version: 1,
+    lastCompletedDay: "",
+    lastCompletedAt: 0,
+    lastVerseId: "",
+    byVerse: {}
+  };
+}
+
+function normalizeDailyQuestionsProgress(
+  rawProgress
+) {
+  const normalizer =
+    window.BibloZooDailyQuestions
+      ?.normalizeDailyProgress;
+
+  if (typeof normalizer === "function") {
+    return normalizer(rawProgress);
+  }
+
+  return createDefaultDailyQuestionsProgress();
+}
+
+function migrateDailyQuestionsProgress(
+  progress
+) {
+  if (
+    !progress ||
+    typeof progress !== "object"
+  ) {
+    return false;
+  }
+
+  const before =
+    JSON.stringify(
+      progress.dailyQuestions || null
+    );
+
+  const normalized =
+    normalizeDailyQuestionsProgress(
+      progress.dailyQuestions
+    );
+
+  const after =
+    JSON.stringify(normalized);
+
+  if (before === after) {
+    return false;
+  }
+
+  progress.dailyQuestions =
+    normalized;
+
+  return true;
+}
+
 function createEmptyProgress() {
   return {
     version: PROGRESS_VERSION,
     lastActiveVerseId: "",
     verses: {},
-    tutorial: createDefaultTutorialProgress()
+    tutorial: createDefaultTutorialProgress(),
+    dailyQuestions:
+      createDefaultDailyQuestionsProgress()
   };
 }
 
@@ -1994,6 +2062,14 @@ function loadProgress() {
       changed = true;
     }
 
+    if (
+      migrateDailyQuestionsProgress(
+        parsed
+      )
+    ) {
+      changed = true;
+    }
+
     if (changed) {
       saveProgress(parsed);
     }
@@ -2028,6 +2104,42 @@ function saveProgress(progress) {
   }
 }
 
+function getDailyQuestionsProgress() {
+  const progress =
+    loadProgress();
+
+  return normalizeDailyQuestionsProgress(
+    progress.dailyQuestions
+  );
+}
+
+function updateDailyQuestionsProgress(
+  updater
+) {
+  const progress =
+    loadProgress();
+
+  const dailyQuestions =
+    normalizeDailyQuestionsProgress(
+      progress.dailyQuestions
+    );
+
+  if (typeof updater === "function") {
+    updater(
+      dailyQuestions,
+      progress
+    );
+  }
+
+  progress.dailyQuestions =
+    normalizeDailyQuestionsProgress(
+      dailyQuestions
+    );
+
+  saveProgress(progress);
+
+  return progress.dailyQuestions;
+}
 
 function isVerseAvailableForRestore(verseId) {
   const cleanVerseId = String(verseId || "").trim();
@@ -2134,6 +2246,7 @@ function normalizeProgressForProfileMigration(rawProgress) {
 
   migrateTrafficProgress(progress);
   migrateTutorialProgress(progress);
+  migrateDailyQuestionsProgress(progress);
 
   return progress;
 }
@@ -2207,6 +2320,7 @@ function normalizeImportedProgress(rawProgress) {
 
   migrateTrafficProgress(progress);
   migrateTutorialProgress(progress);
+  migrateDailyQuestionsProgress(progress);
 
   return progress;
 }
