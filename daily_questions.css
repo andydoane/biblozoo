@@ -520,7 +520,7 @@
 /* ---------- Something to Chew On ---------- */
 
 .daily-question-reflection-shell,
-.daily-question-complete-shell {
+.daily-reward-intro-shell {
   width: min(100%, 560px);
   min-height: 100%;
   margin: 0 auto;
@@ -539,7 +539,7 @@
 }
 
 .daily-question-reflection-card,
-.daily-question-complete-card {
+.daily-reward-intro-card {
   width: 100%;
 
   display: flex;
@@ -587,7 +587,7 @@
 }
 
 .daily-question-reflection-done,
-.daily-question-complete-back {
+.daily-reward-intro-back {
   width: min(100%, 300px);
   min-height: 52px;
 
@@ -611,31 +611,41 @@
 }
 
 .daily-question-reflection-done:active,
-.daily-question-complete-back:active {
+.daily-reward-intro-back:active {
   transform: translateY(3px);
 
   box-shadow:
     0 3px 0 rgba(0, 0, 0, 0.20);
 }
 
-.daily-question-complete-title {
+/* ---------- Reward intro ---------- */
+
+.daily-reward-intro-title {
   color: var(--purple);
 
   font-size:
-    clamp(28px, 7vw, 42px);
+    clamp(30px, 7.5vw, 46px);
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.03;
 
   text-wrap: balance;
 }
 
-.daily-question-complete-note {
-  color: #5d5663;
+.daily-reward-intro-snack {
+  font-size:
+    clamp(72px, 22vw, 128px);
+  line-height: 1;
+}
+
+.daily-reward-intro-instruction {
+  color: #4f4855;
 
   font-size:
-    clamp(18px, 4.5vw, 23px);
-  font-weight: 800;
-  line-height: 1.2;
+    clamp(21px, 5.3vw, 30px);
+  font-weight: 900;
+  line-height: 1.12;
+
+  text-wrap: balance;
 }
 
 /* ---------- Check the Verse ---------- */
@@ -823,12 +833,12 @@
   }
 
   .daily-question-reflection-shell,
-  .daily-question-complete-shell {
+  .daily-reward-intro-shell {
     gap: 10px;
   }
 
   .daily-question-reflection-card,
-  .daily-question-complete-card {
+  .daily-reward-intro-card {
     gap: 10px;
     padding: 15px 14px;
   }
@@ -839,7 +849,7 @@
   }
 
   .daily-question-reflection-done,
-  .daily-question-complete-back {
+  .daily-reward-intro-back {
     min-height: 46px;
   }
 

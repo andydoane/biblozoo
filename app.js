@@ -4912,6 +4912,19 @@ window.BibloZooDailyQuestions
     getPetName:
       getBibloPetDisplayNameForVerseId,
 
+    getRandomSnack: () => {
+      if (!HUNGRY_FOOD_POOL.length) {
+        return "🍎";
+      }
+
+      return HUNGRY_FOOD_POOL[
+        Math.floor(
+          Math.random() *
+          HUNGRY_FOOD_POOL.length
+        )
+      ];
+    },
+
     profilePictureHtml:
       profilePictureVisualHtml,
 

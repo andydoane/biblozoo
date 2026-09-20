@@ -1173,31 +1173,47 @@
       session.phase ===
         SESSION_PHASES.REWARD_INTRO
     ) {
+      const snack =
+        String(
+          session.snack || "🍎"
+        ).trim() || "🍎";
+
       wrap.innerHTML = `
         <div
-          class="daily-question-complete-shell"
+          class="daily-reward-intro-shell"
           data-daily-session-phase="${escapeHtml(
             session.phase
           )}"
         >
           <div
-            class="daily-question-complete-card"
+            class="daily-reward-intro-card"
           >
             <div
-              class="daily-question-complete-title"
+              class="daily-reward-intro-title"
             >
-              Daily Question complete!
+              You earned a snack!
             </div>
 
             <div
-              class="daily-question-complete-note"
+              class="daily-reward-intro-snack"
+              aria-label="Snack reward"
             >
-              Your reward comes next.
+              ${escapeHtml(
+                snack
+              )}
+            </div>
+
+            <div
+              class="daily-reward-intro-instruction"
+            >
+              Tilt to feed ${escapeHtml(
+                session.petName
+              )}.
             </div>
           </div>
 
           <button
-            class="daily-question-complete-back no-zoom"
+            class="daily-reward-intro-back no-zoom"
             type="button"
             data-daily-session-back
           >
@@ -1607,6 +1623,15 @@
 
           dailySession.completionRecorded =
             true;
+
+          const earnedSnack =
+            String(
+              appApi?.getRandomSnack?.() ||
+              ""
+            ).trim();
+
+          dailySession.snack =
+            earnedSnack || "🍎";
 
           dailySession.phase =
             SESSION_PHASES.REWARD_INTRO;
