@@ -4883,6 +4883,26 @@ function isBibloPetUnlocked(verseProgress) {
   return !!verseProgress.learnCompleted && hasAnyTrackedGameCompletion(verseProgress);
 }
 
+window.BibloZooDailyQuestions
+  ?.initialize?.({
+    isEnabled: () =>
+      FEATURES.DAILY_PET_QUESTIONS === true,
+
+    isDebugEnabled: () =>
+      FEATURES.DAILY_PET_QUESTIONS_DEBUG === true,
+
+    getVerseList: () =>
+      VERSE_LIST,
+
+    getVerseProgress,
+
+    isPetUnlocked:
+      isBibloPetUnlocked,
+
+    getDailyProgress:
+      getDailyQuestionsProgress
+  });
+
 function getVerseListItemById(verseId) {
   return VERSE_LIST.find(item => item.id === verseId) || null;
 }

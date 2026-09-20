@@ -46,6 +46,24 @@
   const DAILY_PET_QUESTION_VERSE_ID_SET =
     new Set(DAILY_PET_QUESTION_VERSE_IDS);
 
+  let appApi = null;
+
+  function initialize(api) {
+    appApi =
+      api &&
+        typeof api === "object"
+        ? api
+        : null;
+
+    return !!appApi;
+  }
+
+  function isFeatureEnabled() {
+    return (
+      appApi?.isEnabled?.() === true
+    );
+  }
+
   function getAllowedVerseIds() {
     return [...DAILY_PET_QUESTION_VERSE_IDS];
   }
@@ -264,6 +282,170 @@
     );
   }
 
+  function getEligibleVerses() {
+    if (!isFeatureEnabled()) {
+      return [];
+    }
+
+    const verseList =
+      appApi?.getVerseList?.();
+
+    if (!Array.isArray(verseList)) {
+      return [];
+    }
+
+    const getVerseProgress =
+      appApi?.getVerseProgress;
+
+    const isPetUnlocked =
+      appApi?.isPetUnlocked;
+
+    if (
+      typeof getVerseProgress !== "function" ||
+      typeof isPetUnlocked !== "function"
+    ) {
+      return [];
+    }
+
+    return verseList
+      .map((verse) => {
+        const verseId =
+          String(
+            verse?.id || ""
+          ).trim();
+
+        if (
+          !verseId ||
+          !isAllowedVerseId(verseId)
+        ) {
+          return null;
+        }
+
+        const reflection =
+          normalizeReflection(
+            verse?.reflection
+          );
+
+        if (!reflection) {
+          return null;
+        }
+
+        const verseProgress =
+          getVerseProgress(verseId);
+
+        if (
+          !isPetUnlocked(
+            verseProgress
+          )
+        ) {
+          return null;
+        }
+
+        return {
+          ...verse,
+          id: verseId,
+          reflection
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function getLastAskedAtForVerse(
+    dailyProgress,
+    verseId
+  ) {
+    const lastAskedAt =
+      Number(
+        dailyProgress
+          ?.byVerse
+          ?.[verseId]
+          ?.lastAskedAt
+      );
+
+    return (
+      Number.isFinite(lastAskedAt) &&
+        lastAskedAt > 0
+        ? lastAskedAt
+        : 0
+    );
+  }
+
+  function chooseDailyQuestionVerse() {
+    const eligibleVerses =
+      getEligibleVerses();
+
+    if (!eligibleVerses.length) {
+      return null;
+    }
+
+    if (eligibleVerses.length === 1) {
+      return eligibleVerses[0];
+    }
+
+    const dailyProgress =
+      normalizeDailyProgress(
+        appApi?.getDailyProgress?.()
+      );
+
+    let candidates =
+      eligibleVerses;
+
+    const lastVerseId =
+      String(
+        dailyProgress.lastVerseId || ""
+      ).trim();
+
+    if (
+      lastVerseId &&
+      eligibleVerses.length > 1
+    ) {
+      const alternatives =
+        eligibleVerses.filter(
+          (verse) =>
+            verse.id !== lastVerseId
+        );
+
+      if (alternatives.length) {
+        candidates =
+          alternatives;
+      }
+    }
+
+    const oldestLastAskedAt =
+      Math.min(
+        ...candidates.map(
+          (verse) =>
+            getLastAskedAtForVerse(
+              dailyProgress,
+              verse.id
+            )
+        )
+      );
+
+    const leastRecentlyAsked =
+      candidates.filter(
+        (verse) =>
+          getLastAskedAtForVerse(
+            dailyProgress,
+            verse.id
+          ) === oldestLastAskedAt
+      );
+
+    const pool =
+      leastRecentlyAsked.length
+        ? leastRecentlyAsked
+        : candidates;
+
+    return (
+      pool[
+      Math.floor(
+        Math.random() *
+        pool.length
+      )
+      ] || null
+    );
+  }
+
   window.BibloZooDailyQuestions =
     Object.freeze({
       version: MODULE_VERSION,
@@ -274,5 +456,21 @@
       createDefaultDailyProgress,
       normalizeDailyProgress
     });
+
+  window.BibloZooDailyQuestions =
+    Object.freeze({
+      version: MODULE_VERSION,
+      initialize,
+      isFeatureEnabled,
+      getAllowedVerseIds,
+      isAllowedVerseId,
+      normalizeReflection,
+      getLocalDayKey,
+      createDefaultDailyProgress,
+      normalizeDailyProgress,
+      getEligibleVerses,
+      chooseDailyQuestionVerse
+    });
+
 
 })();
