@@ -721,6 +721,7 @@
       answerCorrect: false,
       usedVerseHelp: false,
       verseAudioPlaying: false,
+      completionRecorded: false,
       snack: "",
       rewardComplete: false
     };
@@ -1095,6 +1096,115 @@
           </button>
         </div>
       `;
+    } else if (
+      session.phase ===
+        SESSION_PHASES.REFLECTION
+    ) {
+      const profilePictureHtml =
+        typeof appApi
+          ?.profilePictureHtml ===
+          "function"
+          ? appApi.profilePictureHtml(
+            session.verseId,
+            {
+              className:
+                "daily-question-session-avatar",
+              alt: ""
+            }
+          )
+          : "";
+
+      const applicationPrompt =
+        String(
+          session.reflection
+            ?.application
+            ?.prompt || ""
+        ).trim();
+
+      wrap.innerHTML = `
+        <div
+          class="daily-question-reflection-shell"
+          data-daily-session-phase="${escapeHtml(
+            session.phase
+          )}"
+        >
+          <div
+            class="daily-question-reflection-pet"
+          >
+            ${profilePictureHtml}
+          </div>
+
+          <div
+            class="daily-question-reflection-card"
+          >
+            <div
+              class="daily-question-ref-pill"
+            >
+              ${escapeHtml(
+                session.verseRef
+              )}
+            </div>
+
+            <div
+              class="daily-question-reflection-title"
+            >
+              Something to chew on...
+            </div>
+
+            <div
+              class="daily-question-reflection-prompt"
+            >
+              ${escapeHtml(
+                applicationPrompt
+              )}
+            </div>
+          </div>
+
+          <button
+            class="daily-question-reflection-done no-zoom"
+            type="button"
+            data-daily-reflection-done
+          >
+            Done
+          </button>
+        </div>
+      `;
+    } else if (
+      session.phase ===
+        SESSION_PHASES.REWARD_INTRO
+    ) {
+      wrap.innerHTML = `
+        <div
+          class="daily-question-complete-shell"
+          data-daily-session-phase="${escapeHtml(
+            session.phase
+          )}"
+        >
+          <div
+            class="daily-question-complete-card"
+          >
+            <div
+              class="daily-question-complete-title"
+            >
+              Daily Question complete!
+            </div>
+
+            <div
+              class="daily-question-complete-note"
+            >
+              Your reward comes next.
+            </div>
+          </div>
+
+          <button
+            class="daily-question-complete-back no-zoom"
+            type="button"
+            data-daily-session-back
+          >
+            Back to My Zoo
+          </button>
+        </div>
+      `;
     } else {
       const question =
         getSessionQuestion(
@@ -1322,8 +1432,7 @@
             </div>
 
             ${
-              session.answered &&
-              questionNumber === 1
+              session.answered
                 ? `
                   <button
                     class="daily-question-feedback-next no-zoom"
@@ -1426,19 +1535,81 @@
 
           if (
             !dailySession ||
-            dailySession.questionIndex !==
-              0 ||
+            dailySession.phase !==
+              SESSION_PHASES.QUESTION ||
             !dailySession.answered
           ) {
             return;
           }
 
-          dailySession.questionIndex = 1;
-          dailySession.selectedAnswer =
-            null;
-          dailySession.answered = false;
-          dailySession.answerCorrect =
-            false;
+          if (
+            dailySession.questionIndex === 0
+          ) {
+            dailySession.questionIndex = 1;
+            dailySession.selectedAnswer =
+              null;
+            dailySession.answered = false;
+            dailySession.answerCorrect =
+              false;
+
+            appApi?.renderApp?.();
+            return;
+          }
+
+          if (
+            dailySession.questionIndex === 1
+          ) {
+            dailySession.phase =
+              SESSION_PHASES.REFLECTION;
+
+            dailySession.selectedAnswer =
+              null;
+            dailySession.answered = false;
+            dailySession.answerCorrect =
+              false;
+
+            appApi?.renderApp?.();
+          }
+        };
+    }
+
+    const reflectionDoneButton =
+      wrap.querySelector(
+        "[data-daily-reflection-done]"
+      );
+
+    if (reflectionDoneButton) {
+      reflectionDoneButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (
+            !dailySession ||
+            dailySession.phase !==
+              SESSION_PHASES.REFLECTION ||
+            dailySession.completionRecorded
+          ) {
+            return;
+          }
+
+          const completedProgress =
+            markSessionCompleted(
+              dailySession.verseId
+            );
+
+          if (!completedProgress) {
+            console.warn(
+              "Could not complete Daily Question session"
+            );
+            return;
+          }
+
+          dailySession.completionRecorded =
+            true;
+
+          dailySession.phase =
+            SESSION_PHASES.REWARD_INTRO;
 
           appApi?.renderApp?.();
         };

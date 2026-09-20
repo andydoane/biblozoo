@@ -517,6 +517,127 @@
     0 3px 0 rgba(0, 0, 0, 0.20);
 }
 
+/* ---------- Something to Chew On ---------- */
+
+.daily-question-reflection-shell,
+.daily-question-complete-shell {
+  width: min(100%, 560px);
+  min-height: 100%;
+  margin: 0 auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: clamp(14px, 2.5vh, 22px);
+}
+
+.daily-question-reflection-pet {
+  display: flex;
+  justify-content: center;
+}
+
+.daily-question-reflection-card,
+.daily-question-complete-card {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  gap: clamp(12px, 2vh, 18px);
+
+  padding:
+    clamp(20px, 5vw, 30px);
+
+  border-radius:
+    clamp(22px, 5vw, 30px);
+
+  background: #ffffff;
+  color: #333333;
+
+  box-shadow:
+    0 8px 0 rgba(0, 0, 0, 0.18),
+    0 18px 34px rgba(0, 0, 0, 0.16);
+}
+
+.daily-question-reflection-title {
+  color: var(--purple);
+
+  font-size:
+    clamp(26px, 6.5vw, 39px);
+  font-weight: 900;
+  line-height: 1.05;
+
+  text-wrap: balance;
+}
+
+.daily-question-reflection-prompt {
+  max-width: 460px;
+
+  color: #3d3742;
+
+  font-size:
+    clamp(21px, 5.3vw, 30px);
+  font-weight: 800;
+  line-height: 1.22;
+
+  text-wrap: balance;
+}
+
+.daily-question-reflection-done,
+.daily-question-complete-back {
+  width: min(100%, 300px);
+  min-height: 52px;
+
+  border: 0;
+  border-radius: 999px;
+
+  padding: 10px 20px;
+
+  background: #78ad4f;
+  color: #ffffff;
+
+  font: inherit;
+  font-size:
+    clamp(18px, 4.6vw, 23px);
+  font-weight: 900;
+
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.20);
+
+  cursor: pointer;
+}
+
+.daily-question-reflection-done:active,
+.daily-question-complete-back:active {
+  transform: translateY(3px);
+
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.20);
+}
+
+.daily-question-complete-title {
+  color: var(--purple);
+
+  font-size:
+    clamp(28px, 7vw, 42px);
+  font-weight: 900;
+  line-height: 1.05;
+
+  text-wrap: balance;
+}
+
+.daily-question-complete-note {
+  color: #5d5663;
+
+  font-size:
+    clamp(18px, 4.5vw, 23px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
 /* ---------- Check the Verse ---------- */
 
 .daily-question-verse-shell {
@@ -698,6 +819,27 @@
   }
 
   .daily-question-feedback-next {
+    min-height: 46px;
+  }
+
+  .daily-question-reflection-shell,
+  .daily-question-complete-shell {
+    gap: 10px;
+  }
+
+  .daily-question-reflection-card,
+  .daily-question-complete-card {
+    gap: 10px;
+    padding: 15px 14px;
+  }
+
+  .daily-question-reflection-prompt {
+    font-size:
+      clamp(19px, 4.8vw, 26px);
+  }
+
+  .daily-question-reflection-done,
+  .daily-question-complete-back {
     min-height: 46px;
   }
 
