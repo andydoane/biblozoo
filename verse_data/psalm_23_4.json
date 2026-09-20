@@ -17,6 +17,29 @@
   ],
   "verseText": "Even though I walk through the valley of the shadow of death, I will fear no evil, for You are with me; Your rod and Your staff, they comfort me.",
   "meaning": "Even when we experience tough times of trouble in life, we don't need to be afraid. God has promised to be with us.",
+    "reflection": {
+      "recall": {
+        "question": "Why does the writer say he will fear no evil?",
+        "choices": [
+          "He is strong",
+          "Valley is safe",
+          "God is near"
+        ],
+        "answer": 2
+      },
+      "meaning": {
+        "question": "What does this verse teach us in scary times?",
+        "choices": [
+          "God stays near",
+          "Run away",
+          "Hide alone"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When something feels scary, remember that God is with you. What could help you remember that today?"
+      }
+    },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
