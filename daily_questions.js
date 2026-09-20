@@ -49,6 +49,20 @@
   let appApi = null;
   let pendingOffer = null;
 
+  let acceptedOffer = null;
+
+  const LATER_STORAGE_PREFIX =
+    "biblozooDailyQuestionLater";
+
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function initialize(api) {
     appApi =
       api &&
@@ -481,16 +495,107 @@
     return !hasCompletedToday(date);
   }
 
+  function getLaterStorageKey(
+    date = new Date()
+  ) {
+    const profileId =
+      String(
+        appApi?.getActiveProfileId?.() || ""
+      ).trim();
+
+    if (!profileId) {
+      return "";
+    }
+
+    return [
+      LATER_STORAGE_PREFIX,
+      profileId,
+      getLocalDayKey(date)
+    ].join(":");
+  }
+
+  function wasDismissedForSession(
+    date = new Date()
+  ) {
+    const storageKey =
+      getLaterStorageKey(date);
+
+    if (!storageKey) {
+      return false;
+    }
+
+    try {
+      return (
+        sessionStorage.getItem(
+          storageKey
+        ) === "1"
+      );
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function dismissPendingOffer(
+    date = new Date()
+  ) {
+    const storageKey =
+      getLaterStorageKey(date);
+
+    if (storageKey) {
+      try {
+        sessionStorage.setItem(
+          storageKey,
+          "1"
+        );
+      } catch (err) {
+        console.warn(
+          "Could not remember Daily Question Later choice",
+          err
+        );
+      }
+    }
+
+    pendingOffer = null;
+    acceptedOffer = null;
+  }
+
+  function acceptPendingOffer() {
+    if (!pendingOffer) {
+      return null;
+    }
+
+    acceptedOffer =
+      pendingOffer;
+
+    pendingOffer = null;
+
+    return acceptedOffer;
+  }
+
+  function getAcceptedOffer() {
+    return acceptedOffer;
+  }
+
+  function clearOfferState() {
+    pendingOffer = null;
+    acceptedOffer = null;
+  }
+
   function prepareStartupOffer({
     allowOffer = false
   } = {}) {
     pendingOffer = null;
+    acceptedOffer = null;
 
     if (!allowOffer) {
       return null;
     }
 
     if (!shouldOfferToday()) {
+      return null;
+    }
+
+    if (wasDismissedForSession()) {
       return null;
     }
 
@@ -515,6 +620,145 @@
 
   function clearPendingOffer() {
     pendingOffer = null;
+  }
+
+  function renderTitleOffer() {
+    if (!isFeatureEnabled()) {
+      return "";
+    }
+
+    const offer =
+      getPendingOffer();
+
+    if (!offer?.verseId) {
+      return "";
+    }
+
+    const verseId =
+      offer.verseId;
+
+    const petName =
+      String(
+        appApi?.getPetName?.(
+          verseId
+        ) ||
+        offer.verse
+          ?.biblopetDefaultName ||
+        "BibloPet"
+      ).trim() ||
+      "BibloPet";
+
+    const profilePictureHtml =
+      typeof appApi
+        ?.profilePictureHtml ===
+        "function"
+        ? appApi.profilePictureHtml(
+          verseId,
+          {
+            className:
+              "daily-question-offer-avatar",
+            alt: ""
+          }
+        )
+        : "";
+
+    return `
+      <div
+        class="daily-question-offer-backdrop"
+        data-daily-question-offer
+        role="dialog"
+        aria-modal="true"
+        aria-label="${escapeHtml(
+      petName
+    )} has a question"
+      >
+        <div
+          class="daily-question-offer-card"
+        >
+          ${profilePictureHtml}
+
+          <div
+            class="daily-question-offer-title"
+          >
+            ${escapeHtml(
+      petName
+    )} has a question!
+          </div>
+
+          <button
+            class="daily-question-offer-accept no-zoom"
+            type="button"
+            data-daily-question-accept
+          >
+            OK
+          </button>
+
+          <button
+            class="daily-question-offer-later no-zoom"
+            type="button"
+            data-daily-question-later
+          >
+            LATER
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function bindTitleOffer(rootEl) {
+    const offerElement =
+      rootEl?.querySelector?.(
+        "[data-daily-question-offer]"
+      );
+
+    if (!offerElement) {
+      return;
+    }
+
+    /*
+      Do not let taps on the modal reach
+      controls on the title page underneath.
+    */
+    offerElement.addEventListener(
+      "click",
+      (event) => {
+        event.stopPropagation();
+      }
+    );
+
+    const acceptButton =
+      offerElement.querySelector(
+        "[data-daily-question-accept]"
+      );
+
+    const laterButton =
+      offerElement.querySelector(
+        "[data-daily-question-later]"
+      );
+
+    if (acceptButton) {
+      acceptButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          acceptPendingOffer();
+
+          appApi?.renderApp?.();
+        };
+    }
+
+    if (laterButton) {
+      laterButton.onclick =
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          dismissPendingOffer();
+
+          appApi?.renderApp?.();
+        };
+    }
   }
 
   function markSessionCompleted(
@@ -619,7 +863,13 @@
       shouldOfferToday,
       prepareStartupOffer,
       getPendingOffer,
+      getAcceptedOffer,
+      acceptPendingOffer,
+      dismissPendingOffer,
       clearPendingOffer,
+      clearOfferState,
+      renderTitleOffer,
+      bindTitleOffer,
       markSessionCompleted
     });
 

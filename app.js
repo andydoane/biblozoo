@@ -49,7 +49,7 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // =========================================================
 const DEBUG_MODE = false;
 const FEATURES = Object.freeze({
-  DAILY_PET_QUESTIONS: false,
+  DAILY_PET_QUESTIONS: true,
   DAILY_PET_QUESTIONS_DEBUG: false
 });
 
@@ -4903,7 +4903,20 @@ window.BibloZooDailyQuestions
       getDailyQuestionsProgress,
 
     updateDailyProgress:
-      updateDailyQuestionsProgress
+      updateDailyQuestionsProgress,
+
+    getActiveProfileId: () =>
+      getProfileApi()
+        ?.getActiveProfileId?.() || "",
+
+    getPetName:
+      getBibloPetDisplayNameForVerseId,
+
+    profilePictureHtml:
+      profilePictureVisualHtml,
+
+    renderApp:
+      render
   });
 
 function getVerseListItemById(verseId) {
@@ -10448,7 +10461,7 @@ function clearTransientStateForProfileActivation() {
   stopProfileTransitionAudio();
 
   window.BibloZooDailyQuestions
-    ?.clearPendingOffer?.();
+    ?.clearOfferState?.();
 
   const pendingRoute = State.pendingBootRoute;
   const preserveGameMix = !!(
@@ -11668,9 +11681,16 @@ function screenTitle(idx) {
 
       ${titleZooVisitButtonHtml()}
 
-
     </div>
+
+    ${
+      window.BibloZooDailyQuestions
+        ?.renderTitleOffer?.() || ""
+    }
   `;
+
+  window.BibloZooDailyQuestions
+    ?.bindTitleOffer?.(wrap);
 
   const titleProfileBtn = wrap.querySelector(
     "#titleProfileBtn"
