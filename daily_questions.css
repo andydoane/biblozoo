@@ -884,10 +884,138 @@
     0 18px 34px rgba(0, 0, 0, 0.16);
 }
 
-.daily-reward-done-snack {
+.daily-reward-done-chomp {
+  color: var(--purple);
+
   font-size:
-    clamp(64px, 20vw, 112px);
+    clamp(34px, 9vw, 54px);
+  font-weight: 900;
   line-height: 1;
+
+  letter-spacing: 0.04em;
+}
+
+.daily-reward-done-pet {
+  position: relative;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height:
+    clamp(112px, 30vw, 154px);
+}
+
+.daily-reward-done-avatar {
+  width:
+    clamp(96px, 27vw, 132px);
+
+  aspect-ratio: 1 / 1;
+
+  border:
+    5px solid #ffffff;
+  border-radius: 50%;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.16);
+
+  transform-origin: center bottom;
+
+  animation:
+    daily-reward-happy-pop
+    780ms
+    ease-in-out
+    2;
+}
+
+.daily-reward-done-avatar
+.profile-picture-img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+
+  object-fit: cover;
+}
+
+.daily-reward-done-avatar
+.profile-picture-fallback {
+  font-size:
+    clamp(48px, 14vw, 72px);
+}
+
+.daily-reward-done-sparkle {
+  position: absolute;
+  top: 4px;
+
+  font-size:
+    clamp(24px, 7vw, 38px);
+
+  animation:
+    daily-reward-sparkle-pop
+    720ms
+    ease-in-out
+    2;
+}
+
+.daily-reward-done-sparkle.is-left {
+  left: 5%;
+}
+
+.daily-reward-done-sparkle.is-right {
+  right: 5%;
+
+  animation-delay: 120ms;
+}
+
+@keyframes daily-reward-happy-pop {
+  0% {
+    transform:
+      translateY(6px)
+      rotate(-4deg)
+      scale(0.96);
+  }
+
+  35% {
+    transform:
+      translateY(-12px)
+      rotate(5deg)
+      scale(1.08);
+  }
+
+  68% {
+    transform:
+      translateY(-4px)
+      rotate(-3deg)
+      scale(1.03);
+  }
+
+  100% {
+    transform:
+      translateY(0)
+      rotate(0)
+      scale(1);
+  }
+}
+
+@keyframes daily-reward-sparkle-pop {
+  0%,
+  100% {
+    opacity: 0.45;
+
+    transform:
+      scale(0.8)
+      rotate(-8deg);
+  }
+
+  50% {
+    opacity: 1;
+
+    transform:
+      scale(1.18)
+      rotate(8deg);
+  }
 }
 
 .daily-reward-done-title {

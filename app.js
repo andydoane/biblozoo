@@ -4925,6 +4925,9 @@ window.BibloZooDailyQuestions
       ];
     },
 
+    stopDailyAudio:
+      cancelVerseDetailListen,
+
     profilePictureHtml:
       profilePictureVisualHtml,
 
@@ -6105,7 +6108,88 @@ function clearPetAnimationCycle() {
   State.petAnimActionClass = "";
 }
 
+let verseDetailListenToken = 0;
+let cancelVerseDetailListenWait = null;
+
+function cancelVerseDetailListen() {
+  verseDetailListenToken += 1;
+
+  const cancelWait =
+    cancelVerseDetailListenWait;
+
+  cancelVerseDetailListenWait = null;
+
+  if (
+    typeof cancelWait === "function"
+  ) {
+    cancelWait();
+  }
+
+  try {
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  } catch (err) { }
+
+  try {
+    setAudioSrc(AUDIO_FILE);
+  } catch (err) { }
+
+  return verseDetailListenToken;
+}
+
+function waitForVerseDetailAudioEnd(
+  token
+) {
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      audioEl.removeEventListener(
+        "ended",
+        onEnd
+      );
+
+      if (
+        cancelVerseDetailListenWait ===
+        finish
+      ) {
+        cancelVerseDetailListenWait =
+          null;
+      }
+
+      resolve();
+    };
+
+    const onEnd = () => {
+      finish();
+    };
+
+    cancelVerseDetailListenWait =
+      finish;
+
+    audioEl.addEventListener(
+      "ended",
+      onEnd
+    );
+
+    if (
+      token !== verseDetailListenToken
+    ) {
+      finish();
+    }
+  });
+}
+
 async function playVerseDetailListen(verseId) {
+  const listenToken =
+    cancelVerseDetailListen();
+
   const verseRefAudioFile =
     `${AUDIO_DIR}${verseId}_ref.mp3`;
 
@@ -6115,20 +6199,69 @@ async function playVerseDetailListen(verseId) {
   try {
     setAudioSrc(verseRefAudioFile);
     audioEl.currentTime = 0;
+
     await safePlay();
-    await waitForAudioEnd();
+
+    if (
+      listenToken !==
+      verseDetailListenToken
+    ) {
+      return false;
+    }
+
+    await waitForVerseDetailAudioEnd(
+      listenToken
+    );
+
+    if (
+      listenToken !==
+      verseDetailListenToken
+    ) {
+      return false;
+    }
 
     setAudioSrc(verseAudioFile);
     audioEl.currentTime = 0;
+
     await safePlay();
-    await waitForAudioEnd();
-  } catch (err) {
-    console.warn(
-      "Verse detail listen failed",
-      err
+
+    if (
+      listenToken !==
+      verseDetailListenToken
+    ) {
+      return false;
+    }
+
+    await waitForVerseDetailAudioEnd(
+      listenToken
     );
+
+    return (
+      listenToken ===
+      verseDetailListenToken
+    );
+  } catch (err) {
+    if (
+      listenToken ===
+      verseDetailListenToken
+    ) {
+      console.warn(
+        "Verse detail listen failed",
+        err
+      );
+    }
+
+    return false;
   } finally {
-    setAudioSrc(AUDIO_FILE);
+    if (
+      listenToken ===
+      verseDetailListenToken
+    ) {
+      cancelVerseDetailListenWait =
+        null;
+
+      setAudioSrc(AUDIO_FILE);
+    }
   }
 }
 
@@ -10469,10 +10602,7 @@ function closeProfileEditor() {
 }
 
 function stopProfileTransitionAudio() {
-  try {
-    audioEl.pause();
-    audioEl.currentTime = 0;
-  } catch (err) { }
+  cancelVerseDetailListen();
 
   try {
     petUnlockAudioEl?.pause?.();

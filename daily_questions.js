@@ -62,6 +62,7 @@
 
   let dailySession = null;
   let rewardGameRuntime = null;
+  let rewardGameStartRafId = 0;
 
   let debugRotationIndex = -1;
 
@@ -761,7 +762,7 @@
   }
 
   function clearOfferState() {
-    stopRewardGame();
+    stopDailySessionRuntime();
 
     pendingOffer = null;
     acceptedOffer = null;
@@ -959,7 +960,7 @@
   }
 
   function clearSessionState() {
-    stopRewardGame();
+    stopDailySessionRuntime();
 
     acceptedOffer = null;
     dailySession = null;
@@ -982,6 +983,14 @@
   }
 
   function stopRewardGame() {
+    if (rewardGameStartRafId) {
+      cancelAnimationFrame(
+        rewardGameStartRafId
+      );
+
+      rewardGameStartRafId = 0;
+    }
+
     const runtime =
       rewardGameRuntime;
 
@@ -1001,12 +1010,69 @@
       runtime.orientationHandler = null;
     }
 
+    if (runtime.stage) {
+      if (runtime.pointerDownHandler) {
+        runtime.stage.removeEventListener(
+          "pointerdown",
+          runtime.pointerDownHandler
+        );
+      }
+
+      if (runtime.pointerMoveHandler) {
+        runtime.stage.removeEventListener(
+          "pointermove",
+          runtime.pointerMoveHandler
+        );
+      }
+
+      if (runtime.pointerEndHandler) {
+        runtime.stage.removeEventListener(
+          "pointerup",
+          runtime.pointerEndHandler
+        );
+
+        runtime.stage.removeEventListener(
+          "pointercancel",
+          runtime.pointerEndHandler
+        );
+      }
+
+      if (
+        Number.isInteger(
+          runtime.activePointerId
+        )
+      ) {
+        try {
+          runtime.stage.releasePointerCapture(
+            runtime.activePointerId
+          );
+        } catch (err) { }
+      }
+    }
+
+    runtime.pointerDownHandler = null;
+    runtime.pointerMoveHandler = null;
+    runtime.pointerEndHandler = null;
+    runtime.activePointerId = null;
+    runtime.dragging = false;
+
     if (runtime.rafId) {
       cancelAnimationFrame(
         runtime.rafId
       );
 
       runtime.rafId = 0;
+    }
+  }
+
+  function stopDailySessionRuntime() {
+    stopRewardGame();
+
+    appApi?.stopDailyAudio?.();
+
+    if (dailySession) {
+      dailySession.verseAudioPlaying =
+        false;
     }
   }
 
@@ -1679,19 +1745,22 @@
       width < 80 ||
       height < 180
     ) {
-      requestAnimationFrame(
-        () => {
-          if (
-            rootEl.isConnected &&
-            dailySession?.phase ===
-              SESSION_PHASES.REWARD_GAME
-          ) {
-            startRewardGame(
-              rootEl
-            );
+      rewardGameStartRafId =
+        requestAnimationFrame(
+          () => {
+            rewardGameStartRafId = 0;
+
+            if (
+              rootEl.isConnected &&
+              dailySession?.phase ===
+                SESSION_PHASES.REWARD_GAME
+            ) {
+              startRewardGame(
+                rootEl
+              );
+            }
           }
-        }
-      );
+        );
 
       return;
     }
@@ -1754,6 +1823,10 @@
       neutralGamma: null,
       smoothedTilt: 0,
       orientationHandler: null,
+      activePointerId: null,
+      pointerDownHandler: null,
+      pointerMoveHandler: null,
+      pointerEndHandler: null,
       pegs:
         createRewardGamePegs(
           width,
@@ -1811,8 +1884,7 @@
         );
       };
 
-    stage.addEventListener(
-      "pointerdown",
+    const pointerDownHandler =
       (event) => {
         if (
           rewardGameRuntime !==
@@ -1824,6 +1896,8 @@
         event.preventDefault();
 
         runtime.dragging = true;
+        runtime.activePointerId =
+          event.pointerId;
 
         try {
           stage.setPointerCapture(
@@ -1834,11 +1908,9 @@
         moveCatcher(
           event
         );
-      }
-    );
+      };
 
-    stage.addEventListener(
-      "pointermove",
+    const pointerMoveHandler =
       (event) => {
         if (
           !runtime.dragging ||
@@ -1853,8 +1925,7 @@
         moveCatcher(
           event
         );
-      }
-    );
+      };
 
     const endDrag =
       (event) => {
@@ -1877,7 +1948,28 @@
             event.pointerId
           );
         } catch (err) { }
+
+        runtime.activePointerId = null;
       };
+
+    runtime.pointerDownHandler =
+      pointerDownHandler;
+
+    runtime.pointerMoveHandler =
+      pointerMoveHandler;
+
+    runtime.pointerEndHandler =
+      endDrag;
+
+    stage.addEventListener(
+      "pointerdown",
+      pointerDownHandler
+    );
+
+    stage.addEventListener(
+      "pointermove",
+      pointerMoveHandler
+    );
 
     stage.addEventListener(
       "pointerup",
@@ -2245,6 +2337,20 @@
       session.phase ===
         SESSION_PHASES.REWARD_DONE
     ) {
+      const profilePictureHtml =
+        typeof appApi
+          ?.profilePictureHtml ===
+          "function"
+          ? appApi.profilePictureHtml(
+            session.verseId,
+            {
+              className:
+                "daily-reward-done-avatar",
+              alt: ""
+            }
+          )
+          : "";
+
       wrap.innerHTML = `
         <div
           class="daily-reward-done-shell"
@@ -2254,20 +2360,37 @@
         >
           <div
             class="daily-reward-done-card"
+            aria-live="polite"
           >
             <div
-              class="daily-reward-done-snack"
+              class="daily-reward-done-chomp"
+            >
+              CHOMP!
+            </div>
+
+            <div
+              class="daily-reward-done-pet"
               aria-hidden="true"
             >
-              ${escapeHtml(
-                session.snack || "🍎"
-              )}
+              ${profilePictureHtml}
+
+              <span
+                class="daily-reward-done-sparkle is-left"
+              >
+                ✨
+              </span>
+
+              <span
+                class="daily-reward-done-sparkle is-right"
+              >
+                ✨
+              </span>
             </div>
 
             <div
               class="daily-reward-done-title"
             >
-              Caught it!
+              Yum! Thanks!
             </div>
 
             <div
@@ -2275,7 +2398,7 @@
             >
               ${escapeHtml(
                 session.petName
-              )} got the snack.
+              )} is happy!
             </div>
           </div>
 
@@ -2877,20 +3000,29 @@
       session?.phase ===
         SESSION_PHASES.REWARD_GAME
     ) {
-      requestAnimationFrame(
-        () => {
-          if (
-            wrap.isConnected &&
-            dailySession === session &&
-            dailySession.phase ===
-              SESSION_PHASES.REWARD_GAME
-          ) {
-            startRewardGame(
-              wrap
-            );
+      if (rewardGameStartRafId) {
+        cancelAnimationFrame(
+          rewardGameStartRafId
+        );
+      }
+
+      rewardGameStartRafId =
+        requestAnimationFrame(
+          () => {
+            rewardGameStartRafId = 0;
+
+            if (
+              wrap.isConnected &&
+              dailySession === session &&
+              dailySession.phase ===
+                SESSION_PHASES.REWARD_GAME
+            ) {
+              startRewardGame(
+                wrap
+              );
+            }
           }
-        }
-      );
+        );
     } else {
       stopRewardGame();
     }
