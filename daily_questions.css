@@ -129,8 +129,7 @@
   font-weight: 900;
   line-height: 1;
 
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  text-decoration: none;
 
   cursor: pointer;
 }
@@ -172,6 +171,8 @@
 /* ---------- Daily Session questions ---------- */
 
 .daily-question-session {
+  position: relative;
+
   height: 100%;
   min-height: 0;
 
@@ -190,6 +191,33 @@
 }
 
 .daily-question-session-shell,
+.daily-question-reflection-shell {
+  --daily-question-pet-slot:
+    clamp(150px, 22vh, 190px);
+  --daily-question-card-slot:
+    clamp(320px, 43vh, 370px);
+  --daily-question-help-slot: 68px;
+  --daily-question-action-slot: 52px;
+  --daily-question-flow-gap:
+    clamp(8px, 1.4vh, 12px);
+
+  width: min(100%, 560px);
+  min-height: 100%;
+  margin: 0 auto;
+
+  display: grid;
+  grid-template-rows:
+    var(--daily-question-pet-slot)
+    var(--daily-question-card-slot)
+    var(--daily-question-help-slot)
+    var(--daily-question-action-slot);
+
+  align-content: center;
+  justify-items: center;
+
+  gap: var(--daily-question-flow-gap);
+}
+
 .daily-question-session-empty {
   width: min(100%, 560px);
   min-height: 100%;
@@ -201,6 +229,13 @@
   justify-content: center;
 
   gap: clamp(10px, 2vh, 16px);
+}
+
+.daily-question-session .screen-title-pill {
+  position: absolute;
+  top: calc(14px + var(--safeT));
+  left: 18px;
+  z-index: 20;
 }
 
 .daily-question-session-empty-title {
@@ -240,10 +275,15 @@
   transform: scale(0.97);
 }
 
-.daily-question-pet {
+.daily-question-pet,
+.daily-question-reflection-pet {
+  width: 100%;
+  height: 100%;
+
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 
   gap: clamp(8px, 1.5vh, 12px);
 }
@@ -299,6 +339,11 @@
 
 .daily-question-card {
   width: 100%;
+  height: 100%;
+  min-height: 0;
+
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 
   display: flex;
   flex-direction: column;
@@ -450,18 +495,24 @@
     0 2px 0 rgba(0, 0, 0, 0.12);
 }
 
+.daily-question-help,
+.daily-question-help-spacer {
+  width: 100%;
+  height: 100%;
+}
+
 .daily-question-help {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 
   gap: 4px;
-
-  padding-top: 2px;
 }
 
 .daily-question-help-label {
-  color: #665f70;
+  color:
+    rgba(255, 255, 255, 0.90);
 
   font-size:
     clamp(14px, 3.6vw, 17px);
@@ -469,22 +520,41 @@
 }
 
 .daily-question-check-verse {
+  min-height: 40px;
+
   border: 0;
+  border-radius: 999px;
 
-  padding: 6px 12px;
+  padding: 7px 18px;
 
-  background: transparent;
-  color: var(--purple);
+  background: #ffc751;
+  color: #333333;
 
   font: inherit;
   font-size:
     clamp(16px, 4vw, 19px);
   font-weight: 900;
 
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.18);
 
   cursor: pointer;
+}
+
+.daily-question-check-verse:active {
+  transform: translateY(2px);
+
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.18);
+}
+
+.daily-question-action-slot {
+  width: min(100%, 300px);
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .daily-question-feedback-next {
@@ -517,9 +587,13 @@
     0 3px 0 rgba(0, 0, 0, 0.20);
 }
 
+.daily-question-feedback-next.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ---------- Something to Chew On ---------- */
 
-.daily-question-reflection-shell,
 .daily-reward-intro-shell {
   width: min(100%, 560px);
   min-height: 100%;
@@ -531,11 +605,6 @@
   justify-content: center;
 
   gap: clamp(14px, 2.5vh, 22px);
-}
-
-.daily-question-reflection-pet {
-  display: flex;
-  justify-content: center;
 }
 
 .daily-question-reflection-card,
@@ -560,6 +629,16 @@
   box-shadow:
     0 8px 0 rgba(0, 0, 0, 0.18),
     0 18px 34px rgba(0, 0, 0, 0.16);
+}
+
+.daily-question-reflection-card {
+  height: 100%;
+  min-height: 0;
+
+  justify-content: center;
+
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .daily-question-reflection-title {
@@ -1184,8 +1263,18 @@
       calc(10px + var(--safeB));
   }
 
-  .daily-question-session-shell {
-    gap: 8px;
+  .daily-question-session-shell,
+  .daily-question-reflection-shell {
+    --daily-question-pet-slot: 120px;
+    --daily-question-card-slot: 294px;
+    --daily-question-help-slot: 58px;
+    --daily-question-action-slot: 46px;
+    --daily-question-flow-gap: 7px;
+  }
+
+  .daily-question-session .screen-title-pill {
+    top: calc(8px + var(--safeT));
+    left: 14px;
   }
 
   .daily-question-session-avatar {
@@ -1226,7 +1315,6 @@
     min-height: 46px;
   }
 
-  .daily-question-reflection-shell,
   .daily-reward-intro-shell {
     gap: 10px;
   }

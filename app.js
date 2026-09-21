@@ -4928,6 +4928,8 @@ window.BibloZooDailyQuestions
     stopDailyAudio:
       cancelVerseDetailListen,
 
+    titleHomePillHtml,
+
     profilePictureHtml:
       profilePictureVisualHtml,
 

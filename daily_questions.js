@@ -2014,6 +2014,15 @@
     const session =
       dailySession;
 
+    const homeButtonHtml =
+      typeof appApi
+        ?.titleHomePillHtml ===
+        "function"
+        ? appApi.titleHomePillHtml(
+          "Back to My Zoo"
+        )
+        : "";
+
     if (!session) {
       wrap.innerHTML = `
         <div
@@ -2148,6 +2157,8 @@
             session.phase
           )}"
         >
+          ${homeButtonHtml}
+
           <div
             class="daily-question-reflection-pet"
           >
@@ -2180,13 +2191,22 @@
             </div>
           </div>
 
-          <button
-            class="daily-question-reflection-done no-zoom"
-            type="button"
-            data-daily-reflection-done
+          <div
+            class="daily-question-help-spacer"
+            aria-hidden="true"
+          ></div>
+
+          <div
+            class="daily-question-action-slot"
           >
-            Done
-          </button>
+            <button
+              class="daily-question-reflection-done no-zoom"
+              type="button"
+              data-daily-reflection-done
+            >
+              Done
+            </button>
+          </div>
         </div>
       `;
     } else if (
@@ -2205,6 +2225,8 @@
             session.phase
           )}"
         >
+          ${homeButtonHtml}
+
           <div
             class="daily-reward-intro-card"
           >
@@ -2241,14 +2263,6 @@
               data-daily-reward-start
             >
               Start Feeding
-            </button>
-
-            <button
-              class="daily-reward-intro-back no-zoom"
-              type="button"
-              data-daily-session-back
-            >
-              Back to My Zoo
             </button>
           </div>
         </div>
@@ -2568,13 +2582,7 @@
             )}"
             data-daily-question-number="${questionNumber}"
           >
-            <button
-              class="daily-question-session-back no-zoom"
-              type="button"
-              data-daily-session-back
-            >
-              Back to My Zoo
-            </button>
+            ${homeButtonHtml}
 
             <div
               class="daily-question-pet"
@@ -2617,60 +2625,66 @@
               >
                 ${choiceButtons}
               </div>
-
-              <div
-                class="daily-question-help"
-              >
-                <div
-                  class="daily-question-help-label"
-                >
-                  Not sure?
-                </div>
-
-                <button
-                  class="daily-question-check-verse no-zoom"
-                  type="button"
-                  data-daily-check-verse
-                >
-                  Check the verse
-                </button>
-              </div>
             </div>
 
-            ${
-              session.answered
-                ? `
-                  <button
-                    class="daily-question-feedback-next no-zoom"
-                    type="button"
-                    data-daily-question-next
-                  >
-                    Next
-                  </button>
-                `
-                : ""
-            }
+            <div
+              class="daily-question-help"
+            >
+              <div
+                class="daily-question-help-label"
+              >
+                Not sure?
+              </div>
+
+              <button
+                class="daily-question-check-verse no-zoom"
+                type="button"
+                data-daily-check-verse
+              >
+                Check the Verse
+              </button>
+            </div>
+
+            <div
+              class="daily-question-action-slot"
+            >
+              <button
+                class="daily-question-feedback-next no-zoom${
+                  session.answered
+                    ? ""
+                    : " is-placeholder"
+                }"
+                type="button"
+                data-daily-question-next
+                ${
+                  session.answered
+                    ? ""
+                    : `disabled aria-hidden="true" tabindex="-1"`
+                }
+              >
+                Next
+              </button>
+            </div>
           </div>
         `;
       }
     }
 
-    const backButton =
-      wrap.querySelector(
-        "[data-daily-session-back]"
-      );
+    wrap
+      .querySelectorAll(
+        "[data-daily-session-back], [data-home-pill]"
+      )
+      .forEach((backButton) => {
+        backButton.onclick =
+          (event) => {
+            event.preventDefault();
+            event.stopPropagation();
 
-    if (backButton) {
-      backButton.onclick =
-        (event) => {
-          event.preventDefault();
-          event.stopPropagation();
+            clearSessionState();
 
-          clearSessionState();
-
-          appApi?.goToTitle?.();
-        };
-    }
+            appApi?.goToTitle?.();
+          };
+      });
 
     wrap
       .querySelectorAll(
