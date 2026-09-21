@@ -992,6 +992,15 @@
     rewardGameRuntime = null;
     runtime.running = false;
 
+    if (runtime.orientationHandler) {
+      window.removeEventListener(
+        "deviceorientation",
+        runtime.orientationHandler
+      );
+
+      runtime.orientationHandler = null;
+    }
+
     if (runtime.rafId) {
       cancelAnimationFrame(
         runtime.rafId
@@ -1094,6 +1103,113 @@
 
     runtime.catcher.style.left =
       `${safeX}px`;
+  }
+
+  async function requestRewardTiltPermission() {
+    const OrientationEvent =
+      window.DeviceOrientationEvent;
+
+    if (!OrientationEvent) {
+      return false;
+    }
+
+    if (
+      typeof OrientationEvent
+        .requestPermission ===
+        "function"
+    ) {
+      try {
+        const permission =
+          await OrientationEvent
+            .requestPermission();
+
+        return (
+          permission === "granted"
+        );
+      } catch (err) {
+        console.warn(
+          "Daily Question motion permission was unavailable",
+          err
+        );
+
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function handleRewardTilt(
+    runtime,
+    event
+  ) {
+    if (
+      !runtime ||
+      !runtime.tiltEnabled ||
+      runtime.dragging ||
+      rewardGameRuntime !== runtime
+    ) {
+      return;
+    }
+
+    const gamma =
+      Number(event?.gamma);
+
+    if (!Number.isFinite(gamma)) {
+      return;
+    }
+
+    if (
+      !Number.isFinite(
+        runtime.neutralGamma
+      )
+    ) {
+      runtime.neutralGamma =
+        gamma;
+
+      runtime.smoothedTilt = 0;
+
+      return;
+    }
+
+    const relativeTilt =
+      Math.max(
+        -25,
+        Math.min(
+          25,
+          gamma -
+          runtime.neutralGamma
+        )
+      );
+
+    runtime.smoothedTilt =
+      runtime.smoothedTilt *
+      0.85 +
+      relativeTilt *
+      0.15;
+
+    const halfWidth =
+      runtime.catcherWidth / 2;
+
+    const travel =
+      Math.max(
+        0,
+        runtime.width / 2 -
+        halfWidth
+      );
+
+    const targetX =
+      runtime.width / 2 +
+      (
+        runtime.smoothedTilt /
+        25
+      ) *
+      travel;
+
+    setRewardCatcherX(
+      runtime,
+      targetX
+    );
   }
 
   function resetRewardSnack(
@@ -1632,6 +1748,12 @@
           catcher.offsetHeight
         ),
       dragging: false,
+      tiltEnabled:
+        dailySession
+          .rewardTiltEnabled === true,
+      neutralGamma: null,
+      smoothedTilt: 0,
+      orientationHandler: null,
       pegs:
         createRewardGamePegs(
           width,
@@ -1652,6 +1774,21 @@
 
     rewardGameRuntime =
       runtime;
+
+    if (runtime.tiltEnabled) {
+      runtime.orientationHandler =
+        (event) => {
+          handleRewardTilt(
+            runtime,
+            event
+          );
+        };
+
+      window.addEventListener(
+        "deviceorientation",
+        runtime.orientationHandler
+      );
+    }
 
     setRewardCatcherX(
       runtime,
@@ -1729,6 +1866,11 @@
         }
 
         runtime.dragging = false;
+
+        if (runtime.tiltEnabled) {
+          runtime.neutralGamma = null;
+          runtime.smoothedTilt = 0;
+        }
 
         try {
           stage.releasePointerCapture(
@@ -1992,7 +2134,7 @@
             <div
               class="daily-reward-intro-instruction"
             >
-              Drag to feed ${escapeHtml(
+              Tilt or drag to feed ${escapeHtml(
                 session.petName
               )}.
             </div>
@@ -2055,15 +2197,25 @@
           <div
             class="daily-pachinko-instruction"
           >
-            Drag ${escapeHtml(
-              session.petName
-            )} left and right to catch the snack.
+            ${
+              session.rewardTiltEnabled
+                ? `
+                  Tilt your phone or drag ${escapeHtml(
+                    session.petName
+                  )} left and right to catch the snack.
+                `
+                : `
+                  Drag ${escapeHtml(
+                    session.petName
+                  )} left and right to catch the snack.
+                `
+            }
           </div>
 
           <div
             class="daily-pachinko-stage"
             data-daily-pachinko-stage
-            aria-label="Drag the BibloPet left and right to catch the falling snack"
+            aria-label="Move the BibloPet left and right to catch the falling snack"
           >
             <canvas
               class="daily-pachinko-canvas"
@@ -2562,7 +2714,7 @@
 
     if (rewardStartButton) {
       rewardStartButton.onclick =
-        (event) => {
+        async (event) => {
           event.preventDefault();
           event.stopPropagation();
 
@@ -2574,10 +2726,32 @@
             return;
           }
 
-          dailySession.rewardComplete =
+          const sessionAtStart =
+            dailySession;
+
+          rewardStartButton.disabled =
+            true;
+
+          const tiltEnabled =
+            await requestRewardTiltPermission();
+
+          if (
+            dailySession !==
+              sessionAtStart ||
+            sessionAtStart.phase !==
+              SESSION_PHASES.REWARD_INTRO
+          ) {
+            return;
+          }
+
+          sessionAtStart
+            .rewardTiltEnabled =
+              tiltEnabled;
+
+          sessionAtStart.rewardComplete =
             false;
 
-          dailySession.phase =
+          sessionAtStart.phase =
             SESSION_PHASES.REWARD_GAME;
 
           appApi?.renderApp?.();
