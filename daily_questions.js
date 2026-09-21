@@ -725,6 +725,8 @@
       verseAudioPlaying: false,
       completionRecorded: false,
       snack: "",
+      rewardScore: 0,
+      rewardCaught: 0,
       rewardComplete: false
     };
   }
@@ -1066,6 +1068,9 @@
   }
 
   function stopDailySessionRuntime() {
+    window.BibloZooDailyFeedGame
+      ?.stop?.();
+
     stopRewardGame();
 
     appApi?.stopDailyAudio?.();
@@ -2248,6 +2253,10 @@
       session.phase ===
         SESSION_PHASES.REWARD_GAME
     ) {
+      wrap.classList.add(
+        "is-feed-game"
+      );
+
       const profilePictureHtml =
         typeof appApi
           ?.profilePictureHtml ===
@@ -2256,74 +2265,33 @@
             session.verseId,
             {
               className:
-                "daily-pachinko-pet-avatar",
+                "daily-feed-pet-avatar",
               alt: ""
             }
           )
           : "";
 
-      wrap.innerHTML = `
-        <div
-          class="daily-pachinko-shell"
-          data-daily-session-phase="${escapeHtml(
-            session.phase
-          )}"
-        >
-          <div
-            class="daily-pachinko-title"
-          >
-            Feed ${escapeHtml(
-              session.petName
-            )}!
-          </div>
+      const feedGame =
+        window.BibloZooDailyFeedGame;
 
-          <div
-            class="daily-pachinko-instruction"
-          >
-            ${
-              session.rewardTiltEnabled
-                ? `
-                  Tilt your phone or drag ${escapeHtml(
-                    session.petName
-                  )} left and right to catch the snack.
-                `
-                : `
-                  Drag ${escapeHtml(
-                    session.petName
-                  )} left and right to catch the snack.
-                `
-            }
-          </div>
-
-          <div
-            class="daily-pachinko-stage"
-            data-daily-pachinko-stage
-            aria-label="Move the BibloPet left and right to catch the falling snack"
-          >
-            <canvas
-              class="daily-pachinko-canvas"
-              data-daily-pachinko-canvas
-              aria-hidden="true"
-            ></canvas>
-
+      wrap.innerHTML =
+        typeof feedGame?.render ===
+        "function"
+          ? feedGame.render({
+            session,
+            profilePictureHtml
+          })
+          : `
             <div
-              class="daily-pachinko-catcher"
-              data-daily-pachinko-catcher
-              aria-hidden="true"
+              class="daily-question-session-empty"
             >
-              ${profilePictureHtml}
+              <div
+                class="daily-question-session-empty-title"
+              >
+                Feeding game unavailable
+              </div>
             </div>
-          </div>
-
-          <button
-            class="daily-pachinko-back no-zoom"
-            type="button"
-            data-daily-session-back
-          >
-            Back to My Zoo
-          </button>
-        </div>
-      `;
+          `;
     } else if (
       session.phase ===
         SESSION_PHASES.REWARD_DONE
@@ -2342,6 +2310,38 @@
           )
           : "";
 
+      const rewardScore =
+        Math.max(
+          0,
+          Number(
+            session.rewardScore
+          ) || 0
+        );
+
+      const rewardCaught =
+        Math.max(
+          0,
+          Number(
+            session.rewardCaught
+          ) || 0
+        );
+
+      const rewardCopy =
+        window.BibloZooDailyFeedGame
+          ?.getResultCopy?.(
+            rewardScore,
+            rewardCaught,
+            session.petName
+          ) || {
+            chomp:
+              rewardCaught > 0
+                ? "CHOMP!"
+                : "ALL DONE!",
+            title: "Nice feeding!",
+            message:
+              `${session.petName} had fun chasing the snacks!`
+          };
+
       wrap.innerHTML = `
         <div
           class="daily-reward-done-shell"
@@ -2356,7 +2356,9 @@
             <div
               class="daily-reward-done-chomp"
             >
-              CHOMP!
+              ${escapeHtml(
+                rewardCopy.chomp
+              )}
             </div>
 
             <div
@@ -2381,15 +2383,34 @@
             <div
               class="daily-reward-done-title"
             >
-              Yum! Thanks!
+              ${escapeHtml(
+                rewardCopy.title
+              )}
+            </div>
+
+            <div
+              class="daily-reward-done-score"
+            >
+              Score ${rewardScore}
+            </div>
+
+            <div
+              class="daily-reward-done-count"
+            >
+              ${escapeHtml(
+                session.petName
+              )} ate ${rewardCaught}
+              ${rewardCaught === 1
+                ? "snack"
+                : "snacks"}!
             </div>
 
             <div
               class="daily-reward-done-note"
             >
               ${escapeHtml(
-                session.petName
-              )} is happy!
+                rewardCopy.message
+              )}
             </div>
           </div>
 
@@ -2843,6 +2864,9 @@
           const sessionAtStart =
             dailySession;
 
+          window.BibloZooDailyFeedGame
+            ?.prepareAudio?.();
+
           rewardStartButton.disabled =
             true;
 
@@ -2861,6 +2885,12 @@
           sessionAtStart
             .rewardTiltEnabled =
               tiltEnabled;
+
+          sessionAtStart.rewardScore =
+            0;
+
+          sessionAtStart.rewardCaught =
+            0;
 
           sessionAtStart.rewardComplete =
             false;
@@ -3038,13 +3068,68 @@
               dailySession.phase ===
                 SESSION_PHASES.REWARD_GAME
             ) {
-              startRewardGame(
-                wrap
+              const feedGame =
+                window.BibloZooDailyFeedGame;
+
+              if (
+                typeof feedGame?.start !==
+                "function"
+              ) {
+                console.warn(
+                  "Daily feeding game is unavailable"
+                );
+                return;
+              }
+
+              feedGame.start(
+                wrap,
+                {
+                  session,
+                  onComplete:
+                    (result = {}) => {
+                      if (
+                        !dailySession ||
+                        dailySession !==
+                          session ||
+                        dailySession.phase !==
+                          SESSION_PHASES.REWARD_GAME
+                      ) {
+                        return;
+                      }
+
+                      dailySession.rewardScore =
+                        Math.max(
+                          0,
+                          Number(
+                            result.score
+                          ) || 0
+                        );
+
+                      dailySession.rewardCaught =
+                        Math.max(
+                          0,
+                          Number(
+                            result.caughtCount
+                          ) || 0
+                        );
+
+                      dailySession.rewardComplete =
+                        true;
+
+                      dailySession.phase =
+                        SESSION_PHASES.REWARD_DONE;
+
+                      appApi?.renderApp?.();
+                    }
+                }
               );
             }
           }
         );
     } else {
+      window.BibloZooDailyFeedGame
+        ?.stop?.();
+
       stopRewardGame();
     }
 
