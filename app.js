@@ -49,8 +49,8 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // =========================================================
 const DEBUG_MODE = false;
 const FEATURES = Object.freeze({
-  DAILY_PET_QUESTIONS: false,
-  DAILY_PET_QUESTIONS_DEBUG: false
+  DAILY_PET_QUESTIONS: true,
+  DAILY_PET_QUESTIONS_DEBUG: true
 });
 
 // Temporary: set to false to bring back the “Let’s Memorize God’s Word!” animation screen.
@@ -1727,12 +1727,80 @@ function markZooTodoTutorialPageAudioPlayed(pageNumber) {
   });
 }
 
+
+function createDefaultDailyQuestionsProgress() {
+  const creator =
+    window.BibloZooDailyQuestions
+      ?.createDefaultDailyProgress;
+
+  if (typeof creator === "function") {
+    return creator();
+  }
+
+  return {
+    version: 1,
+    lastCompletedDay: "",
+    lastCompletedAt: 0,
+    lastVerseId: "",
+    byVerse: {}
+  };
+}
+
+function normalizeDailyQuestionsProgress(
+  rawProgress
+) {
+  const normalizer =
+    window.BibloZooDailyQuestions
+      ?.normalizeDailyProgress;
+
+  if (typeof normalizer === "function") {
+    return normalizer(rawProgress);
+  }
+
+  return createDefaultDailyQuestionsProgress();
+}
+
+function migrateDailyQuestionsProgress(
+  progress
+) {
+  if (
+    !progress ||
+    typeof progress !== "object"
+  ) {
+    return false;
+  }
+
+  const before =
+    JSON.stringify(
+      progress.dailyQuestions || null
+    );
+
+  const normalized =
+    normalizeDailyQuestionsProgress(
+      progress.dailyQuestions
+    );
+
+  const after =
+    JSON.stringify(normalized);
+
+  if (before === after) {
+    return false;
+  }
+
+  progress.dailyQuestions =
+    normalized;
+
+  return true;
+}
+
 function createEmptyProgress() {
   return {
     version: PROGRESS_VERSION,
     lastActiveVerseId: "",
     verses: {},
-    tutorial: createDefaultTutorialProgress()
+    tutorial: createDefaultTutorialProgress(),
+    dailyQuestions:
+      createDefaultDailyQuestionsProgress()
   };
 }
 
@@ -1994,6 +2062,14 @@ function loadProgress() {
       changed = true;
     }
 
+    if (
+      migrateDailyQuestionsProgress(
+        parsed
+      )
+    ) {
+      changed = true;
+    }
+
     if (changed) {
       saveProgress(parsed);
     }
@@ -2028,6 +2104,42 @@ function saveProgress(progress) {
   }
 }
 
+function getDailyQuestionsProgress() {
+  const progress =
+    loadProgress();
+
+  return normalizeDailyQuestionsProgress(
+    progress.dailyQuestions
+  );
+}
+
+function updateDailyQuestionsProgress(
+  updater
+) {
+  const progress =
+    loadProgress();
+
+  const dailyQuestions =
+    normalizeDailyQuestionsProgress(
+      progress.dailyQuestions
+    );
+
+  if (typeof updater === "function") {
+    updater(
+      dailyQuestions,
+      progress
+    );
+  }
+
+  progress.dailyQuestions =
+    normalizeDailyQuestionsProgress(
+      dailyQuestions
+    );
+
+  saveProgress(progress);
+
+  return progress.dailyQuestions;
+}
 
 function isVerseAvailableForRestore(verseId) {
   const cleanVerseId = String(verseId || "").trim();
@@ -2134,6 +2246,7 @@ function normalizeProgressForProfileMigration(rawProgress) {
 
   migrateTrafficProgress(progress);
   migrateTutorialProgress(progress);
+  migrateDailyQuestionsProgress(progress);
 
   return progress;
 }
@@ -2207,6 +2320,7 @@ function normalizeImportedProgress(rawProgress) {
 
   migrateTrafficProgress(progress);
   migrateTutorialProgress(progress);
+  migrateDailyQuestionsProgress(progress);
 
   return progress;
 }
@@ -4769,6 +4883,68 @@ function isBibloPetUnlocked(verseProgress) {
   return !!verseProgress.learnCompleted && hasAnyTrackedGameCompletion(verseProgress);
 }
 
+window.BibloZooDailyQuestions
+  ?.initialize?.({
+    isEnabled: () =>
+      FEATURES.DAILY_PET_QUESTIONS === true,
+
+    isDebugEnabled: () =>
+      FEATURES.DAILY_PET_QUESTIONS_DEBUG === true,
+
+    getVerseList: () =>
+      VERSE_LIST,
+
+    getVerseProgress,
+
+    isPetUnlocked:
+      isBibloPetUnlocked,
+
+    getDailyProgress:
+      getDailyQuestionsProgress,
+
+    updateDailyProgress:
+      updateDailyQuestionsProgress,
+
+    getActiveProfileId: () =>
+      getProfileApi()
+        ?.getActiveProfileId?.() || "",
+
+    getPetName:
+      getBibloPetDisplayNameForVerseId,
+
+    getRandomSnack: () => {
+      if (!HUNGRY_FOOD_POOL.length) {
+        return "🍎";
+      }
+
+      return HUNGRY_FOOD_POOL[
+        Math.floor(
+          Math.random() *
+          HUNGRY_FOOD_POOL.length
+        )
+      ];
+    },
+
+    stopDailyAudio:
+      cancelVerseDetailListen,
+
+    titleHomePillHtml,
+
+    profilePictureHtml:
+      profilePictureVisualHtml,
+
+    renderApp:
+      render,
+
+    makeSlide,
+
+    goToDailySession: () =>
+      go(Screen.DAILY_SESSION),
+
+    goToTitle: () =>
+      go(Screen.TITLE)
+  });
+
 function getVerseListItemById(verseId) {
   return VERSE_LIST.find(item => item.id === verseId) || null;
 }
@@ -5934,7 +6110,88 @@ function clearPetAnimationCycle() {
   State.petAnimActionClass = "";
 }
 
+let verseDetailListenToken = 0;
+let cancelVerseDetailListenWait = null;
+
+function cancelVerseDetailListen() {
+  verseDetailListenToken += 1;
+
+  const cancelWait =
+    cancelVerseDetailListenWait;
+
+  cancelVerseDetailListenWait = null;
+
+  if (
+    typeof cancelWait === "function"
+  ) {
+    cancelWait();
+  }
+
+  try {
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  } catch (err) { }
+
+  try {
+    setAudioSrc(AUDIO_FILE);
+  } catch (err) { }
+
+  return verseDetailListenToken;
+}
+
+function waitForVerseDetailAudioEnd(
+  token
+) {
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      audioEl.removeEventListener(
+        "ended",
+        onEnd
+      );
+
+      if (
+        cancelVerseDetailListenWait ===
+        finish
+      ) {
+        cancelVerseDetailListenWait =
+          null;
+      }
+
+      resolve();
+    };
+
+    const onEnd = () => {
+      finish();
+    };
+
+    cancelVerseDetailListenWait =
+      finish;
+
+    audioEl.addEventListener(
+      "ended",
+      onEnd
+    );
+
+    if (
+      token !== verseDetailListenToken
+    ) {
+      finish();
+    }
+  });
+}
+
 async function playVerseDetailListen(verseId) {
+  const listenToken =
+    cancelVerseDetailListen();
+
   const verseRefAudioFile =
     `${AUDIO_DIR}${verseId}_ref.mp3`;
 
@@ -5944,20 +6201,69 @@ async function playVerseDetailListen(verseId) {
   try {
     setAudioSrc(verseRefAudioFile);
     audioEl.currentTime = 0;
+
     await safePlay();
-    await waitForAudioEnd();
+
+    if (
+      listenToken !==
+      verseDetailListenToken
+    ) {
+      return false;
+    }
+
+    await waitForVerseDetailAudioEnd(
+      listenToken
+    );
+
+    if (
+      listenToken !==
+      verseDetailListenToken
+    ) {
+      return false;
+    }
 
     setAudioSrc(verseAudioFile);
     audioEl.currentTime = 0;
+
     await safePlay();
-    await waitForAudioEnd();
-  } catch (err) {
-    console.warn(
-      "Verse detail listen failed",
-      err
+
+    if (
+      listenToken !==
+      verseDetailListenToken
+    ) {
+      return false;
+    }
+
+    await waitForVerseDetailAudioEnd(
+      listenToken
     );
+
+    return (
+      listenToken ===
+      verseDetailListenToken
+    );
+  } catch (err) {
+    if (
+      listenToken ===
+      verseDetailListenToken
+    ) {
+      console.warn(
+        "Verse detail listen failed",
+        err
+      );
+    }
+
+    return false;
   } finally {
-    setAudioSrc(AUDIO_FILE);
+    if (
+      listenToken ===
+      verseDetailListenToken
+    ) {
+      cancelVerseDetailListenWait =
+        null;
+
+      setAudioSrc(AUDIO_FILE);
+    }
   }
 }
 
@@ -6520,6 +6826,19 @@ async function loadVerseList() {
           return {
             id: verseId,
             ref,
+            translation:
+              String(
+                verseJson.translation || ""
+              ).trim(),
+            verseText:
+              String(
+                verseJson.verseText || ""
+              ).trim(),
+            reflection:
+              window.BibloZooDailyQuestions
+                ?.normalizeReflection?.(
+                  verseJson.reflection
+                ) || null,
             biblopetDefaultName:
               verseJson.biblopetDefaultName || "",
             biblopet:
@@ -6639,6 +6958,7 @@ const Screen = {
   PROFILE_EDITOR: "profile_editor",
   PROFILE_MANAGE: "profile_manage",
   TITLE: "title",
+  DAILY_SESSION: "daily_session",
   SETTINGS: "settings",
   PRIVACY: "privacy",
   TODO: "todo",
@@ -6663,6 +6983,40 @@ const Screen = {
   PLAYGROUND: "playground",
   GAME_MIX_FINISHED: "game_mix_finished"
 };
+
+const SCREEN_ORDER = Object.freeze([
+  Screen.INTRO,
+  Screen.TITLE_SEQUENCE,
+  Screen.PROFILE_WELCOME,
+  Screen.PROFILE_PICKER,
+  Screen.PROFILE_EDITOR,
+  Screen.TITLE,
+  Screen.DAILY_SESSION,
+  Screen.PROFILE_MANAGE,
+  Screen.SETTINGS,
+  Screen.PRIVACY,
+  Screen.TODO,
+  Screen.TODO_DEV,
+  Screen.NEW_VERSE_PICKER,
+  Screen.PROGRESS,
+  Screen.PET_STATS,
+  Screen.VERSE_DETAIL,
+  Screen.LEARN_LEVEL,
+  Screen.PRACTICE_GATE,
+  Screen.LEARN_INSTRUCTION,
+  Screen.LISTEN,
+  Screen.MEANING,
+  Screen.CHUNKS,
+  Screen.ECHO,
+  Screen.HIDE,
+  Screen.FINAL_RECALL,
+  Screen.CELEBRATION,
+  Screen.PET_UNLOCK,
+  Screen.PRACTICE_HUB,
+  Screen.PRACTICE,
+  Screen.PLAYGROUND,
+  Screen.GAME_MIX_FINISHED
+]);
 
 function isLearnFlowScreen(screen) {
   return (
@@ -6945,6 +7299,7 @@ const HIDDEN_PRACTICE_GAME_ID = "dino_dash_2";
 const HIDDEN_PRACTICE_LONG_PRESS_MS = 2000;
 const HIDDEN_LEARN_COMPLETE_LONG_PRESS_MS = 2000;
 const HIDDEN_UTILITIES_LONG_PRESS_MS = 2000;
+const HIDDEN_DAILY_QUESTION_LONG_PRESS_MS = 2000;
 
 function getExternalPracticeGames() {
   const list = Array.isArray(window.EXTERNAL_VERSE_GAMES) ? window.EXTERNAL_VERSE_GAMES : [];
@@ -7782,40 +8137,7 @@ function startListenInstructionIfNeeded() {
 
 /* Slide navigation */
 function screenToIndex(screen) {
-  // order matters for sliding
-  const order = [
-    Screen.INTRO,
-    Screen.TITLE_SEQUENCE,
-    Screen.PROFILE_WELCOME,
-    Screen.PROFILE_PICKER,
-    Screen.PROFILE_EDITOR,
-    Screen.TITLE,
-    Screen.PROFILE_MANAGE,
-    Screen.SETTINGS,
-    Screen.PRIVACY,
-    Screen.TODO,
-    Screen.TODO_DEV,
-    Screen.NEW_VERSE_PICKER,
-    Screen.PROGRESS,
-    Screen.PET_STATS,
-    Screen.VERSE_DETAIL,
-    Screen.LEARN_LEVEL,
-    Screen.PRACTICE_GATE,
-    Screen.LEARN_INSTRUCTION,
-    Screen.LISTEN,
-    Screen.MEANING,
-    Screen.CHUNKS,
-    Screen.ECHO,
-    Screen.HIDE,
-    Screen.FINAL_RECALL,
-    Screen.CELEBRATION,
-    Screen.PET_UNLOCK,
-    Screen.PRACTICE_HUB,
-    Screen.PRACTICE,
-    Screen.PLAYGROUND,
-    Screen.GAME_MIX_FINISHED
-  ];
-  return order.indexOf(screen);
+  return SCREEN_ORDER.indexOf(screen);
 }
 
 function go(nextScreen) {
@@ -9348,6 +9670,7 @@ function renderNav() {
     State.screen !== Screen.PROFILE_EDITOR &&
     State.screen !== Screen.PROFILE_MANAGE &&
     State.screen !== Screen.TITLE &&
+    State.screen !== Screen.DAILY_SESSION &&
     State.screen !== Screen.SETTINGS &&
     State.screen !== Screen.PRIVACY &&
     State.screen !== Screen.TODO &&
@@ -9979,6 +10302,31 @@ function captureBootRouteFromUrl() {
   };
 }
 
+function isNormalDailyQuestionBootRoute(
+  route
+) {
+  if (
+    !route ||
+    typeof route !== "object"
+  ) {
+    return false;
+  }
+
+  return !(
+    String(route.verseId || "").trim() ||
+    String(route.screen || "").trim() ||
+    String(route.petUnlock || "").trim() ||
+    route.tutorialPractice ||
+    route.mixNext ||
+    String(
+      route.completedGameId || ""
+    ).trim() ||
+    route.mixPetUnlock ||
+    route.internalReturn ||
+    String(route.profileId || "").trim()
+  );
+}
+
 function clearInternalReturnIdentityParams() {
   try {
     const url = new URL(window.location.href);
@@ -10116,6 +10464,14 @@ async function resumePendingBootRoute() {
   } else if (route.screen === "settings") {
     setScreen(Screen.SETTINGS);
   } else {
+    window.BibloZooDailyQuestions
+      ?.prepareStartupOffer?.({
+        allowOffer:
+          isNormalDailyQuestionBootRoute(
+            route
+          )
+      });
+
     setScreen(Screen.TITLE);
   }
 
@@ -10248,10 +10604,7 @@ function closeProfileEditor() {
 }
 
 function stopProfileTransitionAudio() {
-  try {
-    audioEl.pause();
-    audioEl.currentTime = 0;
-  } catch (err) { }
+  cancelVerseDetailListen();
 
   try {
     petUnlockAudioEl?.pause?.();
@@ -10263,6 +10616,9 @@ function stopProfileTransitionAudio() {
 
 function clearTransientStateForProfileActivation() {
   stopProfileTransitionAudio();
+
+  window.BibloZooDailyQuestions
+    ?.clearOfferState?.();
 
   const pendingRoute = State.pendingBootRoute;
   const preserveGameMix = !!(
@@ -11482,9 +11838,16 @@ function screenTitle(idx) {
 
       ${titleZooVisitButtonHtml()}
 
-
     </div>
+
+    ${
+      window.BibloZooDailyQuestions
+        ?.renderTitleOffer?.() || ""
+    }
   `;
+
+  window.BibloZooDailyQuestions
+    ?.bindTitleOffer?.(wrap);
 
   const titleProfileBtn = wrap.querySelector(
     "#titleProfileBtn"
@@ -11558,6 +11921,41 @@ function screenTitle(idx) {
       e.stopPropagation();
       go(Screen.PROGRESS);
     };
+
+    bindLongPress(titleZooStrip, {
+      delay:
+        HIDDEN_DAILY_QUESTION_LONG_PRESS_MS,
+
+      shouldStart: () =>
+        FEATURES
+          .DAILY_PET_QUESTIONS === true &&
+        FEATURES
+          .DAILY_PET_QUESTIONS_DEBUG === true,
+
+      onLongPress: () => {
+        const offer =
+          window.BibloZooDailyQuestions
+            ?.prepareForcedDebugOffer?.();
+
+        if (!offer) {
+          showDialog({
+            title:
+              "No Daily Question Available",
+            body:
+              "Unlock one of the four Daily Question BibloPets first.",
+            actions: [
+              dlgBtn("OK", {
+                onClick: closeDialog
+              })
+            ]
+          });
+
+          return;
+        }
+
+        render();
+      }
+    });
   }
 
   const titleZooVisitBtn = wrap.querySelector("#titleZooVisitBtn");
@@ -15134,7 +15532,8 @@ function render() {
 
   const uniq = Array.from(new Set(indicesToRender.filter(i => i !== null && i >= 0)));
   for (const idx of uniq) {
-    const screen = ["intro", "title_sequence", "profile_welcome", "profile_picker", "profile_editor", "title", "profile_manage", "settings", "privacy", "todo", "todo_dev", "new_verse_picker", "progress", "pet_stats", "verse_detail", "learn_level", "practice_gate", "learn_instruction", "listen", "meaning", "chunks", "echo", "hide", "final_recall", "celebration", "pet_unlock", "practice_hub", "practice", "playground", "game_mix_finished"][idx];
+    const screen =
+      SCREEN_ORDER[idx];
     let slide = null;
     if (screen === Screen.INTRO) slide = screenIntro(idx);
     if (screen === Screen.TITLE_SEQUENCE) slide = screenTitleSequence(idx);
@@ -15143,6 +15542,12 @@ function render() {
     if (screen === Screen.PROFILE_EDITOR) slide = screenProfileEditor(idx);
     if (screen === Screen.PROFILE_MANAGE) slide = screenProfileManage(idx);
     if (screen === Screen.TITLE) slide = screenTitle(idx);
+    if (screen === Screen.DAILY_SESSION) {
+      slide =
+        window.BibloZooDailyQuestions
+          ?.renderScreen?.(idx) ||
+        null;
+    }
     if (screen === Screen.SETTINGS) slide = screenSettings(idx);
     if (screen === Screen.PRIVACY) slide = screenPrivacyPolicy(idx);
     if (screen === Screen.TODO) slide = screenTodo(idx);

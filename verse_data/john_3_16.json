@@ -15,6 +15,29 @@
   ],
   "verseText": "For God so loved the world that He gave His one and only Son, that everyone who believes in Him shall not perish but have eternal life.",
   "meaning": "God loved the sinners of the world so much, he sent Jesus to rescue us from our sin.",
+    "reflection": {
+      "recall": {
+        "question": "What did God give because He loved the world?",
+        "choices": [
+          "A crown",
+          "His Son",
+          "A law"
+        ],
+        "answer": 1
+      },
+      "meaning": {
+        "question": "What does this verse show about God's love?",
+        "choices": [
+          "He fears us",
+          "He ignores us",
+          "He saves us"
+        ],
+        "answer": 2
+      },
+      "application": {
+        "prompt": "Think of one way God's love shown in Jesus can help you love someone today."
+      }
+    },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

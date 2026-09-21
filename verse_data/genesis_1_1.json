@@ -13,6 +13,29 @@
   ],
   "verseText": "In the beginning God created the heavens and the earth.",
   "meaning": "God is the maker of everything. Before anything else existed, God was already there, and he created the heavens and the earth.",
+    "reflection": {
+      "recall": {
+        "question": "Who created the heavens and the earth?",
+        "choices": [
+          "God",
+          "Adam",
+          "Noah"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What is God doing in this verse?",
+        "choices": [
+          "Building a boat",
+          "Creating everything",
+          "Planting a garden"
+        ],
+        "answer": 1
+      },
+      "application": {
+        "prompt": "When you notice something amazing in creation today, remember that God made the heavens and the earth."
+      }
+    },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
