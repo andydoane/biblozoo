@@ -2053,15 +2053,19 @@
           data-daily-session-phase="${escapeHtml(
             session.phase
           )}"
+          data-daily-verse-shell
         >
           <div
             class="daily-question-verse-card"
           >
-            <div
-              class="daily-question-verse-kicker"
+            <button
+              class="daily-question-verse-close no-zoom"
+              type="button"
+              data-daily-verse-close
+              aria-label="Back to the Question"
             >
-              Check the Verse
-            </div>
+              ×
+            </button>
 
             <div
               class="daily-question-verse-ref"
@@ -2078,20 +2082,6 @@
                 session.verseText
               )}
             </div>
-
-            ${
-              session.translation
-                ? `
-                  <div
-                    class="daily-question-verse-translation"
-                  >
-                    ${escapeHtml(
-                      session.translation
-                    )}
-                  </div>
-                `
-                : ""
-            }
 
             <button
               class="daily-question-verse-listen no-zoom"
@@ -2110,19 +2100,6 @@
               }
             </button>
           </div>
-
-          <button
-            class="daily-question-verse-back no-zoom"
-            type="button"
-            data-daily-verse-back
-            ${
-              session.verseAudioPlaying
-                ? "disabled"
-                : ""
-            }
-          >
-            Back to the Question
-          </button>
         </div>
       `;
     } else if (
@@ -2920,28 +2897,58 @@
         };
     }
 
-    const verseBackButton =
+    const closeVerseHelp =
+      (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        if (
+          !dailySession ||
+          dailySession.phase !==
+            SESSION_PHASES.VERSE
+        ) {
+          return;
+        }
+
+        appApi?.stopDailyAudio?.();
+
+        dailySession.verseAudioPlaying =
+          false;
+
+        dailySession.phase =
+          SESSION_PHASES.QUESTION;
+
+        appApi?.renderApp?.();
+      };
+
+    const verseCloseButton =
       wrap.querySelector(
-        "[data-daily-verse-back]"
+        "[data-daily-verse-close]"
       );
 
-    if (verseBackButton) {
-      verseBackButton.onclick =
-        (event) => {
-          event.preventDefault();
-          event.stopPropagation();
+    if (verseCloseButton) {
+      verseCloseButton.onclick =
+        closeVerseHelp;
+    }
 
+    const verseShell =
+      wrap.querySelector(
+        "[data-daily-verse-shell]"
+      );
+
+    if (verseShell) {
+      verseShell.onclick =
+        (event) => {
           if (
-            !dailySession ||
-            dailySession.verseAudioPlaying
+            event.target !==
+            verseShell
           ) {
             return;
           }
 
-          dailySession.phase =
-            SESSION_PHASES.QUESTION;
-
-          appApi?.renderApp?.();
+          closeVerseHelp(
+            event
+          );
         };
     }
 
