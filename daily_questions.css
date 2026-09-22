@@ -339,12 +339,8 @@
   text-wrap: balance;
 }
 
-.daily-question-wonders.is-correct {
-  color: #d8ffd2;
-}
-
-.daily-question-wonders.is-nice-try {
-  color: #fff1a6;
+[data-daily-question-color="yellow"] .daily-question-wonders {
+  color: #333333;
 }
 
 .daily-question-wonders.is-placeholder {
@@ -414,6 +410,36 @@
 
   font-weight: 900;
   line-height: 1;
+}
+
+.daily-question-session-shell[data-daily-question-color="red"] .daily-question-ref-pill {
+  background: #ff5a51;
+  color: #ffffff;
+}
+
+.daily-question-session-shell[data-daily-question-color="orange"] .daily-question-ref-pill {
+  background: #ffa351;
+  color: #ffffff;
+}
+
+.daily-question-session-shell[data-daily-question-color="yellow"] .daily-question-ref-pill {
+  background: #ffc751;
+  color: #333333;
+}
+
+.daily-question-session-shell[data-daily-question-color="green"] .daily-question-ref-pill {
+  background: #a7cb6f;
+  color: #ffffff;
+}
+
+.daily-question-session-shell[data-daily-question-color="blue"] .daily-question-ref-pill {
+  background: #40b9c5;
+  color: #ffffff;
+}
+
+.daily-question-session-shell[data-daily-question-color="purple"] .daily-question-ref-pill {
+  background: #7f66c6;
+  color: #ffffff;
 }
 
 .daily-question-text {
@@ -583,6 +609,10 @@
   font-weight: 800;
 }
 
+[data-daily-question-color="yellow"] .daily-question-help-label {
+  color: #333333;
+}
+
 .daily-question-check-verse {
   width: min(100%, 300px);
   min-height: 50px;
@@ -736,6 +766,10 @@
   line-height: 1.04;
 
   text-wrap: balance;
+}
+
+[data-daily-question-color="yellow"] .daily-question-reflection-title {
+  color: #333333;
 }
 
 .daily-question-reflection-prompt {

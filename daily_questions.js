@@ -2770,6 +2770,11 @@
           data-daily-session-phase="${escapeHtml(
             session.phase
           )}"
+          data-daily-question-color="${escapeHtml(
+            getSessionQuestionColor(
+              session
+            )
+          )}"
         >
           ${homeButtonHtml}
 
