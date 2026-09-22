@@ -2186,7 +2186,7 @@
               type="button"
               data-daily-reflection-done
             >
-              Done
+              Snack time!
             </button>
           </div>
         </div>
@@ -2798,7 +2798,7 @@
 
     if (reflectionDoneButton) {
       reflectionDoneButton.onclick =
-        (event) => {
+        async (event) => {
           event.preventDefault();
           event.stopPropagation();
 
@@ -2811,32 +2811,60 @@
             return;
           }
 
+          const sessionAtStart =
+            dailySession;
+
+          window.BibloZooDailyFeedGame
+            ?.prepareAudio?.();
+
+          reflectionDoneButton.disabled =
+            true;
+
           const completedProgress =
             markSessionCompleted(
-              dailySession.verseId
+              sessionAtStart.verseId
             );
 
           if (!completedProgress) {
+            reflectionDoneButton.disabled =
+              false;
+
             console.warn(
               "Could not complete Daily Question session"
             );
             return;
           }
 
-          dailySession.completionRecorded =
+          sessionAtStart.completionRecorded =
             true;
 
-          const earnedSnack =
-            String(
-              appApi?.getRandomSnack?.() ||
-              ""
-            ).trim();
+          const tiltEnabled =
+            await requestRewardTiltPermission();
 
-          dailySession.snack =
-            earnedSnack || "🍎";
+          if (
+            dailySession !==
+              sessionAtStart ||
+            sessionAtStart.phase !==
+              SESSION_PHASES.REFLECTION
+          ) {
+            return;
+          }
 
-          dailySession.phase =
-            SESSION_PHASES.REWARD_INTRO;
+          sessionAtStart
+            .rewardTiltEnabled =
+              tiltEnabled;
+
+          sessionAtStart.rewardScore =
+            0;
+
+          sessionAtStart.rewardCaught =
+            0;
+
+          sessionAtStart.rewardComplete =
+            false;
+
+          sessionAtStart.phase =
+            SESSION_PHASES.REWARD_GAME;
 
           appApi?.renderApp?.();
         };
@@ -3115,11 +3143,20 @@
 
                       dailySession.rewardComplete =
                         true;
+                    },
+                  onBackToZoo:
+                    () => {
+                      if (
+                        !dailySession ||
+                        dailySession !==
+                          session
+                      ) {
+                        return;
+                      }
 
-                      dailySession.phase =
-                        SESSION_PHASES.REWARD_DONE;
+                      clearSessionState();
 
-                      appApi?.renderApp?.();
+                      appApi?.goToTitle?.();
                     }
                 }
               );

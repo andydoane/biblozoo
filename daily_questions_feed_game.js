@@ -26,6 +26,7 @@
   ]);
   const TILT_CALIBRATION_MS = 750;
   const TILT_NEUTRAL_LIMIT = 3.5;
+  const INTRO_TAP_LOCKOUT_MS = 800;
 
   let activeRuntime = null;
   let preparedAudioContext = null;
@@ -181,18 +182,28 @@
     if (runtime) {
       runtime.running = false;
       if (runtime.rafId) cancelAnimationFrame(runtime.rafId);
-      if (runtime.orientationHandler) {
-        window.removeEventListener("deviceorientation", runtime.orientationHandler);
+      detachGameplayInput(runtime);
+
+      if (
+        runtime.startOverlay &&
+        runtime.startOverlayHandler
+      ) {
+        runtime.startOverlay.removeEventListener(
+          "click",
+          runtime.startOverlayHandler
+        );
       }
-      if (runtime.pointerDownHandler) stageRemove(runtime, "pointerdown", runtime.pointerDownHandler);
-      if (runtime.pointerMoveHandler) stageRemove(runtime, "pointermove", runtime.pointerMoveHandler);
-      if (runtime.pointerEndHandler) {
-        stageRemove(runtime, "pointerup", runtime.pointerEndHandler);
-        stageRemove(runtime, "pointercancel", runtime.pointerEndHandler);
+
+      if (
+        runtime.resultBackButton &&
+        runtime.resultBackHandler
+      ) {
+        runtime.resultBackButton.removeEventListener(
+          "click",
+          runtime.resultBackHandler
+        );
       }
-      if (Number.isInteger(runtime.activePointerId)) {
-        try { runtime.stage?.releasePointerCapture(runtime.activePointerId); } catch (err) { }
-      }
+
       if (runtime.starAudio) {
         try { runtime.starAudio.pause(); runtime.starAudio.currentTime = 0; } catch (err) { }
       }
@@ -208,6 +219,61 @@
     runtime.stage?.removeEventListener(type, handler);
   }
 
+  function detachGameplayInput(runtime) {
+    if (!runtime) return;
+
+    if (runtime.orientationHandler) {
+      window.removeEventListener(
+        "deviceorientation",
+        runtime.orientationHandler
+      );
+    }
+
+    if (runtime.pointerDownHandler) {
+      stageRemove(
+        runtime,
+        "pointerdown",
+        runtime.pointerDownHandler
+      );
+    }
+
+    if (runtime.pointerMoveHandler) {
+      stageRemove(
+        runtime,
+        "pointermove",
+        runtime.pointerMoveHandler
+      );
+    }
+
+    if (runtime.pointerEndHandler) {
+      stageRemove(
+        runtime,
+        "pointerup",
+        runtime.pointerEndHandler
+      );
+      stageRemove(
+        runtime,
+        "pointercancel",
+        runtime.pointerEndHandler
+      );
+    }
+
+    if (
+      Number.isInteger(
+        runtime.activePointerId
+      )
+    ) {
+      try {
+        runtime.stage?.releasePointerCapture(
+          runtime.activePointerId
+        );
+      } catch (err) { }
+    }
+
+    runtime.dragging = false;
+    runtime.activePointerId = null;
+  }
+
   function render({ session, profilePictureHtml = "" } = {}) {
     const petName = String(session?.petName || "BibloPet").trim() || "BibloPet";
     return `
@@ -216,14 +282,82 @@
           <span class="daily-feed-score-label">Score</span>
           <strong class="daily-feed-score-value" data-daily-feed-score>0</strong>
         </div>
+
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
           aria-label="Tilt or drag ${petName} left and right to catch the falling food">
           <canvas class="daily-feed-canvas" data-daily-feed-canvas aria-hidden="true"></canvas>
+
           <div class="daily-feed-catcher" data-daily-feed-catcher aria-hidden="true">
             <div class="daily-feed-pet-circle" data-daily-feed-pet-circle>
               ${profilePictureHtml}
             </div>
+
             <img class="daily-feed-shadow" src="${ASSET_BASE}dq_feed_shadow.png" alt="" draggable="false">
+          </div>
+        </div>
+
+        <div
+          class="daily-feed-start-overlay"
+          data-daily-feed-start-overlay
+          role="dialog"
+          aria-modal="true"
+          aria-label="Feeding game instructions"
+        >
+          <div class="daily-feed-start-card">
+            <div class="daily-feed-start-title">
+              Catch the BibloSnack!
+            </div>
+
+            <div class="daily-feed-start-instruction">
+              Tilt to steer!
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="daily-feed-result-overlay"
+          data-daily-feed-result-overlay
+          role="dialog"
+          aria-modal="true"
+          aria-label="Feeding game result"
+          hidden
+        >
+          <div class="daily-feed-result-card">
+            <div
+              class="daily-feed-result-pet-art"
+              aria-hidden="true"
+            >
+              ${profilePictureHtml}
+
+              <img
+                class="daily-feed-result-shadow"
+                src="${ASSET_BASE}dq_feed_shadow.png"
+                alt=""
+                draggable="false"
+              >
+            </div>
+
+            <div
+              class="daily-feed-result-title"
+              data-daily-feed-result-title
+            >
+              Great Catching!
+            </div>
+
+            <div
+              class="daily-feed-result-score"
+              data-daily-feed-result-score
+            >
+              Score: 0
+            </div>
+
+            <button
+              class="daily-feed-result-back no-zoom"
+              type="button"
+              data-daily-feed-result-back
+            >
+              Back to Zoo
+            </button>
           </div>
         </div>
       </div>`;
@@ -686,12 +820,130 @@
     return now >= runtime.finishAt;
   }
 
+  function showResult(runtime, result) {
+    if (!runtime || activeRuntime !== runtime) return;
+
+    runtime.finished = true;
+    runtime.roundStarted = false;
+    runtime.running = false;
+
+    if (runtime.rafId) {
+      cancelAnimationFrame(runtime.rafId);
+      runtime.rafId = 0;
+    }
+
+    detachGameplayInput(runtime);
+
+    if (runtime.starAudio) {
+      try {
+        runtime.starAudio.pause();
+        runtime.starAudio.currentTime = 0;
+      } catch (err) { }
+    }
+
+    stopAudioContext(runtime.audioContext);
+    runtime.audioContext = null;
+
+    const copy =
+      getResultCopy(
+        result.score,
+        result.caughtCount,
+        runtime.petName
+      );
+
+    runtime.gameEl.classList.add(
+      "is-finished"
+    );
+
+    runtime.startOverlay.hidden = true;
+    runtime.resultTitleEl.textContent =
+      copy.title;
+    runtime.resultScoreEl.textContent =
+      `Score: ${result.score}`;
+    runtime.resultOverlay.hidden = false;
+  }
+
   function complete(runtime) {
-    if (activeRuntime !== runtime) return;
-    const result = { score: runtime.score, caughtCount: runtime.caughtCount };
-    const onComplete = runtime.onComplete;
-    stop();
-    onComplete?.(result);
+    if (
+      activeRuntime !== runtime ||
+      runtime.finished
+    ) {
+      return;
+    }
+
+    const result = {
+      score: runtime.score,
+      caughtCount: runtime.caughtCount
+    };
+
+    showResult(runtime, result);
+    runtime.onComplete?.(result);
+  }
+
+  function startRound(runtime) {
+    if (
+      !runtime ||
+      activeRuntime !== runtime ||
+      runtime.roundStarted ||
+      runtime.finished
+    ) {
+      return;
+    }
+
+    runtime.roundStarted = true;
+    runtime.running = true;
+    runtime.startOverlay.hidden = true;
+
+    if (runtime.startOverlayHandler) {
+      runtime.startOverlay.removeEventListener(
+        "click",
+        runtime.startOverlayHandler
+      );
+      runtime.startOverlayHandler = null;
+    }
+
+    const now = performance.now();
+
+    runtime.lastFrameAt = now;
+    runtime.finishAt = 0;
+    runtime.nextScheduledAt =
+      now +
+      (
+        runtime.tiltEnabled
+          ? TILT_CALIBRATION_MS + 300
+          : 650
+      );
+
+    if (runtime.tiltEnabled) {
+      beginTiltCalibration(runtime);
+      window.addEventListener(
+        "deviceorientation",
+        runtime.orientationHandler
+      );
+    }
+
+    runtime.stage.addEventListener(
+      "pointerdown",
+      runtime.pointerDownHandler
+    );
+    runtime.stage.addEventListener(
+      "pointermove",
+      runtime.pointerMoveHandler
+    );
+    runtime.stage.addEventListener(
+      "pointerup",
+      runtime.pointerEndHandler
+    );
+    runtime.stage.addEventListener(
+      "pointercancel",
+      runtime.pointerEndHandler
+    );
+
+    runtime.rafId =
+      requestAnimationFrame(
+        (frameNow) =>
+          runFrame(runtime, frameNow)
+      );
   }
 
   function runFrame(runtime, now) {
@@ -712,72 +964,203 @@
     runtime.rafId = requestAnimationFrame((nextNow) => runFrame(runtime, nextNow));
   }
 
-  function start(rootEl, { session, onComplete } = {}) {
+  function start(
+    rootEl,
+    {
+      session,
+      onComplete,
+      onBackToZoo
+    } = {}
+  ) {
     const savedAudio = preparedAudioContext;
     preparedAudioContext = null;
     stop();
     preparedAudioContext = savedAudio;
 
     if (!rootEl || !session) return null;
-    const stage = rootEl.querySelector("[data-daily-feed-stage]");
-    const canvas = rootEl.querySelector("[data-daily-feed-canvas]");
-    const catcher = rootEl.querySelector("[data-daily-feed-catcher]");
-    const petCircle = rootEl.querySelector("[data-daily-feed-pet-circle]");
-    const scoreEl = rootEl.querySelector("[data-daily-feed-score]");
-    if (!stage || !canvas || !catcher || !petCircle) return null;
+
+    const gameEl =
+      rootEl.querySelector(
+        "[data-daily-feed-game]"
+      );
+
+    const stage =
+      rootEl.querySelector(
+        "[data-daily-feed-stage]"
+      );
+
+    const canvas =
+      rootEl.querySelector(
+        "[data-daily-feed-canvas]"
+      );
+
+    const catcher =
+      rootEl.querySelector(
+        "[data-daily-feed-catcher]"
+      );
+
+    const petCircle =
+      rootEl.querySelector(
+        "[data-daily-feed-pet-circle]"
+      );
+
+    const scoreEl =
+      rootEl.querySelector(
+        "[data-daily-feed-score]"
+      );
+
+    const startOverlay =
+      rootEl.querySelector(
+        "[data-daily-feed-start-overlay]"
+      );
+
+    const resultOverlay =
+      rootEl.querySelector(
+        "[data-daily-feed-result-overlay]"
+      );
+
+    const resultTitleEl =
+      rootEl.querySelector(
+        "[data-daily-feed-result-title]"
+      );
+
+    const resultScoreEl =
+      rootEl.querySelector(
+        "[data-daily-feed-result-score]"
+      );
+
+    const resultBackButton =
+      rootEl.querySelector(
+        "[data-daily-feed-result-back]"
+      );
+
+    if (
+      !gameEl ||
+      !stage ||
+      !canvas ||
+      !catcher ||
+      !petCircle ||
+      !scoreEl ||
+      !startOverlay ||
+      !resultOverlay ||
+      !resultTitleEl ||
+      !resultScoreEl ||
+      !resultBackButton
+    ) {
+      return null;
+    }
 
     const width = stage.clientWidth;
     const height = stage.clientHeight;
+
     if (width < 120 || height < 260) {
       requestAnimationFrame(() => {
-        if (rootEl.isConnected) start(rootEl, { session, onComplete });
+        if (rootEl.isConnected) {
+          start(
+            rootEl,
+            {
+              session,
+              onComplete,
+              onBackToZoo
+            }
+          );
+        }
       });
       return null;
     }
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
 
-    const field = createPegField(width, height);
-    const images = buildImageMap();
+    const dpr = clamp(
+      window.devicePixelRatio || 1,
+      1,
+      2
+    );
+
+    canvas.width =
+      Math.round(width * dpr);
+
+    canvas.height =
+      Math.round(height * dpr);
+
+    const field =
+      createPegField(width, height);
+
+    const images =
+      buildImageMap();
 
     catcher.style.setProperty(
       "--daily-feed-pet-size",
       `${field.pegRadius * 4}px`
     );
 
-    const stageRect = stage.getBoundingClientRect();
-    const petRect = petCircle.getBoundingClientRect();
-    const audioContext = preparedAudioContext;
+    const stageRect =
+      stage.getBoundingClientRect();
+
+    const petRect =
+      petCircle.getBoundingClientRect();
+
+    const audioContext =
+      preparedAudioContext;
+
     preparedAudioContext = null;
-    const starAudio = new Audio(`${ASSET_BASE}dq_feed_star.mp3`);
+
+    const starAudio =
+      new Audio(
+        `${ASSET_BASE}dq_feed_star.mp3`
+      );
+
     starAudio.preload = "auto";
     starAudio.volume = 0.82;
+
     const now = performance.now();
 
     const runtime = {
-      running: true,
+      running: false,
+      roundStarted: false,
+      finished: false,
       rafId: 0,
       lastFrameAt: now,
       width,
       height,
       dpr,
       ctx,
+      gameEl,
       stage,
       canvas,
       catcher,
       petCircle,
       scoreEl,
+      startOverlay,
+      resultOverlay,
+      resultTitleEl,
+      resultScoreEl,
+      resultBackButton,
+      startOverlayHandler: null,
+      resultBackHandler: null,
+      introUnlockAt:
+        now + INTRO_TAP_LOCKOUT_MS,
+      petName:
+        String(
+          session.petName ||
+          "BibloPet"
+        ).trim() ||
+        "BibloPet",
       catcherX: width / 2,
       petRadius: petRect.width / 2,
-      petCenterY: (petRect.top - stageRect.top) + petRect.height / 2,
+      petCenterY:
+        (
+          petRect.top -
+          stageRect.top
+        ) +
+        petRect.height / 2,
       petTilt: 0,
       dragging: false,
       activePointerId: null,
-      tiltEnabled: session.rewardTiltEnabled === true,
+      tiltEnabled:
+        session.rewardTiltEnabled ===
+        true,
       neutralGamma: null,
       smoothedTilt: 0,
       tiltSamples: [],
@@ -793,15 +1176,10 @@
       ballImages: images.balls,
       balls: [],
       nextBallId: 1,
-      scheduled: buildScheduledBalls(),
+      scheduled:
+        buildScheduledBalls(),
       scheduledIndex: 0,
-      nextScheduledAt:
-        now +
-        (
-          session.rewardTiltEnabled === true
-            ? TILT_CALIBRATION_MS + 300
-            : 650
-        ),
+      nextScheduledAt: Infinity,
       pendingBonus: [],
       lastSpawnedColor: "",
       bursts: [],
@@ -810,56 +1188,193 @@
       caughtCount: 0,
       lastPegNoteIndex: -1,
       lastPegSoundAt: 0,
-      audioContext: audioContext || prepareAudio(),
+      audioContext:
+        audioContext ||
+        prepareAudio(),
       starAudio,
       finishAt: 0,
-      onComplete
+      onComplete:
+        typeof onComplete ===
+        "function"
+          ? onComplete
+          : null,
+      onBackToZoo:
+        typeof onBackToZoo ===
+        "function"
+          ? onBackToZoo
+          : null
     };
 
     activeRuntime = runtime;
-    stage.style.backgroundImage = `url("${chooseBackground(width, height)}")`;
-    setCatcherX(runtime, width / 2, 0);
 
-    if (runtime.tiltEnabled) {
-      beginTiltCalibration(runtime);
-      runtime.orientationHandler = (event) => handleTilt(runtime, event);
-      window.addEventListener("deviceorientation", runtime.orientationHandler);
+    stage.style.backgroundImage =
+      `url("${chooseBackground(
+        width,
+        height
+      )}")`;
+
+    setCatcherX(
+      runtime,
+      width / 2,
+      0
+    );
+
+    runtime.orientationHandler =
+      (event) =>
+        handleTilt(
+          runtime,
+          event
+        );
+
+    const moveCatcher =
+      (event) => {
+        const rect =
+          stage
+            .getBoundingClientRect();
+
+        setCatcherX(
+          runtime,
+          event.clientX -
+            rect.left
+        );
+      };
+
+    runtime.pointerDownHandler =
+      (event) => {
+        if (
+          activeRuntime !== runtime ||
+          !runtime.roundStarted ||
+          runtime.finished
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+
+        runtime.dragging = true;
+        runtime.activePointerId =
+          event.pointerId;
+
+        try {
+          stage.setPointerCapture(
+            event.pointerId
+          );
+        } catch (err) { }
+
+        moveCatcher(event);
+      };
+
+    runtime.pointerMoveHandler =
+      (event) => {
+        if (
+          !runtime.dragging ||
+          activeRuntime !== runtime ||
+          runtime.finished
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        moveCatcher(event);
+      };
+
+    runtime.pointerEndHandler =
+      (event) => {
+        if (
+          activeRuntime !== runtime
+        ) {
+          return;
+        }
+
+        runtime.dragging = false;
+        runtime.activePointerId =
+          null;
+
+        if (runtime.tiltEnabled) {
+          runtime.smoothedTilt = 0;
+        }
+
+        try {
+          stage.releasePointerCapture(
+            event.pointerId
+          );
+        } catch (err) { }
+      };
+
+    runtime.startOverlayHandler =
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (
+          activeRuntime !== runtime ||
+          performance.now() <
+            runtime.introUnlockAt
+        ) {
+          return;
+        }
+
+        startRound(runtime);
+      };
+
+    runtime.resultBackHandler =
+      (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (
+          activeRuntime !== runtime ||
+          !runtime.finished
+        ) {
+          return;
+        }
+
+        const goBack =
+          runtime.onBackToZoo;
+
+        stop();
+        goBack?.();
+      };
+
+    startOverlay.addEventListener(
+      "click",
+      runtime.startOverlayHandler
+    );
+
+    resultBackButton.addEventListener(
+      "click",
+      runtime.resultBackHandler
+    );
+
+    draw(runtime, now);
+
+    if (session.rewardComplete) {
+      runtime.score =
+        Math.max(
+          0,
+          Number(
+            session.rewardScore
+          ) || 0
+        );
+
+      runtime.caughtCount =
+        Math.max(
+          0,
+          Number(
+            session.rewardCaught
+          ) || 0
+        );
+
+      showResult(
+        runtime,
+        {
+          score: runtime.score,
+          caughtCount:
+            runtime.caughtCount
+        }
+      );
     }
 
-    const moveCatcher = (event) => {
-      const rect = stage.getBoundingClientRect();
-      setCatcherX(runtime, event.clientX - rect.left);
-    };
-
-    runtime.pointerDownHandler = (event) => {
-      if (activeRuntime !== runtime) return;
-      event.preventDefault();
-      runtime.dragging = true;
-      runtime.activePointerId = event.pointerId;
-      try { stage.setPointerCapture(event.pointerId); } catch (err) { }
-      moveCatcher(event);
-    };
-    runtime.pointerMoveHandler = (event) => {
-      if (!runtime.dragging || activeRuntime !== runtime) return;
-      event.preventDefault();
-      moveCatcher(event);
-    };
-    runtime.pointerEndHandler = (event) => {
-      if (activeRuntime !== runtime) return;
-      runtime.dragging = false;
-      runtime.activePointerId = null;
-      if (runtime.tiltEnabled) {
-        runtime.smoothedTilt = 0;
-      }
-      try { stage.releasePointerCapture(event.pointerId); } catch (err) { }
-    };
-
-    stage.addEventListener("pointerdown", runtime.pointerDownHandler);
-    stage.addEventListener("pointermove", runtime.pointerMoveHandler);
-    stage.addEventListener("pointerup", runtime.pointerEndHandler);
-    stage.addEventListener("pointercancel", runtime.pointerEndHandler);
-    draw(runtime, now);
-    runtime.rafId = requestAnimationFrame((frameNow) => runFrame(runtime, frameNow));
     return runtime;
   }
 
@@ -871,7 +1386,7 @@
     if (safeScore >= 15) {
       return {
         chomp: "CHOMP!",
-        title: "Amazing feast!",
+        title: "Amazing Catching!",
         message: `${cleanPetName} caught a huge pile of snacks!`
       };
     }
@@ -879,7 +1394,7 @@
     if (safeScore >= 12) {
       return {
         chomp: "CHOMP!",
-        title: "Snack superstar!",
+        title: "Snack Superstar!",
         message: `${cleanPetName} is one happy BibloPet!`
       };
     }
@@ -887,7 +1402,7 @@
     if (safeScore >= 8) {
       return {
         chomp: "CHOMP!",
-        title: "Great catching!",
+        title: "Great Catching!",
         message: `${cleanPetName} had a really good snack!`
       };
     }
@@ -895,14 +1410,14 @@
     if (safeScore >= 4) {
       return {
         chomp: "CHOMP!",
-        title: "Nice feeding!",
+        title: "Nice Catching!",
         message: `${cleanPetName} loved those tasty catches!`
       };
     }
 
     return {
       chomp: safeCaught > 0 ? "CHOMP!" : "ALL DONE!",
-      title: "Good try!",
+      title: "Nice Catching!",
       message: `${cleanPetName} had fun chasing the snacks!`
     };
   }
