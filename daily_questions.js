@@ -38,6 +38,17 @@
       "purple"
     ]);
 
+  // Use the same six colors as the Daily Question answer buttons.
+  const DAILY_QUESTION_BACKGROUND_COLORS =
+    Object.freeze({
+      red: "#ff5a51",
+      orange: "#ffa351",
+      yellow: "#ffc751",
+      green: "#a7cb6f",
+      blue: "#40b9c5",
+      purple: "#7f66c6"
+    });
+
   /*
     Any verse with valid Daily Question reflection data may
     participate. Pet-unlock and daily-progress rules are
@@ -2612,6 +2623,24 @@
     const session =
       dailySession;
 
+    // Keep one chosen color for Recall, Meaning, and Application.
+    const useQuestionColor =
+      !!session &&
+      (
+        session.phase === SESSION_PHASES.QUESTION ||
+        session.phase === SESSION_PHASES.REFLECTION
+      );
+
+    const screenBg = useQuestionColor
+      ? (
+        DAILY_QUESTION_BACKGROUND_COLORS[
+          getSessionQuestionColor(session)
+        ] || "var(--purple)"
+      )
+      : "var(--purple)";
+
+    wrap.style.backgroundColor = screenBg;
+
     const homeButtonHtml =
       typeof appApi
         ?.titleHomePillHtml ===
@@ -3815,7 +3844,7 @@
 
     return appApi.makeSlide({
       idx,
-      bg: "var(--purple)",
+      bg: screenBg,
       navHidden: true,
       inner: wrap
     });
