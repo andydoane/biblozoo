@@ -465,12 +465,12 @@
 
 [data-daily-question-color="red"] .daily-question-choice {
   background: #ff5a51;
-  color: #333333;
+  color: #ffffff;
 }
 
 [data-daily-question-color="orange"] .daily-question-choice {
   background: #ffa351;
-  color: #333333;
+  color: #ffffff;
 }
 
 [data-daily-question-color="yellow"] .daily-question-choice {
@@ -480,12 +480,12 @@
 
 [data-daily-question-color="green"] .daily-question-choice {
   background: #a7cb6f;
-  color: #333333;
+  color: #ffffff;
 }
 
 [data-daily-question-color="blue"] .daily-question-choice {
   background: #40b9c5;
-  color: #333333;
+  color: #ffffff;
 }
 
 [data-daily-question-color="purple"] .daily-question-choice {
