@@ -92,6 +92,28 @@
   pointer-events: none;
 }
 
+.daily-feed-start-balls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: clamp(10px, 3vw, 18px);
+}
+
+.daily-feed-start-ball {
+  width:
+    clamp(48px, 13vw, 68px);
+  height: auto;
+
+  flex: 0 0 auto;
+
+  filter:
+    drop-shadow(
+      0 0 10px
+      rgba(255, 255, 255, 0.74)
+    );
+}
+
 .daily-feed-start-title {
   font-size:
     clamp(30px, 7.2vw, 44px);
@@ -147,32 +169,44 @@
 .daily-feed-result-pet-art {
   width:
     clamp(104px, 29vw, 148px);
+  aspect-ratio: 1 / 1;
 
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  flex: 0 0 auto;
 
   pointer-events: none;
 }
 
 .daily-feed-result-pet-art
 .daily-feed-pet-avatar {
+  position: relative;
+
   width: 100%;
-  aspect-ratio: auto;
+  height: 100%;
+  aspect-ratio: 1 / 1;
 
   overflow: visible;
 
   border-radius: 0;
+
+  background: transparent;
+
+  box-shadow: none;
 }
 
 .daily-feed-result-pet-art
 .daily-feed-pet-avatar
 .profile-picture-img {
   width: 100%;
-  height: auto;
+  height: 100%;
   max-height: none;
 
   object-fit: contain;
+
+  filter:
+    drop-shadow(
+      0 8px 6px
+      rgba(0, 0, 0, 0.28)
+    );
 }
 
 .daily-feed-result-pet-art
@@ -180,15 +214,12 @@
 .profile-picture-fallback {
   font-size:
     clamp(52px, 15vw, 82px);
-}
 
-.daily-feed-result-shadow {
-  width: 76%;
-  height: auto;
-
-  margin-top: 2px;
-
-  opacity: 0.78;
+  filter:
+    drop-shadow(
+      0 7px 5px
+      rgba(0, 0, 0, 0.24)
+    );
 }
 
 .daily-feed-result-title {

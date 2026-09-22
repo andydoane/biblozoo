@@ -128,6 +128,32 @@
     };
   }
 
+  function decodeStarAudioData(context, arrayBuffer) {
+    return new Promise((resolve, reject) => {
+      try {
+        const data = arrayBuffer.slice(0);
+        const maybePromise =
+          context.decodeAudioData(
+            data,
+            resolve,
+            reject
+          );
+
+        if (
+          maybePromise &&
+          typeof maybePromise.then ===
+            "function"
+        ) {
+          maybePromise
+            .then(resolve)
+            .catch(reject);
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
   function loadStarBuffer(context) {
     if (!context) return Promise.resolve(null);
     if (preparedStarBuffer) return Promise.resolve(preparedStarBuffer);
@@ -135,10 +161,29 @@
 
     starBufferPromise = fetch(`${ASSET_BASE}dq_feed_star.mp3`)
       .then((response) => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const isCapacitorLocalResponse =
+          window.location.protocol ===
+            "capacitor:" &&
+          response.status === 0;
+
+        if (
+          !response.ok &&
+          !isCapacitorLocalResponse
+        ) {
+          throw new Error(
+            `HTTP ${response.status}`
+          );
+        }
+
         return response.arrayBuffer();
       })
-      .then((bytes) => context.decodeAudioData(bytes))
+      .then(
+        (bytes) =>
+          decodeStarAudioData(
+            context,
+            bytes
+          )
+      )
       .then((buffer) => {
         preparedStarBuffer = buffer;
         return buffer;
@@ -304,12 +349,38 @@
           aria-label="Feeding game instructions"
         >
           <div class="daily-feed-start-card">
+            <div
+              class="daily-feed-start-balls"
+              aria-hidden="true"
+            >
+              <img
+                class="daily-feed-start-ball"
+                src="${ASSET_BASE}dq_feed_ball_red.png"
+                alt=""
+                draggable="false"
+              >
+
+              <img
+                class="daily-feed-start-ball"
+                src="${ASSET_BASE}dq_feed_ball_rainbow.png"
+                alt=""
+                draggable="false"
+              >
+
+              <img
+                class="daily-feed-start-ball"
+                src="${ASSET_BASE}dq_feed_ball_green.png"
+                alt=""
+                draggable="false"
+              >
+            </div>
+
             <div class="daily-feed-start-title">
-              Catch the BibloSnack!
+              Catch the BibloSnacks!
             </div>
 
             <div class="daily-feed-start-instruction">
-              Tilt to steer!
+              Tilt to steer
             </div>
           </div>
         </div>
@@ -328,13 +399,6 @@
               aria-hidden="true"
             >
               ${profilePictureHtml}
-
-              <img
-                class="daily-feed-result-shadow"
-                src="${ASSET_BASE}dq_feed_shadow.png"
-                alt=""
-                draggable="false"
-              >
             </div>
 
             <div
@@ -459,24 +523,59 @@
   function playStarSound(runtime) {
     const context = runtime.audioContext;
 
-    if (context && context.state !== "closed" && preparedStarBuffer) {
+    if (
+      context &&
+      context.state !== "closed"
+    ) {
       try {
-        if (context.state === "suspended") context.resume?.().catch?.(() => {});
-        const source = context.createBufferSource();
-        const gain = context.createGain();
-        source.buffer = preparedStarBuffer;
-        gain.gain.setValueAtTime(0.78, context.currentTime);
-        source.connect(gain);
-        gain.connect(context.destination);
-        source.start();
+        if (
+          context.state === "suspended" ||
+          context.state === "interrupted"
+        ) {
+          context.resume?.().catch?.(() => {});
+        }
+
+        if (preparedStarBuffer) {
+          const source =
+            context.createBufferSource();
+
+          const gain =
+            context.createGain();
+
+          source.buffer =
+            preparedStarBuffer;
+
+          gain.gain.setValueAtTime(
+            0.78,
+            context.currentTime
+          );
+
+          source.connect(gain);
+          gain.connect(
+            context.destination
+          );
+
+          source.start();
+          return;
+        }
+
+        /*
+          Keep warming the decoded buffer, but do not fall back
+          to HTML Audio during gameplay. That fallback can cause
+          a visible hitch on iOS while the file starts/decodes.
+        */
+        loadStarBuffer(context);
         return;
       } catch (err) { }
     }
 
     if (!runtime.starAudio) return;
+
     try {
       runtime.starAudio.currentTime = 0;
-      runtime.starAudio.play().catch?.(() => {});
+      runtime.starAudio
+        .play()
+        .catch?.(() => {});
     } catch (err) { }
   }
 
@@ -1102,17 +1201,26 @@
       petCircle.getBoundingClientRect();
 
     const audioContext =
-      preparedAudioContext;
+      preparedAudioContext ||
+      prepareAudio();
 
     preparedAudioContext = null;
 
     const starAudio =
-      new Audio(
-        `${ASSET_BASE}dq_feed_star.mp3`
-      );
+      audioContext
+        ? null
+        : new Audio(
+          `${ASSET_BASE}dq_feed_star.mp3`
+        );
 
-    starAudio.preload = "auto";
-    starAudio.volume = 0.82;
+    if (starAudio) {
+      starAudio.preload = "auto";
+      starAudio.volume = 0.82;
+
+      try {
+        starAudio.load();
+      } catch (err) { }
+    }
 
     const now = performance.now();
 
@@ -1188,9 +1296,7 @@
       caughtCount: 0,
       lastPegNoteIndex: -1,
       lastPegSoundAt: 0,
-      audioContext:
-        audioContext ||
-        prepareAudio(),
+      audioContext,
       starAudio,
       finishAt: 0,
       onComplete:
