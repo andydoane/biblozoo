@@ -2001,6 +2001,500 @@
       );
   }
 
+  function getDailyQuestionPaddingPx(
+    element,
+    axis
+  ) {
+    if (!element) return 0;
+
+    const styles =
+      window.getComputedStyle(
+        element
+      );
+
+    if (axis === "horizontal") {
+      return (
+        (parseFloat(
+          styles.paddingLeft
+        ) || 0) +
+        (parseFloat(
+          styles.paddingRight
+        ) || 0)
+      );
+    }
+
+    return (
+      (parseFloat(
+        styles.paddingTop
+      ) || 0) +
+      (parseFloat(
+        styles.paddingBottom
+      ) || 0)
+    );
+  }
+
+  function getDailyQuestionFitLineHeight(
+    textLength,
+    stageRatio
+  ) {
+    if (stageRatio > 1.35) {
+      if (textLength <= 90) {
+        return 1.10;
+      }
+
+      if (textLength <= 190) {
+        return 1.08;
+      }
+
+      return 1.05;
+    }
+
+    if (textLength <= 80) {
+      return 1.18;
+    }
+
+    if (textLength <= 170) {
+      return 1.12;
+    }
+
+    return 1.06;
+  }
+
+  function getDailyQuestionFitWidthRatio(
+    textLength,
+    stageRatio
+  ) {
+    if (stageRatio > 1.35) {
+      return 0.96;
+    }
+
+    if (stageRatio > 1.05) {
+      return 0.93;
+    }
+
+    if (textLength <= 80) {
+      return 0.92;
+    }
+
+    return 0.98;
+  }
+
+  function getDailyQuestionFitMaxFontSize(
+    textLength,
+    stageRatio
+  ) {
+    if (stageRatio > 1.35) {
+      if (textLength <= 70) {
+        return 64;
+      }
+
+      if (textLength <= 140) {
+        return 58;
+      }
+
+      if (textLength <= 240) {
+        return 50;
+      }
+
+      return 42;
+    }
+
+    if (stageRatio > 1.05) {
+      if (textLength <= 70) {
+        return 74;
+      }
+
+      if (textLength <= 140) {
+        return 66;
+      }
+
+      if (textLength <= 240) {
+        return 56;
+      }
+
+      return 46;
+    }
+
+    if (textLength > 220) {
+      return 62;
+    }
+
+    if (textLength > 140) {
+      return 74;
+    }
+
+    return 96;
+  }
+
+  function fitDailyQuestionVerseHelp(
+    root
+  ) {
+    const block =
+      root?.querySelector?.(
+        "[data-daily-verse-fit]"
+      );
+
+    const card =
+      block?.closest?.(
+        ".daily-question-verse-card"
+      );
+
+    const verseText =
+      block?.querySelector?.(
+        ".daily-question-verse-text"
+      );
+
+    if (
+      !block ||
+      !card ||
+      !verseText
+    ) {
+      return;
+    }
+
+    const cardWidth =
+      card.clientWidth;
+
+    const cardHeight =
+      card.clientHeight;
+
+    if (
+      cardWidth <= 0 ||
+      cardHeight <= 0
+    ) {
+      return;
+    }
+
+    const contentWidth =
+      Math.max(
+        120,
+        cardWidth -
+          getDailyQuestionPaddingPx(
+            card,
+            "horizontal"
+          )
+      );
+
+    const contentHeight =
+      Math.max(
+        120,
+        cardHeight -
+          getDailyQuestionPaddingPx(
+            card,
+            "vertical"
+          )
+      );
+
+    const textLength =
+      String(
+        verseText.textContent || ""
+      )
+        .replace(/\s+/g, " ")
+        .trim()
+        .length;
+
+    const stageRatio =
+      contentWidth /
+      contentHeight;
+
+    const lineHeight =
+      getDailyQuestionFitLineHeight(
+        textLength,
+        stageRatio
+      );
+
+    const widthRatio =
+      getDailyQuestionFitWidthRatio(
+        textLength,
+        stageRatio
+      );
+
+    const targetWidth =
+      Math.floor(
+        contentWidth *
+        widthRatio
+      );
+
+    block.style.width =
+      `${targetWidth}px`;
+
+    block.style.maxWidth =
+      `${targetWidth}px`;
+
+    block.style.setProperty(
+      "--daily-verse-fit-line-height",
+      String(lineHeight)
+    );
+
+    let low = 18;
+    let high =
+      getDailyQuestionFitMaxFontSize(
+        textLength,
+        stageRatio
+      );
+
+    let best = low;
+
+    for (
+      let index = 0;
+      index < 10;
+      index += 1
+    ) {
+      const mid =
+        (low + high) / 2;
+
+      block.style.setProperty(
+        "--daily-verse-fit-size",
+        `${mid}px`
+      );
+
+      block.style.setProperty(
+        "--daily-verse-ref-fit-size",
+        `${Math.max(
+          22,
+          mid * 0.80
+        )}px`
+      );
+
+      const fits =
+        block.scrollHeight <=
+          contentHeight &&
+        block.scrollWidth <=
+          contentWidth;
+
+      if (fits) {
+        best = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    block.style.setProperty(
+      "--daily-verse-fit-size",
+      `${Math.floor(best)}px`
+    );
+
+    block.style.setProperty(
+      "--daily-verse-ref-fit-size",
+      `${Math.floor(
+        Math.max(
+          22,
+          best * 0.80
+        )
+      )}px`
+    );
+  }
+
+  function fitDailyQuestionReflection(
+    root
+  ) {
+    const prompt =
+      root?.querySelector?.(
+        "[data-daily-reflection-fit]"
+      );
+
+    const body =
+      prompt?.closest?.(
+        ".daily-question-reflection-body"
+      );
+
+    const title =
+      body?.querySelector?.(
+        ".daily-question-reflection-title"
+      );
+
+    if (
+      !prompt ||
+      !body ||
+      !title
+    ) {
+      return;
+    }
+
+    const bodyWidth =
+      body.clientWidth;
+
+    const bodyHeight =
+      body.clientHeight;
+
+    if (
+      bodyWidth <= 0 ||
+      bodyHeight <= 0
+    ) {
+      return;
+    }
+
+    const styles =
+      window.getComputedStyle(
+        body
+      );
+
+    const gap =
+      parseFloat(
+        styles.rowGap ||
+        styles.gap
+      ) || 0;
+
+    const contentWidth =
+      Math.max(
+        120,
+        bodyWidth -
+          getDailyQuestionPaddingPx(
+            body,
+            "horizontal"
+          )
+      );
+
+    const contentHeight =
+      Math.max(
+        80,
+        bodyHeight -
+          getDailyQuestionPaddingPx(
+            body,
+            "vertical"
+          ) -
+          title.offsetHeight -
+          gap
+      );
+
+    const textLength =
+      String(
+        prompt.textContent || ""
+      )
+        .replace(/\s+/g, " ")
+        .trim()
+        .length;
+
+    const stageRatio =
+      contentWidth /
+      contentHeight;
+
+    const targetWidth =
+      Math.floor(
+        contentWidth * 0.98
+      );
+
+    prompt.style.width =
+      `${targetWidth}px`;
+
+    prompt.style.maxWidth =
+      `${targetWidth}px`;
+
+    const lineHeight =
+      textLength <= 100
+        ? 1.13
+        : (
+          textLength <= 170
+            ? 1.09
+            : 1.06
+        );
+
+    prompt.style.setProperty(
+      "--daily-reflection-fit-line-height",
+      String(lineHeight)
+    );
+
+    let high;
+
+    if (stageRatio > 1.35) {
+      high =
+        textLength <= 90
+          ? 52
+          : (
+            textLength <= 150
+              ? 46
+              : 40
+          );
+    } else {
+      high =
+        textLength <= 90
+          ? 62
+          : (
+            textLength <= 150
+              ? 54
+              : 46
+          );
+    }
+
+    let low = 20;
+    let best = low;
+
+    for (
+      let index = 0;
+      index < 10;
+      index += 1
+    ) {
+      const mid =
+        (low + high) / 2;
+
+      prompt.style.setProperty(
+        "--daily-reflection-fit-size",
+        `${mid}px`
+      );
+
+      const fits =
+        prompt.scrollHeight <=
+          contentHeight &&
+        prompt.scrollWidth <=
+          contentWidth;
+
+      if (fits) {
+        best = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+
+    prompt.style.setProperty(
+      "--daily-reflection-fit-size",
+      `${Math.floor(best)}px`
+    );
+  }
+
+  function scheduleDailyQuestionTextFit(
+    root
+  ) {
+    const run =
+      () => {
+        if (
+          !root ||
+          !root.isConnected
+        ) {
+          return;
+        }
+
+        fitDailyQuestionVerseHelp(
+          root
+        );
+
+        fitDailyQuestionReflection(
+          root
+        );
+      };
+
+    requestAnimationFrame(
+      run
+    );
+
+    setTimeout(
+      run,
+      120
+    );
+
+    setTimeout(
+      run,
+      420
+    );
+
+    if (document.fonts?.ready) {
+      document.fonts.ready
+        .then(run)
+        .catch(() => { });
+    }
+  }
+
   function renderScreen(idx) {
     if (
       !isFeatureEnabled() ||
@@ -2073,38 +2567,43 @@
             </button>
 
             <div
-              class="daily-question-verse-ref"
+              class="daily-question-verse-content"
+              data-daily-verse-fit
             >
-              ${escapeHtml(
-                session.verseRef
-              )}
-            </div>
+              <div
+                class="daily-question-verse-ref"
+              >
+                ${escapeHtml(
+                  session.verseRef
+                )}
+              </div>
 
-            <div
-              class="daily-question-verse-text"
-            >
-              ${escapeHtml(
-                session.verseText
-              )}
+              <div
+                class="daily-question-verse-text"
+              >
+                ${escapeHtml(
+                  session.verseText
+                )}
+              </div>
             </div>
-
-            <button
-              class="daily-question-verse-listen no-zoom"
-              type="button"
-              data-daily-verse-listen
-              ${
-                session.verseAudioPlaying
-                  ? "disabled"
-                  : ""
-              }
-            >
-              ${
-                session.verseAudioPlaying
-                  ? "Listening..."
-                  : "Listen to the Verse"
-              }
-            </button>
           </div>
+
+          <button
+            class="daily-question-verse-listen no-zoom"
+            type="button"
+            data-daily-verse-listen
+            ${
+              session.verseAudioPlaying
+                ? "disabled"
+                : ""
+            }
+          >
+            ${
+              session.verseAudioPlaying
+                ? "Listening..."
+                : "Listen to the Verse"
+            }
+          </button>
         </div>
       `;
     } else if (
@@ -2131,15 +2630,6 @@
             ?.application
             ?.prompt || ""
         ).trim();
-
-      const reflectionPromptClass =
-        applicationPrompt.length > 130
-          ? " is-long"
-          : (
-            applicationPrompt.length > 85
-              ? " is-medium"
-              : ""
-          );
 
       wrap.innerHTML = `
         <div
@@ -2186,7 +2676,8 @@
               </div>
 
               <div
-                class="daily-question-reflection-prompt${reflectionPromptClass}"
+                class="daily-question-reflection-prompt"
+                data-daily-reflection-fit
               >
                 ${escapeHtml(
                   applicationPrompt
@@ -3198,6 +3689,17 @@
         ?.stop?.();
 
       stopRewardGame();
+    }
+
+    if (
+      session?.phase ===
+        SESSION_PHASES.VERSE ||
+      session?.phase ===
+        SESSION_PHASES.REFLECTION
+    ) {
+      scheduleDailyQuestionTextFit(
+        wrap
+      );
     }
 
     return appApi.makeSlide({
