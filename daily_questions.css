@@ -218,6 +218,15 @@
   gap: var(--daily-question-flow-gap);
 }
 
+/* Let the pet and heading set their height on Recall and Meaning only. */
+.daily-question-session-shell {
+  grid-template-rows:
+    auto
+    var(--daily-question-card-slot)
+    var(--daily-question-help-slot)
+    var(--daily-question-action-slot);
+}
+
 .daily-question-session-empty {
   width: min(100%, 560px);
   min-height: 100%;
@@ -292,6 +301,17 @@
 
   padding-top:
     clamp(8px, 2vh, 16px);
+}
+
+/* Keep the pet, heading, and question card comfortably separated. */
+.daily-question-session-shell .daily-question-pet {
+  height: auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  gap: clamp(12px, 2vh, 20px);
+  padding-top: 0;
+  margin-bottom: clamp(10px, 1.6vh, 18px);
 }
 
 .daily-question-session-avatar {
@@ -1445,6 +1465,12 @@
     --daily-question-help-slot: 58px;
     --daily-question-action-slot: 46px;
     --daily-question-flow-gap: 7px;
+  }
+
+  /* Leave room for the question card on shorter phones. */
+  .daily-question-session-shell .daily-question-pet {
+    gap: 8px;
+    margin-bottom: 4px;
   }
 
   .daily-question-session .screen-title-pill {
