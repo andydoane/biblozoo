@@ -11933,16 +11933,40 @@ function screenTitle(idx) {
           .DAILY_PET_QUESTIONS_DEBUG === true,
 
       onLongPress: () => {
+        const selectedVerseId =
+          String(
+            wrap.querySelector(
+              "#versePicker"
+            )?.value || ""
+          ).trim();
+
+        if (!selectedVerseId) {
+          showDialog({
+            title: "Choose a Verse First",
+            body:
+              "Select a verse from the title-page dropdown, then long-press the Zoo strip to test its Daily Question.",
+            actions: [
+              dlgBtn("OK", {
+                onClick: closeDialog
+              })
+            ]
+          });
+
+          return;
+        }
+
         const offer =
           window.BibloZooDailyQuestions
-            ?.prepareForcedDebugOffer?.();
+            ?.prepareForcedDebugOffer?.(
+              selectedVerseId
+            );
 
         if (!offer) {
           showDialog({
             title:
-              "No Daily Question Available",
+              "Daily Question Unavailable",
             body:
-              "Unlock one of the four Daily Question BibloPets first.",
+              "The selected verse does not have valid Daily Question content.",
             actions: [
               dlgBtn("OK", {
                 onClick: closeDialog

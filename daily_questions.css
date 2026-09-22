@@ -453,7 +453,9 @@
   font-size:
     clamp(18px, 4.8vw, 24px);
   font-weight: 900;
-  line-height: 1.08;
+  line-height: 1.15;
+
+  text-wrap: balance;
 
   box-shadow:
     0 4px 0 rgba(0, 0, 0, 0.12);

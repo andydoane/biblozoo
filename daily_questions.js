@@ -29,22 +29,10 @@
   const DAILY_PROGRESS_VERSION = 1;
 
   /*
-    Version 1 / initial testing allowlist.
-
-    Only these verses may participate in Daily Pet Questions.
-    Additional verses can be added later without changing the
-    rest of the feature.
+    Any verse with valid Daily Question reflection data may
+    participate. Pet-unlock and daily-progress rules are
+    handled separately by getEligibleVerses().
   */
-  const DAILY_PET_QUESTION_VERSE_IDS =
-    Object.freeze([
-      "genesis_1_1",
-      "john_3_16",
-      "romans_6_23",
-      "psalm_23_4"
-    ]);
-
-  const DAILY_PET_QUESTION_VERSE_ID_SET =
-    new Set(DAILY_PET_QUESTION_VERSE_IDS);
 
   let appApi = null;
   let pendingOffer = null;
@@ -101,15 +89,32 @@
   }
 
   function getAllowedVerseIds() {
-    return [...DAILY_PET_QUESTION_VERSE_IDS];
+    const verseList =
+      appApi?.getVerseList?.();
+
+    if (!Array.isArray(verseList)) {
+      return [];
+    }
+
+    return verseList
+      .map((verse) =>
+        String(
+          verse?.id || ""
+        ).trim()
+      )
+      .filter(Boolean);
   }
 
   function isAllowedVerseId(verseId) {
     const cleanVerseId =
       String(verseId || "").trim();
 
-    return DAILY_PET_QUESTION_VERSE_ID_SET
-      .has(cleanVerseId);
+    if (!cleanVerseId) {
+      return false;
+    }
+
+    return getAllowedVerseIds()
+      .includes(cleanVerseId);
   }
 
   function normalizeQuestion(rawQuestion) {
@@ -157,6 +162,64 @@
       choices,
       answer
     };
+  }
+
+  function createShuffledChoiceOrder() {
+    const order = [0, 1, 2];
+
+    for (
+      let index = order.length - 1;
+      index > 0;
+      index -= 1
+    ) {
+      const swapIndex =
+        Math.floor(
+          Math.random() *
+          (index + 1)
+        );
+
+      [
+        order[index],
+        order[swapIndex]
+      ] = [
+        order[swapIndex],
+        order[index]
+      ];
+    }
+
+    return order;
+  }
+
+  function getSessionChoiceOrder(
+    session
+  ) {
+    const order =
+      session?.choiceOrder;
+
+    const isValidOrder =
+      Array.isArray(order) &&
+      order.length === 3 &&
+      new Set(order).size === 3 &&
+      order.every(
+        (index) =>
+          Number.isInteger(index) &&
+          index >= 0 &&
+          index <= 2
+      );
+
+    if (isValidOrder) {
+      return order;
+    }
+
+    const shuffledOrder =
+      createShuffledChoiceOrder();
+
+    if (session) {
+      session.choiceOrder =
+        shuffledOrder;
+    }
+
+    return shuffledOrder;
   }
 
   function normalizeReflection(rawReflection) {
@@ -350,10 +413,7 @@
             verse?.id || ""
           ).trim();
 
-        if (
-          !verseId ||
-          !isAllowedVerseId(verseId)
-        ) {
+        if (!verseId) {
           return null;
         }
 
@@ -497,54 +557,26 @@
       return null;
     }
 
-    const eligibleById =
-      new Map(
-        eligibleVerses.map(
-          (verse) => [
-            verse.id,
-            verse
-          ]
-        )
-      );
-
     const verseCount =
-      DAILY_PET_QUESTION_VERSE_IDS
-        .length;
+      eligibleVerses.length;
 
-    for (
-      let offset = 1;
-      offset <= verseCount;
-      offset += 1
-    ) {
-      const nextIndex =
-        (
-          debugRotationIndex +
-          offset +
-          verseCount
-        ) % verseCount;
+    debugRotationIndex =
+      (
+        debugRotationIndex +
+        1 +
+        verseCount
+      ) % verseCount;
 
-      const verseId =
-        DAILY_PET_QUESTION_VERSE_IDS[
-        nextIndex
-        ];
-
-      const verse =
-        eligibleById.get(verseId);
-
-      if (!verse) {
-        continue;
-      }
-
-      debugRotationIndex =
-        nextIndex;
-
-      return verse;
-    }
-
-    return null;
+    return (
+      eligibleVerses[
+        debugRotationIndex
+      ] || null
+    );
   }
 
-  function prepareForcedDebugOffer() {
+  function prepareForcedDebugOffer(
+    selectedVerseId
+  ) {
     if (
       !isFeatureEnabled() ||
       !isDebugEnabled()
@@ -555,16 +587,51 @@
     pendingOffer = null;
     acceptedOffer = null;
 
+    const verseId =
+      String(
+        selectedVerseId || ""
+      ).trim();
+
+    const verseList =
+      appApi?.getVerseList?.();
+
+    if (
+      !verseId ||
+      !Array.isArray(verseList)
+    ) {
+      return null;
+    }
+
     const verse =
-      chooseNextDebugVerse();
+      verseList.find(
+        (item) =>
+          String(
+            item?.id || ""
+          ).trim() === verseId
+      );
 
     if (!verse) {
       return null;
     }
 
+    const reflection =
+      normalizeReflection(
+        verse.reflection
+      );
+
+    if (!reflection) {
+      return null;
+    }
+
+    // Debug testing deliberately does not require an unlocked pet.
+    // The normal daily offer still uses getEligibleVerses().
     pendingOffer = {
-      verseId: verse.id,
-      verse,
+      verseId,
+      verse: {
+        ...verse,
+        id: verseId,
+        reflection
+      },
       debugForced: true
     };
 
@@ -718,6 +785,8 @@
       phase:
         SESSION_PHASES.QUESTION,
       questionIndex: 0,
+      choiceOrder:
+        createShuffledChoiceOrder(),
       selectedAnswer: null,
       answered: false,
       answerCorrect: false,
@@ -2972,22 +3041,34 @@
             )
             : "";
 
+        const choiceOrder =
+          getSessionChoiceOrder(
+            session
+          );
+
         const choiceButtons =
-          question.choices
+          choiceOrder
             .map(
-              (choice, index) => {
+              (choiceIndex) => {
+                const choice =
+                  question.choices[
+                    choiceIndex
+                  ];
+
                 const isSelected =
                   session.selectedAnswer ===
-                  index;
+                  choiceIndex;
 
                 const isCorrectChoice =
                   session.answered &&
-                  index === question.answer;
+                  choiceIndex ===
+                    question.answer;
 
                 const isIncorrectSelected =
                   session.answered &&
                   isSelected &&
-                  index !== question.answer;
+                  choiceIndex !==
+                    question.answer;
 
                 const isDimmed =
                   session.answered &&
@@ -3019,7 +3100,7 @@
                   <button
                     class="daily-question-choice no-zoom${stateClass}"
                     type="button"
-                    data-daily-question-choice="${index}"
+                    data-daily-question-choice="${choiceIndex}"
                     aria-pressed="${
                       isSelected
                         ? "true"
@@ -3254,6 +3335,8 @@
             dailySession.questionIndex === 0
           ) {
             dailySession.questionIndex = 1;
+            dailySession.choiceOrder =
+              createShuffledChoiceOrder();
             dailySession.selectedAnswer =
               null;
             dailySession.answered = false;
