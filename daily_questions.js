@@ -2299,15 +2299,9 @@
         ".daily-question-reflection-body"
       );
 
-    const title =
-      body?.querySelector?.(
-        ".daily-question-reflection-title"
-      );
-
     if (
       !prompt ||
-      !body ||
-      !title
+      !body
     ) {
       return;
     }
@@ -2324,17 +2318,6 @@
     ) {
       return;
     }
-
-    const styles =
-      window.getComputedStyle(
-        body
-      );
-
-    const gap =
-      parseFloat(
-        styles.rowGap ||
-        styles.gap
-      ) || 0;
 
     const contentWidth =
       Math.max(
@@ -2353,9 +2336,7 @@
           getDailyQuestionPaddingPx(
             body,
             "vertical"
-          ) -
-          title.offsetHeight -
-          gap
+          )
       );
 
     const textLength =
@@ -2646,12 +2627,9 @@
             ${profilePictureHtml}
 
             <div
-              class="daily-question-wonders is-placeholder"
-              aria-hidden="true"
+              class="daily-question-reflection-title"
             >
-              ${escapeHtml(
-                `${session.petName} wonders...`
-              )}
+              Something to chew on...
             </div>
           </div>
 
@@ -2669,12 +2647,6 @@
             <div
               class="daily-question-reflection-body"
             >
-              <div
-                class="daily-question-reflection-title"
-              >
-                Something to chew on...
-              </div>
-
               <div
                 class="daily-question-reflection-prompt"
                 data-daily-reflection-fit
@@ -3154,35 +3126,32 @@
               >
                 Not sure?
               </div>
-
-              <button
-                class="daily-question-check-verse no-zoom"
-                type="button"
-                data-daily-check-verse
-              >
-                Check the Verse
-              </button>
             </div>
 
             <div
               class="daily-question-action-slot"
             >
-              <button
-                class="daily-question-feedback-next no-zoom${
-                  session.answered
-                    ? ""
-                    : " is-placeholder"
-                }"
-                type="button"
-                data-daily-question-next
-                ${
-                  session.answered
-                    ? ""
-                    : `disabled aria-hidden="true" tabindex="-1"`
-                }
-              >
-                Next
-              </button>
+              ${
+                session.answered
+                  ? `
+                    <button
+                      class="daily-question-feedback-next no-zoom"
+                      type="button"
+                      data-daily-question-next
+                    >
+                      Next
+                    </button>
+                  `
+                  : `
+                    <button
+                      class="daily-question-check-verse no-zoom"
+                      type="button"
+                      data-daily-check-verse
+                    >
+                      Check the Verse
+                    </button>
+                  `
+              }
             </div>
           </div>
         `;
