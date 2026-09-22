@@ -15,6 +15,29 @@
   ],
   "verseText": "Jesus replied, “Truly, truly, I tell you, no one can see the kingdom of God unless he is born again.”",
   "meaning": "Our spirits (or souls) are born dead in sin. In order to believe and join God's kingdom, we need God's Spirit to bring our spirits to life.",
+  "reflection": {
+    "recall": {
+      "question": "What must happen for someone to see God's kingdom?",
+      "choices": [
+        "Be born again",
+        "Become rich",
+        "Move to Jerusalem"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who gives this new spiritual life?",
+      "choices": [
+        "God's Spirit",
+        "Our own effort",
+        "Our family"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank God that new life comes from Him, and ask His Spirit to keep changing your heart."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

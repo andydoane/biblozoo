@@ -16,6 +16,29 @@
   ],
   "verseText": "Therefore go and make disciples of all nations, baptizing them in the name of the Father and of the Son and of the Holy Spirit...",
   "meaning": "This is the Great Commission: the mission Jesus gave to his followers. Our job is to be disciples who go and make new disciples all over the world.",
+  "reflection": {
+    "recall": {
+      "question": "What did Jesus tell His followers to make?",
+      "choices": [
+        "Disciples of all nations",
+        "Big buildings",
+        "Only local friends"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What is the Great Commission?",
+      "choices": [
+        "Jesus' mission for followers to make disciples",
+        "A command to stay home",
+        "A rule only for the apostles"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Think of one person who could learn more about Jesus through your words or example."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

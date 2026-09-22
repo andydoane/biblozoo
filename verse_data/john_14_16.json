@@ -15,6 +15,29 @@
     ],
     "verseText": "And I will ask the Father, and He will give you another Advocate to be with you forever — the Spirit of truth...",
     "meaning": "Jesus knew he would return to heaven and leave his disciples. So promised that the Father would give his followers another Helper, the Holy Spirit, who would always be with them.",
+    "reflection": {
+      "recall": {
+        "question": "What did Jesus say the Father would give?",
+        "choices": [
+          "Another Advocate",
+          "A new king",
+          "A temple"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "Who is the Advocate Jesus promised?",
+        "choices": [
+          "The Holy Spirit",
+          "John the Baptist",
+          "An angel"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Remember that God's Spirit is with His people. Ask Him to help you follow Jesus today."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

@@ -15,6 +15,29 @@
     ],
     "verseText": "You pore over the Scriptures because you presume that by them you possess eternal life. These are the very words that testify about Me.",
     "meaning": "The Scriptures (the Bible) point us to Jesus. The goal of reading the Bible is to know him, because he's the only one who can give us eternal life.",
+    "reflection": {
+      "recall": {
+        "question": "Who do the Scriptures testify about?",
+        "choices": [
+          "Jesus",
+          "Rome",
+          "Themselves"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What is the goal of reading the Bible?",
+        "choices": [
+          "To know Jesus and receive life in Him",
+          "To win trivia contests",
+          "To earn salvation by reading"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "As you read Scripture, ask, 'What does this show me about Jesus?'"
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

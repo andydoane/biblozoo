@@ -13,6 +13,29 @@
   ],
   "verseText": "...for all have sinned and fall short of the glory of God...",
   "meaning": "God is gloriously sinless and perfect. All human beings have sinned – we miss the mark of perfect obedience.",
+  "reflection": {
+    "recall": {
+      "question": "Who has sinned?",
+      "choices": [
+        "All people",
+        "Only bad people",
+        "Only adults"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does falling short of God's glory mean?",
+      "choices": [
+        "None of us reaches God's perfect standard",
+        "Some people are perfect",
+        "God expects very little"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you see your sin, be honest about it and remember that everyone needs God's grace."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

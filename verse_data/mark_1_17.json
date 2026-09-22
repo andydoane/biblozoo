@@ -14,6 +14,29 @@
   ],
   "verseText": "Come, follow Me,” Jesus said, “and I will make you fishers of men.",
   "meaning": "Jesus called his disciples to follow him. By sharing the good news, they would 'catch' people for God's forever kingdom.",
+  "reflection": {
+    "recall": {
+      "question": "What would Jesus make His followers?",
+      "choices": [
+        "Fishers of men",
+        "Kings of nations",
+        "Temple guards"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does fishers of men mean?",
+      "choices": [
+        "Helping bring people to Jesus",
+        "Catching fish for food",
+        "Winning arguments"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Ask Jesus to show you one way you can help someone learn about Him."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

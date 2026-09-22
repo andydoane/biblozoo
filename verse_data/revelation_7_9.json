@@ -17,6 +17,29 @@
   ],
   "verseText": "After this I looked and saw a multitude too large to count, from every nation and tribe and people and tongue, standing before the throne and before the Lamb.",
   "meaning": "This describes God's future forever kingdom, where people from all over the world will worship him together.",
+  "reflection": {
+    "recall": {
+      "question": "Who stood before the throne and the Lamb?",
+      "choices": [
+        "A huge multitude from every nation",
+        "Only one nation",
+        "Only angels"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this vision show about God's kingdom?",
+      "choices": [
+        "People from all peoples will worship together",
+        "Only one culture belongs",
+        "No one will know each other"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Treat people from different places and backgrounds with love, remembering God's forever family includes people from every nation."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

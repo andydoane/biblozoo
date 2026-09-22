@@ -14,6 +14,29 @@
   ],
   "verseText": "Therefore, brothers, since we have confidence to enter the Most Holy Place by the blood of Jesus...",
   "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to him anytime.",
+  "reflection": {
+    "recall": {
+      "question": "What gives us confidence to enter the Most Holy Place?",
+      "choices": [
+        "The blood of Jesus",
+        "Our good behavior",
+        "A temple ticket"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What did Jesus make possible?",
+      "choices": [
+        "We can come directly to God",
+        "We never need to pray",
+        "Only priests can approach God"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Talk to God freely today, remembering that Jesus opened the way for you to come to Him."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

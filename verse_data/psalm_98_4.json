@@ -16,6 +16,29 @@
     ],
     "verseText": "Make a joyful noise to the LORD, all the earth; break forth — let your cry ring out, and sing praises!",
     "meaning": "God made us to worship him and enjoy his goodness. We can give him praise by joyfully singing about his greatness.",
+    "reflection": {
+      "recall": {
+        "question": "What should all the earth make to the LORD?",
+        "choices": [
+          "A joyful noise",
+          "A quiet whisper",
+          "A sad complaint"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "Why should we sing praises to God?",
+        "choices": [
+          "God is worthy of joyful worship",
+          "Singing earns salvation",
+          "God needs entertainment"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Take a moment today to praise God with a song or joyful words."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

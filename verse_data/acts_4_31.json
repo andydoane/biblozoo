@@ -14,6 +14,29 @@
   ],
   "verseText": "...and they were all filled with the Holy Spirit and spoke the word of God boldly.",
   "meaning": "God fills the believers with his Holy Spirit. He gives us courage to bravely share the good news with others.",
+  "reflection": {
+    "recall": {
+      "question": "What did the believers speak boldly?",
+      "choices": [
+        "The word of God",
+        "Their own achievements",
+        "Political news"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who gave them boldness?",
+      "choices": [
+        "The Holy Spirit",
+        "Their enemies",
+        "Their own bravery alone"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you are nervous to speak about God, ask His Spirit to give you courage and kindness."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

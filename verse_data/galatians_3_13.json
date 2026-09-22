@@ -16,6 +16,29 @@
   ],
   "verseText": "Christ redeemed us from the curse of the law by becoming a curse for us. For it is written: “Cursed is everyone who is hung on a tree.”",
   "meaning": "Sin's curse is death. Jesus redeemed us (paid the price to rescue us) from sin's dreadful curse by suffering the curse of death in our place on the cross.",
+  "reflection": {
+    "recall": {
+      "question": "From what did Christ redeem us?",
+      "choices": [
+        "The curse of the law",
+        "Hard work",
+        "Roman rule"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "How did Jesus redeem us?",
+      "choices": [
+        "He took sin's curse in our place on the cross",
+        "He ignored sin",
+        "He told us to save ourselves"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank Jesus for taking the curse of sin in your place."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -15,6 +15,29 @@
   ],
   "verseText": "…have you not read what God said to you: “I am the God of Abraham, the God of Isaac, and the God of Jacob?",
   "meaning": "The God we worship today is the same God who Abraham, Isaac, and Jacob worshiped.",
+  "reflection": {
+    "recall": {
+      "question": "God calls Himself the God of whom?",
+      "choices": [
+        "Abraham, Isaac, and Jacob",
+        "Peter, James, and John",
+        "Saul, David, and Solomon"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this verse show about God?",
+      "choices": [
+        "He is the same faithful God across generations",
+        "He changes with each generation",
+        "He only cared about Abraham"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Remember that the God who cared for His people long ago is the same God you can trust today."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

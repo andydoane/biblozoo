@@ -15,6 +15,29 @@
   ],
   "verseText": "But you know that Christ appeared to take away sins, and in Him there is no sin.",
   "meaning": "The reason Jesus came to earth was to take away our sins. And during his life on earth, he never sinned, not even once.",
+  "reflection": {
+    "recall": {
+      "question": "Why did Christ appear?",
+      "choices": [
+        "To take away sins",
+        "To become rich",
+        "To lead an army"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What was true about Jesus?",
+      "choices": [
+        "There was no sin in Him",
+        "He sinned like everyone else",
+        "He needed someone to save Him"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank Jesus for being sinless and for coming to take away our sins."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

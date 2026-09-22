@@ -16,6 +16,29 @@
   ],
   "verseText": "And we know that God works all things together for the good of those who love Him, who are called according to His purpose.",
   "meaning": "In every situation, we can trust that God is working out a good plan for his people.",
+  "reflection": {
+    "recall": {
+      "question": "What does God work together for good?",
+      "choices": [
+        "All things",
+        "Only easy things",
+        "Only our successes"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "For whom does this promise speak?",
+      "choices": [
+        "Those who love God and are called by Him",
+        "Everyone who gets what they want",
+        "Only people with no problems"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When something confusing happens, ask God to help you trust that He can work even this for good."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

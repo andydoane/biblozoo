@@ -16,6 +16,29 @@
   ],
   "verseText": "For as Jonah was three days and three nights in the belly of the great fish, so the Son of Man will be three days and three nights in the heart of the earth.",
   "meaning": "Jesus compared what would happen to him with Jonah. Just as Jonah was inside the fish for three days and nights, Jesus would rise from the dead on the third day.",
+  "reflection": {
+    "recall": {
+      "question": "How long was Jonah in the great fish?",
+      "choices": [
+        "Three days and three nights",
+        "One week",
+        "Forty days"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What did Jonah's story picture?",
+      "choices": [
+        "Jesus rising after His death",
+        "Jesus calming a storm",
+        "Jesus feeding a crowd"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank Jesus that His death was not the end—He rose again, just as He promised."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -16,6 +16,29 @@
   ],
   "verseText": "Remember that you were a slave in the land of Egypt, and that the LORD your God brought you out of there with a mighty hand and an outstretched arm.",
   "meaning": "God wanted his people to never forget how he rescued them. In the same way, we should never forget how Jesus rescued us.",
+  "reflection": {
+    "recall": {
+      "question": "What did the LORD bring Israel out of?",
+      "choices": [
+        "Slavery in Egypt",
+        "The wilderness",
+        "Babylon"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Why did God tell them to remember their rescue?",
+      "choices": [
+        "So they would not forget His saving power",
+        "So they could boast",
+        "So they would fear Egypt"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Remember one way God has rescued or helped His people, and thank Him for being a saving God."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

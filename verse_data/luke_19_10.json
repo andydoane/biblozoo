@@ -14,6 +14,29 @@
   ],
   "verseText": "For the Son of Man came to seek and to save the lost.",
   "meaning": "Jesus, the Son of Man, is describing his mission. He came to look for lost sinners and to save them.",
+  "reflection": {
+    "recall": {
+      "question": "What did the Son of Man come to do?",
+      "choices": [
+        "Seek and save the lost",
+        "Build a palace",
+        "Judge only rulers"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who are the lost Jesus came to save?",
+      "choices": [
+        "Sinners who need Him",
+        "People who cannot find a road",
+        "Only people far from home"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Remember that Jesus came to seek and save sinners. Thank Him for coming to rescue people like us."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

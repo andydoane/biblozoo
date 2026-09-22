@@ -14,6 +14,29 @@
     ],
     "verseText": "There is a way that seems right to a man, but its end is the way of death.",
     "meaning": "We shouldn't trust in ourselves to figure out what's right. We need God's Word to show us the way that leads to eternal life.",
+    "reflection": {
+      "recall": {
+        "question": "What can seem right but end in death?",
+        "choices": [
+          "A person's own way",
+          "God's Word",
+          "The way of wisdom"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "Why shouldn't we trust only our own ideas?",
+        "choices": [
+          "We can be wrong and need God's truth",
+          "Our ideas are always perfect",
+          "God does not guide us"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Before deciding what is right, ask what God's Word says instead of trusting only your feelings."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

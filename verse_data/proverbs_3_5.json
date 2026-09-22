@@ -14,6 +14,29 @@
   ],
   "verseText": "Trust in the LORD with all your heart, and lean not on your own understanding...",
   "meaning": "Rather than trusting in what we think is right and true, we should trust totally in what God thinks is right and true",
+  "reflection": {
+    "recall": {
+      "question": "What should we not lean on?",
+      "choices": [
+        "Our own understanding",
+        "God's wisdom",
+        "His Word"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does trusting the LORD mean?",
+      "choices": [
+        "Depend on what He says is true",
+        "Believe we always know best",
+        "Never think carefully"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you are unsure what to do, ask God for help and trust His wisdom over your own."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

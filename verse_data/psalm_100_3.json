@@ -15,6 +15,29 @@
   ],
   "verseText": "Know that the LORD is God. It is He who made us, and we are His; we are His people, and the sheep of His pasture.",
   "meaning": "The Lord God is the one who made us. And because he made us, we belong to him.",
+  "reflection": {
+    "recall": {
+      "question": "Who made us?",
+      "choices": [
+        "The LORD",
+        "We made ourselves",
+        "The nations"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does that mean about us?",
+      "choices": [
+        "We belong to God",
+        "We belong only to ourselves",
+        "No one has any claim on our lives"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Remember that you belong to the God who made you, and choose one way to live like one of His people today."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

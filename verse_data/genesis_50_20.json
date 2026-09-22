@@ -16,6 +16,29 @@
   ],
   "verseText": "As for you, what you intended against me for evil, God intended for good, in order to accomplish a day like this—to preserve the lives of many people.",
   "meaning": "Joseph's brothers had an evil plan to hurt Joseph. But God had a good plan the whole time, to use Joseph to save many people",
+  "reflection": {
+    "recall": {
+      "question": "What did Joseph's brothers intend against him?",
+      "choices": [
+        "Evil",
+        "Good",
+        "Nothing"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What did God do with their evil plan?",
+      "choices": [
+        "Used it for good and saved many lives",
+        "Ignored it completely",
+        "Made Joseph take revenge"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When something hard happens, remember that God can work through even bad situations for good."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

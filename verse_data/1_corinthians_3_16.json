@@ -14,6 +14,29 @@
   ],
   "verseText": "Do you not know that you yourselves are God’s temple, and that God’s Spirit dwells in you?",
   "meaning": "In the Old Testament, God's Spirit dwelt in the temple building. But now, because of Jesus, God's Spirit dwells in anyone who believes in Jesus.",
+  "reflection": {
+    "recall": {
+      "question": "What are believers called in this verse?",
+      "choices": [
+        "God's temple",
+        "A palace",
+        "An army"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who dwells in God's people?",
+      "choices": [
+        "God's Spirit",
+        "An angel",
+        "No one"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Remember that God's Spirit lives in His people, and honor God with how you use your body and choices."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

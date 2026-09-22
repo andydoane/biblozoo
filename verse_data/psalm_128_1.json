@@ -13,6 +13,29 @@
   ],
   "verseText": "Blessed are all who fear the LORD, who walk in His ways!",
   "meaning": "We are blessed and truly happy when we have a fearful respect of God's power and live life God's way.",
+  "reflection": {
+    "recall": {
+      "question": "Who is blessed?",
+      "choices": [
+        "Those who fear the LORD and walk in His ways",
+        "Those who are richest",
+        "Those who never have trouble"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does fear of the LORD mean here?",
+      "choices": [
+        "Deep respect that leads to obedience",
+        "Being terrified that He is cruel",
+        "Avoiding Him"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Show your respect for God today by choosing one of His ways even when another way seems easier."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

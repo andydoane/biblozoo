@@ -13,6 +13,29 @@
   ],
   "verseText": "Today in the city of David a Savior has been born to you. He is Christ the Lord!",
   "meaning": "This is how the angels let the shepherds know that Jesus the savior was born in Bethlehem.",
+  "reflection": {
+    "recall": {
+      "question": "Who was born in the city of David?",
+      "choices": [
+        "A Savior, Christ the Lord",
+        "A Roman emperor",
+        "John the Baptist"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What were the angels announcing?",
+      "choices": [
+        "Jesus the Savior had been born",
+        "A war had started",
+        "The shepherds were kings"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Celebrate that Jesus came as Savior, and thank Him for coming to rescue sinners."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

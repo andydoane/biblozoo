@@ -14,6 +14,29 @@
   ],
   "verseText": "...that at the name of Jesus every knee should bow, in heaven and on earth and under the earth...",
   "meaning": "One day, every human being who has ever lived will bow down before king King Jesus.",
+  "reflection": {
+    "recall": {
+      "question": "What will every knee do at the name of Jesus?",
+      "choices": [
+        "Bow",
+        "Run away",
+        "Dance"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this show about Jesus?",
+      "choices": [
+        "He is the King everyone will acknowledge",
+        "He is only one teacher among many",
+        "He has authority only in one place"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Honor Jesus as King today by choosing to obey Him willingly."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

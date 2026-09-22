@@ -13,6 +13,29 @@
 
   "verseText": "Jesus wept.",
    "meaning": "When Jesus went to the tomb of his friend Lazarus, the people cried and Jesus cried with them.",
+   "reflection": {
+     "recall": {
+       "question": "What did Jesus do at Lazarus's tomb?",
+       "choices": [
+         "He wept",
+         "He laughed",
+         "He left"
+       ],
+       "answer": 0
+     },
+     "meaning": {
+       "question": "What does Jesus' weeping show?",
+       "choices": [
+         "He cares about people in sorrow",
+         "He did not know what to do",
+         "He had no power over death"
+       ],
+       "answer": 0
+     },
+     "application": {
+       "prompt": "When someone is sad, follow Jesus' example by caring about their sorrow and being with them."
+     }
+   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     { "type": "emoji", "word": "Jesus", "occurrence": 1, "emoji": "✝️" },

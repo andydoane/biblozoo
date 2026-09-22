@@ -16,6 +16,29 @@
   ],
   "verseText": "The Word became flesh and made His dwelling among us. We have seen His glory, the glory of the one and only Son from the Father, full of grace and truth.",
   "meaning": "The Word is a special name for Jesus. To save us, Jesus 'became flesh,' which means he came in a flesh-and-bone human body.",
+  "reflection": {
+    "recall": {
+      "question": "What did the Word become?",
+      "choices": [
+        "Flesh",
+        "An angel",
+        "A book"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who is the Word?",
+      "choices": [
+        "Jesus",
+        "Moses",
+        "John"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank Jesus for coming close to us as a real human being so He could save us."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

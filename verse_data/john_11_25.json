@@ -16,6 +16,29 @@
     ],
     "verseText": "Jesus said to her, “I am the resurrection and the life. Whoever believes in Me will live, even though he dies.”",
     "meaning": "When we believe in Jesus, we have a promise from him. After we die, we'll live forever with him. When he returns, our bodies will be raised to life.",
+    "reflection": {
+      "recall": {
+        "question": "What does Jesus call Himself?",
+        "choices": [
+          "The resurrection and the life",
+          "A mighty angel",
+          "A temple priest"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What promise does Jesus give believers?",
+        "choices": [
+          "They will live even though they die",
+          "They will never die physically",
+          "They will never suffer"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When death feels scary, remember Jesus' promise of resurrection and life."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

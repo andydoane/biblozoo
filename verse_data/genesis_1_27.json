@@ -16,6 +16,29 @@
   ],
   "verseText": "So God created man in His own image; in the image of God He created him; male and female He created them.",
   "meaning": "God created human beings in his likeness. That makes us special. We are more like God than any of the other creatures he made.",
+  "reflection": {
+    "recall": {
+      "question": "In whose image were humans created?",
+      "choices": [
+        "God's",
+        "Animals'",
+        "Angels'"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does being made in God's image mean?",
+      "choices": [
+        "Human beings have special dignity and likeness to God",
+        "People are gods",
+        "Humans are just like every animal"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Treat another person with respect today because they are made in God's image."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

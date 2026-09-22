@@ -15,6 +15,29 @@
   ],
   "verseText": "And you shall love the LORD your God with all your heart and with all your soul and with all your strength.",
   "meaning": "God commands us to love him completely, giving every part of ourselves to him.",
+  "reflection": {
+    "recall": {
+      "question": "How should we love the LORD?",
+      "choices": [
+        "With all our heart, soul, and strength",
+        "Only with words",
+        "Only when convenient"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this command ask from us?",
+      "choices": [
+        "Wholehearted love for God",
+        "Perfect knowledge",
+        "A weekly ritual only"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Choose one way today to love God with your thoughts, energy, or choices."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

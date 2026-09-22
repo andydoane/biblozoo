@@ -14,6 +14,29 @@
   ],
   "verseText": "They replied, “Believe in the Lord Jesus and you will be saved, you and your household.”",
   "meaning": "Paul and Silas said these words. They explain how we can be saved. Anyone who believes in Jesus can be saved. It includes you and everyone in your house.",
+  "reflection": {
+    "recall": {
+      "question": "What must a person do to be saved?",
+      "choices": [
+        "Believe in the Lord Jesus",
+        "Do enough good works",
+        "Know every Bible verse"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who can this good news be for?",
+      "choices": [
+        "Anyone who believes",
+        "Only church leaders",
+        "Only adults"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Remember that salvation comes through believing in Jesus, and pray for someone in your family to trust Him."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

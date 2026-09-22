@@ -16,6 +16,29 @@
   ],
   "verseText": "Who among the gods is like You, O LORD? Who is like You—majestic in holiness, revered with praises, performing wonders?",
   "meaning": "There is no onle like the Lord God. He's perfectly holy (without sin) and he does impossible miracles to save his people",
+  "reflection": {
+    "recall": {
+      "question": "Who is like the LORD among the gods?",
+      "choices": [
+        "No one",
+        "Everyone",
+        "Only Pharaoh"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What makes God unique?",
+      "choices": [
+        "He is holy and does wonders",
+        "He is just like other gods",
+        "He never acts"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Praise God for one thing that makes Him unlike anyone else."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -15,6 +15,29 @@
   ],
   "verseText": "I consider that our present sufferings are not comparable to the glory that will be revealed in us.",
   "meaning": "The toughest times we face in this life aren't worth thinking about when we compare them to the glory of spending forever with God",
+  "reflection": {
+    "recall": {
+      "question": "How do present sufferings compare with future glory?",
+      "choices": [
+        "They are not comparable",
+        "They are greater",
+        "They are exactly equal"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What hope helps us in suffering?",
+      "choices": [
+        "The glory God will reveal",
+        "Nothing hard will ever happen",
+        "We can fix everything"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When life hurts, remember that the glory God promises is greater than today's suffering."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

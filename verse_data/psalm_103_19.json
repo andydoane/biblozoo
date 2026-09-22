@@ -14,6 +14,29 @@
     ],
     "verseText": "The LORD has established His throne in heaven, and His kingdom rules over all.",
     "meaning": "The Lord God is the King of all creation. In heaven, he sits on his throne and rules over everything he has made.",
+    "reflection": {
+      "recall": {
+        "question": "Where has the LORD established His throne?",
+        "choices": [
+          "In heaven",
+          "In Jerusalem only",
+          "At the sea"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "How much does His kingdom rule over?",
+        "choices": [
+          "Everything",
+          "Only one nation",
+          "Only people who agree"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When life feels out of control, remember that God's kingdom rules over all."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

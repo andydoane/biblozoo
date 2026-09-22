@@ -15,6 +15,29 @@
   ],
   "verseText": "Now to Him who is able to do immeasurably more than all we ask or imagine, according to His power that is at work within us...",
   "meaning": "God is able to do way more than we could ever even think about asking for. His power is beyond our wildest imaginations!",
+  "reflection": {
+    "recall": {
+      "question": "How much is God able to do?",
+      "choices": [
+        "Immeasurably more than we ask or imagine",
+        "Only what we can imagine",
+        "Very little"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this verse emphasize?",
+      "choices": [
+        "God's power is beyond our imagination",
+        "We should never ask God anything",
+        "God only works through strong people"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Bring a big request to God, remembering that His power is greater than what you can imagine."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

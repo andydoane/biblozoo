@@ -14,6 +14,29 @@
   ],
   "verseText": "Is any one of you suffering? He should pray. Is anyone cheerful? He should sing praises.",
   "meaning": "Whenever trouble comes, our first step should be to pray to God for help.",
+  "reflection": {
+    "recall": {
+      "question": "What should a suffering person do?",
+      "choices": [
+        "Pray",
+        "Complain",
+        "Hide"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What should be our first response to trouble?",
+      "choices": [
+        "Turn to God in prayer",
+        "Pretend nothing is wrong",
+        "Solve everything alone"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "The next time something goes wrong, make prayer your first response."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

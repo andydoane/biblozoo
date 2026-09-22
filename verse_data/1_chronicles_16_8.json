@@ -14,6 +14,29 @@
   ],
   "verseText": "Give thanks to the LORD; call upon His name; make known His deeds among the nations.",
   "meaning": "God has done so many amazing things to save his people. We should give thanks and share the stories with others.",
+  "reflection": {
+    "recall": {
+      "question": "What should God's people make known?",
+      "choices": [
+        "What God has done",
+        "What we have done",
+        "What we want"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Why should we tell others what God has done?",
+      "choices": [
+        "His saving works deserve thanks and sharing",
+        "God might forget them",
+        "Stories earn salvation"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Tell someone one thing God has done that makes you thankful."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

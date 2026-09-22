@@ -14,6 +14,29 @@
   ],
   "verseText": "But Peter and the other apostles replied, “We must obey God rather than men.”",
   "meaning": "Peter and the apostles knew that obeying God is more important than obeying people, even when it brings trouble into our lives.",
+  "reflection": {
+    "recall": {
+      "question": "Whom must the apostles obey rather than people?",
+      "choices": [
+        "God",
+        "Themselves",
+        "The crowd"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What should happen when a human command conflicts with God?",
+      "choices": [
+        "Obey God",
+        "Always obey people",
+        "Do whatever is easiest"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "If following God ever costs you something, remember that obeying Him matters most."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

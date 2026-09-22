@@ -14,6 +14,29 @@
   ],
   "verseText": "In the days of those kings, the God of heaven will set up a kingdom that will never be destroyed...",
   "meaning": "Earthly kingdoms do not last forever. But Jesus' kingdom will last forever, and no one will ever be able to destroy it.",
+  "reflection": {
+    "recall": {
+      "question": "What kind of kingdom will God set up?",
+      "choices": [
+        "One that will never be destroyed",
+        "One lasting ten years",
+        "One ruled by Rome"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "How is God's kingdom different from earthly kingdoms?",
+      "choices": [
+        "It lasts forever",
+        "It is weaker",
+        "It depends on armies"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When earthly powers seem important, remember that Jesus' kingdom is the one that lasts forever."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

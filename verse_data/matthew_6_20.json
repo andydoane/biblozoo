@@ -16,6 +16,29 @@
   ],
   "verseText": "But store up for yourselves treasures in heaven, where moth and rust do not destroy, and where thieves do not break in and steal.",
   "meaning": "We should value treasures that last forever (like eternal life in God’s kingdom) instead of earthly things that can be ruined, stolen, or lost.",
+  "reflection": {
+    "recall": {
+      "question": "Where should we store up treasures?",
+      "choices": [
+        "In heaven",
+        "Only in barns",
+        "Under the ground"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What kind of treasure lasts?",
+      "choices": [
+        "Treasure connected to God's kingdom",
+        "Anything expensive",
+        "Whatever we can keep locked up"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Think about what you value most. Ask God to help you care more about what lasts forever."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

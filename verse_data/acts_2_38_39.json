@@ -15,6 +15,29 @@
   ],
   "verseText": "...you will receive the gift of the Holy Spirit. This promise belongs to you and your children and to all who are far off...",
   "meaning": "The Holy Spirit is God's gift to his people. His promise is for all who believe: young and old, near and far.",
+  "reflection": {
+    "recall": {
+      "question": "What gift is promised?",
+      "choices": [
+        "The Holy Spirit",
+        "A crown",
+        "Perfect health"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who is this promise for?",
+      "choices": [
+        "All whom God calls, near and far",
+        "Only adults in Jerusalem",
+        "Only apostles"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank God that His Spirit is a gift for His people, not just for a few special people."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

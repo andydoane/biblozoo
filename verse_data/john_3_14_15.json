@@ -17,6 +17,29 @@
   ],
   "verseText": "Just as Moses lifted up the snake in the wilderness, so the Son of Man must be lifted up, that everyone who believes in Him may have eternal life.",
   "meaning": "God told Moses to lift up a bronze snake so that people who had been bitten by a snake could look at it and live. It was a picture of how Jesus would be lifted up on the cross to save us from sin.",
+  "reflection": {
+    "recall": {
+      "question": "What did Moses lift up in the wilderness?",
+      "choices": [
+        "The snake",
+        "A crown",
+        "A sword"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "How does that story point to Jesus?",
+      "choices": [
+        "He would be lifted up so believers have life",
+        "He would become a king in Egypt",
+        "He would avoid the cross"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Look to Jesus with faith and thank Him for being lifted up on the cross to save sinners."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

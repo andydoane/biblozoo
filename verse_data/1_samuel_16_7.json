@@ -14,6 +14,29 @@
   ],
   "verseText": "...the LORD does not see as man does. For man sees the outward appearance, but the LORD sees the heart.”",
   "meaning": "People often judge by what they can see on the outside, but the Lord sees what is really in a person's heart.",
+  "reflection": {
+    "recall": {
+      "question": "What do people usually see?",
+      "choices": [
+        "Outward appearance",
+        "The heart",
+        "The future"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does the LORD see?",
+      "choices": [
+        "The heart",
+        "Only clothes",
+        "Only achievements"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Instead of judging someone by appearance, remember that God cares about what is in the heart."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -15,6 +15,29 @@
   ],
   "verseText": "The LORD does all that pleases Him in the heavens and on the earth, in the seas and in all their depths.",
   "meaning": "God has the power to do whatever he feels like, wherever he wants: all the way from heaven above down to the bottom of the sea.",
+  "reflection": {
+    "recall": {
+      "question": "Where does the LORD do whatever pleases Him?",
+      "choices": [
+        "Heaven, earth, seas, and depths",
+        "Only heaven",
+        "Only Israel"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this show about God?",
+      "choices": [
+        "He has complete power and freedom",
+        "He is limited by place",
+        "Nature controls Him"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you face something beyond your control, remember that nothing is outside God's rule."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

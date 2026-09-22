@@ -14,6 +14,29 @@
   ],
   "verseText": "Give thanks to the LORD, for He is good. His loving devotion endures forever.",
   "meaning": "These are two reasons to praise God: he is good and he loves us with a steadfast, never-stopping kind of love.",
+  "reflection": {
+    "recall": {
+      "question": "Why should we give thanks to the LORD?",
+      "choices": [
+        "He is good and His love endures",
+        "He makes life easy",
+        "He gives everyone riches"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What is God's loving devotion like?",
+      "choices": [
+        "Steadfast and never-stopping",
+        "Temporary",
+        "Earned by perfect behavior"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank God for one sign of His goodness and remember that His love endures forever."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

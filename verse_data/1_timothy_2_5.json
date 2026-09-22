@@ -14,6 +14,29 @@
   ],
   "verseText": "For there is one God, and there is one mediator between God and men, the man Christ Jesus...",
   "meaning": "Jesus is our mediator, the man who stands in the middle between sinners and our sinless God.",
+  "reflection": {
+    "recall": {
+      "question": "How many mediators are there between God and people?",
+      "choices": [
+        "One",
+        "Many",
+        "None"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Who is the mediator?",
+      "choices": [
+        "Christ Jesus",
+        "Moses",
+        "Paul"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you pray, remember that Jesus is the one who brings sinners to God."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

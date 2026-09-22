@@ -15,6 +15,29 @@
     ],
     "verseText": "The LORD is my light and my salvation — whom shall I fear? The LORD is the stronghold of my life — whom shall I dread?",
     "meaning": "The Lord God guides, saves, and protects his people. He is like a strong castle we can hide in for safety. Because of him, we have no reason to fear.",
+    "reflection": {
+      "recall": {
+        "question": "What is the LORD called in this verse?",
+        "choices": [
+          "My light and my salvation",
+          "My enemy and judge",
+          "My treasure chest"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "Why does the psalmist not need to fear?",
+        "choices": [
+          "The Lord protects and saves him",
+          "No one can ever hurt him",
+          "He never has problems"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you feel afraid, remember that the Lord is your light, salvation, and stronghold."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

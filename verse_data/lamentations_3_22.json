@@ -15,6 +15,29 @@
     ],
     "verseText": "Because of the loving devotion of the LORD we are not consumed, for His mercies never fail.",
     "meaning": "God's love is steadfast: faithful and never-stopping. His mercy (love we don't deserve) will never, ever stop.",
+    "reflection": {
+      "recall": {
+        "question": "Why are we not consumed?",
+        "choices": [
+          "The LORD's loving devotion",
+          "Our perfect behavior",
+          "Our strength"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What are God's mercies like?",
+        "choices": [
+          "They never fail",
+          "They are rare",
+          "They must be earned"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you need another chance, remember that God's mercy does not run out."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

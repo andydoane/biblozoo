@@ -15,6 +15,29 @@
   ],
   "verseText": "Not one of all the LORD’s good promises to the house of Israel had failed; everything was fulfilled.",
   "meaning": "God kept all the promises he made to the Israelites. And he keeps all the promises he makes to us.",
+  "reflection": {
+    "recall": {
+      "question": "How many of the LORD's good promises failed?",
+      "choices": [
+        "Not one",
+        "Half of them",
+        "Most of them"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this teach about God?",
+      "choices": [
+        "He keeps His promises",
+        "He changes His mind often",
+        "His promises are guesses"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Choose one promise of God you know and thank Him that He is faithful to keep it."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -14,6 +14,29 @@
   ],
   "verseText": "What then shall we say in response to these things? If God is for us, who can be against us?",
   "meaning": "We know God is on our side because he sent Jesus to save us. And if God is on our side, no one can defeat us.",
+  "reflection": {
+    "recall": {
+      "question": "If God is for us, who can finally defeat us?",
+      "choices": [
+        "No one",
+        "Everyone",
+        "Only our friends"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "How do we know God is for us?",
+      "choices": [
+        "He sent Jesus to save us",
+        "We never suffer",
+        "We always win arguments"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you feel outmatched, remember that God has shown He is for His people through Jesus."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

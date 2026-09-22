@@ -14,6 +14,29 @@
     ],
     "verseText": "How awesome is the LORD Most High, the great King over all the earth!",
     "meaning": "The Lord God is our Creator and the Most High King of the Universe. He is awesome, deserving of a 'wow' kind of fear.",
+    "reflection": {
+      "recall": {
+        "question": "What is the LORD Most High called?",
+        "choices": [
+          "The great King over all the earth",
+          "A local ruler",
+          "A servant"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does it mean that God is awesome?",
+        "choices": [
+          "He deserves wonder and reverence",
+          "He is frightening for no reason",
+          "He is like a superhero story"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Look at something God made and take a moment to wonder at the greatness of the King who made it."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

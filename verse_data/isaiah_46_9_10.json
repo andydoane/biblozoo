@@ -16,6 +16,29 @@
   ],
   "verseText": "I am God, and there is none like Me. I declare the end from the beginning, and from ancient times what is still to come.",
   "meaning": "No one is like God. He knows every single thing that will happen in the future.",
+  "reflection": {
+    "recall": {
+      "question": "What can God declare from the beginning?",
+      "choices": [
+        "The end",
+        "Only the past",
+        "Nothing about the future"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this show about God?",
+      "choices": [
+        "He knows the future",
+        "He guesses well",
+        "He learns as events happen"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When the future feels uncertain, remember that God already knows what is coming."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -14,6 +14,29 @@
   ],
   "verseText": "For the LORD your God is God of gods and Lord of lords, the great, mighty, and awesome God...",
   "meaning": "The Lord God is powerful and awesome. He's the one true God in charge of everything and everyone.",
+  "reflection": {
+    "recall": {
+      "question": "Who is the LORD?",
+      "choices": [
+        "God of gods and Lord of lords",
+        "One god among many",
+        "A human king"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this verse teach about God?",
+      "choices": [
+        "He is great, mighty, and above all",
+        "He is weak",
+        "He answers to other gods"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Let God's greatness shape how you worship and obey Him today."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

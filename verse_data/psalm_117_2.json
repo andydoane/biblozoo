@@ -15,6 +15,29 @@
   ],
   "verseText": "For great is His loving devotion toward us, and the faithfulness of the LORD endures forever. Hallelujah!",
   "meaning": "God loves his people with a never-stopping love. We can trust him to always keep his promises.",
+  "reflection": {
+    "recall": {
+      "question": "How long does the LORD's faithfulness endure?",
+      "choices": [
+        "Forever",
+        "Until hard times",
+        "One generation"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What kind of love does God have?",
+      "choices": [
+        "Faithful, never-stopping love",
+        "Love that depends on our perfection",
+        "Love that quickly fades"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you feel unsure, remember that God's faithful love does not run out."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

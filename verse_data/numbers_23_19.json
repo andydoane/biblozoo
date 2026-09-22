@@ -16,6 +16,29 @@
   ],
   "verseText": "God is not a man, that He should lie, or a son of man, that He should change His mind. Does He speak and not act? Does He promise and not fulfill?",
   "meaning": "God is different from human beings. We lie and change our minds, but God always tells the truth and keeps every promise he makes.",
+  "reflection": {
+    "recall": {
+      "question": "Is God like a man who lies?",
+      "choices": [
+        "No",
+        "Yes",
+        "Sometimes"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What can we trust about God?",
+      "choices": [
+        "He tells the truth and keeps His promises",
+        "He often changes His mind",
+        "He forgets what He said"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you read one of God's promises, remember that He does not lie and will do what He says."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

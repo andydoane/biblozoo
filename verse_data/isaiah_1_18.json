@@ -14,6 +14,29 @@
   ],
   "verseText": "Though your sins are like scarlet, they will be as white as snow; though they are as red as crimson, they will become like wool.",
   "meaning": "The price of sin is deep and serious: forever death! But even the filthiest sinner can be washed clean through Jesus' blood.",
+  "reflection": {
+    "recall": {
+      "question": "What can scarlet sins become like?",
+      "choices": [
+        "White as snow",
+        "Darker red",
+        "Gold"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What picture is this verse giving?",
+      "choices": [
+        "God can cleanse deep sin",
+        "Sin is not serious",
+        "We clean ourselves"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you feel stained by sin, confess it to God and remember that He can make sinners clean."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

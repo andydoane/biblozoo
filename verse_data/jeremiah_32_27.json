@@ -14,6 +14,29 @@
   ],
   "verseText": "Behold, I am the LORD, the God of all flesh. Is anything too difficult for Me?",
   "meaning": "God is all-powerful. Nothing is too hard for him to do.",
+  "reflection": {
+    "recall": {
+      "question": "Is anything too difficult for the LORD?",
+      "choices": [
+        "No",
+        "Yes, many things",
+        "Only big problems"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does this question teach about God?",
+      "choices": [
+        "He is all-powerful",
+        "He needs our help",
+        "He has limits"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Bring a hard situation to God in prayer, remembering that nothing is too difficult for Him."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

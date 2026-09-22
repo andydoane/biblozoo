@@ -16,6 +16,29 @@
   ],
   "verseText": "But you will receive power when the Holy Spirit comes upon you, and you will be My witnesses in Jerusalem, and in all Judea and Samaria, and to the ends of the earth.”",
   "meaning": "Jesus promised that the Holy Spirit would give us power to share the good news, beginning nearby and spreading through the whole world.",
+  "reflection": {
+    "recall": {
+      "question": "What gives Jesus' followers power?",
+      "choices": [
+        "The Holy Spirit",
+        "Money",
+        "Government"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What are believers empowered to do?",
+      "choices": [
+        "Be Jesus' witnesses",
+        "Rule nations",
+        "Avoid other people"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Ask the Holy Spirit for courage to tell someone something true about Jesus."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

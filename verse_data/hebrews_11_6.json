@@ -16,6 +16,29 @@
   ],
   "verseText": "And without faith it is impossible to please God. For anyone who approaches Him must believe that He exists and that He rewards those who earnestly seek Him.",
   "meaning": "If we don't have faith in God, it doesn't matter how good we try to be. The only way to please God is to put our faith and trust in his Son Jesus.",
+  "reflection": {
+    "recall": {
+      "question": "Without what is it impossible to please God?",
+      "choices": [
+        "Faith",
+        "Money",
+        "Knowledge"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What must a person who comes to God believe?",
+      "choices": [
+        "He exists and rewards those who seek Him",
+        "God cannot be known",
+        "Good deeds replace faith"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you pray, come to God believing that He is real and worth seeking."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

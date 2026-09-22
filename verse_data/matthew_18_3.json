@@ -16,6 +16,29 @@
   ],
   "verseText": "Truly I tell you,” He said, “unless you change and become like little children, you will never enter the kingdom of heaven.",
   "meaning": "In order to enter God's kingdom, we must trust in Jesus as much as a child trusts in their parents.",
+  "reflection": {
+    "recall": {
+      "question": "What must people become like to enter the kingdom?",
+      "choices": [
+        "Little children",
+        "Powerful rulers",
+        "Religious teachers"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What childlike quality is important here?",
+      "choices": [
+        "Trust",
+        "Knowing everything",
+        "Being physically small"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Ask Jesus to help you trust Him simply and fully, like a child trusts a loving parent."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

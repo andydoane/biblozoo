@@ -16,6 +16,29 @@
   ],
   "verseText": "Look at the birds of the air: They do not sow or reap or gather into barns, and yet your heavenly Father feeds them. Are you not much more valuable than they?",
   "meaning": "Birds aren’t farmers. They must rely on God to take care of their needs. We can trust our heavenly Father to care for us because we are even more valuable to him.",
+  "reflection": {
+    "recall": {
+      "question": "Who feeds the birds of the air?",
+      "choices": [
+        "Your heavenly Father",
+        "The birds' barns",
+        "The farmers"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "Why can we trust God to care for us?",
+      "choices": [
+        "We are valuable to our Father",
+        "We never need to work",
+        "Birds can solve our problems"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you worry about what you need, remember the birds and thank your heavenly Father for caring for you."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

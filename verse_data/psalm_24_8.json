@@ -13,6 +13,29 @@
     ],
     "verseText": "Who is this King of Glory? The LORD strong and mighty, the LORD mighty in battle.",
     "meaning": "The Lord God is the glorious King of the Universe. He is strong, powerful, and mighty. No enemy stands a chance against him in battle.",
+    "reflection": {
+      "recall": {
+        "question": "Who is the King of Glory?",
+        "choices": [
+          "The LORD",
+          "David",
+          "An angel"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does this verse say about the LORD?",
+        "choices": [
+          "He is strong and mighty",
+          "He avoids battles",
+          "He needs protection"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When something seems too big for you, remember that the Lord is mighty and ask Him for help."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

@@ -15,6 +15,29 @@
     ],
     "verseText": "And being found in appearance as a man, He humbled Himself and became obedient to death — even death on a cross.",
     "meaning": "Though Jesus deserved to be treated like a king, he chose to become a lowly human and suffer the dreadful death of the cross in order to save us.",
+    "reflection": {
+      "recall": {
+        "question": "How far did Jesus humble Himself?",
+        "choices": [
+          "To death on a cross",
+          "To becoming a rich king",
+          "To avoiding suffering"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does Jesus' humility show?",
+        "choices": [
+          "He willingly suffered to save us",
+          "He was powerless",
+          "He wanted people to ignore Him"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Look for one way to put someone else's good ahead of your own comfort today."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

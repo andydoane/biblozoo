@@ -15,6 +15,29 @@
   ],
   "verseText": "For even the Son of Man did not come to be served, but to serve, and to give His life as a ransom for many.",
   "meaning": "Jesus, the Son of Man, did not come so that others would serve him. He came to be our ransom: to pay the price to save us from sin.",
+  "reflection": {
+    "recall": {
+      "question": "Did the Son of Man come to be served or to serve?",
+      "choices": [
+        "To serve",
+        "To be served",
+        "To avoid people"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does ransom mean in this verse?",
+      "choices": [
+        "Jesus paid the price to rescue sinners",
+        "Jesus asked people for money",
+        "Jesus became a political king"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Follow Jesus' example by looking for one simple way to serve someone today."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

@@ -18,6 +18,29 @@
     ],
     "verseText": "Do not fear, for I am with you; do not be afraid, for I am your God. I will strengthen you; I will surely help you; I will uphold you with My righteous right hand.",
     "meaning": "If we trust in Jesus, we can trust that God will always be with us. No matter what troubles we face, we have no reason to fear. Our mighty God is always near to give us what we need.",
+    "reflection": {
+      "recall": {
+        "question": "Why should God's people not fear?",
+        "choices": [
+          "God is with them",
+          "Nothing difficult will happen",
+          "They are stronger than everyone"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does God promise to do?",
+        "choices": [
+          "Strengthen, help, and uphold us",
+          "Keep us from every problem",
+          "Let us handle life alone"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you feel afraid, remind yourself that God is with you and ask Him for strength and help."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

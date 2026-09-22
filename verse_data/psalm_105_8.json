@@ -13,6 +13,29 @@
   ],
   "verseText": "He remembers His covenant forever, the word He ordained for a thousand generations...",
   "meaning": "God will never forget or fail to keep the covenants (super special promises) he makes to his people.",
+  "reflection": {
+    "recall": {
+      "question": "How long does God remember His covenant?",
+      "choices": [
+        "Forever",
+        "A few years",
+        "Until people forget"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What is a covenant?",
+      "choices": [
+        "A special promise God faithfully keeps",
+        "A song of praise",
+        "A building"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Thank God that He never forgets His promises."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

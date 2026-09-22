@@ -14,6 +14,29 @@
     ],
     "verseText": "Why should the nations say, “Where is their God?” Our God is in heaven; He does as He pleases.",
     "meaning": "God is the Maker of everything and the King of the Universe. He has the power to do whatever he wants.",
+    "reflection": {
+      "recall": {
+        "question": "Where is our God?",
+        "choices": [
+          "In heaven",
+          "Inside an idol",
+          "Hidden in the hills"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What can God do?",
+        "choices": [
+          "Whatever He pleases",
+          "Only what people allow",
+          "Nothing without idols"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Trust that God is truly in control, even when you cannot see what He is doing."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

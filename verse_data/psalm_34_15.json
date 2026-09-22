@@ -14,6 +14,29 @@
     ],
     "verseText": "The eyes of the LORD are on the righteous, and His ears are inclined to their cry.",
     "meaning": "The Lord God fills heaven and earth. He is always near to us when we are in trouble. He sees and hears everything.",
+    "reflection": {
+      "recall": {
+        "question": "What are the eyes of the LORD on?",
+        "choices": [
+          "The righteous",
+          "Only kings",
+          "The mountains"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does this verse show about God?",
+        "choices": [
+          "He sees and hears His people",
+          "He is far away",
+          "He only notices big problems"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you need help, pray knowing that God sees you and hears your cry."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

@@ -17,6 +17,29 @@
   ],
   "verseText": "Jesus declared, “‘Love the Lord your God with all your heart and with all your soul and with all your mind.’ This is the first and greatest commandment.",
   "meaning": "Out of all the commandments in the Bible, there is one that is most important of all: to love God with all that we are and all that we have, more than anything else in the world.",
+  "reflection": {
+    "recall": {
+      "question": "What is the first and greatest commandment?",
+      "choices": [
+        "Love the Lord with all your heart, soul, and mind",
+        "Earn lots of money",
+        "Never make mistakes"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does it mean to love God this way?",
+      "choices": [
+        "Put Him first with our whole selves",
+        "Think about Him once a week",
+        "Only say nice words"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Choose one part of your day—your thoughts, choices, or energy—and offer it to God in love."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

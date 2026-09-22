@@ -14,6 +14,29 @@
     ],
     "verseText": "The LORD is on my side; I will not be afraid. What can man do to me?",
     "meaning": "If God is on our side, we have nothing to fear. How do we know God is on our side? Because he sent his Son to die for us!",
+    "reflection": {
+      "recall": {
+        "question": "Who is on the psalmist's side?",
+        "choices": [
+          "The LORD",
+          "Every person",
+          "An army"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "Why can believers face people without fear?",
+        "choices": [
+          "God is greater and is for His people",
+          "People can never hurt us",
+          "We are always stronger"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you worry about what someone might do or think, remember that the Lord is with you."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

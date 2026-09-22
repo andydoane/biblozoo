@@ -15,6 +15,29 @@
   ],
   "verseText": "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.",
   "meaning": "When the Holy Spirit lives inside us, he grows good things in our lives, just like a fruit tree grows delicious fruit.",
+  "reflection": {
+    "recall": {
+      "question": "What is listed as fruit of the Spirit?",
+      "choices": [
+        "Love, joy, peace, and more",
+        "Gold, silver, and jewels",
+        "Strength, speed, and fame"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "How does this fruit grow in us?",
+      "choices": [
+        "The Holy Spirit produces it",
+        "We fake it",
+        "It appears only when life is easy"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Choose one fruit of the Spirit you especially need today and ask God to grow it in you."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

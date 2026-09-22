@@ -15,6 +15,29 @@
     ],
     "verseText": "As it is written: “There is no one righteous, not even one. There is no one who understands, no one who seeks God.”",
     "meaning": "It is written in many places in the Bible that no one is truly righteous. Nobody is perfect. Nobody always does what God says is right. That's why we need Jesus to save us.",
+    "reflection": {
+      "recall": {
+        "question": "How many people are righteous on their own?",
+        "choices": [
+          "No one",
+          "Almost everyone",
+          "Only adults"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "Why do we need Jesus to save us?",
+        "choices": [
+          "None of us is perfectly righteous",
+          "We need help becoming popular",
+          "We can save ourselves"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you notice your own sin, don't pretend you are perfect. Ask Jesus for forgiveness and help."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

@@ -13,6 +13,29 @@
   ],
   "verseText": "Turn my heart to Your testimonies and not to covetous gain.",
   "meaning": "We need God to help our hearts love his word more than money or selfish things.",
+  "reflection": {
+    "recall": {
+      "question": "What should the heart turn toward?",
+      "choices": [
+        "God's testimonies",
+        "Covetous gain",
+        "More possessions"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What is this prayer asking God to change?",
+      "choices": [
+        "What the heart loves",
+        "The amount of money we have",
+        "Other people's choices"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Ask God to make your heart love His Word more than money or selfish gain."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
