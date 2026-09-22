@@ -24,6 +24,8 @@
   const PEG_NOTE_FREQUENCIES = Object.freeze([
     523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
   ]);
+  const TILT_CALIBRATION_MS = 750;
+  const TILT_NEUTRAL_LIMIT = 3.5;
 
   let activeRuntime = null;
   let preparedAudioContext = null;
@@ -78,7 +80,14 @@
     const pegs = [];
     const rows = 9;
     const radius = clamp(width * 0.04, 14, 26);
-    const spacing = width / 6;
+    const foodRadius = radius * 0.66;
+    const edgeGap = foodRadius * 3;
+    const edgeCenter = clamp(
+      radius + edgeGap,
+      radius * 1.35,
+      width * 0.18
+    );
+    const regularSpacing = (width - edgeCenter * 2) / 4;
     const topY = Math.max(radius * 2.6, height * 0.12);
     const bottomY = height * 0.76;
 
@@ -87,11 +96,15 @@
       const columns = offset ? 4 : 5;
       const y = topY + ((bottomY - topY) * row / (rows - 1));
       for (let column = 0; column < columns; column += 1) {
+        const x = offset
+          ? edgeCenter + regularSpacing * (column + 0.5)
+          : edgeCenter + regularSpacing * column;
+
         pegs.push({
           id: `${row}-${column}`,
           row,
           column,
-          x: spacing * (column + 1 + (offset ? 0.5 : 0)),
+          x,
           y,
           radius,
           isStar: false
@@ -228,15 +241,49 @@
     runtime.petCircle.style.setProperty("--daily-feed-pet-tilt", `${runtime.petTilt}deg`);
   }
 
+  function beginTiltCalibration(runtime) {
+    if (!runtime?.tiltEnabled) return;
+    runtime.neutralGamma = null;
+    runtime.smoothedTilt = 0;
+    runtime.tiltSamples = [];
+    runtime.tiltCalibrationUntil =
+      performance.now() + TILT_CALIBRATION_MS;
+    setCatcherX(runtime, runtime.width / 2, 0);
+  }
+
   function handleTilt(runtime, event) {
     if (!runtime || !runtime.tiltEnabled || runtime.dragging || activeRuntime !== runtime) return;
     const gamma = Number(event?.gamma);
     if (!Number.isFinite(gamma)) return;
-    if (!Number.isFinite(runtime.neutralGamma)) {
-      runtime.neutralGamma = gamma;
-      runtime.smoothedTilt = 0;
+
+    const now = performance.now();
+
+    if (now < runtime.tiltCalibrationUntil) {
+      runtime.tiltSamples.push(gamma);
+      if (runtime.tiltSamples.length > 24) {
+        runtime.tiltSamples.shift();
+      }
       return;
     }
+
+    if (!Number.isFinite(runtime.neutralGamma)) {
+      const samples = runtime.tiltSamples.length
+        ? runtime.tiltSamples
+        : [gamma];
+      const average = samples.reduce(
+        (sum, value) => sum + value,
+        0
+      ) / samples.length;
+
+      runtime.neutralGamma = clamp(
+        average,
+        -TILT_NEUTRAL_LIMIT,
+        TILT_NEUTRAL_LIMIT
+      );
+      runtime.tiltSamples = [];
+      runtime.smoothedTilt = 0;
+    }
+
     const relative = clamp(gamma - runtime.neutralGamma, -25, 25);
     runtime.smoothedTilt = runtime.smoothedTilt * 0.85 + relative * 0.15;
     const travel = Math.max(0, runtime.width / 2 - runtime.petRadius);
@@ -385,11 +432,11 @@
   function collideBallWithWalls(runtime, ball) {
     if (ball.x - ball.radius < 0) {
       ball.x = ball.radius;
-      ball.vx = Math.abs(ball.vx) * 0.74;
+      ball.vx = Math.abs(ball.vx) * 0.72;
       ball.angularVelocity += 0.75;
     } else if (ball.x + ball.radius > runtime.width) {
       ball.x = runtime.width - ball.radius;
-      ball.vx = -Math.abs(ball.vx) * 0.74;
+      ball.vx = -Math.abs(ball.vx) * 0.72;
       ball.angularVelocity -= 0.75;
     }
   }
@@ -414,7 +461,7 @@
     if (peg.isStar && runtime.starActive) triggerStarPeg(runtime, peg, now);
     else playPegTone(runtime, now);
 
-    const impulse = (1 + 0.72) * velocityAlongNormal;
+    const impulse = (1 + 0.68) * velocityAlongNormal;
     ball.vx -= impulse * nx;
     ball.vy -= impulse * ny;
     ball.vx += nx * (Math.random() - 0.5) * 7;
@@ -479,7 +526,7 @@
 
   function updateBall(runtime, ball, dt, now) {
     addTrailPoint(ball, now);
-    ball.vy = Math.min(runtime.height * 0.30, ball.vy + runtime.gravity * dt);
+    ball.vy = Math.min(runtime.height * 0.46, ball.vy + runtime.gravity * dt);
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
     ball.rotation += ball.angularVelocity * dt;
@@ -487,7 +534,7 @@
     collideBallWithWalls(runtime, ball);
     for (const peg of runtime.pegs) collideBallWithPeg(runtime, ball, peg, now);
     ball.vx = clamp(ball.vx, -runtime.width * 0.44, runtime.width * 0.44);
-    ball.vy = clamp(ball.vy, -runtime.height * 0.22, runtime.height * 0.30);
+    ball.vy = clamp(ball.vy, -runtime.height * 0.26, runtime.height * 0.46);
   }
 
   function ballTouchesPet(runtime, ball) {
@@ -616,8 +663,18 @@
   }
 
   function maybeFinish(runtime, now) {
-    const complete = runtime.scheduledIndex >= runtime.scheduled.length &&
-      runtime.pendingBonus.length === 0 && runtime.balls.length === 0;
+    const allScheduledBallsSpawned =
+      runtime.scheduledIndex >= runtime.scheduled.length;
+    const allBonusBallsSpawned =
+      runtime.pendingBonus.length === 0;
+    const noActiveBalls =
+      runtime.balls.length === 0;
+
+    const complete =
+      allScheduledBallsSpawned &&
+      allBonusBallsSpawned &&
+      noActiveBalls;
+
     if (!complete) {
       runtime.finishAt = 0;
       return false;
@@ -686,6 +743,12 @@
 
     const field = createPegField(width, height);
     const images = buildImageMap();
+
+    catcher.style.setProperty(
+      "--daily-feed-pet-size",
+      `${field.pegRadius * 4}px`
+    );
+
     const stageRect = stage.getBoundingClientRect();
     const petRect = petCircle.getBoundingClientRect();
     const audioContext = preparedAudioContext;
@@ -717,6 +780,8 @@
       tiltEnabled: session.rewardTiltEnabled === true,
       neutralGamma: null,
       smoothedTilt: 0,
+      tiltSamples: [],
+      tiltCalibrationUntil: 0,
       orientationHandler: null,
       pointerDownHandler: null,
       pointerMoveHandler: null,
@@ -730,11 +795,17 @@
       nextBallId: 1,
       scheduled: buildScheduledBalls(),
       scheduledIndex: 0,
-      nextScheduledAt: now + 650,
+      nextScheduledAt:
+        now +
+        (
+          session.rewardTiltEnabled === true
+            ? TILT_CALIBRATION_MS + 300
+            : 650
+        ),
       pendingBonus: [],
       lastSpawnedColor: "",
       bursts: [],
-      gravity: height * 0.17,
+      gravity: height * 0.31,
       score: 0,
       caughtCount: 0,
       lastPegNoteIndex: -1,
@@ -750,6 +821,7 @@
     setCatcherX(runtime, width / 2, 0);
 
     if (runtime.tiltEnabled) {
+      beginTiltCalibration(runtime);
       runtime.orientationHandler = (event) => handleTilt(runtime, event);
       window.addEventListener("deviceorientation", runtime.orientationHandler);
     }
@@ -777,7 +849,6 @@
       runtime.dragging = false;
       runtime.activePointerId = null;
       if (runtime.tiltEnabled) {
-        runtime.neutralGamma = null;
         runtime.smoothedTilt = 0;
       }
       try { stage.releasePointerCapture(event.pointerId); } catch (err) { }
