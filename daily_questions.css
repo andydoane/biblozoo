@@ -337,6 +337,11 @@
   color: #fff1a6;
 }
 
+.daily-question-wonders.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .daily-question-card {
   width: 100%;
   height: 100%;
@@ -348,9 +353,9 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: flex-start;
 
-  gap: clamp(10px, 1.8vh, 14px);
+  gap: 0;
 
   padding:
     clamp(16px, 4vw, 24px);
@@ -364,6 +369,17 @@
   box-shadow:
     0 8px 0 rgba(0, 0, 0, 0.18),
     0 18px 34px rgba(0, 0, 0, 0.16);
+}
+
+.daily-question-card-body {
+  flex: 1 0 auto;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  gap: clamp(10px, 1.8vh, 14px);
 }
 
 .daily-question-ref-pill {
@@ -511,6 +527,11 @@
   gap: 4px;
 }
 
+.daily-question-help.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .daily-question-help-label {
   color:
     rgba(255, 255, 255, 0.90);
@@ -636,10 +657,25 @@
   height: 100%;
   min-height: 0;
 
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
+
+  gap: 0;
 
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.daily-question-reflection-body {
+  flex: 1 0 auto;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: clamp(14px, 2.2vh, 20px);
 }
 
 .daily-question-reflection-title {
@@ -654,16 +690,28 @@
 }
 
 .daily-question-reflection-prompt {
-  max-width: 460px;
+  max-width: 480px;
 
   color: #3d3742;
 
   font-size:
-    clamp(21px, 5.3vw, 30px);
+    clamp(28px, 7vw, 42px);
   font-weight: 800;
-  line-height: 1.22;
+  line-height: 1.16;
 
   text-wrap: balance;
+}
+
+.daily-question-reflection-prompt.is-medium {
+  font-size:
+    clamp(24px, 6vw, 36px);
+}
+
+.daily-question-reflection-prompt.is-long {
+  font-size:
+    clamp(21px, 5.3vw, 30px);
+
+  line-height: 1.20;
 }
 
 .daily-question-reflection-done,
@@ -1137,17 +1185,23 @@
 .daily-question-verse-card {
   position: relative;
 
-  width: min(100%, 560px);
+  width: min(100%, 620px);
+  height: min(76vh, 650px);
+  max-height: 100%;
+
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 
-  gap: clamp(18px, 3vh, 28px);
+  gap: clamp(20px, 3.4vh, 32px);
 
   padding:
-    clamp(28px, 6vw, 40px)
-    clamp(20px, 5vw, 32px);
+    clamp(34px, 7vw, 48px)
+    clamp(22px, 5.5vw, 38px);
 
   border-radius:
     clamp(22px, 5vw, 30px);
@@ -1199,10 +1253,10 @@
   padding:
     4px 54px 0;
 
-  color: #ffffff;
+  color: #ffc751;
 
   font-size:
-    clamp(28px, 7vw, 42px);
+    clamp(30px, 7.5vw, 46px);
   font-weight: 900;
   line-height: 1.05;
 
@@ -1211,13 +1265,14 @@
 
 .daily-question-verse-text {
   width: 100%;
+  max-width: 540px;
 
   color: #ffffff;
 
   font-size:
-    clamp(24px, 6vw, 36px);
+    clamp(26px, 6.5vw, 40px);
   font-weight: 800;
-  line-height: 1.22;
+  line-height: 1.20;
 
   text-wrap: balance;
 }
@@ -1231,8 +1286,8 @@
 
   padding: 10px 20px;
 
-  background: #78ad4f;
-  color: #ffffff;
+  background: #ffc751;
+  color: #333333;
 
   font: inherit;
   font-size:
@@ -1290,8 +1345,12 @@
   }
 
   .daily-question-card {
-    gap: 8px;
+    gap: 0;
     padding: 13px 14px;
+  }
+
+  .daily-question-card-body {
+    gap: 8px;
   }
 
   .daily-question-text {
@@ -1327,7 +1386,25 @@
     padding: 15px 14px;
   }
 
+  .daily-question-reflection-card {
+    gap: 0;
+  }
+
+  .daily-question-reflection-body {
+    gap: 10px;
+  }
+
   .daily-question-reflection-prompt {
+    font-size:
+      clamp(24px, 6vw, 34px);
+  }
+
+  .daily-question-reflection-prompt.is-medium {
+    font-size:
+      clamp(22px, 5.5vw, 30px);
+  }
+
+  .daily-question-reflection-prompt.is-long {
     font-size:
       clamp(19px, 4.8vw, 26px);
   }
@@ -1363,13 +1440,24 @@
   }
 
   .daily-question-verse-card {
-    gap: 10px;
-    padding: 15px 14px;
+    height: min(74vh, 480px);
+
+    gap: 12px;
+
+    padding:
+      24px 16px 18px;
+  }
+
+  .daily-question-verse-ref {
+    font-size:
+      clamp(25px, 6.4vw, 34px);
   }
 
   .daily-question-verse-text {
     font-size:
-      clamp(20px, 5.2vw, 28px);
+      clamp(22px, 5.5vw, 30px);
+
+    line-height: 1.18;
   }
 
   .daily-question-verse-listen {

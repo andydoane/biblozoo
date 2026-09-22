@@ -2132,6 +2132,15 @@
             ?.prompt || ""
         ).trim();
 
+      const reflectionPromptClass =
+        applicationPrompt.length > 130
+          ? " is-long"
+          : (
+            applicationPrompt.length > 85
+              ? " is-medium"
+              : ""
+          );
+
       wrap.innerHTML = `
         <div
           class="daily-question-reflection-shell"
@@ -2145,6 +2154,15 @@
             class="daily-question-reflection-pet"
           >
             ${profilePictureHtml}
+
+            <div
+              class="daily-question-wonders is-placeholder"
+              aria-hidden="true"
+            >
+              ${escapeHtml(
+                `${session.petName} wonders...`
+              )}
+            </div>
           </div>
 
           <div
@@ -2159,17 +2177,21 @@
             </div>
 
             <div
-              class="daily-question-reflection-title"
+              class="daily-question-reflection-body"
             >
-              Something to chew on...
-            </div>
+              <div
+                class="daily-question-reflection-title"
+              >
+                Something to chew on...
+              </div>
 
-            <div
-              class="daily-question-reflection-prompt"
-            >
-              ${escapeHtml(
-                applicationPrompt
-              )}
+              <div
+                class="daily-question-reflection-prompt${reflectionPromptClass}"
+              >
+                ${escapeHtml(
+                  applicationPrompt
+                )}
+              </div>
             </div>
           </div>
 
@@ -2609,24 +2631,32 @@
               </div>
 
               <div
-                class="daily-question-text"
+                class="daily-question-card-body"
               >
-                ${escapeHtml(
-                  question.question
-                )}
-              </div>
+                <div
+                  class="daily-question-text"
+                >
+                  ${escapeHtml(
+                    question.question
+                  )}
+                </div>
 
-              <div
-                class="daily-question-choices"
-                role="group"
-                aria-label="Answer choices"
-              >
-                ${choiceButtons}
+                <div
+                  class="daily-question-choices"
+                  role="group"
+                  aria-label="Answer choices"
+                >
+                  ${choiceButtons}
+                </div>
               </div>
             </div>
 
             <div
-              class="daily-question-help"
+              class="daily-question-help${
+                session.answered
+                  ? " is-hidden"
+                  : ""
+              }"
             >
               <div
                 class="daily-question-help-label"
