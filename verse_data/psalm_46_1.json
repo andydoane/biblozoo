@@ -13,6 +13,29 @@
     ],
     "verseText": "God is our refuge and strength, an ever-present help in times of trouble.",
     "meaning": "God is our refuge. He's like a strong castle we can hide in whenever trouble comes. And whenever we cry out to him for help, he's always nearby.",
+    "reflection": {
+      "recall": {
+        "question": "What is God called in this verse?",
+        "choices": [
+          "Our refuge and strength",
+          "A distant ruler",
+          "A hidden mystery"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does ever-present help mean?",
+        "choices": [
+          "God is near in trouble",
+          "Trouble never happens",
+          "We solve problems alone"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "If trouble comes today, pause and ask God to be your refuge and strength."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

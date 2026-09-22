@@ -14,6 +14,29 @@
     ],
     "verseText": "Come to Me, all you who are weary and burdened, and I will give you rest.",
     "meaning": "We can never work our way to heaven by being good. Instead, we can rest in Jesus, trusting that he did the work for us. Because he died for our sins and rose again, we can enjoy forever rest in God's kingdom.",
+    "reflection": {
+      "recall": {
+        "question": "Who does Jesus invite to come to Him?",
+        "choices": [
+          "The weary and burdened",
+          "Only rulers",
+          "People with no problems"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What does Jesus promise to give?",
+        "choices": [
+          "Rest",
+          "Riches",
+          "Fame"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you feel worn out or burdened, bring it to Jesus in prayer and remember you can rest in what He has done."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

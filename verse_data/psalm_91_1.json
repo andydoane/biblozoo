@@ -14,6 +14,29 @@
     ],
     "verseText": "He who dwells in the shelter of the Most High will abide in the shadow of the Almighty.",
     "meaning": "Those who trust in God are safe with him, like a person finding shelter and shade inside a house. God keeps them near under his strong protection.",
+    "reflection": {
+      "recall": {
+        "question": "Where does the person who dwells with God abide?",
+        "choices": [
+          "In the Almighty's shadow",
+          "On a mountain",
+          "In a palace"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What picture does this verse give of trusting God?",
+        "choices": [
+          "Being sheltered by Him",
+          "Never leaving the house",
+          "Hiding from everyone"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you feel unsafe or uncertain, remember that God is your shelter and stay close to Him in prayer."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

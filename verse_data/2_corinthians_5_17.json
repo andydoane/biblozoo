@@ -14,6 +14,29 @@
     ],
     "verseText": "Therefore if anyone is in Christ, he is a new creation. The old has passed away. Behold, the new has come!",
     "meaning": "When we believe in Jesus Christ, we are made like new. Not only are our sins forgiven, God's Holy Spirit gives us power to live a brand new life.",
+    "reflection": {
+      "recall": {
+        "question": "What is someone in Christ called?",
+        "choices": [
+          "A new creation",
+          "An old creation",
+          "A stranger"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What happens when we belong to Christ?",
+        "choices": [
+          "God makes us new",
+          "Every problem disappears",
+          "We never need help"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Ask God to help you leave behind one old sinful habit and live in the new way Jesus gives you."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

@@ -16,6 +16,29 @@
     ],
     "verseText": "Have I not commanded you to be strong and courageous? Do not be afraid; do not be discouraged, for the LORD your God is with you wherever you go.",
     "meaning": "Even when we face scary times, God tells us to be strong and courageous. We don't need to be scared because the Lord God has promised to be with us wherever we go.",
+    "reflection": {
+      "recall": {
+        "question": "Why can Joshua be strong and courageous?",
+        "choices": [
+          "God is with him",
+          "He is the strongest",
+          "Nothing hard will happen"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What can help us face scary situations?",
+        "choices": [
+          "Remembering God is with us",
+          "Pretending fear is not real",
+          "Never trying new things"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "Think of something that feels scary. Remind yourself, 'God is with me,' and ask Him for courage."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

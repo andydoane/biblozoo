@@ -13,6 +13,29 @@
     ],
     "verseText": "Your word is a lamp to my feet and a light to my path.",
     "meaning": "God's Word shows us how to live. Like a lamp, it helps us to see the right way to live in this dark and sinful world.",
+    "reflection": {
+      "recall": {
+        "question": "What does the writer call God's Word?",
+        "choices": [
+          "A lamp and a light",
+          "A map and a compass",
+          "A song and a trumpet"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "How is God's Word like a light?",
+        "choices": [
+          "It shows us how to live",
+          "It makes night disappear",
+          "It tells every future event"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you need to know the right thing to do, remember to look to God's Word for light."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

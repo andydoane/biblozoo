@@ -14,6 +14,29 @@
   ],
   "verseText": "But God proves His love for us in this: While we were still sinners, Christ died for us.",
   "meaning": "The cross of Jesus shows us exactly how much God loves us. Jesus was willing to suffer the worst even though we were sinners.",
+  "reflection": {
+    "recall": {
+      "question": "When did Christ die for us?",
+      "choices": [
+        "While we were still sinners",
+        "After we became perfect",
+        "Before people sinned"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "How does God prove His love for us?",
+      "choices": [
+        "Christ died for us",
+        "He gives us easy lives",
+        "He makes us famous"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you wonder whether God loves you, remember the cross and thank Jesus for loving sinners like us."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

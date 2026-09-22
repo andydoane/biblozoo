@@ -14,6 +14,29 @@
     ],
     "verseText": "You will keep in perfect peace the steadfast of mind, because he trusts in You.",
     "meaning": "Keeping our minds 'stayed' on God means to keep our thoughts focused on who he is, what he's done, and what he wants us to do. When we do this, we can enjoy peace, even in times of trouble.",
+    "reflection": {
+      "recall": {
+        "question": "Who does God keep in perfect peace?",
+        "choices": [
+          "The one who trusts Him",
+          "The one with no troubles",
+          "The one with the most things"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "What helps bring God's peace?",
+        "choices": [
+          "Keeping our minds on God",
+          "Controlling everything",
+          "Ignoring every problem"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When your thoughts feel worried today, turn your mind toward God and remember something true about Him."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

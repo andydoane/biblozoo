@@ -14,6 +14,29 @@
     ],
     "verseText": "But He said to me, “My grace is sufficient for you, for My power is perfected in weakness.”",
     "meaning": "We aren't saved by how good or powerful we are. God's grace is sufficient (enough) to save even the weakest of sinners.",
+    "reflection": {
+      "recall": {
+        "question": "What did God say was sufficient for Paul?",
+        "choices": [
+          "My grace",
+          "Your strength",
+          "Good luck"
+        ],
+        "answer": 0
+      },
+      "meaning": {
+        "question": "When is God's power perfected?",
+        "choices": [
+          "In weakness",
+          "Only when we are strong",
+          "When we never need help"
+        ],
+        "answer": 0
+      },
+      "application": {
+        "prompt": "When you feel weak or unable to do something, ask God to help you depend on His grace and power."
+      }
+    },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

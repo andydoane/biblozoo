@@ -16,6 +16,29 @@
   ],
   "verseText": "All Scripture is God-breathed and is useful for instruction, for conviction, for correction, and for training in righteousness, so that the man of God may be complete, fully equipped for every good work.",
   "meaning": "The Bible comes from God. It helps us learn what is true, correct what is wrong, and grow in right living. By reading, believing, and following God's Word, we can be prepared for any good thing God wants us to do.",
+  "reflection": {
+    "recall": {
+      "question": "What does this verse say all Scripture is?",
+      "choices": [
+        "God-breathed",
+        "Only stories",
+        "A secret code"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What does Scripture help prepare us for?",
+      "choices": [
+        "Every good work",
+        "Winning every argument",
+        "Knowing every fact"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When you read the Bible today, ask God to teach, correct, and prepare you to do what is right."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

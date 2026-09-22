@@ -13,6 +13,29 @@
   ],
   "verseText": "I have been crucified with Christ, and I no longer live, but Christ lives in me.",
   "meaning": "When we believe in Jesus, we share in his death and life. His death on a cross was our death for our sins. And his new life on the third day means our forever life in his kingdom.",
+  "reflection": {
+    "recall": {
+      "question": "Who does Paul say lives in him?",
+      "choices": [
+        "Christ",
+        "Moses",
+        "Caesar"
+      ],
+      "answer": 0
+    },
+    "meaning": {
+      "question": "What happens when we belong to Christ?",
+      "choices": [
+        "Jesus gives us new life",
+        "We never make mistakes",
+        "We become famous"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Think of one choice today where you can remember that Christ lives in you and choose what pleases Him."
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
