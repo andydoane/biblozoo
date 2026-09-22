@@ -17,25 +17,25 @@
   "meaning": "The Holy Spirit is God's gift to his people. His promise is for all who believe: young and old, near and far.",
   "reflection": {
     "recall": {
-      "question": "What gift is promised?",
+      "question": "What special gift does God promise to His people?",
       "choices": [
         "The Holy Spirit",
-        "A crown",
-        "Perfect health"
+        "A crown of gold",
+        "A life without problems"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Who is this promise for?",
+      "question": "Who is God's promise of the Holy Spirit for?",
       "choices": [
-        "All whom God calls, near and far",
-        "Only adults in Jerusalem",
-        "Only apostles"
+        "All who believe in Jesus",
+        "Only grown-ups",
+        "Only good people"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Thank God that His Spirit is a gift for His people, not just for a few special people."
+      "prompt": "God's gift of the Holy Spirit isn't just for grown-ups or people who lived long ago. It's for everyone who believes in Jesus! If you believe in Jesus, you have God's Spirit, no matter how old you are!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

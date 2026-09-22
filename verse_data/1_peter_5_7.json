@@ -13,29 +13,29 @@
     ],
     "verseText": "Cast all your anxiety on Him, because He cares for you.",
     "meaning": "Whenever something makes us feel anxious or worried, we should cast (or give) those worries to God. Like a loving Father he cares for us and helps us in times of trouble.",
-    "reflection": {
-      "recall": {
-        "question": "What should we cast on God?",
-        "choices": [
-          "All our anxiety",
-          "Our food",
-          "Our responsibilities"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why can we give our worries to God?",
-        "choices": [
-          "He cares for us",
-          "He is too busy",
-          "Our worries do not matter"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Name one worry you are carrying and tell God about it, trusting that He cares for you."
-      }
-    },
+"reflection": {
+  "recall": {
+    "question": "Anxiety means feeling worried. What does this verse tell us to cast (or give) to God?",
+    "choices": [
+      "All of our worries",
+      "Just our biggest worries",
+      "Only our happy thoughts"
+    ],
+    "answer": 0
+  },
+  "meaning": {
+    "question": "Why can we give our worries to God?",
+    "choices": [
+      "Because he cares for us",
+      "Because he is bored",
+      "God doesn't care about them"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "What's something you've been worried about lately? Remember that God cares about you, and you can tell Him about anything that's troubling you!"
+  }
+},
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {

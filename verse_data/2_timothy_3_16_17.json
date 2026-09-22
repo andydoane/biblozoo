@@ -18,25 +18,25 @@
   "meaning": "The Bible comes from God. It helps us learn what is true, correct what is wrong, and grow in right living. By reading, believing, and following God's Word, we can be prepared for any good thing God wants us to do.",
   "reflection": {
     "recall": {
-      "question": "What does this verse say all Scripture is?",
+      "question": "What does this verse say about Scripture (the Bible)?",
       "choices": [
-        "God-breathed",
-        "Only stories",
-        "A secret code"
+        "It is God-breathed",
+        "It is just people's ideas",
+        "It is only for grown-ups"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does Scripture help prepare us for?",
+      "question": "God-breathed means the Bible comes from God. What does God use it to help us do?",
       "choices": [
-        "Every good work",
-        "Winning every argument",
-        "Knowing every fact"
+        "Learn and do what's right",
+        "Know everything about the world",
+        "Learn about made-up stories"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you read the Bible today, ask God to teach, correct, and prepare you to do what is right."
+      "prompt": "Sometimes the Bible teaches us something new, and sometimes it shows us something we need to change. How could remembering that the Bible comes from God help you listen to what it says?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

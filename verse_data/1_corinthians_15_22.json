@@ -16,25 +16,25 @@
   "meaning": "Because of Adam's sin all people die, but through Jesus Christ those who belong to him will have forever life.",
   "reflection": {
     "recall": {
-      "question": "In whom will people be made alive?",
+      "question": "Who makes sinful people alive (give them eternal life)?",
       "choices": [
-        "Christ",
+        "Jesus Christ",
         "Adam",
-        "Moses"
+        "Us"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What contrast is this verse making?",
+      "question": "Adam was the first man, and his sin brought death. What does Jesus bring to those who believe?",
       "choices": [
-        "Death came through Adam, life through Christ",
-        "Adam and Christ did the same thing",
-        "No one really dies"
+        "Life with God forever",
+        "A life without troubles",
+        "Punishment for our sins"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you think about death, remember the hope of forever life that comes through Christ."
+      "prompt": "Death can feel scary or sad. But remember: Jesus defeated death! How can Jesus' promise of life forever give you hope?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

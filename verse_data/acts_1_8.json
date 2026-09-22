@@ -18,25 +18,25 @@
   "meaning": "Jesus promised that the Holy Spirit would give us power to share the good news, beginning nearby and spreading through the whole world.",
   "reflection": {
     "recall": {
-      "question": "What gives Jesus' followers power?",
+      "question": "Jesus promised that someone would come and give us power. Who was he talking about?",
       "choices": [
         "The Holy Spirit",
-        "Money",
-        "Government"
+        "An angel",
+        "A pastor"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What are believers empowered to do?",
+      "question": "A witness is someone who tells others what they know. What does the Holy Spirit give us the power to share?",
       "choices": [
-        "Be Jesus' witnesses",
-        "Rule nations",
-        "Avoid other people"
+        "The good news of Jesus",
+        "The story of Noah's Ark",
+        "How to become a god"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Ask the Holy Spirit for courage to tell someone something true about Jesus."
+      "prompt": "Sometimes telling others about Jesus can feel scary. But we don't have to do it alone! How could remembering that the Holy Spirit helps us give you courage to share the good news?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

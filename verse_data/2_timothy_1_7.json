@@ -1,80 +1,80 @@
 {
-    "biblopet": "🥝",
-    "biblopetDefaultName": "Buttons",
-    "biblopetFeetFromBottom": "3.6%",
-    "verseId": "2_timothy_1_7",
-    "ref": "2 Timothy 1:7",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "For God has not given us",
-        "a spirit of fear",
-        "but of power",
-        "love",
-        "and self-control"
-    ],
-    "verseText": "For God has not given us a spirit of fear, but of power, love, and self-control.",
-    "meaning": "When we believe in Jesus, God's Holy Spirit lives inside us. Because of that, we don't have to live lives of fear. Instead, we have God's power to love and control our sinful desires.",
-    "reflection": {
-      "recall": {
-        "question": "What has God not given us?",
-        "choices": [
-          "A spirit of fear",
-          "Power",
-          "Love"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does God's Spirit help us live with?",
-        "choices": [
-          "Power, love, and self-control",
-          "Fear, anger, and selfishness",
-          "Popularity, comfort, and success"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When fear shows up today, ask God to help you respond with His power, love, and self-control."
-      }
+  "biblopet": "🥝",
+  "biblopetDefaultName": "Buttons",
+  "biblopetFeetFromBottom": "3.6%",
+  "verseId": "2_timothy_1_7",
+  "ref": "2 Timothy 1:7",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "For God has not given us",
+    "a spirit of fear",
+    "but of power",
+    "love",
+    "and self-control"
+  ],
+  "verseText": "For God has not given us a spirit of fear, but of power, love, and self-control.",
+  "meaning": "When we believe in Jesus, God's Holy Spirit lives inside us. Because of that, we don't have to live lives of fear. Instead, we have God's power to love and control our sinful desires.",
+  "reflection": {
+    "recall": {
+      "question": "What kind of spirit has God NOT given us?",
+      "choices": [
+        "A spirit of fear",
+        "A spirit of love",
+        "A spirit of power"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "image",
-            "word": "God",
-            "occurrence": 1,
-            "image": "god_crown"
-        },
-        {
-            "type": "image",
-            "word": "spirit",
-            "occurrence": 1,
-            "image": "soul"
-        },
-        {
-            "type": "emoji",
-            "word": "fear",
-            "occurrence": 1,
-            "emoji": "😨"
-        },
-        {
-            "type": "emoji",
-            "word": "power",
-            "occurrence": 1,
-            "emoji": "⚡"
-        },
-        {
-            "type": "emoji",
-            "word": "love",
-            "occurrence": 1,
-            "emoji": "❤️"
-        },
-        {
-            "type": "emoji",
-            "word": "self-control",
-            "occurrence": 1,
-            "emoji": "🎮"
-        }
-    ]
+    "meaning": {
+      "question": "Self-control means being able to control our actions and desires. What does God's Spirit help us do?",
+      "choices": [
+        "Choose what is right",
+        "Always get our way",
+        "Control other people"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Have you ever been afraid to do the right thing? Remember that God's Spirit gives His people power, love, and self-control! How could that help you be brave when doing what's right feels scary?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "image",
+      "word": "spirit",
+      "occurrence": 1,
+      "image": "soul"
+    },
+    {
+      "type": "emoji",
+      "word": "fear",
+      "occurrence": 1,
+      "emoji": "😨"
+    },
+    {
+      "type": "emoji",
+      "word": "power",
+      "occurrence": 1,
+      "emoji": "⚡"
+    },
+    {
+      "type": "emoji",
+      "word": "love",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "emoji",
+      "word": "self-control",
+      "occurrence": 1,
+      "emoji": "🎮"
+    }
+  ]
 }

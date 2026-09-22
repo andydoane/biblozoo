@@ -28,6 +28,16 @@
   const MODULE_VERSION = 1;
   const DAILY_PROGRESS_VERSION = 1;
 
+  const DAILY_QUESTION_COLOR_IDS =
+    Object.freeze([
+      "red",
+      "orange",
+      "yellow",
+      "green",
+      "blue",
+      "purple"
+    ]);
+
   /*
     Any verse with valid Daily Question reflection data may
     participate. Pet-unlock and daily-progress rules are
@@ -162,6 +172,43 @@
       choices,
       answer
     };
+  }
+
+  function createRandomQuestionColor() {
+    return (
+      DAILY_QUESTION_COLOR_IDS[
+        Math.floor(
+          Math.random() *
+          DAILY_QUESTION_COLOR_IDS.length
+        )
+      ] || "purple"
+    );
+  }
+
+  function getSessionQuestionColor(
+    session
+  ) {
+    const color =
+      String(
+        session?.questionColor || ""
+      ).trim();
+
+    if (
+      DAILY_QUESTION_COLOR_IDS
+        .includes(color)
+    ) {
+      return color;
+    }
+
+    const randomColor =
+      createRandomQuestionColor();
+
+    if (session) {
+      session.questionColor =
+        randomColor;
+    }
+
+    return randomColor;
   }
 
   function createShuffledChoiceOrder() {
@@ -785,6 +832,8 @@
       phase:
         SESSION_PHASES.QUESTION,
       questionIndex: 0,
+      questionColor:
+        createRandomQuestionColor(),
       choiceOrder:
         createShuffledChoiceOrder(),
       selectedAnswer: null,
@@ -2602,6 +2651,11 @@
           data-daily-session-phase="${escapeHtml(
             session.phase
           )}"
+          data-daily-question-color="${escapeHtml(
+            getSessionQuestionColor(
+              session
+            )
+          )}"
           data-daily-verse-shell
         >
           <div
@@ -3143,6 +3197,11 @@
             class="daily-question-session-shell"
             data-daily-session-phase="${escapeHtml(
               session.phase
+            )}"
+            data-daily-question-color="${escapeHtml(
+              getSessionQuestionColor(
+                session
+              )
             )}"
             data-daily-question-number="${questionNumber}"
           >

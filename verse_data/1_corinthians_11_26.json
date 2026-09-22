@@ -14,29 +14,29 @@
   ],
   "verseText": "For as often as you eat this bread and drink this cup, you proclaim the Lord’s death until He comes.",
   "meaning": "This verse explains why we celebrate the Lord's Supper. We eat bread and drink the cup to proclaim the good news of Jesus's death for our sins.",
-  "reflection": {
-    "recall": {
-      "question": "What do the bread and cup proclaim?",
-      "choices": [
-        "The Lord's death",
-        "Israel's exodus",
-        "Creation"
-      ],
-      "answer": 0
-    },
-    "meaning": {
-      "question": "Why do Christians celebrate the Lord's Supper?",
-      "choices": [
-        "To remember and proclaim Jesus' death",
-        "To earn salvation",
-        "To show who is best"
-      ],
-      "answer": 0
-    },
-    "application": {
-      "prompt": "When you hear about the Lord's Supper, remember the good news that Jesus gave His life for sinners."
-    }
+"reflection": {
+  "recall": {
+    "question": "To proclaim means to tell others. What do the bread and cup proclaim?",
+    "choices": [
+      "Jesus' death",
+      "Jesus' birth",
+      "Jesus' miracles"
+    ],
+    "answer": 0
   },
+  "meaning": {
+    "question": "Why is Jesus' death good news for us?",
+    "choices": [
+      "He died for our sins",
+      "He died for His sins",
+      "He died to become famous"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "When you eat the Lord's Supper with your church, remember that Jesus gave His life for us. What does that show you about His love?"
+  }
+},
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

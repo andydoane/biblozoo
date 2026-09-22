@@ -463,6 +463,36 @@
   cursor: pointer;
 }
 
+[data-daily-question-color="red"] .daily-question-choice {
+  background: #ff5a51;
+  color: #333333;
+}
+
+[data-daily-question-color="orange"] .daily-question-choice {
+  background: #ffa351;
+  color: #333333;
+}
+
+[data-daily-question-color="yellow"] .daily-question-choice {
+  background: #ffc751;
+  color: #333333;
+}
+
+[data-daily-question-color="green"] .daily-question-choice {
+  background: #a7cb6f;
+  color: #333333;
+}
+
+[data-daily-question-color="blue"] .daily-question-choice {
+  background: #40b9c5;
+  color: #333333;
+}
+
+[data-daily-question-color="purple"] .daily-question-choice {
+  background: #7f66c6;
+  color: #ffffff;
+}
+
 .daily-question-choice:disabled {
   opacity: 1;
   cursor: default;
@@ -576,6 +606,12 @@
   cursor: pointer;
 }
 
+[data-daily-question-color="orange"] .daily-question-check-verse,
+[data-daily-question-color="yellow"] .daily-question-check-verse {
+  background: #333333;
+  color: #ffffff;
+}
+
 .daily-question-check-verse:active {
   transform: translateY(3px);
 
@@ -601,7 +637,7 @@
 
   padding: 9px 20px;
 
-  background: #78ad4f;
+  background: #333333;
   color: #ffffff;
 
   font: inherit;
@@ -1340,6 +1376,12 @@
     0 6px 0 rgba(0, 0, 0, 0.20);
 
   cursor: pointer;
+}
+
+[data-daily-question-color="orange"] .daily-question-verse-listen,
+[data-daily-question-color="yellow"] .daily-question-verse-listen {
+  background: #333333;
+  color: #ffffff;
 }
 
 .daily-question-verse-listen:disabled {

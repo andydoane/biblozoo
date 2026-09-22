@@ -15,29 +15,29 @@
   ],
   "verseText": "...Christ died for our sins according to the Scriptures, that He was buried, that He was raised on the third day...",
   "meaning": "This verse tells us the gospel: the good news that Jesus died and rose again to save us from our sins.",
-  "reflection": {
-    "recall": {
-      "question": "What happened to Christ on the third day?",
-      "choices": [
-        "He was raised",
-        "He was born",
-        "He left Galilee"
-      ],
-      "answer": 0
-    },
-    "meaning": {
-      "question": "What good news does this passage summarize?",
-      "choices": [
-        "Jesus died and rose to save sinners",
-        "Good people save themselves",
-        "Death is the end"
-      ],
-      "answer": 0
-    },
-    "application": {
-      "prompt": "Take a moment to thank Jesus for dying for your sins and rising again."
-    }
+"reflection": {
+  "recall": {
+    "question": "What happened to Jesus (the Christ) on the third day after he died?",
+    "choices": [
+      "He was raised from the dead",
+      "He was born",
+      "He stayed dead"
+    ],
+    "answer": 0
   },
+  "meaning": {
+    "question": "The gospel means “good news.” What's the good news in this verse?",
+    "choices": [
+      "Jesus died and rose for us",
+      "We can save ourselves",
+      "Jesus never really died"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "Jesus died for our sins and rose again! How could remembering that help you when you've done something wrong?"
+  }
+},
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

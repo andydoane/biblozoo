@@ -15,27 +15,27 @@
     "verseText": "Therefore if anyone is in Christ, he is a new creation. The old has passed away. Behold, the new has come!",
     "meaning": "When we believe in Jesus Christ, we are made like new. Not only are our sins forgiven, God's Holy Spirit gives us power to live a brand new life.",
     "reflection": {
-      "recall": {
-        "question": "What is someone in Christ called?",
-        "choices": [
-          "A new creation",
-          "An old creation",
-          "A stranger"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What happens when we belong to Christ?",
-        "choices": [
-          "God makes us new",
-          "Every problem disappears",
-          "We never need help"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Ask God to help you leave behind one old sinful habit and live in the new way Jesus gives you."
-      }
+        "recall": {
+            "question": "What does this verse call someone who believes in Jesus called?",
+            "choices": [
+                "A new creation",
+                "A perfect person",
+                "An old creation"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "What does it mean to be a “new creation” in Christ?",
+            "choices": [
+                "God changes us and gives us new life",
+                "We never sin again",
+                "We change how we look"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "When we believe in Jesus, God doesn't just forgive our sins. He also helps us live in a new way! What's one old habit or way of thinking you'd like God to help you change?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [

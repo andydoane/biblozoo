@@ -15,29 +15,29 @@
   ],
   "verseText": "This is a trustworthy saying, worthy of full acceptance: Christ Jesus came into the world to save sinners, of whom I am the worst.",
   "meaning": "Paul believed he was the foremost sinner, the worst sinner in the world. And he believed that Jesus could even save a sinner such as him.",
-  "reflection": {
-    "recall": {
-      "question": "Why did Christ Jesus come into the world?",
-      "choices": [
-        "To save sinners",
-        "To become wealthy",
-        "To avoid sinners"
-      ],
-      "answer": 0
-    },
-    "meaning": {
-      "question": "What did Paul believe about himself?",
-      "choices": [
-        "He was a great sinner who needed Jesus",
-        "He did not need forgiveness",
-        "He had earned salvation"
-      ],
-      "answer": 0
-    },
-    "application": {
-      "prompt": "No matter how badly you have sinned, remember that Jesus came to save sinners and bring your sin to Him."
-    }
+"reflection": {
+  "recall": {
+    "question": "Why did Jesus come into the world?",
+    "choices": [
+      "To save sinners",
+      "To see what earth is like",
+      "To punish sinners"
+    ],
+    "answer": 0
   },
+  "meaning": {
+    "question": "Paul wrote these words. What did he think about himsef?",
+    "choices": [
+      "He was the worst sinner of all",
+      "He never, ever sinned",
+      "He was an ordinary sinner"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "Have you ever felt like you've done something too bad for God to forgive? Remember that Jesus came to save sinners — even Paul, who called himself the worst! You can always come to Jesus and ask for forgiveness."
+  }
+},
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
