@@ -16,25 +16,25 @@
   "meaning": "Earthly kingdoms do not last forever. But Jesus' kingdom will last forever, and no one will ever be able to destroy it.",
   "reflection": {
     "recall": {
-      "question": "What kind of kingdom will God set up?",
+      "question": "Who will set up a kingdom that can never be destroyed?",
       "choices": [
-        "One that will never be destroyed",
-        "One lasting ten years",
-        "One ruled by Rome"
+        "The God of heaven",
+        "King David",
+        "King Solomon"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "How is God's kingdom different from earthly kingdoms?",
+      "question": "What makes God's kingdom different from kingdoms on earth?",
       "choices": [
         "It lasts forever",
-        "It is weaker",
-        "It depends on armies"
+        "It's only for angels",
+        "It isn't real"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When earthly powers seem important, remember that Jesus' kingdom is the one that lasts forever."
+      "prompt": "Things in our world change. Even the most powerful kings and kingdoms don't last forever. But Jesus' kingdom will never end! When life feels uncertain, remember that Jesus is still King and you can trust Him."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

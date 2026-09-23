@@ -14,30 +14,30 @@
     "it is the gift of God",
     "not by works",
     "so that no one can boast"
-  ],  
+  ],
   "verseText": "For it is by grace you have been saved through faith, and this not from yourselves; it is the gift of God, not by works, so that no one can boast.",
   "meaning": "Our salvation (being saved from sin) is not something we can earn by being good. It's not something we can brag about. It's a free gift from God. And that gift was paid for by Jesus when he died on the cross in our place.",
   "reflection": {
     "recall": {
-      "question": "How are we saved according to this verse?",
+      "question": "How does this verse say we are saved?",
       "choices": [
         "By grace through faith",
-        "By earning it",
-        "By boasting"
+        "By doing enough good deeds",
+        "By going to church every week"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Why can no one boast about being saved?",
+      "question": "Grace means God's kindness that we don't earn. Why can't we brag about being saved?",
       "choices": [
-        "It is God's gift",
-        "We save ourselves",
-        "Good works earn heaven"
+        "It's a gift from God",
+        "We earned it ourselves",
+        "We're better than others"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you are tempted to feel proud about being good, remember that salvation is God's gift, not something we earn."
+      "prompt": "Have you ever felt like you have to be good enough for God? Remember, being saved isn't a prize we earn by being good. It's a free gift from God! We receive His gift by putting our faith (trust) in Jesus, not in ourselves."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

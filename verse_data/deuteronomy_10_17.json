@@ -16,25 +16,25 @@
   "meaning": "The Lord God is powerful and awesome. He's the one true God in charge of everything and everyone.",
   "reflection": {
     "recall": {
-      "question": "Who is the LORD?",
+      "question": "What three words does this verse use to describe God?",
       "choices": [
-        "God of gods and Lord of lords",
-        "One god among many",
-        "A human king"
+        "Great, mighty, and awesome",
+        "Wise, loving, and patient",
+        "Small, weak, and afraid"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this verse teach about God?",
+      "question": "The Bible calls God the “God of gods and Lord of lords.” What does that mean?",
       "choices": [
-        "He is great, mighty, and above all",
-        "He is weak",
-        "He answers to other gods"
+        "He rules over everyone, even kings",
+        "He is one of many gods",
+        "He is only the King of Heaven, not earth"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Let God's greatness shape how you worship and obey Him today."
+      "prompt": "Sometimes people or problems can seem so big that they make us feel small. But remember, God is greater than any problem we face. He's the King of the Universe! You can trust Him even when something feels too big for you."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

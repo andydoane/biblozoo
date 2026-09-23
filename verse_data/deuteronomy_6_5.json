@@ -17,25 +17,25 @@
   "meaning": "God commands us to love him completely, giving every part of ourselves to him.",
   "reflection": {
     "recall": {
-      "question": "How should we love the LORD?",
+      "question": "What does this verse say we should love God with?",
       "choices": [
-        "With all our heart, soul, and strength",
-        "Only with words",
-        "Only when convenient"
+        "Heart, soul, and strength",
+        "Hands, feet, and eyes",
+        "Head, shoulders, knees, and toes"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this command ask from us?",
+      "question": "Your heart and soul describe who you are deep inside. What does it mean to love God with all your heart, soul, and strength?",
       "choices": [
-        "Wholehearted love for God",
-        "Perfect knowledge",
-        "A weekly ritual only"
+        "To love Him with all we are",
+        "To love him on Sundays",
+        "To love Him only with words"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Choose one way today to love God with your thoughts, energy, or choices."
+      "prompt": "God is our Maker and King. We wouldn't be here without him. Because of that, it's our job to live our lives completely for him. Think about one way you could show your love for God today, even when nobody else is watching."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

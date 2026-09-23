@@ -18,25 +18,25 @@
   "meaning": "God wanted his people to never forget how he rescued them. In the same way, we should never forget how Jesus rescued us.",
   "reflection": {
     "recall": {
-      "question": "What did the LORD bring Israel out of?",
+      "question": "What did God rescue His people from?",
       "choices": [
-        "Slavery in Egypt",
-        "The wilderness",
-        "Babylon"
+        "Being slaves in Egypt",
+        "A great flood",
+        "The Roman army"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Why did God tell them to remember their rescue?",
+      "question": "What does God rescuing His people from slavery teach us about Him?",
       "choices": [
-        "So they would not forget His saving power",
-        "So they could boast",
-        "So they would fear Egypt"
+        "He has the power to save his people",
+        "He doesn't like Egypt",
+        "He enjoys fighting battles"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Remember one way God has rescued or helped His people, and thank Him for being a saving God."
+      "prompt": "When life feels hard, remember how God rescued His people from slavery and how Jesus came to rescue us from sin. God is powerful, and you can trust Him!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

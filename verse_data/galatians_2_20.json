@@ -17,23 +17,23 @@
     "recall": {
       "question": "Who does Paul say lives in him?",
       "choices": [
-        "Christ",
+        "Jesus Christ",
         "Moses",
-        "Caesar"
+        "An angel"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What happens when we belong to Christ?",
+      "question": "Paul says he was “crucified with Christ.” Crucified means put to death on a cross. What does Paul mean?",
       "choices": [
-        "Jesus gives us new life",
-        "We never make mistakes",
-        "We become famous"
+        "Jesus died for his sins",
+        "Paul died on a cross too",
+        "Paul killed Jesus"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Think of one choice today where you can remember that Christ lives in you and choose what pleases Him."
+      "prompt": "When we believe in Jesus, He gives us a brand-new life! The next time you're tempted to do something wrong, remember that you don't have to keep living your old way. Jesus can help you choose what pleases Him!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

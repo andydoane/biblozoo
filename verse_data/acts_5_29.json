@@ -16,25 +16,25 @@
   "meaning": "Peter and the apostles knew that obeying God is more important than obeying people, even when it brings trouble into our lives.",
   "reflection": {
     "recall": {
-      "question": "Whom must the apostles obey rather than people?",
+      "question": "The apostles were Jesus' chosen messengers. Who did they say we must obey above everyone else?",
       "choices": [
         "God",
-        "Themselves",
-        "The crowd"
+        "Our rulers",
+        "Our heart"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What should happen when a human command conflicts with God?",
+      "question": "What should we do if someone tells us to do something God says is wrong?",
       "choices": [
-        "Obey God",
-        "Always obey people",
-        "Do whatever is easiest"
+        "Obey God instead",
+        "Follow our heart",
+        "Just do what they say"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "If following God ever costs you something, remember that obeying Him matters most."
+      "prompt": "Jesus told us that following him wouldn't be easy. Sometimes, we'll be mistreated for doing what God says is right. Remember that obeying God matters more than fitting in, and you can ask Him for courage to do what's right!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

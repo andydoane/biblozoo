@@ -16,25 +16,25 @@
   "meaning": "Paul and Silas said these words. They explain how we can be saved. Anyone who believes in Jesus can be saved. It includes you and everyone in your house.",
   "reflection": {
     "recall": {
-      "question": "What must a person do to be saved?",
+      "question": "What did Paul and Silas say we must do to be saved from sin?",
       "choices": [
-        "Believe in the Lord Jesus",
-        "Do enough good works",
-        "Know every Bible verse"
+        "Believe in Jesus",
+        "Be a good person",
+        "Go to church"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Who can this good news be for?",
+      "question": "Paul and Silas said that everyone in our household could be saved. What does that mean?",
       "choices": [
-        "Anyone who believes",
-        "Only church leaders",
-        "Only adults"
+        "Anyone who believes can be saved",
+        "If a dad believes, his whole family is saved",
+        "God keeps our houses from falling down"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Remember that salvation comes through believing in Jesus, and pray for someone in your family to trust Him."
+      "prompt": "You don't have to be grown up or know everything about the Bible to believe in Jesus. You can trust Him right now! The good news of Jesus is for anyone who believes: moms, dads, brothers, sisters, aunts, uncles... everyone!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

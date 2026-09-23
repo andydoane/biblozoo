@@ -17,25 +17,25 @@
   "meaning": "God is able to do way more than we could ever even think about asking for. His power is beyond our wildest imaginations!",
   "reflection": {
     "recall": {
-      "question": "How much is God able to do?",
+      "question": "Immeasurably means “too much to measure.” How much does this verse say God is able to do?",
       "choices": [
-        "Immeasurably more than we ask or imagine",
-        "Only what we can imagine",
-        "Very little"
+        "More than we can imagine",
+        "Exactly what we can imagine",
+        "Only what we can see"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this verse emphasize?",
+      "question": "What should we remember when something seems impossible?",
       "choices": [
-        "God's power is beyond our imagination",
-        "We should never ask God anything",
-        "God only works through strong people"
+        "God's power is greater",
+        "God needs our help",
+        "It's okay to give up"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Bring a big request to God, remembering that His power is greater than what you can imagine."
+      "prompt": "Have you ever faced a problem that seemed too big to solve? Remember, God's power is greater than anything you can imagine! You can bring even your biggest worries and hopes to Him in prayer, trusting Him with whatever happens."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

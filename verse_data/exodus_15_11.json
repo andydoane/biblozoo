@@ -18,25 +18,25 @@
   "meaning": "There is no onle like the Lord God. He's perfectly holy (without sin) and he does impossible miracles to save his people",
   "reflection": {
     "recall": {
-      "question": "Who is like the LORD among the gods?",
+      "question": "Who does this verse say is like the LORD?",
       "choices": [
         "No one",
-        "Everyone",
-        "Only Pharaoh"
+        "The angels",
+        "The other gods"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What makes God unique?",
+      "question": "Holy means completely good and without sin. What makes God unlike anyone else?",
       "choices": [
         "He is holy and does wonders",
-        "He is just like other gods",
-        "He never acts"
+        "He sometimes makes mistakes",
+        "He has the best mustache"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Praise God for one thing that makes Him unlike anyone else."
+      "prompt": "Think about some of the amazing things God has done in the Bible, like rescuing His people from Egypt. The same holy and powerful God is still at work today! When something seems impossible, remember that there's no one like Him."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
