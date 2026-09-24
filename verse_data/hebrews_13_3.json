@@ -14,25 +14,31 @@
   ],
   "verseText": "Remember those in prison as if you were bound with them, and those who are mistreated as if you were suffering with them.",
   "meaning": "God calls us to remember and care about people who are imprisoned or mistreated, feeling their suffering as if it were happening to us.",
-  "reflection": {
-    "recall": {
-      "question": "Who should we remember?",
-      "choices": [
-        "Those in prison and mistreated",
-        "Only our close friends",
-        "Only people who agree with us"
-      ],
-      "answer": 0
-    },
-    "meaning": {
-      "question": "How should we care about people who suffer?",
-      "choices": [
-        "As if their suffering were happening to us",
-        "From a distance without concern",
-        "Only if we are rewarded"
-      ],
-      "answer": 0
-    },
+
+"reflection": {
+  "recall": {
+    "question": "Who does this verse tell us to remember and care about?",
+    "choices": [
+      "People in prison or being mistreated",
+      "Only our friends",
+      "Everyone"
+    ],
+    "answer": 0
+  },
+  "meaning": {
+    "question": "Mistreated means treated badly or unfairly. How should we feel about people who are suffering?",
+    "choices": [
+      "As if we were suffering too",
+      "Forget about them",
+      "Tell them the did something wrong"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "Imagine how you would feel if you were being treated unfairly and nobody seemed to care. God wants us to remember people who are hurting, even when we don't know them! When you hear about someone who is suffering, remember to pray for them and think about how you would want to be treated in their place."
+  }
+},
+
     "application": {
       "prompt": "Pray for someone who is suffering or mistreated and think of one practical way to show care."
     }
