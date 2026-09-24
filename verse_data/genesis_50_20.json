@@ -18,25 +18,25 @@
   "meaning": "Joseph's brothers had an evil plan to hurt Joseph. But God had a good plan the whole time, to use Joseph to save many people",
   "reflection": {
     "recall": {
-      "question": "What did Joseph's brothers intend against him?",
+      "question": "Joseph's brothers planned to hurt him. What did God use their evil plan to do?",
       "choices": [
-        "Evil",
-        "Good",
-        "Nothing"
+        "Save many lives",
+        "Make Joseph rich",
+        "Punish everyone"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What did God do with their evil plan?",
+      "question": "What does Joseph's story teach us about God?",
       "choices": [
-        "Used it for good and saved many lives",
-        "Ignored it completely",
-        "Made Joseph take revenge"
+        "He can bring good out of evil",
+        "He makes bad things happen for fun",
+        "He forgets us when life is hard"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When something hard happens, remember that God can work through even bad situations for good."
+      "prompt": "Sometimes people hurt us, or things happen that seem terribly unfair. Joseph's brothers meant to hurt him, but it was all part of God's great big plan to save many lives! When something bad happens to you, remember that God is still at work, even when you can't see what He's doing."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -18,25 +18,25 @@
   "meaning": "If we don't have faith in God, it doesn't matter how good we try to be. The only way to please God is to put our faith and trust in his Son Jesus.",
   "reflection": {
     "recall": {
-      "question": "Without what is it impossible to please God?",
+      "question": "It's impossible to please God without... what?",
       "choices": [
         "Faith",
-        "Money",
-        "Knowledge"
+        "Knowing a lot",
+        "Strong muscles"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What must a person who comes to God believe?",
+      "question": "To seek God means to want to know Him and draw close to Him. What must we believe when we seek Him?",
       "choices": [
-        "He exists and rewards those who seek Him",
-        "God cannot be known",
-        "Good deeds replace faith"
+        "He is real and rewards us",
+        "He is too busy for us",
+        "He might or might not be real"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you pray, come to God believing that He is real and worth seeking."
+      "prompt": "God is pleased when his children seek and follow him. But the important step in that journey is to have faith. After all, how could we please him if we don't have faith that he's real?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

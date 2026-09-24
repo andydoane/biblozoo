@@ -16,25 +16,25 @@
   "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to him anytime.",
   "reflection": {
     "recall": {
-      "question": "What gives us confidence to enter the Most Holy Place?",
+      "question": "What gives us confidence to come near to God?",
       "choices": [
         "The blood of Jesus",
-        "Our good behavior",
-        "A temple ticket"
+        "Our own good deeds",
+        "A lucky feeling"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What did Jesus make possible?",
+      "question": "In the Old Testament, God met with his people in the Most Holy Place in the temple. But we don't need a temple anymore. Why?",
       "choices": [
-        "We can come directly to God",
-        "We never need to pray",
-        "Only priests can approach God"
+        "Jesus died for our sins",
+        "God doesn't meet with his people",
+        "God designed a new building"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Talk to God freely today, remembering that Jesus opened the way for you to come to Him."
+      "prompt": "Because Jesus died for our sins, we don't need a special building or a priest to help us talk to God. We can come to Him in prayer anytime! The next time you're worried, afraid, or need help, remember that Jesus has opened the way for you to come to God wherever you are!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
