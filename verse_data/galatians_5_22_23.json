@@ -15,29 +15,31 @@
   ],
   "verseText": "But the fruit of the Spirit is love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, and self-control.",
   "meaning": "When the Holy Spirit lives inside us, he grows good things in our lives, just like a fruit tree grows delicious fruit.",
-  "reflection": {
-    "recall": {
-      "question": "What is listed as fruit of the Spirit?",
-      "choices": [
-        "Love, joy, peace, and more",
-        "Gold, silver, and jewels",
-        "Strength, speed, and fame"
-      ],
-      "answer": 0
-    },
-    "meaning": {
-      "question": "How does this fruit grow in us?",
-      "choices": [
-        "The Holy Spirit produces it",
-        "We fake it",
-        "It appears only when life is easy"
-      ],
-      "answer": 0
-    },
-    "application": {
-      "prompt": "Choose one fruit of the Spirit you especially need today and ask God to grow it in you."
-    }
+
+"reflection": {
+  "recall": {
+    "question": "Which of these are part of the fruit of the Spirit?",
+    "choices": [
+      "Love, joy, and peace",
+      "Strength, speed, and courage",
+      "Apples, grapes, and bananas"
+    ],
+    "answer": 0
   },
+  "meaning": {
+    "question": "The fruit of the Spirit is like good fruit growing on a tree. Who grows these good qualities in God's people?",
+    "choices": [
+      "The Holy Spirit",
+      "We do",
+      "Our church leaders"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "Fruit doesn't grow on a tree overnight, and we don't become patient, kind, or loving overnight either! When you find it hard to show one of these good qualities, remember that the Holy Spirit is helping you grow. Ask Him to help you become more like Jesus!"
+  }
+},
+
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
