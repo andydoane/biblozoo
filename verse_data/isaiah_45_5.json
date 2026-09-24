@@ -14,29 +14,31 @@
   ],
   "verseText": "I am the LORD, and there is no other; there is no God but Me.",
   "meaning": "The Bible lists the names of many different gods. But there is only one God who exists: the Lord, the God of the Bible.",
-  "reflection": {
-    "recall": {
-      "question": "How many true gods are there?",
-      "choices": [
-        "One LORD",
-        "Many equal gods",
-        "None"
-      ],
-      "answer": 0
-    },
-    "meaning": {
-      "question": "What does there is no other teach?",
-      "choices": [
-        "Only the LORD is God",
-        "Every god is equally real",
-        "People can become gods"
-      ],
-      "answer": 0
-    },
-    "application": {
-      "prompt": "Give your worship and trust to the Lord alone."
-    }
+
+"reflection": {
+  "recall": {
+    "question": "How many true gods does this verse say there are?",
+    "choices": [
+      "Only one",
+      "Many",
+      "Three"
+    ],
+    "answer": 0
   },
+  "meaning": {
+    "question": "People worship many different things, but what does God tell us about Himself?",
+    "choices": [
+      "He is the only true God",
+      "He is one of many gods",
+      "He was created by another god"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "Sometimes we treat things like toys, games, or being popular as if they're the most important things in the world. But there is only one true God, and He deserves first place in our hearts! Think about what matters most to you. Are you giving God the love and attention He deserves?"
+  }
+},
+
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {
