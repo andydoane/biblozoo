@@ -14,29 +14,31 @@
     ],
     "verseText": "You will keep in perfect peace the steadfast of mind, because he trusts in You.",
     "meaning": "Keeping our minds 'stayed' on God means to keep our thoughts focused on who he is, what he's done, and what he wants us to do. When we do this, we can enjoy peace, even in times of trouble.",
-    "reflection": {
-      "recall": {
-        "question": "Who does God keep in perfect peace?",
-        "choices": [
-          "The one who trusts Him",
-          "The one with no troubles",
-          "The one with the most things"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What helps bring God's peace?",
-        "choices": [
-          "Keeping our minds on God",
-          "Controlling everything",
-          "Ignoring every problem"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When your thoughts feel worried today, turn your mind toward God and remember something true about Him."
-      }
-    },
+
+"reflection": {
+  "recall": {
+    "question": "What does God promise to those who keep trusting Him?",
+    "choices": [
+      "Perfect peace",
+      "Lots of money",
+      "A life without problems"
+    ],
+    "answer": 0
+  },
+  "meaning": {
+    "question": "Steadfast means staying firm and not giving up. What does it mean to have a steadfast mind that trusts God?",
+    "choices": [
+      "Keep our thoughts focused on God",
+      "Never have any worries",
+      "Be really smart"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "When you're worried or afraid, it's easy to think about everything that could go wrong. But God wants us to keep our minds on Him! Instead of focusing on your worries, try remembering something true about God, like His love, His power, or His promises. He can give you peace even when life is hard."
+  }
+},
+
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
