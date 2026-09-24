@@ -18,29 +18,31 @@
     ],
     "verseText": "Do not fear, for I am with you; do not be afraid, for I am your God. I will strengthen you; I will surely help you; I will uphold you with My righteous right hand.",
     "meaning": "If we trust in Jesus, we can trust that God will always be with us. No matter what troubles we face, we have no reason to fear. Our mighty God is always near to give us what we need.",
-    "reflection": {
-      "recall": {
-        "question": "Why should God's people not fear?",
-        "choices": [
-          "God is with them",
-          "Nothing difficult will happen",
-          "They are stronger than everyone"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does God promise to do?",
-        "choices": [
-          "Strengthen, help, and uphold us",
-          "Keep us from every problem",
-          "Let us handle life alone"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you feel afraid, remind yourself that God is with you and ask Him for strength and help."
-      }
-    },
+
+"reflection": {
+  "recall": {
+    "question": "Why does God tell His people not to be afraid?",
+    "choices": [
+      "He is with them",
+      "Nothing bad will happen",
+      "Our fears are no big deal"
+    ],
+    "answer": 0
+  },
+  "meaning": {
+    "question": "God promises to uphold His people, to support or hold us up. What does God promise to do when we're struggling?",
+    "choices": [
+      "Strengthen and help us",
+      "Make every problem disappear",
+      "Leave us to figure it out"
+    ],
+    "answer": 0
+  },
+  "application": {
+    "prompt": "Have you ever felt afraid because something seemed too hard for you? God doesn't promise that we'll never face trouble, but He does promise to strengthen and help His people! When you feel scared or overwhelmed, remember that you don't have to face your troubles alone. God is with you, and he can do the impossible!"
+  }
+},
+
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
         {
