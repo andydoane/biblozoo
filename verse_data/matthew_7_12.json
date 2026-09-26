@@ -18,25 +18,25 @@
   "meaning": "This verse is another way to say the second Great Commandment: 'Love your neighbor as you love yourself.'",
   "reflection": {
     "recall": {
-      "question": "How should we treat other people?",
+      "question": "How does Jesus tell us to treat other people?",
       "choices": [
-        "As we want them to treat us",
-        "Only as they treat us first",
-        "However is easiest"
+        "As we want to be treated",
+        "Like they treat us",
+        "Like they are our servants"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What command does this summarize?",
+      "question": "This teaching is often called the Golden Rule. How often should we follow this rule?",
       "choices": [
-        "Love your neighbor",
-        "Store up treasures",
-        "Remember the Sabbath"
+        "In everything we do",
+        "Only on Sundays",
+        "When people are kind to us"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Before you act toward someone today, ask, 'How would I want to be treated?'"
+      "prompt": "Jesus wants us to show others the same kindness, patience, and respect we hope to receive. That includes people who aren't always kind to us! The next time someone annoys or upsets you, how could remembering the Golden Rule change the way you respond?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -1,78 +1,78 @@
 {
-    "biblopet": "🍄",
-    "biblopetDefaultName": "Doodle",
-    "biblopetFeetFromBottom": "23.1%",
-    "verseId": "matthew_11_28",
-    "ref": "Matthew 11:28",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "Come to Me",
-        "all you who are weary",
-        "and burdened",
-        "and I will give you rest"
-    ],
-    "verseText": "Come to Me, all you who are weary and burdened, and I will give you rest.",
-    "meaning": "We can never work our way to heaven by being good. Instead, we can rest in Jesus, trusting that he did the work for us. Because he died for our sins and rose again, we can enjoy forever rest in God's kingdom.",
-    "reflection": {
-      "recall": {
-        "question": "Who does Jesus invite to come to Him?",
-        "choices": [
-          "The weary and burdened",
-          "Only rulers",
-          "People with no problems"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does Jesus promise to give?",
-        "choices": [
-          "Rest",
-          "Riches",
-          "Fame"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you feel worn out or burdened, bring it to Jesus in prayer and remember you can rest in what He has done."
-      }
+  "biblopet": "🍄",
+  "biblopetDefaultName": "Doodle",
+  "biblopetFeetFromBottom": "23.1%",
+  "verseId": "matthew_11_28",
+  "ref": "Matthew 11:28",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "Come to Me",
+    "all you who are weary",
+    "and burdened",
+    "and I will give you rest"
+  ],
+  "verseText": "Come to Me, all you who are weary and burdened, and I will give you rest.",
+  "meaning": "We can never work our way to heaven by being good. Instead, we can rest in Jesus, trusting that he did the work for us. Because he died for our sins and rose again, we can enjoy forever rest in God's kingdom.",
+  "reflection": {
+    "recall": {
+      "question": "Weary means very tired, and burdened means weighed down by troubles. What does Jesus promise those who come to Him?",
+      "choices": [
+        "Rest",
+        "A comfy bed",
+        "A warm meal"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "Come",
-            "occurrence": 1,
-            "emoji": "➡️"
-        },
-        {
-            "type": "underscore",
-            "word": "all",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "weary",
-            "occurrence": 1,
-            "emoji": "😴"
-        },
-        {
-            "type": "emoji",
-            "word": "burdened",
-            "occurrence": 1,
-            "emoji": "🪨"
-        },
-        {
-            "type": "emoji",
-            "word": "give",
-            "occurrence": 1,
-            "emoji": "🎁"
-        },
-        {
-            "type": "emoji",
-            "word": "rest",
-            "occurrence": 1,
-            "emoji": "🛏️"
-        }
-    ]
+    "meaning": {
+      "question": "What kind of rest does Jesus offer us?",
+      "choices": [
+        "Rest from trying to save ourselves",
+        "A life without any problems",
+        "A good night's sleep"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Trying to be good enough to earn God's love can feel like carrying a heavy backpack. But Jesus has already done the work to save us! We can rest in Him instead of trying to earn our way to heaven. How does knowing this change the way you think about obeying God?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "Come",
+      "occurrence": 1,
+      "emoji": "➡️"
+    },
+    {
+      "type": "underscore",
+      "word": "all",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "weary",
+      "occurrence": 1,
+      "emoji": "😴"
+    },
+    {
+      "type": "emoji",
+      "word": "burdened",
+      "occurrence": 1,
+      "emoji": "🪨"
+    },
+    {
+      "type": "emoji",
+      "word": "give",
+      "occurrence": 1,
+      "emoji": "🎁"
+    },
+    {
+      "type": "emoji",
+      "word": "rest",
+      "occurrence": 1,
+      "emoji": "🛏️"
+    }
+  ]
 }

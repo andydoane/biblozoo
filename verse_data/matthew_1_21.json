@@ -14,28 +14,28 @@
     "from their sins"
   ],
   "verseText": "She will give birth to a Son, and you are to give Him the name Jesus, because He will save His people from their sins.",
-  "meaning": "These are the words the angel said to Joseph in a dream. The angel was telling Joseph that Mary's baby would save the world from sin.",
+  "meaning": "These are the words the angel said to Joseph in a dream. The angel was telling Joseph that Mary's baby would save the world from sin. That's why he was named Jesus: it means “The Lord saves.”",
   "reflection": {
     "recall": {
-      "question": "What name should Mary's Son receive?",
+      "question": "What name did the angel tell Joseph to give Mary's baby?",
       "choices": [
         "Jesus",
-        "Moses",
-        "David"
+        "Jesse",
+        "Joseph Jr."
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Why was He to be named Jesus?",
+      "question": "The name Jesus means “The Lord saves.” Why was that a good name for Jesus?",
       "choices": [
-        "He will save His people from their sins",
-        "He will become the richest man",
-        "He will rebuild the temple"
+        "He would save His people from their sins",
+        "He would save us a lot of money",
+        "Jesus was a cool-sounding name"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Thank Jesus for coming into the world to save His people from their sins."
+      "prompt": "Even before Jesus was born, God announced why He was coming: to save His people from their sins! God even gave him a name that matched his special mission: Jesus means, “The Lord saves.” How does knowing the meaning behind Jesus' name help you understand who He is?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

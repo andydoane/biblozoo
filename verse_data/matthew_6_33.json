@@ -16,27 +16,27 @@
     "verseText": "But seek first the kingdom of God and His righteousness, and all these things will be added unto you.",
     "meaning": "There are many things in life to think about and worry about. But Jesus teaches us to put God's kingdom and what is right before everything else, trusting God to take care of what we need.",
     "reflection": {
-      "recall": {
-        "question": "What should we seek first?",
-        "choices": [
-          "God's kingdom and righteousness",
-          "Money and comfort",
-          "Other people's approval"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does Jesus teach us to put first?",
-        "choices": [
-          "God and what is right",
-          "Our worries",
-          "Getting more things"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you have many things to think about today, ask how you can put God's kingdom and what is right first."
-      }
+        "recall": {
+            "question": "What does Jesus tell us to seek first?",
+            "choices": [
+                "God's kingdom and righteousness",
+                "Money and diamonds",
+                "Having big muscles"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "What does it mean to “seek first” the kingdom of God?",
+            "choices": [
+                "To make knowing God most important",
+                "To read your Bible when you wake up each morning",
+                "To look for God's buried treasure"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "With so many things to think about, it's easy to forget what matters most. Jesus tells us to put God first and trust our heavenly Father to care for our needs. What is one choice you could make today that puts God's kingdom first?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [

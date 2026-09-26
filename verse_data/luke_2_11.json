@@ -15,25 +15,25 @@
   "meaning": "This is how the angels let the shepherds know that Jesus the savior was born in Bethlehem.",
   "reflection": {
     "recall": {
-      "question": "Who was born in the city of David?",
+      "question": "What wonderful news did the angels announce to the shepherds?",
       "choices": [
-        "A Savior, Christ the Lord",
-        "A Roman emperor",
-        "John the Baptist"
+        "Jesus the Savior was born",
+        "Santa was on his way",
+        "Their lost sheep had been found"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What were the angels announcing?",
+      "question": "The word “Savior” means someone who rescues others. What did Jesus come to save us from",
       "choices": [
-        "Jesus the Savior had been born",
-        "A war had started",
-        "The shepherds were kings"
+        "From sin",
+        "From the Roman Empire",
+        "From the angels"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Celebrate that Jesus came as Savior, and thank Him for coming to rescue sinners."
+      "prompt": "The birth of Jesus is more than a cute Christmas story. It's the start of the greatest rescue story ever: how God's Son saved the world from sin! How does knowing why Jesus came make Christmas even more special?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

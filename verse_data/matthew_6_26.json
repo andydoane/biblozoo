@@ -18,25 +18,25 @@
   "meaning": "Birds aren’t farmers. They must rely on God to take care of their needs. We can trust our heavenly Father to care for us because we are even more valuable to him.",
   "reflection": {
     "recall": {
-      "question": "Who feeds the birds of the air?",
+      "question": "Who does Jesus say feeds the birds of the air?",
       "choices": [
-        "Your heavenly Father",
-        "The birds' barns",
-        "The farmers"
+        "Our heavenly Father",
+        "The farmers",
+        "The bird feeders"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Why can we trust God to care for us?",
+      "question": "Why does Jesus tell us to look at how God cares for the birds?",
       "choices": [
-        "We are valuable to our Father",
-        "We never need to work",
-        "Birds can solve our problems"
+        "We are more valuable to God than birds",
+        "We should be thankful we don't have to eat worms",
+        "Birds are interesting to look at"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you worry about what you need, remember the birds and thank your heavenly Father for caring for you."
+      "prompt": "Have you ever see a bird plant seeds like a farmer? Of course not! They have to trust God to feed them each day. When you feel worried about something you need, remember that God feeds the birds, so he'll definitely take care of you, too! What is one worry you can bring to God and trust Him with today?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

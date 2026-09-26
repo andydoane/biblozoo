@@ -18,25 +18,25 @@
   "meaning": "We should value treasures that last forever (like eternal life in God’s kingdom) instead of earthly things that can be ruined, stolen, or lost.",
   "reflection": {
     "recall": {
-      "question": "Where should we store up treasures?",
+      "question": "Where does Jesus tell us to store up our treasures?",
       "choices": [
         "In heaven",
-        "Only in barns",
-        "Under the ground"
+        "In a hole in the ground",
+        "In a giant treasure chest"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What kind of treasure lasts?",
+      "question": "Why are treasures in heaven better than treasures on earth?",
       "choices": [
-        "Treasure connected to God's kingdom",
-        "Anything expensive",
-        "Whatever we can keep locked up"
+        "They last forever",
+        "They glow in the dark",
+        "They cost less money"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Think about what you value most. Ask God to help you care more about what lasts forever."
+      "prompt": "Toys, money, and other kinds of treasures can break, get lost, or wear out. But the treasures of God's kingdom last forever! How could you spend less time worrying about things you own and more time caring about what matters to God?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -18,25 +18,25 @@
   "meaning": "When someone hurts us, we feel like getting revenge. But Jesus wants us to love them instead.",
   "reflection": {
     "recall": {
-      "question": "What should we do to our enemies?",
+      "question": "What does Jesus tell us to do for our enemies?",
       "choices": [
         "Love them",
         "Get revenge",
-        "Ignore every need"
+        "Pray for God to punish them"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "How does Jesus want us to respond to people who hurt us?",
+      "question": "How does Jesus want us to respond when someone treats us badly?",
       "choices": [
-        "Do good instead of taking revenge",
-        "Hurt them back",
-        "Wait until they apologize"
+        "Show kindness instead of revenge",
+        "Treat them how they treated us",
+        "Only be kind if they apologize"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Think of someone who is hard to love and ask Jesus to help you do something kind instead of getting even."
+      "prompt": "It's easy to be kind to people who are kind to us, but Jesus calls us to love even those who hurt us! That doesn't mean letting someone keep hurting you, but it does mean choosing kindness over revenge. How could you show Jesus' love to someone who has been unkind to you?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
