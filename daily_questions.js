@@ -69,6 +69,7 @@
 
   let dailySession = null;
   let feedGameStartRafId = 0;
+  let questionPageTransition = false;
 
   const LATER_STORAGE_PREFIX =
     "biblozooDailyQuestionLater";
@@ -1618,6 +1619,57 @@
     }
   }
 
+  async function transitionQuestionPage(wrap, advance) {
+    if (questionPageTransition || !wrap.isConnected) return;
+
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      typeof wrap.animate !== "function"
+    ) {
+      advance();
+      return;
+    }
+
+    const sessionAtStart = dailySession;
+    const overlay = document.createElement("div");
+    overlay.className = "daily-question-page-transition";
+    overlay.style.backgroundColor = getComputedStyle(wrap).backgroundColor;
+    overlay.setAttribute("aria-hidden", "true");
+
+    questionPageTransition = true;
+    const wasInert = wrap.inert;
+    wrap.inert = true;
+    let nextWrap = null;
+
+    try {
+      document.body.appendChild(overlay);
+      await overlay.animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        { duration: 225, easing: "ease-in", fill: "forwards" }
+      ).finished;
+
+      if (dailySession !== sessionAtStart || !wrap.isConnected) return;
+
+      // Replace the page only after the overlay is completely opaque.
+      advance();
+      nextWrap = document.querySelector(".daily-question-session");
+      if (nextWrap) nextWrap.inert = true;
+      await new Promise((resolve) => setTimeout(resolve, 75));
+
+      await overlay.animate(
+        [{ opacity: 1 }, { opacity: 0 }],
+        { duration: 275, easing: "ease-out", fill: "forwards" }
+      ).finished;
+    } catch (error) {
+      console.warn("Daily Question page transition interrupted", error);
+    } finally {
+      overlay.remove();
+      wrap.inert = wasInert;
+      if (nextWrap) nextWrap.inert = false;
+      questionPageTransition = false;
+    }
+  }
+
   function renderScreen(idx) {
     if (
       !isFeatureEnabled() ||
@@ -2242,6 +2294,7 @@
 
           if (
             !dailySession ||
+            questionPageTransition ||
             dailySession.phase !==
               SESSION_PHASES.QUESTION ||
             !dailySession.answered
@@ -2252,32 +2305,36 @@
           if (
             dailySession.questionIndex === 0
           ) {
-            dailySession.questionIndex = 1;
-            dailySession.choiceOrder =
-              createShuffledChoiceOrder();
-            dailySession.selectedAnswer =
-              null;
-            dailySession.answered = false;
-            dailySession.answerCorrect =
-              false;
+            void transitionQuestionPage(wrap, () => {
+              dailySession.questionIndex = 1;
+              dailySession.choiceOrder =
+                createShuffledChoiceOrder();
+              dailySession.selectedAnswer =
+                null;
+              dailySession.answered = false;
+              dailySession.answerCorrect =
+                false;
 
-            appApi?.renderApp?.();
+              appApi?.renderApp?.();
+            });
             return;
           }
 
           if (
             dailySession.questionIndex === 1
           ) {
-            dailySession.phase =
-              SESSION_PHASES.REFLECTION;
+            void transitionQuestionPage(wrap, () => {
+              dailySession.phase =
+                SESSION_PHASES.REFLECTION;
 
-            dailySession.selectedAnswer =
-              null;
-            dailySession.answered = false;
-            dailySession.answerCorrect =
-              false;
+              dailySession.selectedAnswer =
+                null;
+              dailySession.answered = false;
+              dailySession.answerCorrect =
+                false;
 
-            appApi?.renderApp?.();
+              appApi?.renderApp?.();
+            });
           }
         };
     }

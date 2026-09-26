@@ -1214,7 +1214,8 @@
 
   .daily-question-session-shell,
   .daily-question-reflection-shell {
-    align-content: start;
+    /* The shell grows with long content; spare height centers short content. */
+    align-content: center;
     row-gap: 8px;
   }
 
@@ -1274,6 +1275,15 @@
     padding-top: 10px;
     padding-bottom: 12px;
   }
+}
+
+/* Mounted on body so replacing the current slide cannot remove the fade. */
+.daily-question-page-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 16000;
+  opacity: 0;
+  touch-action: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
