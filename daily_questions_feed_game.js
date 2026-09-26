@@ -25,13 +25,14 @@
     523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
   ]);
   const TILT_CALIBRATION_MS = 750;
-  const TILT_NEUTRAL_LIMIT = 3.5;
   const INTRO_TAP_LOCKOUT_MS = 800;
 
   let activeRuntime = null;
   let preparedAudioContext = null;
   let preparedStarBuffer = null;
   let starBufferPromise = null;
+  let preparedChompBuffer = null;
+  let chompBufferPromise = null;
 
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const randomFrom = (items) => items?.length
@@ -55,20 +56,7 @@
   }
 
   function buildScheduledBalls() {
-    const scheduled = [];
-    while (scheduled.length < 9) {
-      const bag = shuffle(SOLID_BALLS);
-      const previous = scheduled[scheduled.length - 1];
-      if (previous && bag.length > 1 && bag[0].id === previous.id) {
-        [bag[0], bag[1]] = [bag[1], bag[0]];
-      }
-      for (const config of bag) {
-        if (scheduled.length >= 9) break;
-        scheduled.push(config);
-      }
-    }
-    scheduled.push(RAINBOW_BALL);
-    return scheduled;
+    return [...shuffle(SOLID_BALLS), RAINBOW_BALL];
   }
 
   function chooseBackground(width, height) {
@@ -197,18 +185,50 @@
     return starBufferPromise;
   }
 
+  function loadChompBuffer(context) {
+    if (!context) return Promise.resolve(null);
+    if (preparedChompBuffer) return Promise.resolve(preparedChompBuffer);
+    if (chompBufferPromise) return chompBufferPromise;
+
+    chompBufferPromise = fetch(`${ASSET_BASE}dq_feed_chomp.mp3`)
+      .then((response) => {
+        const isCapacitorLocalResponse =
+          window.location.protocol === "capacitor:" && response.status === 0;
+
+        if (!response.ok && !isCapacitorLocalResponse) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        return response.arrayBuffer();
+      })
+      .then((bytes) => decodeStarAudioData(context, bytes))
+      .then((buffer) => {
+        preparedChompBuffer = buffer;
+        return buffer;
+      })
+      .catch((err) => {
+        console.warn("Daily feeding chomp sound could not load", err);
+        chompBufferPromise = null;
+        return null;
+      });
+
+    return chompBufferPromise;
+  }
+
   function prepareAudio() {
     const Ctor = window.AudioContext || window.webkitAudioContext;
     if (!Ctor) return null;
     if (preparedAudioContext && preparedAudioContext.state !== "closed") {
       preparedAudioContext.resume?.().catch?.(() => {});
       loadStarBuffer(preparedAudioContext);
+      loadChompBuffer(preparedAudioContext);
       return preparedAudioContext;
     }
     try {
       preparedAudioContext = new Ctor();
       preparedAudioContext.resume?.().catch?.(() => {});
       loadStarBuffer(preparedAudioContext);
+      loadChompBuffer(preparedAudioContext);
       return preparedAudioContext;
     } catch (err) {
       preparedAudioContext = null;
@@ -251,6 +271,9 @@
 
       if (runtime.starAudio) {
         try { runtime.starAudio.pause(); runtime.starAudio.currentTime = 0; } catch (err) { }
+      }
+      if (runtime.chompAudio) {
+        try { runtime.chompAudio.pause(); runtime.chompAudio.currentTime = 0; } catch (err) { }
       }
       stopAudioContext(runtime.audioContext);
     }
@@ -339,6 +362,8 @@
 
             <img class="daily-feed-shadow" src="${ASSET_BASE}dq_feed_shadow.png" alt="" draggable="false">
           </div>
+
+          <div class="daily-feed-score-popups" data-daily-feed-score-popups aria-hidden="true"></div>
         </div>
 
         <div
@@ -427,15 +452,34 @@
       </div>`;
   }
 
-  function setCatcherX(runtime, nextX, tiltHint = null) {
+  function setCatcherX(runtime, nextX) {
     if (!runtime) return;
-    const previous = runtime.catcherX;
-    const safeX = clamp(Number(nextX) || runtime.width / 2, runtime.petRadius, runtime.width - runtime.petRadius);
+    const requestedX = Number(nextX);
+    const safeX = clamp(
+      Number.isFinite(requestedX) ? requestedX : runtime.width / 2,
+      runtime.petRadius,
+      runtime.width - runtime.petRadius
+    );
     runtime.catcherX = safeX;
     runtime.catcher.style.left = `${safeX}px`;
-    runtime.petTilt = Number.isFinite(tiltHint)
-      ? clamp(tiltHint, -13, 13)
-      : clamp((safeX - previous) * 0.62, -13, 13);
+  }
+
+  function updatePetLean(runtime, dt) {
+    const velocity = (runtime.catcherX - runtime.lastCatcherX) / Math.max(dt, 0.008);
+    runtime.lastCatcherX = runtime.catcherX;
+    runtime.smoothedPetVelocity = runtime.smoothedPetVelocity * 0.76 + velocity * 0.24;
+
+    const targetLean = clamp(
+      (runtime.smoothedPetVelocity / Math.max(1, runtime.width * 1.5)) * 13,
+      -15,
+      15
+    );
+
+    runtime.petTilt += (targetLean - runtime.petTilt) * 0.25;
+    if (Math.abs(runtime.petTilt) < 0.12 && Math.abs(targetLean) < 0.12) {
+      runtime.petTilt = 0;
+    }
+
     runtime.petCircle.style.setProperty("--daily-feed-pet-tilt", `${runtime.petTilt}deg`);
   }
 
@@ -446,7 +490,7 @@
     runtime.tiltSamples = [];
     runtime.tiltCalibrationUntil =
       performance.now() + TILT_CALIBRATION_MS;
-    setCatcherX(runtime, runtime.width / 2, 0);
+    setCatcherX(runtime, runtime.width / 2);
   }
 
   function handleTilt(runtime, event) {
@@ -473,11 +517,8 @@
         0
       ) / samples.length;
 
-      runtime.neutralGamma = clamp(
-        average,
-        -TILT_NEUTRAL_LIMIT,
-        TILT_NEUTRAL_LIMIT
-      );
+      // Use the phone's actual resting angle as its neutral position.
+      runtime.neutralGamma = average;
       runtime.tiltSamples = [];
       runtime.smoothedTilt = 0;
     }
@@ -487,8 +528,7 @@
     const travel = Math.max(0, runtime.width / 2 - runtime.petRadius);
     setCatcherX(
       runtime,
-      runtime.width / 2 + (runtime.smoothedTilt / 25) * travel,
-      runtime.smoothedTilt * 0.5
+      runtime.width / 2 + (runtime.smoothedTilt / 25) * travel
     );
   }
 
@@ -579,6 +619,38 @@
     } catch (err) { }
   }
 
+  function playChompSound(runtime) {
+    const context = runtime.audioContext;
+
+    if (context && context.state !== "closed") {
+      if (preparedChompBuffer) {
+        try {
+          if (context.state === "suspended" || context.state === "interrupted") {
+            context.resume?.().catch?.(() => {});
+          }
+
+          const source = context.createBufferSource();
+          const gain = context.createGain();
+          source.buffer = preparedChompBuffer;
+          gain.gain.setValueAtTime(0.85, context.currentTime);
+          source.connect(gain);
+          gain.connect(context.destination);
+          source.start();
+          return;
+        } catch (err) { }
+      }
+
+      loadChompBuffer(context);
+      return;
+    }
+
+    if (!runtime.chompAudio) return;
+    try {
+      runtime.chompAudio.currentTime = 0;
+      runtime.chompAudio.play().catch?.(() => {});
+    } catch (err) { }
+  }
+
   function createStarBurst(runtime, peg, now) {
     const colors = ["#ffc751", "#ffffff", "#ff5a51", "#78ad4f", "#46aef0", "#7f66c6"];
     const particles = [];
@@ -594,19 +666,17 @@
     runtime.bursts.push({ x: peg.x, y: peg.y, startedAt: now, duration: 780, particles });
   }
 
-  function chooseBonusBall(runtime) {
-    const choices = SOLID_BALLS.filter((config) => config.id !== runtime.lastSpawnedColor);
-    return randomFrom(choices) || randomFrom(SOLID_BALLS);
-  }
+  function spawnStarBonusBalls(runtime, now) {
+    // Extra balls are simultaneous and do not count toward the seven scheduled balls.
+    const colors = shuffle(SOLID_BALLS).slice(0, 3);
+    const spawnLanes = [0.2, 0.5, 0.8];
 
-  function queueBonusBalls(runtime, now) {
-    const count = 1 + Math.floor(Math.random() * 3);
-    for (let index = 0; index < count; index += 1) {
-      runtime.pendingBonus.push({
-        at: now + 160 + index * 190,
-        config: chooseBonusBall(runtime)
+    colors.forEach((config, index) => {
+      spawnBall(runtime, config, now, {
+        bonus: true,
+        spawnX: runtime.width * spawnLanes[index]
       });
-    }
+    });
   }
 
   function triggerStarPeg(runtime, peg, now) {
@@ -615,19 +685,21 @@
     peg.isStar = false;
     createStarBurst(runtime, peg, now);
     playStarSound(runtime);
-    queueBonusBalls(runtime, now);
+    spawnStarBonusBalls(runtime, now);
   }
 
-  function spawnBall(runtime, config, now, { bonus = false } = {}) {
+  function spawnBall(runtime, config, now, { bonus = false, spawnX = null } = {}) {
     if (!config) return;
     const radius = runtime.pegRadius * 0.66;
     const padding = Math.max(radius * 2.4, runtime.width * 0.06);
-    const x = padding + Math.random() * Math.max(1, runtime.width - padding * 2);
+    const x = Number.isFinite(spawnX)
+      ? clamp(spawnX, padding, runtime.width - padding)
+      : padding + Math.random() * Math.max(1, runtime.width - padding * 2);
     runtime.balls.push({
       id: runtime.nextBallId++,
       config,
       x,
-      y: -radius - Math.random() * radius,
+      y: bonus ? -radius : -radius - Math.random() * radius,
       vx: (Math.random() - 0.5) * runtime.width * 0.055,
       vy: runtime.height * (0.018 + Math.random() * 0.012),
       radius,
@@ -639,14 +711,9 @@
       trail: [],
       lastTrailAt: 0
     });
-    runtime.lastSpawnedColor = config.id;
   }
 
   function processSpawns(runtime, now) {
-    while (runtime.pendingBonus.length && runtime.pendingBonus[0].at <= now) {
-      const bonus = runtime.pendingBonus.shift();
-      spawnBall(runtime, bonus.config, now, { bonus: true });
-    }
     if (runtime.scheduledIndex >= runtime.scheduled.length || now < runtime.nextScheduledAt) return;
     spawnBall(runtime, runtime.scheduled[runtime.scheduledIndex], now);
     runtime.scheduledIndex += 1;
@@ -748,10 +815,27 @@
     badge.classList.add("is-bumped");
   }
 
+  function showCatchScore(runtime, ball) {
+    if (!runtime.scorePopupsEl) return;
+
+    const popup = document.createElement("span");
+    popup.className = "daily-feed-score-popup";
+    if (ball.config.id === "rainbow") {
+      popup.classList.add("is-rainbow");
+    }
+    popup.textContent = `+${ball.points}`;
+    popup.style.left = `${runtime.catcherX}px`;
+    popup.style.top = `${runtime.petCenterY - runtime.petRadius * 0.65}px`;
+    popup.addEventListener("animationend", () => popup.remove(), { once: true });
+    runtime.scorePopupsEl.appendChild(popup);
+  }
+
   function catchBall(runtime, ball) {
     runtime.score += ball.points;
     runtime.caughtCount += 1;
     updateScoreBadge(runtime);
+    showCatchScore(runtime, ball);
+    playChompSound(runtime);
     runtime.catcher.classList.remove("is-catching");
     void runtime.catcher.offsetWidth;
     runtime.catcher.classList.add("is-catching");
@@ -898,14 +982,11 @@
   function maybeFinish(runtime, now) {
     const allScheduledBallsSpawned =
       runtime.scheduledIndex >= runtime.scheduled.length;
-    const allBonusBallsSpawned =
-      runtime.pendingBonus.length === 0;
     const noActiveBalls =
       runtime.balls.length === 0;
 
     const complete =
       allScheduledBallsSpawned &&
-      allBonusBallsSpawned &&
       noActiveBalls;
 
     if (!complete) {
@@ -937,6 +1018,12 @@
       try {
         runtime.starAudio.pause();
         runtime.starAudio.currentTime = 0;
+      } catch (err) { }
+    }
+    if (runtime.chompAudio) {
+      try {
+        runtime.chompAudio.pause();
+        runtime.chompAudio.currentTime = 0;
       } catch (err) { }
     }
 
@@ -1053,8 +1140,7 @@
     const step = dt / 2;
     updateBalls(runtime, step, now);
     updateBalls(runtime, step, now);
-    runtime.petTilt *= 0.88;
-    runtime.petCircle.style.setProperty("--daily-feed-pet-tilt", `${runtime.petTilt}deg`);
+    updatePetLean(runtime, dt);
     draw(runtime, now);
     if (maybeFinish(runtime, now)) {
       complete(runtime);
@@ -1108,6 +1194,11 @@
         "[data-daily-feed-score]"
       );
 
+    const scorePopupsEl =
+      rootEl.querySelector(
+        "[data-daily-feed-score-popups]"
+      );
+
     const startOverlay =
       rootEl.querySelector(
         "[data-daily-feed-start-overlay]"
@@ -1140,6 +1231,7 @@
       !catcher ||
       !petCircle ||
       !scoreEl ||
+      !scorePopupsEl ||
       !startOverlay ||
       !resultOverlay ||
       !resultTitleEl ||
@@ -1222,6 +1314,16 @@
       } catch (err) { }
     }
 
+    const chompAudio = audioContext
+      ? null
+      : new Audio(`${ASSET_BASE}dq_feed_chomp.mp3`);
+
+    if (chompAudio) {
+      chompAudio.preload = "auto";
+      chompAudio.volume = 0.85;
+      try { chompAudio.load(); } catch (err) { }
+    }
+
     const now = performance.now();
 
     const runtime = {
@@ -1240,6 +1342,7 @@
       catcher,
       petCircle,
       scoreEl,
+      scorePopupsEl,
       startOverlay,
       resultOverlay,
       resultTitleEl,
@@ -1264,6 +1367,8 @@
         ) +
         petRect.height / 2,
       petTilt: 0,
+      lastCatcherX: width / 2,
+      smoothedPetVelocity: 0,
       dragging: false,
       activePointerId: null,
       tiltEnabled:
@@ -1288,8 +1393,6 @@
         buildScheduledBalls(),
       scheduledIndex: 0,
       nextScheduledAt: Infinity,
-      pendingBonus: [],
-      lastSpawnedColor: "",
       bursts: [],
       gravity: height * 0.31,
       score: 0,
@@ -1298,6 +1401,7 @@
       lastPegSoundAt: 0,
       audioContext,
       starAudio,
+      chompAudio,
       finishAt: 0,
       onComplete:
         typeof onComplete ===
@@ -1321,8 +1425,7 @@
 
     setCatcherX(
       runtime,
-      width / 2,
-      0
+      width / 2
     );
 
     runtime.orientationHandler =
@@ -1495,7 +1598,7 @@
     const safeCaught = Math.max(0, Number(caughtCount) || 0);
     const cleanPetName = String(petName || "Your BibloPet").trim() || "Your BibloPet";
 
-    if (safeScore >= 15) {
+    if (safeScore >= 13) {
       return {
         chomp: "CHOMP!",
         title: "Amazing Catching!",

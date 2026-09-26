@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Titan One";
+  src: url("./verse_fonts/TitanOne.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 /* ---------- Daily Question feeding reward ---------- */
 
 .daily-question-session.is-feed-game {
@@ -326,6 +334,39 @@
   animation: daily-feed-score-bump 260ms ease-out;
 }
 
+.daily-feed-score-popups {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.daily-feed-score-popup {
+  position: absolute;
+  color: #ffffff;
+  font-family: "Titan One", "Baloo 2", sans-serif;
+  font-size: clamp(29px, 7vw, 42px);
+  line-height: 1;
+  white-space: nowrap;
+  -webkit-text-stroke: 2px #33295f;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, 0);
+  animation: daily-feed-score-float 850ms ease-out forwards;
+}
+
+.daily-feed-score-popup.is-rainbow {
+  color: #ffc751;
+  font-size: clamp(39px, 9vw, 54px);
+  -webkit-text-stroke: 2.5px #33295f;
+}
+
+@keyframes daily-feed-score-float {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.7); }
+  18% { opacity: 1; transform: translate(-50%, -10px) scale(1.12); }
+  100% { opacity: 0; transform: translate(-50%, -72px) scale(1); }
+}
+
 @keyframes daily-feed-score-bump {
   0% { transform: scale(1); }
   45% { transform: scale(1.13); }
@@ -359,7 +400,7 @@
   background: rgba(255, 255, 255, 0.50);
   transform: rotate(var(--daily-feed-pet-tilt, 0deg));
   transform-origin: center center;
-  transition: transform 70ms linear;
+  transition: none;
   will-change: transform;
 }
 
@@ -430,6 +471,10 @@
 
   .daily-feed-pet-circle {
     transition: none;
+  }
+
+  .daily-feed-score-popup {
+    animation-duration: 350ms;
   }
 }
 
