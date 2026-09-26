@@ -16,27 +16,27 @@
     "verseText": "But to all who did receive Him, to those who believed in His name, He gave the right to become children of God.",
     "meaning": "When we believe that Jesus is the Son of God and trust in him to save us, we are adopted as children into God's forever family.",
     "reflection": {
-      "recall": {
-        "question": "What do those who receive Jesus become?",
-        "choices": [
-          "Children of God",
-          "Angels",
-          "Kings of the earth"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "How do we become part of God's family?",
-        "choices": [
-          "By receiving and believing in Jesus",
-          "By earning our way in",
-          "By being born in a certain place"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "If you trust in Jesus, remember today that you belong to God's family. Thank Him for making you His child."
-      }
+        "recall": {
+            "question": "What does God give those who receive Jesus and believe in His name?",
+            "choices": [
+                "The right to be His children",
+                "The power to become angels",
+                "The chance to become kings"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "What does it mean to become a child of God?",
+            "choices": [
+                "We become part of God's forever family",
+                "We become little gods",
+                "We become just like angels"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "When you believe in Jesus and trust Him to save you, God adopts you into His forever family! Even on days when you feel left out, lonely, or like you don't belong, remember that you are loved by your heavenly Father. You have a place in His family forever!"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
@@ -46,12 +46,12 @@
             "occurrence": 1,
             "emoji": "🤲"
         },
-    {
-        "type": "image",
-        "word": "believed",
-        "occurrence": 1,
-        "image": "believe"
-    },
+        {
+            "type": "image",
+            "word": "believed",
+            "occurrence": 1,
+            "image": "believe"
+        },
         {
             "type": "emoji",
             "word": "gave",

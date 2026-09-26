@@ -18,25 +18,25 @@
   "meaning": "No one is like God. He knows every single thing that will happen in the future.",
   "reflection": {
     "recall": {
-      "question": "What can God declare from the beginning?",
+      "question": "God says He can declare the end from the beginning. What does that mean?",
       "choices": [
-        "The end",
-        "Only the past",
-        "Nothing about the future"
+        "He knows the future",
+        "He only knows the past",
+        "He guesses about the future"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this show about God?",
+      "question": "What makes God's knowledge different from ours?",
       "choices": [
-        "He knows the future",
-        "He guesses well",
-        "He learns as events happen"
+        "He knows everything that will happen",
+        "He knows a little about everything",
+        "He has to wait and see"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When the future feels uncertain, remember that God already knows what is coming."
+      "prompt": "Have you ever worried about what might happen tomorrow or wondered what your future will be like? We don't know what's going to happen, but God does! When you feel unsure about the future, remember that nothing takes God by surprise. You can trust Him with whatever comes next!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -15,29 +15,29 @@
   ],
   "verseText": "For God so loved the world that He gave His one and only Son, that everyone who believes in Him shall not perish but have eternal life.",
   "meaning": "God loved the sinners of the world so much, he sent Jesus to rescue us from our sin.",
-    "reflection": {
-      "recall": {
-        "question": "What did God give because He loved the world?",
-        "choices": [
-          "A crown",
-          "His Son",
-          "A law"
-        ],
-        "answer": 1
-      },
-      "meaning": {
-        "question": "What does this verse show about God's love?",
-        "choices": [
-          "He fears us",
-          "He ignores us",
-          "He saves us"
-        ],
-        "answer": 2
-      },
-      "application": {
-        "prompt": "Think of one way God's love shown in Jesus can help you love someone today."
-      }
+  "reflection": {
+    "recall": {
+      "question": "God loved the world so much that He gave us a wonderful gift. What was it?",
+      "choices": [
+        "His one and only Son",
+        "A mountain of gold",
+        "One of his many sons"
+      ],
+      "answer": 0
     },
+    "meaning": {
+      "question": "Eternal life means living with God forever. How does this verse say we can receive eternal life?",
+      "choices": [
+        "By believing in Jesus",
+        "By saying the magic words",
+        "By reading our Bibles and praying"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "God loves us so much that He sent Jesus to save us from our sins! We don't have to earn His love by being good enough. When you mess up or wonder if God loves you, how can remembering what Jesus did for you help?"
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

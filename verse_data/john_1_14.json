@@ -18,25 +18,25 @@
   "meaning": "The Word is a special name for Jesus. To save us, Jesus 'became flesh,' which means he came in a flesh-and-bone human body.",
   "reflection": {
     "recall": {
-      "question": "What did the Word become?",
+      "question": "The Word is a special name for Jesus. What does 'The Word became flesh' mean?",
       "choices": [
-        "Flesh",
-        "An angel",
-        "A book"
+        "Jesus became a human being",
+        "Jesus ate lots of meat",
+        "The Bible is food for us"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Who is the Word?",
+      "question": "What does it mean that Jesus “made His dwelling among us”?",
       "choices": [
-        "Jesus",
-        "Moses",
-        "John"
+        "He lived on earth among us",
+        "Jesus came on vacation",
+        "Jesus stopped being God"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Thank Jesus for coming close to us as a real human being so He could save us."
+      "prompt": "Isn't it amazing that God's own Son came to live among us as a real human being? Jesus knows what it's like to feel hungry, tired, sad, and hurt. When you're going through something difficult, remember that Jesus understands what it's like to be human!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

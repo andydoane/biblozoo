@@ -17,25 +17,25 @@
   "meaning": "Our spirits (or souls) are born dead in sin. In order to believe and join God's kingdom, we need God's Spirit to bring our spirits to life.",
   "reflection": {
     "recall": {
-      "question": "What must happen for someone to see God's kingdom?",
+      "question": "What does Jesus say must happen before someone can see God's kingdom?",
       "choices": [
-        "Be born again",
-        "Become rich",
-        "Move to Jerusalem"
+        "They must be born again",
+        "They must become rich",
+        "They must grow up first"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Who gives this new spiritual life?",
+      "question": "Being “born again” doesn't mean becoming a baby again! What does Jesus mean?",
       "choices": [
-        "God's Spirit",
-        "Our own effort",
-        "Our family"
+        "God gives us new spiritual life",
+        "We start our lives all over",
+        "We make ourselves perfect"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Thank God that new life comes from Him, and ask His Spirit to keep changing your heart."
+      "prompt": "When you were born, you received physical life. But Jesus says we also need new spiritual life, which only God can give us! You can't earn this new life by being good enough. Ask God's Holy Spirit to give you a new heart that loves Jesus and trusts Him."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

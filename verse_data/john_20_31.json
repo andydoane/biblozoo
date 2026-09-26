@@ -18,25 +18,25 @@
   "meaning": "John wrote a book describing many of Jesus' miracles. He wrote it so that people would believe that Jesus was the Christ, the savior sent to rescue us from our sins.",
   "reflection": {
     "recall": {
-      "question": "Why were these things written?",
+      "question": "Why did John write down the miracles and teachings of Jesus?",
       "choices": [
-        "So people may believe Jesus is the Christ",
-        "So people learn Roman history",
-        "So John becomes famous"
+        "So people would believe in Jesus",
+        "So people would buy his book",
+        "So people would forget about Jesus"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does believing in Jesus bring?",
+      "question": "Christ means the Savior God promised to send. What does John say we receive by believing that Jesus is the Christ, the Son of God?",
       "choices": [
-        "Life in His name",
-        "A problem-free life",
-        "Earthly riches"
+        "Eternal life",
+        "A life without problems",
+        "A million heaven bucks"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "As you read about Jesus, ask God to strengthen your faith that He is the Christ, the Son of God."
+      "prompt": "John wrote a book telling the story of Jesus and his wonders. He did it so we could know who Jesus is and believe in Him. Every miracle and teaching gives us another reason to have confidence that Jesus really was the Savior of the World."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -17,27 +17,27 @@
     "verseText": "Jesus said to her, “I am the resurrection and the life. Whoever believes in Me will live, even though he dies.”",
     "meaning": "When we believe in Jesus, we have a promise from him. After we die, we'll live forever with him. When he returns, our bodies will be raised to life.",
     "reflection": {
-      "recall": {
-        "question": "What does Jesus call Himself?",
-        "choices": [
-          "The resurrection and the life",
-          "A mighty angel",
-          "A temple priest"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What promise does Jesus give believers?",
-        "choices": [
-          "They will live even though they die",
-          "They will never die physically",
-          "They will never suffer"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When death feels scary, remember Jesus' promise of resurrection and life."
-      }
+        "recall": {
+            "question": "Jesus calls Himself the resurrection and the life. What does resurrection mean?",
+            "choices": [
+                "To rise from the dead",
+                "To live a long life",
+                "To heal a disease"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "What does Jesus mean when He says believers will live even though they die?",
+            "choices": [
+                "They will be raised to live with Him forever",
+                "They will never die",
+                "They will come back as babies"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Death can feel scary or make us very sad, especially when someone we love dies. But Jesus has power over death! He promises that everyone who believes in Him will live with Him forever. When you feel sad or afraid about death, remember the wonderful hope Jesus gives us!"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
@@ -64,12 +64,12 @@
             "word": "Whoever",
             "occurrence": 1
         },
-    {
-        "type": "image",
-        "word": "believes",
-        "occurrence": 1,
-        "image": "believe"
-    },
+        {
+            "type": "image",
+            "word": "believes",
+            "occurrence": 1,
+            "image": "believe"
+        },
         {
             "type": "underscore",
             "word": "live",

@@ -18,27 +18,27 @@
     "verseText": "I have told you these things so that in Me you may have peace. In the world you will have tribulation. But take courage; I have overcome the world!",
     "meaning": "Jesus promised that his disciples would face tribulations (times of trouble) in this world. But we can have peace in our hearts, knowing that Jesus has earned us a place in God's forever kingdom.",
     "reflection": {
-      "recall": {
-        "question": "What did Jesus say we will have in the world?",
-        "choices": [
-          "Tribulation",
-          "No problems",
-          "Riches"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why can believers take courage?",
-        "choices": [
-          "Jesus has overcome the world",
-          "We are stronger than everyone",
-          "Trouble is not real"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When trouble comes, remember that Jesus has overcome the world and ask Him to give you peace and courage."
-      }
+        "recall": {
+            "question": "Tribulation means times of trouble or suffering. What does Jesus tell His followers to do when they face trouble?",
+            "choices": [
+                "Be courageous",
+                "Give up hope",
+                "Smile and pretend nothing is wrong"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "Why can we have peace and courage even when life is difficult?",
+            "choices": [
+                "Jesus has overcome the world",
+                "We'll never have any problems",
+                "We can solve everything ourselves"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Jesus never promised that life would be easy, but He did promise us peace in Him! When you feel worried, hurt, or afraid, remember that Jesus has overcome the world. What is one trouble you can trust Him with today?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [

@@ -1,78 +1,78 @@
 {
-    "biblopet": "🐆",
-    "biblopetDefaultName": "Jeebee",
-    "biblopetFeetFromBottom": "9.1%",
-    "verseId": "john_15_13",
-    "ref": "John 15:13",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "Greater love",
-        "has no one than this",
-        "that he lay down his life",
-        "for his friends"
-    ],
-    "verseText": "Greater love has no one than this, that he lay down his life for his friends.",
-    "meaning": "The greatest love is shown by giving up your life for someone else. Jesus showed this perfect love when he died in our place on the cross.",
-    "reflection": {
-      "recall": {
-        "question": "What is the greatest kind of love?",
-        "choices": [
-          "Laying down your life for friends",
-          "Giving expensive gifts",
-          "Always agreeing"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "How did Jesus show this love?",
-        "choices": [
-          "He died for us",
-          "He became famous",
-          "He avoided suffering"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "You may not be asked to die for a friend, but choose one way to sacrifice your time or comfort to love someone today."
-      }
+  "biblopet": "🐆",
+  "biblopetDefaultName": "Jeebee",
+  "biblopetFeetFromBottom": "9.1%",
+  "verseId": "john_15_13",
+  "ref": "John 15:13",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "Greater love",
+    "has no one than this",
+    "that he lay down his life",
+    "for his friends"
+  ],
+  "verseText": "Greater love has no one than this, that he lay down his life for his friends.",
+  "meaning": "The greatest love is shown by giving up your life for someone else. Jesus showed this perfect love when he died in our place on the cross.",
+  "reflection": {
+    "recall": {
+      "question": "What does Jesus say is the greatest way to show love for your friends?",
+      "choices": [
+        "Give your life for them",
+        "Buy them expensive gifts",
+        "Give them a hug"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "underscore",
-            "word": "Greater",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "love",
-            "occurrence": 1,
-            "emoji": "❤️"
-        },
-        {
-            "type": "emoji",
-            "word": "no",
-            "occurrence": 1,
-            "emoji": "🚫"
-        },
-        {
-            "type": "emoji",
-            "word": "down",
-            "occurrence": 1,
-            "emoji": "⬇️"
-        },
-        {
-            "type": "emoji",
-            "word": "life",
-            "occurrence": 1,
-            "emoji": "🌱"
-        },
-        {
-            "type": "emoji",
-            "word": "friends",
-            "occurrence": 1,
-            "emoji": "🧑‍🤝‍🧑"
-        }
-    ]
+    "meaning": {
+      "question": "How did Jesus show us this greatest kind of love?",
+      "choices": [
+        "He died on the cross for our sins",
+        "He gave everyone presents",
+        "He did mighty miracles"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Jesus is the greatest friend of all. He proved it by giving His life for us! You can show that same kind of selfless love in smaller ways, too. Maybe you can share something special, help someone when you'd rather play, or stand up for a friend. Remember, real love sometimes means putting someone else's needs before your own!"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "underscore",
+      "word": "Greater",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "love",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "emoji",
+      "word": "no",
+      "occurrence": 1,
+      "emoji": "🚫"
+    },
+    {
+      "type": "emoji",
+      "word": "down",
+      "occurrence": 1,
+      "emoji": "⬇️"
+    },
+    {
+      "type": "emoji",
+      "word": "life",
+      "occurrence": 1,
+      "emoji": "🌱"
+    },
+    {
+      "type": "emoji",
+      "word": "friends",
+      "occurrence": 1,
+      "emoji": "🧑‍🤝‍🧑"
+    }
+  ]
 }

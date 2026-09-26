@@ -1,78 +1,78 @@
 {
-    "biblopet": "🦚",
-    "biblopetDefaultName": "Fluffy",
-    "biblopetFeetFromBottom": "15.4%",
-    "verseId": "lamentations_3_22",
-    "ref": "Lamentations 3:22",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "Because of the loving devotion",
-        "of the LORD",
-        "we are not consumed",
-        "for His mercies",
-        "never fail"
-    ],
-    "verseText": "Because of the loving devotion of the LORD we are not consumed, for His mercies never fail.",
-    "meaning": "God's love is steadfast: faithful and never-stopping. His mercy (love we don't deserve) will never, ever stop.",
-    "reflection": {
-      "recall": {
-        "question": "Why are we not consumed?",
-        "choices": [
-          "The LORD's loving devotion",
-          "Our perfect behavior",
-          "Our strength"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What are God's mercies like?",
-        "choices": [
-          "They never fail",
-          "They are rare",
-          "They must be earned"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you need another chance, remember that God's mercy does not run out."
-      }
+  "biblopet": "🦚",
+  "biblopetDefaultName": "Fluffy",
+  "biblopetFeetFromBottom": "15.4%",
+  "verseId": "lamentations_3_22",
+  "ref": "Lamentations 3:22",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "Because of the loving devotion",
+    "of the LORD",
+    "we are not consumed",
+    "for His mercies",
+    "never fail"
+  ],
+  "verseText": "Because of the loving devotion of the LORD we are not consumed, for His mercies never fail.",
+  "meaning": "God's love is steadfast: faithful and never-stopping. His mercy (love we don't deserve) will never, ever stop.",
+  "reflection": {
+    "recall": {
+      "question": "What does this verse tell us about God's mercies?",
+      "choices": [
+        "They never fail",
+        "There is a limited supply of them",
+        "God's mercies last 100 years"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "loving",
-            "occurrence": 1,
-            "emoji": "❤️"
-        },
-        {
-            "type": "underscore",
-            "word": "devotion",
-            "occurrence": 1
-        },
-        {
-            "type": "image",
-            "word": "LORD",
-            "occurrence": 1,
-            "image": "god_crown"
-        },
-        {
-            "type": "emoji",
-            "word": "consumed",
-            "occurrence": 1,
-            "emoji": "🔥"
-        },
-        {
-            "type": "underscore",
-            "word": "mercies",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "never",
-            "occurrence": 1,
-            "emoji": "🚫"
-        }
-    ]
+    "meaning": {
+      "question": "Mercy means showing kindness and forgiveness even when someone doesn't deserve it. What does God's never-ending mercy teach us about Him?",
+      "choices": [
+        "His love for us never ends",
+        "He loves us only when we love him",
+        "He stops loving us when we fail"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Even when we mess up, God's mercy never runs out! His love remains faithful through our hardest days. How could remembering God's mercy change the way you respond after you've sinned?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "loving",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "underscore",
+      "word": "devotion",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "consumed",
+      "occurrence": 1,
+      "emoji": "🔥"
+    },
+    {
+      "type": "underscore",
+      "word": "mercies",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "never",
+      "occurrence": 1,
+      "emoji": "🚫"
+    }
+  ]
 }

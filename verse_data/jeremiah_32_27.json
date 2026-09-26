@@ -16,25 +16,25 @@
   "meaning": "God is all-powerful. Nothing is too hard for him to do.",
   "reflection": {
     "recall": {
-      "question": "Is anything too difficult for the LORD?",
+      "question": "God asks, “Is anything too difficult for Me?” What's the answer?",
       "choices": [
-        "No",
-        "Yes, many things",
-        "Only big problems"
+        "No, nothing!",
+        "Math is too difficult for God",
+        "Yes, lots of things"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this question teach about God?",
+      "question": "God calls Himself the “God of all flesh,” meaning He is God over every living creature. What does this verse teach us about him?",
       "choices": [
-        "He is all-powerful",
-        "He needs our help",
-        "He has limits"
+        "He rules over everything",
+        "He's only in charge of people",
+        "He is made of flesh and bone"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Bring a hard situation to God in prayer, remembering that nothing is too difficult for Him."
+      "prompt": "Have you ever faced a problem that seemed impossible to solve? Remember, nothing is too difficult for God! You can bring even your biggest problems to Him in prayer. He might not solve them the way you expect, but you can trust that His power is greater than any problem you face."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

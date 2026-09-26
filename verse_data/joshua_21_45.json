@@ -17,25 +17,25 @@
   "meaning": "God kept all the promises he made to the Israelites. And he keeps all the promises he makes to us.",
   "reflection": {
     "recall": {
-      "question": "How many of the LORD's good promises failed?",
+      "question": "God made many promises to the Israelites. How many did he break?",
       "choices": [
-        "Not one",
-        "Half of them",
-        "Most of them"
+        "Zero",
+        "One",
+        "Almost all of them"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this teach about God?",
+      "question": "What does this verse teach us about God?",
       "choices": [
-        "He keeps His promises",
-        "He changes His mind often",
-        "His promises are guesses"
+        "He always keeps His promises",
+        "He keeps most of his promises",
+        "He forgets his promises"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Choose one promise of God you know and thank Him that He is faithful to keep it."
+      "prompt": "God kept every promise He made to the Israelites, and we can trust Him to keep His promises to us, too! Sometimes we have to wait, but God is always faithful. What is one of God's promises you can remember when things don't go the way you hoped?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

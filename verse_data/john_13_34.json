@@ -17,25 +17,25 @@
   "meaning": "Jesus commands us to love each other like he loved us, and he loved us enough to give his life in our place.",
   "reflection": {
     "recall": {
-      "question": "What new commandment did Jesus give?",
+      "question": "What new commandment did Jesus give His followers?",
       "choices": [
         "Love one another",
-        "Become rich",
-        "Avoid strangers"
+        "Read your Bible everyday",
+        "Love your friends, hate your enemies"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What is the model for our love?",
+      "question": "Jesus tells us to love one another as He loved us. How did Jesus love us?",
       "choices": [
-        "Jesus' love for us",
-        "How others treat us",
-        "Whatever feels easiest"
+        "He gave his life to save us",
+        "He wrote a book of the Bible",
+        "He loved us after we loved him first"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Show Jesus-like love to someone today by putting their good ahead of your convenience."
+      "prompt": "Jesus didn't just tell us to love others, He showed us what love looked like by giving His life for us! Think about how Jesus has loved you, and look for ways to show that same love to others!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

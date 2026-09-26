@@ -17,27 +17,27 @@
     "verseText": "Jesus answered, “I am the bread of life. Whoever comes to Me will never hunger, and whoever believes in Me will never thirst.”",
     "meaning": "Like bread and water give our bodies what they need to live, Jesus gives our souls what they need to live forever.",
     "reflection": {
-      "recall": {
-        "question": "What does Jesus call Himself?",
-        "choices": [
-          "The bread of life",
-          "A mighty soldier",
-          "A temple priest"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "How is Jesus like bread and water?",
-        "choices": [
-          "He gives our souls what they need for eternal life",
-          "He promises no physical hunger",
-          "He teaches us to cook"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you notice physical hunger or thirst, let it remind you that your deepest need is Jesus."
-      }
+        "recall": {
+            "question": "What does Jesus call Himself in this verse?",
+            "choices": [
+                "The bread of life",
+                "The sandwich of salvation",
+                "The bread of death"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "How is Jesus like bread and water?",
+            "choices": [
+                "Bread and water give us life; He gives us eternal life",
+                "He keeps us from ever feeling hungry",
+                "He gives us unlimited food"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Food and water keep our bodies alive, but only Jesus can give us eternal life! The next time you feel hungry or thirsty, let it remind you that your soul needs Jesus as much as your body needs food and water."
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
@@ -71,12 +71,12 @@
             "occurrence": 1,
             "emoji": "🍽️"
         },
-    {
-        "type": "image",
-        "word": "believes",
-        "occurrence": 1,
-        "image": "believe"
-    },
+        {
+            "type": "image",
+            "word": "believes",
+            "occurrence": 1,
+            "image": "believe"
+        },
         {
             "type": "emoji",
             "word": "thirst",

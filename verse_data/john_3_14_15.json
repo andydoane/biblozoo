@@ -21,8 +21,8 @@
     "recall": {
       "question": "What did Moses lift up in the wilderness?",
       "choices": [
-        "The snake",
-        "A crown",
+        "A snake",
+        "A cross",
         "A sword"
       ],
       "answer": 0
@@ -30,14 +30,14 @@
     "meaning": {
       "question": "How does that story point to Jesus?",
       "choices": [
-        "He would be lifted up so believers have life",
-        "He would become a king in Egypt",
-        "He would avoid the cross"
+        "Jesus would be lifted up so believers have life",
+        "Jesus would become a snake",
+        "Jesus would be bitten by a snake"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Look to Jesus with faith and thank Him for being lifted up on the cross to save sinners."
+      "prompt": "The whole Bible points us to Jesus. Moses lifted up a snake in the wilderness to save his people from death. In the same way, Jesus was lifted up on the cross to save his people from sin's price of forever death."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
@@ -60,29 +60,29 @@
       "occurrence": 1,
       "emoji": "⬆️"
     },
-      {
-        "type": "emoji",
-        "word": "Son",
-        "occurrence": 1,
-        "emoji": "👨‍🍼"
-      },
+    {
+      "type": "emoji",
+      "word": "Son",
+      "occurrence": 1,
+      "emoji": "👨‍🍼"
+    },
     {
       "type": "image",
       "word": "believes",
       "occurrence": 1,
       "image": "believe"
     },
-      {
-        "type": "emoji",
-        "word": "eternal",
-        "occurrence": 1,
-        "emoji": "♾️"
-      },
-      {
-        "type": "emoji",
-        "word": "life",
-        "occurrence": 1,
-        "emoji": "🌱"
-      }
-    ]
-  }
+    {
+      "type": "emoji",
+      "word": "eternal",
+      "occurrence": 1,
+      "emoji": "♾️"
+    },
+    {
+      "type": "emoji",
+      "word": "life",
+      "occurrence": 1,
+      "emoji": "🌱"
+    }
+  ]
+}

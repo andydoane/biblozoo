@@ -16,27 +16,27 @@
     "verseText": "And I will ask the Father, and He will give you another Advocate to be with you forever — the Spirit of truth...",
     "meaning": "Jesus knew he would return to heaven and leave his disciples. So promised that the Father would give his followers another Helper, the Holy Spirit, who would always be with them.",
     "reflection": {
-      "recall": {
-        "question": "What did Jesus say the Father would give?",
-        "choices": [
-          "Another Advocate",
-          "A new king",
-          "A temple"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Who is the Advocate Jesus promised?",
-        "choices": [
-          "The Holy Spirit",
-          "John the Baptist",
-          "An angel"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Remember that God's Spirit is with His people. Ask Him to help you follow Jesus today."
-      }
+        "recall": {
+            "question": "An Advocate is someone who helps and speaks up for others. Who is the Advocate Jesus promise the Father would send?",
+            "choices": [
+                "The Holy Spirit",
+                "A mighty angel",
+                "Moses"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "How long did Jesus promise the Holy Spirit would stay with His followers?",
+            "choices": [
+                "Forever",
+                "40 days and 40 nights",
+                "Until Jesus returned"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Jesus knew His followers would need help after He returned to heaven, so He promised to send the Holy Spirit! If you believe in Jesus, you're never alone. God's Spirit is always with you, helping you understand God's truth and follow Jesus, even when life gets difficult."
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [

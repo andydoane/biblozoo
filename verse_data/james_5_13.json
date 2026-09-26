@@ -16,25 +16,25 @@
   "meaning": "Whenever trouble comes, our first step should be to pray to God for help.",
   "reflection": {
     "recall": {
-      "question": "What should a suffering person do?",
+      "question": "What does this verse tell us to do when we're suffering (going through something hard)?",
       "choices": [
-        "Pray",
-        "Complain",
-        "Hide"
+        "Pray to God",
+        "Keep it a secret",
+        "Pretend we're happy"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What should be our first response to trouble?",
+      "question": "This verse tells us to pray when we're hurting and sing praises when we're cheerful. What does that teach us?",
       "choices": [
-        "Turn to God in prayer",
-        "Pretend nothing is wrong",
-        "Solve everything alone"
+        "Turn to God in every situation",
+        "Only pray when you need something",
+        "Only thank God when life is easy"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "The next time something goes wrong, make prayer your first response."
+      "prompt": "Whether you're having the best day, the worst day, or something in-between, you can always turn to God! When something is troubling you, tell Him about it. And when something makes you happy, remember to thank Him. What's something you can thank him for today?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

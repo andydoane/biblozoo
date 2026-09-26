@@ -17,27 +17,27 @@
     "verseText": "Jesus answered, “I am the way and the truth and the life. No one comes to the Father except through Me.”",
     "meaning": "The only way we can be part of the forever kingdom of God the Father is through Jesus. Because he died and rose again, we can have eternal life.",
     "reflection": {
-      "recall": {
-        "question": "Who is the way, the truth, and the life?",
-        "choices": [
-          "Jesus",
-          "Moses",
-          "An angel"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "How do we come to the Father?",
-        "choices": [
-          "Through Jesus",
-          "By any path we choose",
-          "By being good enough"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Thank Jesus for being the way to the Father and trust Him rather than your own goodness."
-      }
+        "recall": {
+            "question": "Who said, “I am the way and the truth and the life”?",
+            "choices": [
+                "Jesus",
+                "Moses",
+                "Peter"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "What does Jesus mean when He says He is the only way to God the Father?",
+            "choices": [
+                "No one else can save us",
+                "There are many paths to God",
+                "He knows the directions to get to heaven"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Have you ever tried really hard to be good enough? Jesus tells us that He is the way to God—not our good deeds or how many Bible verses we know! Because Jesus died for our sins and rose again, everyone who believes in Him can have eternal life. Since he is the only way, we must make sure to tell others about Him!"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
