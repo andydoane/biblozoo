@@ -1123,6 +1123,159 @@
   }
 }
 
+/* ---------- One scrolling page for Daily Questions ---------- */
+
+/* The outer screen already scrolls. Let the question and application cards
+   grow to their full content height instead of introducing nested scrolling. */
+.daily-question-session-shell,
+.daily-question-reflection-shell {
+  --daily-question-pet-slot: auto;
+  --daily-question-card-slot: auto;
+  --daily-question-help-slot: auto;
+  --daily-question-action-slot: auto;
+  grid-template-rows: auto auto auto auto;
+  align-content: center;
+  row-gap: clamp(10px, 1.5vh, 16px);
+}
+
+.daily-question-session-shell .daily-question-pet,
+.daily-question-reflection-pet {
+  height: auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  align-items: center;
+  gap: clamp(10px, 1.6vh, 18px);
+  padding-top: 0;
+  margin-bottom: clamp(4px, 1vh, 10px);
+}
+
+.daily-question-card,
+.daily-question-reflection-card {
+  height: auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+.daily-question-card-body {
+  flex: none;
+  min-height: auto;
+  margin-top: clamp(12px, 2vh, 18px);
+}
+
+.daily-question-reflection-body {
+  flex: none;
+  min-height: auto;
+  margin-top: clamp(12px, 2vh, 18px);
+}
+
+.daily-question-help,
+.daily-question-help-spacer {
+  height: auto;
+  min-height: 24px;
+}
+
+.daily-question-action-slot {
+  height: auto;
+  padding-bottom: 8px;
+}
+
+/* The fade matches the selected question's background, never catches taps,
+   and is hidden once the last portion of the page is visible. */
+.daily-question-scroll-cue {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 12;
+  height: clamp(34px, 7vh, 58px);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--daily-question-screen-bg, var(--purple))
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease-out;
+}
+
+.daily-question-scroll-cue.is-visible {
+  opacity: 1;
+}
+
+/* The iPhone SE and similarly short screens gain space above the card.
+   Long questions remain readable and the whole page scrolls if necessary. */
+@media (max-height: 740px) and (max-width: 699px) {
+  .daily-question-session {
+    padding:
+      calc(8px + var(--safeT))
+      12px
+      calc(22px + var(--safeB));
+  }
+
+  .daily-question-session-shell,
+  .daily-question-reflection-shell {
+    align-content: start;
+    row-gap: 8px;
+  }
+
+  .daily-question-session .screen-title-pill {
+    top: calc(8px + var(--safeT));
+    left: 14px;
+  }
+
+  .daily-question-session-shell .daily-question-pet,
+  .daily-question-reflection-pet {
+    gap: 7px;
+    margin-bottom: 3px;
+  }
+
+  .daily-question-session-avatar {
+    width: clamp(70px, 19vw, 82px);
+  }
+
+  .daily-question-wonders,
+  .daily-question-reflection-title {
+    font-size: clamp(20px, 5.4vw, 27px);
+  }
+
+  .daily-question-card,
+  .daily-question-reflection-card {
+    padding: 14px;
+  }
+
+  .daily-question-card-body,
+  .daily-question-reflection-body {
+    margin-top: 12px;
+    gap: 9px;
+  }
+
+  .daily-question-text {
+    font-size: clamp(21px, 5.7vw, 27px);
+    line-height: 1.08;
+  }
+
+  .daily-question-choice {
+    min-height: 48px;
+    padding: 10px 42px;
+    font-size: clamp(18px, 4.8vw, 22px);
+  }
+
+  .daily-question-help,
+  .daily-question-help-spacer {
+    display: none;
+  }
+
+  .daily-question-reflection-prompt {
+    --daily-reflection-fit-size: clamp(25px, 6.6vw, 32px);
+    max-width: 100%;
+  }
+
+  .daily-question-action-slot {
+    padding-top: 10px;
+    padding-bottom: 12px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .daily-question-session-back:active,
   .daily-question-choice:not(:disabled):active,

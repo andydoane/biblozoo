@@ -1439,6 +1439,15 @@
       return;
     }
 
+    // On short phones the reflection card grows naturally; no height-fitting
+    // is needed (or wanted) once the entire page can scroll.
+    if (window.matchMedia?.("(max-height: 740px) and (max-width: 699px)")?.matches) {
+      prompt.style.removeProperty("--daily-reflection-fit-size");
+      prompt.style.removeProperty("width");
+      prompt.style.removeProperty("max-width");
+      return;
+    }
+
     const bodyWidth =
       body.clientWidth;
 
@@ -1644,6 +1653,7 @@
       : "var(--purple)";
 
     wrap.style.backgroundColor = screenBg;
+    wrap.style.setProperty("--daily-question-screen-bg", screenBg);
 
     const homeButtonHtml =
       typeof appApi
@@ -2597,6 +2607,30 @@
 
       window.BibloZooDailyFeedGame
         ?.stop?.();
+    }
+
+    // A non-interactive bottom fade appears only while more of the question
+    // or application screen remains below the visible scroll area.
+    if (
+      session?.phase === SESSION_PHASES.QUESTION ||
+      session?.phase === SESSION_PHASES.REFLECTION
+    ) {
+      const scrollCue = document.createElement("div");
+      scrollCue.className = "daily-question-scroll-cue";
+      scrollCue.setAttribute("aria-hidden", "true");
+      wrap.appendChild(scrollCue);
+
+      const updateScrollCue = () => {
+        if (!wrap.isConnected) return;
+        const remaining =
+          wrap.scrollHeight - wrap.clientHeight - wrap.scrollTop;
+        scrollCue.classList.toggle("is-visible", remaining > 16);
+      };
+
+      wrap.addEventListener("scroll", updateScrollCue, { passive: true });
+      requestAnimationFrame(updateScrollCue);
+      setTimeout(updateScrollCue, 160);
+      document.fonts?.ready?.then(updateScrollCue).catch(() => {});
     }
 
     if (
