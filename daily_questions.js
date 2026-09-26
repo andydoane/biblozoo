@@ -109,6 +109,12 @@
     );
   }
 
+  function isDebugLongPressEnabled() {
+    return (
+      appApi?.isDebugLongPressEnabled?.() === true
+    );
+  }
+
   function getAllowedVerseIds() {
     const verseList =
       appApi?.getVerseList?.();
@@ -637,7 +643,7 @@
   ) {
     if (
       !isFeatureEnabled() ||
-      !isDebugEnabled()
+      !isDebugLongPressEnabled()
     ) {
       return null;
     }
@@ -755,7 +761,7 @@
 
     try {
       return (
-        sessionStorage.getItem(
+        localStorage.getItem(
           storageKey
         ) === "1"
       );
@@ -772,7 +778,7 @@
 
     if (storageKey) {
       try {
-        sessionStorage.setItem(
+        localStorage.setItem(
           storageKey,
           "1"
         );
@@ -853,6 +859,8 @@
       usedVerseHelp: false,
       verseAudioPlaying: false,
       completionRecorded: false,
+      debugForced:
+        offer?.debugForced === true,
       snack: "",
       rewardScore: 0,
       rewardCaught: 0,
@@ -3471,8 +3479,7 @@
           if (
             !dailySession ||
             dailySession.phase !==
-              SESSION_PHASES.REFLECTION ||
-            dailySession.completionRecorded
+              SESSION_PHASES.REFLECTION
           ) {
             return;
           }
@@ -3484,24 +3491,6 @@
             ?.prepareAudio?.();
 
           reflectionDoneButton.disabled =
-            true;
-
-          const completedProgress =
-            markSessionCompleted(
-              sessionAtStart.verseId
-            );
-
-          if (!completedProgress) {
-            reflectionDoneButton.disabled =
-              false;
-
-            console.warn(
-              "Could not complete Daily Question session"
-            );
-            return;
-          }
-
-          sessionAtStart.completionRecorded =
             true;
 
           const tiltEnabled =
@@ -3815,14 +3804,38 @@
                       if (
                         !dailySession ||
                         dailySession !==
-                          session
+                          session ||
+                        !dailySession.rewardComplete
                       ) {
-                        return;
+                        return false;
+                      }
+
+                      if (
+                        !dailySession.debugForced &&
+                        !dailySession.completionRecorded
+                      ) {
+                        const completedProgress =
+                          markSessionCompleted(
+                            dailySession.verseId
+                          );
+
+                        if (!completedProgress) {
+                          console.warn(
+                            "Could not complete Daily Question session"
+                          );
+
+                          return false;
+                        }
+
+                        dailySession.completionRecorded =
+                          true;
                       }
 
                       clearSessionState();
 
                       appApi?.goToTitle?.();
+
+                      return true;
                     }
                 }
               );
@@ -3945,6 +3958,7 @@
       initialize,
       isFeatureEnabled,
       isDebugEnabled,
+      isDebugLongPressEnabled,
       getAllowedVerseIds,
       isAllowedVerseId,
       normalizeReflection,

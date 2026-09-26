@@ -1438,8 +1438,14 @@
         const goBack =
           runtime.onBackToZoo;
 
+        const shouldClose =
+          goBack?.();
+
+        if (shouldClose === false) {
+          return;
+        }
+
         stop();
-        goBack?.();
       };
 
     startOverlay.addEventListener(

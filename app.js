@@ -50,7 +50,8 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const DEBUG_MODE = false;
 const FEATURES = Object.freeze({
   DAILY_PET_QUESTIONS: true,
-  DAILY_PET_QUESTIONS_DEBUG: true
+  DAILY_PET_QUESTIONS_DEBUG: false,
+  DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS: true
 });
 
 // Temporary: set to false to bring back the “Let’s Memorize God’s Word!” animation screen.
@@ -4890,6 +4891,9 @@ window.BibloZooDailyQuestions
 
     isDebugEnabled: () =>
       FEATURES.DAILY_PET_QUESTIONS_DEBUG === true,
+
+    isDebugLongPressEnabled: () =>
+      FEATURES.DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true,
 
     getVerseList: () =>
       VERSE_LIST,
@@ -11930,7 +11934,7 @@ function screenTitle(idx) {
         FEATURES
           .DAILY_PET_QUESTIONS === true &&
         FEATURES
-          .DAILY_PET_QUESTIONS_DEBUG === true,
+          .DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true,
 
       onLongPress: () => {
         const selectedVerseId =

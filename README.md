@@ -146,30 +146,44 @@ Important pieces:
 
 ## Daily Pet Questions status
 
-Daily Pet Questions are currently enabled on this branch:
+Daily Pet Questions are enabled on this branch:
 
 ```js
 DAILY_PET_QUESTIONS: true
 ```
 
-The debug flag is also currently enabled:
+Normal automatic daily behavior is enabled. The automatic debug mode is off:
 
 ```js
-DAILY_PET_QUESTIONS_DEBUG: true
+DAILY_PET_QUESTIONS_DEBUG: false
 ```
 
-At the moment, the module handles:
+A hidden title-screen long-press remains available for manual testing:
 
-- a four-verse testing allowlist
-- eligibility based on unlocked BibloPets
-- daily/per-profile progress state
-- least-recently-used verse selection
-- the title-screen question offer
-- `OK` / `LATER` offer handling
-- debug rotation and forced debug offers
-- normalization of question/reflection data stored with verses
+```js
+DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS: true
+```
 
-The larger question-session, reflection, reward, and feeding-game flow is still being built. Before a production release, review whether `DAILY_PET_QUESTIONS_DEBUG` should be disabled.
+The Daily Questions flow includes:
+
+- eligibility based on unlocked BibloPets and valid reflection data
+- daily/per-profile progress with least-recently-used verse selection
+- one automatic Daily Question completion per local day
+- a `LATER` choice remembered for the rest of the local day
+- Recall and Meaning multiple-choice questions with randomized answer order
+- verse help and verse audio
+- the “Something to Chew On” application prompt
+- the feeding reward game with tilt and drag controls
+- completion recorded when the player finishes the feeding game and presses `Back to Zoo`
+- a selected-verse debug long-press that can test valid Daily Question content without requiring an unlocked BibloPet
+
+Daily Question content can be checked with:
+
+```bash
+npm run validate:daily-questions
+```
+
+The validator checks every verse in `verse_data/verse_list.json` for valid Daily Question structure, including Recall, Meaning, three unique answer choices, valid answer indexes, and an application prompt.
 
 ## Progress, backups, and privacy
 
