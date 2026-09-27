@@ -1,78 +1,78 @@
 {
-    "biblopet": "🪲",
-    "biblopetDefaultName": "Draco",
-    "biblopetFeetFromBottom": "15.2%",
-    "verseId": "proverbs_17_17",
-    "ref": "Proverbs 17:17",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "A friend loves",
-        "at all times",
-        "and a brother",
-        "is born for adversity"
-    ],
-    "verseText": "A friend loves at all times, and a brother is born for adversity.",
-    "meaning": "A true friend is like a brother who sticks with you in adversity (tough times of trouble). And the greatest friend of all was Jesus, who gave his life for us.",
-    "reflection": {
-      "recall": {
-        "question": "When does a true friend love?",
-        "choices": [
-          "At all times",
-          "Only in easy times",
-          "Only when rewarded"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does true friendship look like in trouble?",
-        "choices": [
-          "Sticking with someone",
-          "Leaving them alone",
-          "Pretending nothing is wrong"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Think of someone having a hard time and look for one way to be a faithful friend to them."
-      }
+  "biblopet": "🪲",
+  "biblopetDefaultName": "Draco",
+  "biblopetFeetFromBottom": "15.2%",
+  "verseId": "proverbs_17_17",
+  "ref": "Proverbs 17:17",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "A friend loves",
+    "at all times",
+    "and a brother",
+    "is born for adversity"
+  ],
+  "verseText": "A friend loves at all times, and a brother is born for adversity.",
+  "meaning": "A true friend is like a brother who sticks with you in adversity (tough times of trouble). And the greatest friend of all was Jesus, who gave his life for us.",
+  "reflection": {
+    "recall": {
+      "question": "When does a true friend love?",
+      "choices": [
+        "At all times",
+        "Only in easy times",
+        "When they feel like it"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "friend",
-            "occurrence": 1,
-            "emoji": "🧑‍🤝‍🧑"
-        },
-        {
-            "type": "emoji",
-            "word": "loves",
-            "occurrence": 1,
-            "emoji": "❤️"
-        },
-        {
-            "type": "emoji",
-            "word": "times",
-            "occurrence": 1,
-            "emoji": "⏰"
-        },
-        {
-            "type": "underscore",
-            "word": "brother",
-            "occurrence": 1
-        },
-        {
-            "type": "image",
-            "word": "born",
-            "occurrence": 1,
-            "image": "baby"
-        },
-        {
-            "type": "emoji",
-            "word": "adversity",
-            "occurrence": 1,
-            "emoji": "🤕"
-        }
-    ]
+    "meaning": {
+      "question": "“Adversity” means hard times or trouble. How does a true friend show love during adversity?",
+      "choices": [
+        "They stay with you and help",
+        "They leave you alone to deal with it yourself",
+        "They help you if you'll help them back"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Being a friend means caring when someone is sad or struggling, too. Have you ever known something who went through tough times? What could you have done to be a good friend during that time?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "friend",
+      "occurrence": 1,
+      "emoji": "🧑‍🤝‍🧑"
+    },
+    {
+      "type": "emoji",
+      "word": "loves",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "emoji",
+      "word": "times",
+      "occurrence": 1,
+      "emoji": "⏰"
+    },
+    {
+      "type": "underscore",
+      "word": "brother",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "born",
+      "occurrence": 1,
+      "image": "baby"
+    },
+    {
+      "type": "emoji",
+      "word": "adversity",
+      "occurrence": 1,
+      "emoji": "🤕"
+    }
+  ]
 }

@@ -18,23 +18,23 @@
     "recall": {
       "question": "Where are the eyes of the LORD?",
       "choices": [
-        "Every place",
-        "Only in church",
+        "Everywhere",
+        "Only on the evil",
         "Only in heaven"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does God see?",
+      "question": "What does this verse teach us about things we do in secret?",
       "choices": [
-        "Both evil and good",
-        "Only public actions",
-        "Only big events"
+        "God sees both the good and the wrong we do",
+        "God notices only when we do something wrong",
+        "God doesn't always pay attention"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Remember that God sees what you do even when no one else is watching, and choose what is right."
+      "prompt": "God notices when you do something kind, even if no one thanks you. He also sees wrong choices that you try to hide. How could remembering that God sees you help you choose what is right when you are alone?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

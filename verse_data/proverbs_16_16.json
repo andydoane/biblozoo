@@ -1,77 +1,77 @@
 {
-    "biblopet": "🦎",
-    "biblopetDefaultName": "Grizz",
-    "biblopetFeetFromBottom": "8.7%",
-    "verseId": "proverbs_16_16",
-    "ref": "Proverbs 16:16",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "How much better",
-        "to acquire wisdom than gold",
-        "To gain understanding",
-        "is more desirable than silver"
-    ],
-    "verseText": "How much better to acquire wisdom than gold! To gain understanding is more desirable than silver.",
-    "meaning": "Knowing the truth and wisdom of God is a priceless treasure. It is more valuable than any amount of gold or silver.",
-    "reflection": {
-      "recall": {
-        "question": "What is better to acquire than gold?",
-        "choices": [
-          "Wisdom",
-          "Popularity",
-          "Comfort"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why is God's wisdom so valuable?",
-        "choices": [
-          "It is worth more than riches",
-          "It guarantees money",
-          "It keeps us from learning"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When choosing between what is wise and what looks valuable, ask God to help you choose wisdom."
-      }
+  "biblopet": "🦎",
+  "biblopetDefaultName": "Grizz",
+  "biblopetFeetFromBottom": "8.7%",
+  "verseId": "proverbs_16_16",
+  "ref": "Proverbs 16:16",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "How much better",
+    "to acquire wisdom than gold",
+    "To gain understanding",
+    "is more desirable than silver"
+  ],
+  "verseText": "How much better to acquire wisdom than gold! To gain understanding is more desirable than silver.",
+  "meaning": "Knowing the truth and wisdom of God is a priceless treasure. It is more valuable than any amount of gold or silver.",
+  "reflection": {
+    "recall": {
+      "question": "What does this verse say is better than gold?",
+      "choices": [
+        "Wisdom",
+        "Diamonds",
+        "Beauty"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "underscore",
-            "word": "acquire",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "wisdom",
-            "occurrence": 1,
-            "emoji": "🦉"
-        },
-        {
-            "type": "image",
-            "word": "gold",
-            "occurrence": 1,
-            "image": "gold"
-        },
-        {
-            "type": "underscore",
-            "word": "gain",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "understanding",
-            "occurrence": 1,
-            "emoji": "🧠"
-        },
-        {
-            "type": "image",
-            "word": "silver",
-            "occurrence": 1,
-            "image": "silver"
-        }
-    ]
+    "meaning": {
+      "question": "Wisdom is knowing the right way to live. Why is it more valuable than riches?",
+      "choices": [
+        "It helps us make choices that honor God",
+        "Wise people earn lots of gold",
+        "It makes other people admire us"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Who wouldn't love having a giant pile of gold? But God says the wisdom to know right from wrong is an even greater treasure. Can you think of a situation where making a wise choice saved you from a lot of trouble?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "underscore",
+      "word": "acquire",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "wisdom",
+      "occurrence": 1,
+      "emoji": "🦉"
+    },
+    {
+      "type": "image",
+      "word": "gold",
+      "occurrence": 1,
+      "image": "gold"
+    },
+    {
+      "type": "underscore",
+      "word": "gain",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "understanding",
+      "occurrence": 1,
+      "emoji": "🧠"
+    },
+    {
+      "type": "image",
+      "word": "silver",
+      "occurrence": 1,
+      "image": "silver"
+    }
+  ]
 }

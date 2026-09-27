@@ -19,22 +19,22 @@
       "question": "What should we not lean on?",
       "choices": [
         "Our own understanding",
-        "God's wisdom",
-        "His Word"
+        "God’s wisdom",
+        "The wall"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does trusting the LORD mean?",
+      "question": "To “lean on” something means to depend on it. What does trusting God instead of our own understanding mean?",
       "choices": [
-        "Depend on what He says is true",
-        "Believe we always know best",
-        "Never think carefully"
+        "Trust that God knows better than us",
+        "Trust God only when we agree with Him",
+        "Trust in what we think is best"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you are unsure what to do, ask God for help and trust His wisdom over your own."
+      "prompt": "Sometimes your own idea seems best, but God sees things you cannot see and knows everything. Think of a choice you need to make. How could praying and learning what God says in the Bible help you decide what to do?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

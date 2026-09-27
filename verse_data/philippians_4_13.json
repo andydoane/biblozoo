@@ -1,77 +1,77 @@
 {
-    "biblopet": "🌟",
-    "biblopetDefaultName": "Sparky",
-    "biblopetFeetFromBottom": "15.2%",
-    "verseId": "philippians_4_13",
-    "ref": "Philippians 4:13",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "I can do all things",
-        "through Christ",
-        "who gives me strength"
-    ],
-    "verseText": "I can do all things through Christ who gives me strength.",
-    "meaning": "Paul wrote these words. He experienced both good times and bad. But he trusted Christ Jesus to give him strength to face every situation and do what God called him to do.",
-    "reflection": {
-      "recall": {
-        "question": "Who gives Paul strength?",
-        "choices": [
-          "Christ",
-          "His friends",
-          "His own courage"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What kind of strength is this verse about?",
-        "choices": [
-          "Strength to face what God calls us to",
-          "Power to win every contest",
-          "A promise that life will be easy"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When something God wants you to do feels hard, ask Christ to give you strength to do it faithfully."
-      }
+  "biblopet": "🌟",
+  "biblopetDefaultName": "Sparky",
+  "biblopetFeetFromBottom": "15.2%",
+  "verseId": "philippians_4_13",
+  "ref": "Philippians 4:13",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "I can do all things",
+    "through Christ",
+    "who gives me strength"
+  ],
+  "verseText": "I can do all things through Christ who gives me strength.",
+  "meaning": "Paul wrote these words. He experienced both good times and bad. But he trusted Christ Jesus to give him strength to face every situation and do what God called him to do.",
+  "reflection": {
+    "recall": {
+      "question": "Who gives Paul strength?",
+      "choices": [
+        "Jesus Christ",
+        "His friends",
+        "His enemies"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "do",
-            "occurrence": 1,
-            "emoji": "🛠️"
-        },
-        {
-            "type": "image",
-            "word": "all",
-            "occurrence": 1,
-            "image": "arrows"
-        },
-        {
-            "type": "underscore",
-            "word": "things",
-            "occurrence": 1
-        },
-        {
-            "type": "image",
-            "word": "Christ",
-            "occurrence": 1,
-            "image": "cross"
-        },
-        {
-            "type": "emoji",
-            "word": "gives",
-            "occurrence": 1,
-            "emoji": "🎁"
-        },
-        {
-            "type": "emoji",
-            "word": "strength",
-            "occurrence": 1,
-            "emoji": "💪"
-        }
-    ]
+    "meaning": {
+      "question": "Paul trusted Jesus whether he had plenty or very little. What kind of strength is this verse about?",
+      "choices": [
+        "Strength to trust God in every situation",
+        "Strength to win every game",
+        "Strength to make life go our way"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Paul faced hard days, and Jesus gave him strength to keep trusting Him. Think of something difficult you are facing. What could it look like to ask Jesus for strength and trust Him, even if the situation stays hard?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "do",
+      "occurrence": 1,
+      "emoji": "🛠️"
+    },
+    {
+      "type": "image",
+      "word": "all",
+      "occurrence": 1,
+      "image": "arrows"
+    },
+    {
+      "type": "underscore",
+      "word": "things",
+      "occurrence": 1
+    },
+    {
+      "type": "image",
+      "word": "Christ",
+      "occurrence": 1,
+      "image": "cross"
+    },
+    {
+      "type": "emoji",
+      "word": "gives",
+      "occurrence": 1,
+      "emoji": "🎁"
+    },
+    {
+      "type": "emoji",
+      "word": "strength",
+      "occurrence": 1,
+      "emoji": "💪"
+    }
+  ]
 }

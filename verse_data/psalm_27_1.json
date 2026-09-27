@@ -16,27 +16,27 @@
     "verseText": "The LORD is my light and my salvation — whom shall I fear? The LORD is the stronghold of my life — whom shall I dread?",
     "meaning": "The Lord God guides, saves, and protects his people. He is like a strong castle we can hide in for safety. Because of him, we have no reason to fear.",
     "reflection": {
-      "recall": {
-        "question": "What is the LORD called in this verse?",
-        "choices": [
-          "My light and my salvation",
-          "My enemy and judge",
-          "My treasure chest"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why does the psalmist not need to fear?",
-        "choices": [
-          "The Lord protects and saves him",
-          "No one can ever hurt him",
-          "He never has problems"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you feel afraid, remember that the Lord is your light, salvation, and stronghold."
-      }
+        "recall": {
+            "question": "What does the writer call the LORD in this verse?",
+            "choices": [
+                "My light, my salvation, and my stronghold",
+                "My King and my Father",
+                "My shepherd and my best friend"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "A “stronghold” is a safe place, like a strong castle. What does calling God a stronghold teach us?",
+            "choices": [
+                "God can protect us from danger",
+                "God's kingdom has strong walls",
+                "We must be ready to protect ourselves"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "God is your light to guide you in the right way to go. And He's your stronghold to turn to when you are afraid. Think of a worry you are carrying today. What could you say to God about it, knowing you can trust His strength and care?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
@@ -52,12 +52,12 @@
             "occurrence": 1,
             "emoji": "💡"
         },
-    {
-        "type": "image",
-        "word": "salvation",
-        "occurrence": 1,
-        "image": "superhero"
-    },
+        {
+            "type": "image",
+            "word": "salvation",
+            "occurrence": 1,
+            "image": "superhero"
+        },
         {
             "type": "emoji",
             "word": "fear",

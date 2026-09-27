@@ -1,79 +1,79 @@
 {
-    "biblopet": "🐃",
-    "biblopetDefaultName": "Bluto",
-    "biblopetFeetFromBottom": "26.1%",
-    "verseId": "proverbs_14_12",
-    "ref": "Proverbs 14:12",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "There is a way",
-        "that seems right to a man",
-        "but its end",
-        "is the way of death"
-    ],
-    "verseText": "There is a way that seems right to a man, but its end is the way of death.",
-    "meaning": "We shouldn't trust in ourselves to figure out what's right. We need God's Word to show us the way that leads to eternal life.",
-    "reflection": {
-      "recall": {
-        "question": "What can seem right but end in death?",
-        "choices": [
-          "A person's own way",
-          "God's Word",
-          "The way of wisdom"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why shouldn't we trust only our own ideas?",
-        "choices": [
-          "We can be wrong and need God's truth",
-          "Our ideas are always perfect",
-          "God does not guide us"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Before deciding what is right, ask what God's Word says instead of trusting only your feelings."
-      }
+  "biblopet": "🐃",
+  "biblopetDefaultName": "Bluto",
+  "biblopetFeetFromBottom": "26.1%",
+  "verseId": "proverbs_14_12",
+  "ref": "Proverbs 14:12",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "There is a way",
+    "that seems right to a man",
+    "but its end",
+    "is the way of death"
+  ],
+  "verseText": "There is a way that seems right to a man, but its end is the way of death.",
+  "meaning": "We shouldn't trust in ourselves to figure out what's right. We need God's Word to show us the way that leads to eternal life.",
+  "reflection": {
+    "recall": {
+      "question": "Where can a way that seems right to a person lead?",
+      "choices": [
+        "To death",
+        "To heaven",
+        "To the moon"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "way",
-            "occurrence": 1,
-            "emoji": "🛣️"
-        },
-        {
-            "type": "emoji",
-            "word": "right",
-            "occurrence": 1,
-            "emoji": "✅"
-        },
-        {
-            "type": "emoji",
-            "word": "man",
-            "occurrence": 1,
-            "emoji": "🧍"
-        },
-        {
-            "type": "emoji",
-            "word": "end",
-            "occurrence": 1,
-            "emoji": "🏁"
-        },
-        {
-            "type": "emoji",
-            "word": "way",
-            "occurrence": 2,
-            "emoji": "🛣️"
-        },
-        {
-            "type": "emoji",
-            "word": "death",
-            "occurrence": 1,
-            "emoji": "💀"
-        }
-    ]
+    "meaning": {
+      "question": "We shouldn't trust our own ideas about what is right because...?",
+      "choices": [
+        "God knows better than us",
+        "We know better than God",
+        "It doesn't matter what we do"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Imagine you could avoid getting in trouble by telling a lie. That might seem like a good idea to us, but God lets us know that lying leads us down the road to destruction. Can you think of a time where something sounded like a good idea, but it was against God's commands?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "way",
+      "occurrence": 1,
+      "emoji": "🛣️"
+    },
+    {
+      "type": "emoji",
+      "word": "right",
+      "occurrence": 1,
+      "emoji": "✅"
+    },
+    {
+      "type": "emoji",
+      "word": "man",
+      "occurrence": 1,
+      "emoji": "🧍"
+    },
+    {
+      "type": "emoji",
+      "word": "end",
+      "occurrence": 1,
+      "emoji": "🏁"
+    },
+    {
+      "type": "emoji",
+      "word": "way",
+      "occurrence": 2,
+      "emoji": "🛣️"
+    },
+    {
+      "type": "emoji",
+      "word": "death",
+      "occurrence": 1,
+      "emoji": "💀"
+    }
+  ]
 }
