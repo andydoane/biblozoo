@@ -20,22 +20,22 @@
       "question": "God calls Himself the God of whom?",
       "choices": [
         "Abraham, Isaac, and Jacob",
-        "Peter, James, and John",
-        "Saul, David, and Solomon"
+        "Moses, David, and Elijah",
+        "Peter, James, and John"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this verse show about God?",
+      "question": "Abraham, Isaac, and Jacob lived long ago. What does this verse teach us about the God we worship today?",
       "choices": [
-        "He is the same faithful God across generations",
-        "He changes with each generation",
-        "He only cared about Abraham"
+        "He is the same God they worshiped",
+        "God has changed over the years",
+        "God is an old and weak"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Remember that the God who cared for His people long ago is the same God you can trust today."
+      "prompt": "The same God who spoke to Abraham, Isaac, and Jacob 4,000 years ago is alive and well today. He's been around since before the beginning and he'll be around forever into the future."
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

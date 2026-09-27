@@ -15,25 +15,25 @@
   "meaning": "This is a promise to us from Jesus. He will always be with us, until the end of time.",
   "reflection": {
     "recall": {
-      "question": "How long is Jesus with His followers?",
+      "question": "How long did Jesus promise to be with His followers?",
       "choices": [
-        "Always, to the end of the age",
-        "Only on Sundays",
-        "Until they face trouble"
+        "Always",
+        "For the next 40 years",
+        "Until they die"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this promise mean?",
+      "question": "What does Jesus’ promise mean for us?",
       "choices": [
-        "Jesus never abandons His people",
-        "Believers never feel lonely",
-        "Hard times never happen"
+        "He is still with us today",
+        "We will never feel lonely",
+        "Nothing hard will happen to us"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Whatever happens today, remind yourself: Jesus is with me."
+      "prompt": "Even when you feel lonely or unsure, Jesus promises to be with you. Think of a time when you find it hard to be brave and do what God says is right. How could remembering Jesus' promise help you face that moment?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

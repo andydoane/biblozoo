@@ -16,25 +16,25 @@
   "meaning": "One day, every human being who has ever lived will bow down before king King Jesus.",
   "reflection": {
     "recall": {
-      "question": "What will every knee do at the name of Jesus?",
+      "question": "At the name of Jesus, who will bow?",
       "choices": [
-        "Bow",
-        "Run away",
-        "Dance"
+        "Everyone who has ever lived",
+        "Only his disciples",
+        "The angels in heaven"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this show about Jesus?",
+      "question": "Who are the people “under the earth?”",
       "choices": [
-        "He is the King everyone will acknowledge",
-        "He is only one teacher among many",
-        "He has authority only in one place"
+        "People who have died",
+        "Underground goblins",
+        "People from Australia"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Honor Jesus as King today by choosing to obey Him willingly."
+      "prompt": "One day everyone who has ever lived will bow before Jesus. It doesn't matter whether they followed him during this life or not: one day, everyone will realize that Jesus really was the Son of God. But we shouldn't wait until He comes back to serve Him; we should believe in him today!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

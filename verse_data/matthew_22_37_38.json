@@ -19,25 +19,25 @@
   "meaning": "Out of all the commandments in the Bible, there is one that is most important of all: to love God with all that we are and all that we have, more than anything else in the world.",
   "reflection": {
     "recall": {
-      "question": "What is the first and greatest commandment?",
+      "question": "Jesus told us to love God with all of our... what?",
       "choices": [
-        "Love the Lord with all your heart, soul, and mind",
-        "Earn lots of money",
-        "Never make mistakes"
+        "Heart, soul, mind, and strength",
+        "Head, shoulders, knees, and toes",
+        "Up, down, left, and left"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does it mean to love God this way?",
+      "question": "What does it mean to love God with all your heart, soul, and mind?",
       "choices": [
-        "Put Him first with our whole selves",
-        "Think about Him once a week",
-        "Only say nice words"
+        "Love Him with every part of who you are",
+        "Think about Him only at church",
+        "Say you love Him without meaning it"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Choose one part of your day—your thoughts, choices, or energy—and offer it to God in love."
+      "prompt": "Loving God includes what you think about, what you care about, and the choices you make. Think of something you enjoy doing. How could you show your love for God while doing it?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

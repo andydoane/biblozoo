@@ -18,25 +18,25 @@
   "meaning": "God is different from human beings. We lie and change our minds, but God always tells the truth and keeps every promise he makes.",
   "reflection": {
     "recall": {
-      "question": "Is God like a man who lies?",
+      "question": "What does God always do when He makes a promise?",
       "choices": [
-        "No",
-        "Yes",
-        "Sometimes"
+        "He keeps it",
+        "He breaks it",
+        "He sometimes forgets about it"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What can we trust about God?",
+      "question": "Why can we trust God’s promises?",
       "choices": [
-        "He tells the truth and keeps His promises",
-        "He often changes His mind",
-        "He forgets what He said"
+        "Because He never lies",
+        "Because He usually means what He says",
+        "We shouldn't trust God's promises"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you read one of God's promises, remember that He does not lie and will do what He says."
+      "prompt": "People sometimes tell us lies or let us down, but God always keeps His promises. Think of a promise you have learned from the Bible. How could remembering that God tells the truth help you trust Him when you feel unsure?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

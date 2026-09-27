@@ -18,25 +18,25 @@
   "meaning": "This is the Great Commission: the mission Jesus gave to his followers. Our job is to be disciples who go and make new disciples all over the world.",
   "reflection": {
     "recall": {
-      "question": "What did Jesus tell His followers to make?",
+      "question": "A disciple is someone who learns from Jesus and follows Him. Where did Jesus tell His followers to make disciples?",
       "choices": [
-        "Disciples of all nations",
-        "Big buildings",
-        "Only local friends"
+        "In all nations",
+        "In their own country",
+        "At the North Pole"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What is the Great Commission?",
+      "question": "What does it mean to make disciples?",
       "choices": [
-        "Jesus' mission for followers to make disciples",
-        "A command to stay home",
-        "A rule only for the apostles"
+        "Share the good news about Jesus with others and teach them to obey Him",
+        "Tell people to just be good",
+        "Build robots who follow Jesus"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Think of one person who could learn more about Jesus through your words or example."
+      "prompt": "Jesus sent His first followers to make disciples all over the world. If you believe in Him, you can be part of that great mission to spread the good news everywhere. Can you think of someone you can share the good news with?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
