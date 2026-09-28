@@ -506,7 +506,78 @@
   box-shadow:
     0 4px 0 rgba(0, 0, 0, 0.12);
 
+  overflow: visible;
+
   cursor: pointer;
+}
+
+.daily-question-star-reward {
+  position: absolute;
+  top: -38px;
+  left: 50%;
+  z-index: 6;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+
+  pointer-events: none;
+
+  color: #ffffff;
+  font: inherit;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+
+  opacity: 0;
+  transform: translateX(-50%);
+  animation:
+    daily-question-star-reward-float
+    850ms
+    ease-out
+    forwards;
+}
+
+.daily-question-star-reward img {
+  width: 31px;
+  height: 31px;
+
+  display: block;
+
+  object-fit: contain;
+}
+
+.daily-question-star-reward-plus {
+  display: inline-block;
+}
+
+[data-daily-question-color="yellow"] .daily-question-star-reward {
+  color: #333333;
+}
+
+@keyframes daily-question-star-reward-float {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, 10px)
+      scale(0.78);
+  }
+
+  18% {
+    opacity: 1;
+    transform:
+      translate(-50%, 0)
+      scale(1.08);
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -28px)
+      scale(1);
+  }
 }
 
 [data-daily-question-color="red"] .daily-question-choice {
