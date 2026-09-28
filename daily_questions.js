@@ -49,6 +49,12 @@
       purple: "#7f66c6"
     });
 
+  const DAILY_QUESTION_ANSWER_SOUND_ASSETS =
+    Object.freeze({
+      correct: "./verse_images/daily_questions/dq_correct.mp3",
+      incorrect: "./verse_images/daily_questions/dq_incorrect.mp3"
+    });
+
   /*
     Any verse with valid Daily Question reflection data may
     participate. Pet-unlock and daily-progress rules are
@@ -70,6 +76,8 @@
   let dailySession = null;
   let feedGameStartRafId = 0;
   let questionPageTransition = false;
+  let correctAnswerAudio = null;
+  let incorrectAnswerAudio = null;
 
   const LATER_STORAGE_PREFIX =
     "biblozooDailyQuestionLater";
@@ -83,12 +91,54 @@
       .replace(/'/g, "&#39;");
   }
 
+  function prepareDailyQuestionAnswerSounds() {
+    if (typeof Audio === "undefined") {
+      return;
+    }
+
+    if (!correctAnswerAudio) {
+      correctAnswerAudio =
+        new Audio(
+          DAILY_QUESTION_ANSWER_SOUND_ASSETS.correct
+        );
+      correctAnswerAudio.preload = "auto";
+    }
+
+    if (!incorrectAnswerAudio) {
+      incorrectAnswerAudio =
+        new Audio(
+          DAILY_QUESTION_ANSWER_SOUND_ASSETS.incorrect
+        );
+      incorrectAnswerAudio.preload = "auto";
+    }
+  }
+
+  function playDailyQuestionAnswerSound(isCorrect) {
+    prepareDailyQuestionAnswerSounds();
+
+    const audio =
+      isCorrect
+        ? correctAnswerAudio
+        : incorrectAnswerAudio;
+
+    if (!audio) {
+      return;
+    }
+
+    try {
+      audio.currentTime = 0;
+      audio.play().catch?.(() => {});
+    } catch (err) { }
+  }
+
   function initialize(api) {
     appApi =
       api &&
         typeof api === "object"
         ? api
         : null;
+
+    prepareDailyQuestionAnswerSounds();
 
     return !!appApi;
   }
@@ -825,6 +875,7 @@
       completionRecorded: false,
       debugForced:
         offer?.debugForced === true,
+      earnedStarPegCount: 0,
       snack: "",
       rewardScore: 0,
       rewardCaught: 0,
@@ -2086,6 +2137,28 @@
                     </span>
 
                     ${
+                      session.answerCorrect &&
+                      isSelected &&
+                      isCorrectChoice
+                        ? `
+                          <span
+                            class="daily-question-star-reward"
+                            aria-hidden="true"
+                          >
+                            <span
+                              class="daily-question-star-reward-plus"
+                            >+</span>
+                            <img
+                              src="./verse_images/daily_questions/dq_feed_star_peg.png"
+                              alt=""
+                              draggable="false"
+                            >
+                          </span>
+                        `
+                        : ""
+                    }
+
+                    ${
                       marker
                         ? `
                           <span
@@ -2276,6 +2349,18 @@
             dailySession.answerCorrect =
               selectedIndex ===
               currentQuestion.answer;
+
+            playDailyQuestionAnswerSound(
+              dailySession.answerCorrect
+            );
+
+            if (dailySession.answerCorrect) {
+              dailySession.earnedStarPegCount =
+                Math.min(
+                  2,
+                  dailySession.earnedStarPegCount + 1
+                );
+            }
 
             appApi?.renderApp?.();
           };
