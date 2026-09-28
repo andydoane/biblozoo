@@ -65,7 +65,7 @@
     return `${ASSET_BASE}dq_feed_bg_${scene}_${format}.jpg`;
   }
 
-  function createPegField(width, height, earnedStarPegCount = 0) {
+  function createPegField(width, height) {
     const pegs = [];
     const rows = 9;
     const radius = clamp(width * 0.04, 14, 26);
@@ -101,35 +101,9 @@
       }
     }
 
-    const starRowCandidates =
-      shuffle(
-        Array.from(
-          { length: rows - 2 },
-          (_, index) => index + 1
-        )
-      );
-
-    const starCount =
-      Math.min(
-        1 + Math.max(0, Number(earnedStarPegCount) || 0),
-        starRowCandidates.length
-      );
-
-    const starRows =
-      starRowCandidates.slice(0, starCount);
-
-    starRows.forEach((row) => {
-      const starPeg =
-        randomFrom(
-          pegs.filter((peg) => peg.row === row)
-        );
-      if (starPeg) starPeg.isStar = true;
-    });
-
-    return {
-      pegs,
-      pegRadius: radius
-    };
+    const starPeg = randomFrom(pegs.filter((peg) => peg.row > 0 && peg.row < rows - 1));
+    if (starPeg) starPeg.isStar = true;
+    return { pegs, pegRadius: radius, starPeg };
   }
 
   function buildImageMap() {
@@ -706,7 +680,8 @@
   }
 
   function triggerStarPeg(runtime, peg, now) {
-    if (!peg?.isStar) return;
+    if (!runtime.starActive || !peg?.isStar) return;
+    runtime.starActive = false;
     peg.isStar = false;
     createStarBurst(runtime, peg, now);
     playStarSound(runtime);
@@ -783,7 +758,7 @@
     const velocityAlongNormal = ball.vx * nx + ball.vy * ny;
     if (velocityAlongNormal >= 0) return;
 
-    if (peg.isStar) triggerStarPeg(runtime, peg, now);
+    if (peg.isStar && runtime.starActive) triggerStarPeg(runtime, peg, now);
     else playPegTone(runtime, now);
 
     const impulse = (1 + 0.68) * velocityAlongNormal;
@@ -1300,18 +1275,8 @@
     canvas.height =
       Math.round(height * dpr);
 
-    const earnedStarPegCount =
-      Math.min(
-        2,
-        Math.max(0, Number(session.earnedStarPegCount) || 0)
-      );
-
     const field =
-      createPegField(
-        width,
-        height,
-        earnedStarPegCount
-      );
+      createPegField(width, height);
 
     const images =
       buildImageMap();
@@ -1419,6 +1384,7 @@
       pointerEndHandler: null,
       pegs: field.pegs,
       pegRadius: field.pegRadius,
+      starActive: !!field.starPeg,
       starImage: images.star,
       ballImages: images.balls,
       balls: [],
