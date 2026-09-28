@@ -19,25 +19,25 @@
   "meaning": "This describes God's future forever kingdom, where people from all over the world will worship him together.",
   "reflection": {
     "recall": {
-      "question": "Who stood before the throne and the Lamb?",
+      "question": "A “multitude” is a huge crowd, and “tongue” means language here. Who did John see standing before the throne?",
       "choices": [
-        "A huge multitude from every nation",
-        "Only one nation",
-        "Only angels"
+        "People from every nation and language",
+        "People from only one country",
+        "Only people who spoke his language"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this vision show about God's kingdom?",
+      "question": "Jesus is called “the Lamb” because He gave His life to save us. What does this crowd before Him show us about God’s family?",
       "choices": [
-        "People from all peoples will worship together",
-        "Only one culture belongs",
-        "No one will know each other"
+        "Jesus saves people from all over the world",
+        "Only people from one nation can belong",
+        "Everyone must speak Jesus' language to belong"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Treat people from different places and backgrounds with love, remembering God's forever family includes people from every nation."
+      "prompt": "Imagine a crowd too big to count, with people from every part of the world worshiping Jesus together. How could this picture help you welcome someone whose comes from a different place than you do?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -1,77 +1,77 @@
 {
-    "biblopet": "🪁",
-    "biblopetDefaultName": "Snickers",
-    "biblopetFeetFromBottom": "19.1%",
-    "verseId": "psalm_46_1",
-    "ref": "Psalm 46:1",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "God is our refuge and strength",
-        "an ever-present help",
-        "in times of trouble"
-    ],
-    "verseText": "God is our refuge and strength, an ever-present help in times of trouble.",
-    "meaning": "God is our refuge. He's like a strong castle we can hide in whenever trouble comes. And whenever we cry out to him for help, he's always nearby.",
-    "reflection": {
-      "recall": {
-        "question": "What is God called in this verse?",
-        "choices": [
-          "Our refuge and strength",
-          "A distant ruler",
-          "A hidden mystery"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does ever-present help mean?",
-        "choices": [
-          "God is near in trouble",
-          "Trouble never happens",
-          "We solve problems alone"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "If trouble comes today, pause and ask God to be your refuge and strength."
-      }
+  "biblopet": "🪁",
+  "biblopetDefaultName": "Snickers",
+  "biblopetFeetFromBottom": "19.1%",
+  "verseId": "psalm_46_1",
+  "ref": "Psalm 46:1",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "God is our refuge and strength",
+    "an ever-present help",
+    "in times of trouble"
+  ],
+  "verseText": "God is our refuge and strength, an ever-present help in times of trouble.",
+  "meaning": "God is our refuge. He's like a strong castle we can hide in whenever trouble comes. And whenever we cry out to him for help, he's always nearby.",
+  "reflection": {
+    "recall": {
+      "question": "What is God called in this verse?",
+      "choices": [
+        "Our refuge and strength",
+        "A cloud of light",
+        "A mighty warrior"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "image",
-            "word": "God",
-            "occurrence": 1,
-            "image": "god_crown"
-        },
-        {
-            "type": "emoji",
-            "word": "refuge",
-            "occurrence": 1,
-            "emoji": "🏰"
-        },
-        {
-            "type": "emoji",
-            "word": "strength",
-            "occurrence": 1,
-            "emoji": "💪"
-        },
-        {
-            "type": "underscore",
-            "word": "ever-present",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "help",
-            "occurrence": 1,
-            "emoji": "🤝"
-        },
-        {
-            "type": "emoji",
-            "word": "trouble",
-            "occurrence": 1,
-            "emoji": "😧"
-        }
-    ]
+    "meaning": {
+      "question": "A “refuge” is a place to turn to for safety. What does it mean that God is our refuge and “ever-present help”?",
+      "choices": [
+        "He's there to help whenever trouble comes",
+        "He promises we will never have trouble",
+        "He's not interested in helping"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "When trouble comes, you do not have to face it with only your own strength. God is near, and you can turn to Him for help. Think of a problem that feels too big for you. What could you ask God to help you with today?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "refuge",
+      "occurrence": 1,
+      "emoji": "🏰"
+    },
+    {
+      "type": "emoji",
+      "word": "strength",
+      "occurrence": 1,
+      "emoji": "💪"
+    },
+    {
+      "type": "underscore",
+      "word": "ever-present",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "help",
+      "occurrence": 1,
+      "emoji": "🤝"
+    },
+    {
+      "type": "emoji",
+      "word": "trouble",
+      "occurrence": 1,
+      "emoji": "😧"
+    }
+  ]
 }

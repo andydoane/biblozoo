@@ -16,25 +16,25 @@
   "meaning": "God has done many wonderful things in the past to rescue his people. It is good for us to look back and remember them.",
   "reflection": {
     "recall": {
-      "question": "What will the writer remember?",
+      "question": "What are God's “wonders of old?”",
       "choices": [
-        "The works and wonders of the LORD",
-        "His own victories",
-        "His worries"
+        "God's mighty miracles from the past",
+        "God's crazy inventions",
+        "God's mysterious magic tricks"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Why should we remember God's past works?",
+      "question": "Why should we remember what God has done in the past?",
       "choices": [
-        "They help us trust Him now",
-        "God may forget them",
-        "We should live only in the past"
+        "It helps us trust Him now",
+        "It's fun to read about his wondrs of old",
+        "It means we'll be able to do wonders, too"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Think of one Bible story where God rescued His people and let it strengthen your trust today."
+      "prompt": "Think of a Bible story where God rescued His people, like when He made a path through the sea. How could remembering these stories help you trust God with something difficult today?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -17,25 +17,25 @@
   "meaning": "The toughest times we face in this life aren't worth thinking about when we compare them to the glory of spending forever with God",
   "reflection": {
     "recall": {
-      "question": "How do present sufferings compare with future glory?",
+      "question": "What does this verse say about the suffering we face now?",
       "choices": [
-        "They are not comparable",
-        "They are greater",
-        "They are exactly equal"
+        "The glory God has promised is far greater",
+        "Stop complaining",
+        "You are suffering because you sinned"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What hope helps us in suffering?",
+      "question": "What does “the glory that will be revealed in us” mean?",
       "choices": [
-        "The glory God will reveal",
-        "Nothing hard will ever happen",
-        "We can fix everything"
+        "We'll enjoy forever life with GOd",
+        "We will become world famous",
+        "We'll learn a secrety mystery about God"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When life hurts, remember that the glory God promises is greater than today's suffering."
+      "prompt": "The man who wrote this verse suffered a lot during his life. Still, he believed that the worst he faced could never compare to how incredible forever life with God will be. How could remembering that promise help you keep trusting Him on a difficult day?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

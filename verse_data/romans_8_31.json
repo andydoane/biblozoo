@@ -16,25 +16,25 @@
   "meaning": "We know God is on our side because he sent Jesus to save us. And if God is on our side, no one can defeat us.",
   "reflection": {
     "recall": {
-      "question": "If God is for us, who can finally defeat us?",
+      "question": "What does it mean that God is “for us?”",
       "choices": [
-        "No one",
-        "Everyone",
-        "Only our friends"
+        "He is on our side",
+        "He is our biggest cheerleader",
+        "He is our enemy"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "How do we know God is for us?",
+      "question": "What does “If God is for us, who can be against us?” mean?",
       "choices": [
-        "He sent Jesus to save us",
-        "We never suffer",
-        "We always win arguments"
+        "If God is on our side, nobody can defeat us",
+        "The devil is just as strong as God",
+        "God will be on our side if we are good"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you feel outmatched, remember that God has shown He is for His people through Jesus."
+      "prompt": "We can be sure God is on our side. He proved it by sending his Son to save us. And with God on our side, there is no enemy that could stop God' good plan for us. How could remembering what God has done help you face a difficult situation with courage?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

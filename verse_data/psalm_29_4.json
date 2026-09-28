@@ -16,25 +16,25 @@
   "meaning": "God is so mighty, even his voice is powerful. When God speaks, amazing things happen. God spoke to create the world and Jesus often spoke to do miracles.",
   "reflection": {
     "recall": {
-      "question": "What is the voice of the LORD like?",
+      "question": "According to this verse, hat is the voice of the LORD like?",
       "choices": [
         "Powerful and majestic",
-        "Quiet and weak",
-        "Impossible to hear"
+        "Weak and uncertain",
+        "Strange and scary"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What can God's word do?",
+      "question": "“Majestic” means grand and worthy of honor, like a great king. What does this tell us about God’s voice?",
       "choices": [
-        "Accomplish mighty things",
-        "Only make suggestions",
-        "Change nothing"
+        "He speaks with power and authority, like a king",
+        "He has a really deep voice",
+        "His words are only suggestions"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you read God's words, remember the powerful God who speaks them."
+      "prompt": "The God whose voice is powerful and majestic speaks to us through the Bible. Think about how carefully you listen when someone has something important to say. How could remembering who God is help you pay attention to His words?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

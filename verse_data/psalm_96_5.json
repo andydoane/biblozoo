@@ -1,78 +1,78 @@
 {
-    "biblopet": "🐓",
-    "biblopetDefaultName": "Sandra",
-    "biblopetFeetFromBottom": "3.6%",
-    "verseId": "psalm_96_5",
-    "ref": "Psalm 96:5",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "For all the gods",
-        "of the nations are idols",
-        "but it is the LORD",
-        "who made the heavens"
-    ],
-    "verseText": "For all the gods of the nations are idols, but it is the LORD who made the heavens.",
-    "meaning": "The Lord God is the one and only true God. He created the universe. All other gods are worthless. Because they aren't real, they can't do anything.",
-    "reflection": {
-      "recall": {
-        "question": "Who made the heavens?",
-        "choices": [
-          "The LORD",
-          "The idols",
-          "The nations"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "How is the LORD different from idols?",
-        "choices": [
-          "He is the true Creator",
-          "He is one god among many",
-          "He cannot act"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Remember that only the Lord is truly God, and give Him your worship instead of treating created things as most important."
-      }
+  "biblopet": "🐓",
+  "biblopetDefaultName": "Sandra",
+  "biblopetFeetFromBottom": "3.6%",
+  "verseId": "psalm_96_5",
+  "ref": "Psalm 96:5",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "For all the gods",
+    "of the nations are idols",
+    "but it is the LORD",
+    "who made the heavens"
+  ],
+  "verseText": "For all the gods of the nations are idols, but it is the LORD who made the heavens.",
+  "meaning": "The Lord God is the one and only true God. He created the universe. All other gods are worthless. Because they aren't real, they can't do anything.",
+  "reflection": {
+    "recall": {
+      "question": "Who made the heavens?",
+      "choices": [
+        "The LORD",
+        "The idols",
+        "Many different gods"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "underscore",
-            "word": "gods",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "nations",
-            "occurrence": 1,
-            "emoji": "👥"
-        },
-        {
-            "type": "emoji",
-            "word": "idols",
-            "occurrence": 1,
-            "emoji": "🗿"
-        },
-        {
-            "type": "image",
-            "word": "LORD",
-            "occurrence": 1,
-            "image": "god_crown"
-        },
-        {
-            "type": "emoji",
-            "word": "made",
-            "occurrence": 1,
-            "emoji": "🛠️"
-        },
-        {
-            "type": "emoji",
-            "word": "heavens",
-            "occurrence": 1,
-            "emoji": "☁️"
-        }
-    ]
+    "meaning": {
+      "question": "An idol is something people worship as a god. How is the LORD different from idols?",
+      "choices": [
+        "He made the heavens",
+        "He is made out of gold",
+        "People worship Him"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "There are many “gods” that people worship in this world. But there is only one God who is real: the Lord God, who made the heavens. What are some other ways you know that the Lord God is real?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "underscore",
+      "word": "gods",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "nations",
+      "occurrence": 1,
+      "emoji": "👥"
+    },
+    {
+      "type": "emoji",
+      "word": "idols",
+      "occurrence": 1,
+      "emoji": "🗿"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "made",
+      "occurrence": 1,
+      "emoji": "🛠️"
+    },
+    {
+      "type": "emoji",
+      "word": "heavens",
+      "occurrence": 1,
+      "emoji": "☁️"
+    }
+  ]
 }

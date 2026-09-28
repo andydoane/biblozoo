@@ -16,27 +16,27 @@
     "verseText": "I lift up my eyes to the hills. From where does my help come? My help comes from the LORD, the Maker of heaven and earth.",
     "meaning": "When hard times come, we can look up to God for help. Since he made the whole world, he is strong enough to fix any problem!",
     "reflection": {
-      "recall": {
-        "question": "Where does the writer say his help comes from?",
-        "choices": [
-          "The LORD",
-          "The hills",
-          "Himself"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why can we trust God to help us?",
-        "choices": [
-          "He made heaven and earth",
-          "He removes every problem",
-          "He needs no prayer"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you need help today, look to the Lord first and ask the Maker of heaven and earth to help you."
-      }
+        "recall": {
+            "question": "Where does the writer say his help comes from?",
+            "choices": [
+                "The LORD GOd",
+                "The hills",
+                "His guardian angel"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "Why is it encouraging to know that our Helper made heaven and earth?",
+            "choices": [
+                "He has unbelievable power",
+                "He won't let anything tough come our way",
+                "He's too busy to help us"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "The Lord God made the mountains, the sky, and the whole earth, and He's never to busy to help us when we call. Think of something big God has made. How does that show us that He has the power to help us?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [

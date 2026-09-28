@@ -17,25 +17,25 @@
   "meaning": "God has the power to do whatever he feels like, wherever he wants: all the way from heaven above down to the bottom of the sea.",
   "reflection": {
     "recall": {
-      "question": "Where does the LORD do whatever pleases Him?",
+      "question": "What does it mean that “the LORD does all that pleases Him?”",
       "choices": [
-        "Heaven, earth, seas, and depths",
-        "Only heaven",
-        "Only Israel"
+        "He can do whatever He wants to do",
+        "He does whatever we want Him to do",
+        "He can do almost anything He wants"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does this show about God?",
+      "question": "God does all that He pleases in heaven, on earth, and even at the bottom of the sea. What does that teach us about His power?",
       "choices": [
-        "He has complete power and freedom",
-        "He is limited by place",
-        "Nature controls Him"
+        "There is no place beyond His rule",
+        "His power only works in heaven",
+        "He is afraid of the water"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you face something beyond your control, remember that nothing is outside God's rule."
+      "prompt": "From the highest heavens to the deepest ocean, no place is beyond God’s rule. Think of a place where you feel nervous or unsure. How could remembering that God rules there too help you fight your fears?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

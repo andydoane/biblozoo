@@ -15,25 +15,25 @@
   "meaning": "We are blessed and truly happy when we have a fearful respect of God's power and live life God's way.",
   "reflection": {
     "recall": {
-      "question": "Who is blessed?",
+      "question": "Who does this verse say is blessed?",
       "choices": [
         "Those who fear the LORD and walk in His ways",
-        "Those who are richest",
-        "Those who never have trouble"
+        "Those who are rich",
+        "Those who go to church"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does fear of the LORD mean here?",
+      "question": "To “fear the LORD” means to honor Him with deep respect. What does it mean to “walk in His ways”?",
       "choices": [
-        "Deep respect that leads to obedience",
-        "Being terrified that He is cruel",
-        "Avoiding Him"
+        "Live by what He teaches us",
+        "To walk 10,000 steps each day",
+        "To do what He says on Sundays"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Show your respect for God today by choosing one of His ways even when another way seems easier."
+      "prompt": "God doesn't give us rules to spoil our fun. His commands are the best way to live in the world that He made for us. Think of a time when following His way feels difficult. How could trusting that His way is good help you choose to obey Him?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

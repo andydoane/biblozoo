@@ -17,25 +17,25 @@
   "meaning": "The Lord God is the one who made us. And because he made us, we belong to him.",
   "reflection": {
     "recall": {
-      "question": "Who made us?",
+      "question": "Who made us, and to whom do we belong?",
       "choices": [
         "The LORD",
-        "We made ourselves",
-        "The nations"
+        "The king or president of our country",
+        "Ourselves"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does that mean about us?",
+      "question": "A pasture is a field where sheep eat and rest. Why does this verse call God’s people “the sheep of His pasture”?",
       "choices": [
-        "We belong to God",
-        "We belong only to ourselves",
-        "No one has any claim on our lives"
+        "Because He cares for us like a shepherd",
+        "Because we must eat grass like a sheep",
+        "Because we act like animals sometimes"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Remember that you belong to the God who made you, and choose one way to live like one of His people today."
+      "prompt": "You belong to the God who made you, and He cares for His people like a shepherd cares for sheep. What are some things a shepherd does for his sheep? How does that remind you of God's care for you?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

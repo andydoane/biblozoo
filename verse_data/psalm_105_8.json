@@ -15,25 +15,25 @@
   "meaning": "God will never forget or fail to keep the covenants (super special promises) he makes to his people.",
   "reflection": {
     "recall": {
-      "question": "How long does God remember His covenant?",
+      "question": "A covenant is a serious promise or agreement. How long does God remember His covenant?",
       "choices": [
         "Forever",
         "A few years",
-        "Until people forget"
+        "Until the day we die"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What is a covenant?",
+      "question": "What does it mean that God “remembers His covenant”?",
       "choices": [
-        "A special promise God faithfully keeps",
-        "A song of praise",
-        "A building"
+        "He will do what He promised to do",
+        "He sometimes changes His mind",
+        "He forgets what He has promised to us"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Thank God that He never forgets His promises."
+      "prompt": "People sometimes forget what they promised, but God never does. People also break their promises, but God will always keep them. Think of a promise God has made in the Bible and be encourage that God will certainly keep it!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

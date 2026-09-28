@@ -18,25 +18,25 @@
   "meaning": "In every situation, we can trust that God is working out a good plan for his people.",
   "reflection": {
     "recall": {
-      "question": "What does God work together for good?",
+      "question": "God works all things together for... what?",
       "choices": [
-        "All things",
-        "Only easy things",
-        "Only our successes"
+        "The good",
+        "The bad",
+        "Our entertainment"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "For whom does this promise speak?",
+      "question": "What does this promise mean when something bad happens to God’s people?",
       "choices": [
-        "Those who love God and are called by Him",
-        "Everyone who gets what they want",
-        "Only people with no problems"
+        "We can trust that God has a good plan",
+        "The bad thing is actually good",
+        "God will make everything go our way"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When something confusing happens, ask God to help you trust that He can work even this for good."
+      "prompt": "Sometimes we cannot see how anything good could come from a hard situation. But God is so much greater than us, and He has the amazing ability to make good come out of any situation. Can you think of a time you had trouble believing this promise?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

@@ -14,29 +14,29 @@
   ],
   "verseText": "For the wages of sin is death, but the gift of God is eternal life in Christ Jesus our Lord.",
   "meaning": "Our sin earned the pay of death, but Jesus died to offer us the gift of forever life.",
-    "reflection": {
-      "recall": {
-        "question": "What are the wages of sin?",
-        "choices": [
-          "Love",
-          "Death",
-          "Sickness"
-        ],
-        "answer": 1
-      },
-      "meaning": {
-        "question": "What gift does God offer us in Jesus?",
-        "choices": [
-          "Good luck",
-          "More rules",
-          "Eternal life"
-        ],
-        "answer": 2
-      },
-      "application": {
-        "prompt": "When you think about what sin earns and what God gives, what makes God's gift such good news?"
-      }
+  "reflection": {
+    "recall": {
+      "question": "“Wages” are what someone earns for a job. What “wage” does this verse say our sin earns?",
+      "choices": [
+        "A second chance",
+        "Death",
+        "Only a warning"
+      ],
+      "answer": 1
     },
+    "meaning": {
+      "question": "Eternal life means living with God forever. Why does this verse call it a gift?",
+      "choices": [
+        "We earn it by doing more good than bad",
+        "Because we need to pay for it",
+        "Because Jesus paid sin's price in our place"
+      ],
+      "answer": 2
+    },
+    "application": {
+      "prompt": "Think about receiving a gift from someone who loves you. Eternal life is the best gift ever, and Jesus paid for this gift with His life! How could knowing you do not have to earn this gift help you feel thankful for what Jesus has done?"
+    }
+  },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
   "hidePlan": [
     {

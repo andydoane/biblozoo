@@ -1,77 +1,77 @@
 {
-    "biblopet": "🦕",
-    "biblopetDefaultName": "Blubber",
-    "biblopetFeetFromBottom": "11.6%",
-    "verseId": "psalm_34_15",
-    "ref": "Psalm 34:15",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "The eyes of the LORD",
-        "are on the righteous",
-        "and His ears",
-        "are inclined to their cry"
-    ],
-    "verseText": "The eyes of the LORD are on the righteous, and His ears are inclined to their cry.",
-    "meaning": "The Lord God fills heaven and earth. He is always near to us when we are in trouble. He sees and hears everything.",
-    "reflection": {
-      "recall": {
-        "question": "What are the eyes of the LORD on?",
-        "choices": [
-          "The righteous",
-          "Only kings",
-          "The mountains"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does this verse show about God?",
-        "choices": [
-          "He sees and hears His people",
-          "He is far away",
-          "He only notices big problems"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you need help, pray knowing that God sees you and hears your cry."
-      }
+  "biblopet": "🦕",
+  "biblopetDefaultName": "Blubber",
+  "biblopetFeetFromBottom": "11.6%",
+  "verseId": "psalm_34_15",
+  "ref": "Psalm 34:15",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "The eyes of the LORD",
+    "are on the righteous",
+    "and His ears",
+    "are inclined to their cry"
+  ],
+  "verseText": "The eyes of the LORD are on the righteous, and His ears are inclined to their cry.",
+  "meaning": "The Lord God fills heaven and earth. He is always near to us when we are in trouble. He sees and hears everything.",
+  "reflection": {
+    "recall": {
+      "question": "The “righteous” are people who trust God and seek to live His way. What does this verse say God does for them?",
+      "choices": [
+        "He watches over them and hears their cry",
+        "He keeps them from ever needing help",
+        "He waits for them to solve their own problems"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "eyes",
-            "occurrence": 1,
-            "emoji": "👀"
-        },
-        {
-            "type": "image",
-            "word": "LORD",
-            "occurrence": 1,
-            "image": "god_crown"
-        },
-        {
-            "type": "underscore",
-            "word": "righteous",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "ears",
-            "occurrence": 1,
-            "emoji": "👂"
-        },
-        {
-            "type": "underscore",
-            "word": "inclined",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "cry",
-            "occurrence": 1,
-            "emoji": "😭"
-        }
-    ]
+    "meaning": {
+      "question": "God’s ears “inclined” to the cries of the righteous. That means He listens closely. What does this show about Him?",
+      "choices": [
+        "He cares when His people need help",
+        "He listens only if we pray loudly",
+        "He isn't always paying attention"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Sometimes you may wonder if anyone notices what you are going through. God sees you and listens when you call to Him. What would you like to tell Him today, knowing that He cares and is listening?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "eyes",
+      "occurrence": 1,
+      "emoji": "👀"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "underscore",
+      "word": "righteous",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "ears",
+      "occurrence": 1,
+      "emoji": "👂"
+    },
+    {
+      "type": "underscore",
+      "word": "inclined",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "cry",
+      "occurrence": 1,
+      "emoji": "😭"
+    }
+  ]
 }

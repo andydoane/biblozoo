@@ -1,79 +1,79 @@
 {
-    "biblopet": "🪳",
-    "biblopetDefaultName": "Swiper",
-    "biblopetFeetFromBottom": "22%",
-    "verseId": "psalm_47_2",
-    "ref": "Psalm 47:2",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "How awesome",
-        "is the LORD Most High",
-        "the great King",
-        "over all the earth"
-    ],
-    "verseText": "How awesome is the LORD Most High, the great King over all the earth!",
-    "meaning": "The Lord God is our Creator and the Most High King of the Universe. He is awesome, deserving of a 'wow' kind of fear.",
-    "reflection": {
-      "recall": {
-        "question": "What is the LORD Most High called?",
-        "choices": [
-          "The great King over all the earth",
-          "A local ruler",
-          "A servant"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What does it mean that God is awesome?",
-        "choices": [
-          "He deserves wonder and reverence",
-          "He is frightening for no reason",
-          "He is like a superhero story"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Look at something God made and take a moment to wonder at the greatness of the King who made it."
-      }
+  "biblopet": "🪳",
+  "biblopetDefaultName": "Swiper",
+  "biblopetFeetFromBottom": "22%",
+  "verseId": "psalm_47_2",
+  "ref": "Psalm 47:2",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "How awesome",
+    "is the LORD Most High",
+    "the great King",
+    "over all the earth"
+  ],
+  "verseText": "How awesome is the LORD Most High, the great King over all the earth!",
+  "meaning": "The Lord God is our Creator and the Most High King of the Universe. He is awesome, deserving of a 'wow' kind of fear.",
+  "reflection": {
+    "recall": {
+      "question": "What is the LORD Most High called in this verse?",
+      "choices": [
+        "The great King over all the earth",
+        "The king of just one nation",
+        "One of the greatest gods"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "emoji",
-            "word": "awesome",
-            "occurrence": 1,
-            "emoji": "🤩"
-        },
-        {
-            "type": "image",
-            "word": "LORD",
-            "occurrence": 1,
-            "image": "god_crown"
-        },
-        {
-            "type": "emoji",
-            "word": "High",
-            "occurrence": 1,
-            "emoji": "⬆️"
-        },
-        {
-            "type": "emoji",
-            "word": "great",
-            "occurrence": 1,
-            "emoji": "👍"
-        },
-        {
-            "type": "emoji",
-            "word": "King",
-            "occurrence": 1,
-            "emoji": "👑"
-        },
-        {
-            "type": "emoji",
-            "word": "earth",
-            "occurrence": 1,
-            "emoji": "🌍"
-        }
-    ]
+    "meaning": {
+      "question": "Calling God “awesome” means His greatness fills us with wonder and deep respect. How should we respond to Him?",
+      "choices": [
+        "Worship and honor Him as King",
+        "Treat Him like our servant",
+        "Run away from Him in fear"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Look at something God made, like the stars, a tall tree, or a tiny insect. God make everything we see and rules over every inch of creation. What amazes you about His greatness, and what would you like to praise Him for?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "emoji",
+      "word": "awesome",
+      "occurrence": 1,
+      "emoji": "🤩"
+    },
+    {
+      "type": "image",
+      "word": "LORD",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "High",
+      "occurrence": 1,
+      "emoji": "⬆️"
+    },
+    {
+      "type": "emoji",
+      "word": "great",
+      "occurrence": 1,
+      "emoji": "👍"
+    },
+    {
+      "type": "emoji",
+      "word": "King",
+      "occurrence": 1,
+      "emoji": "👑"
+    },
+    {
+      "type": "emoji",
+      "word": "earth",
+      "occurrence": 1,
+      "emoji": "🌍"
+    }
+  ]
 }

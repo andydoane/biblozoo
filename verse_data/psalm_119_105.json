@@ -1,77 +1,77 @@
 {
-    "biblopet": "🎵",
-    "biblopetDefaultName": "Gizmo",
-    "biblopetFeetFromBottom": "12.3%",
-    "verseId": "psalm_119_105",
-    "ref": "Psalm 119:105",
-    "published": true,
-    "translation": "BSB",
-    "echoParts": [
-        "Your word",
-        "is a lamp to my feet",
-        "and a light to my path"
-    ],
-    "verseText": "Your word is a lamp to my feet and a light to my path.",
-    "meaning": "God's Word shows us how to live. Like a lamp, it helps us to see the right way to live in this dark and sinful world.",
-    "reflection": {
-      "recall": {
-        "question": "What does the writer call God's Word?",
-        "choices": [
-          "A lamp and a light",
-          "A map and a compass",
-          "A song and a trumpet"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "How is God's Word like a light?",
-        "choices": [
-          "It shows us how to live",
-          "It makes night disappear",
-          "It tells every future event"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "When you need to know the right thing to do, remember to look to God's Word for light."
-      }
+  "biblopet": "🎵",
+  "biblopetDefaultName": "Gizmo",
+  "biblopetFeetFromBottom": "12.3%",
+  "verseId": "psalm_119_105",
+  "ref": "Psalm 119:105",
+  "published": true,
+  "translation": "BSB",
+  "echoParts": [
+    "Your word",
+    "is a lamp to my feet",
+    "and a light to my path"
+  ],
+  "verseText": "Your word is a lamp to my feet and a light to my path.",
+  "meaning": "God's Word shows us how to live. Like a lamp, it helps us to see the right way to live in this dark and sinful world.",
+  "reflection": {
+    "recall": {
+      "question": "What does the writer call God’s Word?",
+      "choices": [
+        "A lamp and a light",
+        "A map and a compass",
+        "A song and a trumpet"
+      ],
+      "answer": 0
     },
-    "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
-    "hidePlan": [
-        {
-            "type": "underscore",
-            "word": "Your",
-            "occurrence": 1
-        },
-        {
-            "type": "emoji",
-            "word": "word",
-            "occurrence": 1,
-            "emoji": "📖"
-        },
-        {
-            "type": "emoji",
-            "word": "lamp",
-            "occurrence": 1,
-            "emoji": "🕯️"
-        },
-        {
-            "type": "emoji",
-            "word": "feet",
-            "occurrence": 1,
-            "emoji": "🦶"
-        },
-        {
-            "type": "emoji",
-            "word": "light",
-            "occurrence": 1,
-            "emoji": "💡"
-        },
-        {
-            "type": "emoji",
-            "word": "path",
-            "occurrence": 1,
-            "emoji": "🛤️"
-        }
-    ]
+    "meaning": {
+      "question": "How is God’s Word like a light on a dark path?",
+      "choices": [
+        "It shows us how to live in God's world",
+        "It tells us what will happen in the future",
+        "It helps us not be afraid of the dark"
+      ],
+      "answer": 0
+    },
+    "application": {
+      "prompt": "Imagine walking along a dark path with a lamp to help you see where to step. God’s Word guides your choices in a similar way. Think of a Bible verse you have learned. How could it help you know what to do in a situation you face today?"
+    }
+  },
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "hidePlan": [
+    {
+      "type": "underscore",
+      "word": "Your",
+      "occurrence": 1
+    },
+    {
+      "type": "emoji",
+      "word": "word",
+      "occurrence": 1,
+      "emoji": "📖"
+    },
+    {
+      "type": "emoji",
+      "word": "lamp",
+      "occurrence": 1,
+      "emoji": "🕯️"
+    },
+    {
+      "type": "emoji",
+      "word": "feet",
+      "occurrence": 1,
+      "emoji": "🦶"
+    },
+    {
+      "type": "emoji",
+      "word": "light",
+      "occurrence": 1,
+      "emoji": "💡"
+    },
+    {
+      "type": "emoji",
+      "word": "path",
+      "occurrence": 1,
+      "emoji": "🛤️"
+    }
+  ]
 }

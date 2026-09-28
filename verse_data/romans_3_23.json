@@ -15,25 +15,25 @@
   "meaning": "God is gloriously sinless and perfect. All human beings have sinned – we miss the mark of perfect obedience.",
   "reflection": {
     "recall": {
-      "question": "Who has sinned?",
+      "question": "Sin means disobeying God. Who does this verse say has sinned?",
       "choices": [
-        "All people",
-        "Only bad people",
-        "Only adults"
+        "All of us",
+        "Most of us",
+        "Only a few of us"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "What does falling short of God's glory mean?",
+      "question": "What does it mean that we “fall short of the glory of God”?",
       "choices": [
-        "None of us reaches God's perfect standard",
-        "Some people are perfect",
-        "God expects very little"
+        "We do not live up to God’s perfect goodness",
+        "We are not important to God",
+        "We need to try harder"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "When you see your sin, be honest about it and remember that everyone needs God's grace."
+      "prompt": "It can be hard to admit when you have done something wrong. This verse reminds us that we all all have sinned. But thankfully, Jesus came to save sinners like you and me. What could you honestly tell God today and ask Him to forgive?"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
@@ -50,7 +50,12 @@
       "occurrence": 1,
       "emoji": "👎"
     },
-{ "type": "image", "word": "fall", "occurrence": 1, "image": "fall" },
+    {
+      "type": "image",
+      "word": "fall",
+      "occurrence": 1,
+      "image": "fall"
+    },
     {
       "type": "underscore",
       "word": "short",

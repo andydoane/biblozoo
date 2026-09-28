@@ -15,27 +15,27 @@
     "verseText": "Why should the nations say, “Where is their God?” Our God is in heaven; He does as He pleases.",
     "meaning": "God is the Maker of everything and the King of the Universe. He has the power to do whatever he wants.",
     "reflection": {
-      "recall": {
-        "question": "Where is our God?",
-        "choices": [
-          "In heaven",
-          "Inside an idol",
-          "Hidden in the hills"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "What can God do?",
-        "choices": [
-          "Whatever He pleases",
-          "Only what people allow",
-          "Nothing without idols"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Trust that God is truly in control, even when you cannot see what He is doing."
-      }
+        "recall": {
+            "question": "When the nations ask, “Where is their God?” what answer does this verse give?",
+            "choices": [
+                "Our God is in heaven",
+                "Our God in on vacation",
+                "Our God isn't real"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "What does “He does as He pleases” tell us about God?",
+            "choices": [
+                "He can do whatever He wants to do",
+                "He sometimes doesn't feel like helping",
+                "He does whatever people tell Him to do"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Even when you cannot see what God is doing, He is still ruling from heaven. His plans are wise and good, and He has the mighty power to do whatever He puts his mind to! How could remembering this help you trust Him when things seem like they are out of control?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [

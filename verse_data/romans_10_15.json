@@ -16,27 +16,27 @@
     "verseText": "And how can they preach unless they are sent? As it is written: “How beautiful are the feet of those who bring good news!",
     "meaning": "People need to believe the good news of Jesus to be saved. That means it's our job to tell others about Jesus. It's a beautiful thing when we use our feet to go and tell others about Jesus.",
     "reflection": {
-      "recall": {
-        "question": "What do the beautiful feet in this verse do?",
-        "choices": [
-          "Bring good news",
-          "Run the fastest",
-          "Wear special shoes"
-        ],
-        "answer": 0
-      },
-      "meaning": {
-        "question": "Why is sharing the good news beautiful?",
-        "choices": [
-          "People need to hear about Jesus",
-          "It makes us look important",
-          "Everyone already knows"
-        ],
-        "answer": 0
-      },
-      "application": {
-        "prompt": "Think of one person you can encourage with something true about Jesus."
-      }
+        "recall": {
+            "question": "What do the people with “beautiful feet” bring?",
+            "choices": [
+                "Good news about Jesus",
+                "Expensive gifts",
+                "Bad news about the weather"
+            ],
+            "answer": 0
+        },
+        "meaning": {
+            "question": "The “good news” is that Jesus died and rose again to save sinners. Why are the messengers’ feet called “beautiful”?",
+            "choices": [
+                "The good news they bring leads to eternal life",
+                "They wear fancy gospel shoes",
+                "They run faster than others"
+            ],
+            "answer": 0
+        },
+        "application": {
+            "prompt": "Think of the person who first helped you learn about Jesus. Because they shared the good news, you have the beautiful gift of forever life! Who is someone you could share the good news with?"
+        }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
     "hidePlan": [
