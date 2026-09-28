@@ -19,7 +19,7 @@
             "question": "When the nations ask, “Where is their God?” what answer does this verse give?",
             "choices": [
                 "Our God is in heaven",
-                "Our God in on vacation",
+                "Our God is on vacation",
                 "Our God isn't real"
             ],
             "answer": 0
@@ -34,7 +34,7 @@
             "answer": 0
         },
         "application": {
-            "prompt": "Even when you cannot see what God is doing, He is still ruling from heaven. His plans are wise and good, and He has the mighty power to do whatever He puts his mind to! How could remembering this help you trust Him when things seem like they are out of control?"
+            "prompt": "Even when you cannot see what God is doing, He is still ruling from heaven. His plans are wise and good, and He has the mighty power to do whatever He puts His mind to! How could remembering this help you trust Him when things seem like they are out of control?"
         }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

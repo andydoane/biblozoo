@@ -13,19 +13,19 @@
     "and under the earth..."
   ],
   "verseText": "...that at the name of Jesus every knee should bow, in heaven and on earth and under the earth...",
-  "meaning": "One day, every human being who has ever lived will bow down before king King Jesus.",
+  "meaning": "One day, every human being who has ever lived will bow down before King Jesus.",
   "reflection": {
     "recall": {
       "question": "At the name of Jesus, who will bow?",
       "choices": [
         "Everyone who has ever lived",
-        "Only his disciples",
-        "The angels in heaven"
+        "Only His disciples",
+        "Only the angels in heaven"
       ],
       "answer": 0
     },
     "meaning": {
-      "question": "Who are the people “under the earth?”",
+      "question": "Who are the people “under the earth”?",
       "choices": [
         "People who have died",
         "Underground goblins",
@@ -34,7 +34,7 @@
       "answer": 0
     },
     "application": {
-      "prompt": "One day everyone who has ever lived will bow before Jesus. It doesn't matter whether they followed him during this life or not: one day, everyone will realize that Jesus really was the Son of God. But we shouldn't wait until He comes back to serve Him; we should believe in him today!"
+      "prompt": "One day everyone who has ever lived will bow before Jesus. It doesn't matter whether they followed Him during this life or not: one day, everyone will realize that Jesus really was the Son of God. But we shouldn't wait until He comes back to serve Him; we should believe in Him today!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

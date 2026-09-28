@@ -13,7 +13,7 @@
     "by the blood of Jesus"
   ],
   "verseText": "Therefore, brothers, since we have confidence to enter the Most Holy Place by the blood of Jesus...",
-  "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to him anytime.",
+  "meaning": "Because of what Jesus did for us on the cross, we don't need a temple to meet with God. We can pray directly to Him anytime.",
   "reflection": {
     "recall": {
       "question": "What gives us confidence to come near to God?",
@@ -25,7 +25,7 @@
       "answer": 0
     },
     "meaning": {
-      "question": "In the Old Testament, God met with his people in the Most Holy Place in the temple. But we don't need a temple anymore. Why?",
+      "question": "In the Old Testament, only the high priest could enter the Most Holy Place. Why can we now come near to God with confidence?",
       "choices": [
         "Jesus died for our sins",
         "God doesn't meet with his people",
@@ -34,7 +34,7 @@
       "answer": 0
     },
     "application": {
-      "prompt": "Because Jesus died for our sins, we don't need a special building or a priest to help us talk to God. We can come to Him in prayer anytime! The next time you're worried, afraid, or need help, remember that Jesus has opened the way for you to come to God wherever you are!"
+      "prompt": "Because Jesus died for our sins, we don't need a special building to help us talk to God. We can come to Him in prayer anytime! The next time you're worried, afraid, or need help, remember that Jesus has opened the way for you to come to God wherever you are!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

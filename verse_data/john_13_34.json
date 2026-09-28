@@ -14,13 +14,13 @@
     "must love one another"
   ],
   "verseText": "A new commandment I give you: Love one another. As I have loved you, so you also must love one another.",
-  "meaning": "Jesus commands us to love each other like he loved us, and he loved us enough to give his life in our place.",
+  "meaning": "Jesus commands us to love each other like He loved us, and He loved us enough to give His life in our place.",
   "reflection": {
     "recall": {
       "question": "What new commandment did Jesus give His followers?",
       "choices": [
         "Love one another",
-        "Read your Bible everyday",
+        "Read your Bible every day",
         "Love your friends, hate your enemies"
       ],
       "answer": 0
@@ -28,14 +28,14 @@
     "meaning": {
       "question": "Jesus tells us to love one another as He loved us. How did Jesus love us?",
       "choices": [
-        "He gave his life to save us",
+        "He gave His life to save us",
         "He wrote a book of the Bible",
-        "He loved us after we loved him first"
+        "He loved us after we loved Him first"
       ],
       "answer": 0
     },
     "application": {
-      "prompt": "Jesus didn't just tell us to love others, He showed us what love looked like by giving His life for us! Think about how Jesus has loved you, and look for ways to show that same love to others!"
+      "prompt": "Jesus didn't just tell us to love others. He showed us what love looked like by giving His life for us! Think about how Jesus has loved you, and look for ways to show that same love to others!"
     }
   },
   "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

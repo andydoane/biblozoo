@@ -19,7 +19,7 @@
         "recall": {
             "question": "Where does the writer say his help comes from?",
             "choices": [
-                "The LORD GOd",
+                "The LORD God",
                 "The hills",
                 "His guardian angel"
             ],
@@ -35,7 +35,7 @@
             "answer": 0
         },
         "application": {
-            "prompt": "The Lord God made the mountains, the sky, and the whole earth, and He's never to busy to help us when we call. Think of something big God has made. How does that show us that He has the power to help us?"
+            "prompt": "The Lord God made the mountains, the sky, and the whole earth, and He's never too busy to help us when we call. Think of something big God has made. How does that show us that He has the power to help us?"
         }
     },
     "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",

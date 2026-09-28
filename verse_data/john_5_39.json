@@ -17,20 +17,20 @@
     "meaning": "The Scriptures (the Bible) point us to Jesus. The goal of reading the Bible is to know him, because he's the only one who can give us eternal life.",
     "reflection": {
         "recall": {
-            "question": "The Scriptures are the words of the Bible. Who did Jesus say the Scriptures tell us about?",
+            "question": "What are the Scriptures?",
             "choices": [
-                "Jesus",
-                "Ourselves",
-                "King David"
+                "The Bible",
+                "A book of drawings",
+                "Scribble drawings"
             ],
             "answer": 0
         },
         "meaning": {
-            "question": "The religious leaders were studying the scriptures closely. What were they hoping to find?",
+            "question": "Jesus said all the Scriptures “testify” or point us to someone special. Who is that person?",
             "choices": [
-                "Eternal life",
-                "The meaning of life",
-                "Interesting stories"
+                "Jesus",
+                "Moses",
+                "King David"
             ],
             "answer": 0
         },
