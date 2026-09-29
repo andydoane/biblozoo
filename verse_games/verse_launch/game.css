@@ -1541,9 +1541,7 @@ select {
   z-index: 5;
   pointer-events: none;
   transform-origin: center center;
-  transition:
-    transform 120ms ease,
-    opacity 180ms ease;
+  transition: opacity 180ms ease;
 }
 
 .vl-player-unit.is-despawned {

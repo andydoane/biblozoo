@@ -181,6 +181,10 @@
     astroPlayerScale: 1,
     astroLastTs: 0,
     astroRaf: 0,
+    astroStageWidth: 0,
+    astroStageHeight: 0,
+    astroRocketSizePx: 0,
+    astroRocketBottomOffsetPx: 0,
   };
 
   let muted = false;
@@ -2040,8 +2044,43 @@
     return Number.isFinite(parsed) ? parsed : 84;
   }
 
+  function cacheAstroGeometry(stageRect) {
+    const unit = $("#vlPlayerUnit");
+    if (!unit || !stageRect) return;
+
+    if (
+      state.astroStageWidth === stageRect.width &&
+      state.astroStageHeight === stageRect.height &&
+      state.astroRocketSizePx > 0 &&
+      state.astroRocketBottomOffsetPx > 0
+    ) {
+      return;
+    }
+
+    const styles = getComputedStyle(unit);
+    const rocketSize = parseFloat(
+      styles.getPropertyValue("--vl-player-rocket-size")
+    );
+    const safeRocketSize =
+      Number.isFinite(rocketSize)
+        ? rocketSize
+        : 84;
+    const bottomOffset =
+      parseFloat(styles.bottom);
+
+    state.astroStageWidth = stageRect.width;
+    state.astroStageHeight = stageRect.height;
+    state.astroRocketSizePx = safeRocketSize;
+    state.astroRocketBottomOffsetPx =
+      Number.isFinite(bottomOffset)
+        ? bottomOffset
+        : safeRocketSize * 0.5;
+  }
+
   function bonusRocketVisualSizePx() {
-    return readPlayerRocketSizePx();
+    return state.astroRocketSizePx > 0
+      ? state.astroRocketSizePx
+      : readPlayerRocketSizePx();
   }
 
   function bonusAsteroidAverageSizePx() {
@@ -2070,6 +2109,10 @@
   }
 
   function bonusRocketBottomOffsetPx() {
+    if (state.astroRocketBottomOffsetPx > 0) {
+      return state.astroRocketBottomOffsetPx;
+    }
+
     const unit = $("#vlPlayerUnit");
 
     if (unit) {
@@ -3261,7 +3304,7 @@
     );
   }
 
-  function renderAstroEntities() {
+  function renderAstroEntities(stageRect = null) {
     const {
       stage,
       layer,
@@ -3279,6 +3322,7 @@
     }
 
     const rect =
+      stageRect ||
       stage.getBoundingClientRect();
 
     const leftPx =
@@ -3774,8 +3818,6 @@
       return;
     }
 
-    const rect =
-      stage.getBoundingClientRect();
     if (state.menuOpen || state.helpOpen) {
       state.astroLastTs = ts;
       state.astroRaf =
@@ -3784,6 +3826,12 @@
         );
       return;
     }
+
+    const rect =
+      stage.getBoundingClientRect();
+
+    cacheAstroGeometry(rect);
+
     const dtSec = dtMs / 1000;
     const moveSpeed = 0.62 * dtSec;
     state.astroPlayerX = safeLeftPct(state.astroPlayerX + state.astroMoveDir * moveSpeed);
@@ -3923,7 +3971,7 @@
       }
     }
 
-    renderAstroEntities();
+    renderAstroEntities(rect);
     state.astroRaf = requestAnimationFrame(astroTick);
   }
 
@@ -3957,6 +4005,10 @@
     state.astroLandingPhase = false;
     state.astroPlayerLiftPx = 0;
     state.astroPlayerScale = 1;
+    state.astroStageWidth = 0;
+    state.astroStageHeight = 0;
+    state.astroRocketSizePx = 0;
+    state.astroRocketBottomOffsetPx = 0;
 
     syncAstroUpgradeUi();
     syncAstroLandingOverlay();
