@@ -910,6 +910,7 @@
       answered: false,
       answerCorrect: false,
       showStarRewardPopup: false,
+      earnedStarPegCount: 0,
       usedVerseHelp: false,
       verseAudioPlaying: false,
       completionRecorded: false,
@@ -2403,6 +2404,17 @@
                 dailySession,
                 dailySession.questionIndex
               );
+
+              dailySession.earnedStarPegCount =
+                Math.min(
+                  2,
+                  Math.max(
+                    0,
+                    Number(
+                      dailySession.earnedStarPegCount
+                    ) || 0
+                  ) + 1
+                );
             } else {
               clearDailyQuestionRewardPopupTimer();
               dailySession.showStarRewardPopup =
