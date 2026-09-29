@@ -228,6 +228,7 @@
   const PROJECTILE_ASTEROID_HITBOX_SCALE = 0.78;
   const ASTRO_BASE_SPEED_VH_PER_SEC = 42;
   const STAR_BASE_SPEED_VH_PER_SEC = 34;
+  const ASTRO_MAX_FRAME_DT_MS = 50;
   const PROJECTILE_BASE_SPEED_VH_PER_SEC = 126;
   const ASTRO_MODE_MULTIPLIER = { easy: 1, medium: 1.18, hard: 1.38 };
   const STAR_MODE_MULTIPLIER = { easy: 0.92, medium: 1, hard: 1.08 };
@@ -3755,7 +3756,10 @@
   function astroTick(ts) {
     if (!state.astroRunning) return;
     if (!state.astroLastTs) state.astroLastTs = ts;
-    const dtMs = Math.min(34, ts - state.astroLastTs);
+    const dtMs = Math.min(
+      ASTRO_MAX_FRAME_DT_MS,
+      ts - state.astroLastTs
+    );
     state.astroLastTs = ts;
 
     const stage =
