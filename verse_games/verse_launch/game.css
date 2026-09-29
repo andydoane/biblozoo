@@ -1416,6 +1416,11 @@ select {
   align-items: center;
 }
 
+.vl-asteroid-topbar {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
 .vl-bonus-stage {
   position: relative;
   width: 100%;
@@ -1697,9 +1702,7 @@ select {
 }
 
 .vl-space-status {
-  position: absolute;
-  right: 14px;
-  top: var(--vl-bonus-top-pad);
+  position: static;
   z-index: 8;
   display: flex;
   gap: 8px;

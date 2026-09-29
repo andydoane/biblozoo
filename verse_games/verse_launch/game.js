@@ -1631,8 +1631,14 @@
 
     app.innerHTML = `
       <div class="vl-asteroid-screen">
-        <div class="vl-bonus-topbar">
+        <div class="vl-bonus-topbar vl-asteroid-topbar">
           <button class="vl-pill vl-menu-pill no-zoom" id="vlMenuPill" type="button" aria-label="Game Menu">☰</button>
+          <div class="vl-space-status">
+            <div class="vl-star-counter" id="vlStarCounter" aria-label="Stars collected">
+              <img class="vl-star-counter-icon" src="${STAR_IMAGE_SRC}" alt="">
+              <span id="vlStarCount">${state.astroStarCount}</span>
+            </div>
+          </div>
         </div>
         <div class="vl-bonus-stage" id="vlAstroStage">
           <div class="vl-space-layer" id="vlSpaceLayer">
@@ -1642,12 +1648,6 @@
             <div class="vl-blast-ship vl-player-blast-ship">
               <img class="vl-player-rocket-img" id="vlPlayerRocket" src="${rocket.src}" alt="">
               <div class="vl-player-particle-trail" id="vlPlayerTrail" aria-hidden="true"></div>
-            </div>
-          </div>
-          <div class="vl-space-status">
-            <div class="vl-star-counter" id="vlStarCounter" aria-label="Stars collected">
-              <img class="vl-star-counter-icon" src="${STAR_IMAGE_SRC}" alt="">
-              <span id="vlStarCount">${state.astroStarCount}</span>
             </div>
           </div>
           ${renderAstroLandingOverlay()}
@@ -2261,8 +2261,11 @@
 
     const rocketSize = readPlayerRocketSizePx();
 
+    const compactTrail =
+      window.innerWidth < 420;
+
     const settings = {
-      particleCount: 35,
+      particleCount: compactTrail ? 22 : 35,
       streamSources: 5,
       particleSize: rocketSize * 0.25,
       sizeRandomness: 0,
@@ -3612,12 +3615,15 @@
     });
   }
 
-  function restartAstroCssAnimation(element, className) {
+  function restartAstroCssAnimation(
+    element,
+    className,
+    resetClasses = ["is-pop", "is-upgrade"]
+  ) {
     if (!element) return;
 
     element.classList.remove(
-      "is-pop",
-      "is-upgrade"
+      ...resetClasses
     );
 
     requestAnimationFrame(() => {
@@ -3781,10 +3787,19 @@
     state.astroSpinMs = isFatalHit ? 0 : 1000;
 
     if (rocket) {
-      rocket.classList.remove("is-hit", "is-flash", "is-despawned");
-      void rocket.offsetWidth;
+      rocket.classList.remove("is-despawned");
+
       if (!isFatalHit) {
-        rocket.classList.add("is-flash");
+        restartAstroCssAnimation(
+          rocket,
+          "is-flash",
+          ["is-hit", "is-flash"]
+        );
+      } else {
+        rocket.classList.remove(
+          "is-hit",
+          "is-flash"
+        );
       }
     }
 
