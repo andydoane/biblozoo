@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,15 +15,30 @@
       --tester-panel: rgba(255, 255, 255, 0.96);
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     html,
     body {
       margin: 0;
       min-height: 100%;
-      background: linear-gradient(145deg, var(--tester-purple), var(--tester-teal));
+      height: auto;
+      overflow-x: hidden;
+      overflow-y: auto;
+      background: linear-gradient(145deg, var(--tester-purple), var(--tester-teal)) !important;
       color: var(--tester-ink);
       font-family: "Baloo 2", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    /*
+  This standalone utility intentionally loads the production styles.css
+  so it can use the real BibloPet animation classes and keyframes.
+  The main app normally removes this page-transition cover with JavaScript,
+  but the utility does not run that app transition code.
+*/
+    body::after {
+      display: none !important;
     }
 
     body {
@@ -141,7 +157,9 @@
       font-weight: 800;
     }
 
-    .tester-stage-guide[hidden] { display: none; }
+    .tester-stage-guide[hidden] {
+      display: none;
+    }
 
     .tester-panel {
       margin-top: 14px;
@@ -169,7 +187,9 @@
       gap: 6px;
     }
 
-    .tester-control.full { grid-column: 1 / -1; }
+    .tester-control.full {
+      grid-column: 1 / -1;
+    }
 
     .tester-control label,
     .tester-label {
@@ -195,7 +215,9 @@
       align-items: center;
     }
 
-    .size-row input[type="range"] { width: 100%; }
+    .size-row input[type="range"] {
+      width: 100%;
+    }
 
     .size-readout {
       min-width: 72px;
@@ -241,11 +263,17 @@
     }
 
     @media (max-width: 640px) {
-      .tester-grid { grid-template-columns: 1fr; }
-      .tester-control.full { grid-column: auto; }
+      .tester-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .tester-control.full {
+        grid-column: auto;
+      }
     }
   </style>
 </head>
+
 <body>
   <main class="tester-page pet-animation-tester">
     <div class="tester-nav">
@@ -257,20 +285,6 @@
     <p class="tester-subhead">
       Test real BibloPet animation classes from <code>styles.css</code> without changing saved pet state or progress.
     </p>
-
-    <section class="tester-preview" aria-label="BibloPet animation preview">
-      <div class="tester-ref" id="testerRef">Loading…</div>
-      <div class="pet-stage" id="testerStage">
-        <div class="tester-stage-guide" id="feetGuide" data-label="Feet guide" hidden></div>
-        <div class="pet-emoji pet-emoji-unlocked" id="testerPet">
-          <span class="biblopet-visual" id="testerVisual">
-            <img class="biblopet-img" id="testerPetImage" alt="">
-            <span class="biblopet-emoji-fallback" id="testerEmojiFallback">🐾</span>
-          </span>
-        </div>
-      </div>
-      <div class="tester-pet-name" id="testerPetName">BibloPet</div>
-    </section>
 
     <section class="tester-panel">
       <h2>Pet</h2>
@@ -346,6 +360,97 @@
         Uses the production animation class and keyframes from <code>styles.css</code>.
       </div>
     </section>
+      <div class="tester-meta" id="animationMeta">
+        Uses the production animation class and keyframes from <code>styles.css</code>.
+    <section class="tester-panel">
+      <h2>Animation</h2>
+      <div class="tester-grid">
+        <div class="tester-control">
+          <label for="animationCategory">Type</label>
+          <select id="animationCategory">
+            <option value="idle">Idle</option>
+            <option value="action">Movement / Action</option>
+          </select>
+        </div>
+    
+        <div class="tester-control">
+          <label for="animationSelect">Animation</label>
+          <select id="animationSelect"></select>
+        </div>
+    
+        <div class="tester-control">
+          <label for="speedSelect">Speed</label>
+          <select id="speedSelect">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </div>
+    
+        <label class="tester-check">
+          <input id="loopToggle" type="checkbox" checked>
+          Loop animation
+        </label>
+    
+        <label class="tester-check">
+          <input id="feetGuideToggle" type="checkbox">
+          Show feet / ground guide
+        </label>
+      </div>
+    
+      <div class="tester-actions">
+        <button class="tester-btn primary" id="playBtn" type="button">Play / Replay</button>
+        <button class="tester-btn" id="productionBtn" type="button">Current Production Animation</button>
+        <button class="tester-btn" id="resetAllBtn" type="button">Reset All</button>
+      </div>
+    
+      <div class="tester-meta" id="animationMeta">
+        Uses the production animation class and keyframes from <code>styles.css</code>.
+      </div>
+    </section>
+    
+    <section class="tester-preview" aria-label="BibloPet animation preview">
+      <div class="tester-ref" id="testerRef">Loading…</div>
+      <div class="pet-stage" id="testerStage">
+        <div class="tester-stage-guide" id="feetGuide" data-label="Feet guide" hidden></div>
+        <div class="pet-emoji pet-emoji-unlocked" id="testerPet">
+          <span class="biblopet-visual" id="testerVisual">
+            <img class="biblopet-img" id="testerPetImage" alt="">
+            <span class="biblopet-emoji-fallback" id="testerEmojiFallback">🐾</span>
+          </span>
+        </div>
+      </div>
+      <div class="tester-pet-name" id="testerPetName">BibloPet</div>
+    </section>
+    
+    <section class="tester-panel">
+      <h2>Pet</h2>
+      <div class="tester-grid">
+        <div class="tester-control full">
+          <label for="petSelect">BibloPet</label>
+          <select id="petSelect">
+            <option value="">Loading verse list…</option>
+          </select>
+        </div>
+    
+        <div class="tester-control full">
+          <span class="tester-label">Pet size — percent of stage height</span>
+          <div class="size-row">
+            <input id="petSize" type="range" min="40" max="100" step="1" value="75">
+            <div class="size-readout" id="petSizeReadout">75%</div>
+          </div>
+        </div>
+      </div>
+    
+      <div class="tester-actions">
+        <button class="tester-btn" id="resetSizeBtn" type="button">Reset to production size</button>
+      </div>
+    
+      <div class="tester-meta" id="petMeta">Production size: 75% of stage height.</div>
+      <div class="tester-error" id="petError" hidden></div>
+    </section>
+
   </main>
 
   <script>
@@ -667,4 +772,5 @@
     })();
   </script>
 </body>
+
 </html>
