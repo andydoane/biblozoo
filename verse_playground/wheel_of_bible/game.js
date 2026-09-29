@@ -815,7 +815,7 @@
     ].slice();
   }
 
-  function playKeywordChallengeLetterSound() {
+  function playChallengeMelodySound() {
     const melody = state.challengeMelody;
 
     if (
@@ -2123,12 +2123,18 @@
     state.currentChallenge = challenge;
     state.challengeInputIndex = challengePrefilledCount(challenge);
 
+    const usesChallengeMelody =
+      challenge.type === "reference" ||
+      (
+        challenge.type === "word" &&
+        challenge.word?.isKeyword
+      );
+
     state.challengeMelody =
-      challenge.type === "word" &&
-      challenge.word?.isKeyword
+      usesChallengeMelody
         ? chooseKeywordMelodyForLength(
-            challenge.expected?.length || 1
-          )
+          challenge.expected?.length || 1
+        )
         : [];
 
     state.challengeMelodyStep = 0;
@@ -2418,10 +2424,13 @@
     }
 
     if (
-      challenge.type === "word" &&
-      challenge.word?.isKeyword
+      challenge.type === "reference" ||
+      (
+        challenge.type === "word" &&
+        challenge.word?.isKeyword
+      )
     ) {
-      playKeywordChallengeLetterSound();
+      playChallengeMelodySound();
     } else {
       playGood();
     }
