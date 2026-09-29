@@ -57,6 +57,14 @@ body{
   font-family: "Baloo 2", system-ui, sans-serif;
 }
 
+/* Prevent text selection and long-press callouts throughout Scripture Scrub. */
+.scripture-scrub-app,
+.scripture-scrub-app *:not(input):not(textarea) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .vm-game-screen.scripture-scrub-root{
   --vm-game-accent: #40b9c5;
   --vm-game-bg: linear-gradient(145deg, #7f66c6 0%, #40b9c5 100%);
