@@ -3362,17 +3362,18 @@
         img.style.height =
           `${star.size}px`;
 
+        img.style.left = "0";
+        img.style.top = "0";
+
         return img;
       },
       (img, star) => {
-        img.style.left =
-          `${rect.width * star.x - star.size / 2}px`;
-
-        img.style.top =
-          `${star.yPx}px`;
+        const xPx =
+          rect.width * star.x -
+          star.size / 2;
 
         img.style.transform =
-          `rotate(${star.rot}deg)`;
+          `translate3d(${xPx}px, ${star.yPx}px, 0) rotate(${star.rot}deg)`;
 
         img.style.opacity =
           drainOpacity;
@@ -3401,14 +3402,21 @@
           projectile.color
         );
 
+        shot.style.left = "0";
+        shot.style.top = "0";
+
         return shot;
       },
       (shot, projectile) => {
-        shot.style.left =
-          `${rect.width * projectile.x - projectile.size / 2}px`;
+        const xPx =
+          rect.width * projectile.x -
+          projectile.size / 2;
+        const yPx =
+          projectile.yPx -
+          projectile.size / 2;
 
-        shot.style.top =
-          `${projectile.yPx - projectile.size / 2}px`;
+        shot.style.transform =
+          `translate3d(${xPx}px, ${yPx}px, 0)`;
 
         shot.style.opacity =
           drainOpacity;
@@ -3437,17 +3445,18 @@
         img.style.height =
           `${asteroid.size}px`;
 
+        img.style.left = "0";
+        img.style.top = "0";
+
         return img;
       },
       (img, asteroid) => {
-        img.style.left =
-          `${rect.width * asteroid.x - asteroid.size / 2}px`;
-
-        img.style.top =
-          `${asteroid.yPx}px`;
+        const xPx =
+          rect.width * asteroid.x -
+          asteroid.size / 2;
 
         img.style.transform =
-          `rotate(${asteroid.rot}deg)`;
+          `translate3d(${xPx}px, ${asteroid.yPx}px, 0) rotate(${asteroid.rot}deg)`;
 
         img.style.opacity =
           drainOpacity;
@@ -3603,6 +3612,22 @@
     });
   }
 
+  function restartAstroCssAnimation(element, className) {
+    if (!element) return;
+
+    element.classList.remove(
+      "is-pop",
+      "is-upgrade"
+    );
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!element.isConnected) return;
+        element.classList.add(className);
+      });
+    });
+  }
+
   function awardAsteroidShotStars(stageRect, asteroid) {
     playGameSound("asteroidDestroyed");
 
@@ -3619,17 +3644,17 @@
       state.astroStarCount >= SPREAD_SHOT_STAR_COUNT;
 
     const counter = $("#vlStarCounter");
-    if (counter) {
-      counter.classList.remove("is-pop", "is-upgrade");
-      void counter.offsetWidth;
-      counter.classList.add(upgraded ? "is-upgrade" : "is-pop");
-    }
+    restartAstroCssAnimation(
+      counter,
+      upgraded ? "is-upgrade" : "is-pop"
+    );
 
     const unit = $("#vlPlayerUnit");
     if (unit && upgraded) {
-      unit.classList.remove("is-upgrade");
-      void unit.offsetWidth;
-      unit.classList.add("is-upgrade");
+      restartAstroCssAnimation(
+        unit,
+        "is-upgrade"
+      );
     }
   }
 
@@ -3725,20 +3750,20 @@
       state.astroStarCount === BLASTER_STAR_COUNT;
 
     const counter = $("#vlStarCounter");
-    if (counter) {
-      counter.classList.remove("is-pop", "is-upgrade");
-      void counter.offsetWidth;
-      counter.classList.add(upgraded ? "is-upgrade" : "is-pop");
-    }
+    restartAstroCssAnimation(
+      counter,
+      upgraded ? "is-upgrade" : "is-pop"
+    );
 
     const unit = $("#vlPlayerUnit");
     if (unit && upgraded) {
-      unit.classList.remove("is-upgrade");
-      void unit.offsetWidth;
-      unit.classList.add("is-upgrade");
+      restartAstroCssAnimation(
+        unit,
+        "is-upgrade"
+      );
     }
 
-    renderAstroEntities();
+    renderAstroEntities(stageRect);
   }
 
   async function astroHandleHit() {
