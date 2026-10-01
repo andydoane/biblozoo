@@ -1289,12 +1289,14 @@ New Verse Picker
 
 .new-verse-card-ref {
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   color: #7f66c6;
   font-size: clamp(23px, 5.6vw, 38px);
   font-weight: 900;
   line-height: 0.98;
   text-align: center;
-  text-wrap: balance;
+  white-space: nowrap;
 }
 
 @media (max-width: 380px) {

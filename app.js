@@ -13343,6 +13343,109 @@ function getUnlearnedVerseListItems() {
   });
 }
 
+const PICKER_REFERENCE_ABBREVIATIONS = Object.freeze([
+  ["Leviticus", "Lev"],
+  ["Deuteronomy", "Deut"],
+  ["1 Samuel", "1 Sam"],
+  ["2 Samuel", "2 Sam"],
+  ["1 Chronicles", "1 Chron"],
+  ["2 Chronicles", "2 Chron"],
+  ["Ecclesiastes", "Ecc"],
+  ["Lamentations", "Lam"],
+  ["Zephaniah", "Zeph"],
+  ["Zechariah", "Zech"],
+  ["1 Corinthians", "1 Cor"],
+  ["2 Corinthians", "2 Cor"],
+  ["Galatians", "Gal"],
+  ["Ephesians", "Eph"],
+  ["Philippians", "Phil"],
+  ["Colossians", "Col"],
+  ["1 Thessalonians", "1 Thes"],
+  ["2 Thessalonians", "2 Thes"],
+  ["1 Timothy", "1 Tim"],
+  ["2 Timothy", "2 Tim"],
+  ["Revelation", "Rev"]
+]);
+
+function getPickerDisplayReference(
+  reference,
+  { abbreviated = false } = {}
+) {
+  const fullReference =
+    String(reference || "").trim();
+
+  if (!abbreviated || !fullReference) {
+    return fullReference;
+  }
+
+  for (const [bookName, shortName] of PICKER_REFERENCE_ABBREVIATIONS) {
+    if (fullReference.startsWith(`${bookName} `)) {
+      return `${shortName}${fullReference.slice(bookName.length)}`;
+    }
+  }
+
+  return fullReference;
+}
+
+function fitPickerReferenceElement(element) {
+  if (!element) return;
+
+  const fullReference =
+    String(
+      element.getAttribute("data-picker-reference") ||
+      ""
+    ).trim();
+
+  if (!fullReference) return;
+
+  element.textContent =
+    getPickerDisplayReference(fullReference);
+  element.classList.remove("is-abbreviated");
+
+  if (element.scrollWidth <= element.clientWidth + 1) {
+    return;
+  }
+
+  const abbreviatedReference =
+    getPickerDisplayReference(
+      fullReference,
+      { abbreviated: true }
+    );
+
+  if (abbreviatedReference === fullReference) {
+    return;
+  }
+
+  element.textContent = abbreviatedReference;
+  element.classList.add("is-abbreviated");
+}
+
+function fitPickerReferences(rootEl) {
+  rootEl
+    ?.querySelectorAll?.("[data-picker-reference]")
+    .forEach(fitPickerReferenceElement);
+}
+
+function schedulePickerReferenceFitting(rootEl) {
+  const fit = () => {
+    if (!rootEl?.isConnected) return;
+    fitPickerReferences(rootEl);
+  };
+
+  requestAnimationFrame(fit);
+
+  const fontsReady = document.fonts?.ready;
+  if (fontsReady?.then) {
+    fontsReady.then(fit).catch(() => {});
+  }
+}
+
+window.addEventListener("resize", () => {
+  requestAnimationFrame(() => {
+    fitPickerReferences(document);
+  });
+});
+
 function newVersePickerCardHtml(
   item,
   { changeVerseMode = false } = {}
@@ -13380,7 +13483,10 @@ function newVersePickerCardHtml(
         ${bibloPetVisualHtml(verseId, petEmoji)}
       </div>
 
-      <div class="new-verse-card-ref">
+      <div
+        class="new-verse-card-ref"
+        data-picker-reference="${escapeHtml(ref)}"
+      >
         ${escapeHtml(ref)}
       </div>
     </button>
@@ -13563,7 +13669,10 @@ function screenMyVerses(idx) {
           }
         </div>
 
-        <div class="new-verse-card-ref">
+        <div
+          class="new-verse-card-ref"
+          data-picker-reference="${escapeHtml(ref)}"
+        >
           ${escapeHtml(ref)}
         </div>
 
@@ -13681,6 +13790,7 @@ function screenMyVerses(idx) {
   `;
 
   bindHomePill(wrap);
+  schedulePickerReferenceFitting(wrap);
 
   wrap.querySelectorAll("[data-my-verse-id]").forEach((btn) => {
     btn.onclick = async (e) => {
@@ -13789,6 +13899,7 @@ function screenNewVersePicker(idx) {
   `;
 
   bindNewVersePickerHomePill(wrap);
+  schedulePickerReferenceFitting(wrap);
 
   wrap.querySelectorAll("[data-new-verse-id]").forEach((btn) => {
     btn.onclick = async (e) => {
