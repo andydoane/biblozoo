@@ -413,8 +413,8 @@ function titleZooStripHtml() {
       class="title-zoo-strip no-zoom"
       id="titleZooStrip"
       type="button"
-      data-verse-id="${escapeHtml(VERSE_ID || "")}"
-      aria-label="Open current BibloPet"
+      data-verse-id="${escapeHtml(pet?.verseId || "")}"
+      aria-label="Open displayed BibloPet"
     >
       <img
         class="title-zoo-layer title-zoo-bg"
@@ -497,6 +497,12 @@ function updateTitleZooPetVisitor(rootEl, pet) {
 
   visitor.setAttribute("title", pet.name);
   visitor.setAttribute("data-verse-id", pet.verseId);
+  const strip = rootEl.querySelector("#titleZooStrip");
+  if (strip) {
+    strip.setAttribute("data-verse-id", pet.verseId);
+    strip.setAttribute("aria-label", `Open ${pet.name}`);
+  }
+
 
   applyTitleZooPetFeetStyle(visitor, pet);
 
@@ -5277,18 +5283,19 @@ function chooseTitleZooPet({ avoidVerseId = "" } = {}) {
 }
 
 function getTitleZooPet() {
-  const verseId = String(VERSE_ID || "").trim();
+  const unlockedPets = getUnlockedTitleZooPets();
 
-  if (!verseId) {
+  if (!unlockedPets.length) {
     titleZooPetVerseId = "";
     return null;
   }
 
-  const currentPet =
-    getUnlockedTitleZooPets().find((pet) => pet.verseId === verseId) || null;
+  const rememberedPet = unlockedPets.find((pet) => pet.verseId === titleZooPetVerseId);
+  if (rememberedPet) {
+    return rememberedPet;
+  }
 
-  titleZooPetVerseId = currentPet?.verseId || "";
-  return currentPet;
+  return chooseTitleZooPet();
 }
 
 function advanceTitleZooPet() {
@@ -5315,7 +5322,7 @@ function bindTitleZooPetRotation(rootEl) {
 
     rotationInProgress = true;
 
-    const nextPet = getTitleZooPet();
+    const nextPet = advanceTitleZooPet();
 
     if (!nextPet) {
       rotationInProgress = false;
@@ -11952,7 +11959,6 @@ function screenTitle(idx) {
       const verseId =
         String(
           titleZooStrip.getAttribute("data-verse-id") ||
-          VERSE_ID ||
           ""
         ).trim();
 
