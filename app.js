@@ -13455,10 +13455,141 @@ async function startLearningNewVerse(verseId) {
 function screenMyVerses(idx) {
   const wrap = document.createElement("div");
   wrap.className = "title-screen practice-screen my-verses-screen";
+
+  const currentVerseId = String(VERSE_ID || "").trim();
   const currentVerseRef =
     HAS_VERSE_SELECTION && VERSE_REF
       ? VERSE_REF
       : "Choose a verse";
+  const currentVerseProgress =
+    currentVerseId
+      ? getVerseProgress(currentVerseId)
+      : null;
+  const currentPetUnlocked =
+    currentVerseId
+      ? isBibloPetUnlocked(currentVerseProgress)
+      : false;
+  const currentPetStatus =
+    currentVerseId
+      ? getBibloPetStatus(currentVerseProgress)
+      : "locked";
+  const currentPetEmoji =
+    currentVerseId
+      ? getBibloPetEmojiForVerseId(currentVerseId)
+      : "🐾";
+  const currentPetAnimationClass =
+    currentPetUnlocked
+      ? getBibloPetAnimationClass(
+          currentVerseId,
+          currentVerseProgress
+        )
+      : "";
+
+  const learnedItems =
+    Array.isArray(VERSE_LIST)
+      ? VERSE_LIST.filter((item) => {
+          const verseId = item?.id || "";
+          return (
+            verseId &&
+            !!getVerseProgress(verseId)?.learnCompleted
+          );
+        })
+      : [];
+
+  function learnedCardHtml(item) {
+    const verseId = item?.id || "";
+    const ref = item?.ref || verseId;
+    const verseProgress =
+      getVerseProgress(verseId);
+    const unlocked =
+      isBibloPetUnlocked(verseProgress);
+    const status =
+      getBibloPetStatus(verseProgress);
+    const isCurrent =
+      verseId === currentVerseId;
+    const petEmoji =
+      getBibloPetEmojiForVerseId(verseId);
+    const feetFromBottom =
+      getBibloPetFeetFromBottomForVerseId(
+        verseId
+      );
+
+    const statusLabel =
+      !unlocked
+        ? "Play to Unlock"
+        : status === "sleeping"
+          ? "Sleeping"
+          : status === "hungry"
+            ? "Hungry"
+            : "Happy";
+
+    const statusVisual =
+      unlocked
+        ? bibloPetStatusImageHtml(
+            status,
+            "pet-status-img my-verses-status-icon"
+          )
+        : lockIconHtml(
+            "my-verses-status-icon my-verses-status-lock-icon"
+          );
+
+    return `
+      <button
+        class="new-verse-card my-verses-learned-card no-zoom${isCurrent ? " is-current" : ""}${unlocked ? "" : " is-pending-unlock"}"
+        type="button"
+        data-my-verse-id="${escapeHtml(verseId)}"
+        ${isCurrent ? 'aria-current="true"' : ""}
+        aria-label="Select ${escapeHtml(ref)}, ${escapeHtml(statusLabel)}"
+      >
+        <div
+          class="my-verses-card-pet"
+          style="--my-verses-pet-feet-from-bottom: ${escapeHtml(feetFromBottom)};"
+          aria-hidden="true"
+        >
+          <div class="my-verses-card-shadow"></div>
+
+          <div class="my-verses-card-visual">
+            ${bibloPetVisualHtml(verseId, petEmoji)}
+          </div>
+
+          ${
+            unlocked
+              ? ""
+              : `
+                <div class="my-verses-card-lock-badge">
+                  ${lockIconHtml("my-verses-pending-lock-icon")}
+                </div>
+              `
+          }
+        </div>
+
+        <div class="new-verse-card-ref">
+          ${escapeHtml(ref)}
+        </div>
+
+        <div class="my-verses-status-pill status-${escapeHtml(unlocked ? status : "locked")}">
+          ${statusVisual}
+          <span>${escapeHtml(statusLabel)}</span>
+        </div>
+      </button>
+    `;
+  }
+
+  const learnedCardsHtml =
+    learnedItems.length
+      ? `
+          <div class="new-verse-grid my-verses-learned-grid">
+            ${learnedItems.map(learnedCardHtml).join("")}
+          </div>
+        `
+      : `
+          <div class="practice-empty-card">
+            <div class="practice-empty-title">No Learned Verses Yet</div>
+            <div class="practice-empty-text">
+              Learn a verse to add its BibloPet here.
+            </div>
+          </div>
+        `;
 
   wrap.innerHTML = `
     <div class="title-content practice-content">
@@ -13469,11 +13600,79 @@ function screenMyVerses(idx) {
       </div>
 
       <div class="practice-scroll-wrap">
-        <div class="practice-card-list">
-          <div class="title-current-verse-panel my-verses-foundation-current">
-            <div class="title-current-verse-label">Current Verse</div>
-            <div class="title-current-verse-ref">${escapeHtml(currentVerseRef)}</div>
-          </div>
+        <div class="practice-card-list my-verses-content">
+          <section class="my-verses-hero" aria-label="Current BibloPet">
+            <div class="pet-stage my-verses-hero-stage">
+              ${
+                currentPetUnlocked
+                  ? `
+                    ${
+                      currentPetStatus === "sleeping"
+                        ? `
+                          <div class="pet-sleep-zs" aria-hidden="true">
+                            <span>Z</span>
+                            <span>Z</span>
+                            <span>Z</span>
+                          </div>
+                        `
+                        : ""
+                    }
+
+                    ${
+                      currentPetStatus === "hungry"
+                        ? `
+                          <div class="pet-hungry-food-targets" aria-hidden="true">
+                            <span class="pet-hungry-food-target left">🍎</span>
+                            <span class="pet-hungry-food-target right">🍞</span>
+                          </div>
+                        `
+                        : ""
+                    }
+
+                    <div class="pet-emoji pet-emoji-unlocked ${escapeHtml(currentPetAnimationClass)}">
+                      ${bibloPetVisualHtml(currentVerseId, currentPetEmoji)}
+                    </div>
+                  `
+                  : `
+                    <div class="pet-emoji pet-emoji-locked">
+                      ${lockIconHtml("lock-icon-pet")}
+                    </div>
+                    <div class="pet-locked-text">
+                      ${
+                        currentVerseId
+                          ? "Practice more to unlock your BibloPet."
+                          : "Choose a verse to meet its BibloPet."
+                      }
+                    </div>
+                  `
+              }
+            </div>
+
+            <div class="my-verses-current-copy">
+              <div class="my-verses-current-label">
+                Current Verse
+              </div>
+              <div class="my-verses-current-ref">
+                ${escapeHtml(currentVerseRef)}
+              </div>
+            </div>
+          </section>
+
+          <section class="my-verses-learned-section">
+            <div class="my-verses-section-title">
+              Learned Verses
+            </div>
+
+            ${learnedCardsHtml}
+          </section>
+
+          <button
+            class="carousel-main my-verses-learn-new-btn no-zoom"
+            id="myVersesLearnNewBtn"
+            type="button"
+          >
+            Learn a New Verse
+          </button>
         </div>
       </div>
     </div>
@@ -13482,6 +13681,54 @@ function screenMyVerses(idx) {
   `;
 
   bindHomePill(wrap);
+
+  wrap.querySelectorAll("[data-my-verse-id]").forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+
+      const verseId =
+        btn.getAttribute("data-my-verse-id") || "";
+
+      await selectVerseAndReturnHome(verseId);
+    };
+  });
+
+  const learnNewBtn =
+    wrap.querySelector("#myVersesLearnNewBtn");
+
+  if (learnNewBtn) {
+    learnNewBtn.onclick = (e) => {
+      e.stopPropagation();
+
+      State.activeTodo = null;
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete("changeVerse");
+      url.searchParams.delete("screen");
+      history.replaceState(
+        null,
+        "",
+        url.toString()
+      );
+
+      go(Screen.NEW_VERSE_PICKER);
+    };
+  }
+
+  requestAnimationFrame(() => {
+    applyPetMotionVars(wrap);
+    startHungryFoodCycle(
+      wrap,
+      currentPetStatus
+    );
+
+    if (currentVerseId) {
+      startPetAnimationCycle(
+        currentVerseId,
+        currentVerseProgress
+      );
+    }
+  });
 
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
@@ -15537,11 +15784,24 @@ function screenGameMixFinished(idx) {
    ========================= */
 function render() {
   let savedDetailScrollTop = 0;
+  let savedMyVersesScrollTop = 0;
 
   if (State.screen === Screen.VERSE_DETAIL) {
     const existingDetailScroll = document.querySelector(".detail-scroll");
     if (existingDetailScroll) {
       savedDetailScrollTop = existingDetailScroll.scrollTop;
+    }
+  }
+
+  if (State.screen === Screen.MY_VERSES) {
+    const existingMyVersesScroll =
+      document.querySelector(
+        ".my-verses-screen .practice-scroll-wrap"
+      );
+
+    if (existingMyVersesScroll) {
+      savedMyVersesScrollTop =
+        existingMyVersesScroll.scrollTop;
     }
   }
 
@@ -15630,6 +15890,20 @@ function render() {
       const newDetailScroll = document.querySelector(".detail-scroll");
       if (newDetailScroll) {
         newDetailScroll.scrollTop = savedDetailScrollTop;
+      }
+    });
+  }
+
+  if (State.screen === Screen.MY_VERSES && savedMyVersesScrollTop > 0) {
+    requestAnimationFrame(() => {
+      const newMyVersesScroll =
+        document.querySelector(
+          ".my-verses-screen .practice-scroll-wrap"
+        );
+
+      if (newMyVersesScroll) {
+        newMyVersesScroll.scrollTop =
+          savedMyVersesScrollTop;
       }
     });
   }
