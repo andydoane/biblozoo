@@ -2449,7 +2449,7 @@ My Verses Screen
   color: #555555;
 }
 
-.my-verses-status-icon {
+.my-verses-status-pill .my-verses-status-icon {
   flex: 0 0 auto;
   width: 24px;
   height: 24px;
@@ -2500,7 +2500,7 @@ My Verses Screen
     font-size: 12px;
   }
 
-  .my-verses-status-icon {
+  .my-verses-status-pill .my-verses-status-icon {
     width: 21px;
     height: 21px;
   }
