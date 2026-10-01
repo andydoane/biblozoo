@@ -13344,27 +13344,27 @@ function getUnlearnedVerseListItems() {
 }
 
 const PICKER_REFERENCE_ABBREVIATIONS = Object.freeze([
-  ["Leviticus", "Lev"],
-  ["Deuteronomy", "Deut"],
-  ["1 Samuel", "1 Sam"],
-  ["2 Samuel", "2 Sam"],
-  ["1 Chronicles", "1 Chron"],
-  ["2 Chronicles", "2 Chron"],
-  ["Ecclesiastes", "Ecc"],
-  ["Lamentations", "Lam"],
-  ["Zephaniah", "Zeph"],
-  ["Zechariah", "Zech"],
-  ["1 Corinthians", "1 Cor"],
-  ["2 Corinthians", "2 Cor"],
-  ["Galatians", "Gal"],
-  ["Ephesians", "Eph"],
-  ["Philippians", "Phil"],
-  ["Colossians", "Col"],
-  ["1 Thessalonians", "1 Thes"],
-  ["2 Thessalonians", "2 Thes"],
-  ["1 Timothy", "1 Tim"],
-  ["2 Timothy", "2 Tim"],
-  ["Revelation", "Rev"]
+  ["Leviticus", "Lev."],
+  ["Deuteronomy", "Deut."],
+  ["1 Samuel", "1 Sam."],
+  ["2 Samuel", "2 Sam."],
+  ["1 Chronicles", "1 Chron."],
+  ["2 Chronicles", "2 Chron."],
+  ["Ecclesiastes", "Ecc."],
+  ["Lamentations", "Lam."],
+  ["Zephaniah", "Zeph."],
+  ["Zechariah", "Zech."],
+  ["1 Corinthians", "1 Cor."],
+  ["2 Corinthians", "2 Cor."],
+  ["Galatians", "Gal."],
+  ["Ephesians", "Eph."],
+  ["Philippians", "Phil."],
+  ["Colossians", "Col."],
+  ["1 Thessalonians", "1 Thes."],
+  ["2 Thessalonians", "2 Thes."],
+  ["1 Timothy", "1 Tim."],
+  ["2 Timothy", "2 Tim."],
+  ["Revelation", "Rev."]
 ]);
 
 function getPickerDisplayReference(
@@ -13398,26 +13398,30 @@ function fitPickerReferenceElement(element) {
 
   if (!fullReference) return;
 
-  element.textContent =
-    getPickerDisplayReference(fullReference);
-  element.classList.remove("is-abbreviated");
-
-  if (element.scrollWidth <= element.clientWidth + 1) {
-    return;
-  }
-
   const abbreviatedReference =
     getPickerDisplayReference(
       fullReference,
       { abbreviated: true }
     );
 
-  if (abbreviatedReference === fullReference) {
+  element.textContent = fullReference;
+  element.classList.remove("is-abbreviated");
+  element.classList.add("is-single-line");
+
+  if (element.scrollWidth <= element.clientWidth + 1) {
     return;
   }
 
-  element.textContent = abbreviatedReference;
-  element.classList.add("is-abbreviated");
+  if (abbreviatedReference !== fullReference) {
+    element.textContent = abbreviatedReference;
+    element.classList.add("is-abbreviated");
+
+    if (element.scrollWidth <= element.clientWidth + 1) {
+      return;
+    }
+  }
+
+  element.classList.remove("is-single-line");
 }
 
 function fitPickerReferences(rootEl) {
