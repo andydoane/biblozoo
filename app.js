@@ -413,7 +413,8 @@ function titleZooStripHtml() {
       class="title-zoo-strip no-zoom"
       id="titleZooStrip"
       type="button"
-      aria-label="Visit BibloPet Zoo"
+      data-verse-id="${escapeHtml(VERSE_ID || "")}"
+      aria-label="Open current BibloPet"
     >
       <img
         class="title-zoo-layer title-zoo-bg"
@@ -5276,19 +5277,18 @@ function chooseTitleZooPet({ avoidVerseId = "" } = {}) {
 }
 
 function getTitleZooPet() {
-  const unlockedPets = getUnlockedTitleZooPets();
+  const verseId = String(VERSE_ID || "").trim();
 
-  if (!unlockedPets.length) {
+  if (!verseId) {
     titleZooPetVerseId = "";
     return null;
   }
 
-  const rememberedPet = unlockedPets.find((pet) => pet.verseId === titleZooPetVerseId);
-  if (rememberedPet) {
-    return rememberedPet;
-  }
+  const currentPet =
+    getUnlockedTitleZooPets().find((pet) => pet.verseId === verseId) || null;
 
-  return chooseTitleZooPet();
+  titleZooPetVerseId = currentPet?.verseId || "";
+  return currentPet;
 }
 
 function advanceTitleZooPet() {
@@ -5315,7 +5315,7 @@ function bindTitleZooPetRotation(rootEl) {
 
     rotationInProgress = true;
 
-    const nextPet = advanceTitleZooPet();
+    const nextPet = getTitleZooPet();
 
     if (!nextPet) {
       rotationInProgress = false;
@@ -6962,6 +6962,7 @@ const Screen = {
   PROFILE_EDITOR: "profile_editor",
   PROFILE_MANAGE: "profile_manage",
   TITLE: "title",
+  MY_VERSES: "my_verses",
   DAILY_SESSION: "daily_session",
   SETTINGS: "settings",
   PRIVACY: "privacy",
@@ -6995,6 +6996,7 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PROFILE_PICKER,
   Screen.PROFILE_EDITOR,
   Screen.TITLE,
+  Screen.MY_VERSES,
   Screen.DAILY_SESSION,
   Screen.PROFILE_MANAGE,
   Screen.SETTINGS,
@@ -9674,6 +9676,7 @@ function renderNav() {
     State.screen !== Screen.PROFILE_EDITOR &&
     State.screen !== Screen.PROFILE_MANAGE &&
     State.screen !== Screen.TITLE &&
+    State.screen !== Screen.MY_VERSES &&
     State.screen !== Screen.DAILY_SESSION &&
     State.screen !== Screen.SETTINGS &&
     State.screen !== Screen.PRIVACY &&
@@ -11739,6 +11742,10 @@ function screenTitle(idx) {
     opt.id === "learn" && State.hasLearnedVerse
       ? "Learn Again"
       : opt.label;
+  const currentVerseRef =
+    HAS_VERSE_SELECTION && VERSE_REF
+      ? VERSE_REF
+      : "Choose a verse";
 
   wrap.innerHTML = `
     <div class="title-content">
@@ -11753,9 +11760,16 @@ function screenTitle(idx) {
 
 
       <div class="title-picker-tools${activeProfile ? " has-profile" : ""}">
-        <div class="title-picker">
-          <select id="versePicker" class="title-picker-select"></select>
-        </div>
+        <button
+          class="title-my-verses-btn no-zoom"
+          id="titleMyVersesBtn"
+          type="button"
+          ${tutorialActive ? "disabled" : ""}
+          aria-label="Open My Verses"
+        >
+          <span>My Verses</span>
+          <span class="title-my-verses-chevron" aria-hidden="true">&gt;</span>
+        </button>
 
         ${
           activeProfile
@@ -11792,6 +11806,11 @@ function screenTitle(idx) {
             onerror="this.style.display='none'"
           >
         </button>
+      </div>
+
+      <div class="title-current-verse-panel" aria-label="Current verse">
+        <div class="title-current-verse-label">Current Verse</div>
+        <div class="title-current-verse-ref">${escapeHtml(currentVerseRef)}</div>
       </div>
 
       <div class="title-action-row" aria-label="Main actions">
@@ -11840,8 +11859,6 @@ function screenTitle(idx) {
 
       ${titleZooStripHtml()}
 
-      ${titleZooVisitButtonHtml()}
-
     </div>
 
     ${
@@ -11852,6 +11869,14 @@ function screenTitle(idx) {
 
   window.BibloZooDailyQuestions
     ?.bindTitleOffer?.(wrap);
+
+  const titleMyVersesBtn = wrap.querySelector("#titleMyVersesBtn");
+  if (titleMyVersesBtn) {
+    titleMyVersesBtn.onclick = (e) => {
+      e.stopPropagation();
+      go(Screen.MY_VERSES);
+    };
+  }
 
   const titleProfileBtn = wrap.querySelector(
     "#titleProfileBtn"
@@ -11896,7 +11921,7 @@ function screenTitle(idx) {
       if (!HAS_VERSE_SELECTION) {
         showDialog({
           title: "Pick a verse first 🙂",
-          body: "Choose a verse from the dropdown before you start.",
+          body: "Choose a verse from My Verses before you start.",
           actions: [dlgBtn("OK", { onClick: closeDialog })]
         });
         return;
@@ -11923,7 +11948,18 @@ function screenTitle(idx) {
   if (titleZooStrip) {
     titleZooStrip.onclick = (e) => {
       e.stopPropagation();
-      go(Screen.PROGRESS);
+
+      const verseId =
+        String(
+          titleZooStrip.getAttribute("data-verse-id") ||
+          VERSE_ID ||
+          ""
+        ).trim();
+
+      if (!verseId) return;
+
+      State.selectedVerseId = verseId;
+      go(Screen.VERSE_DETAIL);
     };
 
     bindLongPress(titleZooStrip, {
@@ -11938,17 +11974,13 @@ function screenTitle(idx) {
 
       onLongPress: () => {
         const selectedVerseId =
-          String(
-            wrap.querySelector(
-              "#versePicker"
-            )?.value || ""
-          ).trim();
+          String(VERSE_ID || "").trim();
 
         if (!selectedVerseId) {
           showDialog({
             title: "Choose a Verse First",
             body:
-              "Select a verse from the title-page dropdown, then long-press the Zoo strip to test its Daily Question.",
+              "Choose a verse from My Verses, then long-press the pet scene to test its Daily Question.",
             actions: [
               dlgBtn("OK", {
                 onClick: closeDialog
@@ -11986,19 +12018,6 @@ function screenTitle(idx) {
     });
   }
 
-  const titleZooVisitBtn = wrap.querySelector("#titleZooVisitBtn");
-  if (titleZooVisitBtn) {
-    titleZooVisitBtn.onclick = (e) => {
-      e.stopPropagation();
-
-      const verseId = titleZooVisitBtn.getAttribute("data-verse-id");
-      if (!verseId) return;
-
-      State.selectedVerseId = verseId;
-      go(Screen.VERSE_DETAIL);
-    };
-  }
-
   bindTitleZooPetRotation(wrap);
 
   const titleLogoSecretWrap = wrap.querySelector("#titleLogoSecretWrap");
@@ -12033,75 +12052,14 @@ function screenTitle(idx) {
     }
   });
 
-  const versePicker = wrap.querySelector("#versePicker");
-  if (versePicker) {
-    versePicker.innerHTML = "";
-
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Choose a verse...";
-    placeholder.disabled = true;
-    placeholder.selected = !HAS_VERSE_SELECTION;
-    versePicker.appendChild(placeholder);
-
-    const progress = loadProgress();
-
-    for (const item of VERSE_LIST) {
-      const opt = document.createElement("option");
-      opt.value = item.id;
-
-      const learned =
-        !!progress.verses?.[item.id]?.learnCompleted;
-
-      const selected =
-        HAS_VERSE_SELECTION &&
-        item.id === VERSE_ID;
-
-      const learnedMark =
-        learned ? " ✔" : "";
-
-      opt.textContent =
-        `${item.ref}${learnedMark}`;
-
-      if (selected) {
-        opt.selected = true;
-      }
-
-      versePicker.appendChild(opt);
-    }
-
-    versePicker.disabled = tutorialActive;
-    versePicker.setAttribute("aria-disabled", tutorialActive ? "true" : "false");
-
-    versePicker.onchange = async () => {
-      const nextVerseId = versePicker.value;
-      if (!nextVerseId) return;
-
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set("v", nextVerseId);
-        history.replaceState(null, "", url.toString());
-
-        await loadVerse(nextVerseId);
-        HAS_VERSE_SELECTION = true;
-        State.titleOptionIndex = 0;
-        resetLearn(false);
-        render();
-      } catch (err) {
-        console.error(err);
-        showDialog({
-          title: "Verse JSON not found",
-          body: `Could not load ${DATA_DIR}${nextVerseId}.json`,
-          actions: [dlgBtn("OK", { onClick: closeDialog })]
-        });
-      }
-    };
-  }
-
-
-
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
+
+
+
+
+
+
 
 function screenSettings(idx) {
   const wrap = document.createElement("div");
@@ -13482,10 +13440,38 @@ async function startLearningNewVerse(verseId) {
 
     showDialog({
       title: "Verse JSON not found",
+function screenMyVerses(idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "title-screen practice-screen my-verses-screen";
+  const currentVerseRef =
+    HAS_VERSE_SELECTION && VERSE_REF
+      ? VERSE_REF
+      : "Choose a verse";
       body: `Could not load ${DATA_DIR}${verseId}.json`,
+  wrap.innerHTML = `
+    <div class="title-content practice-content">
+      <div class="practice-title-row">
+        ${homePillHtml("Back to Home")}
+        <h2>My Verses</h2>
+        <div class="practice-title-spacer" aria-hidden="true"></div>
+      </div>
       actions: [dlgBtn("OK", { onClick: closeDialog })]
+      <div class="practice-scroll-wrap">
+        <div class="practice-card-list">
+          <div class="title-current-verse-panel my-verses-foundation-current">
+            <div class="title-current-verse-label">Current Verse</div>
+            <div class="title-current-verse-ref">${escapeHtml(currentVerseRef)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
     });
+    <div class="practice-scroll-vignette" aria-hidden="true"></div>
+  `;
   }
+  bindHomePill(wrap);
+}
+  return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
 function screenNewVersePicker(idx) {
@@ -15570,6 +15556,7 @@ function render() {
     if (screen === Screen.PROFILE_EDITOR) slide = screenProfileEditor(idx);
     if (screen === Screen.PROFILE_MANAGE) slide = screenProfileManage(idx);
     if (screen === Screen.TITLE) slide = screenTitle(idx);
+    if (screen === Screen.MY_VERSES) slide = screenMyVerses(idx);
     if (screen === Screen.DAILY_SESSION) {
       slide =
         window.BibloZooDailyQuestions

@@ -6,6 +6,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Titan One";
+  src: url("./verse_fonts/TitanOne.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --appH: 100vh;
   --navH: 70px;
@@ -2179,6 +2187,83 @@ Game Mix Finished Screen
   opacity: 0.52;
   filter: grayscale(0.35) saturate(0.7);
   cursor: default;
+}
+
+.title-my-verses-btn {
+  width: 100%;
+  min-width: 0;
+  height: 50px;
+  border: none;
+  border-radius: 14px;
+  padding: 0 14px 0 16px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333333;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(20px, 5vw, 28px);
+  font-weight: 400;
+  line-height: 1;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.22);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.title-my-verses-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
+
+.title-my-verses-btn:disabled {
+  opacity: 0.52;
+  filter: grayscale(0.35) saturate(0.7);
+  cursor: default;
+  transform: none;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
+}
+
+.title-my-verses-chevron {
+  flex: 0 0 auto;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.title-current-verse-panel {
+  width: min(100%, 700px);
+  max-width: 700px;
+  min-height: clamp(76px, 13vw, 108px);
+  margin: clamp(12px, 2vh, 18px) auto 0;
+  border-radius: clamp(18px, 4.2vw, 28px);
+  padding: clamp(10px, 2.2vw, 16px) clamp(12px, 3vw, 20px);
+  background: #333333;
+  color: #ffffff;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(3px, 0.8vw, 6px);
+  text-align: center;
+}
+
+.title-current-verse-label {
+  color: #ffc751;
+  font-size: clamp(16px, 4vw, 25px);
+  line-height: 1;
+}
+
+.title-current-verse-ref {
+  width: 100%;
+  color: #ffffff;
+  font-size: clamp(19px, 5.2vw, 36px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.my-verses-foundation-current {
+  margin-top: 0;
 }
 
 .title-picker-tools {
