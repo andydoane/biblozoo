@@ -11751,7 +11751,9 @@ function screenTitle(idx) {
       : opt.label;
   const currentVerseRef =
     HAS_VERSE_SELECTION && VERSE_REF
-      ? VERSE_REF
+      ? String(VERSE_REF)
+          .replace(/\s*\([^)]*\)\s*$/, "")
+          .trim()
       : "Choose a verse";
 
   wrap.innerHTML = `
