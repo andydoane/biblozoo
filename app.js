@@ -13440,6 +13440,12 @@ async function startLearningNewVerse(verseId) {
 
     showDialog({
       title: "Verse JSON not found",
+      body: `Could not load ${DATA_DIR}${verseId}.json`,
+      actions: [dlgBtn("OK", { onClick: closeDialog })]
+    });
+  }
+}
+
 function screenMyVerses(idx) {
   const wrap = document.createElement("div");
   wrap.className = "title-screen practice-screen my-verses-screen";
@@ -13447,7 +13453,7 @@ function screenMyVerses(idx) {
     HAS_VERSE_SELECTION && VERSE_REF
       ? VERSE_REF
       : "Choose a verse";
-      body: `Could not load ${DATA_DIR}${verseId}.json`,
+
   wrap.innerHTML = `
     <div class="title-content practice-content">
       <div class="practice-title-row">
@@ -13455,7 +13461,7 @@ function screenMyVerses(idx) {
         <h2>My Verses</h2>
         <div class="practice-title-spacer" aria-hidden="true"></div>
       </div>
-      actions: [dlgBtn("OK", { onClick: closeDialog })]
+
       <div class="practice-scroll-wrap">
         <div class="practice-card-list">
           <div class="title-current-verse-panel my-verses-foundation-current">
@@ -13465,12 +13471,12 @@ function screenMyVerses(idx) {
         </div>
       </div>
     </div>
-    });
+
     <div class="practice-scroll-vignette" aria-hidden="true"></div>
   `;
-  }
+
   bindHomePill(wrap);
-}
+
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
