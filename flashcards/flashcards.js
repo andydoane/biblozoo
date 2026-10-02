@@ -60,6 +60,7 @@
   };
 
   let api = null;
+  let resizeObserver = null;
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -149,6 +150,8 @@
   }
 
   function resetSession() {
+    resizeObserver?.disconnect();
+    resizeObserver = null;
     state.view = "landing";
     state.selectedVerseId = "";
     state.difficulty = "";
@@ -187,7 +190,7 @@
     if (!option) return;
 
     state.difficulty = option.id;
-    state.view = "difficulty_selected";
+    state.view = "recording_intro";
     requestRender();
   }
 
@@ -365,58 +368,129 @@
       });
   }
 
-  function renderDifficultySelected(wrap) {
-    const selected = getSelectedVerse();
-    const difficulty =
-      getDifficultyOption(state.difficulty);
+  // Use the actual verse words; echoParts supplies only the grouping.
+  function getFirstLetterChunks(selected) {
+    const words = (text) => api.tokenizeVerseText(String(text || ""))
+      .filter((token) => token.type === "word")
+      .map((token) => token.text);
+    const verseWords = words(selected.verseText);
+    const chunks = (selected.echoParts || []).map(words).filter((part) => part.length);
+    const matches = chunks.flat().join(" ").toLowerCase() ===
+      verseWords.join(" ").toLowerCase();
+    let offset = 0;
+    return (matches && chunks.length ? chunks : [verseWords]).map((chunk) => {
+      const initials = verseWords.slice(offset, offset + chunk.length)
+        .map((word) => word.charAt(0).toUpperCase()).join(" ");
+      offset += chunk.length;
+      return initials;
+    });
+  }
 
-    if (!selected || !difficulty) {
-      state.view = "difficulty";
-      state.difficulty = "";
-      renderDifficulty(wrap);
-      return;
-    }
-
+  function renderRecordingIntro(wrap) {
     wrap.innerHTML = `
       ${renderMenuButton()}
+      <div class="flashcards-recall-shell">
+        <section class="flashcards-panel flashcards-recall-panel">
+          ${renderMascot("flashcards-overlap-mascot")}
+          <div class="flashcards-recording-copy">
+            <p>Say the verse out loud. Try your best and keep going
+              if you make a mistake!</p>
+            <p>When recording is available, you'll be able to listen
+              back and see how you did.</p>
+          </div>
+        </section>
+        <div class="flashcards-recall-actions">
+          <button class="flashcards-record-preview" id="flashcardsRecordStartBtn"
+            type="button" aria-describedby="flashcardsRecordingNote">
+            <img src="${escapeHtml(getThemedControlAsset("record"))}" alt="">
+            <span>Record — Preview</span>
+          </button>
+          <p class="flashcards-recording-note" id="flashcardsRecordingNote">
+            Recording isn't available yet. Both buttons start practice without audio capture.
+          </p>
+          <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
+            type="button">Skip Recording</button>
+        </div>
+      </div>
+    `;
+    const begin = () => {
+      state.view = "challenge";
+      requestRender();
+    };
+    wrap.querySelector("#flashcardsRecordStartBtn").onclick = begin;
+    wrap.querySelector("#flashcardsSkipRecordingBtn").onclick = begin;
+  }
 
+  function renderChallenge(wrap) {
+    const selected = getSelectedVerse();
+    wrap.innerHTML = `
+      ${renderMenuButton()}
+      <div class="flashcards-recall-shell">
+        <div class="flashcards-card-stack flashcards-recall-stack">
+          ${renderMascot("flashcards-overlap-mascot")}
+          <section class="flashcards-card-front flashcards-recall-card">
+            ${renderReferencePill(selected.ref || selected.id)}
+            <div class="learn-stage flashcards-recall-stage"></div>
+          </section>
+        </div>
+        <div class="flashcards-recall-actions">
+          <button class="flashcards-secondary-btn" id="flashcardsChallengeDoneBtn"
+            type="button">I'm Done</button>
+        </div>
+      </div>
+    `;
+    const stage = wrap.querySelector(".flashcards-recall-stage");
+    if (state.difficulty !== "really_well") {
+      const block = document.createElement("div");
+      block.className = "smart-learn-text";
+      block.dataset.smartLearnText = "";
+      block.dataset.smartFitText = selected.verseText;
+      const body = document.createElement("div");
+      body.className = "smart-learn-body";
+      if (state.difficulty === "pretty_good") {
+        body.classList.add("flashcards-initials");
+        for (const chunk of getFirstLetterChunks(selected)) {
+          const line = document.createElement("div");
+          line.textContent = chunk;
+          body.appendChild(line);
+        }
+      } else {
+        block.classList.add("smart-learn-text-remove");
+        body.classList.add("learn-verse", "missing-words-theme", "flashcards-hidden-verse");
+        body.appendChild(api.createHiddenVerseNode(selected));
+      }
+      block.appendChild(body);
+      stage.appendChild(block);
+      api.scheduleSmartLearnTextFit(wrap);
+    }
+    wrap.querySelector("#flashcardsChallengeDoneBtn").onclick = () => {
+      state.view = "challenge_complete";
+      requestRender();
+    };
+  }
+
+  function renderChallengeComplete(wrap) {
+    const selected = getSelectedVerse();
+    wrap.innerHTML = `
+      ${renderMenuButton()}
       <div class="flashcards-stage-shell">
         <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
           ${renderMascot("flashcards-overlap-mascot")}
-
           ${renderReferencePill(selected.ref || selected.id)}
-
-          <h1 class="flashcards-next-title">
-            ${escapeHtml(difficulty.label)}
-          </h1>
-
-          <div class="flashcards-next-copy">
-            Recording instructions come in Patch 3.
-          </div>
-
-          <button
-            class="flashcards-primary-btn"
-            id="flashcardsChooseDifficultyAgainBtn"
-            type="button"
-          >
-            Choose Difficulty Again
-          </button>
+          <h1 class="flashcards-next-title">Nice work!</h1>
+          <p class="flashcards-next-copy">Keep practicing your verse out loud.</p>
+          <button class="flashcards-primary-btn" id="flashcardsRetryBtn"
+            type="button">Try Again</button>
+          <button class="flashcards-secondary-btn" data-flashcards-exit
+            type="button">Done</button>
         </section>
       </div>
     `;
-
-    const chooseAgainBtn =
-      wrap.querySelector(
-        "#flashcardsChooseDifficultyAgainBtn"
-      );
-
-    if (chooseAgainBtn) {
-      chooseAgainBtn.onclick = () => {
-        state.difficulty = "";
-        state.view = "difficulty";
-        requestRender();
-      };
-    }
+    wrap.querySelector("#flashcardsRetryBtn").onclick = () => {
+      state.difficulty = "";
+      state.view = "difficulty";
+      requestRender();
+    };
   }
 
   function bindCommonActions(wrap) {
@@ -432,6 +506,10 @@
 
   function renderScreen(idx) {
     if (!api?.makeSlide) return null;
+
+    if (state.view !== "landing" && !getSelectedVerse()) resetSession();
+    if (["recording_intro", "challenge", "challenge_complete"].includes(state.view) &&
+        !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
     const isLanding =
       state.view === "landing";
@@ -452,13 +530,27 @@
 
     if (state.view === "difficulty") {
       renderDifficulty(wrap);
-    } else if (state.view === "difficulty_selected") {
-      renderDifficultySelected(wrap);
+    } else if (state.view === "recording_intro") {
+      renderRecordingIntro(wrap);
+    } else if (state.view === "challenge") {
+      renderChallenge(wrap);
+    } else if (state.view === "challenge_complete") {
+      renderChallengeComplete(wrap);
     } else {
       renderLanding(wrap);
     }
 
     bindCommonActions(wrap);
+    if (state.view === "challenge" && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => api.scheduleSmartLearnTextFit(wrap));
+      observer.observe(wrap);
+      // requestRender replaces the screen; disconnect the previous observer.
+      resizeObserver?.disconnect();
+      resizeObserver = observer;
+    } else {
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+    }
 
     return api.makeSlide({
       idx,

@@ -6845,6 +6845,10 @@ async function loadVerseList() {
               String(
                 verseJson.verseText || ""
               ).trim(),
+            echoParts: Array.isArray(verseJson.echoParts)
+              ? verseJson.echoParts : [],
+            hidePlan: Array.isArray(verseJson.hidePlan)
+              ? verseJson.hidePlan : [],
             reflection:
               window.BibloZooDailyQuestions
                 ?.normalizeReflection?.(
@@ -7039,6 +7043,22 @@ window.BibloZooFlashcards
       VERSE_LIST,
 
     getVerseProgress,
+    tokenizeVerseText: tokenize,
+    scheduleSmartLearnTextFit,
+    createHiddenVerseNode: (verse) => {
+      const verseTokens = tokenize(verse.verseText || "");
+      const hidden = new Map(
+        resolveHidePlanToTokenIndices(verseTokens, verse.hidePlan || [])
+          .map((item) => [item.tokenIndex, item])
+      );
+      return verseNode({
+        tokens: verseTokens,
+        hiddenAt: (index) => hidden.has(index),
+        infoAt: (index) => hidden.get(index),
+        revealed: new Set(),
+        interactive: false
+      });
+    },
 
     makeSlide,
 
@@ -8571,7 +8591,11 @@ function isTrailingLearnPunctuation(token) {
   );
 }
 
-function verseNode() {
+function verseNode(options = {}) {
+  const verseTokens = options.tokens || tokens;
+  const hiddenAt = options.hiddenAt || isTokenHidden;
+  const infoAt = options.infoAt || hideInfoForToken;
+  const revealedIndices = options.revealed || State.revealedTokenIdx;
   const p = document.createElement("p");
   p.className = "verse";
 
@@ -8590,7 +8614,7 @@ function verseNode() {
     node,
     tokenIndex
   ) {
-    const nextToken = tokens[tokenIndex + 1];
+    const nextToken = verseTokens[tokenIndex + 1];
 
     if (!isTrailingLearnPunctuation(nextToken)) {
       p.appendChild(node);
@@ -8611,17 +8635,17 @@ function verseNode() {
     return true;
   }
 
-  for (let i = 0; i < tokens.length; i++) {
-    const t = tokens[i];
+  for (let i = 0; i < verseTokens.length; i++) {
+    const t = verseTokens[i];
 
     if (t.type === TokenType.SPACE) {
       p.appendChild(document.createTextNode(t.text));
       continue;
     }
 
-    if (!isTokenHidden(i)) {
+    if (!hiddenAt(i)) {
       const visibleSpan =
-        State.revealedTokenIdx.has(i)
+        revealedIndices.has(i)
           ? makeLearnTokenSpan(
             t.text,
             "revealed-word"
@@ -8640,7 +8664,7 @@ function verseNode() {
       continue;
     }
 
-    const info = hideInfoForToken(i);
+    const info = infoAt(i);
     const isEmoji = info?.type === "emoji";
     const isImage = info?.type === "image";
 
@@ -8695,8 +8719,8 @@ function verseNode() {
       }
     }
 
-    span.onclick = () => {
-      State.revealedTokenIdx.add(i);
+    if (options.interactive !== false) span.onclick = () => {
+      revealedIndices.add(i);
 
       const revealed = document.createElement("span");
       revealed.className = "learn-token revealed-word";

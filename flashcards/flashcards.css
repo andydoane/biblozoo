@@ -449,3 +449,157 @@ Patch 2: themed visual system + difficulty flow
     gap: 18px;
   }
 }
+
+/* Recall: reserve a bounded card area for the shared Learn text fitter. */
+.flashcards-recall-shell {
+  --recall-mascot-size: clamp(110px, 24vw, 180px);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: calc(560px + var(--safeT) + var(--safeB));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(16px, 2.5vh, 28px);
+  padding: calc(130px + var(--safeT)) clamp(28px, 7vw, 70px)
+    calc(24px + var(--safeB));
+}
+
+.flashcards-recall-shell .flashcards-overlap-mascot {
+  width: var(--recall-mascot-size);
+}
+
+.flashcards-recall-panel,
+.flashcards-recall-stack {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  width: min(100%, 700px);
+}
+
+.flashcards-recall-panel,
+.flashcards-recall-card {
+  box-sizing: border-box;
+  padding: calc(var(--recall-mascot-size) / 2 + 16px) clamp(14px, 3vw, 28px) 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.flashcards-recall-card {
+  height: 100%;
+}
+
+.flashcards-recall-card .flashcards-reference-pill {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  font-size: clamp(20px, 4.8vw, 32px);
+}
+
+.flashcards-recall-stage {
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flashcards-initials > div {
+  color: #333333;
+  margin: 0.18em 0;
+}
+
+.flashcards-initials > div:nth-child(even) {
+  color: var(--flashcards-accent);
+}
+
+.flashcards-hidden-verse {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.flashcards-hidden-verse .hintable {
+  pointer-events: none;
+}
+
+.flashcards-recall-actions {
+  flex: 0 0 auto;
+  width: min(100%, 600px);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.flashcards-recording-copy {
+  margin: auto 0;
+  font-size: clamp(19px, 4vw, 29px);
+  font-weight: 800;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.flashcards-recording-copy p { margin: 0 0 0.75em; }
+.flashcards-recording-copy p:last-child { margin-bottom: 0; }
+
+.flashcards-record-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--flashcards-accent-text);
+  font: inherit;
+  font-size: clamp(20px, 4vw, 28px);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.flashcards-record-preview img { width: 64px; height: 64px; }
+
+.flashcards-recording-note {
+  margin: 0;
+  max-width: 42ch;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: #ffffff;
+  color: #333333;
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.flashcards-secondary-btn {
+  width: min(100%, 500px);
+  min-height: 48px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #333333;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.16);
+  font: inherit;
+  font-size: clamp(21px, 4vw, 30px);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.flashcards-secondary-btn:active,
+.flashcards-record-preview:active { transform: translateY(4px); }
+
+.flashcards-next-panel .flashcards-secondary-btn { margin-top: 20px; }
+
+@media (max-height: 650px) {
+  .flashcards-recall-shell {
+    --recall-mascot-size: 100px;
+    gap: 12px;
+    padding-top: calc(106px + var(--safeT));
+    padding-bottom: calc(16px + var(--safeB));
+  }
+  .flashcards-record-preview img { width: 48px; height: 48px; }
+  .flashcards-recording-copy { font-size: 18px; }
+}

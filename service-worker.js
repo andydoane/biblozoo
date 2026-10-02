@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_01_flashcards_theme_a";
+const CACHE_VERSION = "2026_Oct_02_flashcards_recall_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -37,6 +37,8 @@ const CORE_PATHS = [
   "./app.js",
 
   "./flashcards/flashcards_mascot.png",
+  "./flashcards/flashcards_record.png",
+  "./flashcards/flashcards_record_black.png",
 
   "./flashcards/flashcards_bg_phone_red.jpg",
   "./flashcards/flashcards_bg_phone_orange.jpg",
