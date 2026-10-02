@@ -4544,6 +4544,18 @@ function updateVerseProgress(verseId, updater) {
   saveProgress(progress);
 }
 
+function recordFlashcardAttempt(verseId, mode, grade) {
+  if (!verseId || !mode || !grade) return;
+  const levels = { practicing: 1, getting_close: 2, memorized: 3 };
+  const mapping = { really_well: { perfect: "memorized", mostly_right: "getting_close", needs_practice: "practicing" }, pretty_good: { perfect: "getting_close", mostly_right: "practicing", needs_practice: "practicing" }, still_learning: { perfect: "practicing", mostly_right: "practicing", needs_practice: "practicing" } };
+  const earned = mapping[mode]?.[grade]; if (!earned) return;
+  updateVerseProgress(verseId, (verseProgress) => {
+    const current = verseProgress.flashcards || {}; const attempts = Number(current.attempts || 0); const best = levels[current.bestMemoryLevel] || 0; const now = Date.now();
+    verseProgress.flashcards = { attempts: Number.isFinite(attempts) ? attempts + 1 : 1, lastMode: mode, lastGrade: grade, lastPlayedAt: now, bestMemoryLevel: best >= levels[earned] ? (current.bestMemoryLevel || earned) : earned };
+    verseProgress.lastPracticedAt = now;
+  });
+}
+
 function markLearnCompleted(verseId) {
   updateVerseProgress(verseId, (verseProgress) => {
     const now = Date.now();
@@ -4906,6 +4918,7 @@ window.BibloZooDailyQuestions
       VERSE_LIST,
 
     getVerseProgress,
+    recordFlashcardAttempt,
 
     isPetUnlocked:
       isBibloPetUnlocked,
@@ -7030,6 +7043,7 @@ const SCREEN_ORDER = Object.freeze([
   Screen.FINAL_RECALL,
   Screen.CELEBRATION,
   Screen.PET_UNLOCK,
+    recordFlashcardAttempt,
   Screen.PRACTICE_HUB,
   Screen.PRACTICE,
   Screen.PLAYGROUND,
@@ -7043,6 +7057,7 @@ window.BibloZooFlashcards
       VERSE_LIST,
 
     getVerseProgress,
+    recordFlashcardAttempt,
     showRecordingFallback: (continueWithoutRecording) => showDialog({
       title: "Continue without recording?",
       body: "The microphone is unavailable or permission wasn't granted. You can still practice this verse.",

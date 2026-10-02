@@ -64,6 +64,11 @@
   let recording = null;
   let recordRequest = 0;
   let recordingNotice = "";
+  const GRADES = Object.freeze([
+    { id: "perfect", label: "Perfect", helper: "I didn't miss a single word." },
+    { id: "mostly_right", label: "Mostly Right", helper: "I missed a couple of words." },
+    { id: "needs_practice", label: "Needs Practice", helper: "I missed more than a few words." }
+  ]);
 
   function discardRecording() {
     recordRequest += 1;
@@ -570,22 +575,35 @@
         <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
           ${renderMascot("flashcards-overlap-mascot")}
           ${renderReferencePill(selected.ref || selected.id)}
-          <h1 class="flashcards-next-title">Nice work!</h1>
-          <p class="flashcards-next-copy">Keep practicing your verse out loud.</p>
-          <button class="flashcards-primary-btn" id="flashcardsRetryBtn"
-            type="button">Try Again</button>
-          <button class="flashcards-secondary-btn" data-flashcards-exit
-            type="button">Done</button>
+          <h1 class="flashcards-next-title">Grade Yourself!</h1>
+          <p class="flashcards-next-copy">How well did you do?</p>
+          <div class="flashcards-choice-stack">
+            ${GRADES.map((grade) => `<button class="flashcards-choice-btn" type="button" data-flashcards-grade="${grade.id}">
+              <span class="flashcards-choice-pill">${grade.label}</span>
+              <span class="flashcards-choice-helper">${grade.helper}</span>
+            </button>`).join("")}
+          </div>
         </section>
       </div>
     `;
-    wrap.querySelector("#flashcardsRetryBtn").onclick = () => {
-      state.difficulty = "";
-      state.view = "difficulty";
-      requestRender();
-    };
+    wrap.querySelectorAll("[data-flashcards-grade]").forEach((button) => {
+      button.onclick = () => {
+        api.recordFlashcardAttempt(selected.id, state.difficulty, button.dataset.flashcardsGrade);
+        state.grade = button.dataset.flashcardsGrade;
+        state.view = "result";
+        requestRender();
+      };
+    });
   }
 
+
+  function renderResult(wrap) {
+    const messages = { perfect: ["Amazing!", "You nailed that verse!"], mostly_right: ["Great work!", "You're really close!"], needs_practice: ["Great work!", "Keep practicing and you'll soon know it by heart!"] };
+    const [title, copy] = messages[state.grade] || messages.needs_practice;
+    wrap.innerHTML = `${renderMenuButton()}<div class="flashcards-stage-shell"><section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel"><h1 class="flashcards-next-title">${title}</h1><p class="flashcards-next-copy">${copy}</p><button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button><button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button><button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button></section></div>`;
+    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { state.view = "difficulty"; requestRender(); };
+    wrap.querySelector("#flashcardsRandomBtn").onclick = chooseRandomVerse;
+  }
   function bindCommonActions(wrap) {
     wrap
       .querySelectorAll("[data-flashcards-exit]")
@@ -601,7 +619,7 @@
     if (!api?.makeSlide) return null;
 
     if (state.view !== "landing" && !getSelectedVerse()) resetSession();
-    if (["recording_intro", "challenge", "comparison", "challenge_complete"].includes(state.view) &&
+    if (["recording_intro", "challenge", "comparison", "challenge_complete", "result"].includes(state.view) &&
         !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
     const isLanding =
@@ -631,6 +649,8 @@
       renderComparison(wrap);
     } else if (state.view === "challenge_complete") {
       renderChallengeComplete(wrap);
+    } else if (state.view === "result") {
+      renderResult(wrap);
     } else {
       renderLanding(wrap);
     }
