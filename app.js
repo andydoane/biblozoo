@@ -6993,6 +6993,7 @@ const Screen = {
   PRACTICE_HUB: "practice_hub",
   PRACTICE: "practice",
   PLAYGROUND: "playground",
+  FLASHCARDS: "flashcards",
   GAME_MIX_FINISHED: "game_mix_finished"
 };
 
@@ -7028,8 +7029,28 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PRACTICE_HUB,
   Screen.PRACTICE,
   Screen.PLAYGROUND,
+  Screen.FLASHCARDS,
   Screen.GAME_MIX_FINISHED
 ]);
+
+window.BibloZooFlashcards
+  ?.initialize?.({
+    getVerseList: () =>
+      VERSE_LIST,
+
+    getVerseProgress,
+
+    makeSlide,
+
+    requestRender: () =>
+      render(),
+
+    goToPractice: () =>
+      go(Screen.PRACTICE_HUB),
+
+    goToNewVerse: () =>
+      go(Screen.NEW_VERSE_PICKER)
+  });
 
 function isLearnFlowScreen(screen) {
   return (
@@ -8259,7 +8280,9 @@ function go(nextScreen) {
           nextScreen ===
             Screen.PRACTICE ||
           nextScreen ===
-            Screen.PLAYGROUND;
+            Screen.PLAYGROUND ||
+          nextScreen ===
+            Screen.FLASHCARDS;
 
         if (keepArrivedPracticeScreen) {
           const outgoingSlide =
@@ -15653,6 +15676,16 @@ function screenPracticeHub(idx) {
     })}
 
       ${renderPracticeHubCard({
+      id: "flashcards",
+      title: "Flashcards",
+      icon: "🧠",
+      iconImage: "flashcards/flashcards_mascot.png",
+      iconAlt: "Flashcards",
+      cardColor: "#7f66c6",
+      cardTextColor: "#ffffff"
+    })}
+
+      ${renderPracticeHubCard({
       id: "playground",
       title: "Playground",
       icon: "🛝",
@@ -15696,6 +15729,14 @@ function screenPracticeHub(idx) {
       const choice = btn.dataset.practiceHubChoice;
 
       if (choice === "games") {
+        return;
+      }
+
+      if (choice === "flashcards") {
+        window.BibloZooFlashcards
+          ?.start?.();
+
+        go(Screen.FLASHCARDS);
         go(Screen.PRACTICE);
         return;
       }
@@ -15974,6 +16015,12 @@ function render() {
     if (screen === Screen.PRACTICE_HUB) slide = screenPracticeHub(idx);
     if (screen === Screen.PRACTICE) slide = screenPractice(idx);
     if (screen === Screen.PLAYGROUND) slide = screenPlayground(idx);
+    if (screen === Screen.FLASHCARDS) {
+      slide =
+        window.BibloZooFlashcards
+          ?.renderScreen?.(idx) ||
+        null;
+    }
     if (screen === Screen.GAME_MIX_FINISHED) slide = screenGameMixFinished(idx);
 
     if (slide) {

@@ -28,6 +28,7 @@ const rootFiles = [
 ];
 
 const runtimeDirs = [
+    "flashcards",
     "pet_images",
     "profile_pictures",
     "ui_audio",

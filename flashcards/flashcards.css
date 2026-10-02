@@ -1,0 +1,247 @@
+/* =========================
+BibloZoo Flashcards
+Patch 1: foundation + landing screen
+========================= */
+
+.flashcards-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background:
+    #7f66c6
+    url("./flashcards_bg_phone_purple.jpg")
+    center / cover no-repeat;
+  color: #333333;
+  font-family:
+    "Baloo 2",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.flashcards-menu-btn {
+  position: absolute;
+  z-index: 5;
+  top: calc(22px + var(--safeT));
+  left: clamp(18px, 4vw, 34px);
+  width: clamp(54px, 12vw, 72px);
+  height: clamp(54px, 12vw, 72px);
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  background: rgba(66, 51, 104, 0.78);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+  display: grid;
+  place-items: center;
+  font: inherit;
+  cursor: pointer;
+}
+
+.flashcards-menu-btn span {
+  font-size: clamp(28px, 7vw, 38px);
+  font-weight: 900;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.flashcards-menu-btn:active,
+.flashcards-primary-btn:active {
+  transform: translateY(4px);
+}
+
+.flashcards-landing-shell {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(108px + var(--safeT))
+    clamp(24px, 6vw, 54px)
+    calc(54px + var(--safeB));
+}
+
+.flashcards-panel {
+  width: min(100%, 700px);
+  border-radius: clamp(32px, 7vw, 46px);
+  background: #ffffff;
+  box-shadow: 0 12px 0 rgba(62, 46, 103, 0.34);
+  text-align: center;
+}
+
+.flashcards-landing-panel {
+  min-height: min(70vh, 820px);
+  padding:
+    clamp(42px, 7vh, 72px)
+    clamp(24px, 6vw, 58px)
+    clamp(42px, 7vh, 72px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vh, 30px);
+}
+
+.flashcards-landing-mascot {
+  display: block;
+  width: clamp(180px, 40vw, 310px);
+  height: auto;
+  max-height: 34vh;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.flashcards-title {
+  margin: 0;
+  color: #7f66c6;
+  font-family:
+    "Titan One",
+    "Baloo 2",
+    system-ui,
+    sans-serif;
+  font-size: clamp(44px, 10vw, 78px);
+  font-weight: 400;
+  line-height: 0.98;
+}
+
+.flashcards-picker-label {
+  margin: 0;
+  font-size: clamp(24px, 5.2vw, 38px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.flashcards-verse-select {
+  width: min(100%, 560px);
+  min-height: 58px;
+  border: 2px solid #333333;
+  border-radius: 999px;
+  padding: 4px 50px 4px 22px;
+  background: #ffffff;
+  color: #333333;
+  font: inherit;
+  font-size: clamp(20px, 4.6vw, 32px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: left;
+}
+
+.flashcards-primary-btn {
+  width: min(100%, 500px);
+  min-height: 62px;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 24px;
+  background: #7f66c6;
+  color: #ffffff;
+  box-shadow: 0 6px 0 rgba(73, 51, 127, 0.28);
+  font: inherit;
+  font-family:
+    "Titan One",
+    "Baloo 2",
+    system-ui,
+    sans-serif;
+  font-size: clamp(23px, 5.4vw, 36px);
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.flashcards-empty-title {
+  max-width: 18ch;
+  color: #333333;
+  font-size: clamp(28px, 6vw, 42px);
+  font-weight: 900;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.flashcards-selected-panel {
+  position: relative;
+  min-height: min(58vh, 620px);
+  padding:
+    clamp(104px, 14vh, 150px)
+    clamp(24px, 6vw, 58px)
+    clamp(42px, 7vh, 72px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(20px, 3vh, 30px);
+}
+
+.flashcards-selected-mascot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: clamp(150px, 34vw, 240px);
+  height: auto;
+  transform: translate(-50%, -50%);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.flashcards-reference-pill {
+  width: min(100%, 560px);
+  border-radius: 999px;
+  padding: 14px 18px;
+  background: #7f66c6;
+  color: #ffffff;
+  font-family:
+    "Titan One",
+    "Baloo 2",
+    system-ui,
+    sans-serif;
+  font-size: clamp(22px, 5vw, 34px);
+  line-height: 1;
+}
+
+.flashcards-selected-title {
+  margin: 0;
+  font-size: clamp(34px, 7vw, 54px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.flashcards-selected-copy {
+  max-width: 22ch;
+  font-size: clamp(20px, 4.2vw, 30px);
+  font-weight: 800;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+@media (min-width: 700px) and (min-height: 700px) {
+  .flashcards-screen {
+    background-image:
+      url("./flashcards_bg_ipad_purple.jpg");
+  }
+
+  .flashcards-landing-shell {
+    padding-left: clamp(54px, 9vw, 110px);
+    padding-right: clamp(54px, 9vw, 110px);
+  }
+}
+
+@media (max-height: 720px) {
+  .flashcards-landing-shell {
+    align-items: flex-start;
+    padding-top: calc(92px + var(--safeT));
+  }
+
+  .flashcards-landing-panel {
+    min-height: auto;
+  }
+
+  .flashcards-landing-mascot {
+    width: clamp(130px, 30vw, 210px);
+    max-height: 25vh;
+  }
+}
