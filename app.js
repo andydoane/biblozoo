@@ -7043,6 +7043,17 @@ window.BibloZooFlashcards
       VERSE_LIST,
 
     getVerseProgress,
+    showRecordingFallback: (continueWithoutRecording) => showDialog({
+      title: "Continue without recording?",
+      body: "The microphone is unavailable or permission wasn't granted. You can still practice this verse.",
+      actions: [
+        dlgBtn("Continue without recording", { onClick: () => {
+          closeDialog();
+          continueWithoutRecording();
+        } }),
+        dlgBtn("Cancel", { secondary: true, onClick: closeDialog })
+      ]
+    }),
     tokenizeVerseText: tokenize,
     scheduleSmartLearnTextFit,
     createHiddenVerseNode: (verse) => {
@@ -8210,6 +8221,7 @@ function go(nextScreen) {
     return;
   }
 
+  if (from === Screen.FLASHCARDS) window.BibloZooFlashcards?.stopSession?.();
   State.isSliding = true;
 
   // stop any learn audio/echo sequence when leaving a screen
@@ -8333,6 +8345,9 @@ function go(nextScreen) {
 
 /* If you jump directly (no transition), call this */
 function setScreen(screen) {
+  if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
+    window.BibloZooFlashcards?.stopSession?.();
+  }
   State.screen = screen;
   State.slideX = screenToIndex(screen);
   render();

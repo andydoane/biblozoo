@@ -61,6 +61,45 @@
 
   let api = null;
   let resizeObserver = null;
+  let recording = null;
+  let recordRequest = 0;
+  let recordingNotice = "";
+
+  function discardRecording() {
+    recordRequest += 1;
+    recording?.dispose();
+    recordingNotice = "";
+  }
+
+  function beginWithoutRecording() {
+    discardRecording();
+    state.view = "challenge";
+    requestRender();
+  }
+
+  async function beginRecording() {
+    if (!recording || recording.snapshot().status === "requesting") return;
+    recordingNotice = "";
+    const request = ++recordRequest;
+    const result = await recording.start(() => {
+      state.view = "challenge";
+      requestRender();
+    });
+    if (request !== recordRequest || result !== "failed") return;
+    state.view = "recording_intro";
+    requestRender();
+    api.showRecordingFallback(() => {
+      if (request === recordRequest) beginWithoutRecording();
+    });
+  }
+
+  function controlButton(id, asset, label, disabled = false) {
+    return `<button class="flashcards-record-preview" id="${id}" type="button"
+      data-no-ui-sound ${disabled ? "disabled" : ""}>
+      <img src="${escapeHtml(getThemedControlAsset(asset))}" alt="">
+      <span>${escapeHtml(label)}</span>
+    </button>`;
+  }
 
   function escapeHtml(value) {
     return String(value ?? "")
@@ -150,6 +189,7 @@
   }
 
   function resetSession() {
+    discardRecording();
     resizeObserver?.disconnect();
     resizeObserver = null;
     state.view = "landing";
@@ -168,6 +208,7 @@
 
     if (!selected) return;
 
+    discardRecording();
     state.selectedVerseId = selected.id;
     state.difficulty = "";
     state.themeId = pickRandomThemeId();
@@ -200,6 +241,7 @@
         class="flashcards-menu-btn"
         type="button"
         data-flashcards-exit
+        ${["recording", "stopping"].includes(recording?.snapshot().status) ? "data-no-ui-sound" : ""}
         aria-label="Back to Practice"
       >
         <span aria-hidden="true">☰</span>
@@ -387,42 +429,37 @@
   }
 
   function renderRecordingIntro(wrap) {
+    const requesting = recording?.snapshot().status === "requesting";
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell">
         <section class="flashcards-panel flashcards-recall-panel">
           ${renderMascot("flashcards-overlap-mascot")}
           <div class="flashcards-recording-copy">
-            <p>Say the verse out loud. Try your best and keep going
-              if you make a mistake!</p>
-            <p>When recording is available, you'll be able to listen
-              back and see how you did.</p>
+            <p>Record yourself saying the verse. Try your best and
+              keep going if you make a mistake!</p>
+            <p>Afterward, listen back and see how you did.</p>
           </div>
         </section>
         <div class="flashcards-recall-actions">
-          <button class="flashcards-record-preview" id="flashcardsRecordStartBtn"
-            type="button" aria-describedby="flashcardsRecordingNote">
-            <img src="${escapeHtml(getThemedControlAsset("record"))}" alt="">
-            <span>Record — Preview</span>
-          </button>
-          <p class="flashcards-recording-note" id="flashcardsRecordingNote">
-            Recording isn't available yet. Both buttons start practice without audio capture.
+          ${controlButton("flashcardsRecordStartBtn", "record",
+            requesting ? "Waiting for microphone…" : "Record", requesting)}
+          <p class="flashcards-recording-note" role="status">
+            ${escapeHtml(recordingNotice || "Your recording stays here for this attempt. It isn't saved or uploaded.")}
           </p>
           <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
             type="button">Skip Recording</button>
         </div>
       </div>
     `;
-    const begin = () => {
-      state.view = "challenge";
-      requestRender();
-    };
-    wrap.querySelector("#flashcardsRecordStartBtn").onclick = begin;
-    wrap.querySelector("#flashcardsSkipRecordingBtn").onclick = begin;
+    wrap.querySelector("#flashcardsRecordStartBtn").onclick = beginRecording;
+    wrap.querySelector("#flashcardsSkipRecordingBtn").onclick = beginWithoutRecording;
   }
 
   function renderChallenge(wrap) {
     const selected = getSelectedVerse();
+    const audioStatus = recording?.snapshot().status;
+    const capturing = ["requesting", "recording", "stopping"].includes(audioStatus);
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell">
@@ -434,8 +471,13 @@
           </section>
         </div>
         <div class="flashcards-recall-actions">
-          <button class="flashcards-secondary-btn" id="flashcardsChallengeDoneBtn"
-            type="button">I'm Done</button>
+          ${capturing ? controlButton("flashcardsChallengeDoneBtn", "stop",
+            audioStatus === "recording" ? "Stop" : "Please wait…", audioStatus !== "recording") : `
+            <button class="flashcards-secondary-btn" id="flashcardsChallengeDoneBtn"
+              type="button">I'm Done</button>`}
+          ${capturing ? `<span class="flashcards-recording-note" role="status">
+            ${audioStatus === "recording" ? "Recording…" : "Preparing your recording…"}
+          </span>` : ""}
         </div>
       </div>
     `;
@@ -464,6 +506,57 @@
       api.scheduleSmartLearnTextFit(wrap);
     }
     wrap.querySelector("#flashcardsChallengeDoneBtn").onclick = () => {
+      if (capturing) recording.stop();
+      else {
+        state.view = "comparison";
+        requestRender();
+      }
+    };
+  }
+
+  function renderComparison(wrap) {
+    const selected = getSelectedVerse();
+    const audio = recording.snapshot();
+    wrap.innerHTML = `
+      ${renderMenuButton()}
+      <div class="flashcards-recall-shell flashcards-comparison-shell">
+        <div class="flashcards-card-stack flashcards-recall-stack">
+          ${renderMascot("flashcards-overlap-mascot")}
+          <section class="flashcards-card-front flashcards-recall-card">
+            ${renderReferencePill(selected.ref || selected.id)}
+            <div class="learn-stage flashcards-recall-stage">
+              <div class="smart-learn-text" data-smart-learn-text>
+                <div class="smart-learn-body">${escapeHtml(selected.verseText)}</div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="flashcards-recall-actions">
+          ${audio.hasRecording ? controlButton("flashcardsPlayBtn",
+            audio.status === "playing" ? "stop" : "play",
+            audio.status === "playing" ? "Stop Playback" : "Play My Recording",
+            audio.status === "loading") : ""}
+          ${audio.message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(audio.message)}</p>` : ""}
+          <div class="flashcards-comparison-buttons">
+            ${audio.hasRecording ? `<button class="flashcards-secondary-btn"
+              id="flashcardsRerecordBtn" type="button" data-no-ui-sound>Re-record</button>` : ""}
+            <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
+              type="button">Next</button>
+          </div>
+        </div>
+      </div>
+    `;
+    api.scheduleSmartLearnTextFit(wrap);
+    const play = wrap.querySelector("#flashcardsPlayBtn");
+    if (play) play.onclick = () => { void recording.play(); };
+    const retry = wrap.querySelector("#flashcardsRerecordBtn");
+    if (retry) retry.onclick = () => {
+      discardRecording();
+      state.view = "recording_intro";
+      requestRender();
+    };
+    wrap.querySelector("#flashcardsNextBtn").onclick = () => {
+      discardRecording();
       state.view = "challenge_complete";
       requestRender();
     };
@@ -508,7 +601,7 @@
     if (!api?.makeSlide) return null;
 
     if (state.view !== "landing" && !getSelectedVerse()) resetSession();
-    if (["recording_intro", "challenge", "challenge_complete"].includes(state.view) &&
+    if (["recording_intro", "challenge", "comparison", "challenge_complete"].includes(state.view) &&
         !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
     const isLanding =
@@ -534,6 +627,8 @@
       renderRecordingIntro(wrap);
     } else if (state.view === "challenge") {
       renderChallenge(wrap);
+    } else if (state.view === "comparison") {
+      renderComparison(wrap);
     } else if (state.view === "challenge_complete") {
       renderChallengeComplete(wrap);
     } else {
@@ -541,7 +636,7 @@
     }
 
     bindCommonActions(wrap);
-    if (state.view === "challenge" && typeof ResizeObserver !== "undefined") {
+    if (["challenge", "comparison"].includes(state.view) && typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(() => api.scheduleSmartLearnTextFit(wrap));
       observer.observe(wrap);
       // requestRender replaces the screen; disconnect the previous observer.
@@ -562,11 +657,27 @@
 
   function initialize(nextApi) {
     api = nextApi || null;
+    if (!recording) recording = window.BibloZooRecording.create({
+      onChange: () => {
+        if (recording?.snapshot().status === "ready" && state.view === "challenge") {
+          state.view = "comparison";
+        }
+        requestRender();
+      },
+      onInterrupted: () => {
+        recordRequest += 1;
+        if (!getSelectedVerse()) return;
+        recordingNotice = "Recording was interrupted. Please try again or skip recording.";
+        state.view = "recording_intro";
+        requestRender();
+      }
+    });
   }
 
   window.BibloZooFlashcards = Object.freeze({
     initialize,
     start,
+    stopSession: resetSession,
     renderScreen,
     getEligibleVerses,
     getThemedControlAsset,

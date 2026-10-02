@@ -603,3 +603,18 @@ Patch 2: themed visual system + difficulty flow
   .flashcards-record-preview img { width: 48px; height: 48px; }
   .flashcards-recording-copy { font-size: 18px; }
 }
+
+/* Recording and comparison controls keep the verse card's fitting area bounded. */
+.flashcards-comparison-buttons {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+}
+
+.flashcards-comparison-buttons > button { flex: 1; }
+.flashcards-record-preview:disabled { opacity: 0.65; cursor: wait; }
+.flashcards-comparison-shell { min-height: calc(650px + var(--safeT) + var(--safeB)); }
+
+@media (max-height: 650px) {
+  .flashcards-comparison-shell .flashcards-recall-actions { gap: 8px; }
+}
