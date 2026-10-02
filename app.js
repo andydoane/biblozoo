@@ -9719,6 +9719,7 @@ function renderNav() {
     State.screen !== Screen.PRACTICE_HUB &&
     State.screen !== Screen.PRACTICE &&
     State.screen !== Screen.PLAYGROUND &&
+    State.screen !== Screen.FLASHCARDS &&
     State.screen !== Screen.PROGRESS &&
     State.screen !== Screen.VERSE_DETAIL &&
     State.screen !== Screen.PET_STATS &&
