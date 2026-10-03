@@ -332,6 +332,7 @@ Patch 2: themed visual system + difficulty flow
     system-ui,
     sans-serif;
   font-size: clamp(24px, 5.6vw, 38px);
+  font-weight: 800;
   line-height: 1;
 }
 
