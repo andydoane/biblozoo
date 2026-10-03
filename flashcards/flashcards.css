@@ -629,3 +629,13 @@ Patch 2: themed visual system + difficulty flow
 @media (max-height: 650px) {
   .flashcards-comparison-shell .flashcards-recall-actions { gap: 8px; }
 }
+
+.flashcards-countdown {
+  width: 100%;
+  margin: 0;
+  color: #333333;
+  font-size: clamp(1.75rem, 7vw, 3rem);
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+}

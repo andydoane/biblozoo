@@ -65,6 +65,58 @@
   let recording = null;
   let recordRequest = 0;
   let recordingNotice = "";
+  let countdownRemaining = 0;
+  let countdownTimer = null;
+  let finishCountdown = null;
+
+  function cancelCountdown() {
+    clearTimeout(countdownTimer);
+    countdownTimer = null;
+    countdownRemaining = 0;
+    const finish = finishCountdown;
+    finishCountdown = null;
+    finish?.(false);
+  }
+
+  function runCountdown(request) {
+    cancelCountdown();
+    if (request !== recordRequest || document.hidden) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      finishCountdown = resolve;
+      countdownRemaining = 3;
+      state.view = "challenge";
+      requestRender();
+      const tick = () => {
+        if (request !== recordRequest || document.hidden) {
+          interruptCountdown();
+          return;
+        }
+        countdownRemaining -= 1;
+        if (!countdownRemaining) {
+          countdownTimer = null;
+          finishCountdown = null;
+          resolve(true);
+          return;
+        }
+        requestRender();
+        countdownTimer = setTimeout(tick, 1000);
+      };
+      countdownTimer = setTimeout(tick, 1000);
+    });
+  }
+
+  function interruptCountdown() {
+    if (!finishCountdown) return;
+    discardRecording();
+    state.view = "recording_intro";
+    recordingNotice = "Countdown was interrupted. Please try again or skip recording.";
+    requestRender();
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) interruptCountdown();
+  });
+  window.addEventListener("pagehide", interruptCountdown);
   const GRADES = Object.freeze([
     { id: "perfect", label: "Perfect", helper: "I didn't miss a single word." },
     { id: "mostly_right", label: "Mostly Right", helper: "I missed a couple of words." },
@@ -73,26 +125,30 @@
 
   function discardRecording() {
     recordRequest += 1;
+    cancelCountdown();
     recording?.dispose();
     recordingNotice = "";
   }
 
-  function beginWithoutRecording() {
+  async function beginWithoutRecording() {
     discardRecording();
     state.grade = "";
+    const request = recordRequest;
+    if (!await runCountdown(request)) return;
+    if (request !== recordRequest || document.hidden) return;
     state.view = "challenge";
     requestRender();
   }
 
   async function beginRecording() {
-    if (!recording || recording.snapshot().status === "requesting") return;
+    if (!recording || ["requesting", "preparing", "recording"].includes(recording.snapshot().status)) return;
     recordingNotice = "";
     state.grade = "";
     const request = ++recordRequest;
     const result = await recording.start(() => {
       state.view = "challenge";
       requestRender();
-    });
+    }, () => runCountdown(request));
     if (request !== recordRequest || result !== "failed") return;
     state.view = "recording_intro";
     requestRender();
@@ -268,7 +324,7 @@
         class="flashcards-menu-btn"
         type="button"
         data-flashcards-navigation
-        ${["requesting", "recording", "stopping"].includes(recording?.snapshot().status) ? "data-no-ui-sound" : ""}
+        ${countdownRemaining || ["requesting", "preparing", "recording", "stopping"].includes(recording?.snapshot().status) ? "data-no-ui-sound" : ""}
         aria-label="${isLanding ? "Home" : "Back"}"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -490,7 +546,7 @@
   function renderChallenge(wrap) {
     const selected = getSelectedVerse();
     const audioStatus = recording?.snapshot().status;
-    const capturing = ["requesting", "recording", "stopping"].includes(audioStatus);
+    const capturing = ["requesting", "preparing", "recording", "stopping"].includes(audioStatus);
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell">
@@ -502,6 +558,7 @@
           </section>
         </div>
         <div class="flashcards-recall-actions">
+          ${countdownRemaining ? "" : `
           ${capturing ? controlButton("flashcardsChallengeDoneBtn", "stop",
             audioStatus === "recording" ? "Stop" : "Please wait…", audioStatus !== "recording") : `
             <button class="flashcards-secondary-btn" id="flashcardsChallengeDoneBtn"
@@ -509,10 +566,15 @@
           ${capturing ? `<span class="flashcards-recording-note" role="status">
             ${audioStatus === "recording" ? "Recording…" : "Preparing your recording…"}
           </span>` : ""}
+          `}
         </div>
       </div>
     `;
     const stage = wrap.querySelector(".flashcards-recall-stage");
+    if (countdownRemaining) {
+      stage.innerHTML = `<p class="flashcards-countdown" role="status" aria-live="polite" aria-atomic="true">Say the verse: ${countdownRemaining}…</p>`;
+      return;
+    }
     if (state.difficulty !== "really_well") {
       const block = document.createElement("div");
       block.className = "smart-learn-text";
@@ -770,6 +832,7 @@
       },
       onInterrupted: () => {
         recordRequest += 1;
+        cancelCountdown();
         if (!getSelectedVerse()) return;
         recordingNotice = "Recording was interrupted. Please try again or skip recording.";
         state.view = "recording_intro";

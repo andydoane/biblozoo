@@ -48,7 +48,7 @@
       onInterrupted?.();
     }
 
-    async function start(onStart) {
+    async function start(onStart, beforeStart) {
       dispose();
       const current = generation;
       status = "requesting";
@@ -77,7 +77,7 @@
         };
         recorder.onerror = () => { if (current === generation) interrupt(); };
         stream.getTracks().forEach((track) => {
-          track.onended = () => { if (current === generation && status === "recording") interrupt(); };
+          track.onended = () => { if (current === generation && ["preparing", "recording"].includes(status)) interrupt(); };
         });
         recorder.onstop = () => {
           if (current !== generation) return;
@@ -104,7 +104,18 @@
           status = "ready";
           notify();
         };
-        // Render the challenge before starting capture; no permission prompt remains.
+        // Hold the stream without capturing audio while the UI counts down.
+        if (beforeStart) {
+          status = "preparing";
+          notify();
+          const proceed = await beforeStart();
+          if (current !== generation) return "cancelled";
+          if (!proceed || document.hidden) {
+            interrupt();
+            return "cancelled";
+          }
+        }
+        // Reveal the challenge only after the countdown, then begin capture.
         onStart();
         if (current !== generation) return "cancelled";
         recorder.start();
@@ -163,7 +174,7 @@
 
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) return;
-      if (["requesting", "recording", "stopping"].includes(status)) interrupt();
+      if (["requesting", "preparing", "recording", "stopping"].includes(status)) interrupt();
       else pause();
     });
     window.addEventListener("pagehide", () => {
