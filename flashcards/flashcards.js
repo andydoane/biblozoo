@@ -56,6 +56,7 @@
     view: "landing",
     selectedVerseId: "",
     difficulty: "",
+    grade: "",
     themeId: "purple"
   };
 
@@ -78,6 +79,7 @@
 
   function beginWithoutRecording() {
     discardRecording();
+    state.grade = "";
     state.view = "challenge";
     requestRender();
   }
@@ -85,6 +87,7 @@
   async function beginRecording() {
     if (!recording || recording.snapshot().status === "requesting") return;
     recordingNotice = "";
+    state.grade = "";
     const request = ++recordRequest;
     const result = await recording.start(() => {
       state.view = "challenge";
@@ -200,6 +203,7 @@
     state.view = "landing";
     state.selectedVerseId = "";
     state.difficulty = "";
+    state.grade = "";
     state.themeId = "purple";
   }
 
@@ -216,6 +220,7 @@
     discardRecording();
     state.selectedVerseId = selected.id;
     state.difficulty = "";
+    state.grade = "";
     state.themeId = pickRandomThemeId();
     state.view = "difficulty";
     requestRender();
@@ -240,16 +245,37 @@
     requestRender();
   }
 
+  function goBack() {
+    const previousView = {
+      difficulty: "landing",
+      recording_intro: "difficulty",
+      challenge: "recording_intro",
+      comparison: "challenge",
+      challenge_complete: "comparison",
+      result: "challenge_complete"
+    }[state.view];
+    if (!previousView) return;
+    // Invalidate pending permission requests and release audio before leaving.
+    discardRecording();
+    state.view = previousView;
+    requestRender();
+  }
+
   function renderMenuButton() {
+    const isLanding = state.view === "landing";
     return `
       <button
         class="flashcards-menu-btn"
         type="button"
-        data-flashcards-exit
-        ${["recording", "stopping"].includes(recording?.snapshot().status) ? "data-no-ui-sound" : ""}
-        aria-label="Back to Practice"
+        data-flashcards-navigation
+        ${["requesting", "recording", "stopping"].includes(recording?.snapshot().status) ? "data-no-ui-sound" : ""}
+        aria-label="${isLanding ? "Home" : "Back"}"
       >
-        <span aria-hidden="true">☰</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          ${isLanding
+            ? '<path d="M12 3L3 10h2v9h5v-6h4v6h5v-9h2L12 3z" fill="currentColor"/>'
+            : '<path d="m14 5-7 7 7 7M7 12h14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'}
+        </svg>
       </button>
     `;
   }
@@ -576,9 +602,9 @@
           ${renderMascot("flashcards-overlap-mascot")}
           ${renderReferencePill(selected.ref || selected.id)}
           <h1 class="flashcards-next-title">Grade Yourself!</h1>
-          <p class="flashcards-next-copy">How well did you do?</p>
+          <p class="flashcards-next-copy">${state.grade ? "Your grade is saved. Continue to your result." : "How well did you do?"}</p>
           <div class="flashcards-choice-stack">
-            ${GRADES.map((grade) => `<button class="flashcards-choice-btn" type="button" data-flashcards-grade="${grade.id}">
+            ${GRADES.map((grade) => `<button class="flashcards-choice-btn" type="button" data-flashcards-grade="${grade.id}" ${state.grade && state.grade !== grade.id ? "disabled" : ""}>
               <span class="flashcards-choice-pill">${grade.label}</span>
               <span class="flashcards-choice-helper">${grade.helper}</span>
             </button>`).join("")}
@@ -588,8 +614,10 @@
     `;
     wrap.querySelectorAll("[data-flashcards-grade]").forEach((button) => {
       button.onclick = () => {
-        api.recordFlashcardAttempt(selected.id, state.difficulty, button.dataset.flashcardsGrade);
-        state.grade = button.dataset.flashcardsGrade;
+        if (!state.grade) {
+          api.recordFlashcardAttempt(selected.id, state.difficulty, button.dataset.flashcardsGrade);
+          state.grade = button.dataset.flashcardsGrade;
+        }
         state.view = "result";
         requestRender();
       };
@@ -601,10 +629,19 @@
     const messages = { perfect: ["Amazing!", "You nailed that verse!"], mostly_right: ["Great work!", "You're really close!"], needs_practice: ["Great work!", "Keep practicing and you'll soon know it by heart!"] };
     const [title, copy] = messages[state.grade] || messages.needs_practice;
     wrap.innerHTML = `${renderMenuButton()}<div class="flashcards-stage-shell"><section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel"><h1 class="flashcards-next-title">${title}</h1><p class="flashcards-next-copy">${copy}</p><button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button><button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button><button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button></section></div>`;
-    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { state.view = "difficulty"; requestRender(); };
+    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { state.grade = ""; state.view = "difficulty"; requestRender(); };
     wrap.querySelector("#flashcardsRandomBtn").onclick = chooseRandomVerse;
   }
   function bindCommonActions(wrap) {
+    const navigation = wrap.querySelector("[data-flashcards-navigation]");
+    if (navigation) navigation.onclick = () => {
+      if (state.view === "landing") {
+        resetSession();
+        api?.goToHome?.();
+      } else {
+        goBack();
+      }
+    };
     wrap
       .querySelectorAll("[data-flashcards-exit]")
       .forEach((button) => {

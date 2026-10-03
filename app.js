@@ -7091,6 +7091,9 @@ window.BibloZooFlashcards
     requestRender: () =>
       render(),
 
+    goToHome: () =>
+      go(Screen.TITLE),
+
     goToPractice: () =>
       go(Screen.PRACTICE_HUB),
 

@@ -8020,3 +8020,10 @@ body:has(#app .todo-dev-screen),
 .slide:has(.pet-unlock-screen) {
   background: #a7cb6f !important;
 }
+/* Keep button labels consistent, including labels with their own font rule. */
+button,
+button *,
+[role="button"],
+[role="button"] * {
+  font-family: "Baloo 2", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
+}

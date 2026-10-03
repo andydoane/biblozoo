@@ -105,11 +105,9 @@ Patch 2: themed visual system + difficulty flow
   cursor: pointer;
 }
 
-.flashcards-menu-btn span {
-  font-size: clamp(28px, 7vw, 38px);
-  font-weight: 900;
-  line-height: 1;
-  transform: translateY(-1px);
+.flashcards-menu-btn svg {
+  width: 55%;
+  height: 55%;
 }
 
 .flashcards-menu-btn:active,
@@ -193,8 +191,15 @@ Patch 2: themed visual system + difficulty flow
   min-height: 58px;
   border: 2px solid #333333;
   border-radius: 999px;
-  padding: 4px 50px 4px 22px;
-  background: #ffffff;
+  padding: 4px 58px 4px 22px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23333333' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 20px center;
+  background-size: 24px 24px;
+  text-overflow: ellipsis;
   color: #333333;
   font: inherit;
   font-size: clamp(20px, 4.6vw, 32px);
@@ -219,7 +224,7 @@ Patch 2: themed visual system + difficulty flow
     system-ui,
     sans-serif;
   font-size: clamp(23px, 5.4vw, 36px);
-  font-weight: 400;
+  font-weight: 800;
   line-height: 1;
   cursor: pointer;
 }
