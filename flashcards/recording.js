@@ -232,7 +232,7 @@
     });
 
     return Object.freeze({
-      start, stop, play, dispose, readLevel,
+      start, stop, play, pause, dispose, readLevel,
       snapshot: () => ({ status, hasRecording: !!url, message })
     });
   }

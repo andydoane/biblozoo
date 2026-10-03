@@ -172,6 +172,7 @@
   async function beginRecording() {
     if (!recording || ["requesting", "preparing", "recording"].includes(recording.snapshot().status)) return;
     recordingNotice = "";
+    comparisonPlaybackStarted = false;
     state.grade = "";
     const request = ++recordRequest;
     const result = await recording.start(() => {
@@ -340,8 +341,8 @@
       result: "challenge_complete"
     }[state.view];
     if (!previousView) return;
-    // Invalidate pending permission requests and release audio before leaving.
-    discardRecording();
+    // Grading and results still belong to this attempt; retain review audio.
+    if (!["challenge_complete", "result"].includes(state.view)) discardRecording();
     state.view = previousView;
     requestRender();
   }
@@ -684,10 +685,10 @@
     const selected = getSelectedVerse();
     const audio = recording.snapshot();
     const waiting = ["requesting", "preparing"].includes(audio.status);
-    const showVerseImmediately = !audio.hasRecording;
-    const comparisonInstruction = audio.hasRecording
+    const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
+    const comparisonInstruction = audio.hasRecording || waiting
       ? "Listen to your recording, then compare it with the verse."
-      : "Read the verse and see how you did.";
+      : "Check the verse and see how you did.";
     const message = audio.message;
     wrap.innerHTML = `
       ${renderMenuButton()}
@@ -696,7 +697,7 @@
           ${renderMascot("flashcards-overlap-mascot")}
           <section class="flashcards-card-front flashcards-recall-card">
             ${renderReferencePill(selected.ref || selected.id)}
-<div class="learn-stage flashcards-recall-stage flashcards-comparison-stage${comparisonPlaybackStarted || showVerseImmediately ? " flashcards-comparison-active" : ""}">
+<div class="learn-stage flashcards-recall-stage flashcards-comparison-stage${comparisonPlaybackStarted ? " flashcards-comparison-active" : ""}">
   <p class="flashcards-comparison-instruction">
     ${comparisonInstruction}
   </p>
@@ -716,7 +717,7 @@
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
-              type="button" ${waiting ? "disabled" : ""}>Next</button>
+              type="button" ${waiting ? "disabled" : ""}>${needsVerseCheck ? "Check Verse" : "Next"}</button>
           </div>
         </div>
       </div>
@@ -731,6 +732,12 @@
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
+      if (needsVerseCheck) {
+        comparisonPlaybackStarted = true;
+        requestRender();
+        return;
+      }
+      recording.pause();
       state.view = "challenge_complete";
       requestRender();
     };
@@ -784,7 +791,7 @@
         </section>
       </div>
     `;
-    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { state.grade = ""; state.view = "difficulty"; requestRender(); };
+    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { discardRecording(); state.grade = ""; state.view = "difficulty"; requestRender(); };
     wrap.querySelector("#flashcardsRandomBtn").onclick = chooseRandomVerse;
   }
   function bindCommonActions(wrap) {
