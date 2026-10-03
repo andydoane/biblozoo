@@ -14,11 +14,57 @@
     let url = "";
     let stopTimer = null;
     let message = "";
+    let meterContext = null;
+    let meterSource = null;
+    let analyser = null;
+    let samples = null;
+
+    function closeMeter() {
+      try { meterSource?.disconnect(); } catch (_) {}
+      try { analyser?.disconnect(); } catch (_) {}
+      const context = meterContext;
+      meterContext = meterSource = analyser = samples = null;
+      if (context) void context.close().catch(() => {});
+    }
+
+    function prepareMeter() {
+      try {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        if (!Context) return;
+        meterContext = new Context();
+        // Called from the Record/Re-record gesture for iOS audio activation.
+        void meterContext.resume().catch(() => {});
+      } catch (_) { closeMeter(); }
+    }
+
+    function connectMeter() {
+      try {
+        if (!meterContext) return;
+        analyser = meterContext.createAnalyser();
+        analyser.fftSize = 256;
+        samples = new Uint8Array(analyser.fftSize);
+        meterSource = meterContext.createMediaStreamSource(stream);
+        meterSource.connect(analyser);
+        // Never connect the microphone to the speakers.
+      } catch (_) { closeMeter(); }
+    }
+
+    function readLevel() {
+      if (status !== "recording" || meterContext?.state !== "running" || !analyser) return null;
+      try {
+        analyser.getByteTimeDomainData(samples);
+        let sum = 0;
+        for (const sample of samples) sum += ((sample - 128) / 128) ** 2;
+        const rms = Math.sqrt(sum / samples.length);
+        return Math.max(0, Math.min(1, (20 * Math.log10(Math.max(rms, 0.00001)) + 55) / 55));
+      } catch (_) { closeMeter(); return null; }
+    }
     const notify = () => onChange?.();
     const stopTracks = (value) => value?.getTracks().forEach((track) => track.stop());
 
     function dispose() {
       generation += 1;
+      closeMeter();
       clearTimeout(stopTimer);
       stopTimer = null;
       if (recorder) {
@@ -51,6 +97,7 @@
     async function start(onStart, beforeStart) {
       dispose();
       const current = generation;
+      prepareMeter();
       status = "requesting";
       notify();
       try {
@@ -64,6 +111,7 @@
           return "cancelled";
         }
         stream = acquired;
+        connectMeter();
         const mimeType = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]
           .find((type) => MediaRecorder.isTypeSupported?.(type));
         try {
@@ -83,6 +131,7 @@
           if (current !== generation) return;
           clearTimeout(stopTimer);
           stopTimer = null;
+          closeMeter();
           stopTracks(stream);
           stream = recorder = null;
           const blob = new Blob(chunks, { type: activeRecorder.mimeType || chunks[0]?.type || "" });
@@ -133,6 +182,7 @@
     function stop() {
       if (status !== "recording") return;
       status = "stopping";
+      closeMeter();
       notify();
       stopTimer = setTimeout(interrupt, 5000);
       try {
@@ -182,7 +232,7 @@
     });
 
     return Object.freeze({
-      start, stop, play, dispose,
+      start, stop, play, dispose, readLevel,
       snapshot: () => ({ status, hasRecording: !!url, message })
     });
   }

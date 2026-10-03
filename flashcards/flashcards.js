@@ -67,10 +67,14 @@
   let recordingNotice = "";
   let countdownRemaining = 0;
   let countdownTimer = null;
+  let countdownFrame = null;
+  let meterFrame = null;
   let finishCountdown = null;
 
   function cancelCountdown() {
     clearTimeout(countdownTimer);
+    cancelAnimationFrame(countdownFrame);
+    countdownFrame = null;
     countdownTimer = null;
     countdownRemaining = 0;
     const finish = finishCountdown;
@@ -85,7 +89,24 @@
       finishCountdown = resolve;
       countdownRemaining = 3;
       state.view = "challenge";
-      requestRender();
+      const armAfterPaint = () => {
+        countdownFrame = requestAnimationFrame(() => {
+          countdownFrame = requestAnimationFrame(() => {
+            if (request !== recordRequest || document.hidden) {
+              interruptCountdown();
+              return;
+            }
+            const number = document.querySelector(".flashcards-countdown-number");
+            if (!document.hasFocus() || !number?.isConnected ||
+                !number.getBoundingClientRect().height) {
+              armAfterPaint();
+              return;
+            }
+            countdownFrame = null;
+            countdownTimer = setTimeout(tick, 1000);
+          });
+        });
+      };
       const tick = () => {
         if (request !== recordRequest || document.hidden) {
           interruptCountdown();
@@ -99,9 +120,10 @@
           return;
         }
         requestRender();
-        countdownTimer = setTimeout(tick, 1000);
+        armAfterPaint();
       };
-      countdownTimer = setTimeout(tick, 1000);
+      requestRender();
+      armAfterPaint();
     });
   }
 
@@ -117,6 +139,9 @@
     if (document.hidden) interruptCountdown();
   });
   window.addEventListener("pagehide", interruptCountdown);
+  window.addEventListener("blur", () => {
+    if (countdownTimer !== null) interruptCountdown();
+  });
   const GRADES = Object.freeze([
     { id: "perfect", label: "Perfect", helper: "I didn't miss a single word." },
     { id: "mostly_right", label: "Mostly Right", helper: "I missed a couple of words." },
@@ -126,6 +151,8 @@
   function discardRecording() {
     recordRequest += 1;
     cancelCountdown();
+    cancelAnimationFrame(meterFrame);
+    meterFrame = null;
     recording?.dispose();
     recordingNotice = "";
   }
@@ -559,13 +586,21 @@
         </div>
         <div class="flashcards-recall-actions">
           ${countdownRemaining ? "" : `
-          ${capturing ? controlButton("flashcardsChallengeDoneBtn", "stop",
-            audioStatus === "recording" ? "Stop" : "Please wait…", audioStatus !== "recording") : `
+          ${capturing ? `<div class="flashcards-recording-row">
+            <button class="flashcards-record-preview flashcards-stop-btn"
+              id="flashcardsChallengeDoneBtn" type="button" data-no-ui-sound
+              aria-label="Stop recording" ${audioStatus !== "recording" ? "disabled" : ""}>
+              <img src="${escapeHtml(getThemedControlAsset("stop"))}" alt="">
+            </button>
+            <div class="flashcards-meter" aria-label="${audioStatus === "recording" ? "Recording" : "Preparing recording"}">
+              <span class="flashcards-meter-label">${audioStatus === "recording" ? "● Recording" : "Preparing…"}</span>
+              <div class="flashcards-meter-bars" aria-hidden="true">
+                ${Array.from({ length: 16 }, () => '<i></i>').join("")}
+              </div>
+            </div>
+          </div>` : `
             <button class="flashcards-secondary-btn" id="flashcardsChallengeDoneBtn"
               type="button">I'm Done</button>`}
-          ${capturing ? `<span class="flashcards-recording-note" role="status">
-            ${audioStatus === "recording" ? "Recording…" : "Preparing your recording…"}
-          </span>` : ""}
           `}
         </div>
       </div>
@@ -610,11 +645,44 @@
     };
   }
 
+  function showRerecordWaiting() {
+    const play = document.querySelector("#flashcardsPlayBtn");
+    if (!play) return false;
+    play.style.height = `${play.getBoundingClientRect().height}px`;
+    play.style.width = "100%";
+    play.disabled = true;
+    play.innerHTML = `<img src="${escapeHtml(getThemedControlAsset("record"))}" alt="">
+      <span role="status">Waiting for microphone…</span>`;
+    for (const id of ["flashcardsRerecordBtn", "flashcardsNextBtn"]) {
+      const button = document.getElementById(id);
+      if (button) button.disabled = true;
+    }
+    return true;
+  }
+
+  function updateMeter(wrap) {
+    cancelAnimationFrame(meterFrame);
+    const bars = wrap.querySelectorAll(".flashcards-meter-bars i");
+    const meter = wrap.querySelector(".flashcards-meter");
+    if (!meter || recording?.snapshot().status !== "recording") return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let level = 0;
+    const sample = () => {
+      if (!wrap.isConnected || recording.snapshot().status !== "recording") return;
+      const value = reduced.matches ? null : recording.readLevel();
+      meter.classList.toggle("is-static", value === null);
+      level = value === null ? 0 : Math.max(value, level * 0.85);
+      bars.forEach((bar, index) => bar.classList.toggle("is-lit", index < Math.ceil(level * bars.length)));
+      meterFrame = requestAnimationFrame(sample);
+    };
+    meterFrame = requestAnimationFrame(sample);
+  }
+
   function renderComparison(wrap) {
     const selected = getSelectedVerse();
     const audio = recording.snapshot();
-    const message = audio.status === "requesting"
-      ? "Waiting for microphone…" : audio.message;
+    const waiting = ["requesting", "preparing"].includes(audio.status);
+    const message = audio.message;
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell flashcards-comparison-shell">
@@ -630,16 +698,16 @@
           </section>
         </div>
         <div class="flashcards-recall-actions">
-          ${audio.hasRecording ? controlButton("flashcardsPlayBtn",
-            audio.status === "playing" ? "stop" : "play",
-            audio.status === "playing" ? "Stop Playback" : "Play My Recording",
-            audio.status === "loading") : ""}
+          ${audio.hasRecording || waiting ? controlButton("flashcardsPlayBtn",
+            waiting ? "record" : audio.status === "playing" ? "stop" : "play",
+            waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
+            waiting || audio.status === "loading") : ""}
           ${message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(message)}</p>` : ""}
           <div class="flashcards-comparison-buttons">
-            ${audio.hasRecording ? `<button class="flashcards-secondary-btn"
-              id="flashcardsRerecordBtn" type="button" data-no-ui-sound>Re-record</button>` : ""}
+            ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
+              id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
-              type="button">Next</button>
+              type="button" ${waiting ? "disabled" : ""}>Next</button>
           </div>
         </div>
       </div>
@@ -795,6 +863,7 @@
     }
 
     bindCommonActions(wrap);
+    updateMeter(wrap);
     const instructionView = state.view === "recording_intro";
     const fit = () => instructionView
       ? fitRecordingInstructions(wrap)
@@ -826,6 +895,9 @@
     api = nextApi || null;
     if (!recording) recording = window.BibloZooRecording.create({
       onChange: () => {
+        if (state.view === "comparison" &&
+            ["requesting", "preparing"].includes(recording?.snapshot().status) &&
+            showRerecordWaiting()) return;
         if (recording?.snapshot().status === "ready" && state.view === "challenge") {
           state.view = "comparison";
         }
