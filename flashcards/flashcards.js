@@ -448,6 +448,7 @@
 
     const select = wrap.querySelector("#flashcardsVersePicker");
     if (select) {
+      let selectionRequest = 0;
       select.addEventListener("pointerdown", () => {
         console.info("[Flashcards timing] Dropdown touched; waiting for native selection.");
       });
@@ -455,12 +456,21 @@
         const verseId = String(select.value || "").trim();
         if (!verseId) return;
         const started = performance.now();
+        const request = ++selectionRequest;
         console.info("[Flashcards timing] Selection change received.");
-        beginRound(verseId);
-        console.info(`[Flashcards timing] Selection handling + DOM render: ${(performance.now() - started).toFixed(1)} ms; theme=${state.themeId}`);
+        select.blur();
+        // Keep the native select mounted through a rendering opportunity.
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          if (state.view !== "difficulty" || state.selectedVerseId !== verseId) return;
-          console.info(`[Flashcards timing] Second animation frame after selection: ${(performance.now() - started).toFixed(1)} ms (not an image-load measurement).`);
+          if (request !== selectionRequest || !select.isConnected ||
+            document.hidden || state.view !== "landing") return;
+          console.info(`[Flashcards timing] Focus-release wait before navigation: ${(performance.now() - started).toFixed(1)} ms`);
+          const renderStarted = performance.now();
+          beginRound(verseId);
+          console.info(`[Flashcards timing] Selection handling + DOM render: ${(performance.now() - renderStarted).toFixed(1)} ms; theme=${state.themeId}`);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (state.view !== "difficulty" || state.selectedVerseId !== verseId) return;
+            console.info(`[Flashcards timing] Second frame after navigation: ${(performance.now() - renderStarted).toFixed(1)} ms; total since selection: ${(performance.now() - started).toFixed(1)} ms (not an image-load measurement).`);
+          }));
         }));
       };
     }
