@@ -572,7 +572,10 @@
     `;
     const stage = wrap.querySelector(".flashcards-recall-stage");
     if (countdownRemaining) {
-      stage.innerHTML = `<p class="flashcards-countdown" role="status" aria-live="polite" aria-atomic="true">Say the verse: ${countdownRemaining}…</p>`;
+      stage.innerHTML = `<p class="flashcards-countdown" role="status" aria-live="polite" aria-atomic="true">
+        <span>Say the verse in...</span>
+        <span class="flashcards-countdown-number">${countdownRemaining}</span>
+      </p>`;
       return;
     }
     if (state.difficulty !== "really_well") {
@@ -610,6 +613,8 @@
   function renderComparison(wrap) {
     const selected = getSelectedVerse();
     const audio = recording.snapshot();
+    const message = audio.status === "requesting"
+      ? "Waiting for microphone…" : audio.message;
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell flashcards-comparison-shell">
@@ -629,7 +634,7 @@
             audio.status === "playing" ? "stop" : "play",
             audio.status === "playing" ? "Stop Playback" : "Play My Recording",
             audio.status === "loading") : ""}
-          ${audio.message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(audio.message)}</p>` : ""}
+          ${message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(message)}</p>` : ""}
           <div class="flashcards-comparison-buttons">
             ${audio.hasRecording ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound>Re-record</button>` : ""}
@@ -643,11 +648,7 @@
     const play = wrap.querySelector("#flashcardsPlayBtn");
     if (play) play.onclick = () => { void recording.play(); };
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
-    if (retry) retry.onclick = () => {
-      discardRecording();
-      state.view = "recording_intro";
-      requestRender();
-    };
+    if (retry) retry.onclick = beginRecording;
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
       discardRecording();
       state.view = "challenge_complete";

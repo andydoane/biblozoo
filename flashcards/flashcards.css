@@ -634,8 +634,15 @@ Patch 2: themed visual system + difficulty flow
   width: 100%;
   margin: 0;
   color: #333333;
-  font-size: clamp(1.75rem, 7vw, 3rem);
+  font-size: clamp(1.25rem, 5vw, 2rem);
   font-weight: 800;
   line-height: 1.15;
   text-align: center;
+}
+
+.flashcards-countdown-number {
+  display: block;
+  margin-top: 0.1em;
+  font-size: clamp(5rem, min(24vw, 20vh), 10rem);
+  line-height: 1;
 }
