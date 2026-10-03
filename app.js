@@ -8315,7 +8315,7 @@ function go(nextScreen) {
         State.forceSlideForward = false;
 
         /*
-          Practice menu screens are already fully
+          Menu and picker screens are already fully
           rendered in their arrived position.
 
           Keep that existing DOM instead of
@@ -8324,7 +8324,7 @@ function go(nextScreen) {
           can make WebKit briefly repaint/redecode
           their card images.
         */
-        const keepArrivedPracticeScreen =
+        const keepArrivedMenuScreen =
           nextScreen ===
             Screen.PRACTICE_HUB ||
           nextScreen ===
@@ -8332,9 +8332,11 @@ function go(nextScreen) {
           nextScreen ===
             Screen.PLAYGROUND ||
           nextScreen ===
-            Screen.FLASHCARDS;
+            Screen.FLASHCARDS ||
+          nextScreen ===
+            Screen.NEW_VERSE_PICKER;
 
-        if (keepArrivedPracticeScreen) {
+        if (keepArrivedMenuScreen) {
           const outgoingSlide =
             Array.from(
               app.children
@@ -16001,6 +16003,11 @@ function screenGameMixFinished(idx) {
 function render() {
   let savedDetailScrollTop = 0;
   let savedMyVersesScrollTop = 0;
+  const pickerScrollSelector =
+    ".new-verse-picker-screen .practice-scroll-wrap";
+  // Also preserve the outgoing picker while another screen slides in.
+  const savedPickerScrollTop =
+    app.querySelector(pickerScrollSelector)?.scrollTop;
 
   if (State.screen === Screen.VERSE_DETAIL) {
     const existingDetailScroll = document.querySelector(".detail-scroll");
@@ -16090,6 +16097,12 @@ function render() {
         );
       }
     }
+  }
+
+  // Restore before paint, so no delayed callback can undo a new gesture.
+  if (savedPickerScrollTop !== undefined) {
+    const pickerScroll = app.querySelector(pickerScrollSelector);
+    if (pickerScroll) pickerScroll.scrollTop = savedPickerScrollTop;
   }
 
   if (!State.isSliding) {
