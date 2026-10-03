@@ -329,14 +329,15 @@
     if (!option) return;
 
     state.difficulty = option.id;
-    state.view = "recording_intro";
+    state.view = "difficulty_intro";
     requestRender();
   }
 
   function goBack() {
     const previousView = {
       difficulty: "landing",
-      recording_intro: "difficulty",
+      difficulty_intro: "difficulty",
+      recording_intro: "difficulty_intro",
       challenge: "recording_intro",
       comparison: "challenge",
       challenge_complete: "comparison",
@@ -526,9 +527,6 @@
                 <span class="flashcards-choice-pill">
                   ${escapeHtml(option.label)}
                 </span>
-                <span class="flashcards-choice-helper">
-                  ${escapeHtml(option.helper)}
-                </span>
               </button>
             `).join("")}
           </div>
@@ -568,6 +566,12 @@
   }
 
   function renderRecordingIntro(wrap) {
+    const explaining = state.view === "difficulty_intro";
+    const explanations = {
+      really_well: "Try to say the verse without any help at all.",
+      pretty_good: "Say the verse using just the first letter of each word to help you remember.",
+      still_learning: "Say the verse, using the words and pictures to help you remember."
+    };
     const requesting = recording?.snapshot().status === "requesting";
     wrap.innerHTML = `
       ${renderMenuButton()}
@@ -575,9 +579,9 @@
         <section class="flashcards-panel flashcards-recall-panel">
           ${renderMascot("flashcards-overlap-mascot")}
           <div class="flashcards-recording-copy">
-            <p>Record yourself saying the verse. Try your best and
-              keep going if you make a mistake!</p>
-            <p>Afterward, listen back and see how you did.</p>
+            ${explaining ? `<p>${escapeHtml(explanations[state.difficulty])}</p>` : `
+              <p>Record yourself saying the verse.</p>
+              <p>When you're done, listen back and see how you did.</p>`}
           </div>
         </section>
         <div class="flashcards-recall-actions">
@@ -586,13 +590,39 @@
           ${recordingNotice ? `<p class="flashcards-recording-note" role="status">
             ${escapeHtml(recordingNotice)}
           </p>` : ""}
-          <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
-            type="button">Skip Recording</button>
+          <div class="flashcards-comparison-buttons">
+            <button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
+              type="button">Go Back</button>
+            <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
+              type="button">${explaining ? "Next" : "Skip Recording"}</button>
+          </div>
         </div>
       </div>
     `;
-    wrap.querySelector("#flashcardsRecordStartBtn").onclick = beginRecording;
-    wrap.querySelector("#flashcardsSkipRecordingBtn").onclick = beginWithoutRecording;
+    const record = wrap.querySelector("#flashcardsRecordStartBtn");
+    record.onclick = beginRecording;
+    if (explaining) {
+      record.style.visibility = "hidden";
+      record.disabled = true;
+      record.setAttribute("aria-hidden", "true");
+    }
+    wrap.querySelector("#flashcardsIntroBackBtn").onclick = goBack;
+    const next = wrap.querySelector("#flashcardsSkipRecordingBtn");
+    next.onclick = explaining ? async () => {
+      if (next.disabled) return;
+      next.disabled = true;
+      const copy = wrap.querySelector(".flashcards-recording-copy");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduceMotion && copy.animate) {
+        await copy.animate([{ opacity: 1 }, { opacity: 0 }],
+          { duration: 180, fill: "forwards" }).finished.catch(() => {});
+      }
+      if (!wrap.isConnected || state.view !== "difficulty_intro") return;
+      state.view = "recording_intro";
+      requestRender();
+      const incoming = document.querySelector(".flashcards-recording-copy");
+      if (!reduceMotion) incoming?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
+    } : beginWithoutRecording;
   }
 
   function renderChallenge(wrap) {
@@ -867,7 +897,7 @@
     if (!api?.makeSlide) return null;
 
     if (state.view !== "landing" && !getSelectedVerse()) resetSession();
-    if (["recording_intro", "challenge", "comparison", "challenge_complete", "result"].includes(state.view) &&
+    if (["difficulty_intro", "recording_intro", "challenge", "comparison", "challenge_complete", "result"].includes(state.view) &&
       !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
     const isLanding =
@@ -889,7 +919,7 @@
 
     if (state.view === "difficulty") {
       renderDifficulty(wrap);
-    } else if (state.view === "recording_intro") {
+    } else if (["difficulty_intro", "recording_intro"].includes(state.view)) {
       renderRecordingIntro(wrap);
     } else if (state.view === "challenge") {
       renderChallenge(wrap);
@@ -905,7 +935,7 @@
 
     bindCommonActions(wrap);
     updateMeter(wrap);
-    const instructionView = state.view === "recording_intro";
+    const instructionView = ["difficulty_intro", "recording_intro"].includes(state.view);
     const fit = () => instructionView
       ? fitRecordingInstructions(wrap)
       : api.scheduleSmartLearnTextFit(wrap);
@@ -913,7 +943,7 @@
       requestAnimationFrame(fit);
       document.fonts?.ready.then(fit).catch(() => { });
     }
-    if (["recording_intro", "challenge", "comparison"].includes(state.view) && typeof ResizeObserver !== "undefined") {
+    if (["difficulty_intro", "recording_intro", "challenge", "comparison"].includes(state.view) && typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(fit);
       observer.observe(wrap);
       // requestRender replaces the screen; disconnect the previous observer.
