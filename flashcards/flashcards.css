@@ -130,7 +130,8 @@ Patch 2: themed visual system + difficulty flow
 .flashcards-stage-shell {
   --stage-room: calc(var(--appH, 100vh) - var(--safeT) - var(--safeB));
   --stage-mascot: clamp(100px, calc(var(--stage-room) * 0.18), 180px);
-  --stage-gap: clamp(10px, calc(var(--stage-room) * 0.018), 20px);
+  --stage-gap: clamp(10px, calc(10px + (var(--stage-room) - 600px) * 0.08), 32px);
+  --stage-helper-gap: clamp(9px, calc(9px + (var(--stage-room) - 600px) * 0.015), 14px);
   padding: calc(var(--safeT) + var(--stage-mascot) / 2 + 32px) clamp(18px, 5vw, 54px) calc(20px + var(--safeB));
 }
 
@@ -237,7 +238,7 @@ Patch 2: themed visual system + difficulty flow
 
 .flashcards-overlap-panel {
   position: relative;
-  padding: calc(var(--stage-mascot) / 2 + 12px) clamp(18px, 5vw, 44px) clamp(16px, 2.5vh, 28px);
+  padding: calc(var(--stage-mascot) / 2 + var(--stage-gap)) clamp(18px, 5vw, 44px) max(20px, var(--stage-gap));
 }
 
 .flashcards-overlap-mascot {
@@ -257,18 +258,20 @@ Patch 2: themed visual system + difficulty flow
 }
 
 .flashcards-stage-shell .flashcards-reference-pill {
-  padding: 10px 12px;
+  padding: 10px 20px;
   font-size: clamp(1.25rem, 5vw, 2rem);
 }
 
 .flashcards-reference-pill {
-  width: min(100%, 560px);
+  width: fit-content;
+  max-width: min(calc(100% - 32px), 560px);
+  overflow-wrap: anywhere;
   margin-left: auto;
   margin-right: auto;
   border-radius: 999px;
   padding: 14px 18px;
-  background: var(--flashcards-accent);
-  color: var(--flashcards-accent-text);
+  background: #333333;
+  color: #ffffff;
   font-family:
     "Titan One",
     "Baloo 2",
@@ -292,7 +295,7 @@ Patch 2: themed visual system + difficulty flow
     sans-serif;
   font-size: clamp(1.625rem, 7vw, 2.625rem);
   font-weight: 900;
-  line-height: 0.98;
+  line-height: 1.08;
   text-wrap: balance;
 }
 
@@ -312,7 +315,7 @@ Patch 2: themed visual system + difficulty flow
   font: inherit;
   cursor: pointer;
   display: grid;
-  gap: 5px;
+  gap: var(--stage-helper-gap);
 }
 
 .flashcards-choice-pill {
