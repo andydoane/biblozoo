@@ -11824,7 +11824,7 @@ function screenTitle(idx) {
   preloadPracticeHubImages();
 
   const wrap = document.createElement("div");
-  wrap.className = "title-screen";
+  wrap.className = "title-screen home-screen";
   const tutorialActive = isTutorialActive();
   const activeProfile =
     getProfileApi()?.getActiveProfile?.();
@@ -11950,7 +11950,7 @@ function screenTitle(idx) {
         >
       </button>
 
-      ${titleZooStripHtml()}
+      <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
     </div>
 

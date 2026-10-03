@@ -8022,6 +8022,64 @@ body:has(#app .todo-dev-screen),
   background: #a7cb6f !important;
 }
 /* Keep button labels consistent, including labels with their own font rule. */
+/* Home gets a height budget; artwork yields space before controls do. */
+.home-zoo-space { width: 100%; }
+
+@media (min-width: 700px) {
+  .home-screen {
+    padding: calc(16px + var(--safeT)) 24px calc(24px + var(--safeB));
+  }
+  .home-screen > .title-content {
+    height: calc(var(--appH) - var(--safeT) - var(--safeB) - 40px);
+    margin: 0 auto;
+    display: grid;
+    grid-template-rows: minmax(70px, 1fr) auto auto auto auto minmax(150px, 2fr);
+    gap: clamp(10px, 1.4vh, 18px);
+    justify-items: center;
+    align-items: stretch;
+  }
+  .home-screen .title-logo-secret-wrap { min-height: 0; }
+  .home-screen #titleLogoSecret {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+  .home-screen .title-picker-tools,
+  .home-screen .title-current-verse-panel,
+  .home-screen .title-action-row,
+  .home-screen .title-todo-btn { margin: 0; }
+  .home-screen .title-current-verse-panel {
+    min-height: 0;
+    padding: 12px 20px;
+  }
+  .home-screen .title-current-verse-ref { white-space: normal; }
+  .home-screen .title-action-btn { min-height: 112px; padding: 10px; }
+  .home-screen .title-action-img { width: 64px; height: 64px; }
+  .home-screen .title-todo-btn { padding: 8px 20px; }
+  .home-screen .title-todo-img { max-height: 52px; }
+  .home-screen .home-zoo-space {
+    min-height: 150px;
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+  .home-screen .title-zoo-strip {
+    width: min(100%, calc(100cqh * 16 / 9));
+    margin: 0;
+  }
+}
+
+@media (min-width: 1000px) and (orientation: landscape) {
+  .home-screen > .title-content {
+    max-width: 1200px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(70px, 1fr) auto auto auto auto;
+    column-gap: 28px;
+  }
+  .home-screen .title-content > :not(.home-zoo-space) { grid-column: 1; }
+  .home-screen .home-zoo-space { grid-column: 2; grid-row: 1 / -1; }
+}
+
 button,
 button *,
 [role="button"],
