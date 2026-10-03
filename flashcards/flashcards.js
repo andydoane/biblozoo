@@ -405,7 +405,7 @@
           ${renderReferencePill(selected.ref || selected.id)}
 
           <h1 class="flashcards-difficulty-title">
-            How well do you know this verse?
+            How well do you<br>know this verse?
           </h1>
 
           <div class="flashcards-choice-stack">
@@ -463,7 +463,7 @@
     const requesting = recording?.snapshot().status === "requesting";
     wrap.innerHTML = `
       ${renderMenuButton()}
-      <div class="flashcards-recall-shell">
+      <div class="flashcards-recall-shell flashcards-instruction-shell">
         <section class="flashcards-panel flashcards-recall-panel">
           ${renderMascot("flashcards-overlap-mascot")}
           <div class="flashcards-recording-copy">
@@ -475,9 +475,9 @@
         <div class="flashcards-recall-actions">
           ${controlButton("flashcardsRecordStartBtn", "record",
             requesting ? "Waiting for microphone…" : "Record", requesting)}
-          <p class="flashcards-recording-note" role="status">
-            ${escapeHtml(recordingNotice || "Your recording stays here for this attempt. It isn't saved or uploaded.")}
-          </p>
+          ${recordingNotice ? `<p class="flashcards-recording-note" role="status">
+            ${escapeHtml(recordingNotice)}
+          </p>` : ""}
           <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
             type="button">Skip Recording</button>
         </div>
@@ -598,11 +598,11 @@
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-stage-shell">
-        <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
+        <section class="flashcards-panel flashcards-overlap-panel flashcards-difficulty-panel">
           ${renderMascot("flashcards-overlap-mascot")}
-          ${renderReferencePill(selected.ref || selected.id)}
-          <h1 class="flashcards-next-title">Grade Yourself!</h1>
-          <p class="flashcards-next-copy">${state.grade ? "Your grade is saved. Continue to your result." : "How well did you do?"}</p>
+          ${renderReferencePill("Grade Yourself!")}
+          <h1 class="flashcards-difficulty-title">How well did you do?</h1>
+          ${state.grade ? '<p class="flashcards-next-copy">Your grade is saved. Continue to your result.</p>' : ""}
           <div class="flashcards-choice-stack">
             ${GRADES.map((grade) => `<button class="flashcards-choice-btn" type="button" data-flashcards-grade="${grade.id}" ${state.grade && state.grade !== grade.id ? "disabled" : ""}>
               <span class="flashcards-choice-pill">${grade.label}</span>
@@ -628,7 +628,19 @@
   function renderResult(wrap) {
     const messages = { perfect: ["Amazing!", "You nailed that verse!"], mostly_right: ["Great work!", "You're really close!"], needs_practice: ["Great work!", "Keep practicing and you'll soon know it by heart!"] };
     const [title, copy] = messages[state.grade] || messages.needs_practice;
-    wrap.innerHTML = `${renderMenuButton()}<div class="flashcards-stage-shell"><section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel"><h1 class="flashcards-next-title">${title}</h1><p class="flashcards-next-copy">${copy}</p><button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button><button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button><button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button></section></div>`;
+    wrap.innerHTML = `
+      ${renderMenuButton()}
+      <div class="flashcards-stage-shell">
+        <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
+          ${renderMascot("flashcards-overlap-mascot")}
+          <h1 class="flashcards-next-title">${title}</h1>
+          <p class="flashcards-next-copy">${copy}</p>
+          <button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button>
+          <button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button>
+          <button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button>
+        </section>
+      </div>
+    `;
     wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { state.grade = ""; state.view = "difficulty"; requestRender(); };
     wrap.querySelector("#flashcardsRandomBtn").onclick = chooseRandomVerse;
   }
@@ -650,6 +662,33 @@
           api?.goToPractice?.();
         };
       });
+  }
+
+  function fitRecordingInstructions(wrap) {
+    if (!wrap.isConnected) return;
+    const panel = wrap.querySelector(".flashcards-recall-panel");
+    const copy = wrap.querySelector(".flashcards-recording-copy");
+    if (!panel || !copy) return;
+    panel.style.minHeight = "0";
+    const style = getComputedStyle(panel);
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const available = panel.clientHeight - padding;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    let low = 1.375 * rem;
+    let high = 2.75 * rem;
+    let best = low;
+    for (let i = 0; i < 9; i++) {
+      const size = (low + high) / 2;
+      copy.style.fontSize = `${size}px`;
+      if (copy.scrollHeight <= available && copy.scrollWidth <= copy.clientWidth) {
+        best = low = size;
+      } else {
+        high = size;
+      }
+    }
+    copy.style.fontSize = `${Math.floor(best)}px`;
+    // Keep the minimum readable size; let the screen scroll when space is short.
+    panel.style.minHeight = `${Math.ceil(copy.scrollHeight + padding)}px`;
   }
 
   function renderScreen(idx) {
@@ -693,8 +732,16 @@
     }
 
     bindCommonActions(wrap);
-    if (["challenge", "comparison"].includes(state.view) && typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => api.scheduleSmartLearnTextFit(wrap));
+    const instructionView = state.view === "recording_intro";
+    const fit = () => instructionView
+      ? fitRecordingInstructions(wrap)
+      : api.scheduleSmartLearnTextFit(wrap);
+    if (instructionView) {
+      requestAnimationFrame(fit);
+      document.fonts?.ready.then(fit).catch(() => {});
+    }
+    if (["recording_intro", "challenge", "comparison"].includes(state.view) && typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(fit);
       observer.observe(wrap);
       // requestRender replaces the screen; disconnect the previous observer.
       resizeObserver?.disconnect();

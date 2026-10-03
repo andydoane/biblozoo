@@ -131,8 +131,11 @@ Patch 2: themed visual system + difficulty flow
 }
 
 .flashcards-stage-shell {
-  padding-top:
-    calc(156px + var(--safeT));
+  --stage-room: calc(var(--appH, 100vh) - var(--safeT) - var(--safeB));
+  --stage-mascot: clamp(100px, calc(var(--stage-room) * 0.18), 180px);
+  --stage-gap: clamp(10px, calc(var(--stage-room) * 0.018), 20px);
+  padding: calc(var(--safeT) + var(--stage-mascot) / 2 + 32px)
+    clamp(18px, 5vw, 54px) calc(20px + var(--safeB));
 }
 
 .flashcards-panel {
@@ -240,10 +243,8 @@ Patch 2: themed visual system + difficulty flow
 
 .flashcards-overlap-panel {
   position: relative;
-  padding:
-    clamp(102px, 14vh, 142px)
-    clamp(24px, 6vw, 58px)
-    clamp(34px, 6vh, 58px);
+  padding: calc(var(--stage-mascot) / 2 + 12px)
+    clamp(18px, 5vw, 44px) clamp(16px, 2.5vh, 28px);
 }
 
 .flashcards-overlap-mascot {
@@ -256,6 +257,14 @@ Patch 2: themed visual system + difficulty flow
   transform: translate(-50%, -50%);
   user-select: none;
   -webkit-user-drag: none;
+}
+.flashcards-stage-shell .flashcards-overlap-mascot {
+  width: var(--stage-mascot);
+}
+
+.flashcards-stage-shell .flashcards-reference-pill {
+  padding: 10px 12px;
+  font-size: clamp(1.25rem, 5vw, 2rem);
 }
 
 .flashcards-reference-pill {
@@ -277,20 +286,17 @@ Patch 2: themed visual system + difficulty flow
 }
 
 .flashcards-difficulty-panel {
-  min-height: min(68vh, 760px);
+  min-height: 0;
 }
 
 .flashcards-difficulty-title {
-  max-width: 12ch;
-  margin:
-    clamp(30px, 5vh, 52px)
-    auto
-    clamp(28px, 4.5vh, 46px);
+  max-width: 22ch;
+  margin: var(--stage-gap) auto;
   font-family:
     "Baloo 2",
     system-ui,
     sans-serif;
-  font-size: clamp(38px, 8vw, 62px);
+  font-size: clamp(1.625rem, 7vw, 2.625rem);
   font-weight: 900;
   line-height: 0.98;
   text-wrap: balance;
@@ -300,7 +306,7 @@ Patch 2: themed visual system + difficulty flow
   width: min(100%, 560px);
   margin: 0 auto;
   display: grid;
-  gap: clamp(22px, 3.8vh, 34px);
+  gap: var(--stage-gap);
 }
 
 .flashcards-choice-btn {
@@ -312,12 +318,12 @@ Patch 2: themed visual system + difficulty flow
   font: inherit;
   cursor: pointer;
   display: grid;
-  gap: 8px;
+  gap: 5px;
 }
 
 .flashcards-choice-pill {
   width: 100%;
-  min-height: 58px;
+  min-height: 48px;
   border-radius: 999px;
   padding: 10px 20px;
   background: var(--flashcards-accent);
@@ -331,38 +337,39 @@ Patch 2: themed visual system + difficulty flow
     "Baloo 2",
     system-ui,
     sans-serif;
-  font-size: clamp(24px, 5.6vw, 38px);
+  font-size: clamp(1.5rem, 5.6vw, 2.375rem);
   font-weight: 800;
   line-height: 1;
 }
 
 .flashcards-choice-helper {
   color: #333333;
-  font-size: clamp(17px, 3.9vw, 25px);
+  font-size: clamp(1rem, 3.9vw, 1.5625rem);
   font-weight: 900;
   line-height: 1.05;
   text-wrap: balance;
 }
 
 .flashcards-next-panel {
-  min-height: min(52vh, 560px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(24px, 4vh, 38px);
+  gap: var(--stage-gap);
 }
 
 .flashcards-next-title {
   margin: 0;
-  font-size: clamp(38px, 8vw, 58px);
+  font-size: clamp(1.875rem, 7vw, 3rem);
   font-weight: 900;
   line-height: 1;
 }
 
 .flashcards-next-copy {
-  max-width: 20ch;
-  font-size: clamp(22px, 4.8vw, 32px);
+  margin: 0;
+  max-width: 24ch;
+  font-size: clamp(1.25rem, 4.8vw, 2rem);
   font-weight: 800;
   line-height: 1.12;
   text-wrap: balance;
@@ -418,8 +425,7 @@ Patch 2: themed visual system + difficulty flow
 }
 
 @media (max-height: 720px) {
-  .flashcards-landing-shell,
-  .flashcards-stage-shell {
+  .flashcards-landing-shell {
     align-items: flex-start;
     padding-top: calc(92px + var(--safeT));
   }
@@ -433,27 +439,10 @@ Patch 2: themed visual system + difficulty flow
     max-height: 25vh;
   }
 
-  .flashcards-overlap-panel {
-    margin-top: 72px;
-  }
-
   .flashcards-overlap-mascot {
     width: clamp(130px, 30vw, 190px);
   }
 
-  .flashcards-difficulty-panel {
-    min-height: auto;
-  }
-
-  .flashcards-difficulty-title {
-    margin-top: 24px;
-    margin-bottom: 24px;
-    font-size: clamp(34px, 7vw, 48px);
-  }
-
-  .flashcards-choice-stack {
-    gap: 18px;
-  }
 }
 
 /* Recall: reserve a bounded card area for the shared Learn text fitter. */
@@ -597,7 +586,23 @@ Patch 2: themed visual system + difficulty flow
 .flashcards-secondary-btn:active,
 .flashcards-record-preview:active { transform: translateY(4px); }
 
-.flashcards-next-panel .flashcards-secondary-btn { margin-top: 20px; }
+.flashcards-next-panel .flashcards-primary-btn { min-height: 48px; }
+.flashcards-next-panel .flashcards-secondary-btn {
+  margin-top: 0;
+  background: #333333;
+  color: #ffffff;
+}
+
+.flashcards-instruction-shell {
+  min-height: 0;
+}
+
+.flashcards-recording-copy {
+  flex: 0 0 auto;
+  width: 100%;
+  font-size: 1.375rem;
+  overflow-wrap: break-word;
+}
 
 @media (max-height: 650px) {
   .flashcards-recall-shell {
@@ -607,7 +612,7 @@ Patch 2: themed visual system + difficulty flow
     padding-bottom: calc(16px + var(--safeB));
   }
   .flashcards-record-preview img { width: 48px; height: 48px; }
-  .flashcards-recording-copy { font-size: 18px; }
+
 }
 
 /* Recording and comparison controls keep the verse card's fitting area bounded. */
