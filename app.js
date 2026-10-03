@@ -15784,6 +15784,7 @@ function screenPracticeHub(idx) {
       const choice = btn.dataset.practiceHubChoice;
 
       if (choice === "games") {
+        go(Screen.PRACTICE);
         return;
       }
 
@@ -15792,7 +15793,6 @@ function screenPracticeHub(idx) {
           ?.start?.();
 
         go(Screen.FLASHCARDS);
-        go(Screen.PRACTICE);
         return;
       }
 
