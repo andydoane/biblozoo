@@ -684,6 +684,10 @@
     const selected = getSelectedVerse();
     const audio = recording.snapshot();
     const waiting = ["requesting", "preparing"].includes(audio.status);
+    const showVerseImmediately = !audio.hasRecording;
+    const comparisonInstruction = audio.hasRecording
+      ? "Listen to your recording, then compare it with the verse."
+      : "Read the verse and see how you did.";
     const message = audio.message;
     wrap.innerHTML = `
       ${renderMenuButton()}
@@ -692,9 +696,9 @@
           ${renderMascot("flashcards-overlap-mascot")}
           <section class="flashcards-card-front flashcards-recall-card">
             ${renderReferencePill(selected.ref || selected.id)}
-<div class="learn-stage flashcards-recall-stage flashcards-comparison-stage${comparisonPlaybackStarted ? " flashcards-comparison-active" : ""}">
+<div class="learn-stage flashcards-recall-stage flashcards-comparison-stage${comparisonPlaybackStarted || showVerseImmediately ? " flashcards-comparison-active" : ""}">
   <p class="flashcards-comparison-instruction">
-    Listen to your recording, then compare it with the verse.
+    ${comparisonInstruction}
   </p>
   <div class="smart-learn-text" data-smart-learn-text>
     <div class="smart-learn-body">${escapeHtml(selected.verseText)}</div>
@@ -727,7 +731,6 @@
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
-      discardRecording();
       state.view = "challenge_complete";
       requestRender();
     };
