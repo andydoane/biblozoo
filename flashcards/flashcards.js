@@ -210,11 +210,13 @@
   }
 
   function getEligibleVerses() {
+    const progress = api?.getVerseProgressSnapshot?.();
     return getVerseList().filter((item) => {
       const verseId = String(item?.id || "").trim();
       if (!verseId) return false;
 
-      return !!api?.getVerseProgress?.(verseId)?.learnCompleted;
+      const verseProgress = progress ? progress[verseId] : api?.getVerseProgress?.(verseId);
+      return !!verseProgress?.learnCompleted;
     });
   }
 
@@ -446,10 +448,20 @@
 
     const select = wrap.querySelector("#flashcardsVersePicker");
     if (select) {
+      select.addEventListener("pointerdown", () => {
+        console.info("[Flashcards timing] Dropdown touched; waiting for native selection.");
+      });
       select.onchange = () => {
         const verseId = String(select.value || "").trim();
         if (!verseId) return;
+        const started = performance.now();
+        console.info("[Flashcards timing] Selection change received.");
         beginRound(verseId);
+        console.info(`[Flashcards timing] Selection handling + DOM render: ${(performance.now() - started).toFixed(1)} ms; theme=${state.themeId}`);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (state.view !== "difficulty" || state.selectedVerseId !== verseId) return;
+          console.info(`[Flashcards timing] Second animation frame after selection: ${(performance.now() - started).toFixed(1)} ms (not an image-load measurement).`);
+        }));
       };
     }
 

@@ -7057,6 +7057,7 @@ window.BibloZooFlashcards
       VERSE_LIST,
 
     getVerseProgress,
+    getVerseProgressSnapshot: () => loadProgress().verses,
     recordFlashcardAttempt,
     showRecordingFallback: (continueWithoutRecording) => showDialog({
       title: "Continue without recording?",
