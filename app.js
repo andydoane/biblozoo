@@ -7058,6 +7058,8 @@ window.BibloZooFlashcards
 
     getVerseProgress,
     getVerseProgressSnapshot: () => loadProgress().verses,
+    playVersePreview: playVerseDetailListen,
+    stopVersePreview: cancelVerseDetailListen,
     recordFlashcardAttempt,
     showRecordingFallback: (continueWithoutRecording) => showDialog({
       title: "Continue without recording?",

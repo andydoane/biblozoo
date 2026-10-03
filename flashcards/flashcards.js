@@ -150,6 +150,7 @@
   ]);
 
   function discardRecording() {
+    stopVersePreview();
     recordRequest += 1;
     cancelCountdown();
     cancelAnimationFrame(meterFrame);
@@ -328,6 +329,7 @@
     const option = getDifficultyOption(difficultyId);
     if (!option) return;
 
+    stopVersePreview();
     state.difficulty = option.id;
     state.view = "difficulty_intro";
     requestRender();
@@ -495,6 +497,48 @@
     }
   }
 
+  let previewPlaying = false;
+  let previewRequest = 0;
+  let previewMessage = "";
+
+  function stopVersePreview() {
+    previewRequest += 1;
+    if (previewPlaying) api?.stopVersePreview?.();
+    previewPlaying = false;
+    previewMessage = "";
+  }
+
+  async function toggleVersePreview() {
+    if (previewPlaying) {
+      stopVersePreview();
+      requestRender();
+      return;
+    }
+    const selected = getSelectedVerse();
+    if (!selected || state.view !== "difficulty") return;
+    const request = ++previewRequest;
+    previewPlaying = true;
+    previewMessage = "";
+    requestRender();
+    let completed = false;
+    try { completed = await api.playVersePreview(selected.id); }
+    catch (_) { /* Show the retry message below. */ }
+    if (request !== previewRequest) return;
+    previewPlaying = false;
+    previewMessage = completed ? "" : "Audio couldn't play. Tap Listen to try again.";
+    requestRender();
+  }
+
+  const stopBackgroundPreview = () => {
+    if (!previewPlaying) return;
+    stopVersePreview();
+    requestRender();
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopBackgroundPreview();
+  });
+  window.addEventListener("pagehide", stopBackgroundPreview);
+
   function renderDifficulty(wrap) {
     const selected = getSelectedVerse();
 
@@ -513,6 +557,12 @@
 
           ${renderReferencePill(selected.ref || selected.id)}
 
+            <button class="flashcards-listen-btn" id="flashcardsListenBtn"
+              type="button" data-no-ui-sound aria-pressed="${previewPlaying}">
+              <span aria-hidden="true">${previewPlaying ? "■" : "▶"}</span>
+              ${previewPlaying ? "Stop Listening" : "Listen to the Verse"}
+            </button>
+            ${previewMessage ? `<span class="flashcards-listen-message" role="status">${escapeHtml(previewMessage)}</span>` : ""}
           <h1 class="flashcards-difficulty-title">
             How well do you<br>know this verse?
           </h1>
@@ -534,6 +584,7 @@
       </div>
     `;
 
+    wrap.querySelector("#flashcardsListenBtn").onclick = toggleVersePreview;
     wrap
       .querySelectorAll("[data-flashcards-difficulty]")
       .forEach((button) => {
