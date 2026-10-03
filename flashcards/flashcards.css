@@ -112,8 +112,7 @@ Patch 2: themed visual system + difficulty flow
 
 .flashcards-menu-btn:active,
 .flashcards-primary-btn:active,
-.flashcards-choice-btn:active
-  .flashcards-choice-pill {
+.flashcards-choice-btn:active .flashcards-choice-pill {
   transform: translateY(4px);
 }
 
@@ -125,17 +124,14 @@ Patch 2: themed visual system + difficulty flow
   align-items: center;
   justify-content: center;
   padding:
-    calc(108px + var(--safeT))
-    clamp(24px, 6vw, 54px)
-    calc(54px + var(--safeB));
+    calc(108px + var(--safeT)) clamp(24px, 6vw, 54px) calc(54px + var(--safeB));
 }
 
 .flashcards-stage-shell {
   --stage-room: calc(var(--appH, 100vh) - var(--safeT) - var(--safeB));
   --stage-mascot: clamp(100px, calc(var(--stage-room) * 0.18), 180px);
   --stage-gap: clamp(10px, calc(var(--stage-room) * 0.018), 20px);
-  padding: calc(var(--safeT) + var(--stage-mascot) / 2 + 32px)
-    clamp(18px, 5vw, 54px) calc(20px + var(--safeB));
+  padding: calc(var(--safeT) + var(--stage-mascot) / 2 + 32px) clamp(18px, 5vw, 54px) calc(20px + var(--safeB));
 }
 
 .flashcards-panel {
@@ -149,9 +145,7 @@ Patch 2: themed visual system + difficulty flow
 .flashcards-landing-panel {
   min-height: min(70vh, 820px);
   padding:
-    clamp(42px, 7vh, 72px)
-    clamp(24px, 6vw, 58px)
-    clamp(42px, 7vh, 72px);
+    clamp(42px, 7vh, 72px) clamp(24px, 6vw, 58px) clamp(42px, 7vh, 72px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -243,8 +237,7 @@ Patch 2: themed visual system + difficulty flow
 
 .flashcards-overlap-panel {
   position: relative;
-  padding: calc(var(--stage-mascot) / 2 + 12px)
-    clamp(18px, 5vw, 44px) clamp(16px, 2.5vh, 28px);
+  padding: calc(var(--stage-mascot) / 2 + 12px) clamp(18px, 5vw, 44px) clamp(16px, 2.5vh, 28px);
 }
 
 .flashcards-overlap-mascot {
@@ -258,6 +251,7 @@ Patch 2: themed visual system + difficulty flow
   user-select: none;
   -webkit-user-drag: none;
 }
+
 .flashcards-stage-shell .flashcards-overlap-mascot {
   width: var(--stage-mascot);
 }
@@ -456,8 +450,7 @@ Patch 2: themed visual system + difficulty flow
   flex-direction: column;
   align-items: center;
   gap: clamp(16px, 2.5vh, 28px);
-  padding: calc(130px + var(--safeT)) clamp(28px, 7vw, 70px)
-    calc(24px + var(--safeB));
+  padding: calc(130px + var(--safeT)) clamp(28px, 7vw, 70px) calc(24px + var(--safeB));
 }
 
 .flashcards-recall-shell .flashcards-overlap-mascot {
@@ -501,12 +494,12 @@ Patch 2: themed visual system + difficulty flow
   justify-content: center;
 }
 
-.flashcards-initials > div {
+.flashcards-initials>div {
   color: #333333;
   margin: 0.18em 0;
 }
 
-.flashcards-initials > div:nth-child(even) {
+.flashcards-initials>div:nth-child(even) {
   color: var(--flashcards-accent);
 }
 
@@ -537,8 +530,13 @@ Patch 2: themed visual system + difficulty flow
   text-wrap: balance;
 }
 
-.flashcards-recording-copy p { margin: 0 0 0.75em; }
-.flashcards-recording-copy p:last-child { margin-bottom: 0; }
+.flashcards-recording-copy p {
+  margin: 0 0 0.75em;
+}
+
+.flashcards-recording-copy p:last-child {
+  margin-bottom: 0;
+}
 
 .flashcards-record-preview {
   display: flex;
@@ -554,7 +552,10 @@ Patch 2: themed visual system + difficulty flow
   cursor: pointer;
 }
 
-.flashcards-record-preview img { width: 64px; height: 64px; }
+.flashcards-record-preview img {
+  width: 64px;
+  height: 64px;
+}
 
 .flashcards-recording-note {
   margin: 0;
@@ -584,9 +585,14 @@ Patch 2: themed visual system + difficulty flow
 }
 
 .flashcards-secondary-btn:active,
-.flashcards-record-preview:active { transform: translateY(4px); }
+.flashcards-record-preview:active {
+  transform: translateY(4px);
+}
 
-.flashcards-next-panel .flashcards-primary-btn { min-height: 48px; }
+.flashcards-next-panel .flashcards-primary-btn {
+  min-height: 48px;
+}
+
 .flashcards-next-panel .flashcards-secondary-btn {
   margin-top: 0;
   background: #333333;
@@ -611,7 +617,11 @@ Patch 2: themed visual system + difficulty flow
     padding-top: calc(106px + var(--safeT));
     padding-bottom: calc(16px + var(--safeB));
   }
-  .flashcards-record-preview img { width: 48px; height: 48px; }
+
+  .flashcards-record-preview img {
+    width: 48px;
+    height: 48px;
+  }
 
 }
 
@@ -622,12 +632,23 @@ Patch 2: themed visual system + difficulty flow
   gap: 12px;
 }
 
-.flashcards-comparison-buttons > button { flex: 1; }
-.flashcards-record-preview:disabled { opacity: 0.65; cursor: wait; }
-.flashcards-comparison-shell { min-height: calc(650px + var(--safeT) + var(--safeB)); }
+.flashcards-comparison-buttons>button {
+  flex: 1;
+}
+
+.flashcards-record-preview:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.flashcards-comparison-shell {
+  min-height: calc(650px + var(--safeT) + var(--safeB));
+}
 
 @media (max-height: 650px) {
-  .flashcards-comparison-shell .flashcards-recall-actions { gap: 8px; }
+  .flashcards-comparison-shell .flashcards-recall-actions {
+    gap: 8px;
+  }
 }
 
 .flashcards-countdown {
@@ -647,14 +668,29 @@ Patch 2: themed visual system + difficulty flow
   line-height: 1;
 }
 
-.flashcards-recording-note { font-weight: 800; }
+.flashcards-recording-note {
+  font-weight: 800;
+}
+
 .flashcards-comparison-shell .flashcards-record-preview {
   width: 100%;
   min-height: 64px;
 }
-.flashcards-comparison-shell .flashcards-record-preview img { flex-shrink: 0; }
-.flashcards-comparison-shell .flashcards-record-preview span { min-width: 0; line-height: 1.1; }
-.flashcards-comparison-buttons button:disabled { opacity: 0.65; cursor: default; }
+
+.flashcards-comparison-shell .flashcards-record-preview img {
+  flex-shrink: 0;
+}
+
+.flashcards-comparison-shell .flashcards-record-preview span {
+  min-width: 0;
+  line-height: 1.1;
+}
+
+.flashcards-comparison-buttons button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
 .flashcards-recording-row {
   width: 100%;
   height: 64px;
@@ -662,7 +698,12 @@ Patch 2: themed visual system + difficulty flow
   align-items: center;
   gap: 16px;
 }
-.flashcards-stop-btn { flex: 0 0 64px; padding: 0; }
+
+.flashcards-stop-btn {
+  flex: 0 0 64px;
+  padding: 0;
+}
+
 .flashcards-meter {
   flex: 1;
   min-width: 0;
@@ -671,13 +712,45 @@ Patch 2: themed visual system + difficulty flow
   border-radius: 12px;
   padding: 6px 10px;
 }
-.flashcards-meter-label { display: block; font-size: 1rem; font-weight: 800; line-height: 1.2; }
-.flashcards-meter-bars { display: flex; gap: 3px; height: 18px; margin-top: 3px; }
-.flashcards-meter-bars i { flex: 1; background: #e0e0e0; border-radius: 2px; }
-.flashcards-meter-bars .is-lit { background: var(--flashcards-accent); box-shadow: inset 0 0 0 1px #333333; }
-.flashcards-meter.is-static .flashcards-meter-bars { visibility: hidden; }
+
+.flashcards-meter-label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.flashcards-meter-bars {
+  display: flex;
+  gap: 3px;
+  height: 18px;
+  margin-top: 3px;
+}
+
+.flashcards-meter-bars i {
+  flex: 1;
+  background: #e0e0e0;
+  border-radius: 2px;
+}
+
+.flashcards-meter-bars .is-lit {
+  background: var(--flashcards-accent);
+}
+
+.flashcards-meter.is-static .flashcards-meter-bars {
+  visibility: hidden;
+}
+
 @media (max-height: 650px) {
-  .flashcards-recording-row { height: 48px; }
-  .flashcards-stop-btn { flex-basis: 48px; }
-  .flashcards-comparison-shell .flashcards-record-preview { min-height: 48px; }
+  .flashcards-recording-row {
+    height: 48px;
+  }
+
+  .flashcards-stop-btn {
+    flex-basis: 48px;
+  }
+
+  .flashcards-comparison-shell .flashcards-record-preview {
+    min-height: 48px;
+  }
 }
