@@ -4544,6 +4544,13 @@ function updateVerseProgress(verseId, updater) {
   saveProgress(progress);
 }
 
+function getMemoryBadge(level) {
+  const label = { practicing: "Practicing", getting_close: "Improving", memorized: "Memorized" }[level];
+  if (!label) return null;
+  const base = `flashcards/flashcard_badge_${level}`;
+  return { label, image: `${base}.png`, smallImage: `${base}_small.png` };
+}
+
 function recordFlashcardAttempt(verseId, mode, grade) {
   if (!verseId || !mode || !grade) return;
   const levels = { practicing: 1, getting_close: 2, memorized: 3 };
@@ -7058,6 +7065,7 @@ window.BibloZooFlashcards
 
     getVerseProgress,
     getVerseProgressSnapshot: () => loadProgress().verses,
+    getMemoryBadge,
     playVersePreview: playVerseDetailListen,
     stopVersePreview: cancelVerseDetailListen,
     recordFlashcardAttempt,
@@ -13712,6 +13720,8 @@ function screenMyVerses(idx) {
         verseId
       );
 
+    const memoryBadge = getMemoryBadge(verseProgress.flashcards?.bestMemoryLevel);
+
     const statusLabel =
       !unlocked
         ? "Play to Unlock"
@@ -13733,12 +13743,14 @@ function screenMyVerses(idx) {
 
     return `
       <button
-        class="new-verse-card my-verses-learned-card no-zoom${isCurrent ? " is-current" : ""}${unlocked ? "" : " is-pending-unlock"}"
+        class="new-verse-card my-verses-learned-card no-zoom${isCurrent ? " is-current" : ""}${unlocked ? "" : " is-pending-unlock"}${memoryBadge ? " has-memory-badge" : ""}"
         type="button"
         data-my-verse-id="${escapeHtml(verseId)}"
         ${isCurrent ? 'aria-current="true"' : ""}
-        aria-label="Select ${escapeHtml(ref)}, ${escapeHtml(statusLabel)}"
+        aria-label="Select ${escapeHtml(ref)}, ${escapeHtml(statusLabel)}${memoryBadge ? `, Best Memory Badge: ${memoryBadge.label}` : ""}"
       >
+        ${memoryBadge ? `<img class="my-verses-memory-badge" src="${memoryBadge.smallImage}"
+          alt="" title="Best Memory Badge: ${memoryBadge.label}" draggable="false">` : ""}
         <div
           class="my-verses-card-pet"
           style="--my-verses-pet-feet-from-bottom: ${escapeHtml(feetFromBottom)};"

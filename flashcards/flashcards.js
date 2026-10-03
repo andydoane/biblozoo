@@ -879,6 +879,7 @@
 
 
   function renderResult(wrap) {
+    const badge = api.getMemoryBadge(api.getVerseProgress(state.selectedVerseId)?.flashcards?.bestMemoryLevel);
     const messages = { perfect: ["Amazing!", "You nailed that verse!"], mostly_right: ["Great work!", "You're really close!"], needs_practice: ["Great work!", "Keep practicing and you'll soon know it by heart!"] };
     const [title, copy] = messages[state.grade] || messages.needs_practice;
     wrap.innerHTML = `
@@ -888,6 +889,10 @@
           ${renderMascot("flashcards-overlap-mascot")}
           <h1 class="flashcards-next-title">${title}</h1>
           <p class="flashcards-next-copy">${copy}</p>
+          ${badge ? `<div class="flashcards-result-badge">
+            <img src="${badge.image}" alt="" draggable="false">
+            <div>Best Memory Badge<strong>${badge.label}</strong></div>
+          </div>` : ""}
           <button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button>
           <button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button>
           <button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button>
