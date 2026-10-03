@@ -69,6 +69,7 @@
   let countdownTimer = null;
   let countdownFrame = null;
   let meterFrame = null;
+  let comparisonPlaybackStarted = false;
   let finishCountdown = null;
 
   function cancelCountdown() {
@@ -98,7 +99,7 @@
             }
             const number = document.querySelector(".flashcards-countdown-number");
             if (!document.hasFocus() || !number?.isConnected ||
-                !number.getBoundingClientRect().height) {
+              !number.getBoundingClientRect().height) {
               armAfterPaint();
               return;
             }
@@ -153,6 +154,7 @@
     cancelCountdown();
     cancelAnimationFrame(meterFrame);
     meterFrame = null;
+    comparisonPlaybackStarted = false;
     recording?.dispose();
     recordingNotice = "";
   }
@@ -239,7 +241,7 @@
   function pickRandomThemeId() {
     const theme =
       FLASHCARD_THEMES[
-        Math.floor(Math.random() * FLASHCARD_THEMES.length)
+      Math.floor(Math.random() * FLASHCARD_THEMES.length)
       ];
 
     return theme?.id || "purple";
@@ -356,8 +358,8 @@
       >
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           ${isLanding
-            ? '<path d="M12 3L3 10h2v9h5v-6h4v6h5v-9h2L12 3z" fill="currentColor"/>'
-            : '<path d="m14 5-7 7 7 7M7 12h14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'}
+        ? '<path d="M12 3L3 10h2v9h5v-6h4v6h5v-9h2L12 3z" fill="currentColor"/>'
+        : '<path d="m14 5-7 7 7 7M7 12h14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'}
         </svg>
       </button>
     `;
@@ -557,7 +559,7 @@
         </section>
         <div class="flashcards-recall-actions">
           ${controlButton("flashcardsRecordStartBtn", "record",
-            requesting ? "Waiting for microphone…" : "Record", requesting)}
+      requesting ? "Waiting for microphone…" : "Record", requesting)}
           ${recordingNotice ? `<p class="flashcards-recording-note" role="status">
             ${escapeHtml(recordingNotice)}
           </p>` : ""}
@@ -690,18 +692,21 @@
           ${renderMascot("flashcards-overlap-mascot")}
           <section class="flashcards-card-front flashcards-recall-card">
             ${renderReferencePill(selected.ref || selected.id)}
-            <div class="learn-stage flashcards-recall-stage">
-              <div class="smart-learn-text" data-smart-learn-text>
-                <div class="smart-learn-body">${escapeHtml(selected.verseText)}</div>
-              </div>
-            </div>
+<div class="learn-stage flashcards-recall-stage flashcards-comparison-stage${comparisonPlaybackStarted ? " flashcards-comparison-active" : ""}">
+  <p class="flashcards-comparison-instruction">
+    Listen to your recording, then compare it with the verse.
+  </p>
+  <div class="smart-learn-text" data-smart-learn-text>
+    <div class="smart-learn-body">${escapeHtml(selected.verseText)}</div>
+  </div>
+</div>
           </section>
         </div>
         <div class="flashcards-recall-actions">
           ${audio.hasRecording || waiting ? controlButton("flashcardsPlayBtn",
-            waiting ? "record" : audio.status === "playing" ? "stop" : "play",
-            waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
-            waiting || audio.status === "loading") : ""}
+      waiting ? "record" : audio.status === "playing" ? "stop" : "play",
+      waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
+      waiting || audio.status === "loading") : ""}
           ${message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(message)}</p>` : ""}
           <div class="flashcards-comparison-buttons">
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
@@ -714,7 +719,11 @@
     `;
     api.scheduleSmartLearnTextFit(wrap);
     const play = wrap.querySelector("#flashcardsPlayBtn");
-    if (play) play.onclick = () => { void recording.play(); };
+    if (play) play.onclick = () => {
+  comparisonPlaybackStarted = true;
+  requestRender();
+  void recording.play();
+};
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
@@ -827,7 +836,7 @@
 
     if (state.view !== "landing" && !getSelectedVerse()) resetSession();
     if (["recording_intro", "challenge", "comparison", "challenge_complete", "result"].includes(state.view) &&
-        !getDifficultyOption(state.difficulty)) state.view = "difficulty";
+      !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
     const isLanding =
       state.view === "landing";
@@ -870,7 +879,7 @@
       : api.scheduleSmartLearnTextFit(wrap);
     if (instructionView) {
       requestAnimationFrame(fit);
-      document.fonts?.ready.then(fit).catch(() => {});
+      document.fonts?.ready.then(fit).catch(() => { });
     }
     if (["recording_intro", "challenge", "comparison"].includes(state.view) && typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(fit);
@@ -896,8 +905,8 @@
     if (!recording) recording = window.BibloZooRecording.create({
       onChange: () => {
         if (state.view === "comparison" &&
-            ["requesting", "preparing"].includes(recording?.snapshot().status) &&
-            showRerecordWaiting()) return;
+          ["requesting", "preparing"].includes(recording?.snapshot().status) &&
+          showRerecordWaiting()) return;
         if (recording?.snapshot().status === "ready" && state.view === "challenge") {
           state.view = "comparison";
         }

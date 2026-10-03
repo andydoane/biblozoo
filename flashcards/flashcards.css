@@ -754,3 +754,49 @@ Patch 2: themed visual system + difficulty flow
     min-height: 48px;
   }
 }
+
+.flashcards-comparison-stage {
+  position: relative;
+}
+
+.flashcards-comparison-instruction {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 24ch);
+  margin: auto;
+  padding: 20px;
+  color: #333333;
+  font-size: clamp(1.5rem, min(7vw, 8vh), 3rem);
+  font-weight: 800;
+  line-height: 1.12;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+  opacity: 1;
+  transition: opacity 260ms ease;
+}
+
+.flashcards-comparison-stage .smart-learn-text {
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.flashcards-comparison-stage.flashcards-comparison-active .flashcards-comparison-instruction {
+  opacity: 0;
+}
+
+.flashcards-comparison-stage.flashcards-comparison-active .smart-learn-text {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .flashcards-comparison-instruction,
+  .flashcards-comparison-stage .smart-learn-text {
+    transition: none;
+  }
+}
