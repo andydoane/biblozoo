@@ -16,6 +16,7 @@ Patch 2: themed visual system + difficulty flow
   height: 100%;
   min-height: 0;
   overflow-y: auto;
+  touch-action: manipulation;
   -webkit-overflow-scrolling: touch;
   background-color: var(--flashcards-accent);
   background-image: var(--flashcards-bg-phone);
