@@ -37,17 +37,17 @@
   const DIFFICULTY_OPTIONS = Object.freeze([
     Object.freeze({
       id: "really_well",
-      label: "Really Well",
+      label: "No Help",
       helper: "Say it with no help at all"
     }),
     Object.freeze({
       id: "pretty_good",
-      label: "Pretty Good",
+      label: "First Letters",
       helper: "Say it with just the first letters"
     }),
     Object.freeze({
       id: "still_learning",
-      label: "Still Learning",
+      label: "Pictures",
       helper: "Say it with words and pictures"
     })
   ]);
@@ -559,12 +559,11 @@
 
             <button class="flashcards-listen-btn" id="flashcardsListenBtn"
               type="button" data-no-ui-sound aria-pressed="${previewPlaying}">
-              <span aria-hidden="true">${previewPlaying ? "■" : "▶"}</span>
               ${previewPlaying ? "Stop Listening" : "Listen to the Verse"}
             </button>
             ${previewMessage ? `<span class="flashcards-listen-message" role="status">${escapeHtml(previewMessage)}</span>` : ""}
           <h1 class="flashcards-difficulty-title">
-            How well do you<br>know this verse?
+            How do you want to say the verse?
           </h1>
 
           <div class="flashcards-choice-stack">
@@ -642,8 +641,8 @@
             ${escapeHtml(recordingNotice)}
           </p>` : ""}
           <div class="flashcards-comparison-buttons">
-            <button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
-              type="button">Go Back</button>
+            ${explaining ? `<button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
+              type="button">Go Back</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
               type="button">${explaining ? "Next" : "Skip Recording"}</button>
           </div>
@@ -657,7 +656,8 @@
       record.disabled = true;
       record.setAttribute("aria-hidden", "true");
     }
-    wrap.querySelector("#flashcardsIntroBackBtn").onclick = goBack;
+    const introBack = wrap.querySelector("#flashcardsIntroBackBtn");
+    if (introBack) introBack.onclick = goBack;
     const next = wrap.querySelector("#flashcardsSkipRecordingBtn");
     next.onclick = explaining ? async () => {
       if (next.disabled) return;
