@@ -14379,6 +14379,7 @@ function screenVerseDetail(idx) {
       )
     : lockIconHtml("lock-icon-status");
   const statusText = getBibloPetStatusText(verseProgress);
+  const memoryBadge = getMemoryBadge(verseProgress.flashcards?.bestMemoryLevel);
   const petStatus = getBibloPetStatus(verseProgress);
   const petAnimationClass = unlocked ? getBibloPetAnimationClass(verseId, verseProgress) : "";
   const petBackgroundClass = unlocked ? getVerseBackgroundClass(verseId, verseProgress) : "";
@@ -14556,6 +14557,16 @@ function screenVerseDetail(idx) {
         <div class="pet-status-card">
           <div class="pet-status-label">BibloPet Status:</div>
           <div class="pet-status-visual">${statusVisual}</div>
+        </div>
+
+        <div class="pet-status-card">
+          <div class="pet-status-label">Memory Badge:</div>
+          <div class="pet-status-visual" role="img"
+            aria-label="${memoryBadge ? escapeHtml(memoryBadge.label) : "No Memory Badge earned yet"}">
+            ${memoryBadge ? `<img class="pet-status-img pet-status-img-detail"
+              src="${escapeHtml(memoryBadge.smallImage)}" alt="" draggable="false">`
+              : lockIconHtml("lock-icon-status")}
+          </div>
         </div>
 
         <div class="pet-helper-text">${statusText}</div>
