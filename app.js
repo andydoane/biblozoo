@@ -6083,6 +6083,8 @@ function getBibloPetAnimationClass(verseId, verseProgress) {
 }
 
 function startPetAnimationCycle(verseId, verseProgress) {
+  const ownerScreen = State.screen;
+  if (![Screen.MY_VERSES, Screen.VERSE_DETAIL].includes(ownerScreen)) return;
   const status = getBibloPetStatus(verseProgress);
 
   if (status !== "happy") {
@@ -6095,6 +6097,10 @@ function startPetAnimationCycle(verseId, verseProgress) {
   if (State.petAnimTimer) return;
 
   function scheduleIdle() {
+    if (State.screen !== ownerScreen) {
+      clearPetAnimationCycle();
+      return;
+    }
     State.petAnimPhase = "idle";
     State.petAnimActionClass = "";
     render();
@@ -6108,6 +6114,10 @@ function startPetAnimationCycle(verseId, verseProgress) {
   }
 
   function scheduleAction() {
+    if (State.screen !== ownerScreen) {
+      clearPetAnimationCycle();
+      return;
+    }
     const action =
       HAPPY_PET_ANIMATIONS[Math.floor(Math.random() * HAPPY_PET_ANIMATIONS.length)];
 
@@ -13931,6 +13941,9 @@ function screenMyVerses(idx) {
   }
 
   requestAnimationFrame(() => {
+    // The outgoing My Verses slide is also rendered during navigation.
+    // Its deferred setup must not restart timers on the incoming picker.
+    if (!wrap.isConnected || State.screen !== Screen.MY_VERSES) return;
     applyPetMotionVars(wrap);
     startHungryFoodCycle(
       wrap,
