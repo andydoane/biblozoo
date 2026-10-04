@@ -13773,15 +13773,6 @@ function screenMyVerses(idx) {
             ${bibloPetVisualHtml(verseId, petEmoji)}
           </div>
 
-          ${
-            unlocked
-              ? ""
-              : `
-                <div class="my-verses-card-lock-badge">
-                  ${lockIconHtml("my-verses-pending-lock-icon")}
-                </div>
-              `
-          }
         </div>
 
         <div

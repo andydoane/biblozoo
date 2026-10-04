@@ -875,11 +875,23 @@
     const badge = api.getMemoryBadge(bestLevel);
     const title = state.grade === "perfect" ? "Amazing!" : "Great work!";
     const guidance = {
-      practicing: "Next time, try First Letters and see how much you remember!",
-      getting_close: "Next time, try No Help and see how you do!",
-      memorized: "You’ve memorized this verse! Keep practicing to help it stick."
+      still_learning: {
+        perfect: "Next time, try saying it with just the first letters!",
+        mostly_right: "Try Pictures again and see if you can remember the whole verse!",
+        needs_practice: "Listen to the verse again, then give Pictures another try!"
+      },
+      pretty_good: {
+        perfect: "Next time, try saying it without any help!",
+        mostly_right: "Try First Letters again—you’re getting closer!",
+        needs_practice: "Try Pictures next time to help you remember more of the verse!"
+      },
+      really_well: {
+        perfect: "You’ve memorized this verse! Keep practicing to help it stick.",
+        mostly_right: "You’re almost there! Try No Help again and see how you do!",
+        needs_practice: "Try First Letters next time for a little help remembering!"
+      }
     };
-    const copy = guidance[bestLevel] || "Keep practicing and see how much you remember!";
+    const copy = guidance[state.difficulty]?.[state.grade] || "Keep practicing and see how much you remember!";
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-stage-shell">
