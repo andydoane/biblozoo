@@ -13,6 +13,8 @@
     let player = null;
     let url = "";
     let stopTimer = null;
+    let limitTimer = null;
+    let recordingDeadline = 0;
     let message = "";
     let meterContext = null;
     let meterSource = null;
@@ -63,6 +65,9 @@
     const stopTracks = (value) => value?.getTracks().forEach((track) => track.stop());
 
     function dispose() {
+      clearTimeout(limitTimer);
+      limitTimer = null;
+      recordingDeadline = 0;
       generation += 1;
       closeMeter();
       clearTimeout(stopTimer);
@@ -94,7 +99,7 @@
       onInterrupted?.();
     }
 
-    async function start(onStart, beforeStart) {
+    async function start(onStart, beforeStart, getLimitMs = () => 120000) {
       dispose();
       const current = generation;
       prepareMeter();
@@ -129,6 +134,9 @@
         });
         recorder.onstop = () => {
           if (current !== generation) return;
+          clearTimeout(limitTimer);
+          limitTimer = null;
+          recordingDeadline = 0;
           clearTimeout(stopTimer);
           stopTimer = null;
           closeMeter();
@@ -169,6 +177,12 @@
         if (current !== generation) return "cancelled";
         recorder.start();
         status = "recording";
+        const requestedLimit = getLimitMs();
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 120000;
+        recordingDeadline = performance.now() + limit;
+        limitTimer = setTimeout(() => {
+          if (current === generation) stop();
+        }, limit);
         notify();
         return "recording";
       } catch (_) {
@@ -181,6 +195,9 @@
 
     function stop() {
       if (status !== "recording") return;
+      clearTimeout(limitTimer);
+      limitTimer = null;
+      recordingDeadline = 0;
       status = "stopping";
       closeMeter();
       notify();
@@ -233,7 +250,8 @@
 
     return Object.freeze({
       start, stop, play, pause, dispose, readLevel,
-      snapshot: () => ({ status, hasRecording: !!url, message })
+      snapshot: () => ({ status, hasRecording: !!url, message,
+        remainingSeconds: status === "recording" ? Math.max(0, Math.ceil((recordingDeadline - performance.now()) / 1000)) : null })
     });
   }
 })();

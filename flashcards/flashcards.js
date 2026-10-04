@@ -179,7 +179,7 @@
     const result = await recording.start(() => {
       state.view = "challenge";
       requestRender();
-    }, () => runCountdown(request));
+    }, () => runCountdown(request), () => recordingLimitMs);
     if (request !== recordRequest || result !== "failed") return;
     state.view = "recording_intro";
     requestRender();
@@ -286,6 +286,8 @@
   }
 
   function resetSession() {
+    limitRequest += 1;
+    recordingLimitMs = 120000;
     discardRecording();
     resizeObserver?.disconnect();
     resizeObserver = null;
@@ -328,11 +330,20 @@
     beginRound(randomVerse.id);
   }
 
+  let recordingLimitMs = 120000;
+  let limitRequest = 0;
+
   function chooseDifficulty(difficultyId) {
     const option = getDifficultyOption(difficultyId);
     if (!option) return;
 
     stopVersePreview();
+    recordingLimitMs = 120000;
+    const request = ++limitRequest;
+    const verseId = state.selectedVerseId;
+    void api.getRecordingLimit(verseId).then((limit) => {
+      if (request === limitRequest && state.selectedVerseId === verseId) recordingLimitMs = limit;
+    }).catch(() => {});
     state.difficulty = option.id;
     state.view = "difficulty_intro";
     requestRender();
@@ -767,6 +778,10 @@
     let level = 0;
     const sample = () => {
       if (!wrap.isConnected || recording.snapshot().status !== "recording") return;
+      const remaining = recording.snapshot().remainingSeconds;
+      const label = meter.querySelector(".flashcards-meter-label");
+      const text = remaining <= 10 ? `● ${remaining}s left` : "● Recording";
+      if (label && label.textContent !== text) label.textContent = text;
       const value = reduced.matches ? null : recording.readLevel();
       meter.classList.toggle("is-static", value === null);
       level = value === null ? 0 : Math.max(value, level * 0.85);

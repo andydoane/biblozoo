@@ -4544,6 +4544,47 @@ function updateVerseProgress(verseId, updater) {
   saveProgress(progress);
 }
 
+const FLASHCARD_RECORDING_MULTIPLIER = 1.75;
+const FLASHCARD_RECORDING_MIN_MS = 20000;
+const FLASHCARD_RECORDING_FALLBACK_MS = 120000;
+
+function readFlashcardAudioDuration(file) {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    let settled = false;
+    const finish = (seconds) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      audio.onloadedmetadata = audio.ondurationchange = audio.onerror = null;
+      audio.removeAttribute("src");
+      audio.load();
+      resolve(seconds);
+    };
+    const timer = setTimeout(() => finish(null), 4000);
+    const check = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) finish(audio.duration);
+    };
+    audio.onloadedmetadata = audio.ondurationchange = check;
+    audio.onerror = () => finish(null);
+    audio.preload = "metadata";
+    audio.src = file;
+    audio.load();
+  });
+}
+
+async function getFlashcardRecordingLimit(verseId) {
+  try {
+    const durations = await Promise.all([
+      readFlashcardAudioDuration(`${AUDIO_DIR}${verseId}_ref.mp3`),
+      readFlashcardAudioDuration(`${AUDIO_DIR}${verseId}.mp3`)
+    ]);
+    if (durations.some((value) => value === null)) return FLASHCARD_RECORDING_FALLBACK_MS;
+    return Math.max(FLASHCARD_RECORDING_MIN_MS,
+      Math.ceil((durations[0] + durations[1]) * 1000 * FLASHCARD_RECORDING_MULTIPLIER));
+  } catch (_) { return FLASHCARD_RECORDING_FALLBACK_MS; }
+}
+
 function getMemoryBadge(level) {
   const label = { practicing: "Practicing", getting_close: "Improving", memorized: "Memorized" }[level];
   if (!label) return null;
@@ -7076,6 +7117,7 @@ window.BibloZooFlashcards
     getVerseProgress,
     getVerseProgressSnapshot: () => loadProgress().verses,
     getCurrentVerseId: () => VERSE_ID,
+    getRecordingLimit: getFlashcardRecordingLimit,
     getMemoryBadge,
     playVersePreview: playVerseDetailListen,
     stopVersePreview: cancelVerseDetailListen,
