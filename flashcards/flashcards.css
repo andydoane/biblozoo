@@ -669,6 +669,7 @@ Patch 2: themed visual system + difficulty flow
 }
 
 #flashcardsNextBtn:disabled {
+  pointer-events: none;
   opacity: 0.45;
   cursor: default;
 }
