@@ -386,23 +386,9 @@ Patch 2: themed visual system + difficulty flow
   line-height: 1;
 }
 
-.flashcards-result-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  max-width: 100%;
+.flashcards-result-badge-label {
   font-size: 1rem;
   line-height: 1.2;
-}
-.flashcards-result-badge img {
-  width: clamp(72px, 12vh, 120px);
-  height: auto;
-  flex: 0 0 auto;
-}
-.flashcards-result-badge strong {
-  display: block;
-  font-size: 1.25rem;
 }
 
 .flashcards-next-copy {

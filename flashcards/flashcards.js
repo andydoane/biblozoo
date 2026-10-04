@@ -871,27 +871,31 @@
 
 
   function renderResult(wrap) {
-    const badge = api.getMemoryBadge(api.getVerseProgress(state.selectedVerseId)?.flashcards?.bestMemoryLevel);
-    const messages = { perfect: ["Amazing!", "You nailed that verse!"], mostly_right: ["Great work!", "You're really close!"], needs_practice: ["Great work!", "Keep practicing and you'll soon know it by heart!"] };
-    const [title, copy] = messages[state.grade] || messages.needs_practice;
+    const bestLevel = api.getVerseProgress(state.selectedVerseId)?.flashcards?.bestMemoryLevel;
+    const badge = api.getMemoryBadge(bestLevel);
+    const title = state.grade === "perfect" ? "Amazing!" : "Great work!";
+    const guidance = {
+      practicing: "Next time, try First Letters and see how much you remember!",
+      getting_close: "Next time, try No Help and see how you do!",
+      memorized: "You’ve memorized this verse! Keep practicing to help it stick."
+    };
+    const copy = guidance[bestLevel] || "Keep practicing and see how much you remember!";
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-stage-shell">
         <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
-          ${renderMascot("flashcards-overlap-mascot")}
+          ${badge ? `<img class="flashcards-overlap-mascot" src="${badge.image}"
+            alt="${badge.label}" draggable="false">
+            <div class="flashcards-result-badge-label">Best Memory Badge</div>` : ""}
           <h1 class="flashcards-next-title">${title}</h1>
           <p class="flashcards-next-copy">${copy}</p>
-          ${badge ? `<div class="flashcards-result-badge">
-            <img src="${badge.image}" alt="" draggable="false">
-            <div>Best Memory Badge<strong>${badge.label}</strong></div>
-          </div>` : ""}
-          <button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button>
+          <button class="flashcards-primary-btn" id="flashcardsBackToTitleBtn" type="button">Back to Title</button>
           <button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button>
           <button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button>
         </section>
       </div>
     `;
-    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { discardRecording(); state.grade = ""; state.view = "difficulty"; requestRender(); };
+    wrap.querySelector("#flashcardsBackToTitleBtn").onclick = () => { start(); requestRender(); };
     wrap.querySelector("#flashcardsRandomBtn").onclick = chooseRandomVerse;
   }
   function bindCommonActions(wrap) {
