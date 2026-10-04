@@ -16,6 +16,8 @@
     let limitTimer = null;
     let recordingDeadline = 0;
     let message = "";
+    let playbackComplete = false;
+    let playbackFailed = false;
     let meterContext = null;
     let meterSource = null;
     let analyser = null;
@@ -65,6 +67,8 @@
     const stopTracks = (value) => value?.getTracks().forEach((track) => track.stop());
 
     function dispose() {
+      playbackComplete = false;
+      playbackFailed = false;
       clearTimeout(limitTimer);
       limitTimer = null;
       recordingDeadline = 0;
@@ -149,11 +153,15 @@
           player = new Audio(url);
           player.onended = () => {
             if (current !== generation) return;
+            playbackComplete = true;
+            playbackFailed = false;
+            message = "";
             status = "ready";
             notify();
           };
           player.onerror = () => {
             if (current !== generation) return;
+            playbackFailed = true;
             status = "ready";
             message = "This recording couldn't play. You can re-record or continue.";
             notify();
@@ -223,6 +231,7 @@
       if (status === "playing") { pause(); return; }
       const current = generation;
       const audio = player;
+      playbackFailed = false;
       message = "";
       status = "loading";
       notify();
@@ -235,6 +244,7 @@
         if (current !== generation) return;
         status = "ready";
         message = "Playback couldn't start. Tap Play to try again.";
+        playbackFailed = true;
       }
       notify();
     }
@@ -250,7 +260,7 @@
 
     return Object.freeze({
       start, stop, play, pause, dispose, readLevel,
-      snapshot: () => ({ status, hasRecording: !!url, message,
+      snapshot: () => ({ status, hasRecording: !!url, message, playbackComplete, playbackFailed,
         remainingSeconds: status === "recording" ? Math.max(0, Math.ceil((recordingDeadline - performance.now()) / 1000)) : null })
     });
   }

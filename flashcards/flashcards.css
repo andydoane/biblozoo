@@ -667,6 +667,11 @@ Patch 2: themed visual system + difficulty flow
   flex: 1;
 }
 
+#flashcardsNextBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .flashcards-record-preview:disabled {
   opacity: 0.65;
   cursor: wait;

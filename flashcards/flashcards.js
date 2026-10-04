@@ -796,6 +796,7 @@
     const audio = recording.snapshot();
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
+    const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
     const comparisonInstruction = audio.hasRecording || waiting
       ? "Listen to your recording, then compare it with the verse."
       : "Check the verse and see how you did.";
@@ -827,8 +828,11 @@
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
-              type="button" ${waiting ? "disabled" : ""}>${needsVerseCheck ? "Check Verse" : "Next"}</button>
+              type="button" ${nextDisabled ? "disabled" : ""}>${needsVerseCheck ? "Check Verse" : "Next"}</button>
           </div>
+          ${audio.playbackFailed && !audio.playbackComplete && !waiting ? `<button
+            class="flashcards-secondary-btn" id="flashcardsContinueUnheardBtn"
+            type="button">Continue Without Listening</button>` : ""}
         </div>
       </div>
     `;
@@ -841,7 +845,17 @@
 };
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
+    const continueUnheard = wrap.querySelector("#flashcardsContinueUnheardBtn");
+    if (continueUnheard) continueUnheard.onclick = () => {
+      if (!recording.snapshot().playbackFailed) return;
+      recording.pause();
+      state.view = "challenge_complete";
+      requestRender();
+    };
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
+      const currentAudio = recording.snapshot();
+      if (["requesting", "preparing"].includes(currentAudio.status) ||
+        (currentAudio.hasRecording && !currentAudio.playbackComplete)) return;
       if (needsVerseCheck) {
         comparisonPlaybackStarted = true;
         requestRender();
