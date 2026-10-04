@@ -298,6 +298,9 @@
 
   function start() {
     resetSession();
+    const currentId = api?.getCurrentVerseId?.();
+    state.selectedVerseId = getEligibleVerses().some((verse) => verse.id === currentId)
+      ? currentId : "";
   }
 
   function beginRound(verseId) {
@@ -393,6 +396,7 @@
 
   function renderLanding(wrap) {
     const eligible = getEligibleVerses();
+    if (!eligible.some((verse) => verse.id === state.selectedVerseId)) state.selectedVerseId = "";
 
     const bodyHtml = eligible.length
       ? `
@@ -407,11 +411,14 @@
           >
             <option value="">Choose a Verse</option>
             ${eligible.map((item) => `
-              <option value="${escapeHtml(item.id)}">
+              <option value="${escapeHtml(item.id)}" ${item.id === state.selectedVerseId ? "selected" : ""}>
                 ${escapeHtml(item.ref || item.id)}
               </option>
             `).join("")}
           </select>
+
+          <button class="flashcards-primary-btn" id="flashcardsStartBtn"
+            type="button" ${state.selectedVerseId ? "" : "disabled"}>Start</button>
 
           <button
             class="flashcards-primary-btn"
@@ -451,30 +458,15 @@
 
     const select = wrap.querySelector("#flashcardsVersePicker");
     if (select) {
-      let selectionRequest = 0;
-      select.addEventListener("pointerdown", () => {
-        console.info("[Flashcards timing] Dropdown touched; waiting for native selection.");
-      });
+      const startButton = wrap.querySelector("#flashcardsStartBtn");
       select.onchange = () => {
         const verseId = String(select.value || "").trim();
-        if (!verseId) return;
-        const started = performance.now();
-        const request = ++selectionRequest;
-        console.info("[Flashcards timing] Selection change received.");
-        select.blur();
-        // Keep the native select mounted through a rendering opportunity.
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          if (request !== selectionRequest || !select.isConnected ||
-            document.hidden || state.view !== "landing") return;
-          console.info(`[Flashcards timing] Focus-release wait before navigation: ${(performance.now() - started).toFixed(1)} ms`);
-          const renderStarted = performance.now();
-          beginRound(verseId);
-          console.info(`[Flashcards timing] Selection handling + DOM render: ${(performance.now() - renderStarted).toFixed(1)} ms; theme=${state.themeId}`);
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (state.view !== "difficulty" || state.selectedVerseId !== verseId) return;
-            console.info(`[Flashcards timing] Second frame after navigation: ${(performance.now() - renderStarted).toFixed(1)} ms; total since selection: ${(performance.now() - started).toFixed(1)} ms (not an image-load measurement).`);
-          }));
-        }));
+        state.selectedVerseId = eligible.some((verse) => verse.id === verseId) ? verseId : "";
+        // Keep the native picker mounted while it dismisses.
+        startButton.disabled = !state.selectedVerseId;
+      };
+      startButton.onclick = () => {
+        if (state.view === "landing" && !startButton.disabled) beginRound(state.selectedVerseId);
       };
     }
 

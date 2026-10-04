@@ -7065,6 +7065,7 @@ window.BibloZooFlashcards
 
     getVerseProgress,
     getVerseProgressSnapshot: () => loadProgress().verses,
+    getCurrentVerseId: () => VERSE_ID,
     getMemoryBadge,
     playVersePreview: playVerseDetailListen,
     stopVersePreview: cancelVerseDetailListen,
