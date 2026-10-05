@@ -11,6 +11,12 @@
   min-height: 100%;
   padding-bottom:
     calc(48px + var(--safeB));
+  background-color: #1f2d26;
+  background-image:
+    url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
 }
 
 .todo-dev-screen.is-daily-mode .todo-dev-clipboard {
@@ -203,6 +209,12 @@
       url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg");
     background-position: center top;
   }
+
+    .todo-dev-screen.is-daily-mode .todo-dev-page {
+      background-image:
+        url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg");
+      background-position: center top;
+    }
 
   .daily-zoo-todo-pet {
     width: 170px;
