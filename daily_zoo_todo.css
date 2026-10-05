@@ -50,18 +50,17 @@
   justify-content: center;
 }
 
-.daily-zoo-todo-pet .biblopet-visual {
+.daily-zoo-todo-pet
+  .daily-zoo-todo-profile-picture {
   width: 100%;
   height: 100%;
-  font-size: clamp(92px, 24vw, 168px);
+  border-radius: 50%;
 }
 
-.daily-zoo-todo-pet .biblopet-img {
-  width: 1em;
-  height: 1em;
-  max-width: none;
-  max-height: none;
-  object-fit: contain;
+.daily-zoo-todo-pet
+  .daily-zoo-todo-profile-picture
+  .profile-picture-fallback {
+  font-size: clamp(64px, 18vw, 130px);
 }
 
 .daily-zoo-todo-pet-name {

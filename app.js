@@ -14219,11 +14219,13 @@ function screenTodoDev(idx) {
               )
             : "",
           petVisualHtml: dailyVerseId
-            ? bibloPetVisualHtml(
+            ? profilePictureVisualHtml(
                 dailyVerseId,
-                getBibloPetEmojiForVerseId(
-                  dailyVerseId
-                )
+                {
+                  className:
+                    "daily-zoo-todo-profile-picture",
+                  alt: ""
+                }
               )
             : "",
           gameRegistry:
