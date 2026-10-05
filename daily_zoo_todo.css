@@ -258,3 +258,238 @@
     transition: none;
   }
 }
+
+.todo-dev-screen.is-daily-mode.has-daily-completion-ui
+  .todo-dev-paper {
+  z-index: 50;
+}
+
+.daily-completion-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(22px + var(--safeT))
+    16px
+    calc(22px + var(--safeB));
+}
+
+.daily-completion-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.daily-completion-modal {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 440px);
+  border-radius:
+    clamp(26px, 7vw, 38px);
+  background: #ffffff;
+  padding:
+    clamp(24px, 6vw, 38px)
+    clamp(20px, 5vw, 34px)
+    clamp(22px, 5.5vw, 34px);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(14px, 3.8vw, 22px);
+  text-align: center;
+}
+
+.daily-completion-pet {
+  width: clamp(104px, 27vw, 150px);
+  height: clamp(104px, 27vw, 150px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.daily-completion-pet
+  .daily-zoo-todo-profile-picture {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.daily-completion-pet
+  .daily-zoo-todo-profile-picture
+  .profile-picture-fallback {
+  font-size: clamp(58px, 15vw, 98px);
+}
+
+.daily-completion-thanks {
+  max-width: 16ch;
+  color: #333333;
+  font-size: clamp(23px, 5.8vw, 34px);
+  font-weight: 900;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.daily-completion-check {
+  width: clamp(90px, 24vw, 132px);
+  height: clamp(90px, 24vw, 132px);
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.daily-completion-button {
+  width: min(100%, 320px);
+  min-height: clamp(58px, 14vw, 72px);
+  border: none;
+  border-radius:
+    clamp(18px, 4.5vw, 26px);
+  background: #7f66c6;
+  color: #ffffff;
+  padding: 10px 22px;
+  font: inherit;
+  font-size: clamp(22px, 5.5vw, 30px);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+}
+
+.daily-completion-button:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.16);
+}
+
+.daily-completion-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.daily-medal-toast {
+  position: fixed;
+  z-index: 130;
+  top: calc(16px + var(--safeT));
+  left: 50%;
+  width: min(calc(100vw - 28px), 430px);
+  min-height: 82px;
+  border-radius: 22px;
+  background: #333333;
+  color: #ffffff;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  opacity: 0;
+  transform:
+    translate(-50%, -18px);
+  animation:
+    dailyMedalToastLife
+    3600ms
+    ease
+    forwards;
+}
+
+.daily-medal-toast-img {
+  flex: 0 0 62px;
+  width: 62px;
+  height: 62px;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.daily-medal-toast-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.daily-medal-toast-label {
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.daily-medal-toast-label strong {
+  font-weight: 900;
+}
+
+.daily-medal-toast-game {
+  color: #ffc751;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+@keyframes dailyMedalToastLife {
+  0% {
+    opacity: 0;
+    transform:
+      translate(-50%, -18px);
+  }
+
+  10%,
+  82% {
+    opacity: 1;
+    transform:
+      translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -10px);
+  }
+}
+
+@media (max-width: 380px) {
+  .daily-completion-layer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .daily-completion-modal {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .daily-medal-toast {
+    width: calc(100vw - 20px);
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .daily-medal-toast-img {
+    flex-basis: 54px;
+    width: 54px;
+    height: 54px;
+  }
+
+  .daily-medal-toast-label {
+    font-size: 15px;
+  }
+
+  .daily-medal-toast-game {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-medal-toast {
+    transform: translate(-50%, 0);
+    animation-timing-function: linear;
+  }
+}
