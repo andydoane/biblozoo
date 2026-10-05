@@ -1,0 +1,249 @@
+.todo-dev-screen.is-daily-mode {
+  background-color: #1f2d26;
+  background-image:
+    url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+.todo-dev-screen.is-daily-mode .todo-dev-page {
+  min-height: 100%;
+  padding-bottom:
+    calc(48px + var(--safeB));
+}
+
+.todo-dev-screen.is-daily-mode .todo-dev-clipboard {
+  margin-top: clamp(34px, 7vw, 60px);
+}
+
+.todo-dev-screen.is-daily-mode .todo-dev-paper {
+  padding-top: clamp(48px, 8vw, 72px);
+}
+
+.todo-dev-screen.is-daily-mode .todo-dev-title-img {
+  margin-bottom:
+    clamp(16px, 3.8vw, 30px);
+}
+
+.daily-zoo-todo-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.6vw, 12px);
+  margin:
+    0 auto clamp(16px, 4vw, 28px);
+}
+
+.daily-zoo-todo-pet {
+  width: clamp(112px, 28vw, 190px);
+  height: clamp(112px, 28vw, 190px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.daily-zoo-todo-pet .biblopet-visual {
+  width: 100%;
+  height: 100%;
+  font-size: clamp(92px, 24vw, 168px);
+}
+
+.daily-zoo-todo-pet .biblopet-img {
+  width: 1em;
+  height: 1em;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+}
+
+.daily-zoo-todo-pet-name {
+  max-width: 100%;
+  color: #333333;
+  font-size: clamp(28px, 7vw, 44px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.daily-zoo-todo-heading {
+  width: min(100%, 420px);
+  margin:
+    0 auto clamp(20px, 5vw, 34px);
+  border-radius:
+    clamp(18px, 4vw, 26px);
+  padding:
+    clamp(8px, 2vw, 13px)
+    clamp(16px, 4vw, 24px);
+  background: #333333;
+  color: #ffffff;
+  font-size: clamp(24px, 6vw, 38px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+}
+
+.daily-zoo-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 4.8vw, 36px);
+}
+
+.daily-zoo-todo-row {
+  width: 100%;
+  min-height:
+    clamp(104px, 27vw, 172px);
+  border: none;
+  border-radius:
+    clamp(20px, 5vw, 34px);
+  padding:
+    clamp(8px, 2vw, 14px)
+    clamp(14px, 3vw, 22px);
+  background:
+    var(--daily-todo-row-bg, #7f66c6);
+  color:
+    var(--daily-todo-row-text, #ffffff);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 4vw, 28px);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 90ms ease,
+    opacity 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daily-zoo-todo-row:not(:disabled):active {
+  transform: scale(0.985);
+}
+
+.daily-zoo-todo-row:disabled {
+  cursor: default;
+}
+
+.daily-zoo-todo-row.is-complete {
+  opacity: 1;
+}
+
+.daily-zoo-todo-row.is-faded {
+  opacity: 0.36;
+}
+
+.daily-zoo-todo-row-icon {
+  flex: 0 0 clamp(82px, 20vw, 138px);
+  width: clamp(82px, 20vw, 138px);
+  height: clamp(82px, 20vw, 138px);
+  border-radius:
+    clamp(16px, 4vw, 26px);
+  background:
+    rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.daily-zoo-todo-row.is-complete
+  .daily-zoo-todo-row-icon {
+  background: transparent;
+}
+
+.daily-zoo-todo-row-img {
+  width: 84%;
+  height: 84%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.daily-zoo-todo-row.is-complete
+  .daily-zoo-todo-row-img {
+  width: 92%;
+  height: 92%;
+  filter: none;
+}
+
+.daily-zoo-todo-row-fallback {
+  font-size:
+    clamp(42px, 11vw, 78px);
+  line-height: 1;
+}
+
+.daily-zoo-todo-row-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: inherit;
+  font-size:
+    clamp(24px, 6.2vw, 40px);
+  font-weight: 900;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.daily-zoo-todo-empty {
+  padding:
+    clamp(24px, 6vw, 40px)
+    clamp(12px, 3vw, 24px);
+  color: #333333;
+  font-size:
+    clamp(22px, 5.5vw, 34px);
+  font-weight: 900;
+  line-height: 1.08;
+  text-align: center;
+}
+
+@media (min-width: 700px) {
+  .todo-dev-screen.is-daily-mode {
+    background-image:
+      url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg");
+    background-position: center top;
+  }
+
+  .daily-zoo-todo-pet {
+    width: 170px;
+    height: 170px;
+  }
+
+  .daily-zoo-todo-list {
+    gap: 30px;
+  }
+
+  .daily-zoo-todo-row {
+    min-height: 150px;
+  }
+
+  .daily-zoo-todo-row-icon {
+    flex-basis: 120px;
+    width: 120px;
+    height: 120px;
+  }
+}
+
+@media (max-width: 380px) {
+  .todo-dev-screen.is-daily-mode
+    .todo-dev-page {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .daily-zoo-todo-row {
+    gap: 12px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .daily-zoo-todo-row-label {
+    font-size: 23px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-zoo-todo-row {
+    transition: none;
+  }
+}

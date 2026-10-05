@@ -14110,11 +14110,79 @@ function screenTodoDev(idx) {
   wrap.className = "todo-dev-screen";
 
   const tutorialActive = isTutorialActive();
+  const dailyTodoUi = window.BibloZooDailyTodoUI;
+  const dailyPreviewMode = !tutorialActive
+    ? dailyTodoUi?.getPreviewMode?.(
+        window.location.search
+      ) || ""
+    : "";
+  const dailyPreviewActive = !!dailyPreviewMode;
   const tutorialPageNumber = tutorialActive ? getZooTodoTutorialPageNumber() : 0;
+
+  let dailyPreviewPlan = null;
+
+  if (dailyPreviewActive) {
+    const dailyTodoApi =
+      window.BibloZooDailyTodo;
+    const profileId =
+      getProfileApi()
+        ?.getActiveProfileId?.() || "";
+
+    if (
+      dailyTodoApi &&
+      profileId
+    ) {
+      dailyPreviewPlan =
+        dailyTodoApi
+          .getOrCreatePersistedPlan?.({
+            loadProgress,
+            saveProgress,
+            profileId,
+            verseList: VERSE_LIST,
+            gameRegistry:
+              window.EXTERNAL_VERSE_GAMES || [],
+            playgroundRegistry:
+              window.EXTERNAL_VERSE_PLAYGROUND || [],
+            isPetUnlocked:
+              isBibloPetUnlocked,
+            getPetStatus:
+              getBibloPetStatus
+          })?.plan || null;
+    }
+
+    wrap.classList.add("is-daily-mode");
+  }
+
+  const dailyVerseId =
+    dailyPreviewPlan?.verseId || "";
 
   const paperBodyHtml = tutorialActive
     ? renderZooTodoTutorialHtml()
-    : renderNormalZooTodoListHtml();
+    : dailyPreviewActive
+      ? dailyTodoUi?.renderPreview?.({
+          mode: dailyPreviewMode,
+          plan: dailyPreviewPlan,
+          engine:
+            window.BibloZooDailyTodo,
+          petName: dailyVerseId
+            ? getBibloPetDisplayNameForVerseId(
+                dailyVerseId
+              )
+            : "",
+          petVisualHtml: dailyVerseId
+            ? bibloPetVisualHtml(
+                dailyVerseId,
+                getBibloPetEmojiForVerseId(
+                  dailyVerseId
+                )
+              )
+            : "",
+          gameRegistry:
+            window.EXTERNAL_VERSE_GAMES || [],
+          playgroundRegistry:
+            window.EXTERNAL_VERSE_PLAYGROUND || []
+        }) || ""
+      : renderNormalZooTodoListHtml();
 
   wrap.innerHTML = `
     ${homePillHtml("Home")}
@@ -14154,7 +14222,7 @@ function screenTodoDev(idx) {
     if (State.screen === Screen.TODO_DEV) {
       playZooTodoTutorialPageAudio(tutorialPageNumber);
     }
-  } else {
+  } else if (!dailyPreviewActive) {
     bindZooTodoRows(wrap);
     bindZooTodoCareInfo(wrap);
   }
@@ -14167,7 +14235,14 @@ function screenTodoDev(idx) {
     State.todoTutorialJustFinishedLearn = false;
   }
 
-  return makeSlide({ idx, bg: "#a7cb6f", navHidden: true, inner: wrap });
+  return makeSlide({
+    idx,
+    bg: dailyPreviewActive
+      ? "#1f2d26"
+      : "#a7cb6f",
+    navHidden: true,
+    inner: wrap
+  });
 }
 
 
