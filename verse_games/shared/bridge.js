@@ -506,13 +506,27 @@ function markCompleted(payload){
 
     saveProgress(progress);
 
-    return {
+    const completion = {
       ok: true,
       verseId: safeVerseId,
       activityId: safeActivityId,
       alreadyCompleted,
       newlyCompleted: !alreadyCompleted
     };
+
+    const params = getParams();
+    if (
+      params.dailyActivityKind === "playground" &&
+      params.dailyVerseId === safeVerseId &&
+      params.dailyActivityId === safeActivityId
+    ) {
+      returnToDailyTodo({
+        status: "success",
+        completion
+      });
+    }
+
+    return completion;
   }
 
   function wasAlreadyCompleted(verseId, gameId, mode){
