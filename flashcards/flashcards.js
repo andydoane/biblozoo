@@ -37,17 +37,17 @@
   const DIFFICULTY_OPTIONS = Object.freeze([
     Object.freeze({
       id: "really_well",
-      label: "Really Well",
+      label: "No Help",
       helper: "Say it with no help at all"
     }),
     Object.freeze({
       id: "pretty_good",
-      label: "Pretty Good",
+      label: "First Letters",
       helper: "Say it with just the first letters"
     }),
     Object.freeze({
       id: "still_learning",
-      label: "Still Learning",
+      label: "Pictures",
       helper: "Say it with words and pictures"
     })
   ]);
@@ -179,7 +179,7 @@
     const result = await recording.start(() => {
       state.view = "challenge";
       requestRender();
-    }, () => runCountdown(request));
+    }, () => runCountdown(request), () => recordingLimitMs);
     if (request !== recordRequest || result !== "failed") return;
     state.view = "recording_intro";
     requestRender();
@@ -286,6 +286,8 @@
   }
 
   function resetSession() {
+    limitRequest += 1;
+    recordingLimitMs = 120000;
     discardRecording();
     resizeObserver?.disconnect();
     resizeObserver = null;
@@ -298,6 +300,9 @@
 
   function start() {
     resetSession();
+    const currentId = api?.getCurrentVerseId?.();
+    state.selectedVerseId = getEligibleVerses().some((verse) => verse.id === currentId)
+      ? currentId : "";
   }
 
   function beginRound(verseId) {
@@ -325,11 +330,20 @@
     beginRound(randomVerse.id);
   }
 
+  let recordingLimitMs = 120000;
+  let limitRequest = 0;
+
   function chooseDifficulty(difficultyId) {
     const option = getDifficultyOption(difficultyId);
     if (!option) return;
 
     stopVersePreview();
+    recordingLimitMs = 120000;
+    const request = ++limitRequest;
+    const verseId = state.selectedVerseId;
+    void api.getRecordingLimit(verseId).then((limit) => {
+      if (request === limitRequest && state.selectedVerseId === verseId) recordingLimitMs = limit;
+    }).catch(() => {});
     state.difficulty = option.id;
     state.view = "difficulty_intro";
     requestRender();
@@ -393,6 +407,7 @@
 
   function renderLanding(wrap) {
     const eligible = getEligibleVerses();
+    if (!eligible.some((verse) => verse.id === state.selectedVerseId)) state.selectedVerseId = "";
 
     const bodyHtml = eligible.length
       ? `
@@ -407,11 +422,14 @@
           >
             <option value="">Choose a Verse</option>
             ${eligible.map((item) => `
-              <option value="${escapeHtml(item.id)}">
+              <option value="${escapeHtml(item.id)}" ${item.id === state.selectedVerseId ? "selected" : ""}>
                 ${escapeHtml(item.ref || item.id)}
               </option>
             `).join("")}
           </select>
+
+          <button class="flashcards-primary-btn" id="flashcardsStartBtn"
+            type="button" ${state.selectedVerseId ? "" : "disabled"}>Start</button>
 
           <button
             class="flashcards-primary-btn"
@@ -451,30 +469,15 @@
 
     const select = wrap.querySelector("#flashcardsVersePicker");
     if (select) {
-      let selectionRequest = 0;
-      select.addEventListener("pointerdown", () => {
-        console.info("[Flashcards timing] Dropdown touched; waiting for native selection.");
-      });
+      const startButton = wrap.querySelector("#flashcardsStartBtn");
       select.onchange = () => {
         const verseId = String(select.value || "").trim();
-        if (!verseId) return;
-        const started = performance.now();
-        const request = ++selectionRequest;
-        console.info("[Flashcards timing] Selection change received.");
-        select.blur();
-        // Keep the native select mounted through a rendering opportunity.
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          if (request !== selectionRequest || !select.isConnected ||
-            document.hidden || state.view !== "landing") return;
-          console.info(`[Flashcards timing] Focus-release wait before navigation: ${(performance.now() - started).toFixed(1)} ms`);
-          const renderStarted = performance.now();
-          beginRound(verseId);
-          console.info(`[Flashcards timing] Selection handling + DOM render: ${(performance.now() - renderStarted).toFixed(1)} ms; theme=${state.themeId}`);
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            if (state.view !== "difficulty" || state.selectedVerseId !== verseId) return;
-            console.info(`[Flashcards timing] Second frame after navigation: ${(performance.now() - renderStarted).toFixed(1)} ms; total since selection: ${(performance.now() - started).toFixed(1)} ms (not an image-load measurement).`);
-          }));
-        }));
+        state.selectedVerseId = eligible.some((verse) => verse.id === verseId) ? verseId : "";
+        // Keep the native picker mounted while it dismisses.
+        startButton.disabled = !state.selectedVerseId;
+      };
+      startButton.onclick = () => {
+        if (state.view === "landing" && !startButton.disabled) beginRound(state.selectedVerseId);
       };
     }
 
@@ -559,12 +562,11 @@
 
             <button class="flashcards-listen-btn" id="flashcardsListenBtn"
               type="button" data-no-ui-sound aria-pressed="${previewPlaying}">
-              <span aria-hidden="true">${previewPlaying ? "■" : "▶"}</span>
               ${previewPlaying ? "Stop Listening" : "Listen to the Verse"}
             </button>
             ${previewMessage ? `<span class="flashcards-listen-message" role="status">${escapeHtml(previewMessage)}</span>` : ""}
           <h1 class="flashcards-difficulty-title">
-            How well do you<br>know this verse?
+            How do you want to say the verse?
           </h1>
 
           <div class="flashcards-choice-stack">
@@ -642,8 +644,8 @@
             ${escapeHtml(recordingNotice)}
           </p>` : ""}
           <div class="flashcards-comparison-buttons">
-            <button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
-              type="button">Go Back</button>
+            ${explaining ? `<button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
+              type="button">Go Back</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
               type="button">${explaining ? "Next" : "Skip Recording"}</button>
           </div>
@@ -657,7 +659,8 @@
       record.disabled = true;
       record.setAttribute("aria-hidden", "true");
     }
-    wrap.querySelector("#flashcardsIntroBackBtn").onclick = goBack;
+    const introBack = wrap.querySelector("#flashcardsIntroBackBtn");
+    if (introBack) introBack.onclick = goBack;
     const next = wrap.querySelector("#flashcardsSkipRecordingBtn");
     next.onclick = explaining ? async () => {
       if (next.disabled) return;
@@ -775,6 +778,10 @@
     let level = 0;
     const sample = () => {
       if (!wrap.isConnected || recording.snapshot().status !== "recording") return;
+      const remaining = recording.snapshot().remainingSeconds;
+      const label = meter.querySelector(".flashcards-meter-label");
+      const text = remaining <= 10 ? `● ${remaining}s left` : "● Recording";
+      if (label && label.textContent !== text) label.textContent = text;
       const value = reduced.matches ? null : recording.readLevel();
       meter.classList.toggle("is-static", value === null);
       level = value === null ? 0 : Math.max(value, level * 0.85);
@@ -789,6 +796,7 @@
     const audio = recording.snapshot();
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
+    const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
     const comparisonInstruction = audio.hasRecording || waiting
       ? "Listen to your recording, then compare it with the verse."
       : "Check the verse and see how you did.";
@@ -820,8 +828,11 @@
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
-              type="button" ${waiting ? "disabled" : ""}>${needsVerseCheck ? "Check Verse" : "Next"}</button>
+              type="button" ${nextDisabled ? "disabled" : ""}>${needsVerseCheck ? "Check Verse" : "Next"}</button>
           </div>
+          ${audio.playbackFailed && !audio.playbackComplete && !waiting ? `<button
+            class="flashcards-secondary-btn" id="flashcardsContinueUnheardBtn"
+            type="button">Continue Without Listening</button>` : ""}
         </div>
       </div>
     `;
@@ -834,7 +845,17 @@
 };
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
+    const continueUnheard = wrap.querySelector("#flashcardsContinueUnheardBtn");
+    if (continueUnheard) continueUnheard.onclick = () => {
+      if (!recording.snapshot().playbackFailed) return;
+      recording.pause();
+      state.view = "challenge_complete";
+      requestRender();
+    };
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
+      const currentAudio = recording.snapshot();
+      if (["requesting", "preparing"].includes(currentAudio.status) ||
+        (currentAudio.hasRecording && !currentAudio.playbackComplete)) return;
       if (needsVerseCheck) {
         comparisonPlaybackStarted = true;
         requestRender();
@@ -879,22 +900,43 @@
 
 
   function renderResult(wrap) {
-    const messages = { perfect: ["Amazing!", "You nailed that verse!"], mostly_right: ["Great work!", "You're really close!"], needs_practice: ["Great work!", "Keep practicing and you'll soon know it by heart!"] };
-    const [title, copy] = messages[state.grade] || messages.needs_practice;
+    const bestLevel = api.getVerseProgress(state.selectedVerseId)?.flashcards?.bestMemoryLevel;
+    const badge = api.getMemoryBadge(bestLevel);
+    const title = state.grade === "perfect" ? "Amazing!" : "Great work!";
+    const guidance = {
+      still_learning: {
+        perfect: "Next time, try saying it with just the first letters!",
+        mostly_right: "Try Pictures again and see if you can remember the whole verse!",
+        needs_practice: "Listen to the verse again, then give Pictures another try!"
+      },
+      pretty_good: {
+        perfect: "Next time, try saying it without any help!",
+        mostly_right: "Try First Letters again—you’re getting closer!",
+        needs_practice: "Try Pictures next time to help you remember more of the verse!"
+      },
+      really_well: {
+        perfect: "You’ve memorized this verse! Keep practicing to help it stick.",
+        mostly_right: "You’re almost there! Try No Help again and see how you do!",
+        needs_practice: "Try First Letters next time for a little help remembering!"
+      }
+    };
+    const copy = guidance[state.difficulty]?.[state.grade] || "Keep practicing and see how much you remember!";
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-stage-shell">
         <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
-          ${renderMascot("flashcards-overlap-mascot")}
+          ${badge ? `<img class="flashcards-overlap-mascot" src="${badge.image}"
+            alt="${badge.label}" draggable="false">
+            <div class="flashcards-result-badge-label">Best Memory Badge</div>` : ""}
           <h1 class="flashcards-next-title">${title}</h1>
           <p class="flashcards-next-copy">${copy}</p>
-          <button class="flashcards-primary-btn" id="flashcardsTryAgainBtn" type="button">Try Again</button>
+          <button class="flashcards-primary-btn" id="flashcardsBackToTitleBtn" type="button">Back to Title</button>
           <button class="flashcards-primary-btn" id="flashcardsRandomBtn" type="button">Random Verse</button>
           <button class="flashcards-secondary-btn" data-flashcards-exit type="button">Done</button>
         </section>
       </div>
     `;
-    wrap.querySelector("#flashcardsTryAgainBtn").onclick = () => { discardRecording(); state.grade = ""; state.view = "difficulty"; requestRender(); };
+    wrap.querySelector("#flashcardsBackToTitleBtn").onclick = () => { start(); requestRender(); };
     wrap.querySelector("#flashcardsRandomBtn").onclick = chooseRandomVerse;
   }
   function bindCommonActions(wrap) {

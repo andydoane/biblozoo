@@ -4544,6 +4544,54 @@ function updateVerseProgress(verseId, updater) {
   saveProgress(progress);
 }
 
+const FLASHCARD_RECORDING_MULTIPLIER = 1.75;
+const FLASHCARD_RECORDING_MIN_MS = 20000;
+const FLASHCARD_RECORDING_FALLBACK_MS = 120000;
+
+function readFlashcardAudioDuration(file) {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    let settled = false;
+    const finish = (seconds) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      audio.onloadedmetadata = audio.ondurationchange = audio.onerror = null;
+      audio.removeAttribute("src");
+      audio.load();
+      resolve(seconds);
+    };
+    const timer = setTimeout(() => finish(null), 4000);
+    const check = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) finish(audio.duration);
+    };
+    audio.onloadedmetadata = audio.ondurationchange = check;
+    audio.onerror = () => finish(null);
+    audio.preload = "metadata";
+    audio.src = file;
+    audio.load();
+  });
+}
+
+async function getFlashcardRecordingLimit(verseId) {
+  try {
+    const durations = await Promise.all([
+      readFlashcardAudioDuration(`${AUDIO_DIR}${verseId}_ref.mp3`),
+      readFlashcardAudioDuration(`${AUDIO_DIR}${verseId}.mp3`)
+    ]);
+    if (durations.some((value) => value === null)) return FLASHCARD_RECORDING_FALLBACK_MS;
+    return Math.max(FLASHCARD_RECORDING_MIN_MS,
+      Math.ceil((durations[0] + durations[1]) * 1000 * FLASHCARD_RECORDING_MULTIPLIER));
+  } catch (_) { return FLASHCARD_RECORDING_FALLBACK_MS; }
+}
+
+function getMemoryBadge(level) {
+  const label = { practicing: "Practicing", getting_close: "Improving", memorized: "Memorized" }[level];
+  if (!label) return null;
+  const base = `flashcards/flashcard_badge_${level}`;
+  return { label, image: `${base}.png`, smallImage: `${base}_small.png` };
+}
+
 function recordFlashcardAttempt(verseId, mode, grade) {
   if (!verseId || !mode || !grade) return;
   const levels = { practicing: 1, getting_close: 2, memorized: 3 };
@@ -6076,6 +6124,8 @@ function getBibloPetAnimationClass(verseId, verseProgress) {
 }
 
 function startPetAnimationCycle(verseId, verseProgress) {
+  const ownerScreen = State.screen;
+  if (![Screen.MY_VERSES, Screen.VERSE_DETAIL].includes(ownerScreen)) return;
   const status = getBibloPetStatus(verseProgress);
 
   if (status !== "happy") {
@@ -6088,6 +6138,10 @@ function startPetAnimationCycle(verseId, verseProgress) {
   if (State.petAnimTimer) return;
 
   function scheduleIdle() {
+    if (State.screen !== ownerScreen) {
+      clearPetAnimationCycle();
+      return;
+    }
     State.petAnimPhase = "idle";
     State.petAnimActionClass = "";
     render();
@@ -6101,6 +6155,10 @@ function startPetAnimationCycle(verseId, verseProgress) {
   }
 
   function scheduleAction() {
+    if (State.screen !== ownerScreen) {
+      clearPetAnimationCycle();
+      return;
+    }
     const action =
       HAPPY_PET_ANIMATIONS[Math.floor(Math.random() * HAPPY_PET_ANIMATIONS.length)];
 
@@ -7058,6 +7116,9 @@ window.BibloZooFlashcards
 
     getVerseProgress,
     getVerseProgressSnapshot: () => loadProgress().verses,
+    getCurrentVerseId: () => VERSE_ID,
+    getRecordingLimit: getFlashcardRecordingLimit,
+    getMemoryBadge,
     playVersePreview: playVerseDetailListen,
     stopVersePreview: cancelVerseDetailListen,
     recordFlashcardAttempt,
@@ -13712,6 +13773,8 @@ function screenMyVerses(idx) {
         verseId
       );
 
+    const memoryBadge = getMemoryBadge(verseProgress.flashcards?.bestMemoryLevel);
+
     const statusLabel =
       !unlocked
         ? "Play to Unlock"
@@ -13733,12 +13796,14 @@ function screenMyVerses(idx) {
 
     return `
       <button
-        class="new-verse-card my-verses-learned-card no-zoom${isCurrent ? " is-current" : ""}${unlocked ? "" : " is-pending-unlock"}"
+        class="new-verse-card my-verses-learned-card no-zoom${isCurrent ? " is-current" : ""}${unlocked ? "" : " is-pending-unlock"}${memoryBadge ? " has-memory-badge" : ""}"
         type="button"
         data-my-verse-id="${escapeHtml(verseId)}"
         ${isCurrent ? 'aria-current="true"' : ""}
-        aria-label="Select ${escapeHtml(ref)}, ${escapeHtml(statusLabel)}"
+        aria-label="Select ${escapeHtml(ref)}, ${escapeHtml(statusLabel)}${memoryBadge ? `, Best Memory Badge: ${memoryBadge.label}` : ""}"
       >
+        ${memoryBadge ? `<img class="my-verses-memory-badge" src="${memoryBadge.smallImage}"
+          alt="" title="Best Memory Badge: ${memoryBadge.label}" draggable="false">` : ""}
         <div
           class="my-verses-card-pet"
           style="--my-verses-pet-feet-from-bottom: ${escapeHtml(feetFromBottom)};"
@@ -13750,15 +13815,6 @@ function screenMyVerses(idx) {
             ${bibloPetVisualHtml(verseId, petEmoji)}
           </div>
 
-          ${
-            unlocked
-              ? ""
-              : `
-                <div class="my-verses-card-lock-badge">
-                  ${lockIconHtml("my-verses-pending-lock-icon")}
-                </div>
-              `
-          }
         </div>
 
         <div
@@ -13918,6 +13974,9 @@ function screenMyVerses(idx) {
   }
 
   requestAnimationFrame(() => {
+    // The outgoing My Verses slide is also rendered during navigation.
+    // Its deferred setup must not restart timers on the incoming picker.
+    if (!wrap.isConnected || State.screen !== Screen.MY_VERSES) return;
     applyPetMotionVars(wrap);
     startHungryFoodCycle(
       wrap,
@@ -14320,6 +14379,7 @@ function screenVerseDetail(idx) {
       )
     : lockIconHtml("lock-icon-status");
   const statusText = getBibloPetStatusText(verseProgress);
+  const memoryBadge = getMemoryBadge(verseProgress.flashcards?.bestMemoryLevel);
   const petStatus = getBibloPetStatus(verseProgress);
   const petAnimationClass = unlocked ? getBibloPetAnimationClass(verseId, verseProgress) : "";
   const petBackgroundClass = unlocked ? getVerseBackgroundClass(verseId, verseProgress) : "";
@@ -14497,6 +14557,16 @@ function screenVerseDetail(idx) {
         <div class="pet-status-card">
           <div class="pet-status-label">BibloPet Status:</div>
           <div class="pet-status-visual">${statusVisual}</div>
+        </div>
+
+        <div class="pet-status-card">
+          <div class="pet-status-label">Memory Badge:</div>
+          <div class="pet-status-visual" role="img"
+            aria-label="${memoryBadge ? escapeHtml(memoryBadge.label) : "No Memory Badge earned yet"}">
+            ${memoryBadge ? `<img class="pet-status-img pet-status-img-detail"
+              src="${escapeHtml(memoryBadge.smallImage)}" alt="" draggable="false">`
+              : lockIconHtml("lock-icon-status")}
+          </div>
         </div>
 
         <div class="pet-helper-text">${statusText}</div>

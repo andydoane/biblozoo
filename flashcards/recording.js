@@ -13,7 +13,11 @@
     let player = null;
     let url = "";
     let stopTimer = null;
+    let limitTimer = null;
+    let recordingDeadline = 0;
     let message = "";
+    let playbackComplete = false;
+    let playbackFailed = false;
     let meterContext = null;
     let meterSource = null;
     let analyser = null;
@@ -63,6 +67,11 @@
     const stopTracks = (value) => value?.getTracks().forEach((track) => track.stop());
 
     function dispose() {
+      playbackComplete = false;
+      playbackFailed = false;
+      clearTimeout(limitTimer);
+      limitTimer = null;
+      recordingDeadline = 0;
       generation += 1;
       closeMeter();
       clearTimeout(stopTimer);
@@ -94,7 +103,7 @@
       onInterrupted?.();
     }
 
-    async function start(onStart, beforeStart) {
+    async function start(onStart, beforeStart, getLimitMs = () => 120000) {
       dispose();
       const current = generation;
       prepareMeter();
@@ -129,6 +138,9 @@
         });
         recorder.onstop = () => {
           if (current !== generation) return;
+          clearTimeout(limitTimer);
+          limitTimer = null;
+          recordingDeadline = 0;
           clearTimeout(stopTimer);
           stopTimer = null;
           closeMeter();
@@ -141,11 +153,15 @@
           player = new Audio(url);
           player.onended = () => {
             if (current !== generation) return;
+            playbackComplete = true;
+            playbackFailed = false;
+            message = "";
             status = "ready";
             notify();
           };
           player.onerror = () => {
             if (current !== generation) return;
+            playbackFailed = true;
             status = "ready";
             message = "This recording couldn't play. You can re-record or continue.";
             notify();
@@ -169,6 +185,12 @@
         if (current !== generation) return "cancelled";
         recorder.start();
         status = "recording";
+        const requestedLimit = getLimitMs();
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 120000;
+        recordingDeadline = performance.now() + limit;
+        limitTimer = setTimeout(() => {
+          if (current === generation) stop();
+        }, limit);
         notify();
         return "recording";
       } catch (_) {
@@ -181,6 +203,9 @@
 
     function stop() {
       if (status !== "recording") return;
+      clearTimeout(limitTimer);
+      limitTimer = null;
+      recordingDeadline = 0;
       status = "stopping";
       closeMeter();
       notify();
@@ -206,6 +231,7 @@
       if (status === "playing") { pause(); return; }
       const current = generation;
       const audio = player;
+      playbackFailed = false;
       message = "";
       status = "loading";
       notify();
@@ -218,6 +244,7 @@
         if (current !== generation) return;
         status = "ready";
         message = "Playback couldn't start. Tap Play to try again.";
+        playbackFailed = true;
       }
       notify();
     }
@@ -233,7 +260,8 @@
 
     return Object.freeze({
       start, stop, play, pause, dispose, readLevel,
-      snapshot: () => ({ status, hasRecording: !!url, message })
+      snapshot: () => ({ status, hasRecording: !!url, message, playbackComplete, playbackFailed,
+        remainingSeconds: status === "recording" ? Math.max(0, Math.ceil((recordingDeadline - performance.now()) / 1000)) : null })
     });
   }
 })();

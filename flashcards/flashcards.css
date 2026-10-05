@@ -16,6 +16,7 @@ Patch 2: themed visual system + difficulty flow
   height: 100%;
   min-height: 0;
   overflow-y: auto;
+  touch-action: manipulation;
   -webkit-overflow-scrolling: touch;
   background-color: var(--flashcards-accent);
   background-image: var(--flashcards-bg-phone);
@@ -296,7 +297,7 @@ Patch 2: themed visual system + difficulty flow
   border: 0;
   border-radius: 999px;
   background: rgba(51, 51, 51, 0.5);
-  color: #333333;
+  color: #ffffff;
   font: inherit;
   font-size: clamp(1.125rem, 4vw, 1.5rem);
   font-weight: 900;
@@ -384,6 +385,11 @@ Patch 2: themed visual system + difficulty flow
   font-size: clamp(1.875rem, 7vw, 3rem);
   font-weight: 900;
   line-height: 1;
+}
+
+.flashcards-result-badge-label {
+  font-size: 1rem;
+  line-height: 1.2;
 }
 
 .flashcards-next-copy {
@@ -660,6 +666,12 @@ Patch 2: themed visual system + difficulty flow
 
 .flashcards-comparison-buttons>button {
   flex: 1;
+}
+
+#flashcardsNextBtn:disabled {
+  pointer-events: none;
+  opacity: 0.45;
+  cursor: default;
 }
 
 .flashcards-record-preview:disabled {
