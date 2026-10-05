@@ -12047,10 +12047,59 @@ function screenTitle(idx) {
 
   const titleTodoBtn = wrap.querySelector("#titleTodoBtn");
   if (titleTodoBtn) {
-    titleTodoBtn.onclick = (e) => {
-      e.stopPropagation();
+    const openDailyTodoPreview = (mode = "") => {
+      const url = new URL(window.location.href);
+      const safeMode = String(mode || "").trim();
+
+      if (safeMode) {
+        url.searchParams.set("dailyTodoPreview", safeMode);
+      } else {
+        url.searchParams.delete("dailyTodoPreview");
+      }
+
+      window.history.replaceState(
+        window.history.state,
+        "",
+        url.href
+      );
+
       go(Screen.TODO_DEV);
     };
+
+    titleTodoBtn.onclick = (e) => {
+      e.stopPropagation();
+      openDailyTodoPreview("");
+    };
+
+    bindLongPress(titleTodoBtn, {
+      delay: 1200,
+      shouldStart: () => !isTutorialActive(),
+      onLongPress: () => {
+        const previewButton = (label, mode) =>
+          dlgBtn(label, {
+            onClick: () => {
+              closeDialog();
+              openDailyTodoPreview(mode);
+            }
+          });
+
+        showDialog({
+          title: "Daily To-Do Preview",
+          body: "Choose a Daily Tasks state to inspect.",
+          actions: [
+            previewButton("Open", "open"),
+            previewButton("1 Complete", "one"),
+            previewButton("2 Complete", "two"),
+            previewButton("Snack Ready", "ready"),
+            previewButton("Actual", "actual"),
+            dlgBtn("Cancel", {
+              secondary: true,
+              onClick: closeDialog
+            })
+          ]
+        });
+      }
+    });
   }
 
   const titleSettingsBtn = wrap.querySelector("#titleSettingsBtn");
