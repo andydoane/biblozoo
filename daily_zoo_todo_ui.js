@@ -22,6 +22,7 @@
     "two",
     "ready",
     "actual",
+    "toast",
     "debug"
   ]);
   const VALID_MEDAL_TIERS = Object.freeze([
@@ -571,13 +572,16 @@
   }
 
   function renderMedalToastHtml(
-    medal
+    medal,
+    {
+      held = false
+    } = {}
   ) {
     if (!medal) return "";
 
     return `
       <div
-        class="daily-medal-toast"
+        class="daily-medal-toast${held ? " is-test-held" : ""}"
         role="status"
         aria-live="polite"
       >
@@ -635,7 +639,12 @@
       );
 
     return `
-      ${renderMedalToastHtml(medal)}
+      ${renderMedalToastHtml(
+        medal,
+        {
+          held: scope === "tester"
+        }
+      )}
 
       <div
         class="daily-completion-layer"
@@ -843,6 +852,25 @@
     const taskId = cleanString(
       button.dataset.dailyTaskId
     );
+
+    if (scope === "tester") {
+      button.disabled = true;
+
+      removeCompletionLayer(
+        planId,
+        taskId
+      );
+
+      root?.document
+        ?.querySelectorAll?.(
+          ".daily-medal-toast.is-test-held"
+        )
+        ?.forEach?.((toast) =>
+          toast.remove()
+        );
+
+      return true;
+    }
 
     const loaded =
       getPendingStateForScope(
@@ -1528,6 +1556,52 @@
       taskIds.QUESTIONS || "questions";
     const activityId =
       taskIds.ACTIVITY || "activity";
+
+    if (mode === "toast") {
+      displayPlan.activity = {
+        kind: "game",
+        id: "bible_bugs",
+        mode: "hard"
+      };
+
+      const toastTask =
+        displayPlan.tasks?.[activityId];
+
+      if (toastTask) {
+        toastTask.status =
+          statuses.PENDING || "pending";
+        toastTask.startedAt = Date.now();
+        toastTask.pendingAt = Date.now();
+        toastTask.completedAt = 0;
+        toastTask.launchToken =
+          "daily-toast-layer-test";
+        toastTask.pendingData =
+          createPendingCompletionData({
+            planId: displayPlan.id,
+            taskId: activityId,
+            source:
+              "developer_toast_test",
+            thankYouKey: "bible_bugs",
+            activityId: "bible_bugs",
+            activityKind: "game",
+            activityTitle: "Bible Bugs",
+            newMedal: {
+              isNew: true,
+              tier: "gold",
+              gameName: "Bible Bugs"
+            }
+          });
+      }
+
+      displayPlan.educationalCompletedAt = 0;
+      displayPlan.snack = {
+        ...(displayPlan.snack || {}),
+        unlocked: false,
+        claimed: false,
+        claimedAt: 0
+      };
+      pendingScope = "tester";
+    }
 
     const activityManifest =
       getActivityManifest(

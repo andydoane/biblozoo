@@ -2,6 +2,20 @@
   "use strict";
 
   const WRAPPED = "__bibloZooDailyTodoWrapped";
+  const STANDARD_GAME_IDS = Object.freeze([
+    "scramble",
+    "traffic_tap_external",
+    "chain",
+    "foodslice",
+    "tower_bible",
+    "verse_snake",
+    "versey_bird",
+    "dino_dash",
+    "verse_munch",
+    "verse_invaders",
+    "bible_bugs",
+    "verse_splat"
+  ]);
 
   function clean(value) {
     return String(value ?? "").trim();
@@ -14,7 +28,10 @@
     if (
       params.todoSource !== "daily_todo" ||
       params.mix ||
-      clean(params.dailyActivityKind) !== "game"
+      clean(params.dailyActivityKind) !== "game" ||
+      !STANDARD_GAME_IDS.includes(
+        clean(params.dailyActivityId)
+      )
     ) {
       return null;
     }
@@ -137,6 +154,7 @@
   }
 
   root.BibloZooDailyTodoShell = Object.freeze({
+    STANDARD_GAME_IDS,
     getContext,
     matchesRun,
     wrapShell

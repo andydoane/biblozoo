@@ -397,6 +397,12 @@
     forwards;
 }
 
+.daily-medal-toast.is-test-held {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  animation: none;
+}
+
 .daily-medal-toast-img {
   flex: 0 0 62px;
   width: 62px;

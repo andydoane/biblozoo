@@ -12631,6 +12631,7 @@ function screenTitle(idx) {
             previewButton("2 Complete", "two"),
             previewButton("Snack Ready", "ready"),
             previewButton("Actual", "actual"),
+            previewButton("Toast Test", "toast"),
             dlgBtn("Cancel", {
               secondary: true,
               onClick: closeDialog

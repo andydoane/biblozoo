@@ -4,6 +4,20 @@
   const SOURCE = "daily_todo";
   const RETURN_CONTEXT = "daily_tasks_clipboard";
   const ACTIVITY_TASK_ID = "activity";
+  const STANDARD_GAME_TITLES = Object.freeze({
+    scramble: "Verse Scramble",
+    traffic_tap_external: "Traffic Tap",
+    chain: "Verse Launch",
+    foodslice: "Food Slice",
+    tower_bible: "Tower of Bible",
+    verse_snake: "Scripture Snake",
+    versey_bird: "Versey Bird",
+    dino_dash: "Dino Dash",
+    verse_munch: "Verse Munch",
+    verse_invaders: "Verse Invaders",
+    bible_bugs: "Bible Bugs",
+    verse_splat: "Verse Splat"
+  });
   const RETURN_KEYS = Object.freeze([
     "todoSource",
     "dailyReturnStatus",
@@ -132,7 +146,11 @@
       clean(item?.manifest?.id) === clean(activityId)
     );
 
-    return clean(entry?.manifest?.title) || "Practice Game";
+    return clean(entry?.manifest?.title) ||
+      STANDARD_GAME_TITLES[
+        clean(activityId)
+      ] ||
+      "Practice Game";
   }
 
   function makePendingData(data) {
