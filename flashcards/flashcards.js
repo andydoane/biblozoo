@@ -57,7 +57,8 @@
     selectedVerseId: "",
     difficulty: "",
     grade: "",
-    themeId: "purple"
+    themeId: "purple",
+    context: null
   };
 
   let api = null;
@@ -285,6 +286,24 @@
     api?.requestRender?.();
   }
 
+  function getSessionContext() {
+    if (
+      !state.context ||
+      typeof state.context !== "object"
+    ) {
+      return null;
+    }
+
+    return { ...state.context };
+  }
+
+  function isDailyTodoSession() {
+    return (
+      state.context?.source ===
+      "daily_todo"
+    );
+  }
+
   function resetSession() {
     limitRequest += 1;
     recordingLimitMs = 120000;
@@ -296,6 +315,7 @@
     state.difficulty = "";
     state.grade = "";
     state.themeId = "purple";
+    state.context = null;
   }
 
   function start() {
@@ -303,6 +323,37 @@
     const currentId = api?.getCurrentVerseId?.();
     state.selectedVerseId = getEligibleVerses().some((verse) => verse.id === currentId)
       ? currentId : "";
+  }
+
+  function startForVerse(
+    verseId,
+    context = null
+  ) {
+    resetSession();
+
+    const selected =
+      getEligibleVerses().find(
+        (item) =>
+          item?.id ===
+          String(verseId || "").trim()
+      );
+
+    if (!selected) {
+      return false;
+    }
+
+    state.selectedVerseId = selected.id;
+    state.difficulty = "";
+    state.grade = "";
+    state.themeId = pickRandomThemeId();
+    state.context =
+      context &&
+      typeof context === "object"
+        ? { ...context }
+        : null;
+    state.view = "difficulty";
+
+    return true;
   }
 
   function beginRound(verseId) {
@@ -350,6 +401,21 @@
   }
 
   function goBack() {
+    if (
+      state.view === "difficulty" &&
+      isDailyTodoSession() &&
+      typeof api?.onContextExit === "function"
+    ) {
+      const handled =
+        api.onContextExit(
+          getSessionContext()
+        );
+
+      if (handled !== false) {
+        return;
+      }
+    }
+
     const previousView = {
       difficulty: "landing",
       difficulty_intro: "difficulty",
@@ -566,7 +632,9 @@
             </button>
             ${previewMessage ? `<span class="flashcards-listen-message" role="status">${escapeHtml(previewMessage)}</span>` : ""}
           <h1 class="flashcards-difficulty-title">
-            How do you want to say the verse?
+            ${isDailyTodoSession()
+              ? "How well do you know this verse?"
+              : "How do you want to say the verse?"}
           </h1>
 
           <div class="flashcards-choice-stack">
@@ -892,6 +960,27 @@
           api.recordFlashcardAttempt(selected.id, state.difficulty, button.dataset.flashcardsGrade);
           state.grade = button.dataset.flashcardsGrade;
         }
+
+        if (
+          isDailyTodoSession() &&
+          typeof api?.onContextComplete ===
+            "function"
+        ) {
+          const handled =
+            api.onContextComplete({
+              context:
+                getSessionContext(),
+              verseId: selected.id,
+              difficulty:
+                state.difficulty,
+              grade: state.grade
+            });
+
+          if (handled !== false) {
+            return;
+          }
+        }
+
         state.view = "result";
         requestRender();
       };
@@ -1081,6 +1170,7 @@
   window.BibloZooFlashcards = Object.freeze({
     initialize,
     start,
+    startForVerse,
     stopSession: resetSession,
     renderScreen,
     getEligibleVerses,
@@ -1089,7 +1179,9 @@
       view: state.view,
       selectedVerseId: state.selectedVerseId,
       difficulty: state.difficulty,
-      themeId: state.themeId
+      grade: state.grade,
+      themeId: state.themeId,
+      context: getSessionContext()
     })
   });
 })();

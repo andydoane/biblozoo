@@ -4604,6 +4604,304 @@ function recordFlashcardAttempt(verseId, mode, grade) {
   });
 }
 
+function setDailyTodoActualPreviewMode() {
+  try {
+    const url =
+      new URL(window.location.href);
+
+    url.searchParams.set(
+      "dailyTodoPreview",
+      "actual"
+    );
+
+    window.history.replaceState(
+      window.history.state,
+      "",
+      url.href
+    );
+  } catch (err) { }
+}
+
+function loadDailyTodoRuntime() {
+  const engine =
+    window.BibloZooDailyTodo;
+
+  if (!engine?.normalizeState) {
+    return null;
+  }
+
+  const progress = loadProgress();
+  const state =
+    engine.normalizeState(
+      progress?.dailyZooTodo
+    );
+
+  return {
+    engine,
+    progress,
+    state,
+    plan: state.activePlan
+  };
+}
+
+function saveDailyTodoRuntime(
+  progress,
+  state
+) {
+  if (
+    !progress ||
+    typeof progress !== "object"
+  ) {
+    return false;
+  }
+
+  progress.dailyZooTodo = state;
+  return saveProgress(progress) !== false;
+}
+
+function startDailyTodoFlashcard(
+  requestedPlan
+) {
+  const flashcards =
+    window.BibloZooFlashcards;
+  const loaded =
+    loadDailyTodoRuntime();
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (
+    !flashcards?.startForVerse ||
+    !loaded ||
+    !profileId
+  ) {
+    return false;
+  }
+
+  const { engine, progress, state } =
+    loaded;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.FLASHCARD ||
+    "flashcard";
+  const task = plan?.tasks?.[taskId];
+  const openStatus =
+    engine.TASK_STATUSES?.OPEN ||
+    "open";
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const verseId =
+    String(plan?.verseId || "").trim();
+
+  if (
+    !plan ||
+    plan.id !== requestedPlan?.id ||
+    plan.profileId !== profileId ||
+    !verseId ||
+    ![openStatus, runningStatus]
+      .includes(task?.status)
+  ) {
+    return false;
+  }
+
+  const isEligible =
+    flashcards.getEligibleVerses?.()
+      ?.some?.(
+        (item) => item?.id === verseId
+      ) === true;
+
+  if (!isEligible) {
+    return false;
+  }
+
+  const started =
+    engine.beginTask(
+      state,
+      {
+        planId: plan.id,
+        taskId,
+        now: new Date()
+      }
+    );
+
+  if (!started.launchToken) {
+    return false;
+  }
+
+  const context = {
+    source: "daily_todo",
+    profileId,
+    planId: plan.id,
+    planDay: plan.day,
+    taskId,
+    launchToken:
+      started.launchToken,
+    verseId
+  };
+
+  if (
+    !flashcards.startForVerse(
+      verseId,
+      context
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    started.changed &&
+    !saveDailyTodoRuntime(
+      progress,
+      started.state
+    )
+  ) {
+    flashcards.stopSession?.();
+    return false;
+  }
+
+  setDailyTodoActualPreviewMode();
+  go(Screen.FLASHCARDS);
+  return true;
+}
+
+function completeDailyTodoFlashcard({
+  context = null,
+  verseId = "",
+  difficulty = "",
+  grade = ""
+} = {}) {
+  if (
+    context?.source !== "daily_todo"
+  ) {
+    return false;
+  }
+
+  const loaded =
+    loadDailyTodoRuntime();
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (!loaded || !profileId) {
+    return false;
+  }
+
+  const { engine, progress, state } =
+    loaded;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.FLASHCARD ||
+    "flashcard";
+  const task = plan?.tasks?.[taskId];
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const pendingStatus =
+    engine.TASK_STATUSES?.PENDING ||
+    "pending";
+  const safeVerseId =
+    String(verseId || "").trim();
+  const launchToken =
+    String(
+      context.launchToken || ""
+    ).trim();
+
+  if (
+    !plan ||
+    context.profileId !== profileId ||
+    context.planId !== plan.id ||
+    context.planDay !== plan.day ||
+    context.taskId !== taskId ||
+    context.verseId !== plan.verseId ||
+    safeVerseId !== plan.verseId ||
+    !launchToken ||
+    task?.launchToken !==
+      launchToken
+  ) {
+    return false;
+  }
+
+  if (
+    task.status === pendingStatus
+  ) {
+    setDailyTodoActualPreviewMode();
+    go(Screen.TODO_DEV);
+    return true;
+  }
+
+  if (
+    task.status !== runningStatus
+  ) {
+    return false;
+  }
+
+  const pendingData =
+    window.BibloZooDailyTodoUI
+      ?.createPendingCompletionData?.({
+        planId: plan.id,
+        taskId,
+        source: "flashcard",
+        thankYouKey: "flashcard",
+        extra: {
+          verseId: safeVerseId,
+          difficulty:
+            String(difficulty || ""),
+          grade: String(grade || "")
+        }
+      }) || {
+        version: 1,
+        planId: plan.id,
+        taskId,
+        source: "flashcard",
+        thankYouKey: "flashcard",
+        verseId: safeVerseId,
+        difficulty:
+          String(difficulty || ""),
+        grade: String(grade || "")
+      };
+
+  const pending =
+    engine.setPendingCompletion(
+      state,
+      {
+        planId: plan.id,
+        taskId,
+        launchToken,
+        pendingData,
+        now: new Date()
+      }
+    );
+
+  if (
+    !pending.changed ||
+    !saveDailyTodoRuntime(
+      progress,
+      pending.state
+    )
+  ) {
+    return false;
+  }
+
+  setDailyTodoActualPreviewMode();
+  go(Screen.TODO_DEV);
+  return true;
+}
+
+function exitDailyTodoFlashcard(
+  context = null
+) {
+  if (
+    context?.source !== "daily_todo"
+  ) {
+    return false;
+  }
+
+  setDailyTodoActualPreviewMode();
+  go(Screen.TODO_DEV);
+  return true;
+}
+
 function markLearnCompleted(verseId) {
   updateVerseProgress(verseId, (verseProgress) => {
     const now = Date.now();
@@ -7122,6 +7420,10 @@ window.BibloZooFlashcards
     playVersePreview: playVerseDetailListen,
     stopVersePreview: cancelVerseDetailListen,
     recordFlashcardAttempt,
+    onContextComplete:
+      completeDailyTodoFlashcard,
+    onContextExit:
+      exitDailyTodoFlashcard,
     showRecordingFallback: (continueWithoutRecording) => showDialog({
       title: "Continue without recording?",
       body: "The microphone is unavailable or permission wasn't granted. You can still practice this verse.",
@@ -14266,6 +14568,45 @@ function screenTodoDev(idx) {
   `;
 
   bindHomePill(wrap);
+
+  if (
+    dailyPreviewMode === "actual" &&
+    dailyPreviewPlan
+  ) {
+    const engine =
+      window.BibloZooDailyTodo;
+    const taskId =
+      engine?.TASK_IDS?.FLASHCARD ||
+      "flashcard";
+    const task =
+      dailyPreviewPlan.tasks?.[taskId];
+    const launchableStatuses = [
+      engine?.TASK_STATUSES?.OPEN ||
+        "open",
+      engine?.TASK_STATUSES?.RUNNING ||
+        "running"
+    ];
+    const flashcardRow =
+      wrap.querySelector(
+        `.daily-zoo-todo-row[data-daily-todo-preview-task="${taskId}"]`
+      );
+
+    if (
+      flashcardRow &&
+      launchableStatuses.includes(
+        task?.status
+      )
+    ) {
+      flashcardRow.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        startDailyTodoFlashcard(
+          dailyPreviewPlan
+        );
+      };
+    }
+  }
 
   if (tutorialActive) {
     bindZooTodoTutorial(wrap);
