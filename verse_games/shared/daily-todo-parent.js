@@ -7,6 +7,9 @@
   const GAME_TEST_STORAGE_PREFIX =
     "biblozooDailyTodoGameTest:";
   const GAME_TEST_PREVIEW_MODE = "game_test";
+  const PLAYGROUND_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoPlaygroundTest:";
+  const PLAYGROUND_TEST_PREVIEW_MODE = "playground_test";
   const STANDARD_GAME_TITLES = Object.freeze({
     scramble: "Verse Scramble",
     traffic_tap_external: "Traffic Tap",
@@ -20,6 +23,13 @@
     verse_invaders: "Verse Invaders",
     bible_bugs: "Bible Bugs",
     verse_splat: "Verse Splat"
+  });
+  const PLAYGROUND_ACTIVITY_TITLES = Object.freeze({
+    verse_jam: "Verse Jam",
+    scripture_scrub: "Scripture Scrub",
+    ghost_writer: "Ghost Writer",
+    verse_typer: "Verse Typer",
+    wheel_of_bible: "Wheel of Bible"
   });
   const RETURN_KEYS = Object.freeze([
     "todoSource",
@@ -35,6 +45,7 @@
     "dailyActivityMode",
     "dailyReturnContext",
     "dailyTest",
+    "dailyTestKind",
     "dailyNewMedal",
     "dailyMedalTier"
   ]);
@@ -87,8 +98,28 @@
       : "";
   }
 
-  function loadGameTestState(profileId) {
-    const key = getGameTestStorageKey(profileId);
+  function getPlaygroundTestStorageKey(profileId) {
+    const safeProfileId = clean(profileId);
+
+    return safeProfileId
+      ? `${PLAYGROUND_TEST_STORAGE_PREFIX}${safeProfileId}`
+      : "";
+  }
+
+  function normalizeTestKind(value) {
+    return clean(value).toLowerCase() === "playground"
+      ? "playground"
+      : "game";
+  }
+
+  function getTestStorageKey(profileId, testKind) {
+    return normalizeTestKind(testKind) === "playground"
+      ? getPlaygroundTestStorageKey(profileId)
+      : getGameTestStorageKey(profileId);
+  }
+
+  function loadTestState(profileId, testKind) {
+    const key = getTestStorageKey(profileId, testKind);
     if (!key) return null;
 
     try {
@@ -100,15 +131,15 @@
         : null;
     } catch (err) {
       console.warn(
-        "Could not load Daily Game Tester state",
+        "Could not load Daily activity tester state",
         err
       );
       return null;
     }
   }
 
-  function saveGameTestState(profileId, state) {
-    const key = getGameTestStorageKey(profileId);
+  function saveTestState(profileId, state, testKind) {
+    const key = getTestStorageKey(profileId, testKind);
 
     if (!key || !state || typeof state !== "object") {
       return false;
@@ -122,11 +153,19 @@
       return true;
     } catch (err) {
       console.warn(
-        "Could not save Daily Game Tester state",
+        "Could not save Daily activity tester state",
         err
       );
       return false;
     }
+  }
+
+  function loadGameTestState(profileId) {
+    return loadTestState(profileId, "game");
+  }
+
+  function saveGameTestState(profileId, state) {
+    return saveTestState(profileId, state, "game");
   }
 
   function saveProgress(profileId, progress) {
@@ -174,6 +213,12 @@
       activityMode: clean(params.get("dailyActivityMode")),
       returnContext: clean(params.get("dailyReturnContext")),
       isTest: params.get("dailyTest") === "1",
+      testKind:
+        params.get("dailyTest") === "1"
+          ? normalizeTestKind(
+              params.get("dailyTestKind")
+            )
+          : "",
       newMedal: params.get("dailyNewMedal") === "1",
       medalTier: clean(params.get("dailyMedalTier"))
     };
@@ -195,9 +240,12 @@
       task.status === "running";
   }
 
-  function getActivityTitle(activityId) {
-    const list = Array.isArray(root.EXTERNAL_VERSE_GAMES)
-      ? root.EXTERNAL_VERSE_GAMES
+  function getActivityTitle(activityId, activityKind = "game") {
+    const registry = activityKind === "playground"
+      ? root.EXTERNAL_VERSE_PLAYGROUND
+      : root.EXTERNAL_VERSE_GAMES;
+    const list = Array.isArray(registry)
+      ? registry
       : [];
 
     const entry = list.find((item) =>
@@ -205,10 +253,12 @@
       clean(item?.manifest?.id) === clean(activityId)
     );
 
+    const fallbackTitles = activityKind === "playground"
+      ? PLAYGROUND_ACTIVITY_TITLES
+      : STANDARD_GAME_TITLES;
+
     return clean(entry?.manifest?.title) ||
-      STANDARD_GAME_TITLES[
-        clean(activityId)
-      ] ||
+      fallbackTitles[clean(activityId)] ||
       "Practice Game";
   }
 
@@ -227,12 +277,20 @@
       thankYouKey: data.activityId,
       activityId: data.activityId,
       activityKind: data.activityKind,
-      activityTitle: getActivityTitle(data.activityId),
-      newMedal: data.newMedal && tier
+      activityTitle: getActivityTitle(
+        data.activityId,
+        data.activityKind
+      ),
+      newMedal:
+        data.activityKind === "game" &&
+        data.newMedal && tier
         ? {
             isNew: true,
             tier,
-            gameName: getActivityTitle(data.activityId)
+            gameName: getActivityTitle(
+              data.activityId,
+              data.activityKind
+            )
           }
         : null
     };
@@ -266,7 +324,10 @@
       : loadProgress(data.profileId);
     const state = engine?.normalizeState?.(
       data.isTest
-        ? loadGameTestState(data.profileId)
+        ? loadTestState(
+            data.profileId,
+            data.testKind
+          )
         : progress?.dailyZooTodo
     );
     const plan = state?.activePlan;
@@ -316,9 +377,10 @@
     }
 
     const saved = data.isTest
-      ? saveGameTestState(
+      ? saveTestState(
           data.profileId,
-          resultState
+          resultState,
+          data.testKind
         )
       : saveProgress(
           data.profileId,
@@ -333,9 +395,12 @@
     };
   }
 
-  function findGameManifest(activityId) {
-    const list = Array.isArray(root.EXTERNAL_VERSE_GAMES)
-      ? root.EXTERNAL_VERSE_GAMES
+  function findActivityManifest(activityKind, activityId) {
+    const registry = activityKind === "playground"
+      ? root.EXTERNAL_VERSE_PLAYGROUND
+      : root.EXTERNAL_VERSE_GAMES;
+    const list = Array.isArray(registry)
+      ? registry
       : [];
 
     return list.find((entry) =>
@@ -344,7 +409,14 @@
     )?.manifest || null;
   }
 
-  function buildReturnUrl({ isTest = false } = {}) {
+  function findGameManifest(activityId) {
+    return findActivityManifest("game", activityId);
+  }
+
+  function buildReturnUrl({ testKind = "" } = {}) {
+    const safeTestKind = testKind
+      ? normalizeTestKind(testKind)
+      : "";
     const url = new URL(root.location.href);
     RETURN_KEYS.forEach((key) =>
       url.searchParams.delete(key)
@@ -353,8 +425,10 @@
     url.searchParams.set("screen", "todo_dev");
     url.searchParams.set(
       "dailyTodoPreview",
-      isTest
-        ? GAME_TEST_PREVIEW_MODE
+      safeTestKind
+        ? safeTestKind === "playground"
+          ? PLAYGROUND_TEST_PREVIEW_MODE
+          : GAME_TEST_PREVIEW_MODE
         : "actual"
     );
     return url.href;
@@ -387,9 +461,14 @@
     root.location.href = href;
   }
 
-  async function launchAssignedGame({
-    isTest = false
+  async function launchAssignedActivity({
+    testKind = "",
+    expectedKind = ""
   } = {}) {
+    const safeTestKind = testKind
+      ? normalizeTestKind(testKind)
+      : "";
+    const isTest = !!safeTestKind;
     const profileId = clean(
       root.BibloZooProfiles
         ?.getActiveProfileId?.()
@@ -400,7 +479,7 @@
     const engine = root.BibloZooDailyTodo;
     const state = engine?.normalizeState?.(
       isTest
-        ? loadGameTestState(profileId)
+        ? loadTestState(profileId, safeTestKind)
         : progress?.dailyZooTodo
     );
     const plan = state?.activePlan;
@@ -414,16 +493,21 @@
       !engine ||
       !plan ||
       plan.profileId !== profileId ||
-      activity?.kind !== "game" ||
+      !["game", "playground"].includes(activity?.kind) ||
+      (expectedKind && activity.kind !== expectedKind) ||
+      (isTest && activity.kind !== safeTestKind) ||
       !activity.id ||
-      !activity.mode ||
+      (activity.kind === "game" && !activity.mode) ||
       !task ||
       !["open", "running"].includes(task.status)
     ) {
       return false;
     }
 
-    const manifest = findGameManifest(activity.id);
+    const manifest = findActivityManifest(
+      activity.kind,
+      activity.id
+    );
     if (!manifest?.launchUrl) return false;
 
     let launchToken = clean(task.launchToken);
@@ -450,9 +534,10 @@
       }
 
       const saved = isTest
-        ? saveGameTestState(
+        ? saveTestState(
             profileId,
-            started.state
+            started.state,
+            safeTestKind
           )
         : saveProgress(
             profileId,
@@ -471,7 +556,9 @@
       verseId: plan.verseId,
       ref: verse.ref,
       translation: verse.translation,
-      returnTo: buildReturnUrl({ isTest }),
+      returnTo: buildReturnUrl({
+        testKind: safeTestKind
+      }),
       source: "verse_memory_app",
       profileId,
       mode: activity.mode,
@@ -490,10 +577,20 @@
 
     if (isTest) {
       params.set("dailyTest", "1");
+      params.set("dailyTestKind", safeTestKind);
     }
 
     navigate(`${manifest.launchUrl}?${params.toString()}`);
     return true;
+  }
+
+  async function launchAssignedGame({
+    isTest = false
+  } = {}) {
+    return launchAssignedActivity({
+      testKind: isTest ? "game" : "",
+      expectedKind: "game"
+    });
   }
 
   function createGameTestState({
@@ -586,6 +683,110 @@
     });
   }
 
+  function createPlaygroundTestState({
+    templatePlan,
+    activityId,
+    mode = ""
+  } = {}) {
+    const engine = root.BibloZooDailyTodo;
+    const safeActivityId = clean(activityId);
+    const safeMode = clean(mode).toLowerCase();
+    const manifest = findActivityManifest(
+      "playground",
+      safeActivityId
+    );
+    const modes = Array.isArray(manifest?.modes)
+      ? manifest.modes.map((value) =>
+          clean(value).toLowerCase()
+        ).filter(Boolean)
+      : [];
+
+    if (
+      !engine?.normalizeState ||
+      !templatePlan ||
+      templatePlan.activity == null ||
+      !manifest ||
+      (modes.length > 0 && !modes.includes(safeMode)) ||
+      (modes.length === 0 && safeMode)
+    ) {
+      return null;
+    }
+
+    const state = engine.normalizeState({});
+    const plan = cloneJson(templatePlan);
+    const openStatus =
+      engine.TASK_STATUSES?.OPEN || "open";
+
+    plan.id = [
+      "daily-playground-test",
+      Date.now().toString(36),
+      Math.random().toString(36).slice(2, 10)
+    ].join("-");
+    plan.activity = {
+      kind: "playground",
+      id: safeActivityId,
+      mode: safeMode
+    };
+
+    Object.keys(plan.tasks || {}).forEach((taskId) => {
+      plan.tasks[taskId] = {
+        ...plan.tasks[taskId],
+        status: openStatus,
+        startedAt: 0,
+        pendingAt: 0,
+        completedAt: 0,
+        launchToken: "",
+        pendingData: null
+      };
+    });
+
+    plan.educationalCompletedAt = 0;
+    plan.snack = {
+      ...(plan.snack || {}),
+      unlocked: false,
+      claimed: false,
+      claimedAt: 0
+    };
+    plan.rolloverHold = null;
+    state.activePlan = plan;
+
+    return engine.normalizeState(state);
+  }
+
+  async function launchPlaygroundTest({
+    templatePlan,
+    activityId,
+    mode = ""
+  } = {}) {
+    const profileId = clean(
+      root.BibloZooProfiles
+        ?.getActiveProfileId?.()
+    );
+    const state = createPlaygroundTestState({
+      templatePlan,
+      activityId,
+      mode
+    });
+
+    if (
+      !profileId ||
+      !state?.activePlan ||
+      clean(state.activePlan.profileId) !== profileId ||
+      !saveTestState(
+        profileId,
+        state,
+        "playground"
+      )
+    ) {
+      return false;
+    }
+
+    return launchAssignedActivity({
+      testKind: "playground",
+      expectedKind: "playground"
+    });
+  }
+
   function releaseCompletedRolloverHold(event) {
     const button = event.target?.closest?.(
       '[data-daily-complete-task][data-daily-pending-scope="actual"]'
@@ -635,16 +836,24 @@
     if (
       !row ||
       row.disabled ||
-      !["actual", GAME_TEST_PREVIEW_MODE]
+      ![
+        "actual",
+        GAME_TEST_PREVIEW_MODE,
+        PLAYGROUND_TEST_PREVIEW_MODE
+      ]
         .includes(previewMode)
     ) {
       return;
     }
 
     event.preventDefault();
-    launchAssignedGame({
-      isTest:
+    launchAssignedActivity({
+      testKind:
         previewMode === GAME_TEST_PREVIEW_MODE
+          ? "game"
+          : previewMode === PLAYGROUND_TEST_PREVIEW_MODE
+            ? "playground"
+            : ""
     });
   });
 
@@ -657,8 +866,11 @@
     matchesPersistedLaunch,
     processReturn,
     createGameTestState,
+    createPlaygroundTestState,
+    launchAssignedActivity,
     launchAssignedGame,
     launchGameTest,
+    launchPlaygroundTest,
     bootReturn
   });
 })(window);

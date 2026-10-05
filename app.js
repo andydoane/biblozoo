@@ -12679,6 +12679,9 @@ function screenTitle(idx) {
           dlgBtn("Game Tester", {
             onClick: showDailyGameTesterDialog
           }),
+          dlgBtn("Playground Tester", {
+            onClick: showDailyPlaygroundTesterDialog
+          }),
           dlgBtn("Cancel", {
             secondary: true,
             onClick: closeDialog
@@ -12783,6 +12786,126 @@ function screenTitle(idx) {
                   showDailyGameModeDialog(
                     game
                   )
+              }
+            )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showDailyPreviewDialog
+          })
+        ]
+      });
+    }
+
+    const launchDailyPlaygroundTest = async (
+      activityId,
+      mode = ""
+    ) => {
+      closeDialog();
+
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const launched = templatePlan
+        ? await window.BibloZooDailyTodoParent
+            ?.launchPlaygroundTest?.({
+              templatePlan,
+              activityId,
+              mode
+            })
+        : false;
+
+      if (!launched) {
+        showDialog({
+          title: "Playground Tester Unavailable",
+          body:
+            "Unlock a BibloPet and create today's Daily To-Do before using the Playground Tester.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
+      }
+    };
+
+    const showDailyPlaygroundModeDialog = (
+      activity
+    ) => {
+      const manifest = activity?.manifest;
+      const modes = Array.isArray(manifest?.modes)
+        ? manifest.modes
+        : [];
+
+      if (!manifest?.id || !modes.length) return;
+
+      showDialog({
+        title: manifest.title || "Choose Mode",
+        body: "Choose the assigned Daily mode.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...modes.map((mode) =>
+            dlgBtn(
+              mode.charAt(0).toUpperCase() +
+                mode.slice(1),
+              {
+                onClick: () =>
+                  launchDailyPlaygroundTest(
+                    manifest.id,
+                    mode
+                  )
+              }
+            )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showDailyPlaygroundTesterDialog
+          })
+        ]
+      });
+    };
+
+    function showDailyPlaygroundTesterDialog() {
+      const activities = (
+        window.EXTERNAL_VERSE_PLAYGROUND || []
+      ).filter((entry) =>
+        entry?.enabled !== false &&
+        entry?.manifest?.id &&
+        entry?.manifest?.launchUrl
+      );
+
+      showDialog({
+        title: "Daily Playground Tester",
+        body: "Choose one of the five Playground activities.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...activities.map((activity) =>
+            dlgBtn(
+              activity.manifest.title,
+              {
+                onClick: () => {
+                  const modes = activity
+                    .manifest.modes;
+
+                  if (
+                    Array.isArray(modes) &&
+                    modes.length
+                  ) {
+                    showDailyPlaygroundModeDialog(
+                      activity
+                    );
+                    return;
+                  }
+
+                  launchDailyPlaygroundTest(
+                    activity.manifest.id
+                  );
+                }
               }
             )
           ),
@@ -14889,11 +15012,17 @@ function screenTodoDev(idx) {
       window.BibloZooDailyTodo;
 
     dailyPreviewPlan =
-      dailyPreviewMode === "game_test"
-        ? dailyTodoUi
-            ?.getGameTestPlan?.(
-              dailyTodoApi
-            ) || null
+      ["game_test", "playground_test"]
+        .includes(dailyPreviewMode)
+        ? dailyPreviewMode === "playground_test"
+          ? dailyTodoUi
+              ?.getPlaygroundTestPlan?.(
+                dailyTodoApi
+              ) || null
+          : dailyTodoUi
+              ?.getGameTestPlan?.(
+                dailyTodoApi
+              ) || null
         : getOrCreateDailyTodoPreviewPlan();
 
     wrap.classList.add("is-daily-mode");

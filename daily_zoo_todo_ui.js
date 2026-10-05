@@ -17,6 +17,8 @@
     "biblozooDailyTodoPendingPreview:";
   const GAME_TEST_STORAGE_PREFIX =
     "biblozooDailyTodoGameTest:";
+  const PLAYGROUND_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoPlaygroundTest:";
   const PENDING_DATA_VERSION = 1;
   const PREVIEW_MODES = Object.freeze([
     "open",
@@ -26,7 +28,8 @@
     "actual",
     "toast",
     "debug",
-    "game_test"
+    "game_test",
+    "playground_test"
   ]);
   const VALID_MEDAL_TIERS = Object.freeze([
     "bronze",
@@ -269,6 +272,14 @@
       : "";
   }
 
+  function getPlaygroundTestStorageKey() {
+    const profileId = getActiveProfileId();
+
+    return profileId
+      ? `${PLAYGROUND_TEST_STORAGE_PREFIX}${profileId}`
+      : "";
+  }
+
   function readStoredJson(key) {
     if (!root?.localStorage || !key) {
       return null;
@@ -368,6 +379,30 @@
 
   function getGameTestPlan(engine) {
     return loadGameTestState(engine)
+      ?.activePlan || null;
+  }
+
+  function loadPlaygroundTestState(engine) {
+    const raw = readStoredJson(
+      getPlaygroundTestStorageKey()
+    );
+
+    if (!raw || !engine?.normalizeState) {
+      return null;
+    }
+
+    return engine.normalizeState(raw);
+  }
+
+  function savePlaygroundTestState(state) {
+    return writeStoredJson(
+      getPlaygroundTestStorageKey(),
+      state
+    );
+  }
+
+  function getPlaygroundTestPlan(engine) {
+    return loadPlaygroundTestState(engine)
       ?.activePlan || null;
   }
 
@@ -812,6 +847,14 @@
       };
     }
 
+    if (scope === "playground_test") {
+      return {
+        state:
+          loadPlaygroundTestState(engine),
+        progress: null
+      };
+    }
+
     const progress =
       loadActualProgress();
 
@@ -1011,6 +1054,10 @@
         ? saveGameTestState(
             confirmed.state
           )
+        : scope === "playground_test"
+          ? savePlaygroundTestState(
+              confirmed.state
+            )
         : saveActualState(
             confirmed.state
           );
@@ -1638,6 +1685,10 @@
       displayPlan =
         getGameTestPlan(engine);
       pendingScope = "game_test";
+    } else if (mode === "playground_test") {
+      displayPlan =
+        getPlaygroundTestPlan(engine);
+      pendingScope = "playground_test";
     } else {
       displayPlan = buildDisplayPlan(
         plan,
@@ -1853,6 +1904,7 @@
     getThankYouMessage,
     getMedalToastData,
     getGameTestPlan,
+    getPlaygroundTestPlan,
     promoteMedalToasts,
     renderPreview,
     confirmPendingCompletion

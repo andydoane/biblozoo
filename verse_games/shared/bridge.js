@@ -190,7 +190,8 @@
       dailyActivityId: params.get("dailyActivityId") || "",
       dailyActivityMode: params.get("dailyActivityMode") || "",
       dailyReturnContext: params.get("dailyReturnContext") || "",
-      dailyTest: params.get("dailyTest") === "1"
+      dailyTest: params.get("dailyTest") === "1",
+      dailyTestKind: params.get("dailyTestKind") || ""
     };
   }
 
@@ -698,6 +699,7 @@ function markCompleted(payload){
 
   function isDailyTodoLaunch() {
     const params = getParams();
+    const activityKind = params.dailyActivityKind;
 
     return params.todoSource === "daily_todo" &&
       !!params.dailyProfileId &&
@@ -706,9 +708,9 @@ function markCompleted(payload){
       !!params.dailyTaskId &&
       !!params.dailyLaunchToken &&
       !!params.dailyVerseId &&
-      params.dailyActivityKind === "game" &&
+      ["game", "playground"].includes(activityKind) &&
       !!params.dailyActivityId &&
-      !!params.dailyActivityMode &&
+      (activityKind !== "game" || !!params.dailyActivityMode) &&
       !!params.dailyReturnContext;
   }
 
@@ -737,7 +739,9 @@ function markCompleted(payload){
     target.searchParams.set(
       "dailyTodoPreview",
       params.dailyTest
-        ? "game_test"
+        ? params.dailyTestKind === "playground"
+          ? "playground_test"
+          : "game_test"
         : "actual"
     );
     target.searchParams.set("internalReturn", "1");
@@ -757,11 +761,22 @@ function markCompleted(payload){
 
     if (params.dailyTest) {
       target.searchParams.set("dailyTest", "1");
+      if (params.dailyTestKind) {
+        target.searchParams.set(
+          "dailyTestKind",
+          params.dailyTestKind
+        );
+      }
     } else {
       target.searchParams.delete("dailyTest");
+      target.searchParams.delete("dailyTestKind");
     }
 
-    if (status === "success" && completion?.newlyCompleted) {
+    if (
+      status === "success" &&
+      params.dailyActivityKind === "game" &&
+      completion?.newlyCompleted
+    ) {
       target.searchParams.set("dailyNewMedal", "1");
       target.searchParams.set("dailyMedalTier", params.dailyActivityMode);
     }

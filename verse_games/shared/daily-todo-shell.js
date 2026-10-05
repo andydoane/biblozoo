@@ -16,6 +16,23 @@
     "bible_bugs",
     "verse_splat"
   ]);
+  const PLAYGROUND_ACTIVITY_IDS = Object.freeze([
+    "verse_jam",
+    "scripture_scrub",
+    "ghost_writer",
+    "verse_typer",
+    "wheel_of_bible"
+  ]);
+  const PLAYGROUND_MODE_ALIASES = Object.freeze({
+    verse_jam: Object.freeze({
+      beginner: "easy",
+      advanced: "hard"
+    }),
+    verse_typer: Object.freeze({
+      beginner: "easy",
+      advanced: "hard"
+    })
+  });
 
   function clean(value) {
     return String(value ?? "").trim();
@@ -25,13 +42,23 @@
     const params = root.VerseGameBridge
       ?.getLaunchParams?.() || {};
 
+    const kind = clean(
+      params.dailyActivityKind
+    );
+    const activityId = clean(
+      params.dailyActivityId
+    );
+    const supportedActivity =
+      kind === "game"
+        ? STANDARD_GAME_IDS.includes(activityId)
+        : kind === "playground"
+          ? PLAYGROUND_ACTIVITY_IDS.includes(activityId)
+          : false;
+
     if (
       params.todoSource !== "daily_todo" ||
       params.mix ||
-      clean(params.dailyActivityKind) !== "game" ||
-      !STANDARD_GAME_IDS.includes(
-        clean(params.dailyActivityId)
-      )
+      !supportedActivity
     ) {
       return null;
     }
@@ -44,11 +71,14 @@
       "dailyLaunchToken",
       "dailyVerseId",
       "dailyActivityId",
-      "dailyActivityMode",
       "dailyReturnContext"
     ];
 
-    if (required.some((key) => !clean(params[key]))) {
+    if (
+      required.some((key) => !clean(params[key])) ||
+      (kind === "game" &&
+        !clean(params.dailyActivityMode))
+    ) {
       return null;
     }
 
@@ -56,7 +86,12 @@
   }
 
   function matchesRun(options, context) {
-    if (!context) return false;
+    if (
+      !context ||
+      clean(context.dailyActivityKind) !== "game"
+    ) {
+      return false;
+    }
 
     const completion = options?.completion;
 
@@ -67,6 +102,59 @@
         clean(context.dailyActivityId) &&
       clean(options?.mode || completion.mode) ===
         clean(context.dailyActivityMode);
+  }
+
+  function getAvailableModeIds(options) {
+    return Array.isArray(options?.modes)
+      ? options.modes
+          .map((mode) =>
+            clean(
+              typeof mode === "string"
+                ? mode
+                : mode?.id
+            )
+          )
+          .filter(Boolean)
+      : [];
+  }
+
+  function resolveAssignedMode(
+    context,
+    options
+  ) {
+    const assignedMode = clean(
+      context?.dailyActivityMode
+    );
+    const availableModes =
+      getAvailableModeIds(options);
+
+    if (
+      !assignedMode ||
+      !availableModes.length
+    ) {
+      return "";
+    }
+
+    if (availableModes.includes(assignedMode)) {
+      return assignedMode;
+    }
+
+    if (
+      clean(context?.dailyActivityKind) !==
+      "playground"
+    ) {
+      return "";
+    }
+
+    const alias = clean(
+      PLAYGROUND_MODE_ALIASES[
+        clean(context.dailyActivityId)
+      ]?.[assignedMode]
+    );
+
+    return availableModes.includes(alias)
+      ? alias
+      : "";
   }
 
   function showStarting(app) {
@@ -92,13 +180,15 @@
 
     shell.renderModeSelect = function (options = {}) {
       const context = getContext();
-      const assignedMode = clean(
-        context?.dailyActivityMode
-      );
+      const assignedMode =
+        resolveAssignedMode(
+          context,
+          options
+        );
 
       if (
         context &&
-        ["easy", "medium", "hard"].includes(assignedMode) &&
+        assignedMode &&
         typeof options.onSelect === "function"
       ) {
         showStarting(options.app);
@@ -155,8 +245,11 @@
 
   root.BibloZooDailyTodoShell = Object.freeze({
     STANDARD_GAME_IDS,
+    PLAYGROUND_ACTIVITY_IDS,
+    PLAYGROUND_MODE_ALIASES,
     getContext,
     matchesRun,
+    resolveAssignedMode,
     wrapShell
   });
 })(window);
