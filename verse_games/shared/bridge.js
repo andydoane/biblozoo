@@ -189,7 +189,8 @@
       dailyActivityKind: params.get("dailyActivityKind") || "",
       dailyActivityId: params.get("dailyActivityId") || "",
       dailyActivityMode: params.get("dailyActivityMode") || "",
-      dailyReturnContext: params.get("dailyReturnContext") || ""
+      dailyReturnContext: params.get("dailyReturnContext") || "",
+      dailyTest: params.get("dailyTest") === "1"
     };
   }
 
@@ -733,7 +734,12 @@ function markCompleted(payload){
     }
 
     target.searchParams.set("screen", "todo_dev");
-    target.searchParams.set("dailyTodoPreview", "actual");
+    target.searchParams.set(
+      "dailyTodoPreview",
+      params.dailyTest
+        ? "game_test"
+        : "actual"
+    );
     target.searchParams.set("internalReturn", "1");
     target.searchParams.set("profileId", params.dailyProfileId);
     target.searchParams.set("todoSource", "daily_todo");
@@ -748,6 +754,12 @@ function markCompleted(payload){
     target.searchParams.set("dailyActivityId", params.dailyActivityId);
     target.searchParams.set("dailyActivityMode", params.dailyActivityMode);
     target.searchParams.set("dailyReturnContext", params.dailyReturnContext);
+
+    if (params.dailyTest) {
+      target.searchParams.set("dailyTest", "1");
+    } else {
+      target.searchParams.delete("dailyTest");
+    }
 
     if (status === "success" && completion?.newlyCompleted) {
       target.searchParams.set("dailyNewMedal", "1");

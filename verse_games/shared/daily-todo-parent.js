@@ -4,6 +4,9 @@
   const SOURCE = "daily_todo";
   const RETURN_CONTEXT = "daily_tasks_clipboard";
   const ACTIVITY_TASK_ID = "activity";
+  const GAME_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoGameTest:";
+  const GAME_TEST_PREVIEW_MODE = "game_test";
   const STANDARD_GAME_TITLES = Object.freeze({
     scramble: "Verse Scramble",
     traffic_tap_external: "Traffic Tap",
@@ -31,12 +34,17 @@
     "dailyActivityId",
     "dailyActivityMode",
     "dailyReturnContext",
+    "dailyTest",
     "dailyNewMedal",
     "dailyMedalTier"
   ]);
 
   function clean(value) {
     return String(value ?? "").trim();
+  }
+
+  function cloneJson(value) {
+    return JSON.parse(JSON.stringify(value));
   }
 
   function getStorageKey(profileId) {
@@ -68,6 +76,56 @@
         err
       );
       return null;
+    }
+  }
+
+  function getGameTestStorageKey(profileId) {
+    const safeProfileId = clean(profileId);
+
+    return safeProfileId
+      ? `${GAME_TEST_STORAGE_PREFIX}${safeProfileId}`
+      : "";
+  }
+
+  function loadGameTestState(profileId) {
+    const key = getGameTestStorageKey(profileId);
+    if (!key) return null;
+
+    try {
+      const raw = root.localStorage?.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+
+      return parsed && typeof parsed === "object"
+        ? parsed
+        : null;
+    } catch (err) {
+      console.warn(
+        "Could not load Daily Game Tester state",
+        err
+      );
+      return null;
+    }
+  }
+
+  function saveGameTestState(profileId, state) {
+    const key = getGameTestStorageKey(profileId);
+
+    if (!key || !state || typeof state !== "object") {
+      return false;
+    }
+
+    try {
+      root.localStorage?.setItem(
+        key,
+        JSON.stringify(state)
+      );
+      return true;
+    } catch (err) {
+      console.warn(
+        "Could not save Daily Game Tester state",
+        err
+      );
+      return false;
     }
   }
 
@@ -115,6 +173,7 @@
       activityId: clean(params.get("dailyActivityId")),
       activityMode: clean(params.get("dailyActivityMode")),
       returnContext: clean(params.get("dailyReturnContext")),
+      isTest: params.get("dailyTest") === "1",
       newMedal: params.get("dailyNewMedal") === "1",
       medalTier: clean(params.get("dailyMedalTier"))
     };
@@ -202,16 +261,21 @@
     if (!data) return { handled: false, accepted: false };
 
     const engine = root.BibloZooDailyTodo;
-    const progress = loadProgress(data.profileId);
+    const progress = data.isTest
+      ? null
+      : loadProgress(data.profileId);
     const state = engine?.normalizeState?.(
-      progress?.dailyZooTodo
+      data.isTest
+        ? loadGameTestState(data.profileId)
+        : progress?.dailyZooTodo
     );
     const plan = state?.activePlan;
     const task = plan?.tasks?.[data.taskId];
+    let resultState = state;
 
     if (
       !engine ||
-      !progress ||
+      (!data.isTest && !progress) ||
       !matchesPersistedLaunch(plan, task, data) ||
       !["success", "quit"].includes(data.status)
     ) {
@@ -227,7 +291,6 @@
       task.launchToken = "";
       task.pendingData = null;
       plan.rolloverHold = null;
-      progress.dailyZooTodo = state;
     } else {
       const pending = engine.setPendingCompletion(
         state,
@@ -245,13 +308,22 @@
         return { handled: true, accepted: false };
       }
 
-      progress.dailyZooTodo = pending.state;
+      resultState = pending.state;
     }
 
-    const saved = saveProgress(
-      data.profileId,
-      progress
-    );
+    if (!data.isTest) {
+      progress.dailyZooTodo = resultState;
+    }
+
+    const saved = data.isTest
+      ? saveGameTestState(
+          data.profileId,
+          resultState
+        )
+      : saveProgress(
+          data.profileId,
+          progress
+        );
 
     clearReturnParams();
     return {
@@ -272,14 +344,19 @@
     )?.manifest || null;
   }
 
-  function buildReturnUrl() {
+  function buildReturnUrl({ isTest = false } = {}) {
     const url = new URL(root.location.href);
     RETURN_KEYS.forEach((key) =>
       url.searchParams.delete(key)
     );
     url.searchParams.delete("v");
     url.searchParams.set("screen", "todo_dev");
-    url.searchParams.set("dailyTodoPreview", "actual");
+    url.searchParams.set(
+      "dailyTodoPreview",
+      isTest
+        ? GAME_TEST_PREVIEW_MODE
+        : "actual"
+    );
     return url.href;
   }
 
@@ -310,15 +387,21 @@
     root.location.href = href;
   }
 
-  async function launchAssignedGame() {
+  async function launchAssignedGame({
+    isTest = false
+  } = {}) {
     const profileId = clean(
       root.BibloZooProfiles
         ?.getActiveProfileId?.()
     );
-    const progress = loadProgress(profileId);
+    const progress = isTest
+      ? null
+      : loadProgress(profileId);
     const engine = root.BibloZooDailyTodo;
     const state = engine?.normalizeState?.(
-      progress?.dailyZooTodo
+      isTest
+        ? loadGameTestState(profileId)
+        : progress?.dailyZooTodo
     );
     const plan = state?.activePlan;
     const taskId = engine?.TASK_IDS?.ACTIVITY || ACTIVITY_TASK_ID;
@@ -327,7 +410,7 @@
 
     if (
       !profileId ||
-      !progress ||
+      (!isTest && !progress) ||
       !engine ||
       !plan ||
       plan.profileId !== profileId ||
@@ -360,10 +443,23 @@
         return false;
       }
 
-      progress.dailyZooTodo = started.state;
       launchToken = started.launchToken;
 
-      if (!saveProgress(profileId, progress)) {
+      if (!isTest) {
+        progress.dailyZooTodo = started.state;
+      }
+
+      const saved = isTest
+        ? saveGameTestState(
+            profileId,
+            started.state
+          )
+        : saveProgress(
+            profileId,
+            progress
+          );
+
+      if (!saved) {
         return false;
       }
     }
@@ -375,7 +471,7 @@
       verseId: plan.verseId,
       ref: verse.ref,
       translation: verse.translation,
-      returnTo: buildReturnUrl(),
+      returnTo: buildReturnUrl({ isTest }),
       source: "verse_memory_app",
       profileId,
       mode: activity.mode,
@@ -392,8 +488,102 @@
       dailyReturnContext: RETURN_CONTEXT
     });
 
+    if (isTest) {
+      params.set("dailyTest", "1");
+    }
+
     navigate(`${manifest.launchUrl}?${params.toString()}`);
     return true;
+  }
+
+  function createGameTestState({
+    templatePlan,
+    gameId,
+    mode
+  } = {}) {
+    const engine = root.BibloZooDailyTodo;
+    const safeGameId = clean(gameId);
+    const safeMode = clean(mode).toLowerCase();
+    const manifest = findGameManifest(safeGameId);
+
+    if (
+      !engine?.normalizeState ||
+      !templatePlan ||
+      templatePlan.activity == null ||
+      !manifest ||
+      !["easy", "medium", "hard"].includes(safeMode)
+    ) {
+      return null;
+    }
+
+    const state = engine.normalizeState({});
+    const plan = cloneJson(templatePlan);
+    const openStatus =
+      engine.TASK_STATUSES?.OPEN || "open";
+
+    plan.id = [
+      "daily-game-test",
+      Date.now().toString(36),
+      Math.random().toString(36).slice(2, 10)
+    ].join("-");
+    plan.activity = {
+      kind: "game",
+      id: safeGameId,
+      mode: safeMode
+    };
+
+    Object.keys(plan.tasks || {}).forEach((taskId) => {
+      plan.tasks[taskId] = {
+        ...plan.tasks[taskId],
+        status: openStatus,
+        startedAt: 0,
+        pendingAt: 0,
+        completedAt: 0,
+        launchToken: "",
+        pendingData: null
+      };
+    });
+
+    plan.educationalCompletedAt = 0;
+    plan.snack = {
+      ...(plan.snack || {}),
+      unlocked: false,
+      claimed: false,
+      claimedAt: 0
+    };
+    plan.rolloverHold = null;
+    state.activePlan = plan;
+
+    return engine.normalizeState(state);
+  }
+
+  async function launchGameTest({
+    templatePlan,
+    gameId,
+    mode
+  } = {}) {
+    const profileId = clean(
+      root.BibloZooProfiles
+        ?.getActiveProfileId?.()
+    );
+    const state = createGameTestState({
+      templatePlan,
+      gameId,
+      mode
+    });
+
+    if (
+      !profileId ||
+      !state?.activePlan ||
+      clean(state.activePlan.profileId) !== profileId ||
+      !saveGameTestState(profileId, state)
+    ) {
+      return false;
+    }
+
+    return launchAssignedGame({
+      isTest: true
+    });
   }
 
   function releaseCompletedRolloverHold(event) {
@@ -438,17 +628,24 @@
       '[data-daily-todo-preview-task="activity"]'
     );
 
+    const previewMode =
+      root.BibloZooDailyTodoUI
+        ?.getPreviewMode?.(root.location.search);
+
     if (
       !row ||
       row.disabled ||
-      root.BibloZooDailyTodoUI
-        ?.getPreviewMode?.(root.location.search) !== "actual"
+      !["actual", GAME_TEST_PREVIEW_MODE]
+        .includes(previewMode)
     ) {
       return;
     }
 
     event.preventDefault();
-    launchAssignedGame();
+    launchAssignedGame({
+      isTest:
+        previewMode === GAME_TEST_PREVIEW_MODE
+    });
   });
 
   const bootReturn = processReturn();
@@ -459,7 +656,9 @@
     getReturnData,
     matchesPersistedLaunch,
     processReturn,
+    createGameTestState,
     launchAssignedGame,
+    launchGameTest,
     bootReturn
   });
 })(window);

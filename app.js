@@ -594,7 +594,10 @@ function showDialog({
     dlgBody.textContent = body;
   }
 
-  dlgActions.classList.remove("import-dialog-actions");
+  dlgActions.classList.remove(
+    "import-dialog-actions",
+    "daily-preview-dialog-actions"
+  );
 
   if (actionsClass) {
     dlgActions.classList.add(actionsClass);
@@ -609,7 +612,8 @@ function closeDialog() {
   overlay.classList.remove("show");
   dlgActions.classList.remove(
     "pet-name-dialog-actions",
-    "import-dialog-actions"
+    "import-dialog-actions",
+    "daily-preview-dialog-actions"
   );
 }
 overlay.addEventListener("click", (e) => { if (e.target === overlay) closeDialog(); });
@@ -4642,6 +4646,52 @@ function loadDailyTodoRuntime() {
     state,
     plan: state.activePlan
   };
+}
+
+function getOrCreateDailyTodoPreviewPlan({
+  persist = true
+} = {}) {
+  const dailyTodoApi =
+    window.BibloZooDailyTodo;
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (!dailyTodoApi || !profileId) {
+    return null;
+  }
+
+  const options = {
+    loadProgress,
+    saveProgress,
+    profileId,
+    verseList: VERSE_LIST,
+    gameRegistry:
+      window.EXTERNAL_VERSE_GAMES || [],
+    playgroundRegistry:
+      window.EXTERNAL_VERSE_PLAYGROUND || [],
+    isPetUnlocked:
+      isBibloPetUnlocked,
+    getPetStatus:
+      getBibloPetStatus
+  };
+
+  if (persist) {
+    return dailyTodoApi
+      .getOrCreatePersistedPlan?.(
+        options
+      )?.plan || null;
+  }
+
+  const progress = JSON.parse(
+    JSON.stringify(loadProgress())
+  );
+
+  return dailyTodoApi
+    .getOrCreatePlan?.({
+      ...options,
+      progress
+    })?.plan || null;
 }
 
 function saveDailyTodoRuntime(
@@ -12605,6 +12655,146 @@ function screenTitle(idx) {
       go(Screen.TODO_DEV);
     };
 
+    const showDailyPreviewDialog = () => {
+      const previewButton = (label, mode) =>
+        dlgBtn(label, {
+          onClick: () => {
+            closeDialog();
+            openDailyTodoPreview(mode);
+          }
+        });
+
+      showDialog({
+        title: "Daily To-Do Preview",
+        body: "Choose a Daily Tasks state to inspect.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          previewButton("Open", "open"),
+          previewButton("1 Complete", "one"),
+          previewButton("2 Complete", "two"),
+          previewButton("Snack Ready", "ready"),
+          previewButton("Actual", "actual"),
+          previewButton("Toast Test", "toast"),
+          dlgBtn("Game Tester", {
+            onClick: showDailyGameTesterDialog
+          }),
+          dlgBtn("Cancel", {
+            secondary: true,
+            onClick: closeDialog
+          })
+        ]
+      });
+    };
+
+    const launchDailyGameTest = async (
+      gameId,
+      mode
+    ) => {
+      closeDialog();
+
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const launched = templatePlan
+        ? await window.BibloZooDailyTodoParent
+            ?.launchGameTest?.({
+              templatePlan,
+              gameId,
+              mode
+            })
+        : false;
+
+      if (!launched) {
+        showDialog({
+          title: "Game Tester Unavailable",
+          body:
+            "Unlock a BibloPet and create today's Daily To-Do before using the Game Tester.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
+      }
+    };
+
+    const showDailyGameModeDialog = (
+      game
+    ) => {
+      const manifest = game?.manifest;
+      if (!manifest?.id) return;
+
+      showDialog({
+        title: manifest.title || "Choose Difficulty",
+        body: "Choose the assigned Daily difficulty.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...["easy", "medium", "hard"]
+            .map((mode) =>
+              dlgBtn(
+                mode.charAt(0).toUpperCase() +
+                  mode.slice(1),
+                {
+                  onClick: () =>
+                    launchDailyGameTest(
+                      manifest.id,
+                      mode
+                    )
+                }
+              )
+            ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showDailyGameTesterDialog
+          })
+        ]
+      });
+    };
+
+    function showDailyGameTesterDialog() {
+      const games = (
+        window.EXTERNAL_VERSE_GAMES || []
+      ).filter((entry) => {
+        const manifest = entry?.manifest;
+
+        return entry?.enabled !== false &&
+          manifest?.progressType === "standard" &&
+          ["easy", "medium", "hard"].every(
+            (mode) =>
+              manifest.modes?.includes?.(mode)
+          );
+      });
+
+      showDialog({
+        title: "Daily Game Tester",
+        body: "Choose one of the 12 standard Games.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...games.map((game) =>
+            dlgBtn(
+              game.manifest.title,
+              {
+                onClick: () =>
+                  showDailyGameModeDialog(
+                    game
+                  )
+              }
+            )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showDailyPreviewDialog
+          })
+        ]
+      });
+    }
+
     titleTodoBtn.onclick = (e) => {
       e.stopPropagation();
       openDailyTodoPreview("");
@@ -12613,32 +12803,8 @@ function screenTitle(idx) {
     bindLongPress(titleTodoBtn, {
       delay: 1200,
       shouldStart: () => !isTutorialActive(),
-      onLongPress: () => {
-        const previewButton = (label, mode) =>
-          dlgBtn(label, {
-            onClick: () => {
-              closeDialog();
-              openDailyTodoPreview(mode);
-            }
-          });
-
-        showDialog({
-          title: "Daily To-Do Preview",
-          body: "Choose a Daily Tasks state to inspect.",
-          actions: [
-            previewButton("Open", "open"),
-            previewButton("1 Complete", "one"),
-            previewButton("2 Complete", "two"),
-            previewButton("Snack Ready", "ready"),
-            previewButton("Actual", "actual"),
-            previewButton("Toast Test", "toast"),
-            dlgBtn("Cancel", {
-              secondary: true,
-              onClick: closeDialog
-            })
-          ]
-        });
-      }
+      onLongPress:
+        showDailyPreviewDialog
     });
   }
 
@@ -14721,31 +14887,14 @@ function screenTodoDev(idx) {
   if (dailyPreviewActive) {
     const dailyTodoApi =
       window.BibloZooDailyTodo;
-    const profileId =
-      getProfileApi()
-        ?.getActiveProfileId?.() || "";
 
-    if (
-      dailyTodoApi &&
-      profileId
-    ) {
-      dailyPreviewPlan =
-        dailyTodoApi
-          .getOrCreatePersistedPlan?.({
-            loadProgress,
-            saveProgress,
-            profileId,
-            verseList: VERSE_LIST,
-            gameRegistry:
-              window.EXTERNAL_VERSE_GAMES || [],
-            playgroundRegistry:
-              window.EXTERNAL_VERSE_PLAYGROUND || [],
-            isPetUnlocked:
-              isBibloPetUnlocked,
-            getPetStatus:
-              getBibloPetStatus
-          })?.plan || null;
-    }
+    dailyPreviewPlan =
+      dailyPreviewMode === "game_test"
+        ? dailyTodoUi
+            ?.getGameTestPlan?.(
+              dailyTodoApi
+            ) || null
+        : getOrCreateDailyTodoPreviewPlan();
 
     wrap.classList.add("is-daily-mode");
   }
@@ -14812,6 +14961,10 @@ function screenTodoDev(idx) {
       </section>
     </main>
   `;
+
+  dailyTodoUi?.promoteMedalToasts?.(
+    wrap
+  );
 
   bindHomePill(wrap);
 

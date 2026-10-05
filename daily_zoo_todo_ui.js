@@ -15,6 +15,8 @@
   const MEDAL_ASSET_DIR = "verse_images/";
   const DEBUG_PENDING_STORAGE_PREFIX =
     "biblozooDailyTodoPendingPreview:";
+  const GAME_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoGameTest:";
   const PENDING_DATA_VERSION = 1;
   const PREVIEW_MODES = Object.freeze([
     "open",
@@ -23,7 +25,8 @@
     "ready",
     "actual",
     "toast",
-    "debug"
+    "debug",
+    "game_test"
   ]);
   const VALID_MEDAL_TIERS = Object.freeze([
     "bronze",
@@ -258,6 +261,14 @@
       : "";
   }
 
+  function getGameTestStorageKey() {
+    const profileId = getActiveProfileId();
+
+    return profileId
+      ? `${GAME_TEST_STORAGE_PREFIX}${profileId}`
+      : "";
+  }
+
   function readStoredJson(key) {
     if (!root?.localStorage || !key) {
       return null;
@@ -334,6 +345,30 @@
       getDeveloperStorageKey(),
       state
     );
+  }
+
+  function loadGameTestState(engine) {
+    const raw = readStoredJson(
+      getGameTestStorageKey()
+    );
+
+    if (!raw || !engine?.normalizeState) {
+      return null;
+    }
+
+    return engine.normalizeState(raw);
+  }
+
+  function saveGameTestState(state) {
+    return writeStoredJson(
+      getGameTestStorageKey(),
+      state
+    );
+  }
+
+  function getGameTestPlan(engine) {
+    return loadGameTestState(engine)
+      ?.activePlan || null;
   }
 
   function findPendingCompletion(
@@ -574,7 +609,9 @@
   function renderMedalToastHtml(
     medal,
     {
-      held = false
+      held = false,
+      planId = "",
+      taskId = ""
     } = {}
   ) {
     if (!medal) return "";
@@ -584,6 +621,8 @@
         class="daily-medal-toast${held ? " is-test-held" : ""}"
         role="status"
         aria-live="polite"
+        data-daily-medal-plan-id="${escapeHtml(planId)}"
+        data-daily-medal-task-id="${escapeHtml(taskId)}"
       >
         <img
           class="daily-medal-toast-img"
@@ -642,7 +681,9 @@
       ${renderMedalToastHtml(
         medal,
         {
-          held: scope === "tester"
+          held: scope === "toast_test",
+          planId: pending.planId,
+          taskId: pending.taskId
         }
       )}
 
@@ -708,6 +749,49 @@
     `;
   }
 
+  function promoteMedalToasts(host) {
+    if (!host || !root?.document?.body) {
+      return 0;
+    }
+
+    const toasts = Array.from(
+      host.querySelectorAll?.(
+        ".daily-medal-toast"
+      ) || []
+    );
+
+    toasts.forEach((toast) => {
+      const planId = cleanString(
+        toast.dataset.dailyMedalPlanId
+      );
+      const taskId = cleanString(
+        toast.dataset.dailyMedalTaskId
+      );
+
+      root.document.body
+        .querySelectorAll?.(
+          ".daily-medal-toast"
+        )
+        ?.forEach?.((existing) => {
+          if (
+            existing !== toast &&
+            cleanString(
+              existing.dataset.dailyMedalPlanId
+            ) === planId &&
+            cleanString(
+              existing.dataset.dailyMedalTaskId
+            ) === taskId
+          ) {
+            existing.remove();
+          }
+        });
+
+      root.document.body.appendChild(toast);
+    });
+
+    return toasts.length;
+  }
+
   function getPendingStateForScope(
     scope,
     engine
@@ -716,6 +800,14 @@
       return {
         state:
           loadDeveloperState(engine),
+        progress: null
+      };
+    }
+
+    if (scope === "game_test") {
+      return {
+        state:
+          loadGameTestState(engine),
         progress: null
       };
     }
@@ -853,7 +945,7 @@
       button.dataset.dailyTaskId
     );
 
-    if (scope === "tester") {
+    if (scope === "toast_test") {
       button.disabled = true;
 
       removeCompletionLayer(
@@ -915,9 +1007,13 @@
       ? saveDeveloperState(
           confirmed.state
         )
-      : saveActualState(
-          confirmed.state
-        );
+      : scope === "game_test"
+        ? saveGameTestState(
+            confirmed.state
+          )
+        : saveActualState(
+            confirmed.state
+          );
 
     if (!saved) {
       button.disabled = false;
@@ -1339,7 +1435,16 @@
         ".todo-dev-screen.is-daily-mode"
       );
 
-    if (!screen) return;
+    if (!screen) {
+      root?.document
+        ?.querySelectorAll?.(
+          ".daily-medal-toast.is-test-held"
+        )
+        ?.forEach?.((toast) =>
+          toast.remove()
+        );
+      return;
+    }
 
     const hasCompletionUi = !!(
       screen.querySelector(
@@ -1529,6 +1634,10 @@
           engine
         )?.activePlan || null;
       pendingScope = "debug";
+    } else if (mode === "game_test") {
+      displayPlan =
+        getGameTestPlan(engine);
+      pendingScope = "game_test";
     } else {
       displayPlan = buildDisplayPlan(
         plan,
@@ -1600,7 +1709,7 @@
         claimed: false,
         claimedAt: 0
       };
-      pendingScope = "tester";
+      pendingScope = "toast_test";
     }
 
     const activityManifest =
@@ -1743,6 +1852,8 @@
     createPendingCompletionData,
     getThankYouMessage,
     getMedalToastData,
+    getGameTestPlan,
+    promoteMedalToasts,
     renderPreview,
     confirmPendingCompletion
   });

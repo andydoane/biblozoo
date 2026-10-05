@@ -259,6 +259,36 @@
   }
 }
 
+.dialog .row.daily-preview-dialog-actions {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.dialog .row.daily-preview-dialog-actions
+  .dlg-btn {
+  width: 100%;
+  min-width: 0;
+  font-size: clamp(15px, 4vw, 18px);
+}
+
+.dialog .row.daily-preview-dialog-actions
+  .dlg-btn:last-child {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 520px) {
+  .dialog .row.daily-preview-dialog-actions {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+}
+
 .todo-dev-screen.is-daily-mode.has-daily-completion-ui
   .todo-dev-paper {
   z-index: 50;
@@ -372,7 +402,7 @@
 
 .daily-medal-toast {
   position: fixed;
-  z-index: 130;
+  z-index: 60000;
   top: calc(16px + var(--safeT));
   left: 50%;
   width: min(calc(100vw - 28px), 430px);
