@@ -4902,6 +4902,253 @@ function exitDailyTodoFlashcard(
   return true;
 }
 
+
+function startDailyTodoQuestions(
+  requestedPlan
+) {
+  const questions =
+    window.BibloZooDailyQuestions;
+  const loaded =
+    loadDailyTodoRuntime();
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (
+    !questions?.startForVerse ||
+    !loaded ||
+    !profileId
+  ) {
+    return false;
+  }
+
+  const { engine, progress, state } =
+    loaded;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.QUESTIONS ||
+    "questions";
+  const task = plan?.tasks?.[taskId];
+  const openStatus =
+    engine.TASK_STATUSES?.OPEN ||
+    "open";
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const verseId =
+    String(plan?.verseId || "").trim();
+
+  if (
+    !plan ||
+    plan.id !== requestedPlan?.id ||
+    plan.profileId !== profileId ||
+    !verseId ||
+    ![openStatus, runningStatus]
+      .includes(task?.status)
+  ) {
+    return false;
+  }
+
+  const started =
+    engine.beginTask(
+      state,
+      {
+        planId: plan.id,
+        taskId,
+        now: new Date()
+      }
+    );
+
+  if (!started.launchToken) {
+    return false;
+  }
+
+  const context = {
+    source: "daily_todo",
+    profileId,
+    planId: plan.id,
+    planDay: plan.day,
+    taskId,
+    launchToken:
+      started.launchToken,
+    verseId
+  };
+
+  if (
+    !questions.startForVerse(
+      verseId,
+      context
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    started.changed &&
+    !saveDailyTodoRuntime(
+      progress,
+      started.state
+    )
+  ) {
+    questions.clearOfferState?.();
+    return false;
+  }
+
+  setDailyTodoActualPreviewMode();
+  go(Screen.DAILY_SESSION);
+  return true;
+}
+
+function completeDailyTodoQuestions({
+  context = null,
+  verseId = "",
+  earnedStarPegCount = 0
+} = {}) {
+  if (
+    context?.source !== "daily_todo"
+  ) {
+    return false;
+  }
+
+  const loaded =
+    loadDailyTodoRuntime();
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (!loaded || !profileId) {
+    return false;
+  }
+
+  const { engine, progress, state } =
+    loaded;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.QUESTIONS ||
+    "questions";
+  const task = plan?.tasks?.[taskId];
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const pendingStatus =
+    engine.TASK_STATUSES?.PENDING ||
+    "pending";
+  const safeVerseId =
+    String(verseId || "").trim();
+  const launchToken =
+    String(
+      context.launchToken || ""
+    ).trim();
+
+  if (
+    !plan ||
+    context.profileId !== profileId ||
+    context.planId !== plan.id ||
+    context.planDay !== plan.day ||
+    context.taskId !== taskId ||
+    context.verseId !== plan.verseId ||
+    safeVerseId !== plan.verseId ||
+    !launchToken ||
+    task?.launchToken !==
+      launchToken
+  ) {
+    return false;
+  }
+
+  if (
+    task.status === pendingStatus
+  ) {
+    setDailyTodoActualPreviewMode();
+    go(Screen.TODO_DEV);
+    return true;
+  }
+
+  if (
+    task.status !== runningStatus
+  ) {
+    return false;
+  }
+
+  const safeStarPegCount =
+    Math.min(
+      2,
+      Math.max(
+        0,
+        Math.floor(
+          Number(
+            earnedStarPegCount
+          ) || 0
+        )
+      )
+    );
+
+  state.activePlan.earnedStarPegCount =
+    safeStarPegCount;
+
+  const pendingData =
+    window.BibloZooDailyTodoUI
+      ?.createPendingCompletionData?.({
+        planId: plan.id,
+        taskId,
+        source: "questions",
+        thankYouKey: "questions",
+        extra: {
+          verseId: safeVerseId,
+          earnedStarPegCount:
+            safeStarPegCount
+        }
+      }) || {
+        version: 1,
+        planId: plan.id,
+        taskId,
+        source: "questions",
+        thankYouKey: "questions",
+        verseId: safeVerseId,
+        earnedStarPegCount:
+          safeStarPegCount
+      };
+
+  const pending =
+    engine.setPendingCompletion(
+      state,
+      {
+        planId: plan.id,
+        taskId,
+        launchToken,
+        pendingData,
+        now: new Date()
+      }
+    );
+
+  if (
+    !pending.changed ||
+    !saveDailyTodoRuntime(
+      progress,
+      pending.state
+    )
+  ) {
+    return false;
+  }
+
+  setDailyTodoActualPreviewMode();
+  go(Screen.TODO_DEV);
+  return true;
+}
+
+function exitDailyTodoQuestions(
+  context = null
+) {
+  if (
+    context?.source !== "daily_todo"
+  ) {
+    return false;
+  }
+
+  setDailyTodoActualPreviewMode();
+  go(Screen.TODO_DEV);
+  return true;
+}
+
 function markLearnCompleted(verseId) {
   updateVerseProgress(verseId, (verseProgress) => {
     const now = Date.now();
@@ -5274,6 +5521,12 @@ window.BibloZooDailyQuestions
 
     updateDailyProgress:
       updateDailyQuestionsProgress,
+
+    onContextComplete:
+      completeDailyTodoQuestions,
+
+    onContextExit:
+      exitDailyTodoQuestions,
 
     getActiveProfileId: () =>
       getProfileApi()
@@ -10927,14 +11180,6 @@ async function resumePendingBootRoute() {
   } else if (route.screen === "settings") {
     setScreen(Screen.SETTINGS);
   } else {
-    window.BibloZooDailyQuestions
-      ?.prepareStartupOffer?.({
-        allowOffer:
-          isNormalDailyQuestionBootRoute(
-            route
-          )
-      });
-
     setScreen(Screen.TITLE);
   }
 
@@ -12318,15 +12563,7 @@ function screenTitle(idx) {
       <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
     </div>
-
-    ${
-      window.BibloZooDailyQuestions
-        ?.renderTitleOffer?.() || ""
-    }
   `;
-
-  window.BibloZooDailyQuestions
-    ?.bindTitleOffer?.(wrap);
 
   const titleMyVersesBtn = wrap.querySelector("#titleMyVersesBtn");
   if (titleMyVersesBtn) {
@@ -12519,7 +12756,15 @@ function screenTitle(idx) {
           return;
         }
 
-        render();
+        const accepted =
+          window.BibloZooDailyQuestions
+            ?.acceptPendingOffer?.();
+
+        if (!accepted) {
+          return;
+        }
+
+        go(Screen.DAILY_SESSION);
       }
     });
   }
@@ -14602,6 +14847,33 @@ function screenTodoDev(idx) {
         event.stopPropagation();
 
         startDailyTodoFlashcard(
+          dailyPreviewPlan
+        );
+      };
+    }
+
+    const questionsTaskId =
+      engine?.TASK_IDS?.QUESTIONS ||
+      "questions";
+    const questionsTask =
+      dailyPreviewPlan.tasks
+        ?.[questionsTaskId];
+    const questionsRow =
+      wrap.querySelector(
+        `.daily-zoo-todo-row[data-daily-todo-preview-task="${questionsTaskId}"]`
+      );
+
+    if (
+      questionsRow &&
+      launchableStatuses.includes(
+        questionsTask?.status
+      )
+    ) {
+      questionsRow.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        startDailyTodoQuestions(
           dailyPreviewPlan
         );
       };

@@ -247,6 +247,12 @@
       day,
       verseId,
       activity,
+      earnedStarPegCount: Math.min(
+        2,
+        toNonNegativeInteger(
+          rawPlan.earnedStarPegCount
+        )
+      ),
       tasks: {
         [TASK_IDS.FLASHCARD]: normalizeTask(rawTasks[TASK_IDS.FLASHCARD]),
         [TASK_IDS.QUESTIONS]: normalizeTask(rawTasks[TASK_IDS.QUESTIONS]),
@@ -707,6 +713,7 @@
       day: safeDay,
       verseId: safeVerseId,
       activity: safeActivity,
+      earnedStarPegCount: 0,
       tasks: {
         [TASK_IDS.FLASHCARD]: createDefaultTask(),
         [TASK_IDS.QUESTIONS]: createDefaultTask(),

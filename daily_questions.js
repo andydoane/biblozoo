@@ -899,6 +899,12 @@
         ).trim(),
       petName,
       reflection,
+      context:
+        offer?.context &&
+        typeof offer.context === "object" &&
+        !Array.isArray(offer.context)
+          ? { ...offer.context }
+          : null,
       phase:
         SESSION_PHASES.QUESTION,
       questionIndex: 0,
@@ -921,6 +927,96 @@
       rewardCaught: 0,
       rewardComplete: false
     };
+  }
+
+  function getSessionContext(
+    session = dailySession
+  ) {
+    if (
+      !session?.context ||
+      typeof session.context !== "object" ||
+      Array.isArray(session.context)
+    ) {
+      return null;
+    }
+
+    return { ...session.context };
+  }
+
+  function isDailyTodoSession(
+    session = dailySession
+  ) {
+    return (
+      getSessionContext(session)?.source ===
+      "daily_todo"
+    );
+  }
+
+  function startForVerse(
+    verseId,
+    context = null
+  ) {
+    if (!isFeatureEnabled()) {
+      return false;
+    }
+
+    const cleanVerseId =
+      String(verseId || "").trim();
+    const verseList =
+      appApi?.getVerseList?.();
+
+    if (
+      !cleanVerseId ||
+      !Array.isArray(verseList)
+    ) {
+      return false;
+    }
+
+    const verse =
+      verseList.find(
+        (item) =>
+          String(
+            item?.id || ""
+          ).trim() === cleanVerseId
+      );
+
+    if (!verse) {
+      return false;
+    }
+
+    const reflection =
+      normalizeReflection(
+        verse.reflection
+      );
+
+    if (!reflection) {
+      return false;
+    }
+
+    clearOfferState();
+
+    const session =
+      createSessionFromOffer({
+        verseId: cleanVerseId,
+        verse: {
+          ...verse,
+          id: cleanVerseId,
+          reflection
+        },
+        context:
+          context &&
+          typeof context === "object" &&
+          !Array.isArray(context)
+            ? { ...context }
+            : null
+      });
+
+    if (!session) {
+      return false;
+    }
+
+    dailySession = session;
+    return true;
   }
 
   function acceptPendingOffer() {
@@ -1985,7 +2081,11 @@
               type="button"
               data-daily-reflection-done
             >
-              Snack time!
+              ${
+                isDailyTodoSession(session)
+                  ? "Done"
+                  : "Snack time!"
+              }
             </button>
           </div>
         </div>
@@ -2337,6 +2437,30 @@
             event.preventDefault();
             event.stopPropagation();
 
+            const sessionContext =
+              getSessionContext(
+                dailySession
+              );
+
+            if (
+              isDailyTodoSession(
+                dailySession
+              ) &&
+              typeof appApi
+                ?.onContextExit ===
+                "function"
+            ) {
+              const handled =
+                appApi.onContextExit(
+                  sessionContext
+                );
+
+              if (handled !== false) {
+                clearSessionState();
+                return;
+              }
+            }
+
             clearSessionState();
 
             appApi?.goToTitle?.();
@@ -2504,6 +2628,55 @@
 
           const sessionAtStart =
             dailySession;
+
+          if (
+            isDailyTodoSession(
+              sessionAtStart
+            )
+          ) {
+            if (
+              typeof appApi
+                ?.onContextComplete !==
+                "function"
+            ) {
+              return;
+            }
+
+            reflectionDoneButton.disabled =
+              true;
+
+            const handled =
+              appApi.onContextComplete({
+                context:
+                  getSessionContext(
+                    sessionAtStart
+                  ),
+                verseId:
+                  sessionAtStart.verseId,
+                earnedStarPegCount:
+                  Math.min(
+                    2,
+                    Math.max(
+                      0,
+                      Math.floor(
+                        Number(
+                          sessionAtStart
+                            .earnedStarPegCount
+                        ) || 0
+                      )
+                    )
+                  )
+              });
+
+            if (handled !== false) {
+              clearSessionState();
+              return;
+            }
+
+            reflectionDoneButton.disabled =
+              false;
+            return;
+          }
 
           window.BibloZooDailyFeedGame
             ?.prepareAudio?.();
@@ -2954,6 +3127,7 @@
       chooseDailyQuestionVerse,
       hasCompletedToday,
       prepareForcedDebugOffer,
+      startForVerse,
       shouldOfferToday,
       prepareStartupOffer,
       getPendingOffer,
