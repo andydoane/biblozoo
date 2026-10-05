@@ -8,6 +8,7 @@ const rootFiles = [
     "index.html",
     "app.js",
     "profiles.js",
+    "daily_zoo_todo.js",
     "daily_questions_feed_game.js",
     "daily_questions.js",
     "styles.css",

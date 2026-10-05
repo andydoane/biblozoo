@@ -5,7 +5,8 @@
   "main": "app.js",
   "scripts": {
     "build": "node scripts/build.js",
-    "validate:daily-questions": "node scripts/validate_daily_questions.js"
+    "validate:daily-questions": "node scripts/validate_daily_questions.js",
+    "validate:daily-zoo-todo": "node scripts/validate_daily_zoo_todo.js"
   },
   "repository": {
     "type": "git",
