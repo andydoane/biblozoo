@@ -1,3 +1,21 @@
+(function loadDailyTodoShell(){
+  if (
+    document.readyState !== "loading" ||
+    !document.currentScript?.src
+  ) {
+    return;
+  }
+
+  const src = new URL(
+    "daily-todo-shell.js",
+    document.currentScript.src
+  ).href;
+
+  document.write(
+    `<script src="${src}"><\/script>`
+  );
+})();
+
 (function(){
   const PROFILE_PROGRESS_STORAGE_KEY_BASE = "biblozooPwaProgress";
   const PAGE_TRANSITION_MS = 300;
@@ -160,7 +178,18 @@
       todoVerseId: params.get("todoVerseId") || "",
       todoPetName: params.get("todoPetName") || "",
       todoPetEmoji: params.get("todoPetEmoji") || "",
-      todoText: params.get("todoText") || ""
+      todoText: params.get("todoText") || "",
+
+      dailyProfileId: params.get("dailyProfileId") || "",
+      dailyPlanId: params.get("dailyPlanId") || "",
+      dailyPlanDay: params.get("dailyPlanDay") || "",
+      dailyTaskId: params.get("dailyTaskId") || "",
+      dailyLaunchToken: params.get("dailyLaunchToken") || "",
+      dailyVerseId: params.get("dailyVerseId") || "",
+      dailyActivityKind: params.get("dailyActivityKind") || "",
+      dailyActivityId: params.get("dailyActivityId") || "",
+      dailyActivityMode: params.get("dailyActivityMode") || "",
+      dailyReturnContext: params.get("dailyReturnContext") || ""
     };
   }
 
@@ -666,6 +695,69 @@ function markCompleted(payload){
     return target;
   }
 
+  function isDailyTodoLaunch() {
+    const params = getParams();
+
+    return params.todoSource === "daily_todo" &&
+      !!params.dailyProfileId &&
+      !!params.dailyPlanId &&
+      !!params.dailyPlanDay &&
+      !!params.dailyTaskId &&
+      !!params.dailyLaunchToken &&
+      !!params.dailyVerseId &&
+      params.dailyActivityKind === "game" &&
+      !!params.dailyActivityId &&
+      !!params.dailyActivityMode &&
+      !!params.dailyReturnContext;
+  }
+
+  function returnToDailyTodo({
+    status = "quit",
+    completion = null
+  } = {}) {
+    if (!isDailyTodoLaunch()) return false;
+
+    const params = getParams();
+    let target;
+
+    try {
+      target = new URL(
+        params.returnTo || "../../index.html",
+        window.location.href
+      );
+    } catch (err) {
+      target = new URL(
+        "../../index.html",
+        window.location.href
+      );
+    }
+
+    target.searchParams.set("screen", "todo_dev");
+    target.searchParams.set("dailyTodoPreview", "actual");
+    target.searchParams.set("internalReturn", "1");
+    target.searchParams.set("profileId", params.dailyProfileId);
+    target.searchParams.set("todoSource", "daily_todo");
+    target.searchParams.set("dailyReturnStatus", status === "success" ? "success" : "quit");
+    target.searchParams.set("dailyProfileId", params.dailyProfileId);
+    target.searchParams.set("dailyPlanId", params.dailyPlanId);
+    target.searchParams.set("dailyPlanDay", params.dailyPlanDay);
+    target.searchParams.set("dailyTaskId", params.dailyTaskId);
+    target.searchParams.set("dailyLaunchToken", params.dailyLaunchToken);
+    target.searchParams.set("dailyVerseId", params.dailyVerseId);
+    target.searchParams.set("dailyActivityKind", params.dailyActivityKind);
+    target.searchParams.set("dailyActivityId", params.dailyActivityId);
+    target.searchParams.set("dailyActivityMode", params.dailyActivityMode);
+    target.searchParams.set("dailyReturnContext", params.dailyReturnContext);
+
+    if (status === "success" && completion?.newlyCompleted) {
+      target.searchParams.set("dailyNewMedal", "1");
+      target.searchParams.set("dailyMedalTier", params.dailyActivityMode);
+    }
+
+    navigateWithTransition(target.href);
+    return true;
+  }
+
 
   function clearExternalPetUnlockPending(verseId){
     if (!verseId) return;
@@ -783,6 +875,10 @@ function markCompleted(payload){
 function exitGame(){
   const params = getParams();
 
+  if (returnToDailyTodo({ status: "quit" })) {
+    return;
+  }
+
   try {
     const raw = params.returnTo || "";
     const target = raw
@@ -826,6 +922,8 @@ function exitGame(){
     openPetUnlockFromMix,
     continueGameMix,
     endGameMix,
+    isDailyTodoLaunch,
+    returnToDailyTodo,
     exitGame
   };
 })();
