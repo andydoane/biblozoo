@@ -787,44 +787,7 @@
     });
   }
 
-  function releaseCompletedRolloverHold(event) {
-    const button = event.target?.closest?.(
-      '[data-daily-complete-task][data-daily-pending-scope="actual"]'
-    );
-
-    if (!button) return;
-
-    const profileId = clean(
-      root.BibloZooProfiles
-        ?.getActiveProfileId?.()
-    );
-    const progress = loadProgress(profileId);
-    const engine = root.BibloZooDailyTodo;
-    const state = engine?.normalizeState?.(
-      progress?.dailyZooTodo
-    );
-    const plan = state?.activePlan;
-    const taskId = clean(button.dataset.dailyTaskId);
-    const task = plan?.tasks?.[taskId];
-
-    if (
-      !progress ||
-      !plan ||
-      task?.status !== "complete" ||
-      !plan.rolloverHold ||
-      plan.rolloverHold.taskId !== taskId
-    ) {
-      return;
-    }
-
-    plan.rolloverHold = null;
-    progress.dailyZooTodo = state;
-    saveProgress(profileId, progress);
-  }
-
   root.document?.addEventListener?.("click", (event) => {
-    releaseCompletedRolloverHold(event);
-
     const row = event.target?.closest?.(
       '[data-daily-todo-preview-task="activity"]'
     );

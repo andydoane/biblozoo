@@ -805,6 +805,100 @@ function testOldDayActiveFlowPreservation() {
   assert.strictEqual(expired.state.activePlan, null);
 }
 
+function testConfirmationReleasesRolloverHold() {
+  let state = makePlanState({
+    day: "2026-10-05"
+  });
+
+  state.activePlan.rolloverHold = {
+    taskId: "activity",
+    launchToken: "token-a",
+    startedAt: 1
+  };
+
+  const confirmed =
+    DailyTodo.confirmPendingCompletion(
+      state,
+      {
+        planId: state.activePlan.id,
+        taskId: "activity",
+        now: new Date(
+          2026,
+          9,
+          5,
+          18,
+          0,
+          0
+        )
+      }
+    );
+
+  assert.strictEqual(
+    confirmed.taskCompleted,
+    true
+  );
+  assert.strictEqual(
+    confirmed.state.activePlan
+      .rolloverHold,
+    null
+  );
+
+  const nextDay =
+    DailyTodo.expireOldPlanIfNeeded(
+      confirmed.state,
+      "2026-10-06"
+    );
+
+  assert.strictEqual(nextDay.expired, true);
+  assert.strictEqual(
+    nextDay.state.activePlan,
+    null
+  );
+}
+
+function testCompletedRolloverHoldSelfHeals() {
+  const state = makePlanState({
+    day: "2026-10-05"
+  });
+
+  state.activePlan.tasks.activity.status =
+    "complete";
+  state.activePlan.tasks.activity.completedAt =
+    3;
+  state.activePlan.educationalCompletedAt = 4;
+  state.activePlan.snack = {
+    unlocked: true,
+    claimed: true,
+    claimedAt: 5
+  };
+  state.activePlan.rolloverHold = {
+    taskId: "activity",
+    launchToken: "token-a",
+    startedAt: 1
+  };
+
+  const normalized =
+    DailyTodo.normalizeState(state);
+
+  assert.strictEqual(
+    normalized.activePlan.rolloverHold,
+    null
+  );
+
+  const nextDay =
+    DailyTodo.expireOldPlanIfNeeded(
+      state,
+      "2026-10-06"
+    );
+
+  assert.strictEqual(nextDay.preserved, false);
+  assert.strictEqual(nextDay.expired, true);
+  assert.strictEqual(
+    nextDay.state.activePlan,
+    null
+  );
+}
+
 function testIdempotentTaskConfirmationAndStreak() {
   let state = makePlanState({
     day: "2026-10-05",
@@ -1300,6 +1394,8 @@ function main() {
     testNoUnlockedPetCreatesNoPlan,
     testRolloverCreatesFreshPlan,
     testOldDayActiveFlowPreservation,
+    testConfirmationReleasesRolloverHold,
+    testCompletedRolloverHoldSelfHeals,
     testIdempotentTaskConfirmationAndStreak,
     testSnackClaimIsOptionalIdempotentAndStatNeutral,
     testStreakResetAfterGapAndBestStreakPersistence,

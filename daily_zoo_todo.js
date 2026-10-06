@@ -328,6 +328,28 @@
       snack.claimedAt = 0;
     }
 
+    const tasks = {
+      [TASK_IDS.FLASHCARD]: normalizeTask(rawTasks[TASK_IDS.FLASHCARD]),
+      [TASK_IDS.QUESTIONS]: normalizeTask(rawTasks[TASK_IDS.QUESTIONS]),
+      [TASK_IDS.ACTIVITY]: normalizeTask(rawTasks[TASK_IDS.ACTIVITY])
+    };
+    const normalizedHold = normalizeRolloverHold(
+      rawPlan.rolloverHold
+    );
+    const heldTask = normalizedHold
+      ? tasks[normalizedHold.taskId]
+      : null;
+    const rolloverHold =
+      heldTask &&
+      [
+        TASK_STATUSES.RUNNING,
+        TASK_STATUSES.PENDING
+      ].includes(heldTask.status) &&
+      heldTask.launchToken ===
+        normalizedHold.launchToken
+        ? normalizedHold
+        : null;
+
     return {
       id,
       profileId,
@@ -340,14 +362,10 @@
           rawPlan.earnedStarPegCount
         )
       ),
-      tasks: {
-        [TASK_IDS.FLASHCARD]: normalizeTask(rawTasks[TASK_IDS.FLASHCARD]),
-        [TASK_IDS.QUESTIONS]: normalizeTask(rawTasks[TASK_IDS.QUESTIONS]),
-        [TASK_IDS.ACTIVITY]: normalizeTask(rawTasks[TASK_IDS.ACTIVITY])
-      },
+      tasks,
       educationalCompletedAt,
       snack,
-      rolloverHold: normalizeRolloverHold(rawPlan.rolloverHold)
+      rolloverHold
     };
   }
 
@@ -1472,6 +1490,14 @@
     task.status = TASK_STATUSES.COMPLETE;
     task.completedAt = now.getTime();
     task.pendingData = null;
+
+    if (
+      plan.rolloverHold?.taskId === taskId &&
+      plan.rolloverHold.launchToken ===
+        task.launchToken
+    ) {
+      plan.rolloverHold = null;
+    }
 
     state.stats.totalTasks = toNonNegativeInteger(
       state.stats.totalTasks
