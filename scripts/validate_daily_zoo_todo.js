@@ -1055,6 +1055,43 @@ function testHomePlanProgressSummary() {
   assert.strictEqual(summary.snackClaimed, true);
 }
 
+function testDailyPlanPresentationRouting() {
+  const state = makePlanState();
+
+  assert.strictEqual(
+    DailyTodo.shouldShowFocusedPlan(
+      state.activePlan
+    ),
+    true
+  );
+
+  state.activePlan.tasks.activity.status =
+    "complete";
+  state.activePlan.educationalCompletedAt = 4;
+  state.activePlan.snack.unlocked = true;
+
+  assert.strictEqual(
+    DailyTodo.shouldShowFocusedPlan(
+      state.activePlan
+    ),
+    true
+  );
+
+  state.activePlan.snack.claimed = true;
+  state.activePlan.snack.claimedAt = 5;
+
+  assert.strictEqual(
+    DailyTodo.shouldShowFocusedPlan(
+      state.activePlan
+    ),
+    false
+  );
+  assert.strictEqual(
+    DailyTodo.shouldShowFocusedPlan(null),
+    false
+  );
+}
+
 function testResetActivePlanProgress() {
   let state = makePlanState({
     totalTasks: 7
@@ -1269,6 +1306,7 @@ function main() {
     testCurrentStreakDisplaysZeroAfterMissedDay,
     testPendingStateIsDistinctFromComplete,
     testHomePlanProgressSummary,
+    testDailyPlanPresentationRouting,
     testResetActivePlanProgress,
     testResetCompletedPlanRollsBackToday,
     testEarnedBadgesNeverDisappear,

@@ -4723,6 +4723,23 @@ function getDailyHomePlanView(plan) {
   };
 }
 
+function shouldShowFocusedDailyTodo(plan) {
+  const engine =
+    window.BibloZooDailyTodo;
+
+  if (
+    typeof engine
+      ?.shouldShowFocusedPlan ===
+      "function"
+  ) {
+    return engine
+      .shouldShowFocusedPlan(plan);
+  }
+
+  return !!plan &&
+    plan.snack?.claimed !== true;
+}
+
 function getDailyHomeOfferKey(plan) {
   const profileId = String(
     plan?.profileId || ""
@@ -13436,7 +13453,7 @@ function screenTitle(idx) {
         getDailyHomePlan();
 
       openDailyTodoPreview(
-        plan && plan.snack?.claimed !== true
+        shouldShowFocusedDailyTodo(plan)
           ? "actual"
           : ""
       );
@@ -15658,36 +15675,54 @@ function screenTodoDev(idx) {
 
   const tutorialActive = isTutorialActive();
   const dailyTodoUi = window.BibloZooDailyTodoUI;
-  const dailyPreviewMode = !tutorialActive
+  let dailyPreviewMode = !tutorialActive
     ? dailyTodoUi?.getPreviewMode?.(
         window.location.search
       ) || ""
     : "";
-  const dailyPreviewActive = !!dailyPreviewMode;
   const tutorialPageNumber = tutorialActive ? getZooTodoTutorialPageNumber() : 0;
 
   let dailyPreviewPlan = null;
 
-  if (dailyPreviewActive) {
+  if (!tutorialActive) {
     const dailyTodoApi =
       window.BibloZooDailyTodo;
 
-    dailyPreviewPlan =
-      ["game_test", "playground_test"]
-        .includes(dailyPreviewMode)
-        ? dailyPreviewMode === "playground_test"
-          ? dailyTodoUi
-              ?.getPlaygroundTestPlan?.(
-                dailyTodoApi
-              ) || null
-          : dailyTodoUi
-              ?.getGameTestPlan?.(
-                dailyTodoApi
-              ) || null
-        : getOrCreateDailyTodoPreviewPlan();
+    if (dailyPreviewMode) {
+      dailyPreviewPlan =
+        ["game_test", "playground_test"]
+          .includes(dailyPreviewMode)
+          ? dailyPreviewMode === "playground_test"
+            ? dailyTodoUi
+                ?.getPlaygroundTestPlan?.(
+                  dailyTodoApi
+                ) || null
+            : dailyTodoUi
+                ?.getGameTestPlan?.(
+                  dailyTodoApi
+                ) || null
+          : getOrCreateDailyTodoPreviewPlan();
+    } else {
+      const currentPlan =
+        getOrCreateDailyTodoPreviewPlan();
 
-    wrap.classList.add("is-daily-mode");
+      if (
+        shouldShowFocusedDailyTodo(
+          currentPlan
+        )
+      ) {
+        dailyPreviewMode = "actual";
+        dailyPreviewPlan = currentPlan;
+      }
+    }
+
+    if (dailyPreviewMode) {
+      wrap.classList.add("is-daily-mode");
+    }
   }
+
+  const dailyPreviewActive =
+    !!dailyPreviewMode;
 
   const dailyVerseId =
     dailyPreviewPlan?.verseId || "";
@@ -18759,6 +18794,53 @@ function renderInstallInstructions(
 /* =========================
    8. App Bootstrap
    ========================= */
+
+let lastObservedDailyDayKey =
+  window.BibloZooDailyTodo
+    ?.localDayKey?.() || "";
+
+function refreshDailySurfacesForNewDay() {
+  if (
+    document.visibilityState === "hidden"
+  ) {
+    return;
+  }
+
+  const day =
+    window.BibloZooDailyTodo
+      ?.localDayKey?.() || "";
+
+  if (!day) return;
+
+  const dayChanged = !!(
+    lastObservedDailyDayKey &&
+    lastObservedDailyDayKey !== day
+  );
+
+  lastObservedDailyDayKey = day;
+
+  if (
+    !dayChanged ||
+    ![
+      Screen.TITLE,
+      Screen.TODO_DEV
+    ].includes(State.screen)
+  ) {
+    return;
+  }
+
+  render();
+}
+
+document.addEventListener(
+  "visibilitychange",
+  refreshDailySurfacesForNewDay
+);
+
+window.addEventListener(
+  "pageshow",
+  refreshDailySurfacesForNewDay
+);
 
 (async function init() {
   if (

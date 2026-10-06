@@ -987,6 +987,12 @@
     };
   }
 
+  function shouldShowFocusedPlan(rawPlan) {
+    const plan = normalizePlan(rawPlan);
+
+    return !!plan && !plan.snack.claimed;
+  }
+
   function resetActivePlanProgress(
     rawState,
     {
@@ -1568,6 +1574,7 @@
     getStatsForDay,
     getEarnedBadgeDefinitions,
     getPlanProgress,
+    shouldShowFocusedPlan,
     resetActivePlanProgress,
     expireOldPlanIfNeeded,
     beginTask,
