@@ -862,6 +862,54 @@ function testPendingStateIsDistinctFromComplete() {
   assert.strictEqual(confirmed.state.stats.totalTasks, 1);
 }
 
+function testHomePlanProgressSummary() {
+  let state = makePlanState();
+  let summary = DailyTodo.getPlanProgress(
+    state.activePlan
+  );
+
+  assert.deepStrictEqual(summary.taskComplete, {
+    flashcard: true,
+    questions: true,
+    activity: false
+  });
+  assert.strictEqual(summary.completeCount, 2);
+  assert.strictEqual(summary.educationalComplete, false);
+  assert.strictEqual(summary.feedingTime, false);
+  assert.strictEqual(summary.snackClaimed, false);
+
+  const confirmed = DailyTodo.confirmPendingCompletion(
+    state,
+    {
+      planId: state.activePlan.id,
+      taskId: DailyTodo.TASK_IDS.ACTIVITY,
+      now: new Date(2026, 9, 5, 12, 0, 0)
+    }
+  );
+  state = confirmed.state;
+  summary = DailyTodo.getPlanProgress(
+    state.activePlan
+  );
+
+  assert.strictEqual(summary.completeCount, 3);
+  assert.strictEqual(summary.educationalComplete, true);
+  assert.strictEqual(summary.feedingTime, true);
+
+  const claimed = DailyTodo.markSnackClaimed(
+    state,
+    {
+      planId: state.activePlan.id,
+      now: new Date(2026, 9, 5, 12, 5, 0)
+    }
+  );
+  summary = DailyTodo.getPlanProgress(
+    claimed.state.activePlan
+  );
+
+  assert.strictEqual(summary.feedingTime, false);
+  assert.strictEqual(summary.snackClaimed, true);
+}
+
 function testDefensiveNormalization() {
   const state = DailyTodo.normalizeState({
     version: 999,
@@ -904,6 +952,7 @@ function main() {
     testStreakResetAfterGapAndBestStreakPersistence,
     testCurrentStreakDisplaysZeroAfterMissedDay,
     testPendingStateIsDistinctFromComplete,
+    testHomePlanProgressSummary,
     testDefensiveNormalization
   ];
 

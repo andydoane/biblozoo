@@ -839,6 +839,40 @@
     );
   }
 
+  function getPlanProgress(rawPlan) {
+    const plan = normalizePlan(rawPlan);
+    if (!plan) return null;
+
+    const taskComplete = {
+      [TASK_IDS.FLASHCARD]:
+        plan.tasks[TASK_IDS.FLASHCARD].status ===
+        TASK_STATUSES.COMPLETE,
+      [TASK_IDS.QUESTIONS]:
+        plan.tasks[TASK_IDS.QUESTIONS].status ===
+        TASK_STATUSES.COMPLETE,
+      [TASK_IDS.ACTIVITY]:
+        plan.tasks[TASK_IDS.ACTIVITY].status ===
+        TASK_STATUSES.COMPLETE
+    };
+    const completeCount = Object.values(
+      taskComplete
+    ).filter(Boolean).length;
+    const educationalComplete =
+      plan.educationalCompletedAt > 0 &&
+      completeCount === 3;
+
+    return {
+      taskComplete,
+      completeCount,
+      educationalComplete,
+      feedingTime:
+        educationalComplete &&
+        plan.snack.unlocked &&
+        !plan.snack.claimed,
+      snackClaimed: plan.snack.claimed
+    };
+  }
+
   function completeEducationalPlanIfReady(state, now = new Date()) {
     const plan = state?.activePlan;
 
@@ -1338,6 +1372,7 @@
     getOrCreatePlan,
     getOrCreatePersistedPlan,
     getStatsForDay,
+    getPlanProgress,
     expireOldPlanIfNeeded,
     beginTask,
     setPendingCompletion,

@@ -3988,6 +3988,7 @@ function resetAllProgressData() {
   State.activeTodo = null;
   State.pendingZooTodoGameId = "";
   State.dailySnackSession = null;
+  State.dailyHomeOfferKey = "";
   State.hasLearnedVerse = false;
 
   titleZooPetVerseId = "";
@@ -4693,6 +4694,90 @@ function getOrCreateDailyTodoPreviewPlan({
       ...options,
       progress
     })?.plan || null;
+}
+
+const DAILY_HOME_OFFER_STORAGE_PREFIX =
+  "biblozooDailyHomeOffer";
+
+function getDailyHomePlanView(plan) {
+  const engine =
+    window.BibloZooDailyTodo;
+
+  if (!plan || !engine) return null;
+
+  const progress =
+    engine.getPlanProgress?.(plan);
+  if (!progress) return null;
+
+  return {
+    taskComplete: [
+      progress.taskComplete.flashcard,
+      progress.taskComplete.questions,
+      progress.taskComplete.activity
+    ],
+    completeCount: progress.completeCount,
+    educationalComplete:
+      progress.educationalComplete,
+    feedingTime: progress.feedingTime,
+    snackClaimed: progress.snackClaimed
+  };
+}
+
+function getDailyHomeOfferKey(plan) {
+  const profileId = String(
+    plan?.profileId || ""
+  ).trim();
+  const day = String(
+    plan?.day || ""
+  ).trim();
+  const planId = String(
+    plan?.id || ""
+  ).trim();
+
+  if (!profileId || !day || !planId) {
+    return "";
+  }
+
+  return [
+    DAILY_HOME_OFFER_STORAGE_PREFIX,
+    encodeURIComponent(profileId),
+    encodeURIComponent(day),
+    encodeURIComponent(planId)
+  ].join(":");
+}
+
+function isDailyHomeOfferSuppressed(plan) {
+  const key = getDailyHomeOfferKey(plan);
+  if (!key) return true;
+
+  try {
+    return sessionStorage.getItem(key) === "1";
+  } catch (err) {
+    return false;
+  }
+}
+
+function suppressDailyHomeOffer(plan) {
+  const key = getDailyHomeOfferKey(plan);
+  if (!key) return false;
+
+  try {
+    sessionStorage.setItem(key, "1");
+  } catch (err) { }
+
+  return true;
+}
+
+function getDailyHomePlan() {
+  if (
+    isTutorialActive() ||
+    !getProfileApi()
+      ?.getActiveProfileId?.()
+  ) {
+    return null;
+  }
+
+  return getOrCreateDailyTodoPreviewPlan();
 }
 
 function saveDailyTodoRuntime(
@@ -8021,6 +8106,7 @@ const State = {
   activeTodo: null,
   pendingZooTodoGameId: "",
   dailySnackSession: null,
+  dailyHomeOfferKey: "",
   todoTutorialPage: 1,
   todoTutorialJustFinishedLearn: false,
   tutorialPracticeMode: false,
@@ -11617,6 +11703,7 @@ function clearTransientStateForProfileActivation() {
   State.pendingZooTodoGameId = "";
   State.todoTutorialPage = 1;
   State.dailySnackSession = null;
+  State.dailyHomeOfferKey = "";
   State.todoTutorialJustFinishedLearn = false;
   State.tutorialPracticeMode = false;
   State.todoInfoPage = "";
@@ -12719,6 +12806,149 @@ function screenTitle(idx) {
           .replace(/\s*\([^)]*\)\s*$/, "")
           .trim()
       : "Choose a verse";
+  const dailyHomePlan =
+    activeProfile && !tutorialActive
+      ? getDailyHomePlan()
+      : null;
+  const dailyHomeView =
+    getDailyHomePlanView(
+      dailyHomePlan
+    );
+  const dailyOfferKey =
+    getDailyHomeOfferKey(
+      dailyHomePlan
+    );
+  const continueVisibleOffer = !!(
+    dailyOfferKey &&
+    State.dailyHomeOfferKey ===
+      dailyOfferKey
+  );
+  const showDailyOffer = !!(
+    dailyHomePlan &&
+    dailyHomeView &&
+    !dailyHomeView.educationalComplete &&
+    (
+      continueVisibleOffer ||
+      !isDailyHomeOfferSuppressed(
+        dailyHomePlan
+      )
+    )
+  );
+
+  if (showDailyOffer) {
+    State.dailyHomeOfferKey =
+      dailyOfferKey;
+    suppressDailyHomeOffer(
+      dailyHomePlan
+    );
+  } else if (
+    State.dailyHomeOfferKey ===
+      dailyOfferKey
+  ) {
+    State.dailyHomeOfferKey = "";
+  }
+
+  const dailyTaskLabels = [
+    "Flashcard",
+    "Questions",
+    "Activity"
+  ];
+  const dailyProgressHtml =
+    dailyHomeView
+      ? `
+        <div
+          class="title-todo-progress"
+          aria-label="${dailyHomeView.completeCount} of 3 Daily Tasks complete"
+        >
+          ${dailyHomeView.taskComplete
+            .map((complete, index) => `
+              <span class="title-todo-progress-item">
+                <img
+                  class="title-todo-progress-check"
+                  src="${IMG_DIR}daily_zoo_todo/${complete ? "checkbox_complete.png" : "checkbox_empty.png"}"
+                  alt=""
+                  draggable="false"
+                >
+                <span>${dailyTaskLabels[index]}</span>
+              </span>
+            `)
+            .join("")}
+        </div>
+
+        ${dailyHomeView.feedingTime
+          ? `
+            <div class="title-todo-feeding-time">
+              Feeding Time!
+            </div>
+          `
+          : ""}
+      `
+      : "";
+  const dailyPetName = dailyHomePlan
+    ? getBibloPetDisplayNameForVerseId(
+        dailyHomePlan.verseId
+      )
+    : "";
+  const dailyOfferHtml = showDailyOffer
+    ? `
+      <div
+        class="daily-home-offer"
+        data-daily-home-offer
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dailyHomeOfferTitle"
+      >
+        <div class="daily-home-offer-card">
+          <img
+            class="daily-home-offer-brand"
+            src="${IMG_DIR}button_todo.png"
+            alt="Zoo To-Do"
+            draggable="false"
+          >
+
+          <div class="daily-home-offer-pet" aria-hidden="true">
+            ${profilePictureVisualHtml(
+              dailyHomePlan.verseId,
+              {
+                className:
+                  "daily-home-offer-pet-profile",
+                alt: ""
+              }
+            )}
+          </div>
+
+          <div
+            class="daily-home-offer-title"
+            id="dailyHomeOfferTitle"
+          >
+            ${escapeHtml(activeProfile.name)}, ${escapeHtml(dailyPetName)} is ready!
+          </div>
+
+          <div class="daily-home-offer-copy">
+            Today’s Zoo To-Do is waiting for you.
+          </div>
+
+          <div class="daily-home-offer-actions">
+            <button
+              class="daily-home-offer-ready no-zoom"
+              type="button"
+              data-daily-home-ready
+            >
+              I’m Ready!
+            </button>
+
+            <button
+              class="daily-home-offer-later no-zoom"
+              type="button"
+              data-daily-home-later
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    : "";
 
   wrap.innerHTML = `
     <div class="title-content">
@@ -12819,7 +13049,7 @@ function screenTitle(idx) {
         class="title-todo-btn no-zoom${tutorialActive ? " is-tutorial-prompt" : ""}"
         id="titleTodoBtn"
         type="button"
-        aria-label="Open Zoo To-Do"
+        aria-label="Open Zoo To-Do${dailyHomeView ? `, ${dailyHomeView.completeCount} of 3 Daily Tasks complete` : ""}"
       >
         <img
           class="title-todo-img"
@@ -12828,11 +13058,15 @@ function screenTitle(idx) {
           draggable="false"
           onerror="this.style.display='none'"
         >
+
+        ${dailyProgressHtml}
       </button>
 
       <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
     </div>
+
+    ${dailyOfferHtml}
   `;
 
   const titleMyVersesBtn = wrap.querySelector("#titleMyVersesBtn");
@@ -13141,7 +13375,7 @@ function screenTitle(idx) {
     titleTodoBtn.onclick = (e) => {
       e.stopPropagation();
       const plan =
-        getOrCreateDailyTodoPreviewPlan();
+        getDailyHomePlan();
 
       openDailyTodoPreview(
         plan && plan.snack?.claimed !== true
@@ -13156,6 +13390,38 @@ function screenTitle(idx) {
       onLongPress:
         showDailyPreviewDialog
     });
+
+    const dailyHomeReady = wrap.querySelector(
+      "[data-daily-home-ready]"
+    );
+    const dailyHomeLater = wrap.querySelector(
+      "[data-daily-home-later]"
+    );
+    const dailyHomeOffer = wrap.querySelector(
+      "[data-daily-home-offer]"
+    );
+
+    if (dailyHomeReady) {
+      dailyHomeReady.onclick = (e) => {
+        e.stopPropagation();
+        suppressDailyHomeOffer(
+          dailyHomePlan
+        );
+        State.dailyHomeOfferKey = "";
+        openDailyTodoPreview("actual");
+      };
+    }
+
+    if (dailyHomeLater) {
+      dailyHomeLater.onclick = (e) => {
+        e.stopPropagation();
+        suppressDailyHomeOffer(
+          dailyHomePlan
+        );
+        State.dailyHomeOfferKey = "";
+        dailyHomeOffer?.remove();
+      };
+    }
   }
 
   const titleSettingsBtn = wrap.querySelector("#titleSettingsBtn");
