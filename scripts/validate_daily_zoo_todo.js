@@ -17,6 +17,30 @@ function loadRegistry(relativePath, globalName) {
   return sandbox.window[globalName];
 }
 
+function loadDailyTodoShellApi() {
+  const relativePath =
+    "verse_games/shared/daily-todo-shell.js";
+  const source = fs.readFileSync(
+    path.join(rootDir, relativePath),
+    "utf8"
+  );
+  const sandbox = {
+    window: {
+      VerseGameShell: {
+        renderModeSelect() {},
+        renderCompleteScreen() {}
+      }
+    }
+  };
+
+  vm.createContext(sandbox);
+  vm.runInContext(source, sandbox, {
+    filename: relativePath
+  });
+  return sandbox.window
+    .BibloZooDailyTodoShell;
+}
+
 function makeVerseProgress({
   status = "happy",
   lastPracticedAt = 1000,
@@ -282,6 +306,33 @@ function testGameDifficultySelection() {
       }
     }),
     "hard"
+  );
+}
+
+function testDailyGameUsesSharedDefaultModes() {
+  const shell = loadDailyTodoShellApi();
+  const context = {
+    dailyActivityKind: "game",
+    dailyActivityId: "bible_bugs",
+    dailyActivityMode: "medium"
+  };
+
+  assert.strictEqual(
+    shell.resolveAssignedMode(
+      context,
+      {}
+    ),
+    "medium"
+  );
+  assert.strictEqual(
+    shell.resolveAssignedMode(
+      {
+        ...context,
+        dailyActivityMode: "unknown"
+      },
+      {}
+    ),
+    ""
   );
 }
 
@@ -910,6 +961,127 @@ function testHomePlanProgressSummary() {
   assert.strictEqual(summary.snackClaimed, true);
 }
 
+function testResetActivePlanProgress() {
+  let state = makePlanState({
+    totalTasks: 7
+  });
+  const originalAssignment =
+    JSON.parse(JSON.stringify(
+      state.activePlan.activity
+    ));
+  state.activePlan.earnedStarPegCount = 2;
+
+  const reset =
+    DailyTodo.resetActivePlanProgress(
+      state,
+      {
+        planId: state.activePlan.id,
+        day: "2026-10-05"
+      }
+    );
+
+  assert.strictEqual(reset.changed, true);
+  assert.deepStrictEqual(
+    reset.state.activePlan.activity,
+    originalAssignment
+  );
+  assert.strictEqual(
+    reset.state.stats.totalTasks,
+    5
+  );
+  assert.strictEqual(
+    reset.state.activePlan.earnedStarPegCount,
+    0
+  );
+  assert.strictEqual(
+    reset.state.activePlan.educationalCompletedAt,
+    0
+  );
+  assert.deepStrictEqual(
+    reset.state.activePlan.snack,
+    {
+      unlocked: false,
+      claimed: false,
+      claimedAt: 0
+    }
+  );
+
+  Object.values(DailyTodo.TASK_IDS)
+    .forEach((taskId) => {
+      const task =
+        reset.state.activePlan.tasks[taskId];
+      assert.strictEqual(task.status, "open");
+      assert.strictEqual(task.startedAt, 0);
+      assert.strictEqual(task.pendingAt, 0);
+      assert.strictEqual(task.completedAt, 0);
+      assert.strictEqual(task.launchToken, "");
+      assert.strictEqual(task.pendingData, null);
+    });
+}
+
+function testResetCompletedPlanRollsBackToday() {
+  const state = makePlanState({
+    currentStreak: 4,
+    bestStreak: 6,
+    lastCompletedDay: "2026-10-05",
+    totalTasks: 10
+  });
+
+  state.activePlan.tasks.activity = {
+    status: "complete",
+    startedAt: 1,
+    pendingAt: 2,
+    completedAt: 3,
+    launchToken: "",
+    pendingData: null
+  };
+  state.activePlan.educationalCompletedAt = 4;
+  state.activePlan.earnedStarPegCount = 2;
+  state.activePlan.snack = {
+    unlocked: true,
+    claimed: true,
+    claimedAt: 5
+  };
+
+  const reset =
+    DailyTodo.resetActivePlanProgress(
+      state,
+      {
+        planId: state.activePlan.id,
+        day: "2026-10-05"
+      }
+    );
+
+  assert.strictEqual(reset.changed, true);
+  assert.strictEqual(
+    reset.state.stats.totalTasks,
+    7
+  );
+  assert.strictEqual(
+    reset.state.stats.currentStreak,
+    3
+  );
+  assert.strictEqual(
+    reset.state.stats.lastCompletedDay,
+    "2026-10-04"
+  );
+  assert.strictEqual(
+    reset.state.stats.bestStreak,
+    6
+  );
+
+  const wrongDay =
+    DailyTodo.resetActivePlanProgress(
+      state,
+      {
+        planId: state.activePlan.id,
+        day: "2026-10-06"
+      }
+    );
+
+  assert.strictEqual(wrongDay.changed, false);
+}
+
 function testDefensiveNormalization() {
   const state = DailyTodo.normalizeState({
     version: 999,
@@ -938,6 +1110,7 @@ function main() {
     testExactTieCanRandomize,
     testRegistryPool,
     testGameDifficultySelection,
+    testDailyGameUsesSharedDefaultModes,
     testPlaygroundModes,
     testUnfinishedContentWins,
     testRecentAssignmentAvoidance,
@@ -953,6 +1126,8 @@ function main() {
     testCurrentStreakDisplaysZeroAfterMissedDay,
     testPendingStateIsDistinctFromComplete,
     testHomePlanProgressSummary,
+    testResetActivePlanProgress,
+    testResetCompletedPlanRollsBackToday,
     testDefensiveNormalization
   ];
 

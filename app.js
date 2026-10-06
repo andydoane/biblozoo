@@ -4768,6 +4768,19 @@ function suppressDailyHomeOffer(plan) {
   return true;
 }
 
+function clearDailyHomeOfferSuppression(
+  plan
+) {
+  const key = getDailyHomeOfferKey(plan);
+  if (!key) return false;
+
+  try {
+    sessionStorage.removeItem(key);
+  } catch (err) { }
+
+  return true;
+}
+
 function getDailyHomePlan() {
   if (
     isTutorialActive() ||
@@ -4778,6 +4791,48 @@ function getDailyHomePlan() {
   }
 
   return getOrCreateDailyTodoPreviewPlan();
+}
+
+function resetTodayDailyTodoForTesting(
+  requestedPlan
+) {
+  const loaded = loadDailyTodoRuntime();
+  const plan = loaded?.plan;
+
+  if (
+    !requestedPlan?.id ||
+    !plan ||
+    plan.id !== requestedPlan.id ||
+    !loaded.engine
+      ?.resetActivePlanProgress
+  ) {
+    return false;
+  }
+
+  const reset =
+    loaded.engine
+      .resetActivePlanProgress(
+        loaded.state,
+        {
+          planId: plan.id,
+          day:
+            loaded.engine.localDayKey()
+        }
+      );
+
+  if (
+    !reset.changed ||
+    !saveDailyTodoRuntime(
+      loaded.progress,
+      reset.state
+    )
+  ) {
+    return false;
+  }
+
+  clearDailyHomeOfferSuppression(plan);
+  State.dailyHomeOfferKey = "";
+  return true;
 }
 
 function saveDailyTodoRuntime(
@@ -8346,7 +8401,7 @@ const HIDDEN_PRACTICE_GAME_ID = "dino_dash_2";
 const HIDDEN_PRACTICE_LONG_PRESS_MS = 2000;
 const HIDDEN_LEARN_COMPLETE_LONG_PRESS_MS = 2000;
 const HIDDEN_UTILITIES_LONG_PRESS_MS = 2000;
-const HIDDEN_DAILY_QUESTION_LONG_PRESS_MS = 2000;
+const HIDDEN_DAILY_TODO_RESET_LONG_PRESS_MS = 2000;
 
 function getExternalPracticeGames() {
   const list = Array.isArray(window.EXTERNAL_VERSE_GAMES) ? window.EXTERNAL_VERSE_GAMES : [];
@@ -13490,64 +13545,50 @@ function screenTitle(idx) {
 
     bindLongPress(titleZooStrip, {
       delay:
-        HIDDEN_DAILY_QUESTION_LONG_PRESS_MS,
+        HIDDEN_DAILY_TODO_RESET_LONG_PRESS_MS,
 
       shouldStart: () =>
-        FEATURES
-          .DAILY_PET_QUESTIONS === true &&
-        FEATURES
-          .DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true,
+        !!dailyHomePlan &&
+        !tutorialActive,
 
       onLongPress: () => {
-        const selectedVerseId =
-          String(VERSE_ID || "").trim();
+        showDialog({
+          title: "Reset Today’s Zoo To-Do?",
+          body:
+            "This resets today’s three checkboxes and snack so you can test the same plan again. Verse, pet, and normal activity progress will stay intact.",
+          actions: [
+            dlgBtn("Cancel", {
+              secondary: true,
+              onClick: closeDialog
+            }),
+            dlgBtn("Reset Today", {
+              onClick: () => {
+                const reset =
+                  resetTodayDailyTodoForTesting(
+                    dailyHomePlan
+                  );
 
-        if (!selectedVerseId) {
-          showDialog({
-            title: "Choose a Verse First",
-            body:
-              "Choose a verse from My Verses, then long-press the pet scene to test its Daily Question.",
-            actions: [
-              dlgBtn("OK", {
-                onClick: closeDialog
-              })
-            ]
-          });
+                closeDialog();
 
-          return;
-        }
+                if (reset) {
+                  render();
+                  return;
+                }
 
-        const offer =
-          window.BibloZooDailyQuestions
-            ?.prepareForcedDebugOffer?.(
-              selectedVerseId
-            );
-
-        if (!offer) {
-          showDialog({
-            title:
-              "Daily Question Unavailable",
-            body:
-              "The selected verse does not have valid Daily Question content.",
-            actions: [
-              dlgBtn("OK", {
-                onClick: closeDialog
-              })
-            ]
-          });
-
-          return;
-        }
-
-        const accepted =
-          window.BibloZooDailyQuestions
-            ?.acceptPendingOffer?.();
-
-        if (!accepted) {
-          return;
-        }
-
-        go(Screen.DAILY_SESSION);
+                showDialog({
+                  title: "Reset Unavailable",
+                  body:
+                    "Today’s Zoo To-Do could not be reset. Return Home and try again.",
+                  actions: [
+                    dlgBtn("OK", {
+                      onClick: closeDialog
+                    })
+                  ]
+                });
+              }
+            })
+          ]
+        });
       }
     });
   }

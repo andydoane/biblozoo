@@ -873,6 +873,79 @@
     };
   }
 
+  function resetActivePlanProgress(
+    rawState,
+    {
+      planId = "",
+      day = localDayKey()
+    } = {}
+  ) {
+    const state = normalizeState(rawState);
+    const plan = state.activePlan;
+    const safePlanId = cleanString(planId);
+    const safeDay = cleanString(day);
+
+    if (
+      !plan ||
+      (safePlanId && plan.id !== safePlanId) ||
+      plan.day !== safeDay
+    ) {
+      return { state, changed: false };
+    }
+
+    const completedTaskCount =
+      Object.values(TASK_IDS).filter(
+        (taskId) =>
+          plan.tasks[taskId]?.status ===
+          TASK_STATUSES.COMPLETE
+      ).length;
+    const completedEducationalDay =
+      plan.educationalCompletedAt > 0 &&
+      areEducationalTasksComplete(plan);
+
+    state.stats.totalTasks = Math.max(
+      0,
+      toNonNegativeInteger(
+        state.stats.totalTasks
+      ) - completedTaskCount
+    );
+
+    if (
+      completedEducationalDay &&
+      state.stats.lastCompletedDay ===
+        plan.day
+    ) {
+      state.stats.currentStreak =
+        Math.max(
+          0,
+          toNonNegativeInteger(
+            state.stats.currentStreak
+          ) - 1
+        );
+      state.stats.lastCompletedDay =
+        state.stats.currentStreak > 0
+          ? previousLocalDayKey(plan.day)
+          : "";
+    }
+
+    Object.values(TASK_IDS).forEach(
+      (taskId) => {
+        plan.tasks[taskId] =
+          createDefaultTask();
+      }
+    );
+    plan.earnedStarPegCount = 0;
+    plan.educationalCompletedAt = 0;
+    plan.snack = {
+      unlocked: false,
+      claimed: false,
+      claimedAt: 0
+    };
+    plan.rolloverHold = null;
+
+    return { state, changed: true };
+  }
+
   function completeEducationalPlanIfReady(state, now = new Date()) {
     const plan = state?.activePlan;
 
@@ -1373,6 +1446,7 @@
     getOrCreatePersistedPlan,
     getStatsForDay,
     getPlanProgress,
+    resetActivePlanProgress,
     expireOldPlanIfNeeded,
     beginTask,
     setPendingCompletion,

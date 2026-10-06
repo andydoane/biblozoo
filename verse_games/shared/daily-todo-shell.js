@@ -104,17 +104,31 @@
         clean(context.dailyActivityMode);
   }
 
-  function getAvailableModeIds(options) {
-    return Array.isArray(options?.modes)
-      ? options.modes
-          .map((mode) =>
-            clean(
-              typeof mode === "string"
-                ? mode
-                : mode?.id
+  function getAvailableModeIds(
+    options,
+    context
+  ) {
+    const configuredModes =
+      Array.isArray(options?.modes)
+        ? options.modes
+            .map((mode) =>
+              clean(
+                typeof mode === "string"
+                  ? mode
+                  : mode?.id
+              )
             )
-          )
-          .filter(Boolean)
+            .filter(Boolean)
+        : [];
+
+    if (configuredModes.length) {
+      return configuredModes;
+    }
+
+    return clean(
+      context?.dailyActivityKind
+    ) === "game"
+      ? ["easy", "medium", "hard"]
       : [];
   }
 
@@ -126,7 +140,10 @@
       context?.dailyActivityMode
     );
     const availableModes =
-      getAvailableModeIds(options);
+      getAvailableModeIds(
+        options,
+        context
+      );
 
     if (
       !assignedMode ||
