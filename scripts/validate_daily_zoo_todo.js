@@ -309,6 +309,100 @@ function testGameDifficultySelection() {
   );
 }
 
+function testMilestoneDefinitionsAndAssets() {
+  assert.deepStrictEqual(
+    DailyTodo.STREAK_BADGE_THRESHOLDS,
+    [3, 7, 14, 28, 50, 100, 200, 300, 365]
+  );
+  assert.deepStrictEqual(
+    DailyTodo.TASK_BADGE_THRESHOLDS,
+    [
+      10, 25, 50, 100, 200, 300, 400,
+      500, 600, 700, 800, 900, 1000
+    ]
+  );
+
+  const definitions = [
+    ...DailyTodo.BADGE_DEFINITIONS.streak,
+    ...DailyTodo.BADGE_DEFINITIONS.tasks
+  ];
+
+  for (const badge of definitions) {
+    assert.ok(badge.id);
+    assert.ok(badge.label);
+    assert.ok(
+      fs.existsSync(
+        path.join(
+          rootDir,
+          "verse_images/daily_zoo_todo",
+          badge.asset
+        )
+      ),
+      `Missing badge asset: ${badge.asset}`
+    );
+  }
+}
+
+function testMilestoneBoundaries() {
+  for (
+    const threshold of
+      DailyTodo.STREAK_BADGE_THRESHOLDS
+  ) {
+    const below =
+      DailyTodo.getEarnedBadgeDefinitions({
+        bestStreak: threshold - 1
+      });
+    const at =
+      DailyTodo.getEarnedBadgeDefinitions({
+        bestStreak: threshold
+      });
+
+    assert.strictEqual(
+      below.streak.some(
+        (badge) =>
+          badge.threshold === threshold
+      ),
+      false
+    );
+    assert.strictEqual(
+      at.streak.some(
+        (badge) =>
+          badge.threshold === threshold
+      ),
+      true
+    );
+  }
+
+  for (
+    const threshold of
+      DailyTodo.TASK_BADGE_THRESHOLDS
+  ) {
+    const below =
+      DailyTodo.getEarnedBadgeDefinitions({
+        totalTasks: threshold - 1
+      });
+    const at =
+      DailyTodo.getEarnedBadgeDefinitions({
+        totalTasks: threshold
+      });
+
+    assert.strictEqual(
+      below.tasks.some(
+        (badge) =>
+          badge.threshold === threshold
+      ),
+      false
+    );
+    assert.strictEqual(
+      at.tasks.some(
+        (badge) =>
+          badge.threshold === threshold
+      ),
+      true
+    );
+  }
+}
+
 function testDailyGameUsesSharedDefaultModes() {
   const shell = loadDailyTodoShellApi();
   const context = {
@@ -1082,6 +1176,53 @@ function testResetCompletedPlanRollsBackToday() {
   assert.strictEqual(wrongDay.changed, false);
 }
 
+function testEarnedBadgesNeverDisappear() {
+  const state = makePlanState({
+    totalTasks: 10
+  });
+
+  const reset =
+    DailyTodo.resetActivePlanProgress(
+      state,
+      {
+        planId: state.activePlan.id,
+        day: "2026-10-05"
+      }
+    );
+  const badges =
+    DailyTodo.getEarnedBadgeDefinitions(
+      reset.state.stats
+    );
+
+  assert.strictEqual(
+    reset.state.stats.totalTasks,
+    8
+  );
+  assert.deepStrictEqual(
+    reset.state.stats.earnedTaskBadges,
+    [10]
+  );
+  assert.strictEqual(
+    badges.tasks.some(
+      (badge) => badge.threshold === 10
+    ),
+    true
+  );
+
+  const persistedStreak =
+    DailyTodo.getEarnedBadgeDefinitions({
+      bestStreak: 2,
+      earnedStreakBadges: [3, 999]
+    });
+
+  assert.deepStrictEqual(
+    persistedStreak.streak.map(
+      (badge) => badge.threshold
+    ),
+    [3]
+  );
+}
+
 function testDefensiveNormalization() {
   const state = DailyTodo.normalizeState({
     version: 999,
@@ -1110,6 +1251,8 @@ function main() {
     testExactTieCanRandomize,
     testRegistryPool,
     testGameDifficultySelection,
+    testMilestoneDefinitionsAndAssets,
+    testMilestoneBoundaries,
     testDailyGameUsesSharedDefaultModes,
     testPlaygroundModes,
     testUnfinishedContentWins,
@@ -1128,6 +1271,7 @@ function main() {
     testHomePlanProgressSummary,
     testResetActivePlanProgress,
     testResetCompletedPlanRollsBackToday,
+    testEarnedBadgesNeverDisappear,
     testDefensiveNormalization
   ];
 

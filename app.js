@@ -8013,6 +8013,7 @@ const Screen = {
   CELEBRATION: "celebration",
   PET_UNLOCK: "pet_unlock",
   PET_STATS: "pet_stats",
+  ZOOKEEPER_STATS: "zookeeper_stats",
   PRACTICE_HUB: "practice_hub",
   PRACTICE: "practice",
   PLAYGROUND: "playground",
@@ -8038,6 +8039,7 @@ const SCREEN_ORDER = Object.freeze([
   Screen.NEW_VERSE_PICKER,
   Screen.PROGRESS,
   Screen.PET_STATS,
+  Screen.ZOOKEEPER_STATS,
   Screen.VERSE_DETAIL,
   Screen.LEARN_LEVEL,
   Screen.PRACTICE_GATE,
@@ -10811,6 +10813,7 @@ function renderNav() {
     State.screen !== Screen.PROGRESS &&
     State.screen !== Screen.VERSE_DETAIL &&
     State.screen !== Screen.PET_STATS &&
+    State.screen !== Screen.ZOOKEEPER_STATS &&
     State.screen !== Screen.PET_UNLOCK &&
     !isLearnFlowScreen(State.screen)
   );
@@ -14094,6 +14097,19 @@ function renderNormalZooTodoListHtml() {
 
   const rows = [
     {
+      type: "daily_complete",
+      image:
+        `${IMG_DIR}daily_zoo_todo/completion_checkmark.png`,
+      text: "Daily To-Do Complete",
+      iconColor: "#a7cb6f",
+      disabled: true
+    },
+    {
+      type: "zookeeper_stats",
+      emoji: "🏆",
+      text: "Zookeeper Stats"
+    },
+    {
       type: "care_info",
       emoji: "🐾",
       text: "Caring for BibloPets"
@@ -14780,6 +14796,11 @@ async function startZooMedalTodo(verseId, gameId) {
 }
 
 async function startZooTodo(todoType, verseId) {
+  if (todoType === "zookeeper_stats") {
+    go(Screen.ZOOKEEPER_STATS);
+    return;
+  }
+
   if (todoType === "care_info") {
     State.todoInfoPage = "care";
     render();
@@ -16754,6 +16775,174 @@ function screenPetStats(idx) {
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
+function zookeeperBadgeGroupHtml(
+  title,
+  badges
+) {
+  if (!Array.isArray(badges) || !badges.length) {
+    return "";
+  }
+
+  return `
+    <section class="zookeeper-badge-group">
+      <h3>${escapeHtml(title)}</h3>
+
+      <div class="zookeeper-badge-grid">
+        ${badges.map((badge) => `
+          <div class="zookeeper-badge-card">
+            <img
+              class="zookeeper-badge-img"
+              src="${IMG_DIR}daily_zoo_todo/${escapeHtml(badge.asset)}"
+              alt="${escapeHtml(badge.label)}"
+              draggable="false"
+              onerror="this.style.display='none'"
+            >
+            <div class="zookeeper-badge-label">
+              ${escapeHtml(badge.label)}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function screenZookeeperStats(idx) {
+  const profile =
+    getProfileApi()
+      ?.getActiveProfile?.();
+  const loaded = loadDailyTodoRuntime();
+  const engine = loaded?.engine;
+  const stats = engine?.getStatsForDay?.(
+    loaded?.state
+  ) || {
+    currentStreak: 0,
+    bestStreak: 0,
+    totalTasks: 0
+  };
+  const earnedBadges =
+    engine?.getEarnedBadgeDefinitions?.(
+      stats
+    ) || {
+      streak: [],
+      tasks: []
+    };
+  const hasBadges =
+    earnedBadges.streak.length > 0 ||
+    earnedBadges.tasks.length > 0;
+  const profileName =
+    String(profile?.name || "Zookeeper")
+      .trim() || "Zookeeper";
+  const avatarVerseId =
+    String(
+      profile?.avatarVerseId || ""
+    ).trim();
+  const wrap = document.createElement("div");
+  wrap.className =
+    "zookeeper-stats-screen";
+
+  wrap.innerHTML = `
+    <div class="zookeeper-stats-shell">
+      <div class="biblopet-title-row">
+        <button
+          class="screen-title-pill no-zoom"
+          type="button"
+          data-zookeeper-stats-back
+          aria-label="Back to Zoo To-Do"
+        >
+          ${SVG_BACK}
+        </button>
+
+        <div class="zookeeper-stats-heading">
+          Zookeeper Stats
+        </div>
+
+        <div class="biblopet-title-spacer"></div>
+      </div>
+
+      <div class="zookeeper-stats-scroll">
+        <section class="zookeeper-profile-card">
+          ${profilePictureVisualHtml(
+            avatarVerseId,
+            {
+              className:
+                "zookeeper-stats-avatar",
+              alt:
+                `${profileName}’s Zookeeper picture`
+            }
+          )}
+
+          <div class="zookeeper-profile-name">
+            ${escapeHtml(profileName)}
+          </div>
+        </section>
+
+        <section
+          class="zookeeper-stat-list"
+          aria-label="Daily To-Do statistics"
+        >
+          <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">Current Streak</div>
+            <div class="zookeeper-stat-value">
+              ${stats.currentStreak}
+            </div>
+          </div>
+
+          <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">Best Streak</div>
+            <div class="zookeeper-stat-value">
+              ${stats.bestStreak}
+            </div>
+          </div>
+
+          <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">Total Tasks</div>
+            <div class="zookeeper-stat-value">
+              ${stats.totalTasks}
+            </div>
+          </div>
+        </section>
+
+        <section class="zookeeper-badges-section">
+          <h2>Badges</h2>
+
+          ${hasBadges
+            ? `
+              ${zookeeperBadgeGroupHtml(
+                "Streak Badges",
+                earnedBadges.streak
+              )}
+              ${zookeeperBadgeGroupHtml(
+                "Task Badges",
+                earnedBadges.tasks
+              )}
+            `
+            : `
+              <div class="zookeeper-badges-empty">
+                Complete Daily To-Dos to earn badges!
+              </div>
+            `}
+        </section>
+      </div>
+    </div>
+  `;
+
+  wrap.querySelector(
+    "[data-zookeeper-stats-back]"
+  )?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    State.todoInfoPage = "";
+    go(Screen.TODO_DEV);
+  });
+
+  return makeSlide({
+    idx,
+    bg: "var(--purple)",
+    navHidden: true,
+    inner: wrap
+  });
+}
+
 function screenLearnLevel(idx) {
   const wrap = document.createElement("div");
   wrap.className = "title-screen learn-level-screen";
@@ -17838,6 +18027,9 @@ function render() {
     if (screen === Screen.NEW_VERSE_PICKER) slide = screenNewVersePicker(idx);
     if (screen === Screen.PROGRESS) slide = screenProgress(idx);
     if (screen === Screen.PET_STATS) slide = screenPetStats(idx);
+    if (screen === Screen.ZOOKEEPER_STATS) {
+      slide = screenZookeeperStats(idx);
+    }
     if (screen === Screen.VERSE_DETAIL) slide = screenVerseDetail(idx);
     if (screen === Screen.LEARN_LEVEL) slide = screenLearnLevel(idx);
     if (screen === Screen.PRACTICE_GATE) slide = screenPracticeGate(idx);

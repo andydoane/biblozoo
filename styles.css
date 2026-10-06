@@ -6582,6 +6582,188 @@ BibloPet Stats Screen
   text-wrap: balance;
 }
 
+/* =========================
+Zookeeper Stats Screen
+========================= */
+
+.zookeeper-stats-screen {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding:
+    calc(14px + var(--safeT))
+    14px
+    calc(14px + var(--safeB));
+  overflow: hidden;
+}
+
+.zookeeper-stats-shell {
+  width: min(92vw, 760px);
+  margin: 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.zookeeper-stats-heading {
+  font-size: clamp(25px, 6vw, 46px);
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.zookeeper-stats-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+}
+
+.zookeeper-stats-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.zookeeper-profile-card {
+  border-radius: 28px;
+  padding: clamp(18px, 4vw, 28px);
+  background: rgba(255, 255, 255, 0.14);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.zookeeper-stats-avatar {
+  width: clamp(112px, 28vw, 164px);
+  height: clamp(112px, 28vw, 164px);
+  border: 6px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.20);
+}
+
+.zookeeper-stats-avatar .profile-picture-fallback {
+  font-size: clamp(54px, 15vw, 90px);
+}
+
+.zookeeper-profile-name {
+  font-size: clamp(26px, 6vw, 42px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.zookeeper-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zookeeper-stat-row {
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.zookeeper-stat-value {
+  min-width: 64px;
+  font-size: clamp(27px, 6vw, 40px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: right;
+}
+
+.zookeeper-badges-section {
+  border-radius: 28px;
+  padding: clamp(16px, 4vw, 26px);
+  background: rgba(255, 255, 255, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.zookeeper-badges-section h2,
+.zookeeper-badge-group h3 {
+  margin: 0;
+  text-align: center;
+  line-height: 1.05;
+}
+
+.zookeeper-badges-section h2 {
+  font-size: clamp(25px, 5vw, 36px);
+  font-weight: 900;
+}
+
+.zookeeper-badge-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zookeeper-badge-group h3 {
+  font-size: clamp(18px, 4vw, 25px);
+  font-weight: 900;
+}
+
+.zookeeper-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.zookeeper-badge-card {
+  min-width: 0;
+  border-radius: 20px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #3e3150;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.zookeeper-badge-img {
+  display: block;
+  width: min(100%, 132px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.zookeeper-badge-label {
+  font-size: clamp(13px, 3vw, 18px);
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.zookeeper-badges-empty {
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: clamp(16px, 3.5vw, 21px);
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+@media (min-width: 620px) {
+  .zookeeper-badge-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 520px) {
   .pet-stats-grid {
     grid-template-columns: 1fr;

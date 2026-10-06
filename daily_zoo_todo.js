@@ -11,9 +11,41 @@
 })(typeof window !== "undefined" ? window : null, function () {
   "use strict";
 
-  const STATE_VERSION = 1;
+  const STATE_VERSION = 2;
   const RECENT_ASSIGNMENT_DAYS = 3;
   const RECENT_ASSIGNMENT_HISTORY_LIMIT = 40;
+
+  const STREAK_BADGE_THRESHOLDS = Object.freeze([
+    3, 7, 14, 28, 50, 100, 200, 300, 365
+  ]);
+  const TASK_BADGE_THRESHOLDS = Object.freeze([
+    10, 25, 50, 100, 200, 300, 400,
+    500, 600, 700, 800, 900, 1000
+  ]);
+  const BADGE_DEFINITIONS = Object.freeze({
+    streak: Object.freeze(
+      STREAK_BADGE_THRESHOLDS.map(
+        (threshold) => Object.freeze({
+          id: `streak-${threshold}`,
+          type: "streak",
+          threshold,
+          label: `${threshold} Day Streak`,
+          asset: `streak_${threshold}.png`
+        })
+      )
+    ),
+    tasks: Object.freeze(
+      TASK_BADGE_THRESHOLDS.map(
+        (threshold) => Object.freeze({
+          id: `tasks-${threshold}`,
+          type: "tasks",
+          threshold,
+          label: `${threshold} Tasks`,
+          asset: `tasks_${threshold}.png`
+        })
+      )
+    )
+  });
 
   const TASK_IDS = Object.freeze({
     FLASHCARD: "flashcard",
@@ -64,6 +96,52 @@
     const number = Number(value);
     if (!Number.isFinite(number) || number < 0) return 0;
     return Math.floor(number);
+  }
+
+  function normalizeEarnedThresholds(
+    rawValues,
+    thresholds,
+    metric
+  ) {
+    const allowed = new Set(thresholds);
+    const earned = new Set(
+      Array.isArray(rawValues)
+        ? rawValues
+            .map(toNonNegativeInteger)
+            .filter((value) =>
+              allowed.has(value)
+            )
+        : []
+    );
+    const safeMetric =
+      toNonNegativeInteger(metric);
+
+    thresholds.forEach((threshold) => {
+      if (safeMetric >= threshold) {
+        earned.add(threshold);
+      }
+    });
+
+    return thresholds.filter((threshold) =>
+      earned.has(threshold)
+    );
+  }
+
+  function refreshEarnedBadges(stats) {
+    if (!stats) return;
+
+    stats.earnedStreakBadges =
+      normalizeEarnedThresholds(
+        stats.earnedStreakBadges,
+        STREAK_BADGE_THRESHOLDS,
+        stats.bestStreak
+      );
+    stats.earnedTaskBadges =
+      normalizeEarnedThresholds(
+        stats.earnedTaskBadges,
+        TASK_BADGE_THRESHOLDS,
+        stats.totalTasks
+      );
   }
 
   function toTimestamp(value) {
@@ -131,6 +209,8 @@
       bestStreak: 0,
       lastCompletedDay: "",
       totalTasks: 0,
+      earnedStreakBadges: [],
+      earnedTaskBadges: [],
       recentAssignments: []
     };
   }
@@ -168,15 +248,22 @@
           .slice(-RECENT_ASSIGNMENT_HISTORY_LIMIT)
       : [];
 
-    return {
+    const stats = {
       currentStreak,
       bestStreak,
       lastCompletedDay: isValidDayKey(raw.lastCompletedDay)
         ? raw.lastCompletedDay
         : "",
       totalTasks: toNonNegativeInteger(raw.totalTasks),
+      earnedStreakBadges:
+        raw.earnedStreakBadges,
+      earnedTaskBadges:
+        raw.earnedTaskBadges,
       recentAssignments
     };
+
+    refreshEarnedBadges(stats);
+    return stats;
   }
 
   function normalizeActivity(rawActivity) {
@@ -806,6 +893,33 @@
     return stats;
   }
 
+  function getEarnedBadgeDefinitions(rawStats) {
+    const stats = normalizeStats(rawStats);
+    const earnedStreaks = new Set(
+      stats.earnedStreakBadges
+    );
+    const earnedTasks = new Set(
+      stats.earnedTaskBadges
+    );
+
+    return {
+      streak: BADGE_DEFINITIONS.streak
+        .filter((badge) =>
+          earnedStreaks.has(
+            badge.threshold
+          )
+        )
+        .map(cloneJson),
+      tasks: BADGE_DEFINITIONS.tasks
+        .filter((badge) =>
+          earnedTasks.has(
+            badge.threshold
+          )
+        )
+        .map(cloneJson)
+    };
+  }
+
   function recordEducationalDayComplete(stats, day) {
     if (!stats || !isValidDayKey(day)) return false;
 
@@ -942,6 +1056,8 @@
       claimedAt: 0
     };
     plan.rolloverHold = null;
+
+    refreshEarnedBadges(state.stats);
 
     return { state, changed: true };
   }
@@ -1360,6 +1476,8 @@
       now
     );
 
+    refreshEarnedBadges(state.stats);
+
     return {
       state,
       changed: true,
@@ -1427,6 +1545,9 @@
   return Object.freeze({
     STATE_VERSION,
     RECENT_ASSIGNMENT_DAYS,
+    STREAK_BADGE_THRESHOLDS,
+    TASK_BADGE_THRESHOLDS,
+    BADGE_DEFINITIONS,
     TASK_IDS,
     TASK_STATUSES,
     ACTIVITY_KINDS,
@@ -1445,6 +1566,7 @@
     getOrCreatePlan,
     getOrCreatePersistedPlan,
     getStatsForDay,
+    getEarnedBadgeDefinitions,
     getPlanProgress,
     resetActivePlanProgress,
     expireOldPlanIfNeeded,
