@@ -372,8 +372,10 @@
 
   function render({ session, profilePictureHtml = "" } = {}) {
     const petName = String(session?.petName || "BibloPet").trim() || "BibloPet";
+    const isDailyTodoSnack =
+      session?.dailyTodoSnack === true;
     return `
-      <div class="daily-feed-game" data-daily-feed-game data-daily-session-phase="reward_game">
+      <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-session-phase="reward_game">
         <div class="daily-feed-score-badge" aria-live="polite" aria-label="Score">
           <span class="daily-feed-score-label">Score</span>
           <strong class="daily-feed-score-value" data-daily-feed-score>0</strong>
@@ -458,7 +460,7 @@
               class="daily-feed-result-title"
               data-daily-feed-result-title
             >
-              Great Catching!
+              ${isDailyTodoSnack ? "Thanks for the snack!" : "Great Catching!"}
             </div>
 
             <div
@@ -468,12 +470,18 @@
               Score: 0
             </div>
 
+            ${isDailyTodoSnack ? `
+              <div class="daily-feed-result-complete">
+                Zoo To-Do Complete!
+              </div>
+            ` : ""}
+
             <button
               class="daily-feed-result-back no-zoom"
               type="button"
               data-daily-feed-result-back
             >
-              Back to Zoo
+              ${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}
             </button>
           </div>
         </div>
@@ -1070,7 +1078,9 @@
 
     runtime.startOverlay.hidden = true;
     runtime.resultTitleEl.textContent =
-      copy.title;
+      runtime.dailyTodoSnack
+        ? `Thanks for the snack, ${runtime.zookeeperName}!`
+        : copy.title;
     runtime.resultScoreEl.textContent =
       `Score: ${result.score}`;
     runtime.resultOverlay.hidden = false;
@@ -1395,6 +1405,14 @@
           "BibloPet"
         ).trim() ||
         "BibloPet",
+      dailyTodoSnack:
+        session.dailyTodoSnack === true,
+      zookeeperName:
+        String(
+          session.zookeeperName ||
+          "Zookeeper"
+        ).trim() ||
+        "Zookeeper",
       catcherX: width / 2,
       petRadius: petRect.width / 2,
       petCenterY:

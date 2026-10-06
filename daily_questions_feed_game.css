@@ -258,6 +258,22 @@
     0 5px 0 rgba(0, 0, 0, 0.16);
 }
 
+.daily-feed-result-complete {
+  color: var(--purple);
+
+  font-size:
+    clamp(24px, 6vw, 34px);
+  font-weight: 900;
+  line-height: 1.05;
+
+  text-wrap: balance;
+}
+
+.daily-feed-game.is-daily-todo-snack
+.daily-feed-result-card {
+  gap: clamp(11px, 2vh, 17px);
+}
+
 .daily-feed-result-back {
   width: min(100%, 260px);
   min-height: 54px;

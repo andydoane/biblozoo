@@ -1301,7 +1301,13 @@
       return { state, changed: false };
     }
 
-    if (!plan.snack.unlocked || plan.snack.claimed) {
+    if (
+      plan.day !== localDayKey(now) ||
+      plan.educationalCompletedAt <= 0 ||
+      !areEducationalTasksComplete(plan) ||
+      !plan.snack.unlocked ||
+      plan.snack.claimed
+    ) {
       return { state, changed: false };
     }
 

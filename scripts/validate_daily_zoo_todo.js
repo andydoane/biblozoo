@@ -715,6 +715,81 @@ function testStreakResetAfterGapAndBestStreakPersistence() {
   assert.strictEqual(completed.state.stats.totalTasks, 21);
 }
 
+function testSnackClaimIsOptionalIdempotentAndStatNeutral() {
+  const ready = DailyTodo.confirmPendingCompletion(
+    makePlanState({
+      day: "2026-10-05",
+      currentStreak: 2,
+      bestStreak: 4,
+      lastCompletedDay: "2026-10-04",
+      totalTasks: 8
+    }),
+    {
+      planId: "plan-2026-10-05",
+      taskId: "activity",
+      now: new Date(2026, 9, 5, 18, 0, 0)
+    }
+  );
+  const statsBefore = JSON.parse(
+    JSON.stringify(ready.state.stats)
+  );
+
+  const claimed = DailyTodo.markSnackClaimed(
+    ready.state,
+    {
+      planId: "plan-2026-10-05",
+      now: new Date(2026, 9, 5, 18, 5, 0)
+    }
+  );
+
+  assert.strictEqual(claimed.changed, true);
+  assert.strictEqual(claimed.state.activePlan.snack.claimed, true);
+  assert.strictEqual(
+    claimed.state.activePlan.snack.claimedAt,
+    new Date(2026, 9, 5, 18, 5, 0).getTime()
+  );
+  assert.deepStrictEqual(claimed.state.stats, statsBefore);
+
+  const duplicate = DailyTodo.markSnackClaimed(
+    claimed.state,
+    {
+      planId: "plan-2026-10-05",
+      now: new Date(2026, 9, 5, 18, 6, 0)
+    }
+  );
+
+  assert.strictEqual(duplicate.changed, false);
+  assert.strictEqual(
+    duplicate.state.activePlan.snack.claimedAt,
+    claimed.state.activePlan.snack.claimedAt
+  );
+  assert.deepStrictEqual(duplicate.state.stats, statsBefore);
+
+  const expired = DailyTodo.markSnackClaimed(
+    ready.state,
+    {
+      planId: "plan-2026-10-05",
+      now: new Date(2026, 9, 6, 0, 1, 0)
+    }
+  );
+  assert.strictEqual(expired.changed, false);
+
+  const uncredited = makePlanState({
+    day: "2026-10-05"
+  });
+  uncredited.activePlan.tasks.activity.status = "complete";
+  uncredited.activePlan.snack.unlocked = true;
+
+  const premature = DailyTodo.markSnackClaimed(
+    uncredited,
+    {
+      planId: "plan-2026-10-05",
+      now: new Date(2026, 9, 5, 18, 5, 0)
+    }
+  );
+  assert.strictEqual(premature.changed, false);
+}
+
 function testCurrentStreakDisplaysZeroAfterMissedDay() {
   const state = DailyTodo.createDefaultState();
   state.stats.currentStreak = 5;
@@ -825,6 +900,7 @@ function main() {
     testRolloverCreatesFreshPlan,
     testOldDayActiveFlowPreservation,
     testIdempotentTaskConfirmationAndStreak,
+    testSnackClaimIsOptionalIdempotentAndStatNeutral,
     testStreakResetAfterGapAndBestStreakPersistence,
     testCurrentStreakDisplaysZeroAfterMissedDay,
     testPendingStateIsDistinctFromComplete,

@@ -1790,6 +1790,8 @@
 
     const snackUnlocked =
       displayPlan.snack?.unlocked === true;
+    const snackClaimed =
+      displayPlan.snack?.claimed === true;
     const pending =
       findPendingCompletion(
         displayPlan,
@@ -1872,9 +1874,13 @@
             `${ASSET_DIR}task_snack.png`,
           emoji: "🍎",
           rowColor: "#333333",
-          status: "open",
+          status: snackClaimed
+            ? completeStatus
+            : "open",
           completeStatus,
-          disabled: !snackUnlocked,
+          disabled:
+            !snackUnlocked ||
+            snackClaimed,
           faded: !snackUnlocked
         })}
       </div>

@@ -3987,6 +3987,7 @@ function resetAllProgressData() {
   State.pendingPetUnlockVerseId = null;
   State.activeTodo = null;
   State.pendingZooTodoGameId = "";
+  State.dailySnackSession = null;
   State.hasLearnedVerse = false;
 
   titleZooPetVerseId = "";
@@ -5196,6 +5197,211 @@ function exitDailyTodoQuestions(
 
   setDailyTodoActualPreviewMode();
   go(Screen.TODO_DEV);
+  return true;
+}
+
+function getReadyDailySnackRuntime(
+  requestedPlan = null,
+  now = new Date()
+) {
+  const loaded =
+    loadDailyTodoRuntime();
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (!loaded || !profileId) {
+    return null;
+  }
+
+  const { engine, progress, state } =
+    loaded;
+  const plan = state.activePlan;
+  const completeStatus =
+    engine.TASK_STATUSES?.COMPLETE ||
+    "complete";
+  const taskIds = Object.values(
+    engine.TASK_IDS || {}
+  );
+
+  if (
+    !plan ||
+    plan.id !== requestedPlan?.id ||
+    plan.profileId !== profileId ||
+    plan.day !== engine.localDayKey?.(now) ||
+    plan.educationalCompletedAt <= 0 ||
+    !taskIds.length ||
+    !taskIds.every((taskId) =>
+      plan.tasks?.[taskId]?.status ===
+        completeStatus
+    ) ||
+    plan.snack?.unlocked !== true ||
+    plan.snack?.claimed === true
+  ) {
+    return null;
+  }
+
+  return {
+    engine,
+    progress,
+    state,
+    plan,
+    profileId
+  };
+}
+
+async function requestDailySnackTiltPermission() {
+  const OrientationEvent =
+    window.DeviceOrientationEvent;
+
+  if (!OrientationEvent) {
+    return false;
+  }
+
+  if (
+    typeof OrientationEvent
+      .requestPermission === "function"
+  ) {
+    try {
+      return await OrientationEvent
+        .requestPermission() === "granted";
+    } catch (err) {
+      console.warn(
+        "Daily snack motion permission was unavailable",
+        err
+      );
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function startDailyTodoSnack(
+  requestedPlan
+) {
+  const initial =
+    getReadyDailySnackRuntime(
+      requestedPlan
+    );
+  const feedGame =
+    window.BibloZooDailyFeedGame;
+
+  if (!initial || !feedGame?.render || !feedGame?.start) {
+    return false;
+  }
+
+  feedGame.prepareAudio?.();
+  const rewardTiltEnabled =
+    await requestDailySnackTiltPermission();
+  const ready =
+    getReadyDailySnackRuntime(
+      requestedPlan
+    );
+
+  if (!ready) {
+    return false;
+  }
+
+  const profile =
+    getProfileApi()
+      ?.getActiveProfile?.();
+
+  State.dailySnackSession = {
+    dailyTodoSnack: true,
+    profileId: ready.profileId,
+    planId: ready.plan.id,
+    planDay: ready.plan.day,
+    verseId: ready.plan.verseId,
+    petName:
+      getBibloPetDisplayNameForVerseId(
+        ready.plan.verseId
+      ),
+    zookeeperName:
+      String(profile?.name || "Zookeeper")
+        .trim() || "Zookeeper",
+    earnedStarPegCount:
+      Math.min(
+        2,
+        Math.max(
+          0,
+          Number(
+            ready.plan.earnedStarPegCount
+          ) || 0
+        )
+      ),
+    rewardTiltEnabled,
+    rewardScore: 0,
+    rewardCaught: 0,
+    rewardComplete: false,
+    rewardClaimed: false
+  };
+
+  go(Screen.DAILY_SNACK);
+  return true;
+}
+
+function claimDailyTodoSnack(
+  session,
+  result = {}
+) {
+  if (
+    !session ||
+    session !== State.dailySnackSession ||
+    session.rewardClaimed
+  ) {
+    return false;
+  }
+
+  const loaded =
+    loadDailyTodoRuntime();
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+  const plan = loaded?.state?.activePlan;
+
+  if (
+    !loaded ||
+    !profileId ||
+    session.profileId !== profileId ||
+    session.planId !== plan?.id ||
+    session.planDay !== plan?.day ||
+    session.verseId !== plan?.verseId
+  ) {
+    return false;
+  }
+
+  const claimed =
+    loaded.engine.markSnackClaimed(
+      loaded.state,
+      {
+        planId: session.planId,
+        now: new Date()
+      }
+    );
+
+  if (
+    !claimed.changed ||
+    !saveDailyTodoRuntime(
+      loaded.progress,
+      claimed.state
+    )
+  ) {
+    return false;
+  }
+
+  session.rewardScore =
+    Math.max(
+      0,
+      Number(result.score) || 0
+    );
+  session.rewardCaught =
+    Math.max(
+      0,
+      Number(result.caughtCount) || 0
+    );
+  session.rewardComplete = true;
+  session.rewardClaimed = true;
   return true;
 }
 
@@ -7647,6 +7853,7 @@ const Screen = {
   TITLE: "title",
   MY_VERSES: "my_verses",
   DAILY_SESSION: "daily_session",
+  DAILY_SNACK: "daily_snack",
   SETTINGS: "settings",
   PRIVACY: "privacy",
   TODO: "todo",
@@ -7687,6 +7894,7 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PRIVACY,
   Screen.TODO,
   Screen.TODO_DEV,
+  Screen.DAILY_SNACK,
   Screen.NEW_VERSE_PICKER,
   Screen.PROGRESS,
   Screen.PET_STATS,
@@ -7812,6 +8020,7 @@ const State = {
   pendingPetUnlockVerseId: null,
   activeTodo: null,
   pendingZooTodoGameId: "",
+  dailySnackSession: null,
   todoTutorialPage: 1,
   todoTutorialJustFinishedLearn: false,
   tutorialPracticeMode: false,
@@ -8909,6 +9118,9 @@ function go(nextScreen) {
   }
 
   if (from === Screen.FLASHCARDS) window.BibloZooFlashcards?.stopSession?.();
+  if (from === Screen.DAILY_SNACK) {
+    window.BibloZooDailyFeedGame?.stop?.();
+  }
   State.isSliding = true;
 
   // stop any learn audio/echo sequence when leaving a screen
@@ -9036,6 +9248,12 @@ function go(nextScreen) {
 function setScreen(screen) {
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
     window.BibloZooFlashcards?.stopSession?.();
+  }
+  if (
+    State.screen === Screen.DAILY_SNACK &&
+    screen !== Screen.DAILY_SNACK
+  ) {
+    window.BibloZooDailyFeedGame?.stop?.();
   }
   State.screen = screen;
   State.slideX = screenToIndex(screen);
@@ -10436,6 +10654,7 @@ function renderNav() {
     State.screen !== Screen.TITLE &&
     State.screen !== Screen.MY_VERSES &&
     State.screen !== Screen.DAILY_SESSION &&
+    State.screen !== Screen.DAILY_SNACK &&
     State.screen !== Screen.SETTINGS &&
     State.screen !== Screen.PRIVACY &&
     State.screen !== Screen.TODO &&
@@ -11397,6 +11616,7 @@ function clearTransientStateForProfileActivation() {
   State.activeTodo = null;
   State.pendingZooTodoGameId = "";
   State.todoTutorialPage = 1;
+  State.dailySnackSession = null;
   State.todoTutorialJustFinishedLearn = false;
   State.tutorialPracticeMode = false;
   State.todoInfoPage = "";
@@ -12920,7 +13140,14 @@ function screenTitle(idx) {
 
     titleTodoBtn.onclick = (e) => {
       e.stopPropagation();
-      openDailyTodoPreview("");
+      const plan =
+        getOrCreateDailyTodoPreviewPlan();
+
+      openDailyTodoPreview(
+        plan && plan.snack?.claimed !== true
+          ? "actual"
+          : ""
+      );
     };
 
     bindLongPress(titleTodoBtn, {
@@ -14991,6 +15218,112 @@ function screenTodo(idx) {
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
+function screenDailySnack(idx) {
+  const wrap = document.createElement("div");
+  wrap.className =
+    "daily-question-session is-feed-game";
+
+  const session =
+    State.dailySnackSession;
+  const feedGame =
+    window.BibloZooDailyFeedGame;
+
+  if (!session || !feedGame?.render) {
+    wrap.innerHTML = `
+      <div class="daily-question-session-empty">
+        <div class="daily-question-session-empty-title">
+          No Daily snack is ready.
+        </div>
+
+        <button
+          class="daily-question-session-back no-zoom"
+          type="button"
+          data-daily-snack-home
+        >
+          Back Home
+        </button>
+      </div>
+    `;
+
+    wrap.querySelector(
+      "[data-daily-snack-home]"
+    )?.addEventListener("click", () => {
+      State.dailySnackSession = null;
+      go(Screen.TITLE);
+    });
+  } else {
+    wrap.innerHTML = feedGame.render({
+      session,
+      profilePictureHtml:
+        profilePictureVisualHtml(
+          session.verseId,
+          {
+            className:
+              "daily-feed-pet-avatar",
+            alt: ""
+          }
+        )
+    });
+
+    requestAnimationFrame(() => {
+      if (
+        !wrap.isConnected ||
+        State.screen !== Screen.DAILY_SNACK ||
+        State.dailySnackSession !== session
+      ) {
+        return;
+      }
+
+      feedGame.start(
+        wrap,
+        {
+          session,
+          onComplete: (result = {}) => {
+            if (
+              claimDailyTodoSnack(
+                session,
+                result
+              )
+            ) {
+              return;
+            }
+
+            showDialog({
+              title: "Snack Could Not Be Saved",
+              body:
+                "Your snack is still available. Return Home and try it again.",
+              actions: [
+                dlgBtn("OK", {
+                  onClick: closeDialog
+                })
+              ]
+            });
+          },
+          onBackToZoo: () => {
+            if (
+              !session.rewardComplete ||
+              !session.rewardClaimed
+            ) {
+              return false;
+            }
+
+            State.dailySnackSession = null;
+            go(Screen.TITLE);
+            return true;
+          }
+        }
+      );
+    });
+  }
+
+  return makeSlide({
+    idx,
+    bg: "#000000",
+    navHidden: true,
+    inner: wrap
+  });
+}
+
 function screenTodoDev(idx) {
   const wrap = document.createElement("div");
   wrap.className = "todo-dev-screen";
@@ -15159,6 +15492,41 @@ function screenTodoDev(idx) {
         startDailyTodoQuestions(
           dailyPreviewPlan
         );
+      };
+    }
+
+    const snackRow =
+      wrap.querySelector(
+        '.daily-zoo-todo-row[data-daily-todo-preview-task="snack"]'
+      );
+
+    if (
+      snackRow &&
+      dailyPreviewPlan.snack?.claimed !== true
+    ) {
+      snackRow.onclick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        snackRow.disabled = true;
+
+        const launched =
+          await startDailyTodoSnack(
+            dailyPreviewPlan
+          );
+
+        if (launched) return;
+
+        snackRow.disabled = false;
+        showDialog({
+          title: "Snack Unavailable",
+          body:
+            "Confirm all three Daily Tasks before feeding today's BibloPet.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
       };
     }
   }
@@ -17152,6 +17520,9 @@ function render() {
         window.BibloZooDailyQuestions
           ?.renderScreen?.(idx) ||
         null;
+    }
+    if (screen === Screen.DAILY_SNACK) {
+      slide = screenDailySnack(idx);
     }
     if (screen === Screen.SETTINGS) slide = screenSettings(idx);
     if (screen === Screen.PRIVACY) slide = screenPrivacyPolicy(idx);
