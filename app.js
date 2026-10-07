@@ -4974,6 +4974,13 @@ function saveDailyTodoRuntime(
   return saveProgress(progress) !== false;
 }
 
+function returnToDailyTodoWithTransition() {
+  setDailyTodoActualPreviewMode();
+  transitionToAppScreen(
+    Screen.TODO_DEV
+  );
+}
+
 function startDailyTodoFlashcard(
   requestedPlan
 ) {
@@ -5142,8 +5149,7 @@ function completeDailyTodoFlashcard({
   if (
     task.status === pendingStatus
   ) {
-    setDailyTodoActualPreviewMode();
-    go(Screen.TODO_DEV);
+    returnToDailyTodoWithTransition();
     return true;
   }
 
@@ -5200,8 +5206,7 @@ function completeDailyTodoFlashcard({
     return false;
   }
 
-  setDailyTodoActualPreviewMode();
-  go(Screen.TODO_DEV);
+  returnToDailyTodoWithTransition();
   return true;
 }
 
@@ -5214,8 +5219,7 @@ function exitDailyTodoFlashcard(
     return false;
   }
 
-  setDailyTodoActualPreviewMode();
-  go(Screen.TODO_DEV);
+  returnToDailyTodoWithTransition();
   return true;
 }
 
@@ -5377,8 +5381,7 @@ function completeDailyTodoQuestions({
   if (
     task.status === pendingStatus
   ) {
-    setDailyTodoActualPreviewMode();
-    go(Screen.TODO_DEV);
+    returnToDailyTodoWithTransition();
     return true;
   }
 
@@ -5449,8 +5452,7 @@ function completeDailyTodoQuestions({
     return false;
   }
 
-  setDailyTodoActualPreviewMode();
-  go(Screen.TODO_DEV);
+  returnToDailyTodoWithTransition();
   return true;
 }
 
@@ -5463,8 +5465,7 @@ function exitDailyTodoQuestions(
     return false;
   }
 
-  setDailyTodoActualPreviewMode();
-  go(Screen.TODO_DEV);
+  returnToDailyTodoWithTransition();
   return true;
 }
 
