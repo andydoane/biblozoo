@@ -2976,6 +2976,12 @@ Settings Screen
   margin: 4px 0;
 }
 
+.settings-info-dialog a {
+  color: inherit;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
 .settings-reset-dialog {
   color: rgba(255, 255, 255, 0.95);
   font-weight: 700;
@@ -4915,12 +4921,27 @@ Game Mix Loading Screen
 
 .dialog {
   width: min(520px, 100%);
+  max-height: calc(100vh - 32px - var(--safeT) - var(--safeB));
+  max-height: calc(100dvh - 32px - var(--safeT) - var(--safeB));
+  display: flex;
+  flex-direction: column;
   border-radius: 22px;
   background: rgba(20, 20, 20, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
   padding: 18px;
   text-align: left;
+}
+
+.dialog > #dlgBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dialog > #dlgActions {
+  flex: 0 0 auto;
 }
 
 .dialog h3 {

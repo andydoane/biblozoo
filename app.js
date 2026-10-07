@@ -4545,6 +4545,11 @@ function showCreditsDialog() {
           Typography features Baloo 2, designed by Ek Type and distributed via Google Fonts.
         </p>
 
+        <p>
+          <strong>Open-source software:</strong><br>
+          Wacky Replay audio processing uses SoundTouchJS (<code>@soundtouchjs/audio-worklet</code> version 2.1.1), licensed under the Mozilla Public License 2.0. Source code and license information are available from the <a href="https://github.com/cutterbl/SoundTouchJS" target="_blank" rel="noopener noreferrer">SoundTouchJS project</a>.
+        </p>
+
       </div>
     `,
     actions: [dlgBtn("OK", { onClick: closeDialog })]
