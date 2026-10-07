@@ -16879,7 +16879,7 @@ function screenPetUnlock(idx) {
     }
   }
 
-  return makeSlide({ idx, bg: "#a7cb6f", navHidden: true, inner: wrap });
+  return makeSlide({ idx, bg: "#1f2d26", navHidden: true, inner: wrap });
 }
 
 function screenPetStats(idx) {

@@ -5964,9 +5964,21 @@ BibloPet Unlock Screen
   align-items: center;
   justify-content: center;
   padding: calc(18px + var(--safeT)) 18px calc(18px + var(--safeB));
-  background: #a7cb6f;
+  background-color: #1f2d26;
+  background-image:
+    url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
   color: #ffffff;
   overflow: hidden;
+}
+
+@media (min-width: 700px) {
+  .pet-unlock-screen {
+    background-image:
+      url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg");
+  }
 }
 
 .pet-unlock-screen .screen-home-pill {
@@ -8412,13 +8424,21 @@ body:has(#app .todo-dev-screen),
   background: #a7cb6f !important;
 }
 
-/* Pet unlock should stay green all the way through the safe area. */
-.pet-unlock-screen {
-  background: #a7cb6f;
+/* Match the slide behind Pet Unlock to its artwork through the safe area. */
+.slide:has(.pet-unlock-screen) {
+  background-color: #1f2d26 !important;
+  background-image:
+    url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg") !important;
+  background-size: cover !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
 }
 
-.slide:has(.pet-unlock-screen) {
-  background: #a7cb6f !important;
+@media (min-width: 700px) {
+  .slide:has(.pet-unlock-screen) {
+    background-image:
+      url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg") !important;
+  }
 }
 /* Keep button labels consistent, including labels with their own font rule. */
 .my-verses-learned-card { position: relative; }
