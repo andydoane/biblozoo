@@ -62,6 +62,10 @@
       "wacky"
     ]);
 
+  const IS_NATIVE_CAPACITOR =
+    !!window.Capacitor?.isNativePlatform?.() ||
+    window.location.protocol === "capacitor:";
+
   const state = {
     view: "landing",
     selectedVerseId: "",
@@ -76,6 +80,7 @@
   let recording = null;
   let recordRequest = 0;
   let recordingNotice = "";
+  let nativeMicrophonePermissionDenied = false;
   let countdownRemaining = 0;
   let countdownTimer = null;
   let countdownFrame = null;
@@ -149,7 +154,9 @@
     if (!finishCountdown) return;
     discardRecording();
     state.view = "recording_intro";
-    recordingNotice = "Countdown was interrupted. Please try again or skip recording.";
+    recordingNotice = IS_NATIVE_CAPACITOR
+      ? "Countdown was interrupted. Please try again."
+      : "Countdown was interrupted. Please try again or skip recording.";
     requestRender();
   }
 
@@ -244,7 +251,15 @@
       state.view = "challenge";
       requestRender();
     }, () => runCountdown(request), () => recordingLimitMs);
-    if (request !== recordRequest || result !== "failed") return;
+    if (request !== recordRequest) return;
+    if (result === "recording") {
+      nativeMicrophonePermissionDenied = false;
+      return;
+    }
+    if (result === "permission-denied") {
+      nativeMicrophonePermissionDenied = true;
+    }
+    if (!["failed", "permission-denied"].includes(result)) return;
     state.view = "recording_intro";
     requestRender();
     api.showRecordingFallback(() => {
@@ -753,6 +768,9 @@
 
   function renderRecordingIntro(wrap) {
     const explaining = state.view === "difficulty_intro";
+    const showSkipRecording =
+      !IS_NATIVE_CAPACITOR ||
+      nativeMicrophonePermissionDenied;
     const explanations = {
       really_well: "Try to say the verse without any help at all.",
       pretty_good: "Say the verse using just the first letter of each word to help you remember.",
@@ -779,8 +797,10 @@
           <div class="flashcards-comparison-buttons">
             ${explaining ? `<button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
               type="button">Go Back</button>` : ""}
-            <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
-              type="button">${explaining ? "Next" : "Skip Recording"}</button>
+            ${explaining || showSkipRecording ? `
+              <button class="flashcards-secondary-btn" id="flashcardsSkipRecordingBtn"
+                type="button">${explaining ? "Next" : "Skip Recording"}</button>
+            ` : ""}
           </div>
         </div>
       </div>
@@ -795,7 +815,7 @@
     const introBack = wrap.querySelector("#flashcardsIntroBackBtn");
     if (introBack) introBack.onclick = goBack;
     const next = wrap.querySelector("#flashcardsSkipRecordingBtn");
-    next.onclick = explaining ? async () => {
+    if (next) next.onclick = explaining ? async () => {
       if (next.disabled) return;
       next.disabled = true;
       const copy = wrap.querySelector(".flashcards-recording-copy");
@@ -1340,7 +1360,9 @@
         recordRequest += 1;
         cancelCountdown();
         if (!getSelectedVerse()) return;
-        recordingNotice = "Recording was interrupted. Please try again or skip recording.";
+        recordingNotice = IS_NATIVE_CAPACITOR
+          ? "Recording was interrupted. Please try again."
+          : "Recording was interrupted. Please try again or skip recording.";
         state.view = "recording_intro";
         requestRender();
       }

@@ -4,6 +4,15 @@
   // Audio stays in this closure. Never include it in profile data or backups.
   window.BibloZooRecording = Object.freeze({ create });
 
+  function isPermissionDeniedError(error) {
+    const name = String(error?.name || "");
+    return [
+      "NotAllowedError",
+      "PermissionDeniedError",
+      "SecurityError"
+    ].includes(name);
+  }
+
   function create({ onChange, onInterrupted }) {
     let generation = 0;
     let status = "idle";
@@ -109,6 +118,7 @@
     async function start(onStart, beforeStart, getLimitMs = () => 120000) {
       dispose();
       const current = generation;
+      let requestingMicrophonePermission = false;
       prepareMeter();
       status = "requesting";
       notify();
@@ -116,7 +126,9 @@
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
           throw new Error("Recording unavailable");
         }
+        requestingMicrophonePermission = true;
         const acquired = await navigator.mediaDevices.getUserMedia({ audio: true });
+        requestingMicrophonePermission = false;
         if (current !== generation || document.hidden) {
           stopTracks(acquired);
           if (current === generation) interrupt();
@@ -196,11 +208,16 @@
         }, limit);
         notify();
         return "recording";
-      } catch (_) {
+      } catch (error) {
         if (current !== generation) return "cancelled";
+        const permissionDenied =
+          requestingMicrophonePermission &&
+          isPermissionDeniedError(error);
         dispose();
         notify();
-        return "failed";
+        return permissionDenied
+          ? "permission-denied"
+          : "failed";
       }
     }
 
