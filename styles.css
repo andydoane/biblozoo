@@ -1070,6 +1070,7 @@ nav#navBar {
   flex-direction: column;
   align-items: center;
   gap: clamp(10px, 2vh, 18px);
+  text-align: center;
 }
 
 .title-screen .daily-home-offer-brand {
@@ -1079,17 +1080,20 @@ nav#navBar {
   object-fit: contain;
 }
 
-.daily-home-offer-pet {
+.daily-home-offer-pet-profile {
   width: clamp(112px, 30vw, 174px);
   aspect-ratio: 1;
+  flex: 0 0 auto;
+  margin-inline: auto;
+  overflow: visible;
+  background: transparent;
 }
 
-.daily-home-offer-pet-profile {
+.daily-home-offer-pet-profile .profile-picture-img {
   width: 100%;
   height: 100%;
-  border: 6px solid #a7cb6f;
-  border-radius: 50%;
-  box-shadow: 0 7px 0 rgba(76, 99, 42, 0.24);
+  max-height: none;
+  object-fit: contain;
 }
 
 .daily-home-offer-pet-profile .profile-picture-fallback {
@@ -1097,51 +1101,87 @@ nav#navBar {
 }
 
 .daily-home-offer-title {
+  width: 100%;
   font-size: clamp(23px, 5.5vw, 34px);
   font-weight: 900;
   line-height: 1.05;
   text-wrap: balance;
 }
 
+.daily-home-offer-greeting,
+.daily-home-offer-name {
+  display: block;
+}
+
+.daily-home-offer-greeting {
+  color: #5d526b;
+  font-size: 0.72em;
+  line-height: 1.12;
+}
+
+.daily-home-offer-name {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
 .daily-home-offer-copy {
-  font-size: clamp(17px, 4vw, 23px);
-  font-weight: 700;
+  width: 100%;
+  font-size: clamp(19px, 4.5vw, 26px);
+  font-weight: 900;
   line-height: 1.15;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .daily-home-offer-actions {
   width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
 .daily-home-offer-actions button {
-  min-height: 54px;
   border: none;
-  border-radius: 999px;
-  padding: 10px 16px;
   font: inherit;
-  font-size: clamp(17px, 4vw, 22px);
   font-weight: 900;
   cursor: pointer;
 }
 
-.daily-home-offer-actions button:active {
-  transform: translateY(3px);
-}
-
 .daily-home-offer-ready {
+  width: min(100%, 330px);
+  min-height: 58px;
+  border-radius: 999px;
+  padding: 10px 22px;
   background: #7f66c6;
   color: #ffffff;
+  font-size: clamp(19px, 4.5vw, 24px);
   box-shadow: 0 6px 0 #58449b;
 }
 
+.daily-home-offer-ready:active {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #58449b;
+}
+
 .daily-home-offer-later {
-  background: #eee9f6;
+  min-width: 96px;
+  min-height: 44px;
+  border-radius: 0;
+  padding: 10px 18px;
+  background: transparent;
   color: #4d3b69;
-  box-shadow: 0 6px 0 #c8bddb;
+  font-size: clamp(15px, 3.5vw, 19px);
+  box-shadow: none;
+}
+
+.daily-home-offer-later:active {
+  transform: scale(0.97);
+}
+
+.daily-home-offer-actions button:focus-visible {
+  outline: 4px solid rgba(127, 102, 198, 0.34);
+  outline-offset: 3px;
 }
 
 @media (max-height: 620px) {
@@ -1150,7 +1190,7 @@ nav#navBar {
     padding-block: 16px;
   }
 
-  .daily-home-offer-pet {
+  .daily-home-offer-pet-profile {
     width: 94px;
   }
 

@@ -3988,7 +3988,7 @@ function resetAllProgressData() {
   State.activeTodo = null;
   State.pendingZooTodoGameId = "";
   State.dailySnackSession = null;
-  State.dailyHomeOfferKey = "";
+  clearDailyHomeOfferPresentation();
   State.hasLearnedVerse = false;
 
   titleZooPetVerseId = "";
@@ -4698,6 +4698,55 @@ function getOrCreateDailyTodoPreviewPlan({
 
 const DAILY_HOME_OFFER_STORAGE_PREFIX =
   "biblozooDailyHomeOffer";
+const DAILY_HOME_OFFER_GREETINGS =
+  Object.freeze([
+    "Welcome back",
+    "Good to see you",
+    "Howdy",
+    "Glad you’re back"
+  ]);
+
+function clearDailyHomeOfferPresentation() {
+  State.dailyHomeOfferKey = "";
+  State.dailyHomeOfferGreetingKey = "";
+  State.dailyHomeOfferGreeting = "";
+}
+
+function getDailyHomeOfferGreeting(
+  offerKey
+) {
+  const safeOfferKey = String(
+    offerKey || ""
+  ).trim();
+
+  if (!safeOfferKey) {
+    return DAILY_HOME_OFFER_GREETINGS[0];
+  }
+
+  if (
+    State.dailyHomeOfferGreetingKey ===
+      safeOfferKey &&
+    DAILY_HOME_OFFER_GREETINGS.includes(
+      State.dailyHomeOfferGreeting
+    )
+  ) {
+    return State.dailyHomeOfferGreeting;
+  }
+
+  const index = Math.floor(
+    Math.random() *
+      DAILY_HOME_OFFER_GREETINGS.length
+  );
+  const greeting =
+    DAILY_HOME_OFFER_GREETINGS[index] ||
+    DAILY_HOME_OFFER_GREETINGS[0];
+
+  State.dailyHomeOfferGreetingKey =
+    safeOfferKey;
+  State.dailyHomeOfferGreeting = greeting;
+
+  return greeting;
+}
 
 function getDailyHomePlanView(plan) {
   const engine =
@@ -4848,7 +4897,7 @@ function resetTodayDailyTodoForTesting(
   }
 
   clearDailyHomeOfferSuppression(plan);
-  State.dailyHomeOfferKey = "";
+  clearDailyHomeOfferPresentation();
   return true;
 }
 
@@ -8181,6 +8230,8 @@ const State = {
   pendingZooTodoGameId: "",
   dailySnackSession: null,
   dailyHomeOfferKey: "",
+  dailyHomeOfferGreetingKey: "",
+  dailyHomeOfferGreeting: "",
   todoTutorialPage: 1,
   todoTutorialJustFinishedLearn: false,
   tutorialPracticeMode: false,
@@ -11778,7 +11829,7 @@ function clearTransientStateForProfileActivation() {
   State.pendingZooTodoGameId = "";
   State.todoTutorialPage = 1;
   State.dailySnackSession = null;
-  State.dailyHomeOfferKey = "";
+  clearDailyHomeOfferPresentation();
   State.todoTutorialJustFinishedLearn = false;
   State.tutorialPracticeMode = false;
   State.todoInfoPage = "";
@@ -12916,12 +12967,16 @@ function screenTitle(idx) {
     suppressDailyHomeOffer(
       dailyHomePlan
     );
-  } else if (
-    State.dailyHomeOfferKey ===
-      dailyOfferKey
-  ) {
-    State.dailyHomeOfferKey = "";
+  } else if (State.dailyHomeOfferKey) {
+    clearDailyHomeOfferPresentation();
   }
+
+  const dailyOfferGreeting =
+    showDailyOffer
+      ? getDailyHomeOfferGreeting(
+          dailyOfferKey
+        )
+      : "";
 
   const dailyTaskLabels = [
     "Flashcard",
@@ -12972,6 +13027,7 @@ function screenTitle(idx) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="dailyHomeOfferTitle"
+        aria-describedby="dailyHomeOfferCopy"
       >
         <div class="daily-home-offer-card">
           <img
@@ -12981,26 +13037,33 @@ function screenTitle(idx) {
             draggable="false"
           >
 
-          <div class="daily-home-offer-pet" aria-hidden="true">
-            ${profilePictureVisualHtml(
-              dailyHomePlan.verseId,
-              {
-                className:
-                  "daily-home-offer-pet-profile",
-                alt: ""
-              }
-            )}
-          </div>
+          ${profilePictureVisualHtml(
+            dailyHomePlan.verseId,
+            {
+              className:
+                "daily-home-offer-pet-profile",
+              alt: ""
+            }
+          )}
 
           <div
             class="daily-home-offer-title"
             id="dailyHomeOfferTitle"
           >
-            ${escapeHtml(activeProfile.name)}, ${escapeHtml(dailyPetName)} is ready!
+            <span class="daily-home-offer-greeting">
+              ${escapeHtml(dailyOfferGreeting)},
+            </span>
+
+            <span class="daily-home-offer-name">
+              ${escapeHtml(activeProfile.name)}!
+            </span>
           </div>
 
-          <div class="daily-home-offer-copy">
-            Today’s Zoo To-Do is waiting for you.
+          <div
+            class="daily-home-offer-copy"
+            id="dailyHomeOfferCopy"
+          >
+            ${escapeHtml(dailyPetName)} wants to play!
           </div>
 
           <div class="daily-home-offer-actions">
@@ -13482,7 +13545,7 @@ function screenTitle(idx) {
         suppressDailyHomeOffer(
           dailyHomePlan
         );
-        State.dailyHomeOfferKey = "";
+        clearDailyHomeOfferPresentation();
         openDailyTodoPreview("actual");
       };
     }
@@ -13493,7 +13556,7 @@ function screenTitle(idx) {
         suppressDailyHomeOffer(
           dailyHomePlan
         );
-        State.dailyHomeOfferKey = "";
+        clearDailyHomeOfferPresentation();
         dailyHomeOffer?.remove();
       };
     }
