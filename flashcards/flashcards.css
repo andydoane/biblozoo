@@ -589,6 +589,32 @@ Patch 2: themed visual system + difficulty flow
   height: 64px;
 }
 
+.flashcards-wacky-replay-icon {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+}
+
+.flashcards-wacky-replay-icon img,
+.flashcards-wacky-replay-emoji {
+  grid-area: 1 / 1;
+}
+
+.flashcards-wacky-replay-icon img {
+  object-fit: contain;
+}
+
+.flashcards-wacky-replay-emoji {
+  font-size: 52px;
+  line-height: 1;
+}
+
+.flashcards-wacky-replay-icon [hidden] {
+  display: none;
+}
+
 .flashcards-recording-note {
   margin: 0;
   max-width: 42ch;
@@ -653,6 +679,16 @@ Patch 2: themed visual system + difficulty flow
   .flashcards-record-preview img {
     width: 48px;
     height: 48px;
+  }
+
+  .flashcards-wacky-replay-icon {
+    flex-basis: 48px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .flashcards-wacky-replay-emoji {
+    font-size: 40px;
   }
 
 }

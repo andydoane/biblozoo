@@ -52,6 +52,16 @@
     })
   ]);
 
+  const WACKY_PRESET_IDS =
+    Object.freeze([
+      "squirrel",
+      "giant",
+      "monster",
+      "turtle",
+      "rocket",
+      "wacky"
+    ]);
+
   const state = {
     view: "landing",
     selectedVerseId: "",
@@ -71,6 +81,12 @@
   let countdownFrame = null;
   let meterFrame = null;
   let comparisonPlaybackStarted = false;
+  let wackyReplayUnlocked = false;
+  let wackyReplayConsumed = false;
+  let wackyReplayPlaying = false;
+  let wackyReplayMessage = "";
+  let wackyPlaybackRequest = 0;
+  let lastWackyPreset = "";
   let finishCountdown = null;
 
   function cancelCountdown() {
@@ -150,7 +166,51 @@
     { id: "needs_practice", label: "Needs Practice", helper: "I missed more than a few words." }
   ]);
 
+  function stopWackyPlayback() {
+    wackyPlaybackRequest += 1;
+    recording?.stopFun?.();
+    wackyReplayPlaying = false;
+  }
+
+  function resetWackyReplayRun() {
+    stopWackyPlayback();
+    wackyReplayUnlocked = false;
+    wackyReplayConsumed = false;
+    wackyReplayMessage = "";
+  }
+
+  function leaveFlashcards() {
+    resetSession();
+    lastWackyPreset = "";
+  }
+
+  function pickWackyPreset() {
+    const choices =
+      WACKY_PRESET_IDS.filter(
+        (preset) =>
+          preset !== lastWackyPreset
+      );
+
+    const selected =
+      choices[
+        Math.floor(
+          Math.random() *
+            choices.length
+        )
+      ] || WACKY_PRESET_IDS[0];
+
+    lastWackyPreset = selected;
+    return selected;
+  }
+
+  function consumeWackyReplay() {
+    wackyReplayConsumed = true;
+    wackyReplayUnlocked = false;
+  }
+
   function discardRecording() {
+    stopWackyPlayback();
+    wackyReplayUnlocked = false;
     stopVersePreview();
     recordRequest += 1;
     cancelCountdown();
@@ -173,6 +233,9 @@
 
   async function beginRecording() {
     if (!recording || ["requesting", "preparing", "recording"].includes(recording.snapshot().status)) return;
+    stopWackyPlayback();
+    wackyReplayUnlocked = false;
+    wackyReplayMessage = "";
     recordingNotice = "";
     comparisonPlaybackStarted = false;
     state.grade = "";
@@ -308,6 +371,7 @@
     limitRequest += 1;
     recordingLimitMs = 120000;
     discardRecording();
+    resetWackyReplayRun();
     resizeObserver?.disconnect();
     resizeObserver = null;
     state.view = "landing";
@@ -363,6 +427,7 @@
     if (!selected) return;
 
     discardRecording();
+    resetWackyReplayRun();
     state.selectedVerseId = selected.id;
     state.difficulty = "";
     state.grade = "";
@@ -837,6 +902,83 @@
     return true;
   }
 
+  function wackyReplayButtonHtml() {
+    const label = wackyReplayPlaying
+      ? "Wacky Replay…"
+      : "Wacky Replay";
+
+    return `
+      <button
+        class="flashcards-record-preview flashcards-wacky-replay"
+        id="flashcardsWackyReplayBtn"
+        type="button"
+        data-no-ui-sound
+        aria-label="Wacky Replay"
+        ${wackyReplayPlaying ? "disabled" : ""}
+      >
+        <span
+          class="flashcards-wacky-replay-icon"
+          aria-hidden="true"
+        >
+          <img
+            src="flashcards/flashcards_wacky_replay.png"
+            alt=""
+            draggable="false"
+            onerror="this.hidden=true;this.nextElementSibling.hidden=false"
+          >
+          <span
+            class="flashcards-wacky-replay-emoji"
+            hidden
+          >😜</span>
+        </span>
+        <span>${label}</span>
+      </button>
+    `;
+  }
+
+  async function playWackyReplay() {
+    const audio = recording?.snapshot?.();
+
+    if (
+      state.view !== "comparison" ||
+      !audio?.hasRecording ||
+      !audio.playbackComplete ||
+      !wackyReplayUnlocked ||
+      wackyReplayConsumed ||
+      wackyReplayPlaying
+    ) {
+      return;
+    }
+
+    consumeWackyReplay();
+    wackyReplayPlaying = true;
+    wackyReplayMessage = "";
+
+    const preset = pickWackyPreset();
+    const request =
+      ++wackyPlaybackRequest;
+
+    requestRender();
+
+    const completed =
+      await recording.playFun(preset);
+
+    if (
+      request !== wackyPlaybackRequest
+    ) {
+      return;
+    }
+
+    wackyReplayPlaying = false;
+
+    if (!completed) {
+      wackyReplayMessage =
+        "Wacky Replay couldn't play, but you can still continue.";
+    }
+
+    requestRender();
+  }
+
   function updateMeter(wrap) {
     cancelAnimationFrame(meterFrame);
     const bars = wrap.querySelectorAll(".flashcards-meter-bars i");
@@ -865,6 +1007,12 @@
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
     const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
+    const showWackyReplay =
+      wackyReplayPlaying ||
+      (
+        wackyReplayUnlocked &&
+        !wackyReplayConsumed
+      );
     const comparisonInstruction = audio.hasRecording || waiting
       ? "Listen to your recording, then compare it with the verse."
       : "Check the verse and see how you did.";
@@ -887,11 +1035,16 @@
           </section>
         </div>
         <div class="flashcards-recall-actions">
-          ${audio.hasRecording || waiting ? controlButton("flashcardsPlayBtn",
-      waiting ? "record" : audio.status === "playing" ? "stop" : "play",
-      waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
-      waiting || audio.status === "loading") : ""}
+          ${showWackyReplay
+            ? wackyReplayButtonHtml()
+            : audio.hasRecording || waiting
+              ? controlButton("flashcardsPlayBtn",
+                  waiting ? "record" : audio.status === "playing" ? "stop" : "play",
+                  waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
+                  waiting || audio.status === "loading")
+              : ""}
           ${message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(message)}</p>` : ""}
+          ${wackyReplayMessage ? `<p class="flashcards-recording-note" role="status">${escapeHtml(wackyReplayMessage)}</p>` : ""}
           <div class="flashcards-comparison-buttons">
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
@@ -911,6 +1064,15 @@
   requestRender();
   void recording.play();
 };
+    const wackyReplay =
+      wrap.querySelector(
+        "#flashcardsWackyReplayBtn"
+      );
+    if (wackyReplay) {
+      wackyReplay.onclick = () => {
+        void playWackyReplay();
+      };
+    }
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
     const continueUnheard = wrap.querySelector("#flashcardsContinueUnheardBtn");
@@ -929,6 +1091,10 @@
         requestRender();
         return;
       }
+      if (wackyReplayUnlocked) {
+        consumeWackyReplay();
+      }
+      stopWackyPlayback();
       recording.pause();
       state.view = "challenge_complete";
       requestRender();
@@ -1032,7 +1198,7 @@
     const navigation = wrap.querySelector("[data-flashcards-navigation]");
     if (navigation) navigation.onclick = () => {
       if (state.view === "landing") {
-        resetSession();
+        leaveFlashcards();
         api?.goToHome?.();
       } else {
         goBack();
@@ -1042,7 +1208,7 @@
       .querySelectorAll("[data-flashcards-exit]")
       .forEach((button) => {
         button.onclick = () => {
-          resetSession();
+          leaveFlashcards();
           api?.goToPractice?.();
         };
       });
@@ -1148,11 +1314,25 @@
     api = nextApi || null;
     if (!recording) recording = window.BibloZooRecording.create({
       onChange: () => {
+        const audio =
+          recording?.snapshot();
+
         if (state.view === "comparison" &&
-          ["requesting", "preparing"].includes(recording?.snapshot().status) &&
+          ["requesting", "preparing"].includes(audio?.status) &&
           showRerecordWaiting()) return;
-        if (recording?.snapshot().status === "ready" && state.view === "challenge") {
+        if (audio?.status === "ready" && state.view === "challenge") {
           state.view = "comparison";
+        }
+        if (
+          state.view === "comparison" &&
+          audio?.hasRecording &&
+          audio.playbackComplete &&
+          !wackyReplayConsumed &&
+          !wackyReplayPlaying &&
+          window.BibloZooAudioEffects
+            ?.isSupported?.() === true
+        ) {
+          wackyReplayUnlocked = true;
         }
         requestRender();
       },
@@ -1171,7 +1351,7 @@
     initialize,
     start,
     startForVerse,
-    stopSession: resetSession,
+    stopSession: leaveFlashcards,
     renderScreen,
     getEligibleVerses,
     getThemedControlAsset,

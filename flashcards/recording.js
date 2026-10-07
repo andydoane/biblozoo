@@ -10,6 +10,7 @@
     let stream = null;
     let recorder = null;
     let chunks = [];
+    let blob = null;
     let player = null;
     let url = "";
     let stopTimer = null;
@@ -67,6 +68,7 @@
     const stopTracks = (value) => value?.getTracks().forEach((track) => track.stop());
 
     function dispose() {
+      stopFun();
       playbackComplete = false;
       playbackFailed = false;
       clearTimeout(limitTimer);
@@ -85,6 +87,7 @@
       stopTracks(stream);
       stream = recorder = null;
       chunks = [];
+      blob = null;
       if (player) {
         player.onended = player.onerror = null;
         player.pause();
@@ -146,7 +149,7 @@
           closeMeter();
           stopTracks(stream);
           stream = recorder = null;
-          const blob = new Blob(chunks, { type: activeRecorder.mimeType || chunks[0]?.type || "" });
+          blob = new Blob(chunks, { type: activeRecorder.mimeType || chunks[0]?.type || "" });
           chunks = [];
           if (!blob.size) { interrupt(); return; }
           url = URL.createObjectURL(blob);
@@ -229,6 +232,7 @@
     async function play() {
       if (!player || status === "loading") return;
       if (status === "playing") { pause(); return; }
+      stopFun();
       const current = generation;
       const audio = player;
       playbackFailed = false;
@@ -249,17 +253,54 @@
       notify();
     }
 
+    function stopFun() {
+      return window
+        .BibloZooAudioEffects
+        ?.stop?.() === true;
+    }
+
+    async function playFun(preset) {
+      if (!blob?.size) return false;
+
+      const effects =
+        window.BibloZooAudioEffects;
+
+      if (
+        !effects?.isSupported?.() ||
+        typeof effects.playRecordedVerse !==
+          "function"
+      ) {
+        return false;
+      }
+
+      pause();
+
+      try {
+        return (
+          await effects.playRecordedVerse(
+            blob,
+            preset
+          )
+        ) === true;
+      } catch (_) {
+        return false;
+      }
+    }
+
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) return;
       if (["requesting", "preparing", "recording", "stopping"].includes(status)) interrupt();
-      else pause();
+      else {
+        pause();
+        stopFun();
+      }
     });
     window.addEventListener("pagehide", () => {
       if (status !== "idle" || url) interrupt();
     });
 
     return Object.freeze({
-      start, stop, play, pause, dispose, readLevel,
+      start, stop, play, pause, playFun, stopFun, dispose, readLevel,
       snapshot: () => ({ status, hasRecording: !!url, message, playbackComplete, playbackFailed,
         remainingSeconds: status === "recording" ? Math.max(0, Math.ceil((recordingDeadline - performance.now()) / 1000)) : null })
     });
