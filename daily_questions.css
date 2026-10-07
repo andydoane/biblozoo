@@ -881,7 +881,7 @@
 
   padding: 10px 20px;
 
-  background: #78ad4f;
+  background: #333333;
   color: #ffffff;
 
   font: inherit;
@@ -1248,6 +1248,33 @@
 .daily-question-action-slot {
   height: auto;
   padding-bottom: 8px;
+}
+
+@media (min-width: 700px) and (min-height: 700px) {
+  /* Keep the application action visible on roomy tablet screens. The card
+     receives the remaining height so the existing fitter has a real vertical
+     limit instead of measuring an already-expanded content box. */
+  .daily-question-reflection-shell {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows:
+      auto
+      minmax(0, 1fr)
+      24px
+      auto;
+    align-content: stretch;
+  }
+
+  .daily-question-reflection-card {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .daily-question-reflection-body {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }
 
 /* The fade matches the selected question's background, never catches taps,
