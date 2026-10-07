@@ -131,6 +131,99 @@
         3, -3
       ]),
       pitchStepSeconds: 0.22
+    }),
+    alien: Object.freeze({
+      label: "Alien",
+      category: "experimental",
+      description: "A shifting voice with a sweeping space filter.",
+      pitchLabel: "Moving",
+      characterLabel: "Alien filter",
+      semitones: 0,
+      speed: 0.96,
+      pitchTargets: Object.freeze([
+        5, 9, 3, 8
+      ]),
+      pitchStepSeconds: 0.38,
+      characterEffect: "alien",
+      filterHz: 1450,
+      filterDepthHz: 650,
+      filterModulationHz: 4.5
+    }),
+    alien_echo: Object.freeze({
+      label: "Alien Echo",
+      category: "experimental",
+      description: "A high alien voice with a fading space echo.",
+      pitchLabel: "+7",
+      characterLabel: "Echo",
+      semitones: 7,
+      speed: 0.93,
+      characterEffect: "alien_echo",
+      filterHz: 1650,
+      filterDepthHz: 500,
+      filterModulationHz: 3.2,
+      delaySeconds: 0.18,
+      feedback: 0.3,
+      tailSeconds: 0.75
+    }),
+    classic_robot: Object.freeze({
+      label: "Classic Robot",
+      category: "experimental",
+      description: "Metallic voice modulation with a focused robot tone.",
+      pitchLabel: "Original",
+      characterLabel: "42 Hz robot",
+      semitones: 0,
+      speed: 1,
+      characterEffect: "robot",
+      modulationHz: 42,
+      filterType: "bandpass",
+      filterHz: 1350,
+      filterQ: 1.1,
+      distortion: 8
+    }),
+    tiny_robot: Object.freeze({
+      label: "Tiny Robot",
+      category: "experimental",
+      description: "A small, bright robot with faster metallic motion.",
+      pitchLabel: "+7",
+      characterLabel: "72 Hz robot",
+      semitones: 7,
+      speed: 1.08,
+      characterEffect: "robot",
+      modulationHz: 72,
+      filterType: "bandpass",
+      filterHz: 1950,
+      filterQ: 1,
+      distortion: 6
+    }),
+    deep_robot: Object.freeze({
+      label: "Deep Robot",
+      category: "experimental",
+      description: "A slower, lower machine voice with a dark tone.",
+      pitchLabel: "-7",
+      characterLabel: "28 Hz robot",
+      semitones: -7,
+      speed: 0.92,
+      characterEffect: "robot",
+      modulationHz: 28,
+      filterType: "lowpass",
+      filterHz: 1250,
+      filterQ: 0.8,
+      distortion: 10
+    }),
+    robot_radio: Object.freeze({
+      label: "Robot Radio",
+      category: "experimental",
+      description: "A narrow, crunchy robot voice from an old radio.",
+      pitchLabel: "-2",
+      characterLabel: "Radio filter",
+      semitones: -2,
+      speed: 1,
+      characterEffect: "robot",
+      modulationHz: 55,
+      filterType: "bandpass",
+      filterHz: 1150,
+      filterQ: 3.2,
+      distortion: 20
     })
   });
 
@@ -175,6 +268,21 @@
     try {
       playback.soundTouch.disconnect();
     } catch (_) { }
+
+    for (
+      const source of
+      playback.effectSources || []
+    ) {
+      try { source.stop(); } catch (_) { }
+      try { source.disconnect(); } catch (_) { }
+    }
+
+    for (
+      const node of
+      playback.effectNodes || []
+    ) {
+      try { node.disconnect(); } catch (_) { }
+    }
 
     try {
       playback.gain.disconnect();
@@ -318,6 +426,235 @@
     );
   }
 
+  function createDistortionCurve(
+    amount = 0
+  ) {
+    const strength =
+      Math.max(0, Number(amount) || 0);
+    const samples = 2048;
+    const curve =
+      new Float32Array(samples);
+
+    for (let index = 0; index < samples; index += 1) {
+      const value =
+        (index * 2) / samples - 1;
+
+      curve[index] =
+        ((3 + strength) * value * 20 *
+          (Math.PI / 180)) /
+        (Math.PI + strength *
+          Math.abs(value));
+    }
+
+    return curve;
+  }
+
+  function createAlienEffectChain(
+    audioContext,
+    preset,
+    startTime,
+    stopTime
+  ) {
+    const filter =
+      audioContext.createBiquadFilter();
+    const oscillator =
+      audioContext.createOscillator();
+    const filterDepth =
+      audioContext.createGain();
+
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(
+      preset.filterHz,
+      startTime
+    );
+    filter.Q.setValueAtTime(
+      0.9,
+      startTime
+    );
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(
+      preset.filterModulationHz,
+      startTime
+    );
+    filterDepth.gain.setValueAtTime(
+      preset.filterDepthHz,
+      startTime
+    );
+    oscillator.connect(filterDepth);
+    filterDepth.connect(filter.frequency);
+
+    const nodes = [
+      filter,
+      filterDepth
+    ];
+    let output = filter;
+
+    if (
+      preset.characterEffect ===
+      "alien_echo"
+    ) {
+      const dry =
+        audioContext.createGain();
+      const wet =
+        audioContext.createGain();
+      const delay =
+        audioContext.createDelay(1);
+      const feedback =
+        audioContext.createGain();
+      const mix =
+        audioContext.createGain();
+
+      dry.gain.setValueAtTime(
+        0.76,
+        startTime
+      );
+      wet.gain.setValueAtTime(
+        0.44,
+        startTime
+      );
+      delay.delayTime.setValueAtTime(
+        preset.delaySeconds,
+        startTime
+      );
+      feedback.gain.setValueAtTime(
+        preset.feedback,
+        startTime
+      );
+
+      filter.connect(dry);
+      dry.connect(mix);
+      filter.connect(delay);
+      delay.connect(wet);
+      wet.connect(mix);
+      delay.connect(feedback);
+      feedback.connect(delay);
+
+      nodes.push(
+        dry,
+        wet,
+        delay,
+        feedback,
+        mix
+      );
+      output = mix;
+    }
+
+    oscillator.start(startTime);
+    oscillator.stop(stopTime);
+
+    return {
+      input: filter,
+      output,
+      nodes,
+      sources: [oscillator]
+    };
+  }
+
+  function createRobotEffectChain(
+    audioContext,
+    preset,
+    startTime,
+    stopTime
+  ) {
+    const ring =
+      audioContext.createGain();
+    const oscillator =
+      audioContext.createOscillator();
+    const modulationDepth =
+      audioContext.createGain();
+    const filter =
+      audioContext.createBiquadFilter();
+    const shaper =
+      audioContext.createWaveShaper();
+
+    ring.gain.setValueAtTime(
+      0.28,
+      startTime
+    );
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(
+      preset.modulationHz,
+      startTime
+    );
+    modulationDepth.gain.setValueAtTime(
+      0.72,
+      startTime
+    );
+
+    filter.type = preset.filterType;
+    filter.frequency.setValueAtTime(
+      preset.filterHz,
+      startTime
+    );
+    filter.Q.setValueAtTime(
+      preset.filterQ,
+      startTime
+    );
+
+    shaper.curve =
+      createDistortionCurve(
+        preset.distortion
+      );
+    shaper.oversample = "2x";
+
+    oscillator.connect(
+      modulationDepth
+    );
+    modulationDepth.connect(
+      ring.gain
+    );
+    ring.connect(filter);
+    filter.connect(shaper);
+
+    oscillator.start(startTime);
+    oscillator.stop(stopTime);
+
+    return {
+      input: ring,
+      output: shaper,
+      nodes: [
+        ring,
+        modulationDepth,
+        filter,
+        shaper
+      ],
+      sources: [oscillator]
+    };
+  }
+
+  function createCharacterEffectChain(
+    audioContext,
+    preset,
+    startTime,
+    stopTime
+  ) {
+    if (
+      preset.characterEffect === "alien" ||
+      preset.characterEffect === "alien_echo"
+    ) {
+      return createAlienEffectChain(
+        audioContext,
+        preset,
+        startTime,
+        stopTime
+      );
+    }
+
+    if (
+      preset.characterEffect === "robot"
+    ) {
+      return createRobotEffectChain(
+        audioContext,
+        preset,
+        startTime,
+        stopTime
+      );
+    }
+
+    return null;
+  }
+
   async function playRecordedVerse(
     blob,
     presetName
@@ -388,6 +725,16 @@
         audioBuffer.duration /
           preset.speed
       );
+    const tailSeconds =
+      Math.max(
+        0,
+        Number(preset.tailSeconds) || 0
+      );
+    const effectStopTime =
+      startTime +
+      expectedDuration +
+      tailSeconds +
+      0.25;
 
     if (preset.pitchTargets?.length) {
       scheduleDynamicPitch(
@@ -405,7 +752,22 @@
     }
 
     source.connect(soundTouch);
-    soundTouch.connect(gain);
+    const effectChain =
+      createCharacterEffectChain(
+        runtime.context,
+        preset,
+        startTime,
+        effectStopTime
+      );
+
+    if (effectChain) {
+      soundTouch.connect(
+        effectChain.input
+      );
+      effectChain.output.connect(gain);
+    } else {
+      soundTouch.connect(gain);
+    }
     gain.connect(
       runtime.context.destination
     );
@@ -415,6 +777,10 @@
         source,
         soundTouch,
         gain,
+        effectNodes:
+          effectChain?.nodes || [],
+        effectSources:
+          effectChain?.sources || [],
         finishTimer: null,
         resolve
       };
@@ -435,7 +801,10 @@
         playback.finishTimer =
           window.setTimeout(
             finish,
-            180
+            Math.max(
+              180,
+              tailSeconds * 1000
+            )
           );
       };
 
@@ -474,6 +843,10 @@
             category: preset.category,
             description:
               preset.description,
+            pitchLabel:
+              preset.pitchLabel || "",
+            characterLabel:
+              preset.characterLabel || "",
             semitones:
               preset.semitones,
             speed: preset.speed

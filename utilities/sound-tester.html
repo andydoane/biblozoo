@@ -405,13 +405,20 @@
       }
 
       function presetButton(preset) {
+        const pitchLabel =
+          preset.pitchLabel ||
+          signed(preset.semitones);
+
         return `
           <button class="effect-card" type="button" data-preset="${escapeHtml(preset.id)}" disabled>
             <span class="effect-name">${escapeHtml(preset.label)}</span>
             <span class="effect-copy">${escapeHtml(preset.description)}</span>
             <span class="effect-values">
-              <span class="chip">Pitch ${escapeHtml(signed(preset.semitones))}</span>
+              <span class="chip">Pitch ${escapeHtml(pitchLabel)}</span>
               <span class="chip">Speed ${escapeHtml(Number(preset.speed).toFixed(2))}×</span>
+              ${preset.characterLabel
+                ? `<span class="chip">${escapeHtml(preset.characterLabel)}</span>`
+                : ""}
             </span>
           </button>
         `;
