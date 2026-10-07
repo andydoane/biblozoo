@@ -73,6 +73,16 @@
   overflow-wrap: anywhere;
 }
 
+.daily-zoo-todo-verse-ref {
+  max-width: 100%;
+  color: #333333;
+  font-size: clamp(28px, 7vw, 44px);
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
 .daily-zoo-todo-heading {
   width: min(100%, 420px);
   margin:

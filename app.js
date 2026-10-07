@@ -157,7 +157,7 @@ function revealAppPageWhenReady() {
 }
 
 function navigateToExternalPage(href) {
-  if (appPageTransitionStarted) return;
+  if (appPageTransitionStarted) return false;
 
   appPageTransitionStarted = true;
 
@@ -180,7 +180,65 @@ function navigateToExternalPage(href) {
       requestAnimationFrame(beginPageFade);
     });
   }
+
+  return true;
 }
+
+function transitionToAppScreen(screen) {
+  if (
+    appPageTransitionStarted ||
+    State.isSliding
+  ) {
+    return false;
+  }
+
+  appPageTransitionStarted = true;
+  setAppPageTransitionChromeBlack(true);
+
+  const revealDestination = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.body.classList.add(
+          "page-transition-ready"
+        );
+
+        const transitionDelay =
+          getAppPageTransitionDelayMs();
+
+        window.setTimeout(() => {
+          setAppPageTransitionChromeBlack(false);
+          appPageTransitionStarted = false;
+        }, transitionDelay);
+      });
+    });
+  };
+
+  const beginPageFade = () => {
+    document.body.classList.remove(
+      "page-transition-ready"
+    );
+
+    window.setTimeout(() => {
+      setScreen(screen);
+      revealDestination();
+    }, getAppPageTransitionDelayMs());
+  };
+
+  if (IS_NATIVE_CAPACITOR) {
+    beginPageFade();
+  } else {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(beginPageFade);
+    });
+  }
+
+  return true;
+}
+
+window.BibloZooAppPageTransitions =
+  Object.freeze({
+    navigateToExternalPage
+  });
 
 setAppPageTransitionChromeBlack(true);
 revealAppPageWhenReady();
@@ -5018,7 +5076,9 @@ function startDailyTodoFlashcard(
   }
 
   setDailyTodoActualPreviewMode();
-  go(Screen.FLASHCARDS);
+  transitionToAppScreen(
+    Screen.FLASHCARDS
+  );
   return true;
 }
 
@@ -5252,7 +5312,9 @@ function startDailyTodoQuestions(
   }
 
   setDailyTodoActualPreviewMode();
-  go(Screen.DAILY_SESSION);
+  transitionToAppScreen(
+    Screen.DAILY_SESSION
+  );
   return true;
 }
 
@@ -15800,6 +15862,11 @@ function screenTodoDev(idx) {
             window.BibloZooDailyTodo,
           petName: dailyVerseId
             ? getBibloPetDisplayNameForVerseId(
+                dailyVerseId
+              )
+            : "",
+          verseRef: dailyVerseId
+            ? getZooTodoVerseRef(
                 dailyVerseId
               )
             : "",

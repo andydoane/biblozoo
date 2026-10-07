@@ -458,7 +458,16 @@
   }
 
   function navigate(href) {
+    const transition =
+      root.BibloZooAppPageTransitions
+        ?.navigateToExternalPage;
+
+    if (typeof transition === "function") {
+      return transition(href);
+    }
+
     root.location.href = href;
+    return true;
   }
 
   async function launchAssignedActivity({

@@ -1668,6 +1668,7 @@
     plan = null,
     engine = null,
     petName = "",
+    verseRef = "",
     petVisualHtml = "",
     gameRegistry = [],
     playgroundRegistry = []
@@ -1803,6 +1804,7 @@
       plan: cloneJson(plan),
       engine,
       petName,
+      verseRef,
       petVisualHtml,
       gameRegistry,
       playgroundRegistry,
@@ -1821,6 +1823,12 @@
         <div class="daily-zoo-todo-pet-name">
           ${escapeHtml(petName || "BibloPet")}
         </div>
+
+        ${verseRef ? `
+          <div class="daily-zoo-todo-verse-ref">
+            ${escapeHtml(verseRef)}
+          </div>
+        ` : ""}
       </div>
 
       <div class="daily-zoo-todo-heading">
