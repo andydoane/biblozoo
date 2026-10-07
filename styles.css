@@ -1080,7 +1080,7 @@ nav#navBar {
   object-fit: contain;
 }
 
-.daily-home-offer-pet-profile {
+.profile-picture-visual.daily-home-offer-pet-profile {
   width: clamp(112px, 30vw, 174px);
   aspect-ratio: 1;
   flex: 0 0 auto;
@@ -1115,8 +1115,8 @@ nav#navBar {
 
 .daily-home-offer-greeting {
   color: #5d526b;
-  font-size: 0.72em;
-  line-height: 1.12;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .daily-home-offer-name {
@@ -1126,9 +1126,9 @@ nav#navBar {
 
 .daily-home-offer-copy {
   width: 100%;
-  font-size: clamp(19px, 4.5vw, 26px);
+  font-size: clamp(23px, 5.5vw, 34px);
   font-weight: 900;
-  line-height: 1.15;
+  line-height: 1.05;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -1148,14 +1148,14 @@ nav#navBar {
   cursor: pointer;
 }
 
-.daily-home-offer-ready {
+.daily-home-offer-actions .daily-home-offer-ready {
   width: min(100%, 330px);
   min-height: 58px;
   border-radius: 999px;
   padding: 10px 22px;
   background: #7f66c6;
   color: #ffffff;
-  font-size: clamp(19px, 4.5vw, 24px);
+  font-size: clamp(20px, 4.8vw, 32px);
   box-shadow: 0 6px 0 #58449b;
 }
 
@@ -1164,7 +1164,7 @@ nav#navBar {
   box-shadow: 0 3px 0 #58449b;
 }
 
-.daily-home-offer-later {
+.daily-home-offer-actions .daily-home-offer-later {
   min-width: 96px;
   min-height: 44px;
   border-radius: 0;
@@ -1190,7 +1190,7 @@ nav#navBar {
     padding-block: 16px;
   }
 
-  .daily-home-offer-pet-profile {
+  .profile-picture-visual.daily-home-offer-pet-profile {
     width: 94px;
   }
 
