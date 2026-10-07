@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en" style="background:#11151b">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#11151b">
+  <title>BibloZoo Sound Tester</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #11151b;
+      --panel: #1a2029;
+      --panel-2: #212936;
+      --text: #eef3f8;
+      --muted: #a8b3c2;
+      --border: #364152;
+      --accent: #7ec8ff;
+      --green: #5fd38d;
+      --yellow: #f4cc67;
+      --red: #ff7d7d;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      width: min(980px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    h1,
+    h2,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 6px;
+      font-size: clamp(28px, 5vw, 42px);
+      line-height: 1.1;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: 21px;
+    }
+
+    .subhead {
+      max-width: 760px;
+      margin-bottom: 20px;
+      color: var(--muted);
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .btn {
+      min-height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 9px 14px;
+      font-weight: 750;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .btn:hover:not(:disabled),
+    .btn:focus-visible {
+      border-color: var(--accent);
+    }
+
+    .btn.primary {
+      border-color: transparent;
+      background: var(--accent);
+      color: #07131c;
+    }
+
+    .btn.stop {
+      border-color: color-mix(in srgb, var(--red) 60%, var(--border));
+    }
+
+    .btn:disabled {
+      cursor: default;
+      opacity: .45;
+    }
+
+    .panel {
+      margin-bottom: 18px;
+      border: 1px solid var(--border);
+      border-radius: 17px;
+      background: var(--panel);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .record-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .status {
+      min-height: 24px;
+      margin: 0;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    .status.good {
+      color: var(--green);
+    }
+
+    .status.warn {
+      color: var(--yellow);
+    }
+
+    .status.bad {
+      color: var(--red);
+    }
+
+    .record-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 9px;
+    }
+
+    .meter {
+      display: flex;
+      align-items: end;
+      gap: 4px;
+      height: 38px;
+      margin-top: 15px;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #10151c;
+      overflow: hidden;
+    }
+
+    .meter i {
+      flex: 1;
+      min-width: 3px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--green);
+      transition: height 70ms linear, background-color 70ms linear;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .effect-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 11px;
+    }
+
+    .effect-card {
+      width: 100%;
+      min-height: 126px;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 13px;
+      text-align: left;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .effect-card:hover:not(:disabled),
+    .effect-card:focus-visible {
+      border-color: var(--accent);
+    }
+
+    .effect-card.active {
+      border-color: var(--green);
+      box-shadow: inset 0 0 0 1px var(--green);
+    }
+
+    .effect-card:disabled {
+      cursor: default;
+      opacity: .42;
+    }
+
+    .effect-name {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .effect-copy {
+      display: block;
+      min-height: 40px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .effect-values {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 9px;
+    }
+
+    .chip {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .privacy-note {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 760px) {
+      .effect-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .record-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .record-actions {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page {
+        width: min(100% - 20px, 980px);
+      }
+
+      .panel {
+        padding: 14px;
+      }
+
+      .effect-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .effect-card {
+        min-height: 0;
+      }
+
+      .effect-copy {
+        min-height: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page">
+    <header>
+      <h1>Sound Tester</h1>
+      <p class="subhead">
+        Record one short voice sample, then compare normal playback, every current Wacky Replay effect,
+        and several experimental SoundTouch combinations.
+      </p>
+    </header>
+
+    <nav class="nav" aria-label="Utilities">
+      <button class="btn" id="backBtn" type="button">Back to Utilities</button>
+      <button class="btn primary" type="button" aria-current="page">Sound Tester</button>
+    </nav>
+
+    <section class="panel" aria-labelledby="recordHeading">
+      <div class="record-grid">
+        <div>
+          <h2 id="recordHeading">1. Record your voice</h2>
+          <p class="status" id="statusText" role="status" aria-live="polite">
+            Record a short sample to begin.
+          </p>
+        </div>
+        <div class="record-actions">
+          <button class="btn primary" id="recordBtn" type="button">Record</button>
+          <button class="btn stop" id="stopRecordBtn" type="button" disabled>Stop Recording</button>
+          <button class="btn" id="stopPlaybackBtn" type="button" disabled>Stop Playback</button>
+        </div>
+      </div>
+      <div class="meter" id="meter" aria-label="Microphone level">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="normalHeading">
+      <h2 id="normalHeading">2. Normal playback</h2>
+      <p class="section-note">Use this as the reference when comparing effects.</p>
+      <div class="effect-grid">
+        <button class="effect-card" id="normalPlaybackBtn" type="button" disabled>
+          <span class="effect-name">Normal Playback</span>
+          <span class="effect-copy">Your original recording with no pitch or speed changes.</span>
+          <span class="effect-values"><span class="chip">Original audio</span></span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="currentHeading">
+      <h2 id="currentHeading">3. Current Wacky Replay effects</h2>
+      <p class="section-note">These are the six effects currently available in Flashcards.</p>
+      <div class="effect-grid" id="currentEffects"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="experimentalHeading">
+      <h2 id="experimentalHeading">4. Experimental options</h2>
+      <p class="section-note">
+        These stay inside the tester. Trying them here does not add them to Wacky Replay.
+      </p>
+      <div class="effect-grid" id="experimentalEffects"></div>
+    </section>
+
+    <section class="panel">
+      <p class="privacy-note">
+        This recording remains only in memory. It is not saved, uploaded, or included in backups,
+        and it is discarded when you leave this page.
+      </p>
+    </section>
+  </main>
+
+  <script src="../flashcards/audio-effects.js"></script>
+  <script src="../flashcards/recording.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const statusText = document.getElementById("statusText");
+      const recordBtn = document.getElementById("recordBtn");
+      const stopRecordBtn = document.getElementById("stopRecordBtn");
+      const stopPlaybackBtn = document.getElementById("stopPlaybackBtn");
+      const normalPlaybackBtn = document.getElementById("normalPlaybackBtn");
+      const currentEffects = document.getElementById("currentEffects");
+      const experimentalEffects = document.getElementById("experimentalEffects");
+      const meterBars = [...document.querySelectorAll("#meter i")];
+
+      let activeEffect = "";
+      let notice = "";
+      let noticeTone = "";
+      let playbackRequest = 0;
+      let meterFrame = 0;
+
+      const effects = window.BibloZooAudioEffects;
+      const presets = effects?.getPresets?.() || [];
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function signed(value) {
+        const number = Number(value) || 0;
+        return number > 0 ? `+${number}` : String(number);
+      }
+
+      function presetButton(preset) {
+        return `
+          <button class="effect-card" type="button" data-preset="${escapeHtml(preset.id)}" disabled>
+            <span class="effect-name">${escapeHtml(preset.label)}</span>
+            <span class="effect-copy">${escapeHtml(preset.description)}</span>
+            <span class="effect-values">
+              <span class="chip">Pitch ${escapeHtml(signed(preset.semitones))}</span>
+              <span class="chip">Speed ${escapeHtml(Number(preset.speed).toFixed(2))}×</span>
+            </span>
+          </button>
+        `;
+      }
+
+      currentEffects.innerHTML = presets
+        .filter((preset) => preset.category === "current")
+        .map(presetButton)
+        .join("");
+
+      experimentalEffects.innerHTML = presets
+        .filter((preset) => preset.category === "experimental")
+        .map(presetButton)
+        .join("");
+
+      const recording = window.BibloZooRecording.create({
+        onChange: render,
+        onInterrupted: () => {
+          activeEffect = "";
+          notice = "Recording was interrupted. Please try again.";
+          noticeTone = "warn";
+          render();
+        }
+      });
+
+      function stopMeter() {
+        cancelAnimationFrame(meterFrame);
+        meterFrame = 0;
+        meterBars.forEach((bar) => {
+          bar.style.height = "4px";
+          bar.style.backgroundColor = "";
+        });
+      }
+
+      function updateMeter() {
+        cancelAnimationFrame(meterFrame);
+        meterFrame = 0;
+
+        if (recording.snapshot().status !== "recording") {
+          stopMeter();
+          return;
+        }
+
+        const level = recording.readLevel();
+        const normalized = Number.isFinite(level) ? level : 0.08;
+
+        meterBars.forEach((bar, index) => {
+          const threshold = index / meterBars.length;
+          const amount = Math.max(0.08, Math.min(1, normalized * 1.65 - threshold * .55));
+          bar.style.height = `${4 + amount * 25}px`;
+          bar.style.backgroundColor = amount > .72 ? "var(--yellow)" : "var(--green)";
+        });
+
+        meterFrame = requestAnimationFrame(updateMeter);
+      }
+
+      function statusCopy(snapshot) {
+        if (notice) return notice;
+        if (snapshot.message) return snapshot.message;
+        if (activeEffect) {
+          const preset = presets.find((item) => item.id === activeEffect);
+          return `Playing ${preset?.label || "effect"}…`;
+        }
+
+        return {
+          idle: "Record a short sample to begin.",
+          requesting: "Waiting for microphone permission…",
+          preparing: "Preparing the microphone…",
+          recording: `Recording… ${snapshot.remainingSeconds ?? 30} seconds remaining`,
+          stopping: "Finishing your recording…",
+          ready: "Recording ready. Choose any playback option below.",
+          loading: "Loading normal playback…",
+          playing: "Playing the normal recording…"
+        }[snapshot.status] || "Ready.";
+      }
+
+      function render() {
+        const snapshot = recording.snapshot();
+        const recordingBusy = ["requesting", "preparing", "recording", "stopping"].includes(snapshot.status);
+        const hasRecording = snapshot.hasRecording;
+        const normalPlaying = snapshot.status === "playing" || snapshot.status === "loading";
+        const anyPlayback = normalPlaying || !!activeEffect;
+
+        statusText.textContent = statusCopy(snapshot);
+        statusText.className = `status${noticeTone ? ` ${noticeTone}` : hasRecording ? " good" : ""}`;
+
+        recordBtn.textContent = hasRecording ? "Re-record" : "Record";
+        recordBtn.disabled = recordingBusy;
+        stopRecordBtn.disabled = snapshot.status !== "recording";
+        stopPlaybackBtn.disabled = !anyPlayback;
+        normalPlaybackBtn.disabled = !hasRecording || recordingBusy;
+        normalPlaybackBtn.classList.toggle("active", normalPlaying);
+
+        document.querySelectorAll("[data-preset]").forEach((button) => {
+          const presetId = button.dataset.preset || "";
+          button.disabled = !hasRecording || recordingBusy || !effects?.isSupported?.();
+          button.classList.toggle("active", activeEffect === presetId);
+        });
+
+        if (snapshot.status === "recording" && !meterFrame) {
+          meterFrame = requestAnimationFrame(updateMeter);
+        } else if (snapshot.status !== "recording") {
+          stopMeter();
+        }
+      }
+
+      async function beginRecording() {
+        playbackRequest += 1;
+        activeEffect = "";
+        notice = "";
+        noticeTone = "";
+
+        const result = await recording.start(
+          render,
+          null,
+          () => 30000
+        );
+
+        if (result === "permission-denied") {
+          notice = "Microphone permission was denied. Enable it in device or browser settings, then try again.";
+          noticeTone = "bad";
+        } else if (result === "failed") {
+          notice = "The microphone or recorder is unavailable on this device.";
+          noticeTone = "bad";
+        }
+
+        render();
+      }
+
+      function stopPlayback() {
+        playbackRequest += 1;
+        activeEffect = "";
+        recording.pause();
+        recording.stopFun();
+        render();
+      }
+
+      async function playEffect(presetId) {
+        if (activeEffect === presetId) {
+          stopPlayback();
+          return;
+        }
+
+        const request = ++playbackRequest;
+        notice = "";
+        noticeTone = "";
+        recording.pause();
+        recording.stopFun();
+        activeEffect = presetId;
+        render();
+
+        const completed = await recording.playFun(presetId);
+        if (request !== playbackRequest) return;
+
+        activeEffect = "";
+        if (!completed) {
+          notice = "That effect could not play. Try it again or choose another option.";
+          noticeTone = "warn";
+        }
+        render();
+      }
+
+      recordBtn.addEventListener("click", beginRecording);
+      stopRecordBtn.addEventListener("click", () => recording.stop());
+      stopPlaybackBtn.addEventListener("click", stopPlayback);
+
+      normalPlaybackBtn.addEventListener("click", () => {
+        notice = "";
+        noticeTone = "";
+        if (activeEffect) stopPlayback();
+        void recording.play();
+      });
+
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-preset]");
+        if (!button || button.disabled) return;
+        void playEffect(button.dataset.preset || "");
+      });
+
+      document.getElementById("backBtn").addEventListener("click", () => {
+        recording.dispose();
+        location.href = "index.html";
+      });
+
+      window.addEventListener("pagehide", () => {
+        recording.dispose();
+      });
+
+      if (!effects?.isSupported?.()) {
+        notice = "Normal playback is available, but SoundTouch effects are not supported in this browser.";
+        noticeTone = "warn";
+      }
+
+      render();
+    })();
+  </script>
+</body>
+
+</html>

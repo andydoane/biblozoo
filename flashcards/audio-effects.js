@@ -25,29 +25,112 @@
 
   const PRESETS = Object.freeze({
     squirrel: Object.freeze({
+      label: "Squirrel",
+      category: "current",
+      description: "Higher and a little faster.",
       semitones: 9,
       speed: 1.15
     }),
     giant: Object.freeze({
+      label: "Giant",
+      category: "current",
+      description: "Lower and slightly slower.",
       semitones: -7,
       speed: 0.9
     }),
     monster: Object.freeze({
+      label: "Monster",
+      category: "current",
+      description: "Very low and heavy.",
       semitones: -10,
       speed: 0.85
     }),
     turtle: Object.freeze({
+      label: "Turtle",
+      category: "current",
+      description: "Slow with the original pitch.",
       semitones: 0,
       speed: 0.65
     }),
     rocket: Object.freeze({
+      label: "Rocket",
+      category: "current",
+      description: "Fast with the original pitch.",
       semitones: 0,
       speed: 1.65
     }),
     wacky: Object.freeze({
+      label: "Wacky",
+      category: "current",
+      description: "Pitch swoops up and down.",
       semitones: 0,
       speed: 1,
-      dynamicPitch: true
+      pitchTargets: Object.freeze([
+        7, -5, 8, -7, 6, -4
+      ]),
+      pitchStepSeconds: 0.7
+    }),
+    helium: Object.freeze({
+      label: "Helium",
+      category: "experimental",
+      description: "One octave higher at normal speed.",
+      semitones: 12,
+      speed: 1
+    }),
+    deep_voice: Object.freeze({
+      label: "Deep Voice",
+      category: "experimental",
+      description: "Lower pitch without slowing down.",
+      semitones: -5,
+      speed: 1
+    }),
+    sleepy: Object.freeze({
+      label: "Sleepy",
+      category: "experimental",
+      description: "Extra slow with a small pitch drop.",
+      semitones: -3,
+      speed: 0.55
+    }),
+    speedster: Object.freeze({
+      label: "Speedster",
+      category: "experimental",
+      description: "Fast and slightly higher.",
+      semitones: 4,
+      speed: 1.35
+    }),
+    roller_coaster: Object.freeze({
+      label: "Roller Coaster",
+      category: "experimental",
+      description: "Wide, smooth pitch climbs and dives.",
+      semitones: 0,
+      speed: 1,
+      pitchTargets: Object.freeze([
+        12, -12, 10, -10
+      ]),
+      pitchStepSeconds: 0.75
+    }),
+    staircase: Object.freeze({
+      label: "Staircase",
+      category: "experimental",
+      description: "Climbs upward in distinct pitch steps.",
+      semitones: 0,
+      speed: 1,
+      pitchTargets: Object.freeze([
+        -12, -8, -4, 0, 4, 8, 12
+      ]),
+      pitchStepSeconds: 0.45,
+      steppedPitch: true
+    }),
+    wobble: Object.freeze({
+      label: "Wobble",
+      category: "experimental",
+      description: "A quick, gentle pitch wobble.",
+      semitones: 0,
+      speed: 1,
+      pitchTargets: Object.freeze([
+        3, -3
+      ]),
+      pitchStepSeconds: 0.22
     })
   });
 
@@ -187,17 +270,13 @@
   function scheduleDynamicPitch(
     parameter,
     startTime,
-    duration
+    duration,
+    preset
   ) {
-    const targets = [
-      7,
-      -5,
-      8,
-      -7,
-      6,
-      -4
-    ];
-    const stepSeconds = 0.7;
+    const targets =
+      preset.pitchTargets;
+    const stepSeconds =
+      preset.pitchStepSeconds;
 
     parameter.cancelScheduledValues(
       startTime
@@ -214,12 +293,22 @@
       offset < duration;
       offset += stepSeconds
     ) {
-      parameter.linearRampToValueAtTime(
+      const target =
         targets[
           targetIndex % targets.length
-        ],
-        startTime + offset
-      );
+        ];
+
+      if (preset.steppedPitch) {
+        parameter.setValueAtTime(
+          target,
+          startTime + offset
+        );
+      } else {
+        parameter.linearRampToValueAtTime(
+          target,
+          startTime + offset
+        );
+      }
       targetIndex += 1;
     }
 
@@ -300,11 +389,12 @@
           preset.speed
       );
 
-    if (preset.dynamicPitch) {
+    if (preset.pitchTargets?.length) {
       scheduleDynamicPitch(
         soundTouch.pitchSemitones,
         startTime,
-        expectedDuration
+        expectedDuration,
+        preset
       );
     } else {
       soundTouch.pitchSemitones
@@ -376,6 +466,19 @@
   window.BibloZooAudioEffects =
     Object.freeze({
       isSupported,
+      getPresets: () =>
+        Object.entries(PRESETS).map(
+          ([id, preset]) => ({
+            id,
+            label: preset.label,
+            category: preset.category,
+            description:
+              preset.description,
+            semitones:
+              preset.semitones,
+            speed: preset.speed
+          })
+        ),
       playRecordedVerse,
       stop
     });

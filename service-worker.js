@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_07_capacitor_mic_skip_a";
+const CACHE_VERSION = "2026_Oct_07_utilities_sound_tester_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -68,6 +68,8 @@ const CORE_PATHS = [
 
   "./site.webmanifest",
   "./privacy_policy.html",
+  "./utilities/index.html",
+  "./utilities/sound-tester.html",
 
   "./verse_fonts/Baloo2.ttf",
 
