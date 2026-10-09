@@ -224,6 +224,166 @@
       filterHz: 1150,
       filterQ: 3.2,
       distortion: 20
+    }),
+    ascending: Object.freeze({
+      label: "Ascending",
+      category: "experimental",
+      description: "Climbs smoothly from very low to very high.",
+      pitchLabel: "-10 → +10",
+      semitones: 0,
+      speed: 1,
+      pitchRampStart: -10,
+      pitchRampEnd: 10
+    }),
+    descending: Object.freeze({
+      label: "Descending",
+      category: "experimental",
+      description: "Falls smoothly from very high to very low.",
+      pitchLabel: "+10 → -10",
+      semitones: 0,
+      speed: 1,
+      pitchRampStart: 10,
+      pitchRampEnd: -10
+    }),
+    old_telephone: Object.freeze({
+      label: "Old Telephone",
+      category: "experimental",
+      description: "A thin, slightly crunchy old phone call.",
+      pitchLabel: "Original",
+      characterLabel: "Phone filter",
+      semitones: 0,
+      speed: 1,
+      characterEffect: "transmission",
+      lowCutHz: 300,
+      highCutHz: 3400,
+      distortion: 4,
+      makeupGain: 2.35
+    }),
+    megaphone: Object.freeze({
+      label: "Megaphone",
+      category: "experimental",
+      description: "A driven public-address voice with short slapback.",
+      pitchLabel: "Original",
+      characterLabel: "Horn + slapback",
+      semitones: 0,
+      speed: 1,
+      characterEffect: "transmission",
+      lowCutHz: 450,
+      highCutHz: 4200,
+      distortion: 25,
+      makeupGain: 2.05,
+      delaySeconds: 0.075,
+      feedback: 0.12,
+      echoMix: 0.28,
+      tailSeconds: 0.35
+    }),
+    eight_bit_voice: Object.freeze({
+      label: "8-Bit Voice",
+      category: "experimental",
+      description: "A blocky retro-game voice with reduced resolution.",
+      pitchLabel: "+2",
+      characterLabel: "5-bit crush",
+      semitones: 2,
+      speed: 1,
+      characterEffect: "bitcrusher",
+      bitDepth: 5,
+      highCutHz: 5200
+    }),
+    demon: Object.freeze({
+      label: "Demon",
+      category: "experimental",
+      description: "A deep, driven voice in a dark cavern.",
+      pitchLabel: "-8",
+      characterLabel: "Dark reverb",
+      semitones: -8,
+      speed: 0.92,
+      characterEffect: "atmosphere",
+      filterType: "lowpass",
+      filterHz: 1500,
+      filterQ: 0.8,
+      distortion: 14,
+      makeupGain: 2.15,
+      dryMix: 0.62,
+      reverbMix: 0.52,
+      reverbSeconds: 2.4,
+      reverbDecay: 2.4,
+      reverbFilterHz: 1800,
+      tailSeconds: 2.4
+    }),
+    ghost: Object.freeze({
+      label: "Ghost",
+      category: "experimental",
+      description: "A wavering, distant voice with echo and reverb.",
+      pitchLabel: "Moving",
+      characterLabel: "Haunted echo",
+      semitones: 0,
+      speed: 0.97,
+      pitchTargets: Object.freeze([
+        2, -1, 1, -2
+      ]),
+      pitchStepSeconds: 0.85,
+      characterEffect: "atmosphere",
+      filterType: "highpass",
+      filterHz: 220,
+      filterQ: 0.7,
+      dryMix: 0.5,
+      reverbMix: 0.48,
+      reverbSeconds: 2.2,
+      reverbDecay: 2,
+      reverbFilterHz: 3000,
+      tremoloHz: 4.2,
+      tremoloDepth: 0.22,
+      delaySeconds: 0.24,
+      feedback: 0.24,
+      echoMix: 0.25,
+      tailSeconds: 2.2
+    }),
+    cave: Object.freeze({
+      label: "Cave",
+      category: "experimental",
+      description: "Your natural voice reflected through a huge cavern.",
+      pitchLabel: "Original",
+      characterLabel: "Long reverb",
+      semitones: 0,
+      speed: 1,
+      characterEffect: "atmosphere",
+      filterType: "lowpass",
+      filterHz: 7200,
+      filterQ: 0.7,
+      dryMix: 0.55,
+      reverbMix: 0.58,
+      reverbSeconds: 3.2,
+      reverbDecay: 1.7,
+      reverbFilterHz: 4200,
+      tailSeconds: 3.2
+    }),
+    frog: Object.freeze({
+      label: "Frog",
+      category: "experimental",
+      description: "A low croak with a quick resonant wobble.",
+      pitchLabel: "-4",
+      characterLabel: "Croak filter",
+      semitones: -4,
+      speed: 0.94,
+      characterEffect: "alien",
+      filterHz: 720,
+      filterDepthHz: 190,
+      filterModulationHz: 5.2
+    }),
+    chorus_alien: Object.freeze({
+      label: "Chorus Alien",
+      category: "experimental",
+      description: "Several swirling alien voices speaking together.",
+      pitchLabel: "+3",
+      characterLabel: "Modulated chorus",
+      semitones: 3,
+      speed: 0.98,
+      characterEffect: "chorus",
+      chorusRateHz: 1.8,
+      chorusDepthSeconds: 0.0045,
+      chorusDelaySeconds: 0.014,
+      chorusWetMix: 0.34,
+      tailSeconds: 0.2
     })
   });
 
@@ -389,6 +549,22 @@
     parameter.cancelScheduledValues(
       startTime
     );
+
+    if (
+      Number.isFinite(preset.pitchRampStart) &&
+      Number.isFinite(preset.pitchRampEnd)
+    ) {
+      parameter.setValueAtTime(
+        preset.pitchRampStart,
+        startTime
+      );
+      parameter.linearRampToValueAtTime(
+        preset.pitchRampEnd,
+        startTime + duration
+      );
+      return;
+    }
+
     parameter.setValueAtTime(
       0,
       startTime
@@ -447,6 +623,462 @@
     }
 
     return curve;
+  }
+
+  function createBitcrusherCurve(
+    bitDepth = 5
+  ) {
+    const bits =
+      Math.max(
+        2,
+        Math.min(12, Number(bitDepth) || 5)
+      );
+    const levels =
+      2 ** (bits - 1);
+    const samples = 65536;
+    const curve =
+      new Float32Array(samples);
+
+    for (let index = 0; index < samples; index += 1) {
+      const value =
+        (index * 2) / (samples - 1) - 1;
+
+      curve[index] =
+        Math.round(value * levels) /
+        levels;
+    }
+
+    return curve;
+  }
+
+  function createReverbImpulse(
+    audioContext,
+    seconds,
+    decay
+  ) {
+    const length =
+      Math.max(
+        1,
+        Math.floor(
+          audioContext.sampleRate * seconds
+        )
+      );
+    const impulse =
+      audioContext.createBuffer(
+        2,
+        length,
+        audioContext.sampleRate
+      );
+    let seed = 0x2f6e2b1;
+
+    for (let channel = 0; channel < 2; channel += 1) {
+      const data =
+        impulse.getChannelData(channel);
+
+      for (let index = 0; index < length; index += 1) {
+        seed =
+          (seed * 1664525 + 1013904223) >>> 0;
+
+        const noise =
+          (seed / 0xffffffff) * 2 - 1;
+        const envelope =
+          (1 - index / length) ** decay;
+
+        data[index] = noise * envelope;
+      }
+    }
+
+    return impulse;
+  }
+
+  function createTransmissionEffectChain(
+    audioContext,
+    preset,
+    startTime
+  ) {
+    const highPass =
+      audioContext.createBiquadFilter();
+    const lowPass =
+      audioContext.createBiquadFilter();
+    const shaper =
+      audioContext.createWaveShaper();
+    const makeup =
+      audioContext.createGain();
+    const nodes = [
+      highPass,
+      lowPass,
+      shaper,
+      makeup
+    ];
+
+    highPass.type = "highpass";
+    highPass.frequency.setValueAtTime(
+      preset.lowCutHz,
+      startTime
+    );
+    highPass.Q.setValueAtTime(
+      0.7,
+      startTime
+    );
+
+    lowPass.type = "lowpass";
+    lowPass.frequency.setValueAtTime(
+      preset.highCutHz,
+      startTime
+    );
+    lowPass.Q.setValueAtTime(
+      0.7,
+      startTime
+    );
+
+    shaper.curve =
+      createDistortionCurve(
+        preset.distortion
+      );
+    shaper.oversample = "2x";
+    makeup.gain.setValueAtTime(
+      preset.makeupGain,
+      startTime
+    );
+
+    highPass.connect(lowPass);
+    lowPass.connect(shaper);
+    shaper.connect(makeup);
+
+    let output = makeup;
+
+    if (preset.delaySeconds) {
+      const dry =
+        audioContext.createGain();
+      const delay =
+        audioContext.createDelay(1);
+      const feedback =
+        audioContext.createGain();
+      const echo =
+        audioContext.createGain();
+      const mix =
+        audioContext.createGain();
+
+      dry.gain.setValueAtTime(
+        0.82,
+        startTime
+      );
+      delay.delayTime.setValueAtTime(
+        preset.delaySeconds,
+        startTime
+      );
+      feedback.gain.setValueAtTime(
+        preset.feedback,
+        startTime
+      );
+      echo.gain.setValueAtTime(
+        preset.echoMix,
+        startTime
+      );
+
+      makeup.connect(dry);
+      dry.connect(mix);
+      makeup.connect(delay);
+      delay.connect(echo);
+      echo.connect(mix);
+      delay.connect(feedback);
+      feedback.connect(delay);
+
+      nodes.push(
+        dry,
+        delay,
+        feedback,
+        echo,
+        mix
+      );
+      output = mix;
+    }
+
+    return {
+      input: highPass,
+      output,
+      nodes,
+      sources: []
+    };
+  }
+
+  function createBitcrusherEffectChain(
+    audioContext,
+    preset,
+    startTime
+  ) {
+    const shaper =
+      audioContext.createWaveShaper();
+    const filter =
+      audioContext.createBiquadFilter();
+
+    shaper.curve =
+      createBitcrusherCurve(
+        preset.bitDepth
+      );
+    shaper.oversample = "none";
+
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(
+      preset.highCutHz,
+      startTime
+    );
+    filter.Q.setValueAtTime(
+      0.75,
+      startTime
+    );
+
+    shaper.connect(filter);
+
+    return {
+      input: shaper,
+      output: filter,
+      nodes: [shaper, filter],
+      sources: []
+    };
+  }
+
+  function createAtmosphereEffectChain(
+    audioContext,
+    preset,
+    startTime,
+    stopTime
+  ) {
+    const input =
+      audioContext.createGain();
+    const filter =
+      audioContext.createBiquadFilter();
+    const dry =
+      audioContext.createGain();
+    const convolver =
+      audioContext.createConvolver();
+    const reverbFilter =
+      audioContext.createBiquadFilter();
+    const wet =
+      audioContext.createGain();
+    const mix =
+      audioContext.createGain();
+    const nodes = [input];
+    const sources = [];
+    let chainOutput = input;
+
+    if (preset.distortion) {
+      const shaper =
+        audioContext.createWaveShaper();
+
+      shaper.curve =
+        createDistortionCurve(
+          preset.distortion
+        );
+      shaper.oversample = "2x";
+      const makeup =
+        audioContext.createGain();
+
+      makeup.gain.setValueAtTime(
+        preset.makeupGain || 2.1,
+        startTime
+      );
+      chainOutput.connect(shaper);
+      shaper.connect(makeup);
+      chainOutput = makeup;
+      nodes.push(shaper, makeup);
+    }
+
+    filter.type = preset.filterType;
+    filter.frequency.setValueAtTime(
+      preset.filterHz,
+      startTime
+    );
+    filter.Q.setValueAtTime(
+      preset.filterQ,
+      startTime
+    );
+    chainOutput.connect(filter);
+    chainOutput = filter;
+    nodes.push(filter);
+
+    if (preset.tremoloHz) {
+      const tremolo =
+        audioContext.createGain();
+      const oscillator =
+        audioContext.createOscillator();
+      const depth =
+        audioContext.createGain();
+
+      tremolo.gain.setValueAtTime(
+        1 - preset.tremoloDepth,
+        startTime
+      );
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        preset.tremoloHz,
+        startTime
+      );
+      depth.gain.setValueAtTime(
+        preset.tremoloDepth,
+        startTime
+      );
+
+      oscillator.connect(depth);
+      depth.connect(tremolo.gain);
+      chainOutput.connect(tremolo);
+      chainOutput = tremolo;
+      oscillator.start(startTime);
+      oscillator.stop(stopTime);
+
+      nodes.push(tremolo, depth);
+      sources.push(oscillator);
+    }
+
+    dry.gain.setValueAtTime(
+      preset.dryMix,
+      startTime
+    );
+    convolver.buffer =
+      createReverbImpulse(
+        audioContext,
+        preset.reverbSeconds,
+        preset.reverbDecay
+      );
+    reverbFilter.type = "lowpass";
+    reverbFilter.frequency.setValueAtTime(
+      preset.reverbFilterHz,
+      startTime
+    );
+    reverbFilter.Q.setValueAtTime(
+      0.7,
+      startTime
+    );
+    wet.gain.setValueAtTime(
+      preset.reverbMix,
+      startTime
+    );
+
+    chainOutput.connect(dry);
+    dry.connect(mix);
+    chainOutput.connect(convolver);
+    convolver.connect(reverbFilter);
+    reverbFilter.connect(wet);
+    wet.connect(mix);
+
+    nodes.push(
+      dry,
+      convolver,
+      reverbFilter,
+      wet,
+      mix
+    );
+
+    if (preset.delaySeconds) {
+      const delay =
+        audioContext.createDelay(1);
+      const feedback =
+        audioContext.createGain();
+      const echo =
+        audioContext.createGain();
+
+      delay.delayTime.setValueAtTime(
+        preset.delaySeconds,
+        startTime
+      );
+      feedback.gain.setValueAtTime(
+        preset.feedback,
+        startTime
+      );
+      echo.gain.setValueAtTime(
+        preset.echoMix,
+        startTime
+      );
+
+      chainOutput.connect(delay);
+      delay.connect(echo);
+      echo.connect(mix);
+      delay.connect(feedback);
+      feedback.connect(delay);
+      nodes.push(delay, feedback, echo);
+    }
+
+    return {
+      input,
+      output: mix,
+      nodes,
+      sources
+    };
+  }
+
+  function createChorusEffectChain(
+    audioContext,
+    preset,
+    startTime,
+    stopTime
+  ) {
+    const input =
+      audioContext.createGain();
+    const dry =
+      audioContext.createGain();
+    const mix =
+      audioContext.createGain();
+    const nodes = [input, dry, mix];
+    const sources = [];
+
+    dry.gain.setValueAtTime(
+      0.68,
+      startTime
+    );
+    input.connect(dry);
+    dry.connect(mix);
+
+    for (let voice = 0; voice < 2; voice += 1) {
+      const delay =
+        audioContext.createDelay(0.1);
+      const wet =
+        audioContext.createGain();
+      const oscillator =
+        audioContext.createOscillator();
+      const depth =
+        audioContext.createGain();
+      const voiceScale =
+        voice ? 1.35 : 1;
+
+      delay.delayTime.setValueAtTime(
+        preset.chorusDelaySeconds *
+          voiceScale,
+        startTime
+      );
+      wet.gain.setValueAtTime(
+        preset.chorusWetMix,
+        startTime
+      );
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        preset.chorusRateHz *
+          (voice ? 1.17 : 1),
+        startTime
+      );
+      depth.gain.setValueAtTime(
+        preset.chorusDepthSeconds *
+          (voice ? -0.86 : 1),
+        startTime
+      );
+
+      oscillator.connect(depth);
+      depth.connect(delay.delayTime);
+      input.connect(delay);
+      delay.connect(wet);
+      wet.connect(mix);
+      oscillator.start(startTime);
+      oscillator.stop(stopTime);
+
+      nodes.push(delay, wet, depth);
+      sources.push(oscillator);
+    }
+
+    return {
+      input,
+      output: mix,
+      nodes,
+      sources
+    };
   }
 
   function createAlienEffectChain(
@@ -652,6 +1284,51 @@
       );
     }
 
+    if (
+      preset.characterEffect ===
+      "transmission"
+    ) {
+      return createTransmissionEffectChain(
+        audioContext,
+        preset,
+        startTime
+      );
+    }
+
+    if (
+      preset.characterEffect ===
+      "bitcrusher"
+    ) {
+      return createBitcrusherEffectChain(
+        audioContext,
+        preset,
+        startTime
+      );
+    }
+
+    if (
+      preset.characterEffect ===
+      "atmosphere"
+    ) {
+      return createAtmosphereEffectChain(
+        audioContext,
+        preset,
+        startTime,
+        stopTime
+      );
+    }
+
+    if (
+      preset.characterEffect === "chorus"
+    ) {
+      return createChorusEffectChain(
+        audioContext,
+        preset,
+        startTime,
+        stopTime
+      );
+    }
+
     return null;
   }
 
@@ -736,7 +1413,17 @@
       tailSeconds +
       0.25;
 
-    if (preset.pitchTargets?.length) {
+    if (
+      preset.pitchTargets?.length ||
+      (
+        Number.isFinite(
+          preset.pitchRampStart
+        ) &&
+        Number.isFinite(
+          preset.pitchRampEnd
+        )
+      )
+    ) {
       scheduleDynamicPitch(
         soundTouch.pitchSemitones,
         startTime,
