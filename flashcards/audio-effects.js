@@ -23,45 +23,56 @@
     vendorRoot
   ).href;
 
+  const OFFICIAL_PRESET_IDS =
+    Object.freeze([
+      "squirrel",
+      "giant",
+      "sleepy",
+      "rocket",
+      "roller_coaster",
+      "ascending",
+      "descending",
+      "demon",
+      "chorus_alien",
+      "cave"
+    ]);
+
+  const OFFICIAL_PRESET_SET =
+    new Set(OFFICIAL_PRESET_IDS);
+
   const PRESETS = Object.freeze({
     squirrel: Object.freeze({
       label: "Squirrel",
-      category: "current",
       description: "Higher and a little faster.",
       semitones: 9,
       speed: 1.15
     }),
     giant: Object.freeze({
       label: "Giant",
-      category: "current",
       description: "Lower and slightly slower.",
       semitones: -7,
       speed: 0.9
     }),
     monster: Object.freeze({
       label: "Monster",
-      category: "current",
       description: "Very low and heavy.",
       semitones: -10,
       speed: 0.85
     }),
     turtle: Object.freeze({
       label: "Turtle",
-      category: "current",
       description: "Slow with the original pitch.",
       semitones: 0,
       speed: 0.65
     }),
     rocket: Object.freeze({
       label: "Rocket",
-      category: "current",
-      description: "Fast with the original pitch.",
-      semitones: 0,
+      description: "Fast with a higher pitch.",
+      semitones: 4,
       speed: 1.65
     }),
     wacky: Object.freeze({
       label: "Wacky",
-      category: "current",
       description: "Pitch swoops up and down.",
       semitones: 0,
       speed: 1,
@@ -72,35 +83,30 @@
     }),
     helium: Object.freeze({
       label: "Helium",
-      category: "experimental",
       description: "One octave higher at normal speed.",
       semitones: 12,
       speed: 1
     }),
     deep_voice: Object.freeze({
       label: "Deep Voice",
-      category: "experimental",
       description: "Lower pitch without slowing down.",
       semitones: -5,
       speed: 1
     }),
     sleepy: Object.freeze({
       label: "Sleepy",
-      category: "experimental",
       description: "Extra slow with a small pitch drop.",
       semitones: -3,
       speed: 0.55
     }),
     speedster: Object.freeze({
       label: "Speedster",
-      category: "experimental",
       description: "Fast and slightly higher.",
       semitones: 4,
       speed: 1.35
     }),
     roller_coaster: Object.freeze({
       label: "Roller Coaster",
-      category: "experimental",
       description: "Wide, smooth pitch climbs and dives.",
       semitones: 0,
       speed: 1,
@@ -111,7 +117,6 @@
     }),
     staircase: Object.freeze({
       label: "Staircase",
-      category: "experimental",
       description: "Climbs upward in distinct pitch steps.",
       semitones: 0,
       speed: 1,
@@ -123,7 +128,6 @@
     }),
     wobble: Object.freeze({
       label: "Wobble",
-      category: "experimental",
       description: "A quick, gentle pitch wobble.",
       semitones: 0,
       speed: 1,
@@ -134,7 +138,6 @@
     }),
     alien: Object.freeze({
       label: "Alien",
-      category: "experimental",
       description: "A shifting voice with a sweeping space filter.",
       pitchLabel: "Moving",
       characterLabel: "Alien filter",
@@ -151,7 +154,6 @@
     }),
     alien_echo: Object.freeze({
       label: "Alien Echo",
-      category: "experimental",
       description: "A high alien voice with a fading space echo.",
       pitchLabel: "+7",
       characterLabel: "Echo",
@@ -167,7 +169,6 @@
     }),
     classic_robot: Object.freeze({
       label: "Classic Robot",
-      category: "experimental",
       description: "Metallic voice modulation with a focused robot tone.",
       pitchLabel: "Original",
       characterLabel: "42 Hz robot",
@@ -182,7 +183,6 @@
     }),
     tiny_robot: Object.freeze({
       label: "Tiny Robot",
-      category: "experimental",
       description: "A small, bright robot with faster metallic motion.",
       pitchLabel: "+7",
       characterLabel: "72 Hz robot",
@@ -197,7 +197,6 @@
     }),
     deep_robot: Object.freeze({
       label: "Deep Robot",
-      category: "experimental",
       description: "A slower, lower machine voice with a dark tone.",
       pitchLabel: "-7",
       characterLabel: "28 Hz robot",
@@ -212,7 +211,6 @@
     }),
     robot_radio: Object.freeze({
       label: "Robot Radio",
-      category: "experimental",
       description: "A narrow, crunchy robot voice from an old radio.",
       pitchLabel: "-2",
       characterLabel: "Radio filter",
@@ -227,7 +225,6 @@
     }),
     ascending: Object.freeze({
       label: "Ascending",
-      category: "experimental",
       description: "Climbs smoothly from very low to very high.",
       pitchLabel: "-10 → +10",
       semitones: 0,
@@ -237,7 +234,6 @@
     }),
     descending: Object.freeze({
       label: "Descending",
-      category: "experimental",
       description: "Falls smoothly from very high to very low.",
       pitchLabel: "+10 → -10",
       semitones: 0,
@@ -247,7 +243,6 @@
     }),
     old_telephone: Object.freeze({
       label: "Old Telephone",
-      category: "experimental",
       description: "A thin, slightly crunchy old phone call.",
       pitchLabel: "Original",
       characterLabel: "Phone filter",
@@ -261,7 +256,6 @@
     }),
     megaphone: Object.freeze({
       label: "Megaphone",
-      category: "experimental",
       description: "A driven public-address voice with short slapback.",
       pitchLabel: "Original",
       characterLabel: "Horn + slapback",
@@ -279,7 +273,6 @@
     }),
     eight_bit_voice: Object.freeze({
       label: "8-Bit Voice",
-      category: "experimental",
       description: "A blocky retro-game voice with reduced resolution.",
       pitchLabel: "+2",
       characterLabel: "5-bit crush",
@@ -291,7 +284,6 @@
     }),
     demon: Object.freeze({
       label: "Demon",
-      category: "experimental",
       description: "A deep, driven voice in a dark cavern.",
       pitchLabel: "-8",
       characterLabel: "Dark reverb",
@@ -312,7 +304,6 @@
     }),
     ghost: Object.freeze({
       label: "Ghost",
-      category: "experimental",
       description: "A wavering, distant voice with echo and reverb.",
       pitchLabel: "Moving",
       characterLabel: "Haunted echo",
@@ -340,7 +331,6 @@
     }),
     cave: Object.freeze({
       label: "Cave",
-      category: "experimental",
       description: "Your natural voice reflected through a huge cavern.",
       pitchLabel: "Original",
       characterLabel: "Long reverb",
@@ -359,7 +349,6 @@
     }),
     frog: Object.freeze({
       label: "Frog",
-      category: "experimental",
       description: "A low croak with a quick resonant wobble.",
       pitchLabel: "-4",
       characterLabel: "Croak filter",
@@ -372,7 +361,6 @@
     }),
     chorus_alien: Object.freeze({
       label: "Chorus Alien",
-      category: "experimental",
       description: "Several swirling alien voices speaking together.",
       pitchLabel: "+3",
       characterLabel: "Modulated chorus",
@@ -1522,22 +1510,37 @@
   window.BibloZooAudioEffects =
     Object.freeze({
       isSupported,
+      getOfficialPresetIds: () =>
+        [...OFFICIAL_PRESET_IDS],
       getPresets: () =>
-        Object.entries(PRESETS).map(
-          ([id, preset]) => ({
-            id,
-            label: preset.label,
-            category: preset.category,
-            description:
-              preset.description,
-            pitchLabel:
-              preset.pitchLabel || "",
-            characterLabel:
-              preset.characterLabel || "",
-            semitones:
-              preset.semitones,
-            speed: preset.speed
-          })
+        [
+          ...OFFICIAL_PRESET_IDS,
+          ...Object.keys(PRESETS).filter(
+            (id) =>
+              !OFFICIAL_PRESET_SET.has(id)
+          )
+        ].map(
+          (id) => {
+            const preset = PRESETS[id];
+
+            return {
+              id,
+              label: preset.label,
+              category:
+                OFFICIAL_PRESET_SET.has(id)
+                  ? "current"
+                  : "experimental",
+              description:
+                preset.description,
+              pitchLabel:
+                preset.pitchLabel || "",
+              characterLabel:
+                preset.characterLabel || "",
+              semitones:
+                preset.semitones,
+              speed: preset.speed
+            };
+          }
         ),
       playRecordedVerse,
       stop

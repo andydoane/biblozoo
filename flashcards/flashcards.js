@@ -53,14 +53,10 @@
   ]);
 
   const WACKY_PRESET_IDS =
-    Object.freeze([
-      "squirrel",
-      "giant",
-      "monster",
-      "turtle",
-      "rocket",
-      "wacky"
-    ]);
+    Object.freeze(
+      window.BibloZooAudioEffects
+        ?.getOfficialPresetIds?.() || []
+    );
 
   const IS_NATIVE_CAPACITOR =
     !!window.Capacitor?.isNativePlatform?.() ||
