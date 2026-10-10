@@ -636,6 +636,20 @@ const overlay = document.getElementById("overlay");
 const dlgTitle = document.getElementById("dlgTitle");
 const dlgBody = document.getElementById("dlgBody");
 const dlgActions = document.getElementById("dlgActions");
+let dailyQuestionPreviewAudio = null;
+
+function stopDailyQuestionPreviewAudio() {
+  if (!dailyQuestionPreviewAudio) return;
+
+  try {
+    dailyQuestionPreviewAudio.pause();
+    dailyQuestionPreviewAudio.currentTime = 0;
+  } catch (err) {
+    // The tester may be closing before playback has started.
+  }
+
+  dailyQuestionPreviewAudio = null;
+}
 
 function showDialog({
   title = "Notice",
@@ -667,6 +681,7 @@ function showDialog({
 }
 
 function closeDialog() {
+  stopDailyQuestionPreviewAudio();
   overlay.classList.remove("show");
   dlgActions.classList.remove(
     "pet-name-dialog-actions",
@@ -14699,6 +14714,260 @@ function screenTitle(idx) {
       });
     }
 
+    const renderGeneratedQuestionChoice = (
+      choice,
+      isCorrect
+    ) => {
+      let visual = escapeHtml(choice?.label || "");
+
+      if (choice?.kind === "emoji") {
+        visual = `
+          <span class="daily-question-tester-emoji" aria-hidden="true">
+            ${escapeHtml(choice.emoji)}
+          </span>
+          <span>${escapeHtml(choice.label)}</span>
+        `;
+      } else if (choice?.kind === "image") {
+        visual = `
+          <img
+            class="daily-question-tester-image"
+            src="${escapeHtml(choice.src)}"
+            alt=""
+          >
+          <span>${escapeHtml(choice.label)}</span>
+        `;
+      }
+
+      return `
+        <div class="daily-question-tester-choice${isCorrect ? " is-correct" : ""}">
+          ${visual}
+          ${isCorrect ? '<span class="daily-question-tester-answer">Correct</span>' : ""}
+        </div>
+      `;
+    };
+
+    const renderGeneratedQuestionPreview = (
+      result,
+      verse
+    ) => {
+      const definitions =
+        window.BibloZooDailyQuestionGenerators
+          ?.GENERATOR_DEFINITIONS || {};
+
+      if (!result?.eligible) {
+        return `
+          <div class="daily-question-tester-status is-ineligible">
+            <strong>Not eligible</strong>
+            <span>${escapeHtml(result?.reason || "This type is not available for this verse.")}</span>
+          </div>
+        `;
+      }
+
+      const question = result.question;
+      const contextHtml = question.context
+        ? `
+          <div class="daily-question-tester-context">
+            ${(question.context.segments || []).map((segment) => `
+              <span class="${segment.accent ? "is-accent" : ""}">${escapeHtml(segment.text)}</span>
+            `).join("")}
+          </div>
+        `
+        : "";
+      const referenceHtml = question.showReferencePill
+        ? `<div class="daily-question-tester-reference">${escapeHtml(verse?.ref || "")}</div>`
+        : "";
+      const audioHtml = question.media?.kind === "audio"
+        ? `
+          <button
+            class="daily-question-tester-audio no-zoom"
+            id="dailyQuestionTesterAudio"
+            type="button"
+            data-src="${escapeHtml(question.media.src)}"
+          >
+            Play body recording
+          </button>
+        `
+        : "";
+
+      return `
+        <div class="daily-question-tester-status is-eligible">
+          <strong>Eligible</strong>
+          <span>${escapeHtml(definitions[result.type]?.title || result.type)}</span>
+        </div>
+        <div class="daily-question-tester-card">
+          ${referenceHtml}
+          <div class="daily-question-tester-prompt">${escapeHtml(question.prompt)}</div>
+          ${contextHtml}
+          ${audioHtml}
+          <div class="daily-question-tester-choices">
+            ${question.choices.map((choice, index) =>
+              renderGeneratedQuestionChoice(
+                choice,
+                index === question.answer
+              )
+            ).join("")}
+          </div>
+        </div>
+      `;
+    };
+
+    const bindGeneratedQuestionAudio = () => {
+      const button = document.querySelector(
+        "#dailyQuestionTesterAudio"
+      );
+      if (!button) return;
+
+      button.onclick = () => {
+        stopDailyQuestionPreviewAudio();
+        const source = String(
+          button.dataset.src || ""
+        ).trim();
+        if (!source) return;
+
+        const audio = new Audio(source);
+        dailyQuestionPreviewAudio = audio;
+        button.disabled = true;
+        button.textContent = "Playing…";
+
+        const finish = () => {
+          if (dailyQuestionPreviewAudio === audio) {
+            dailyQuestionPreviewAudio = null;
+          }
+          if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = "Play body recording";
+          }
+        };
+
+        audio.addEventListener("ended", finish, { once: true });
+        audio.addEventListener("error", finish, { once: true });
+        audio.play().catch(finish);
+      };
+    };
+
+    function showDailyQuestionsTesterDialog({
+      verseId = "",
+      type = "random",
+      seed = "questions-preview"
+    } = {}) {
+      stopDailyQuestionPreviewAudio();
+      const generators =
+        window.BibloZooDailyQuestionGenerators;
+      const preferredVerseId = String(
+        verseId || VERSE_ID || VERSE_LIST[0]?.id || ""
+      ).trim();
+      const verse = VERSE_LIST.find(
+        (entry) => entry?.id === preferredVerseId
+      ) || VERSE_LIST[0];
+      const safeType = type === "random" ||
+        generators?.GENERATOR_TYPES?.includes(type)
+          ? type
+          : "random";
+      const safeSeed = String(seed || "questions-preview");
+      const result = !generators || !verse
+        ? {
+            eligible: false,
+            type: safeType,
+            reason: "The generated-question module or verse data is unavailable."
+          }
+        : safeType === "random"
+          ? generators.selectGeneratedQuestion({
+              verse,
+              verses: VERSE_LIST,
+              seed: safeSeed
+            })
+          : generators.generateQuestion(safeType, {
+              verse,
+              verses: VERSE_LIST,
+              seed: safeSeed
+            });
+      const eligibility = generators && verse
+        ? generators.listEligibility({
+            verse,
+            verses: VERSE_LIST,
+            seed: safeSeed
+          })
+        : [];
+
+      showDialog({
+        title: "Questions Tester",
+        bodyHtml: `
+          <div class="daily-question-tester-controls">
+            <label for="dailyQuestionTesterVerse">Verse</label>
+            <select id="dailyQuestionTesterVerse">
+              ${VERSE_LIST.map((entry) => `
+                <option value="${escapeHtml(entry.id)}"${entry.id === verse?.id ? " selected" : ""}>
+                  ${escapeHtml(entry.ref || entry.id)}
+                </option>
+              `).join("")}
+            </select>
+            <label for="dailyQuestionTesterType">Generator</label>
+            <select id="dailyQuestionTesterType">
+              <option value="random"${safeType === "random" ? " selected" : ""}>Random eligible type</option>
+              ${(generators?.GENERATOR_TYPES || []).map((generatorType) => `
+                <option value="${escapeHtml(generatorType)}"${safeType === generatorType ? " selected" : ""}>
+                  ${escapeHtml(generators.GENERATOR_DEFINITIONS?.[generatorType]?.title || generatorType)}
+                </option>
+              `).join("")}
+            </select>
+            <label for="dailyQuestionTesterSeed">Seed</label>
+            <input
+              id="dailyQuestionTesterSeed"
+              type="text"
+              value="${escapeHtml(safeSeed)}"
+              autocapitalize="off"
+              autocomplete="off"
+              spellcheck="false"
+            >
+          </div>
+          ${renderGeneratedQuestionPreview(result, verse)}
+          <details class="daily-question-tester-details">
+            <summary>Eligibility for this verse</summary>
+            <ul>
+              ${eligibility.map((entry) => `
+                <li class="${entry.eligible ? "is-eligible" : "is-ineligible"}">
+                  <strong>${escapeHtml(generators?.GENERATOR_DEFINITIONS?.[entry.type]?.title || entry.type)}:</strong>
+                  ${escapeHtml(entry.reason)}
+                </li>
+              `).join("")}
+            </ul>
+          </details>
+          <details class="daily-question-tester-details">
+            <summary>Structured data</summary>
+            <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+          </details>
+        `,
+        actionsClass: "daily-preview-dialog-actions",
+        actions: [
+          dlgBtn("Regenerate", {
+            onClick: () =>
+              showDailyQuestionsTesterDialog({
+                verseId: document.querySelector("#dailyQuestionTesterVerse")?.value,
+                type: document.querySelector("#dailyQuestionTesterType")?.value,
+                seed: document.querySelector("#dailyQuestionTesterSeed")?.value
+              })
+          }),
+          dlgBtn("New Seed", {
+            onClick: () =>
+              showDailyQuestionsTesterDialog({
+                verseId: document.querySelector("#dailyQuestionTesterVerse")?.value,
+                type: document.querySelector("#dailyQuestionTesterType")?.value,
+                seed: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+              })
+          }),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: () => {
+              stopDailyQuestionPreviewAudio();
+              showDailyPreviewDialog();
+            }
+          })
+        ]
+      });
+
+      bindGeneratedQuestionAudio();
+    }
+
     registerDailyTodoPreviewMenuEntry({
       id: "actual",
       label: "Actual Today",
@@ -14731,13 +15000,20 @@ function screenTitle(idx) {
     registerDailyTodoPreviewMenuEntry({
       id: "games",
       label: "Game Tester",
-      order: 50,
+      order: 60,
       onSelect: showDailyGameTesterDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "questions",
+      label: "Questions Tester",
+      order: 50,
+      onSelect:
+        showDailyQuestionsTesterDialog
     });
     registerDailyTodoPreviewMenuEntry({
       id: "playground",
       label: "Playground Tester",
-      order: 60,
+      order: 70,
       onSelect:
         showDailyPlaygroundTesterDialog
     });

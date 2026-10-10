@@ -11,6 +11,7 @@ const rootFiles = [
     "daily_zoo_todo.js",
     "daily_zoo_todo_ui.js",
     "daily_questions_feed_game.js",
+    "daily_question_generators.js",
     "daily_questions.js",
     "read_my_verse.js",
     "styles.css",
