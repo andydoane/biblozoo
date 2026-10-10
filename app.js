@@ -694,6 +694,55 @@ function dlgBtn(label, { secondary = false, onClick } = {}) {
   return b;
 }
 
+const dailyTodoPreviewMenuEntries = new Map();
+
+function registerDailyTodoPreviewMenuEntry({
+  id = "",
+  label = "",
+  order = 100,
+  onSelect = null
+} = {}) {
+  const safeId = String(id || "").trim();
+  const safeLabel = String(label || "").trim();
+
+  if (
+    !safeId ||
+    !safeLabel ||
+    typeof onSelect !== "function"
+  ) {
+    return false;
+  }
+
+  dailyTodoPreviewMenuEntries.set(
+    safeId,
+    Object.freeze({
+      id: safeId,
+      label: safeLabel,
+      order: Number.isFinite(Number(order))
+        ? Number(order)
+        : 100,
+      onSelect
+    })
+  );
+
+  return true;
+}
+
+function getDailyTodoPreviewMenuEntries() {
+  return Array.from(
+    dailyTodoPreviewMenuEntries.values()
+  ).sort((a, b) =>
+    a.order - b.order ||
+    a.label.localeCompare(b.label)
+  );
+}
+
+window.BibloZooDailyTodoPreviewMenu =
+  Object.freeze({
+    register: registerDailyTodoPreviewMenuEntry,
+    getEntries: getDailyTodoPreviewMenuEntries
+  });
+
 function homePillHtml(label = "Home") {
   return `
     <button class="screen-home-pill no-zoom" data-home-pill type="button" aria-label="${label}">
@@ -5619,6 +5668,29 @@ function claimDailyTodoSnack(
   session,
   result = {}
 ) {
+  if (
+    session?.dailyTodoPreview === true &&
+    session === State.dailySnackSession
+  ) {
+    session.rewardScore =
+      Math.max(
+        0,
+        Number(result.score) ||
+        Number(session.rewardScore) ||
+        0
+      );
+    session.rewardCaught =
+      Math.max(
+        0,
+        Number(result.caughtCount) ||
+        Number(session.rewardCaught) ||
+        0
+      );
+    session.rewardComplete = true;
+    session.rewardClaimed = true;
+    return true;
+  }
+
   if (
     !session ||
     session !== State.dailySnackSession ||
@@ -13297,6 +13369,9 @@ function screenTitle(idx) {
   const titleTodoBtn = wrap.querySelector("#titleTodoBtn");
   if (titleTodoBtn) {
     const openDailyTodoPreview = (mode = "") => {
+      window.BibloZooDailyTodoUI
+        ?.clearTemporaryPreviewState?.();
+
       const url = new URL(window.location.href);
       const safeMode = String(mode || "").trim();
 
@@ -13315,33 +13390,168 @@ function screenTitle(idx) {
       go(Screen.TODO_DEV);
     };
 
-    const showDailyPreviewDialog = () => {
-      const previewButton = (label, mode) =>
-        dlgBtn(label, {
-          onClick: () => {
-            closeDialog();
-            openDailyTodoPreview(mode);
-          }
-        });
+    const previewButton = (label, mode) =>
+      dlgBtn(label, {
+        onClick: () => {
+          closeDialog();
+          openDailyTodoPreview(mode);
+        }
+      });
 
+    const showCarePlanPreviewDialog = () => {
       showDialog({
-        title: "Daily To-Do Preview",
-        body: "Choose a Daily Tasks state to inspect.",
+        title: "Care Plan Preview",
+        body:
+          "Choose a normal three-task Daily state to inspect.",
         actionsClass:
           "daily-preview-dialog-actions",
         actions: [
-          previewButton("Open", "open"),
-          previewButton("1 Complete", "one"),
-          previewButton("2 Complete", "two"),
-          previewButton("Snack Ready", "ready"),
-          previewButton("Actual", "actual"),
-          previewButton("Toast Test", "toast"),
-          dlgBtn("Game Tester", {
-            onClick: showDailyGameTesterDialog
+          previewButton(
+            "Nothing Completed",
+            "open"
+          ),
+          previewButton(
+            "First Task Complete",
+            "one"
+          ),
+          previewButton(
+            "First Two Complete",
+            "two"
+          ),
+          previewButton(
+            "Snack Ready",
+            "ready"
+          ),
+          previewButton(
+            "Snack Claimed",
+            "claimed"
+          ),
+          previewButton(
+            "Pending Completion",
+            "pending"
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: showDailyPreviewDialog
+          })
+        ]
+      });
+    };
+
+    const showSnackCompletionEnding = () => {
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const profile =
+        getProfileApi()?.getActiveProfile?.();
+      const verseId = String(
+        templatePlan?.verseId || ""
+      ).trim();
+      const feedGame =
+        window.BibloZooDailyFeedGame;
+
+      if (!templatePlan || !verseId || !feedGame?.render) {
+        showDialog({
+          title: "Snack Preview Unavailable",
+          body:
+            "Unlock a BibloPet and create today's Daily To-Do before previewing the snack ending.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
+        return;
+      }
+
+      closeDialog();
+      window.BibloZooDailyTodoUI
+        ?.clearTemporaryPreviewState?.();
+
+      State.dailySnackSession = {
+        dailyTodoSnack: true,
+        dailyTodoPreview: true,
+        profileId: String(
+          templatePlan.profileId ||
+          profile?.id ||
+          "preview"
+        ),
+        planId:
+          `daily-snack-preview-${Date.now()}`,
+        planDay: String(
+          templatePlan.day || "preview"
+        ),
+        verseId,
+        petName:
+          getBibloPetDisplayNameForVerseId(
+            verseId
+          ),
+        zookeeperName:
+          String(
+            profile?.name || "Zookeeper"
+          ).trim() || "Zookeeper",
+        earnedStarPegCount: 2,
+        rewardTiltEnabled: false,
+        rewardScore: 12,
+        rewardCaught: 7,
+        rewardComplete: true,
+        rewardClaimed: true
+      };
+
+      go(Screen.DAILY_SNACK);
+    };
+
+    const showCompletionRewardsPreviewDialog = () => {
+      showDialog({
+        title: "Completion & Rewards",
+        body:
+          "Choose a completion or reward state to inspect.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          previewButton(
+            "Task Completion Popup",
+            "pending"
+          ),
+          previewButton(
+            "New Medal Toast",
+            "toast"
+          ),
+          previewButton(
+            "Already-Owned Medal",
+            "owned_medal"
+          ),
+          previewButton(
+            "Snack Unlocked",
+            "ready"
+          ),
+          dlgBtn("Snack Ending", {
+            onClick:
+              showSnackCompletionEnding
           }),
-          dlgBtn("Playground Tester", {
-            onClick: showDailyPlaygroundTesterDialog
-          }),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: showDailyPreviewDialog
+          })
+        ]
+      });
+    };
+
+    const showDailyPreviewDialog = () => {
+      showDialog({
+        title: "Daily To-Do Preview",
+        body:
+          "Choose an area to preview or test.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...getDailyTodoPreviewMenuEntries()
+            .map((entry) =>
+              dlgBtn(entry.label, {
+                onClick: entry.onSelect
+              })
+            ),
           dlgBtn("Cancel", {
             secondary: true,
             onClick: closeDialog
@@ -13577,6 +13787,42 @@ function screenTitle(idx) {
         ]
       });
     }
+
+    registerDailyTodoPreviewMenuEntry({
+      id: "actual",
+      label: "Actual Today",
+      order: 10,
+      onSelect: () => {
+        closeDialog();
+        openDailyTodoPreview("actual");
+      }
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "care",
+      label: "Care Plan Preview",
+      order: 20,
+      onSelect: showCarePlanPreviewDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "rewards",
+      label: "Completion & Rewards",
+      order: 30,
+      onSelect:
+        showCompletionRewardsPreviewDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "games",
+      label: "Game Tester",
+      order: 40,
+      onSelect: showDailyGameTesterDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "playground",
+      label: "Playground Tester",
+      order: 50,
+      onSelect:
+        showDailyPlaygroundTesterDialog
+    });
 
     titleTodoBtn.onclick = (e) => {
       e.stopPropagation();
@@ -15832,7 +16078,10 @@ function screenTodoDev(idx) {
                 ?.getGameTestPlan?.(
                   dailyTodoApi
                 ) || null
-          : getOrCreateDailyTodoPreviewPlan();
+          : getOrCreateDailyTodoPreviewPlan({
+              persist:
+                dailyPreviewMode === "actual"
+            });
     } else {
       const currentPlan =
         getOrCreateDailyTodoPreviewPlan();
@@ -15928,6 +16177,49 @@ function screenTodoDev(idx) {
   );
 
   bindHomePill(wrap);
+
+  if (dailyPreviewActive) {
+    const previewHomeButton =
+      wrap.querySelector(
+        "[data-home-pill]"
+      );
+
+    if (previewHomeButton) {
+      previewHomeButton.onclick = (event) => {
+        event.stopPropagation();
+
+        dailyTodoUi
+          ?.clearTemporaryPreviewState?.();
+
+        try {
+          const url = new URL(
+            window.location.href
+          );
+          url.searchParams.delete(
+            "dailyTodoPreview"
+          );
+
+          if (
+            url.searchParams.get("screen") ===
+            "todo_dev"
+          ) {
+            url.searchParams.delete("screen");
+          }
+
+          window.history.replaceState(
+            window.history.state,
+            "",
+            url.href
+          );
+        } catch (err) { }
+
+        State.pendingPetUnlockVerseId = null;
+        State.activeTodo = null;
+        State.todoInfoPage = "";
+        go(Screen.TITLE);
+      };
+    }
+  }
 
   if (
     dailyPreviewMode === "actual" &&

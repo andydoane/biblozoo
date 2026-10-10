@@ -25,8 +25,11 @@
     "one",
     "two",
     "ready",
+    "claimed",
+    "pending",
     "actual",
     "toast",
+    "owned_medal",
     "debug",
     "game_test",
     "playground_test"
@@ -162,14 +165,15 @@
       };
     });
 
+    const completeCountByMode = {
+      one: 1,
+      two: 2,
+      ready: 3,
+      claimed: 3,
+      owned_medal: 2
+    };
     const completeCount =
-      mode === "one"
-        ? 1
-        : mode === "two"
-          ? 2
-          : mode === "ready"
-            ? 3
-            : 0;
+      completeCountByMode[mode] || 0;
 
     ordered
       .slice(0, completeCount)
@@ -191,10 +195,61 @@
     plan.snack = {
       ...(plan.snack || {}),
       unlocked: educationalComplete,
-      claimed: false,
-      claimedAt: 0
+      claimed: mode === "claimed",
+      claimedAt:
+        mode === "claimed"
+          ? Date.now()
+          : 0
     };
     plan.rolloverHold = null;
+
+    const pendingTaskId =
+      mode === "pending"
+        ? ordered[0]
+        : mode === "owned_medal"
+          ? ordered[2]
+          : "";
+
+    if (
+      pendingTaskId &&
+      plan.tasks?.[pendingTaskId]
+    ) {
+      const isActivity =
+        pendingTaskId === ordered[2];
+
+      plan.tasks[pendingTaskId] = {
+        ...plan.tasks[pendingTaskId],
+        status:
+          statuses.PENDING || "pending",
+        startedAt: Date.now(),
+        pendingAt: Date.now(),
+        completedAt: 0,
+        launchToken:
+          `daily-static-preview-${mode}`,
+        pendingData:
+          createPendingCompletionData({
+            planId: plan.id,
+            taskId: pendingTaskId,
+            source:
+              "developer_static_preview",
+            thankYouKey: isActivity
+              ? cleanString(
+                  plan.activity?.id
+                )
+              : pendingTaskId,
+            activityId: isActivity
+              ? cleanString(
+                  plan.activity?.id
+                )
+              : "",
+            activityKind: isActivity
+              ? cleanString(
+                  plan.activity?.kind
+                )
+              : ""
+          })
+      };
+    }
 
     return plan;
   }
@@ -404,6 +459,36 @@
   function getPlaygroundTestPlan(engine) {
     return loadPlaygroundTestState(engine)
       ?.activePlan || null;
+  }
+
+  function clearTemporaryPreviewState() {
+    const keys = [
+      getDeveloperStorageKey(),
+      getGameTestStorageKey(),
+      getPlaygroundTestStorageKey()
+    ].filter(Boolean);
+
+    if (root?.localStorage) {
+      keys.forEach((key) => {
+        try {
+          root.localStorage.removeItem(key);
+        } catch (err) { }
+      });
+    }
+
+    lastRenderContext = null;
+    clearDeveloperLongPress();
+    developerLongPressFired = false;
+
+    root?.document
+      ?.querySelectorAll?.(
+        ".daily-medal-toast.is-test-held"
+      )
+      ?.forEach?.((toast) =>
+        toast.remove()
+      );
+
+    return true;
   }
 
   function findPendingCompletion(
@@ -1003,6 +1088,26 @@
         ?.forEach?.((toast) =>
           toast.remove()
         );
+
+      return true;
+    }
+
+    if (scope === "preview_static") {
+      button.disabled = true;
+      updateCompletedRow(taskId);
+
+      if (
+        taskId ===
+        (engine.TASK_IDS?.ACTIVITY ||
+          "activity")
+      ) {
+        unlockSnackRow();
+      }
+
+      removeCompletionLayer(
+        planId,
+        taskId
+      );
 
       return true;
     }
@@ -1698,6 +1803,13 @@
       );
     }
 
+    if (
+      ["pending", "owned_medal"]
+        .includes(mode)
+    ) {
+      pendingScope = "preview_static";
+    }
+
     if (!displayPlan) {
       return `
         <div class="daily-zoo-todo-empty">
@@ -1919,6 +2031,7 @@
     getMedalToastData,
     getGameTestPlan,
     getPlaygroundTestPlan,
+    clearTemporaryPreviewState,
     promoteMedalToasts,
     renderPreview,
     confirmPendingCompletion

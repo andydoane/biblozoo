@@ -341,7 +341,8 @@
     if (
       normalizedName !== "record" &&
       normalizedName !== "play" &&
-      normalizedName !== "stop"
+      normalizedName !== "stop" &&
+      normalizedName !== "wacky_replay"
     ) {
       return "";
     }
@@ -937,7 +938,11 @@
           aria-hidden="true"
         >
           <img
-            src="flashcards/flashcards_wacky_replay.png"
+            src="${escapeHtml(
+              getThemedControlAsset(
+                "wacky_replay"
+              )
+            )}"
             alt=""
             draggable="false"
             onerror="this.hidden=true;this.nextElementSibling.hidden=false"

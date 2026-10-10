@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_08_official_wacky_replay_pool_a";
+const CACHE_VERSION = "2026_Oct_09_themed_wacky_replay_button_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -48,6 +48,8 @@ const CORE_PATHS = [
   "./flashcards/flashcards_stop_black.png",
   "./flashcards/flashcards_record.png",
   "./flashcards/flashcards_record_black.png",
+  "./flashcards/flashcards_wacky_replay.png",
+  "./flashcards/flashcards_wacky_replay_black.png",
 
   "./flashcards/flashcards_bg_phone_red.jpg",
   "./flashcards/flashcards_bg_phone_orange.jpg",
