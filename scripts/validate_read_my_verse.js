@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("assert");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
@@ -172,6 +173,33 @@ function testAssetsExist() {
   });
 }
 
+function testTypewriterSoundsAreShortAndDistinct() {
+  const soundPaths = [1, 2, 3].map(
+    (index) => path.join(
+      rootDir,
+      `verse_images/read_my_verse/typewriter_${index}.mp3`
+    )
+  );
+  const hashes = soundPaths.map(
+    (soundPath) => crypto
+      .createHash("sha256")
+      .update(fs.readFileSync(soundPath))
+      .digest("hex")
+  );
+
+  soundPaths.forEach((soundPath) => {
+    assert.ok(
+      fs.statSync(soundPath).size < 50000,
+      `${path.basename(soundPath)} should be a short keystroke sample`
+    );
+  });
+  assert.strictEqual(
+    new Set(hashes).size,
+    soundPaths.length,
+    "Typewriter keystroke samples must be distinct"
+  );
+}
+
 function testEveryVerseChunkRecordingExists() {
   const verseIds = JSON.parse(
     fs.readFileSync(
@@ -227,6 +255,7 @@ function main() {
     testOneThroughEightChunkFilenames,
     testDailyContextValidation,
     testAssetsExist,
+    testTypewriterSoundsAreShortAndDistinct,
     testEveryVerseChunkRecordingExists
   ];
 

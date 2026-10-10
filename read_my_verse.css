@@ -18,6 +18,7 @@
   overflow: hidden;
   color: #34291e;
   background: #d8c59f;
+  font-family: "Special Elite", Georgia, serif;
 }
 
 .read-typewriter-stage {
@@ -39,6 +40,12 @@
   user-select: none;
   -webkit-user-select: none;
   cursor: pointer;
+}
+
+/* The app-wide role=button rule forces Baloo on every descendant. */
+.read-typewriter-stage,
+.read-typewriter-stage * {
+  font-family: "Special Elite", Georgia, serif !important;
 }
 
 @media (min-aspect-ratio: 2 / 3) {
@@ -121,7 +128,10 @@
 }
 
 .read-typewriter-body {
-  font: inherit;
+  font-family: "Special Elite", Georgia, serif;
+  font-size: var(--smart-font-size, 40px);
+  font-style: normal;
+  font-weight: 400;
   line-height: var(--smart-line-height, 1.24);
   letter-spacing: 0.012em;
   text-wrap: pretty;
@@ -151,6 +161,11 @@
 .read-typewriter-char {
   display: inline-block;
   opacity: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-style: inherit;
+  font-weight: inherit;
+  line-height: inherit;
   transform:
     translateY(var(--read-char-y, 0))
     rotate(var(--read-char-rotate, 0deg));

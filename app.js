@@ -8715,6 +8715,11 @@ window.BibloZooReadMyVerse
     makeSlide,
     scheduleSmartLearnTextFit,
     isMuted: () => muted,
+    getAudioContext: getAppAudioContext,
+    primeAudioFromGesture: () =>
+      primeAppAudioFromGesture(),
+    isNativePlatform: () =>
+      IS_NATIVE_CAPACITOR,
     requestRender: () => render(),
     onWordActivated: () => true,
     onContextComplete:
@@ -11427,6 +11432,7 @@ function renderNav() {
     State.screen !== Screen.PRACTICE &&
     State.screen !== Screen.PLAYGROUND &&
     State.screen !== Screen.FLASHCARDS &&
+    State.screen !== Screen.READ_MY_VERSE &&
     State.screen !== Screen.PROGRESS &&
     State.screen !== Screen.VERSE_DETAIL &&
     State.screen !== Screen.PET_STATS &&
