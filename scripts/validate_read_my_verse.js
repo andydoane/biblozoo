@@ -1030,6 +1030,22 @@ function testSafeWordScrambles() {
   ));
 }
 
+function testVerseCrawlMotion() {
+  const phone = ReadMyVerse.getCrawlMotion(620, 110, 100, 840);
+  assert.ok(phone.travel > 400, "Crawl must cross most of the scene");
+  assert.ok(phone.visibleMs > 0 && phone.visibleMs < phone.durationMs);
+  assert.ok(Math.abs(phone.vanishingY + 100 - 840 * 0.30) < 1);
+  const tablet = ReadMyVerse.getCrawlMotion(890, 180, 120, 1180);
+  assert.ok(tablet.travel > phone.travel);
+  assert.ok(tablet.durationMs >= 10500 && tablet.durationMs <= 22000);
+  // The new font must be cached for offline PWA use.
+  const sw = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
+  assert.ok(sw.includes('"./verse_fonts/NewsCycle-Bold.ttf"'));
+  const styles = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(styles.includes('font-family: "News Cycle Bold", sans-serif !important'));
+  assert.ok(styles.includes('--read-crawl-travel'));
+}
+
 function main() {
   const tests = [
     testSafeWordScrambles,
@@ -1043,6 +1059,7 @@ function main() {
     testChunkAudioMatchingRules,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
+    testVerseCrawlMotion,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
     testTapOrderHintsAndReset,

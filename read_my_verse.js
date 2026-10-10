@@ -250,6 +250,7 @@
   let wordFeedbackTimer = 0;
   let lastKeySoundIndex = -1;
   let completionReported = false;
+  let crawlSession = null;
 
   const state = {
     verseId: "",
@@ -1393,6 +1394,7 @@
 
   function stopAudio() {
     audioRequest += 1;
+    stopCrawlSequence();
     typingFitCache = null;
     activeTypingFitWrap = null;
 
@@ -2833,6 +2835,230 @@
     `;
   }
 
+  // A crawl has one persistent scene: each chunk keeps moving independently
+  // of later audio and later chunks. No shared animated-activity rerenders.
+  function getCrawlMotion(sceneHeight, chunkHeight, sceneTop, viewportHeight) {
+    const height = Math.max(120, Number(sceneHeight) || 120);
+    const textHeight = Math.max(1, Number(chunkHeight) || 1);
+    const screenHeight = Math.max(height, Number(viewportHeight) || height);
+    const top = Math.max(0, Number(sceneTop) || 0);
+    const vanishingY = Math.max(0, Math.min(height * 0.7, screenHeight * 0.30 - top));
+    const travel = height - vanishingY + textHeight * 0.5;
+    const durationMs = Math.max(10500, Math.min(22000, Math.round(travel / 0.06)));
+    const visibleMs = Math.min(
+      durationMs * 0.78,
+      Math.ceil(durationMs * Math.min(0.78, (textHeight + 14) / travel) + 220)
+    );
+    return { travel, durationMs, visibleMs, vanishingY };
+  }
+
+  function stopCrawlSequence() {
+    const session = crawlSession;
+    if (!session) return;
+    session.active = false;
+    session.timers.forEach((timer) => clearTimeout(timer));
+    session.timers.clear();
+    session.items.forEach((item) => {
+      item.node.style.animation = "none";
+      item.node.remove();
+    });
+    crawlSession = null;
+  }
+
+  function crawlTimer(session, callback, delayMs) {
+    const timer = setTimeout(() => {
+      session.timers.delete(timer);
+      if (session.active && crawlSession === session) callback();
+    }, delayMs);
+    session.timers.add(timer);
+    return timer;
+  }
+
+  function completeCrawlIfReady(session) {
+    const last = session.items.get(state.chunks.length - 1);
+    if (
+      session.active &&
+      crawlSession === session &&
+      !completionReported &&
+      last?.audioDone &&
+      last?.vanished
+    ) {
+      reportCompletion();
+    }
+  }
+
+  function markCrawlVanished(session, item) {
+    if (!session.active || item.vanished) return;
+    item.vanished = true;
+    item.node.remove();
+    completeCrawlIfReady(session);
+  }
+
+  function finishCrawlAudio(session, item) {
+    if (!session.active || item.audioDone) return;
+    item.audioDone = true;
+    if (item.pausedForAudio) {
+      item.node.style.animationPlayState = "running";
+      // In case WebKit omits animationend after resuming a paused animation.
+      crawlTimer(session, () => markCrawlVanished(session, item),
+        Math.ceil(item.durationMs * 0.16) + 1500);
+    }
+    if (state.reducedMotion) {
+      item.node.classList.add("is-fading");
+      crawlTimer(session, () => markCrawlVanished(session, item), 450);
+    }
+    if (item.index + 1 < state.chunks.length) {
+      // Earlier chunks stay in the DOM and continue their own journey.
+      crawlTimer(session, () => launchCrawlChunk(session, item.index + 1), 1000);
+    } else {
+      completeCrawlIfReady(session);
+    }
+  }
+
+  function playCrawlAudio(session, item) {
+    if (!session.active || item.audioStarted || item.vanished) return;
+    item.audioStarted = true;
+    state.phase = "playing";
+    const request = ++audioRequest;
+    const src = getChunkAudioPath(
+      state.verseId,
+      state.chunkAudioIndices[item.index] ?? item.index,
+      state.chunks.length,
+      state.usesChunkAudio
+    );
+    const finish = () => {
+      if (!session.active || request !== audioRequest) return;
+      activeAudio = null;
+      finishCrawlAudio(session, item);
+    };
+    if (!src || typeof Audio === "undefined" || appApi?.isMuted?.()) {
+      crawlTimer(session, finish, 650);
+      return;
+    }
+    try {
+      activeAudio = new Audio(src);
+      activeAudio.preload = "auto";
+      activeAudio.addEventListener("ended", finish, { once: true });
+      activeAudio.addEventListener("error", finish, { once: true });
+      activeAudio.play()?.catch?.(() => crawlTimer(session, finish, 650));
+    } catch (err) {
+      crawlTimer(session, finish, 650);
+    }
+  }
+
+  function launchCrawlChunk(session, index) {
+    if (!session.active || crawlSession !== session || session.items.has(index)) return;
+    state.chunkIndex = index;
+    state.phase = "animating";
+    const node = root.document.createElement("div");
+    node.className = "read-crawl-chunk";
+    node.textContent = String(state.chunks[index] || "").trim();
+    node.dataset.readCrawlChunk = String(index);
+    const item = {
+      index, node, audioStarted: false, audioDone: false,
+      pausedForAudio: false, vanished: false
+    };
+    session.items.set(index, item);
+    session.window.appendChild(node);
+    session.progress.textContent = `Part ${index + 1} of ${state.chunks.length}`;
+
+    if (state.reducedMotion) {
+      // Reduced Motion: stationary centered text with a gentle fade.
+      crawlTimer(session, () => playCrawlAudio(session, item), 520);
+      return;
+    }
+
+    const rect = session.scene.getBoundingClientRect();
+    const motion = getCrawlMotion(
+      rect.height,
+      node.getBoundingClientRect().height,
+      rect.top,
+      root.innerHeight
+    );
+    item.durationMs = motion.durationMs;
+    node.style.setProperty("--read-crawl-travel", `-${motion.travel}px`);
+    node.style.setProperty("--read-crawl-duration", `${motion.durationMs}ms`);
+    node.addEventListener("animationend", (event) => {
+      if (event.target === node) markCrawlVanished(session, item);
+    }, { once: true });
+    // Avoid the text fading away while a longer recording is still playing.
+    crawlTimer(session, () => {
+      if (!item.audioDone && !item.vanished) {
+        item.pausedForAudio = true;
+        node.style.animationPlayState = "paused";
+      }
+    }, Math.round(motion.durationMs * 0.84));
+    crawlTimer(session, () => playCrawlAudio(session, item), motion.visibleMs);
+    // Fallback for a missing animationend event (never before audio ends).
+    crawlTimer(session, () => {
+      if (item.audioDone) markCrawlVanished(session, item);
+    }, motion.durationMs + 1500);
+  }
+
+  function renderCrawlScreen(idx, verse) {
+    if (crawlSession) {
+      stopCrawlSequence();
+      audioRequest += 1;
+      activeAudio?.pause?.();
+      activeAudio = null;
+    }
+    const manifest = READ_ACTIVITY_MANIFEST[VERSE_CRAWL_ACTIVITY_ID];
+    const wrap = root.document.createElement("div");
+    wrap.className = "read-my-verse-screen read-animated-screen read-crawl-screen" +
+      (state.reducedMotion ? " is-reduced-motion" : "");
+    const instruction = state.readTestMode === "early_exit"
+      ? "Early-exit check: use Back before it finishes"
+      : state.reducedMotion
+        ? "Listen to the verse"
+        : "Watch and listen as the verse rises";
+    wrap.innerHTML = `
+      <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Verse Crawl">‹</button>
+      <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
+        <header class="read-animated-header">
+          <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
+          <div class="read-animated-title">Verse Crawl</div>
+          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
+        </header>
+        <section class="read-animated-scene" aria-label="${escapeHtml(verse.verseText)}">
+          <div class="read-crawl-window" data-read-crawl-window></div>
+        </section>
+        <div class="read-animated-progress" data-read-progress aria-live="polite">Part 1 of ${state.chunks.length}</div>
+      </main>
+    `;
+    wrap.querySelector("[data-read-exit]").onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      exitSession();
+    };
+    const session = {
+      active: true, wrap,
+      scene: wrap.querySelector(".read-animated-scene"),
+      window: wrap.querySelector("[data-read-crawl-window]"),
+      progress: wrap.querySelector("[data-read-progress]"),
+      items: new Map(), timers: new Set()
+    };
+    crawlSession = session;
+    let started = false;
+    const start = () => {
+      if (started || !session.active) return;
+      started = true;
+      root.requestAnimationFrame(() => {
+        if (session.active && crawlSession === session && wrap.isConnected) {
+          launchCrawlChunk(session, 0);
+        }
+      });
+    };
+    // Measure after the font loads, with a bounded fallback for a missing font.
+    const fontReady = root.document.fonts?.load?.('700 40px "News Cycle Bold"');
+    if (fontReady?.then) {
+      fontReady.then(start, start);
+      crawlTimer(session, start, 2500);
+    } else {
+      start();
+    }
+    return appApi.makeSlide({ idx, bg: "#030815", navHidden: true, inner: wrap });
+  }
+
   function renderBalloonWordsHtml(
     chunk,
     timing
@@ -2917,6 +3143,9 @@
   }
 
   function renderAnimatedScreen(idx, verse) {
+    if (state.activityId === VERSE_CRAWL_ACTIVITY_ID) {
+      return renderCrawlScreen(idx, verse);
+    }
     const manifest =
       READ_ACTIVITY_MANIFEST[
         state.activityId
@@ -3852,6 +4081,7 @@
     getChunkAudioPath,
     getReferenceAudioPath,
     getAnimatedActivityTiming,
+    getCrawlMotion,
     isAnimatedActivity,
     isTypingActivity,
     isWordActivity,

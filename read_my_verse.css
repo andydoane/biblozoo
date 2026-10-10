@@ -14,6 +14,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "News Cycle Bold";
+  src: url("./verse_fonts/NewsCycle-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 .read-my-verse-screen,
 .read-typewriter-stage {
   position: absolute;
@@ -1277,40 +1285,60 @@ button.read-unscramble-token.is-solved {
   }
 }
 
+/* Chunks enter independently. Movement is in scene pixels, not % of text height. */
 .read-crawl-window {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  perspective: 380px;
-  perspective-origin: 50% 42%;
+  overflow: hidden;
+  perspective: 580px;
+  perspective-origin: 50% 30%;
 }
 
 .read-crawl-chunk {
-  width: min(88%, 760px);
-  padding: 0 5% 4vh;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: min(92%, 760px);
+  margin: 0;
+  padding: 0;
   color: #ffe46b;
-  font-size: clamp(30px, 7.6vw, 70px);
-  font-weight: 800;
-  line-height: 1.18;
+  font-family: "News Cycle Bold", sans-serif !important;
+  font-size: clamp(28px, 7vw, 60px);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: 0.018em;
   text-align: center;
+  text-transform: uppercase;
+  text-wrap: balance;
   text-shadow: 0 3px 8px rgba(0, 0, 0, 0.85);
-  transform-origin: 50% 100%;
-  animation: readCrawlRise 5.2s linear both;
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+  animation: readCrawlRise var(--read-crawl-duration, 10500ms) linear both;
 }
 
 @keyframes readCrawlRise {
   0% {
     opacity: 0;
-    transform: translateY(32%) rotateX(22deg) scale(1.06);
+    transform: translate3d(-50%, 0, 0) rotateX(15deg) scale(1);
   }
-  12% { opacity: 1; }
-  78% { opacity: 1; }
+  9% { opacity: 1; }
+  85% { opacity: 1; }
   100% {
     opacity: 0;
-    transform: translateY(-112%) rotateX(35deg) scale(0.28);
+    transform: translate3d(-50%, var(--read-crawl-travel, -520px), 0) rotateX(35deg) scale(0.3);
   }
+}
+
+/* Reduced Motion: readable stationary chunks, no scrolling perspective. */
+.read-crawl-screen.is-reduced-motion .read-crawl-chunk {
+  top: 50%;
+  opacity: 1;
+  transform: translate(-50%, -50%);
+  animation: none;
+  transition: opacity 350ms ease;
+}
+.read-crawl-screen.is-reduced-motion .read-crawl-chunk.is-fading {
+  opacity: 0;
 }
 
 /* Balloons */
@@ -1607,14 +1635,12 @@ button.read-unscramble-token.is-solved {
   to { transform: translateY(-125vh); }
 }
 
-.read-animated-stage.is-listening .read-crawl-chunk,
 .read-animated-stage.is-listening .read-balloon-word,
 .read-animated-stage.is-listening .read-fish-word {
   opacity: 0;
   animation: none;
 }
 
-.read-animated-screen.is-reduced-motion .read-crawl-chunk,
 .read-animated-screen.is-reduced-motion .read-balloon-word,
 .read-animated-screen.is-reduced-motion .read-fish-word {
   animation-duration: 480ms;
@@ -1627,7 +1653,6 @@ button.read-unscramble-token.is-solved {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .read-crawl-chunk,
   .read-balloon-word,
   .read-fish-word {
     animation-duration: 480ms;
