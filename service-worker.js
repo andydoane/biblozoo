@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_10_interactive_read_a";
+const CACHE_VERSION = "2026_Oct_10_chunk_audio_matching_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -76,6 +76,7 @@ const CORE_PATHS = [
   "./utilities/sound-tester.html",
 
   "./verse_fonts/Baloo2.ttf",
+  "./verse_fonts/TitanOne.ttf",
   "./verse_fonts/SpecialElite-Regular.ttf",
   "./verse_fonts/VT323-Regular.ttf",
 
@@ -102,6 +103,8 @@ const CORE_PATHS = [
   "./verse_images/read_my_verse/fish_medium.png",
   "./verse_images/read_my_verse/fish_long.png",
   "./verse_images/read_my_verse/fish_hook.png",
+  "./verse_images/read_my_verse/simon_says_phone.png",
+  "./verse_images/read_my_verse/simon_says_ipad.png",
 
   "./biblopet_name_blocklist.json",
   "./pet_random_names.json",

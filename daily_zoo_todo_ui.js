@@ -29,6 +29,9 @@
     "ready",
     "claimed",
     "pending",
+    "forced_read",
+    "forced_flashcard",
+    "saved_read",
     "actual",
     "toast",
     "owned_medal",
@@ -150,6 +153,36 @@
     const statuses = engine?.TASK_STATUSES || {};
     const open = statuses.OPEN || "open";
     const complete = statuses.COMPLETE || "complete";
+    const reviewKinds =
+      engine?.REVIEW_KINDS || {};
+
+    if (
+      ["forced_read", "saved_read"]
+        .includes(mode)
+    ) {
+      plan.reviewAssignment = {
+        kind: reviewKinds.READ || "read",
+        activityId:
+          plan.reviewAssignment?.kind ===
+            (reviewKinds.READ || "read") &&
+          cleanString(
+            plan.reviewAssignment?.activityId
+          )
+            ? cleanString(
+                plan.reviewAssignment.activityId
+              )
+            : "chunk_sequence"
+      };
+    } else if (
+      mode === "forced_flashcard"
+    ) {
+      plan.reviewAssignment = {
+        kind:
+          reviewKinds.FLASHCARD ||
+          "flashcard",
+        activityId: ""
+      };
+    }
     const ordered =
       engine?.getRequiredTaskIds?.(plan) ||
       plan.requiredTaskIds || [

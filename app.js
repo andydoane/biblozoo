@@ -4803,7 +4803,38 @@ function getOrCreateDailyTodoPreviewPlan({
     isPetUnlocked:
       isBibloPetUnlocked,
     getPetStatus:
-      getBibloPetStatus
+      getBibloPetStatus,
+    getReadActivitiesForVerse:
+      (verseId) => {
+        const readModule =
+          window.BibloZooReadMyVerse;
+        const verse = VERSE_LIST.find(
+          (item) => item?.id === verseId
+        );
+
+        if (
+          !verse ||
+          !readModule
+            ?.isActivityEligibleForVerse
+        ) {
+          return [];
+        }
+
+        return Object.values(
+          readModule.READ_ACTIVITY_MANIFEST || {}
+        ).map((activity) => ({
+          id: activity?.id,
+          enabled:
+            activity?.enabled !== false,
+          eligible:
+            readModule
+              .isActivityEligibleForVerse(
+                activity?.id,
+                verse,
+                "normal"
+              )
+        }));
+      }
   };
 
   if (persist) {
@@ -13842,6 +13873,18 @@ function screenTitle(idx) {
             "Pending Completion",
             "pending"
           ),
+          previewButton(
+            "Forced Read Day",
+            "forced_read"
+          ),
+          previewButton(
+            "Forced Flashcard Day",
+            "forced_flashcard"
+          ),
+          previewButton(
+            "Reload with Saved Read Assignment",
+            "saved_read"
+          ),
           dlgBtn("Back", {
             secondary: true,
             onClick: showDailyPreviewDialog
@@ -14386,6 +14429,27 @@ function screenTitle(idx) {
           getReadTesterVerseId();
       };
 
+    const getChunkSequenceTesterVerseId =
+      (requestedCount) => {
+        const count = Number(
+          requestedCount
+        );
+        const exact = VERSE_LIST.find(
+          (verse) =>
+            verse?.id &&
+            verse.echoParts?.length === count
+        );
+        const fallback = VERSE_LIST.find(
+          (verse) =>
+            verse?.id &&
+            verse.echoParts?.length >= count
+        );
+
+        return exact?.id ||
+          fallback?.id ||
+          getReadTesterVerseId();
+      };
+
     const showReadDiagnostics = (
       verseId
     ) => {
@@ -14451,7 +14515,8 @@ function screenTitle(idx) {
         "fish",
         "keyboard",
         "unscramble",
-        "tap_words_order"
+        "tap_words_order",
+        "chunk_sequence"
       ].filter(
         (activityId) =>
           readManifest[activityId]
@@ -14491,6 +14556,18 @@ function screenTitle(idx) {
             <option value="forced_short">Forced short chunk</option>
             <option value="forced_long">Forced long chunk</option>
             <option value="forced_hint">Forced Tap Words hint</option>
+            <option value="sequence_two">Chunk Matching: two buttons</option>
+            <option value="sequence_five">Chunk Matching: five buttons</option>
+            <option value="sequence_eight">Chunk Matching: eight buttons</option>
+            <option value="sequence_explore">Chunk Matching: Explore incomplete</option>
+            <option value="sequence_ready">Chunk Matching: I’m Ready available</option>
+            <option value="sequence_challenge">Chunk Matching: challenge in progress</option>
+            <option value="sequence_easy_wrong">Chunk Matching: Easy wrong answer</option>
+            <option value="sequence_easy_help">Chunk Matching: Easy Help available</option>
+            <option value="sequence_hard_reset">Chunk Matching: Hard reset</option>
+            <option value="sequence_hard_help">Chunk Matching: Hard Help available</option>
+            <option value="sequence_help_active">Chunk Matching: Help active</option>
+            <option value="sequence_final">Chunk Matching: final answer</option>
             <option value="reduced_motion">Reduced-motion check</option>
             <option value="early_exit">Early-exit check</option>
           </select>
@@ -14506,6 +14583,15 @@ function screenTitle(idx) {
                 readTestMode ===
                 "many_chunk"
                   ? getManyChunkReadTesterVerseId()
+                  : readTestMode ===
+                      "sequence_two"
+                    ? getChunkSequenceTesterVerseId(2)
+                    : readTestMode ===
+                        "sequence_five"
+                      ? getChunkSequenceTesterVerseId(5)
+                      : readTestMode ===
+                          "sequence_eight"
+                        ? getChunkSequenceTesterVerseId(8)
                   : getReadTesterVerseId();
               const activityId =
                 getReadTesterActivityId();

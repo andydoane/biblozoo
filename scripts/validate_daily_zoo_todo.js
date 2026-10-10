@@ -1813,6 +1813,123 @@ function testReadActivityAssignmentRotation() {
   );
 }
 
+function testReadReadFlashcardCadence() {
+  const activities = [
+    {
+      id: "typewriter",
+      enabled: true,
+      eligible: true
+    },
+    {
+      id: "chunk_sequence",
+      enabled: true,
+      eligible: true
+    }
+  ];
+
+  [
+    [0, "read"],
+    [1, "read"],
+    [2, "flashcard"],
+    [3, "read"],
+    [4, "read"],
+    [5, "flashcard"]
+  ].forEach(([completedDailyTodos, kind]) => {
+    const assignment =
+      DailyTodo.chooseReviewAssignment({
+        verseHistory: {
+          completedDailyTodos
+        },
+        activities,
+        random: () => 0
+      });
+
+    assert.strictEqual(
+      assignment.kind,
+      kind
+    );
+  });
+
+  assert.deepStrictEqual(
+    DailyTodo.chooseReviewAssignment({
+      verseHistory: {
+        completedDailyTodos: 0
+      },
+      activities: [],
+      random: () => 0
+    }),
+    {
+      kind: "flashcard",
+      activityId: ""
+    }
+  );
+
+  const registries = makeSimpleRegistries();
+  const progress = {
+    verses: {
+      verse_a: makeVerseProgress()
+    },
+    dailyZooTodo: {
+      byVerse: {
+        verse_a: {
+          completedDailyTodos: 1
+        }
+      }
+    }
+  };
+  const created = DailyTodo.getOrCreatePlan({
+    progress,
+    profileId: "profile-a",
+    verseList: [{ id: "verse_a" }],
+    gameRegistry: registries.games,
+    playgroundRegistry:
+      registries.playground,
+    isPetUnlocked,
+    getPetStatus,
+    getReadActivitiesForVerse:
+      () => activities,
+    now: new Date(2026, 9, 5, 12),
+    random: () => 0,
+    idFactory: () => "cadence-plan"
+  });
+
+  assert.deepStrictEqual(
+    created.plan.reviewAssignment,
+    {
+      kind: "read",
+      activityId: "typewriter"
+    }
+  );
+
+  const reloaded =
+    DailyTodo.getOrCreatePlan({
+      progress,
+      profileId: "profile-a",
+      verseList: [{ id: "verse_a" }],
+      gameRegistry: registries.games,
+      playgroundRegistry:
+        registries.playground,
+      isPetUnlocked,
+      getPetStatus,
+      getReadActivitiesForVerse:
+        () => [
+          {
+            id: "balloons",
+            enabled: true,
+            eligible: true
+          }
+        ],
+      now: new Date(2026, 9, 5, 13),
+      random: () => 0.99
+    });
+
+  assert.strictEqual(reloaded.created, false);
+  assert.deepStrictEqual(
+    reloaded.plan.reviewAssignment,
+    created.plan.reviewAssignment
+  );
+}
+
 function testDefensiveNormalization() {
   const state = DailyTodo.normalizeState({
     version: 999,
@@ -1911,6 +2028,7 @@ function main() {
     testTwoTaskPlanProgressAndExactOnceCompletion,
     testPerVerseHistoryAdvancesOnConfirmationOnly,
     testReadActivityAssignmentRotation,
+    testReadReadFlashcardCadence,
     testDefensiveNormalization
   ];
 

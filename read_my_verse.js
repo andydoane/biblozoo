@@ -27,7 +27,68 @@
     "unscramble";
   const TAP_WORDS_ORDER_ACTIVITY_ID =
     "tap_words_order";
+  const CHUNK_SEQUENCE_ACTIVITY_ID =
+    "chunk_sequence";
   const CHUNK_PAUSE_MS = 480;
+  const CHUNK_SEQUENCE_COLORS =
+    Object.freeze([
+      Object.freeze({
+        id: "red",
+        value: "#ff5a51",
+        light: "#ff8882",
+        dark: "#d83d36",
+        deep: "#6f1713"
+      }),
+      Object.freeze({
+        id: "orange",
+        value: "#ffa351",
+        light: "#ffc087",
+        dark: "#db792c",
+        deep: "#71350f"
+      }),
+      Object.freeze({
+        id: "yellow",
+        value: "#ffc751",
+        light: "#ffdc91",
+        dark: "#dda52f",
+        deep: "#72500e"
+      }),
+      Object.freeze({
+        id: "green",
+        value: "#a7cb6f",
+        light: "#c9e39f",
+        dark: "#7ea447",
+        deep: "#385018"
+      }),
+      Object.freeze({
+        id: "blue",
+        value: "#40b9c5",
+        light: "#79d4dc",
+        dark: "#238e99",
+        deep: "#0d454b"
+      }),
+      Object.freeze({
+        id: "purple",
+        value: "#7f66c6",
+        light: "#aa98df",
+        dark: "#5c43a3",
+        deep: "#291d55"
+      }),
+      Object.freeze({
+        id: "gray",
+        value: "#666666",
+        light: "#999999",
+        dark: "#444444",
+        deep: "#181818"
+      }),
+      Object.freeze({
+        id: "light_gray",
+        value: "#f2f2f2",
+        light: "#ffffff",
+        dark: "#c8c8c8",
+        deep: "#686868"
+      })
+    ]);
   const READ_FEEDBACK_ASSETS =
     Object.freeze({
       negative:
@@ -41,6 +102,18 @@
       "forced_short",
       "forced_long",
       "forced_hint",
+      "sequence_two",
+      "sequence_five",
+      "sequence_eight",
+      "sequence_explore",
+      "sequence_ready",
+      "sequence_challenge",
+      "sequence_easy_wrong",
+      "sequence_easy_help",
+      "sequence_hard_reset",
+      "sequence_hard_help",
+      "sequence_help_active",
+      "sequence_final",
       "reduced_motion",
       "early_exit"
     ]);
@@ -135,6 +208,18 @@
         enabled: true,
         feedback:
           READ_FEEDBACK_ASSETS
+      }),
+      chunk_sequence: Object.freeze({
+        id: CHUNK_SEQUENCE_ACTIVITY_ID,
+        title: "Chunk Audio Matching",
+        enabled: true,
+        backgrounds: Object.freeze({
+          phone:
+            `${ASSET_BASE}simon_says_phone.png`,
+          ipad:
+            `${ASSET_BASE}simon_says_ipad.png`
+        }),
+        colors: CHUNK_SEQUENCE_COLORS
       })
     });
 
@@ -353,6 +438,13 @@
     ].includes(cleanString(activityId));
   }
 
+  function isChunkSequenceActivity(
+    activityId
+  ) {
+    return cleanString(activityId) ===
+      CHUNK_SEQUENCE_ACTIVITY_ID;
+  }
+
   function getActivePhase(activityId) {
     if (isAnimatedActivity(activityId)) {
       return "animating";
@@ -360,6 +452,10 @@
 
     if (isTypingActivity(activityId)) {
       return "typing";
+    }
+
+    if (isChunkSequenceActivity(activityId)) {
+      return "sequence_mode";
     }
 
     return "interacting";
@@ -732,6 +828,14 @@
         .length >= 2;
     }
 
+    if (
+      safeActivityId ===
+      CHUNK_SEQUENCE_ACTIVITY_ID
+    ) {
+      return String(chunk || "").trim()
+        .length > 0;
+    }
+
     return String(chunk || "").trim()
       .length > 0;
   }
@@ -755,6 +859,41 @@
     );
 
     if (!chunks.length) return null;
+
+    if (
+      activityId ===
+      CHUNK_SEQUENCE_ACTIVITY_ID
+    ) {
+      const forcedCounts = {
+        sequence_two: 2,
+        sequence_five: 5,
+        sequence_eight: 8
+      };
+      const forcedCount =
+        forcedCounts[readTestMode] || 0;
+
+      if (
+        chunks.length < 2 ||
+        (forcedCount &&
+          chunks.length < forcedCount)
+      ) {
+        return null;
+      }
+
+      const selectedChunks = forcedCount
+        ? chunks.slice(0, forcedCount)
+        : chunks;
+
+      return {
+        chunks: selectedChunks,
+        audioIndices: selectedChunks.map(
+          (_, index) => index
+        ),
+        usesChunkAudio:
+          Array.isArray(verse?.echoParts) &&
+          verse.echoParts.length > 0
+      };
+    }
 
     if (readTestMode === "one_chunk") {
       const fullText = String(
@@ -848,6 +987,16 @@
       return false;
     }
 
+    if (
+      readTestMode.startsWith?.(
+        "sequence_"
+      ) &&
+      activityId !==
+        CHUNK_SEQUENCE_ACTIVITY_ID
+    ) {
+      return false;
+    }
+
     return !!selectActivityChunks(
       verse,
       activityId,
@@ -886,6 +1035,229 @@
     } catch (err) {
       return false;
     }
+  }
+
+  function chooseChunkSequenceColors(
+    chunkCount,
+    random = Math.random
+  ) {
+    const count = Math.max(
+      0,
+      Math.min(
+        CHUNK_SEQUENCE_COLORS.length,
+        Math.floor(Number(chunkCount) || 0)
+      )
+    );
+    const pool = count === 8
+      ? CHUNK_SEQUENCE_COLORS
+      : CHUNK_SEQUENCE_COLORS.filter(
+          (color) => color.id !== "gray"
+        );
+
+    return shuffleArray(pool, random)
+      .slice(0, count)
+      .map((color) => ({ ...color }));
+  }
+
+  function createChunkSequenceData(
+    chunkCount,
+    readTestMode = "normal",
+    random = Math.random
+  ) {
+    const count = Math.max(
+      2,
+      Math.min(8, Number(chunkCount) || 2)
+    );
+    const data = {
+      mode: "",
+      phase: "mode",
+      colors:
+        chooseChunkSequenceColors(
+          count,
+          random
+        ),
+      buttonOrder: shuffleArray(
+        Array.from(
+          { length: count },
+          (_, index) => index
+        ),
+        random
+      ),
+      explored: Array(count).fill(false),
+      activeButtonIndex: -1,
+      challengeIndex: 0,
+      wrongAt: -1,
+      easyMisses: 0,
+      hardResets: 0,
+      helpAvailable: false,
+      helpActive: false,
+      message: "Choose how you want to play."
+    };
+
+    if (!readTestMode.startsWith("sequence_")) {
+      return data;
+    }
+
+    data.mode = readTestMode.includes("hard") ||
+      readTestMode === "sequence_help_active"
+        ? "hard"
+        : "easy";
+    data.phase = "explore";
+    data.message = "Listen to each button.";
+
+    if (readTestMode === "sequence_explore") {
+      data.explored[0] = true;
+    }
+
+    if (
+      [
+        "sequence_ready",
+        "sequence_challenge",
+        "sequence_easy_wrong",
+        "sequence_easy_help",
+        "sequence_hard_reset",
+        "sequence_hard_help",
+        "sequence_help_active",
+        "sequence_final"
+      ].includes(readTestMode)
+    ) {
+      data.explored.fill(true);
+      data.phase =
+        readTestMode === "sequence_ready"
+          ? "ready"
+          : "challenge";
+      data.message =
+        data.phase === "ready"
+          ? "You heard every button."
+          : "Tap them in order.";
+    }
+
+    if (
+      [
+        "sequence_challenge",
+        "sequence_easy_wrong",
+        "sequence_final"
+      ].includes(readTestMode)
+    ) {
+      data.challengeIndex =
+        readTestMode === "sequence_final"
+          ? count - 1
+          : Math.min(2, count - 1);
+    }
+
+    if (
+      readTestMode ===
+      "sequence_easy_wrong"
+    ) {
+      data.wrongAt = data.challengeIndex;
+      data.message = "Try that one again!";
+    }
+
+    if (
+      readTestMode ===
+      "sequence_easy_help"
+    ) {
+      data.easyMisses = 3;
+      data.helpAvailable = true;
+    }
+
+    if (
+      readTestMode ===
+      "sequence_hard_reset"
+    ) {
+      data.hardResets = 1;
+      data.wrongAt = 0;
+      data.message = "Oops! Start over!";
+    }
+
+    if (
+      [
+        "sequence_hard_help",
+        "sequence_help_active"
+      ].includes(readTestMode)
+    ) {
+      data.hardResets = 3;
+      data.helpAvailable = true;
+    }
+
+    if (
+      readTestMode ===
+      "sequence_help_active"
+    ) {
+      data.helpActive = true;
+      data.message = "Try the glowing button.";
+    }
+
+    return data;
+  }
+
+  function evaluateChunkSequenceChoice(
+    data,
+    buttonIndex,
+    chunkCount
+  ) {
+    const expected = Math.max(
+      0,
+      Number(data?.challengeIndex) || 0
+    );
+    const count = Math.max(
+      2,
+      Number(chunkCount) || 2
+    );
+    const correct =
+      Number(buttonIndex) === expected;
+
+    if (correct) {
+      const nextIndex = expected + 1;
+      return {
+        correct: true,
+        expected,
+        nextIndex,
+        complete: nextIndex >= count,
+        reset: false,
+        easyMisses: 0,
+        hardResets:
+          Number(data?.hardResets) || 0,
+        helpAvailable: false
+      };
+    }
+
+    const hard = data?.mode === "hard";
+    const easyMisses = hard
+      ? Number(data?.easyMisses) || 0
+      : (Number(data?.easyMisses) || 0) + 1;
+    const hardResets = hard
+      ? (Number(data?.hardResets) || 0) + 1
+      : Number(data?.hardResets) || 0;
+
+    return {
+      correct: false,
+      expected,
+      nextIndex: hard ? 0 : expected,
+      complete: false,
+      reset: hard,
+      easyMisses,
+      hardResets,
+      helpAvailable: hard
+        ? hardResets >= 3
+        : easyMisses >= 3
+    };
+  }
+
+  function markChunkSequenceExplored(
+    data,
+    buttonIndex
+  ) {
+    if (
+      !Array.isArray(data?.explored) ||
+      buttonIndex < 0 ||
+      buttonIndex >= data.explored.length
+    ) {
+      return false;
+    }
+
+    data.explored[buttonIndex] = true;
+    return data.explored.every(Boolean);
   }
 
   function getAnimatedActivityTiming(
@@ -1147,6 +1519,20 @@
 
     if (isWordActivity(safeActivityId)) {
       prepareInteractiveChunk();
+    }
+
+    if (
+      isChunkSequenceActivity(
+        safeActivityId
+      )
+    ) {
+      state.activityData =
+        createChunkSequenceData(
+          chunks.length,
+          state.readTestMode
+        );
+      state.phase =
+        `sequence_${state.activityData.phase}`;
     }
 
     return true;
@@ -1461,6 +1847,24 @@
 
       if (isWordActivity(state.activityId)) {
         prepareInteractiveChunk();
+      }
+      if (
+        isChunkSequenceActivity(
+          state.activityId
+        ) &&
+        state.activityData
+      ) {
+        state.activityData.challengeIndex =
+          Math.max(
+            0,
+            state.chunks.length - 1
+          );
+        state.activityData.phase =
+          "challenge";
+        state.activityData.message =
+          "Tap the final button again.";
+        state.phase =
+          "sequence_challenge";
       }
       appApi?.requestRender?.();
     }
@@ -1865,6 +2269,298 @@
       );
     }
 
+    return true;
+  }
+
+  function setChunkSequencePhase(
+    phase
+  ) {
+    const data = state.activityData;
+    if (!data) return;
+
+    data.phase = phase;
+    state.phase = `sequence_${phase}`;
+  }
+
+  function playChunkSequenceAudio(
+    buttonIndex,
+    onFinished
+  ) {
+    const data = state.activityData;
+
+    if (
+      !data ||
+      data.activeButtonIndex >= 0 ||
+      buttonIndex < 0 ||
+      buttonIndex >= state.chunks.length
+    ) {
+      return false;
+    }
+
+    data.activeButtonIndex = buttonIndex;
+    appApi?.requestRender?.();
+
+    const request = ++audioRequest;
+    const src = getChunkAudioPath(
+      state.verseId,
+      state.chunkAudioIndices[
+        buttonIndex
+      ] ?? buttonIndex,
+      state.chunks.length,
+      state.usesChunkAudio
+    );
+    let finished = false;
+    const finish = () => {
+      if (
+        finished ||
+        request !== audioRequest
+      ) {
+        return;
+      }
+
+      finished = true;
+      activeAudio = null;
+      data.activeButtonIndex = -1;
+      onFinished?.();
+      appApi?.requestRender?.();
+    };
+
+    if (
+      !src ||
+      !root?.Audio ||
+      appApi?.isMuted?.()
+    ) {
+      pauseTimer = setTimeout(
+        finish,
+        520
+      );
+      return true;
+    }
+
+    try {
+      activeAudio?.pause?.();
+      activeAudio = new root.Audio(src);
+      activeAudio.preload = "auto";
+      activeAudio.setAttribute(
+        "playsinline",
+        ""
+      );
+      activeAudio.addEventListener(
+        "ended",
+        finish,
+        { once: true }
+      );
+      activeAudio.addEventListener(
+        "error",
+        finish,
+        { once: true }
+      );
+      activeAudio.play()
+        .catch?.(() => {
+          pauseTimer = setTimeout(
+            finish,
+            520
+          );
+        });
+    } catch (err) {
+      pauseTimer = setTimeout(
+        finish,
+        520
+      );
+    }
+
+    return true;
+  }
+
+  function chooseChunkSequenceMode(mode) {
+    const data = state.activityData;
+    const safeMode = cleanString(mode);
+
+    if (
+      !data ||
+      data.phase !== "mode" ||
+      !["easy", "hard"].includes(
+        safeMode
+      )
+    ) {
+      return false;
+    }
+
+    data.mode = safeMode;
+    data.message =
+      "Listen to each button.";
+    setChunkSequencePhase("explore");
+    appApi?.requestRender?.();
+    return true;
+  }
+
+  function handleChunkSequenceExplore(
+    buttonIndex
+  ) {
+    const data = state.activityData;
+
+    if (
+      !data ||
+      !["explore", "ready"].includes(
+        data.phase
+      )
+    ) {
+      return false;
+    }
+
+    return playChunkSequenceAudio(
+      buttonIndex,
+      () => {
+        const allExplored =
+          markChunkSequenceExplored(
+            data,
+            buttonIndex
+          );
+        data.message = allExplored
+          ? "You heard every button."
+          : "Listen to each button.";
+        setChunkSequencePhase(
+          allExplored ? "ready" : "explore"
+        );
+      }
+    );
+  }
+
+  function beginChunkSequenceChallenge() {
+    const data = state.activityData;
+
+    if (
+      !data ||
+      data.phase !== "ready" ||
+      !data.explored.every(Boolean)
+    ) {
+      return false;
+    }
+
+    data.challengeIndex = 0;
+    data.wrongAt = -1;
+    data.easyMisses = 0;
+    data.hardResets = 0;
+    data.helpAvailable = false;
+    data.helpActive = false;
+    data.message = "Tap them in order.";
+    setChunkSequencePhase("challenge");
+    appApi?.requestRender?.();
+    return true;
+  }
+
+  function finishChunkSequenceMistake(
+    evaluation
+  ) {
+    const data = state.activityData;
+    if (!data) return;
+
+    data.easyMisses =
+      evaluation.easyMisses;
+    data.hardResets =
+      evaluation.hardResets;
+    data.helpAvailable =
+      evaluation.helpAvailable;
+
+    if (evaluation.reset) {
+      data.message = "Oops! Start over!";
+    } else {
+      data.message = "Try that one again!";
+    }
+
+    setChunkSequencePhase("feedback");
+    appApi?.requestRender?.();
+    clearTimeout(pauseTimer);
+    pauseTimer = setTimeout(() => {
+      if (evaluation.reset) {
+        data.challengeIndex =
+          evaluation.nextIndex;
+      }
+      data.wrongAt = -1;
+      data.message = data.helpActive
+        ? "Try the glowing button."
+        : "Tap them in order.";
+      setChunkSequencePhase("challenge");
+      appApi?.requestRender?.();
+    }, state.reducedMotion ? 250 : 780);
+  }
+
+  function handleChunkSequenceChallenge(
+    buttonIndex
+  ) {
+    const data = state.activityData;
+
+    if (
+      !data ||
+      data.phase !== "challenge" ||
+      data.activeButtonIndex >= 0
+    ) {
+      return false;
+    }
+
+    const expected = data.challengeIndex;
+    const evaluation =
+      evaluateChunkSequenceChoice(
+        data,
+        buttonIndex,
+        state.chunks.length
+      );
+
+    if (!evaluation.correct) {
+      data.wrongAt = expected;
+      return playChunkSequenceAudio(
+        buttonIndex,
+        () =>
+          finishChunkSequenceMistake(
+            evaluation
+          )
+      );
+    }
+
+    return playChunkSequenceAudio(
+      buttonIndex,
+      () => {
+        data.challengeIndex =
+          evaluation.nextIndex;
+        data.wrongAt = -1;
+        data.easyMisses = 0;
+        data.helpAvailable = false;
+        data.helpActive = false;
+        data.message = "Tap them in order.";
+
+        if (evaluation.complete) {
+          reportCompletion();
+        }
+      }
+    );
+  }
+
+  function activateChunkSequenceHelp() {
+    const data = state.activityData;
+
+    if (
+      !data ||
+      !data.helpAvailable ||
+      !["challenge", "feedback"].includes(
+        data.phase
+      )
+    ) {
+      return false;
+    }
+
+    clearTimeout(pauseTimer);
+    if (
+      data.mode === "hard" &&
+      data.phase === "feedback"
+    ) {
+      data.challengeIndex = 0;
+    }
+    data.wrongAt = -1;
+    data.helpActive = true;
+    data.helpAvailable = false;
+    data.message = "Try the glowing button.";
+    setChunkSequencePhase("challenge");
+    appApi?.requestRender?.();
     return true;
   }
 
@@ -2506,6 +3202,228 @@
     });
   }
 
+  function chunkSequenceColorStyle(color) {
+    return [
+      `--chunk-button-color:${color?.value || "#40b9c5"}`,
+      `--chunk-button-light:${color?.light || "#79d4dc"}`,
+      `--chunk-button-dark:${color?.dark || "#238e99"}`,
+      `--chunk-button-deep:${color?.deep || "#0d454b"}`
+    ].join(";");
+  }
+
+  function renderChunkSequenceProgressHtml() {
+    const data = state.activityData;
+    const inChallenge = [
+      "challenge",
+      "feedback"
+    ].includes(data?.phase);
+
+    return state.chunks.map((_, index) => {
+      const color = data?.colors?.[index];
+      const complete = inChallenge &&
+        index < data.challengeIndex;
+      const wrong = inChallenge &&
+        index === data.wrongAt;
+      const classes = [
+        "read-chunk-sequence-progress-dot",
+        complete ? "is-complete" : "",
+        wrong ? "is-wrong" : ""
+      ].filter(Boolean).join(" ");
+      const label = wrong
+        ? `Part ${index + 1}, try again`
+        : complete
+          ? `Part ${index + 1}, complete`
+          : `Part ${index + 1}, not complete`;
+
+      return `
+        <span class="${classes}" style="${complete ? chunkSequenceColorStyle(color) : ""}" aria-label="${label}">
+          ${wrong
+            ? `<span aria-hidden="true">×</span>`
+            : `<span aria-hidden="true">${index + 1}</span>`}
+        </span>
+      `;
+    }).join("");
+  }
+
+  function renderChunkSequenceButtonsHtml() {
+    const data = state.activityData;
+    const interactive = [
+      "explore",
+      "ready",
+      "challenge"
+    ].includes(data?.phase);
+
+    return (data?.buttonOrder || [])
+      .map((chunkIndex, visualIndex) => {
+        const color = data.colors[chunkIndex];
+        const active =
+          data.activeButtonIndex ===
+          chunkIndex;
+        const helped =
+          data.helpActive &&
+          data.challengeIndex ===
+            chunkIndex;
+        const classes = [
+          "read-chunk-arcade-button",
+          active ? "is-pushed" : "",
+          helped ? "is-helped" : "",
+          color?.id === "light_gray"
+            ? "is-light-gray"
+            : ""
+        ].filter(Boolean).join(" ");
+
+        return `
+          <button class="${classes}" type="button" data-read-chunk-button="${chunkIndex}" data-no-ui-sound style="${chunkSequenceColorStyle(color)}"${!interactive || data.activeButtonIndex >= 0 ? " disabled" : ""} aria-label="Audio button ${visualIndex + 1}${active ? ", playing" : ""}">
+            <span class="read-chunk-arcade-gloss" aria-hidden="true"></span>
+          </button>
+        `;
+      })
+      .join("");
+  }
+
+  function renderChunkSequenceActionsHtml() {
+    const data = state.activityData;
+
+    if (data?.phase === "mode") {
+      return `
+        <div class="read-chunk-sequence-mode" aria-label="Choose difficulty">
+          <h1>Choose a Mode</h1>
+          <button type="button" data-read-sequence-mode="easy" data-no-ui-sound>
+            <strong>Easy</strong>
+            <span>Keep your correct answers after a mistake.</span>
+          </button>
+          <button type="button" data-read-sequence-mode="hard" data-no-ui-sound>
+            <strong>Hard</strong>
+            <span>A mistake sends you back to the beginning.</span>
+          </button>
+        </div>
+      `;
+    }
+
+    if (data?.phase === "ready") {
+      return `
+        <button class="read-chunk-sequence-action" type="button" data-read-sequence-ready data-no-ui-sound>I’m Ready</button>
+      `;
+    }
+
+    if (data?.helpAvailable) {
+      return `
+        <button class="read-chunk-sequence-action" type="button" data-read-sequence-help data-no-ui-sound>I’d Like Help</button>
+      `;
+    }
+
+    return "";
+  }
+
+  function renderChunkSequenceScreen(
+    idx,
+    verse
+  ) {
+    const data = state.activityData;
+    const manifest =
+      READ_ACTIVITY_MANIFEST[
+        CHUNK_SEQUENCE_ACTIVITY_ID
+      ];
+    const wrap = root.document.createElement(
+      "div"
+    );
+    const count = state.chunks.length;
+    const instruction =
+      state.readTestMode === "early_exit"
+        ? "Early-exit check: use Back before completing"
+        : data?.message ||
+          "Choose how you want to play.";
+
+    wrap.className = [
+      "read-my-verse-screen",
+      "read-chunk-sequence-screen",
+      `has-${count}-buttons`,
+      data?.phase === "mode"
+        ? "is-mode-select"
+        : "",
+      state.reducedMotion
+        ? "is-reduced-motion"
+        : ""
+    ].filter(Boolean).join(" ");
+    wrap.innerHTML = `
+      <button class="read-my-verse-back read-chunk-sequence-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Chunk Audio Matching">‹</button>
+      <main class="read-chunk-sequence-stage" style="${animatedBackgroundStyle(manifest)}">
+        <div class="read-chunk-sequence-progress" role="group" aria-label="Sequence progress">
+          ${renderChunkSequenceProgressHtml()}
+        </div>
+        <div class="read-chunk-sequence-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
+        <div class="read-chunk-sequence-actions">
+          ${renderChunkSequenceActionsHtml()}
+        </div>
+        <section class="read-chunk-sequence-buttons read-chunk-sequence-layout-${count}" aria-label="Audio buttons">
+          ${renderChunkSequenceButtonsHtml()}
+        </section>
+        <div class="read-chunk-sequence-mode-label">${data?.mode ? `${escapeHtml(data.mode)} mode` : escapeHtml(manifest.title)}</div>
+      </main>
+    `;
+
+    wrap.querySelectorAll(
+      "[data-read-sequence-mode]"
+    ).forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        chooseChunkSequenceMode(
+          button.dataset.readSequenceMode
+        );
+      };
+    });
+    wrap.querySelectorAll(
+      "[data-read-chunk-button]"
+    ).forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        const chunkIndex = Number(
+          button.dataset.readChunkButton
+        );
+
+        if (
+          ["explore", "ready"].includes(
+            data.phase
+          )
+        ) {
+          handleChunkSequenceExplore(
+            chunkIndex
+          );
+        } else {
+          handleChunkSequenceChallenge(
+            chunkIndex
+          );
+        }
+      };
+    });
+    const readyButton = wrap.querySelector(
+      "[data-read-sequence-ready]"
+    );
+    if (readyButton) {
+      readyButton.onclick = (event) => {
+        event.preventDefault();
+        beginChunkSequenceChallenge();
+      };
+    }
+    const helpButton = wrap.querySelector(
+      "[data-read-sequence-help]"
+    );
+    if (helpButton) {
+      helpButton.onclick = (event) => {
+        event.preventDefault();
+        activateChunkSequenceHelp();
+      };
+    }
+    bindExitButton(wrap);
+
+    return appApi.makeSlide({
+      idx,
+      bg: "#202020",
+      navHidden: true,
+      inner: wrap
+    });
+  }
+
   function exitSession() {
     const context = getSessionContext();
     const completed = completionReported;
@@ -2547,6 +3465,17 @@
       KEYBOARD_ACTIVITY_ID
     ) {
       return renderKeyboardScreen(
+        idx,
+        verse
+      );
+    }
+
+    if (
+      isChunkSequenceActivity(
+        state.activityId
+      )
+    ) {
+      return renderChunkSequenceScreen(
         idx,
         verse
       );
@@ -2638,6 +3567,8 @@
     KEYBOARD_ACTIVITY_ID,
     UNSCRAMBLE_ACTIVITY_ID,
     TAP_WORDS_ORDER_ACTIVITY_ID,
+    CHUNK_SEQUENCE_ACTIVITY_ID,
+    CHUNK_SEQUENCE_COLORS,
     READ_FEEDBACK_ASSETS,
     READ_TEST_MODES,
     READ_ACTIVITY_MANIFEST,
@@ -2658,7 +3589,14 @@
       readTestMode: state.readTestMode,
       reducedMotion:
         state.reducedMotion,
-      context: getSessionContext()
+      context: getSessionContext(),
+      activityData: state.activityData
+        ? JSON.parse(
+            JSON.stringify(
+              state.activityData
+            )
+          )
+        : null
     }),
     isTypeableCharacter,
     getInitialRevealCount,
@@ -2670,6 +3608,11 @@
     isAnimatedActivity,
     isTypingActivity,
     isWordActivity,
+    isChunkSequenceActivity,
+    chooseChunkSequenceColors,
+    createChunkSequenceData,
+    evaluateChunkSequenceChoice,
+    markChunkSequenceExplored,
     splitWordToken,
     tokenizeChunkWords,
     canScrambleCore,

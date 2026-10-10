@@ -511,6 +511,34 @@
       : null;
   }
 
+  function chooseReviewAssignment({
+    verseHistory = null,
+    activities = [],
+    random = Math.random
+  } = {}) {
+    const history = normalizeVerseHistory(
+      verseHistory
+    );
+    const cadencePosition =
+      history.completedDailyTodos % 3;
+
+    if (cadencePosition === 2) {
+      return {
+        kind: REVIEW_KINDS.FLASHCARD,
+        activityId: ""
+      };
+    }
+
+    return chooseReadActivityAssignment({
+      activities,
+      verseHistory: history,
+      random
+    }) || {
+      kind: REVIEW_KINDS.FLASHCARD,
+      activityId: ""
+    };
+  }
+
   function createDefaultStats() {
     return {
       currentStreak: 0,
@@ -1777,6 +1805,7 @@
     playgroundRegistry = [],
     isPetUnlocked = () => false,
     getPetStatus = () => "locked",
+    getReadActivitiesForVerse = () => [],
     now = new Date(),
     random = Math.random,
     idFactory = null
@@ -1859,11 +1888,32 @@
       };
     }
 
+    let readActivities = [];
+
+    try {
+      const available =
+        getReadActivitiesForVerse(
+          pet.verseId
+        );
+      readActivities = Array.isArray(available)
+        ? available
+        : [];
+    } catch (err) { }
+
+    const reviewAssignment =
+      chooseReviewAssignment({
+        verseHistory:
+          state.byVerse[pet.verseId],
+        activities: readActivities,
+        random
+      });
+
     const plan = createPlan({
       profileId,
       day,
       verseId: pet.verseId,
       activity,
+      reviewAssignment,
       now,
       random,
       idFactory
@@ -2253,6 +2303,7 @@
     normalizeState,
     getVerseHistory,
     chooseReadActivityAssignment,
+    chooseReviewAssignment,
     getRequiredTaskIds,
     resolveTaskId,
     localDayKey,

@@ -178,7 +178,8 @@ function testDailyContextValidation() {
   [
     "keyboard",
     "unscramble",
-    "tap_words_order"
+    "tap_words_order",
+    "chunk_sequence"
   ].forEach((activityId) => {
     const interactiveContext = {
       ...context,
@@ -235,7 +236,10 @@ function testAssetsExist() {
     "verse_images/read_my_verse/keyboard_5.mp3",
     "verse_images/read_my_verse/keyboard_6.mp3",
     "verse_images/read_my_verse/keyboard_7.mp3",
-    "verse_images/daily_questions/dq_incorrect.mp3"
+    "verse_images/daily_questions/dq_incorrect.mp3",
+    "verse_fonts/TitanOne.ttf",
+    "verse_images/read_my_verse/simon_says_phone.png",
+    "verse_images/read_my_verse/simon_says_ipad.png"
   ];
 
   assets.forEach((asset) => {
@@ -286,6 +290,164 @@ function testInteractiveActivityManifest() {
     ),
     true
   );
+}
+
+function testChunkAudioMatchingRules() {
+  const manifest =
+    ReadMyVerse.READ_ACTIVITY_MANIFEST
+      .chunk_sequence;
+
+  assert.strictEqual(
+    manifest.title,
+    "Chunk Audio Matching"
+  );
+  assert.strictEqual(manifest.enabled, true);
+  assert.strictEqual(
+    ReadMyVerse.isChunkSequenceActivity(
+      "chunk_sequence"
+    ),
+    true
+  );
+
+  for (let count = 2; count <= 8; count += 1) {
+    const colors =
+      ReadMyVerse.chooseChunkSequenceColors(
+        count,
+        () => 0.41
+      );
+
+    assert.strictEqual(colors.length, count);
+    assert.strictEqual(
+      new Set(
+        colors.map((color) => color.id)
+      ).size,
+      count
+    );
+    assert.strictEqual(
+      colors.some(
+        (color) => color.id === "gray"
+      ),
+      count === 8
+    );
+  }
+
+  const easy =
+    ReadMyVerse.createChunkSequenceData(
+      5,
+      "sequence_challenge",
+      () => 0.23
+    );
+  easy.mode = "easy";
+  easy.challengeIndex = 2;
+
+  const explore =
+    ReadMyVerse.createChunkSequenceData(
+      2,
+      "normal",
+      () => 0.17
+    );
+  assert.strictEqual(explore.phase, "mode");
+  explore.phase = "explore";
+  assert.strictEqual(
+    ReadMyVerse.markChunkSequenceExplored(
+      explore,
+      0
+    ),
+    false
+  );
+  assert.strictEqual(
+    ReadMyVerse.markChunkSequenceExplored(
+      explore,
+      1
+    ),
+    true
+  );
+
+  let result =
+    ReadMyVerse.evaluateChunkSequenceChoice(
+      easy,
+      4,
+      5
+    );
+  assert.strictEqual(result.correct, false);
+  assert.strictEqual(result.reset, false);
+  assert.strictEqual(result.nextIndex, 2);
+  assert.strictEqual(result.easyMisses, 1);
+
+  easy.easyMisses = 2;
+  result =
+    ReadMyVerse.evaluateChunkSequenceChoice(
+      easy,
+      4,
+      5
+    );
+  assert.strictEqual(
+    result.helpAvailable,
+    true
+  );
+
+  const hard = {
+    ...easy,
+    mode: "hard",
+    hardResets: 2
+  };
+  result =
+    ReadMyVerse.evaluateChunkSequenceChoice(
+      hard,
+      4,
+      5
+    );
+  assert.strictEqual(result.reset, true);
+  assert.strictEqual(result.nextIndex, 0);
+  assert.strictEqual(result.hardResets, 3);
+  assert.strictEqual(
+    result.helpAvailable,
+    true
+  );
+
+  result =
+    ReadMyVerse.evaluateChunkSequenceChoice(
+      {
+        ...easy,
+        challengeIndex: 4
+      },
+      4,
+      5
+    );
+  assert.strictEqual(result.correct, true);
+  assert.strictEqual(result.complete, true);
+}
+
+function testChunkAudioMatchingEligibility() {
+  const verse = (count) => ({
+    id: `chunks_${count}`,
+    verseText: Array.from(
+      { length: count },
+      (_, index) => `Part ${index + 1}`
+    ).join(" "),
+    echoParts: Array.from(
+      { length: count },
+      (_, index) => `Part ${index + 1}`
+    )
+  });
+
+  assert.strictEqual(
+    ReadMyVerse.isActivityEligibleForVerse(
+      "chunk_sequence",
+      verse(1)
+    ),
+    false
+  );
+
+  for (let count = 2; count <= 8; count += 1) {
+    assert.strictEqual(
+      ReadMyVerse.isActivityEligibleForVerse(
+        "chunk_sequence",
+        verse(count)
+      ),
+      true
+    );
+  }
 }
 
 function testScramblePreservesLettersAndPunctuation() {
@@ -858,6 +1020,8 @@ function main() {
     testAssetsExist,
     testAnimatedActivityManifest,
     testInteractiveActivityManifest,
+    testChunkAudioMatchingRules,
+    testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
