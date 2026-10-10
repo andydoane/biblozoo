@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_10_generated_questions_a";
+const CACHE_VERSION = "2026_Oct_10_generated_questions_7a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -33,6 +33,7 @@ const CORE_PATHS = [
   "./read_my_verse.css",
   "./profiles.js",
   "./daily_questions_feed_game.js",
+  "./safe_word_scramble.js",
   "./daily_question_generators.js",
   "./daily_questions.js",
   "./flashcards/audio-effects.js",

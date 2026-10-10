@@ -4,6 +4,7 @@ const assert = require("assert");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const ScrambleSafety = require("../safe_word_scramble.js");
 
 const ReadMyVerse = require(
   "../read_my_verse.js"
@@ -1011,8 +1012,27 @@ function testEveryVerseChunkRecordingExists() {
   });
 }
 
+function testSafeWordScrambles() {
+  assert.strictEqual(ScrambleSafety.isSafeWord("SHIT"), false);
+  assert.strictEqual(ScrambleSafety.isSafeWord("friendly"), true);
+  for (let seed = 0; seed < 1000; seed += 1) {
+    let state = (seed + 1) >>> 0;
+    const random = () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state / 4294967296;
+    };
+    const scrambled = ReadMyVerse.scrambleCore("THIS", random);
+    assert.ok(scrambled === null || ScrambleSafety.isSafeWord(scrambled));
+  }
+  const puzzle = ReadMyVerse.buildUnscramblePuzzle("THIS is the Word.", () => 0.5);
+  assert.ok(puzzle.tokens.every((token) =>
+    !token.required || ScrambleSafety.isSafeWord(token.scrambled)
+  ));
+}
+
 function main() {
   const tests = [
+    testSafeWordScrambles,
     testOneTapRevealsOneActualCharacter,
     testChunkTextPreservesPunctuation,
     testOneThroughEightChunkFilenames,

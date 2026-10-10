@@ -4,6 +4,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const Generators = require("../daily_question_generators.js");
+const ScrambleSafety = require("../safe_word_scramble.js");
 
 const rootDir = path.resolve(__dirname, "..");
 const dataDir = path.join(rootDir, "verse_data");
@@ -56,16 +57,8 @@ function sortedLetters(value) {
 }
 
 function assertMask(original, masked, label) {
-  const before = Array.from(original);
-  const after = Array.from(masked);
-  assert.strictEqual(after.length, before.length, `${label} mask length`);
-  before.forEach((character, index) => {
-    assert.strictEqual(
-      after[index],
-      /[\p{L}\p{N}]/u.test(character) ? "?" : character,
-      `${label} mask preserves punctuation`
-    );
-  });
+  assert.ok(original, `${label} has a target`);
+  assert.strictEqual(masked, "???", `${label} fixed mask`);
 }
 
 function assertQuestion(result, verse, verseById, label) {
@@ -120,6 +113,11 @@ function assertQuestion(result, verse, verseById, label) {
         sortedLetters(question.metadata.targetWord),
         `${label} same scramble letters`
       );
+      assert.strictEqual(
+        ScrambleSafety.isSafeWord(question.metadata.scrambledWord),
+        true,
+        `${label} safe scramble`
+      );
       break;
     case "imposter_word":
       assert.strictEqual(
@@ -164,6 +162,16 @@ function assertQuestion(result, verse, verseById, label) {
       );
       assert.ok(!words.has(question.metadata.outsiderNormalized), `${label} outsider absent`);
       assert.notStrictEqual(question.metadata.outsiderVerseId, verse.verseId);
+      const hideWords = new Set(
+        Generators.resolveHidePlanEntries(verse).map((entry) => entry.normalized)
+      );
+      if (hideWords.size >= 2) {
+        question.choices.filter((_, index) => index !== question.answer)
+          .forEach((choice) => assert.ok(
+            hideWords.has(Generators.normalizeComparison(choice.label)),
+            `${label} prefers target Hide Plan words`
+          ));
+      }
       break;
     case "first_word":
     case "last_word": {
@@ -174,6 +182,7 @@ function assertQuestion(result, verse, verseById, label) {
       break;
     }
     case "does_this_belong": {
+      assert.deepStrictEqual(question.choices.map((choice) => choice.label), ["Yes", "No"]);
       assert.strictEqual(answer.label === "Yes", question.metadata.belongs, `${label} Yes/No`);
       if (question.metadata.belongs) {
         assert.strictEqual(question.metadata.sourceVerseId, verse.verseId);
@@ -187,14 +196,18 @@ function assertQuestion(result, verse, verseById, label) {
     case "sounds_like":
       assert.strictEqual(
         question.media?.src,
-        `./verse_audio/${question.metadata.sourceVerseId}.mp3`,
-        `${label} body recording`
+        `./verse_audio/${question.metadata.sourceVerseId}${String.fromCharCode(97 + question.metadata.chunkIndex)}.mp3`,
+        `${label} chunk recording`
       );
       assert.ok(!question.media.src.includes("_ref"), `${label} excludes reference audio`);
       assert.ok(
         fs.existsSync(path.join(rootDir, question.media.src.replace(/^\.\//, ""))),
         `${label} audio exists`
       );
+      assert.deepStrictEqual(question.choices.map((choice) => choice.label), ["Yes", "No"]);
+      const sourceVerse = verseById.get(question.metadata.sourceVerseId);
+      assert.ok(sourceVerse?.echoParts?.[question.metadata.chunkIndex]);
+      assert.strictEqual(question.metadata.chunkText, sourceVerse.echoParts[question.metadata.chunkIndex]);
       assert.strictEqual(answer.label === "Yes", question.metadata.belongs);
       assert.strictEqual(
         question.metadata.belongs,
@@ -276,11 +289,23 @@ function testShortDevelopmentVerse(verses) {
   assert.ok(report.some((entry) => !entry.eligible));
 }
 
+function testSafeScrambleSeeds() {
+  assert.strictEqual(ScrambleSafety.isSafeWord("SHIT"), false);
+  for (let index = 0; index < 1000; index += 1) {
+    const scrambled = Generators.scrambleWord(
+      "THIS",
+      Generators.createSeededRandom(`safe-scramble-${index}`)
+    );
+    assert.ok(!scrambled || ScrambleSafety.isSafeWord(scrambled));
+  }
+}
+
 const verses = loadVerses();
 assert.strictEqual(Generators.GENERATOR_TYPES.length, 10);
 const counts = validateAll(verses);
 testSelection(verses);
 testShortDevelopmentVerse(verses);
+testSafeScrambleSeeds();
 console.log(
   `Generated-question validation passed for ${verses.length} published verses ` +
   `(${counts.eligible} eligible samples, ${counts.ineligible} safe ineligible samples).`

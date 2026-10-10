@@ -11,6 +11,10 @@
 })(typeof window !== "undefined" ? window : null, function (root) {
   "use strict";
 
+  const ScrambleSafety = typeof module === "object" && module.exports
+    ? require("./safe_word_scramble.js")
+    : root?.BibloZooSafeWordScramble;
+
   const ASSET_BASE =
     "./verse_images/read_my_verse/";
   const AUDIO_BASE = "./verse_audio/";
@@ -590,6 +594,10 @@
       return null;
     }
 
+    const isAcceptable = (candidate) =>
+      candidate.join("") !== original.join("") &&
+      ScrambleSafety?.isSafeWord(candidate.join("")) === true;
+
     let scrambled = original;
 
     for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -598,10 +606,7 @@
         random
       );
 
-      if (
-        candidate.join("") !==
-        original.join("")
-      ) {
+      if (isAcceptable(candidate)) {
         scrambled = candidate;
         break;
       }
@@ -621,14 +626,15 @@
           ...original.slice(0, shift)
         ];
 
-        if (
-          candidate.join("") !==
-          original.join("")
-        ) {
+        if (isAcceptable(candidate)) {
           scrambled = candidate;
           break;
         }
       }
+    }
+
+    if (!isAcceptable(scrambled)) {
+      return null;
     }
 
     const result = [...characters];

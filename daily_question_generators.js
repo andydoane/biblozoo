@@ -11,6 +11,10 @@
 })(typeof window !== "undefined" ? window : null, function () {
   "use strict";
 
+  const ScrambleSafety = typeof module === "object" && module.exports
+    ? require("./safe_word_scramble.js")
+    : window.BibloZooSafeWordScramble;
+
   const CONTEXT_WORD_LIMIT = 7;
   const ANDYMOJI_BASE =
     "./verse_images/andymoji/";
@@ -373,13 +377,10 @@
   }
 
   function maskWord(value) {
-    return Array.from(String(value ?? ""))
-      .map((character) =>
-        /[\p{L}\p{N}]/u.test(character)
-          ? "?"
-          : character
-      )
-      .join("");
+    // Target tokens contain only word characters and optional apostrophes.
+    // All targets use a fixed-length clue; punctuation outside the token
+    // remains intact in the original context window.
+    return "???";
   }
 
   function canScrambleWord(value) {
@@ -414,12 +415,14 @@
 
     if (!canScrambleWord(value)) return "";
 
+    const isAcceptable = (candidate) =>
+      candidate.join("") !== original.join("") &&
+      ScrambleSafety?.isSafeWord(candidate.join("")) === true;
+
     let scrambled = original;
     for (let attempt = 0; attempt < 16; attempt += 1) {
       const candidate = shuffle(original, random);
-      if (
-        candidate.join("") !== original.join("")
-      ) {
+      if (isAcceptable(candidate)) {
         scrambled = candidate;
         break;
       }
@@ -431,16 +434,14 @@
           ...original.slice(shift),
           ...original.slice(0, shift)
         ];
-        if (
-          candidate.join("") !== original.join("")
-        ) {
+        if (isAcceptable(candidate)) {
           scrambled = candidate;
           break;
         }
       }
     }
 
-    if (scrambled.join("") === original.join("")) {
+    if (!isAcceptable(scrambled)) {
       return "";
     }
 
@@ -993,9 +994,27 @@
     const targetTokens = uniqueTokens(
       tokenizeWords(getVerseText(verse))
     );
-    const targetChoices = shuffle(
-      targetTokens,
-      random
+    const hideWords = new Set(
+      resolveHidePlanEntries(verse)
+        .map((entry) => entry.normalized)
+    );
+    const commonWords = new Set([
+      "a", "an", "and", "are", "as", "at", "be", "but",
+      "by", "for", "from", "he", "in", "is", "it", "of",
+      "on", "or", "the", "to", "was", "were", "with"
+    ]);
+    const shuffled = shuffle(targetTokens, random);
+    const targetChoices = [
+      ...shuffled.filter((token) =>
+        hideWords.has(token.normalized)
+      ),
+      ...shuffled.filter((token) =>
+        token.normalized.length >= 4 &&
+        !commonWords.has(token.normalized)
+      ),
+      ...shuffled
+    ].filter((token, index, all) =>
+      all.indexOf(token) === index
     ).slice(0, 2);
     const outsider = chooseRandom(
       getOutsiderCandidates(verse, verses),
@@ -1151,16 +1170,14 @@
     return candidates;
   }
 
-  function yesNoChoices(answerYes, random) {
-    const correctKey = answerYes ? "yes" : "no";
-    return arrangeChoices(
-      [
-        { key: "yes", ...makeTextChoice("Yes") },
-        { key: "no", ...makeTextChoice("No") }
+  function yesNoChoices(answerYes) {
+    return {
+      choices: [
+        makeTextChoice("Yes"),
+        makeTextChoice("No")
       ],
-      correctKey,
-      random
-    );
+      answer: answerYes ? 0 : 1
+    };
   }
 
   function generateDoesThisBelong(
@@ -1222,20 +1239,27 @@
     random
   ) {
     const type = "sounds_like";
-    const others = getOtherVerses(
-      verse,
-      verses
-    );
-    if (!getVerseId(verse) || !others.length) {
-      return ineligible(type, "Another published verse recording is required.");
+    const hasChunks = (candidate) =>
+      Array.isArray(candidate?.echoParts) &&
+      candidate.echoParts.length >= 1 &&
+      candidate.echoParts.length <= 8 &&
+      candidate.echoParts.every((chunk) => cleanString(chunk));
+    const others = getOtherVerses(verse, verses)
+      .filter(hasChunks);
+    if (!getVerseId(verse) || !hasChunks(verse) || !others.length) {
+      return ineligible(type, "Two verses with chunk recordings are required.");
     }
 
     const belongs = random() < 0.5;
     const sourceVerse = belongs
       ? verse
       : chooseRandom(others, random);
-    const sourceVerseId =
-      getVerseId(sourceVerse);
+    const sourceVerseId = getVerseId(sourceVerse);
+    const chunkIndex = randomIndex(
+      sourceVerse.echoParts.length, random
+    );
+    const suffix = String.fromCharCode(97 + chunkIndex);
+    const chunkAudio = `${AUDIO_BASE}${sourceVerseId}${suffix}.mp3`;
     const arranged = yesNoChoices(
       belongs,
       random
@@ -1251,14 +1275,17 @@
       showReferencePill: true,
       media: {
         kind: "audio",
-        src: `${AUDIO_BASE}${sourceVerseId}.mp3`,
+        src: chunkAudio,
         sourceVerseId,
+        chunkIndex,
         belongs
       },
       metadata: {
         verseId: getVerseId(verse),
         belongs,
-        sourceVerseId
+        sourceVerseId,
+        chunkIndex,
+        chunkText: sourceVerse.echoParts[chunkIndex]
       }
     });
   }
