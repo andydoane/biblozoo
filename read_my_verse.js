@@ -16,7 +16,20 @@
   const AUDIO_BASE = "./verse_audio/";
   const TYPEWRITER_ACTIVITY_ID =
     "typewriter";
+  const VERSE_CRAWL_ACTIVITY_ID =
+    "star_wars";
+  const BALLOONS_ACTIVITY_ID =
+    "balloons";
+  const FISH_ACTIVITY_ID = "fish";
   const CHUNK_PAUSE_MS = 480;
+  const READ_TEST_MODES =
+    Object.freeze([
+      "normal",
+      "one_chunk",
+      "many_chunk",
+      "reduced_motion",
+      "early_exit"
+    ]);
   const READ_ACTIVITY_MANIFEST =
     Object.freeze({
       typewriter: Object.freeze({
@@ -36,6 +49,49 @@
         ]),
         font:
           "./verse_fonts/SpecialElite-Regular.ttf"
+      }),
+      star_wars: Object.freeze({
+        id: VERSE_CRAWL_ACTIVITY_ID,
+        title: "Verse Crawl",
+        enabled: true,
+        backgrounds: Object.freeze({
+          phone:
+            `${ASSET_BASE}starfield_phone.png`,
+          ipad:
+            `${ASSET_BASE}starfield_ipad.png`
+        })
+      }),
+      balloons: Object.freeze({
+        id: BALLOONS_ACTIVITY_ID,
+        title: "Balloons",
+        enabled: true,
+        decorations: Object.freeze({
+          red:
+            `${ASSET_BASE}red_balloon.png`,
+          blue:
+            `${ASSET_BASE}blue_balloon.png`
+        })
+      }),
+      fish: Object.freeze({
+        id: FISH_ACTIVITY_ID,
+        title: "Fish",
+        enabled: true,
+        backgrounds: Object.freeze({
+          phone:
+            `${ASSET_BASE}underwater_phone.png`,
+          ipad:
+            `${ASSET_BASE}underwater_ipad.png`
+        }),
+        decorations: Object.freeze({
+          small:
+            `${ASSET_BASE}fish_small.png`,
+          medium:
+            `${ASSET_BASE}fish_medium.png`,
+          long:
+            `${ASSET_BASE}fish_long.png`,
+          hook:
+            `${ASSET_BASE}fish_hook.png`
+        })
       })
     });
 
@@ -44,6 +100,7 @@
   let keySoundAudio = [];
   let audioRequest = 0;
   let pauseTimer = 0;
+  let animationTimer = 0;
   let wordFeedbackTimer = 0;
   let lastKeySoundIndex = -1;
   let completionReported = false;
@@ -57,7 +114,11 @@
     chunkIndex: 0,
     revealCount: 0,
     phase: "idle",
-    activatedCharacterIndex: -1
+    activatedCharacterIndex: -1,
+    readTestMode: "normal",
+    reducedMotion: false,
+    animationKey: "",
+    decorations: []
   };
 
   function cleanString(value) {
@@ -222,6 +283,92 @@
       : "";
   }
 
+  function isAnimatedActivity(activityId) {
+    return [
+      VERSE_CRAWL_ACTIVITY_ID,
+      BALLOONS_ACTIVITY_ID,
+      FISH_ACTIVITY_ID
+    ].includes(cleanString(activityId));
+  }
+
+  function normalizeReadTestMode(
+    mode,
+    previewScope
+  ) {
+    const safeMode = cleanString(mode);
+
+    if (
+      previewScope === "read_test" &&
+      READ_TEST_MODES.includes(safeMode)
+    ) {
+      return safeMode;
+    }
+
+    return "normal";
+  }
+
+  function prefersReducedMotion() {
+    if (
+      state.readTestMode ===
+      "reduced_motion"
+    ) {
+      return true;
+    }
+
+    try {
+      return root?.matchMedia?.(
+        "(prefers-reduced-motion: reduce)"
+      )?.matches === true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function getAnimatedActivityTiming(
+    activityId,
+    wordCount = 1,
+    reducedMotion = false
+  ) {
+    const count = Math.max(
+      1,
+      Math.floor(Number(wordCount) || 1)
+    );
+
+    if (reducedMotion) {
+      return Object.freeze({
+        wordStaggerMs: 45,
+        audioStartMs: 520
+      });
+    }
+
+    if (
+      activityId ===
+      VERSE_CRAWL_ACTIVITY_ID
+    ) {
+      return Object.freeze({
+        wordStaggerMs: 0,
+        audioStartMs: 5200
+      });
+    }
+
+    if (
+      activityId ===
+      BALLOONS_ACTIVITY_ID
+    ) {
+      return Object.freeze({
+        wordStaggerMs: 620,
+        audioStartMs:
+          1850 + (count - 1) * 620
+      });
+    }
+
+    return Object.freeze({
+      wordStaggerMs: 560,
+      audioStartMs:
+        1650 + (count - 1) * 560
+    });
+  }
+
   function validateContext(
     context,
     verseId,
@@ -243,7 +390,12 @@
       readActivityId:
         cleanString(context.readActivityId),
       previewScope:
-        cleanString(context.previewScope)
+        cleanString(context.previewScope),
+      readTestMode:
+        normalizeReadTestMode(
+          context.readTestMode,
+          cleanString(context.previewScope)
+        )
     };
 
     if (
@@ -259,8 +411,9 @@
         cleanString(verseId) ||
       normalized.readActivityId !==
         cleanString(activityId) ||
-      normalized.readActivityId !==
-        TYPEWRITER_ACTIVITY_ID
+      !READ_ACTIVITY_MANIFEST[
+        normalized.readActivityId
+      ]?.enabled
     ) {
       return null;
     }
@@ -308,8 +461,10 @@
 
   function clearTimers() {
     clearTimeout(pauseTimer);
+    clearTimeout(animationTimer);
     clearTimeout(wordFeedbackTimer);
     pauseTimer = 0;
+    animationTimer = 0;
     wordFeedbackTimer = 0;
   }
 
@@ -327,6 +482,10 @@
     state.revealCount = 0;
     state.phase = "idle";
     state.activatedCharacterIndex = -1;
+    state.readTestMode = "normal";
+    state.reducedMotion = false;
+    state.animationKey = "";
+    state.decorations = [];
   }
 
   function initialize(nextApi) {
@@ -368,10 +527,15 @@
       return false;
     }
 
-    const chunks = buildDisplayChunks(
-      verse.verseText,
-      verse.echoParts
-    );
+    const oneChunkPreview =
+      validatedContext.readTestMode ===
+      "one_chunk";
+    const chunks = oneChunkPreview
+      ? [String(verse.verseText || "")]
+      : buildDisplayChunks(
+          verse.verseText,
+          verse.echoParts
+        );
 
     if (
       !chunks.length ||
@@ -385,14 +549,30 @@
     state.context = validatedContext;
     state.chunks = chunks;
     state.usesChunkAudio =
+      !oneChunkPreview &&
       Array.isArray(verse.echoParts) &&
       verse.echoParts.length > 0;
     state.chunkIndex = 0;
     state.revealCount =
       getInitialRevealCount(chunks[0]);
-    state.phase = "typing";
+    state.readTestMode =
+      validatedContext.readTestMode;
+    state.reducedMotion =
+      prefersReducedMotion();
+    state.phase = isAnimatedActivity(
+      safeActivityId
+    )
+      ? "animating"
+      : "typing";
+    state.decorations =
+      createDecorations(safeActivityId);
 
-    ensureKeySoundAudio();
+    if (
+      safeActivityId ===
+      TYPEWRITER_ACTIVITY_ID
+    ) {
+      ensureKeySoundAudio();
+    }
 
     return true;
   }
@@ -568,7 +748,12 @@
 
     if (handled === false) {
       completionReported = false;
-      state.phase = "typing";
+      state.phase = isAnimatedActivity(
+        state.activityId
+      )
+        ? "animating"
+        : "typing";
+      state.animationKey = "";
       appApi?.requestRender?.();
     }
   }
@@ -594,8 +779,15 @@
       getInitialRevealCount(
         state.chunks[state.chunkIndex]
       );
-    state.phase = "typing";
+    state.phase = isAnimatedActivity(
+      state.activityId
+    )
+      ? "animating"
+      : "typing";
     state.activatedCharacterIndex = -1;
+    state.animationKey = "";
+    state.decorations =
+      createDecorations(state.activityId);
     appApi?.requestRender?.();
   }
 
@@ -673,6 +865,59 @@
     pauseTimer = setTimeout(
       playCurrentChunk,
       CHUNK_PAUSE_MS
+    );
+  }
+
+  function beginAnimatedChunkAudio() {
+    if (state.phase !== "animating") {
+      return;
+    }
+
+    state.phase = "pause";
+    appApi?.requestRender?.();
+    pauseTimer = setTimeout(
+      playCurrentChunk,
+      state.reducedMotion ? 80 : 180
+    );
+  }
+
+  function scheduleAnimatedChunk() {
+    if (
+      state.phase !== "animating" ||
+      !isAnimatedActivity(
+        state.activityId
+      )
+    ) {
+      return;
+    }
+
+    const key = [
+      state.activityId,
+      state.verseId,
+      state.chunkIndex,
+      state.context?.launchToken || ""
+    ].join(":");
+
+    if (state.animationKey === key) {
+      return;
+    }
+
+    state.animationKey = key;
+    clearTimeout(animationTimer);
+
+    const wordCount = getChunkWords(
+      state.chunks[state.chunkIndex]
+    ).length;
+    const timing =
+      getAnimatedActivityTiming(
+        state.activityId,
+        wordCount,
+        state.reducedMotion
+      );
+
+    animationTimer = setTimeout(
+      beginAnimatedChunkAudio,
+      timing.audioStartMs
     );
   }
 
@@ -827,6 +1072,293 @@
       .join("");
   }
 
+  function getChunkWords(text) {
+    return String(text || "")
+      .trim()
+      .split(/\s+/u)
+      .filter(Boolean);
+  }
+
+  function createDecorations(activityId) {
+    if (
+      activityId ===
+      BALLOONS_ACTIVITY_ID
+    ) {
+      const colors = ["red", "blue"];
+      return Array.from(
+        { length: Math.random() < 0.48 ? 1 : 2 },
+        (_, index) => ({
+          id: `balloon-${index}`,
+          kind:
+            colors[
+              Math.floor(
+                Math.random() *
+                colors.length
+              )
+            ],
+          left: 8 + Math.random() * 78,
+          delay: 0.3 + Math.random() * 1.8
+        })
+      );
+    }
+
+    if (activityId === FISH_ACTIVITY_ID) {
+      const kinds = [
+        "small",
+        "medium",
+        "long"
+      ];
+      return Array.from(
+        { length: Math.random() < 0.52 ? 1 : 2 },
+        (_, index) => ({
+          id: `fish-${index}`,
+          kind:
+            kinds[
+              Math.floor(
+                Math.random() *
+                kinds.length
+              )
+            ],
+          top: 25 + Math.random() * 52,
+          delay: 0.2 + Math.random() * 2.2
+        })
+      );
+    }
+
+    return [];
+  }
+
+  function animatedBackgroundStyle(
+    manifest
+  ) {
+    const phone = cleanString(
+      manifest?.backgrounds?.phone
+    );
+    const ipad = cleanString(
+      manifest?.backgrounds?.ipad
+    );
+
+    return [
+      phone
+        ? `--read-bg-phone:url('${phone}')`
+        : "",
+      ipad
+        ? `--read-bg-ipad:url('${ipad}')`
+        : ""
+    ].filter(Boolean).join(";");
+  }
+
+  function renderCrawlChunkHtml(chunk) {
+    return `
+      <div class="read-crawl-window">
+        <div class="read-crawl-chunk">${escapeHtml(chunk)}</div>
+      </div>
+    `;
+  }
+
+  function renderBalloonWordsHtml(
+    chunk,
+    timing
+  ) {
+    return `
+      <div class="read-balloon-words" aria-label="${escapeHtml(chunk)}">
+        ${getChunkWords(chunk).map(
+          (word, index) => `
+            <span class="read-balloon-word" style="--read-word-index:${index};--read-word-delay:${index * timing.wordStaggerMs}ms;--read-lane-offset:${(((index * 37) % 5) - 2) * 8}vw">${escapeHtml(word)}</span>
+          `
+        ).join("")}
+      </div>
+    `;
+  }
+
+  function renderFishWordsHtml(
+    chunk,
+    timing
+  ) {
+    return `
+      <div class="read-fish-words" aria-label="${escapeHtml(chunk)}">
+        ${getChunkWords(chunk).map(
+          (word, index) => `
+            <span class="read-fish-word" style="--read-word-index:${index};--read-word-delay:${index * timing.wordStaggerMs}ms;--read-word-top:${19 + (index % 4) * 17}%">${escapeHtml(word)}</span>
+          `
+        ).join("")}
+      </div>
+    `;
+  }
+
+  function renderBalloonDecorationsHtml(
+    manifest
+  ) {
+    return state.decorations.map(
+      (decoration) => `
+        <button class="read-decorative-balloon" type="button" data-read-decoration aria-label="Pop decorative balloon" style="--read-decor-left:${decoration.left.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
+          <img src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-image-missing')">
+          <span class="read-balloon-string" aria-hidden="true"></span>
+        </button>
+      `
+    ).join("");
+  }
+
+  function renderFishDecorationsHtml(
+    manifest
+  ) {
+    return state.decorations.map(
+      (decoration) => `
+        <button class="read-decorative-fish" type="button" data-read-decoration aria-label="Catch decorative fish" style="--read-decor-top:${decoration.top.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
+          <span class="read-fish-hook-line" aria-hidden="true"></span>
+          <img class="read-fish-hook" src="${escapeHtml(manifest.decorations?.hook || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-hook-missing')">
+          <span class="read-fish-hook-fallback" aria-hidden="true">J</span>
+          <img class="read-fish-image" src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-image-missing')">
+          <span class="read-fish-fallback" aria-hidden="true"></span>
+        </button>
+      `
+    ).join("");
+  }
+
+  function bindDecorativeInteractions(wrap) {
+    wrap.querySelectorAll(
+      "[data-read-decoration]"
+    ).forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (
+          button.classList.contains(
+            "is-activated"
+          )
+        ) {
+          return;
+        }
+
+        button.classList.add(
+          "is-activated"
+        );
+        button.disabled = true;
+      };
+    });
+  }
+
+  function renderAnimatedScreen(idx, verse) {
+    const manifest =
+      READ_ACTIVITY_MANIFEST[
+        state.activityId
+      ];
+    const chunk =
+      state.chunks[state.chunkIndex] || "";
+    const words = getChunkWords(chunk);
+    const timing =
+      getAnimatedActivityTiming(
+        state.activityId,
+        words.length,
+        state.reducedMotion
+      );
+    const activityClass =
+      state.activityId ===
+      VERSE_CRAWL_ACTIVITY_ID
+        ? "crawl"
+        : state.activityId;
+    const isListening = [
+      "pause",
+      "playing"
+    ].includes(state.phase);
+    const previewHint =
+      state.readTestMode === "early_exit"
+        ? "Early-exit check: use Back before it finishes"
+        : isListening
+          ? "Listen to this part"
+          : state.activityId ===
+              BALLOONS_ACTIVITY_ID
+            ? "Watch the words float"
+            : state.activityId ===
+                FISH_ACTIVITY_ID
+              ? "Watch the words swim"
+              : "Watch the verse rise";
+    let activityHtml = "";
+    let decorationsHtml = "";
+
+    if (
+      state.activityId ===
+      VERSE_CRAWL_ACTIVITY_ID
+    ) {
+      activityHtml =
+        renderCrawlChunkHtml(chunk);
+    } else if (
+      state.activityId ===
+      BALLOONS_ACTIVITY_ID
+    ) {
+      activityHtml =
+        renderBalloonWordsHtml(
+          chunk,
+          timing
+        );
+      decorationsHtml =
+        renderBalloonDecorationsHtml(
+          manifest
+        );
+    } else {
+      activityHtml = renderFishWordsHtml(
+        chunk,
+        timing
+      );
+      decorationsHtml =
+        renderFishDecorationsHtml(
+          manifest
+        );
+    }
+
+    const wrap = root.document.createElement(
+      "div"
+    );
+    wrap.className = [
+      "read-my-verse-screen",
+      "read-animated-screen",
+      `read-${activityClass}-screen`,
+      state.reducedMotion
+        ? "is-reduced-motion"
+        : ""
+    ].filter(Boolean).join(" ");
+    wrap.innerHTML = `
+      <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit ${escapeHtml(manifest.title)}">‹</button>
+      <main class="read-animated-stage${isListening ? " is-listening" : ""}" style="${animatedBackgroundStyle(manifest)}">
+        <header class="read-animated-header">
+          <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
+          <div class="read-animated-title">${escapeHtml(manifest.title)}</div>
+          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(previewHint)}</div>
+        </header>
+        <section class="read-animated-scene" aria-label="${escapeHtml(chunk)}">
+          ${activityHtml}
+          <div class="read-animated-decorations" aria-hidden="false">${decorationsHtml}</div>
+        </section>
+        <div class="read-animated-progress" aria-live="polite">Part ${state.chunkIndex + 1} of ${state.chunks.length}</div>
+      </main>
+    `;
+
+    wrap.querySelector(
+      "[data-read-exit]"
+    ).onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      exitSession();
+    };
+    bindDecorativeInteractions(wrap);
+    scheduleAnimatedChunk();
+
+    return appApi.makeSlide({
+      idx,
+      bg:
+        state.activityId ===
+        VERSE_CRAWL_ACTIVITY_ID
+          ? "#030815"
+          : state.activityId ===
+              FISH_ACTIVITY_ID
+            ? "#197ea7"
+            : "#82d7f4",
+      navHidden: true,
+      inner: wrap
+    });
+  }
+
   function exitSession() {
     const context = getSessionContext();
     const completed = completionReported;
@@ -852,18 +1384,40 @@
       return null;
     }
 
+    if (
+      isAnimatedActivity(
+        state.activityId
+      )
+    ) {
+      return renderAnimatedScreen(
+        idx,
+        verse
+      );
+    }
+
     const wrap = root.document.createElement(
       "div"
     );
     const isLocked = state.phase !== "typing";
+    const typewriterInstruction =
+      state.readTestMode === "early_exit"
+        ? "Early-exit check: use Back before finishing"
+        : isLocked
+          ? "Listen to this part"
+          : "Tap to type the verse";
 
-    wrap.className =
-      "read-my-verse-screen read-typewriter-screen";
+    wrap.className = [
+      "read-my-verse-screen",
+      "read-typewriter-screen",
+      state.reducedMotion
+        ? "is-reduced-motion"
+        : ""
+    ].filter(Boolean).join(" ");
     wrap.innerHTML = `
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Typewriter">‹</button>
       <main class="read-typewriter-stage${isLocked ? " is-input-locked" : ""}" data-read-type-area data-no-ui-sound role="button" tabindex="0" aria-label="Tap to type ${escapeHtml(verse.ref || state.verseId)}">
         <div class="read-typewriter-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-        <div class="read-typewriter-instruction">${isLocked ? "Listen to this part" : "Tap to type the verse"}</div>
+        <div class="read-typewriter-instruction">${typewriterInstruction}</div>
         <section class="learn-stage read-typewriter-paper" aria-label="${escapeHtml(verse.verseText)}">
           <div class="smart-learn-text read-typewriter-fit" data-smart-learn-text data-smart-fit-text="${escapeHtml(verse.verseText)}">
             <div class="smart-learn-body read-typewriter-body" aria-hidden="true">${renderVerseHtml()}</div>
@@ -914,6 +1468,10 @@
     ASSET_BASE,
     AUDIO_BASE,
     TYPEWRITER_ACTIVITY_ID,
+    VERSE_CRAWL_ACTIVITY_ID,
+    BALLOONS_ACTIVITY_ID,
+    FISH_ACTIVITY_ID,
+    READ_TEST_MODES,
     READ_ACTIVITY_MANIFEST,
     initialize,
     startForVerse,
@@ -926,6 +1484,12 @@
       chunkIndex: state.chunkIndex,
       revealCount: state.revealCount,
       phase: state.phase,
+      chunkCount: state.chunks.length,
+      usesChunkAudio:
+        state.usesChunkAudio,
+      readTestMode: state.readTestMode,
+      reducedMotion:
+        state.reducedMotion,
       context: getSessionContext()
     }),
     isTypeableCharacter,
@@ -934,6 +1498,8 @@
     buildDisplayChunks,
     getChunkAudioPath,
     getReferenceAudioPath,
+    getAnimatedActivityTiming,
+    isAnimatedActivity,
     validateContext
   });
 });

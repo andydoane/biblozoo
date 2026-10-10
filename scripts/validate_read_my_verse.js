@@ -129,7 +129,10 @@ function testDailyContextValidation() {
       "romans_6_23",
       "typewriter"
     ),
-    context
+    {
+      ...context,
+      readTestMode: "normal"
+    }
   );
   assert.strictEqual(
     ReadMyVerse.validateContext(
@@ -150,6 +153,39 @@ function testDailyContextValidation() {
     ),
     null
   );
+
+  [
+    "star_wars",
+    "balloons",
+    "fish"
+  ].forEach((activityId) => {
+    const animatedContext = {
+      ...context,
+      readActivityId: activityId,
+      readTestMode: "reduced_motion"
+    };
+
+    assert.deepStrictEqual(
+      ReadMyVerse.validateContext(
+        animatedContext,
+        "romans_6_23",
+        activityId
+      ),
+      animatedContext
+    );
+  });
+
+  assert.strictEqual(
+    ReadMyVerse.validateContext(
+      {
+        ...context,
+        readActivityId: "not_real"
+      },
+      "romans_6_23",
+      "not_real"
+    ),
+    null
+  );
 }
 
 function testAssetsExist() {
@@ -159,7 +195,17 @@ function testAssetsExist() {
     "verse_images/read_my_verse/paper_ipad.png",
     "verse_images/read_my_verse/typewriter_1.mp3",
     "verse_images/read_my_verse/typewriter_2.mp3",
-    "verse_images/read_my_verse/typewriter_3.mp3"
+    "verse_images/read_my_verse/typewriter_3.mp3",
+    "verse_images/read_my_verse/starfield_phone.png",
+    "verse_images/read_my_verse/starfield_ipad.png",
+    "verse_images/read_my_verse/red_balloon.png",
+    "verse_images/read_my_verse/blue_balloon.png",
+    "verse_images/read_my_verse/underwater_phone.png",
+    "verse_images/read_my_verse/underwater_ipad.png",
+    "verse_images/read_my_verse/fish_small.png",
+    "verse_images/read_my_verse/fish_medium.png",
+    "verse_images/read_my_verse/fish_long.png",
+    "verse_images/read_my_verse/fish_hook.png"
   ];
 
   assets.forEach((asset) => {
@@ -171,6 +217,152 @@ function testAssetsExist() {
       `Missing Read asset: ${asset}`
     );
   });
+}
+
+function testAnimatedActivityManifest() {
+  assert.strictEqual(
+    ReadMyVerse.READ_ACTIVITY_MANIFEST
+      .star_wars.title,
+    "Verse Crawl"
+  );
+
+  [
+    "star_wars",
+    "balloons",
+    "fish"
+  ].forEach((activityId) => {
+    assert.strictEqual(
+      ReadMyVerse.READ_ACTIVITY_MANIFEST[
+        activityId
+      ].enabled,
+      true
+    );
+    assert.strictEqual(
+      ReadMyVerse.isAnimatedActivity(
+        activityId
+      ),
+      true
+    );
+  });
+}
+
+function testAnimatedTimingAndReducedMotion() {
+  [
+    "star_wars",
+    "balloons",
+    "fish"
+  ].forEach((activityId) => {
+    const normal =
+      ReadMyVerse.getAnimatedActivityTiming(
+        activityId,
+        6,
+        false
+      );
+    const reduced =
+      ReadMyVerse.getAnimatedActivityTiming(
+        activityId,
+        6,
+        true
+      );
+
+    assert.ok(normal.audioStartMs > 0);
+    assert.ok(
+      reduced.audioStartMs <
+      normal.audioStartMs
+    );
+  });
+
+  const oneWord =
+    ReadMyVerse.getAnimatedActivityTiming(
+      "balloons",
+      1,
+      false
+    );
+  const manyWords =
+    ReadMyVerse.getAnimatedActivityTiming(
+      "balloons",
+      8,
+      false
+    );
+
+  assert.ok(
+    manyWords.audioStartMs >
+    oneWord.audioStartMs
+  );
+}
+
+function testPreviewChunkModes() {
+  const verse = {
+    id: "preview_verse",
+    ref: "Preview 1:1",
+    verseText: "One part, two parts.",
+    echoParts: ["One part", "two parts"]
+  };
+  const makeContext = (
+    activityId,
+    readTestMode
+  ) => ({
+    source: "daily_todo",
+    profileId: "profile-a",
+    planId: "plan-a",
+    planDay: "2026-10-09",
+    taskId: "review",
+    launchToken: "token-a",
+    verseId: verse.id,
+    readActivityId: activityId,
+    previewScope: "read_test",
+    readTestMode
+  });
+
+  ReadMyVerse.initialize({
+    getVerseList: () => [verse]
+  });
+
+  assert.strictEqual(
+    ReadMyVerse.startForVerse(
+      verse.id,
+      "balloons",
+      makeContext(
+        "balloons",
+        "one_chunk"
+      )
+    ),
+    true
+  );
+  assert.strictEqual(
+    ReadMyVerse.getSessionState()
+      .chunkCount,
+    1
+  );
+  assert.strictEqual(
+    ReadMyVerse.getSessionState()
+      .usesChunkAudio,
+    false
+  );
+
+  ReadMyVerse.stopSession();
+  assert.strictEqual(
+    ReadMyVerse.startForVerse(
+      verse.id,
+      "fish",
+      makeContext(
+        "fish",
+        "reduced_motion"
+      )
+    ),
+    true
+  );
+  assert.strictEqual(
+    ReadMyVerse.getSessionState()
+      .chunkCount,
+    2
+  );
+  assert.strictEqual(
+    ReadMyVerse.getSessionState()
+      .reducedMotion,
+    true
+  );
+  ReadMyVerse.stopSession();
 }
 
 function testTypewriterSoundsAreShortAndDistinct() {
@@ -222,6 +414,21 @@ function testEveryVerseChunkRecordingExists() {
       )
     );
     const chunks = verse.echoParts || [];
+    const fullRecording =
+      ReadMyVerse.getChunkAudioPath(
+        verseId,
+        0,
+        1,
+        false
+      ).replace(/^\.\//, "");
+
+    assert.strictEqual(
+      fs.existsSync(
+        path.join(rootDir, fullRecording)
+      ),
+      true,
+      `Missing full recording: ${fullRecording}`
+    );
 
     assert.ok(
       chunks.length >= 1 &&
@@ -255,6 +462,9 @@ function main() {
     testOneThroughEightChunkFilenames,
     testDailyContextValidation,
     testAssetsExist,
+    testAnimatedActivityManifest,
+    testAnimatedTimingAndReducedMotion,
+    testPreviewChunkModes,
     testTypewriterSoundsAreShortAndDistinct,
     testEveryVerseChunkRecordingExists
   ];

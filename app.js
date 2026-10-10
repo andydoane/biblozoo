@@ -5388,7 +5388,8 @@ function saveDailyTodoReadRuntime(
 function startDailyTodoRead(
   requestedPlan,
   {
-    previewScope = ""
+    previewScope = "",
+    readTestMode = "normal"
   } = {}
 ) {
   const readModule =
@@ -5436,7 +5437,9 @@ function startDailyTodoRead(
     plan.reviewAssignment?.kind !==
       (engine.REVIEW_KINDS?.READ ||
         "read") ||
-    activityId !== "typewriter" ||
+    !readModule?.READ_ACTIVITY_MANIFEST?.[
+      activityId
+    ]?.enabled ||
     !verseId ||
     ![openStatus, runningStatus]
       .includes(task?.status)
@@ -5470,7 +5473,11 @@ function startDailyTodoRead(
     previewScope:
       previewScope === "read_test"
         ? "read_test"
-        : ""
+        : "",
+    readTestMode:
+      previewScope === "read_test"
+        ? readTestMode
+        : "normal"
   };
 
   if (
@@ -14196,7 +14203,8 @@ function screenTitle(idx) {
     const createDailyReadTestState = (
       verseId,
       {
-        pending = false
+        pending = false,
+        activityId = "typewriter"
       } = {}
     ) => {
       const engine =
@@ -14213,12 +14221,19 @@ function screenTitle(idx) {
       const safeVerseId = String(
         verseId || ""
       ).trim();
+      const safeActivityId = String(
+        activityId || ""
+      ).trim();
 
       if (
         !engine ||
         !ui?.saveReadTestState ||
         !templatePlan ||
         !profileId ||
+        !window.BibloZooReadMyVerse
+          ?.READ_ACTIVITY_MANIFEST?.[
+            safeActivityId
+          ]?.enabled ||
         !VERSE_LIST.some(
           (verse) =>
             verse?.id === safeVerseId
@@ -14245,7 +14260,7 @@ function screenTitle(idx) {
         kind:
           engine.REVIEW_KINDS?.READ ||
           "read",
-        activityId: "typewriter"
+        activityId: safeActivityId
       };
       plan.requiredTaskIds = [
         taskId,
@@ -14317,7 +14332,7 @@ function screenTitle(idx) {
                   extra: {
                     verseId: safeVerseId,
                     readActivityId:
-                      "typewriter"
+                      safeActivityId
                   }
                 }),
               now: new Date()
@@ -14343,6 +14358,34 @@ function screenTitle(idx) {
         )?.value || ""
       ).trim();
 
+    const getReadTesterActivityId = () =>
+      String(
+        document.querySelector(
+          "#dailyReadActivitySelect"
+        )?.value || "typewriter"
+      ).trim();
+
+    const getReadTesterMode = () =>
+      String(
+        document.querySelector(
+          "#dailyReadModeSelect"
+        )?.value || "normal"
+      ).trim();
+
+    const getManyChunkReadTesterVerseId =
+      () => {
+        const sorted = [...VERSE_LIST]
+          .filter((verse) => verse?.id)
+          .sort(
+            (left, right) =>
+              (right.echoParts?.length || 0) -
+              (left.echoParts?.length || 0)
+          );
+
+        return sorted[0]?.id ||
+          getReadTesterVerseId();
+      };
+
     const showReadDiagnostics = (
       verseId
     ) => {
@@ -14358,7 +14401,7 @@ function screenTitle(idx) {
         ) || [];
 
       showDialog({
-        title: "Typewriter Diagnostics",
+        title: "Read Audio & Chunks",
         bodyHtml: `
           <div class="daily-read-diagnostics">
             <strong>${escapeHtml(verse?.ref || verseId)}</strong>
@@ -14398,10 +14441,33 @@ function screenTitle(idx) {
           ? VERSE_ID
           : templatePlan?.verseId ||
             VERSE_LIST[0]?.id || "";
+      const readManifest =
+        window.BibloZooReadMyVerse
+          ?.READ_ACTIVITY_MANIFEST || {};
+      const activityIds = [
+        "typewriter",
+        "star_wars",
+        "balloons",
+        "fish"
+      ].filter(
+        (activityId) =>
+          readManifest[activityId]
+            ?.enabled
+      );
 
       showDialog({
         title: "Read Activity Tester",
         bodyHtml: `
+          <label class="daily-read-tester-label" for="dailyReadActivitySelect">
+            Activity
+          </label>
+          <select class="daily-read-tester-select" id="dailyReadActivitySelect">
+            ${activityIds.map((activityId) => `
+              <option value="${escapeHtml(activityId)}">
+                ${escapeHtml(readManifest[activityId]?.title || activityId)}
+              </option>
+            `).join("")}
+          </select>
           <label class="daily-read-tester-label" for="dailyReadVerseSelect">
             Verse
           </label>
@@ -14412,24 +14478,43 @@ function screenTitle(idx) {
               </option>
             `).join("")}
           </select>
+          <label class="daily-read-tester-label" for="dailyReadModeSelect">
+            Test
+          </label>
+          <select class="daily-read-tester-select" id="dailyReadModeSelect">
+            <option value="normal">Normal completion</option>
+            <option value="one_chunk">One-chunk example</option>
+            <option value="many_chunk">Many-chunk example</option>
+            <option value="reduced_motion">Reduced-motion check</option>
+            <option value="early_exit">Early-exit check</option>
+          </select>
         `,
         actionsClass:
           "daily-preview-dialog-actions",
         actions: [
-          dlgBtn("Start Typewriter", {
+          dlgBtn("Start Activity", {
             onClick: () => {
+              const readTestMode =
+                getReadTesterMode();
               const verseId =
-                getReadTesterVerseId();
+                readTestMode ===
+                "many_chunk"
+                  ? getManyChunkReadTesterVerseId()
+                  : getReadTesterVerseId();
+              const activityId =
+                getReadTesterActivityId();
               const state =
                 createDailyReadTestState(
-                  verseId
+                  verseId,
+                  { activityId }
                 );
               const launched = state
                 ? startDailyTodoRead(
                     state.activePlan,
                     {
                       previewScope:
-                        "read_test"
+                        "read_test",
+                      readTestMode
                     }
                   )
                 : false;
@@ -14457,7 +14542,11 @@ function screenTitle(idx) {
               const state =
                 createDailyReadTestState(
                   getReadTesterVerseId(),
-                  { pending: true }
+                  {
+                    pending: true,
+                    activityId:
+                      getReadTesterActivityId()
+                  }
                 );
 
               if (!state) return;

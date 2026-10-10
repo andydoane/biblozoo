@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_09_read_typewriter_c";
+const CACHE_VERSION = "2026_Oct_09_animated_read_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -83,6 +83,16 @@ const CORE_PATHS = [
   "./verse_images/read_my_verse/typewriter_1.mp3",
   "./verse_images/read_my_verse/typewriter_2.mp3",
   "./verse_images/read_my_verse/typewriter_3.mp3",
+  "./verse_images/read_my_verse/starfield_phone.png",
+  "./verse_images/read_my_verse/starfield_ipad.png",
+  "./verse_images/read_my_verse/red_balloon.png",
+  "./verse_images/read_my_verse/blue_balloon.png",
+  "./verse_images/read_my_verse/underwater_phone.png",
+  "./verse_images/read_my_verse/underwater_ipad.png",
+  "./verse_images/read_my_verse/fish_small.png",
+  "./verse_images/read_my_verse/fish_medium.png",
+  "./verse_images/read_my_verse/fish_long.png",
+  "./verse_images/read_my_verse/fish_hook.png",
 
   "./biblopet_name_blocklist.json",
   "./pet_random_names.json",
