@@ -1052,6 +1052,29 @@ function testVerseCrawlMotion() {
   assert.ok(styles.includes('--read-crawl-travel'));
 }
 
+function testBalloonFloatingAndParticles() {
+  const one = ReadMyVerse.getBalloonMotion(620, 54, 1);
+  const many = ReadMyVerse.getBalloonMotion(620, 54, 6);
+  assert.ok(one.durationMs >= 6000 && one.durationMs <= 10500);
+  assert.strictEqual(one.staggerMs, 450);
+  assert.ok(one.visibleMs > 0 && one.visibleMs < one.durationMs);
+  assert.ok(many.audioStartMs > one.audioStartMs);
+  assert.ok(many.audioStartMs < (6 - 1) * 620 + 1850);
+  const sw = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const styles = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  ["cloud_phone.jpg", "cloud_ipad.jpg"].forEach((file) => {
+    const asset = `verse_images/read_my_verse/${file}`;
+    assert.ok(fs.existsSync(path.join(rootDir, asset)), `Missing ${asset}`);
+    assert.ok(sw.includes(`"./${asset}"`), `Background not cached: ${asset}`);
+    assert.ok(source.includes(file), `Balloons manifest missing ${file}`);
+  });
+  assert.ok(source.includes("button.remove(); // Includes the string"));
+  assert.ok(source.includes('balloonTimer(session, () => launchBalloonChunk(session, item.index + 1), 200)'));
+  assert.ok(styles.includes("@keyframes readBalloonParticleBurst"));
+  assert.ok(styles.includes("@keyframes readBalloonWordSway"));
+}
+
 function main() {
   const tests = [
     testSafeWordScrambles,
@@ -1066,6 +1089,7 @@ function main() {
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,
+    testBalloonFloatingAndParticles,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
     testTapOrderHintsAndReset,

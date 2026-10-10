@@ -160,6 +160,10 @@
         id: BALLOONS_ACTIVITY_ID,
         title: "Balloons",
         enabled: true,
+        backgrounds: Object.freeze({
+          phone: `${ASSET_BASE}cloud_phone.jpg`,
+          ipad: `${ASSET_BASE}cloud_ipad.jpg`
+        }),
         decorations: Object.freeze({
           red:
             `${ASSET_BASE}red_balloon.png`,
@@ -256,6 +260,7 @@
   let completionReported = false;
   let crawlSession = null;
   let crawlMusic = null;
+  let balloonSession = null;
 
   const state = {
     verseId: "",
@@ -1315,10 +1320,10 @@
       activityId ===
       BALLOONS_ACTIVITY_ID
     ) {
+      const motion = getBalloonMotion(620, 54, count);
       return Object.freeze({
-        wordStaggerMs: 620,
-        audioStartMs:
-          1850 + (count - 1) * 620
+        wordStaggerMs: motion.staggerMs,
+        audioStartMs: motion.audioStartMs
       });
     }
 
@@ -1401,6 +1406,7 @@
     audioRequest += 1;
     stopCrawlSequence();
     stopCrawlMusic();
+    stopBalloonSequence();
     typingFitCache = null;
     activeTypingFitWrap = null;
 
@@ -2981,6 +2987,24 @@
     return { travel, durationMs, visibleMs, vanishingY };
   }
 
+  // Travel speed stays gentle while the final word clears the bottom edge
+  // as soon as it is entirely readable, not after it finishes its journey.
+  function getBalloonMotion(sceneHeight, wordHeight, wordCount = 1) {
+    const height = Math.max(120, Number(sceneHeight) || 120);
+    const textHeight = Math.max(1, Number(wordHeight) || 1);
+    const count = Math.max(1, Math.floor(Number(wordCount) || 1));
+    const travel = height + textHeight + 24;
+    const durationMs = Math.max(6000,
+      Math.min(10500, Math.round(travel / 0.115)));
+    const staggerMs = 450;
+    const visibleMs = Math.min(durationMs * 0.75,
+      Math.ceil(durationMs * (textHeight + 18) / travel) + 120);
+    return {
+      travel, durationMs, staggerMs, visibleMs,
+      audioStartMs: (count - 1) * staggerMs + visibleMs
+    };
+  }
+
   function stopCrawlSequence() {
     const session = crawlSession;
     if (!session) return;
@@ -3208,15 +3232,249 @@
     return appApi.makeSlide({ idx, bg: "#030815", navHidden: true, inner: wrap });
   }
 
+  // Balloons keeps a single scene so words and decorations survive
+  // transitions from floating -> listening -> the following chunk.
+  function stopBalloonSequence() {
+    const session = balloonSession;
+    if (!session) return;
+    session.active = false;
+    session.timers.forEach((timer) => clearTimeout(timer));
+    session.timers.clear();
+    balloonSession = null;
+  }
+
+  function balloonTimer(session, callback, delayMs) {
+    const timer = setTimeout(() => {
+      session.timers.delete(timer);
+      if (session.active && balloonSession === session) callback();
+    }, delayMs);
+    session.timers.add(timer);
+    return timer;
+  }
+
+  function completeBalloonsIfReady(session) {
+    const last = session.items.get(state.chunks.length - 1);
+    if (session.active && balloonSession === session &&
+        !completionReported && last?.audioDone && last?.vanished) {
+      reportCompletion();
+    }
+  }
+
+  function markBalloonWordsVanished(session, item) {
+    if (!session.active || item.vanished) return;
+    item.vanished = true;
+    item.group.remove();
+    completeBalloonsIfReady(session);
+  }
+
+  function finishBalloonAudio(session, item) {
+    if (!session.active || item.audioDone) return;
+    item.audioDone = true;
+    if (state.reducedMotion) {
+      item.group.classList.add("is-fading");
+      balloonTimer(session, () => markBalloonWordsVanished(session, item), 450);
+    }
+    if (item.index + 1 < state.chunks.length) {
+      // Old words and balloons continue floating independently.
+      balloonTimer(session, () => launchBalloonChunk(session, item.index + 1), 200);
+    } else {
+      completeBalloonsIfReady(session);
+    }
+  }
+
+  function playBalloonAudio(session, item) {
+    if (!session.active || item.audioStarted) return;
+    item.audioStarted = true;
+    state.phase = "playing";
+    const request = ++audioRequest;
+    const src = getChunkAudioPath(
+      state.verseId,
+      state.chunkAudioIndices[item.index] ?? item.index,
+      state.chunks.length,
+      state.usesChunkAudio
+    );
+    const finish = () => {
+      if (!session.active || balloonSession !== session ||
+          request !== audioRequest) return;
+      activeAudio = null;
+      finishBalloonAudio(session, item);
+    };
+    if (!src || typeof Audio === "undefined" || appApi?.isMuted?.()) {
+      balloonTimer(session, finish, 250);
+      return;
+    }
+    try {
+      activeAudio?.pause?.();
+      activeAudio = new Audio(src);
+      activeAudio.preload = "auto";
+      activeAudio.addEventListener("ended", finish, { once: true });
+      activeAudio.addEventListener("error", finish, { once: true });
+      activeAudio.play()?.catch?.(() => balloonTimer(session, finish, 650));
+    } catch (err) {
+      balloonTimer(session, finish, 650);
+    }
+  }
+
+  // A cloudless, color-matched adaptation of Verse Launch's wrong-tap
+  // radial particles. The original balloon is removed in the same tick.
+  function popReadBalloon(session, button) {
+    if (!session.active || !button.isConnected) return;
+    const kind = button.dataset.readBalloonKind === "blue" ? "blue" : "red";
+    const colors = kind === "blue"
+      ? ["#1776e8", "#53b1ff", "#a8ddff"]
+      : ["#e72e4c", "#ff6880", "#ffc2c9"];
+    const imageRect = (button.querySelector("img") || button)
+      .getBoundingClientRect();
+    const sceneRect = session.scene.getBoundingClientRect();
+    const burst = root.document.createElement("div");
+    burst.className = "read-balloon-particles";
+    burst.style.left = `${imageRect.left + imageRect.width / 2 - sceneRect.left}px`;
+    burst.style.top = `${imageRect.top + imageRect.height / 2 - sceneRect.top}px`;
+    const offset = Math.random() * Math.PI * 2;
+    for (let i = 0; i < 9; i += 1) {
+      const angle = offset + i * Math.PI * 2 / 9 + (Math.random() - 0.5) * 0.22;
+      const distance = 36 + Math.random() * 22;
+      const particle = root.document.createElement("span");
+      particle.className = "read-balloon-particle";
+      particle.style.backgroundColor = colors[i % colors.length];
+      particle.style.setProperty("--read-particle-x", `${Math.cos(angle) * distance}px`);
+      particle.style.setProperty("--read-particle-y", `${Math.sin(angle) * distance}px`);
+      particle.style.setProperty("--read-particle-size", `${7 + (i % 4) * 2}px`);
+      burst.appendChild(particle);
+    }
+    session.effects.appendChild(burst);
+    button.remove(); // Includes the string: no lingering pop animation.
+    balloonTimer(session, () => burst.remove(), 700);
+  }
+
+  function launchBalloonChunk(session, index) {
+    if (!session.active || balloonSession !== session ||
+        session.items.has(index)) return;
+    state.chunkIndex = index;
+    state.phase = "animating";
+    const holder = root.document.createElement("div");
+    holder.innerHTML = renderBalloonWordsHtml(state.chunks[index]);
+    const group = holder.firstElementChild;
+    session.scene.appendChild(group);
+    const item = {
+      index, group, audioStarted: false, audioDone: false,
+      vanished: false
+    };
+    session.items.set(index, item);
+    session.progress.textContent = `Part ${index + 1} of ${state.chunks.length}`;
+
+    if (state.reducedMotion) {
+      balloonTimer(session, () => playBalloonAudio(session, item), 520);
+      return;
+    }
+
+    const words = Array.from(group.querySelectorAll(".read-balloon-word"));
+    const height = session.scene.getBoundingClientRect().height;
+    let lastEntryMs = 0;
+    let lastExitMs = 0;
+    words.forEach((word, wordIndex) => {
+      const motion = getBalloonMotion(height,
+        word.getBoundingClientRect().height, words.length);
+      const delayMs = wordIndex * motion.staggerMs;
+      word.style.setProperty("--read-balloon-travel", `${motion.travel}px`);
+      word.style.setProperty("--read-balloon-duration", `${motion.durationMs}ms`);
+      word.style.setProperty("--read-word-delay", `${delayMs}ms`);
+      lastEntryMs = Math.max(lastEntryMs, delayMs + motion.visibleMs);
+      lastExitMs = Math.max(lastExitMs, delayMs + motion.durationMs);
+    });
+    // Wait for every word to leave before completing the final chunk.
+    let remainingWords = words.length;
+    words.forEach((word) => {
+      word.addEventListener("animationend", (event) => {
+        if (event.target !== word || item.vanished) return;
+        remainingWords -= 1;
+        if (remainingWords === 0) markBalloonWordsVanished(session, item);
+      }, { once: true });
+    });
+    balloonTimer(session, () => markBalloonWordsVanished(session, item),
+      lastExitMs + 800);
+    balloonTimer(session, () => playBalloonAudio(session, item), lastEntryMs);
+
+    const balloons = createDecorations(BALLOONS_ACTIVITY_ID);
+    const wrapper = root.document.createElement("div");
+    wrapper.innerHTML = renderBalloonDecorationsHtml(
+      READ_ACTIVITY_MANIFEST[BALLOONS_ACTIVITY_ID], balloons);
+    Array.from(wrapper.children).forEach((button) => {
+      session.decorations.appendChild(button);
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        popReadBalloon(session, button);
+      };
+      button.addEventListener("animationend", (event) => {
+        if (event.target === button) button.remove();
+      }, { once: true });
+    });
+  }
+
+  function renderBalloonScreen(idx, verse) {
+    if (balloonSession) {
+      stopBalloonSequence();
+      audioRequest += 1;
+      activeAudio?.pause?.();
+      activeAudio = null;
+    }
+    const manifest = READ_ACTIVITY_MANIFEST[BALLOONS_ACTIVITY_ID];
+    const wrap = root.document.createElement("div");
+    wrap.className = "read-my-verse-screen read-animated-screen read-balloons-screen" +
+      (state.reducedMotion ? " is-reduced-motion" : "");
+    const instruction = state.readTestMode === "early_exit"
+      ? "Early-exit check: use Back before it finishes"
+      : "Watch and listen as the words float";
+    wrap.innerHTML = `
+      <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Balloons">‹</button>
+      <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
+        <header class="read-animated-header">
+          <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
+          <div class="read-animated-title">Balloons</div>
+          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
+        </header>
+        <section class="read-animated-scene" aria-label="${escapeHtml(verse.verseText)}">
+          <div class="read-animated-decorations" data-read-balloons></div>
+          <div class="read-balloon-effects" data-read-balloon-effects aria-hidden="true"></div>
+        </section>
+        <div class="read-animated-progress" data-read-progress aria-live="polite">Part 1 of ${state.chunks.length}</div>
+      </main>
+    `;
+    wrap.querySelector("[data-read-exit]").onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      exitSession();
+    };
+    const session = {
+      active: true, wrap,
+      scene: wrap.querySelector(".read-animated-scene"),
+      decorations: wrap.querySelector("[data-read-balloons]"),
+      effects: wrap.querySelector("[data-read-balloon-effects]"),
+      progress: wrap.querySelector("[data-read-progress]"),
+      items: new Map(), timers: new Set()
+    };
+    balloonSession = session;
+    root.requestAnimationFrame(() => {
+      if (session.active && balloonSession === session && wrap.isConnected) {
+        launchBalloonChunk(session, 0);
+      }
+    });
+    return appApi.makeSlide({ idx, bg: "#82d7f4", navHidden: true, inner: wrap });
+  }
+
   function renderBalloonWordsHtml(
     chunk,
     timing
   ) {
+    if (state.reducedMotion) {
+      return `<div class="read-balloon-words is-stationary"><div class="read-balloon-reduced-text">${escapeHtml(chunk)}</div></div>`;
+    }
     return `
       <div class="read-balloon-words" aria-label="${escapeHtml(chunk)}">
         ${getChunkWords(chunk).map(
           (word, index) => `
-            <span class="read-balloon-word" style="--read-word-index:${index};--read-word-delay:${index * timing.wordStaggerMs}ms;--read-lane-offset:${(((index * 37) % 5) - 2) * 8}vw">${escapeHtml(word)}</span>
+            <span class="read-balloon-word" style="--read-lane-offset:${(((index * 37) % 5) - 2) * 7}vw;--read-sway-phase:-${(index * 277) % 2400}ms;--read-sway-duration:${3100 + (index % 4) * 580}ms"><span class="read-balloon-word-inner">${escapeHtml(word)}</span></span>
           `
         ).join("")}
       </div>
@@ -3239,11 +3497,12 @@
   }
 
   function renderBalloonDecorationsHtml(
-    manifest
+    manifest,
+    decorations = state.decorations
   ) {
-    return state.decorations.map(
+    return decorations.map(
       (decoration) => `
-        <button class="read-decorative-balloon" type="button" data-read-decoration aria-label="Pop decorative balloon" style="--read-decor-left:${decoration.left.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
+        <button class="read-decorative-balloon" type="button" data-read-decoration data-read-balloon-kind="${decoration.kind}" aria-label="Pop decorative balloon" style="--read-decor-left:${decoration.left.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
           <img src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-image-missing')">
           <span class="read-balloon-string" aria-hidden="true"></span>
         </button>
@@ -3294,6 +3553,9 @@
   function renderAnimatedScreen(idx, verse) {
     if (state.activityId === VERSE_CRAWL_ACTIVITY_ID) {
       return renderCrawlScreen(idx, verse);
+    }
+    if (state.activityId === BALLOONS_ACTIVITY_ID) {
+      return renderBalloonScreen(idx, verse);
     }
     const manifest =
       READ_ACTIVITY_MANIFEST[
@@ -4231,6 +4493,7 @@
     getReferenceAudioPath,
     getAnimatedActivityTiming,
     getCrawlMotion,
+    getBalloonMotion,
     isAnimatedActivity,
     isTypingActivity,
     isWordActivity,

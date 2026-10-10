@@ -1358,8 +1358,8 @@ button.read-unscramble-token.is-solved {
 .read-balloon-word {
   position: absolute;
   z-index: 3;
-  left: 50%;
-  bottom: -18%;
+  top: 100%;
+  left: calc(50% + var(--read-lane-offset, 0vw));
   max-width: 84%;
   border-radius: 999px;
   padding: 0.18em 0.58em 0.23em;
@@ -1371,20 +1371,81 @@ button.read-unscramble-token.is-solved {
   line-height: 1.04;
   white-space: nowrap;
   opacity: 0;
-  transform: translateX(calc(-50% + var(--read-lane-offset)));
-  animation: readBalloonWordRise 2.35s ease-out var(--read-word-delay) both;
+  transform: translate3d(-50%, 0, 0);
+  will-change: transform, opacity;
+  animation: readBalloonWordRise var(--read-balloon-duration, 6000ms)
+    linear var(--read-word-delay, 0ms) both;
+}
+
+/* Independent slow vertical movement + gentle side-to-side bobbing. */
+.read-balloon-word-inner {
+  display: block;
+  animation: readBalloonWordSway var(--read-sway-duration, 3500ms)
+    ease-in-out var(--read-sway-phase, 0ms) infinite alternate;
 }
 
 @keyframes readBalloonWordRise {
-  0% {
-    bottom: -18%;
-    opacity: 0;
-  }
-  18% { opacity: 1; }
-  72% { opacity: 1; }
+  0% { opacity: 0; transform: translate3d(-50%, 0, 0); }
+  7% { opacity: 1; }
+  86% { opacity: 1; }
   100% {
-    bottom: 104%;
     opacity: 0;
+    transform: translate3d(-50%, calc(-1 * var(--read-balloon-travel, 700px)), 0);
+  }
+}
+
+@keyframes readBalloonWordSway {
+  0% { transform: translate3d(-14px, 3px, 0); }
+  45% { transform: translate3d(17px, -4px, 0); }
+  100% { transform: translate3d(-8px, 2px, 0); }
+}
+
+.read-balloon-reduced-text {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90%;
+  color: #243a49;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.4em 0.5em;
+  border-radius: 22px;
+  font-size: clamp(26px, 7vw, 52px);
+  font-weight: 800;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  transition: opacity 350ms ease;
+}
+.read-balloon-words.is-fading .read-balloon-reduced-text { opacity: 0; }
+
+.read-balloon-effects {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  pointer-events: none;
+}
+.read-balloon-particles {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.read-balloon-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--read-particle-size, 9px);
+  height: var(--read-particle-size, 9px);
+  margin: calc(var(--read-particle-size, 9px) / -2);
+  border-radius: 50%;
+  opacity: 0;
+  animation: readBalloonParticleBurst 620ms cubic-bezier(.12,.75,.22,1) both;
+}
+@keyframes readBalloonParticleBurst {
+  0% { opacity: 1; transform: translate(0,0) scale(.75); }
+  100% {
+    opacity: 0;
+    transform: translate(var(--read-particle-x, 0px),
+      var(--read-particle-y, 0px)) scale(1.18);
   }
 }
 
@@ -1410,7 +1471,7 @@ button.read-unscramble-token.is-solved {
   bottom: -28%;
   width: clamp(52px, 15vw, 110px);
   height: clamp(130px, 31vw, 230px);
-  animation: readDecorBalloon 8.5s linear var(--read-decor-delay) both;
+  animation: readDecorBalloon 12s linear var(--read-decor-delay) both;
 }
 
 .read-decorative-balloon img {
@@ -1457,8 +1518,10 @@ button.read-unscramble-token.is-solved {
 }
 
 @keyframes readDecorBalloon {
-  from { transform: translateY(0) rotate(-3deg); }
-  to { transform: translateY(-145vh) rotate(5deg); }
+  0% { transform: translate3d(0, 0, 0) rotate(-3deg); }
+  35% { transform: translate3d(14px, -52vh, 0) rotate(3deg); }
+  65% { transform: translate3d(-9px, -97vh, 0) rotate(-2deg); }
+  100% { transform: translate3d(7px, -145vh, 0) rotate(4deg); }
 }
 
 @keyframes readBalloonPop {
@@ -1635,13 +1698,11 @@ button.read-unscramble-token.is-solved {
   to { transform: translateY(-125vh); }
 }
 
-.read-animated-stage.is-listening .read-balloon-word,
 .read-animated-stage.is-listening .read-fish-word {
   opacity: 0;
   animation: none;
 }
 
-.read-animated-screen.is-reduced-motion .read-balloon-word,
 .read-animated-screen.is-reduced-motion .read-fish-word {
   animation-duration: 480ms;
   animation-delay: 0ms;
@@ -1653,7 +1714,6 @@ button.read-unscramble-token.is-solved {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .read-balloon-word,
   .read-fish-word {
     animation-duration: 480ms;
     animation-delay: 0ms;

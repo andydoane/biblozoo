@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_10_verse_crawl_fanfare_a";
+const CACHE_VERSION = "2026_Oct_10_balloons_float_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -100,6 +100,8 @@ const CORE_PATHS = [
   "./verse_images/read_my_verse/verse_crawl_theme.mp3",
   "./verse_images/read_my_verse/starfield_phone.png",
   "./verse_images/read_my_verse/starfield_ipad.png",
+  "./verse_images/read_my_verse/cloud_phone.jpg",
+  "./verse_images/read_my_verse/cloud_ipad.jpg",
   "./verse_images/read_my_verse/red_balloon.png",
   "./verse_images/read_my_verse/blue_balloon.png",
   "./verse_images/read_my_verse/underwater_phone.png",
