@@ -129,6 +129,18 @@
   background: transparent;
 }
 
+.read-typewriter-fit,
+.read-keyboard-fit {
+  align-items: stretch;
+}
+
+.read-typewriter-body,
+.read-keyboard-body {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
 .read-typewriter-fit {
   font-family: "Special Elite", Georgia, serif;
   color: #30271f;
@@ -142,7 +154,7 @@
   font-weight: 400;
   line-height: var(--smart-line-height, 1.24);
   letter-spacing: 0.012em;
-  text-wrap: pretty;
+  text-wrap: wrap;
 }
 
 .read-typewriter-chunk {
@@ -357,7 +369,7 @@
   text-shadow:
     0 0 4px rgba(101, 255, 114, 0.9),
     0 0 12px rgba(101, 255, 114, 0.34);
-  text-wrap: pretty;
+  text-wrap: wrap;
 }
 
 .read-keyboard-chunk {

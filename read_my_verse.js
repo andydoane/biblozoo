@@ -2987,6 +2987,103 @@
     };
   }
 
+  // Unlike the Learn fitter, typing screens render each character separately.
+  // Measure the real laid-out word spans as well as the whole text body so a
+  // large font cannot pass merely because its parent container fits.
+  function fitReadTypingVerseText(wrap) {
+    const block = wrap.querySelector(
+      "[data-read-typing-fit]"
+    );
+    const stage = block?.closest(".learn-stage");
+    const body = block?.querySelector(
+      ".smart-learn-body"
+    );
+    if (!stage || !body) return;
+
+    const style = root.getComputedStyle(stage);
+    const horizontalPadding =
+      (parseFloat(style.paddingLeft) || 0) +
+      (parseFloat(style.paddingRight) || 0);
+    const verticalPadding =
+      (parseFloat(style.paddingTop) || 0) +
+      (parseFloat(style.paddingBottom) || 0);
+    const contentWidth =
+      stage.clientWidth - horizontalPadding;
+    const contentHeight =
+      stage.clientHeight - verticalPadding;
+    if (contentWidth <= 0 || contentHeight <= 0) {
+      return;
+    }
+
+    // Reserve room around the writing, similar to Ghost Writer's layout.
+    const fitWidth = Math.floor(contentWidth * 0.92);
+    const fitHeight = Math.floor(contentHeight * 0.88);
+    block.style.width = `${fitWidth}px`;
+    block.style.maxWidth = `${fitWidth}px`;
+    block.style.setProperty(
+      "--smart-line-height",
+      block.classList.contains("read-keyboard-fit")
+        ? "1.12"
+        : "1.16"
+    );
+
+    const words = body.querySelectorAll(
+      ".read-typewriter-word"
+    );
+    const fits = (fontSize) => {
+      block.style.setProperty(
+        "--smart-font-size",
+        `${fontSize}px`
+      );
+      const bounds = body.getBoundingClientRect();
+      if (
+        bounds.height > fitHeight + 1 ||
+        body.scrollHeight > fitHeight + 1 ||
+        body.scrollWidth > fitWidth + 1
+      ) {
+        return false;
+      }
+      return Array.from(words).every((word) =>
+        word.getBoundingClientRect().width <=
+          fitWidth + 1
+      );
+    };
+
+    // Use a genuinely smaller fallback if even the usual minimum won't fit.
+    let low = 10;
+    let high = Math.min(100, contentWidth * 0.2);
+    let best = low;
+    if (!fits(low)) {
+      return;
+    }
+
+    for (let i = 0; i < 12; i += 1) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) {
+        best = mid;
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    block.style.setProperty(
+      "--smart-font-size",
+      `${Math.floor(best)}px`
+    );
+  }
+
+  function scheduleReadTypingVerseFit(wrap) {
+    const run = () => {
+      if (wrap.isConnected) {
+        fitReadTypingVerseText(wrap);
+      }
+    };
+    root.requestAnimationFrame(run);
+    root.setTimeout(run, 120);
+    root.setTimeout(run, 420);
+    root.document.fonts?.ready?.then(run).catch(() => {});
+  }
+
   function renderKeyboardScreen(idx, verse) {
     const wrap = root.document.createElement(
       "div"
@@ -3015,7 +3112,7 @@
           <div class="read-keyboard-instruction">${instruction}</div>
         </header>
         <section class="learn-stage read-keyboard-terminal" aria-label="${escapeHtml(verse.verseText)}">
-          <div class="smart-learn-text read-keyboard-fit" data-smart-learn-text data-smart-fit-text="${escapeHtml(verse.verseText)}">
+          <div class="smart-learn-text read-keyboard-fit" data-read-typing-fit>
             <div class="smart-learn-body read-keyboard-body" aria-hidden="true">${renderVerseHtml()}</div>
           </div>
         </section>
@@ -3041,9 +3138,7 @@
       }
     };
     bindExitButton(wrap);
-    appApi.scheduleSmartLearnTextFit?.(
-      wrap
-    );
+    scheduleReadTypingVerseFit(wrap);
 
     return appApi.makeSlide({
       idx,
@@ -3518,7 +3613,7 @@
         <div class="read-typewriter-reference">${escapeHtml(verse.ref || state.verseId)}</div>
         <div class="read-typewriter-instruction">${typewriterInstruction}</div>
         <section class="learn-stage read-typewriter-paper" aria-label="${escapeHtml(verse.verseText)}">
-          <div class="smart-learn-text read-typewriter-fit" data-smart-learn-text data-smart-fit-text="${escapeHtml(verse.verseText)}">
+          <div class="smart-learn-text read-typewriter-fit" data-read-typing-fit>
             <div class="smart-learn-body read-typewriter-body" aria-hidden="true">${renderVerseHtml()}</div>
           </div>
         </section>
@@ -3551,9 +3646,7 @@
       exitSession();
     };
 
-    appApi.scheduleSmartLearnTextFit?.(
-      wrap
-    );
+    scheduleReadTypingVerseFit(wrap);
 
     return appApi.makeSlide({
       idx,
