@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_10_balloons_float_a";
+const CACHE_VERSION = "2026_Oct_10_new_pet_mission_10a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -31,6 +31,7 @@ const CORE_PATHS = [
   "./daily_questions_feed_game.css",
   "./flashcards/flashcards.css",
   "./read_my_verse.css",
+  "./daily_zoo_todo.css",
   "./profiles.js",
   "./daily_questions_feed_game.js",
   "./safe_word_scramble.js",
@@ -41,6 +42,10 @@ const CORE_PATHS = [
   "./flashcards/recording.js",
   "./flashcards/flashcards.js",
   "./read_my_verse.js",
+  "./daily_zoo_todo.js",
+  "./daily_zoo_todo_ui.js",
+  "./verse_games/shared/daily-todo-parent.js",
+  "./verse_games/shared/bridge.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",

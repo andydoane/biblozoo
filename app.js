@@ -4858,7 +4858,8 @@ function getOrCreateDailyTodoPreviewPlan({
                 "normal"
               )
         }));
-      }
+      },
+    tutorialActive: isTutorialActive()
   };
 
   if (persist) {
@@ -9339,6 +9340,7 @@ const State = {
   pendingZooTodoGameId: "",
   dailySnackSession: null,
   dailyNewPetMissionContext: null,
+  dailyNewPetUnlockContext: null,
   dailyHomeOfferKey: "",
   dailyHomeOfferGreetingKey: "",
   dailyHomeOfferGreeting: "",
@@ -15962,13 +15964,26 @@ function screenTitle(idx) {
       const learnTaskId =
         engine.TASK_IDS?.LEARN ||
         "learn";
+      const gameScenarios = [
+        "game_ready",
+        "game_launched",
+        "game_quit",
+        "game_success",
+        "game_owned_medal",
+        "game_valid_unlock",
+        "game_invalid_unlock",
+        "game_pending",
+        "game_complete",
+        "callback_checks"
+      ];
 
       if (
         [
           "learning",
           "finished",
           "pending",
-          "confirmed"
+          "confirmed",
+          ...gameScenarios
         ].includes(scenario)
       ) {
         const started = engine.beginTask(
@@ -15987,7 +16002,8 @@ function screenTitle(idx) {
 
         if (
           scenario === "pending" ||
-          scenario === "confirmed"
+          scenario === "confirmed" ||
+          gameScenarios.includes(scenario)
         ) {
           const pending =
             engine.setPendingCompletion(
@@ -16013,7 +16029,10 @@ function screenTitle(idx) {
           if (!pending.changed) return null;
           state = pending.state;
 
-          if (scenario === "confirmed") {
+          if (
+            scenario === "confirmed" ||
+            gameScenarios.includes(scenario)
+          ) {
             const confirmed =
               engine.confirmPendingCompletion(
                 state,
@@ -16028,6 +16047,62 @@ function screenTitle(idx) {
               return null;
             }
             state = confirmed.state;
+          }
+        }
+      }
+
+      if (gameScenarios.includes(scenario)) {
+        const activityTaskId =
+          engine.TASK_IDS?.ACTIVITY || "activity";
+
+        if (scenario !== "game_ready" && scenario !== "game_quit") {
+          const started = engine.beginTask(state, {
+            planId: plan.id,
+            taskId: activityTaskId,
+            preserveAcrossDay: true,
+            now,
+            random: () => 0.271828
+          });
+          if (!started.launchToken) return null;
+          state = started.state;
+
+          if (!["game_launched", "game_invalid_unlock", "callback_checks"].includes(scenario)) {
+            const pending = engine.setPendingCompletion(state, {
+              planId: plan.id,
+              taskId: activityTaskId,
+              launchToken: started.launchToken,
+              pendingData: ui.createPendingCompletionData({
+                planId: plan.id,
+                taskId: activityTaskId,
+                source: "daily_todo_external",
+                thankYouKey: plan.activity.id,
+                extra: {
+                  activityId: plan.activity.id,
+                  activityKind: "game",
+                  petUnlockTriggered: true,
+                  petUnlockVerseId: verseId,
+                  newMedal:
+                    scenario === "game_owned_medal"
+                      ? null
+                      : {
+                          isNew: true,
+                          tier: "bronze",
+                          gameName: "Assigned Game"
+                        }
+                }
+              }),
+              now
+            });
+            if (!pending.changed) return null;
+            state = pending.state;
+
+            if (scenario === "game_complete") {
+              state = engine.confirmPendingCompletion(state, {
+                planId: plan.id,
+                taskId: activityTaskId,
+                now
+              }).state;
+            }
           }
         }
       }
@@ -16167,7 +16242,7 @@ function screenTitle(idx) {
               }
             </p>
             <p>
-              Automatic mission creation remains disabled until Patch 10.
+              Automatic mission creation is enabled for eligible profiles.
             </p>
           </div>
         `,
@@ -16227,6 +16302,36 @@ function screenTitle(idx) {
               openNewPetMissionPreview(
                 "confirmed"
               )
+          }),
+          dlgBtn("Assigned Easy Game", {
+            onClick: () => openNewPetMissionPreview("game_ready")
+          }),
+          dlgBtn("Game Launched", {
+            onClick: () => openNewPetMissionPreview("game_launched")
+          }),
+          dlgBtn("Game Quit", {
+            onClick: () => openNewPetMissionPreview("game_quit")
+          }),
+          dlgBtn("Game Success / New Bronze", {
+            onClick: () => openNewPetMissionPreview("game_success")
+          }),
+          dlgBtn("Already-Owned Medal", {
+            onClick: () => openNewPetMissionPreview("game_owned_medal")
+          }),
+          dlgBtn("Valid Pet Unlock", {
+            onClick: () => openNewPetMissionPreview("game_valid_unlock")
+          }),
+          dlgBtn("Invalid / Missing Unlock", {
+            onClick: () => openNewPetMissionPreview("game_invalid_unlock")
+          }),
+          dlgBtn("Game Pending Confirmation", {
+            onClick: () => openNewPetMissionPreview("game_pending")
+          }),
+          dlgBtn("Fully Completed Mission", {
+            onClick: () => openNewPetMissionPreview("game_complete")
+          }),
+          dlgBtn("Duplicate / Stale Callback", {
+            onClick: () => openNewPetMissionPreview("callback_checks")
           }),
           dlgBtn("Carried Across Midnight", {
             onClick: () =>
@@ -18980,16 +19085,10 @@ function screenTodoDev(idx) {
           return;
         }
 
-        showDialog({
-          title: "Game Ready",
-          body:
-            "The assigned Easy game is ready. Patch 10 will connect this button to the game and BibloPet unlock flow.",
-          actions: [
-            dlgBtn("OK", {
-              onClick: closeDialog
-            })
-          ]
-        });
+        window.BibloZooDailyTodoParent
+          ?.launchAssignedActivity?.({
+            expectedKind: "game"
+          });
       };
     }
 
@@ -19693,6 +19792,30 @@ function spawnBibloPetUnlockPoofAtElement(targetEl, opts = {}) {
   window.setTimeout(() => burst.remove(), duration + 160);
 }
 
+window.addEventListener(
+  "biblozoo:daily-task-confirmed",
+  (event) => {
+    const detail = event?.detail || {};
+    const pendingData = detail.pendingData || {};
+
+    if (
+      detail.planKind !== "new_pet" ||
+      detail.taskId !== "activity" ||
+      pendingData.petUnlockTriggered !== true ||
+      !detail.verseId
+    ) {
+      return;
+    }
+
+    State.dailyNewPetUnlockContext = {
+      planId: detail.planId,
+      verseId: detail.verseId
+    };
+    State.pendingPetUnlockVerseId = detail.verseId;
+    go(Screen.PET_UNLOCK);
+  }
+);
+
 function screenPetUnlock(idx) {
   const verseId = State.pendingPetUnlockVerseId;
   const verseItem = getVerseListItemById(verseId);
@@ -19700,6 +19823,8 @@ function screenPetUnlock(idx) {
   const petEmoji = getBibloPetEmojiForVerseId(verseId);
   const petName = getBibloPetDisplayNameForVerseId(verseId);
   const isMixUnlock = isGameMixPetUnlockRequest();
+  const isDailyMissionUnlock =
+    State.dailyNewPetUnlockContext?.verseId === verseId;
   const keepPlayingText = isMixUnlock ? "Continue Mix" : "Keep Practicing";
   const careText = verseRef
     ? `Practice ${verseRef} to keep ${petName} happy.`
@@ -19765,12 +19890,18 @@ function screenPetUnlock(idx) {
         <div class="pet-unlock-title">Meet ${escapeHtml(petName)}!</div>
 
         <div class="celebration-actions pet-unlock-reveal-actions">
-          <button class="carousel-main no-zoom" id="btnPetUnlockVisit" type="button">
-            Visit ${escapeHtml(petName)}
-          </button>
-          <button class="carousel-main no-zoom" id="btnPetUnlockPractice" type="button">
-            ${escapeHtml(keepPlayingText)}
-          </button>
+          ${isDailyMissionUnlock ? `
+            <button class="carousel-main no-zoom" id="btnPetUnlockHome" type="button">
+              Back Home
+            </button>
+          ` : `
+            <button class="carousel-main no-zoom" id="btnPetUnlockVisit" type="button">
+              Visit ${escapeHtml(petName)}
+            </button>
+            <button class="carousel-main no-zoom" id="btnPetUnlockPractice" type="button">
+              ${escapeHtml(keepPlayingText)}
+            </button>
+          `}
         </div>
       </div>
     </div>
@@ -19839,6 +19970,15 @@ function screenPetUnlock(idx) {
     };
   }
 
+  const btnHome = wrap.querySelector("#btnPetUnlockHome");
+  if (btnHome) {
+    btnHome.onclick = () => {
+      State.pendingPetUnlockVerseId = null;
+      State.dailyNewPetUnlockContext = null;
+      go(Screen.TITLE);
+    };
+  }
+
   const btnVisit = wrap.querySelector("#btnPetUnlockVisit");
   if (btnVisit) {
     btnVisit.onclick = () => {
@@ -19858,6 +19998,18 @@ function screenPetUnlock(idx) {
   }
 
   bindHomePill(wrap);
+
+  if (isDailyMissionUnlock) {
+    const homeBtn = wrap.querySelector("[data-home-pill]");
+    if (homeBtn) {
+      homeBtn.onclick = (event) => {
+        event.stopPropagation();
+        State.pendingPetUnlockVerseId = null;
+        State.dailyNewPetUnlockContext = null;
+        go(Screen.TITLE);
+      };
+    }
+  }
 
   if (isGameMixPetUnlockRequest()) {
     const homeBtn = wrap.querySelector("[data-home-pill]");

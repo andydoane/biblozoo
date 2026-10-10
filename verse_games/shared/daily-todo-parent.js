@@ -47,7 +47,8 @@
     "dailyTest",
     "dailyTestKind",
     "dailyNewMedal",
-    "dailyMedalTier"
+    "dailyMedalTier",
+    "dailyPetUnlockTriggered"
   ]);
 
   function clean(value) {
@@ -220,7 +221,9 @@
             )
           : "",
       newMedal: params.get("dailyNewMedal") === "1",
-      medalTier: clean(params.get("dailyMedalTier"))
+      medalTier: clean(params.get("dailyMedalTier")),
+      petUnlockTriggered:
+        params.get("dailyPetUnlockTriggered") === "1"
     };
   }
 
@@ -281,6 +284,9 @@
         data.activityId,
         data.activityKind
       ),
+      petUnlockTriggered: data.petUnlockTriggered === true,
+      petUnlockVerseId:
+        data.petUnlockTriggered === true ? data.verseId : "",
       newMedal:
         data.activityKind === "game" &&
         data.newMedal && tier
@@ -344,6 +350,32 @@
       return { handled: true, accepted: false };
     }
 
+    if (
+      data.status === "success" &&
+      plan.kind === "new_pet"
+    ) {
+      const marker = progress?.verses?.[data.verseId]
+        ?.externalPetUnlockPending;
+      const session = plan.newPetGameSession;
+      const validUnlock =
+        data.petUnlockTriggered === true &&
+        marker && typeof marker === "object" &&
+        clean(marker.gameId) === data.activityId &&
+        clean(marker.mode) === "easy" &&
+        session &&
+        clean(session.launchToken) === data.launchToken &&
+        clean(session.gameId) === data.activityId &&
+        clean(session.mode) === "easy";
+
+      if (!validUnlock) {
+        clearReturnParams();
+        return { handled: true, accepted: false };
+      }
+
+      delete progress.verses[data.verseId]
+        .externalPetUnlockPending;
+    }
+
     if (data.status === "quit") {
       task.status = "open";
       task.startedAt = 0;
@@ -352,6 +384,7 @@
       task.launchToken = "";
       task.pendingData = null;
       plan.rolloverHold = null;
+      plan.newPetGameSession = null;
     } else {
       const pending = engine.setPendingCompletion(
         state,
@@ -537,6 +570,21 @@
       }
 
       launchToken = started.launchToken;
+
+      if (started.state.activePlan?.kind === "new_pet") {
+        started.state.activePlan.newPetGameSession = {
+          profileId,
+          planId: started.state.activePlan.id,
+          planDay: started.state.activePlan.day,
+          taskId,
+          launchToken,
+          verseId: started.state.activePlan.verseId,
+          gameId: activity.id,
+          mode: activity.mode,
+          returnContext: RETURN_CONTEXT,
+          startedAt: Date.now()
+        };
+      }
 
       if (!isTest) {
         progress.dailyZooTodo = started.state;

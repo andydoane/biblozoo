@@ -402,7 +402,11 @@ function markCompleted(payload){
 
   if (!wasUnlockedBefore && isUnlockedNow && !verseProgress.petUnlockShown) {
     verseProgress.petUnlockShown = true;
-    verseProgress.externalPetUnlockPending = true;
+    verseProgress.externalPetUnlockPending = {
+      gameId: payload.gameId,
+      mode: payload.mode,
+      createdAt: now
+    };
     petUnlockTriggered = true;
   }
 
@@ -793,6 +797,14 @@ function markCompleted(payload){
     ) {
       target.searchParams.set("dailyNewMedal", "1");
       target.searchParams.set("dailyMedalTier", params.dailyActivityMode);
+    }
+
+    if (
+      status === "success" &&
+      params.dailyActivityKind === "game" &&
+      completion?.reward?.petUnlockTriggered === true
+    ) {
+      target.searchParams.set("dailyPetUnlockTriggered", "1");
     }
 
     navigateWithTransition(target.href);

@@ -16,7 +16,7 @@
   const RECENT_ASSIGNMENT_HISTORY_LIMIT = 40;
   const RECENT_QUESTION_TYPE_HISTORY_LIMIT = 6;
   const LEGACY_FLASHCARD_TASK_ID = "flashcard";
-  const NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED = false;
+  const NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED = true;
   const NEW_PET_MISSION_RULES = Object.freeze({
     minimumAgeDays: 3,
     normalAccomplishments: 5,
@@ -827,6 +827,11 @@
       tasks,
       educationalCompletedAt,
       snack,
+      newPetGameSession:
+        kind === PLAN_KINDS.NEW_PET &&
+        isPlainObject(rawPlan.newPetGameSession)
+          ? cloneJson(rawPlan.newPetGameSession)
+          : null,
       rolloverHold
     };
   }
@@ -1597,6 +1602,7 @@
               claimedAt: 0
             }
           : null,
+      newPetGameSession: null,
       rolloverHold: null
     };
   }
@@ -1605,6 +1611,7 @@
     profileId = "",
     day = localDayKey(),
     gameRegistry = [],
+    recentAssignments = [],
     now = new Date(),
     random = Math.random,
     idFactory = null
@@ -1616,8 +1623,12 @@
       activity.kind === ACTIVITY_KINDS.GAME &&
       getGameModes(activity).includes("easy")
     );
-    const selected = games[
-      randomIndex(games.length, random)
+    const nonRecent = games.filter((activity) =>
+      !isRecentlyAssigned(activity, recentAssignments, day)
+    );
+    const candidates = nonRecent.length ? nonRecent : games;
+    const selected = candidates[
+      randomIndex(candidates.length, random)
     ];
 
     if (!selected) return null;
@@ -2215,6 +2226,7 @@
     isPetUnlocked = () => false,
     getPetStatus = () => "locked",
     getReadActivitiesForVerse = () => [],
+    tutorialActive = false,
     now = new Date(),
     random = Math.random,
     idFactory = null
@@ -2253,6 +2265,44 @@
         created: false,
         preservedOldDay: rollover.preserved
       };
+    }
+
+    if (NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED) {
+      const readiness = getNewPetMissionReadiness({
+        progress: targetProgress,
+        verseList,
+        gameRegistry,
+        playgroundRegistry,
+        isPetUnlocked,
+        tutorialActive,
+        now
+      });
+
+      if (readiness.eligible) {
+        const mission = createNewPetMissionPlan({
+          profileId: safeProfileId,
+          day,
+          gameRegistry,
+          recentAssignments: state.stats.recentAssignments,
+          now,
+          random,
+          idFactory
+        });
+
+        if (mission) {
+          state.activePlan = mission;
+          recordRecentAssignment(state.stats, day, mission.activity);
+          refreshCurrentStreakForDay(state.stats, day);
+          targetProgress.dailyZooTodo = state;
+          return {
+            progress: targetProgress,
+            state,
+            plan: mission,
+            created: true,
+            preservedOldDay: false
+          };
+        }
+      }
     }
 
     const pet = chooseTodaysPet({
@@ -2462,6 +2512,13 @@
     task.completedAt = 0;
     task.launchToken = launchToken;
     task.pendingData = null;
+
+    if (
+      plan.kind === PLAN_KINDS.NEW_PET &&
+      resolvedTaskId === TASK_IDS.ACTIVITY
+    ) {
+      plan.newPetGameSession = null;
+    }
 
     if (preserveAcrossDay) {
       plan.rolloverHold = {

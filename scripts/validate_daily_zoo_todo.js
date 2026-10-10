@@ -1633,7 +1633,7 @@ function testNewPetMissionReadinessRules() {
   );
   assert.strictEqual(
     DailyTodo.NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED,
-    false
+    true
   );
   assert.deepStrictEqual(
     readiness().accomplishments,
@@ -1766,6 +1766,13 @@ function testNewPetMissionPlanSelectionAndUi() {
     profileId: "profile-a",
     day: "2026-10-05",
     gameRegistry: registries.games,
+    recentAssignments: [
+      {
+        day: "2026-10-04",
+        kind: "game",
+        id: "game_a"
+      }
+    ],
     now: new Date(2026, 9, 5, 8, 0, 0),
     random: () => 0,
     idFactory: () => "new-pet-mission"
@@ -1785,7 +1792,7 @@ function testNewPetMissionPlanSelectionAndUi() {
   assert.strictEqual(plan.questionSession, null);
   assert.strictEqual(plan.snack, null);
   assert.strictEqual(plan.activity.kind, "game");
-  assert.strictEqual(plan.activity.id, "game_a");
+  assert.strictEqual(plan.activity.id, "game_b");
   assert.strictEqual(plan.activity.mode, "easy");
 
   let state = DailyTodo.normalizeState({

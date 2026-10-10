@@ -1417,6 +1417,25 @@
       taskId
     );
 
+    if (scope === "actual") {
+      try {
+        root.dispatchEvent(new CustomEvent(
+          "biblozoo:daily-task-confirmed",
+          {
+            detail: {
+              planId,
+              taskId,
+              planKind: currentPlan.kind,
+              verseId: currentPlan.verseId,
+              pendingData: currentPending.pendingData,
+              educationalCompleted:
+                confirmed.educationalCompleted === true
+            }
+          }
+        ));
+      } catch (err) { }
+    }
+
     if (scope === "debug") {
       clearDeveloperRouteMarker();
     }
