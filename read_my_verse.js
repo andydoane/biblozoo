@@ -261,6 +261,7 @@
   let crawlSession = null;
   let crawlMusic = null;
   let balloonSession = null;
+  let fishSession = null;
 
   const state = {
     verseId: "",
@@ -1407,6 +1408,7 @@
     stopCrawlSequence();
     stopCrawlMusic();
     stopBalloonSequence();
+    stopFishSequence();
     typingFitCache = null;
     activeTypingFitWrap = null;
 
@@ -3005,6 +3007,42 @@
     };
   }
 
+  // A full right-to-left crossing takes about 4.5–5.5 seconds on phones.
+  // The fish spurts/glides share these distance waypoints with the CSS.
+  const FISH_SWIM_PATH = [
+    [0, 0], [0.16, 0.10], [0.30, 0.31],
+    [0.54, 0.50], [0.68, 0.71], [0.85, 0.83], [1, 1]
+  ];
+
+  function getFishMotion(sceneWidth, wordWidth, wordCount = 1) {
+    const width = Math.max(120, Number(sceneWidth) || 120);
+    const textWidth = Math.max(1, Number(wordWidth) || 1);
+    const count = Math.max(1, Math.floor(Number(wordCount) || 1));
+    // A 12px gap on either side ensures the entire pill enters and exits.
+    const travel = width + textWidth + 24;
+    const durationMs = Math.max(4500,
+      Math.min(width <= 460 ? 5500 : 9000,
+        Math.round(travel / 0.105)));
+    // Convert the moment the right edge clears the screen into animation time.
+    const entryProgress = (textWidth + 12) / travel;
+    let fraction = 1;
+    for (let i = 1; i < FISH_SWIM_PATH.length; i += 1) {
+      const [endTime, endDistance] = FISH_SWIM_PATH[i];
+      if (entryProgress <= endDistance) {
+        const [startTime, startDistance] = FISH_SWIM_PATH[i - 1];
+        fraction = startTime + (endTime - startTime) *
+          (entryProgress - startDistance) / (endDistance - startDistance);
+        break;
+      }
+    }
+    const staggerMs = 500;
+    const visibleMs = Math.ceil(durationMs * fraction) + 90;
+    return {
+      travel, durationMs, staggerMs, visibleMs,
+      audioStartMs: (count - 1) * staggerMs + visibleMs
+    };
+  }
+
   function stopCrawlSequence() {
     const session = crawlSession;
     if (!session) return;
@@ -3593,17 +3631,235 @@
     `;
   }
 
-  function renderFishWordsHtml(
-    chunk,
-    timing
-  ) {
+  // Keep fish, hooks and swimming words alive across audio/chunk changes.
+  function stopFishSequence() {
+    const session = fishSession;
+    if (!session) return;
+    session.active = false;
+    session.timers.forEach((timer) => clearTimeout(timer));
+    session.timers.clear();
+    fishSession = null;
+  }
+
+  function fishTimer(session, callback, delayMs) {
+    const timer = setTimeout(() => {
+      session.timers.delete(timer);
+      if (session.active && fishSession === session) callback();
+    }, delayMs);
+    session.timers.add(timer);
+    return timer;
+  }
+
+  function completeFishIfReady(session) {
+    const last = session.items.get(state.chunks.length - 1);
+    if (session.active && fishSession === session &&
+        !completionReported && last?.audioDone && last?.vanished) {
+      reportCompletion();
+    }
+  }
+
+  function markFishWordsVanished(session, item) {
+    if (!session.active || item.vanished) return;
+    item.vanished = true;
+    item.group.remove();
+    completeFishIfReady(session);
+  }
+
+  function finishFishAudio(session, item) {
+    if (!session.active || item.audioDone) return;
+    item.audioDone = true;
+    if (state.reducedMotion) {
+      item.group.classList.add("is-fading");
+      fishTimer(session, () => markFishWordsVanished(session, item), 450);
+    }
+    if (item.index + 1 < state.chunks.length) {
+      // Let earlier words and decorative fish finish their own journeys.
+      fishTimer(session, () => launchFishChunk(session, item.index + 1), 200);
+    } else {
+      completeFishIfReady(session);
+    }
+  }
+
+  function playFishAudio(session, item) {
+    if (!session.active || item.audioStarted) return;
+    item.audioStarted = true;
+    state.phase = "playing";
+    const request = ++audioRequest;
+    const src = getChunkAudioPath(
+      state.verseId,
+      state.chunkAudioIndices[item.index] ?? item.index,
+      state.chunks.length,
+      state.usesChunkAudio
+    );
+    const finish = () => {
+      if (!session.active || fishSession !== session ||
+          request !== audioRequest) return;
+      activeAudio = null;
+      finishFishAudio(session, item);
+    };
+    if (!src || typeof Audio === "undefined" || appApi?.isMuted?.()) {
+      fishTimer(session, finish, 250);
+      return;
+    }
+    try {
+      activeAudio?.pause?.();
+      activeAudio = new Audio(src);
+      activeAudio.preload = "auto";
+      activeAudio.addEventListener("ended", finish, { once: true });
+      activeAudio.addEventListener("error", finish, { once: true });
+      activeAudio.play()?.catch?.(() => fishTimer(session, finish, 650));
+    } catch (err) {
+      fishTimer(session, finish, 650);
+    }
+  }
+
+  function launchFishDecorations(session) {
+    const manifest = READ_ACTIVITY_MANIFEST[FISH_ACTIVITY_ID];
+    const decorations = createDecorations(FISH_ACTIVITY_ID);
+    const sceneWidth = session.scene.getBoundingClientRect().width;
+    decorations.forEach((decoration) => {
+      const holder = root.document.createElement("div");
+      holder.innerHTML = renderFishDecorationsHtml(manifest, [decoration]);
+      const button = holder.firstElementChild;
+      session.decorations.appendChild(button);
+      const width = button.getBoundingClientRect().width;
+      const travel = sceneWidth + width + 24;
+      button.style.left = `${-width - 12}px`;
+      button.style.setProperty("--read-fish-decor-travel", `${travel}px`);
+      button.style.setProperty("--read-fish-decor-duration",
+        `${Math.max(9500, Math.min(18000, Math.round(travel / 0.051)))}ms`);
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.classList.contains("is-activated")) return;
+        button.classList.add("is-activated");
+        button.disabled = true;
+        // Fallback if WebKit does not fire the caught-fish animationend.
+        fishTimer(session, () => button.remove(), 2300);
+      };
+      button.addEventListener("animationend", (event) => {
+        if (event.target === button && !button.classList.contains("is-activated")) {
+          button.remove(); // Normal fish finished crossing.
+        } else if (event.animationName === "readCaughtFish") {
+          button.remove(); // Catch animation completed, including the hook.
+        }
+      });
+    });
+  }
+
+  function launchFishChunk(session, index) {
+    if (!session.active || fishSession !== session ||
+        session.items.has(index)) return;
+    state.chunkIndex = index;
+    state.phase = "animating";
+    const holder = root.document.createElement("div");
+    holder.innerHTML = renderFishWordsHtml(state.chunks[index]);
+    const group = holder.firstElementChild;
+    session.scene.appendChild(group);
+    const item = {
+      index, group, audioStarted: false, audioDone: false, vanished: false
+    };
+    session.items.set(index, item);
+    session.progress.textContent = `Part ${index + 1} of ${state.chunks.length}`;
+
+    if (state.reducedMotion) {
+      fishTimer(session, () => playFishAudio(session, item), 520);
+      return;
+    }
+
+    const words = Array.from(group.querySelectorAll(".read-fish-word"));
+    const scene = session.scene.getBoundingClientRect();
+    let lastEntryMs = 0;
+    let lastExitMs = 0;
+    words.forEach((word, wordIndex) => {
+      const box = word.getBoundingClientRect();
+      const motion = getFishMotion(scene.width, box.width, words.length);
+      const delayMs = wordIndex * motion.staggerMs;
+      // Keep every lane inside the playfield, even with a tall word pill.
+      const preferredTop = scene.height * (0.19 + (wordIndex % 4) * 0.17);
+      word.style.top = `${Math.max(8, Math.min(scene.height - box.height - 8,
+        preferredTop))}px`;
+      word.style.setProperty("--read-fish-travel", `${motion.travel}px`);
+      word.style.setProperty("--read-fish-duration", `${motion.durationMs}ms`);
+      word.style.setProperty("--read-word-delay", `${delayMs}ms`);
+      word.style.setProperty("--read-fish-wiggle-duration",
+        `${Math.round(motion.durationMs / 2)}ms`);
+      lastEntryMs = Math.max(lastEntryMs, delayMs + motion.visibleMs);
+      lastExitMs = Math.max(lastExitMs, delayMs + motion.durationMs);
+    });
+    let remaining = words.length;
+    words.forEach((word) => {
+      word.addEventListener("animationend", (event) => {
+        if (event.target !== word || event.animationName !== "readFishWordSwim" ||
+            item.vanished) return;
+        remaining -= 1;
+        if (remaining === 0) markFishWordsVanished(session, item);
+      });
+    });
+    fishTimer(session, () => markFishWordsVanished(session, item),
+      lastExitMs + 800);
+    fishTimer(session, () => playFishAudio(session, item), lastEntryMs);
+    launchFishDecorations(session);
+  }
+
+  function renderFishScreen(idx, verse) {
+    if (fishSession) {
+      stopFishSequence();
+      audioRequest += 1;
+      activeAudio?.pause?.();
+      activeAudio = null;
+    }
+    const manifest = READ_ACTIVITY_MANIFEST[FISH_ACTIVITY_ID];
+    const wrap = root.document.createElement("div");
+    wrap.className = "read-my-verse-screen read-animated-screen read-fish-screen" +
+      (state.reducedMotion ? " is-reduced-motion" : "");
+    const instruction = state.readTestMode === "early_exit"
+      ? "Early-exit check: use Back before it finishes"
+      : "Watch and listen as the words swim";
+    wrap.innerHTML = `
+      <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Fish Read">‹</button>
+      <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
+        <header class="read-animated-header">
+          <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
+          <div class="read-animated-title">${escapeHtml(manifest.title)}</div>
+          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
+        </header>
+        <section class="read-animated-scene" aria-label="${escapeHtml(verse.verseText)}">
+          <div class="read-animated-decorations" data-read-fish></div>
+        </section>
+        <div class="read-animated-progress" data-read-progress aria-live="polite">Part 1 of ${state.chunks.length}</div>
+      </main>
+    `;
+    wrap.querySelector("[data-read-exit]").onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      exitSession();
+    };
+    const session = {
+      active: true, wrap,
+      scene: wrap.querySelector(".read-animated-scene"),
+      decorations: wrap.querySelector("[data-read-fish]"),
+      progress: wrap.querySelector("[data-read-progress]"),
+      items: new Map(), timers: new Set()
+    };
+    fishSession = session;
+    root.requestAnimationFrame(() => {
+      if (session.active && fishSession === session && wrap.isConnected) {
+        launchFishChunk(session, 0);
+      }
+    });
+    return appApi.makeSlide({ idx, bg: "#197ea7", navHidden: true, inner: wrap });
+  }
+
+  function renderFishWordsHtml(chunk) {
+    if (state.reducedMotion) {
+      return `<div class="read-fish-words is-stationary"><div class="read-fish-reduced-text">${escapeHtml(chunk)}</div></div>`;
+    }
     return `
       <div class="read-fish-words" aria-label="${escapeHtml(chunk)}">
-        ${getChunkWords(chunk).map(
-          (word, index) => `
-            <span class="read-fish-word" style="--read-word-index:${index};--read-word-delay:${index * timing.wordStaggerMs}ms;--read-word-top:${19 + (index % 4) * 17}%">${escapeHtml(word)}</span>
-          `
-        ).join("")}
+        ${getChunkWords(chunk).map((word, index) => `
+          <span class="read-fish-word" style="--read-fish-wiggle-phase:-${(index * 173) % 900}ms"><span class="read-fish-word-inner">${escapeHtml(word)}</span></span>
+        `).join("")}
       </div>
     `;
   }
@@ -3622,20 +3878,18 @@
     ).join("");
   }
 
-  function renderFishDecorationsHtml(
-    manifest
-  ) {
-    return state.decorations.map(
-      (decoration) => `
-        <button class="read-decorative-fish" type="button" data-read-decoration aria-label="Catch decorative fish" style="--read-decor-top:${decoration.top.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
-          <span class="read-fish-hook-line" aria-hidden="true"></span>
+  function renderFishDecorationsHtml(manifest, decorations = state.decorations) {
+    return decorations.map((decoration) => `
+      <button class="read-decorative-fish" type="button" data-read-decoration aria-label="Catch decorative fish" style="--read-decor-top:${decoration.top.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
+        <span class="read-fish-hook-rig" aria-hidden="true">
+          <span class="read-fish-hook-line"></span>
           <img class="read-fish-hook" src="${escapeHtml(manifest.decorations?.hook || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-hook-missing')">
-          <span class="read-fish-hook-fallback" aria-hidden="true">J</span>
-          <img class="read-fish-image" src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-image-missing')">
-          <span class="read-fish-fallback" aria-hidden="true"></span>
-        </button>
-      `
-    ).join("");
+          <span class="read-fish-hook-fallback">J</span>
+        </span>
+        <img class="read-fish-image" src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-image-missing')">
+        <span class="read-fish-fallback" aria-hidden="true"></span>
+      </button>
+    `).join("");
   }
 
   function bindDecorativeInteractions(wrap) {
@@ -3668,6 +3922,9 @@
     }
     if (state.activityId === BALLOONS_ACTIVITY_ID) {
       return renderBalloonScreen(idx, verse);
+    }
+    if (state.activityId === FISH_ACTIVITY_ID) {
+      return renderFishScreen(idx, verse);
     }
     const manifest =
       READ_ACTIVITY_MANIFEST[
@@ -4606,6 +4863,7 @@
     getAnimatedActivityTiming,
     getCrawlMotion,
     getBalloonMotion,
+    getFishMotion,
     readBalloonRectAt,
     readBalloonPathsOverlap,
     chooseReadBalloonSpawn,

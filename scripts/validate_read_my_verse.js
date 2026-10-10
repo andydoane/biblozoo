@@ -1093,7 +1093,33 @@ function testBalloonSafeSpawning() {
   assert.strictEqual(ReadMyVerse.chooseReadBalloonSpawn(base, 85, [], []), null);
   const source = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
   assert.ok(source.includes(".read-balloons-screen .read-animated-scene"));
-  assert.ok(source.includes("rotate(2.5deg)"));
+  assert.ok(source.includes("rotate(1.500deg)"));
+}
+
+function testFishSwimmingAndHookAlignment() {
+  const short = ReadMyVerse.getFishMotion(360, 70, 1);
+  const long = ReadMyVerse.getFishMotion(360, 155, 5);
+  const tablet = ReadMyVerse.getFishMotion(850, 155, 1);
+  assert.ok(short.durationMs >= 4500 && short.durationMs <= 5500);
+  assert.ok(long.durationMs >= 4500 && long.durationMs <= 5500);
+  assert.ok(tablet.durationMs > short.durationMs);
+  assert.strictEqual(short.staggerMs, 500);
+  assert.ok(short.visibleMs > 0 && short.visibleMs < short.durationMs);
+  assert.ok(long.visibleMs < long.durationMs);
+  assert.ok(long.audioStartMs > short.audioStartMs);
+  assert.strictEqual(short.travel, 360 + 70 + 24);
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(source.includes("return renderFishScreen(idx, verse)"));
+  assert.ok(source.includes("stopFishSequence();"));
+  assert.ok(source.includes("launchFishDecorations(session);"));
+  assert.ok(source.includes('fishTimer(session, () => launchFishChunk(session, item.index + 1), 200)'));
+  assert.ok(css.includes(".read-fish-screen .read-animated-scene"));
+  assert.ok(css.includes("@keyframes readFishWordWiggle"));
+  assert.ok(css.includes("transform: scaleX(-1)"));
+  assert.ok(css.includes("left: 83.875%"));
+  assert.ok(css.includes("bottom: 88.9%"));
+  assert.ok(!css.includes(".read-animated-stage.is-listening .read-fish-word"));
 }
 
 function main() {
@@ -1112,6 +1138,7 @@ function main() {
     testVerseCrawlMotion,
     testBalloonFloatingAndParticles,
     testBalloonSafeSpawning,
+    testFishSwimmingAndHookAlignment,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
     testTapOrderHintsAndReset,

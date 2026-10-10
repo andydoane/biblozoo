@@ -1577,6 +1577,11 @@ button.read-unscramble-token.is-solved {
   background-color: #197ea7;
 }
 
+/* Fish-only full-width travel: keep the header and progress safe-area padding. */
+.read-fish-screen .read-animated-scene {
+  margin-inline: calc(-1 * clamp(16px, 4vw, 54px));
+}
+
 .read-fish-screen .read-animated-stage {
   background-image:
     var(--read-bg-phone, none),
@@ -1594,45 +1599,82 @@ button.read-unscramble-token.is-solved {
 .read-fish-word {
   position: absolute;
   z-index: 3;
-  top: var(--read-word-top);
-  left: 108%;
-  max-width: 88%;
+  top: 20%;
+  left: calc(100% + 12px);
+  width: max-content;
+  max-width: calc(100% - 36px);
+  font-size: clamp(27px, 7vw, 62px);
+  font-weight: 800;
+  line-height: 1.04;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: readFishWordSwim var(--read-fish-duration, 5000ms)
+    linear var(--read-word-delay, 0ms) both;
+}
+
+/* The inner pill wiggles independently from its horizontal spurts/glides. */
+.read-fish-word-inner {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
   border: 2px solid rgba(255, 255, 255, 0.42);
   border-radius: 999px;
   padding: 0.15em 0.56em 0.2em;
   color: #073e55;
   background: rgba(232, 252, 255, 0.92);
   box-shadow: 0 5px 18px rgba(0, 48, 70, 0.28);
-  font-size: clamp(27px, 7vw, 62px);
-  font-weight: 800;
-  line-height: 1.04;
-  white-space: nowrap;
-  opacity: 0;
-  animation: readFishWordSwim 2.2s ease-in-out var(--read-word-delay) both;
+  text-align: center;
+  overflow-wrap: anywhere;
+  will-change: transform;
+  animation: readFishWordWiggle var(--read-fish-wiggle-duration, 2500ms)
+    ease-in-out var(--read-fish-wiggle-phase, 0ms) infinite;
 }
 
+/* Distance waypoints match getFishMotion's readability timing. */
 @keyframes readFishWordSwim {
-  0% {
-    left: 108%;
-    opacity: 0;
-    transform: translateY(0);
-  }
-  16% { opacity: 1; }
-  50% { transform: translateY(-12px); }
-  84% { opacity: 1; }
-  100% {
-    left: -112%;
-    opacity: 0;
-    transform: translateY(8px);
-  }
+  0% { opacity: 0; transform: translate3d(0, 0, 0); }
+  10% { opacity: 1; }
+  16% { transform: translate3d(calc(var(--read-fish-travel, 500px) * -0.10), 0, 0); }
+  30% { transform: translate3d(calc(var(--read-fish-travel, 500px) * -0.31), 0, 0); }
+  54% { transform: translate3d(calc(var(--read-fish-travel, 500px) * -0.50), 0, 0); }
+  68% { transform: translate3d(calc(var(--read-fish-travel, 500px) * -0.71), 0, 0); }
+  85% { transform: translate3d(calc(var(--read-fish-travel, 500px) * -0.83), 0, 0); opacity: 1; }
+  100% { opacity: 0; transform: translate3d(calc(var(--read-fish-travel, 500px) * -1), 0, 0); }
 }
+
+@keyframes readFishWordWiggle {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  20% { transform: translate3d(0, -3px, 0) rotate(-1deg); }
+  42% { transform: translate3d(0, 2px, 0) rotate(0.6deg); }
+  65% { transform: translate3d(0, -2px, 0) rotate(-0.7deg); }
+  83% { transform: translate3d(0, 3px, 0) rotate(0.9deg); }
+}
+
+.read-fish-reduced-text {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90%;
+  border-radius: 22px;
+  padding: 0.4em 0.5em;
+  color: #073e55;
+  background: rgba(232, 252, 255, 0.94);
+  font-size: clamp(26px, 7vw, 52px);
+  font-weight: 800;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  transition: opacity 350ms ease;
+}
+.read-fish-words.is-fading .read-fish-reduced-text { opacity: 0; }
 
 .read-decorative-fish {
   top: var(--read-decor-top);
   left: -30%;
   width: clamp(78px, 22vw, 165px);
   height: clamp(88px, 25vw, 190px);
-  animation: readDecorFish 10s linear var(--read-decor-delay) both;
+  will-change: transform;
+  animation: readDecorFish var(--read-fish-decor-duration, 10000ms)
+    linear var(--read-decor-delay, 0s) both;
 }
 
 .read-fish-image {
@@ -1643,6 +1685,7 @@ button.read-unscramble-token.is-solved {
   width: 100%;
   height: auto;
   pointer-events: none;
+  transform: scaleX(-1);
 }
 
 .read-fish-fallback {
@@ -1655,6 +1698,7 @@ button.read-unscramble-token.is-solved {
   height: 35%;
   border-radius: 52% 45% 45% 52%;
   background: #ffc93d;
+  transform: scaleX(-1);
 }
 
 .read-fish-fallback::after {
@@ -1671,40 +1715,46 @@ button.read-unscramble-token.is-solved {
   display: block;
 }
 
-.read-fish-hook-line,
-.read-fish-hook,
-.read-fish-hook-fallback {
+/* Width/height come from the hook PNG itself, not its fish button. */
+.read-fish-hook-rig {
   position: absolute;
   z-index: 4;
+  left: calc(50% - 15px);
+  bottom: 56%;
+  width: clamp(28px, 7vw, 46px);
   opacity: 0;
   pointer-events: none;
 }
 
+.read-fish-hook {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.read-fish-hook[hidden] { display: none; }
+
+/* 16.125% from image right = 83.875% left; 11.1% down = 88.9% bottom. */
 .read-fish-hook-line {
-  left: 50%;
-  bottom: 70%;
+  position: absolute;
+  z-index: 5;
+  left: 83.875%;
+  bottom: 88.9%;
   width: 2px;
   height: 130vh;
   background: rgba(225, 235, 238, 0.9);
-}
-
-.read-fish-hook {
-  left: calc(50% - 15px);
-  bottom: 56%;
-  width: clamp(28px, 7vw, 46px);
-  height: auto;
+  transform: translateX(-50%);
 }
 
 .read-fish-hook-fallback {
   display: none;
-  left: calc(50% - 9px);
-  bottom: 52%;
+  width: 100%;
+  aspect-ratio: 1;
   color: rgba(225, 235, 238, 0.95);
   font: 700 clamp(28px, 7vw, 46px) Georgia, serif;
+  text-align: center;
   transform: scaleX(-1);
 }
-
-.read-decorative-fish.is-hook-missing .read-fish-hook-fallback {
+.read-fish-hook-rig.is-hook-missing .read-fish-hook-fallback {
   display: block;
 }
 
@@ -1713,9 +1763,7 @@ button.read-unscramble-token.is-solved {
   pointer-events: none;
 }
 
-.read-decorative-fish.is-activated .read-fish-hook-line,
-.read-decorative-fish.is-activated .read-fish-hook,
-.read-decorative-fish.is-activated .read-fish-hook-fallback {
+.read-decorative-fish.is-activated .read-fish-hook-rig {
   opacity: 1;
   animation: readHookLower 620ms ease-out both;
 }
@@ -1726,9 +1774,11 @@ button.read-unscramble-token.is-solved {
 }
 
 @keyframes readDecorFish {
-  from { transform: translateX(0) translateY(0); }
-  45% { transform: translateX(72vw) translateY(-10px); }
-  to { transform: translateX(145vw) translateY(8px); }
+  0% { transform: translate3d(0, 0, 0); }
+  38% { transform: translate3d(calc(var(--read-fish-decor-travel, 500px) * 0.36), -8px, 0); }
+  52% { transform: translate3d(calc(var(--read-fish-decor-travel, 500px) * 0.55), 3px, 0); }
+  76% { transform: translate3d(calc(var(--read-fish-decor-travel, 500px) * 0.72), -5px, 0); }
+  100% { transform: translate3d(var(--read-fish-decor-travel, 500px), 8px, 0); }
 }
 
 @keyframes readHookLower {
@@ -1737,17 +1787,8 @@ button.read-unscramble-token.is-solved {
 }
 
 @keyframes readCaughtFish {
-  to { transform: translateY(-125vh); }
-}
-
-.read-animated-stage.is-listening .read-fish-word {
-  opacity: 0;
-  animation: none;
-}
-
-.read-animated-screen.is-reduced-motion .read-fish-word {
-  animation-duration: 480ms;
-  animation-delay: 0ms;
+  from { transform: scaleX(-1); }
+  to { transform: translateY(-125vh) scaleX(-1); }
 }
 
 .read-animated-screen.is-reduced-motion .read-decorative-balloon,
@@ -1756,11 +1797,6 @@ button.read-unscramble-token.is-solved {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .read-fish-word {
-    animation-duration: 480ms;
-    animation-delay: 0ms;
-  }
-
   .read-decorative-balloon,
   .read-decorative-fish {
     display: none;
