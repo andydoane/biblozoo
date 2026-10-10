@@ -1041,6 +1041,12 @@ function testVerseCrawlMotion() {
   // The new font must be cached for offline PWA use.
   const sw = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
   assert.ok(sw.includes('"./verse_fonts/NewsCycle-Bold.ttf"'));
+  assert.ok(sw.includes('"./verse_images/read_my_verse/verse_crawl_theme.mp3"'));
+  assert.ok(fs.existsSync(path.join(rootDir,
+    "verse_images/read_my_verse/verse_crawl_theme.mp3")));
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  assert.ok(source.includes("const CRAWL_FANFARE_SECONDS = 8;"));
+  assert.ok(source.includes("audio.loop = false;"));
   const styles = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
   assert.ok(styles.includes('font-family: "News Cycle Bold", sans-serif !important'));
   assert.ok(styles.includes('--read-crawl-travel'));

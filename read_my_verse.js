@@ -34,6 +34,10 @@
   const CHUNK_SEQUENCE_ACTIVITY_ID =
     "chunk_sequence";
   const CHUNK_PAUSE_MS = 480;
+  const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme.mp3`;
+  const CRAWL_FANFARE_SECONDS = 8;
+  const CRAWL_UNDERSCORE_VOLUME = 0.22;
+  const CRAWL_DUCK_FADE_MS = 1350;
   const CHUNK_SEQUENCE_COLORS =
     Object.freeze([
       Object.freeze({
@@ -251,6 +255,7 @@
   let lastKeySoundIndex = -1;
   let completionReported = false;
   let crawlSession = null;
+  let crawlMusic = null;
 
   const state = {
     verseId: "",
@@ -1395,6 +1400,7 @@
   function stopAudio() {
     audioRequest += 1;
     stopCrawlSequence();
+    stopCrawlMusic();
     typingFitCache = null;
     activeTypingFitWrap = null;
 
@@ -1527,6 +1533,11 @@
     );
     state.decorations =
       createDecorations(safeActivityId);
+
+    // Start in the launch gesture so iOS permits music playback.
+    if (safeActivityId === VERSE_CRAWL_ACTIVITY_ID) {
+      startCrawlMusic();
+    }
 
     if (
       isTypingActivity(safeActivityId)
@@ -2835,6 +2846,124 @@
     `;
   }
 
+  // Music is independent of spoken chunk audio. It starts in the launch tap,
+  // before the crawl screen is mounted, to satisfy iOS playback restrictions.
+  function startCrawlMusic() {
+    if (appApi?.isMuted?.() || !root?.Audio) return;
+    try {
+      const audio = new root.Audio(CRAWL_MUSIC_SRC);
+      audio.preload = "auto";
+      audio.loop = false;
+      audio.volume = 1;
+      audio.setAttribute("playsinline", "");
+      audio.setAttribute("webkit-playsinline", "");
+      const music = {
+        audio, context: null, gain: null,
+        failed: false, fadeFrame: 0
+      };
+      crawlMusic = music;
+      audio.addEventListener("error", () => { music.failed = true; });
+
+      // iOS WebKit may ignore HTMLMediaElement.volume. Route the music
+      // through a GainNode so the fanfare and spoken verse can be balanced.
+      const AudioContextClass = root.AudioContext || root.webkitAudioContext;
+      if (AudioContextClass) {
+        let context = null;
+        try {
+          context = new AudioContextClass();
+          const source = context.createMediaElementSource(audio);
+          const gain = context.createGain();
+          source.connect(gain);
+          gain.connect(context.destination);
+          music.context = context;
+          music.gain = gain;
+          context.resume()?.catch?.(() => { music.failed = true; });
+        } catch (err) {
+          context?.close?.()?.catch?.(() => {});
+        }
+      }
+      audio.play()?.catch?.(() => { music.failed = true; });
+    } catch (err) {
+      stopCrawlMusic();
+    }
+  }
+
+  function stopCrawlMusic() {
+    const music = crawlMusic;
+    crawlMusic = null;
+    if (!music) return;
+    if (music.fadeFrame) root?.cancelAnimationFrame?.(music.fadeFrame);
+    try {
+      music.audio.pause();
+      music.audio.removeAttribute?.("src");
+      music.audio.load?.();
+    } catch (err) { }
+    music.context?.close?.()?.catch?.(() => {});
+  }
+
+  function fadeCrawlMusic(target, durationMs) {
+    const music = crawlMusic;
+    if (!music || music.failed || music.audio.ended) return;
+    const level = Math.max(0, Math.min(1, target));
+    const seconds = Math.max(0.01, durationMs / 1000);
+    if (music.gain && music.context) {
+      const now = music.context.currentTime;
+      const param = music.gain.gain;
+      param.cancelScheduledValues(now);
+      param.setValueAtTime(param.value, now);
+      param.linearRampToValueAtTime(level, now + seconds);
+      return;
+    }
+    // Compatible fallback for browsers where element volume is writable.
+    if (music.fadeFrame) root?.cancelAnimationFrame?.(music.fadeFrame);
+    const startVolume = music.audio.volume;
+    const startedAt = Date.now();
+    const tick = () => {
+      if (crawlMusic !== music) return;
+      const fraction = Math.min(1, (Date.now() - startedAt) / (seconds * 1000));
+      music.audio.volume = startVolume + (level - startVolume) * fraction;
+      music.fadeFrame = fraction < 1 ? root.requestAnimationFrame(tick) : 0;
+    };
+    tick();
+  }
+
+  function waitForCrawlFanfare(session, start) {
+    const music = crawlMusic;
+    if (!music || music.failed || appApi?.isMuted?.()) {
+      if (music?.failed || appApi?.isMuted?.()) stopCrawlMusic();
+      start();
+      return;
+    }
+    let lastProgress = Date.now();
+    let lastTime = -1;
+    const check = () => {
+      if (!session.active || crawlSession !== session) return;
+      if (crawlMusic !== music || music.failed || music.audio.ended ||
+          appApi?.isMuted?.()) {
+        stopCrawlMusic();
+        start();
+        return;
+      }
+      const elapsed = music.audio.currentTime || 0;
+      if (elapsed >= CRAWL_FANFARE_SECONDS) {
+        fadeCrawlMusic(CRAWL_UNDERSCORE_VOLUME, CRAWL_DUCK_FADE_MS);
+        start();
+        return;
+      }
+      if (elapsed > lastTime + 0.02) {
+        lastTime = elapsed;
+        lastProgress = Date.now();
+      }
+      // A blocked or stalled soundtrack must never strand the activity.
+      if (Date.now() - lastProgress > 3500) {
+        stopCrawlMusic();
+        start();
+        return;
+      }
+      crawlTimer(session, check, 125);
+    };
+    check();
+  }
   // A crawl has one persistent scene: each chunk keeps moving independently
   // of later audio and later chunks. No shared animated-activity rerenders.
   function getCrawlMotion(sceneHeight, chunkHeight, sceneTop, viewportHeight) {
@@ -2897,6 +3026,11 @@
   function finishCrawlAudio(session, item) {
     if (!session.active || item.audioDone) return;
     item.audioDone = true;
+    if (item.index === state.chunks.length - 1 &&
+        (item.pausedForAudio || state.reducedMotion)) {
+      fadeCrawlMusic(0, state.reducedMotion ? 450 :
+        Math.ceil(item.durationMs * 0.16));
+    }
     if (item.pausedForAudio) {
       item.node.style.animationPlayState = "running";
       // In case WebKit omits animationend after resuming a paused animation.
@@ -2988,6 +3122,14 @@
         node.style.animationPlayState = "paused";
       }
     }, Math.round(motion.durationMs * 0.84));
+    if (index === state.chunks.length - 1) {
+      // Match the music fade to the last 15% of the final crawl fade.
+      crawlTimer(session, () => {
+        if (item.audioDone && !item.pausedForAudio && !item.vanished) {
+          fadeCrawlMusic(0, motion.durationMs * 0.15);
+        }
+      }, Math.round(motion.durationMs * 0.85));
+    }
     crawlTimer(session, () => playCrawlAudio(session, item), motion.visibleMs);
     // Fallback for a missing animationend event (never before audio ends).
     crawlTimer(session, () => {
@@ -3048,13 +3190,20 @@
         }
       });
     };
-    // Measure after the font loads, with a bounded fallback for a missing font.
+    // Wait for both font layout and eight seconds of actual music playback.
+    // A stalled/blocked soundtrack falls back to the normal silent crawl.
+    let waiting = false;
+    const ready = () => {
+      if (waiting || !session.active) return;
+      waiting = true;
+      waitForCrawlFanfare(session, start);
+    };
     const fontReady = root.document.fonts?.load?.('700 40px "News Cycle Bold"');
     if (fontReady?.then) {
-      fontReady.then(start, start);
-      crawlTimer(session, start, 2500);
+      fontReady.then(ready, ready);
+      crawlTimer(session, ready, 2500);
     } else {
-      start();
+      ready();
     }
     return appApi.makeSlide({ idx, bg: "#030815", navHidden: true, inner: wrap });
   }
