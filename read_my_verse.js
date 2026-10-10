@@ -3586,7 +3586,7 @@
       <div class="read-balloon-words" aria-label="${escapeHtml(chunk)}">
         ${getChunkWords(chunk).map(
           (word, index) => `
-            <span class="read-balloon-word" style="--read-lane-offset:${(((index * 37) % 5) - 2) * 7}vw;--read-sway-amplitude:${14 + (index % 3) * 3}px;--read-sway-phase:-${(index * 277) % 2400}ms;--read-sway-duration:${3100 + (index % 4) * 580}ms"><span class="read-balloon-word-inner">${escapeHtml(word)}</span></span>
+            <span class="read-balloon-word" style="--read-lane-offset:${(((index * 37) % 5) - 2) * 7}vw;--read-sway-amplitude:${12 + (index % 3) * 1.5}px;--read-sway-phase:-${(index * 277) % 2400}ms;--read-sway-duration:${4200 + (index % 4) * 260}ms"><span class="read-balloon-word-inner">${escapeHtml(word)}</span></span>
           `
         ).join("")}
       </div>
