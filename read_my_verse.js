@@ -41,11 +41,7 @@
 
   let appApi = null;
   let activeAudio = null;
-  let keySoundBuffers = [];
-  let keySoundBuffersPromise = null;
-  let keySoundBufferContext = null;
-  let keyFallbackAudio = [];
-  const activeKeySources = new Set();
+  let keySoundAudio = [];
   let audioRequest = 0;
   let pauseTimer = 0;
   let wordFeedbackTimer = 0;
@@ -302,20 +298,12 @@
 
     activeAudio = null;
 
-    keyFallbackAudio.forEach((audio) => {
+    keySoundAudio.forEach((audio) => {
       try {
         audio.pause();
         audio.currentTime = 0;
       } catch (err) { }
     });
-
-    activeKeySources.forEach((source) => {
-      try {
-        source.stop();
-        source.disconnect();
-      } catch (err) { }
-    });
-    activeKeySources.clear();
   }
 
   function clearTimers() {
@@ -343,8 +331,7 @@
 
   function initialize(nextApi) {
     appApi = nextApi || null;
-    ensureKeyFallbackAudio();
-    preloadKeySoundBuffers();
+    ensureKeySoundAudio();
   }
 
   function startForVerse(
@@ -405,8 +392,7 @@
       getInitialRevealCount(chunks[0]);
     state.phase = "typing";
 
-    ensureKeyFallbackAudio();
-    preloadKeySoundBuffers();
+    ensureKeySoundAudio();
 
     return true;
   }
@@ -432,15 +418,15 @@
     return selected;
   }
 
-  function ensureKeyFallbackAudio() {
+  function ensureKeySoundAudio() {
     if (
-      keyFallbackAudio.length ||
+      keySoundAudio.length ||
       !root?.Audio
     ) {
-      return keyFallbackAudio;
+      return keySoundAudio;
     }
 
-    keyFallbackAudio =
+    keySoundAudio =
       READ_ACTIVITY_MANIFEST.typewriter
         .keySounds.map((src) => {
           const audio = new root.Audio(src);
@@ -458,150 +444,13 @@
           return audio;
         });
 
-    return keyFallbackAudio;
+    return keySoundAudio;
   }
 
-  function decodeAudioDataCompat(
-    context,
-    arrayBuffer
-  ) {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const finish = (callback) =>
-        (value) => {
-          if (settled) return;
-          settled = true;
-          callback(value);
-        };
-      const succeed = finish(resolve);
-      const fail = finish(reject);
+  function playKeySound() {
+    if (appApi?.isMuted?.()) return;
 
-      try {
-        const result = context.decodeAudioData(
-          arrayBuffer,
-          succeed,
-          fail
-        );
-
-        result?.then?.(succeed).catch?.(fail);
-      } catch (err) {
-        fail(err);
-      }
-    });
-  }
-
-  function preloadKeySoundBuffers() {
-    const context =
-      appApi?.getAudioContext?.();
-
-    if (!context || !root?.fetch) {
-      return Promise.resolve([]);
-    }
-
-    if (
-      keySoundBufferContext === context &&
-      keySoundBuffers.length
-    ) {
-      return Promise.resolve(
-        keySoundBuffers
-      );
-    }
-
-    if (
-      keySoundBufferContext === context &&
-      keySoundBuffersPromise
-    ) {
-      return keySoundBuffersPromise;
-    }
-
-    keySoundBufferContext = context;
-    keySoundBuffers = [];
-    const sounds =
-      READ_ACTIVITY_MANIFEST.typewriter
-        .keySounds;
-
-    keySoundBuffersPromise = Promise.all(
-      sounds.map(async (src) => {
-        try {
-          const response = await root.fetch(
-            src,
-            { cache: "force-cache" }
-          );
-          const capacitorResponse =
-            appApi?.isNativePlatform?.() &&
-            response.status === 0;
-
-          if (
-            !response.ok &&
-            !capacitorResponse
-          ) {
-            throw new Error(
-              `HTTP ${response.status}`
-            );
-          }
-
-          const data =
-            await response.arrayBuffer();
-          return await decodeAudioDataCompat(
-            context,
-            data
-          );
-        } catch (err) {
-          return null;
-        }
-      })
-    ).then((decoded) => {
-      if (keySoundBufferContext !== context) {
-        return keySoundBuffers;
-      }
-
-      keySoundBuffers = decoded.filter(Boolean);
-      return keySoundBuffers;
-    }).finally(() => {
-      if (keySoundBufferContext === context) {
-        keySoundBuffersPromise = null;
-      }
-    });
-
-    return keySoundBuffersPromise;
-  }
-
-  function playBufferedKeySound(context) {
-    if (!keySoundBuffers.length) {
-      return false;
-    }
-
-    const index = chooseKeySoundIndex(
-      keySoundBuffers.length
-    );
-
-    try {
-      const source =
-        context.createBufferSource();
-      const gain = context.createGain();
-
-      source.buffer = keySoundBuffers[index];
-      gain.gain.value = 0.72;
-      source.connect(gain);
-      gain.connect(context.destination);
-      activeKeySources.add(source);
-      source.onended = () => {
-        activeKeySources.delete(source);
-
-        try {
-          source.disconnect();
-          gain.disconnect();
-        } catch (err) { }
-      };
-      source.start(0);
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function playFallbackKeySound() {
-    const sounds = ensureKeyFallbackAudio();
+    const sounds = ensureKeySoundAudio();
 
     if (!sounds.length) return;
 
@@ -611,36 +460,16 @@
     const audio = sounds[index];
 
     try {
+      sounds.forEach((sound) => {
+        sound.pause();
+        sound.currentTime = 0;
+      });
+      audio.muted = false;
+      audio.volume = 1;
       audio.pause();
       audio.currentTime = 0;
       audio.play().catch?.(() => { });
     } catch (err) { }
-  }
-
-  function playKeySound() {
-    if (appApi?.isMuted?.()) return;
-
-    appApi?.primeAudioFromGesture?.();
-
-    const context =
-      appApi?.getAudioContext?.();
-
-    if (context) {
-      if (
-        context.state === "suspended" &&
-        typeof context.resume === "function"
-      ) {
-        context.resume().catch?.(() => { });
-      }
-
-      if (playBufferedKeySound(context)) {
-        return;
-      }
-
-      preloadKeySoundBuffers();
-    }
-
-    playFallbackKeySound();
   }
 
   function isWordCompleted(

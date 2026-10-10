@@ -8715,11 +8715,6 @@ window.BibloZooReadMyVerse
     makeSlide,
     scheduleSmartLearnTextFit,
     isMuted: () => muted,
-    getAudioContext: getAppAudioContext,
-    primeAudioFromGesture: () =>
-      primeAppAudioFromGesture(),
-    isNativePlatform: () =>
-      IS_NATIVE_CAPACITOR,
     requestRender: () => render(),
     onWordActivated: () => true,
     onContextComplete:
