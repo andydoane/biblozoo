@@ -5299,7 +5299,9 @@ function completeDailyTodoFlashcard({
   if (
     task.status === pendingStatus
   ) {
-    returnToDailyTodoWithTransition();
+    returnToDailyTodoWithTransition(
+      previewScope || "actual"
+    );
     return true;
   }
 
@@ -5707,27 +5709,92 @@ function exitDailyTodoRead(
 }
 
 
+function loadDailyTodoQuestionsRuntime(
+  previewScope = ""
+) {
+  const engine =
+    window.BibloZooDailyTodo;
+  const ui =
+    window.BibloZooDailyTodoUI;
+
+  if (!engine?.normalizeState) {
+    return null;
+  }
+
+  if (previewScope === "questions_test") {
+    const state =
+      ui?.loadQuestionsTestState?.(
+        engine
+      );
+
+    return state
+      ? {
+          engine,
+          progress: null,
+          state,
+          previewScope
+        }
+      : null;
+  }
+
+  const loaded = loadDailyTodoRuntime();
+  return loaded
+    ? {
+        ...loaded,
+        previewScope: ""
+      }
+    : null;
+}
+
+function saveDailyTodoQuestionsRuntime(
+  runtime,
+  state
+) {
+  if (
+    runtime?.previewScope ===
+      "questions_test"
+  ) {
+    return window.BibloZooDailyTodoUI
+      ?.saveQuestionsTestState?.(state) ===
+      true;
+  }
+
+  return !!runtime?.progress &&
+    saveDailyTodoRuntime(
+      runtime.progress,
+      state
+    );
+}
+
 function startDailyTodoQuestions(
-  requestedPlan
+  requestedPlan,
+  {
+    previewScope = "",
+    sessionOptions = null
+  } = {}
 ) {
   const questions =
     window.BibloZooDailyQuestions;
-  const loaded =
-    loadDailyTodoRuntime();
+  const sessionPlanner =
+    window.BibloZooDailyQuestionSessions;
+  const runtime =
+    loadDailyTodoQuestionsRuntime(
+      previewScope
+    );
   const profileId =
     getProfileApi()
       ?.getActiveProfileId?.() || "";
 
   if (
     !questions?.startForVerse ||
-    !loaded ||
+    !sessionPlanner?.createSessionPlan ||
+    !runtime ||
     !profileId
   ) {
     return false;
   }
 
-  const { engine, progress, state } =
-    loaded;
+  const { engine, state } = runtime;
   const plan = state.activePlan;
   const taskId =
     engine.TASK_IDS?.QUESTIONS ||
@@ -5741,11 +5808,15 @@ function startDailyTodoQuestions(
     "running";
   const verseId =
     String(plan?.verseId || "").trim();
+  const verse = VERSE_LIST.find(
+    (entry) => entry?.id === verseId
+  );
 
   if (
     !plan ||
     plan.id !== requestedPlan?.id ||
     plan.profileId !== profileId ||
+    !verse ||
     !verseId ||
     ![openStatus, runningStatus]
       .includes(task?.status)
@@ -5767,6 +5838,64 @@ function startDailyTodoQuestions(
     return false;
   }
 
+  const startedPlan =
+    started.state.activePlan;
+  let questionSession =
+    sessionPlanner.normalizeSessionPlan?.(
+      startedPlan.questionSession,
+      verseId
+    );
+  let sessionCreated = false;
+
+  if (!questionSession) {
+    const history =
+      engine.getVerseHistory?.(
+        started.state,
+        verseId
+      ) || {};
+    const safeOptions =
+      previewScope === "questions_test" &&
+      sessionOptions &&
+      typeof sessionOptions === "object"
+        ? sessionOptions
+        : {};
+
+    questionSession =
+      sessionPlanner.createSessionPlan({
+        verse,
+        verses: VERSE_LIST,
+        confirmedSessions:
+          Number.isFinite(
+            Number(
+              safeOptions.confirmedSessions
+            )
+          )
+            ? Number(
+                safeOptions.confirmedSessions
+              )
+            : history.questionsCompleted || 0,
+        recentTypes:
+          history.recentGeneratedQuestionTypes || [],
+        seed:
+          String(
+            safeOptions.seed ||
+            `${startedPlan.id}:questions`
+          ),
+        forcedGeneratedTypes:
+          safeOptions.forcedGeneratedTypes || [],
+        initialStarPegCount:
+          safeOptions.initialStarPegCount || 0
+      });
+
+    if (!questionSession) {
+      return false;
+    }
+
+    startedPlan.questionSession =
+      questionSession;
+    sessionCreated = true;
+  }
+
   const context = {
     source: "daily_todo",
     profileId,
@@ -5775,7 +5904,12 @@ function startDailyTodoQuestions(
     taskId,
     launchToken:
       started.launchToken,
-    verseId
+    verseId,
+    questionSession,
+    previewScope:
+      previewScope === "questions_test"
+        ? "questions_test"
+        : ""
   };
 
   if (
@@ -5788,9 +5922,9 @@ function startDailyTodoQuestions(
   }
 
   if (
-    started.changed &&
-    !saveDailyTodoRuntime(
-      progress,
+    (started.changed || sessionCreated) &&
+    !saveDailyTodoQuestionsRuntime(
+      runtime,
       started.state
     )
   ) {
@@ -5798,7 +5932,9 @@ function startDailyTodoQuestions(
     return false;
   }
 
-  setDailyTodoActualPreviewMode();
+  setDailyTodoPreviewMode(
+    previewScope || "actual"
+  );
   transitionToAppScreen(
     Screen.DAILY_SESSION
   );
@@ -5808,7 +5944,8 @@ function startDailyTodoQuestions(
 function completeDailyTodoQuestions({
   context = null,
   verseId = "",
-  earnedStarPegCount = 0
+  earnedStarPegCount = 0,
+  generatedQuestionTypes = []
 } = {}) {
   if (
     context?.source !== "daily_todo"
@@ -5816,18 +5953,24 @@ function completeDailyTodoQuestions({
     return false;
   }
 
-  const loaded =
-    loadDailyTodoRuntime();
+  const previewScope =
+    context?.previewScope ===
+      "questions_test"
+      ? "questions_test"
+      : "";
+  const runtime =
+    loadDailyTodoQuestionsRuntime(
+      previewScope
+    );
   const profileId =
     getProfileApi()
       ?.getActiveProfileId?.() || "";
 
-  if (!loaded || !profileId) {
+  if (!runtime || !profileId) {
     return false;
   }
 
-  const { engine, progress, state } =
-    loaded;
+  const { engine, state } = runtime;
   const plan = state.activePlan;
   const taskId =
     engine.TASK_IDS?.QUESTIONS ||
@@ -5864,7 +6007,9 @@ function completeDailyTodoQuestions({
   if (
     task.status === pendingStatus
   ) {
-    returnToDailyTodoWithTransition();
+    returnToDailyTodoWithTransition(
+      previewScope || "actual"
+    );
     return true;
   }
 
@@ -5900,7 +6045,13 @@ function completeDailyTodoQuestions({
         extra: {
           verseId: safeVerseId,
           earnedStarPegCount:
-            safeStarPegCount
+            safeStarPegCount,
+          generatedQuestionTypes:
+            Array.isArray(
+              generatedQuestionTypes
+            )
+              ? generatedQuestionTypes
+              : []
         }
       }) || {
         version: 1,
@@ -5910,7 +6061,13 @@ function completeDailyTodoQuestions({
         thankYouKey: "questions",
         verseId: safeVerseId,
         earnedStarPegCount:
-          safeStarPegCount
+          safeStarPegCount,
+        generatedQuestionTypes:
+          Array.isArray(
+            generatedQuestionTypes
+          )
+            ? generatedQuestionTypes
+            : []
       };
 
   const pending =
@@ -5927,15 +6084,17 @@ function completeDailyTodoQuestions({
 
   if (
     !pending.changed ||
-    !saveDailyTodoRuntime(
-      progress,
+    !saveDailyTodoQuestionsRuntime(
+      runtime,
       pending.state
     )
   ) {
     return false;
   }
 
-  returnToDailyTodoWithTransition();
+  returnToDailyTodoWithTransition(
+    previewScope || "actual"
+  );
   return true;
 }
 
@@ -5948,7 +6107,12 @@ function exitDailyTodoQuestions(
     return false;
   }
 
-  returnToDailyTodoWithTransition();
+  returnToDailyTodoWithTransition(
+    context.previewScope ===
+      "questions_test"
+      ? "questions_test"
+      : "actual"
+  );
   return true;
 }
 
@@ -14784,7 +14948,7 @@ function screenTitle(idx) {
             type="button"
             data-src="${escapeHtml(question.media.src)}"
           >
-            Play body recording
+            Play verse sound
           </button>
         `
         : "";
@@ -14835,7 +14999,7 @@ function screenTitle(idx) {
           }
           if (button.isConnected) {
             button.disabled = false;
-            button.textContent = "Play body recording";
+            button.textContent = "Play verse sound";
           }
         };
 
@@ -14845,10 +15009,205 @@ function screenTitle(idx) {
       };
     };
 
+    const getQuestionSessionTestOptions = (
+      scenario,
+      generatorType,
+      seed
+    ) => {
+      const options = {
+        confirmedSessions: 0,
+        seed,
+        forcedGeneratedTypes: [],
+        initialStarPegCount: 0
+      };
+
+      if (scenario === "second") {
+        options.confirmedSessions = 1;
+      } else if (scenario !== "first") {
+        options.confirmedSessions = 2;
+      }
+
+      const forcedByScenario = {
+        two_choice: "does_this_belong",
+        three_choice: "missing_word",
+        picture: "picture",
+        sounds_like: "sounds_like"
+      };
+      const forcedType =
+        scenario === "force_type"
+          ? generatorType
+          : forcedByScenario[scenario];
+
+      if (forcedType && forcedType !== "random") {
+        options.forcedGeneratedTypes = [forcedType];
+      }
+
+      if (scenario === "two_stars") {
+        options.initialStarPegCount = 2;
+      }
+
+      return options;
+    };
+
+    const createDailyQuestionsTestState = (
+      verseId,
+      sessionOptions,
+      { pending = false } = {}
+    ) => {
+      const engine =
+        window.BibloZooDailyTodo;
+      const ui =
+        window.BibloZooDailyTodoUI;
+      const planner =
+        window.BibloZooDailyQuestionSessions;
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const profileId =
+        getProfileApi()
+          ?.getActiveProfileId?.() || "";
+      const verse = VERSE_LIST.find(
+        (entry) => entry?.id === verseId
+      );
+
+      if (
+        !engine ||
+        !ui?.saveQuestionsTestState ||
+        !planner?.createSessionPlan ||
+        !templatePlan ||
+        !profileId ||
+        !verse
+      ) {
+        return null;
+      }
+
+      const plan = JSON.parse(
+        JSON.stringify(templatePlan)
+      );
+      const taskId =
+        engine.TASK_IDS?.QUESTIONS ||
+        "questions";
+
+      plan.id =
+        `daily-questions-test-${Date.now().toString(36)}`;
+      plan.profileId = profileId;
+      plan.day = engine.localDayKey(
+        new Date()
+      );
+      plan.verseId = verseId;
+      plan.questionSession = null;
+      plan.requiredTaskIds = [
+        engine.TASK_IDS?.REVIEW || "review",
+        taskId,
+        engine.TASK_IDS?.ACTIVITY || "activity"
+      ];
+      plan.tasks = {};
+      plan.requiredTaskIds.forEach(
+        (requiredTaskId) => {
+          plan.tasks[requiredTaskId] = {
+            status:
+              engine.TASK_STATUSES?.OPEN ||
+              "open",
+            startedAt: 0,
+            pendingAt: 0,
+            completedAt: 0,
+            launchToken: "",
+            pendingData: null
+          };
+        }
+      );
+      plan.educationalCompletedAt = 0;
+      plan.earnedStarPegCount = 0;
+      plan.snack = {
+        unlocked: false,
+        claimed: false,
+        claimedAt: 0
+      };
+      plan.rolloverHold = null;
+
+      let state = engine.normalizeState({
+        ...engine.normalizeState(
+          loadProgress()?.dailyZooTodo
+        ),
+        activePlan: plan
+      });
+      state.byVerse[verseId] = {
+        ...engine.getVerseHistory(
+          state,
+          verseId
+        ),
+        questionsCompleted:
+          sessionOptions.confirmedSessions,
+        recentGeneratedQuestionTypes: [
+          "reference",
+          "last_word"
+        ]
+      };
+
+      if (pending) {
+        const questionSession =
+          planner.createSessionPlan({
+            verse,
+            verses: VERSE_LIST,
+            recentTypes:
+              state.byVerse[verseId]
+                .recentGeneratedQuestionTypes,
+            ...sessionOptions
+          });
+        if (!questionSession) return null;
+
+        state.activePlan.questionSession =
+          questionSession;
+        const started = engine.beginTask(
+          state,
+          {
+            planId: plan.id,
+            taskId,
+            now: new Date(),
+            random: () => 0.271828
+          }
+        );
+        const pendingResult =
+          engine.setPendingCompletion(
+            started.state,
+            {
+              planId: plan.id,
+              taskId,
+              launchToken:
+                started.launchToken,
+              pendingData:
+                ui.createPendingCompletionData({
+                  planId: plan.id,
+                  taskId,
+                  source: "questions",
+                  thankYouKey: "questions",
+                  extra: {
+                    verseId,
+                    earnedStarPegCount: 2,
+                    generatedQuestionTypes:
+                      questionSession
+                        .generatedTypeIds
+                  }
+                }),
+              now: new Date()
+            }
+          );
+
+        if (!pendingResult.changed) return null;
+        state = pendingResult.state;
+      }
+
+      return ui.saveQuestionsTestState(state)
+        ? state
+        : null;
+    };
+
     function showDailyQuestionsTesterDialog({
       verseId = "",
       type = "random",
-      seed = "questions-preview"
+      seed = "questions-preview",
+      scenario = "first"
     } = {}) {
       stopDailyQuestionPreviewAudio();
       const generators =
@@ -14864,6 +15223,21 @@ function screenTitle(idx) {
           ? type
           : "random";
       const safeSeed = String(seed || "questions-preview");
+      const safeScenario = [
+        "first",
+        "second",
+        "third",
+        "force_type",
+        "two_choice",
+        "three_choice",
+        "picture",
+        "sounds_like",
+        "two_stars",
+        "reload",
+        "pending"
+      ].includes(scenario)
+        ? scenario
+        : "first";
       const result = !generators || !verse
         ? {
             eligible: false,
@@ -14910,6 +15284,20 @@ function screenTitle(idx) {
                 </option>
               `).join("")}
             </select>
+            <label for="dailyQuestionTesterScenario">Session</label>
+            <select id="dailyQuestionTesterScenario">
+              <option value="first"${safeScenario === "first" ? " selected" : ""}>First Questions session</option>
+              <option value="second"${safeScenario === "second" ? " selected" : ""}>Second Questions session</option>
+              <option value="third"${safeScenario === "third" ? " selected" : ""}>Third-or-later session</option>
+              <option value="force_type"${safeScenario === "force_type" ? " selected" : ""}>Force selected generated type</option>
+              <option value="two_choice"${safeScenario === "two_choice" ? " selected" : ""}>Two-choice rendering</option>
+              <option value="three_choice"${safeScenario === "three_choice" ? " selected" : ""}>Three-choice rendering</option>
+              <option value="picture"${safeScenario === "picture" ? " selected" : ""}>Picture answers</option>
+              <option value="sounds_like"${safeScenario === "sounds_like" ? " selected" : ""}>Sounds Like audio</option>
+              <option value="two_stars"${safeScenario === "two_stars" ? " selected" : ""}>Two stars already earned</option>
+              <option value="reload"${safeScenario === "reload" ? " selected" : ""}>Reload persisted question set</option>
+              <option value="pending"${safeScenario === "pending" ? " selected" : ""}>Pending completion</option>
+            </select>
             <label for="dailyQuestionTesterSeed">Seed</label>
             <input
               id="dailyQuestionTesterSeed"
@@ -14939,12 +15327,136 @@ function screenTitle(idx) {
         `,
         actionsClass: "daily-preview-dialog-actions",
         actions: [
+          dlgBtn("Start Session", {
+            onClick: () => {
+              const selectedVerseId =
+                document.querySelector(
+                  "#dailyQuestionTesterVerse"
+                )?.value || "";
+              const selectedType =
+                document.querySelector(
+                  "#dailyQuestionTesterType"
+                )?.value || "random";
+              const selectedScenario =
+                document.querySelector(
+                  "#dailyQuestionTesterScenario"
+                )?.value || "first";
+              const selectedSeed =
+                document.querySelector(
+                  "#dailyQuestionTesterSeed"
+                )?.value || "questions-preview";
+
+              if (
+                selectedScenario ===
+                  "force_type" &&
+                selectedType === "random"
+              ) {
+                showDialog({
+                  title: "Choose a Generator",
+                  body:
+                    "Select one generated type before using Force selected generated type.",
+                  actions: [
+                    dlgBtn("Back", {
+                      onClick: () =>
+                        showDailyQuestionsTesterDialog({
+                          verseId: selectedVerseId,
+                          type: selectedType,
+                          seed: selectedSeed,
+                          scenario: selectedScenario
+                        })
+                    })
+                  ]
+                });
+                return;
+              }
+
+              const sessionTestOptions =
+                getQuestionSessionTestOptions(
+                  selectedScenario,
+                  selectedType,
+                  selectedSeed
+                );
+              const state =
+                createDailyQuestionsTestState(
+                  selectedVerseId,
+                  sessionTestOptions,
+                  {
+                    pending:
+                      selectedScenario ===
+                      "pending"
+                  }
+                );
+
+              if (!state) {
+                showDialog({
+                  title: "Session Unavailable",
+                  body:
+                    "That verse and forced question combination is not eligible. Choose another verse or generator.",
+                  actions: [
+                    dlgBtn("Back", {
+                      onClick: () =>
+                        showDailyQuestionsTesterDialog({
+                          verseId: selectedVerseId,
+                          type: selectedType,
+                          seed: selectedSeed,
+                          scenario: selectedScenario
+                        })
+                    })
+                  ]
+                });
+                return;
+              }
+
+              closeDialog();
+
+              if (selectedScenario === "pending") {
+                setDailyTodoPreviewMode(
+                  "questions_test"
+                );
+                transitionToAppScreen(
+                  Screen.TODO_DEV
+                );
+                return;
+              }
+
+              const launched =
+                startDailyTodoQuestions(
+                state.activePlan,
+                {
+                  previewScope:
+                    "questions_test",
+                  sessionOptions:
+                    sessionTestOptions
+                }
+              );
+
+              if (!launched) {
+                showDialog({
+                  title: "Session Unavailable",
+                  body:
+                    "That verse and forced question combination is not eligible. Choose another verse or generator.",
+                  actions: [
+                    dlgBtn("Back", {
+                      onClick: () =>
+                        showDailyQuestionsTesterDialog({
+                          verseId: selectedVerseId,
+                          type: selectedType,
+                          seed: selectedSeed,
+                          scenario: selectedScenario
+                        })
+                    })
+                  ]
+                });
+              }
+            }
+          }),
           dlgBtn("Regenerate", {
             onClick: () =>
               showDailyQuestionsTesterDialog({
                 verseId: document.querySelector("#dailyQuestionTesterVerse")?.value,
                 type: document.querySelector("#dailyQuestionTesterType")?.value,
-                seed: document.querySelector("#dailyQuestionTesterSeed")?.value
+                seed: document.querySelector("#dailyQuestionTesterSeed")?.value,
+                scenario: document.querySelector("#dailyQuestionTesterScenario")?.value
               })
           }),
           dlgBtn("New Seed", {
@@ -14952,7 +15464,8 @@ function screenTitle(idx) {
               showDailyQuestionsTesterDialog({
                 verseId: document.querySelector("#dailyQuestionTesterVerse")?.value,
                 type: document.querySelector("#dailyQuestionTesterType")?.value,
-                seed: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+                seed: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+                scenario: document.querySelector("#dailyQuestionTesterScenario")?.value
               })
           }),
           dlgBtn("Back", {
@@ -17264,23 +17777,31 @@ function screenTodoDev(idx) {
         [
           "game_test",
           "playground_test",
-          "read_test"
+          "read_test",
+          "questions_test"
         ]
           .includes(dailyPreviewMode)
-          ? dailyPreviewMode === "read_test"
-            ? dailyTodoUi
-                ?.getReadTestPlan?.(
-                  dailyTodoApi
-                ) || null
-          : dailyPreviewMode === "playground_test"
-            ? dailyTodoUi
-                ?.getPlaygroundTestPlan?.(
-                  dailyTodoApi
-                ) || null
-            : dailyTodoUi
-                ?.getGameTestPlan?.(
-                  dailyTodoApi
-                ) || null
+          ? (
+              dailyPreviewMode === "read_test"
+                ? dailyTodoUi
+                    ?.getReadTestPlan?.(
+                      dailyTodoApi
+                    ) || null
+                : dailyPreviewMode === "questions_test"
+                  ? dailyTodoUi
+                      ?.getQuestionsTestPlan?.(
+                        dailyTodoApi
+                      ) || null
+                  : dailyPreviewMode === "playground_test"
+                    ? dailyTodoUi
+                        ?.getPlaygroundTestPlan?.(
+                          dailyTodoApi
+                        ) || null
+                    : dailyTodoUi
+                        ?.getGameTestPlan?.(
+                          dailyTodoApi
+                        ) || null
+            )
           : getOrCreateDailyTodoPreviewPlan({
               persist:
                 dailyPreviewMode === "actual"
@@ -17425,7 +17946,11 @@ function screenTodoDev(idx) {
   }
 
   if (
-    ["actual", "read_test"].includes(
+    [
+      "actual",
+      "read_test",
+      "questions_test"
+    ].includes(
       dailyPreviewMode
     ) &&
     dailyPreviewPlan
@@ -17449,6 +17974,8 @@ function screenTodoDev(idx) {
       );
 
     if (
+      dailyPreviewMode !==
+        "questions_test" &&
       flashcardRow &&
       launchableStatuses.includes(
         task?.status
@@ -17496,6 +18023,7 @@ function screenTodoDev(idx) {
       );
 
     if (
+      dailyPreviewMode !== "read_test" &&
       questionsRow &&
       launchableStatuses.includes(
         questionsTask?.status
@@ -17506,7 +18034,14 @@ function screenTodoDev(idx) {
         event.stopPropagation();
 
         startDailyTodoQuestions(
-          dailyPreviewPlan
+          dailyPreviewPlan,
+          {
+            previewScope:
+              dailyPreviewMode ===
+                "questions_test"
+                ? "questions_test"
+                : ""
+          }
         );
       };
     }

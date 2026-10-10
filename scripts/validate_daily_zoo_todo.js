@@ -1205,6 +1205,11 @@ function testResetActivePlanProgress() {
       state.activePlan.activity
     ));
   state.activePlan.earnedStarPegCount = 2;
+  state.activePlan.questionSession = {
+    version: 1,
+    verseId: state.activePlan.verseId,
+    items: [{}, {}, {}]
+  };
 
   const reset =
     DailyTodo.resetActivePlanProgress(
@@ -1227,6 +1232,10 @@ function testResetActivePlanProgress() {
   assert.strictEqual(
     reset.state.activePlan.earnedStarPegCount,
     0
+  );
+  assert.strictEqual(
+    reset.state.activePlan.questionSession,
+    null
   );
   assert.strictEqual(
     reset.state.activePlan.educationalCompletedAt,

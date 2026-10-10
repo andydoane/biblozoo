@@ -80,6 +80,7 @@
   let questionPageTransition = false;
   let correctAnswerAudio = null;
   let incorrectAnswerAudio = null;
+  let generatedQuestionAudio = null;
   let rewardPopupTimeoutId = 0;
 
   const LATER_STORAGE_PREFIX =
@@ -132,6 +133,21 @@
       audio.currentTime = 0;
       audio.play().catch?.(() => {});
     } catch (err) { }
+  }
+
+  function stopGeneratedQuestionAudio() {
+    if (!generatedQuestionAudio) return;
+
+    try {
+      generatedQuestionAudio.pause();
+      generatedQuestionAudio.currentTime = 0;
+    } catch (err) { }
+
+    generatedQuestionAudio = null;
+
+    if (dailySession) {
+      dailySession.questionAudioPlaying = false;
+    }
   }
 
   function clearDailyQuestionRewardPopupTimer() {
@@ -883,6 +899,55 @@
       ).trim() ||
       "BibloPet";
 
+    const sessionPlanner =
+      window.BibloZooDailyQuestionSessions;
+    const context =
+      offer?.context &&
+      typeof offer.context === "object" &&
+      !Array.isArray(offer.context)
+        ? { ...offer.context }
+        : null;
+    const dailyProgress =
+      normalizeDailyProgress(
+        appApi?.getDailyProgress?.()
+      );
+    const legacyCompletedCount =
+      dailyProgress.byVerse?.[verseId]
+        ?.sessionsCompleted || 0;
+    const suppliedPlan =
+      sessionPlanner?.normalizeSessionPlan?.(
+        context?.questionSession,
+        verseId
+      );
+    const questionSession = suppliedPlan ||
+      sessionPlanner?.createSessionPlan?.({
+        verse: {
+          ...verse,
+          id: verseId,
+          reflection
+        },
+        verses:
+          appApi?.getVerseList?.() || [],
+        confirmedSessions:
+          legacyCompletedCount,
+        recentTypes: [],
+        seed:
+          `${verseId}:${getLocalDayKey()}:legacy`
+      });
+
+    if (!questionSession) {
+      return null;
+    }
+
+    const firstItem =
+      questionSession.items[0];
+    const firstPhase =
+      firstItem?.kind ===
+        sessionPlanner?.ITEM_KINDS
+          ?.APPLICATION
+        ? SESSION_PHASES.REFLECTION
+        : SESSION_PHASES.QUESTION;
+
     return {
       verseId,
       verseRef:
@@ -899,14 +964,9 @@
         ).trim(),
       petName,
       reflection,
-      context:
-        offer?.context &&
-        typeof offer.context === "object" &&
-        !Array.isArray(offer.context)
-          ? { ...offer.context }
-          : null,
-      phase:
-        SESSION_PHASES.QUESTION,
+      questionSession,
+      context,
+      phase: firstPhase,
       questionIndex: 0,
       questionColor:
         createRandomQuestionColor(),
@@ -916,9 +976,11 @@
       answered: false,
       answerCorrect: false,
       showStarRewardPopup: false,
-      earnedStarPegCount: 0,
+      earnedStarPegCount:
+        questionSession.initialStarPegCount,
       usedVerseHelp: false,
       verseAudioPlaying: false,
+      questionAudioPlaying: false,
       completionRecorded: false,
       debugForced:
         offer?.debugForced === true,
@@ -1266,12 +1328,21 @@
       return null;
     }
 
-    return session.questionIndex === 1
-      ? session.reflection?.meaning || null
-      : session.reflection?.recall || null;
+    return session.questionSession
+      ?.items?.[session.questionIndex]
+      ?.question || null;
+  }
+
+  function getSessionItem(
+    session = dailySession
+  ) {
+    return session?.questionSession
+      ?.items?.[session.questionIndex] || null;
   }
 
   function stopDailySessionRuntime() {
+    stopGeneratedQuestionAudio();
+
     if (feedGameStartRafId) {
       cancelAnimationFrame(feedGameStartRafId);
       feedGameStartRafId = 0;
@@ -1857,6 +1928,145 @@
     }
   }
 
+  function renderQuestionContextHtml(question) {
+    const segments = Array.isArray(
+      question?.context?.segments
+    )
+      ? question.context.segments
+      : [];
+
+    if (!segments.length) return "";
+
+    return `
+      <div class="daily-question-generated-context">
+        ${segments.map((segment) => `
+          <span class="${segment?.accent ? "is-accent" : ""}">${escapeHtml(segment?.text || "")}</span>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderQuestionChoiceContent(choice) {
+    const label = escapeHtml(choice?.label || "");
+
+    if (choice?.kind === "emoji") {
+      return `
+        <span class="daily-question-choice-visual is-emoji" aria-hidden="true">
+          ${escapeHtml(choice.emoji || "")}
+        </span>
+        <span class="daily-question-choice-label">${label}</span>
+      `;
+    }
+
+    if (choice?.kind === "image") {
+      return `
+        <img
+          class="daily-question-choice-visual is-image"
+          src="${escapeHtml(choice.src || "")}"
+          alt=""
+          draggable="false"
+        >
+        <span class="daily-question-choice-label">${label}</span>
+      `;
+    }
+
+    return `
+      <span class="daily-question-choice-label">${label}</span>
+    `;
+  }
+
+  function getSessionGeneratedTypeIds(
+    session = dailySession
+  ) {
+    return Array.isArray(
+      session?.questionSession
+        ?.generatedTypeIds
+    )
+      ? [...session.questionSession.generatedTypeIds]
+      : [];
+  }
+
+  async function finishQuestionSession(
+    actionButton = null
+  ) {
+    const sessionAtStart = dailySession;
+
+    if (!sessionAtStart) return false;
+
+    stopGeneratedQuestionAudio();
+
+    if (isDailyTodoSession(sessionAtStart)) {
+      if (
+        typeof appApi?.onContextComplete !==
+          "function"
+      ) {
+        return false;
+      }
+
+      if (actionButton) {
+        actionButton.disabled = true;
+      }
+
+      const handled = appApi.onContextComplete({
+        context:
+          getSessionContext(sessionAtStart),
+        verseId: sessionAtStart.verseId,
+        earnedStarPegCount:
+          Math.min(
+            2,
+            Math.max(
+              0,
+              Math.floor(
+                Number(
+                  sessionAtStart
+                    .earnedStarPegCount
+                ) || 0
+              )
+            )
+          ),
+        generatedQuestionTypes:
+          getSessionGeneratedTypeIds(
+            sessionAtStart
+          )
+      });
+
+      if (handled !== false) {
+        clearSessionState();
+        return true;
+      }
+
+      if (actionButton) {
+        actionButton.disabled = false;
+      }
+      return false;
+    }
+
+    window.BibloZooDailyFeedGame
+      ?.prepareAudio?.();
+
+    if (actionButton) {
+      actionButton.disabled = true;
+    }
+
+    const tiltEnabled =
+      await requestRewardTiltPermission();
+
+    if (dailySession !== sessionAtStart) {
+      return false;
+    }
+
+    sessionAtStart.rewardTiltEnabled =
+      tiltEnabled;
+    sessionAtStart.rewardScore = 0;
+    sessionAtStart.rewardCaught = 0;
+    sessionAtStart.rewardComplete = false;
+    sessionAtStart.phase =
+      SESSION_PHASES.REWARD_GAME;
+
+    appApi?.renderApp?.();
+    return true;
+  }
+
   function renderScreen(idx) {
     if (
       !isFeatureEnabled() ||
@@ -2012,9 +2222,10 @@
 
       const applicationPrompt =
         String(
+          getSessionItem(session)
+            ?.prompt ||
           session.reflection
-            ?.application
-            ?.prompt || ""
+            ?.application?.prompt || ""
         ).trim();
 
       wrap.innerHTML = `
@@ -2175,9 +2386,7 @@
         `;
       } else {
         const questionNumber =
-          session.questionIndex === 1
-            ? 2
-            : 1;
+          session.questionIndex + 1;
 
         const headingText =
           session.answered
@@ -2198,8 +2407,8 @@
             : "";
 
         const choiceOrder =
-          getSessionChoiceOrder(
-            session
+          question.choices.map(
+            (choice, index) => index
           );
 
         const choiceButtons =
@@ -2264,6 +2473,7 @@
                     class="daily-question-choice no-zoom${stateClass}"
                     type="button"
                     data-daily-question-choice="${choiceIndex}"
+                    aria-label="${escapeHtml(choice?.label || "Answer choice")}"
                     aria-pressed="${
                       isSelected
                         ? "true"
@@ -2275,13 +2485,7 @@
                         : ""
                     }
                   >
-                    <span
-                      class="daily-question-choice-label"
-                    >
-                      ${escapeHtml(
-                        choice
-                      )}
-                    </span>
+                    ${renderQuestionChoiceContent(choice)}
 
                     ${
                       showStarRewardPopup
@@ -2354,13 +2558,15 @@
             <div
               class="daily-question-card"
             >
-              <div
-                class="daily-question-ref-pill"
-              >
-                ${escapeHtml(
-                  session.verseRef
-                )}
-              </div>
+              ${
+                question.showReferencePill !== false
+                  ? `
+                    <div class="daily-question-ref-pill">
+                      ${escapeHtml(session.verseRef)}
+                    </div>
+                  `
+                  : ""
+              }
 
               <div
                 class="daily-question-card-body"
@@ -2368,10 +2574,25 @@
                 <div
                   class="daily-question-text"
                 >
-                  ${escapeHtml(
-                    question.question
-                  )}
+                  ${escapeHtml(question.prompt)}
                 </div>
+
+                ${renderQuestionContextHtml(question)}
+
+                ${
+                  question.media?.kind === "audio"
+                    ? `
+                      <button
+                        class="daily-question-audio-play no-zoom"
+                        type="button"
+                        data-daily-question-audio
+                        ${session.questionAudioPlaying ? "disabled" : ""}
+                      >
+                        ${session.questionAudioPlaying ? "Playing…" : "Play Sound"}
+                      </button>
+                    `
+                    : ""
+                }
 
                 <div
                   class="daily-question-choices"
@@ -2505,10 +2726,13 @@
                 selectedIndex
               ) ||
               selectedIndex < 0 ||
-              selectedIndex > 2
+              selectedIndex >=
+                currentQuestion.choices.length
             ) {
               return;
             }
+
+            stopGeneratedQuestionAudio();
 
             dailySession.selectedAnswer =
               selectedIndex;
@@ -2524,12 +2748,7 @@
             );
 
             if (dailySession.answerCorrect) {
-              showDailyQuestionRewardPopup(
-                dailySession,
-                dailySession.questionIndex
-              );
-
-              dailySession.earnedStarPegCount =
+              const currentStarCount =
                 Math.min(
                   2,
                   Math.max(
@@ -2537,8 +2756,20 @@
                     Number(
                       dailySession.earnedStarPegCount
                     ) || 0
-                  ) + 1
+                  )
                 );
+
+              if (currentStarCount < 2) {
+                showDailyQuestionRewardPopup(
+                  dailySession,
+                  dailySession.questionIndex
+                );
+                dailySession.earnedStarPegCount =
+                  currentStarCount + 1;
+              } else {
+                clearDailyQuestionRewardPopupTimer();
+                dailySession.showStarRewardPopup = false;
+              }
             } else {
               clearDailyQuestionRewardPopupTimer();
               dailySession.showStarRewardPopup =
@@ -2548,6 +2779,76 @@
             appApi?.renderApp?.();
           };
       });
+
+    const questionAudioButton =
+      wrap.querySelector(
+        "[data-daily-question-audio]"
+      );
+
+    if (questionAudioButton) {
+      questionAudioButton.onclick =
+        async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const sessionAtStart = dailySession;
+          const questionAtStart =
+            getSessionQuestion(
+              sessionAtStart
+            );
+          const source = String(
+            questionAtStart?.media?.src || ""
+          ).trim();
+
+          if (
+            !sessionAtStart ||
+            sessionAtStart.answered ||
+            sessionAtStart.questionAudioPlaying ||
+            !source ||
+            typeof Audio === "undefined"
+          ) {
+            return;
+          }
+
+          stopGeneratedQuestionAudio();
+
+          const audio = new Audio(source);
+          generatedQuestionAudio = audio;
+          sessionAtStart.questionAudioPlaying = true;
+          appApi?.renderApp?.();
+
+          const finish = () => {
+            if (generatedQuestionAudio === audio) {
+              generatedQuestionAudio = null;
+            }
+
+            if (
+              dailySession === sessionAtStart &&
+              sessionAtStart.questionAudioPlaying
+            ) {
+              sessionAtStart.questionAudioPlaying = false;
+              appApi?.renderApp?.();
+            }
+          };
+
+          audio.addEventListener(
+            "ended",
+            finish,
+            { once: true }
+          );
+          audio.addEventListener(
+            "error",
+            finish,
+            { once: true }
+          );
+
+          try {
+            await audio.play();
+          } catch (err) {
+            finish();
+          }
+        };
+    }
 
     const nextQuestionButton =
       wrap.querySelector(
@@ -2570,13 +2871,25 @@
             return;
           }
 
-          if (
-            dailySession.questionIndex === 0
-          ) {
+          const nextIndex =
+            dailySession.questionIndex + 1;
+          const nextItem =
+            dailySession.questionSession
+              ?.items?.[nextIndex];
+
+          if (nextItem) {
+            stopGeneratedQuestionAudio();
             void transitionQuestionPage(wrap, () => {
-              dailySession.questionIndex = 1;
-              dailySession.choiceOrder =
-                createShuffledChoiceOrder();
+              dailySession.questionIndex =
+                nextIndex;
+              dailySession.phase =
+                nextItem.kind ===
+                  window
+                    .BibloZooDailyQuestionSessions
+                    ?.ITEM_KINDS
+                    ?.APPLICATION
+                  ? SESSION_PHASES.REFLECTION
+                  : SESSION_PHASES.QUESTION;
               dailySession.selectedAnswer =
                 null;
               dailySession.answered = false;
@@ -2588,22 +2901,9 @@
             return;
           }
 
-          if (
-            dailySession.questionIndex === 1
-          ) {
-            void transitionQuestionPage(wrap, () => {
-              dailySession.phase =
-                SESSION_PHASES.REFLECTION;
-
-              dailySession.selectedAnswer =
-                null;
-              dailySession.answered = false;
-              dailySession.answerCorrect =
-                false;
-
-              appApi?.renderApp?.();
-            });
-          }
+          void finishQuestionSession(
+            nextQuestionButton
+          );
         };
     }
 
@@ -2626,93 +2926,9 @@
             return;
           }
 
-          const sessionAtStart =
-            dailySession;
-
-          if (
-            isDailyTodoSession(
-              sessionAtStart
-            )
-          ) {
-            if (
-              typeof appApi
-                ?.onContextComplete !==
-                "function"
-            ) {
-              return;
-            }
-
-            reflectionDoneButton.disabled =
-              true;
-
-            const handled =
-              appApi.onContextComplete({
-                context:
-                  getSessionContext(
-                    sessionAtStart
-                  ),
-                verseId:
-                  sessionAtStart.verseId,
-                earnedStarPegCount:
-                  Math.min(
-                    2,
-                    Math.max(
-                      0,
-                      Math.floor(
-                        Number(
-                          sessionAtStart
-                            .earnedStarPegCount
-                        ) || 0
-                      )
-                    )
-                  )
-              });
-
-            if (handled !== false) {
-              clearSessionState();
-              return;
-            }
-
-            reflectionDoneButton.disabled =
-              false;
-            return;
-          }
-
-          window.BibloZooDailyFeedGame
-            ?.prepareAudio?.();
-
-          reflectionDoneButton.disabled =
-            true;
-
-          const tiltEnabled =
-            await requestRewardTiltPermission();
-
-          if (
-            dailySession !==
-              sessionAtStart ||
-            sessionAtStart.phase !==
-              SESSION_PHASES.REFLECTION
-          ) {
-            return;
-          }
-
-          sessionAtStart
-            .rewardTiltEnabled =
-              tiltEnabled;
-
-          sessionAtStart.rewardScore =
-            0;
-
-          sessionAtStart.rewardCaught =
-            0;
-
-          sessionAtStart.rewardComplete =
-            false;
-
-          sessionAtStart.phase =
-            SESSION_PHASES.REWARD_GAME;
-
-          appApi?.renderApp?.();
+          await finishQuestionSession(
+            reflectionDoneButton
+          );
         };
     }
 
@@ -2730,6 +2946,8 @@
           if (!dailySession) {
             return;
           }
+
+          stopGeneratedQuestionAudio();
 
           dailySession.usedVerseHelp =
             true;

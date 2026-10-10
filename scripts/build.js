@@ -13,6 +13,7 @@ const rootFiles = [
     "daily_questions_feed_game.js",
     "safe_word_scramble.js",
     "daily_question_generators.js",
+    "daily_question_sessions.js",
     "daily_questions.js",
     "read_my_verse.js",
     "styles.css",

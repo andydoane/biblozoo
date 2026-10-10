@@ -663,6 +663,35 @@
     return { taskId, launchToken, startedAt };
   }
 
+  function normalizeQuestionSession(
+    rawSession,
+    verseId
+  ) {
+    if (!isPlainObject(rawSession)) return null;
+
+    const safeVerseId = cleanString(
+      rawSession.verseId
+    );
+    const items = Array.isArray(rawSession.items)
+      ? rawSession.items
+      : [];
+
+    if (
+      Number(rawSession.version) !== 1 ||
+      !safeVerseId ||
+      safeVerseId !== cleanString(verseId) ||
+      items.length !== 3
+    ) {
+      return null;
+    }
+
+    try {
+      return cloneJson(rawSession);
+    } catch (err) {
+      return null;
+    }
+  }
+
   function normalizePlan(rawPlan) {
     if (!isPlainObject(rawPlan)) return null;
 
@@ -772,6 +801,16 @@
             )
           : null,
       activity,
+      questionSession:
+        kind === PLAN_KINDS.CARE &&
+        requiredTaskIds.includes(
+          TASK_IDS.QUESTIONS
+        )
+          ? normalizeQuestionSession(
+              rawPlan.questionSession,
+              verseId
+            )
+          : null,
       earnedStarPegCount: Math.min(
         2,
         toNonNegativeInteger(
@@ -1267,6 +1306,7 @@
             )
           : null,
       activity: safeActivity,
+      questionSession: null,
       earnedStarPegCount: 0,
       tasks,
       educationalCompletedAt: 0,
@@ -1694,6 +1734,7 @@
       }
     );
     plan.earnedStarPegCount = 0;
+    plan.questionSession = null;
     plan.educationalCompletedAt = 0;
     plan.snack =
       plan.kind === PLAN_KINDS.CARE

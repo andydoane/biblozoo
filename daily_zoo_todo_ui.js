@@ -21,6 +21,8 @@
     "biblozooDailyTodoPlaygroundTest:";
   const READ_TEST_STORAGE_PREFIX =
     "biblozooDailyTodoReadTest:";
+  const QUESTIONS_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoQuestionsTest:";
   const PENDING_DATA_VERSION = 1;
   const PREVIEW_MODES = Object.freeze([
     "open",
@@ -38,7 +40,8 @@
     "debug",
     "game_test",
     "playground_test",
-    "read_test"
+    "read_test",
+    "questions_test"
   ]);
   const VALID_MEDAL_TIERS = Object.freeze([
     "bronze",
@@ -393,6 +396,14 @@
       : "";
   }
 
+  function getQuestionsTestStorageKey() {
+    const profileId = getActiveProfileId();
+
+    return profileId
+      ? `${QUESTIONS_TEST_STORAGE_PREFIX}${profileId}`
+      : "";
+  }
+
   function readStoredJson(key) {
     if (!root?.localStorage || !key) {
       return null;
@@ -543,12 +554,37 @@
       ?.activePlan || null;
   }
 
+  function loadQuestionsTestState(engine) {
+    const raw = readStoredJson(
+      getQuestionsTestStorageKey()
+    );
+
+    if (!raw || !engine?.normalizeState) {
+      return null;
+    }
+
+    return engine.normalizeState(raw);
+  }
+
+  function saveQuestionsTestState(state) {
+    return writeStoredJson(
+      getQuestionsTestStorageKey(),
+      state
+    );
+  }
+
+  function getQuestionsTestPlan(engine) {
+    return loadQuestionsTestState(engine)
+      ?.activePlan || null;
+  }
+
   function clearTemporaryPreviewState() {
     const keys = [
       getDeveloperStorageKey(),
       getGameTestStorageKey(),
       getPlaygroundTestStorageKey(),
-      getReadTestStorageKey()
+      getReadTestStorageKey(),
+      getQuestionsTestStorageKey()
     ].filter(Boolean);
 
     if (root?.localStorage) {
@@ -1041,6 +1077,14 @@
       };
     }
 
+    if (scope === "questions_test") {
+      return {
+        state:
+          loadQuestionsTestState(engine),
+        progress: null
+      };
+    }
+
     const progress =
       loadActualProgress();
 
@@ -1268,6 +1312,10 @@
             ? saveReadTestState(
                 confirmed.state
               )
+            : scope === "questions_test"
+              ? saveQuestionsTestState(
+                  confirmed.state
+                )
             : saveActualState(
                 confirmed.state
               );
@@ -1904,6 +1952,10 @@
       displayPlan =
         getReadTestPlan(engine);
       pendingScope = "read_test";
+    } else if (mode === "questions_test") {
+      displayPlan =
+        getQuestionsTestPlan(engine);
+      pendingScope = "questions_test";
     } else {
       displayPlan = buildDisplayPlan(
         plan,
@@ -2177,6 +2229,9 @@
     loadReadTestState,
     saveReadTestState,
     getReadTestPlan,
+    loadQuestionsTestState,
+    saveQuestionsTestState,
+    getQuestionsTestPlan,
     clearTemporaryPreviewState,
     promoteMedalToasts,
     renderPreview,
