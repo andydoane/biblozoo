@@ -1726,6 +1726,93 @@ function testPerVerseHistoryAdvancesOnConfirmationOnly() {
   );
 }
 
+function testReadActivityAssignmentRotation() {
+  const activities = [
+    { id: "typewriter", enabled: true },
+    { id: "balloons", enabled: true },
+    { id: "fish", enabled: false },
+    { id: "not_real", enabled: true }
+  ];
+  const history = {
+    readActivities: {
+      typewriter: {
+        completedCount: 2,
+        lastCompletedAt: 300
+      },
+      balloons: {
+        completedCount: 0,
+        lastCompletedAt: 0
+      }
+    }
+  };
+
+  assert.deepStrictEqual(
+    DailyTodo.chooseReadActivityAssignment({
+      activities,
+      verseHistory: history,
+      random: () => 0
+    }),
+    {
+      kind: "read",
+      activityId: "balloons"
+    }
+  );
+
+  history.readActivities.balloons = {
+    completedCount: 1,
+    lastCompletedAt: 100
+  };
+
+  assert.deepStrictEqual(
+    DailyTodo.chooseReadActivityAssignment({
+      activities,
+      verseHistory: history,
+      random: () => 0
+    }),
+    {
+      kind: "read",
+      activityId: "balloons"
+    }
+  );
+
+  const normalized = DailyTodo.normalizeState({
+    activePlan: {
+      kind: "care",
+      id: "saved-read-plan",
+      profileId: "profile-a",
+      day: "2026-10-05",
+      verseId: "verse_a",
+      requiredTaskIds: [
+        "review",
+        "questions",
+        "activity"
+      ],
+      reviewAssignment: {
+        kind: "read",
+        activityId: "typewriter"
+      },
+      activity: {
+        kind: "game",
+        id: "game_a",
+        mode: "easy"
+      },
+      tasks: {
+        review: { status: "open" },
+        questions: { status: "open" },
+        activity: { status: "open" }
+      }
+    }
+  });
+
+  assert.deepStrictEqual(
+    normalized.activePlan.reviewAssignment,
+    {
+      kind: "read",
+      activityId: "typewriter"
+    }
+  );
+}
+
 function testDefensiveNormalization() {
   const state = DailyTodo.normalizeState({
     version: 999,
@@ -1823,6 +1910,7 @@ function main() {
     testVersion2PlanMigratesWithoutLosingWork,
     testTwoTaskPlanProgressAndExactOnceCompletion,
     testPerVerseHistoryAdvancesOnConfirmationOnly,
+    testReadActivityAssignmentRotation,
     testDefensiveNormalization
   ];
 

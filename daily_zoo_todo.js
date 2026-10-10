@@ -435,6 +435,82 @@
     return state.byVerse[safeVerseId];
   }
 
+  function getVerseHistory(
+    rawState,
+    verseId
+  ) {
+    const state = normalizeState(rawState);
+    const safeVerseId = cleanString(verseId);
+
+    return safeVerseId
+      ? cloneJson(
+          state.byVerse[safeVerseId] ||
+          createDefaultVerseHistory()
+        )
+      : null;
+  }
+
+  function chooseReadActivityAssignment({
+    activities = [],
+    verseHistory = null,
+    random = Math.random
+  } = {}) {
+    const history = normalizeVerseHistory(
+      verseHistory
+    );
+    const eligible = Array.isArray(activities)
+      ? activities
+          .filter((activity) =>
+            activity?.enabled !== false &&
+            activity?.eligible !== false &&
+            READ_ACTIVITY_IDS.includes(
+              cleanString(activity?.id)
+            )
+          )
+          .map((activity) => ({
+            id: cleanString(activity.id)
+          }))
+      : [];
+
+    if (!eligible.length) return null;
+
+    const neverCompleted = eligible.filter(
+      (activity) =>
+        history.readActivities[
+          activity.id
+        ]?.completedCount === 0
+    );
+    const candidates = neverCompleted.length
+      ? neverCompleted
+      : (() => {
+          const oldest = Math.min(
+            ...eligible.map((activity) =>
+              history.readActivities[
+                activity.id
+              ]?.lastCompletedAt || 0
+            )
+          );
+
+          return eligible.filter(
+            (activity) =>
+              (history.readActivities[
+                activity.id
+              ]?.lastCompletedAt || 0) ===
+              oldest
+          );
+        })();
+    const selected = candidates[
+      randomIndex(candidates.length, random)
+    ];
+
+    return selected
+      ? {
+          kind: REVIEW_KINDS.READ,
+          activityId: selected.id
+        }
+      : null;
+  }
+
   function createDefaultStats() {
     return {
       currentStreak: 0,
@@ -2175,6 +2251,8 @@
     DEFAULT_REQUIRED_TASK_IDS,
     createDefaultState,
     normalizeState,
+    getVerseHistory,
+    chooseReadActivityAssignment,
     getRequiredTaskIds,
     resolveTaskId,
     localDayKey,

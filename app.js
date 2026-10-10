@@ -4722,15 +4722,27 @@ function recordFlashcardAttempt(verseId, mode, grade) {
   });
 }
 
-function setDailyTodoActualPreviewMode() {
+function setDailyTodoPreviewMode(
+  mode = "actual"
+) {
   try {
     const url =
       new URL(window.location.href);
 
-    url.searchParams.set(
-      "dailyTodoPreview",
-      "actual"
-    );
+    const safeMode = String(
+      mode || ""
+    ).trim();
+
+    if (safeMode) {
+      url.searchParams.set(
+        "dailyTodoPreview",
+        safeMode
+      );
+    } else {
+      url.searchParams.delete(
+        "dailyTodoPreview"
+      );
+    }
 
     window.history.replaceState(
       window.history.state,
@@ -4738,6 +4750,10 @@ function setDailyTodoActualPreviewMode() {
       url.href
     );
   } catch (err) { }
+}
+
+function setDailyTodoActualPreviewMode() {
+  setDailyTodoPreviewMode("actual");
 }
 
 function loadDailyTodoRuntime() {
@@ -5053,8 +5069,12 @@ function saveDailyTodoRuntime(
   return saveProgress(progress) !== false;
 }
 
-function returnToDailyTodoWithTransition() {
-  setDailyTodoActualPreviewMode();
+function returnToDailyTodoWithTransition(
+  previewMode = "actual"
+) {
+  setDailyTodoPreviewMode(
+    previewMode
+  );
   transitionToAppScreen(
     Screen.TODO_DEV
   );
@@ -5304,6 +5324,332 @@ function exitDailyTodoFlashcard(
   }
 
   returnToDailyTodoWithTransition();
+  return true;
+}
+
+function loadDailyTodoReadRuntime(
+  previewScope = ""
+) {
+  const engine =
+    window.BibloZooDailyTodo;
+  const ui =
+    window.BibloZooDailyTodoUI;
+
+  if (!engine?.normalizeState) {
+    return null;
+  }
+
+  if (previewScope === "read_test") {
+    const state =
+      ui?.loadReadTestState?.(
+        engine
+      );
+
+    return state
+      ? {
+          engine,
+          progress: null,
+          state,
+          previewScope
+        }
+      : null;
+  }
+
+  const loaded = loadDailyTodoRuntime();
+
+  return loaded
+    ? {
+        ...loaded,
+        previewScope: ""
+      }
+    : null;
+}
+
+function saveDailyTodoReadRuntime(
+  runtime,
+  state
+) {
+  if (
+    runtime?.previewScope ===
+    "read_test"
+  ) {
+    return window.BibloZooDailyTodoUI
+      ?.saveReadTestState?.(state) ===
+      true;
+  }
+
+  return !!runtime?.progress &&
+    saveDailyTodoRuntime(
+      runtime.progress,
+      state
+    );
+}
+
+function startDailyTodoRead(
+  requestedPlan,
+  {
+    previewScope = ""
+  } = {}
+) {
+  const readModule =
+    window.BibloZooReadMyVerse;
+  const runtime =
+    loadDailyTodoReadRuntime(
+      previewScope
+    );
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (
+    !readModule?.startForVerse ||
+    !runtime ||
+    !profileId
+  ) {
+    return false;
+  }
+
+  const { engine, state } = runtime;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.REVIEW ||
+    "review";
+  const task = plan?.tasks?.[taskId];
+  const openStatus =
+    engine.TASK_STATUSES?.OPEN ||
+    "open";
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const verseId = String(
+    plan?.verseId || ""
+  ).trim();
+  const activityId = String(
+    plan?.reviewAssignment
+      ?.activityId || ""
+  ).trim();
+
+  if (
+    !plan ||
+    plan.id !== requestedPlan?.id ||
+    plan.profileId !== profileId ||
+    plan.reviewAssignment?.kind !==
+      (engine.REVIEW_KINDS?.READ ||
+        "read") ||
+    activityId !== "typewriter" ||
+    !verseId ||
+    ![openStatus, runningStatus]
+      .includes(task?.status)
+  ) {
+    return false;
+  }
+
+  const started = engine.beginTask(
+    state,
+    {
+      planId: plan.id,
+      taskId,
+      now: new Date()
+    }
+  );
+
+  if (!started.launchToken) {
+    return false;
+  }
+
+  const context = {
+    source: "daily_todo",
+    profileId,
+    planId: plan.id,
+    planDay: plan.day,
+    taskId,
+    launchToken:
+      started.launchToken,
+    verseId,
+    readActivityId: activityId,
+    previewScope:
+      previewScope === "read_test"
+        ? "read_test"
+        : ""
+  };
+
+  if (
+    !readModule.startForVerse(
+      verseId,
+      activityId,
+      context
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    started.changed &&
+    !saveDailyTodoReadRuntime(
+      runtime,
+      started.state
+    )
+  ) {
+    readModule.stopSession?.();
+    return false;
+  }
+
+  setDailyTodoPreviewMode(
+    previewScope || "actual"
+  );
+  transitionToAppScreen(
+    Screen.READ_MY_VERSE
+  );
+  return true;
+}
+
+function completeDailyTodoRead({
+  context = null,
+  verseId = "",
+  readActivityId = ""
+} = {}) {
+  if (
+    context?.source !== "daily_todo"
+  ) {
+    return false;
+  }
+
+  const previewScope =
+    context.previewScope === "read_test"
+      ? "read_test"
+      : "";
+  const runtime =
+    loadDailyTodoReadRuntime(
+      previewScope
+    );
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (!runtime || !profileId) {
+    return false;
+  }
+
+  const { engine, state } = runtime;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.REVIEW ||
+    "review";
+  const task = plan?.tasks?.[taskId];
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const pendingStatus =
+    engine.TASK_STATUSES?.PENDING ||
+    "pending";
+  const safeVerseId = String(
+    verseId || ""
+  ).trim();
+  const safeActivityId = String(
+    readActivityId || ""
+  ).trim();
+  const launchToken = String(
+    context.launchToken || ""
+  ).trim();
+
+  if (
+    !plan ||
+    context.profileId !== profileId ||
+    context.planId !== plan.id ||
+    context.planDay !== plan.day ||
+    context.taskId !== taskId ||
+    context.verseId !== plan.verseId ||
+    safeVerseId !== plan.verseId ||
+    context.readActivityId !==
+      safeActivityId ||
+    safeActivityId !==
+      plan.reviewAssignment
+        ?.activityId ||
+    plan.reviewAssignment?.kind !==
+      (engine.REVIEW_KINDS?.READ ||
+        "read") ||
+    !launchToken ||
+    task?.launchToken !== launchToken
+  ) {
+    return false;
+  }
+
+  if (task.status === pendingStatus) {
+    returnToDailyTodoWithTransition(
+      previewScope || "actual"
+    );
+    return true;
+  }
+
+  if (task.status !== runningStatus) {
+    return false;
+  }
+
+  const pendingData =
+    window.BibloZooDailyTodoUI
+      ?.createPendingCompletionData?.({
+        planId: plan.id,
+        taskId,
+        source: "read",
+        thankYouKey: "read",
+        extra: {
+          verseId: safeVerseId,
+          readActivityId:
+            safeActivityId
+        }
+      }) || {
+        version: 1,
+        planId: plan.id,
+        taskId,
+        source: "read",
+        thankYouKey: "read",
+        verseId: safeVerseId,
+        readActivityId:
+          safeActivityId
+      };
+  const pending =
+    engine.setPendingCompletion(
+      state,
+      {
+        planId: plan.id,
+        taskId,
+        launchToken,
+        pendingData,
+        now: new Date()
+      }
+    );
+
+  if (
+    !pending.changed ||
+    !saveDailyTodoReadRuntime(
+      runtime,
+      pending.state
+    )
+  ) {
+    return false;
+  }
+
+  returnToDailyTodoWithTransition(
+    previewScope || "actual"
+  );
+  return true;
+}
+
+function exitDailyTodoRead(
+  context = null
+) {
+  if (
+    context?.source !== "daily_todo"
+  ) {
+    return false;
+  }
+
+  returnToDailyTodoWithTransition(
+    context.previewScope ===
+      "read_test"
+      ? "read_test"
+      : "actual"
+  );
   return true;
 }
 
@@ -8258,6 +8604,7 @@ const Screen = {
   PRACTICE: "practice",
   PLAYGROUND: "playground",
   FLASHCARDS: "flashcards",
+  READ_MY_VERSE: "read_my_verse",
   GAME_MIX_FINISHED: "game_mix_finished"
 };
 
@@ -8297,6 +8644,7 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PRACTICE,
   Screen.PLAYGROUND,
   Screen.FLASHCARDS,
+  Screen.READ_MY_VERSE,
   Screen.GAME_MIX_FINISHED
 ]);
 
@@ -8330,6 +8678,7 @@ window.BibloZooFlashcards
     }),
     tokenizeVerseText: tokenize,
     scheduleSmartLearnTextFit,
+    isMuted: () => muted,
     createHiddenVerseNode: (verse) => {
       const verseTokens = tokenize(verse.verseText || "");
       const hidden = new Map(
@@ -8358,6 +8707,21 @@ window.BibloZooFlashcards
 
     goToNewVerse: () =>
       go(Screen.NEW_VERSE_PICKER)
+  });
+
+window.BibloZooReadMyVerse
+  ?.initialize?.({
+    getVerseList: () => VERSE_LIST,
+    makeSlide,
+    scheduleSmartLearnTextFit,
+    isMuted: () => muted,
+    requestRender: () => render(),
+    onWordActivated: () => true,
+    onContextComplete:
+      completeDailyTodoRead,
+    onContextExit:
+      exitDailyTodoRead,
+    goToHome: () => go(Screen.TITLE)
   });
 
 function isLearnFlowScreen(screen) {
@@ -9503,6 +9867,10 @@ function go(nextScreen) {
   }
 
   if (from === Screen.FLASHCARDS) window.BibloZooFlashcards?.stopSession?.();
+  if (from === Screen.READ_MY_VERSE) {
+    window.BibloZooReadMyVerse
+      ?.stopSession?.();
+  }
   if (from === Screen.DAILY_SNACK) {
     window.BibloZooDailyFeedGame?.stop?.();
   }
@@ -9633,6 +10001,13 @@ function go(nextScreen) {
 function setScreen(screen) {
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
     window.BibloZooFlashcards?.stopSession?.();
+  }
+  if (
+    State.screen === Screen.READ_MY_VERSE &&
+    screen !== Screen.READ_MY_VERSE
+  ) {
+    window.BibloZooReadMyVerse
+      ?.stopSession?.();
   }
   if (
     State.screen === Screen.DAILY_SNACK &&
@@ -13817,6 +14192,298 @@ function screenTitle(idx) {
       });
     }
 
+    const createDailyReadTestState = (
+      verseId,
+      {
+        pending = false
+      } = {}
+    ) => {
+      const engine =
+        window.BibloZooDailyTodo;
+      const ui =
+        window.BibloZooDailyTodoUI;
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const profileId =
+        getProfileApi()
+          ?.getActiveProfileId?.() || "";
+      const safeVerseId = String(
+        verseId || ""
+      ).trim();
+
+      if (
+        !engine ||
+        !ui?.saveReadTestState ||
+        !templatePlan ||
+        !profileId ||
+        !VERSE_LIST.some(
+          (verse) =>
+            verse?.id === safeVerseId
+        )
+      ) {
+        return null;
+      }
+
+      const plan = JSON.parse(
+        JSON.stringify(templatePlan)
+      );
+      const taskId =
+        engine.TASK_IDS?.REVIEW ||
+        "review";
+
+      plan.id =
+        `daily-read-test-${Date.now().toString(36)}`;
+      plan.profileId = profileId;
+      plan.day = engine.localDayKey(
+        new Date()
+      );
+      plan.verseId = safeVerseId;
+      plan.reviewAssignment = {
+        kind:
+          engine.REVIEW_KINDS?.READ ||
+          "read",
+        activityId: "typewriter"
+      };
+      plan.requiredTaskIds = [
+        taskId,
+        engine.TASK_IDS?.QUESTIONS ||
+          "questions",
+        engine.TASK_IDS?.ACTIVITY ||
+          "activity"
+      ];
+      plan.tasks = {};
+      plan.requiredTaskIds.forEach(
+        (requiredTaskId) => {
+          plan.tasks[requiredTaskId] = {
+            status:
+              engine.TASK_STATUSES?.OPEN ||
+              "open",
+            startedAt: 0,
+            pendingAt: 0,
+            completedAt: 0,
+            launchToken: "",
+            pendingData: null
+          };
+        }
+      );
+      plan.educationalCompletedAt = 0;
+      plan.earnedStarPegCount = 0;
+      plan.snack = {
+        unlocked: false,
+        claimed: false,
+        claimedAt: 0
+      };
+      plan.rolloverHold = null;
+
+      let state = engine.normalizeState({
+        ...engine.normalizeState(
+          loadProgress()?.dailyZooTodo
+        ),
+        activePlan: plan
+      });
+
+      if (pending) {
+        const started = engine.beginTask(
+          state,
+          {
+            planId: plan.id,
+            taskId,
+            now: new Date(),
+            random: () => 0.271828
+          }
+        );
+
+        if (!started.launchToken) {
+          return null;
+        }
+
+        const pendingResult =
+          engine.setPendingCompletion(
+            started.state,
+            {
+              planId: plan.id,
+              taskId,
+              launchToken:
+                started.launchToken,
+              pendingData:
+                ui.createPendingCompletionData?.({
+                  planId: plan.id,
+                  taskId,
+                  source: "read",
+                  thankYouKey: "read",
+                  extra: {
+                    verseId: safeVerseId,
+                    readActivityId:
+                      "typewriter"
+                  }
+                }),
+              now: new Date()
+            }
+          );
+
+        if (!pendingResult.changed) {
+          return null;
+        }
+
+        state = pendingResult.state;
+      }
+
+      return ui.saveReadTestState(state)
+        ? state
+        : null;
+    };
+
+    const getReadTesterVerseId = () =>
+      String(
+        document.querySelector(
+          "#dailyReadVerseSelect"
+        )?.value || ""
+      ).trim();
+
+    const showReadDiagnostics = (
+      verseId
+    ) => {
+      const verse = VERSE_LIST.find(
+        (item) => item?.id === verseId
+      );
+      const readModule =
+        window.BibloZooReadMyVerse;
+      const chunks =
+        readModule?.buildDisplayChunks?.(
+          verse?.verseText || "",
+          verse?.echoParts || []
+        ) || [];
+
+      showDialog({
+        title: "Typewriter Diagnostics",
+        bodyHtml: `
+          <div class="daily-read-diagnostics">
+            <strong>${escapeHtml(verse?.ref || verseId)}</strong>
+            <div>${chunks.length} verse ${chunks.length === 1 ? "chunk" : "chunks"}</div>
+            <ol>
+              ${chunks.map((chunk, index) => `
+                <li>
+                  <code>${escapeHtml(readModule?.getChunkAudioPath?.(verseId, index, chunks.length) || "")}</code>
+                  <div>${escapeHtml(chunk)}</div>
+                </li>
+              `).join("")}
+            </ol>
+          </div>
+        `,
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showDailyReadTesterDialog
+          })
+        ]
+      });
+    };
+
+    function showDailyReadTesterDialog() {
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const preferredVerseId =
+        VERSE_LIST.some(
+          (verse) =>
+            verse?.id === VERSE_ID
+        )
+          ? VERSE_ID
+          : templatePlan?.verseId ||
+            VERSE_LIST[0]?.id || "";
+
+      showDialog({
+        title: "Read Activity Tester",
+        bodyHtml: `
+          <label class="daily-read-tester-label" for="dailyReadVerseSelect">
+            Verse
+          </label>
+          <select class="daily-read-tester-select" id="dailyReadVerseSelect">
+            ${VERSE_LIST.map((verse) => `
+              <option value="${escapeHtml(verse.id)}"${verse.id === preferredVerseId ? " selected" : ""}>
+                ${escapeHtml(verse.ref || verse.id)}
+              </option>
+            `).join("")}
+          </select>
+        `,
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          dlgBtn("Start Typewriter", {
+            onClick: () => {
+              const verseId =
+                getReadTesterVerseId();
+              const state =
+                createDailyReadTestState(
+                  verseId
+                );
+              const launched = state
+                ? startDailyTodoRead(
+                    state.activePlan,
+                    {
+                      previewScope:
+                        "read_test"
+                    }
+                  )
+                : false;
+
+              if (launched) {
+                closeDialog();
+                return;
+              }
+
+              showDialog({
+                title:
+                  "Read Tester Unavailable",
+                body:
+                  "Unlock a BibloPet and create today's Daily To-Do before using the Read Tester.",
+                actions: [
+                  dlgBtn("OK", {
+                    onClick: closeDialog
+                  })
+                ]
+              });
+            }
+          }),
+          dlgBtn("Restore Pending", {
+            onClick: () => {
+              const state =
+                createDailyReadTestState(
+                  getReadTesterVerseId(),
+                  { pending: true }
+                );
+
+              if (!state) return;
+
+              closeDialog();
+              setDailyTodoPreviewMode(
+                "read_test"
+              );
+              transitionToAppScreen(
+                Screen.TODO_DEV
+              );
+            }
+          }),
+          dlgBtn("Audio & Chunks", {
+            onClick: () =>
+              showReadDiagnostics(
+                getReadTesterVerseId()
+              )
+          }),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: showDailyPreviewDialog
+          })
+        ]
+      });
+    }
+
     registerDailyTodoPreviewMenuEntry({
       id: "actual",
       label: "Actual Today",
@@ -13840,15 +14507,22 @@ function screenTitle(idx) {
         showCompletionRewardsPreviewDialog
     });
     registerDailyTodoPreviewMenuEntry({
+      id: "read",
+      label: "Read Activity Tester",
+      order: 40,
+      onSelect:
+        showDailyReadTesterDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
       id: "games",
       label: "Game Tester",
-      order: 40,
+      order: 50,
       onSelect: showDailyGameTesterDialog
     });
     registerDailyTodoPreviewMenuEntry({
       id: "playground",
       label: "Playground Tester",
-      order: 50,
+      order: 60,
       onSelect:
         showDailyPlaygroundTesterDialog
     });
@@ -16096,9 +16770,18 @@ function screenTodoDev(idx) {
 
     if (dailyPreviewMode) {
       dailyPreviewPlan =
-        ["game_test", "playground_test"]
+        [
+          "game_test",
+          "playground_test",
+          "read_test"
+        ]
           .includes(dailyPreviewMode)
-          ? dailyPreviewMode === "playground_test"
+          ? dailyPreviewMode === "read_test"
+            ? dailyTodoUi
+                ?.getReadTestPlan?.(
+                  dailyTodoApi
+                ) || null
+          : dailyPreviewMode === "playground_test"
             ? dailyTodoUi
                 ?.getPlaygroundTestPlan?.(
                   dailyTodoApi
@@ -16251,7 +16934,9 @@ function screenTodoDev(idx) {
   }
 
   if (
-    dailyPreviewMode === "actual" &&
+    ["actual", "read_test"].includes(
+      dailyPreviewMode
+    ) &&
     dailyPreviewPlan
   ) {
     const engine =
@@ -16281,6 +16966,26 @@ function screenTodoDev(idx) {
       flashcardRow.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
+
+        const isRead =
+          dailyPreviewPlan
+            .reviewAssignment?.kind ===
+          (engine.REVIEW_KINDS?.READ ||
+            "read");
+
+        if (isRead) {
+          startDailyTodoRead(
+            dailyPreviewPlan,
+            {
+              previewScope:
+                dailyPreviewMode ===
+                "read_test"
+                  ? "read_test"
+                  : ""
+            }
+          );
+          return;
+        }
 
         startDailyTodoFlashcard(
           dailyPreviewPlan
@@ -18540,6 +19245,12 @@ function render() {
     if (screen === Screen.FLASHCARDS) {
       slide =
         window.BibloZooFlashcards
+          ?.renderScreen?.(idx) ||
+        null;
+    }
+    if (screen === Screen.READ_MY_VERSE) {
+      slide =
+        window.BibloZooReadMyVerse
           ?.renderScreen?.(idx) ||
         null;
     }

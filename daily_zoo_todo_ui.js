@@ -19,6 +19,8 @@
     "biblozooDailyTodoGameTest:";
   const PLAYGROUND_TEST_STORAGE_PREFIX =
     "biblozooDailyTodoPlaygroundTest:";
+  const READ_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoReadTest:";
   const PENDING_DATA_VERSION = 1;
   const PREVIEW_MODES = Object.freeze([
     "open",
@@ -32,7 +34,8 @@
     "owned_medal",
     "debug",
     "game_test",
-    "playground_test"
+    "playground_test",
+    "read_test"
   ]);
   const VALID_MEDAL_TIERS = Object.freeze([
     "bronze",
@@ -42,6 +45,8 @@
   const THANK_YOU_MESSAGES = Object.freeze({
     flashcard:
       "Thanks for practicing my flashcard, {name}!",
+    read:
+      "Thanks for reading my verse with me, {name}!",
     questions:
       "Thanks for answering my questions, {name}!",
     scramble:
@@ -347,6 +352,14 @@
       : "";
   }
 
+  function getReadTestStorageKey() {
+    const profileId = getActiveProfileId();
+
+    return profileId
+      ? `${READ_TEST_STORAGE_PREFIX}${profileId}`
+      : "";
+  }
+
   function readStoredJson(key) {
     if (!root?.localStorage || !key) {
       return null;
@@ -473,11 +486,36 @@
       ?.activePlan || null;
   }
 
+  function loadReadTestState(engine) {
+    const raw = readStoredJson(
+      getReadTestStorageKey()
+    );
+
+    if (!raw || !engine?.normalizeState) {
+      return null;
+    }
+
+    return engine.normalizeState(raw);
+  }
+
+  function saveReadTestState(state) {
+    return writeStoredJson(
+      getReadTestStorageKey(),
+      state
+    );
+  }
+
+  function getReadTestPlan(engine) {
+    return loadReadTestState(engine)
+      ?.activePlan || null;
+  }
+
   function clearTemporaryPreviewState() {
     const keys = [
       getDeveloperStorageKey(),
       getGameTestStorageKey(),
-      getPlaygroundTestStorageKey()
+      getPlaygroundTestStorageKey(),
+      getReadTestStorageKey()
     ].filter(Boolean);
 
     if (root?.localStorage) {
@@ -962,6 +1000,14 @@
       };
     }
 
+    if (scope === "read_test") {
+      return {
+        state:
+          loadReadTestState(engine),
+        progress: null
+      };
+    }
+
     const progress =
       loadActualProgress();
 
@@ -1185,9 +1231,13 @@
           ? savePlaygroundTestState(
               confirmed.state
             )
-        : saveActualState(
-            confirmed.state
-          );
+          : scope === "read_test"
+            ? saveReadTestState(
+                confirmed.state
+              )
+            : saveActualState(
+                confirmed.state
+              );
 
     if (!saved) {
       button.disabled = false;
@@ -1817,6 +1867,10 @@
       displayPlan =
         getPlaygroundTestPlan(engine);
       pendingScope = "playground_test";
+    } else if (mode === "read_test") {
+      displayPlan =
+        getReadTestPlan(engine);
+      pendingScope = "read_test";
     } else {
       displayPlan = buildDisplayPlan(
         plan,
@@ -2087,6 +2141,9 @@
     getMedalToastData,
     getGameTestPlan,
     getPlaygroundTestPlan,
+    loadReadTestState,
+    saveReadTestState,
+    getReadTestPlan,
     clearTemporaryPreviewState,
     promoteMedalToasts,
     renderPreview,
