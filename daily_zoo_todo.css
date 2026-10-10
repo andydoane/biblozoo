@@ -63,6 +63,50 @@
   font-size: clamp(64px, 18vw, 130px);
 }
 
+.daily-zoo-todo-mission-symbol {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  background: #333333;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(64px, 17vw, 116px);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow:
+    0 8px 0 rgba(0, 0, 0, 0.16);
+}
+
+.daily-home-offer-mission-symbol {
+  width: clamp(112px, 30vw, 174px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #333333;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(64px, 18vw, 108px);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 8px 0 rgba(0, 0, 0, 0.16);
+}
+
+.new-verse-card-mission-paw {
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 50%;
+  background: #333333;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(72px, 20vw, 128px);
+  line-height: 1;
+}
+
 .daily-zoo-todo-pet-name {
   max-width: 100%;
   color: #333333;

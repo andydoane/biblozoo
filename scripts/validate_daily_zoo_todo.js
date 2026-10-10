@@ -6,6 +6,7 @@ const path = require("path");
 const vm = require("vm");
 
 const DailyTodo = require("../daily_zoo_todo.js");
+const DailyTodoUI = require("../daily_zoo_todo_ui.js");
 
 const rootDir = path.resolve(__dirname, "..");
 
@@ -1563,6 +1564,446 @@ function testTwoTaskPlanProgressAndExactOnceCompletion() {
   assert.strictEqual(snack.changed, false);
 }
 
+function testNewPetMissionReadinessRules() {
+  const registries = makeSimpleRegistries();
+  registries.playground.push({
+    enabled: true,
+    manifest: {
+      id: "play_b",
+      visibleInCarousel: true,
+      modes: ["beginner", "advanced"]
+    }
+  });
+  const verseList = [
+    { id: "learned" },
+    { id: "unlearned" }
+  ];
+  const learnedAt = new Date(
+    2026, 9, 2, 12, 0, 0
+  ).getTime();
+  const baseVerse = {
+    learnCompleted: true,
+    unlockedForTest: true,
+    learnedAt,
+    games: {
+      game_a: {
+        easyCompleted: true,
+        mediumCompleted: true,
+        hardCompleted: true
+      },
+      game_b: {
+        easyCompleted: true
+      }
+    },
+    playground: {
+      play_a: true,
+      play_b: { completed: true }
+    }
+  };
+  const progress = {
+    verses: {
+      learned: baseVerse
+    }
+  };
+  const readiness = (overrides = {}) =>
+    DailyTodo.getNewPetMissionReadiness({
+      progress:
+        overrides.progress || progress,
+      verseList:
+        overrides.verseList || verseList,
+      gameRegistry: registries.games,
+      playgroundRegistry:
+        registries.playground,
+      isPetUnlocked,
+      tutorialActive:
+        overrides.tutorialActive || false,
+      now:
+        overrides.now ||
+        new Date(2026, 9, 5, 9, 0, 0)
+    });
+
+  assert.deepStrictEqual(
+    DailyTodo.NEW_PET_MISSION_RULES,
+    {
+      minimumAgeDays: 3,
+      normalAccomplishments: 5,
+      relaxedAgeDays: 7,
+      relaxedAccomplishments: 3
+    }
+  );
+  assert.strictEqual(
+    DailyTodo.NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED,
+    false
+  );
+  assert.deepStrictEqual(
+    readiness().accomplishments,
+    [
+      "game:easy",
+      "game:medium",
+      "game:hard",
+      "playground:play_a",
+      "playground:play_b"
+    ]
+  );
+  assert.strictEqual(readiness().eligible, true);
+  assert.strictEqual(readiness().ageDays, 3);
+
+  const tooNew = readiness({
+    now: new Date(2026, 9, 4, 9, 0, 0)
+  });
+  assert.strictEqual(tooNew.eligible, false);
+  assert.strictEqual(tooNew.reason, "too_new");
+
+  const fourAccomplishments = structuredClone(
+    progress
+  );
+  fourAccomplishments.verses.learned
+    .playground.play_b = false;
+  assert.strictEqual(
+    readiness({
+      progress: fourAccomplishments
+    }).reason,
+    "more_accomplishments_needed"
+  );
+
+  const threeAccomplishments = structuredClone(
+    progress
+  );
+  threeAccomplishments.verses.learned
+    .playground = {};
+  const relaxed = readiness({
+    progress: threeAccomplishments,
+    now: new Date(2026, 9, 9, 9, 0, 0)
+  });
+  assert.strictEqual(relaxed.ageDays, 7);
+  assert.strictEqual(
+    relaxed.requiredAccomplishments,
+    3
+  );
+  assert.strictEqual(relaxed.eligible, true);
+
+  const twoAccomplishments =
+    structuredClone(
+      threeAccomplishments
+    );
+  twoAccomplishments.verses.learned
+    .games.game_a.hardCompleted = false;
+  assert.strictEqual(
+    readiness({
+      progress: twoAccomplishments,
+      now: new Date(2026, 9, 9, 9, 0, 0)
+    }).reason,
+    "more_accomplishments_needed"
+  );
+
+  const memorized = structuredClone(progress);
+  memorized.verses.learned.games = {};
+  memorized.verses.learned.playground = {};
+  memorized.verses.learned.flashcards = {
+    bestMemoryLevel: "memorized"
+  };
+  assert.strictEqual(
+    readiness({ progress: memorized }).eligible,
+    true
+  );
+  assert.strictEqual(
+    readiness({
+      progress: memorized,
+      now: new Date(2026, 9, 4, 9, 0, 0)
+    }).reason,
+    "too_new"
+  );
+
+  assert.strictEqual(
+    readiness({
+      verseList: [{ id: "learned" }]
+    }).reason,
+    "no_unlearned_verses"
+  );
+
+  const firstPetPending = structuredClone(progress);
+  firstPetPending.verses.learned
+    .unlockedForTest = false;
+  assert.strictEqual(
+    readiness({ progress: firstPetPending }).reason,
+    "first_pet_pending"
+  );
+  assert.strictEqual(
+    readiness({ tutorialActive: true }).reason,
+    "tutorial_active"
+  );
+
+  const activeMission = structuredClone(progress);
+  activeMission.dailyZooTodo = {
+    version: DailyTodo.STATE_VERSION,
+    activePlan: {
+      kind: "new_pet",
+      id: "existing-mission",
+      profileId: "profile-a",
+      day: "2026-10-05",
+      verseId: "",
+      requiredTaskIds: ["learn", "activity"],
+      activity: {
+        kind: "game",
+        id: "game_a",
+        mode: "easy"
+      },
+      tasks: {
+        learn: { status: "open" },
+        activity: { status: "open" }
+      }
+    }
+  };
+  assert.strictEqual(
+    readiness({ progress: activeMission }).reason,
+    "mission_active"
+  );
+}
+
+function testNewPetMissionPlanSelectionAndUi() {
+  const registries = makeSimpleRegistries();
+  const plan = DailyTodo.createNewPetMissionPlan({
+    profileId: "profile-a",
+    day: "2026-10-05",
+    gameRegistry: registries.games,
+    now: new Date(2026, 9, 5, 8, 0, 0),
+    random: () => 0,
+    idFactory: () => "new-pet-mission"
+  });
+
+  assert.ok(plan);
+  assert.strictEqual(
+    plan.kind,
+    DailyTodo.PLAN_KINDS.NEW_PET
+  );
+  assert.strictEqual(plan.verseId, "");
+  assert.deepStrictEqual(
+    plan.requiredTaskIds,
+    ["learn", "activity"]
+  );
+  assert.strictEqual(plan.reviewAssignment, null);
+  assert.strictEqual(plan.questionSession, null);
+  assert.strictEqual(plan.snack, null);
+  assert.strictEqual(plan.activity.kind, "game");
+  assert.strictEqual(plan.activity.id, "game_a");
+  assert.strictEqual(plan.activity.mode, "easy");
+
+  let state = DailyTodo.normalizeState({
+    activePlan: plan
+  });
+  const selected =
+    DailyTodo.selectNewPetMissionVerse(
+      state,
+      {
+        planId: plan.id,
+        verseId: "verse_new"
+      }
+    );
+  assert.strictEqual(selected.changed, true);
+  assert.strictEqual(
+    selected.state.activePlan.verseId,
+    "verse_new"
+  );
+
+  const changedAgain =
+    DailyTodo.selectNewPetMissionVerse(
+      selected.state,
+      {
+        planId: plan.id,
+        verseId: "different_verse"
+      }
+    );
+  assert.strictEqual(changedAgain.changed, false);
+  assert.strictEqual(
+    changedAgain.state.activePlan.verseId,
+    "verse_new"
+  );
+
+  const html = DailyTodoUI.renderPreview({
+    mode: "actual",
+    plan: selected.state.activePlan,
+    engine: DailyTodo,
+    verseRef: "Romans 8:28"
+  });
+  assert.match(html, /Unlock a New BibloPet!/);
+  assert.match(html, /Continue Learning/);
+  assert.match(html, /Play a Game/);
+  assert.match(
+    html,
+    /data-daily-todo-preview-task="activity"[\s\S]*?disabled/
+  );
+  assert.doesNotMatch(html, /Feed me a snack/);
+
+  const progress = {
+    verses: {
+      verse_a: makeVerseProgress()
+    }
+  };
+  const ordinary = DailyTodo.getOrCreatePlan({
+    progress,
+    profileId: "profile-a",
+    verseList: [{ id: "verse_a" }],
+    gameRegistry: registries.games,
+    playgroundRegistry: registries.playground,
+    isPetUnlocked,
+    getPetStatus,
+    now: new Date(2026, 9, 5, 8, 0, 0),
+    random: () => 0,
+    idFactory: () => "ordinary-care-plan"
+  });
+  assert.strictEqual(
+    ordinary.plan.kind,
+    DailyTodo.PLAN_KINDS.CARE
+  );
+}
+
+function testNewPetMissionMidnightAndLearnConfirmation() {
+  const registries = makeSimpleRegistries();
+  const plan = DailyTodo.createNewPetMissionPlan({
+    profileId: "profile-a",
+    day: "2026-10-05",
+    gameRegistry: registries.games,
+    random: () => 0,
+    idFactory: () => "overnight-mission"
+  });
+  let state = DailyTodo.normalizeState({
+    activePlan: plan
+  });
+
+  const unselectedRollover =
+    DailyTodo.expireOldPlanIfNeeded(
+      state,
+      "2026-10-06"
+    );
+  assert.strictEqual(
+    unselectedRollover.expired,
+    true
+  );
+
+  state = DailyTodo.selectNewPetMissionVerse(
+    state,
+    {
+      planId: plan.id,
+      verseId: "verse_new"
+    }
+  ).state;
+  const selectedRollover =
+    DailyTodo.expireOldPlanIfNeeded(
+      state,
+      "2026-10-06"
+    );
+  assert.strictEqual(
+    selectedRollover.preserved,
+    true
+  );
+  assert.strictEqual(
+    selectedRollover.state.activePlan.verseId,
+    "verse_new"
+  );
+
+  const started = DailyTodo.beginTask(
+    selectedRollover.state,
+    {
+      planId: plan.id,
+      taskId: "learn",
+      preserveAcrossDay: true,
+      now: new Date(2026, 9, 6, 8, 0, 0),
+      random: () => 0
+    }
+  );
+  const pending = DailyTodo.setPendingCompletion(
+    started.state,
+    {
+      planId: plan.id,
+      taskId: "learn",
+      launchToken: started.launchToken,
+      pendingData: {
+        source: "new_pet_learn",
+        thankYouKey: "learn"
+      },
+      now: new Date(2026, 9, 6, 8, 5, 0)
+    }
+  );
+  assert.strictEqual(
+    pending.state.activePlan.tasks.learn.status,
+    "pending"
+  );
+  assert.strictEqual(
+    pending.state.activePlan.tasks.activity.status,
+    "open"
+  );
+
+  const confirmed =
+    DailyTodo.confirmPendingCompletion(
+      pending.state,
+      {
+        planId: plan.id,
+        taskId: "learn",
+        now: new Date(2026, 9, 6, 8, 6, 0)
+      }
+    );
+  assert.strictEqual(confirmed.taskCompleted, true);
+  assert.strictEqual(
+    confirmed.state.activePlan.tasks.learn.status,
+    "complete"
+  );
+  assert.strictEqual(
+    confirmed.state.activePlan.tasks.activity.status,
+    "open"
+  );
+  assert.deepStrictEqual(
+    DailyTodo.getPlanProgress(
+      confirmed.state.activePlan
+    ),
+    {
+      kind: "new_pet",
+      requiredTaskIds: ["learn", "activity"],
+      requiredCount: 2,
+      completeCount: 1,
+      taskComplete: {
+        learn: true,
+        activity: false
+      },
+      educationalComplete: false,
+      feedingTime: false,
+      snackClaimed: false
+    }
+  );
+
+  const html = DailyTodoUI.renderPreview({
+    mode: "actual",
+    plan: confirmed.state.activePlan,
+    engine: DailyTodo,
+    verseRef: "Romans 8:28"
+  });
+  assert.match(
+    html,
+    /data-daily-todo-preview-task="activity"/
+  );
+  const activityMarker =
+    'data-daily-todo-preview-task="activity"';
+  const activityMarkerIndex =
+    html.indexOf(activityMarker);
+  const activityButtonStart =
+    html.lastIndexOf(
+      "<button",
+      activityMarkerIndex
+    );
+  const activityButtonEnd =
+    html.indexOf(
+      "</button>",
+      activityMarkerIndex
+    );
+  const activityButtonHtml = html.slice(
+    activityButtonStart,
+    activityButtonEnd + 9
+  );
+  assert.doesNotMatch(
+    activityButtonHtml,
+    /disabled/
+  );
+}
+
 function testPerVerseHistoryAdvancesOnConfirmationOnly() {
   let state = DailyTodo.createDefaultState();
   state.activePlan = {
@@ -2035,6 +2476,9 @@ function main() {
     testEarnedBadgesNeverDisappear,
     testVersion2PlanMigratesWithoutLosingWork,
     testTwoTaskPlanProgressAndExactOnceCompletion,
+    testNewPetMissionReadinessRules,
+    testNewPetMissionPlanSelectionAndUi,
+    testNewPetMissionMidnightAndLearnConfirmation,
     testPerVerseHistoryAdvancesOnConfirmationOnly,
     testReadActivityAssignmentRotation,
     testReadReadFlashcardCadence,

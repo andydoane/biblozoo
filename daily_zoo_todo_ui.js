@@ -23,6 +23,8 @@
     "biblozooDailyTodoReadTest:";
   const QUESTIONS_TEST_STORAGE_PREFIX =
     "biblozooDailyTodoQuestionsTest:";
+  const NEW_PET_TEST_STORAGE_PREFIX =
+    "biblozooDailyTodoNewPetTest:";
   const PENDING_DATA_VERSION = 1;
   const PREVIEW_MODES = Object.freeze([
     "open",
@@ -41,7 +43,8 @@
     "game_test",
     "playground_test",
     "read_test",
-    "questions_test"
+    "questions_test",
+    "new_pet_test"
   ]);
   const VALID_MEDAL_TIERS = Object.freeze([
     "bronze",
@@ -55,6 +58,8 @@
       "Thanks for reading my verse with me, {name}!",
     questions:
       "Thanks for answering my questions, {name}!",
+    learn:
+      "Thanks for learning a new verse, {name}!",
     scramble:
       "You put my verse back together, {name}! Thanks!",
     traffic_tap_external:
@@ -404,6 +409,14 @@
       : "";
   }
 
+  function getNewPetTestStorageKey() {
+    const profileId = getActiveProfileId();
+
+    return profileId
+      ? `${NEW_PET_TEST_STORAGE_PREFIX}${profileId}`
+      : "";
+  }
+
   function readStoredJson(key) {
     if (!root?.localStorage || !key) {
       return null;
@@ -578,13 +591,38 @@
       ?.activePlan || null;
   }
 
+  function loadNewPetTestState(engine) {
+    const raw = readStoredJson(
+      getNewPetTestStorageKey()
+    );
+
+    if (!raw || !engine?.normalizeState) {
+      return null;
+    }
+
+    return engine.normalizeState(raw);
+  }
+
+  function saveNewPetTestState(state) {
+    return writeStoredJson(
+      getNewPetTestStorageKey(),
+      state
+    );
+  }
+
+  function getNewPetTestPlan(engine) {
+    return loadNewPetTestState(engine)
+      ?.activePlan || null;
+  }
+
   function clearTemporaryPreviewState() {
     const keys = [
       getDeveloperStorageKey(),
       getGameTestStorageKey(),
       getPlaygroundTestStorageKey(),
       getReadTestStorageKey(),
-      getQuestionsTestStorageKey()
+      getQuestionsTestStorageKey(),
+      getNewPetTestStorageKey()
     ].filter(Boolean);
 
     if (root?.localStorage) {
@@ -1085,6 +1123,14 @@
       };
     }
 
+    if (scope === "new_pet_test") {
+      return {
+        state:
+          loadNewPetTestState(engine),
+        progress: null
+      };
+    }
+
     const progress =
       loadActualProgress();
 
@@ -1140,6 +1186,23 @@
     const row = root?.document
       ?.querySelector?.(
         '.daily-zoo-todo-row[data-daily-todo-preview-task="snack"]'
+      );
+
+    if (!row) return;
+
+    row.classList.remove("is-faded");
+    row.disabled = false;
+  }
+
+  function unlockNewPetActivityRow(
+    engine
+  ) {
+    const activityTaskId =
+      engine?.TASK_IDS?.ACTIVITY ||
+      "activity";
+    const row = root?.document
+      ?.querySelector?.(
+        `.daily-zoo-todo-row[data-daily-todo-preview-task="${activityTaskId}"]`
       );
 
     if (!row) return;
@@ -1316,6 +1379,10 @@
               ? saveQuestionsTestState(
                   confirmed.state
                 )
+            : scope === "new_pet_test"
+              ? saveNewPetTestState(
+                  confirmed.state
+                )
             : saveActualState(
                 confirmed.state
               );
@@ -1332,6 +1399,17 @@
         ?.snack?.unlocked === true
     ) {
       unlockSnackRow();
+    }
+
+    if (
+      confirmed.state?.activePlan?.kind ===
+        (engine.PLAN_KINDS?.NEW_PET ||
+          "new_pet") &&
+      taskId ===
+        (engine.TASK_IDS?.LEARN ||
+          "learn")
+    ) {
+      unlockNewPetActivityRow(engine);
     }
 
     removeCompletionLayer(
@@ -1956,6 +2034,10 @@
       displayPlan =
         getQuestionsTestPlan(engine);
       pendingScope = "questions_test";
+    } else if (mode === "new_pet_test") {
+      displayPlan =
+        getNewPetTestPlan(engine);
+      pendingScope = "new_pet_test";
     } else {
       displayPlan = buildDisplayPlan(
         plan,
@@ -1990,6 +2072,10 @@
       taskIds.QUESTIONS || "questions";
     const activityId =
       taskIds.ACTIVITY || "activity";
+    const learnId =
+      taskIds.LEARN || "learn";
+    const isNewPetMission =
+      displayPlan.kind === "new_pet";
 
     if (mode === "toast") {
       displayPlan.activity = {
@@ -2080,6 +2166,9 @@
         questionsId,
         activityId
       ];
+    const learnComplete =
+      displayPlan.tasks?.[learnId]
+        ?.status === completeStatus;
     const taskRows = {
       [reviewId]: {
         text:
@@ -2101,7 +2190,7 @@
       },
       [activityId]: {
         text:
-          displayPlan.kind === "new_pet"
+          isNewPetMission
             ? "Play a Game"
             : "Play a Game with Me",
         image: activityImage,
@@ -2110,8 +2199,13 @@
         rowTextColor:
           activityTextColor
       },
-      [taskIds.LEARN || "learn"]: {
-        text: "Learn a New Verse",
+      [learnId]: {
+        text:
+          isNewPetMission &&
+          displayPlan.verseId &&
+          !learnComplete
+            ? "Continue Learning"
+            : "Learn a New Verse",
         image: "",
         emoji: "📖",
         rowColor: "#7f66c6"
@@ -2134,7 +2228,15 @@
             status:
               displayPlan.tasks?.[taskId]
                 ?.status || "open",
-            completeStatus
+            completeStatus,
+            disabled:
+              isNewPetMission &&
+              taskId === activityId &&
+              !learnComplete,
+            faded:
+              isNewPetMission &&
+              taskId === activityId &&
+              !learnComplete
           });
         })
         .join("");
@@ -2177,11 +2279,19 @@
           class="daily-zoo-todo-pet"
           aria-hidden="true"
         >
-          ${petVisualHtml || "🐾"}
+          ${
+            isNewPetMission
+              ? '<span class="daily-zoo-todo-mission-symbol">?</span>'
+              : petVisualHtml || "🐾"
+          }
         </div>
 
         <div class="daily-zoo-todo-pet-name">
-          ${escapeHtml(petName || "BibloPet")}
+          ${escapeHtml(
+            isNewPetMission
+              ? "Unlock a New BibloPet!"
+              : petName || "BibloPet"
+          )}
         </div>
 
         ${verseRef ? `
@@ -2192,7 +2302,7 @@
       </div>
 
       <div class="daily-zoo-todo-heading">
-        Daily Tasks
+        ${isNewPetMission ? "Mission Tasks" : "Daily Tasks"}
       </div>
 
       <div class="daily-zoo-todo-list">
@@ -2203,7 +2313,10 @@
       ${renderPendingCompletionHtml({
         plan: displayPlan,
         pending,
-        petVisualHtml,
+        petVisualHtml:
+          isNewPetMission
+            ? '<span class="daily-zoo-todo-mission-symbol">?</span>'
+            : petVisualHtml,
         activityManifest,
         scope: pendingScope
       })}
@@ -2232,6 +2345,9 @@
     loadQuestionsTestState,
     saveQuestionsTestState,
     getQuestionsTestPlan,
+    loadNewPetTestState,
+    saveNewPetTestState,
+    getNewPetTestPlan,
     clearTemporaryPreviewState,
     promoteMedalToasts,
     renderPreview,

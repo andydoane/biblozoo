@@ -864,6 +864,14 @@ function bindNewVersePickerHomePill(rootEl) {
     State.pendingPetUnlockVerseId = null;
     State.activeTodo = null;
 
+    if (
+      getDailyNewPetMissionContext()
+        ?.source === "daily_new_pet"
+    ) {
+      returnFromDailyNewPetLearn();
+      return;
+    }
+
     if (isTutorialActive()) {
       State.todoTutorialPage = 3;
       State.todoTutorialJustFinishedLearn = false;
@@ -4110,6 +4118,7 @@ function resetAllProgressData() {
   State.activeTodo = null;
   State.pendingZooTodoGameId = "";
   State.dailySnackSession = null;
+  State.dailyNewPetMissionContext = null;
   clearDailyHomeOfferPresentation();
   State.hasLearnedVerse = false;
 
@@ -5113,6 +5122,351 @@ function saveDailyTodoRuntime(
 
   progress.dailyZooTodo = state;
   return saveProgress(progress) !== false;
+}
+
+function loadDailyNewPetMissionRuntime(
+  previewScope = ""
+) {
+  const engine =
+    window.BibloZooDailyTodo;
+  const ui =
+    window.BibloZooDailyTodoUI;
+
+  if (!engine?.normalizeState) {
+    return null;
+  }
+
+  if (previewScope === "new_pet_test") {
+    const state =
+      ui?.loadNewPetTestState?.(
+        engine
+      );
+
+    return state
+      ? {
+          engine,
+          progress: null,
+          state,
+          previewScope
+        }
+      : null;
+  }
+
+  const loaded = loadDailyTodoRuntime();
+  return loaded
+    ? {
+        ...loaded,
+        previewScope: ""
+      }
+    : null;
+}
+
+function saveDailyNewPetMissionRuntime(
+  runtime,
+  state
+) {
+  if (
+    runtime?.previewScope ===
+      "new_pet_test"
+  ) {
+    return window.BibloZooDailyTodoUI
+      ?.saveNewPetTestState?.(state) ===
+      true;
+  }
+
+  return !!runtime?.progress &&
+    saveDailyTodoRuntime(
+      runtime.progress,
+      state
+    );
+}
+
+function getDailyNewPetMissionContext() {
+  const context =
+    State.dailyNewPetMissionContext;
+
+  if (
+    !context ||
+    typeof context !== "object" ||
+    Array.isArray(context)
+  ) {
+    return null;
+  }
+
+  return context;
+}
+
+function returnFromDailyNewPetLearn() {
+  const context =
+    getDailyNewPetMissionContext();
+  const previewScope =
+    context?.previewScope ===
+      "new_pet_test"
+      ? "new_pet_test"
+      : "actual";
+
+  State.dailyNewPetMissionContext = null;
+  returnToDailyTodoWithTransition(
+    previewScope
+  );
+  return true;
+}
+
+async function startDailyNewPetLearn(
+  requestedPlan,
+  {
+    previewScope = "",
+    openAtFinalAction = false
+  } = {}
+) {
+  const runtime =
+    loadDailyNewPetMissionRuntime(
+      previewScope
+    );
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+
+  if (!runtime || !profileId) {
+    return false;
+  }
+
+  const { engine, state } = runtime;
+  const plan = state.activePlan;
+  const taskId =
+    engine.TASK_IDS?.LEARN ||
+    "learn";
+  const task = plan?.tasks?.[taskId];
+  const openStatus =
+    engine.TASK_STATUSES?.OPEN ||
+    "open";
+  const runningStatus =
+    engine.TASK_STATUSES?.RUNNING ||
+    "running";
+  const isMission =
+    plan?.kind ===
+    (engine.PLAN_KINDS?.NEW_PET ||
+      "new_pet");
+
+  if (
+    !isMission ||
+    plan.id !== requestedPlan?.id ||
+    plan.profileId !== profileId ||
+    ![openStatus, runningStatus]
+      .includes(task?.status)
+  ) {
+    return false;
+  }
+
+  const safePreviewScope =
+    previewScope === "new_pet_test"
+      ? "new_pet_test"
+      : "";
+
+  if (!plan.verseId) {
+    State.dailyNewPetMissionContext = {
+      source: "daily_new_pet",
+      profileId,
+      planId: plan.id,
+      planDay: plan.day,
+      taskId,
+      launchToken: "",
+      verseId: "",
+      previewScope: safePreviewScope,
+      awaitingVerse: true
+    };
+    go(Screen.NEW_VERSE_PICKER);
+    return true;
+  }
+
+  const started = engine.beginTask(
+    state,
+    {
+      planId: plan.id,
+      taskId,
+      preserveAcrossDay: true,
+      now: new Date()
+    }
+  );
+
+  if (!started.launchToken) {
+    return false;
+  }
+
+  if (
+    started.changed &&
+    !saveDailyNewPetMissionRuntime(
+      runtime,
+      started.state
+    )
+  ) {
+    return false;
+  }
+
+  State.dailyNewPetMissionContext = {
+    source: "daily_new_pet",
+    profileId,
+    planId: plan.id,
+    planDay: plan.day,
+    taskId,
+    launchToken:
+      started.launchToken,
+    verseId: plan.verseId,
+    previewScope: safePreviewScope,
+    awaitingVerse: false
+  };
+
+  const alreadyLearned =
+    getVerseProgress(
+      plan.verseId
+    )?.learnCompleted === true;
+
+  return startLearningNewVerse(
+    plan.verseId,
+    {
+      resumeAtFinalAction:
+        openAtFinalAction ||
+        alreadyLearned
+    }
+  );
+}
+
+async function selectDailyNewPetMissionVerse(
+  verseId
+) {
+  const context =
+    getDailyNewPetMissionContext();
+  const safeVerseId = String(
+    verseId || ""
+  ).trim();
+
+  if (
+    context?.source !== "daily_new_pet" ||
+    !context.awaitingVerse ||
+    !safeVerseId ||
+    getVerseProgress(safeVerseId)
+      ?.learnCompleted === true
+  ) {
+    return false;
+  }
+
+  const runtime =
+    loadDailyNewPetMissionRuntime(
+      context.previewScope
+    );
+  const selected = runtime?.engine
+    ?.selectNewPetMissionVerse?.(
+      runtime.state,
+      {
+        planId: context.planId,
+        verseId: safeVerseId
+      }
+    );
+
+  if (
+    !selected?.changed ||
+    !saveDailyNewPetMissionRuntime(
+      runtime,
+      selected.state
+    )
+  ) {
+    return false;
+  }
+
+  return startDailyNewPetLearn(
+    selected.state.activePlan,
+    {
+      previewScope:
+        context.previewScope
+    }
+  );
+}
+
+function completeDailyNewPetLearn() {
+  const context =
+    getDailyNewPetMissionContext();
+
+  if (
+    context?.source !== "daily_new_pet" ||
+    context.awaitingVerse ||
+    !context.verseId ||
+    !context.launchToken
+  ) {
+    return false;
+  }
+
+  const runtime =
+    loadDailyNewPetMissionRuntime(
+      context.previewScope
+    );
+  const profileId =
+    getProfileApi()
+      ?.getActiveProfileId?.() || "";
+  const plan = runtime?.state
+    ?.activePlan;
+  const task = plan?.tasks
+    ?.[context.taskId];
+  const runningStatus =
+    runtime?.engine?.TASK_STATUSES
+      ?.RUNNING || "running";
+
+  if (
+    !runtime ||
+    !profileId ||
+    context.profileId !== profileId ||
+    plan?.id !== context.planId ||
+    plan?.verseId !== context.verseId ||
+    task?.status !== runningStatus ||
+    task.launchToken !==
+      context.launchToken ||
+    getVerseProgress(context.verseId)
+      ?.learnCompleted !== true
+  ) {
+    return false;
+  }
+
+  const pendingData =
+    window.BibloZooDailyTodoUI
+      ?.createPendingCompletionData?.({
+        planId: plan.id,
+        taskId: context.taskId,
+        source: "new_pet_learn",
+        thankYouKey: "learn",
+        extra: {
+          verseId: context.verseId
+        }
+      });
+  const pending =
+    runtime.engine.setPendingCompletion(
+      runtime.state,
+      {
+        planId: plan.id,
+        taskId: context.taskId,
+        launchToken:
+          context.launchToken,
+        pendingData,
+        now: new Date()
+      }
+    );
+
+  if (
+    !pending.changed ||
+    !saveDailyNewPetMissionRuntime(
+      runtime,
+      pending.state
+    )
+  ) {
+    return false;
+  }
+
+  State.dailyNewPetMissionContext = null;
+  returnToDailyTodoWithTransition(
+    context.previewScope ===
+      "new_pet_test"
+      ? "new_pet_test"
+      : "actual"
+  );
+  return true;
 }
 
 function returnToDailyTodoWithTransition(
@@ -8984,6 +9338,7 @@ const State = {
   activeTodo: null,
   pendingZooTodoGameId: "",
   dailySnackSession: null,
+  dailyNewPetMissionContext: null,
   dailyHomeOfferKey: "",
   dailyHomeOfferGreetingKey: "",
   dailyHomeOfferGreeting: "",
@@ -10047,7 +10402,17 @@ function resetLearn(goTitle = false) {
   stopFireworks();
 
   cancelLearnAudio();
-  if (goTitle) go(Screen.TITLE);
+  if (goTitle) {
+    if (
+      getDailyNewPetMissionContext()
+        ?.source === "daily_new_pet"
+    ) {
+      returnFromDailyNewPetLearn();
+      return;
+    }
+
+    go(Screen.TITLE);
+  }
   render();
 }
 
@@ -12596,6 +12961,7 @@ function clearTransientStateForProfileActivation() {
   State.pendingZooTodoGameId = "";
   State.todoTutorialPage = 1;
   State.dailySnackSession = null;
+  State.dailyNewPetMissionContext = null;
   clearDailyHomeOfferPresentation();
   State.todoTutorialJustFinishedLearn = false;
   State.tutorialPracticeMode = false;
@@ -13707,6 +14073,11 @@ function screenTitle(idx) {
     getDailyHomePlanView(
       dailyHomePlan
     );
+  const dailyHomeIsNewPetMission =
+    dailyHomePlan?.kind ===
+    (window.BibloZooDailyTodo
+      ?.PLAN_KINDS?.NEW_PET ||
+      "new_pet");
   const dailyOfferKey =
     getDailyHomeOfferKey(
       dailyHomePlan
@@ -13777,7 +14148,9 @@ function screenTitle(idx) {
       `
       : "";
   const dailyPetName = dailyHomePlan
-    ? getBibloPetDisplayNameForVerseId(
+    ? dailyHomeIsNewPetMission
+      ? ""
+      : getBibloPetDisplayNameForVerseId(
         dailyHomePlan.verseId
       )
     : "";
@@ -13799,14 +14172,23 @@ function screenTitle(idx) {
             draggable="false"
           >
 
-          ${profilePictureVisualHtml(
-            dailyHomePlan.verseId,
-            {
-              className:
-                "daily-home-offer-pet-profile",
-              alt: ""
-            }
-          )}
+          ${
+            dailyHomeIsNewPetMission
+              ? `
+                <div
+                  class="daily-home-offer-mission-symbol"
+                  aria-hidden="true"
+                >?</div>
+              `
+              : profilePictureVisualHtml(
+                  dailyHomePlan.verseId,
+                  {
+                    className:
+                      "daily-home-offer-pet-profile",
+                    alt: ""
+                  }
+                )
+          }
 
           <div
             class="daily-home-offer-title"
@@ -13825,7 +14207,11 @@ function screenTitle(idx) {
             class="daily-home-offer-copy"
             id="dailyHomeOfferCopy"
           >
-            ${escapeHtml(dailyPetName)} wants to play!
+            ${
+              dailyHomeIsNewPetMission
+                ? "A new BibloPet mission is ready!"
+                : `${escapeHtml(dailyPetName)} wants to play!`
+            }
           </div>
 
           <div class="daily-home-offer-actions">
@@ -15481,6 +15867,381 @@ function screenTitle(idx) {
       bindGeneratedQuestionAudio();
     }
 
+    const getNewPetMissionPreviewVerseId = ({
+      learned = false
+    } = {}) => {
+      const progress = loadProgress();
+      const matches = VERSE_LIST.filter(
+        (verse) => {
+          const completed =
+            progress?.verses?.[verse?.id]
+              ?.learnCompleted === true;
+
+          return learned
+            ? completed
+            : !completed;
+        }
+      );
+
+      return String(
+        matches[0]?.id || ""
+      ).trim();
+    };
+
+    const createNewPetMissionTestState = (
+      scenario
+    ) => {
+      const engine =
+        window.BibloZooDailyTodo;
+      const ui =
+        window.BibloZooDailyTodoUI;
+      const profileId =
+        getProfileApi()
+          ?.getActiveProfileId?.() || "";
+      const useLearnedVerse =
+        scenario === "finished";
+      const verseId =
+        scenario === "eligible"
+          ? ""
+          : getNewPetMissionPreviewVerseId({
+              learned: useLearnedVerse
+            });
+
+      if (
+        !engine?.createNewPetMissionPlan ||
+        !ui?.saveNewPetTestState ||
+        !profileId ||
+        (scenario !== "eligible" &&
+          !verseId)
+      ) {
+        return null;
+      }
+
+      const now = new Date();
+      const plan =
+        engine.createNewPetMissionPlan({
+          profileId,
+          day:
+            scenario === "midnight"
+              ? engine.shiftLocalDayKey(
+                  engine.localDayKey(now),
+                  -1
+                )
+              : engine.localDayKey(now),
+          gameRegistry:
+            window.EXTERNAL_VERSE_GAMES || [],
+          now,
+          random: () => 0,
+          idFactory: () =>
+            `new-pet-preview-${Date.now().toString(36)}`
+        });
+
+      if (!plan) return null;
+
+      let state = engine.normalizeState({
+        ...engine.normalizeState(
+          loadProgress()?.dailyZooTodo
+        ),
+        activePlan: plan
+      });
+
+      if (verseId) {
+        const selected =
+          engine.selectNewPetMissionVerse(
+            state,
+            {
+              planId: plan.id,
+              verseId
+            }
+          );
+
+        if (!selected.changed) return null;
+        state = selected.state;
+      }
+
+      const learnTaskId =
+        engine.TASK_IDS?.LEARN ||
+        "learn";
+
+      if (
+        [
+          "learning",
+          "finished",
+          "pending",
+          "confirmed"
+        ].includes(scenario)
+      ) {
+        const started = engine.beginTask(
+          state,
+          {
+            planId: plan.id,
+            taskId: learnTaskId,
+            preserveAcrossDay: true,
+            now,
+            random: () => 0.314159
+          }
+        );
+
+        if (!started.launchToken) return null;
+        state = started.state;
+
+        if (
+          scenario === "pending" ||
+          scenario === "confirmed"
+        ) {
+          const pending =
+            engine.setPendingCompletion(
+              state,
+              {
+                planId: plan.id,
+                taskId: learnTaskId,
+                launchToken:
+                  started.launchToken,
+                pendingData:
+                  ui.createPendingCompletionData({
+                    planId: plan.id,
+                    taskId: learnTaskId,
+                    source:
+                      "new_pet_learn",
+                    thankYouKey: "learn",
+                    extra: { verseId }
+                  }),
+                now
+              }
+            );
+
+          if (!pending.changed) return null;
+          state = pending.state;
+
+          if (scenario === "confirmed") {
+            const confirmed =
+              engine.confirmPendingCompletion(
+                state,
+                {
+                  planId: plan.id,
+                  taskId: learnTaskId,
+                  now
+                }
+              );
+
+            if (!confirmed.taskCompleted) {
+              return null;
+            }
+            state = confirmed.state;
+          }
+        }
+      }
+
+      return ui.saveNewPetTestState(state)
+        ? state
+        : null;
+    };
+
+    const openNewPetMissionPreview = async (
+      scenario
+    ) => {
+      const state =
+        createNewPetMissionTestState(
+          scenario
+        );
+
+      if (!state) {
+        showDialog({
+          title: "Mission Preview Unavailable",
+          body:
+            scenario === "finished"
+              ? "Learn at least one published verse before testing the finished-Learn action."
+              : "This scenario needs an unlearned published verse and at least one enabled standard Game.",
+          actions: [
+            dlgBtn("Back", {
+              onClick:
+                showNewPetMissionPreviewDialog
+            })
+          ]
+        });
+        return;
+      }
+
+      closeDialog();
+
+      if (
+        scenario === "learning" ||
+        scenario === "finished"
+      ) {
+        const launched =
+          await startDailyNewPetLearn(
+            state.activePlan,
+            {
+              previewScope:
+                "new_pet_test",
+              openAtFinalAction:
+                scenario === "finished"
+            }
+          );
+
+        if (!launched) {
+          showDialog({
+            title: "Mission Learn Unavailable",
+            body:
+              "The isolated mission could not open its Learn flow.",
+            actions: [
+              dlgBtn("OK", {
+                onClick: closeDialog
+              })
+            ]
+          });
+        }
+        return;
+      }
+
+      setDailyTodoPreviewMode(
+        "new_pet_test"
+      );
+      transitionToAppScreen(
+        Screen.TODO_DEV
+      );
+    };
+
+    const showNewPetMissionReadiness = () => {
+      const engine =
+        window.BibloZooDailyTodo;
+      const readiness =
+        engine?.getNewPetMissionReadiness?.({
+          progress: loadProgress(),
+          verseList: VERSE_LIST,
+          gameRegistry:
+            window.EXTERNAL_VERSE_GAMES || [],
+          playgroundRegistry:
+            window.EXTERNAL_VERSE_PLAYGROUND || [],
+          isPetUnlocked:
+            isBibloPetUnlocked,
+          tutorialActive:
+            isTutorialActive(),
+          now: new Date()
+        });
+      const reasonLabels = {
+        ready: "Eligible",
+        no_published_verses:
+          "No published verses are available",
+        no_unlearned_verses:
+          "No unlearned published verses remain",
+        tutorial_active:
+          "The first-pet tutorial is active",
+        mission_active:
+          "Another New BibloPet mission is active",
+        first_pet_pending:
+          "A learned verse still needs its first BibloPet",
+        no_learned_verse:
+          "No verse has been learned yet",
+        missing_learned_date:
+          "The latest learned verse has no usable date",
+        too_new:
+          "The latest learned verse is not three local days old",
+        more_accomplishments_needed:
+          "More distinct accomplishments are needed"
+      };
+
+      showDialog({
+        title: readiness?.eligible
+          ? "Mission Is Eligible"
+          : "Mission Not Eligible",
+        bodyHtml: `
+          <div class="daily-preview-summary">
+            <p>${escapeHtml(
+              reasonLabels[readiness?.reason] ||
+              "Readiness could not be calculated"
+            )}</p>
+            <p>
+              Age: ${escapeHtml(
+                readiness?.ageDays ?? "—"
+              )} local days<br>
+              Accomplishments: ${escapeHtml(
+                readiness?.accomplishmentCount ?? 0
+              )} of ${escapeHtml(
+                readiness?.requiredAccomplishments ?? 5
+              )}<br>
+              Memorized: ${
+                readiness?.memorized
+                  ? "Yes"
+                  : "No"
+              }
+            </p>
+            <p>
+              Automatic mission creation remains disabled until Patch 10.
+            </p>
+          </div>
+        `,
+        actions: [
+          dlgBtn("Back", {
+            onClick:
+              showNewPetMissionPreviewDialog
+          })
+        ]
+      });
+    };
+
+    function showNewPetMissionPreviewDialog() {
+      showDialog({
+        title: "New BibloPet Mission",
+        body:
+          "Choose a readiness or two-task mission state to test.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          dlgBtn("Not Eligible / Readiness", {
+            onClick:
+              showNewPetMissionReadiness
+          }),
+          dlgBtn("Eligible — No Verse", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "eligible"
+              )
+          }),
+          dlgBtn("Verse Selected", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "selected"
+              )
+          }),
+          dlgBtn("Learning in Progress", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "learning"
+              )
+          }),
+          dlgBtn("Learn Successfully Finished", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "finished"
+              )
+          }),
+          dlgBtn("Learn Pending Confirmation", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "pending"
+              )
+          }),
+          dlgBtn("Learn Confirmed — Game Ready", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "confirmed"
+              )
+          }),
+          dlgBtn("Carried Across Midnight", {
+            onClick: () =>
+              openNewPetMissionPreview(
+                "midnight"
+              )
+          }),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: showDailyPreviewDialog
+          })
+        ]
+      });
+    }
+
     registerDailyTodoPreviewMenuEntry({
       id: "actual",
       label: "Actual Today",
@@ -15513,7 +16274,7 @@ function screenTitle(idx) {
     registerDailyTodoPreviewMenuEntry({
       id: "games",
       label: "Game Tester",
-      order: 60,
+      order: 70,
       onSelect: showDailyGameTesterDialog
     });
     registerDailyTodoPreviewMenuEntry({
@@ -15526,9 +16287,16 @@ function screenTitle(idx) {
     registerDailyTodoPreviewMenuEntry({
       id: "playground",
       label: "Playground Tester",
-      order: 70,
+      order: 80,
       onSelect:
         showDailyPlaygroundTesterDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "new_pet",
+      label: "New BibloPet Mission Preview",
+      order: 60,
+      onSelect:
+        showNewPetMissionPreviewDialog
     });
 
     titleTodoBtn.onclick = (e) => {
@@ -17143,7 +17911,10 @@ window.addEventListener("resize", () => {
 
 function newVersePickerCardHtml(
   item,
-  { changeVerseMode = false } = {}
+  {
+    changeVerseMode = false,
+    hideFuturePet = false
+  } = {}
 ) {
   const verseId = item?.id || "";
   const ref = item?.ref || verseId;
@@ -17175,7 +17946,11 @@ function newVersePickerCardHtml(
       }
 
       <div class="new-verse-card-pet" aria-hidden="true">
-        ${bibloPetVisualHtml(verseId, petEmoji)}
+        ${
+          hideFuturePet
+            ? '<span class="new-verse-card-mission-paw">🐾</span>'
+            : bibloPetVisualHtml(verseId, petEmoji)
+        }
       </div>
 
       <div
@@ -17218,8 +17993,13 @@ async function selectVerseAndReturnHome(verseId) {
   }
 }
 
-async function startLearningNewVerse(verseId) {
-  if (!verseId) return;
+async function startLearningNewVerse(
+  verseId,
+  {
+    resumeAtFinalAction = false
+  } = {}
+) {
+  if (!verseId) return false;
 
   if (isTutorialActive()) {
     State.todoTutorialPage = 3;
@@ -17241,7 +18021,15 @@ async function startLearningNewVerse(verseId) {
     HAS_VERSE_SELECTION = true;
 
     resetLearn(false);
-    startLearnInstruction("listen");
+    if (resumeAtFinalAction) {
+      State.hasLearnedVerse = true;
+      State.finalRecallDone = true;
+      State.finalRecallRevealed = true;
+      go(Screen.FINAL_RECALL);
+    } else {
+      startLearnInstruction("listen");
+    }
+    return true;
   } catch (err) {
     console.error(err);
 
@@ -17250,6 +18038,7 @@ async function startLearningNewVerse(verseId) {
       body: `Could not load ${DATA_DIR}${verseId}.json`,
       actions: [dlgBtn("OK", { onClick: closeDialog })]
     });
+    return false;
   }
 }
 
@@ -17544,6 +18333,12 @@ function screenNewVersePicker(idx) {
     new URLSearchParams(
       window.location.search
     ).get("changeVerse") === "1";
+  const missionContext =
+    getDailyNewPetMissionContext();
+  const missionPicker =
+    missionContext?.source ===
+      "daily_new_pet" &&
+    missionContext.awaitingVerse === true;
 
   const verseItems = changeVerseMode
     ? (Array.isArray(VERSE_LIST) ? VERSE_LIST : [])
@@ -17552,14 +18347,24 @@ function screenNewVersePicker(idx) {
   const cardsHtml = verseItems.length
     ? `
       <div class="practice-pick-heading">
-        ${changeVerseMode ? "Choose a Verse" : "Choose a New Verse"}
+        ${
+          changeVerseMode
+            ? "Choose a Verse"
+            : missionPicker
+              ? "Choose an Unlearned Verse"
+              : "Choose a New Verse"
+        }
       </div>
 
       <div class="new-verse-grid">
         ${verseItems.map((item) =>
           newVersePickerCardHtml(
             item,
-            { changeVerseMode }
+            {
+              changeVerseMode,
+              hideFuturePet:
+                missionPicker
+            }
           )
         ).join("")}
       </div>
@@ -17576,7 +18381,13 @@ function screenNewVersePicker(idx) {
       <div class="practice-title-row">
         ${homePillHtml()}
         <h2 id="newVersePickerTitle">
-          ${changeVerseMode ? "Change Verse" : "New Verse"}
+          ${
+            changeVerseMode
+              ? "Change Verse"
+              : missionPicker
+                ? "Choose Your Mission Verse"
+                : "New Verse"
+          }
         </h2>
         <div class="practice-title-spacer" aria-hidden="true"></div>
       </div>
@@ -17602,6 +18413,27 @@ function screenNewVersePicker(idx) {
 
       if (changeVerseMode) {
         await selectVerseAndReturnHome(verseId);
+        return;
+      }
+
+      if (missionPicker) {
+        const started =
+          await selectDailyNewPetMissionVerse(
+            verseId
+          );
+
+        if (!started) {
+          showDialog({
+            title: "Verse Unavailable",
+            body:
+              "That verse could not be saved to this mission. Return to the mission and try again.",
+            actions: [
+              dlgBtn("OK", {
+                onClick: closeDialog
+              })
+            ]
+          });
+        }
         return;
       }
 
@@ -17778,7 +18610,8 @@ function screenTodoDev(idx) {
           "game_test",
           "playground_test",
           "read_test",
-          "questions_test"
+          "questions_test",
+          "new_pet_test"
         ]
           .includes(dailyPreviewMode)
           ? (
@@ -17792,6 +18625,11 @@ function screenTodoDev(idx) {
                       ?.getQuestionsTestPlan?.(
                         dailyTodoApi
                       ) || null
+                  : dailyPreviewMode === "new_pet_test"
+                    ? dailyTodoUi
+                        ?.getNewPetTestPlan?.(
+                          dailyTodoApi
+                        ) || null
                   : dailyPreviewMode === "playground_test"
                     ? dailyTodoUi
                         ?.getPlaygroundTestPlan?.(
@@ -17949,7 +18787,8 @@ function screenTodoDev(idx) {
     [
       "actual",
       "read_test",
-      "questions_test"
+      "questions_test",
+      "new_pet_test"
     ].includes(
       dailyPreviewMode
     ) &&
@@ -17974,6 +18813,8 @@ function screenTodoDev(idx) {
       );
 
     if (
+      dailyPreviewMode !==
+        "new_pet_test" &&
       dailyPreviewMode !==
         "questions_test" &&
       flashcardRow &&
@@ -18024,6 +18865,7 @@ function screenTodoDev(idx) {
 
     if (
       dailyPreviewMode !== "read_test" &&
+      dailyPreviewMode !== "new_pet_test" &&
       questionsRow &&
       launchableStatuses.includes(
         questionsTask?.status
@@ -18043,6 +18885,111 @@ function screenTodoDev(idx) {
                 : ""
           }
         );
+      };
+    }
+
+    const learnTaskId =
+      engine?.TASK_IDS?.LEARN ||
+      "learn";
+    const learnTask =
+      dailyPreviewPlan.tasks
+        ?.[learnTaskId];
+    const learnRow =
+      wrap.querySelector(
+        `.daily-zoo-todo-row[data-daily-todo-preview-task="${learnTaskId}"]`
+      );
+
+    if (
+      learnRow &&
+      launchableStatuses.includes(
+        learnTask?.status
+      )
+    ) {
+      learnRow.onclick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const launched =
+          await startDailyNewPetLearn(
+            dailyPreviewPlan,
+            {
+              previewScope:
+                dailyPreviewMode ===
+                  "new_pet_test"
+                  ? "new_pet_test"
+                  : ""
+            }
+          );
+
+        if (!launched) {
+          showDialog({
+            title: "Learn Task Unavailable",
+            body:
+              "This mission could not start or resume its Learn task.",
+            actions: [
+              dlgBtn("OK", {
+                onClick: closeDialog
+              })
+            ]
+          });
+        }
+      };
+    }
+
+    const activityTaskId =
+      engine?.TASK_IDS?.ACTIVITY ||
+      "activity";
+    const activityTask =
+      dailyPreviewPlan.tasks
+        ?.[activityTaskId];
+    const activityRow =
+      wrap.querySelector(
+        `.daily-zoo-todo-row[data-daily-todo-preview-task="${activityTaskId}"]`
+      );
+
+    if (
+      dailyPreviewPlan.kind ===
+        (engine?.PLAN_KINDS?.NEW_PET ||
+          "new_pet") &&
+      activityRow &&
+      launchableStatuses.includes(
+        activityTask?.status
+      )
+    ) {
+      activityRow.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const latestRuntime =
+          loadDailyNewPetMissionRuntime(
+            dailyPreviewMode ===
+              "new_pet_test"
+              ? "new_pet_test"
+              : ""
+          );
+        const latestLearnStatus =
+          latestRuntime?.state
+            ?.activePlan?.tasks
+            ?.[learnTaskId]?.status;
+
+        if (
+          latestLearnStatus !==
+          (engine?.TASK_STATUSES
+            ?.COMPLETE || "complete")
+        ) {
+          return;
+        }
+
+        showDialog({
+          title: "Game Ready",
+          body:
+            "The assigned Easy game is ready. Patch 10 will connect this button to the game and BibloPet unlock flow.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
       };
     }
 
@@ -19771,6 +20718,30 @@ function screenFinalRecall(idx) {
   const btnFinalGames = inner.querySelector("#btnFinalGames");
   if (btnFinalGames) {
     btnFinalGames.onclick = () => {
+      if (
+        getDailyNewPetMissionContext()
+          ?.source === "daily_new_pet"
+      ) {
+        if (completeDailyNewPetLearn()) {
+          return;
+        }
+
+        showDialog({
+          title: "Mission Could Not Finish",
+          body:
+            "Your verse progress is safe. Return to the mission and try Continue Learning again.",
+          actions: [
+            dlgBtn("Return to Mission", {
+              onClick: () => {
+                closeDialog();
+                returnFromDailyNewPetLearn();
+              }
+            })
+          ]
+        });
+        return;
+      }
+
       if (isTutorialActive()) {
         State.hasLearnedVerse = true;
 

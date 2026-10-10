@@ -16,6 +16,13 @@
   const RECENT_ASSIGNMENT_HISTORY_LIMIT = 40;
   const RECENT_QUESTION_TYPE_HISTORY_LIMIT = 6;
   const LEGACY_FLASHCARD_TASK_ID = "flashcard";
+  const NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED = false;
+  const NEW_PET_MISSION_RULES = Object.freeze({
+    minimumAgeDays: 3,
+    normalAccomplishments: 5,
+    relaxedAgeDays: 7,
+    relaxedAccomplishments: 3
+  });
 
   const PLAN_KINDS = Object.freeze({
     CARE: "care",
@@ -928,6 +935,278 @@
     return Math.round((toUtc - fromUtc) / 86400000);
   }
 
+  function isCompletedPlaygroundProgress(value) {
+    return value === true ||
+      (isPlainObject(value) && value.completed === true);
+  }
+
+  function hasAnyGameCompletion(verseProgress) {
+    const games = isPlainObject(verseProgress?.games)
+      ? verseProgress.games
+      : {};
+
+    return Object.values(games).some((gameProgress) =>
+      isPlainObject(gameProgress) &&
+      (
+        gameProgress.easyCompleted === true ||
+        gameProgress.mediumCompleted === true ||
+        gameProgress.hardCompleted === true ||
+        gameProgress.roadCompleted === true ||
+        gameProgress.trailCompleted === true ||
+        gameProgress.riverCompleted === true
+      )
+    );
+  }
+
+  function defaultPetUnlocked(verseProgress) {
+    return verseProgress?.learnCompleted === true &&
+      hasAnyGameCompletion(verseProgress);
+  }
+
+  function getPublishedVerseIds(verseList = []) {
+    return Array.isArray(verseList)
+      ? verseList
+          .map(getVerseId)
+          .filter(Boolean)
+      : [];
+  }
+
+  function getLearnedAt(verseProgress) {
+    return toTimestamp(
+      verseProgress?.learnedAt ||
+      verseProgress?.lastPracticedAt
+    );
+  }
+
+  function findMostRecentlyLearnedVerse({
+    progress = {},
+    verseList = []
+  } = {}) {
+    const verses = isPlainObject(progress?.verses)
+      ? progress.verses
+      : {};
+    let selected = null;
+
+    getPublishedVerseIds(verseList)
+      .forEach((verseId) => {
+        const verseProgress = isPlainObject(verses[verseId])
+          ? verses[verseId]
+          : null;
+
+        if (!verseProgress?.learnCompleted) return;
+
+        const learnedAt = getLearnedAt(verseProgress);
+        if (
+          !selected ||
+          learnedAt > selected.learnedAt
+        ) {
+          selected = {
+            verseId,
+            verseProgress,
+            learnedAt
+          };
+        }
+      });
+
+    return selected;
+  }
+
+  function getNewPetAccomplishments({
+    verseProgress = {},
+    gameRegistry = [],
+    playgroundRegistry = []
+  } = {}) {
+    const accomplishments = [];
+    const games = isPlainObject(verseProgress?.games)
+      ? verseProgress.games
+      : {};
+    const registeredGameIds = new Set(
+      buildActivityPool(gameRegistry, [])
+        .filter((activity) =>
+          activity.kind === ACTIVITY_KINDS.GAME
+        )
+        .map((activity) => activity.id)
+    );
+    const gameEntries = registeredGameIds.size
+      ? [...registeredGameIds].map((gameId) =>
+          games[gameId]
+        )
+      : Object.values(games);
+
+    GAME_MODE_ORDER.forEach((mode) => {
+      if (
+        gameEntries.some((gameProgress) =>
+          isGameModeComplete(gameProgress, mode)
+        )
+      ) {
+        accomplishments.push(`game:${mode}`);
+      }
+    });
+
+    const playground = isPlainObject(
+      verseProgress?.playground
+    )
+      ? verseProgress.playground
+      : {};
+    const registeredPlaygroundIds = buildActivityPool(
+      [],
+      playgroundRegistry
+    )
+      .filter((activity) =>
+        activity.kind === ACTIVITY_KINDS.PLAYGROUND
+      )
+      .map((activity) => activity.id);
+    const playgroundIds = registeredPlaygroundIds.length
+      ? registeredPlaygroundIds
+      : Object.keys(playground);
+
+    playgroundIds.forEach((activityId) => {
+      if (
+        isCompletedPlaygroundProgress(
+          playground[activityId]
+        )
+      ) {
+        accomplishments.push(
+          `playground:${activityId}`
+        );
+      }
+    });
+
+    return accomplishments;
+  }
+
+  function getNewPetMissionReadiness({
+    progress = {},
+    verseList = [],
+    gameRegistry = [],
+    playgroundRegistry = [],
+    isPetUnlocked = defaultPetUnlocked,
+    tutorialActive = false,
+    now = new Date()
+  } = {}) {
+    const publishedVerseIds =
+      getPublishedVerseIds(verseList);
+    const verses = isPlainObject(progress?.verses)
+      ? progress.verses
+      : {};
+    const state = normalizeState(
+      progress?.dailyZooTodo
+    );
+    const unlearnedVerseIds = publishedVerseIds
+      .filter((verseId) =>
+        verses[verseId]?.learnCompleted !== true
+      );
+    const learnedVerseIds = publishedVerseIds
+      .filter((verseId) =>
+        verses[verseId]?.learnCompleted === true
+      );
+    const pendingFirstPetVerseIds = learnedVerseIds
+      .filter((verseId) => {
+        const verseProgress = verses[verseId] || {};
+
+        try {
+          return !isPetUnlocked(
+            verseProgress,
+            verseId
+          );
+        } catch (err) {
+          return !defaultPetUnlocked(
+            verseProgress
+          );
+        }
+      });
+    const mostRecent =
+      findMostRecentlyLearnedVerse({
+        progress,
+        verseList
+      });
+    const currentDay = localDayKey(now);
+    const learnedDay = mostRecent?.learnedAt
+      ? localDayKey(
+          new Date(mostRecent.learnedAt)
+        )
+      : "";
+    const ageDays = learnedDay
+      ? dayDifference(learnedDay, currentDay)
+      : null;
+    const accomplishments = mostRecent
+      ? getNewPetAccomplishments({
+          verseProgress:
+            mostRecent.verseProgress,
+          gameRegistry,
+          playgroundRegistry
+        })
+      : [];
+    const memorized =
+      mostRecent?.verseProgress
+        ?.flashcards?.bestMemoryLevel ===
+      "memorized";
+    const activeMission =
+      state.activePlan?.kind ===
+      PLAN_KINDS.NEW_PET;
+    let requiredAccomplishments =
+      NEW_PET_MISSION_RULES
+        .normalAccomplishments;
+
+    if (
+      Number.isInteger(ageDays) &&
+      ageDays >=
+        NEW_PET_MISSION_RULES
+          .relaxedAgeDays
+    ) {
+      requiredAccomplishments =
+        NEW_PET_MISSION_RULES
+          .relaxedAccomplishments;
+    }
+
+    let reason = "ready";
+
+    if (!publishedVerseIds.length) {
+      reason = "no_published_verses";
+    } else if (!unlearnedVerseIds.length) {
+      reason = "no_unlearned_verses";
+    } else if (tutorialActive) {
+      reason = "tutorial_active";
+    } else if (activeMission) {
+      reason = "mission_active";
+    } else if (pendingFirstPetVerseIds.length) {
+      reason = "first_pet_pending";
+    } else if (!mostRecent) {
+      reason = "no_learned_verse";
+    } else if (!mostRecent.learnedAt) {
+      reason = "missing_learned_date";
+    } else if (
+      ageDays === null ||
+      ageDays <
+        NEW_PET_MISSION_RULES.minimumAgeDays
+    ) {
+      reason = "too_new";
+    } else if (
+      !memorized &&
+      accomplishments.length <
+        requiredAccomplishments
+    ) {
+      reason = "more_accomplishments_needed";
+    }
+
+    return {
+      eligible: reason === "ready",
+      reason,
+      mostRecentVerseId:
+        mostRecent?.verseId || "",
+      learnedDay,
+      ageDays,
+      accomplishmentCount:
+        accomplishments.length,
+      accomplishments,
+      requiredAccomplishments,
+      memorized,
+      unlearnedVerseIds,
+      pendingFirstPetVerseIds,
+      activeMission
+    };
+  }
+
   function getVerseId(item) {
     if (typeof item === "string") return cleanString(item);
     return cleanString(item?.id || item?.verseId);
@@ -1320,6 +1599,87 @@
           : null,
       rolloverHold: null
     };
+  }
+
+  function createNewPetMissionPlan({
+    profileId = "",
+    day = localDayKey(),
+    gameRegistry = [],
+    now = new Date(),
+    random = Math.random,
+    idFactory = null
+  } = {}) {
+    const games = buildActivityPool(
+      gameRegistry,
+      []
+    ).filter((activity) =>
+      activity.kind === ACTIVITY_KINDS.GAME &&
+      getGameModes(activity).includes("easy")
+    );
+    const selected = games[
+      randomIndex(games.length, random)
+    ];
+
+    if (!selected) return null;
+
+    return createPlan({
+      kind: PLAN_KINDS.NEW_PET,
+      profileId,
+      day,
+      verseId: "",
+      requiredTaskIds:
+        DEFAULT_REQUIRED_TASK_IDS[
+          PLAN_KINDS.NEW_PET
+        ],
+      activity: {
+        kind: ACTIVITY_KINDS.GAME,
+        id: selected.id,
+        mode: "easy"
+      },
+      now,
+      random,
+      idFactory
+    });
+  }
+
+  function selectNewPetMissionVerse(
+    rawState,
+    {
+      planId = "",
+      verseId = ""
+    } = {}
+  ) {
+    const state = normalizeState(rawState);
+    const plan = state.activePlan;
+    const safeVerseId = cleanString(verseId);
+
+    if (
+      !plan ||
+      plan.id !== cleanString(planId) ||
+      plan.kind !== PLAN_KINDS.NEW_PET ||
+      !safeVerseId ||
+      (plan.verseId &&
+        plan.verseId !== safeVerseId)
+    ) {
+      return { state, changed: false };
+    }
+
+    if (plan.verseId === safeVerseId) {
+      return { state, changed: false };
+    }
+
+    const learnTask =
+      plan.tasks?.[TASK_IDS.LEARN];
+
+    if (
+      !learnTask ||
+      learnTask.status !== TASK_STATUSES.OPEN
+    ) {
+      return { state, changed: false };
+    }
+
+    plan.verseId = safeVerseId;
+    return { state, changed: true };
   }
 
   function pruneRecentAssignments(assignments, currentDay) {
@@ -1797,6 +2157,14 @@
   }
 
   function shouldPreserveOldPlan(plan) {
+    if (
+      plan?.kind === PLAN_KINDS.NEW_PET &&
+      cleanString(plan.verseId) &&
+      plan.educationalCompletedAt <= 0
+    ) {
+      return true;
+    }
+
     return !!normalizeRolloverHold(
       plan?.rolloverHold,
       plan
@@ -2330,6 +2698,8 @@
   return Object.freeze({
     STATE_VERSION,
     RECENT_ASSIGNMENT_DAYS,
+    NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED,
+    NEW_PET_MISSION_RULES,
     STREAK_BADGE_THRESHOLDS,
     TASK_BADGE_THRESHOLDS,
     BADGE_DEFINITIONS,
@@ -2357,6 +2727,10 @@
     chooseGameMode,
     choosePlaygroundMode,
     chooseActivityAssignment,
+    getNewPetAccomplishments,
+    getNewPetMissionReadiness,
+    createNewPetMissionPlan,
+    selectNewPetMissionVerse,
     getOrCreatePlan,
     getOrCreatePersistedPlan,
     getStatsForDay,
