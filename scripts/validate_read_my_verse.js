@@ -1075,6 +1075,27 @@ function testBalloonFloatingAndParticles() {
   assert.ok(styles.includes("@keyframes readBalloonWordSway"));
 }
 
+function testBalloonSafeSpawning() {
+  const sceneHeight = 600;
+  const base = { kind: "balloon", width: 52, height: 70, sway: 16,
+    sceneHeight, viewportHeight: 780, startY: 600, startMs: 1000,
+    durationMs: 12000 };
+  const first = ReadMyVerse.chooseReadBalloonSpawn(base, 360, [], [], () => 0);
+  assert.ok(first);
+  assert.ok(first.x >= 30 && first.x + first.width + 16 <= 360);
+  assert.ok(ReadMyVerse.readBalloonPathsOverlap(first, first));
+  const duplicate = ReadMyVerse.chooseReadBalloonSpawn(base, 360, [], [first], () => 0);
+  assert.ok(!duplicate || !ReadMyVerse.readBalloonPathsOverlap(first, duplicate));
+  const crowded = { kind: "word", x: 180, width: 360, height: 100,
+    sway: 20, sceneHeight, travel: 600, startMs: 1000, durationMs: 12000 };
+  const chosen = ReadMyVerse.chooseReadBalloonSpawn(base, 360, [crowded], [], () => 0);
+  assert.ok(!chosen || !ReadMyVerse.readBalloonPathsOverlap(chosen, crowded));
+  assert.strictEqual(ReadMyVerse.chooseReadBalloonSpawn(base, 85, [], []), null);
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(source.includes(".read-balloons-screen .read-animated-scene"));
+  assert.ok(source.includes("rotate(2.5deg)"));
+}
+
 function main() {
   const tests = [
     testSafeWordScrambles,
@@ -1090,6 +1111,7 @@ function main() {
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,
     testBalloonFloatingAndParticles,
+    testBalloonSafeSpawning,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
     testTapOrderHintsAndReset,

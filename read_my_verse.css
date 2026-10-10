@@ -1348,6 +1348,11 @@ button.read-unscramble-token.is-solved {
   background-color: #82d7f4;
 }
 
+/* Expand only the Balloons playfield into the stage's horizontal padding. */
+.read-balloons-screen .read-animated-scene {
+  margin-inline: calc(-1 * clamp(16px, 4vw, 54px));
+}
+
 .read-balloon-words,
 .read-fish-words {
   position: absolute;
@@ -1360,16 +1365,11 @@ button.read-unscramble-token.is-solved {
   z-index: 3;
   top: 100%;
   left: calc(50% + var(--read-lane-offset, 0vw));
-  max-width: 84%;
-  border-radius: 999px;
-  padding: 0.18em 0.58em 0.23em;
-  color: #243a49;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 5px 18px rgba(32, 93, 119, 0.24);
+  width: max-content;
+  max-width: calc(100% - 76px);
   font-size: clamp(28px, 7.5vw, 66px);
   font-weight: 800;
   line-height: 1.04;
-  white-space: nowrap;
   opacity: 0;
   transform: translate3d(-50%, 0, 0);
   will-change: transform, opacity;
@@ -1377,11 +1377,20 @@ button.read-unscramble-token.is-solved {
     linear var(--read-word-delay, 0ms) both;
 }
 
-/* Independent slow vertical movement + gentle side-to-side bobbing. */
+/* The whole white pill, including text and shadow, sways and leans together. */
 .read-balloon-word-inner {
   display: block;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: 999px;
+  padding: 0.18em 0.58em 0.23em;
+  color: #243a49;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 5px 18px rgba(32, 93, 119, 0.24);
+  text-align: center;
+  overflow-wrap: anywhere;
   animation: readBalloonWordSway var(--read-sway-duration, 3500ms)
-    ease-in-out var(--read-sway-phase, 0ms) infinite alternate;
+    linear var(--read-sway-phase, 0ms) infinite;
 }
 
 @keyframes readBalloonWordRise {
@@ -1395,9 +1404,15 @@ button.read-unscramble-token.is-solved {
 }
 
 @keyframes readBalloonWordSway {
-  0% { transform: translate3d(-14px, 3px, 0); }
-  45% { transform: translate3d(17px, -4px, 0); }
-  100% { transform: translate3d(-8px, 2px, 0); }
+  0% { transform: translate3d(calc(-1 * var(--read-sway-amplitude, 14px)), 3px, 0) rotate(0deg); }
+  12.5% { transform: translate3d(calc(-0.7 * var(--read-sway-amplitude, 14px)), 0, 0) rotate(2deg); }
+  25% { transform: translate3d(0, -3px, 0) rotate(2.5deg); }
+  37.5% { transform: translate3d(calc(0.7 * var(--read-sway-amplitude, 14px)), -4px, 0) rotate(2deg); }
+  50% { transform: translate3d(var(--read-sway-amplitude, 14px), -3px, 0) rotate(0deg); }
+  62.5% { transform: translate3d(calc(0.7 * var(--read-sway-amplitude, 14px)), 0, 0) rotate(-2deg); }
+  75% { transform: translate3d(0, 3px, 0) rotate(-2.5deg); }
+  87.5% { transform: translate3d(calc(-0.7 * var(--read-sway-amplitude, 14px)), 4px, 0) rotate(-2deg); }
+  100% { transform: translate3d(calc(-1 * var(--read-sway-amplitude, 14px)), 3px, 0) rotate(0deg); }
 }
 
 .read-balloon-reduced-text {

@@ -3347,6 +3347,77 @@
     balloonTimer(session, () => burst.remove(), 700);
   }
 
+  // Predict occupied rectangles as decorations and word pills cross the scene.
+  // A little extra clearance also covers sway, lean and image movement.
+  function readBalloonRectAt(track, timeMs) {
+    const elapsed = timeMs - track.startMs;
+    if (elapsed < 0 || elapsed > track.durationMs) return null;
+    const fraction = Math.min(1, elapsed / track.durationMs);
+    let x = track.x;
+    let y;
+    let width = track.width;
+    let height = track.height;
+    if (track.kind === "word") {
+      y = track.sceneHeight - fraction * track.travel;
+      x -= width / 2;
+      x -= track.sway;
+      width += track.sway * 2;
+    } else {
+      // Match readDecorBalloon's 0%, 35%, 65%, 100% waypoints.
+      const points = [[0, 0], [0.35, -0.52], [0.65, -0.97], [1, -1.45]];
+      let vhOffset = 0;
+      for (let i = 1; i < points.length; i += 1) {
+        if (fraction <= points[i][0]) {
+          const [p0, y0] = points[i - 1];
+          const [p1, y1] = points[i];
+          vhOffset = y0 + (y1 - y0) * (fraction - p0) / (p1 - p0);
+          break;
+        }
+      }
+      y = track.startY + vhOffset * track.viewportHeight;
+      x -= track.sway;
+      width += track.sway * 2;
+    }
+    if (y + height < 0 || y > track.sceneHeight) return null;
+    return { left: x, right: x + width, top: y, bottom: y + height };
+  }
+
+  function readBalloonPathsOverlap(candidate, other, padding = 12) {
+    const start = Math.max(candidate.startMs, other.startMs);
+    const end = Math.min(candidate.startMs + candidate.durationMs,
+      other.startMs + other.durationMs);
+    if (end < start) return false;
+    // Sample repeatedly along the future trajectories, not just at spawn.
+    for (let time = start; time <= end + 180; time += 180) {
+      const a = readBalloonRectAt(candidate, Math.min(time, end));
+      const b = readBalloonRectAt(other, Math.min(time, end));
+      if (a && b && a.left < b.right + padding &&
+          a.right + padding > b.left && a.top < b.bottom + padding &&
+          a.bottom + padding > b.top) return true;
+    }
+    return false;
+  }
+
+  function chooseReadBalloonSpawn(track, sceneWidth, words, balloons, random = Math.random) {
+    const edge = Math.max(18, Math.min(38, sceneWidth * 0.07));
+    const minX = edge + track.sway;
+    const maxX = sceneWidth - edge - track.sway - track.width;
+    if (maxX < minX) return null;
+    // Check left and right lanes first; use center only when genuinely clear.
+    const lanes = [0, 1, 0.1, 0.9, 0.22, 0.78, 0.36, 0.64, 0.5];
+    if (random() < 0.5) lanes.reverse();
+    const active = [...words, ...balloons].filter((item) =>
+      item.startMs + item.durationMs >= track.startMs);
+    for (const lane of lanes) {
+      const x = minX + lane * (maxX - minX);
+      const proposal = { ...track, x };
+      if (active.every((other) => !readBalloonPathsOverlap(proposal, other))) {
+        return proposal;
+      }
+    }
+    return null;
+  }
+
   function launchBalloonChunk(session, index) {
     if (!session.active || balloonSession !== session ||
         session.items.has(index)) return;
@@ -3369,16 +3440,32 @@
     }
 
     const words = Array.from(group.querySelectorAll(".read-balloon-word"));
-    const height = session.scene.getBoundingClientRect().height;
+    const sceneRect = session.scene.getBoundingClientRect();
+    const height = sceneRect.height;
+    const width = sceneRect.width;
+    const now = Date.now();
+    session.wordTracks = session.wordTracks.filter((track) =>
+      track.startMs + track.durationMs > now);
     let lastEntryMs = 0;
     let lastExitMs = 0;
     words.forEach((word, wordIndex) => {
-      const motion = getBalloonMotion(height,
-        word.getBoundingClientRect().height, words.length);
+      const box = word.getBoundingClientRect();
+      const motion = getBalloonMotion(height, box.height, words.length);
       const delayMs = wordIndex * motion.staggerMs;
+      const sway = 14 + (wordIndex % 3) * 3;
+      const idealX = width / 2 + (((wordIndex * 37) % 5) - 2) * width * 0.07;
+      // Keep wide pills inside the scene for their full sideways swing.
+      const half = Math.min(width / 2, box.width / 2 + sway + 16);
+      const centerX = Math.max(half, Math.min(width - half, idealX));
+      word.style.left = `${centerX}px`;
       word.style.setProperty("--read-balloon-travel", `${motion.travel}px`);
       word.style.setProperty("--read-balloon-duration", `${motion.durationMs}ms`);
       word.style.setProperty("--read-word-delay", `${delayMs}ms`);
+      session.wordTracks.push({
+        kind: "word", x: centerX, width: box.width, height: box.height,
+        sway, sceneHeight: height, travel: motion.travel,
+        startMs: now + delayMs, durationMs: motion.durationMs
+      });
       lastEntryMs = Math.max(lastEntryMs, delayMs + motion.visibleMs);
       lastExitMs = Math.max(lastExitMs, delayMs + motion.durationMs);
     });
@@ -3396,11 +3483,35 @@
     balloonTimer(session, () => playBalloonAudio(session, item), lastEntryMs);
 
     const balloons = createDecorations(BALLOONS_ACTIVITY_ID);
-    const wrapper = root.document.createElement("div");
-    wrapper.innerHTML = renderBalloonDecorationsHtml(
-      READ_ACTIVITY_MANIFEST[BALLOONS_ACTIVITY_ID], balloons);
-    Array.from(wrapper.children).forEach((button) => {
+    session.balloonTracks = session.balloonTracks.filter((track) =>
+      track.element.isConnected && track.startMs + track.durationMs > now);
+    balloons.forEach((decoration) => {
+      const wrapper = root.document.createElement("div");
+      wrapper.innerHTML = renderBalloonDecorationsHtml(
+        READ_ACTIVITY_MANIFEST[BALLOONS_ACTIVITY_ID], [decoration]);
+      const button = wrapper.firstElementChild;
       session.decorations.appendChild(button);
+      const box = button.getBoundingClientRect();
+      const candidate = {
+        kind: "balloon", element: button,
+        width: box.width,
+        // The visible balloon body occupies only the top of its button;
+        // the remainder is the string and tap area.
+        height: Math.min(box.height, box.width * 1.35),
+        sway: 16, sceneHeight: height,
+        viewportHeight: root.innerHeight || height,
+        startY: height * 1.28 - box.height,
+        startMs: Date.now() + decoration.delay * 1000,
+        durationMs: 12000
+      };
+      const placed = chooseReadBalloonSpawn(candidate, width,
+        session.wordTracks, session.balloonTracks);
+      if (!placed) {
+        button.remove(); // Never force a balloon into a crowded scene.
+        return;
+      }
+      button.style.left = `${placed.x}px`;
+      session.balloonTracks.push(placed);
       button.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -3452,6 +3563,7 @@
       decorations: wrap.querySelector("[data-read-balloons]"),
       effects: wrap.querySelector("[data-read-balloon-effects]"),
       progress: wrap.querySelector("[data-read-progress]"),
+      wordTracks: [], balloonTracks: [],
       items: new Map(), timers: new Set()
     };
     balloonSession = session;
@@ -3474,7 +3586,7 @@
       <div class="read-balloon-words" aria-label="${escapeHtml(chunk)}">
         ${getChunkWords(chunk).map(
           (word, index) => `
-            <span class="read-balloon-word" style="--read-lane-offset:${(((index * 37) % 5) - 2) * 7}vw;--read-sway-phase:-${(index * 277) % 2400}ms;--read-sway-duration:${3100 + (index % 4) * 580}ms"><span class="read-balloon-word-inner">${escapeHtml(word)}</span></span>
+            <span class="read-balloon-word" style="--read-lane-offset:${(((index * 37) % 5) - 2) * 7}vw;--read-sway-amplitude:${14 + (index % 3) * 3}px;--read-sway-phase:-${(index * 277) % 2400}ms;--read-sway-duration:${3100 + (index % 4) * 580}ms"><span class="read-balloon-word-inner">${escapeHtml(word)}</span></span>
           `
         ).join("")}
       </div>
@@ -4494,6 +4606,9 @@
     getAnimatedActivityTiming,
     getCrawlMotion,
     getBalloonMotion,
+    readBalloonRectAt,
+    readBalloonPathsOverlap,
+    chooseReadBalloonSpawn,
     isAnimatedActivity,
     isTypingActivity,
     isWordActivity,
