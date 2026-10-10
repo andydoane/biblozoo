@@ -1,0 +1,251 @@
+@font-face {
+  font-family: "Special Elite";
+  src: url("./verse_fonts/SpecialElite-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+.read-my-verse-screen,
+.read-typewriter-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.read-my-verse-screen {
+  overflow: hidden;
+  color: #34291e;
+  background: #d8c59f;
+}
+
+.read-typewriter-stage {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: clamp(7px, 1.5vh, 15px);
+  padding:
+    calc(24px + env(safe-area-inset-top))
+    clamp(24px, 7vw, 76px)
+    calc(24px + env(safe-area-inset-bottom));
+  overflow: hidden;
+  background-color: #d8c59f;
+  background-image:
+    url("./verse_images/read_my_verse/paper_phone.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+@media (min-aspect-ratio: 2 / 3) {
+  .read-typewriter-stage {
+    background-image:
+      url("./verse_images/read_my_verse/paper_ipad.png");
+  }
+}
+
+.read-typewriter-stage:focus-visible {
+  outline: 4px solid rgba(72, 53, 34, 0.72);
+  outline-offset: -7px;
+}
+
+.read-my-verse-back {
+  position: absolute;
+  z-index: 10;
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(12px + env(safe-area-inset-left));
+  width: clamp(44px, 11vw, 56px);
+  height: clamp(44px, 11vw, 56px);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 0 5px;
+  color: #34291e;
+  background: rgba(255, 250, 231, 0.76);
+  box-shadow: 0 3px 10px rgba(57, 42, 26, 0.23);
+  font-family: system-ui, sans-serif;
+  font-size: clamp(42px, 10vw, 54px);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.read-typewriter-reference,
+.read-typewriter-instruction,
+.read-typewriter-progress {
+  position: relative;
+  z-index: 2;
+  justify-self: center;
+  color: #433628;
+  font-family: "Special Elite", Georgia, serif;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.read-typewriter-reference {
+  max-width: calc(100% - 92px);
+  font-size: clamp(22px, 5.4vw, 38px);
+  line-height: 1.05;
+}
+
+.read-typewriter-instruction {
+  padding: 7px 14px 5px;
+  border-radius: 999px;
+  background: rgba(255, 250, 231, 0.54);
+  font-size: clamp(16px, 3.9vw, 25px);
+  line-height: 1;
+}
+
+.read-typewriter-paper {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(8px, 2vw, 22px);
+  background: transparent;
+}
+
+.read-typewriter-fit {
+  font-family: "Special Elite", Georgia, serif;
+  color: #30271f;
+  text-align: left;
+}
+
+.read-typewriter-body {
+  font: inherit;
+  line-height: var(--smart-line-height, 1.24);
+  letter-spacing: 0.012em;
+  text-wrap: pretty;
+}
+
+.read-typewriter-chunk {
+  border-radius: 0.22em;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.read-typewriter-chunk.is-listening {
+  background: rgba(255, 211, 75, 0.36);
+  box-shadow:
+    0 0 0 0.12em rgba(255, 211, 75, 0.25),
+    0 0 0.55em rgba(255, 211, 75, 0.32);
+}
+
+.read-typewriter-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.read-typewriter-char {
+  display: inline-block;
+  opacity: 0;
+  transform:
+    translateY(var(--read-char-y, 0))
+    rotate(var(--read-char-rotate, 0deg));
+  transform-origin: 50% 70%;
+  transition:
+    opacity 70ms linear,
+    color 120ms ease,
+    text-shadow 120ms ease;
+}
+
+.read-typewriter-char.is-space {
+  white-space: pre;
+}
+
+.read-typewriter-char.is-revealed {
+  opacity: 1;
+}
+
+.read-typewriter-char.is-word-feedback {
+  color: #6b4b25;
+  text-shadow: 0 0 0.32em rgba(255, 207, 78, 0.74);
+}
+
+.read-typewriter-progress {
+  align-self: end;
+  padding: 5px 12px 3px;
+  border-radius: 999px;
+  background: rgba(255, 250, 231, 0.48);
+  font-size: clamp(14px, 3.3vw, 20px);
+  line-height: 1.05;
+}
+
+.read-typewriter-stage.is-input-locked {
+  cursor: default;
+}
+
+@media (min-width: 700px) {
+  .read-typewriter-stage {
+    padding-right: clamp(70px, 11vw, 150px);
+    padding-left: clamp(70px, 11vw, 150px);
+  }
+
+  .read-typewriter-paper {
+    padding: clamp(16px, 3vw, 40px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .read-typewriter-char,
+  .read-typewriter-chunk {
+    transition: none;
+  }
+}
+
+.daily-read-tester-label {
+  display: block;
+  margin: 2px 0 7px;
+  color: #333333;
+  font-weight: 800;
+  text-align: left;
+}
+
+.daily-read-tester-select {
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 4px;
+  border: 2px solid rgba(51, 51, 51, 0.22);
+  border-radius: 13px;
+  padding: 8px 36px 8px 12px;
+  color: #333333;
+  background: #ffffff;
+  font: inherit;
+  font-size: 18px;
+}
+
+.daily-read-diagnostics {
+  max-height: min(48vh, 420px);
+  overflow: auto;
+  color: #333333;
+  text-align: left;
+  -webkit-overflow-scrolling: touch;
+}
+
+.daily-read-diagnostics ol {
+  margin: 10px 0 0;
+  padding-left: 24px;
+}
+
+.daily-read-diagnostics li {
+  margin-bottom: 12px;
+}
+
+.daily-read-diagnostics code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  opacity: 0.72;
+}

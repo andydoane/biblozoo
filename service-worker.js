@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_09_themed_wacky_replay_button_a";
+const CACHE_VERSION = "2026_Oct_09_read_typewriter_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -30,12 +30,14 @@ const CORE_PATHS = [
   "./daily_questions.css",
   "./daily_questions_feed_game.css",
   "./flashcards/flashcards.css",
+  "./read_my_verse.css",
   "./profiles.js",
   "./daily_questions_feed_game.js",
   "./daily_questions.js",
   "./flashcards/audio-effects.js",
   "./flashcards/recording.js",
   "./flashcards/flashcards.js",
+  "./read_my_verse.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",
@@ -74,6 +76,13 @@ const CORE_PATHS = [
   "./utilities/sound-tester.html",
 
   "./verse_fonts/Baloo2.ttf",
+  "./verse_fonts/SpecialElite-Regular.ttf",
+
+  "./verse_images/read_my_verse/paper_phone.png",
+  "./verse_images/read_my_verse/paper_ipad.png",
+  "./verse_images/read_my_verse/typewriter_1.mp3",
+  "./verse_images/read_my_verse/typewriter_2.mp3",
+  "./verse_images/read_my_verse/typewriter_3.mp3",
 
   "./biblopet_name_blocklist.json",
   "./pet_random_names.json",
