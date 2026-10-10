@@ -21,12 +21,26 @@
   const BALLOONS_ACTIVITY_ID =
     "balloons";
   const FISH_ACTIVITY_ID = "fish";
+  const KEYBOARD_ACTIVITY_ID =
+    "keyboard";
+  const UNSCRAMBLE_ACTIVITY_ID =
+    "unscramble";
+  const TAP_WORDS_ORDER_ACTIVITY_ID =
+    "tap_words_order";
   const CHUNK_PAUSE_MS = 480;
+  const READ_FEEDBACK_ASSETS =
+    Object.freeze({
+      negative:
+        "./verse_images/daily_questions/dq_incorrect.mp3"
+    });
   const READ_TEST_MODES =
     Object.freeze([
       "normal",
       "one_chunk",
       "many_chunk",
+      "forced_short",
+      "forced_long",
+      "forced_hint",
       "reduced_motion",
       "early_exit"
     ]);
@@ -92,12 +106,43 @@
           hook:
             `${ASSET_BASE}fish_hook.png`
         })
+      }),
+      keyboard: Object.freeze({
+        id: KEYBOARD_ACTIVITY_ID,
+        title: "Keyboard",
+        enabled: true,
+        keySounds: Object.freeze([
+          `${ASSET_BASE}keyboard_1.mp3`,
+          `${ASSET_BASE}keyboard_2.mp3`,
+          `${ASSET_BASE}keyboard_3.mp3`,
+          `${ASSET_BASE}keyboard_4.mp3`,
+          `${ASSET_BASE}keyboard_5.mp3`,
+          `${ASSET_BASE}keyboard_6.mp3`,
+          `${ASSET_BASE}keyboard_7.mp3`
+        ]),
+        font:
+          "./verse_fonts/VT323-Regular.ttf"
+      }),
+      unscramble: Object.freeze({
+        id: UNSCRAMBLE_ACTIVITY_ID,
+        title: "Unscramble",
+        enabled: true
+      }),
+      tap_words_order: Object.freeze({
+        id:
+          TAP_WORDS_ORDER_ACTIVITY_ID,
+        title: "Tap Words in Order",
+        enabled: true,
+        feedback:
+          READ_FEEDBACK_ASSETS
       })
     });
 
   let appApi = null;
   let activeAudio = null;
   let keySoundAudio = [];
+  let keySoundActivityId = "";
+  let negativeFeedbackAudio = null;
   let audioRequest = 0;
   let pauseTimer = 0;
   let animationTimer = 0;
@@ -115,10 +160,13 @@
     revealCount: 0,
     phase: "idle",
     activatedCharacterIndex: -1,
+    activatedTokenId: "",
     readTestMode: "normal",
     reducedMotion: false,
     animationKey: "",
-    decorations: []
+    decorations: [],
+    chunkAudioIndices: [],
+    activityData: null
   };
 
   function cleanString(value) {
@@ -291,6 +339,522 @@
     ].includes(cleanString(activityId));
   }
 
+  function isTypingActivity(activityId) {
+    return [
+      TYPEWRITER_ACTIVITY_ID,
+      KEYBOARD_ACTIVITY_ID
+    ].includes(cleanString(activityId));
+  }
+
+  function isWordActivity(activityId) {
+    return [
+      UNSCRAMBLE_ACTIVITY_ID,
+      TAP_WORDS_ORDER_ACTIVITY_ID
+    ].includes(cleanString(activityId));
+  }
+
+  function getActivePhase(activityId) {
+    if (isAnimatedActivity(activityId)) {
+      return "animating";
+    }
+
+    if (isTypingActivity(activityId)) {
+      return "typing";
+    }
+
+    return "interacting";
+  }
+
+  function splitWordToken(raw, index = 0) {
+    const value = String(raw || "");
+    const characters = Array.from(value);
+    const meaningfulIndices = characters
+      .map((character, characterIndex) =>
+        isTypeableCharacter(character)
+          ? characterIndex
+          : -1
+      )
+      .filter((characterIndex) =>
+        characterIndex >= 0
+      );
+    const first = meaningfulIndices[0];
+    const last = meaningfulIndices[
+      meaningfulIndices.length - 1
+    ];
+
+    if (
+      first === undefined ||
+      last === undefined
+    ) {
+      return {
+        id: `word-${index}`,
+        raw: value,
+        leading: value,
+        core: "",
+        trailing: "",
+        normalized: "",
+        meaningfulCount: 0
+      };
+    }
+
+    const core = characters
+      .slice(first, last + 1)
+      .join("");
+    const normalized = Array.from(core)
+      .filter(isTypeableCharacter)
+      .join("")
+      .toLocaleLowerCase();
+
+    return {
+      id: `word-${index}`,
+      raw: value,
+      leading: characters
+        .slice(0, first)
+        .join(""),
+      core,
+      trailing: characters
+        .slice(last + 1)
+        .join(""),
+      normalized,
+      meaningfulCount:
+        Array.from(normalized).length
+    };
+  }
+
+  function tokenizeChunkWords(text) {
+    return String(text || "")
+      .trim()
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map(splitWordToken)
+      .filter((token) => token.normalized);
+  }
+
+  function canScrambleCore(
+    core,
+    minimumLength = 2
+  ) {
+    const letters = Array.from(
+      String(core || "")
+    ).filter(isTypeableCharacter);
+
+    return (
+      letters.length >= minimumLength &&
+      new Set(
+        letters.map((letter) =>
+          letter.toLocaleLowerCase()
+        )
+      ).size > 1
+    );
+  }
+
+  function shuffleArray(
+    values,
+    random = Math.random
+  ) {
+    const result = [...values];
+
+    for (
+      let index = result.length - 1;
+      index > 0;
+      index -= 1
+    ) {
+      const swapIndex = Math.floor(
+        Math.max(
+          0,
+          Math.min(0.999999, random())
+        ) * (index + 1)
+      );
+      [result[index], result[swapIndex]] =
+        [result[swapIndex], result[index]];
+    }
+
+    return result;
+  }
+
+  function scrambleCore(
+    core,
+    random = Math.random
+  ) {
+    const characters = Array.from(
+      String(core || "")
+    );
+    const positions = characters
+      .map((character, index) =>
+        isTypeableCharacter(character)
+          ? index
+          : -1
+      )
+      .filter((index) => index >= 0);
+    const original = positions.map(
+      (index) => characters[index]
+    );
+
+    if (!canScrambleCore(core, 2)) {
+      return null;
+    }
+
+    let scrambled = original;
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const candidate = shuffleArray(
+        original,
+        random
+      );
+
+      if (
+        candidate.join("") !==
+        original.join("")
+      ) {
+        scrambled = candidate;
+        break;
+      }
+    }
+
+    if (
+      scrambled.join("") ===
+      original.join("")
+    ) {
+      for (
+        let shift = 1;
+        shift < original.length;
+        shift += 1
+      ) {
+        const candidate = [
+          ...original.slice(shift),
+          ...original.slice(0, shift)
+        ];
+
+        if (
+          candidate.join("") !==
+          original.join("")
+        ) {
+          scrambled = candidate;
+          break;
+        }
+      }
+    }
+
+    const result = [...characters];
+    positions.forEach((position, index) => {
+      result[position] = scrambled[index];
+    });
+
+    return result.join("");
+  }
+
+  function buildUnscramblePuzzle(
+    text,
+    random = Math.random
+  ) {
+    const tokens = tokenizeChunkWords(text);
+    const threshold = [4, 3, 2].find(
+      (minimumLength) =>
+        tokens.some((token) =>
+          canScrambleCore(
+            token.core,
+            minimumLength
+          )
+        )
+    ) || 0;
+    let requiredCount = 0;
+    const puzzleTokens = tokens.map(
+      (token) => {
+        const eligible = threshold > 0 &&
+          canScrambleCore(
+            token.core,
+            threshold
+          );
+        const scrambled = eligible
+          ? scrambleCore(token.core, random)
+          : null;
+        const required = !!scrambled &&
+          scrambled !== token.core;
+
+        if (required) requiredCount += 1;
+
+        return {
+          ...token,
+          scrambled:
+            required
+              ? scrambled
+              : token.core,
+          required,
+          solved: !required
+        };
+      }
+    );
+
+    return {
+      threshold,
+      requiredCount,
+      tokens: puzzleTokens
+    };
+  }
+
+  function buildTapOrderPuzzle(
+    text,
+    random = Math.random,
+    { forceHint = false } = {}
+  ) {
+    const tokens = tokenizeChunkWords(text);
+    let displayOrder = shuffleArray(
+      tokens.map((token) => token.id),
+      random
+    );
+    const originalOrder = tokens.map(
+      (token) => token.id
+    );
+
+    if (
+      displayOrder.length > 1 &&
+      displayOrder.every(
+        (id, index) =>
+          id === originalOrder[index]
+      )
+    ) {
+      displayOrder = [
+        ...displayOrder.slice(1),
+        displayOrder[0]
+      ];
+    }
+
+    const firstExpected = tokens[0]
+      ?.normalized || "";
+    const hintedTokenId = forceHint
+      ? displayOrder.find((id) =>
+          tokens.find(
+            (token) => token.id === id
+          )?.normalized === firstExpected
+        ) || ""
+      : "";
+
+    return {
+      tokens: tokens.map((token) => ({
+        ...token,
+        solved: false
+      })),
+      displayOrder,
+      nextIndex: 0,
+      incorrectStreak: forceHint ? 2 : 0,
+      hintedTokenId
+    };
+  }
+
+  function applyTapOrderChoice(
+    data,
+    tokenId
+  ) {
+    const token = data?.tokens?.find(
+      (item) => item.id === tokenId
+    );
+    const expected = data?.tokens?.[
+      data.nextIndex
+    ];
+
+    if (!token || token.solved || !expected) {
+      return {
+        valid: false,
+        correct: false,
+        complete: false
+      };
+    }
+
+    if (
+      token.normalized !==
+      expected.normalized
+    ) {
+      data.incorrectStreak += 1;
+
+      if (data.incorrectStreak >= 2) {
+        data.hintedTokenId =
+          data.displayOrder.find((id) => {
+            const candidate =
+              data.tokens.find(
+                (item) => item.id === id
+              );
+
+            return (
+              !candidate?.solved &&
+              candidate?.normalized ===
+                expected.normalized
+            );
+          }) || "";
+      }
+
+      return {
+        valid: true,
+        correct: false,
+        complete: false,
+        token,
+        expected
+      };
+    }
+
+    token.solved = true;
+    data.nextIndex += 1;
+    data.incorrectStreak = 0;
+    data.hintedTokenId = "";
+
+    return {
+      valid: true,
+      correct: true,
+      complete:
+        data.nextIndex >=
+        data.tokens.length,
+      token,
+      expected
+    };
+  }
+
+  function isChunkEligible(
+    activityId,
+    chunk
+  ) {
+    const safeActivityId =
+      cleanString(activityId);
+
+    if (
+      safeActivityId ===
+      UNSCRAMBLE_ACTIVITY_ID
+    ) {
+      return buildUnscramblePuzzle(
+        chunk,
+        () => 0.37
+      ).requiredCount > 0;
+    }
+
+    if (
+      safeActivityId ===
+      TAP_WORDS_ORDER_ACTIVITY_ID
+    ) {
+      return tokenizeChunkWords(chunk)
+        .length >= 2;
+    }
+
+    return String(chunk || "").trim()
+      .length > 0;
+  }
+
+  function selectActivityChunks(
+    verse,
+    activityId,
+    readTestMode = "normal"
+  ) {
+    if (
+      readTestMode === "forced_hint" &&
+      activityId !==
+        TAP_WORDS_ORDER_ACTIVITY_ID
+    ) {
+      return null;
+    }
+
+    const chunks = buildDisplayChunks(
+      verse?.verseText,
+      verse?.echoParts
+    );
+
+    if (!chunks.length) return null;
+
+    if (readTestMode === "one_chunk") {
+      const fullText = String(
+        verse?.verseText || ""
+      );
+
+      return isChunkEligible(
+        activityId,
+        fullText
+      )
+        ? {
+            chunks: [fullText],
+            audioIndices: [0],
+            usesChunkAudio: false
+          }
+        : null;
+    }
+
+    if (
+      ["forced_short", "forced_long"]
+        .includes(readTestMode)
+    ) {
+      const candidates = chunks
+        .map((chunk, index) => ({
+          chunk,
+          index,
+          length: Array.from(chunk).length
+        }))
+        .filter((entry) =>
+          isChunkEligible(
+            activityId,
+            entry.chunk
+          )
+        )
+        .sort((left, right) =>
+          readTestMode === "forced_short"
+            ? left.length - right.length
+            : right.length - left.length
+        );
+      const selected = candidates[0];
+
+      return selected
+        ? {
+            chunks: [selected.chunk],
+            audioIndices: [selected.index],
+            usesChunkAudio: true
+          }
+        : null;
+    }
+
+    if (
+      !chunks.every((chunk) =>
+        isChunkEligible(
+          activityId,
+          chunk
+        )
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      chunks,
+      audioIndices: chunks.map(
+        (_, index) => index
+      ),
+      usesChunkAudio:
+        Array.isArray(verse?.echoParts) &&
+        verse.echoParts.length > 0
+    };
+  }
+
+  function isActivityEligibleForVerse(
+    activityId,
+    verse,
+    readTestMode = "normal"
+  ) {
+    if (
+      !READ_ACTIVITY_MANIFEST[
+        cleanString(activityId)
+      ]?.enabled
+    ) {
+      return false;
+    }
+
+    if (
+      readTestMode === "forced_hint" &&
+      activityId !==
+        TAP_WORDS_ORDER_ACTIVITY_ID
+    ) {
+      return false;
+    }
+
+    return !!selectActivityChunks(
+      verse,
+      activityId,
+      readTestMode
+    );
+  }
+
   function normalizeReadTestMode(
     mode,
     previewScope
@@ -457,6 +1021,13 @@
         audio.currentTime = 0;
       } catch (err) { }
     });
+
+    if (negativeFeedbackAudio) {
+      try {
+        negativeFeedbackAudio.pause();
+        negativeFeedbackAudio.currentTime = 0;
+      } catch (err) { }
+    }
   }
 
   function clearTimers() {
@@ -482,15 +1053,20 @@
     state.revealCount = 0;
     state.phase = "idle";
     state.activatedCharacterIndex = -1;
+    state.activatedTokenId = "";
     state.readTestMode = "normal";
     state.reducedMotion = false;
     state.animationKey = "";
     state.decorations = [];
+    state.chunkAudioIndices = [];
+    state.activityData = null;
   }
 
   function initialize(nextApi) {
     appApi = nextApi || null;
-    ensureKeySoundAudio();
+    ensureKeySoundAudio(
+      TYPEWRITER_ACTIVITY_ID
+    );
   }
 
   function startForVerse(
@@ -527,15 +1103,13 @@
       return false;
     }
 
-    const oneChunkPreview =
-      validatedContext.readTestMode ===
-      "one_chunk";
-    const chunks = oneChunkPreview
-      ? [String(verse.verseText || "")]
-      : buildDisplayChunks(
-          verse.verseText,
-          verse.echoParts
-        );
+    const selectedChunks =
+      selectActivityChunks(
+        verse,
+        safeActivityId,
+        validatedContext.readTestMode
+      );
+    const chunks = selectedChunks?.chunks || [];
 
     if (
       !chunks.length ||
@@ -549,9 +1123,9 @@
     state.context = validatedContext;
     state.chunks = chunks;
     state.usesChunkAudio =
-      !oneChunkPreview &&
-      Array.isArray(verse.echoParts) &&
-      verse.echoParts.length > 0;
+      selectedChunks.usesChunkAudio;
+    state.chunkAudioIndices =
+      selectedChunks.audioIndices;
     state.chunkIndex = 0;
     state.revealCount =
       getInitialRevealCount(chunks[0]);
@@ -559,19 +1133,20 @@
       validatedContext.readTestMode;
     state.reducedMotion =
       prefersReducedMotion();
-    state.phase = isAnimatedActivity(
+    state.phase = getActivePhase(
       safeActivityId
-    )
-      ? "animating"
-      : "typing";
+    );
     state.decorations =
       createDecorations(safeActivityId);
 
     if (
-      safeActivityId ===
-      TYPEWRITER_ACTIVITY_ID
+      isTypingActivity(safeActivityId)
     ) {
-      ensureKeySoundAudio();
+      ensureKeySoundAudio(safeActivityId);
+    }
+
+    if (isWordActivity(safeActivityId)) {
+      prepareInteractiveChunk();
     }
 
     return true;
@@ -598,7 +1173,30 @@
     return selected;
   }
 
-  function ensureKeySoundAudio() {
+  function ensureKeySoundAudio(
+    activityId = state.activityId
+  ) {
+    const safeActivityId =
+      isTypingActivity(activityId)
+        ? activityId
+        : TYPEWRITER_ACTIVITY_ID;
+
+    if (
+      keySoundActivityId !==
+      safeActivityId
+    ) {
+      keySoundAudio.forEach((audio) => {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch (err) { }
+      });
+      keySoundAudio = [];
+      keySoundActivityId =
+        safeActivityId;
+      lastKeySoundIndex = -1;
+    }
+
     if (
       keySoundAudio.length ||
       !root?.Audio
@@ -607,7 +1205,9 @@
     }
 
     keySoundAudio =
-      READ_ACTIVITY_MANIFEST.typewriter
+      READ_ACTIVITY_MANIFEST[
+        safeActivityId
+      ]
         .keySounds.map((src) => {
           const audio = new root.Audio(src);
           audio.preload = "auto";
@@ -630,7 +1230,9 @@
   function playKeySound() {
     if (appApi?.isMuted?.()) return;
 
-    const sounds = ensureKeySoundAudio();
+    const sounds = ensureKeySoundAudio(
+      state.activityId
+    );
 
     if (!sounds.length) return;
 
@@ -650,6 +1252,80 @@
       audio.currentTime = 0;
       audio.play().catch?.(() => { });
     } catch (err) { }
+  }
+
+  function playGeneratedNegativeTone() {
+    const AudioContextClass =
+      root?.AudioContext ||
+      root?.webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    try {
+      const context = new AudioContextClass();
+      const oscillator =
+        context.createOscillator();
+      const gain = context.createGain();
+      const now = context.currentTime;
+
+      oscillator.type = "square";
+      oscillator.frequency.setValueAtTime(
+        180,
+        now
+      );
+      oscillator.frequency.exponentialRampToValueAtTime(
+        105,
+        now + 0.12
+      );
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        now + 0.14
+      );
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.15);
+      oscillator.addEventListener(
+        "ended",
+        () => context.close?.(),
+        { once: true }
+      );
+    } catch (err) { }
+  }
+
+  function playNegativeFeedback() {
+    if (appApi?.isMuted?.()) return;
+
+    if (!root?.Audio) {
+      playGeneratedNegativeTone();
+      return;
+    }
+
+    if (!negativeFeedbackAudio) {
+      negativeFeedbackAudio =
+        new root.Audio(
+          READ_FEEDBACK_ASSETS.negative
+        );
+      negativeFeedbackAudio.preload =
+        "auto";
+      negativeFeedbackAudio.setAttribute(
+        "playsinline",
+        ""
+      );
+      try {
+        negativeFeedbackAudio.load();
+      } catch (err) { }
+    }
+
+    try {
+      negativeFeedbackAudio.pause();
+      negativeFeedbackAudio.currentTime = 0;
+      negativeFeedbackAudio.play()
+        .catch?.(playGeneratedNegativeTone);
+    } catch (err) {
+      playGeneratedNegativeTone();
+    }
   }
 
   function isWordCompleted(
@@ -675,23 +1351,28 @@
 
   function wordActivated(
     text,
-    characterIndex
+    characterIndex,
+    extra = {}
   ) {
     state.activatedCharacterIndex =
       characterIndex;
+    state.activatedTokenId =
+      cleanString(extra.tokenId);
     appApi?.onWordActivated?.({
       verseId: state.verseId,
       activityId: state.activityId,
       chunkIndex: state.chunkIndex,
-      characterIndex
+      characterIndex,
+      ...extra
     });
 
     clearTimeout(wordFeedbackTimer);
     wordFeedbackTimer = setTimeout(() => {
       state.activatedCharacterIndex = -1;
+      state.activatedTokenId = "";
       root?.document
         ?.querySelectorAll?.(
-          ".read-typewriter-char.is-word-feedback"
+          ".is-word-feedback"
         )
         ?.forEach?.((element) =>
           element.classList.remove(
@@ -722,13 +1403,38 @@
       )?.classList.add("is-revealed");
     }
 
+    if (
+      state.activityId ===
+      KEYBOARD_ACTIVITY_ID
+    ) {
+      const chunk = screen.querySelector(
+        `[data-read-chunk="${state.chunkIndex}"]`
+      );
+      const cursor = chunk?.querySelector(
+        "[data-read-keyboard-cursor]"
+      );
+      const nextCharacter = chunk
+        ?.querySelector?.(
+          `[data-read-char-index="${newCount}"]`
+        );
+
+      if (cursor && nextCharacter) {
+        nextCharacter.before(cursor);
+      } else if (cursor && chunk) {
+        chunk.append(cursor);
+      }
+    }
+
     const progress = screen.querySelector(
       "[data-read-progress]"
     );
 
     if (progress) {
       progress.textContent =
-        `Chunk ${state.chunkIndex + 1} of ${state.chunks.length}`;
+        state.activityId ===
+          KEYBOARD_ACTIVITY_ID
+          ? `CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}`
+          : `Chunk ${state.chunkIndex + 1} of ${state.chunks.length}`;
     }
   }
 
@@ -748,12 +1454,14 @@
 
     if (handled === false) {
       completionReported = false;
-      state.phase = isAnimatedActivity(
+      state.phase = getActivePhase(
         state.activityId
-      )
-        ? "animating"
-        : "typing";
+      );
       state.animationKey = "";
+
+      if (isWordActivity(state.activityId)) {
+        prepareInteractiveChunk();
+      }
       appApi?.requestRender?.();
     }
   }
@@ -779,20 +1487,37 @@
       getInitialRevealCount(
         state.chunks[state.chunkIndex]
       );
-    state.phase = isAnimatedActivity(
+    state.phase = getActivePhase(
       state.activityId
-    )
-      ? "animating"
-      : "typing";
+    );
     state.activatedCharacterIndex = -1;
+    state.activatedTokenId = "";
     state.animationKey = "";
     state.decorations =
       createDecorations(state.activityId);
+    state.activityData = null;
+
+    if (isWordActivity(state.activityId)) {
+      prepareInteractiveChunk();
+    }
     appApi?.requestRender?.();
   }
 
   function playCurrentChunk() {
     if (state.phase !== "pause") return;
+
+    keySoundAudio.forEach((audio) => {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (err) { }
+    });
+    if (negativeFeedbackAudio) {
+      try {
+        negativeFeedbackAudio.pause();
+        negativeFeedbackAudio.currentTime = 0;
+      } catch (err) { }
+    }
 
     state.phase = "playing";
     appApi?.requestRender?.();
@@ -800,7 +1525,9 @@
     const request = ++audioRequest;
     const src = getChunkAudioPath(
       state.verseId,
-      state.chunkIndex,
+      state.chunkAudioIndices[
+        state.chunkIndex
+      ] ?? state.chunkIndex,
       state.chunks.length,
       state.usesChunkAudio
     );
@@ -859,6 +1586,19 @@
 
   function finishCurrentChunk() {
     if (state.phase !== "typing") return;
+
+    state.phase = "pause";
+    appApi?.requestRender?.();
+    pauseTimer = setTimeout(
+      playCurrentChunk,
+      CHUNK_PAUSE_MS
+    );
+  }
+
+  function finishInteractiveChunk() {
+    if (state.phase !== "interacting") {
+      return;
+    }
 
     state.phase = "pause";
     appApi?.requestRender?.();
@@ -982,6 +1722,152 @@
     return true;
   }
 
+  function prepareInteractiveChunk() {
+    const chunk =
+      state.chunks[state.chunkIndex] || "";
+
+    if (
+      state.activityId ===
+      UNSCRAMBLE_ACTIVITY_ID
+    ) {
+      state.activityData =
+        buildUnscramblePuzzle(chunk);
+      return state.activityData;
+    }
+
+    if (
+      state.activityId ===
+      TAP_WORDS_ORDER_ACTIVITY_ID
+    ) {
+      state.activityData =
+        buildTapOrderPuzzle(
+          chunk,
+          Math.random,
+          {
+            forceHint:
+              state.readTestMode ===
+              "forced_hint"
+          }
+        );
+      return state.activityData;
+    }
+
+    state.activityData = null;
+    return null;
+  }
+
+  function handleUnscrambleTap(tokenId) {
+    if (
+      state.phase !== "interacting" ||
+      state.activityId !==
+        UNSCRAMBLE_ACTIVITY_ID
+    ) {
+      return false;
+    }
+
+    const data = state.activityData;
+    const tokenIndex = data?.tokens
+      ?.findIndex((token) =>
+        token.id === tokenId
+      );
+    const token =
+      data?.tokens?.[tokenIndex];
+
+    if (
+      !token ||
+      !token.required ||
+      token.solved
+    ) {
+      return false;
+    }
+
+    token.solved = true;
+    wordActivated(
+      token.core,
+      tokenIndex,
+      {
+        tokenId: token.id,
+        word: token.normalized
+      }
+    );
+
+    const complete = data.tokens
+      .filter((item) => item.required)
+      .every((item) => item.solved);
+
+    appApi?.requestRender?.();
+
+    if (complete) {
+      clearTimeout(pauseTimer);
+      pauseTimer = setTimeout(
+        finishInteractiveChunk,
+        280
+      );
+    }
+
+    return true;
+  }
+
+  function handleTapOrderTap(tokenId) {
+    if (
+      state.phase !== "interacting" ||
+      state.activityId !==
+        TAP_WORDS_ORDER_ACTIVITY_ID
+    ) {
+      return false;
+    }
+
+    const data = state.activityData;
+    const result = applyTapOrderChoice(
+      data,
+      tokenId
+    );
+
+    if (!result.valid) {
+      return false;
+    }
+
+    if (!result.correct) {
+      playNegativeFeedback();
+
+      appApi?.requestRender?.();
+      const wrongTile = root?.document
+        ?.querySelector?.(
+          `[data-read-order-token="${result.token.id}"]`
+        );
+      wrongTile?.classList.add("is-wrong");
+      setTimeout(() => {
+        wrongTile?.classList.remove(
+          "is-wrong"
+        );
+      }, 300);
+      return false;
+    }
+
+    wordActivated(
+      result.token.core,
+      data.nextIndex - 1,
+      {
+        tokenId: result.token.id,
+        word: result.token.normalized
+      }
+    );
+
+    appApi?.requestRender?.();
+
+    if (
+      result.complete
+    ) {
+      clearTimeout(pauseTimer);
+      pauseTimer = setTimeout(
+        finishInteractiveChunk,
+        280
+      );
+    }
+
+    return true;
+  }
+
   function characterStyle(index) {
     const rotation =
       ((index * 17) % 7 - 3) * 0.22;
@@ -998,7 +1884,10 @@
   ) {
     const isSpace = /\s/u.test(character);
     const classes = [
-      "read-typewriter-char",
+      state.activityId ===
+        KEYBOARD_ACTIVITY_ID
+        ? "read-keyboard-char"
+        : "read-typewriter-char",
       revealed ? "is-revealed" : "",
       isSpace ? "is-space" : ""
     ].filter(Boolean).join(" ");
@@ -1012,6 +1901,10 @@
     globalOffset
   ) {
     const characters = Array.from(text);
+    const keyboardActive =
+      state.activityId ===
+        KEYBOARD_ACTIVITY_ID &&
+      chunkIndex === state.chunkIndex;
     let html = "";
     let word = "";
 
@@ -1035,16 +1928,33 @@
           index,
           revealed
         );
+      const cursorMarkup =
+        keyboardActive &&
+        index === state.revealCount
+          ? `<span class="read-keyboard-cursor" data-read-keyboard-cursor aria-hidden="true"></span>`
+          : "";
 
       if (/\s/u.test(character)) {
         flushWord();
-        html += characterMarkup;
+        html +=
+          cursorMarkup +
+          characterMarkup;
       } else {
-        word += characterMarkup;
+        word +=
+          cursorMarkup +
+          characterMarkup;
       }
     });
 
     flushWord();
+
+    if (
+      keyboardActive &&
+      state.revealCount >= characters.length
+    ) {
+      html += `<span class="read-keyboard-cursor" data-read-keyboard-cursor aria-hidden="true"></span>`;
+    }
+
     return html;
   }
 
@@ -1067,7 +1977,13 @@
             state.phase
           );
 
-        return `<span class="read-typewriter-chunk${listening ? " is-listening" : ""}" data-read-chunk="${index}">${html}</span>`;
+        const chunkClass =
+          state.activityId ===
+          KEYBOARD_ACTIVITY_ID
+            ? "read-keyboard-chunk"
+            : "read-typewriter-chunk";
+
+        return `<span class="${chunkClass}${listening ? " is-listening" : ""}" data-read-chunk="${index}">${html}</span>`;
       })
       .join("");
   }
@@ -1359,6 +2275,237 @@
     });
   }
 
+  function bindExitButton(wrap) {
+    wrap.querySelector(
+      "[data-read-exit]"
+    ).onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      exitSession();
+    };
+  }
+
+  function renderKeyboardScreen(idx, verse) {
+    const wrap = root.document.createElement(
+      "div"
+    );
+    const isLocked = state.phase !== "typing";
+    const instruction =
+      state.readTestMode === "early_exit"
+        ? "EARLY-EXIT CHECK: USE BACK BEFORE FINISHING"
+        : isLocked
+          ? "PLAYING VERSE AUDIO..."
+          : "TAP TO TYPE THE VERSE";
+
+    wrap.className = [
+      "read-my-verse-screen",
+      "read-keyboard-screen",
+      state.reducedMotion
+        ? "is-reduced-motion"
+        : ""
+    ].filter(Boolean).join(" ");
+    wrap.innerHTML = `
+      <button class="read-my-verse-back read-keyboard-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Keyboard">‹</button>
+      <main class="read-keyboard-stage${isLocked ? " is-input-locked" : ""}" data-read-type-area data-no-ui-sound role="button" tabindex="0" aria-label="Tap to type ${escapeHtml(verse.ref || state.verseId)}">
+        <div class="read-keyboard-scanlines" aria-hidden="true"></div>
+        <header class="read-keyboard-header">
+          <div class="read-keyboard-reference">${escapeHtml(verse.ref || state.verseId)}</div>
+          <div class="read-keyboard-instruction">${instruction}</div>
+        </header>
+        <section class="learn-stage read-keyboard-terminal" aria-label="${escapeHtml(verse.verseText)}">
+          <div class="smart-learn-text read-keyboard-fit" data-smart-learn-text data-smart-fit-text="${escapeHtml(verse.verseText)}">
+            <div class="smart-learn-body read-keyboard-body" aria-hidden="true">${renderVerseHtml()}</div>
+          </div>
+        </section>
+        <div class="read-keyboard-progress" data-read-progress aria-live="polite">CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}</div>
+      </main>
+    `;
+
+    const stage = wrap.querySelector(
+      "[data-read-type-area]"
+    );
+    const activate = (event) => {
+      event?.preventDefault?.();
+      handleTypeTap();
+    };
+
+    stage.onclick = activate;
+    stage.onkeydown = (event) => {
+      if (
+        event.key === "Enter" ||
+        event.key === " "
+      ) {
+        activate(event);
+      }
+    };
+    bindExitButton(wrap);
+    appApi.scheduleSmartLearnTextFit?.(
+      wrap
+    );
+
+    return appApi.makeSlide({
+      idx,
+      bg: "#000000",
+      navHidden: true,
+      inner: wrap
+    });
+  }
+
+  function renderUnscrambleTokensHtml() {
+    const tokens =
+      state.activityData?.tokens || [];
+
+    return tokens.map((token) => {
+      const classes = [
+        "read-unscramble-token",
+        token.required
+          ? "is-interactive"
+          : "is-static",
+        token.solved ? "is-solved" : "",
+        state.activatedTokenId === token.id
+          ? "is-word-feedback"
+          : ""
+      ].filter(Boolean).join(" ");
+      const core = token.solved
+        ? token.core
+        : token.scrambled;
+      const contents = `
+        <span class="read-token-punctuation">${escapeHtml(token.leading)}</span><span class="read-token-core">${escapeHtml(core)}</span><span class="read-token-punctuation">${escapeHtml(token.trailing)}</span>
+      `;
+
+      if (!token.required) {
+        return `<span class="${classes}" data-read-word>${contents}</span>`;
+      }
+
+      return `
+        <button class="${classes}" type="button" data-read-word data-read-unscramble-token="${escapeHtml(token.id)}" data-no-ui-sound${token.solved ? " disabled" : ""} aria-label="${token.solved ? "Restored" : "Unscramble"} ${escapeHtml(token.core)}">
+          ${contents}
+        </button>
+      `;
+    }).join("");
+  }
+
+  function renderTapOrderTilesHtml() {
+    const data = state.activityData;
+    const tokens = data?.tokens || [];
+
+    return (data?.displayOrder || [])
+      .map((tokenId) =>
+        tokens.find((token) =>
+          token.id === tokenId
+        )
+      )
+      .filter(Boolean)
+      .map((token) => {
+        const classes = [
+          "read-order-tile",
+          token.solved ? "is-solved" : "",
+          data.hintedTokenId === token.id
+            ? "is-hinted"
+            : "",
+          state.activatedTokenId === token.id
+            ? "is-word-feedback"
+            : ""
+        ].filter(Boolean).join(" ");
+
+        return `
+          <button class="${classes}" type="button" data-read-word data-read-order-token="${escapeHtml(token.id)}" data-no-ui-sound${token.solved ? " disabled tabindex=\"-1\" aria-hidden=\"true\"" : ""}>
+            ${escapeHtml(token.raw)}
+          </button>
+        `;
+      })
+      .join("");
+  }
+
+  function renderWordActivityScreen(
+    idx,
+    verse
+  ) {
+    const manifest =
+      READ_ACTIVITY_MANIFEST[
+        state.activityId
+      ];
+    const isUnscramble =
+      state.activityId ===
+      UNSCRAMBLE_ACTIVITY_ID;
+    const isListening = [
+      "pause",
+      "playing"
+    ].includes(state.phase);
+    const instruction =
+      state.readTestMode === "early_exit"
+        ? "Early-exit check: use Back before finishing"
+        : isListening
+          ? "Listen to this part"
+          : isUnscramble
+            ? "Tap each mixed-up word"
+            : "Tap the words in verse order";
+    const wrap = root.document.createElement(
+      "div"
+    );
+
+    wrap.className = [
+      "read-my-verse-screen",
+      "read-word-activity-screen",
+      isUnscramble
+        ? "read-unscramble-screen"
+        : "read-order-screen",
+      state.reducedMotion
+        ? "is-reduced-motion"
+        : ""
+    ].filter(Boolean).join(" ");
+    wrap.innerHTML = `
+      <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit ${escapeHtml(manifest.title)}">‹</button>
+      <main class="read-word-activity-stage${isListening ? " is-listening" : ""}">
+        <header class="read-word-activity-header">
+          <div class="read-word-activity-reference">${escapeHtml(verse.ref || state.verseId)}</div>
+          <div class="read-word-activity-title">${escapeHtml(manifest.title)}</div>
+          <div class="read-word-activity-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
+        </header>
+        <section class="${isUnscramble ? "read-unscramble-words" : "read-order-grid"}" aria-label="${escapeHtml(state.chunks[state.chunkIndex] || "")}">
+          ${isUnscramble ? renderUnscrambleTokensHtml() : renderTapOrderTilesHtml()}
+        </section>
+        <div class="read-word-activity-progress" aria-live="polite">Part ${state.chunkIndex + 1} of ${state.chunks.length}</div>
+      </main>
+    `;
+
+    if (isUnscramble) {
+      wrap.querySelectorAll(
+        "[data-read-unscramble-token]"
+      ).forEach((button) => {
+        button.onclick = (event) => {
+          event.preventDefault();
+          handleUnscrambleTap(
+            button.dataset
+              .readUnscrambleToken
+          );
+        };
+      });
+    } else {
+      wrap.querySelectorAll(
+        "[data-read-order-token]"
+      ).forEach((button) => {
+        button.onclick = (event) => {
+          event.preventDefault();
+          handleTapOrderTap(
+            button.dataset.readOrderToken
+          );
+        };
+      });
+    }
+
+    bindExitButton(wrap);
+
+    return appApi.makeSlide({
+      idx,
+      bg: isUnscramble
+        ? "#f3b84b"
+        : "#5b4fbd",
+      navHidden: true,
+      inner: wrap
+    });
+  }
+
   function exitSession() {
     const context = getSessionContext();
     const completed = completionReported;
@@ -1390,6 +2537,23 @@
       )
     ) {
       return renderAnimatedScreen(
+        idx,
+        verse
+      );
+    }
+
+    if (
+      state.activityId ===
+      KEYBOARD_ACTIVITY_ID
+    ) {
+      return renderKeyboardScreen(
+        idx,
+        verse
+      );
+    }
+
+    if (isWordActivity(state.activityId)) {
+      return renderWordActivityScreen(
         idx,
         verse
       );
@@ -1471,6 +2635,10 @@
     VERSE_CRAWL_ACTIVITY_ID,
     BALLOONS_ACTIVITY_ID,
     FISH_ACTIVITY_ID,
+    KEYBOARD_ACTIVITY_ID,
+    UNSCRAMBLE_ACTIVITY_ID,
+    TAP_WORDS_ORDER_ACTIVITY_ID,
+    READ_FEEDBACK_ASSETS,
     READ_TEST_MODES,
     READ_ACTIVITY_MANIFEST,
     initialize,
@@ -1500,6 +2668,18 @@
     getReferenceAudioPath,
     getAnimatedActivityTiming,
     isAnimatedActivity,
+    isTypingActivity,
+    isWordActivity,
+    splitWordToken,
+    tokenizeChunkWords,
+    canScrambleCore,
+    scrambleCore,
+    buildUnscramblePuzzle,
+    buildTapOrderPuzzle,
+    applyTapOrderChoice,
+    isChunkEligible,
+    selectActivityChunks,
+    isActivityEligibleForVerse,
     validateContext
   });
 });

@@ -14448,7 +14448,10 @@ function screenTitle(idx) {
         "typewriter",
         "star_wars",
         "balloons",
-        "fish"
+        "fish",
+        "keyboard",
+        "unscramble",
+        "tap_words_order"
       ].filter(
         (activityId) =>
           readManifest[activityId]
@@ -14485,6 +14488,9 @@ function screenTitle(idx) {
             <option value="normal">Normal completion</option>
             <option value="one_chunk">One-chunk example</option>
             <option value="many_chunk">Many-chunk example</option>
+            <option value="forced_short">Forced short chunk</option>
+            <option value="forced_long">Forced long chunk</option>
+            <option value="forced_hint">Forced Tap Words hint</option>
             <option value="reduced_motion">Reduced-motion check</option>
             <option value="early_exit">Early-exit check</option>
           </select>
@@ -14503,6 +14509,39 @@ function screenTitle(idx) {
                   : getReadTesterVerseId();
               const activityId =
                 getReadTesterActivityId();
+              const verse = VERSE_LIST.find(
+                (item) =>
+                  item?.id === verseId
+              );
+              const readModule =
+                window.BibloZooReadMyVerse;
+
+              if (
+                typeof readModule
+                  ?.isActivityEligibleForVerse !==
+                    "function" ||
+                !readModule
+                  .isActivityEligibleForVerse(
+                    activityId,
+                    verse,
+                    readTestMode
+                  )
+              ) {
+                showDialog({
+                  title:
+                    "Activity Not Available",
+                  body:
+                    "That verse does not have enough usable words in every required chunk for this activity. Choose another verse or test mode.",
+                  actions: [
+                    dlgBtn("OK", {
+                      onClick:
+                        showDailyReadTesterDialog
+                    })
+                  ]
+                });
+                return;
+              }
+
               const state =
                 createDailyReadTestState(
                   verseId,

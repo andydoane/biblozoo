@@ -175,6 +175,27 @@ function testDailyContextValidation() {
     );
   });
 
+  [
+    "keyboard",
+    "unscramble",
+    "tap_words_order"
+  ].forEach((activityId) => {
+    const interactiveContext = {
+      ...context,
+      readActivityId: activityId,
+      readTestMode: "normal"
+    };
+
+    assert.deepStrictEqual(
+      ReadMyVerse.validateContext(
+        interactiveContext,
+        "romans_6_23",
+        activityId
+      ),
+      interactiveContext
+    );
+  });
+
   assert.strictEqual(
     ReadMyVerse.validateContext(
       {
@@ -205,7 +226,16 @@ function testAssetsExist() {
     "verse_images/read_my_verse/fish_small.png",
     "verse_images/read_my_verse/fish_medium.png",
     "verse_images/read_my_verse/fish_long.png",
-    "verse_images/read_my_verse/fish_hook.png"
+    "verse_images/read_my_verse/fish_hook.png",
+    "verse_fonts/VT323-Regular.ttf",
+    "verse_images/read_my_verse/keyboard_1.mp3",
+    "verse_images/read_my_verse/keyboard_2.mp3",
+    "verse_images/read_my_verse/keyboard_3.mp3",
+    "verse_images/read_my_verse/keyboard_4.mp3",
+    "verse_images/read_my_verse/keyboard_5.mp3",
+    "verse_images/read_my_verse/keyboard_6.mp3",
+    "verse_images/read_my_verse/keyboard_7.mp3",
+    "verse_images/daily_questions/dq_incorrect.mp3"
   ];
 
   assets.forEach((asset) => {
@@ -217,6 +247,370 @@ function testAssetsExist() {
       `Missing Read asset: ${asset}`
     );
   });
+}
+
+function testInteractiveActivityManifest() {
+  const expected = {
+    keyboard: "Keyboard",
+    unscramble: "Unscramble",
+    tap_words_order:
+      "Tap Words in Order"
+  };
+
+  Object.entries(expected).forEach(
+    ([activityId, title]) => {
+      assert.strictEqual(
+        ReadMyVerse.READ_ACTIVITY_MANIFEST[
+          activityId
+        ].enabled,
+        true
+      );
+      assert.strictEqual(
+        ReadMyVerse.READ_ACTIVITY_MANIFEST[
+          activityId
+        ].title,
+        title
+      );
+    }
+  );
+
+  assert.strictEqual(
+    ReadMyVerse.isTypingActivity(
+      "keyboard"
+    ),
+    true
+  );
+  assert.strictEqual(
+    ReadMyVerse.isWordActivity(
+      "unscramble"
+    ),
+    true
+  );
+}
+
+function testScramblePreservesLettersAndPunctuation() {
+  const token =
+    ReadMyVerse.splitWordToken(
+      "(Grace!),"
+    );
+
+  assert.strictEqual(token.leading, "(");
+  assert.strictEqual(token.core, "Grace");
+  assert.strictEqual(token.trailing, "!),");
+
+  const scrambled =
+    ReadMyVerse.scrambleCore(
+      "can't",
+      () => 0
+    );
+
+  assert.notStrictEqual(scrambled, "can't");
+  assert.strictEqual(scrambled[3], "'");
+  assert.deepStrictEqual(
+    Array.from(scrambled)
+      .filter(ReadMyVerse.isTypeableCharacter)
+      .map((letter) =>
+        letter.toLocaleLowerCase()
+      )
+      .sort(),
+    Array.from("cant").sort()
+  );
+
+  const puzzle =
+    ReadMyVerse.buildUnscramblePuzzle(
+      "I am in.",
+      () => 0
+    );
+
+  assert.strictEqual(puzzle.threshold, 2);
+  assert.ok(puzzle.requiredCount >= 1);
+  puzzle.tokens
+    .filter((item) => item.required)
+    .forEach((item) => {
+      assert.notStrictEqual(
+        item.scrambled,
+        item.core
+      );
+      assert.deepStrictEqual(
+        Array.from(item.scrambled)
+          .filter(
+            ReadMyVerse.isTypeableCharacter
+          )
+          .map((letter) =>
+            letter.toLocaleLowerCase()
+          )
+          .sort(),
+        Array.from(item.core)
+          .filter(
+            ReadMyVerse.isTypeableCharacter
+          )
+          .map((letter) =>
+            letter.toLocaleLowerCase()
+          )
+          .sort()
+      );
+    });
+}
+
+function testTapOrderHintsAndReset() {
+  const puzzle =
+    ReadMyVerse.buildTapOrderPuzzle(
+      "one two three",
+      () => 0.23
+    );
+  const expected = puzzle.tokens[0];
+  const wrong = puzzle.tokens.find(
+    (token) =>
+      token.normalized !==
+      expected.normalized
+  );
+
+  assert.ok(wrong);
+
+  ReadMyVerse.applyTapOrderChoice(
+    puzzle,
+    wrong.id
+  );
+  assert.strictEqual(
+    puzzle.incorrectStreak,
+    1
+  );
+  assert.strictEqual(
+    puzzle.hintedTokenId,
+    ""
+  );
+
+  ReadMyVerse.applyTapOrderChoice(
+    puzzle,
+    wrong.id
+  );
+  assert.strictEqual(
+    puzzle.incorrectStreak,
+    2
+  );
+  assert.ok(puzzle.hintedTokenId);
+
+  const correctId = puzzle.displayOrder
+    .find((id) =>
+      puzzle.tokens.find(
+        (token) => token.id === id
+      )?.normalized ===
+        expected.normalized
+    );
+  const result =
+    ReadMyVerse.applyTapOrderChoice(
+      puzzle,
+      correctId
+    );
+
+  assert.strictEqual(result.correct, true);
+  assert.strictEqual(
+    puzzle.incorrectStreak,
+    0
+  );
+  assert.strictEqual(
+    puzzle.hintedTokenId,
+    ""
+  );
+}
+
+function testDuplicateTapWordsAreFair() {
+  const puzzle =
+    ReadMyVerse.buildTapOrderPuzzle(
+      "go go now",
+      () => 0.61
+    );
+  const secondGo = puzzle.tokens[1];
+  const result =
+    ReadMyVerse.applyTapOrderChoice(
+      puzzle,
+      secondGo.id
+    );
+
+  assert.strictEqual(result.correct, true);
+  assert.strictEqual(puzzle.nextIndex, 1);
+}
+
+function testActivityEligibilityAndForcedChunks() {
+  const verse = {
+    verseText: "Alone. Two useful words.",
+    echoParts: [
+      "Alone",
+      "Two useful words"
+    ]
+  };
+
+  assert.strictEqual(
+    ReadMyVerse.isActivityEligibleForVerse(
+      "tap_words_order",
+      verse,
+      "normal"
+    ),
+    false
+  );
+  assert.strictEqual(
+    ReadMyVerse.isActivityEligibleForVerse(
+      "keyboard",
+      verse,
+      "forced_hint"
+    ),
+    false
+  );
+  assert.strictEqual(
+    ReadMyVerse.isActivityEligibleForVerse(
+      "not_real",
+      verse,
+      "normal"
+    ),
+    false
+  );
+  assert.strictEqual(
+    ReadMyVerse.isActivityEligibleForVerse(
+      "tap_words_order",
+      verse,
+      "forced_long"
+    ),
+    true
+  );
+
+  const longSelection =
+    ReadMyVerse.selectActivityChunks(
+      verse,
+      "tap_words_order",
+      "forced_long"
+    );
+  assert.deepStrictEqual(
+    longSelection.audioIndices,
+    [1]
+  );
+
+  assert.strictEqual(
+    ReadMyVerse.isActivityEligibleForVerse(
+      "unscramble",
+      {
+        verseText: "aaa",
+        echoParts: ["aaa"]
+      },
+      "normal"
+    ),
+    false
+  );
+}
+
+function testTileLayoutKeepsSolvedPositions() {
+  const css = fs.readFileSync(
+    path.join(rootDir, "read_my_verse.css"),
+    "utf8"
+  );
+
+  assert.match(
+    css,
+    /\.read-order-tile\.is-solved\s*\{[^}]*visibility:\s*hidden;/s
+  );
+  assert.match(
+    css,
+    /readKeyboardCursorBlink 1s step-end infinite/
+  );
+}
+
+function testKeyboardSoundsAreShortAndDistinct() {
+  const soundPaths = Array.from(
+    { length: 7 },
+    (_, index) => path.join(
+      rootDir,
+      `verse_images/read_my_verse/keyboard_${index + 1}.mp3`
+    )
+  );
+  const hashes = soundPaths.map(
+    (soundPath) => crypto
+      .createHash("sha256")
+      .update(fs.readFileSync(soundPath))
+      .digest("hex")
+  );
+
+  soundPaths.forEach((soundPath) => {
+    assert.ok(
+      fs.statSync(soundPath).size < 50000,
+      `${path.basename(soundPath)} should be a short keystroke sample`
+    );
+  });
+  assert.strictEqual(
+    new Set(hashes).size,
+    soundPaths.length,
+    "Keyboard samples must be distinct"
+  );
+}
+
+function testInteractiveSessionsWithoutTts() {
+  const verse = {
+    id: "interactive_preview",
+    ref: "Preview 2:1",
+    verseText:
+      "One useful part, two worthy words.",
+    echoParts: [
+      "One useful part",
+      "two worthy words"
+    ]
+  };
+  const contextFor = (activityId) => ({
+    source: "daily_todo",
+    profileId: "profile-a",
+    planId: "plan-interactive",
+    planDay: "2026-10-10",
+    taskId: "review",
+    launchToken: "token-interactive",
+    verseId: verse.id,
+    readActivityId: activityId,
+    previewScope: "read_test",
+    readTestMode: "normal"
+  });
+
+  ReadMyVerse.initialize({
+    getVerseList: () => [verse]
+  });
+
+  [
+    ["keyboard", "typing"],
+    ["unscramble", "interacting"],
+    ["tap_words_order", "interacting"]
+  ].forEach(([activityId, phase]) => {
+    assert.strictEqual(
+      ReadMyVerse.startForVerse(
+        verse.id,
+        activityId,
+        contextFor(activityId)
+      ),
+      true
+    );
+    assert.strictEqual(
+      ReadMyVerse.getSessionState().phase,
+      phase
+    );
+    ReadMyVerse.stopSession();
+  });
+
+  const invalidVerse = {
+    ...verse,
+    id: "invalid_preview",
+    verseText: "Alone.",
+    echoParts: ["Alone"]
+  };
+
+  ReadMyVerse.initialize({
+    getVerseList: () => [invalidVerse]
+  });
+  assert.strictEqual(
+    ReadMyVerse.startForVerse(
+      invalidVerse.id,
+      "tap_words_order",
+      {
+        ...contextFor("tap_words_order"),
+        verseId: invalidVerse.id
+      }
+    ),
+    false
+  );
+  ReadMyVerse.stopSession();
 }
 
 function testAnimatedActivityManifest() {
@@ -463,9 +857,17 @@ function main() {
     testDailyContextValidation,
     testAssetsExist,
     testAnimatedActivityManifest,
+    testInteractiveActivityManifest,
     testAnimatedTimingAndReducedMotion,
     testPreviewChunkModes,
+    testScramblePreservesLettersAndPunctuation,
+    testTapOrderHintsAndReset,
+    testDuplicateTapWordsAreFair,
+    testActivityEligibilityAndForcedChunks,
+    testTileLayoutKeepsSolvedPositions,
     testTypewriterSoundsAreShortAndDistinct,
+    testKeyboardSoundsAreShortAndDistinct,
+    testInteractiveSessionsWithoutTts,
     testEveryVerseChunkRecordingExists
   ];
 

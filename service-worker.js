@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_09_animated_read_a";
+const CACHE_VERSION = "2026_Oct_10_interactive_read_a";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -77,12 +77,21 @@ const CORE_PATHS = [
 
   "./verse_fonts/Baloo2.ttf",
   "./verse_fonts/SpecialElite-Regular.ttf",
+  "./verse_fonts/VT323-Regular.ttf",
 
   "./verse_images/read_my_verse/paper_phone.png",
   "./verse_images/read_my_verse/paper_ipad.png",
   "./verse_images/read_my_verse/typewriter_1.mp3",
   "./verse_images/read_my_verse/typewriter_2.mp3",
   "./verse_images/read_my_verse/typewriter_3.mp3",
+  "./verse_images/read_my_verse/keyboard_1.mp3",
+  "./verse_images/read_my_verse/keyboard_2.mp3",
+  "./verse_images/read_my_verse/keyboard_3.mp3",
+  "./verse_images/read_my_verse/keyboard_4.mp3",
+  "./verse_images/read_my_verse/keyboard_5.mp3",
+  "./verse_images/read_my_verse/keyboard_6.mp3",
+  "./verse_images/read_my_verse/keyboard_7.mp3",
+  "./verse_images/daily_questions/dq_incorrect.mp3",
   "./verse_images/read_my_verse/starfield_phone.png",
   "./verse_images/read_my_verse/starfield_ipad.png",
   "./verse_images/read_my_verse/red_balloon.png",

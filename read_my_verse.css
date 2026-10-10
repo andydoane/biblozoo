@@ -6,6 +6,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "VT323";
+  src: url("./verse_fonts/VT323-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 .read-my-verse-screen,
 .read-typewriter-stage {
   position: absolute;
@@ -223,6 +231,492 @@
 .read-typewriter-screen.is-reduced-motion .read-typewriter-char,
 .read-typewriter-screen.is-reduced-motion .read-typewriter-chunk {
   transition: none;
+}
+
+/* Keyboard ------------------------------------------------ */
+
+.read-keyboard-screen,
+.read-keyboard-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.read-keyboard-screen {
+  overflow: hidden;
+  color: #65ff72;
+  background: #000000;
+  font-family: "VT323", monospace;
+}
+
+.read-keyboard-stage {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(8px, 1.6vh, 18px);
+  overflow: hidden;
+  padding:
+    calc(22px + env(safe-area-inset-top))
+    clamp(22px, 6vw, 78px)
+    calc(20px + env(safe-area-inset-bottom));
+  color: #65ff72;
+  background:
+    radial-gradient(
+      ellipse at center,
+      #08250d 0%,
+      #020b04 52%,
+      #000000 100%
+    );
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+  isolation: isolate;
+}
+
+.read-keyboard-stage,
+.read-keyboard-stage * {
+  font-family: "VT323", monospace !important;
+}
+
+.read-keyboard-scanlines {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) 3px,
+      rgba(0, 0, 0, 0.28) 4px,
+      rgba(0, 0, 0, 0.28) 5px
+    );
+  box-shadow:
+    inset 0 0 70px rgba(0, 0, 0, 0.78),
+    inset 0 0 8px rgba(101, 255, 114, 0.16);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.read-keyboard-header,
+.read-keyboard-progress,
+.read-keyboard-terminal {
+  position: relative;
+  z-index: 4;
+}
+
+.read-keyboard-header {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  max-width: calc(100% - 94px);
+  justify-self: center;
+  text-align: center;
+  text-shadow:
+    0 0 5px rgba(101, 255, 114, 0.84),
+    0 0 16px rgba(101, 255, 114, 0.38);
+}
+
+.read-keyboard-reference {
+  font-size: clamp(29px, 7vw, 52px);
+  line-height: 0.95;
+}
+
+.read-keyboard-instruction {
+  min-height: 1em;
+  font-size: clamp(19px, 4.5vw, 30px);
+  line-height: 1;
+}
+
+.read-keyboard-terminal {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(101, 255, 114, 0.25);
+  border-radius: clamp(7px, 2vw, 16px);
+  padding: clamp(14px, 4vw, 46px);
+  background: rgba(0, 7, 1, 0.48);
+  box-shadow:
+    inset 0 0 28px rgba(0, 0, 0, 0.82),
+    0 0 18px rgba(101, 255, 114, 0.08);
+}
+
+.read-keyboard-fit {
+  color: #65ff72;
+  text-align: left;
+}
+
+.read-keyboard-body {
+  font-size: var(--smart-font-size, 48px);
+  font-weight: 400;
+  line-height: var(--smart-line-height, 1.12);
+  letter-spacing: 0.025em;
+  text-shadow:
+    0 0 4px rgba(101, 255, 114, 0.9),
+    0 0 12px rgba(101, 255, 114, 0.34);
+  text-wrap: pretty;
+}
+
+.read-keyboard-chunk {
+  border-radius: 0.12em;
+}
+
+.read-keyboard-chunk.is-listening {
+  text-shadow:
+    0 0 5px rgba(101, 255, 114, 1),
+    0 0 18px rgba(101, 255, 114, 0.72);
+}
+
+.read-keyboard-char {
+  display: inline-block;
+  opacity: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  transition: opacity 55ms linear;
+}
+
+.read-keyboard-char.is-space {
+  white-space: pre;
+}
+
+.read-keyboard-char.is-revealed {
+  opacity: 1;
+}
+
+.read-keyboard-char.is-word-feedback {
+  color: #c8ffca;
+  text-shadow:
+    0 0 6px rgba(200, 255, 202, 1),
+    0 0 18px rgba(101, 255, 114, 0.92);
+}
+
+.read-keyboard-cursor {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 0.9em;
+  vertical-align: -0.08em;
+  pointer-events: none;
+}
+
+.read-keyboard-cursor::after {
+  content: "";
+  position: absolute;
+  z-index: 3;
+  left: 0.02em;
+  bottom: 0.04em;
+  width: 0.54em;
+  height: 0.74em;
+  background: #65ff72;
+  box-shadow:
+    0 0 5px rgba(101, 255, 114, 0.95),
+    0 0 12px rgba(101, 255, 114, 0.5);
+  animation: readKeyboardCursorBlink 1s step-end infinite;
+}
+
+@keyframes readKeyboardCursorBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.read-keyboard-progress {
+  justify-self: center;
+  align-self: end;
+  padding: 2px 12px;
+  border: 1px solid rgba(101, 255, 114, 0.42);
+  color: #65ff72;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: clamp(20px, 4.5vw, 30px);
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(101, 255, 114, 0.72);
+}
+
+.read-keyboard-back {
+  color: #65ff72;
+  background: rgba(0, 15, 3, 0.88);
+  box-shadow:
+    0 0 0 1px rgba(101, 255, 114, 0.44),
+    0 0 12px rgba(101, 255, 114, 0.18);
+}
+
+.read-keyboard-stage.is-input-locked {
+  cursor: default;
+}
+
+@media (min-width: 700px) {
+  .read-keyboard-stage {
+    padding-right: clamp(70px, 10vw, 145px);
+    padding-left: clamp(70px, 10vw, 145px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .read-keyboard-cursor::after {
+    animation: none;
+    opacity: 1;
+  }
+
+  .read-keyboard-char {
+    transition: none;
+  }
+}
+
+.read-keyboard-screen.is-reduced-motion .read-keyboard-cursor::after {
+  animation: none;
+  opacity: 1;
+}
+
+/* Interactive word activities ---------------------------- */
+
+.read-word-activity-screen {
+  overflow: hidden;
+  color: #2f2940;
+  background: #f3b84b;
+  font-family: "Baloo 2", system-ui, sans-serif;
+}
+
+.read-word-activity-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(10px, 2vh, 22px);
+  overflow: hidden;
+  padding:
+    calc(20px + env(safe-area-inset-top))
+    clamp(18px, 5vw, 70px)
+    calc(20px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(
+      circle at 50% 34%,
+      rgba(255, 255, 255, 0.42),
+      rgba(255, 255, 255, 0) 48%
+    ),
+    linear-gradient(#ffd978, #eea63b);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.read-order-screen,
+.read-order-screen .read-word-activity-stage {
+  color: #ffffff;
+  background:
+    radial-gradient(
+      circle at 50% 34%,
+      rgba(130, 217, 255, 0.38),
+      rgba(130, 217, 255, 0) 48%
+    ),
+    linear-gradient(#7568d8, #46399f);
+}
+
+.read-word-activity-header,
+.read-word-activity-progress {
+  position: relative;
+  z-index: 2;
+  justify-self: center;
+  text-align: center;
+}
+
+.read-word-activity-header {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  max-width: calc(100% - 98px);
+}
+
+.read-word-activity-reference {
+  font-size: clamp(23px, 5.4vw, 40px);
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.read-word-activity-title {
+  font-size: clamp(16px, 3.8vw, 24px);
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.read-word-activity-instruction {
+  min-height: 1.25em;
+  margin-top: 4px;
+  font-size: clamp(16px, 3.8vw, 23px);
+  font-weight: 700;
+  line-height: 1.08;
+}
+
+.read-unscramble-words {
+  min-width: 0;
+  min-height: 0;
+  align-content: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 16px)
+    clamp(5px, 1.4vw, 11px);
+  overflow: auto;
+  padding: clamp(10px, 3vw, 30px);
+  -webkit-overflow-scrolling: touch;
+}
+
+.read-unscramble-token {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.42em;
+  padding: 0.12em 0.28em 0.18em;
+  color: #3d2b16;
+  background: transparent;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: clamp(25px, 6.4vw, 54px);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+button.read-unscramble-token.is-interactive {
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    0 4px 0 rgba(109, 69, 20, 0.2),
+    0 7px 16px rgba(109, 69, 20, 0.15);
+  cursor: pointer;
+}
+
+button.read-unscramble-token.is-solved {
+  color: #245c31;
+  background: rgba(229, 255, 224, 0.88);
+  box-shadow: none;
+}
+
+.read-token-punctuation {
+  opacity: 0.74;
+}
+
+.read-unscramble-token.is-word-feedback {
+  animation: readWordSuccess 330ms ease-out;
+}
+
+.read-order-grid {
+  min-width: 0;
+  min-height: 0;
+  align-content: center;
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(min(31%, 150px), 1fr));
+  gap: clamp(9px, 2.2vw, 18px);
+  overflow: auto;
+  padding: clamp(12px, 3vw, 34px);
+  -webkit-overflow-scrolling: touch;
+}
+
+.read-order-tile {
+  min-width: 0;
+  min-height: clamp(52px, 13vw, 82px);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: clamp(12px, 3vw, 20px);
+  padding: 0.22em 0.34em 0.28em;
+  color: #302777;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 5px 0 rgba(34, 27, 94, 0.28),
+    0 8px 18px rgba(34, 27, 94, 0.2);
+  font-size: clamp(22px, 5.4vw, 42px);
+  font-weight: 800;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.read-order-tile.is-solved {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.read-order-tile.is-hinted {
+  border-color: #fff06b;
+  box-shadow:
+    0 0 0 4px rgba(255, 240, 107, 0.42),
+    0 0 24px rgba(255, 240, 107, 0.82);
+  animation: readOrderHint 850ms ease-in-out infinite alternate;
+}
+
+.read-order-tile.is-wrong {
+  animation: readOrderWrong 280ms ease-out;
+}
+
+.read-order-tile.is-word-feedback {
+  animation: readWordSuccess 330ms ease-out;
+}
+
+.read-word-activity-stage.is-listening button {
+  pointer-events: none;
+}
+
+.read-word-activity-progress {
+  align-self: end;
+  padding: 5px 13px;
+  border-radius: 999px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.42);
+  font-size: clamp(14px, 3.2vw, 20px);
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.read-order-screen .read-word-activity-progress {
+  background: rgba(21, 15, 78, 0.38);
+}
+
+@keyframes readWordSuccess {
+  50% { transform: scale(1.12); }
+}
+
+@keyframes readOrderHint {
+  to { transform: scale(1.055); }
+}
+
+@keyframes readOrderWrong {
+  25% { transform: translateX(-7px); }
+  55% { transform: translateX(6px); }
+  80% { transform: translateX(-3px); }
+}
+
+@media (min-width: 700px) {
+  .read-word-activity-stage {
+    padding-right: clamp(60px, 9vw, 130px);
+    padding-left: clamp(60px, 9vw, 130px);
+  }
+
+  .read-order-grid {
+    grid-template-columns:
+      repeat(auto-fit, minmax(170px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .read-order-tile,
+  .read-unscramble-token {
+    transition: none;
+    animation: none !important;
+  }
+}
+
+.read-word-activity-screen.is-reduced-motion .read-order-tile,
+.read-word-activity-screen.is-reduced-motion .read-unscramble-token {
+  transition: none;
+  animation: none !important;
 }
 
 /* Animated Read activities -------------------------------- */
