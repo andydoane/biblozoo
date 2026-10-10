@@ -3043,7 +3043,7 @@
     }
     if (item.index + 1 < state.chunks.length) {
       // Earlier chunks stay in the DOM and continue their own journey.
-      crawlTimer(session, () => launchCrawlChunk(session, item.index + 1), 1000);
+      crawlTimer(session, () => launchCrawlChunk(session, item.index + 1), 100);
     } else {
       completeCrawlIfReady(session);
     }
