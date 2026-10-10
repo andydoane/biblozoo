@@ -113,17 +113,27 @@ function makePlanState({
   state.stats.lastCompletedDay = lastCompletedDay;
   state.stats.totalTasks = totalTasks;
   state.activePlan = {
+    kind: DailyTodo.PLAN_KINDS.CARE,
     id: `plan-${day}`,
     profileId: "profile-a",
     day,
     verseId: "verse_a",
+    requiredTaskIds: [
+      DailyTodo.TASK_IDS.REVIEW,
+      DailyTodo.TASK_IDS.QUESTIONS,
+      DailyTodo.TASK_IDS.ACTIVITY
+    ],
+    reviewAssignment: {
+      kind: DailyTodo.REVIEW_KINDS.FLASHCARD,
+      activityId: ""
+    },
     activity: {
       kind: DailyTodo.ACTIVITY_KINDS.GAME,
       id: "game_a",
       mode: "easy"
     },
     tasks: {
-      flashcard: {
+      review: {
         status: "complete",
         startedAt: 1,
         pendingAt: 2,
@@ -1072,32 +1082,32 @@ function testPendingStateIsDistinctFromComplete() {
 
   const started = DailyTodo.beginTask(state, {
     planId: "plan-a",
-    taskId: "flashcard",
+    taskId: "review",
     now: new Date(2026, 9, 5, 10, 0, 0),
     random: () => 0
   });
   state = started.state;
-  assert.strictEqual(state.activePlan.tasks.flashcard.status, "running");
+  assert.strictEqual(state.activePlan.tasks.review.status, "running");
 
   const pending = DailyTodo.setPendingCompletion(state, {
     planId: "plan-a",
-    taskId: "flashcard",
+    taskId: "review",
     launchToken: started.launchToken,
     pendingData: { source: "flashcard" },
     now: new Date(2026, 9, 5, 10, 5, 0)
   });
   state = pending.state;
 
-  assert.strictEqual(state.activePlan.tasks.flashcard.status, "pending");
+  assert.strictEqual(state.activePlan.tasks.review.status, "pending");
   assert.strictEqual(state.stats.totalTasks, 0);
 
   const confirmed = DailyTodo.confirmPendingCompletion(state, {
     planId: "plan-a",
-    taskId: "flashcard",
+    taskId: "review",
     now: new Date(2026, 9, 5, 10, 6, 0)
   });
 
-  assert.strictEqual(confirmed.state.activePlan.tasks.flashcard.status, "complete");
+  assert.strictEqual(confirmed.state.activePlan.tasks.review.status, "complete");
   assert.strictEqual(confirmed.state.stats.totalTasks, 1);
 }
 
@@ -1108,7 +1118,7 @@ function testHomePlanProgressSummary() {
   );
 
   assert.deepStrictEqual(summary.taskComplete, {
-    flashcard: true,
+    review: true,
     questions: true,
     activity: false
   });
@@ -1231,7 +1241,7 @@ function testResetActivePlanProgress() {
     }
   );
 
-  Object.values(DailyTodo.TASK_IDS)
+  reset.state.activePlan.requiredTaskIds
     .forEach((taskId) => {
       const task =
         reset.state.activePlan.tasks[taskId];
@@ -1354,6 +1364,368 @@ function testEarnedBadgesNeverDisappear() {
   );
 }
 
+function testVersion2PlanMigratesWithoutLosingWork() {
+  const state = DailyTodo.normalizeState({
+    version: 2,
+    activePlan: {
+      id: "legacy-plan",
+      profileId: "profile-a",
+      day: "2026-10-05",
+      verseId: "verse_a",
+      activity: {
+        kind: "game",
+        id: "game_a",
+        mode: "medium"
+      },
+      earnedStarPegCount: 2,
+      tasks: {
+        flashcard: {
+          status: "pending",
+          startedAt: 100,
+          pendingAt: 200,
+          completedAt: 0,
+          launchToken: "legacy-token",
+          pendingData: {
+            planId: "legacy-plan",
+            taskId: "flashcard",
+            source: "flashcard"
+          }
+        },
+        questions: {
+          status: "complete",
+          completedAt: 150
+        },
+        activity: {
+          status: "running",
+          startedAt: 175,
+          launchToken: "activity-token"
+        }
+      },
+      educationalCompletedAt: 0,
+      snack: {
+        unlocked: false,
+        claimed: false,
+        claimedAt: 0
+      },
+      rolloverHold: {
+        taskId: "flashcard",
+        launchToken: "legacy-token",
+        startedAt: 100
+      }
+    },
+    stats: {
+      totalTasks: 1
+    }
+  });
+
+  assert.strictEqual(state.version, 3);
+  assert.strictEqual(
+    state.activePlan.kind,
+    DailyTodo.PLAN_KINDS.CARE
+  );
+  assert.deepStrictEqual(
+    state.activePlan.requiredTaskIds,
+    ["review", "questions", "activity"]
+  );
+  assert.strictEqual(
+    state.activePlan.reviewAssignment.kind,
+    DailyTodo.REVIEW_KINDS.FLASHCARD
+  );
+  assert.strictEqual(
+    state.activePlan.tasks.review.status,
+    "pending"
+  );
+  assert.strictEqual(
+    state.activePlan.tasks.review.launchToken,
+    "legacy-token"
+  );
+  assert.strictEqual(
+    state.activePlan.tasks.review.pendingData.taskId,
+    "review"
+  );
+  assert.strictEqual(
+    state.activePlan.tasks.flashcard,
+    undefined
+  );
+  assert.strictEqual(
+    state.activePlan.tasks.activity.status,
+    "running"
+  );
+  assert.strictEqual(
+    state.activePlan.earnedStarPegCount,
+    2
+  );
+  assert.deepStrictEqual(
+    state.activePlan.rolloverHold,
+    {
+      taskId: "review",
+      launchToken: "legacy-token",
+      startedAt: 100
+    }
+  );
+}
+
+function testTwoTaskPlanProgressAndExactOnceCompletion() {
+  let state = DailyTodo.normalizeState({
+    version: 3,
+    activePlan: {
+      kind: "new_pet",
+      id: "new-pet-plan",
+      profileId: "profile-a",
+      day: "2026-10-05",
+      verseId: "",
+      requiredTaskIds: ["learn", "activity"],
+      activity: {
+        kind: "game",
+        id: "game_a",
+        mode: "easy"
+      },
+      tasks: {
+        learn: { status: "open" },
+        activity: { status: "open" }
+      },
+      snack: {
+        unlocked: true,
+        claimed: false
+      }
+    }
+  });
+
+  let summary = DailyTodo.getPlanProgress(
+    state.activePlan
+  );
+  assert.strictEqual(summary.requiredCount, 2);
+  assert.strictEqual(summary.completeCount, 0);
+  assert.strictEqual(state.activePlan.snack, null);
+
+  for (const taskId of ["learn", "activity"]) {
+    const started = DailyTodo.beginTask(state, {
+      planId: "new-pet-plan",
+      taskId,
+      now: new Date(2026, 9, 5, 10, 0, 0),
+      random: () => 0
+    });
+    const pending = DailyTodo.setPendingCompletion(
+      started.state,
+      {
+        planId: "new-pet-plan",
+        taskId,
+        launchToken: started.launchToken,
+        now: new Date(2026, 9, 5, 10, 5, 0)
+      }
+    );
+    const confirmed =
+      DailyTodo.confirmPendingCompletion(
+        pending.state,
+        {
+          planId: "new-pet-plan",
+          taskId,
+          now: new Date(2026, 9, 5, 10, 6, 0)
+        }
+      );
+    state = confirmed.state;
+  }
+
+  summary = DailyTodo.getPlanProgress(
+    state.activePlan
+  );
+  assert.strictEqual(summary.completeCount, 2);
+  assert.strictEqual(summary.educationalComplete, true);
+  assert.strictEqual(summary.feedingTime, false);
+  assert.strictEqual(state.stats.totalTasks, 2);
+  assert.strictEqual(state.stats.currentStreak, 1);
+
+  const duplicate =
+    DailyTodo.confirmPendingCompletion(state, {
+      planId: "new-pet-plan",
+      taskId: "activity",
+      now: new Date(2026, 9, 5, 10, 7, 0)
+    });
+  assert.strictEqual(duplicate.changed, false);
+  assert.strictEqual(duplicate.state.stats.totalTasks, 2);
+
+  const snack = DailyTodo.markSnackClaimed(
+    duplicate.state,
+    {
+      planId: "new-pet-plan",
+      now: new Date(2026, 9, 5, 10, 8, 0)
+    }
+  );
+  assert.strictEqual(snack.changed, false);
+}
+
+function testPerVerseHistoryAdvancesOnConfirmationOnly() {
+  let state = DailyTodo.createDefaultState();
+  state.activePlan = {
+    kind: "care",
+    id: "history-plan",
+    profileId: "profile-a",
+    day: "2026-10-05",
+    verseId: "verse_a",
+    requiredTaskIds: [
+      "review",
+      "questions",
+      "activity"
+    ],
+    reviewAssignment: {
+      kind: "read",
+      activityId: "balloons"
+    },
+    activity: {
+      kind: "game",
+      id: "game_a",
+      mode: "easy"
+    },
+    tasks: {
+      review: { status: "open" },
+      questions: { status: "open" },
+      activity: { status: "open" }
+    },
+    educationalCompletedAt: 0,
+    snack: {
+      unlocked: false,
+      claimed: false,
+      claimedAt: 0
+    }
+  };
+
+  const launched = DailyTodo.beginTask(state, {
+    planId: "history-plan",
+    taskId: "questions",
+    now: new Date(2026, 9, 5, 9, 0, 0),
+    random: () => 0
+  });
+  state = launched.state;
+  assert.deepStrictEqual(state.byVerse, {});
+
+  const questionPending =
+    DailyTodo.setPendingCompletion(state, {
+      planId: "history-plan",
+      taskId: "questions",
+      launchToken: launched.launchToken,
+      pendingData: {
+        generatedQuestionTypes: [
+          "missing_word",
+          "application"
+        ]
+      },
+      now: new Date(2026, 9, 5, 9, 5, 0)
+    });
+  assert.deepStrictEqual(
+    questionPending.state.byVerse,
+    {}
+  );
+
+  const questionConfirmed =
+    DailyTodo.confirmPendingCompletion(
+      questionPending.state,
+      {
+        planId: "history-plan",
+        taskId: "questions",
+        now: new Date(2026, 9, 5, 9, 6, 0)
+      }
+    );
+  state = questionConfirmed.state;
+  assert.strictEqual(
+    state.byVerse.verse_a.questionsCompleted,
+    1
+  );
+  assert.deepStrictEqual(
+    state.byVerse.verse_a
+      .recentGeneratedQuestionTypes,
+    ["missing_word", "application"]
+  );
+
+  const readStarted = DailyTodo.beginTask(state, {
+    planId: "history-plan",
+    taskId: "review",
+    now: new Date(2026, 9, 5, 9, 10, 0),
+    random: () => 0
+  });
+  const readPending = DailyTodo.setPendingCompletion(
+    readStarted.state,
+    {
+      planId: "history-plan",
+      taskId: "review",
+      launchToken: readStarted.launchToken,
+      now: new Date(2026, 9, 5, 9, 15, 0)
+    }
+  );
+  const readConfirmed =
+    DailyTodo.confirmPendingCompletion(
+      readPending.state,
+      {
+        planId: "history-plan",
+        taskId: "review",
+        now: new Date(2026, 9, 5, 9, 16, 0)
+      }
+    );
+  state = readConfirmed.state;
+  assert.strictEqual(
+    state.byVerse.verse_a.readActivities
+      .balloons.completedCount,
+    1
+  );
+  assert.strictEqual(
+    state.byVerse.verse_a.readActivities
+      .balloons.lastCompletedAt,
+    new Date(2026, 9, 5, 9, 16, 0)
+      .getTime()
+  );
+
+  const activityStarted = DailyTodo.beginTask(
+    state,
+    {
+      planId: "history-plan",
+      taskId: "activity",
+      now: new Date(2026, 9, 5, 9, 20, 0),
+      random: () => 0
+    }
+  );
+  const activityPending =
+    DailyTodo.setPendingCompletion(
+      activityStarted.state,
+      {
+        planId: "history-plan",
+        taskId: "activity",
+        launchToken:
+          activityStarted.launchToken,
+        now: new Date(2026, 9, 5, 9, 25, 0)
+      }
+    );
+  const activityConfirmed =
+    DailyTodo.confirmPendingCompletion(
+      activityPending.state,
+      {
+        planId: "history-plan",
+        taskId: "activity",
+        now: new Date(2026, 9, 5, 9, 26, 0)
+      }
+    );
+  state = activityConfirmed.state;
+  assert.strictEqual(
+    state.byVerse.verse_a.completedDailyTodos,
+    1
+  );
+
+  const duplicate =
+    DailyTodo.confirmPendingCompletion(state, {
+      planId: "history-plan",
+      taskId: "activity",
+      now: new Date(2026, 9, 5, 9, 27, 0)
+    });
+  assert.strictEqual(
+    duplicate.state.byVerse.verse_a
+      .completedDailyTodos,
+    1
+  );
+  assert.strictEqual(
+    duplicate.state.byVerse.verse_a
+      .questionsCompleted,
+    1
+  );
+}
+
 function testDefensiveNormalization() {
   const state = DailyTodo.normalizeState({
     version: 999,
@@ -1363,6 +1735,27 @@ function testDefensiveNormalization() {
       bestStreak: "not-a-number",
       totalTasks: -3,
       recentAssignments: [null, { day: "bad", id: "x" }]
+    },
+    byVerse: {
+      verse_a: {
+        completedDailyTodos: -2,
+        questionsCompleted: "3.9",
+        recentGeneratedQuestionTypes: [
+          "one",
+          "two",
+          "three",
+          "four",
+          "five",
+          "six",
+          "seven"
+        ],
+        readActivities: {
+          balloons: {
+            completedCount: -1,
+            lastCompletedAt: "bad"
+          }
+        }
+      }
     }
   });
 
@@ -1372,6 +1765,27 @@ function testDefensiveNormalization() {
   assert.strictEqual(state.stats.bestStreak, 0);
   assert.strictEqual(state.stats.totalTasks, 0);
   assert.deepStrictEqual(state.stats.recentAssignments, []);
+  assert.strictEqual(
+    state.byVerse.verse_a.completedDailyTodos,
+    0
+  );
+  assert.strictEqual(
+    state.byVerse.verse_a.questionsCompleted,
+    3
+  );
+  assert.deepStrictEqual(
+    state.byVerse.verse_a
+      .recentGeneratedQuestionTypes,
+    ["two", "three", "four", "five", "six", "seven"]
+  );
+  assert.deepStrictEqual(
+    state.byVerse.verse_a.readActivities
+      .balloons,
+    {
+      completedCount: 0,
+      lastCompletedAt: 0
+    }
+  );
 }
 
 function main() {
@@ -1406,6 +1820,9 @@ function main() {
     testResetActivePlanProgress,
     testResetCompletedPlanRollsBackToday,
     testEarnedBadgesNeverDisappear,
+    testVersion2PlanMigratesWithoutLosingWork,
+    testTwoTaskPlanProgressAndExactOnceCompletion,
+    testPerVerseHistoryAdvancesOnConfirmationOnly,
     testDefensiveNormalization
   ];
 

@@ -4870,12 +4870,37 @@ function getDailyHomePlanView(plan) {
     engine.getPlanProgress?.(plan);
   if (!progress) return null;
 
+  const taskLabels = {
+    review:
+      plan.reviewAssignment?.kind ===
+      engine.REVIEW_KINDS?.READ
+        ? "Read"
+        : "Flashcard",
+    questions: "Questions",
+    activity:
+      plan.kind ===
+      engine.PLAN_KINDS?.NEW_PET
+        ? "Game"
+        : "Activity",
+    learn: "Learn"
+  };
+
   return {
-    taskComplete: [
-      progress.taskComplete.flashcard,
-      progress.taskComplete.questions,
-      progress.taskComplete.activity
-    ],
+    taskItems:
+      progress.requiredTaskIds.map(
+        (taskId) => ({
+          taskId,
+          label:
+            taskLabels[taskId] ||
+            "Task",
+          complete:
+            progress.taskComplete[
+              taskId
+            ] === true
+        })
+      ),
+    requiredCount:
+      progress.requiredCount,
     completeCount: progress.completeCount,
     educationalComplete:
       progress.educationalComplete,
@@ -5058,8 +5083,8 @@ function startDailyTodoFlashcard(
     loaded;
   const plan = state.activePlan;
   const taskId =
-    engine.TASK_IDS?.FLASHCARD ||
-    "flashcard";
+    engine.TASK_IDS?.REVIEW ||
+    "review";
   const task = plan?.tasks?.[taskId];
   const openStatus =
     engine.TASK_STATUSES?.OPEN ||
@@ -5169,8 +5194,8 @@ function completeDailyTodoFlashcard({
     loaded;
   const plan = state.activePlan;
   const taskId =
-    engine.TASK_IDS?.FLASHCARD ||
-    "flashcard";
+    engine.TASK_IDS?.REVIEW ||
+    "review";
   const task = plan?.tasks?.[taskId];
   const runningStatus =
     engine.TASK_STATUSES?.RUNNING ||
@@ -5184,13 +5209,18 @@ function completeDailyTodoFlashcard({
     String(
       context.launchToken || ""
     ).trim();
+  const contextTaskId =
+    engine.resolveTaskId?.(
+      plan,
+      context.taskId
+    ) || String(context.taskId || "");
 
   if (
     !plan ||
     context.profileId !== profileId ||
     context.planId !== plan.id ||
     context.planDay !== plan.day ||
-    context.taskId !== taskId ||
+    contextTaskId !== taskId ||
     context.verseId !== plan.verseId ||
     safeVerseId !== plan.verseId ||
     !launchToken ||
@@ -5543,12 +5573,16 @@ function getReadyDailySnackRuntime(
   const completeStatus =
     engine.TASK_STATUSES?.COMPLETE ||
     "complete";
-  const taskIds = Object.values(
-    engine.TASK_IDS || {}
-  );
+  const taskIds =
+    engine.getRequiredTaskIds?.(plan) ||
+    plan?.requiredTaskIds ||
+    [];
 
   if (
     !plan ||
+    plan.kind !==
+      (engine.PLAN_KINDS?.CARE ||
+        "care") ||
     plan.id !== requestedPlan?.id ||
     plan.profileId !== profileId ||
     plan.day !== engine.localDayKey?.(now) ||
@@ -13118,28 +13152,23 @@ function screenTitle(idx) {
         )
       : "";
 
-  const dailyTaskLabels = [
-    "Flashcard",
-    "Questions",
-    "Activity"
-  ];
   const dailyProgressHtml =
     dailyHomeView
       ? `
         <div
           class="title-todo-progress"
-          aria-label="${dailyHomeView.completeCount} of 3 Daily Tasks complete"
+          aria-label="${dailyHomeView.completeCount} of ${dailyHomeView.requiredCount} Daily Tasks complete"
         >
-          ${dailyHomeView.taskComplete
-            .map((complete, index) => `
+          ${dailyHomeView.taskItems
+            .map((item) => `
               <span class="title-todo-progress-item">
                 <img
                   class="title-todo-progress-check"
-                  src="${IMG_DIR}daily_zoo_todo/${complete ? "checkbox_complete.png" : "checkbox_empty.png"}"
+                  src="${IMG_DIR}daily_zoo_todo/${item.complete ? "checkbox_complete.png" : "checkbox_empty.png"}"
                   alt=""
                   draggable="false"
                 >
-                <span>${dailyTaskLabels[index]}</span>
+                <span>${escapeHtml(item.label)}</span>
               </span>
             `)
             .join("")}
@@ -13327,7 +13356,7 @@ function screenTitle(idx) {
         class="title-todo-btn no-zoom${tutorialActive ? " is-tutorial-prompt" : ""}"
         id="titleTodoBtn"
         type="button"
-        aria-label="Open Zoo To-Do${dailyHomeView ? `, ${dailyHomeView.completeCount} of 3 Daily Tasks complete` : ""}"
+        aria-label="Open Zoo To-Do${dailyHomeView ? `, ${dailyHomeView.completeCount} of ${dailyHomeView.requiredCount} Daily Tasks complete` : ""}"
       >
         <img
           class="title-todo-img"
@@ -13952,7 +13981,7 @@ function screenTitle(idx) {
         showDialog({
           title: "Reset Today’s Zoo To-Do?",
           body:
-            "This resets today’s three checkboxes and snack so you can test the same plan again. Verse, pet, and normal activity progress will stay intact.",
+            "This resets today’s task checkboxes and snack so you can test the same plan again. Verse, pet, and normal activity progress will stay intact.",
           actions: [
             dlgBtn("Cancel", {
               secondary: true,
@@ -16228,8 +16257,8 @@ function screenTodoDev(idx) {
     const engine =
       window.BibloZooDailyTodo;
     const taskId =
-      engine?.TASK_IDS?.FLASHCARD ||
-      "flashcard";
+      engine?.TASK_IDS?.REVIEW ||
+      "review";
     const task =
       dailyPreviewPlan.tasks?.[taskId];
     const launchableStatuses = [

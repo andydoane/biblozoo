@@ -11,9 +11,16 @@
 })(typeof window !== "undefined" ? window : null, function () {
   "use strict";
 
-  const STATE_VERSION = 2;
+  const STATE_VERSION = 3;
   const RECENT_ASSIGNMENT_DAYS = 3;
   const RECENT_ASSIGNMENT_HISTORY_LIMIT = 40;
+  const RECENT_QUESTION_TYPE_HISTORY_LIMIT = 6;
+  const LEGACY_FLASHCARD_TASK_ID = "flashcard";
+
+  const PLAN_KINDS = Object.freeze({
+    CARE: "care",
+    NEW_PET: "new_pet"
+  });
 
   const STREAK_BADGE_THRESHOLDS = Object.freeze([
     3, 7, 14, 28, 50, 100, 200, 300, 365
@@ -48,9 +55,38 @@
   });
 
   const TASK_IDS = Object.freeze({
-    FLASHCARD: "flashcard",
+    REVIEW: "review",
     QUESTIONS: "questions",
-    ACTIVITY: "activity"
+    ACTIVITY: "activity",
+    LEARN: "learn"
+  });
+
+  const REVIEW_KINDS = Object.freeze({
+    FLASHCARD: "flashcard",
+    READ: "read"
+  });
+
+  const READ_ACTIVITY_IDS = Object.freeze([
+    "star_wars",
+    "balloons",
+    "fish",
+    "typewriter",
+    "keyboard",
+    "unscramble",
+    "tap_words_order",
+    "chunk_sequence"
+  ]);
+
+  const DEFAULT_REQUIRED_TASK_IDS = Object.freeze({
+    [PLAN_KINDS.CARE]: Object.freeze([
+      TASK_IDS.REVIEW,
+      TASK_IDS.QUESTIONS,
+      TASK_IDS.ACTIVITY
+    ]),
+    [PLAN_KINDS.NEW_PET]: Object.freeze([
+      TASK_IDS.LEARN,
+      TASK_IDS.ACTIVITY
+    ])
   });
 
   const TASK_STATUSES = Object.freeze({
@@ -90,6 +126,67 @@
 
   function cleanString(value) {
     return String(value || "").trim();
+  }
+
+  function normalizePlanKind(value) {
+    return Object.values(PLAN_KINDS).includes(value)
+      ? value
+      : PLAN_KINDS.CARE;
+  }
+
+  function normalizeTaskId(value) {
+    const taskId = cleanString(value);
+
+    if (taskId === LEGACY_FLASHCARD_TASK_ID) {
+      return TASK_IDS.REVIEW;
+    }
+
+    return Object.values(TASK_IDS).includes(taskId)
+      ? taskId
+      : "";
+  }
+
+  function normalizeRequiredTaskIds(
+    rawTaskIds,
+    planKind = PLAN_KINDS.CARE
+  ) {
+    const kind = normalizePlanKind(planKind);
+    const normalized = [];
+
+    if (Array.isArray(rawTaskIds)) {
+      rawTaskIds.forEach((value) => {
+        const taskId = normalizeTaskId(value);
+
+        if (
+          taskId &&
+          !normalized.includes(taskId)
+        ) {
+          normalized.push(taskId);
+        }
+      });
+    }
+
+    return normalized.length
+      ? normalized
+      : [...DEFAULT_REQUIRED_TASK_IDS[kind]];
+  }
+
+  function getRequiredTaskIds(rawPlan) {
+    if (!isPlainObject(rawPlan)) return [];
+
+    return normalizeRequiredTaskIds(
+      rawPlan.requiredTaskIds,
+      rawPlan.kind
+    );
+  }
+
+  function resolveTaskId(rawPlan, value) {
+    const taskId = normalizeTaskId(value);
+
+    return taskId &&
+      getRequiredTaskIds(rawPlan).includes(taskId)
+      ? taskId
+      : "";
   }
 
   function toNonNegativeInteger(value) {
@@ -180,7 +277,26 @@
     };
   }
 
-  function normalizeTask(rawTask) {
+  function normalizePendingData(
+    rawPendingData,
+    taskId
+  ) {
+    if (!isPlainObject(rawPendingData)) {
+      return null;
+    }
+
+    const pendingData = cloneJson(
+      rawPendingData
+    );
+
+    if (pendingData.taskId) {
+      pendingData.taskId = taskId;
+    }
+
+    return pendingData;
+  }
+
+  function normalizeTask(rawTask, taskId = "") {
     const raw = isPlainObject(rawTask)
       ? rawTask
       : {};
@@ -191,9 +307,10 @@
       pendingAt: toTimestamp(raw.pendingAt),
       completedAt: toTimestamp(raw.completedAt),
       launchToken: cleanString(raw.launchToken),
-      pendingData: isPlainObject(raw.pendingData)
-        ? cloneJson(raw.pendingData)
-        : null
+      pendingData: normalizePendingData(
+        raw.pendingData,
+        taskId
+      )
     };
 
     if (task.status === TASK_STATUSES.COMPLETE) {
@@ -201,6 +318,121 @@
     }
 
     return task;
+  }
+
+  function createDefaultReadActivityHistory() {
+    return {
+      completedCount: 0,
+      lastCompletedAt: 0
+    };
+  }
+
+  function normalizeReadActivityHistory(rawHistory) {
+    const raw = isPlainObject(rawHistory)
+      ? rawHistory
+      : {};
+
+    return {
+      completedCount:
+        toNonNegativeInteger(
+          raw.completedCount
+        ),
+      lastCompletedAt:
+        toTimestamp(raw.lastCompletedAt)
+    };
+  }
+
+  function createDefaultVerseHistory() {
+    const readActivities = {};
+
+    READ_ACTIVITY_IDS.forEach((activityId) => {
+      readActivities[activityId] =
+        createDefaultReadActivityHistory();
+    });
+
+    return {
+      completedDailyTodos: 0,
+      questionsCompleted: 0,
+      recentGeneratedQuestionTypes: [],
+      readActivities
+    };
+  }
+
+  function normalizeVerseHistory(rawHistory) {
+    const raw = isPlainObject(rawHistory)
+      ? rawHistory
+      : {};
+    const rawReadActivities =
+      isPlainObject(raw.readActivities)
+        ? raw.readActivities
+        : {};
+    const history = createDefaultVerseHistory();
+
+    history.completedDailyTodos =
+      toNonNegativeInteger(
+        raw.completedDailyTodos
+      );
+    history.questionsCompleted =
+      toNonNegativeInteger(
+        raw.questionsCompleted
+      );
+    history.recentGeneratedQuestionTypes =
+      Array.isArray(
+        raw.recentGeneratedQuestionTypes
+      )
+        ? raw.recentGeneratedQuestionTypes
+            .map(cleanString)
+            .filter(Boolean)
+            .slice(
+              -RECENT_QUESTION_TYPE_HISTORY_LIMIT
+            )
+        : [];
+
+    READ_ACTIVITY_IDS.forEach((activityId) => {
+      history.readActivities[activityId] =
+        normalizeReadActivityHistory(
+          rawReadActivities[activityId]
+        );
+    });
+
+    return history;
+  }
+
+  function normalizeByVerse(rawByVerse) {
+    if (!isPlainObject(rawByVerse)) {
+      return {};
+    }
+
+    return Object.entries(rawByVerse)
+      .reduce((result, [verseId, value]) => {
+        const safeVerseId = cleanString(verseId);
+
+        if (safeVerseId) {
+          result[safeVerseId] =
+            normalizeVerseHistory(value);
+        }
+
+        return result;
+      }, {});
+  }
+
+  function getOrCreateVerseHistory(
+    state,
+    verseId
+  ) {
+    const safeVerseId = cleanString(verseId);
+    if (!state || !safeVerseId) return null;
+
+    if (!isPlainObject(state.byVerse)) {
+      state.byVerse = {};
+    }
+
+    state.byVerse[safeVerseId] =
+      normalizeVerseHistory(
+        state.byVerse[safeVerseId]
+      );
+
+    return state.byVerse[safeVerseId];
   }
 
   function createDefaultStats() {
@@ -279,14 +511,49 @@
     return { kind, id, mode };
   }
 
-  function normalizeRolloverHold(rawHold) {
+  function normalizeReviewAssignment(
+    rawAssignment
+  ) {
+    const raw = isPlainObject(rawAssignment)
+      ? rawAssignment
+      : {};
+    const kind = Object.values(
+      REVIEW_KINDS
+    ).includes(raw.kind)
+      ? raw.kind
+      : REVIEW_KINDS.FLASHCARD;
+    const activityId =
+      kind === REVIEW_KINDS.READ
+        ? cleanString(raw.activityId)
+        : "";
+
+    if (
+      kind === REVIEW_KINDS.READ &&
+      !READ_ACTIVITY_IDS.includes(activityId)
+    ) {
+      return {
+        kind: REVIEW_KINDS.FLASHCARD,
+        activityId: ""
+      };
+    }
+
+    return { kind, activityId };
+  }
+
+  function normalizeRolloverHold(
+    rawHold,
+    plan
+  ) {
     if (!isPlainObject(rawHold)) return null;
 
-    const taskId = cleanString(rawHold.taskId);
+    const taskId = resolveTaskId(
+      plan,
+      rawHold.taskId
+    );
     const launchToken = cleanString(rawHold.launchToken);
     const startedAt = toTimestamp(rawHold.startedAt);
 
-    if (!Object.values(TASK_IDS).includes(taskId)) return null;
+    if (!taskId) return null;
     if (!launchToken || !startedAt) return null;
 
     return { taskId, launchToken, startedAt };
@@ -295,15 +562,29 @@
   function normalizePlan(rawPlan) {
     if (!isPlainObject(rawPlan)) return null;
 
+    const kind = normalizePlanKind(
+      rawPlan.kind
+    );
     const id = cleanString(rawPlan.id);
     const profileId = cleanString(rawPlan.profileId);
     const day = cleanString(rawPlan.day);
     const verseId = cleanString(rawPlan.verseId);
     const activity = normalizeActivity(rawPlan.activity);
 
-    if (!id || !isValidDayKey(day) || !verseId || !activity) {
+    if (
+      !id ||
+      !isValidDayKey(day) ||
+      (kind === PLAN_KINDS.CARE && !verseId) ||
+      !activity
+    ) {
       return null;
     }
+
+    const requiredTaskIds =
+      normalizeRequiredTaskIds(
+        rawPlan.requiredTaskIds,
+        kind
+      );
 
     const rawTasks = isPlainObject(rawPlan.tasks)
       ? rawPlan.tasks
@@ -316,25 +597,46 @@
     const rawSnack = isPlainObject(rawPlan.snack)
       ? rawPlan.snack
       : {};
+    const snack = kind === PLAN_KINDS.CARE
+      ? {
+          unlocked:
+            educationalCompletedAt > 0 ||
+            rawSnack.unlocked === true,
+          claimed: rawSnack.claimed === true,
+          claimedAt:
+            toTimestamp(rawSnack.claimedAt)
+        }
+      : null;
 
-    const snack = {
-      unlocked: educationalCompletedAt > 0 || rawSnack.unlocked === true,
-      claimed: rawSnack.claimed === true,
-      claimedAt: toTimestamp(rawSnack.claimedAt)
-    };
-
-    if (!snack.unlocked) {
+    if (snack && !snack.unlocked) {
       snack.claimed = false;
       snack.claimedAt = 0;
     }
 
-    const tasks = {
-      [TASK_IDS.FLASHCARD]: normalizeTask(rawTasks[TASK_IDS.FLASHCARD]),
-      [TASK_IDS.QUESTIONS]: normalizeTask(rawTasks[TASK_IDS.QUESTIONS]),
-      [TASK_IDS.ACTIVITY]: normalizeTask(rawTasks[TASK_IDS.ACTIVITY])
+    const tasks = {};
+
+    requiredTaskIds.forEach((taskId) => {
+      const rawTask =
+        taskId === TASK_IDS.REVIEW
+          ? rawTasks[TASK_IDS.REVIEW] ||
+            rawTasks[
+              LEGACY_FLASHCARD_TASK_ID
+            ]
+          : rawTasks[taskId];
+
+      tasks[taskId] = normalizeTask(
+        rawTask,
+        taskId
+      );
+    });
+
+    const planIdentity = {
+      kind,
+      requiredTaskIds
     };
     const normalizedHold = normalizeRolloverHold(
-      rawPlan.rolloverHold
+      rawPlan.rolloverHold,
+      planIdentity
     );
     const heldTask = normalizedHold
       ? tasks[normalizedHold.taskId]
@@ -351,10 +653,20 @@
         : null;
 
     return {
+      kind,
       id,
       profileId,
       day,
       verseId,
+      requiredTaskIds,
+      reviewAssignment:
+        requiredTaskIds.includes(
+          TASK_IDS.REVIEW
+        )
+          ? normalizeReviewAssignment(
+              rawPlan.reviewAssignment
+            )
+          : null,
       activity,
       earnedStarPegCount: Math.min(
         2,
@@ -373,7 +685,8 @@
     return {
       version: STATE_VERSION,
       activePlan: null,
-      stats: createDefaultStats()
+      stats: createDefaultStats(),
+      byVerse: {}
     };
   }
 
@@ -385,7 +698,8 @@
     return {
       version: STATE_VERSION,
       activePlan: normalizePlan(raw.activePlan),
-      stats: normalizeStats(raw.stats)
+      stats: normalizeStats(raw.stats),
+      byVerse: normalizeByVerse(raw.byVerse)
     };
   }
 
@@ -780,19 +1094,33 @@
   }
 
   function createPlan({
+    kind = PLAN_KINDS.CARE,
     profileId = "",
     day = "",
     verseId = "",
     activity = null,
+    requiredTaskIds = null,
+    reviewAssignment = null,
     now = new Date(),
     random = Math.random,
     idFactory = null
   } = {}) {
+    const safeKind = normalizePlanKind(kind);
     const safeDay = cleanString(day);
     const safeVerseId = cleanString(verseId);
     const safeActivity = normalizeActivity(activity);
+    const safeRequiredTaskIds =
+      normalizeRequiredTaskIds(
+        requiredTaskIds,
+        safeKind
+      );
 
-    if (!isValidDayKey(safeDay) || !safeVerseId || !safeActivity) {
+    if (
+      !isValidDayKey(safeDay) ||
+      (safeKind === PLAN_KINDS.CARE &&
+        !safeVerseId) ||
+      !safeActivity
+    ) {
       return null;
     }
 
@@ -812,24 +1140,40 @@
 
     if (!id) return null;
 
+    const tasks = {};
+
+    safeRequiredTaskIds.forEach((taskId) => {
+      tasks[taskId] = createDefaultTask();
+    });
+
     return {
+      kind: safeKind,
       id,
       profileId: cleanString(profileId),
       day: safeDay,
       verseId: safeVerseId,
+      requiredTaskIds:
+        safeRequiredTaskIds,
+      reviewAssignment:
+        safeRequiredTaskIds.includes(
+          TASK_IDS.REVIEW
+        )
+          ? normalizeReviewAssignment(
+              reviewAssignment
+            )
+          : null,
       activity: safeActivity,
       earnedStarPegCount: 0,
-      tasks: {
-        [TASK_IDS.FLASHCARD]: createDefaultTask(),
-        [TASK_IDS.QUESTIONS]: createDefaultTask(),
-        [TASK_IDS.ACTIVITY]: createDefaultTask()
-      },
+      tasks,
       educationalCompletedAt: 0,
-      snack: {
-        unlocked: false,
-        claimed: false,
-        claimedAt: 0
-      },
+      snack:
+        safeKind === PLAN_KINDS.CARE
+          ? {
+              unlocked: false,
+              claimed: false,
+              claimedAt: 0
+            }
+          : null,
       rolloverHold: null
     };
   }
@@ -964,51 +1308,213 @@
   }
 
   function areEducationalTasksComplete(plan) {
-    if (!plan?.tasks) return false;
+    const requiredTaskIds =
+      getRequiredTaskIds(plan);
 
-    return Object.values(TASK_IDS).every(taskId =>
+    if (
+      !plan?.tasks ||
+      !requiredTaskIds.length
+    ) {
+      return false;
+    }
+
+    return requiredTaskIds.every(taskId =>
       plan.tasks[taskId]?.status === TASK_STATUSES.COMPLETE
     );
+  }
+
+  function recordConfirmedTaskHistory(
+    state,
+    plan,
+    taskId,
+    pendingData,
+    now = new Date()
+  ) {
+    if (
+      plan?.kind !== PLAN_KINDS.CARE ||
+      !plan.verseId
+    ) {
+      return false;
+    }
+
+    const history = getOrCreateVerseHistory(
+      state,
+      plan.verseId
+    );
+
+    if (!history) return false;
+
+    if (taskId === TASK_IDS.QUESTIONS) {
+      history.questionsCompleted += 1;
+
+      const questionTypes = [
+        ...(Array.isArray(
+          pendingData?.generatedQuestionTypes
+        )
+          ? pendingData.generatedQuestionTypes
+          : []),
+        ...(Array.isArray(
+          pendingData?.questionTypes
+        )
+          ? pendingData.questionTypes
+          : [])
+      ]
+        .map(cleanString)
+        .filter(Boolean);
+
+      history.recentGeneratedQuestionTypes = [
+        ...history.recentGeneratedQuestionTypes,
+        ...questionTypes
+      ].slice(
+        -RECENT_QUESTION_TYPE_HISTORY_LIMIT
+      );
+      return true;
+    }
+
+    if (
+      taskId === TASK_IDS.REVIEW &&
+      plan.reviewAssignment?.kind ===
+        REVIEW_KINDS.READ
+    ) {
+      const activityId = cleanString(
+        plan.reviewAssignment.activityId
+      );
+      const activityHistory =
+        history.readActivities[activityId];
+
+      if (!activityHistory) return false;
+
+      activityHistory.completedCount += 1;
+      activityHistory.lastCompletedAt =
+        now.getTime();
+      return true;
+    }
+
+    return false;
+  }
+
+  function rollbackPlanHistoryForReset(
+    state,
+    plan,
+    completedTaskIds,
+    completedEducationalDay
+  ) {
+    if (
+      plan?.kind !== PLAN_KINDS.CARE ||
+      !plan.verseId
+    ) {
+      return;
+    }
+
+    const history = getOrCreateVerseHistory(
+      state,
+      plan.verseId
+    );
+
+    if (!history) return;
+
+    if (
+      completedTaskIds.includes(
+        TASK_IDS.QUESTIONS
+      )
+    ) {
+      history.questionsCompleted = Math.max(
+        0,
+        history.questionsCompleted - 1
+      );
+    }
+
+    if (
+      completedTaskIds.includes(
+        TASK_IDS.REVIEW
+      ) &&
+      plan.reviewAssignment?.kind ===
+        REVIEW_KINDS.READ
+    ) {
+      const activityId = cleanString(
+        plan.reviewAssignment.activityId
+      );
+      const activityHistory =
+        history.readActivities[activityId];
+
+      if (activityHistory) {
+        activityHistory.completedCount =
+          Math.max(
+            0,
+            activityHistory.completedCount - 1
+          );
+
+        if (
+          activityHistory.lastCompletedAt ===
+          toTimestamp(
+            plan.tasks?.[TASK_IDS.REVIEW]
+              ?.completedAt
+          )
+        ) {
+          activityHistory.lastCompletedAt = 0;
+        }
+      }
+    }
+
+    if (completedEducationalDay) {
+      history.completedDailyTodos = Math.max(
+        0,
+        history.completedDailyTodos - 1
+      );
+    }
   }
 
   function getPlanProgress(rawPlan) {
     const plan = normalizePlan(rawPlan);
     if (!plan) return null;
 
-    const taskComplete = {
-      [TASK_IDS.FLASHCARD]:
-        plan.tasks[TASK_IDS.FLASHCARD].status ===
-        TASK_STATUSES.COMPLETE,
-      [TASK_IDS.QUESTIONS]:
-        plan.tasks[TASK_IDS.QUESTIONS].status ===
-        TASK_STATUSES.COMPLETE,
-      [TASK_IDS.ACTIVITY]:
-        plan.tasks[TASK_IDS.ACTIVITY].status ===
-        TASK_STATUSES.COMPLETE
-    };
-    const completeCount = Object.values(
-      taskComplete
-    ).filter(Boolean).length;
+    const requiredTaskIds =
+      getRequiredTaskIds(plan);
+    const taskComplete = {};
+
+    requiredTaskIds.forEach((taskId) => {
+      taskComplete[taskId] =
+        plan.tasks[taskId]?.status ===
+          TASK_STATUSES.COMPLETE;
+    });
+
+    const completeCount = requiredTaskIds
+      .filter((taskId) =>
+        taskComplete[taskId]
+      ).length;
     const educationalComplete =
       plan.educationalCompletedAt > 0 &&
-      completeCount === 3;
+      completeCount === requiredTaskIds.length;
+    const isCarePlan =
+      plan.kind === PLAN_KINDS.CARE;
 
     return {
+      kind: plan.kind,
+      requiredTaskIds,
+      requiredCount:
+        requiredTaskIds.length,
       taskComplete,
       completeCount,
       educationalComplete,
       feedingTime:
+        isCarePlan &&
         educationalComplete &&
-        plan.snack.unlocked &&
-        !plan.snack.claimed,
-      snackClaimed: plan.snack.claimed
+        plan.snack?.unlocked === true &&
+        plan.snack?.claimed !== true,
+      snackClaimed:
+        isCarePlan &&
+        plan.snack?.claimed === true
     };
   }
 
   function shouldShowFocusedPlan(rawPlan) {
     const plan = normalizePlan(rawPlan);
 
-    return !!plan && !plan.snack.claimed;
+    if (!plan) return false;
+
+    return plan.kind === PLAN_KINDS.CARE
+      ? plan.snack?.claimed !== true
+      : plan.educationalCompletedAt <= 0;
   }
 
   function resetActivePlanProgress(
@@ -1031,15 +1537,26 @@
       return { state, changed: false };
     }
 
-    const completedTaskCount =
-      Object.values(TASK_IDS).filter(
+    const requiredTaskIds =
+      getRequiredTaskIds(plan);
+    const completedTaskIds =
+      requiredTaskIds.filter(
         (taskId) =>
           plan.tasks[taskId]?.status ===
           TASK_STATUSES.COMPLETE
-      ).length;
+      );
+    const completedTaskCount =
+      completedTaskIds.length;
     const completedEducationalDay =
       plan.educationalCompletedAt > 0 &&
       areEducationalTasksComplete(plan);
+
+    rollbackPlanHistoryForReset(
+      state,
+      plan,
+      completedTaskIds,
+      completedEducationalDay
+    );
 
     state.stats.totalTasks = Math.max(
       0,
@@ -1066,7 +1583,7 @@
           : "";
     }
 
-    Object.values(TASK_IDS).forEach(
+    requiredTaskIds.forEach(
       (taskId) => {
         plan.tasks[taskId] =
           createDefaultTask();
@@ -1074,11 +1591,14 @@
     );
     plan.earnedStarPegCount = 0;
     plan.educationalCompletedAt = 0;
-    plan.snack = {
-      unlocked: false,
-      claimed: false,
-      claimedAt: 0
-    };
+    plan.snack =
+      plan.kind === PLAN_KINDS.CARE
+        ? {
+            unlocked: false,
+            claimed: false,
+            claimedAt: 0
+          }
+        : null;
     plan.rolloverHold = null;
 
     refreshEarnedBadges(state.stats);
@@ -1094,23 +1614,48 @@
     }
 
     if (plan.educationalCompletedAt > 0) {
-      plan.snack.unlocked = true;
+      if (
+        plan.kind === PLAN_KINDS.CARE &&
+        plan.snack
+      ) {
+        plan.snack.unlocked = true;
+      }
       return false;
     }
 
     plan.educationalCompletedAt = now.getTime();
-    plan.snack.unlocked = true;
+
+    if (
+      plan.kind === PLAN_KINDS.CARE &&
+      plan.snack
+    ) {
+      plan.snack.unlocked = true;
+    }
 
     recordEducationalDayComplete(
       state.stats,
       plan.day
     );
 
+    if (plan.kind === PLAN_KINDS.CARE) {
+      const history = getOrCreateVerseHistory(
+        state,
+        plan.verseId
+      );
+
+      if (history) {
+        history.completedDailyTodos += 1;
+      }
+    }
+
     return true;
   }
 
   function shouldPreserveOldPlan(plan) {
-    return !!normalizeRolloverHold(plan?.rolloverHold);
+    return !!normalizeRolloverHold(
+      plan?.rolloverHold,
+      plan
+    );
   }
 
   function expireOldPlanIfNeeded(
@@ -1312,11 +1857,16 @@
   }
 
   function findTask(plan, taskId) {
-    if (!plan || !Object.values(TASK_IDS).includes(taskId)) {
+    const resolvedTaskId = resolveTaskId(
+      plan,
+      taskId
+    );
+
+    if (!plan || !resolvedTaskId) {
       return null;
     }
 
-    return plan.tasks?.[taskId] || null;
+    return plan.tasks?.[resolvedTaskId] || null;
   }
 
   function createLaunchToken(now, random = Math.random) {
@@ -1340,12 +1890,19 @@
   ) {
     const state = normalizeState(rawState);
     const plan = state.activePlan;
+    const resolvedTaskId = resolveTaskId(
+      plan,
+      taskId
+    );
 
     if (!plan || plan.id !== cleanString(planId)) {
       return { state, changed: false, launchToken: "" };
     }
 
-    const task = findTask(plan, taskId);
+    const task = findTask(
+      plan,
+      resolvedTaskId
+    );
     if (
       !task ||
       task.status === TASK_STATUSES.PENDING ||
@@ -1373,7 +1930,7 @@
 
     if (preserveAcrossDay) {
       plan.rolloverHold = {
-        taskId,
+        taskId: resolvedTaskId,
         launchToken,
         startedAt: task.startedAt
       };
@@ -1394,12 +1951,19 @@
   ) {
     const state = normalizeState(rawState);
     const plan = state.activePlan;
+    const resolvedTaskId = resolveTaskId(
+      plan,
+      taskId
+    );
 
     if (!plan || plan.id !== cleanString(planId)) {
       return { state, changed: false };
     }
 
-    const task = findTask(plan, taskId);
+    const task = findTask(
+      plan,
+      resolvedTaskId
+    );
     if (
       !task ||
       task.status === TASK_STATUSES.OPEN ||
@@ -1431,9 +1995,10 @@
 
     task.status = TASK_STATUSES.PENDING;
     task.pendingAt = now.getTime();
-    task.pendingData = isPlainObject(pendingData)
-      ? cloneJson(pendingData)
-      : null;
+    task.pendingData = normalizePendingData(
+      pendingData,
+      resolvedTaskId
+    );
 
     return { state, changed: true };
   }
@@ -1448,6 +2013,10 @@
   ) {
     const state = normalizeState(rawState);
     const plan = state.activePlan;
+    const resolvedTaskId = resolveTaskId(
+      plan,
+      taskId
+    );
 
     if (!plan || plan.id !== cleanString(planId)) {
       return {
@@ -1458,7 +2027,10 @@
       };
     }
 
-    const task = findTask(plan, taskId);
+    const task = findTask(
+      plan,
+      resolvedTaskId
+    );
 
     if (!task) {
       return {
@@ -1487,12 +2059,17 @@
       };
     }
 
+    const pendingData = cloneJson(
+      task.pendingData
+    );
+
     task.status = TASK_STATUSES.COMPLETE;
     task.completedAt = now.getTime();
     task.pendingData = null;
 
     if (
-      plan.rolloverHold?.taskId === taskId &&
+      plan.rolloverHold?.taskId ===
+        resolvedTaskId &&
       plan.rolloverHold.launchToken ===
         task.launchToken
     ) {
@@ -1502,6 +2079,14 @@
     state.stats.totalTasks = toNonNegativeInteger(
       state.stats.totalTasks
     ) + 1;
+
+    recordConfirmedTaskHistory(
+      state,
+      plan,
+      resolvedTaskId,
+      pendingData,
+      now
+    );
 
     const educationalCompleted = completeEducationalPlanIfReady(
       state,
@@ -1559,11 +2144,12 @@
     }
 
     if (
+      plan.kind !== PLAN_KINDS.CARE ||
       plan.day !== localDayKey(now) ||
       plan.educationalCompletedAt <= 0 ||
       !areEducationalTasksComplete(plan) ||
-      !plan.snack.unlocked ||
-      plan.snack.claimed
+      plan.snack?.unlocked !== true ||
+      plan.snack?.claimed === true
     ) {
       return { state, changed: false };
     }
@@ -1580,11 +2166,17 @@
     STREAK_BADGE_THRESHOLDS,
     TASK_BADGE_THRESHOLDS,
     BADGE_DEFINITIONS,
+    PLAN_KINDS,
     TASK_IDS,
     TASK_STATUSES,
     ACTIVITY_KINDS,
+    REVIEW_KINDS,
+    READ_ACTIVITY_IDS,
+    DEFAULT_REQUIRED_TASK_IDS,
     createDefaultState,
     normalizeState,
+    getRequiredTaskIds,
+    resolveTaskId,
     localDayKey,
     shiftLocalDayKey,
     previousLocalDayKey,

@@ -145,11 +145,13 @@
     const statuses = engine?.TASK_STATUSES || {};
     const open = statuses.OPEN || "open";
     const complete = statuses.COMPLETE || "complete";
-    const ordered = [
-      taskIds.FLASHCARD || "flashcard",
-      taskIds.QUESTIONS || "questions",
-      taskIds.ACTIVITY || "activity"
-    ];
+    const ordered =
+      engine?.getRequiredTaskIds?.(plan) ||
+      plan.requiredTaskIds || [
+        taskIds.REVIEW || "review",
+        taskIds.QUESTIONS || "questions",
+        taskIds.ACTIVITY || "activity"
+      ];
 
     ordered.forEach((taskId) => {
       if (!plan.tasks?.[taskId]) return;
@@ -168,9 +170,14 @@
     const completeCountByMode = {
       one: 1,
       two: 2,
-      ready: 3,
-      claimed: 3,
-      owned_medal: 2
+      ready: ordered.length,
+      claimed: ordered.length,
+      owned_medal: Math.max(
+        0,
+        ordered.indexOf(
+          taskIds.ACTIVITY || "activity"
+        )
+      )
     };
     const completeCount =
       completeCountByMode[mode] || 0;
@@ -192,22 +199,25 @@
         ? Date.now()
         : 0;
 
-    plan.snack = {
-      ...(plan.snack || {}),
-      unlocked: educationalComplete,
-      claimed: mode === "claimed",
-      claimedAt:
-        mode === "claimed"
-          ? Date.now()
-          : 0
-    };
+    if (plan.snack) {
+      plan.snack = {
+        ...plan.snack,
+        unlocked: educationalComplete,
+        claimed: mode === "claimed",
+        claimedAt:
+          mode === "claimed"
+            ? Date.now()
+            : 0
+      };
+    }
     plan.rolloverHold = null;
 
     const pendingTaskId =
       mode === "pending"
         ? ordered[0]
         : mode === "owned_medal"
-          ? ordered[2]
+          ? taskIds.ACTIVITY ||
+            "activity"
           : "";
 
     if (
@@ -215,7 +225,9 @@
       plan.tasks?.[pendingTaskId]
     ) {
       const isActivity =
-        pendingTaskId === ordered[2];
+        pendingTaskId ===
+          (taskIds.ACTIVITY ||
+            "activity");
 
       plan.tasks[pendingTaskId] = {
         ...plan.tasks[pendingTaskId],
@@ -501,11 +513,13 @@
     const pendingStatus =
       engine?.TASK_STATUSES?.PENDING ||
       "pending";
-    const ordered = [
-      taskIds.FLASHCARD || "flashcard",
-      taskIds.QUESTIONS || "questions",
-      taskIds.ACTIVITY || "activity"
-    ];
+    const ordered =
+      engine?.getRequiredTaskIds?.(plan) ||
+      plan.requiredTaskIds || [
+        taskIds.REVIEW || "review",
+        taskIds.QUESTIONS || "questions",
+        taskIds.ACTIVITY || "activity"
+      ];
 
     const pending = ordered
       .map((taskId) => ({
@@ -676,9 +690,17 @@
     );
 
     if (
+      taskId === "review" ||
       taskId === "flashcard" ||
       taskId === "questions"
     ) {
+      if (taskId === "review") {
+        return plan?.reviewAssignment
+          ?.kind === "read"
+          ? "read"
+          : "flashcard";
+      }
+
       return taskId;
     }
 
@@ -1823,8 +1845,8 @@
     const completeStatus =
       statuses.COMPLETE || "complete";
 
-    const flashcardId =
-      taskIds.FLASHCARD || "flashcard";
+    const reviewId =
+      taskIds.REVIEW || "review";
     const questionsId =
       taskIds.QUESTIONS || "questions";
     const activityId =
@@ -1910,6 +1932,93 @@
         displayPlan,
         engine
       );
+    const requiredTaskIds =
+      engine?.getRequiredTaskIds?.(
+        displayPlan
+      ) ||
+      displayPlan.requiredTaskIds || [
+        reviewId,
+        questionsId,
+        activityId
+      ];
+    const taskRows = {
+      [reviewId]: {
+        text:
+          displayPlan.reviewAssignment
+            ?.kind === "read"
+            ? "Read My Verse"
+            : "Review My Flashcard",
+        image:
+          `${ASSET_DIR}task_flashcard.png`,
+        emoji: "🗂️",
+        rowColor: "#7f66c6"
+      },
+      [questionsId]: {
+        text: "Answer My Questions",
+        image:
+          `${ASSET_DIR}task_questions.png`,
+        emoji: "❓",
+        rowColor: "#40b9c5"
+      },
+      [activityId]: {
+        text:
+          displayPlan.kind === "new_pet"
+            ? "Play a Game"
+            : "Play a Game with Me",
+        image: activityImage,
+        emoji: activityEmoji,
+        rowColor: activityColor,
+        rowTextColor:
+          activityTextColor
+      },
+      [taskIds.LEARN || "learn"]: {
+        text: "Learn a New Verse",
+        image: "",
+        emoji: "📖",
+        rowColor: "#7f66c6"
+      }
+    };
+    const taskRowsHtml =
+      requiredTaskIds
+        .map((taskId) => {
+          const row =
+            taskRows[taskId] || {
+              text: "Daily Task",
+              image: "",
+              emoji: "✓",
+              rowColor: "#7f66c6"
+            };
+
+          return taskRowHtml({
+            type: taskId,
+            ...row,
+            status:
+              displayPlan.tasks?.[taskId]
+                ?.status || "open",
+            completeStatus
+          });
+        })
+        .join("");
+    const snackRowHtml =
+      displayPlan.kind === "care" &&
+      displayPlan.snack
+        ? taskRowHtml({
+            type: "snack",
+            text: "Feed me a snack",
+            image:
+              `${ASSET_DIR}task_snack.png`,
+            emoji: "🍎",
+            rowColor: "#333333",
+            status: snackClaimed
+              ? completeStatus
+              : "open",
+            completeStatus,
+            disabled:
+              !snackUnlocked ||
+              snackClaimed,
+            faded: !snackUnlocked
+          })
+        : "";
 
     lastRenderContext = {
       mode,
@@ -1948,61 +2057,8 @@
       </div>
 
       <div class="daily-zoo-todo-list">
-        ${taskRowHtml({
-          type: flashcardId,
-          text: "Review My Flashcard",
-          image:
-            `${ASSET_DIR}task_flashcard.png`,
-          emoji: "🗂️",
-          rowColor: "#7f66c6",
-          status:
-            displayPlan.tasks?.[flashcardId]
-              ?.status || "open",
-          completeStatus
-        })}
-
-        ${taskRowHtml({
-          type: questionsId,
-          text: "Answer My Questions",
-          image:
-            `${ASSET_DIR}task_questions.png`,
-          emoji: "❓",
-          rowColor: "#40b9c5",
-          status:
-            displayPlan.tasks?.[questionsId]
-              ?.status || "open",
-          completeStatus
-        })}
-
-        ${taskRowHtml({
-          type: activityId,
-          text: "Play a Game with Me",
-          image: activityImage,
-          emoji: activityEmoji,
-          rowColor: activityColor,
-          rowTextColor: activityTextColor,
-          status:
-            displayPlan.tasks?.[activityId]
-              ?.status || "open",
-          completeStatus
-        })}
-
-        ${taskRowHtml({
-          type: "snack",
-          text: "Feed me a snack",
-          image:
-            `${ASSET_DIR}task_snack.png`,
-          emoji: "🍎",
-          rowColor: "#333333",
-          status: snackClaimed
-            ? completeStatus
-            : "open",
-          completeStatus,
-          disabled:
-            !snackUnlocked ||
-            snackClaimed,
-          faded: !snackUnlocked
-        })}
+        ${taskRowsHtml}
+        ${snackRowHtml}
       </div>
 
       ${renderPendingCompletionHtml({
