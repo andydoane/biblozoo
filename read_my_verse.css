@@ -134,6 +134,11 @@
   align-items: stretch;
 }
 
+/* A new verse stays hidden until an approved font size has been applied. */
+[data-read-typing-fit]:not(.is-fit-ready) .smart-learn-body {
+  visibility: hidden;
+}
+
 .read-typewriter-body,
 .read-keyboard-body {
   width: 100%;
@@ -361,6 +366,7 @@
 }
 
 .read-keyboard-body {
+  color: #65ff72;
   font-size: var(--smart-font-size, 48px);
   font-weight: 400;
   line-height: var(--smart-line-height, 1.12);

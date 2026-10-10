@@ -231,6 +231,10 @@
   let activeAudio = null;
   let keySoundAudio = [];
   let keySoundActivityId = "";
+  // Layout is part of the session, not a property of its transient audio phase.
+  let typingFitCache = null;
+  let activeTypingFitWrap = null;
+  let typingResizeBound = false;
   let keySoundContext = null;
   let keySoundBuffers = [];
   let keySoundLoadAttempted = false;
@@ -1389,6 +1393,8 @@
 
   function stopAudio() {
     audioRequest += 1;
+    typingFitCache = null;
+    activeTypingFitWrap = null;
 
     if (activeAudio) {
       try {
@@ -1962,7 +1968,9 @@
     if (isWordActivity(state.activityId)) {
       prepareInteractiveChunk();
     }
-    appApi?.requestRender?.();
+    if (!syncTypingScreen()) {
+      appApi?.requestRender?.();
+    }
   }
 
   function playCurrentChunk() {
@@ -1977,7 +1985,9 @@
     }
 
     state.phase = "playing";
-    appApi?.requestRender?.();
+    if (!syncTypingScreen()) {
+      appApi?.requestRender?.();
+    }
 
     const request = ++audioRequest;
     const src = getChunkAudioPath(
@@ -2045,7 +2055,9 @@
     if (state.phase !== "typing") return;
 
     state.phase = "pause";
-    appApi?.requestRender?.();
+    if (!syncTypingScreen()) {
+      appApi?.requestRender?.();
+    }
     pauseTimer = setTimeout(
       playCurrentChunk,
       CHUNK_PAUSE_MS
@@ -3034,17 +3046,89 @@
     };
   }
 
+  // Change only the typing display's state; never discard the fitted verse
+  // simply because an audio chunk starts, ends, or advances.
+  function syncTypingScreen() {
+    if (!isTypingActivity(state.activityId)) return false;
+
+    const keyboard = state.activityId === KEYBOARD_ACTIVITY_ID;
+    const selector = keyboard
+      ? ".read-keyboard-screen"
+      : ".read-typewriter-screen";
+    const wrap = root.document?.querySelector(selector);
+    const stage = wrap?.querySelector("[data-read-type-area]");
+    if (!wrap?.isConnected || !stage) return false;
+
+    stage.classList.toggle("is-input-locked", state.phase !== "typing");
+    const instruction = wrap.querySelector(keyboard
+      ? ".read-keyboard-instruction"
+      : ".read-typewriter-instruction");
+    if (instruction) {
+      instruction.textContent = state.readTestMode === "early_exit"
+        ? (keyboard
+          ? "EARLY-EXIT CHECK: USE BACK BEFORE FINISHING"
+          : "Early-exit check: use Back before finishing")
+        : state.phase === "typing"
+          ? (keyboard ? "TAP TO TYPE THE VERSE" : "Tap to type the verse")
+          : (keyboard ? "PLAYING VERSE AUDIO..." : "Listen to this part");
+    }
+
+    const listening = state.phase === "pause" || state.phase === "playing";
+    wrap.querySelectorAll("[data-read-chunk]").forEach((chunk, chunkIndex) => {
+      chunk.classList.toggle("is-listening", listening && chunkIndex === state.chunkIndex);
+      chunk.querySelectorAll("[data-read-char-index]").forEach((character) => {
+        const index = Number(character.getAttribute("data-read-char-index"));
+        character.classList.toggle("is-revealed",
+          chunkIndex < state.chunkIndex ||
+          (chunkIndex === state.chunkIndex && index < state.revealCount));
+      });
+    });
+
+    if (keyboard) {
+      const cursor = wrap.querySelector("[data-read-keyboard-cursor]");
+      const activeChunk = wrap.querySelector(`[data-read-chunk="${state.chunkIndex}"]`);
+      const nextCharacter = activeChunk?.querySelector(
+        `[data-read-char-index="${state.revealCount}"]`);
+      if (cursor && activeChunk) {
+        if (nextCharacter) nextCharacter.before(cursor);
+        else activeChunk.append(cursor);
+      }
+    }
+
+    const progress = wrap.querySelector("[data-read-progress]");
+    if (progress) {
+      progress.textContent = keyboard
+        ? `CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}`
+        : `Chunk ${state.chunkIndex + 1} of ${state.chunks.length}`;
+    }
+    return true;
+  }
+
+  function typingFitKey() {
+    return `${state.verseId}|${state.activityId}|${state.readTestMode}`;
+  }
+
+  function restoreReadTypingFit(wrap) {
+    const cache = typingFitCache;
+    if (!cache || cache.key !== typingFitKey() ||
+        cache.viewportWidth !== root.innerWidth ||
+        cache.viewportHeight !== root.innerHeight) return;
+    const block = wrap.querySelector("[data-read-typing-fit]");
+    if (!block) return;
+    block.style.width = `${cache.width}px`;
+    block.style.maxWidth = `${cache.width}px`;
+    block.style.setProperty("--smart-line-height", cache.lineHeight);
+    block.style.setProperty("--smart-font-size", `${cache.fontSize}px`);
+    block.classList.add("is-fit-ready");
+  }
+
   // Unlike the Learn fitter, typing screens render each character separately.
   // Measure the real laid-out word spans as well as the whole text body so a
   // large font cannot pass merely because its parent container fits.
-  function fitReadTypingVerseText(wrap) {
-    const block = wrap.querySelector(
-      "[data-read-typing-fit]"
-    );
+  function fitReadTypingVerseText(wrap, force = false) {
+    const block = wrap.querySelector("[data-read-typing-fit]");
     const stage = block?.closest(".learn-stage");
-    const body = block?.querySelector(
-      ".smart-learn-body"
-    );
+    const body = block?.querySelector(".smart-learn-body");
     if (!stage || !body) return;
 
     const style = root.getComputedStyle(stage);
@@ -3054,81 +3138,96 @@
     const verticalPadding =
       (parseFloat(style.paddingTop) || 0) +
       (parseFloat(style.paddingBottom) || 0);
-    const contentWidth =
-      stage.clientWidth - horizontalPadding;
-    const contentHeight =
-      stage.clientHeight - verticalPadding;
-    if (contentWidth <= 0 || contentHeight <= 0) {
-      return;
-    }
+    const contentWidth = stage.clientWidth - horizontalPadding;
+    const contentHeight = stage.clientHeight - verticalPadding;
+    if (contentWidth <= 0 || contentHeight <= 0) return;
 
-    // Reserve room around the writing, similar to Ghost Writer's layout.
     const fitWidth = Math.floor(contentWidth * 0.98);
     const fitHeight = Math.floor(contentHeight * 0.94);
-    block.style.width = `${fitWidth}px`;
-    block.style.maxWidth = `${fitWidth}px`;
-    block.style.setProperty(
-      "--smart-line-height",
-      block.classList.contains("read-keyboard-fit")
-        ? "1.12"
-        : "1.16"
-    );
-
-    const words = body.querySelectorAll(
-      ".read-typewriter-word"
-    );
-    const fits = (fontSize) => {
-      block.style.setProperty(
-        "--smart-font-size",
-        `${fontSize}px`
-      );
-      const bounds = body.getBoundingClientRect();
-      if (
-        bounds.height > fitHeight + 1 ||
-        body.scrollHeight > fitHeight + 1 ||
-        body.scrollWidth > fitWidth + 1
-      ) {
-        return false;
-      }
-      return Array.from(words).every((word) =>
-        word.getBoundingClientRect().width <=
-          fitWidth + 1
-      );
-    };
-
-    // Use a genuinely smaller fallback if even the usual minimum won't fit.
-    let low = 10;
-    let high = Math.min(100, contentWidth * 0.2);
-    let best = low;
-    if (!fits(low)) {
+    const lineHeight = block.classList.contains("read-keyboard-fit")
+      ? "1.12" : "1.16";
+    const cache = typingFitCache;
+    if (!force && cache && cache.key === typingFitKey() &&
+        cache.contentWidth === contentWidth &&
+        cache.contentHeight === contentHeight &&
+        cache.viewportWidth === root.innerWidth &&
+        cache.viewportHeight === root.innerHeight) {
+      restoreReadTypingFit(wrap);
       return;
     }
 
+    const previousSize = block.style.getPropertyValue("--smart-font-size");
+    block.style.width = `${fitWidth}px`;
+    block.style.maxWidth = `${fitWidth}px`;
+    block.style.setProperty("--smart-line-height", lineHeight);
+
+    const words = body.querySelectorAll(".read-typewriter-word");
+    const fits = (fontSize) => {
+      block.style.setProperty("--smart-font-size", `${fontSize}px`);
+      const bounds = body.getBoundingClientRect();
+      if (bounds.height > fitHeight + 1 ||
+          body.scrollHeight > fitHeight + 1 ||
+          body.scrollWidth > fitWidth + 1) return false;
+      return Array.from(words).every((word) =>
+        word.getBoundingClientRect().width <= fitWidth + 1);
+    };
+
+    const low = 10;
+    let high = Math.max(low, Math.min(100, contentWidth * 0.2));
+    let best = low;
+    if (!fits(low)) {
+      // A failed 10px trial must never become the displayed font size.
+      if (previousSize) block.style.setProperty("--smart-font-size", previousSize);
+      else block.style.removeProperty("--smart-font-size");
+      block.classList.add("is-fit-ready");
+      return;
+    }
+
+    let lower = low;
     for (let i = 0; i < 12; i += 1) {
-      const mid = (low + high) / 2;
+      const mid = (lower + high) / 2;
       if (fits(mid)) {
         best = mid;
-        low = mid;
+        lower = mid;
       } else {
         high = mid;
       }
     }
-    block.style.setProperty(
-      "--smart-font-size",
-      `${Math.floor(best)}px`
-    );
+    const fontSize = Math.floor(best);
+    block.style.setProperty("--smart-font-size", `${fontSize}px`);
+    typingFitCache = {
+      key: typingFitKey(),
+      viewportWidth: root.innerWidth,
+      viewportHeight: root.innerHeight,
+      contentWidth,
+      contentHeight,
+      width: fitWidth,
+      fontSize,
+      lineHeight
+    };
+    block.classList.add("is-fit-ready");
   }
 
   function scheduleReadTypingVerseFit(wrap) {
-    const run = () => {
-      if (wrap.isConnected) {
-        fitReadTypingVerseText(wrap);
-      }
+    activeTypingFitWrap = wrap;
+    const run = (force = false) => {
+      if (wrap.isConnected) fitReadTypingVerseText(wrap, force);
     };
-    root.requestAnimationFrame(run);
-    root.setTimeout(run, 120);
-    root.setTimeout(run, 420);
-    root.document.fonts?.ready?.then(run).catch(() => {});
+    root.requestAnimationFrame(() => run());
+    root.setTimeout(() => run(), 120);
+    root.setTimeout(() => run(), 420);
+    root.document.fonts?.ready?.then(() => run(true)).catch(() => {});
+
+    if (!typingResizeBound && root.addEventListener) {
+      typingResizeBound = true;
+      root.addEventListener("resize", () => {
+        const active = activeTypingFitWrap;
+        if (active?.isConnected) {
+          root.requestAnimationFrame(() =>
+            fitReadTypingVerseText(active, true));
+        }
+      });
+    }
   }
 
   function renderKeyboardScreen(idx, verse) {
@@ -3185,6 +3284,7 @@
       }
     };
     bindExitButton(wrap);
+    restoreReadTypingFit(wrap);
     scheduleReadTypingVerseFit(wrap);
 
     return appApi.makeSlide({
@@ -3693,6 +3793,7 @@
       exitSession();
     };
 
+    restoreReadTypingFit(wrap);
     scheduleReadTypingVerseFit(wrap);
 
     return appApi.makeSlide({
