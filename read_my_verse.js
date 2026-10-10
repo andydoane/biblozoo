@@ -231,6 +231,14 @@
   let activeAudio = null;
   let keySoundAudio = [];
   let keySoundActivityId = "";
+  let keySoundContext = null;
+  let keySoundBuffers = [];
+  let keySoundLoadAttempted = false;
+  let keySoundGeneration = 0;
+  let keySoundVoices = [];
+  let fallbackKeyVoiceIndex = 0;
+  const KEY_SOUND_MAX_VOICES = 4;
+  const KEY_SOUND_FALLBACK_VOICES = 2;
   let negativeFeedbackAudio = null;
   let audioRequest = 0;
   let pauseTimer = 0;
@@ -1393,12 +1401,7 @@
 
     activeAudio = null;
 
-    keySoundAudio.forEach((audio) => {
-      try {
-        audio.pause();
-        audio.currentTime = 0;
-      } catch (err) { }
-    });
+    stopKeySoundVoices();
 
     if (negativeFeedbackAudio) {
       try {
@@ -1565,6 +1568,18 @@
     return selected;
   }
 
+  // Key clicks may overlap during rapid taps; never rewind all players on a tap.
+  function stopKeySoundVoices() {
+    keySoundVoices.forEach(({ source, gain }) => {
+      try { source.onended = null; source.stop(); } catch (err) { }
+      try { source.disconnect(); gain.disconnect(); } catch (err) { }
+    });
+    keySoundVoices = [];
+    keySoundAudio.forEach((audio) => {
+      try { audio.pause(); audio.currentTime = 0; } catch (err) { }
+    });
+  }
+
   function ensureKeySoundAudio(
     activityId = state.activityId
   ) {
@@ -1572,49 +1587,57 @@
       isTypingActivity(activityId)
         ? activityId
         : TYPEWRITER_ACTIVITY_ID;
+    const sources = READ_ACTIVITY_MANIFEST[safeActivityId].keySounds;
 
-    if (
-      keySoundActivityId !==
-      safeActivityId
-    ) {
-      keySoundAudio.forEach((audio) => {
-        try {
-          audio.pause();
-          audio.currentTime = 0;
-        } catch (err) { }
-      });
+    if (keySoundActivityId !== safeActivityId) {
+      stopKeySoundVoices();
       keySoundAudio = [];
-      keySoundActivityId =
-        safeActivityId;
+      keySoundBuffers = [];
+      keySoundLoadAttempted = false;
+      keySoundGeneration += 1;
+      keySoundActivityId = safeActivityId;
       lastKeySoundIndex = -1;
+      fallbackKeyVoiceIndex = 0;
     }
 
-    if (
-      keySoundAudio.length ||
-      !root?.Audio
-    ) {
-      return keySoundAudio;
+    // Decode ahead of the first tap. iOS may leave the context suspended
+    // until a gesture; the tap itself will resume it.
+    if (!keySoundLoadAttempted) {
+      keySoundLoadAttempted = true;
+      const AudioContextClass =
+        root?.AudioContext || root?.webkitAudioContext;
+      if (AudioContextClass && root?.fetch) {
+        try {
+          keySoundContext ||= new AudioContextClass();
+          const context = keySoundContext;
+          const generation = keySoundGeneration;
+          Promise.all(sources.map(async (src) => {
+            const response = await root.fetch(src);
+            if (!response.ok) throw new Error("Key sound unavailable");
+            return context.decodeAudioData(await response.arrayBuffer());
+          })).then((buffers) => {
+            if (generation === keySoundGeneration) {
+              keySoundBuffers = buffers;
+            }
+          }).catch(() => {
+            // HTML audio stays ready if decoding is unavailable.
+          });
+        } catch (err) { }
+      }
     }
 
-    keySoundAudio =
-      READ_ACTIVITY_MANIFEST[
-        safeActivityId
-      ]
-        .keySounds.map((src) => {
+    if (!keySoundAudio.length && root?.Audio) {
+      keySoundAudio = sources.flatMap((src) =>
+        Array.from({ length: KEY_SOUND_FALLBACK_VOICES }, () => {
           const audio = new root.Audio(src);
           audio.preload = "auto";
           audio.setAttribute("playsinline", "");
-          audio.setAttribute(
-            "webkit-playsinline",
-            ""
-          );
-
-          try {
-            audio.load();
-          } catch (err) { }
-
+          audio.setAttribute("webkit-playsinline", "");
+          try { audio.load(); } catch (err) { }
           return audio;
-        });
+        })
+      );
+    }
 
     return keySoundAudio;
   }
@@ -1622,26 +1645,55 @@
   function playKeySound() {
     if (appApi?.isMuted?.()) return;
 
-    const sounds = ensureKeySoundAudio(
-      state.activityId
-    );
+    const sounds = ensureKeySoundAudio(state.activityId);
+    const variants = READ_ACTIVITY_MANIFEST[state.activityId]?.keySounds;
+    if (!variants?.length) return;
+    const index = chooseKeySoundIndex(variants.length);
+    const context = keySoundContext;
+    const buffer = keySoundBuffers[index];
 
-    if (!sounds.length) return;
+    if (context && buffer) {
+      if (context.state === "suspended") {
+        context.resume().catch(() => {});
+      }
+      if (context.state === "running") {
+        try {
+          const source = context.createBufferSource();
+          const gain = context.createGain();
+          source.buffer = buffer;
+          gain.gain.value = 0.58;
+          source.connect(gain);
+          gain.connect(context.destination);
+          if (keySoundVoices.length >= KEY_SOUND_MAX_VOICES) {
+            const oldest = keySoundVoices.shift();
+            oldest.gain.gain.setTargetAtTime(0, context.currentTime, 0.006);
+            oldest.source.stop(context.currentTime + 0.03);
+          }
+          const voice = { source, gain };
+          keySoundVoices.push(voice);
+          source.onended = () => {
+            keySoundVoices = keySoundVoices.filter((item) => item !== voice);
+            source.disconnect();
+            gain.disconnect();
+          };
+          source.start();
+          return;
+        } catch (err) {
+          // Try the compatible HTML audio pool below.
+        }
+      }
+    }
 
-    const index = chooseKeySoundIndex(
-      sounds.length
-    );
-    const audio = sounds[index];
-
+    // Keep two players per sample so quick taps don't cut each other off
+    // even before Web Audio has decoded the sounds.
+    const slot = fallbackKeyVoiceIndex++ % KEY_SOUND_FALLBACK_VOICES;
+    const audio = sounds[index * KEY_SOUND_FALLBACK_VOICES + slot];
+    if (!audio) return;
     try {
-      sounds.forEach((sound) => {
-        sound.pause();
-        sound.currentTime = 0;
-      });
-      audio.muted = false;
-      audio.volume = 1;
       audio.pause();
       audio.currentTime = 0;
+      audio.muted = false;
+      audio.volume = 0.7;
       audio.play().catch?.(() => { });
     } catch (err) { }
   }
@@ -1916,12 +1968,7 @@
   function playCurrentChunk() {
     if (state.phase !== "pause") return;
 
-    keySoundAudio.forEach((audio) => {
-      try {
-        audio.pause();
-        audio.currentTime = 0;
-      } catch (err) { }
-    });
+    stopKeySoundVoices();
     if (negativeFeedbackAudio) {
       try {
         negativeFeedbackAudio.pause();
@@ -3016,8 +3063,8 @@
     }
 
     // Reserve room around the writing, similar to Ghost Writer's layout.
-    const fitWidth = Math.floor(contentWidth * 0.92);
-    const fitHeight = Math.floor(contentHeight * 0.88);
+    const fitWidth = Math.floor(contentWidth * 0.98);
+    const fitHeight = Math.floor(contentHeight * 0.94);
     block.style.width = `${fitWidth}px`;
     block.style.maxWidth = `${fitWidth}px`;
     block.style.setProperty(
