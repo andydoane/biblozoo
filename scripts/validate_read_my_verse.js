@@ -1122,6 +1122,50 @@ function testFishSwimmingAndHookAlignment() {
   assert.ok(!css.includes(".read-animated-stage.is-listening .read-fish-word"));
 }
 
+function testFishDescendingLanesAndIndependentCatches() {
+  const sizes = [160, 135, 180, 118, 192, 110, 168, 145]
+    .map((width) => ({ width, height: 64 }));
+  const spacious = ReadMyVerse.getFishWordLayout(390, 700, sizes.slice(0, 4));
+  const crowded = ReadMyVerse.getFishWordLayout(320, 340, sizes);
+  for (const tracks of [spacious, crowded]) {
+    tracks.forEach((track, index) => {
+      assert.ok(track.top >= 0);
+      if (index) {
+        assert.ok(track.top > tracks[index - 1].top,
+          "Reading order must never wrap back to the top");
+        assert.ok(track.delayMs >= tracks[index - 1].delayMs + 500);
+      }
+      tracks.slice(0, index).forEach((previous) => {
+        assert.strictEqual(ReadMyVerse.fishWordTracksOverlap(
+          previous, track, tracks === spacious ? 390 : 320), false,
+        "Overlapping vertical rows must be separated horizontally");
+      });
+    });
+  }
+  assert.ok(crowded.some((track, index) => index &&
+    track.delayMs > crowded[index - 1].delayMs + 500),
+  "Crowded rows should receive extra horizontal staggering");
+
+  const hookWidth = 20;
+  const fish = { left: 50, right: 210, top: 100, height: 70 };
+  const button = { left: 40, top: 60 };
+  const placement = ReadMyVerse.getFishHookPlacement(fish, button, hookWidth);
+  assert.ok(Math.abs(placement.left + .189 * hookWidth -
+    (fish.right - button.left - .03 * hookWidth)) < 0.001);
+  assert.ok(Math.abs(placement.top + .405 * placement.hookHeight -
+    (fish.top - button.top + fish.height / 2)) < 0.001);
+
+  const js = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(js.includes('let catchState = "swimming"'));
+  assert.ok(js.includes('button.classList.add("is-reeling")'));
+  assert.ok(css.includes('width: clamp(14px, 3.5vw, 23px)'));
+  assert.ok(css.includes('@keyframes readFishCatchReel'));
+  assert.ok(!css.includes('.read-decorative-fish.is-activated {\n  animation-play-state: paused;'));
+  assert.ok(css.includes('left: 83.875%'));
+  assert.ok(css.includes('bottom: 88.9%'));
+}
+
 function main() {
   const tests = [
     testSafeWordScrambles,
@@ -1139,6 +1183,7 @@ function main() {
     testBalloonFloatingAndParticles,
     testBalloonSafeSpawning,
     testFishSwimmingAndHookAlignment,
+    testFishDescendingLanesAndIndependentCatches,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
     testTapOrderHintsAndReset,

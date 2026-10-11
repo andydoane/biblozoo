@@ -1715,13 +1715,22 @@ button.read-unscramble-token.is-solved {
   display: block;
 }
 
+/* Fish and hook become one moving unit for the quick reel-in. */
+.read-fish-catch-assembly {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
 /* Width/height come from the hook PNG itself, not its fish button. */
 .read-fish-hook-rig {
   position: absolute;
   z-index: 4;
-  left: calc(50% - 15px);
-  bottom: 56%;
-  width: clamp(28px, 7vw, 46px);
+  left: 50%; /* Replaced by the fish-mouth measurement on tap. */
+  top: 0;
+  width: clamp(14px, 3.5vw, 23px); /* Half the previous hook size. */
+  aspect-ratio: 494 / 690; /* Stable image-relative anchor before PNG loads. */
   opacity: 0;
   pointer-events: none;
 }
@@ -1758,19 +1767,18 @@ button.read-unscramble-token.is-solved {
   display: block;
 }
 
+/* Do not pause horizontal swimming while the hook intercepts the fish. */
 .read-decorative-fish.is-activated {
-  animation-play-state: paused;
   pointer-events: none;
 }
 
-.read-decorative-fish.is-activated .read-fish-hook-rig {
+.read-decorative-fish.is-hooking .read-fish-hook-rig {
   opacity: 1;
   animation: readHookLower 620ms ease-out both;
 }
 
-.read-decorative-fish.is-activated .read-fish-image,
-.read-decorative-fish.is-activated .read-fish-fallback {
-  animation: readCaughtFish 1.35s 560ms ease-in both;
+.read-decorative-fish.is-reeling .read-fish-catch-assembly {
+  animation: readFishCatchReel 610ms cubic-bezier(.55,.03,.95,.42) both;
 }
 
 @keyframes readDecorFish {
@@ -1782,13 +1790,13 @@ button.read-unscramble-token.is-solved {
 }
 
 @keyframes readHookLower {
-  from { transform: translateY(-70vh); }
-  to { transform: translateY(0); }
+  from { transform: translate3d(0, calc(-1 * var(--read-fish-hook-drop, 500px)), 0); }
+  to { transform: translate3d(0, 0, 0); }
 }
 
-@keyframes readCaughtFish {
-  from { transform: scaleX(-1); }
-  to { transform: translateY(-125vh) scaleX(-1); }
+@keyframes readFishCatchReel {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, calc(-1 * var(--read-fish-reel-travel, 800px)), 0); }
 }
 
 .read-animated-screen.is-reduced-motion .read-decorative-balloon,

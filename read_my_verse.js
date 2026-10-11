@@ -3043,6 +3043,94 @@
     };
   }
 
+  // Place Fish words in strictly descending reading order. If the vertical
+  // rows get crowded, keep the swim speed and stagger entry times instead.
+  function fishSwimDistanceAt(progress) {
+    const t = Math.max(0, Math.min(1, Number(progress) || 0));
+    for (let index = 1; index < FISH_SWIM_PATH.length; index += 1) {
+      const [endTime, endDistance] = FISH_SWIM_PATH[index];
+      if (t <= endTime) {
+        const [startTime, startDistance] = FISH_SWIM_PATH[index - 1];
+        return startDistance + (endDistance - startDistance) *
+          (t - startTime) / (endTime - startTime);
+      }
+    }
+    return 1;
+  }
+
+  function fishWordTrackRectAt(track, timeMs, sceneWidth) {
+    const progress = (timeMs - track.delayMs) / track.motion.durationMs;
+    if (progress < 0 || progress > 1) return null;
+    const left = sceneWidth + 12 - track.motion.travel *
+      fishSwimDistanceAt(progress);
+    return { left, right: left + track.width };
+  }
+
+  function fishWordTracksOverlap(first, second, sceneWidth) {
+    const verticalGap = 10; // Include the independent 3px swim wiggle.
+    if (first.top + first.height + verticalGap <= second.top ||
+        second.top + second.height + verticalGap <= first.top) return false;
+    const start = Math.max(first.delayMs, second.delayMs);
+    const end = Math.min(first.delayMs + first.motion.durationMs,
+      second.delayMs + second.motion.durationMs);
+    if (end < start) return false;
+    for (let t = start; t <= end + 50; t += 50) {
+      const a = fishWordTrackRectAt(first, Math.min(t, end), sceneWidth);
+      const b = fishWordTrackRectAt(second, Math.min(t, end), sceneWidth);
+      if (!a || !b || a.right <= 0 || b.right <= 0 ||
+          a.left >= sceneWidth || b.left >= sceneWidth) continue;
+      if (a.left < b.right + 10 && a.right + 10 > b.left) return true;
+    }
+    return false;
+  }
+
+  function getFishWordLayout(sceneWidth, sceneHeight, wordSizes) {
+    const width = Math.max(120, Number(sceneWidth) || 120);
+    const height = Math.max(120, Number(sceneHeight) || 120);
+    const sizes = wordSizes.map((size) => ({
+      width: Math.max(1, Number(size.width) || 1),
+      height: Math.max(1, Number(size.height) || 1)
+    }));
+    if (!sizes.length) return [];
+    const maximumHeight = Math.max(...sizes.map((size) => size.height));
+    const margin = Math.max(8, Math.min(36, height * 0.07));
+    const firstTop = Math.min(margin, Math.max(4,
+      height - maximumHeight - Math.max(2, sizes.length - 1) * 2));
+    const lastTop = Math.max(firstTop + (sizes.length - 1) * 2,
+      height - maximumHeight - margin);
+    const tracks = [];
+    sizes.forEach((size, index) => {
+      const top = sizes.length === 1
+        ? Math.max(firstTop, (height - size.height) / 2)
+        : firstTop + (lastTop - firstTop) * index / (sizes.length - 1);
+      const motion = getFishMotion(width, size.width, sizes.length);
+      const track = { ...size, top, motion,
+        delayMs: index ? tracks[index - 1].delayMs + motion.staggerMs : 0 };
+      // Check the full spurt/glide trajectory, not just positions at entry.
+      // A later word must never catch the one before it in crowded rows.
+      while (tracks.some((prior) =>
+        fishWordTracksOverlap(prior, track, width))) {
+        track.delayMs += 75;
+      }
+      tracks.push(track);
+    });
+    return tracks;
+  }
+
+  // Hook tip: 18.9% from PNG left, 40.5% down from PNG top.
+  // Target: flipped fish's right edge, inset 3% of hook width, mid-height.
+  function getFishHookPlacement(fishRect, buttonRect, hookWidth) {
+    const width = Math.max(1, Number(hookWidth) || 1);
+    const hookHeight = width * (690 / 494);
+    const targetX = fishRect.right - buttonRect.left - width * 0.03;
+    const targetY = fishRect.top - buttonRect.top + fishRect.height / 2;
+    return {
+      left: targetX - width * 0.189,
+      top: targetY - hookHeight * 0.405,
+      hookHeight
+    };
+  }
+
   function stopCrawlSequence() {
     const session = crawlSession;
     if (!session) return;
@@ -3728,21 +3816,58 @@
       button.style.setProperty("--read-fish-decor-travel", `${travel}px`);
       button.style.setProperty("--read-fish-decor-duration",
         `${Math.max(9500, Math.min(18000, Math.round(travel / 0.051)))}ms`);
+      const assembly = button.querySelector(".read-fish-catch-assembly");
+      const hookRig = button.querySelector(".read-fish-hook-rig");
+      let catchState = "swimming"; // Every fish owns its catch lifecycle.
+      const removeFish = () => {
+        catchState = "removed";
+        button.remove();
+      };
       button.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
-        if (button.classList.contains("is-activated")) return;
-        button.classList.add("is-activated");
+        if (!session.active || catchState !== "swimming") return;
+        catchState = "hooking";
+        const buttonRect = button.getBoundingClientRect();
+        const sceneRect = session.scene.getBoundingClientRect();
+        const fishImage = button.querySelector(".read-fish-image");
+        const fishFallback = button.querySelector(".read-fish-fallback");
+        const fishRect = fishImage && !fishImage.hidden &&
+          fishImage.getBoundingClientRect().height
+          ? fishImage.getBoundingClientRect()
+          : fishFallback.getBoundingClientRect();
+        const hookWidth = hookRig.getBoundingClientRect().width;
+        const placement = getFishHookPlacement(fishRect, buttonRect, hookWidth);
+        hookRig.style.left = `${placement.left}px`;
+        hookRig.style.top = `${placement.top}px`;
+        // The hook starts above the scene and descends to where this fish
+        // WILL be: the rig is a child of the still-swimming fish button.
+        const targetSceneY = buttonRect.top - sceneRect.top +
+          placement.top + placement.hookHeight * 0.405;
+        hookRig.style.setProperty("--read-fish-hook-drop",
+          `${Math.max(80, targetSceneY + placement.hookHeight)}px`);
+        assembly.style.setProperty("--read-fish-reel-travel",
+          `${Math.max(220, buttonRect.bottom - sceneRect.top +
+            placement.hookHeight + 70)}px`);
+        button.classList.add("is-activated", "is-hooking");
         button.disabled = true;
-        // Fallback if WebKit does not fire the caught-fish animationend.
-        fishTimer(session, () => button.remove(), 2300);
+        // Keep swimming during descent; then lift fish, hook AND line
+        // inside the same assembly. Separate timers allow simultaneous taps.
+        fishTimer(session, () => {
+          if (catchState !== "hooking" || !button.isConnected) return;
+          catchState = "reeling";
+          button.classList.add("is-reeling");
+          fishTimer(session, () => {
+            if (catchState === "reeling") removeFish();
+          }, 730); // Fallback for WebKit missing animationend.
+        }, 620);
       };
       button.addEventListener("animationend", (event) => {
-        if (event.target === button && !button.classList.contains("is-activated")) {
-          button.remove(); // Normal fish finished crossing.
-        } else if (event.animationName === "readCaughtFish") {
-          button.remove(); // Catch animation completed, including the hook.
-        }
+        if (event.target === button && event.animationName === "readDecorFish" &&
+            catchState === "swimming") removeFish();
+        if (event.target === assembly &&
+            event.animationName === "readFishCatchReel" &&
+            catchState === "reeling") removeFish();
       });
     });
   }
@@ -3771,14 +3896,11 @@
     const scene = session.scene.getBoundingClientRect();
     let lastEntryMs = 0;
     let lastExitMs = 0;
+    const sizes = words.map((word) => word.getBoundingClientRect());
+    const layout = getFishWordLayout(scene.width, scene.height, sizes);
     words.forEach((word, wordIndex) => {
-      const box = word.getBoundingClientRect();
-      const motion = getFishMotion(scene.width, box.width, words.length);
-      const delayMs = wordIndex * motion.staggerMs;
-      // Keep every lane inside the playfield, even with a tall word pill.
-      const preferredTop = scene.height * (0.19 + (wordIndex % 4) * 0.17);
-      word.style.top = `${Math.max(8, Math.min(scene.height - box.height - 8,
-        preferredTop))}px`;
+      const { top, delayMs, motion } = layout[wordIndex];
+      word.style.top = `${top}px`;
       word.style.setProperty("--read-fish-travel", `${motion.travel}px`);
       word.style.setProperty("--read-fish-duration", `${motion.durationMs}ms`);
       word.style.setProperty("--read-word-delay", `${delayMs}ms`);
@@ -3881,13 +4003,15 @@
   function renderFishDecorationsHtml(manifest, decorations = state.decorations) {
     return decorations.map((decoration) => `
       <button class="read-decorative-fish" type="button" data-read-decoration aria-label="Catch decorative fish" style="--read-decor-top:${decoration.top.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
-        <span class="read-fish-hook-rig" aria-hidden="true">
-          <span class="read-fish-hook-line"></span>
-          <img class="read-fish-hook" src="${escapeHtml(manifest.decorations?.hook || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-hook-missing')">
-          <span class="read-fish-hook-fallback">J</span>
+        <span class="read-fish-catch-assembly">
+          <span class="read-fish-hook-rig" aria-hidden="true">
+            <span class="read-fish-hook-line"></span>
+            <img class="read-fish-hook" src="${escapeHtml(manifest.decorations?.hook || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-hook-missing')">
+            <span class="read-fish-hook-fallback">J</span>
+          </span>
+          <img class="read-fish-image" src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.parentElement.classList.add('is-image-missing')">
+          <span class="read-fish-fallback" aria-hidden="true"></span>
         </span>
-        <img class="read-fish-image" src="${escapeHtml(manifest.decorations?.[decoration.kind] || "")}" alt="" draggable="false" onerror="this.hidden=true;this.parentElement.classList.add('is-image-missing')">
-        <span class="read-fish-fallback" aria-hidden="true"></span>
       </button>
     `).join("");
   }
@@ -4864,6 +4988,9 @@
     getCrawlMotion,
     getBalloonMotion,
     getFishMotion,
+    getFishWordLayout,
+    fishWordTracksOverlap,
+    getFishHookPlacement,
     readBalloonRectAt,
     readBalloonPathsOverlap,
     chooseReadBalloonSpawn,
