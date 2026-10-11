@@ -1818,6 +1818,74 @@
     } catch (err) { /* Unsupported Web Audio: continue silently. */ }
   }
 
+  // Tap in Order plays one rising melody note per correct word, with a
+  // completion flourish. These voices use the same lifecycle as Scramble's.
+  function playOrderTone(nextIndex, complete = false, wrong = false) {
+    if (appApi?.isMuted?.()) return;
+    const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      scrambleAudioContext ||= new AudioContextClass();
+      const context = scrambleAudioContext;
+      if (context.state === "suspended") context.resume()?.catch?.(() => {});
+      const scale = [60, 62, 64, 67, 69, 72];
+      const midi = wrong ? 48 : scale[(Math.max(1, nextIndex) - 1) % scale.length];
+      const notes = wrong ? [[midi, 0]] : complete
+        ? [[midi, 0], [midi + 4, 0.09], [midi + 7, 0.18], [midi + 12, 0.27]]
+        : [[midi, 0]];
+      notes.forEach(([pitch, delay]) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = context.currentTime + delay;
+        const end = start + (wrong ? 0.14 : complete ? 0.17 : 0.16);
+        oscillator.type = wrong ? "sine" : "triangle";
+        oscillator.frequency.setValueAtTime(
+          440 * 2 ** ((pitch - 69) / 12), start
+        );
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.linearRampToValueAtTime(wrong ? 0.034 : 0.072, start + 0.018);
+        gain.gain.exponentialRampToValueAtTime(0.0001, end);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        const voice = { oscillator, gain };
+        scrambleSoundVoices.add(voice);
+        oscillator.onended = () => {
+          scrambleSoundVoices.delete(voice);
+          oscillator.disconnect();
+          gain.disconnect();
+        };
+        oscillator.start(start);
+        oscillator.stop(end + 0.01);
+      });
+    } catch (err) { /* Audio is optional on locked-down devices. */ }
+  }
+
+  // The word grid rerenders immediately. An independent visual copy lets the
+  // 380ms Verse Invaders CRT shutdown finish without holding up the next tap.
+  function vanishOrderWord(rect, text, fontSize) {
+    if (state.reducedMotion || !root?.document?.body || !rect) return;
+    const ghost = root.document.createElement("div");
+    ghost.className = "read-order-crt-ghost";
+    ghost.style.left = `${rect.left}px`;
+    ghost.style.top = `${rect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.fontSize = fontSize;
+    const letters = root.document.createElement("span");
+    letters.className = "read-order-crt-letters";
+    letters.textContent = text;
+    ghost.appendChild(letters);
+    ghost.appendChild(root.document.createElement("i")).className = "read-order-crt-line";
+    ghost.appendChild(root.document.createElement("i")).className = "read-order-crt-dot";
+    root.document.body.appendChild(ghost);
+    const effect = { node: ghost, timer: 0 };
+    scrambleParticleBursts.add(effect);
+    effect.timer = setTimeout(() => {
+      scrambleParticleBursts.delete(effect);
+      ghost.remove();
+    }, 430);
+  }
+
   function burstScrambleRainbow(rect) {
     if (state.reducedMotion || !root?.document?.body || !rect) return;
     const burst = root.document.createElement("div");
@@ -2441,7 +2509,7 @@
     }
 
     if (!result.correct) {
-      playNegativeFeedback();
+      playOrderTone(data.nextIndex + 1, false, true);
 
       appApi?.requestRender?.();
       const wrongTile = root?.document
@@ -2474,7 +2542,7 @@
       clearTimeout(pauseTimer);
       pauseTimer = setTimeout(
         finishInteractiveChunk,
-        280
+        440 // Let the CRT collapse and final melody finish before continuing.
       );
     }
 
@@ -4649,8 +4717,8 @@
       }
     });
     if (!best) return;
-    area.style.setProperty("--read-unscramble-font-size", `${best.size}px`);
-    area.style.setProperty("--read-unscramble-row-gap", `${best.rowGap}px`);
+    area.style.setProperty("--read-scramble-font-size", `${best.size}px`);
+    area.style.setProperty("--read-scramble-row-gap", `${best.rowGap}px`);
     area.style.setProperty("--read-scramble-word-gap", `${best.gap}px`);
     // Recreate only the row wrappers; the interactive buttons retain handlers.
     const fragment = root.document.createDocumentFragment();
@@ -4673,6 +4741,64 @@
     schedule();
     // WebKit may initially lay out the fallback font. Refit after Titan One
     // is loaded, and only while this particular screen remains mounted.
+    root.document.fonts?.load?.('48px "Titan One"')?.then?.(
+      schedule, schedule
+    );
+  }
+
+  // Share Scramble's font/line solver; order is the *shuffled* display order,
+  // never the verse order. Solved words stay in their original row slots.
+  function layoutTapOrderWords(wrap) {
+    if (!wrap.isConnected || state.activityId !== TAP_WORDS_ORDER_ACTIVITY_ID) return;
+    const area = wrap.querySelector(".read-order-grid");
+    const data = state.activityData;
+    if (!area || !data?.tokens?.length) return;
+    const elements = Array.from(area.querySelectorAll(".read-order-tile"));
+    if (elements.length !== data.displayOrder.length) return;
+    const style = root.getComputedStyle(area);
+    const availableWidth = area.clientWidth - parseFloat(style.paddingLeft) -
+      parseFloat(style.paddingRight) - 2;
+    const availableHeight = area.clientHeight - parseFloat(style.paddingTop) -
+      parseFloat(style.paddingBottom) - 2;
+    if (!(availableWidth > 0 && availableHeight > 0)) return;
+    const context = root.document.createElement("canvas").getContext("2d");
+    if (!context) return;
+    const words = data.displayOrder.map((id) =>
+      data.tokens.find((token) => token.id === id)?.raw || ""
+    );
+    const maxSize = Math.min(82, Math.max(50, Math.round(availableWidth * .25)));
+    const maxRows = Math.min(words.length, Math.max(3, Math.ceil(words.length / 2)));
+    const best = chooseScrambleFit({
+      maxSize, maxRows, availableWidth, availableHeight,
+      measureWidths: (size) => {
+        context.font = `${size}px "Titan One"`;
+        return words.map((word) =>
+          Math.ceil(context.measureText(word).width + size * .56 + 6)
+        );
+      }
+    });
+    if (!best) return;
+    area.style.setProperty("--read-order-font-size", `${best.size}px`);
+    area.style.setProperty("--read-order-row-gap", `${best.rowGap}px`);
+    area.style.setProperty("--read-order-word-gap", `${best.gap}px`);
+    const fragment = root.document.createDocumentFragment();
+    best.lines.forEach(([from, to]) => {
+      const row = root.document.createElement("div");
+      row.className = "read-order-line";
+      for (let index = from; index < to; index += 1) {
+        row.appendChild(elements[index]);
+      }
+      fragment.appendChild(row);
+    });
+    area.replaceChildren(fragment);
+    area.classList.add("is-layout-ready");
+  }
+
+  function scheduleTapOrderLayout(wrap) {
+    const schedule = () => root.requestAnimationFrame?.(() =>
+      layoutTapOrderWords(wrap)
+    );
+    schedule();
     root.document.fonts?.load?.('48px "Titan One"')?.then?.(
       schedule, schedule
     );
@@ -4820,9 +4946,13 @@
       ).forEach((button) => {
         button.onclick = (event) => {
           event.preventDefault();
-          handleTapOrderTap(
-            button.dataset.readOrderToken
-          );
+          const rect = button.getBoundingClientRect();
+          const fontSize = root.getComputedStyle(button).fontSize;
+          const word = button.textContent;
+          if (!handleTapOrderTap(button.dataset.readOrderToken)) return;
+          const data = state.activityData;
+          vanishOrderWord(rect, word, fontSize);
+          playOrderTone(data.nextIndex, data.nextIndex >= data.tokens.length);
         };
       });
     }
@@ -4838,6 +4968,7 @@
       inner: wrap
     });
     if (isUnscramble) scheduleScrambleLayout(wrap);
+    else scheduleTapOrderLayout(wrap);
     return slide;
   }
 

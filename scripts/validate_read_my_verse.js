@@ -580,8 +580,8 @@ function testScrambleSafeTwoWordMinimumAndBalance() {
   assert.strictEqual(compact.lines.length, 1);
   // The fitter must write the variables actually consumed by Scramble CSS.
   const layoutSource = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
-  assert.ok(layoutSource.includes('setProperty("--read-unscramble-font-size"'));
-  assert.ok(layoutSource.includes('setProperty("--read-unscramble-row-gap"'));
+  assert.ok(layoutSource.includes('setProperty("--read-scramble-font-size"'));
+  assert.ok(layoutSource.includes('setProperty("--read-scramble-row-gap"'));
   // Height constraints remain authoritative even for very long words.
   const heightLimited = ReadMyVerse.chooseScrambleFit({
     maxSize: 82, maxRows: 3, availableWidth: 350,
@@ -658,6 +658,44 @@ function testTapOrderHintsAndReset() {
     puzzle.hintedTokenId,
     ""
   );
+}
+
+function testTapOrderTitanLayoutAndCrtFeedback() {
+  // The same optimizer must handle shuffled words, not their verse order.
+  const widths = [78, 240, 25, 68];
+  const fit = ReadMyVerse.chooseScrambleFit({
+    maxSize: 82, maxRows: 3, availableWidth: 350,
+    availableHeight: 440,
+    measureWidths: (size) => widths.map((width) => width * size / 60)
+  });
+  assert.ok(fit);
+  assert.ok(fit.lines.length >= 2);
+  assert.deepStrictEqual(fit.lines.flatMap(([from, to]) =>
+    Array.from({ length: to - from }, (_, offset) => from + offset)),
+  [0, 1, 2, 3]);
+
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(source.includes('function layoutTapOrderWords(wrap)'));
+  assert.ok(source.includes('const words = data.displayOrder.map'));
+  assert.ok(source.includes('scheduleTapOrderLayout(wrap)'));
+  assert.ok(source.includes('setProperty("--read-order-font-size"'));
+  assert.ok(source.includes('setProperty("--read-order-row-gap"'));
+  assert.ok(source.includes('setProperty("--read-order-word-gap"'));
+  assert.ok(source.includes('if (!handleTapOrderTap(button.dataset.readOrderToken)) return;'));
+  assert.ok(source.includes('vanishOrderWord(rect, word, fontSize)'));
+  assert.ok(source.includes('playOrderTone(data.nextIndex, data.nextIndex >= data.tokens.length)'));
+  assert.ok(source.includes('playOrderTone(data.nextIndex + 1, false, true)'));
+  assert.match(css, /\.read-order-grid\.is-layout-ready\s*\{/);
+  assert.match(css, /\.read-order-tile\s*\{[^}]*background:\s*transparent;/s);
+  assert.match(css, /\.read-order-tile\s*\{[^}]*font-size:\s*var\(--read-order-font-size/s);
+  assert.ok(css.includes('font-family: "Titan One", "Baloo 2"'));
+  assert.ok(css.includes('@keyframes readOrderCrtLetters'));
+  assert.ok(css.includes('@keyframes readOrderCrtLine'));
+  assert.ok(css.includes('@keyframes readOrderCrtDot'));
+  assert.match(css, /\.read-order-tile\.is-solved\s*\{[^}]*visibility:\s*hidden;/s);
+  assert.match(css, /\.read-order-tile\.is-hinted\s*\{[^}]*animation:\s*readOrderHint/s);
+  assert.ok(css.includes('.read-order-crt-ghost { display: none; }'));
 }
 
 function testDuplicateTapWordsAreFair() {
@@ -1316,6 +1354,7 @@ function main() {
     testScramblePreservesLettersAndPunctuation,
     testScrambleSafeTwoWordMinimumAndBalance,
     testTapOrderHintsAndReset,
+    testTapOrderTitanLayoutAndCrtFeedback,
     testDuplicateTapWordsAreFair,
     testActivityEligibilityAndForcedChunks,
     testTileLayoutKeepsSolvedPositions,
