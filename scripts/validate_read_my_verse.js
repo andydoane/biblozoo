@@ -460,6 +460,36 @@ function testChunkAudioMatchingLabelsAndStableLayout() {
   assert.strictEqual(guided.easyMisses, 3);
 }
 
+function testChunkAudioMatchingModeFontAndCompletedContrast() {
+  const css = fs.readFileSync(
+    path.join(rootDir, "read_my_verse.css"), "utf8");
+  const rule = (selector) => {
+    const start = css.indexOf(selector + " {");
+    assert.ok(start >= 0, `Missing Chunk Matching style: ${selector}`);
+    const end = css.indexOf("}", start);
+    return css.slice(start, end);
+  };
+
+  const modeFont = rule(".read-chunk-sequence-mode > button strong");
+  assert.ok(modeFont.includes('font-family: "Baloo 2"'));
+  assert.ok(modeFont.includes("font-weight: 800 !important"),
+    "Easy/Hard choice labels must use bold Baloo 2");
+  const modeDescription = rule(".read-chunk-sequence-mode > button span");
+  assert.ok(modeDescription.includes('font-family: "Baloo 2"'));
+  assert.ok(modeDescription.includes("font-weight: 700 !important"));
+
+  const unfinished = rule(".read-chunk-sequence-progress-dot");
+  const completed = rule(".read-chunk-sequence-progress-dot.is-complete");
+  assert.ok(unfinished.includes("background: rgba(92, 92, 92, 0.62)"),
+    "Unfinished circles should remain visually subdued");
+  assert.ok(completed.includes("background: var(--chunk-button-color)"),
+    "Completed markers must still show their chunk's original color");
+  assert.ok(completed.includes("inset 0 0 0 3px #ffffff"),
+    "All completed markers need a clear white inset ring");
+  assert.ok(!/\b(?:width|height|transform)\s*:/.test(completed),
+    "Completed-marker polish must not cause reflow or scale circles");
+}
+
 function testChunkAudioMatchingEligibility() {
   const verse = (count) => ({
     id: `chunks_${count}`,
@@ -1418,6 +1448,7 @@ function main() {
     testInteractiveActivityManifest,
     testChunkAudioMatchingRules,
     testChunkAudioMatchingLabelsAndStableLayout,
+    testChunkAudioMatchingModeFontAndCompletedContrast,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,

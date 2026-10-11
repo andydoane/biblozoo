@@ -1000,7 +1000,8 @@ button.read-unscramble-token.is-solved {
   place-items: center;
   border-radius: 50%;
   color: rgba(255, 255, 255, 0.64);
-  background: rgba(150, 150, 150, 0.6);
+  /* Keep unfinished spots quiet so completed dark-gray spots are distinct. */
+  background: rgba(92, 92, 92, 0.62);
   font-size: clamp(18px, 5vw, 38px);
   line-height: 1;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
@@ -1012,8 +1013,11 @@ button.read-unscramble-token.is-solved {
 .read-chunk-sequence-progress-dot.is-complete {
   color: #ffffff;
   background: var(--chunk-button-color);
+  /* Inset rings are prominent on gray AND leave every circle's size fixed. */
   box-shadow:
-    inset 0 3px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 3px #ffffff,
+    inset 0 0 0 4px rgba(26, 26, 26, 0.62),
+    0 0 9px rgba(255, 255, 255, 0.35),
     0 3px 8px rgba(0, 0, 0, 0.22);
 }
 
@@ -1119,15 +1123,22 @@ button.read-unscramble-token.is-solved {
   text-align: left;
 }
 
-.read-chunk-sequence-mode strong {
-  font-size: clamp(24px, 5.6vw, 40px);
-  font-weight: 400;
+/* Override the shared Titan One button style just for the mode choices.
+   The app's global button font rule can otherwise thin the labels. */
+.read-chunk-sequence-mode > button,
+.read-chunk-sequence-mode > button strong {
+  font-family: "Baloo 2", system-ui, sans-serif !important;
+  font-weight: 800 !important;
 }
 
-.read-chunk-sequence-mode span {
-  font-family: "Baloo 2", system-ui, sans-serif;
+.read-chunk-sequence-mode strong {
+  font-size: clamp(24px, 5.6vw, 40px);
+}
+
+.read-chunk-sequence-mode > button span {
+  font-family: "Baloo 2", system-ui, sans-serif !important;
   font-size: clamp(14px, 3.2vw, 21px);
-  font-weight: 700;
+  font-weight: 700 !important;
 }
 
 .read-chunk-sequence-buttons {
