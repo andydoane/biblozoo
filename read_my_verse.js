@@ -4587,6 +4587,30 @@
     });
   }
 
+  // Readability first: choose the largest size that fits *any* row layout.
+  // Only compare line balance and row count at that same font size.
+  function chooseScrambleFit({ maxSize, maxRows, availableWidth,
+    availableHeight, measureWidths }) {
+    for (let size = maxSize; size >= 22; size -= 2) {
+      const widths = measureWidths(size);
+      const gap = Math.max(6, Math.min(16, size * .19));
+      const rowHeight = size * 1.4;
+      const rowGap = Math.max(9, Math.min(22, size * .22));
+      let bestAtSize = null;
+      for (let rows = 1; rows <= maxRows; rows += 1) {
+        if (rows * rowHeight + (rows - 1) * rowGap > availableHeight) continue;
+        const candidate = balanceScrambleRows(widths, availableWidth, gap, rows);
+        if (!candidate) continue;
+        const cost = (rows - 1) * .7 + candidate.score * 1.8;
+        if (!bestAtSize || cost < bestAtSize.cost) {
+          bestAtSize = { size, gap, rowGap, lines: candidate.lines, cost };
+        }
+      }
+      if (bestAtSize) return bestAtSize;
+    }
+    return null;
+  }
+
   // Fit the largest comfortable Titan One words into balanced rows.
   // Measure both solved and scrambled spellings, keeping rows stable on tap.
   function layoutScrambleWords(wrap) {
@@ -4607,29 +4631,18 @@
     if (!context) return;
     const maxSize = Math.min(82, Math.max(50, Math.round(availableWidth * .185)));
     const maxRows = Math.min(tokens.length, Math.max(2, Math.ceil(tokens.length / 2)));
-    let best = null;
-    for (let size = maxSize; size >= 22; size -= 2) {
-      context.font = `${size}px "Titan One"`;
-      const widths = tokens.map((token) => {
-        const original = token.leading + token.core + token.trailing;
-        const mixed = token.leading + token.scrambled + token.trailing;
-        return Math.ceil(Math.max(context.measureText(original).width,
-          context.measureText(mixed).width) + size * .56 + 6);
-      });
-      const gap = Math.max(6, Math.min(16, size * .19));
-      const rowHeight = size * 1.4;
-      const rowGap = Math.max(9, Math.min(22, size * .22));
-      for (let rows = 1; rows <= maxRows; rows += 1) {
-        if (rows * rowHeight + (rows - 1) * rowGap > availableHeight) continue;
-        const candidate = balanceScrambleRows(widths, availableWidth, gap, rows);
-        if (!candidate) continue;
-        const cost = (maxSize - size) * .06 + (rows - 1) * .7 +
-          candidate.score * 1.8;
-        if (!best || cost < best.cost) {
-          best = { size, gap, rowGap, lines: candidate.lines, cost };
-        }
+    const best = chooseScrambleFit({
+      maxSize, maxRows, availableWidth, availableHeight,
+      measureWidths: (size) => {
+        context.font = `${size}px "Titan One"`;
+        return tokens.map((token) => {
+          const original = token.leading + token.core + token.trailing;
+          const mixed = token.leading + token.scrambled + token.trailing;
+          return Math.ceil(Math.max(context.measureText(original).width,
+            context.measureText(mixed).width) + size * .56 + 6);
+        });
       }
-    }
+    });
     if (!best) return;
     area.style.setProperty("--read-scramble-font-size", `${best.size}px`);
     area.style.setProperty("--read-scramble-row-gap", `${best.rowGap}px`);
@@ -5248,6 +5261,7 @@
     scrambleCore,
     buildUnscramblePuzzle,
     balanceScrambleRows,
+    chooseScrambleFit,
     buildTapOrderPuzzle,
     applyTapOrderChoice,
     isChunkEligible,

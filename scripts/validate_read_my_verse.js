@@ -542,6 +542,20 @@ function testScrambleSafeTwoWordMinimumAndBalance() {
   assert.strictEqual(rows.lines[1][1], 5);
   assert.ok(Math.abs(rows.lines[0][1] - rows.lines[1][0]) === 0);
   assert.strictEqual(ReadMyVerse.balanceScrambleRows([300], 275, 10, 1), null);
+  // Isaiah 41:10: the long word should wrap rather than shrink all four
+  // words into a single line, even when the one-line score is lower.
+  const isaiahWidths = [18, 65, 235, 75];
+  const isaiah = ReadMyVerse.chooseScrambleFit({
+    maxSize: 60, maxRows: 3, availableWidth: 350,
+    availableHeight: 280,
+    measureWidths: (size) => isaiahWidths.map((width) => width * size / 60)
+  });
+  assert.strictEqual(isaiah.size, 60);
+  assert.ok(isaiah.lines.length >= 2);
+  assert.deepStrictEqual(isaiah.lines.flatMap(([from, to]) =>
+    Array.from({ length: to - from }, (_, index) => from + index)),
+  [0, 1, 2, 3]);
+
   const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
   assert.ok(css.includes('font-family: "Titan One", "Baloo 2"'));
   assert.ok(css.includes(".read-unscramble-burst"));
