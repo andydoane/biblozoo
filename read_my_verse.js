@@ -4723,6 +4723,9 @@
     );
     const activate = (event) => {
       event?.preventDefault?.();
+      // While the intro is being typed, taps must not skip letters or
+      // advance the verse. Once it finishes, a tap can begin normally.
+      if (state.typewriterIntroPhase === "typing") return;
       if (state.typewriterIntroPhase !== "done") {
         stopKeySoundVoices();
         finishTypewriterIntro();
@@ -5416,6 +5419,9 @@
     );
     const activate = (event) => {
       event?.preventDefault?.();
+      // While the intro is being typed, taps must not skip letters or
+      // advance the verse. Once it finishes, a tap can begin normally.
+      if (state.typewriterIntroPhase === "typing") return;
       if (state.typewriterIntroPhase !== "done") {
         // This same tap dismisses the cutscene AND types the first letter.
         stopKeySoundVoices();

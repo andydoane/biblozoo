@@ -1,0 +1,65 @@
+diff --git a/read_my_verse.js b/read_my_verse.js
+index 89f60c1..f94985b 100644
+--- a/read_my_verse.js
++++ b/read_my_verse.js
+@@ -4723,6 +4723,9 @@
+     );
+     const activate = (event) => {
+       event?.preventDefault?.();
++      // While the intro is being typed, taps must not skip letters or
++      // advance the verse. Once it finishes, a tap can begin normally.
++      if (state.typewriterIntroPhase === "typing") return;
+       if (state.typewriterIntroPhase !== "done") {
+         stopKeySoundVoices();
+         finishTypewriterIntro();
+@@ -5416,6 +5419,9 @@
+     );
+     const activate = (event) => {
+       event?.preventDefault?.();
++      // While the intro is being typed, taps must not skip letters or
++      // advance the verse. Once it finishes, a tap can begin normally.
++      if (state.typewriterIntroPhase === "typing") return;
+       if (state.typewriterIntroPhase !== "done") {
+         // This same tap dismisses the cutscene AND types the first letter.
+         stopKeySoundVoices();
+diff --git a/scripts/validate_read_my_verse.js b/scripts/validate_read_my_verse.js
+index 8b67e98..02a9b6a 100644
+--- a/scripts/validate_read_my_verse.js
++++ b/scripts/validate_read_my_verse.js
+@@ -76,6 +76,23 @@ function testTypewriterIntroCutscene() {
+   assert.ok(js.includes('if (hasIntro) scheduleTypewriterIntro(wrap)'));
+   assert.ok(js.includes('stopKeySoundVoices();\n        finishTypewriterIntro();\n      }\n      handleTypeTap();'),
+     "A tap must skip the cutscene and type the first character");
++  // Taps must wait for the LAST intro letter, in both activities.
++  // The completed message remains skippable during its 3-second hold.
++  const introTapGate = 'if (state.typewriterIntroPhase === "typing") return;';
++  assert.strictEqual(js.split(introTapGate).length - 1, 2,
++    "Typewriter and Keyboard must each ignore taps until the intro finishes typing");
++  const keyboardTapStart = js.indexOf('function renderKeyboardScreen(');
++  const keyboardTapGate = js.indexOf(introTapGate, keyboardTapStart);
++  const keyboardTapFinish = js.indexOf('finishTypewriterIntro();', keyboardTapStart);
++  assert.ok(keyboardTapStart >= 0 && keyboardTapGate > keyboardTapStart &&
++    keyboardTapGate < keyboardTapFinish,
++    "Keyboard must ignore taps before dismissing the intro");
++  const typewriterTapStart = js.indexOf('function renderScreen(');
++  const typewriterTapGate = js.indexOf(introTapGate, typewriterTapStart);
++  const typewriterTapFinish = js.indexOf('finishTypewriterIntro();', typewriterTapStart);
++  assert.ok(typewriterTapStart >= 0 && typewriterTapGate > typewriterTapStart &&
++    typewriterTapGate < typewriterTapFinish,
++    "Typewriter must ignore taps before dismissing the intro");
+   assert.ok(js.includes('clearTimeout(typewriterIntroTimer)'),
+     "Exiting must cancel pending intro timers");
+   const start = js.indexOf('const hasIntro = state.typewriterIntroPhase !== "done"');
+diff --git a/service-worker.js b/service-worker.js
+index 8cc52f0..626422b 100644
+--- a/service-worker.js
++++ b/service-worker.js
+@@ -3,7 +3,7 @@
+    App scope: /biblozoo/
+    ========================================================= */
+ 
+-const CACHE_VERSION = "2026_Oct_11_typing_intro_keyboard_i";
++const CACHE_VERSION = "2026_Oct_11_typing_intro_tap_gate_j";
+ const SHELL_CACHE =
+   `biblozoo-shell-${CACHE_VERSION}`;
+ const RUNTIME_CACHE =

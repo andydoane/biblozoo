@@ -76,6 +76,23 @@ function testTypewriterIntroCutscene() {
   assert.ok(js.includes('if (hasIntro) scheduleTypewriterIntro(wrap)'));
   assert.ok(js.includes('stopKeySoundVoices();\n        finishTypewriterIntro();\n      }\n      handleTypeTap();'),
     "A tap must skip the cutscene and type the first character");
+  // Taps must wait for the LAST intro letter, in both activities.
+  // The completed message remains skippable during its 3-second hold.
+  const introTapGate = 'if (state.typewriterIntroPhase === "typing") return;';
+  assert.strictEqual(js.split(introTapGate).length - 1, 2,
+    "Typewriter and Keyboard must each ignore taps until the intro finishes typing");
+  const keyboardTapStart = js.indexOf('function renderKeyboardScreen(');
+  const keyboardTapGate = js.indexOf(introTapGate, keyboardTapStart);
+  const keyboardTapFinish = js.indexOf('finishTypewriterIntro();', keyboardTapStart);
+  assert.ok(keyboardTapStart >= 0 && keyboardTapGate > keyboardTapStart &&
+    keyboardTapGate < keyboardTapFinish,
+    "Keyboard must ignore taps before dismissing the intro");
+  const typewriterTapStart = js.indexOf('function renderScreen(');
+  const typewriterTapGate = js.indexOf(introTapGate, typewriterTapStart);
+  const typewriterTapFinish = js.indexOf('finishTypewriterIntro();', typewriterTapStart);
+  assert.ok(typewriterTapStart >= 0 && typewriterTapGate > typewriterTapStart &&
+    typewriterTapGate < typewriterTapFinish,
+    "Typewriter must ignore taps before dismissing the intro");
   assert.ok(js.includes('clearTimeout(typewriterIntroTimer)'),
     "Exiting must cancel pending intro timers");
   const start = js.indexOf('const hasIntro = state.typewriterIntroPhase !== "done"');
