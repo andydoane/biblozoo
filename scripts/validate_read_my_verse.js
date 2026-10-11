@@ -515,6 +515,39 @@ function testScramblePreservesLettersAndPunctuation() {
     });
 }
 
+function testScrambleSafeTwoWordMinimumAndBalance() {
+  // When a longer word is the only first-pass candidate, a shorter safe
+  // candidate should still make the chunk an actual two-word puzzle.
+  const longAndShort = ReadMyVerse.buildUnscramblePuzzle(
+    "Grace and", () => 0
+  );
+  assert.strictEqual(longAndShort.requiredCount, 2);
+  assert.ok(longAndShort.tokens.every((token) =>
+    token.required && token.scrambled !== token.core));
+
+  const mostlyShort = ReadMyVerse.buildUnscramblePuzzle(
+    "go and us", () => 0
+  );
+  assert.ok(mostlyShort.requiredCount >= 2);
+  // Single eligible tokens stay safe: never invent a forbidden anagram.
+  const impossible = ReadMyVerse.buildUnscramblePuzzle("I a a", () => 0);
+  assert.strictEqual(impossible.requiredCount, 0);
+
+  const rows = ReadMyVerse.balanceScrambleRows(
+    [90, 65, 100, 70, 80], 275, 10, 2
+  );
+  assert.ok(rows);
+  assert.strictEqual(rows.lines.length, 2);
+  assert.strictEqual(rows.lines[0][0], 0);
+  assert.strictEqual(rows.lines[1][1], 5);
+  assert.ok(Math.abs(rows.lines[0][1] - rows.lines[1][0]) === 0);
+  assert.strictEqual(ReadMyVerse.balanceScrambleRows([300], 275, 10, 1), null);
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(css.includes('font-family: "Titan One", "Baloo 2"'));
+  assert.ok(css.includes(".read-unscramble-burst"));
+  assert.ok(css.includes("readBalloonParticleBurst"));
+}
+
 function testTapOrderHintsAndReset() {
   const puzzle =
     ReadMyVerse.buildTapOrderPuzzle(
@@ -1231,6 +1264,7 @@ function main() {
     testFishCompactVariableWordGroups,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
+    testScrambleSafeTwoWordMinimumAndBalance,
     testTapOrderHintsAndReset,
     testDuplicateTapWordsAreFair,
     testActivityEligibilityAndForcedChunks,

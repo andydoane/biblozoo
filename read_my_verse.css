@@ -492,6 +492,15 @@
   opacity: 1;
 }
 
+/* Local font face: Scramble's tokens use Titan One at every state. */
+@font-face {
+  font-family: "Titan One";
+  src: url("./verse_fonts/TitanOne.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Interactive word activities ---------------------------- */
 
 .read-word-activity-screen {
@@ -575,20 +584,36 @@
 .read-unscramble-words {
   min-width: 0;
   min-height: 0;
-  align-content: center;
   display: flex;
   flex-wrap: wrap;
+  align-content: center;
   align-items: center;
   justify-content: center;
-  gap: clamp(8px, 2vw, 16px)
-    clamp(5px, 1.4vw, 11px);
+  gap: 10px;
   overflow: auto;
-  padding: clamp(10px, 3vw, 30px);
+  padding: clamp(10px, 3vw, 24px);
   -webkit-overflow-scrolling: touch;
+  --read-scramble-font-size: 38px;
+}
+
+.read-unscramble-words.is-layout-ready {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: var(--read-scramble-row-gap, 12px);
+}
+
+.read-unscramble-line {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--read-scramble-word-gap, 9px);
+  max-width: 100%;
 }
 
 .read-unscramble-token {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: baseline;
   justify-content: center;
   border: 0;
@@ -596,11 +621,18 @@
   padding: 0.12em 0.28em 0.18em;
   color: #3d2b16;
   background: transparent;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: clamp(25px, 6.4vw, 54px);
-  font-weight: 800;
+  font-size: var(--read-scramble-font-size, 38px);
+  font-weight: 400;
   line-height: 1;
   white-space: nowrap;
+}
+
+/* Buttons and spans must use identical typography. Global button rules
+   otherwise override the static words (for example, "My"). */
+.read-unscramble-screen .read-unscramble-token,
+.read-unscramble-screen .read-unscramble-token * {
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif !important;
+  font-weight: 400 !important;
 }
 
 button.read-unscramble-token.is-interactive {
@@ -623,6 +655,29 @@ button.read-unscramble-token.is-solved {
 
 .read-unscramble-token.is-word-feedback {
   animation: readWordSuccess 330ms ease-out;
+}
+
+/* Fixed-position so the rainbow survives the solved-word screen rerender. */
+.read-unscramble-burst {
+  position: fixed;
+  z-index: 9999;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.read-unscramble-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--read-particle-size, 9px);
+  height: var(--read-particle-size, 9px);
+  margin: calc(var(--read-particle-size, 9px) / -2);
+  border-radius: 50%;
+  opacity: 0;
+  animation: readBalloonParticleBurst 620ms cubic-bezier(.12,.75,.22,1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .read-unscramble-particle { animation: none !important; }
 }
 
 .read-order-grid {

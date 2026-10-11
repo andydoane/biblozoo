@@ -262,6 +262,9 @@
   let crawlMusic = null;
   let balloonSession = null;
   let fishSession = null;
+  let scrambleAudioContext = null;
+  const scrambleSoundVoices = new Set();
+  const scrambleParticleBursts = new Set();
 
   const state = {
     verseId: "",
@@ -675,47 +678,82 @@
   ) {
     const tokens = tokenizeChunkWords(text);
     const threshold = [4, 3, 2].find(
-      (minimumLength) =>
-        tokens.some((token) =>
-          canScrambleCore(
-            token.core,
-            minimumLength
-          )
-        )
+      (minimumLength) => tokens.some((token) =>
+        canScrambleCore(token.core, minimumLength)
+      )
     ) || 0;
     let requiredCount = 0;
-    const puzzleTokens = tokens.map(
-      (token) => {
-        const eligible = threshold > 0 &&
-          canScrambleCore(
-            token.core,
-            threshold
-          );
-        const scrambled = eligible
-          ? scrambleCore(token.core, random)
-          : null;
-        const required = !!scrambled &&
-          scrambled !== token.core;
-
-        if (required) requiredCount += 1;
-
-        return {
-          ...token,
-          scrambled:
-            required
-              ? scrambled
-              : token.core,
-          required,
-          solved: !required
-        };
-      }
-    );
-
-    return {
-      threshold,
-      requiredCount,
-      tokens: puzzleTokens
+    const puzzleTokens = tokens.map((token) => ({
+      ...token,
+      scrambled: token.core,
+      required: false,
+      solved: true
+    }));
+    const tryScramble = (token) => {
+      if (token.required) return;
+      const result = scrambleCore(token.core, random);
+      if (!result || result === token.core) return;
+      token.scrambled = result;
+      token.required = true;
+      token.solved = false;
+      requiredCount += 1;
     };
+
+    // Preserve the usual preference for longer words. If only one can be
+    // mixed up, include a safe three-letter word, then a two-letter word.
+    if (threshold) {
+      puzzleTokens.forEach((token) => {
+        if (canScrambleCore(token.core, threshold)) tryScramble(token);
+      });
+      for (let length = threshold - 1;
+        length >= 2 && requiredCount < 2; length -= 1) {
+        for (const token of puzzleTokens) {
+          if (requiredCount >= 2) break;
+          if (!token.required && canScrambleCore(token.core, length)) {
+            tryScramble(token);
+          }
+        }
+      }
+    }
+
+    // An impossible or disallowed anagram is never forced for the quota.
+    return { threshold, requiredCount, tokens: puzzleTokens };
+  }
+
+  // Pick balanced, consecutive rows without changing the verse word order.
+  // The scorer penalizes both uneven line lengths and single-word orphans.
+  function balanceScrambleRows(widths, maxWidth, gap, rowCount) {
+    const count = widths.length;
+    if (!count || rowCount < 1 || rowCount > count) return null;
+    const target = (widths.reduce((a, b) => a + b, 0) +
+      gap * (count - rowCount)) / rowCount;
+    const cache = new Map();
+    const solve = (from, rowsLeft) => {
+      if (rowsLeft === 0) {
+        return from === count ? { score: 0, lines: [] } : null;
+      }
+      const key = `${from}:${rowsLeft}`;
+      if (cache.has(key)) return cache.get(key);
+      let best = null;
+      let rowWidth = 0;
+      for (let end = from + 1; end <= count - rowsLeft + 1; end += 1) {
+        rowWidth += widths[end - 1] + (end > from + 1 ? gap : 0);
+        if (rowWidth > maxWidth + 0.25) break;
+        const next = solve(end, rowsLeft - 1);
+        if (!next) continue;
+        const imbalance = ((rowWidth - target) / Math.max(1, target)) ** 2;
+        const orphan = count > 2 && rowCount > 1 && end === from + 1
+          ? 0.32 : 0;
+        const candidate = {
+          score: imbalance + orphan + next.score,
+          lines: [[from, end], ...next.lines]
+        };
+        if (!best || candidate.score < best.score) best = candidate;
+      }
+      cache.set(key, best);
+      return best;
+    };
+    return solve(0, rowCount);
   }
 
   function buildTapOrderPuzzle(
@@ -1424,6 +1462,7 @@
     activeAudio = null;
 
     stopKeySoundVoices();
+    stopScrambleRewards();
 
     if (negativeFeedbackAudio) {
       try {
@@ -1725,6 +1764,89 @@
     } catch (err) { }
   }
 
+  function stopScrambleRewards() {
+    scrambleSoundVoices.forEach(({ oscillator, gain }) => {
+      try { oscillator.onended = null; oscillator.stop(); } catch (err) { }
+      try { oscillator.disconnect(); gain.disconnect(); } catch (err) { }
+    });
+    scrambleSoundVoices.clear();
+    scrambleParticleBursts.forEach(({ node, timer }) => {
+      clearTimeout(timer);
+      node.remove();
+    });
+    scrambleParticleBursts.clear();
+  }
+
+  // Gentle pitched rewards, modeled on Verse Typer's triangle-wave tones.
+  // Notes are scheduled together, so no delayed callback can outlive a game.
+  function playScrambleReward(solvedCount, complete) {
+    if (appApi?.isMuted?.()) return;
+    const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      scrambleAudioContext ||= new AudioContextClass();
+      const context = scrambleAudioContext;
+      if (context.state === "suspended") context.resume()?.catch?.(() => {});
+      const base = [60, 62, 64, 67, 69, 72][(solvedCount - 1) % 6];
+      const notes = complete
+        ? [[base, 0], [base + 4, 0.09], [base + 7, 0.19], [base + 12, 0.3]]
+        : [[base, 0], [base + 4, 0.1]];
+      notes.forEach(([midi, delay]) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const begin = context.currentTime + delay;
+        const end = begin + (complete ? 0.2 : 0.17);
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(
+          440 * 2 ** ((midi - 69) / 12), begin
+        );
+        gain.gain.setValueAtTime(0.0001, begin);
+        gain.gain.linearRampToValueAtTime(0.075, begin + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, end);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        const voice = { oscillator, gain };
+        scrambleSoundVoices.add(voice);
+        oscillator.onended = () => {
+          scrambleSoundVoices.delete(voice);
+          oscillator.disconnect();
+          gain.disconnect();
+        };
+        oscillator.start(begin);
+        oscillator.stop(end + 0.01);
+      });
+    } catch (err) { /* Unsupported Web Audio: continue silently. */ }
+  }
+
+  function burstScrambleRainbow(rect) {
+    if (state.reducedMotion || !root?.document?.body || !rect) return;
+    const burst = root.document.createElement("div");
+    burst.className = "read-unscramble-burst";
+    burst.style.left = `${rect.left + rect.width / 2}px`;
+    burst.style.top = `${rect.top + rect.height / 2}px`;
+    const colors = CHUNK_SEQUENCE_COLORS.slice(0, 6).map((color) => color.value);
+    const offset = Math.random() * Math.PI * 2;
+    for (let index = 0; index < 15; index += 1) {
+      const angle = offset + index * Math.PI * 2 / 15 +
+        (Math.random() - 0.5) * 0.23;
+      const distance = 42 + Math.random() * 45;
+      const particle = root.document.createElement("span");
+      particle.className = "read-unscramble-particle";
+      particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      particle.style.setProperty("--read-particle-x", `${Math.cos(angle) * distance}px`);
+      particle.style.setProperty("--read-particle-y", `${Math.sin(angle) * distance}px`);
+      particle.style.setProperty("--read-particle-size", `${7 + Math.random() * 7}px`);
+      burst.appendChild(particle);
+    }
+    root.document.body.appendChild(burst);
+    const effect = { node: burst, timer: 0 };
+    scrambleParticleBursts.add(effect);
+    effect.timer = setTimeout(() => {
+      scrambleParticleBursts.delete(effect);
+      burst.remove();
+    }, 730);
+  }
+
   function playGeneratedNegativeTone() {
     const AudioContextClass =
       root?.AudioContext ||
@@ -1998,6 +2120,7 @@
     if (state.phase !== "pause") return;
 
     stopKeySoundVoices();
+    stopScrambleRewards();
     if (negativeFeedbackAudio) {
       try {
         negativeFeedbackAudio.pause();
@@ -4464,6 +4587,79 @@
     });
   }
 
+  // Fit the largest comfortable Titan One words into balanced rows.
+  // Measure both solved and scrambled spellings, keeping rows stable on tap.
+  function layoutScrambleWords(wrap) {
+    if (!wrap.isConnected || state.activityId !== UNSCRAMBLE_ACTIVITY_ID) return;
+    const area = wrap.querySelector(".read-unscramble-words");
+    const tokens = state.activityData?.tokens || [];
+    if (!area || !tokens.length) return;
+    const elements = Array.from(area.querySelectorAll(".read-unscramble-token"));
+    if (elements.length !== tokens.length) return;
+    const style = root.getComputedStyle(area);
+    const availableWidth = area.clientWidth - parseFloat(style.paddingLeft) -
+      parseFloat(style.paddingRight) - 2;
+    const availableHeight = area.clientHeight - parseFloat(style.paddingTop) -
+      parseFloat(style.paddingBottom) - 2;
+    if (!(availableWidth > 0 && availableHeight > 0)) return;
+    const canvas = root.document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const maxSize = Math.min(82, Math.max(50, Math.round(availableWidth * .185)));
+    const maxRows = Math.min(tokens.length, Math.max(2, Math.ceil(tokens.length / 2)));
+    let best = null;
+    for (let size = maxSize; size >= 22; size -= 2) {
+      context.font = `${size}px "Titan One"`;
+      const widths = tokens.map((token) => {
+        const original = token.leading + token.core + token.trailing;
+        const mixed = token.leading + token.scrambled + token.trailing;
+        return Math.ceil(Math.max(context.measureText(original).width,
+          context.measureText(mixed).width) + size * .56 + 6);
+      });
+      const gap = Math.max(6, Math.min(16, size * .19));
+      const rowHeight = size * 1.4;
+      const rowGap = Math.max(9, Math.min(22, size * .22));
+      for (let rows = 1; rows <= maxRows; rows += 1) {
+        if (rows * rowHeight + (rows - 1) * rowGap > availableHeight) continue;
+        const candidate = balanceScrambleRows(widths, availableWidth, gap, rows);
+        if (!candidate) continue;
+        const cost = (maxSize - size) * .06 + (rows - 1) * .7 +
+          candidate.score * 1.8;
+        if (!best || cost < best.cost) {
+          best = { size, gap, rowGap, lines: candidate.lines, cost };
+        }
+      }
+    }
+    if (!best) return;
+    area.style.setProperty("--read-scramble-font-size", `${best.size}px`);
+    area.style.setProperty("--read-scramble-row-gap", `${best.rowGap}px`);
+    area.style.setProperty("--read-scramble-word-gap", `${best.gap}px`);
+    // Recreate only the row wrappers; the interactive buttons retain handlers.
+    const fragment = root.document.createDocumentFragment();
+    best.lines.forEach(([from, to]) => {
+      const row = root.document.createElement("div");
+      row.className = "read-unscramble-line";
+      for (let index = from; index < to; index += 1) {
+        row.appendChild(elements[index]);
+      }
+      fragment.appendChild(row);
+    });
+    area.replaceChildren(fragment);
+    area.classList.add("is-layout-ready");
+  }
+
+  function scheduleScrambleLayout(wrap) {
+    const schedule = () => root.requestAnimationFrame?.(() =>
+      layoutScrambleWords(wrap)
+    );
+    schedule();
+    // WebKit may initially lay out the fallback font. Refit after Titan One
+    // is loaded, and only while this particular screen remains mounted.
+    root.document.fonts?.load?.('48px "Titan One"')?.then?.(
+      schedule, schedule
+    );
+  }
+
   function renderUnscrambleTokensHtml() {
     const tokens =
       state.activityData?.tokens || [];
@@ -4588,10 +4784,16 @@
       ).forEach((button) => {
         button.onclick = (event) => {
           event.preventDefault();
-          handleUnscrambleTap(
-            button.dataset
-              .readUnscrambleToken
+          const rect = button.getBoundingClientRect();
+          if (!handleUnscrambleTap(button.dataset.readUnscrambleToken)) return;
+          burstScrambleRainbow(rect);
+          const count = state.activityData?.tokens.filter(
+            (item) => item.required && item.solved
+          ).length || 1;
+          const complete = state.activityData?.tokens.every(
+            (item) => !item.required || item.solved
           );
+          playScrambleReward(count, complete);
         };
       });
     } else {
@@ -4609,7 +4811,7 @@
 
     bindExitButton(wrap);
 
-    return appApi.makeSlide({
+    const slide = appApi.makeSlide({
       idx,
       bg: isUnscramble
         ? "#f3b84b"
@@ -4617,6 +4819,8 @@
       navHidden: true,
       inner: wrap
     });
+    if (isUnscramble) scheduleScrambleLayout(wrap);
+    return slide;
   }
 
   function chunkSequenceColorStyle(color) {
@@ -5043,6 +5247,7 @@
     canScrambleCore,
     scrambleCore,
     buildUnscramblePuzzle,
+    balanceScrambleRows,
     buildTapOrderPuzzle,
     applyTapOrderChoice,
     isChunkEligible,
