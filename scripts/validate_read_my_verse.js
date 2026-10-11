@@ -555,6 +555,42 @@ function testScrambleSafeTwoWordMinimumAndBalance() {
   assert.deepStrictEqual(isaiah.lines.flatMap(([from, to]) =>
     Array.from({ length: to - from }, (_, index) => from + index)),
   [0, 1, 2, 3]);
+  // A narrow portrait screen should give "strengthen" its own line:
+  // I will / strengthen / you, rather than shrinking "strengthen you".
+  const portrait = ReadMyVerse.chooseScrambleFit({
+    maxSize: 82, maxRows: 3, availableWidth: 350,
+    availableHeight: 440,
+    measureWidths: (size) => isaiahWidths.map((width) => width * size / 60)
+  });
+  assert.deepStrictEqual(portrait.lines, [[0, 2], [2, 3], [3, 4]]);
+  assert.strictEqual(portrait.size, 82);
+  const twoRowsOnly = ReadMyVerse.chooseScrambleFit({
+    maxSize: 82, maxRows: 2, availableWidth: 350,
+    availableHeight: 440,
+    measureWidths: (size) => isaiahWidths.map((width) => width * size / 60)
+  });
+  assert.ok(portrait.size >= twoRowsOnly.size * 1.10);
+  // Do not add extra rows for a tiny gain at the same maximum font size.
+  const compact = ReadMyVerse.chooseScrambleFit({
+    maxSize: 82, maxRows: 3, availableWidth: 350,
+    availableHeight: 440,
+    measureWidths: (size) => [68, 72, 78, 66].map((width) => width * size / 82)
+  });
+  assert.strictEqual(compact.size, 82);
+  assert.strictEqual(compact.lines.length, 1);
+  // The fitter must write the variables actually consumed by Scramble CSS.
+  const layoutSource = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  assert.ok(layoutSource.includes('setProperty("--read-unscramble-font-size"'));
+  assert.ok(layoutSource.includes('setProperty("--read-unscramble-row-gap"'));
+  // Height constraints remain authoritative even for very long words.
+  const heightLimited = ReadMyVerse.chooseScrambleFit({
+    maxSize: 82, maxRows: 3, availableWidth: 350,
+    availableHeight: 220,
+    measureWidths: (size) => isaiahWidths.map((width) => width * size / 60)
+  });
+  assert.ok(heightLimited);
+  assert.ok(heightLimited.lines.length < 3 ||
+    3 * heightLimited.size * 1.4 + 2 * Math.min(22, heightLimited.size * .22) <= 220);
 
   const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
   assert.ok(css.includes('font-family: "Titan One", "Baloo 2"'));

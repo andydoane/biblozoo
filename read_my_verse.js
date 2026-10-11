@@ -4587,28 +4587,32 @@
     });
   }
 
-  // Readability first: choose the largest size that fits *any* row layout.
-  // Only compare line balance and row count at that same font size.
+  // Compare the largest fitting font *for each row count*, not just the
+  // first layout that fits. An extra line is worthwhile when it makes the
+  // text at least 10% larger; otherwise keep the more compact layout.
   function chooseScrambleFit({ maxSize, maxRows, availableWidth,
     availableHeight, measureWidths }) {
-    for (let size = maxSize; size >= 22; size -= 2) {
-      const widths = measureWidths(size);
-      const gap = Math.max(6, Math.min(16, size * .19));
-      const rowHeight = size * 1.4;
-      const rowGap = Math.max(9, Math.min(22, size * .22));
-      let bestAtSize = null;
-      for (let rows = 1; rows <= maxRows; rows += 1) {
+    let best = null;
+    for (let rows = 1; rows <= maxRows; rows += 1) {
+      for (let size = maxSize; size >= 22; size -= 2) {
+        const gap = Math.max(6, Math.min(16, size * .19));
+        const rowHeight = size * 1.4;
+        const rowGap = Math.max(9, Math.min(22, size * .22));
         if (rows * rowHeight + (rows - 1) * rowGap > availableHeight) continue;
-        const candidate = balanceScrambleRows(widths, availableWidth, gap, rows);
+        const candidate = balanceScrambleRows(
+          measureWidths(size), availableWidth, gap, rows
+        );
         if (!candidate) continue;
-        const cost = (rows - 1) * .7 + candidate.score * 1.8;
-        if (!bestAtSize || cost < bestAtSize.cost) {
-          bestAtSize = { size, gap, rowGap, lines: candidate.lines, cost };
+        // Only switch to a taller layout for a visible readability gain.
+        if (!best || size >= best.size * 1.10) {
+          best = { size, gap, rowGap, lines: candidate.lines,
+            cost: candidate.score };
         }
+        // Smaller sizes of this same row count cannot improve the result.
+        break;
       }
-      if (bestAtSize) return bestAtSize;
     }
-    return null;
+    return best;
   }
 
   // Fit the largest comfortable Titan One words into balanced rows.
@@ -4629,8 +4633,9 @@
     const canvas = root.document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) return;
-    const maxSize = Math.min(82, Math.max(50, Math.round(availableWidth * .185)));
-    const maxRows = Math.min(tokens.length, Math.max(2, Math.ceil(tokens.length / 2)));
+    // Allow long standalone words to grow when a third row makes room.
+    const maxSize = Math.min(82, Math.max(50, Math.round(availableWidth * .25)));
+    const maxRows = Math.min(tokens.length, Math.max(3, Math.ceil(tokens.length / 2)));
     const best = chooseScrambleFit({
       maxSize, maxRows, availableWidth, availableHeight,
       measureWidths: (size) => {
@@ -4644,8 +4649,8 @@
       }
     });
     if (!best) return;
-    area.style.setProperty("--read-scramble-font-size", `${best.size}px`);
-    area.style.setProperty("--read-scramble-row-gap", `${best.rowGap}px`);
+    area.style.setProperty("--read-unscramble-font-size", `${best.size}px`);
+    area.style.setProperty("--read-unscramble-row-gap", `${best.rowGap}px`);
     area.style.setProperty("--read-scramble-word-gap", `${best.gap}px`);
     // Recreate only the row wrappers; the interactive buttons retain handlers.
     const fragment = root.document.createDocumentFragment();
