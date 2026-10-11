@@ -1670,11 +1670,23 @@ button.read-unscramble-token.is-solved {
 .read-decorative-fish {
   top: var(--read-decor-top);
   left: -30%;
+  /* Medium fish is the sizing reference; its width remains unchanged. */
   width: clamp(78px, 22vw, 165px);
   height: clamp(88px, 25vw, 190px);
   will-change: transform;
   animation: readDecorFish var(--read-fish-decor-duration, 10000ms)
     linear var(--read-decor-delay, 0s) both;
+}
+
+
+/* Match the medium fish PNG's displayed height while preserving each
+   PNG's native aspect ratio (small 536x435, medium 858x461, long 1926x488).
+   The same three clamp breakpoints keep the heights equal on phones/tablets. */
+.read-decorative-fish[data-read-fish-kind="small"] {
+  width: clamp(51.640px, 14.565vw, 109.238px);
+}
+.read-decorative-fish[data-read-fish-kind="long"] {
+  width: clamp(165.404px, 46.652vw, 349.892px);
 }
 
 .read-fish-image {

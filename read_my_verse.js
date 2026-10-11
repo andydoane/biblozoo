@@ -4038,7 +4038,7 @@
 
   function renderFishDecorationsHtml(manifest, decorations = state.decorations) {
     return decorations.map((decoration) => `
-      <button class="read-decorative-fish" type="button" data-read-decoration aria-label="Catch decorative fish" style="--read-decor-top:${decoration.top.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
+      <button class="read-decorative-fish" type="button" data-read-decoration aria-label="Catch decorative fish" data-read-fish-kind="${decoration.kind}" style="--read-decor-top:${decoration.top.toFixed(1)}%;--read-decor-delay:${decoration.delay.toFixed(2)}s">
         <span class="read-fish-catch-assembly">
           <span class="read-fish-hook-rig" aria-hidden="true">
             <span class="read-fish-hook-line"></span>
