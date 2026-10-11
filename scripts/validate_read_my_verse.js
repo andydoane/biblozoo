@@ -474,9 +474,10 @@ function testChunkAudioMatchingModeFontAndCompletedContrast() {
   assert.ok(modeFont.includes('font-family: "Baloo 2"'));
   assert.ok(modeFont.includes("font-weight: 800 !important"),
     "Easy/Hard choice labels must use bold Baloo 2");
-  const modeDescription = rule(".read-chunk-sequence-mode > button span");
-  assert.ok(modeDescription.includes('font-family: "Baloo 2"'));
-  assert.ok(modeDescription.includes("font-weight: 700 !important"));
+  const actionFont = rule(".read-chunk-sequence-action");
+  assert.ok(actionFont.includes('font-family: "Baloo 2"'));
+  assert.ok(actionFont.includes("font-weight: 800 !important"),
+    "I'm Ready must match the bold Baloo 2 mode buttons");
 
   const unfinished = rule(".read-chunk-sequence-progress-dot");
   const completed = rule(".read-chunk-sequence-progress-dot.is-complete");
@@ -488,6 +489,40 @@ function testChunkAudioMatchingModeFontAndCompletedContrast() {
     "All completed markers need a clear white inset ring");
   assert.ok(!/\b(?:width|height|transform)\s*:/.test(completed),
     "Completed-marker polish must not cause reflow or scale circles");
+}
+
+function testChunkAudioMatchingSimplifiedButtons() {
+  const js = fs.readFileSync(
+    path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(
+    path.join(rootDir, "read_my_verse.css"), "utf8");
+  const choices = js.slice(
+    js.indexOf('function renderChunkSequenceActionsHtml()'),
+    js.indexOf('function renderChunkSequenceScreen('));
+
+  assert.ok(choices.includes('<strong>Easy</strong>'));
+  assert.ok(choices.includes('<strong>Hard</strong>'));
+  assert.ok(!choices.includes('<span>'),
+    "Easy and Hard should have no explanatory subtitles");
+  assert.ok(choices.includes('data-read-sequence-ready'),
+    "The I'm Ready action must still be present");
+
+  const numberRule = css.match(
+    /\.read-chunk-arcade-number \{([^}]*)\}/)?.[1];
+  assert.ok(numberRule, "Easy number styling must exist");
+  assert.ok(numberRule.includes('font-family: "Titan One"') &&
+    numberRule.includes("!important"),
+    "Easy numbers should use Titan One even with global button overrides");
+  assert.ok(numberRule.includes("text-shadow: none !important"),
+    "Easy numbers should not have a black shadow or outline");
+  assert.ok(numberRule.includes("-webkit-text-stroke: 0"));
+  assert.ok(css.includes(
+    '.read-chunk-arcade-button.is-yellow .read-chunk-arcade-number {\n  color: #333333;'),
+    "Yellow buttons must show dark charcoal numbers");
+  assert.ok(js.includes('color?.id === "yellow" ? "is-yellow" : ""'),
+    "Yellow buttons must be distinguishable for number styling");
+  assert.ok(js.includes('showNumbers ? `<span class="read-chunk-arcade-number"'),
+    "Easy numbers should still appear only during the challenge");
 }
 
 function testChunkAudioMatchingEligibility() {
@@ -1449,6 +1484,7 @@ function main() {
     testChunkAudioMatchingRules,
     testChunkAudioMatchingLabelsAndStableLayout,
     testChunkAudioMatchingModeFontAndCompletedContrast,
+    testChunkAudioMatchingSimplifiedButtons,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,

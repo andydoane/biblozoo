@@ -1074,6 +1074,9 @@ button.read-unscramble-token.is-solved {
 }
 
 .read-chunk-sequence-action {
+  /* Match the mode choices instead of inheriting the shared Titan font. */
+  font-family: "Baloo 2", system-ui, sans-serif !important;
+  font-weight: 800 !important;
   width: min(82vw, 640px);
   border-radius: 999px;
   padding: 0.2em 0.7em 0.28em;
@@ -1116,11 +1119,11 @@ button.read-unscramble-token.is-solved {
 
 .read-chunk-sequence-mode > button {
   display: grid;
-  gap: 2px;
+  place-items: center;
   border-radius: clamp(16px, 4vw, 26px);
   padding: clamp(10px, 2.5vw, 18px);
   line-height: 1.05;
-  text-align: left;
+  text-align: center;
 }
 
 /* Override the shared Titan One button style just for the mode choices.
@@ -1133,12 +1136,6 @@ button.read-unscramble-token.is-solved {
 
 .read-chunk-sequence-mode strong {
   font-size: clamp(24px, 5.6vw, 40px);
-}
-
-.read-chunk-sequence-mode > button span {
-  font-family: "Baloo 2", system-ui, sans-serif !important;
-  font-size: clamp(14px, 3.2vw, 21px);
-  font-weight: 700 !important;
 }
 
 .read-chunk-sequence-buttons {
@@ -1204,24 +1201,24 @@ button.read-unscramble-token.is-solved {
   -webkit-tap-highlight-color: transparent;
 }
 
-.read-chunk-arcade-number {
+.read-chunk-sequence-screen .read-chunk-arcade-number {
   position: absolute;
   z-index: 2;
   inset: 0;
   display: grid;
   place-items: center;
   color: #ffffff;
-  font-family: "Titan One", "Baloo 2", system-ui, sans-serif;
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif !important;
   font-size: .44em;
-  font-weight: 400;
+  font-weight: 400 !important;
   line-height: 1;
-  text-shadow:
-    -2px -2px 1px rgba(0, 0, 0, .78),
-    2px -2px 1px rgba(0, 0, 0, .78),
-    -2px 2px 1px rgba(0, 0, 0, .78),
-    2px 2px 1px rgba(0, 0, 0, .78),
-    0 3px 3px rgba(0, 0, 0, .85);
+  text-shadow: none !important;
+  -webkit-text-stroke: 0;
   pointer-events: none;
+}
+
+.read-chunk-arcade-button.is-yellow .read-chunk-arcade-number {
+  color: #333333;
 }
 
 .read-chunk-arcade-gloss {

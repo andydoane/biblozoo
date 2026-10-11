@@ -5039,6 +5039,7 @@
           "read-chunk-arcade-button",
           active ? "is-pushed" : "",
           helped ? "is-helped" : "",
+          color?.id === "yellow" ? "is-yellow" : "",
           color?.id === "light_gray"
             ? "is-light-gray"
             : ""
@@ -5063,11 +5064,9 @@
           <h1>Choose a Mode</h1>
           <button type="button" data-read-sequence-mode="easy" data-no-ui-sound>
             <strong>Easy</strong>
-            <span>Numbered buttons help you find the right order.</span>
           </button>
           <button type="button" data-read-sequence-mode="hard" data-no-ui-sound>
             <strong>Hard</strong>
-            <span>Listen and remember. Mistakes keep your progress.</span>
           </button>
         </div>
       `;
