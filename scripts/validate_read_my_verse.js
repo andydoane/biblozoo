@@ -85,8 +85,10 @@ function testTypewriterIntroCutscene() {
   assert.ok(!typewriterMarkup.includes('class="read-typewriter-instruction"'));
   assert.ok(!typewriterMarkup.includes('class="read-typewriter-progress"'));
   assert.match(css, /\.read-typewriter-stage \{\s*display: grid;[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\)/);
-  assert.ok(rule('.read-typewriter-paper.is-intro-active .read-typewriter-fit')
-    .includes('visibility: hidden'));
+  assert.ok(css.includes('.read-typewriter-paper.is-intro-active .read-typewriter-fit,'));
+  assert.ok(rule('.read-keyboard-terminal.is-intro-active .read-keyboard-fit')
+    .includes('visibility: hidden'),
+    'Both activities must hide the verse while the intro plays');
   assert.ok(rule('.read-typewriter-intro.is-fading').includes('opacity: 0'));
   assert.ok(css.includes('transition: opacity 300ms ease-out'));
   const introStyle = rule('.read-typewriter-intro');
@@ -99,8 +101,30 @@ function testTypewriterIntroCutscene() {
   assert.strictEqual((js.match(/setProperty\("--typewriter-intro-font-size"/g) || []).length, 2,
     "Both cached and freshly computed verse fits must size the intro");
   assert.ok(css.includes('.read-typewriter-screen.is-reduced-motion .read-typewriter-intro'));
-  assert.ok(js.includes('if (safeActivityId === TYPEWRITER_ACTIVITY_ID)'),
-    "Do not change Keyboard intro behavior");
+  assert.ok(js.includes('if (isTypingActivity(safeActivityId))'),
+    "Both typing activities should run the opening cutscene");
+  assert.ok(js.includes('if (!isTypingActivity(state.activityId)'),
+    "The intro timer must belong only to the two typing activities");
+  assert.strictEqual((js.match(/if \(hasIntro\) scheduleTypewriterIntro\(wrap\)/g) || []).length, 2,
+    "Both activities must schedule the cutscene on launch");
+  assert.ok(js.includes('renderTypingIntroText(TYPEWRITER_INTRO_TEXT.length)'),
+    "Reserve the complete intro while individual letters are typed");
+  assert.ok(js.includes('class="read-typewriter-intro-tail"'),
+    "The words 'the verse.' must stay together on the second line");
+  assert.ok(rule('.read-typewriter-intro-tail').includes('white-space: nowrap'),
+    "Do not wrap 'the' and 'verse.' onto separate lines");
+  assert.ok(rule('.read-keyboard-intro').includes('color: #65ff72'),
+    "Keyboard must retain its green terminal styling");
+  assert.ok(css.includes('grid-template-rows: auto minmax(0, 1fr)'),
+    "Keyboard should remove the unused progress row");
+  const keyboardStart = js.indexOf('function renderKeyboardScreen(');
+  const keyboardEnd = js.indexOf('function chooseScrambleFit(', keyboardStart);
+  const keyboardMarkup = js.slice(keyboardStart, keyboardEnd);
+  assert.ok(keyboardMarkup.includes('read-keyboard-intro'));
+  assert.ok(!keyboardMarkup.includes('class="read-keyboard-instruction"'));
+  assert.ok(!keyboardMarkup.includes('class="read-keyboard-progress"'));
+  assert.ok(keyboardMarkup.includes('stopKeySoundVoices();\n        finishTypewriterIntro();'),
+    "Keyboard's first tap must dismiss intro and reveal one character");
 
   const verse = {
     id: "intro_preview",
@@ -123,8 +147,11 @@ function testTypewriterIntroCutscene() {
   assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroPhase, "done");
   assert.strictEqual(ReadMyVerse.startForVerse(verse.id, "keyboard",
     context("keyboard")), true);
-  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroPhase, "done",
-    "Keyboard must not inherit Typewriter's new cutscene");
+  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroPhase, "typing",
+    "Keyboard should play its own intro upon launch");
+  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroCount, 0);
+  assert.strictEqual(ReadMyVerse.getSessionState().phase, "typing",
+    "Keyboard must preserve the existing tap-to-type game phase");
   ReadMyVerse.stopSession();
 }
 

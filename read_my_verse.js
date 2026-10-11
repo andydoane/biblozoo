@@ -1591,7 +1591,7 @@
       validatedContext.readTestMode;
     state.reducedMotion =
       prefersReducedMotion();
-    if (safeActivityId === TYPEWRITER_ACTIVITY_ID) {
+    if (isTypingActivity(safeActivityId)) {
       state.typewriterIntroPhase = state.reducedMotion ? "hold" : "typing";
       state.typewriterIntroCount = state.reducedMotion
         ? TYPEWRITER_INTRO_TEXT.length : 0;
@@ -1613,7 +1613,7 @@
       ensureKeySoundAudio(safeActivityId);
       // Unlock Web Audio during the launch gesture so the delayed intro
       // keystrokes can play on iOS without requiring another tap.
-      if (safeActivityId === TYPEWRITER_ACTIVITY_ID && !appApi?.isMuted?.()) {
+      if (!appApi?.isMuted?.()) {
         keySoundContext?.resume?.()?.catch?.(() => {});
       }
     }
@@ -4427,15 +4427,28 @@
     };
   }
 
-  // Typewriter-only launch cutscene. Keep the verse DOM fitted underneath
-  // and update just the intro text so the established tap engine is untouched.
+  // Keep the words "the verse." together if the intro wraps. Reserve the
+  // complete sentence while typing so neither line shifts as letters appear.
+  function renderTypingIntroText(count) {
+    const head = "Tap to type ";
+    const tail = "the verse.";
+    const headCount = Math.min(count, head.length);
+    const tailCount = Math.max(0, count - head.length);
+    return `${escapeHtml(head.slice(0, headCount))}` +
+      `<span class="read-typewriter-intro-untyped">${escapeHtml(head.slice(headCount))}</span>` +
+      `<span class="read-typewriter-intro-tail">${escapeHtml(tail.slice(0, tailCount))}` +
+      `<span class="read-typewriter-intro-untyped">${escapeHtml(tail.slice(tailCount))}</span></span>`;
+  }
+
+  // Both typing activities share the cutscene timing, but retain their own
+  // fitted verse, fonts, audio effects, and original tap-to-reveal gameplay.
   function finishTypewriterIntro() {
     clearTimeout(typewriterIntroTimer);
     typewriterIntroTimer = 0;
     if (state.typewriterIntroPhase === "done") return;
     state.typewriterIntroPhase = "done";
     typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")?.remove();
-    typewriterIntroWrap?.querySelector(".read-typewriter-paper")
+    typewriterIntroWrap?.querySelector(".read-typewriter-paper, .read-keyboard-terminal")
       ?.classList.remove("is-intro-active");
     typewriterIntroWrap = null;
     syncTypingScreen();
@@ -4453,7 +4466,7 @@
   }
 
   function startTypewriterIntro() {
-    if (state.activityId !== TYPEWRITER_ACTIVITY_ID ||
+    if (!isTypingActivity(state.activityId) ||
         state.typewriterIntroStarted ||
         state.typewriterIntroPhase === "done") return;
     state.typewriterIntroStarted = true;
@@ -4470,8 +4483,8 @@
       state.typewriterIntroCount += 1;
       const label = typewriterIntroWrap?.querySelector(
         "[data-read-typewriter-intro-text]");
-      if (label) label.textContent = TYPEWRITER_INTRO_TEXT.slice(
-        0, state.typewriterIntroCount);
+      if (label) label.innerHTML = renderTypingIntroText(
+        state.typewriterIntroCount);
       if (!/\s/u.test(character)) playKeySound();
 
       if (state.typewriterIntroCount >= TYPEWRITER_INTRO_TEXT.length) {
@@ -4512,19 +4525,7 @@
     if (!wrap?.isConnected || !stage) return false;
 
     stage.classList.toggle("is-input-locked", state.phase !== "typing");
-    // Typewriter has no persistent instruction or chunk counter. Keyboard
-    // retains its existing status text and progress unchanged.
-    const instruction = keyboard
-      ? wrap.querySelector(".read-keyboard-instruction")
-      : null;
-    if (instruction) {
-      instruction.textContent = state.readTestMode === "early_exit"
-        ? "EARLY-EXIT CHECK: USE BACK BEFORE FINISHING"
-        : state.phase === "typing"
-          ? "TAP TO TYPE THE VERSE"
-          : "PLAYING VERSE AUDIO...";
-    }
-
+    // Both typing activities display their instruction just once at launch.
     const listening = state.phase === "pause" || state.phase === "playing";
     wrap.querySelectorAll("[data-read-chunk]").forEach((chunk, chunkIndex) => {
       chunk.classList.toggle("is-listening", listening && chunkIndex === state.chunkIndex);
@@ -4547,13 +4548,6 @@
       }
     }
 
-    const progress = keyboard
-      ? wrap.querySelector("[data-read-progress]")
-      : null;
-    if (progress) {
-      progress.textContent =
-        `CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}`;
-    }
     return true;
   }
 
@@ -4694,12 +4688,7 @@
       "div"
     );
     const isLocked = state.phase !== "typing";
-    const instruction =
-      state.readTestMode === "early_exit"
-        ? "EARLY-EXIT CHECK: USE BACK BEFORE FINISHING"
-        : isLocked
-          ? "PLAYING VERSE AUDIO..."
-          : "TAP TO TYPE THE VERSE";
+    const hasIntro = state.typewriterIntroPhase !== "done";
 
     wrap.className = [
       "read-my-verse-screen",
@@ -4714,14 +4703,18 @@
         <div class="read-keyboard-scanlines" aria-hidden="true"></div>
         <header class="read-keyboard-header">
           <div class="read-keyboard-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-          <div class="read-keyboard-instruction">${instruction}</div>
         </header>
-        <section class="learn-stage read-keyboard-terminal" aria-label="${escapeHtml(verse.verseText)}">
+        <section class="learn-stage read-keyboard-terminal${hasIntro ? " is-intro-active" : ""}" aria-label="${escapeHtml(verse.verseText)}">
           <div class="smart-learn-text read-keyboard-fit" data-read-typing-fit>
             <div class="smart-learn-body read-keyboard-body" aria-hidden="true">${renderVerseHtml()}</div>
           </div>
+          ${hasIntro ? `<div class="read-typewriter-intro read-keyboard-intro" data-read-typewriter-intro>
+            <div class="read-typewriter-intro-line">
+              <span class="read-typewriter-intro-guide" aria-hidden="true">${renderTypingIntroText(TYPEWRITER_INTRO_TEXT.length)}</span>
+              <span class="read-typewriter-intro-text" data-read-typewriter-intro-text>${renderTypingIntroText(state.typewriterIntroCount)}</span>
+            </div>
+          </div>` : ""}
         </section>
-        <div class="read-keyboard-progress" data-read-progress aria-live="polite">CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}</div>
       </main>
     `;
 
@@ -4730,6 +4723,10 @@
     );
     const activate = (event) => {
       event?.preventDefault?.();
+      if (state.typewriterIntroPhase !== "done") {
+        stopKeySoundVoices();
+        finishTypewriterIntro();
+      }
       handleTypeTap();
     };
 
@@ -4745,6 +4742,7 @@
     bindExitButton(wrap);
     restoreReadTypingFit(wrap);
     scheduleReadTypingVerseFit(wrap);
+    if (hasIntro) scheduleTypewriterIntro(wrap);
 
     return appApi.makeSlide({
       idx,
@@ -5405,8 +5403,8 @@
           </div>
           ${hasIntro ? `<div class="read-typewriter-intro" data-read-typewriter-intro>
             <div class="read-typewriter-intro-line">
-              <span class="read-typewriter-intro-guide" aria-hidden="true">${TYPEWRITER_INTRO_TEXT}</span>
-              <span class="read-typewriter-intro-text" data-read-typewriter-intro-text>${escapeHtml(TYPEWRITER_INTRO_TEXT.slice(0, state.typewriterIntroCount))}</span>
+              <span class="read-typewriter-intro-guide" aria-hidden="true">${renderTypingIntroText(TYPEWRITER_INTRO_TEXT.length)}</span>
+              <span class="read-typewriter-intro-text" data-read-typewriter-intro-text>${renderTypingIntroText(state.typewriterIntroCount)}</span>
             </div>
           </div>` : ""}
         </section>

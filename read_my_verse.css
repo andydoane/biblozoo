@@ -214,7 +214,8 @@
 }
 
 /* The fitted verse keeps its geometry beneath the one-time intro. */
-.read-typewriter-paper.is-intro-active .read-typewriter-fit {
+.read-typewriter-paper.is-intro-active .read-typewriter-fit,
+.read-keyboard-terminal.is-intro-active .read-keyboard-fit {
   visibility: hidden;
 }
 
@@ -247,8 +248,14 @@
   text-align: center;
 }
 
-.read-typewriter-intro-guide {
+.read-typewriter-intro-guide,
+.read-typewriter-intro-untyped {
   visibility: hidden;
+}
+
+/* Keep "the verse." together if the phrase occupies two lines. */
+.read-typewriter-intro-tail {
+  white-space: nowrap;
 }
 
 .read-typewriter-intro-text {
@@ -261,7 +268,8 @@
   opacity: 0;
 }
 
-.read-typewriter-screen.is-reduced-motion .read-typewriter-intro {
+.read-typewriter-screen.is-reduced-motion .read-typewriter-intro,
+.read-keyboard-screen.is-reduced-motion .read-typewriter-intro {
   transition: none;
 }
 
@@ -311,7 +319,7 @@
 
 .read-keyboard-stage {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: clamp(8px, 1.6vh, 18px);
   overflow: hidden;
   padding:
@@ -358,7 +366,6 @@
 }
 
 .read-keyboard-header,
-.read-keyboard-progress,
 .read-keyboard-terminal {
   position: relative;
   z-index: 4;
@@ -381,12 +388,6 @@
   line-height: 0.95;
 }
 
-.read-keyboard-instruction {
-  min-height: 1em;
-  font-size: clamp(19px, 4.5vw, 30px);
-  line-height: 1;
-}
-
 .read-keyboard-terminal {
   min-width: 0;
   min-height: 0;
@@ -404,6 +405,13 @@
 .read-keyboard-fit {
   color: #65ff72;
   text-align: center;
+}
+
+/* Keyboard gets the same timed intro with its native terminal styling. */
+.read-keyboard-intro {
+  color: #65ff72;
+  line-height: 1.12;
+  text-shadow: 0 0 2px rgba(101, 255, 114, 0.38);
 }
 
 .read-keyboard-body {
@@ -476,18 +484,6 @@
 @keyframes readKeyboardCursorBlink {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
-}
-
-.read-keyboard-progress {
-  justify-self: center;
-  align-self: end;
-  padding: 2px 12px;
-  border: 1px solid rgba(101, 255, 114, 0.42);
-  color: #65ff72;
-  background: rgba(0, 0, 0, 0.72);
-  font-size: clamp(20px, 4.5vw, 30px);
-  line-height: 1;
-  text-shadow: 0 0 6px rgba(101, 255, 114, 0.72);
 }
 
 .read-keyboard-back {
