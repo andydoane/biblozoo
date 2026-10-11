@@ -256,6 +256,7 @@
   let pauseTimer = 0;
   let animationTimer = 0;
   let wordFeedbackTimer = 0;
+  let chunkGlowFadeTimer = 0;
   let lastKeySoundIndex = -1;
   let completionReported = false;
   let crawlSession = null;
@@ -1160,6 +1161,7 @@
       ),
       explored: Array(count).fill(false),
       activeButtonIndex: -1,
+      fadeButtonIndex: -1,
       challengeIndex: 0,
       wrongAt: -1,
       easyMisses: 0,
@@ -2573,6 +2575,10 @@
       return false;
     }
 
+    // A fresh tap takes precedence over any lingering glow on this button.
+    if (data.fadeButtonIndex === buttonIndex) {
+      data.fadeButtonIndex = -1;
+    }
     data.activeButtonIndex = buttonIndex;
     appApi?.requestRender?.();
 
@@ -2597,6 +2603,14 @@
       finished = true;
       activeAudio = null;
       data.activeButtonIndex = -1;
+      // Let the halo settle after the sound ends; never lock input for it.
+      data.fadeButtonIndex = buttonIndex;
+      clearTimeout(chunkGlowFadeTimer);
+      chunkGlowFadeTimer = setTimeout(() => {
+        if (state.activityData !== data) return;
+        data.fadeButtonIndex = -1;
+        appApi?.requestRender?.();
+      }, 350);
       onFinished?.();
       appApi?.requestRender?.();
     };
@@ -5031,6 +5045,8 @@
         const active =
           data.activeButtonIndex ===
           chunkIndex;
+        const fading =
+          data.fadeButtonIndex === chunkIndex && !active;
         const helped =
           data.helpActive &&
           data.challengeIndex ===
@@ -5038,6 +5054,7 @@
         const classes = [
           "read-chunk-arcade-button",
           active ? "is-pushed" : "",
+          fading ? "is-glow-fading" : "",
           helped ? "is-helped" : "",
           color?.id === "yellow" ? "is-yellow" : "",
           color?.id === "light_gray"

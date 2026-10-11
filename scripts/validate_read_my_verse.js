@@ -543,6 +543,18 @@ function testChunkAudioMatchingPlaybackGlow() {
     "Playing audio must glow without resizing the button");
 }
 
+function testChunkAudioMatchingGlowFade() {
+  const js = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(js.includes('fadeButtonIndex: -1'));
+  assert.ok(js.includes('data.fadeButtonIndex = buttonIndex;'));
+  assert.ok(js.includes('fading ? "is-glow-fading" : ""'));
+  assert.ok(js.includes('}, 350);'), "Fade expires without delaying new taps");
+  assert.match(css, /\.read-chunk-arcade-button\.is-glow-fading:not\(\.is-helped\)\s*\{\s*animation: readChunkSequenceGlowFade 350ms/);
+  assert.match(css, /@keyframes readChunkSequenceGlowFade[\s\S]*?drop-shadow[\s\S]*?filter: brightness\(1\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.read-chunk-arcade-button\.is-glow-fading:not\(\.is-helped\)\s*\{\s*filter: none/);
+}
+
 function testChunkAudioMatchingEligibility() {
   const verse = (count) => ({
     id: `chunks_${count}`,
@@ -1504,6 +1516,7 @@ function main() {
     testChunkAudioMatchingModeFontAndCompletedContrast,
     testChunkAudioMatchingSimplifiedButtons,
     testChunkAudioMatchingPlaybackGlow,
+    testChunkAudioMatchingGlowFade,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,

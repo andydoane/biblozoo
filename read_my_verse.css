@@ -1270,6 +1270,23 @@ button.read-unscramble-token.is-solved {
     readChunkSequenceHelp 820ms ease-in-out infinite alternate;
 }
 
+/* Audio halo decays after playback rather than disappearing mid-pulse.
+   Adjust 350ms here and in playChunkSequenceAudio together. */
+.read-chunk-arcade-button.is-glow-fading:not(.is-helped) {
+  animation: readChunkSequenceGlowFade 350ms ease-out both;
+}
+
+@keyframes readChunkSequenceGlowFade {
+  from {
+    filter: brightness(1.18)
+      drop-shadow(0 0 16px #fff4a5)
+      drop-shadow(0 0 30px var(--chunk-button-color));
+  }
+  to {
+    filter: brightness(1);
+  }
+}
+
 .read-chunk-arcade-button.is-light-gray {
   outline: max(1px, 0.012em) solid rgba(0, 0, 0, 0.48);
   outline-offset: -0.11em;
@@ -1397,11 +1414,16 @@ button.read-unscramble-token.is-solved {
   }
 
   .read-chunk-arcade-button.is-pushed,
-  .read-chunk-arcade-button.is-helped {
+  .read-chunk-arcade-button.is-helped,
+  .read-chunk-arcade-button.is-glow-fading {
     animation: none;
     filter:
       brightness(1.14)
       drop-shadow(0 0 18px #fff4a5);
+  }
+
+  .read-chunk-arcade-button.is-glow-fading:not(.is-helped) {
+    filter: none;
   }
 }
 
