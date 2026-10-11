@@ -1122,6 +1122,50 @@ function testFishSwimmingAndHookAlignment() {
   assert.ok(!css.includes(".read-animated-stage.is-listening .read-fish-word"));
 }
 
+function testFishCompactVariableWordGroups() {
+  const three = Array.from({ length: 3 }, () => ({ width: 110, height: 50 }));
+  const upper = ReadMyVerse.getFishWordLayout(390, 700, three, 0);
+  const middle = ReadMyVerse.getFishWordLayout(390, 700, three, 0.5);
+  const lower = ReadMyVerse.getFishWordLayout(390, 700, three, 1);
+  for (const group of [upper, middle, lower]) {
+    assert.ok(group.every((track, index) => !index ||
+      track.top > group[index - 1].top));
+    assert.ok(Math.abs(group[1].top - group[0].top - 75) < 0.001,
+      "Ideal gap should be half the 50px pill height");
+    assert.ok(Math.abs(group[2].top + 50 - group[0].top - 200) < 0.001,
+      "Three words should occupy only a compact 200px group");
+    assert.ok(group[0].top >= 8 && group[2].top + 50 <= 692);
+  }
+  assert.ok(upper[0].top + 100 < middle[0].top);
+  assert.ok(middle[0].top + 100 < lower[0].top);
+
+  const uneven = [{ width: 110, height: 50 },
+    { width: 120, height: 70 }, { width: 130, height: 60 }];
+  const different = ReadMyVerse.getFishWordLayout(390, 700, uneven, 0.35);
+  assert.ok(Math.abs(different[1].top - different[0].top - 80) < 0.001);
+  assert.ok(Math.abs(different[2].top - different[1].top - 102.5) < 0.001);
+
+  const eight = Array.from({ length: 8 }, () => ({ width: 145, height: 64 }));
+  const full = ReadMyVerse.getFishWordLayout(390, 700, eight, 0.15);
+  assert.ok(full[7].top - full[0].top > 450,
+    "Tall groups should expand to fill most of the playfield");
+  assert.ok(full[7].top + 64 <= 700 - 8);
+  const crowded = ReadMyVerse.getFishWordLayout(320, 340, eight, 0.9);
+  assert.ok(crowded.some((track, index) => index &&
+    track.delayMs > crowded[index - 1].delayMs + 500),
+    "Crowded rows still require horizontal separation");
+  crowded.forEach((track, index) => {
+    if (index) assert.ok(track.top > crowded[index - 1].top);
+    crowded.slice(0, index).forEach((prior) =>
+      assert.strictEqual(ReadMyVerse.fishWordTracksOverlap(
+        prior, track, 320), false));
+  });
+
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  assert.ok(source.includes("fishGroupZoneOffset"),
+    "Consecutive chunks must vary their group height");
+}
+
 function testFishDescendingLanesAndIndependentCatches() {
   const sizes = [160, 135, 180, 118, 192, 110, 168, 145]
     .map((width) => ({ width, height: 64 }));
@@ -1184,6 +1228,7 @@ function main() {
     testBalloonSafeSpawning,
     testFishSwimmingAndHookAlignment,
     testFishDescendingLanesAndIndependentCatches,
+    testFishCompactVariableWordGroups,
     testPreviewChunkModes,
     testScramblePreservesLettersAndPunctuation,
     testTapOrderHintsAndReset,

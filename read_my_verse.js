@@ -3043,8 +3043,6 @@
     };
   }
 
-  // Place Fish words in strictly descending reading order. If the vertical
-  // rows get crowded, keep the swim speed and stagger entry times instead.
   function fishSwimDistanceAt(progress) {
     const t = Math.max(0, Math.min(1, Number(progress) || 0));
     for (let index = 1; index < FISH_SWIM_PATH.length; index += 1) {
@@ -3084,7 +3082,11 @@
     return false;
   }
 
-  function getFishWordLayout(sceneWidth, sceneHeight, wordSizes) {
+  // Keep a short chunk together, rather than stretching it top to bottom.
+  // Longer chunks use more of the playfield and rely on horizontal staggering
+  // only when their rendered word-pill heights cannot fit without overlap.
+  function getFishWordLayout(sceneWidth, sceneHeight, wordSizes,
+    positionFraction = 0.5) {
     const width = Math.max(120, Number(sceneWidth) || 120);
     const height = Math.max(120, Number(sceneHeight) || 120);
     const sizes = wordSizes.map((size) => ({
@@ -3092,17 +3094,44 @@
       height: Math.max(1, Number(size.height) || 1)
     }));
     if (!sizes.length) return [];
-    const maximumHeight = Math.max(...sizes.map((size) => size.height));
+
+    // A comfortable gap is half the average height of neighboring pills.
+    // Measure real rendered heights: wrapped words may be taller than others.
     const margin = Math.max(8, Math.min(36, height * 0.07));
-    const firstTop = Math.min(margin, Math.max(4,
-      height - maximumHeight - Math.max(2, sizes.length - 1) * 2));
-    const lastTop = Math.max(firstTop + (sizes.length - 1) * 2,
-      height - maximumHeight - margin);
+    const availableHeight = Math.max(1, height - 2 * margin);
+    const offsets = [0];
+    for (let index = 1; index < sizes.length; index += 1) {
+      const previous = sizes[index - 1];
+      const current = sizes[index];
+      const idealGap = (previous.height + current.height) * 0.25;
+      offsets.push(offsets[index - 1] + previous.height + idealGap);
+    }
+    const idealHeight = offsets[offsets.length - 1] +
+      sizes[sizes.length - 1].height;
+
+    // Keep ideal gaps when they fit. Otherwise compress only as far as
+    // needed, accounting for each individual pill's height at every row.
+    let compression = 1;
+    if (idealHeight > availableHeight) {
+      sizes.forEach((size, index) => {
+        if (!offsets[index]) return;
+        compression = Math.min(compression,
+          Math.max(0, availableHeight - size.height) / offsets[index]);
+      });
+      // Extremely short scenes cannot fit every pill; preserve reading
+      // order and let the collision scheduler add horizontal separation.
+      compression = Math.max(0.001, compression);
+    }
+    const groupHeight = Math.max(...sizes.map((size, index) =>
+      offsets[index] * compression + size.height));
+    const remainingSpace = Math.max(0, availableHeight - groupHeight);
+    const location = Math.max(0, Math.min(1,
+      Number.isFinite(Number(positionFraction)) ? Number(positionFraction) : 0.5));
+    const groupTop = margin + remainingSpace * location;
+
     const tracks = [];
     sizes.forEach((size, index) => {
-      const top = sizes.length === 1
-        ? Math.max(firstTop, (height - size.height) / 2)
-        : firstTop + (lastTop - firstTop) * index / (sizes.length - 1);
+      const top = groupTop + offsets[index] * compression;
       const motion = getFishMotion(width, size.width, sizes.length);
       const track = { ...size, top, motion,
         delayMs: index ? tracks[index - 1].delayMs + motion.staggerMs : 0 };
@@ -3897,7 +3926,13 @@
     let lastEntryMs = 0;
     let lastExitMs = 0;
     const sizes = words.map((word) => word.getBoundingClientRect());
-    const layout = getFishWordLayout(scene.width, scene.height, sizes);
+    // Cycle between upper, middle and lower zones across consecutive chunks.
+    // Short word groups can swim at different heights without stretching;
+    // crowded groups naturally fill the space regardless of the zone.
+    const zone = (session.fishGroupZoneOffset + index) % 3;
+    const positionFraction = (zone + 0.15 + Math.random() * 0.7) / 3;
+    const layout = getFishWordLayout(scene.width, scene.height, sizes,
+      positionFraction);
     words.forEach((word, wordIndex) => {
       const { top, delayMs, motion } = layout[wordIndex];
       word.style.top = `${top}px`;
@@ -3962,7 +3997,8 @@
       scene: wrap.querySelector(".read-animated-scene"),
       decorations: wrap.querySelector("[data-read-fish]"),
       progress: wrap.querySelector("[data-read-progress]"),
-      items: new Map(), timers: new Set()
+      items: new Map(), timers: new Set(),
+      fishGroupZoneOffset: Math.floor(Math.random() * 3)
     };
     fishSession = session;
     root.requestAnimationFrame(() => {
