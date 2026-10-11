@@ -1263,6 +1263,8 @@ button.read-unscramble-token.is-solved {
   opacity: 0.5;
 }
 
+/* Audio playback and hints use the same stationary under-button glow. */
+.read-chunk-arcade-button.is-pushed,
 .read-chunk-arcade-button.is-helped {
   animation:
     readChunkSequenceHelp 820ms ease-in-out infinite alternate;
@@ -1394,6 +1396,7 @@ button.read-unscramble-token.is-solved {
     transition: none;
   }
 
+  .read-chunk-arcade-button.is-pushed,
   .read-chunk-arcade-button.is-helped {
     animation: none;
     filter:

@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_11_chunk_match_number_opacity_d";
+const CACHE_VERSION = "2026_Oct_11_chunk_match_audio_glow_e";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =

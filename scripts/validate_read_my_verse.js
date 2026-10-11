@@ -527,6 +527,22 @@ function testChunkAudioMatchingSimplifiedButtons() {
     "Easy numbers should still appear only during the challenge");
 }
 
+function testChunkAudioMatchingPlaybackGlow() {
+  const js = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  // The pressed state is driven by activeButtonIndex, which is cleared
+  // when playback finishes; glow therefore follows the audio lifecycle.
+  assert.ok(js.includes('active ? "is-pushed" : ""'));
+  assert.ok(js.includes('data.activeButtonIndex = -1;'));
+  assert.match(css,
+    /\.read-chunk-arcade-button\.is-pushed,\s*\.read-chunk-arcade-button\.is-helped\s*\{\s*animation:\s*readChunkSequenceHelp/);
+  assert.match(css,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.read-chunk-arcade-button\.is-pushed,\s*\.read-chunk-arcade-button\.is-helped\s*\{\s*animation: none;/);
+  const glow = css.match(/@keyframes readChunkSequenceHelp \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(glow?.includes("drop-shadow") && !glow.includes("transform:"),
+    "Playing audio must glow without resizing the button");
+}
+
 function testChunkAudioMatchingEligibility() {
   const verse = (count) => ({
     id: `chunks_${count}`,
@@ -1487,6 +1503,7 @@ function main() {
     testChunkAudioMatchingLabelsAndStableLayout,
     testChunkAudioMatchingModeFontAndCompletedContrast,
     testChunkAudioMatchingSimplifiedButtons,
+    testChunkAudioMatchingPlaybackGlow,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,
