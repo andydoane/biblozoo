@@ -34,6 +34,10 @@
   const CHUNK_SEQUENCE_ACTIVITY_ID =
     "chunk_sequence";
   const CHUNK_PAUSE_MS = 480;
+  const TYPEWRITER_INTRO_TEXT = "Tap to type the verse.";
+  const TYPEWRITER_INTRO_KEY_MS = 75;
+  const TYPEWRITER_INTRO_HOLD_MS = 3000;
+  const TYPEWRITER_INTRO_FADE_MS = 300;
   const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme.mp3`;
   const CRAWL_FANFARE_SECONDS = 8;
   const CRAWL_UNDERSCORE_VOLUME = 0.22;
@@ -256,6 +260,8 @@
   let pauseTimer = 0;
   let animationTimer = 0;
   let wordFeedbackTimer = 0;
+  let typewriterIntroTimer = 0;
+  let typewriterIntroWrap = null;
   let chunkGlowFadeTimer = 0;
   let lastKeySoundIndex = -1;
   let completionReported = false;
@@ -275,6 +281,9 @@
     usesChunkAudio: true,
     chunkIndex: 0,
     revealCount: 0,
+    typewriterIntroPhase: "done",
+    typewriterIntroCount: 0,
+    typewriterIntroStarted: false,
     phase: "idle",
     activatedCharacterIndex: -1,
     activatedTokenId: "",
@@ -1477,6 +1486,9 @@
     clearTimeout(pauseTimer);
     clearTimeout(animationTimer);
     clearTimeout(wordFeedbackTimer);
+    clearTimeout(typewriterIntroTimer);
+    typewriterIntroTimer = 0;
+    typewriterIntroWrap = null;
     pauseTimer = 0;
     animationTimer = 0;
     wordFeedbackTimer = 0;
@@ -1494,6 +1506,9 @@
     state.usesChunkAudio = true;
     state.chunkIndex = 0;
     state.revealCount = 0;
+    state.typewriterIntroPhase = "done";
+    state.typewriterIntroCount = 0;
+    state.typewriterIntroStarted = false;
     state.phase = "idle";
     state.activatedCharacterIndex = -1;
     state.activatedTokenId = "";
@@ -1576,6 +1591,11 @@
       validatedContext.readTestMode;
     state.reducedMotion =
       prefersReducedMotion();
+    if (safeActivityId === TYPEWRITER_ACTIVITY_ID) {
+      state.typewriterIntroPhase = state.reducedMotion ? "hold" : "typing";
+      state.typewriterIntroCount = state.reducedMotion
+        ? TYPEWRITER_INTRO_TEXT.length : 0;
+    }
     state.phase = getActivePhase(
       safeActivityId
     );
@@ -1591,6 +1611,11 @@
       isTypingActivity(safeActivityId)
     ) {
       ensureKeySoundAudio(safeActivityId);
+      // Unlock Web Audio during the launch gesture so the delayed intro
+      // keystrokes can play on iOS without requiring another tap.
+      if (safeActivityId === TYPEWRITER_ACTIVITY_ID && !appApi?.isMuted?.()) {
+        keySoundContext?.resume?.()?.catch?.(() => {});
+      }
     }
 
     if (isWordActivity(safeActivityId)) {
@@ -4402,6 +4427,77 @@
     };
   }
 
+  // Typewriter-only launch cutscene. Keep the verse DOM fitted underneath
+  // and update just the intro text so the established tap engine is untouched.
+  function finishTypewriterIntro() {
+    clearTimeout(typewriterIntroTimer);
+    typewriterIntroTimer = 0;
+    if (state.typewriterIntroPhase === "done") return;
+    state.typewriterIntroPhase = "done";
+    typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")?.remove();
+    typewriterIntroWrap?.querySelector(".read-typewriter-paper")
+      ?.classList.remove("is-intro-active");
+    typewriterIntroWrap = null;
+    syncTypingScreen();
+  }
+
+  function fadeTypewriterIntro() {
+    if (state.typewriterIntroPhase !== "hold") return;
+    state.typewriterIntroPhase = "fading";
+    typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")
+      ?.classList.add("is-fading");
+    typewriterIntroTimer = setTimeout(
+      finishTypewriterIntro,
+      state.reducedMotion ? 0 : TYPEWRITER_INTRO_FADE_MS
+    );
+  }
+
+  function startTypewriterIntro() {
+    if (state.activityId !== TYPEWRITER_ACTIVITY_ID ||
+        state.typewriterIntroStarted ||
+        state.typewriterIntroPhase === "done") return;
+    state.typewriterIntroStarted = true;
+
+    if (state.typewriterIntroPhase === "hold") {
+      typewriterIntroTimer = setTimeout(
+        fadeTypewriterIntro, TYPEWRITER_INTRO_HOLD_MS);
+      return;
+    }
+
+    const typeNext = () => {
+      if (state.typewriterIntroPhase !== "typing") return;
+      const character = TYPEWRITER_INTRO_TEXT[state.typewriterIntroCount];
+      state.typewriterIntroCount += 1;
+      const label = typewriterIntroWrap?.querySelector(
+        "[data-read-typewriter-intro-text]");
+      if (label) label.textContent = TYPEWRITER_INTRO_TEXT.slice(
+        0, state.typewriterIntroCount);
+      if (!/\s/u.test(character)) playKeySound();
+
+      if (state.typewriterIntroCount >= TYPEWRITER_INTRO_TEXT.length) {
+        state.typewriterIntroPhase = "hold";
+        typewriterIntroTimer = setTimeout(
+          fadeTypewriterIntro, TYPEWRITER_INTRO_HOLD_MS);
+      } else {
+        typewriterIntroTimer = setTimeout(typeNext, TYPEWRITER_INTRO_KEY_MS);
+      }
+    };
+    typewriterIntroTimer = setTimeout(typeNext, TYPEWRITER_INTRO_KEY_MS);
+  }
+
+  function scheduleTypewriterIntro(wrap) {
+    if (state.typewriterIntroPhase === "done") return;
+    typewriterIntroWrap = wrap;
+    const begin = () => {
+      if (typewriterIntroWrap === wrap && wrap.isConnected) {
+        startTypewriterIntro();
+      }
+    };
+    root.requestAnimationFrame?.(begin);
+    // A second chance for slides that mount after the first animation frame.
+    root.setTimeout(begin, 120);
+  }
+
   // Change only the typing display's state; never discard the fitted verse
   // simply because an audio chunk starts, ends, or advances.
   function syncTypingScreen() {
@@ -4416,17 +4512,17 @@
     if (!wrap?.isConnected || !stage) return false;
 
     stage.classList.toggle("is-input-locked", state.phase !== "typing");
-    const instruction = wrap.querySelector(keyboard
-      ? ".read-keyboard-instruction"
-      : ".read-typewriter-instruction");
+    // Typewriter has no persistent instruction or chunk counter. Keyboard
+    // retains its existing status text and progress unchanged.
+    const instruction = keyboard
+      ? wrap.querySelector(".read-keyboard-instruction")
+      : null;
     if (instruction) {
       instruction.textContent = state.readTestMode === "early_exit"
-        ? (keyboard
-          ? "EARLY-EXIT CHECK: USE BACK BEFORE FINISHING"
-          : "Early-exit check: use Back before finishing")
+        ? "EARLY-EXIT CHECK: USE BACK BEFORE FINISHING"
         : state.phase === "typing"
-          ? (keyboard ? "TAP TO TYPE THE VERSE" : "Tap to type the verse")
-          : (keyboard ? "PLAYING VERSE AUDIO..." : "Listen to this part");
+          ? "TAP TO TYPE THE VERSE"
+          : "PLAYING VERSE AUDIO...";
     }
 
     const listening = state.phase === "pause" || state.phase === "playing";
@@ -4451,11 +4547,12 @@
       }
     }
 
-    const progress = wrap.querySelector("[data-read-progress]");
+    const progress = keyboard
+      ? wrap.querySelector("[data-read-progress]")
+      : null;
     if (progress) {
-      progress.textContent = keyboard
-        ? `CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}`
-        : `Chunk ${state.chunkIndex + 1} of ${state.chunks.length}`;
+      progress.textContent =
+        `CHUNK ${state.chunkIndex + 1} / ${state.chunks.length}`;
     }
     return true;
   }
@@ -5283,12 +5380,7 @@
       "div"
     );
     const isLocked = state.phase !== "typing";
-    const typewriterInstruction =
-      state.readTestMode === "early_exit"
-        ? "Early-exit check: use Back before finishing"
-        : isLocked
-          ? "Listen to this part"
-          : "Tap to type the verse";
+    const hasIntro = state.typewriterIntroPhase !== "done";
 
     wrap.className = [
       "read-my-verse-screen",
@@ -5301,13 +5393,17 @@
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Typewriter">‹</button>
       <main class="read-typewriter-stage${isLocked ? " is-input-locked" : ""}" data-read-type-area data-no-ui-sound role="button" tabindex="0" aria-label="Tap to type ${escapeHtml(verse.ref || state.verseId)}">
         <div class="read-typewriter-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-        <div class="read-typewriter-instruction">${typewriterInstruction}</div>
-        <section class="learn-stage read-typewriter-paper" aria-label="${escapeHtml(verse.verseText)}">
+        <section class="learn-stage read-typewriter-paper${hasIntro ? " is-intro-active" : ""}" aria-label="${escapeHtml(verse.verseText)}">
           <div class="smart-learn-text read-typewriter-fit" data-read-typing-fit>
             <div class="smart-learn-body read-typewriter-body" aria-hidden="true">${renderVerseHtml()}</div>
           </div>
+          ${hasIntro ? `<div class="read-typewriter-intro" data-read-typewriter-intro>
+            <div class="read-typewriter-intro-line">
+              <span class="read-typewriter-intro-guide" aria-hidden="true">${TYPEWRITER_INTRO_TEXT}</span>
+              <span class="read-typewriter-intro-text" data-read-typewriter-intro-text>${escapeHtml(TYPEWRITER_INTRO_TEXT.slice(0, state.typewriterIntroCount))}</span>
+            </div>
+          </div>` : ""}
         </section>
-        <div class="read-typewriter-progress" data-read-progress aria-live="polite">Chunk ${state.chunkIndex + 1} of ${state.chunks.length}</div>
       </main>
     `;
 
@@ -5316,6 +5412,11 @@
     );
     const activate = (event) => {
       event?.preventDefault?.();
+      if (state.typewriterIntroPhase !== "done") {
+        // This same tap dismisses the cutscene AND types the first letter.
+        stopKeySoundVoices();
+        finishTypewriterIntro();
+      }
       handleTypeTap();
     };
 
@@ -5338,6 +5439,7 @@
 
     restoreReadTypingFit(wrap);
     scheduleReadTypingVerseFit(wrap);
+    if (hasIntro) scheduleTypewriterIntro(wrap);
 
     return appApi.makeSlide({
       idx,
@@ -5372,6 +5474,8 @@
       activityId: state.activityId,
       chunkIndex: state.chunkIndex,
       revealCount: state.revealCount,
+      typewriterIntroPhase: state.typewriterIntroPhase,
+      typewriterIntroCount: state.typewriterIntroCount,
       phase: state.phase,
       chunkCount: state.chunks.length,
       usesChunkAudio:

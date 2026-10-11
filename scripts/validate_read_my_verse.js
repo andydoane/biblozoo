@@ -59,6 +59,66 @@ function testOneTapRevealsOneActualCharacter() {
   assert.strictEqual(revealed, text.length);
 }
 
+function testTypewriterIntroCutscene() {
+  const js = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  const rule = (selector) => {
+    const start = css.indexOf(selector + " {");
+    assert.ok(start >= 0, `Missing Typewriter CSS selector: ${selector}`);
+    return css.slice(start, css.indexOf("}", start));
+  };
+
+  assert.ok(js.includes('const TYPEWRITER_INTRO_TEXT = "Tap to type the verse."'));
+  assert.ok(js.includes('const TYPEWRITER_INTRO_HOLD_MS = 3000'));
+  assert.ok(js.includes('const TYPEWRITER_INTRO_FADE_MS = 300'));
+  assert.ok(js.includes('state.typewriterIntroCount += 1'));
+  assert.ok(js.includes('if (!/\\s/u.test(character)) playKeySound()'));
+  assert.ok(js.includes('if (hasIntro) scheduleTypewriterIntro(wrap)'));
+  assert.ok(js.includes('stopKeySoundVoices();\n        finishTypewriterIntro();\n      }\n      handleTypeTap();'),
+    "A tap must skip the cutscene and type the first character");
+  assert.ok(js.includes('clearTimeout(typewriterIntroTimer)'),
+    "Exiting must cancel pending intro timers");
+  const start = js.indexOf('const hasIntro = state.typewriterIntroPhase !== "done"');
+  const end = js.indexOf('stage.onclick = activate;', start);
+  const typewriterMarkup = js.slice(start, end);
+  assert.ok(typewriterMarkup.includes('data-read-typewriter-intro'));
+  assert.ok(!typewriterMarkup.includes('class="read-typewriter-instruction"'));
+  assert.ok(!typewriterMarkup.includes('class="read-typewriter-progress"'));
+  assert.match(css, /\.read-typewriter-stage \{\s*display: grid;[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\)/);
+  assert.ok(rule('.read-typewriter-paper.is-intro-active .read-typewriter-fit')
+    .includes('visibility: hidden'));
+  assert.ok(rule('.read-typewriter-intro.is-fading').includes('opacity: 0'));
+  assert.ok(css.includes('transition: opacity 300ms ease-out'));
+  assert.ok(css.includes('.read-typewriter-screen.is-reduced-motion .read-typewriter-intro'));
+  assert.ok(js.includes('if (safeActivityId === TYPEWRITER_ACTIVITY_ID)'),
+    "Do not change Keyboard intro behavior");
+
+  const verse = {
+    id: "intro_preview",
+    verseText: "The Lord is my shepherd.",
+    echoParts: ["The Lord is my shepherd."]
+  };
+  const context = (activityId) => ({
+    source: "daily_todo", profileId: "profile-a", planId: "plan-a",
+    planDay: "2026-10-11", taskId: "review", launchToken: "intro-test",
+    verseId: verse.id, readActivityId: activityId, previewScope: "read_test"
+  });
+  ReadMyVerse.initialize({ getVerseList: () => [verse] });
+  assert.strictEqual(ReadMyVerse.startForVerse(verse.id, "typewriter",
+    context("typewriter")), true);
+  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroPhase, "typing");
+  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroCount, 0);
+  assert.strictEqual(ReadMyVerse.getSessionState().phase, "typing",
+    "The original Typewriter reveal phase must remain unchanged");
+  ReadMyVerse.stopSession();
+  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroPhase, "done");
+  assert.strictEqual(ReadMyVerse.startForVerse(verse.id, "keyboard",
+    context("keyboard")), true);
+  assert.strictEqual(ReadMyVerse.getSessionState().typewriterIntroPhase, "done",
+    "Keyboard must not inherit Typewriter's new cutscene");
+  ReadMyVerse.stopSession();
+}
+
 function testChunkTextPreservesPunctuation() {
   const verse =
     "For the wages of sin is death, but the gift of God is eternal life.";
@@ -1505,6 +1565,7 @@ function main() {
   const tests = [
     testSafeWordScrambles,
     testOneTapRevealsOneActualCharacter,
+    testTypewriterIntroCutscene,
     testChunkTextPreservesPunctuation,
     testOneThroughEightChunkFilenames,
     testDailyContextValidation,
