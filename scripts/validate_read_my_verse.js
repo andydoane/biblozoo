@@ -89,6 +89,15 @@ function testTypewriterIntroCutscene() {
     .includes('visibility: hidden'));
   assert.ok(rule('.read-typewriter-intro.is-fading').includes('opacity: 0'));
   assert.ok(css.includes('transition: opacity 300ms ease-out'));
+  const introStyle = rule('.read-typewriter-intro');
+  assert.ok(introStyle.includes('font-size: var(--typewriter-intro-font-size, 40px)'),
+    "Intro must match the fitted verse size, not use a smaller clamp");
+  assert.ok(introStyle.includes('text-align: center'),
+    "Wrapped intro lines should be centered");
+  assert.ok(js.includes('`${cache.fontSize}px`'),
+    "Cached verse fit must retain its font size");
+  assert.strictEqual((js.match(/setProperty\("--typewriter-intro-font-size"/g) || []).length, 2,
+    "Both cached and freshly computed verse fits must size the intro");
   assert.ok(css.includes('.read-typewriter-screen.is-reduced-motion .read-typewriter-intro'));
   assert.ok(js.includes('if (safeActivityId === TYPEWRITER_ACTIVITY_ID)'),
     "Do not change Keyboard intro behavior");

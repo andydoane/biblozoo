@@ -228,9 +228,10 @@
   padding: clamp(12px, 3vw, 28px);
   color: #30271f;
   font-family: "Special Elite", Georgia, serif;
-  font-size: clamp(23px, 5vw, 42px);
-  line-height: 1.18;
-  text-align: left;
+  /* Use the exact font size computed for the verse, not an intro clamp. */
+  font-size: var(--typewriter-intro-font-size, 40px);
+  line-height: 1.16;
+  text-align: center;
   pointer-events: none;
   opacity: 1;
   transition: opacity 300ms ease-out;
@@ -241,6 +242,9 @@
   position: relative;
   width: max-content;
   max-width: 100%;
+  /* The invisible full sentence reserves identical lines while typing. */
+  overflow-wrap: normal;
+  text-align: center;
 }
 
 .read-typewriter-intro-guide {

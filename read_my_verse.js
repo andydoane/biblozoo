@@ -4572,6 +4572,9 @@
     block.style.maxWidth = `${cache.width}px`;
     block.style.setProperty("--smart-line-height", cache.lineHeight);
     block.style.setProperty("--smart-font-size", `${cache.fontSize}px`);
+    // The intro shares the fitted verse size, including when fit is cached.
+    wrap.querySelector("[data-read-typewriter-intro]")
+      ?.style.setProperty("--typewriter-intro-font-size", `${cache.fontSize}px`);
     block.classList.add("is-fit-ready");
   }
 
@@ -4648,6 +4651,9 @@
     }
     const fontSize = Math.floor(best);
     block.style.setProperty("--smart-font-size", `${fontSize}px`);
+    // Keep the introduction matched to the real verse on every refit/resize.
+    wrap.querySelector("[data-read-typewriter-intro]")
+      ?.style.setProperty("--typewriter-intro-font-size", `${fontSize}px`);
     typingFitCache = {
       key: typingFitKey(),
       viewportWidth: root.innerWidth,
