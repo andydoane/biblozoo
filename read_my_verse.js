@@ -756,6 +756,13 @@
     return solve(0, rowCount);
   }
 
+  // Tap in Order displays only the word, while retaining the original
+  // token (including punctuation) for verse ordering and other activities.
+  // The core preserves meaningful internal apostrophes and hyphens.
+  function getTapOrderDisplayWord(token) {
+    return String(token?.core || "");
+  }
+
   function buildTapOrderPuzzle(
     text,
     random = Math.random,
@@ -1156,7 +1163,6 @@
       challengeIndex: 0,
       wrongAt: -1,
       easyMisses: 0,
-      hardResets: 0,
       helpAvailable: false,
       helpActive: false,
       message: "Choose how you want to play."
@@ -1233,9 +1239,10 @@
       readTestMode ===
       "sequence_hard_reset"
     ) {
-      data.hardResets = 1;
-      data.wrongAt = 0;
-      data.message = "Oops! Start over!";
+      // Keep the existing preview identifier, but never reset progress.
+      data.challengeIndex = Math.min(2, count - 1);
+      data.wrongAt = data.challengeIndex;
+      data.message = "Try that one again!";
     }
 
     if (
@@ -1244,7 +1251,7 @@
         "sequence_help_active"
       ].includes(readTestMode)
     ) {
-      data.hardResets = 3;
+      data.easyMisses = 3;
       data.helpAvailable = true;
     }
 
@@ -1284,31 +1291,23 @@
         complete: nextIndex >= count,
         reset: false,
         easyMisses: 0,
-        hardResets:
-          Number(data?.hardResets) || 0,
         helpAvailable: false
       };
     }
 
-    const hard = data?.mode === "hard";
-    const easyMisses = hard
-      ? Number(data?.easyMisses) || 0
-      : (Number(data?.easyMisses) || 0) + 1;
-    const hardResets = hard
-      ? (Number(data?.hardResets) || 0) + 1
-      : Number(data?.hardResets) || 0;
+    // Easy and Hard now share the same forgiving mistake rules.
+    // Difficulty comes from the numbers displayed in Easy challenge mode.
+    const easyMisses =
+      (Number(data?.easyMisses) || 0) + 1;
 
     return {
       correct: false,
       expected,
-      nextIndex: hard ? 0 : expected,
+      nextIndex: expected,
       complete: false,
-      reset: hard,
+      reset: false,
       easyMisses,
-      hardResets,
-      helpAvailable: hard
-        ? hardResets >= 3
-        : easyMisses >= 3
+      helpAvailable: easyMisses >= 3
     };
   }
 
@@ -2717,7 +2716,6 @@
     data.challengeIndex = 0;
     data.wrongAt = -1;
     data.easyMisses = 0;
-    data.hardResets = 0;
     data.helpAvailable = false;
     data.helpActive = false;
     data.message = "Tap them in order.";
@@ -2734,25 +2732,15 @@
 
     data.easyMisses =
       evaluation.easyMisses;
-    data.hardResets =
-      evaluation.hardResets;
     data.helpAvailable =
       evaluation.helpAvailable;
 
-    if (evaluation.reset) {
-      data.message = "Oops! Start over!";
-    } else {
-      data.message = "Try that one again!";
-    }
+    data.message = "Try that one again!";
 
     setChunkSequencePhase("feedback");
     appApi?.requestRender?.();
     clearTimeout(pauseTimer);
     pauseTimer = setTimeout(() => {
-      if (evaluation.reset) {
-        data.challengeIndex =
-          evaluation.nextIndex;
-      }
       data.wrongAt = -1;
       data.message = data.helpActive
         ? "Try the glowing button."
@@ -2826,12 +2814,6 @@
     }
 
     clearTimeout(pauseTimer);
-    if (
-      data.mode === "hard" &&
-      data.phase === "feedback"
-    ) {
-      data.challengeIndex = 0;
-    }
     data.wrongAt = -1;
     data.helpActive = true;
     data.helpAvailable = false;
@@ -4764,7 +4746,7 @@
     const context = root.document.createElement("canvas").getContext("2d");
     if (!context) return;
     const words = data.displayOrder.map((id) =>
-      data.tokens.find((token) => token.id === id)?.raw || ""
+      getTapOrderDisplayWord(data.tokens.find((token) => token.id === id))
     );
     const maxSize = Math.min(82, Math.max(50, Math.round(availableWidth * .25)));
     const maxRows = Math.min(words.length, Math.max(3, Math.ceil(words.length / 2)));
@@ -4863,7 +4845,7 @@
 
         return `
           <button class="${classes}" type="button" data-read-word data-read-order-token="${escapeHtml(token.id)}" data-no-ui-sound${token.solved ? " disabled tabindex=\"-1\" aria-hidden=\"true\"" : ""}>
-            ${escapeHtml(token.raw)}
+            ${escapeHtml(getTapOrderDisplayWord(token))}
           </button>
         `;
       })
@@ -4981,6 +4963,11 @@
     ].join(";");
   }
 
+  function showChunkSequenceNumbers(data) {
+    return data?.mode === "easy" &&
+      ["challenge", "feedback"].includes(data?.phase);
+  }
+
   function renderChunkSequenceProgressHtml() {
     const data = state.activityData;
     const inChallenge = [
@@ -4988,7 +4975,7 @@
       "feedback"
     ].includes(data?.phase);
 
-    return state.chunks.map((_, index) => {
+    const dots = state.chunks.map((_, index) => {
       const color = data?.colors?.[index];
       const complete = inChallenge &&
         index < data.challengeIndex;
@@ -5012,7 +4999,21 @@
             : `<span aria-hidden="true">${index + 1}</span>`}
         </span>
       `;
-    }).join("");
+    });
+
+    // Always use the same rows for a given chunk count. Seven is 4 + 3;
+    // eight is 4 + 4. These do not change as progress colors update.
+    const rowSize = dots.length >= 7 ? 4 :
+      dots.length >= 5 ? 3 : dots.length;
+    const rows = [];
+    for (let index = 0; index < dots.length; index += rowSize) {
+      rows.push(`
+        <div class="read-chunk-sequence-progress-row">
+          ${dots.slice(index, index + rowSize).join("")}
+        </div>
+      `);
+    }
+    return rows.join("");
   }
 
   function renderChunkSequenceButtonsHtml() {
@@ -5022,6 +5023,7 @@
       "ready",
       "challenge"
     ].includes(data?.phase);
+    const showNumbers = showChunkSequenceNumbers(data);
 
     return (data?.buttonOrder || [])
       .map((chunkIndex, visualIndex) => {
@@ -5043,8 +5045,9 @@
         ].filter(Boolean).join(" ");
 
         return `
-          <button class="${classes}" type="button" data-read-chunk-button="${chunkIndex}" data-no-ui-sound style="${chunkSequenceColorStyle(color)}"${!interactive || data.activeButtonIndex >= 0 ? " disabled" : ""} aria-label="Audio button ${visualIndex + 1}${active ? ", playing" : ""}">
+          <button class="${classes}" type="button" data-read-chunk-button="${chunkIndex}" data-no-ui-sound style="${chunkSequenceColorStyle(color)}"${!interactive || data.activeButtonIndex >= 0 ? " disabled" : ""} aria-label="${showNumbers ? `Chunk ${chunkIndex + 1}` : `Audio button ${visualIndex + 1}`}${active ? ", playing" : ""}">
             <span class="read-chunk-arcade-gloss" aria-hidden="true"></span>
+            ${showNumbers ? `<span class="read-chunk-arcade-number" aria-hidden="true">${chunkIndex + 1}</span>` : ""}
           </button>
         `;
       })
@@ -5060,11 +5063,11 @@
           <h1>Choose a Mode</h1>
           <button type="button" data-read-sequence-mode="easy" data-no-ui-sound>
             <strong>Easy</strong>
-            <span>Keep your correct answers after a mistake.</span>
+            <span>Numbered buttons help you find the right order.</span>
           </button>
           <button type="button" data-read-sequence-mode="hard" data-no-ui-sound>
             <strong>Hard</strong>
-            <span>A mistake sends you back to the beginning.</span>
+            <span>Listen and remember. Mistakes keep your progress.</span>
           </button>
         </div>
       `;
@@ -5121,9 +5124,11 @@
         <div class="read-chunk-sequence-progress" role="group" aria-label="Sequence progress">
           ${renderChunkSequenceProgressHtml()}
         </div>
-        <div class="read-chunk-sequence-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
-        <div class="read-chunk-sequence-actions">
-          ${renderChunkSequenceActionsHtml()}
+        <div class="read-chunk-sequence-guidance">
+          <div class="read-chunk-sequence-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
+          <div class="read-chunk-sequence-actions">
+            ${renderChunkSequenceActionsHtml()}
+          </div>
         </div>
         <section class="read-chunk-sequence-buttons read-chunk-sequence-layout-${count}" aria-label="Audio buttons">
           ${renderChunkSequenceButtonsHtml()}
@@ -5390,6 +5395,7 @@
     chooseChunkSequenceColors,
     createChunkSequenceData,
     evaluateChunkSequenceChoice,
+    showChunkSequenceNumbers,
     markChunkSequenceExplored,
     splitWordToken,
     tokenizeChunkWords,
@@ -5399,6 +5405,7 @@
     balanceScrambleRows,
     chooseScrambleFit,
     buildTapOrderPuzzle,
+    getTapOrderDisplayWord,
     applyTapOrderChoice,
     isChunkEligible,
     selectActivityChunks,

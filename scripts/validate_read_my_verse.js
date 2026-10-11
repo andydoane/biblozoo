@@ -389,8 +389,7 @@ function testChunkAudioMatchingRules() {
 
   const hard = {
     ...easy,
-    mode: "hard",
-    hardResets: 2
+    mode: "hard"
   };
   result =
     ReadMyVerse.evaluateChunkSequenceChoice(
@@ -398,13 +397,11 @@ function testChunkAudioMatchingRules() {
       4,
       5
     );
-  assert.strictEqual(result.reset, true);
-  assert.strictEqual(result.nextIndex, 0);
-  assert.strictEqual(result.hardResets, 3);
-  assert.strictEqual(
-    result.helpAvailable,
-    true
-  );
+  assert.strictEqual(result.reset, false);
+  assert.strictEqual(result.nextIndex, 2);
+  assert.strictEqual(result.easyMisses, 3);
+  assert.strictEqual(result.helpAvailable, true);
+  assert.strictEqual(result.hardResets, undefined);
 
   result =
     ReadMyVerse.evaluateChunkSequenceChoice(
@@ -417,6 +414,50 @@ function testChunkAudioMatchingRules() {
     );
   assert.strictEqual(result.correct, true);
   assert.strictEqual(result.complete, true);
+}
+
+function testChunkAudioMatchingLabelsAndStableLayout() {
+  const showNumbers = ReadMyVerse.showChunkSequenceNumbers;
+  for (const phase of ["mode", "explore", "ready"]) {
+    assert.strictEqual(showNumbers({ mode: "easy", phase }), false,
+      `Easy mode must not show labels during ${phase}`);
+    assert.strictEqual(showNumbers({ mode: "hard", phase }), false);
+  }
+  for (const phase of ["challenge", "feedback"]) {
+    assert.strictEqual(showNumbers({ mode: "easy", phase }), true);
+    assert.strictEqual(showNumbers({ mode: "hard", phase }), false);
+  }
+
+  const js = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  assert.ok(js.includes('dots.length >= 7 ? 4'),
+    "Seven/eight progress markers must be arranged in rows of four");
+  assert.ok(js.includes('read-chunk-sequence-progress-row'));
+  assert.ok(js.includes('showNumbers ? `<span class="read-chunk-arcade-number"'),
+    "Easy labels should be conditionally rendered inside each arcade button");
+  assert.ok(js.includes('read-chunk-sequence-guidance'));
+  assert.ok(css.includes('grid-template-rows:\n    var(--chunk-progress-height)'));
+  assert.ok(css.includes('grid-template-columns: repeat(2, var(--chunk-button-size))'));
+  assert.ok(css.includes('.read-chunk-sequence-layout-7 > :last-child'));
+  assert.ok(css.includes('.read-chunk-sequence-layout-5 > :nth-child(3)'));
+  assert.ok(css.includes('.read-chunk-arcade-number {'));
+  const wrongStyle = css.match(/\.read-chunk-sequence-progress-dot\.is-wrong \{([^}]*)\}/)?.[1];
+  assert.ok(wrongStyle && !wrongStyle.includes("transform:"),
+    "Red X must keep the marker's exact size and position");
+  const helpFrames = css.match(/@keyframes readChunkSequenceHelp \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(helpFrames && helpFrames.includes("drop-shadow") &&
+    !helpFrames.includes("transform:"),
+    "Help should glow without scaling the button");
+
+  const preview = ReadMyVerse.createChunkSequenceData(
+    8, "sequence_hard_reset", () => 0.27);
+  assert.ok(preview.challengeIndex > 0,
+    "Legacy hard-reset preview should now preserve achieved progress");
+  assert.strictEqual(preview.message, "Try that one again!");
+  const guided = ReadMyVerse.createChunkSequenceData(
+    8, "sequence_hard_help", () => 0.27);
+  assert.strictEqual(guided.helpAvailable, true);
+  assert.strictEqual(guided.easyMisses, 3);
 }
 
 function testChunkAudioMatchingEligibility() {
@@ -658,6 +699,40 @@ function testTapOrderHintsAndReset() {
     puzzle.hintedTokenId,
     ""
   );
+}
+
+function testTapOrderPunctuationFreeDisplay() {
+  // Remove punctuation only from the *visible* Tap in Order words.
+  // Scripture tokens and their original punctuation remain untouched.
+  const raw = ["(Grace!),", "don't?", "well-being;", "you,", "you;"];
+  const puzzle = ReadMyVerse.buildTapOrderPuzzle(raw.join(" "), () => 0.23);
+  assert.deepStrictEqual(puzzle.tokens.map((token) => token.raw), raw);
+  assert.deepStrictEqual(
+    puzzle.tokens.map(ReadMyVerse.getTapOrderDisplayWord),
+    ["Grace", "don't", "well-being", "you", "you"]
+  );
+  assert.strictEqual(ReadMyVerse.getTapOrderDisplayWord(null), "");
+  // Punctuation-free labels must also be what the Titan One fitter measures.
+  const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  assert.match(source,
+    /const words = data\.displayOrder\.map\(\(id\) =>\s*getTapOrderDisplayWord\(/);
+  assert.ok(source.includes('${escapeHtml(getTapOrderDisplayWord(token))}'));
+  // Identical displayed words still use the original duplicate-word rules.
+  const firstYou = puzzle.tokens[3];
+  const secondYou = puzzle.tokens[4];
+  assert.strictEqual(firstYou.normalized, secondYou.normalized);
+  assert.strictEqual(firstYou.raw, "you,");
+  assert.strictEqual(secondYou.raw, "you;");
+  const duplicate = ReadMyVerse.buildTapOrderPuzzle("you, you; go", () => 0.23);
+  assert.strictEqual(
+    ReadMyVerse.applyTapOrderChoice(duplicate, duplicate.tokens[1].id).correct,
+    true
+  );
+  // Unscramble still retains its original punctuation display tokens.
+  const unscramble = ReadMyVerse.buildUnscramblePuzzle("(Grace!), you;");
+  assert.strictEqual(unscramble.tokens[0].leading, "(");
+  assert.strictEqual(unscramble.tokens[0].trailing, "!),");
+  assert.strictEqual(unscramble.tokens[1].trailing, ";");
 }
 
 function testTapOrderTitanLayoutAndCrtFeedback() {
@@ -1342,6 +1417,7 @@ function main() {
     testAnimatedActivityManifest,
     testInteractiveActivityManifest,
     testChunkAudioMatchingRules,
+    testChunkAudioMatchingLabelsAndStableLayout,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
     testVerseCrawlMotion,
@@ -1354,6 +1430,7 @@ function main() {
     testScramblePreservesLettersAndPunctuation,
     testScrambleSafeTwoWordMinimumAndBalance,
     testTapOrderHintsAndReset,
+    testTapOrderPunctuationFreeDisplay,
     testTapOrderTitanLayoutAndCrtFeedback,
     testDuplicateTapWordsAreFair,
     testActivityEligibilityAndForcedChunks,
