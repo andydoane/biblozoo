@@ -516,9 +516,11 @@ function testChunkAudioMatchingSimplifiedButtons() {
   assert.ok(numberRule.includes("text-shadow: none !important"),
     "Easy numbers should not have a black shadow or outline");
   assert.ok(numberRule.includes("-webkit-text-stroke: 0"));
+  assert.ok(numberRule.includes("opacity: 0.5;"),
+    "All Easy-mode numbers should display at 50% opacity");
   assert.ok(css.includes(
-    '.read-chunk-arcade-button.is-yellow .read-chunk-arcade-number {\n  color: #333333;'),
-    "Yellow buttons must show dark charcoal numbers");
+    '.read-chunk-arcade-button.is-yellow .read-chunk-arcade-number,\n.read-chunk-arcade-button.is-light-gray .read-chunk-arcade-number {\n  color: #333333;'),
+    "Yellow and light-gray (white) buttons need dark charcoal numbers");
   assert.ok(js.includes('color?.id === "yellow" ? "is-yellow" : ""'),
     "Yellow buttons must be distinguishable for number styling");
   assert.ok(js.includes('showNumbers ? `<span class="read-chunk-arcade-number"'),

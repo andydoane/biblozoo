@@ -1208,6 +1208,7 @@ button.read-unscramble-token.is-solved {
   display: grid;
   place-items: center;
   color: #ffffff;
+  opacity: 0.5; /* Easy-mode number visibility: change 0.5 to taste. */
   font-family: "Titan One", "Baloo 2", system-ui, sans-serif !important;
   font-size: .44em;
   font-weight: 400 !important;
@@ -1217,7 +1218,8 @@ button.read-unscramble-token.is-solved {
   pointer-events: none;
 }
 
-.read-chunk-arcade-button.is-yellow .read-chunk-arcade-number {
+.read-chunk-arcade-button.is-yellow .read-chunk-arcade-number,
+.read-chunk-arcade-button.is-light-gray .read-chunk-arcade-number {
   color: #333333;
 }
 
