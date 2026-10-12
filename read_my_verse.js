@@ -3058,6 +3058,19 @@
     ].filter(Boolean).join(";");
   }
 
+  // A reference travels as the first animated item (index -1), but it
+  // never becomes a verse chunk or changes chunk progress/completion.
+  function animatedItemAudioPath(item) {
+    return item.index === -1
+      ? getReferenceAudioPath(state.verseId)
+      : getChunkAudioPath(
+          state.verseId,
+          state.chunkAudioIndices[item.index] ?? item.index,
+          state.chunks.length,
+          state.usesChunkAudio
+        );
+  }
+
   function renderCrawlChunkHtml(chunk) {
     return `
       <div class="read-crawl-window">
@@ -3445,12 +3458,7 @@
     item.audioStarted = true;
     state.phase = "playing";
     const request = ++audioRequest;
-    const src = getChunkAudioPath(
-      state.verseId,
-      state.chunkAudioIndices[item.index] ?? item.index,
-      state.chunks.length,
-      state.usesChunkAudio
-    );
+    const src = animatedItemAudioPath(item);
     const finish = () => {
       if (!session.active || request !== audioRequest) return;
       activeAudio = null;
@@ -3473,11 +3481,12 @@
 
   function launchCrawlChunk(session, index) {
     if (!session.active || crawlSession !== session || session.items.has(index)) return;
-    state.chunkIndex = index;
+    if (index >= 0) state.chunkIndex = index;
     state.phase = "animating";
     const node = root.document.createElement("div");
-    node.className = "read-crawl-chunk";
-    node.textContent = String(state.chunks[index] || "").trim();
+    node.className = "read-crawl-chunk" + (index < 0 ? " is-reference" : "");
+    node.textContent = index < 0 ? session.reference :
+      String(state.chunks[index] || "").trim();
     node.dataset.readCrawlChunk = String(index);
     const item = {
       index, node, audioStarted: false, audioDone: false,
@@ -3485,7 +3494,6 @@
     };
     session.items.set(index, item);
     session.window.appendChild(node);
-    session.progress.textContent = `Part ${index + 1} of ${state.chunks.length}`;
 
     if (state.reducedMotion) {
       // Reduced Motion: stationary centered text with a gentle fade.
@@ -3539,23 +3547,15 @@
     const wrap = root.document.createElement("div");
     wrap.className = "read-my-verse-screen read-animated-screen read-crawl-screen" +
       (state.reducedMotion ? " is-reduced-motion" : "");
-    const instruction = state.readTestMode === "early_exit"
-      ? "Early-exit check: use Back before it finishes"
-      : state.reducedMotion
-        ? "Listen to the verse"
-        : "Watch and listen as the verse rises";
     wrap.innerHTML = `
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Verse Crawl">‹</button>
       <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
         <header class="read-animated-header">
           <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-          <div class="read-animated-title">Verse Crawl</div>
-          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
         </header>
         <section class="read-animated-scene" aria-label="${escapeHtml(verse.verseText)}">
           <div class="read-crawl-window" data-read-crawl-window></div>
         </section>
-        <div class="read-animated-progress" data-read-progress aria-live="polite">Part 1 of ${state.chunks.length}</div>
       </main>
     `;
     wrap.querySelector("[data-read-exit]").onclick = (event) => {
@@ -3565,9 +3565,9 @@
     };
     const session = {
       active: true, wrap,
+      reference: String(verse.ref || state.verseId),
       scene: wrap.querySelector(".read-animated-scene"),
       window: wrap.querySelector("[data-read-crawl-window]"),
-      progress: wrap.querySelector("[data-read-progress]"),
       items: new Map(), timers: new Set()
     };
     crawlSession = session;
@@ -3577,7 +3577,7 @@
       started = true;
       root.requestAnimationFrame(() => {
         if (session.active && crawlSession === session && wrap.isConnected) {
-          launchCrawlChunk(session, 0);
+          launchCrawlChunk(session, -1);
         }
       });
     };
@@ -3654,12 +3654,7 @@
     item.audioStarted = true;
     state.phase = "playing";
     const request = ++audioRequest;
-    const src = getChunkAudioPath(
-      state.verseId,
-      state.chunkAudioIndices[item.index] ?? item.index,
-      state.chunks.length,
-      state.usesChunkAudio
-    );
+    const src = animatedItemAudioPath(item);
     const finish = () => {
       if (!session.active || balloonSession !== session ||
           request !== audioRequest) return;
@@ -3788,10 +3783,11 @@
   function launchBalloonChunk(session, index) {
     if (!session.active || balloonSession !== session ||
         session.items.has(index)) return;
-    state.chunkIndex = index;
+    if (index >= 0) state.chunkIndex = index;
     state.phase = "animating";
     const holder = root.document.createElement("div");
-    holder.innerHTML = renderBalloonWordsHtml(state.chunks[index]);
+    holder.innerHTML = renderBalloonWordsHtml(
+      index < 0 ? session.reference : state.chunks[index], index < 0);
     const group = holder.firstElementChild;
     session.scene.appendChild(group);
     const item = {
@@ -3799,7 +3795,7 @@
       vanished: false
     };
     session.items.set(index, item);
-    session.progress.textContent = `Part ${index + 1} of ${state.chunks.length}`;
+
 
     if (state.reducedMotion) {
       balloonTimer(session, () => playBalloonAudio(session, item), 520);
@@ -3901,22 +3897,16 @@
     const wrap = root.document.createElement("div");
     wrap.className = "read-my-verse-screen read-animated-screen read-balloons-screen" +
       (state.reducedMotion ? " is-reduced-motion" : "");
-    const instruction = state.readTestMode === "early_exit"
-      ? "Early-exit check: use Back before it finishes"
-      : "Watch and listen as the words float";
     wrap.innerHTML = `
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Balloons">‹</button>
       <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
         <header class="read-animated-header">
           <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-          <div class="read-animated-title">Balloons</div>
-          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
         </header>
         <section class="read-animated-scene" aria-label="${escapeHtml(verse.verseText)}">
           <div class="read-animated-decorations" data-read-balloons></div>
           <div class="read-balloon-effects" data-read-balloon-effects aria-hidden="true"></div>
         </section>
-        <div class="read-animated-progress" data-read-progress aria-live="polite">Part 1 of ${state.chunks.length}</div>
       </main>
     `;
     wrap.querySelector("[data-read-exit]").onclick = (event) => {
@@ -3926,32 +3916,29 @@
     };
     const session = {
       active: true, wrap,
+      reference: String(verse.ref || state.verseId),
       scene: wrap.querySelector(".read-animated-scene"),
       decorations: wrap.querySelector("[data-read-balloons]"),
       effects: wrap.querySelector("[data-read-balloon-effects]"),
-      progress: wrap.querySelector("[data-read-progress]"),
       wordTracks: [], balloonTracks: [],
       items: new Map(), timers: new Set()
     };
     balloonSession = session;
     root.requestAnimationFrame(() => {
       if (session.active && balloonSession === session && wrap.isConnected) {
-        launchBalloonChunk(session, 0);
+        launchBalloonChunk(session, -1);
       }
     });
     return appApi.makeSlide({ idx, bg: "#82d7f4", navHidden: true, inner: wrap });
   }
 
-  function renderBalloonWordsHtml(
-    chunk,
-    timing
-  ) {
+  function renderBalloonWordsHtml(chunk, isReference = false) {
     if (state.reducedMotion) {
       return `<div class="read-balloon-words is-stationary"><div class="read-balloon-reduced-text">${escapeHtml(chunk)}</div></div>`;
     }
     return `
-      <div class="read-balloon-words" aria-label="${escapeHtml(chunk)}">
-        ${getChunkWords(chunk).map(
+      <div class="read-balloon-words${isReference ? " is-reference" : ""}" aria-label="${escapeHtml(chunk)}">
+        ${(isReference ? [chunk] : getChunkWords(chunk)).map(
           (word, index) => `
             <span class="read-balloon-word" style="--read-lane-offset:${(((index * 37) % 5) - 2) * 7}vw;--read-sway-amplitude:${12 + (index % 3) * 1.5}px;--read-sway-phase:-${(index * 277) % 2400}ms;--read-sway-duration:${4200 + (index % 4) * 260}ms"><span class="read-balloon-word-inner">${escapeHtml(word)}</span></span>
           `
@@ -4014,12 +4001,7 @@
     item.audioStarted = true;
     state.phase = "playing";
     const request = ++audioRequest;
-    const src = getChunkAudioPath(
-      state.verseId,
-      state.chunkAudioIndices[item.index] ?? item.index,
-      state.chunks.length,
-      state.usesChunkAudio
-    );
+    const src = animatedItemAudioPath(item);
     const finish = () => {
       if (!session.active || fishSession !== session ||
           request !== audioRequest) return;
@@ -4116,17 +4098,18 @@
   function launchFishChunk(session, index) {
     if (!session.active || fishSession !== session ||
         session.items.has(index)) return;
-    state.chunkIndex = index;
+    if (index >= 0) state.chunkIndex = index;
     state.phase = "animating";
     const holder = root.document.createElement("div");
-    holder.innerHTML = renderFishWordsHtml(state.chunks[index]);
+    holder.innerHTML = renderFishWordsHtml(
+      index < 0 ? session.reference : state.chunks[index], index < 0);
     const group = holder.firstElementChild;
     session.scene.appendChild(group);
     const item = {
       index, group, audioStarted: false, audioDone: false, vanished: false
     };
     session.items.set(index, item);
-    session.progress.textContent = `Part ${index + 1} of ${state.chunks.length}`;
+
 
     if (state.reducedMotion) {
       fishTimer(session, () => playFishAudio(session, item), 520);
@@ -4141,7 +4124,7 @@
     // Cycle between upper, middle and lower zones across consecutive chunks.
     // Short word groups can swim at different heights without stretching;
     // crowded groups naturally fill the space regardless of the zone.
-    const zone = (session.fishGroupZoneOffset + index) % 3;
+    const zone = index < 0 ? 1 : (session.fishGroupZoneOffset + index) % 3;
     const positionFraction = (zone + 0.15 + Math.random() * 0.7) / 3;
     const layout = getFishWordLayout(scene.width, scene.height, sizes,
       positionFraction);
@@ -4182,21 +4165,15 @@
     const wrap = root.document.createElement("div");
     wrap.className = "read-my-verse-screen read-animated-screen read-fish-screen" +
       (state.reducedMotion ? " is-reduced-motion" : "");
-    const instruction = state.readTestMode === "early_exit"
-      ? "Early-exit check: use Back before it finishes"
-      : "Watch and listen as the words swim";
     wrap.innerHTML = `
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Fish Read">‹</button>
       <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
         <header class="read-animated-header">
           <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-          <div class="read-animated-title">${escapeHtml(manifest.title)}</div>
-          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
         </header>
         <section class="read-animated-scene" aria-label="${escapeHtml(verse.verseText)}">
           <div class="read-animated-decorations" data-read-fish></div>
         </section>
-        <div class="read-animated-progress" data-read-progress aria-live="polite">Part 1 of ${state.chunks.length}</div>
       </main>
     `;
     wrap.querySelector("[data-read-exit]").onclick = (event) => {
@@ -4206,28 +4183,28 @@
     };
     const session = {
       active: true, wrap,
+      reference: String(verse.ref || state.verseId),
       scene: wrap.querySelector(".read-animated-scene"),
       decorations: wrap.querySelector("[data-read-fish]"),
-      progress: wrap.querySelector("[data-read-progress]"),
       items: new Map(), timers: new Set(),
       fishGroupZoneOffset: Math.floor(Math.random() * 3)
     };
     fishSession = session;
     root.requestAnimationFrame(() => {
       if (session.active && fishSession === session && wrap.isConnected) {
-        launchFishChunk(session, 0);
+        launchFishChunk(session, -1);
       }
     });
     return appApi.makeSlide({ idx, bg: "#197ea7", navHidden: true, inner: wrap });
   }
 
-  function renderFishWordsHtml(chunk) {
+  function renderFishWordsHtml(chunk, isReference = false) {
     if (state.reducedMotion) {
       return `<div class="read-fish-words is-stationary"><div class="read-fish-reduced-text">${escapeHtml(chunk)}</div></div>`;
     }
     return `
-      <div class="read-fish-words" aria-label="${escapeHtml(chunk)}">
-        ${getChunkWords(chunk).map((word, index) => `
+      <div class="read-fish-words${isReference ? " is-reference" : ""}" aria-label="${escapeHtml(chunk)}">
+        ${(isReference ? [chunk] : getChunkWords(chunk)).map((word, index) => `
           <span class="read-fish-word" style="--read-fish-wiggle-phase:-${(index * 173) % 900}ms"><span class="read-fish-word-inner">${escapeHtml(word)}</span></span>
         `).join("")}
       </div>
@@ -4320,18 +4297,6 @@
       "pause",
       "playing"
     ].includes(state.phase);
-    const previewHint =
-      state.readTestMode === "early_exit"
-        ? "Early-exit check: use Back before it finishes"
-        : isListening
-          ? "Listen to this part"
-          : state.activityId ===
-              BALLOONS_ACTIVITY_ID
-            ? "Watch the words float"
-            : state.activityId ===
-                FISH_ACTIVITY_ID
-              ? "Watch the words swim"
-              : "Watch the verse rise";
     let activityHtml = "";
     let decorationsHtml = "";
 
@@ -4346,19 +4311,13 @@
       BALLOONS_ACTIVITY_ID
     ) {
       activityHtml =
-        renderBalloonWordsHtml(
-          chunk,
-          timing
-        );
+        renderBalloonWordsHtml(chunk);
       decorationsHtml =
         renderBalloonDecorationsHtml(
           manifest
         );
     } else {
-      activityHtml = renderFishWordsHtml(
-        chunk,
-        timing
-      );
+      activityHtml = renderFishWordsHtml(chunk);
       decorationsHtml =
         renderFishDecorationsHtml(
           manifest
@@ -4381,14 +4340,11 @@
       <main class="read-animated-stage${isListening ? " is-listening" : ""}" style="${animatedBackgroundStyle(manifest)}">
         <header class="read-animated-header">
           <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-          <div class="read-animated-title">${escapeHtml(manifest.title)}</div>
-          <div class="read-animated-instruction" aria-live="polite">${escapeHtml(previewHint)}</div>
         </header>
         <section class="read-animated-scene" aria-label="${escapeHtml(chunk)}">
           ${activityHtml}
           <div class="read-animated-decorations" aria-hidden="false">${decorationsHtml}</div>
         </section>
-        <div class="read-animated-progress" aria-live="polite">Part ${state.chunkIndex + 1} of ${state.chunks.length}</div>
       </main>
     `;
 
@@ -4985,14 +4941,6 @@
       "pause",
       "playing"
     ].includes(state.phase);
-    const instruction =
-      state.readTestMode === "early_exit"
-        ? "Early-exit check: use Back before finishing"
-        : isListening
-          ? "Listen to this part"
-          : isUnscramble
-            ? "Tap each mixed-up word"
-            : "Tap the words in verse order";
     const wrap = root.document.createElement(
       "div"
     );
@@ -5012,13 +4960,10 @@
       <main class="read-word-activity-stage${isListening ? " is-listening" : ""}">
         <header class="read-word-activity-header">
           <div class="read-word-activity-reference">${escapeHtml(verse.ref || state.verseId)}</div>
-          <div class="read-word-activity-title">${escapeHtml(manifest.title)}</div>
-          <div class="read-word-activity-instruction" aria-live="polite">${escapeHtml(instruction)}</div>
         </header>
         <section class="${isUnscramble ? "read-unscramble-words" : "read-order-grid"}" aria-label="${escapeHtml(state.chunks[state.chunkIndex] || "")}">
           ${isUnscramble ? renderUnscrambleTokensHtml() : renderTapOrderTilesHtml()}
         </section>
-        <div class="read-word-activity-progress" aria-live="polite">Part ${state.chunkIndex + 1} of ${state.chunks.length}</div>
       </main>
     `;
 

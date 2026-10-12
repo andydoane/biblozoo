@@ -1434,6 +1434,65 @@ function testSafeWordScrambles() {
   ));
 }
 
+function testAnimatedReferenceFirstAndMinimalHeaders() {
+  const js = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
+  const css = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
+  const method = (name, next) => js.slice(js.indexOf(`function ${name}(`),
+    js.indexOf(`function ${next}(`));
+
+  // Reference (-1) enters the existing animation system first. The normal
+  // chunks still begin at index 0 and retain their original audio ordering.
+  assert.ok(js.includes("item.index === -1\n      ? getReferenceAudioPath(state.verseId)"),
+    "The opening reference must use the verse's _ref.mp3 recording");
+  assert.strictEqual((js.match(/const src = animatedItemAudioPath\(item\);/g) || []).length, 3,
+    "All three animated activities must use the reference-aware audio path");
+  for (const [name, next, launch] of [
+    ["renderCrawlScreen", "stopBalloonSequence", "launchCrawlChunk"],
+    ["renderBalloonScreen", "renderBalloonWordsHtml", "launchBalloonChunk"],
+    ["renderFishScreen", "renderFishWordsHtml", "launchFishChunk"]
+  ]) {
+    const source = method(name, next);
+    assert.ok(source.includes(`${launch}(session, -1)`),
+      `${name} must animate the reference before chunk 1`);
+    assert.ok(source.includes('reference: String(verse.ref || state.verseId)'),
+      `${name} must show the displayed reference in the animation`);
+    assert.ok(source.includes('class="read-animated-reference"'),
+      `${name} must retain the static reference at the top`);
+    for (const removed of ['read-animated-title', 'read-animated-instruction',
+      'read-animated-progress', 'data-read-progress']) {
+      assert.ok(!source.includes(removed), `${name} should omit ${removed}`);
+    }
+  }
+  for (const [launch, next] of [
+    ["launchCrawlChunk", "renderCrawlScreen"],
+    ["launchBalloonChunk", "renderBalloonScreen"],
+    ["launchFishChunk", "renderFishScreen"]
+  ]) {
+    const source = method(launch, next);
+    assert.ok(source.includes('if (index >= 0) state.chunkIndex = index;'),
+      `${launch} must not count the reference as a verse chunk`);
+  }
+  for (const [name, next] of [
+    ["finishCrawlAudio", "playCrawlAudio"],
+    ["finishBalloonAudio", "playBalloonAudio"],
+    ["finishFishAudio", "playFishAudio"]
+  ]) {
+    const source = method(name, next);
+    assert.ok(source.includes('item.index + 1'),
+      `${name} must wait until audio finishes before advancing to chunk 0`);
+  }
+  const words = method("renderWordActivityScreen", "chunkSequenceColorStyle");
+  assert.ok(words.includes('class="read-word-activity-reference"'));
+  for (const removed of ['read-word-activity-title', 'read-word-activity-instruction',
+    'read-word-activity-progress']) {
+    assert.ok(!words.includes(removed), `Word activities should omit ${removed}`);
+  }
+  assert.ok(css.includes('.read-balloon-words.is-reference .read-balloon-word'));
+  assert.ok(css.includes('.read-fish-words.is-reference .read-fish-word'));
+  assert.match(css, /\.read-animated-stage \{[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\)/);
+  assert.match(css, /\.read-word-activity-stage \{[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\)/);
+}
+
 function testVerseCrawlMotion() {
   const phone = ReadMyVerse.getCrawlMotion(620, 110, 100, 840);
   assert.ok(phone.travel > 400, "Crawl must cross most of the scene");
@@ -1633,6 +1692,7 @@ function main() {
     testChunkAudioMatchingGlowFade,
     testChunkAudioMatchingEligibility,
     testAnimatedTimingAndReducedMotion,
+    testAnimatedReferenceFirstAndMinimalHeaders,
     testVerseCrawlMotion,
     testBalloonFloatingAndParticles,
     testBalloonSafeSpawning,
