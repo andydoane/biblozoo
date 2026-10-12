@@ -1,0 +1,180 @@
+diff --git a/app.js b/app.js
+index 74207ff..f39e6e7 100644
+--- a/app.js
++++ b/app.js
+@@ -17064,6 +17064,28 @@ function renderZooTodoCareInfoHtml() {
+   `;
+ }
+ 
++// A navigation button, not a Daily Task: always available in either mode.
++function zookeeperStatsPillHtml() {
++  return `
++    <button
++      class="daily-zoo-todo-stats-pill no-zoom"
++      type="button"
++      data-zookeeper-stats-link
++      data-ui-sound
++      aria-label="Zookeeper Stats"
++    >
++      <img
++        class="daily-zoo-todo-stats-trophy"
++        src="${IMG_DIR}zookeeper_stats_trophy.png"
++        alt=""
++        draggable="false"
++        onerror="this.hidden=true"
++      >
++      <span>Zookeeper Stats</span>
++    </button>
++  `;
++}
++
+ function renderNormalZooTodoListHtml() {
+   if (State.todoInfoPage === "care") {
+     return renderZooTodoCareInfoHtml();
+@@ -17078,11 +17100,6 @@ function renderNormalZooTodoListHtml() {
+       iconColor: "#a7cb6f",
+       disabled: true
+     },
+-    {
+-      type: "zookeeper_stats",
+-      emoji: "🏆",
+-      text: "Zookeeper Stats"
+-    },
+     {
+       type: "care_info",
+       emoji: "🐾",
+@@ -17092,7 +17109,10 @@ function renderNormalZooTodoListHtml() {
+   ];
+ 
+   const rowsHtml = rows
+-    .map(todoDevRowHtml)
++    .map((row, index) =>
++      todoDevRowHtml(row) +
++      (index === 0 ? zookeeperStatsPillHtml() : "")
++    )
+     .join("");
+ 
+   return `
+@@ -18802,6 +18822,7 @@ function screenTodoDev(idx) {
+                 }
+               )
+             : "",
++          statsPillHtml: zookeeperStatsPillHtml(),
+           gameRegistry:
+             window.EXTERNAL_VERSE_GAMES || [],
+           playgroundRegistry:
+@@ -18845,6 +18866,15 @@ function screenTodoDev(idx) {
+ 
+   bindHomePill(wrap);
+ 
++  // Statistics are navigation, never a completion-gated Daily Task.
++  wrap.addEventListener("click", (event) => {
++    // Delegation also handles refreshed developer previews.
++    if (!event.target?.closest?.("[data-zookeeper-stats-link]")) return;
++    event.preventDefault();
++    event.stopPropagation();
++    go(Screen.ZOOKEEPER_STATS);
++  });
++
+   if (dailyPreviewActive) {
+     const previewHomeButton =
+       wrap.querySelector(
+diff --git a/daily_zoo_todo.css b/daily_zoo_todo.css
+index 5379086..2499066 100644
+--- a/daily_zoo_todo.css
++++ b/daily_zoo_todo.css
+@@ -144,6 +144,52 @@
+   text-align: center;
+ }
+ 
++/* One permanent Stats navigation pill, in either Daily To-Do layout. */
++.daily-zoo-todo-stats-pill {
++  display: flex;
++  width: min(100%, 420px);
++  min-height: 52px;
++  margin: 0 auto clamp(12px, 3vw, 20px);
++  padding: 8px 18px;
++  align-items: center;
++  justify-content: center;
++  gap: clamp(8px, 2.5vw, 14px);
++  border: 2px solid rgba(255, 255, 255, 0.3);
++  border-radius: 999px;
++  background: #24783c;
++  color: #ffffff;
++  font: inherit;
++  font-size: clamp(22px, 5.5vw, 34px);
++  font-weight: 900;
++  line-height: 1.1;
++  text-align: center;
++  cursor: pointer;
++  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.18);
++  -webkit-tap-highlight-color: transparent;
++}
++
++.daily-zoo-todo-stats-pill:focus-visible {
++  outline: 3px solid #ffffff;
++  outline-offset: 3px;
++}
++
++.daily-zoo-todo-stats-pill:active {
++  transform: translateY(2px);
++  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.18);
++}
++
++.daily-zoo-todo-stats-trophy {
++  width: clamp(32px, 7vw, 46px);
++  height: clamp(32px, 7vw, 46px);
++  flex: none;
++  object-fit: contain;
++}
++
++/* Normal completed-mode list supplies its own spacing between rows. */
++.todo-dev-list > .daily-zoo-todo-stats-pill {
++  margin-bottom: 0;
++}
++
+ .daily-zoo-todo-list {
+   display: flex;
+   flex-direction: column;
+diff --git a/daily_zoo_todo_ui.js b/daily_zoo_todo_ui.js
+index 375d6a2..fb0206b 100644
+--- a/daily_zoo_todo_ui.js
++++ b/daily_zoo_todo_ui.js
+@@ -2025,6 +2025,7 @@
+     petName = "",
+     verseRef = "",
+     petVisualHtml = "",
++    statsPillHtml = "",
+     gameRegistry = [],
+     playgroundRegistry = []
+   } = {}) {
+@@ -2287,6 +2288,7 @@
+       petName,
+       verseRef,
+       petVisualHtml,
++      statsPillHtml,
+       gameRegistry,
+       playgroundRegistry,
+       activityManifest
+@@ -2320,6 +2322,8 @@
+         ` : ""}
+       </div>
+ 
++      ${statsPillHtml}
++
+       <div class="daily-zoo-todo-heading">
+         ${isNewPetMission ? "Mission Tasks" : "Daily Tasks"}
+       </div>
+diff --git a/service-worker.js b/service-worker.js
+index 842dc23..d733b51 100644
+--- a/service-worker.js
++++ b/service-worker.js
+@@ -3,7 +3,7 @@
+    App scope: /biblozoo/
+    ========================================================= */
+ 
+-const CACHE_VERSION = "2026_Oct_12_animated_reference_first_k";
++const CACHE_VERSION = "2026_Oct_12_zookeeper_stats_pill_l";
+ const SHELL_CACHE =
+   `biblozoo-shell-${CACHE_VERSION}`;
+ const RUNTIME_CACHE =

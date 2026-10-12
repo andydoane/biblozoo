@@ -2025,6 +2025,7 @@
     petName = "",
     verseRef = "",
     petVisualHtml = "",
+    statsPillHtml = "",
     gameRegistry = [],
     playgroundRegistry = []
   } = {}) {
@@ -2287,6 +2288,7 @@
       petName,
       verseRef,
       petVisualHtml,
+      statsPillHtml,
       gameRegistry,
       playgroundRegistry,
       activityManifest
@@ -2319,6 +2321,8 @@
           </div>
         ` : ""}
       </div>
+
+      ${statsPillHtml}
 
       <div class="daily-zoo-todo-heading">
         ${isNewPetMission ? "Mission Tasks" : "Daily Tasks"}

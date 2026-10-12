@@ -17064,6 +17064,28 @@ function renderZooTodoCareInfoHtml() {
   `;
 }
 
+// A navigation button, not a Daily Task: always available in either mode.
+function zookeeperStatsPillHtml() {
+  return `
+    <button
+      class="daily-zoo-todo-stats-pill no-zoom"
+      type="button"
+      data-zookeeper-stats-link
+      data-ui-sound
+      aria-label="Zookeeper Stats"
+    >
+      <img
+        class="daily-zoo-todo-stats-trophy"
+        src="${IMG_DIR}zookeeper_stats_trophy.png"
+        alt=""
+        draggable="false"
+        onerror="this.hidden=true"
+      >
+      <span>Zookeeper Stats</span>
+    </button>
+  `;
+}
+
 function renderNormalZooTodoListHtml() {
   if (State.todoInfoPage === "care") {
     return renderZooTodoCareInfoHtml();
@@ -17079,11 +17101,6 @@ function renderNormalZooTodoListHtml() {
       disabled: true
     },
     {
-      type: "zookeeper_stats",
-      emoji: "🏆",
-      text: "Zookeeper Stats"
-    },
-    {
       type: "care_info",
       emoji: "🐾",
       text: "Caring for BibloPets"
@@ -17092,7 +17109,10 @@ function renderNormalZooTodoListHtml() {
   ];
 
   const rowsHtml = rows
-    .map(todoDevRowHtml)
+    .map((row, index) =>
+      todoDevRowHtml(row) +
+      (index === 0 ? zookeeperStatsPillHtml() : "")
+    )
     .join("");
 
   return `
@@ -18802,6 +18822,7 @@ function screenTodoDev(idx) {
                 }
               )
             : "",
+          statsPillHtml: zookeeperStatsPillHtml(),
           gameRegistry:
             window.EXTERNAL_VERSE_GAMES || [],
           playgroundRegistry:
@@ -18844,6 +18865,15 @@ function screenTodoDev(idx) {
   );
 
   bindHomePill(wrap);
+
+  // Statistics are navigation, never a completion-gated Daily Task.
+  wrap.addEventListener("click", (event) => {
+    // Delegation also handles refreshed developer previews.
+    if (!event.target?.closest?.("[data-zookeeper-stats-link]")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    go(Screen.ZOOKEEPER_STATS);
+  });
 
   if (dailyPreviewActive) {
     const previewHomeButton =
