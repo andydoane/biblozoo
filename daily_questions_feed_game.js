@@ -50,7 +50,7 @@
     }),
     [FEED_MODES.LABYRINTH]: Object.freeze({
       id: FEED_MODES.LABYRINTH,
-      implemented: false,
+      implemented: true,
       schedule: "classic-seven",
       inputTarget: "snacks",
       catchTarget: "pet",
@@ -89,6 +89,18 @@
     })
   });
 
+  const LABYRINTH_GAP_POSITIONS = Object.freeze([
+    "left", "middle", "right"
+  ]);
+  const LABYRINTH_GAP_FRACTIONS = Object.freeze({
+    left: 0.22,
+    middle: 0.5,
+    right: 0.78
+  });
+  const LABYRINTH_ROW_COUNT = 6;
+  const LABYRINTH_DEFAULT_SEED = 0x4c425a;
+  const LABYRINTH_PHYSICS_STEP = 1 / 120;
+
   let activeRuntime = null;
   let preparedAudioContext = null;
   let preparedStarBuffer = null;
@@ -111,6 +123,126 @@
     return FEED_MODE_CONFIGS[
       normalizeFeedMode(value)
     ];
+  }
+
+  function createSeededRandom(seed = LABYRINTH_DEFAULT_SEED) {
+    let state =
+      (Number(seed) >>> 0) ||
+      LABYRINTH_DEFAULT_SEED;
+
+    return () => {
+      state =
+        (
+          Math.imul(state, 1664525) +
+          1013904223
+        ) >>> 0;
+      return state / 4294967296;
+    };
+  }
+
+  function createLabyrinthPlatformRows(
+    width,
+    height,
+    ballRadius,
+    seed = LABYRINTH_DEFAULT_SEED
+  ) {
+    const safeWidth = Math.max(120, Number(width) || 0);
+    const safeHeight = Math.max(260, Number(height) || 0);
+    const safeRadius = Math.max(6, Number(ballRadius) || 0);
+    const random = createSeededRandom(seed);
+    const gapWidth = Math.min(
+      safeWidth * 0.34,
+      Math.max(
+        safeWidth * 0.24,
+        safeRadius * 5.2
+      )
+    );
+    const thickness = clamp(
+      safeHeight * 0.014,
+      10,
+      16
+    );
+    const topY = Math.max(
+      safeRadius * 5.2,
+      safeHeight * 0.17
+    );
+    const bottomY = safeHeight * 0.69;
+    const rows = [];
+    let previousGap = "";
+
+    for (
+      let index = 0;
+      index < LABYRINTH_ROW_COUNT;
+      index += 1
+    ) {
+      const options =
+        LABYRINTH_GAP_POSITIONS
+          .filter(
+            (position) =>
+              position !== previousGap
+          );
+      const gapPosition =
+        options[
+          Math.floor(random() * options.length)
+        ] || "middle";
+      const gapCenter =
+        safeWidth *
+        LABYRINTH_GAP_FRACTIONS[
+          gapPosition
+        ];
+      const gapLeft = clamp(
+        gapCenter - gapWidth / 2,
+        0,
+        safeWidth
+      );
+      const gapRight = clamp(
+        gapCenter + gapWidth / 2,
+        0,
+        safeWidth
+      );
+      const y =
+        topY +
+        (
+          (bottomY - topY) *
+          index /
+          Math.max(1, LABYRINTH_ROW_COUNT - 1)
+        );
+      const segments = [];
+
+      if (gapLeft > 0) {
+        segments.push({
+          x: 0,
+          y,
+          width: gapLeft,
+          height: thickness
+        });
+      }
+
+      if (gapRight < safeWidth) {
+        segments.push({
+          x: gapRight,
+          y,
+          width: safeWidth - gapRight,
+          height: thickness
+        });
+      }
+
+      rows.push({
+        id: `labyrinth-row-${index}`,
+        y,
+        thickness,
+        gapPosition,
+        gapCenter,
+        gapWidth: gapRight - gapLeft,
+        gapLeft,
+        gapRight,
+        segments
+      });
+
+      previousGap = gapPosition;
+    }
+
+    return rows;
   }
 
   function shuffle(items) {
@@ -474,6 +606,10 @@
       resolveFeedMode(session?.feedMode);
     const modeConfig =
       getFeedModeConfig(mode);
+    const stageAriaLabel =
+      mode === FEED_MODES.LABYRINTH
+        ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
+        : `Tilt or drag ${petName} left and right to catch the falling food`;
     return `
       <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-feed-mode="${mode}" data-daily-session-phase="reward_game">
         <div class="daily-feed-score-badge" aria-live="polite" aria-label="Score">
@@ -482,7 +618,7 @@
         </div>
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
-          aria-label="Tilt or drag ${petName} left and right to catch the falling food">
+          aria-label="${stageAriaLabel}">
           <canvas class="daily-feed-canvas" data-daily-feed-canvas aria-hidden="true"></canvas>
 
           <div class="daily-feed-catcher" data-daily-feed-catcher aria-hidden="true">
@@ -1176,6 +1312,649 @@
     };
   }
 
+  function getLabyrinthSeed(runtime) {
+    const widthPart =
+      Math.round(runtime.width) & 0xffff;
+    const heightPart =
+      Math.round(runtime.height) & 0xffff;
+
+    return (
+      LABYRINTH_DEFAULT_SEED ^
+      (widthPart << 16) ^
+      heightPart
+    ) >>> 0;
+  }
+
+  function initializeLabyrinthMode(runtime) {
+    const ballRadius =
+      runtime.pegRadius * 0.66;
+    const platformRows =
+      createLabyrinthPlatformRows(
+        runtime.width,
+        runtime.height,
+        ballRadius,
+        getLabyrinthSeed(runtime)
+      );
+
+    runtime.pegs = [];
+    runtime.bursts = [];
+    runtime.labyrinth = {
+      platformRows,
+      steering: 0,
+      steerAcceleration:
+        runtime.width * 0.86,
+      maxHorizontalSpeed:
+        runtime.width * 0.28,
+      horizontalDamping: 0.97,
+      gravity:
+        runtime.height * 0.24,
+      maxVerticalSpeed:
+        runtime.height * 0.29,
+      petDirection: 1,
+      petSpeed:
+        runtime.width * 0.19
+    };
+
+    setCatcherX(
+      runtime,
+      runtime.width / 2
+    );
+  }
+
+  function spawnLabyrinthBall(
+    runtime,
+    config,
+    now,
+    spawnIndex
+  ) {
+    if (!config) return;
+
+    const radius =
+      runtime.pegRadius * 0.66;
+    const lanes = [
+      0.22, 0.5, 0.78,
+      0.36, 0.64, 0.5, 0.28
+    ];
+    const fraction =
+      lanes[
+        spawnIndex % lanes.length
+      ];
+    const padding =
+      Math.max(
+        radius * 2.4,
+        runtime.width * 0.06
+      );
+    const x = clamp(
+      runtime.width * fraction,
+      padding,
+      runtime.width - padding
+    );
+
+    runtime.balls.push({
+      id: runtime.nextBallId++,
+      config,
+      x,
+      y: -radius,
+      vx: 0,
+      vy: runtime.height * 0.025,
+      radius,
+      rotation: 0,
+      angularVelocity: 0,
+      points: config.points || 1,
+      bonus: false,
+      bornAt: now,
+      trail: [],
+      lastTrailAt: 0
+    });
+  }
+
+  function processLabyrinthSpawns(
+    runtime,
+    now
+  ) {
+    if (
+      runtime.scheduledIndex >=
+        runtime.scheduled.length ||
+      now < runtime.nextScheduledAt
+    ) {
+      return;
+    }
+
+    const spawnIndex =
+      runtime.scheduledIndex;
+
+    spawnLabyrinthBall(
+      runtime,
+      runtime.scheduled[spawnIndex],
+      now,
+      spawnIndex
+    );
+
+    runtime.scheduledIndex += 1;
+
+    if (
+      runtime.scheduledIndex <
+      runtime.scheduled.length
+    ) {
+      runtime.nextScheduledAt =
+        now + 4000 + Math.random() * 1000;
+    }
+  }
+
+  function collideLabyrinthBallWithWalls(
+    runtime,
+    ball
+  ) {
+    if (ball.x - ball.radius < 0) {
+      ball.x = ball.radius;
+      ball.vx =
+        Math.abs(ball.vx) * 0.42;
+    } else if (
+      ball.x + ball.radius >
+      runtime.width
+    ) {
+      ball.x =
+        runtime.width - ball.radius;
+      ball.vx =
+        -Math.abs(ball.vx) * 0.42;
+    }
+  }
+
+  function collideLabyrinthBallWithSegment(
+    ball,
+    segment,
+    previousY
+  ) {
+    const previousBottom =
+      previousY + ball.radius;
+    const currentBottom =
+      ball.y + ball.radius;
+    const overlapsHorizontally =
+      ball.x + ball.radius > segment.x &&
+      ball.x - ball.radius <
+        segment.x + segment.width;
+
+    if (
+      ball.vy >= 0 &&
+      overlapsHorizontally &&
+      previousBottom <= segment.y + 0.75 &&
+      currentBottom >= segment.y
+    ) {
+      ball.y =
+        segment.y - ball.radius;
+      ball.vy = 0;
+      ball.vx *= 0.93;
+      return true;
+    }
+
+    const nearestX = clamp(
+      ball.x,
+      segment.x,
+      segment.x + segment.width
+    );
+    const nearestY = clamp(
+      ball.y,
+      segment.y,
+      segment.y + segment.height
+    );
+    const dx = ball.x - nearestX;
+    const dy = ball.y - nearestY;
+    const distanceSquared =
+      dx * dx + dy * dy;
+
+    if (
+      distanceSquared >=
+      ball.radius * ball.radius
+    ) {
+      return false;
+    }
+
+    const distance =
+      Math.sqrt(distanceSquared);
+
+    if (distance > 0.001) {
+      const nx = dx / distance;
+      const ny = dy / distance;
+      const overlap =
+        ball.radius - distance;
+
+      ball.x += nx * overlap;
+      ball.y += ny * overlap;
+
+      if (Math.abs(nx) > Math.abs(ny)) {
+        ball.vx =
+          -ball.vx * 0.28;
+      } else if (ny < 0) {
+        ball.vy = 0;
+        ball.vx *= 0.93;
+      }
+
+      return true;
+    }
+
+    const segmentCenterX =
+      segment.x + segment.width / 2;
+    const pushLeft =
+      ball.x < segmentCenterX;
+
+    ball.x = pushLeft
+      ? segment.x - ball.radius
+      : segment.x +
+        segment.width +
+        ball.radius;
+    ball.vx =
+      (pushLeft ? -1 : 1) *
+      Math.abs(ball.vx) * 0.28;
+    return true;
+  }
+
+  function collideLabyrinthBallWithPlatforms(
+    runtime,
+    ball,
+    previousY
+  ) {
+    const rows =
+      runtime.labyrinth?.platformRows || [];
+
+    for (const row of rows) {
+      for (const segment of row.segments) {
+        if (
+          collideLabyrinthBallWithSegment(
+            ball,
+            segment,
+            previousY
+          )
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function updateLabyrinthBall(
+    runtime,
+    ball,
+    dt,
+    now
+  ) {
+    const state = runtime.labyrinth;
+    if (!state) return;
+
+    addTrailPoint(ball, now);
+
+    ball.vx +=
+      state.steering *
+      state.steerAcceleration *
+      dt;
+    ball.vx *=
+      Math.pow(
+        state.horizontalDamping,
+        dt * 60
+      );
+    ball.vx = clamp(
+      ball.vx,
+      -state.maxHorizontalSpeed,
+      state.maxHorizontalSpeed
+    );
+    ball.vy = Math.min(
+      state.maxVerticalSpeed,
+      ball.vy + state.gravity * dt
+    );
+
+    const previousY = ball.y;
+
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+    ball.rotation +=
+      (ball.vx / Math.max(1, ball.radius)) *
+      dt * 0.65;
+
+    collideLabyrinthBallWithWalls(
+      runtime,
+      ball
+    );
+    collideLabyrinthBallWithPlatforms(
+      runtime,
+      ball,
+      previousY
+    );
+  }
+
+  function advanceLabyrinthPet(
+    position,
+    direction,
+    speed,
+    dt,
+    minX,
+    maxX
+  ) {
+    let nextDirection =
+      direction >= 0 ? 1 : -1;
+    let nextPosition =
+      position +
+      nextDirection * speed * dt;
+
+    while (
+      nextPosition < minX ||
+      nextPosition > maxX
+    ) {
+      if (nextPosition > maxX) {
+        nextPosition =
+          maxX - (nextPosition - maxX);
+        nextDirection = -1;
+      } else if (nextPosition < minX) {
+        nextPosition =
+          minX + (minX - nextPosition);
+        nextDirection = 1;
+      }
+    }
+
+    return {
+      position:
+        clamp(
+          nextPosition,
+          minX,
+          maxX
+        ),
+      direction: nextDirection
+    };
+  }
+
+  function updateLabyrinthPet(
+    runtime,
+    dt
+  ) {
+    const state = runtime.labyrinth;
+    if (!state) return;
+
+    const next =
+      advanceLabyrinthPet(
+        runtime.catcherX,
+        state.petDirection,
+        state.petSpeed,
+        dt,
+        runtime.petRadius,
+        runtime.width - runtime.petRadius
+      );
+
+    state.petDirection =
+      next.direction;
+    setCatcherX(
+      runtime,
+      next.position
+    );
+    updatePetLean(runtime, dt);
+  }
+
+  function updateLabyrinthPhysicsStep(
+    runtime,
+    dt,
+    now
+  ) {
+    updateLabyrinthPet(runtime, dt);
+
+    for (const ball of runtime.balls) {
+      updateLabyrinthBall(
+        runtime,
+        ball,
+        dt,
+        now
+      );
+    }
+
+    runtime.balls =
+      runtime.balls.filter((ball) => {
+        if (ballTouchesPet(runtime, ball)) {
+          catchBall(runtime, ball);
+          return false;
+        }
+
+        if (
+          ball.y - ball.radius >
+          runtime.height + 20
+        ) {
+          return false;
+        }
+
+        if (now - ball.bornAt > 22000) {
+          return false;
+        }
+
+        return true;
+      });
+  }
+
+  function updateLabyrinthMode(
+    runtime,
+    dt,
+    now
+  ) {
+    processLabyrinthSpawns(
+      runtime,
+      now
+    );
+
+    const steps = Math.max(
+      1,
+      Math.ceil(
+        dt / LABYRINTH_PHYSICS_STEP
+      )
+    );
+    const step = dt / steps;
+
+    for (
+      let index = 0;
+      index < steps;
+      index += 1
+    ) {
+      updateLabyrinthPhysicsStep(
+        runtime,
+        step,
+        now
+      );
+    }
+  }
+
+  function drawLabyrinthPlatformSegment(
+    runtime,
+    segment
+  ) {
+    const ctx = runtime.ctx;
+
+    ctx.save();
+    ctx.shadowColor =
+      "rgba(48, 25, 8, 0.42)";
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = "#8a572f";
+    ctx.fillRect(
+      segment.x,
+      segment.y,
+      segment.width,
+      segment.height
+    );
+    ctx.shadowColor = "transparent";
+    ctx.fillStyle = "#c48a50";
+    ctx.fillRect(
+      segment.x,
+      segment.y,
+      segment.width,
+      Math.max(2, segment.height * 0.24)
+    );
+    ctx.fillStyle =
+      "rgba(70, 37, 14, 0.58)";
+    ctx.fillRect(
+      segment.x,
+      segment.y + segment.height - 2,
+      segment.width,
+      2
+    );
+    ctx.restore();
+  }
+
+  function drawLabyrinthMode(
+    runtime,
+    now
+  ) {
+    const ctx = runtime.ctx;
+
+    ctx.setTransform(
+      runtime.dpr,
+      0,
+      0,
+      runtime.dpr,
+      0,
+      0
+    );
+    ctx.clearRect(
+      0,
+      0,
+      runtime.width,
+      runtime.height
+    );
+
+    for (const ball of runtime.balls) {
+      drawTrail(runtime, ball, now);
+    }
+
+    for (
+      const row of
+      runtime.labyrinth?.platformRows || []
+    ) {
+      for (const segment of row.segments) {
+        drawLabyrinthPlatformSegment(
+          runtime,
+          segment
+        );
+      }
+    }
+
+    for (const ball of runtime.balls) {
+      drawBall(runtime, ball);
+    }
+  }
+
+  function handleLabyrinthTilt(
+    runtime,
+    event
+  ) {
+    if (
+      !runtime ||
+      !runtime.labyrinth ||
+      !runtime.tiltEnabled ||
+      runtime.dragging ||
+      activeRuntime !== runtime
+    ) {
+      return;
+    }
+
+    const gamma = Number(event?.gamma);
+    if (!Number.isFinite(gamma)) return;
+
+    const now = performance.now();
+
+    if (now < runtime.tiltCalibrationUntil) {
+      runtime.tiltSamples.push(gamma);
+      if (runtime.tiltSamples.length > 24) {
+        runtime.tiltSamples.shift();
+      }
+      return;
+    }
+
+    if (!Number.isFinite(runtime.neutralGamma)) {
+      const samples =
+        runtime.tiltSamples.length
+          ? runtime.tiltSamples
+          : [gamma];
+      const average =
+        samples.reduce(
+          (sum, value) => sum + value,
+          0
+        ) / samples.length;
+
+      runtime.neutralGamma = average;
+      runtime.tiltSamples = [];
+      runtime.smoothedTilt = 0;
+    }
+
+    const relative = clamp(
+      gamma - runtime.neutralGamma,
+      -25,
+      25
+    );
+    runtime.smoothedTilt =
+      runtime.smoothedTilt * 0.85 +
+      relative * 0.15;
+    runtime.labyrinth.steering =
+      runtime.smoothedTilt / 25;
+  }
+
+  function handleLabyrinthModeInput(
+    runtime,
+    input
+  ) {
+    if (!runtime?.labyrinth) return;
+
+    if (input?.type === "tilt") {
+      handleLabyrinthTilt(
+        runtime,
+        input.event
+      );
+      return;
+    }
+
+    if (input?.type === "pointer") {
+      const halfWidth =
+        Math.max(1, runtime.width / 2);
+      runtime.labyrinth.steering =
+        clamp(
+          (
+            Number(input.x) -
+            halfWidth
+          ) /
+          (halfWidth * 0.72),
+          -1,
+          1
+        );
+      return;
+    }
+
+    if (input?.type === "pointerend") {
+      runtime.labyrinth.steering = 0;
+    }
+  }
+
+  function isLabyrinthModeComplete(
+    runtime,
+    now
+  ) {
+    return maybeFinish(runtime, now);
+  }
+
+  function buildLabyrinthResult(runtime) {
+    return buildStandardResult(runtime);
+  }
+
+  function disposeLabyrinthMode(runtime) {
+    if (runtime?.labyrinth) {
+      runtime.labyrinth.steering = 0;
+    }
+  }
+
+  const LABYRINTH_MODE_CONTROLLER =
+    Object.freeze({
+      id: FEED_MODES.LABYRINTH,
+      initialize: initializeLabyrinthMode,
+      update: updateLabyrinthMode,
+      draw: drawLabyrinthMode,
+      handleInput: handleLabyrinthModeInput,
+      isComplete: isLabyrinthModeComplete,
+      buildResult: buildLabyrinthResult,
+      dispose: disposeLabyrinthMode
+    });
+
   function initializeClassicMode() { }
 
   function updateClassicMode(
@@ -1242,7 +2021,9 @@
   const FEED_MODE_CONTROLLERS =
     Object.freeze({
       [FEED_MODES.CLASSIC]:
-        CLASSIC_MODE_CONTROLLER
+        CLASSIC_MODE_CONTROLLER,
+      [FEED_MODES.LABYRINTH]:
+        LABYRINTH_MODE_CONTROLLER
     });
 
   function resolveFeedMode(value) {
@@ -1817,6 +2598,12 @@
         runtime.dragging = false;
         runtime.activePointerId =
           null;
+
+        runtime.modeController
+          .handleInput(
+            runtime,
+            { type: "pointerend" }
+          );
 
         if (runtime.tiltEnabled) {
           runtime.smoothedTilt = 0;

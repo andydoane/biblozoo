@@ -28,12 +28,20 @@ function loadFeedGameForValidation() {
     RAINBOW_BALL,
     TILT_CALIBRATION_MS,
     INTRO_TAP_LOCKOUT_MS,
+    LABYRINTH_GAP_POSITIONS,
+    LABYRINTH_ROW_COUNT,
+    LABYRINTH_PHYSICS_STEP,
     FEED_MODES,
     FEED_MODE_CONFIGS,
     normalizeFeedMode,
     getFeedModeConfig,
     resolveFeedMode,
     getModeController,
+    createLabyrinthPlatformRows,
+    initializeLabyrinthMode,
+    collideLabyrinthBallWithSegment,
+    updateLabyrinthMode,
+    advanceLabyrinthPet,
     buildScheduledBalls,
     chooseBackground,
     createPegField,
@@ -230,7 +238,22 @@ function testFeedModeConfigurations() {
     "Tilt to steer"
   );
 
-  ["labyrinth", "melody", "bounce"]
+  assert.strictEqual(configs.labyrinth.implemented, true);
+  assert.strictEqual(configs.labyrinth.schedule, "classic-seven");
+  assert.strictEqual(configs.labyrinth.inputTarget, "snacks");
+  assert.strictEqual(configs.labyrinth.catchTarget, "pet");
+  assert.strictEqual(configs.labyrinth.scoring, "points");
+  assert.strictEqual(configs.labyrinth.finishDelayMs, 900);
+  assert.strictEqual(
+    configs.labyrinth.instructions.title,
+    "Guide the BibloSnacks!"
+  );
+  assert.strictEqual(
+    configs.labyrinth.instructions.prompt,
+    "Tilt to guide the snacks"
+  );
+
+  ["melody", "bounce"]
     .forEach((mode) => {
       assert.strictEqual(
         configs[mode].implemented,
@@ -239,7 +262,6 @@ function testFeedModeConfigurations() {
       );
     });
 
-  assert.strictEqual(configs.labyrinth.inputTarget, "snacks");
   assert.strictEqual(configs.melody.scoring, "percentage");
   assert.strictEqual(configs.bounce.inputTarget, "paddle");
 }
@@ -249,8 +271,12 @@ function testUnavailableModesSafelyResolveToClassic() {
     hooks.resolveFeedMode("classic"),
     "classic"
   );
+  assert.strictEqual(
+    hooks.resolveFeedMode("labyrinth"),
+    "labyrinth"
+  );
 
-  ["labyrinth", "melody", "bounce"]
+  ["melody", "bounce"]
     .forEach((mode) => {
       assert.strictEqual(
         hooks.resolveFeedMode(mode),
@@ -266,7 +292,7 @@ function testUnavailableModesSafelyResolveToClassic() {
   const fallbackMarkup = api.render({
     session: {
       petName: "Pip",
-      feedMode: "labyrinth"
+      feedMode: "bounce"
     }
   });
 
@@ -309,13 +335,18 @@ function testClassicModeControllerContract() {
     );
   });
 
-  ["labyrinth", "melody", "bounce"]
+  ["melody", "bounce"]
     .forEach((mode) => {
       assert.strictEqual(
         hooks.getModeController(mode),
         controller
       );
     });
+
+  assert.notStrictEqual(
+    hooks.getModeController("labyrinth"),
+    controller
+  );
 
   assert.ok(
     source.includes(
@@ -331,6 +362,454 @@ function testClassicModeControllerContract() {
     source.includes(
       ".isComplete(runtime, now)"
     )
+  );
+}
+
+function testLabyrinthRenderAndControllerContract() {
+  const markup = api.render({
+    session: {
+      petName: "Pip",
+      feedMode: "labyrinth"
+    }
+  });
+
+  assert.ok(
+    markup.includes(
+      'data-daily-feed-mode="labyrinth"'
+    )
+  );
+  assert.ok(
+    markup.includes(
+      "Guide the BibloSnacks!"
+    )
+  );
+  assert.ok(
+    markup.includes(
+      "Tilt to guide the snacks"
+    )
+  );
+  assert.ok(
+    markup.includes(
+      "steer the falling snacks while the BibloPet moves automatically"
+    )
+  );
+
+  const controller =
+    hooks.getModeController("labyrinth");
+
+  assert.strictEqual(
+    controller.id,
+    "labyrinth"
+  );
+
+  [
+    "initialize",
+    "update",
+    "draw",
+    "handleInput",
+    "isComplete",
+    "buildResult",
+    "dispose"
+  ].forEach((name) => {
+    assert.strictEqual(
+      typeof controller[name],
+      "function",
+      `Labyrinth controller must provide ${name}()`
+    );
+  });
+
+  assert.deepStrictEqual(
+    toPlain(
+      controller.buildResult({
+        mode: "labyrinth",
+        score: 6,
+        caughtCount: 2,
+        totalCount: 7,
+        scheduled: new Array(7)
+      })
+    ),
+    {
+      mode: "labyrinth",
+      score: 6,
+      caughtCount: 2,
+      totalCount: 7,
+      completed: true
+    }
+  );
+}
+
+function testLabyrinthPlatformGeneration() {
+  const first = toPlain(
+    hooks.createLabyrinthPlatformRows(
+      390,
+      844,
+      11,
+      12345
+    )
+  );
+  const second = toPlain(
+    hooks.createLabyrinthPlatformRows(
+      390,
+      844,
+      11,
+      12345
+    )
+  );
+
+  assert.deepStrictEqual(first, second);
+  assert.strictEqual(
+    first.length,
+    hooks.LABYRINTH_ROW_COUNT
+  );
+  assert.deepStrictEqual(
+    Array.from(hooks.LABYRINTH_GAP_POSITIONS),
+    ["left", "middle", "right"]
+  );
+
+  first.forEach((row, index) => {
+    assert.ok(
+      row.gapWidth >= 11 * 4,
+      "Every Labyrinth gap must comfortably clear a snack"
+    );
+    assert.ok(row.gapLeft > 0);
+    assert.ok(row.gapRight < 390);
+    assert.strictEqual(row.segments.length, 2);
+    assert.ok(row.segments[0].width > 0);
+    assert.ok(row.segments[1].width > 0);
+
+    if (index > 0) {
+      assert.notStrictEqual(
+        row.gapPosition,
+        first[index - 1].gapPosition,
+        "Consecutive Labyrinth rows must not repeat a gap category"
+      );
+      assert.ok(
+        row.y - first[index - 1].y > 45,
+        "Labyrinth rows must leave steering space"
+      );
+    }
+  });
+}
+
+function makeLabyrinthRuntime(
+  earnedStarPegCount = 0
+) {
+  return {
+    width: 390,
+    height: 844,
+    pegRadius: 16,
+    petRadius: 48,
+    catcherX: 195,
+    lastCatcherX: 195,
+    smoothedPetVelocity: 0,
+    petTilt: 0,
+    earnedStarPegCount,
+    pegs: [
+      { isStar: true },
+      { isStar: earnedStarPegCount > 0 }
+    ],
+    bursts: [{ id: "classic-only" }],
+    catcher: {
+      style: { left: "" },
+      classList: {
+        remove() {},
+        add() {}
+      },
+      offsetWidth: 1
+    },
+    petCircle: {
+      style: {
+        setProperty() {}
+      }
+    },
+    scoreEl: null,
+    scorePopupsEl: null,
+    balls: [],
+    nextBallId: 1,
+    scheduled: [],
+    scheduledIndex: 0,
+    nextScheduledAt: Infinity,
+    score: 0,
+    caughtCount: 0,
+    petCenterY: 790
+  };
+}
+
+function testLabyrinthQuestionStarsDoNotAffectBoard() {
+  const zeroStars =
+    makeLabyrinthRuntime(0);
+  const twoStars =
+    makeLabyrinthRuntime(2);
+
+  hooks.initializeLabyrinthMode(zeroStars);
+  hooks.initializeLabyrinthMode(twoStars);
+
+  assert.deepStrictEqual(
+    toPlain(
+      zeroStars.labyrinth.platformRows
+    ),
+    toPlain(
+      twoStars.labyrinth.platformRows
+    )
+  );
+  assert.deepStrictEqual(toPlain(zeroStars.pegs), []);
+  assert.deepStrictEqual(toPlain(twoStars.pegs), []);
+  assert.deepStrictEqual(toPlain(zeroStars.bursts), []);
+  assert.deepStrictEqual(toPlain(twoStars.bursts), []);
+}
+
+function testLabyrinthPetReversesAtBoundaries() {
+  const right =
+    hooks.advanceLabyrinthPet(
+      265,
+      1,
+      100,
+      0.1,
+      30,
+      270
+    );
+
+  assert.strictEqual(right.direction, -1);
+  assert.ok(right.position < 270);
+
+  const left =
+    hooks.advanceLabyrinthPet(
+      35,
+      -1,
+      100,
+      0.1,
+      30,
+      270
+    );
+
+  assert.strictEqual(left.direction, 1);
+  assert.ok(left.position > 30);
+}
+
+function testLabyrinthPlatformCollisionIsForgiving() {
+  const segment = {
+    x: 0,
+    y: 100,
+    width: 120,
+    height: 12
+  };
+  const landingBall = {
+    x: 60,
+    y: 95,
+    vx: 24,
+    vy: 120,
+    radius: 10
+  };
+
+  assert.strictEqual(
+    hooks.collideLabyrinthBallWithSegment(
+      landingBall,
+      segment,
+      80
+    ),
+    true
+  );
+  assert.strictEqual(landingBall.y, 90);
+  assert.strictEqual(landingBall.vy, 0);
+
+  const gapBall = {
+    x: 180,
+    y: 95,
+    vx: 0,
+    vy: 120,
+    radius: 10
+  };
+
+  assert.strictEqual(
+    hooks.collideLabyrinthBallWithSegment(
+      gapBall,
+      segment,
+      80
+    ),
+    false
+  );
+}
+
+function testLabyrinthSteeringAcceleratesAllSnacks() {
+  const runtime =
+    makeLabyrinthRuntime(0);
+
+  hooks.initializeLabyrinthMode(runtime);
+  runtime.labyrinth.platformRows = [];
+  runtime.labyrinth.gravity = 0;
+  runtime.labyrinth.petSpeed = 0;
+  runtime.balls = [
+    {
+      id: 1,
+      config: { id: "red", color: "#f00" },
+      x: 100,
+      y: 180,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      rotation: 0,
+      points: 1,
+      bornAt: 1000,
+      trail: [],
+      lastTrailAt: 0
+    },
+    {
+      id: 2,
+      config: { id: "blue", color: "#00f" },
+      x: 260,
+      y: 260,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      rotation: 0,
+      points: 1,
+      bornAt: 1000,
+      trail: [],
+      lastTrailAt: 0
+    }
+  ];
+
+  const controller =
+    hooks.getModeController("labyrinth");
+
+  controller.handleInput(
+    runtime,
+    { type: "pointer", x: 390 }
+  );
+  controller.update(
+    runtime,
+    0.016,
+    1016
+  );
+
+  assert.ok(runtime.balls[0].vx > 0);
+  assert.ok(runtime.balls[1].vx > 0);
+
+  controller.handleInput(
+    runtime,
+    { type: "pointerend" }
+  );
+  assert.strictEqual(
+    runtime.labyrinth.steering,
+    0
+  );
+}
+
+function testLabyrinthFixedStepPreventsPlatformTunneling() {
+  const runtime =
+    makeLabyrinthRuntime(0);
+
+  hooks.initializeLabyrinthMode(runtime);
+  runtime.labyrinth.platformRows = [
+    {
+      segments: [
+        {
+          x: 0,
+          y: 100,
+          width: 160,
+          height: 12
+        }
+      ]
+    }
+  ];
+  runtime.labyrinth.gravity = 0;
+  runtime.labyrinth.petSpeed = 0;
+  runtime.balls = [
+    {
+      id: 1,
+      config: { id: "red", color: "#f00" },
+      x: 80,
+      y: 80,
+      vx: 0,
+      vy: 520,
+      radius: 10,
+      rotation: 0,
+      angularVelocity: 0,
+      points: 1,
+      bornAt: 900,
+      trail: [],
+      lastTrailAt: 0
+    }
+  ];
+
+  hooks.updateLabyrinthMode(
+    runtime,
+    0.032,
+    1000
+  );
+
+  assert.strictEqual(runtime.balls.length, 1);
+  assert.ok(
+    runtime.balls[0].y <= 90.001,
+    "A capped Labyrinth frame must not tunnel through a platform"
+  );
+  assert.strictEqual(
+    hooks.LABYRINTH_PHYSICS_STEP,
+    1 / 120
+  );
+  assert.ok(
+    source.includes(
+      "Math.ceil(\n        dt / LABYRINTH_PHYSICS_STEP"
+    )
+  );
+  assert.ok(
+    source.includes(
+      "now - ball.bornAt > 22000"
+    ),
+    "Labyrinth needs the same finite-life safety net so every round can finish"
+  );
+}
+
+function testLabyrinthAlwaysReachesCompletion() {
+  const runtime =
+    makeLabyrinthRuntime(0);
+
+  runtime.mode = "labyrinth";
+  runtime.modeConfig =
+    hooks.FEED_MODE_CONFIGS.labyrinth;
+  runtime.scheduled =
+    new Array(7);
+  runtime.scheduledIndex = 7;
+  runtime.nextScheduledAt = Infinity;
+
+  hooks.initializeLabyrinthMode(runtime);
+  runtime.labyrinth.petSpeed = 0;
+  runtime.balls = [
+    {
+      id: 1,
+      config: { id: "red", color: "#f00" },
+      x: 195,
+      y: 300,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      rotation: 0,
+      points: 1,
+      bornAt: 0,
+      trail: [],
+      lastTrailAt: 0
+    }
+  ];
+
+  hooks.updateLabyrinthMode(
+    runtime,
+    0.016,
+    23000
+  );
+
+  assert.strictEqual(runtime.balls.length, 0);
+
+  const controller =
+    hooks.getModeController("labyrinth");
+
+  assert.strictEqual(
+    controller.isComplete(runtime, 23000),
+    false
+  );
+  assert.strictEqual(runtime.finishAt, 23900);
+  assert.strictEqual(
+    controller.isComplete(runtime, 23900),
+    true
   );
 }
 
@@ -529,8 +1008,15 @@ function testFeedingGameTesterModesAndStars() {
         /enabled: false/g
       ) || []
     ).length,
-    3,
-    "Only Classic should be enabled in Patch 03"
+    2,
+    "Classic and Labyrinth should be enabled after Patch 04"
+  );
+
+  assert.ok(
+    testerSource.includes(
+      'id: "labyrinth",\n          label: "Labyrinth",\n          enabled: true'
+    ),
+    "Labyrinth must be launchable from the Feeding Game Tester"
   );
 
   assert.ok(
@@ -904,6 +1390,14 @@ function main() {
     testFeedModeConfigurations,
     testUnavailableModesSafelyResolveToClassic,
     testClassicModeControllerContract,
+    testLabyrinthRenderAndControllerContract,
+    testLabyrinthPlatformGeneration,
+    testLabyrinthQuestionStarsDoNotAffectBoard,
+    testLabyrinthPetReversesAtBoundaries,
+    testLabyrinthPlatformCollisionIsForgiving,
+    testLabyrinthSteeringAcceleratesAllSnacks,
+    testLabyrinthFixedStepPreventsPlatformTunneling,
+    testLabyrinthAlwaysReachesCompletion,
     testStandardResultContract,
     testModeDisposalAndStopAreIdempotent,
     testFeedingGameTesterRegistration,
