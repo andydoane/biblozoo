@@ -115,12 +115,28 @@
   const MELODY_TRAVEL_MS = 2400;
   const MELODY_BACKGROUND_GAP_MS = 250;
   const MELODY_LANE_FRACTIONS = Object.freeze({
-    left: 0.30,
+    farLeft: 0.20,
+    left: 0.35,
     middle: 0.50,
-    right: 0.70
+    right: 0.65,
+    farRight: 0.80
   });
-  const MELODY_HOLD_LENGTHS = Object.freeze([7, 9, 8, 6]);
+  const MELODY_HOLD_LENGTHS = Object.freeze([3, 5, 4, 6]);
   const MELODY_TRANSITION_NOTES = 4;
+  const MELODY_TARGET_LANE_SEQUENCE = Object.freeze([
+    "farLeft",
+    "middle",
+    "left",
+    "right",
+    "farRight",
+    "middle",
+    "farLeft",
+    "left",
+    "right",
+    "middle",
+    "farRight",
+    "middle"
+  ]);
   const MELODY_TONE_DURATION = 0.22;
   const MELODY_TONE_VOLUME = 0.12;
 
@@ -194,14 +210,11 @@
       Math.max(0, Math.floor(Number(noteCount) || 0));
     if (!count) return [];
 
-    const targetSequence = [
-      MELODY_LANE_FRACTIONS.left,
-      MELODY_LANE_FRACTIONS.right,
-      MELODY_LANE_FRACTIONS.middle,
-      MELODY_LANE_FRACTIONS.left,
-      MELODY_LANE_FRACTIONS.right,
-      MELODY_LANE_FRACTIONS.middle
-    ];
+    const targetSequence =
+      MELODY_TARGET_LANE_SEQUENCE
+        .map((laneName) =>
+          MELODY_LANE_FRACTIONS[laneName]
+        );
     const path = [];
     let targetIndex = 0;
     let current = targetSequence[0];

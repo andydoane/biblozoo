@@ -52,6 +52,7 @@ function loadFeedGameForValidation() {
     MELODY_LANE_FRACTIONS,
     MELODY_HOLD_LENGTHS,
     MELODY_TRANSITION_NOTES,
+    MELODY_TARGET_LANE_SEQUENCE,
     FEED_MELODIES,
     FEED_MODES,
     FEED_MODE_CONFIGS,
@@ -1114,36 +1115,88 @@ function testMelodyLanePathIsReadable() {
   assert.strictEqual(path.length, 60);
   assert.deepStrictEqual(
     toPlain(hooks.MELODY_HOLD_LENGTHS),
-    [7, 9, 8, 6]
+    [3, 5, 4, 6]
   );
   assert.strictEqual(hooks.MELODY_TRANSITION_NOTES, 4);
   assert.deepStrictEqual(
     toPlain(hooks.MELODY_LANE_FRACTIONS),
-    { left: 0.3, middle: 0.5, right: 0.7 }
+    {
+      farLeft: 0.2,
+      left: 0.35,
+      middle: 0.5,
+      right: 0.65,
+      farRight: 0.8
+    }
+  );
+  assert.deepStrictEqual(
+    toPlain(hooks.MELODY_TARGET_LANE_SEQUENCE),
+    [
+      "farLeft",
+      "middle",
+      "left",
+      "right",
+      "farRight",
+      "middle",
+      "farLeft",
+      "left",
+      "right",
+      "middle",
+      "farRight",
+      "middle"
+    ]
   );
 
   path.forEach((fraction) => {
-    assert.ok(fraction >= 0.3 && fraction <= 0.7);
+    assert.ok(fraction >= 0.2 && fraction <= 0.8);
   });
 
   for (let index = 1; index < path.length; index += 1) {
     assert.ok(
-      Math.abs(path[index] - path[index - 1]) <= 0.1 + 1e-9,
-      "Melody lane transitions must move gradually"
+      Math.abs(path[index] - path[index - 1]) <= 0.075 + 1e-9,
+      "Melody lane transitions must stay achievable at the existing BPM"
     );
   }
 
   assert.deepStrictEqual(
-    toPlain(path.slice(0, 7)),
-    new Array(7).fill(0.3)
+    toPlain(path.slice(0, 3)),
+    new Array(3).fill(0.2)
   );
   assert.deepStrictEqual(
     toPlain(
-      path.slice(7, 11)
-        .map((value) => Number(value.toFixed(2)))
+      path.slice(3, 7)
+        .map((value) => Number(value.toFixed(3)))
     ),
-    [0.4, 0.5, 0.6, 0.7]
+    [0.275, 0.35, 0.425, 0.5]
   );
+}
+
+function testMelodyLaneTargetsStayWithinTwoLanes() {
+  const laneNames = Object.keys(hooks.MELODY_LANE_FRACTIONS);
+  const laneIndexes = new Map(
+    laneNames.map((laneName, index) => [laneName, index])
+  );
+  const targets = Array.from(
+    hooks.MELODY_TARGET_LANE_SEQUENCE
+  );
+
+  targets.forEach((laneName) => {
+    assert.ok(
+      laneIndexes.has(laneName),
+      `Unknown Melody lane target: ${laneName}`
+    );
+  });
+
+  for (let index = 0; index < targets.length; index += 1) {
+    const current = laneIndexes.get(targets[index]);
+    const next = laneIndexes.get(
+      targets[(index + 1) % targets.length]
+    );
+
+    assert.ok(
+      Math.abs(next - current) <= 2,
+      "Melody target changes must never jump more than two lanes"
+    );
+  }
 }
 
 function testMelodyMidiFrequencyMatchesVerseTyper() {
@@ -1866,6 +1919,7 @@ function main() {
     testMelodyRenderAndControllerContract,
     testMelodyTimingModel,
     testMelodyLanePathIsReadable,
+    testMelodyLaneTargetsStayWithinTwoLanes,
     testMelodyMidiFrequencyMatchesVerseTyper,
     testMelodyPercentageScoring,
     testMelodyIgnoresQuestionStars,
