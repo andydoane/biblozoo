@@ -100,6 +100,12 @@
   const LABYRINTH_ROW_COUNT = 6;
   const LABYRINTH_DEFAULT_SEED = 0x4c425a;
   const LABYRINTH_PHYSICS_STEP = 1 / 120;
+  const LABYRINTH_STUCK_MS = 3500;
+  const LABYRINTH_STEER_ACCELERATION_SCALE = 3.2;
+  const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
+  const LABYRINTH_HORIZONTAL_DAMPING = 0.982;
+  const LABYRINTH_PLATFORM_ROLL_DAMPING = 0.998;
+  const LABYRINTH_RELEASE_SPEED_SCALE = 0.32;
 
   let activeRuntime = null;
   let preparedAudioContext = null;
@@ -1342,10 +1348,13 @@
       platformRows,
       steering: 0,
       steerAcceleration:
-        runtime.width * 0.86,
+        runtime.width *
+        LABYRINTH_STEER_ACCELERATION_SCALE,
       maxHorizontalSpeed:
-        runtime.width * 0.28,
-      horizontalDamping: 0.97,
+        runtime.width *
+        LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE,
+      horizontalDamping:
+        LABYRINTH_HORIZONTAL_DAMPING,
       gravity:
         runtime.height * 0.24,
       maxVerticalSpeed:
@@ -1403,6 +1412,10 @@
       points: config.points || 1,
       bonus: false,
       bornAt: now,
+      labyrinthProgressAt: now,
+      labyrinthProgressX: x,
+      labyrinthProgressY: -radius,
+      labyrinthReleaseCount: 0,
       trail: [],
       lastTrailAt: 0
     });
@@ -1483,7 +1496,8 @@
       ball.y =
         segment.y - ball.radius;
       ball.vy = 0;
-      ball.vx *= 0.93;
+      ball.vx *=
+        LABYRINTH_PLATFORM_ROLL_DAMPING;
       return true;
     }
 
@@ -1526,7 +1540,8 @@
           -ball.vx * 0.28;
       } else if (ny < 0) {
         ball.vy = 0;
-        ball.vx *= 0.93;
+        ball.vx *=
+          LABYRINTH_PLATFORM_ROLL_DAMPING;
       }
 
       return true;
@@ -1571,6 +1586,130 @@
     }
 
     return false;
+  }
+
+  function getLabyrinthReleaseDirection(
+    runtime,
+    ball
+  ) {
+    const rows =
+      runtime.labyrinth?.platformRows || [];
+    let nearestRow = null;
+    let nearestDistance = Infinity;
+
+    for (const row of rows) {
+      const distance =
+        Math.abs(
+          (row.y - ball.radius) -
+          ball.y
+        );
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestRow = row;
+      }
+    }
+
+    if (
+      nearestRow &&
+      Number.isFinite(nearestRow.gapCenter)
+    ) {
+      const delta =
+        nearestRow.gapCenter - ball.x;
+
+      if (
+        Math.abs(delta) >
+        ball.radius * 0.5
+      ) {
+        return delta > 0 ? 1 : -1;
+      }
+    }
+
+    return ball.id % 2 === 0 ? -1 : 1;
+  }
+
+  function recoverStuckLabyrinthBall(
+    runtime,
+    ball,
+    now
+  ) {
+    const state = runtime.labyrinth;
+    if (!state || !ball) return false;
+
+    const progressDistance =
+      Math.max(
+        ball.radius * 0.8,
+        runtime.width * 0.012
+      );
+
+    if (
+      !Number.isFinite(
+        ball.labyrinthProgressAt
+      )
+    ) {
+      ball.labyrinthProgressAt = now;
+      ball.labyrinthProgressX = ball.x;
+      ball.labyrinthProgressY = ball.y;
+      return false;
+    }
+
+    const dx =
+      ball.x -
+      Number(ball.labyrinthProgressX);
+    const dy =
+      ball.y -
+      Number(ball.labyrinthProgressY);
+
+    if (
+      Number.isFinite(dx) &&
+      Number.isFinite(dy) &&
+      dx * dx + dy * dy >=
+        progressDistance * progressDistance
+    ) {
+      ball.labyrinthProgressAt = now;
+      ball.labyrinthProgressX = ball.x;
+      ball.labyrinthProgressY = ball.y;
+      return false;
+    }
+
+    if (
+      now - ball.labyrinthProgressAt <
+      LABYRINTH_STUCK_MS
+    ) {
+      return false;
+    }
+
+    const direction =
+      getLabyrinthReleaseDirection(
+        runtime,
+        ball
+      );
+    const releaseSpeed =
+      runtime.width *
+      LABYRINTH_RELEASE_SPEED_SCALE;
+
+    ball.vx = clamp(
+      ball.vx +
+        direction * releaseSpeed,
+      -state.maxHorizontalSpeed,
+      state.maxHorizontalSpeed
+    );
+    ball.vy = Math.max(
+      ball.vy,
+      runtime.height * 0.04
+    );
+    ball.labyrinthProgressAt = now;
+    ball.labyrinthProgressX = ball.x;
+    ball.labyrinthProgressY = ball.y;
+    ball.labyrinthReleaseCount =
+      Math.max(
+        0,
+        Number(
+          ball.labyrinthReleaseCount
+        ) || 0
+      ) + 1;
+
+    return true;
   }
 
   function updateLabyrinthBall(
@@ -1619,6 +1758,11 @@
       runtime,
       ball,
       previousY
+    );
+    recoverStuckLabyrinthBall(
+      runtime,
+      ball,
+      now
     );
   }
 
@@ -1715,10 +1859,6 @@
           ball.y - ball.radius >
           runtime.height + 20
         ) {
-          return false;
-        }
-
-        if (now - ball.bornAt > 22000) {
           return false;
         }
 
@@ -1885,8 +2025,8 @@
       25
     );
     runtime.smoothedTilt =
-      runtime.smoothedTilt * 0.85 +
-      relative * 0.15;
+      runtime.smoothedTilt * 0.72 +
+      relative * 0.28;
     runtime.labyrinth.steering =
       runtime.smoothedTilt / 25;
   }

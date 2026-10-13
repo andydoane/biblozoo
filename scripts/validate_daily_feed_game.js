@@ -31,6 +31,10 @@ function loadFeedGameForValidation() {
     LABYRINTH_GAP_POSITIONS,
     LABYRINTH_ROW_COUNT,
     LABYRINTH_PHYSICS_STEP,
+    LABYRINTH_STUCK_MS,
+    LABYRINTH_STEER_ACCELERATION_SCALE,
+    LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE,
+    LABYRINTH_PLATFORM_ROLL_DAMPING,
     FEED_MODES,
     FEED_MODE_CONFIGS,
     normalizeFeedMode,
@@ -42,6 +46,7 @@ function loadFeedGameForValidation() {
     collideLabyrinthBallWithSegment,
     updateLabyrinthMode,
     advanceLabyrinthPet,
+    recoverStuckLabyrinthBall,
     buildScheduledBalls,
     chooseBackground,
     createPegField,
@@ -611,6 +616,14 @@ function testLabyrinthPlatformCollisionIsForgiving() {
   );
   assert.strictEqual(landingBall.y, 90);
   assert.strictEqual(landingBall.vy, 0);
+  assert.ok(
+    Math.abs(
+      landingBall.vx -
+      24 *
+        hooks.LABYRINTH_PLATFORM_ROLL_DAMPING
+    ) < 0.001,
+    "Platform contact should preserve most horizontal steering momentum"
+  );
 
   const gapBall = {
     x: 180,
@@ -635,6 +648,29 @@ function testLabyrinthSteeringAcceleratesAllSnacks() {
     makeLabyrinthRuntime(0);
 
   hooks.initializeLabyrinthMode(runtime);
+  assert.strictEqual(
+    hooks.LABYRINTH_STEER_ACCELERATION_SCALE,
+    3.2
+  );
+  assert.strictEqual(
+    hooks.LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE,
+    0.72
+  );
+  assert.strictEqual(
+    runtime.labyrinth.steerAcceleration,
+    runtime.width * 3.2
+  );
+  assert.strictEqual(
+    runtime.labyrinth.maxHorizontalSpeed,
+    runtime.width * 0.72
+  );
+  assert.ok(
+    source.includes(
+      "runtime.smoothedTilt * 0.72"
+    ),
+    "Labyrinth tilt smoothing should react faster than the original tuning"
+  );
+
   runtime.labyrinth.platformRows = [];
   runtime.labyrinth.gravity = 0;
   runtime.labyrinth.petSpeed = 0;
@@ -682,8 +718,14 @@ function testLabyrinthSteeringAcceleratesAllSnacks() {
     1016
   );
 
-  assert.ok(runtime.balls[0].vx > 0);
-  assert.ok(runtime.balls[1].vx > 0);
+  assert.ok(
+    runtime.balls[0].vx > 15,
+    "Labyrinth steering should build useful sideways speed within one frame"
+  );
+  assert.ok(
+    runtime.balls[1].vx > 15,
+    "All active Labyrinth snacks should receive the stronger steering force"
+  );
 
   controller.handleInput(
     runtime,
@@ -752,11 +794,101 @@ function testLabyrinthFixedStepPreventsPlatformTunneling() {
       "Math.ceil(\n        dt / LABYRINTH_PHYSICS_STEP"
     )
   );
-  assert.ok(
-    source.includes(
-      "now - ball.bornAt > 22000"
+  assert.strictEqual(
+    (
+      source.match(
+        /now - ball\.bornAt > 22000/g
+      ) || []
+    ).length,
+    1,
+    "The 22-second lifetime must remain Classic-only"
+  );
+}
+
+function testLabyrinthOldBallsDoNotExpire() {
+  const runtime =
+    makeLabyrinthRuntime(0);
+
+  hooks.initializeLabyrinthMode(runtime);
+  runtime.labyrinth.platformRows = [];
+  runtime.labyrinth.gravity = 0;
+  runtime.labyrinth.petSpeed = 0;
+  runtime.balls = [
+    {
+      id: 1,
+      config: { id: "red", color: "#f00" },
+      x: 100,
+      y: 260,
+      vx: 0,
+      vy: 0,
+      radius: 10,
+      rotation: 0,
+      angularVelocity: 0,
+      points: 1,
+      bornAt: 0,
+      trail: [],
+      lastTrailAt: 0
+    }
+  ];
+
+  hooks.updateLabyrinthMode(
+    runtime,
+    0.016,
+    23000
+  );
+
+  assert.strictEqual(
+    runtime.balls.length,
+    1,
+    "Labyrinth snacks must not disappear because of age"
+  );
+}
+
+function testLabyrinthStuckRecoveryNudgesTowardGap() {
+  const runtime =
+    makeLabyrinthRuntime(0);
+
+  hooks.initializeLabyrinthMode(runtime);
+  runtime.labyrinth.platformRows = [
+    {
+      y: 300,
+      gapCenter: 320,
+      gapWidth: 100,
+      segments: []
+    }
+  ];
+
+  const ball = {
+    id: 1,
+    x: 90,
+    y: 290,
+    vx: 0,
+    vy: 0,
+    radius: 10,
+    labyrinthProgressAt: 1000,
+    labyrinthProgressX: 90,
+    labyrinthProgressY: 290,
+    labyrinthReleaseCount: 0
+  };
+
+  assert.strictEqual(
+    hooks.recoverStuckLabyrinthBall(
+      runtime,
+      ball,
+      1000 +
+        hooks.LABYRINTH_STUCK_MS +
+        1
     ),
-    "Labyrinth needs the same finite-life safety net so every round can finish"
+    true
+  );
+  assert.ok(
+    ball.vx > 0,
+    "Stuck recovery should nudge a snack toward the nearby gap"
+  );
+  assert.ok(ball.vy > 0);
+  assert.strictEqual(
+    ball.labyrinthReleaseCount,
+    1
   );
 }
 
@@ -779,7 +911,7 @@ function testLabyrinthAlwaysReachesCompletion() {
       id: 1,
       config: { id: "red", color: "#f00" },
       x: 195,
-      y: 300,
+      y: runtime.height + 60,
       vx: 0,
       vy: 0,
       radius: 10,
@@ -794,7 +926,7 @@ function testLabyrinthAlwaysReachesCompletion() {
   hooks.updateLabyrinthMode(
     runtime,
     0.016,
-    23000
+    1000
   );
 
   assert.strictEqual(runtime.balls.length, 0);
@@ -803,12 +935,12 @@ function testLabyrinthAlwaysReachesCompletion() {
     hooks.getModeController("labyrinth");
 
   assert.strictEqual(
-    controller.isComplete(runtime, 23000),
+    controller.isComplete(runtime, 1000),
     false
   );
-  assert.strictEqual(runtime.finishAt, 23900);
+  assert.strictEqual(runtime.finishAt, 1900);
   assert.strictEqual(
-    controller.isComplete(runtime, 23900),
+    controller.isComplete(runtime, 1900),
     true
   );
 }
@@ -1397,6 +1529,8 @@ function main() {
     testLabyrinthPlatformCollisionIsForgiving,
     testLabyrinthSteeringAcceleratesAllSnacks,
     testLabyrinthFixedStepPreventsPlatformTunneling,
+    testLabyrinthOldBallsDoNotExpire,
+    testLabyrinthStuckRecoveryNudgesTowardGap,
     testLabyrinthAlwaysReachesCompletion,
     testStandardResultContract,
     testModeDisposalAndStopAreIdempotent,
