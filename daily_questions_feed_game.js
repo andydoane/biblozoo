@@ -105,6 +105,9 @@
   const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
   const LABYRINTH_HORIZONTAL_DAMPING = 0.982;
   const LABYRINTH_PLATFORM_ROLL_DAMPING = 0.998;
+  const LABYRINTH_PLATFORM_RESTITUTION = 0.34;
+  const LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE = 4;
+  const LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE = 6.5;
   const LABYRINTH_RELEASE_SPEED_SCALE = 0.32;
 
   let activeRuntime = null;
@@ -1473,6 +1476,36 @@
     }
   }
 
+  function getLabyrinthLandingBounceVelocity(ball) {
+    const impactSpeed =
+      Math.max(
+        0,
+        Number(ball?.vy) || 0
+      );
+    const radius =
+      Math.max(
+        1,
+        Number(ball?.radius) || 1
+      );
+    const settleSpeed =
+      radius *
+      LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE;
+
+    if (impactSpeed < settleSpeed) {
+      return 0;
+    }
+
+    const reboundSpeed =
+      Math.min(
+        impactSpeed *
+          LABYRINTH_PLATFORM_RESTITUTION,
+        radius *
+          LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE
+      );
+
+    return -reboundSpeed;
+  }
+
   function collideLabyrinthBallWithSegment(
     ball,
     segment,
@@ -1493,9 +1526,14 @@
       previousBottom <= segment.y + 0.75 &&
       currentBottom >= segment.y
     ) {
+      const reboundVelocity =
+        getLabyrinthLandingBounceVelocity(
+          ball
+        );
+
       ball.y =
         segment.y - ball.radius;
-      ball.vy = 0;
+      ball.vy = reboundVelocity;
       ball.vx *=
         LABYRINTH_PLATFORM_ROLL_DAMPING;
       return true;
@@ -1539,7 +1577,12 @@
         ball.vx =
           -ball.vx * 0.28;
       } else if (ny < 0) {
-        ball.vy = 0;
+        if (ball.vy >= 0) {
+          ball.vy =
+            getLabyrinthLandingBounceVelocity(
+              ball
+            );
+        }
         ball.vx *=
           LABYRINTH_PLATFORM_ROLL_DAMPING;
       }

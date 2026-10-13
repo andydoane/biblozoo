@@ -35,6 +35,9 @@ function loadFeedGameForValidation() {
     LABYRINTH_STEER_ACCELERATION_SCALE,
     LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE,
     LABYRINTH_PLATFORM_ROLL_DAMPING,
+    LABYRINTH_PLATFORM_RESTITUTION,
+    LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE,
+    LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE,
     FEED_MODES,
     FEED_MODE_CONFIGS,
     normalizeFeedMode,
@@ -44,6 +47,7 @@ function loadFeedGameForValidation() {
     createLabyrinthPlatformRows,
     initializeLabyrinthMode,
     collideLabyrinthBallWithSegment,
+    getLabyrinthLandingBounceVelocity,
     updateLabyrinthMode,
     advanceLabyrinthPet,
     recoverStuckLabyrinthBall,
@@ -615,7 +619,10 @@ function testLabyrinthPlatformCollisionIsForgiving() {
     true
   );
   assert.strictEqual(landingBall.y, 90);
-  assert.strictEqual(landingBall.vy, 0);
+  assert.ok(
+    Math.abs(landingBall.vy + 40.8) < 0.001,
+    "A normal Labyrinth landing should rebound upward a little"
+  );
   assert.ok(
     Math.abs(
       landingBall.vx -
@@ -640,6 +647,49 @@ function testLabyrinthPlatformCollisionIsForgiving() {
       80
     ),
     false
+  );
+}
+
+function testLabyrinthLandingBounceIsBounded() {
+  assert.strictEqual(
+    hooks.LABYRINTH_PLATFORM_RESTITUTION,
+    0.34
+  );
+  assert.strictEqual(
+    hooks.LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE,
+    4
+  );
+  assert.strictEqual(
+    hooks.LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE,
+    6.5
+  );
+
+  assert.strictEqual(
+    hooks.getLabyrinthLandingBounceVelocity({
+      vy: 30,
+      radius: 10
+    }),
+    0,
+    "Very gentle platform contacts should settle instead of jittering"
+  );
+
+  assert.ok(
+    Math.abs(
+      hooks.getLabyrinthLandingBounceVelocity({
+        vy: 120,
+        radius: 10
+      }) + 40.8
+    ) < 0.001,
+    "Ordinary falls should get a small speed-dependent rebound"
+  );
+
+  assert.strictEqual(
+    hooks.getLabyrinthLandingBounceVelocity({
+      vy: 520,
+      radius: 10
+    }),
+    -65,
+    "Hard impacts must be capped so a snack cannot bounce toward the previous row"
   );
 }
 
@@ -1527,6 +1577,7 @@ function main() {
     testLabyrinthQuestionStarsDoNotAffectBoard,
     testLabyrinthPetReversesAtBoundaries,
     testLabyrinthPlatformCollisionIsForgiving,
+    testLabyrinthLandingBounceIsBounded,
     testLabyrinthSteeringAcceleratesAllSnacks,
     testLabyrinthFixedStepPreventsPlatformTunneling,
     testLabyrinthOldBallsDoNotExpire,
