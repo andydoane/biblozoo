@@ -7,7 +7,9 @@ const vm = require("vm");
 
 const rootDir = path.resolve(__dirname, "..");
 const feedGamePath = path.join(rootDir, "daily_questions_feed_game.js");
+const appPath = path.join(rootDir, "app.js");
 const source = fs.readFileSync(feedGamePath, "utf8");
+const appSource = fs.readFileSync(appPath, "utf8");
 
 function loadFeedGameForValidation() {
   const exportMarker =
@@ -483,6 +485,211 @@ function testModeDisposalAndStopAreIdempotent() {
   assert.strictEqual(runtime.resultBackHandler, null);
 }
 
+function testFeedingGameTesterRegistration() {
+  assert.ok(
+    appSource.includes(
+      'id: "feeding",\n      label: "Feeding Game Tester",\n      order: 90'
+    ),
+    "Daily To-Do Preview must register the Feeding Game Tester"
+  );
+  assert.ok(
+    appSource.includes(
+      "onSelect:\n        showFeedingGameTesterDialog"
+    )
+  );
+}
+
+function testFeedingGameTesterModesAndStars() {
+  const start =
+    appSource.indexOf(
+      "const FEEDING_GAME_TEST_MODES"
+    );
+  const end =
+    appSource.indexOf(
+      "const showDailyPreviewDialog",
+      start
+    );
+  const testerSource =
+    appSource.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  ["classic", "labyrinth", "melody", "bounce"]
+    .forEach((mode) => {
+      assert.ok(
+        testerSource.includes(
+          `id: "${mode}"`
+        ),
+        `Feeding Game Tester must list ${mode}`
+      );
+    });
+
+  assert.strictEqual(
+    (
+      testerSource.match(
+        /enabled: false/g
+      ) || []
+    ).length,
+    3,
+    "Only Classic should be enabled in Patch 03"
+  );
+
+  assert.ok(
+    testerSource.includes(
+      "...[0, 1, 2].map("
+    )
+  );
+  assert.ok(
+    testerSource.includes(
+      "`${starCount} ★`"
+    )
+  );
+}
+
+function testFeedingGamePreviewSessionIsolation() {
+  const start =
+    appSource.indexOf(
+      "const launchFeedingGameTest"
+    );
+  const end =
+    appSource.indexOf(
+      "const showFeedingGameStarDialog",
+      start
+    );
+  const launchSource =
+    appSource.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.ok(
+    launchSource.includes(
+      "getOrCreateDailyTodoPreviewPlan({\n          persist: false"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "feedGame.stop?.();\n      State.dailySnackSession = null;"
+    ),
+    "Preview launch must invalidate any stale snack session first"
+  );
+  assert.ok(
+    launchSource.includes(
+      "feedGame.prepareAudio?.();"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "await requestDailySnackTiltPermission();"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "dailyTodoPreview: true"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "planId:\n          `daily-feed-preview-${Date.now()}`"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "feedMode: selectedMode.id"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "earnedStarPegCount:\n          selectedStars"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "rewardScore: 0"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "rewardCaught: 0"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "rewardComplete: false"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      "rewardClaimed: false"
+    )
+  );
+}
+
+function testRealDailySnackExplicitlyUsesClassic() {
+  const start =
+    appSource.indexOf(
+      "async function startDailyTodoSnack("
+    );
+  const end =
+    appSource.indexOf(
+      "function claimDailyTodoSnack(",
+      start
+    );
+  const startSource =
+    appSource.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.ok(
+    startSource.includes(
+      'dailyTodoSnack: true,\n    feedMode: "classic",'
+    ),
+    "Normal Daily snack sessions must explicitly launch Classic"
+  );
+}
+
+function testPreviewClaimPathStaysTemporary() {
+  const start =
+    appSource.indexOf(
+      "function claimDailyTodoSnack("
+    );
+  const realBranch =
+    appSource.indexOf(
+      "const loaded =\n    loadDailyTodoRuntime();",
+      start
+    );
+  const previewSource =
+    appSource.slice(
+      start,
+      realBranch
+    );
+
+  assert.ok(start >= 0 && realBranch > start);
+  assert.ok(
+    previewSource.includes(
+      "session?.dailyTodoPreview === true"
+    )
+  );
+  assert.ok(
+    previewSource.includes(
+      "session.rewardComplete = true;"
+    )
+  );
+  assert.ok(
+    previewSource.includes(
+      "session.rewardClaimed = true;"
+    )
+  );
+  assert.ok(
+    !previewSource.includes(
+      "markSnackClaimed"
+    ),
+    "Preview completion must not claim the real Daily snack"
+  );
+  assert.ok(
+    !previewSource.includes(
+      "saveDailyTodoRuntime"
+    ),
+    "Preview completion must not save real Daily progress"
+  );
+}
+
 function testClassicRenderContract() {
   const normal = api.render({
     session: { petName: "Pip" },
@@ -699,6 +906,11 @@ function main() {
     testClassicModeControllerContract,
     testStandardResultContract,
     testModeDisposalAndStopAreIdempotent,
+    testFeedingGameTesterRegistration,
+    testFeedingGameTesterModesAndStars,
+    testFeedingGamePreviewSessionIsolation,
+    testRealDailySnackExplicitlyUsesClassic,
+    testPreviewClaimPathStaysTemporary,
     testClassicRenderContract,
     testClassicScheduledBalls,
     testClassicPegField,

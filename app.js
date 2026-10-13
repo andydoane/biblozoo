@@ -6584,6 +6584,7 @@ async function startDailyTodoSnack(
 
   State.dailySnackSession = {
     dailyTodoSnack: true,
+    feedMode: "classic",
     profileId: ready.profileId,
     planId: ready.plan.id,
     planDay: ready.plan.day,
@@ -14560,6 +14561,214 @@ function screenTitle(idx) {
       });
     };
 
+    const FEEDING_GAME_TEST_MODES =
+      Object.freeze([
+        Object.freeze({
+          id: "classic",
+          label: "Classic",
+          enabled: true
+        }),
+        Object.freeze({
+          id: "labyrinth",
+          label: "Labyrinth",
+          enabled: false
+        }),
+        Object.freeze({
+          id: "melody",
+          label: "Melody",
+          enabled: false
+        }),
+        Object.freeze({
+          id: "bounce",
+          label: "Bounce",
+          enabled: false
+        })
+      ]);
+
+    const launchFeedingGameTest = async (
+      mode,
+      earnedStarPegCount
+    ) => {
+      const selectedMode =
+        FEEDING_GAME_TEST_MODES.find(
+          (entry) => entry.id === mode
+        );
+
+      if (!selectedMode?.enabled) {
+        return false;
+      }
+
+      const feedGame =
+        window.BibloZooDailyFeedGame;
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const profile =
+        getProfileApi()?.getActiveProfile?.();
+      const verseId = String(
+        templatePlan?.verseId || ""
+      ).trim();
+
+      if (
+        !templatePlan ||
+        !verseId ||
+        !feedGame?.render ||
+        !feedGame?.start
+      ) {
+        showDialog({
+          title: "Feeding Game Tester Unavailable",
+          body:
+            "Unlock a BibloPet and create today's Daily To-Do before using the Feeding Game Tester.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
+        return false;
+      }
+
+      const selectedStars =
+        Math.min(
+          2,
+          Math.max(
+            0,
+            Math.floor(
+              Number(earnedStarPegCount) || 0
+            )
+          )
+        );
+
+      feedGame.stop?.();
+      State.dailySnackSession = null;
+      feedGame.prepareAudio?.();
+
+      const rewardTiltEnabled =
+        await requestDailySnackTiltPermission();
+
+      window.BibloZooDailyTodoUI
+        ?.clearTemporaryPreviewState?.();
+
+      State.dailySnackSession = {
+        dailyTodoSnack: true,
+        dailyTodoPreview: true,
+        profileId: String(
+          templatePlan.profileId ||
+          profile?.id ||
+          "preview"
+        ),
+        planId:
+          `daily-feed-preview-${Date.now()}`,
+        planDay: String(
+          templatePlan.day || "preview"
+        ),
+        verseId,
+        petName:
+          getBibloPetDisplayNameForVerseId(
+            verseId
+          ),
+        zookeeperName:
+          String(
+            profile?.name || "Zookeeper"
+          ).trim() || "Zookeeper",
+        feedMode: selectedMode.id,
+        earnedStarPegCount:
+          selectedStars,
+        rewardTiltEnabled,
+        rewardScore: 0,
+        rewardCaught: 0,
+        rewardComplete: false,
+        rewardClaimed: false
+      };
+
+      closeDialog();
+      go(Screen.DAILY_SNACK);
+      return true;
+    };
+
+    const showFeedingGameStarDialog = (
+      mode
+    ) => {
+      const selectedMode =
+        FEEDING_GAME_TEST_MODES.find(
+          (entry) => entry.id === mode
+        );
+
+      if (!selectedMode?.enabled) {
+        return;
+      }
+
+      showDialog({
+        title: "Choose Question Stars",
+        body:
+          "Question stars affect Classic only. Choose the count to use for this preview session.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...[0, 1, 2].map(
+            (starCount) =>
+              dlgBtn(
+                `${starCount} ★`,
+                {
+                  onClick: () =>
+                    launchFeedingGameTest(
+                      selectedMode.id,
+                      starCount
+                    )
+                }
+              )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showFeedingGameTesterDialog
+          })
+        ]
+      });
+    };
+
+    const showFeedingGameTesterDialog = () => {
+      const modeButtons =
+        FEEDING_GAME_TEST_MODES.map(
+          (mode) => {
+            const button =
+              dlgBtn(
+                mode.label,
+                {
+                  onClick: () =>
+                    showFeedingGameStarDialog(
+                      mode.id
+                    )
+                }
+              );
+
+            if (!mode.enabled) {
+              button.disabled = true;
+              button.title =
+                "This feeding mode will be enabled after its gameplay patch is complete.";
+            }
+
+            return button;
+          }
+        );
+
+      showDialog({
+        title: "Feeding Game Tester",
+        body:
+          "Choose a feeding mode. Classic is playable now; the other modes are listed for upcoming gameplay patches.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...modeButtons,
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: showDailyPreviewDialog
+          })
+        ]
+      });
+    };
+
     const showDailyPreviewDialog = () => {
       showDialog({
         title: "Daily To-Do Preview",
@@ -16402,6 +16611,14 @@ function screenTitle(idx) {
       order: 60,
       onSelect:
         showNewPetMissionPreviewDialog
+    });
+
+    registerDailyTodoPreviewMenuEntry({
+      id: "feeding",
+      label: "Feeding Game Tester",
+      order: 90,
+      onSelect:
+        showFeedingGameTesterDialog
     });
 
     titleTodoBtn.onclick = (e) => {
