@@ -27,6 +27,68 @@
   const TILT_CALIBRATION_MS = 750;
   const INTRO_TAP_LOCKOUT_MS = 800;
 
+  const FEED_MODES = Object.freeze({
+    CLASSIC: "classic",
+    LABYRINTH: "labyrinth",
+    MELODY: "melody",
+    BOUNCE: "bounce"
+  });
+
+  const FEED_MODE_CONFIGS = Object.freeze({
+    [FEED_MODES.CLASSIC]: Object.freeze({
+      id: FEED_MODES.CLASSIC,
+      implemented: true,
+      schedule: "classic-seven",
+      inputTarget: "pet",
+      catchTarget: "pet",
+      scoring: "points",
+      finishDelayMs: 900,
+      instructions: Object.freeze({
+        title: "Catch the BibloSnacks!",
+        prompt: "Tilt to steer"
+      })
+    }),
+    [FEED_MODES.LABYRINTH]: Object.freeze({
+      id: FEED_MODES.LABYRINTH,
+      implemented: false,
+      schedule: "classic-seven",
+      inputTarget: "snacks",
+      catchTarget: "pet",
+      scoring: "points",
+      finishDelayMs: 900,
+      instructions: Object.freeze({
+        title: "Guide the BibloSnacks!",
+        prompt: "Tilt to guide the snacks"
+      })
+    }),
+    [FEED_MODES.MELODY]: Object.freeze({
+      id: FEED_MODES.MELODY,
+      implemented: false,
+      schedule: "melody",
+      inputTarget: "pet",
+      catchTarget: "pet",
+      scoring: "percentage",
+      finishDelayMs: 900,
+      instructions: Object.freeze({
+        title: "Catch the BibloSnacks!",
+        prompt: "Tilt to make music"
+      })
+    }),
+    [FEED_MODES.BOUNCE]: Object.freeze({
+      id: FEED_MODES.BOUNCE,
+      implemented: false,
+      schedule: "classic-seven",
+      inputTarget: "paddle",
+      catchTarget: "pet",
+      scoring: "points",
+      finishDelayMs: 900,
+      instructions: Object.freeze({
+        title: "Bounce the BibloSnacks!",
+        prompt: "Tilt to move the paddle"
+      })
+    })
+  });
+
   let activeRuntime = null;
   let preparedAudioContext = null;
   let preparedStarBuffer = null;
@@ -38,6 +100,18 @@
   const randomFrom = (items) => items?.length
     ? items[Math.floor(Math.random() * items.length)]
     : null;
+
+  function normalizeFeedMode(value) {
+    return Object.values(FEED_MODES).includes(value)
+      ? value
+      : FEED_MODES.CLASSIC;
+  }
+
+  function getFeedModeConfig(value) {
+    return FEED_MODE_CONFIGS[
+      normalizeFeedMode(value)
+    ];
+  }
 
   function shuffle(items) {
     const copy = [...items];
@@ -269,6 +343,22 @@
     try { context.close(); } catch (err) { }
   }
 
+  function disposeMode(runtime) {
+    if (!runtime || runtime.modeDisposed) return;
+
+    runtime.modeDisposed = true;
+
+    if (runtime.modeTimers) {
+      for (const timerId of runtime.modeTimers) {
+        clearTimeout(timerId);
+      }
+      runtime.modeTimers.clear();
+    }
+
+    runtime.modeController
+      ?.dispose?.(runtime);
+  }
+
   function stop() {
     const runtime = activeRuntime;
     activeRuntime = null;
@@ -276,6 +366,7 @@
       runtime.running = false;
       if (runtime.rafId) cancelAnimationFrame(runtime.rafId);
       detachGameplayInput(runtime);
+      disposeMode(runtime);
 
       if (
         runtime.startOverlay &&
@@ -304,6 +395,11 @@
         try { runtime.chompAudio.pause(); runtime.chompAudio.currentTime = 0; } catch (err) { }
       }
       stopAudioContext(runtime.audioContext);
+      runtime.audioContext = null;
+      runtime.onComplete = null;
+      runtime.onBackToZoo = null;
+      runtime.startOverlayHandler = null;
+      runtime.resultBackHandler = null;
     }
     if (preparedAudioContext) {
       stopAudioContext(preparedAudioContext);
@@ -374,8 +470,12 @@
     const petName = String(session?.petName || "BibloPet").trim() || "BibloPet";
     const isDailyTodoSnack =
       session?.dailyTodoSnack === true;
+    const mode =
+      resolveFeedMode(session?.feedMode);
+    const modeConfig =
+      getFeedModeConfig(mode);
     return `
-      <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-session-phase="reward_game">
+      <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-feed-mode="${mode}" data-daily-session-phase="reward_game">
         <div class="daily-feed-score-badge" aria-live="polite" aria-label="Score">
           <span class="daily-feed-score-label">Score</span>
           <strong class="daily-feed-score-value" data-daily-feed-score>0</strong>
@@ -431,11 +531,11 @@
             </div>
 
             <div class="daily-feed-start-title">
-              Catch the BibloSnacks!
+              ${modeConfig.instructions.title}
             </div>
 
             <div class="daily-feed-start-instruction">
-              Tilt to steer
+              ${modeConfig.instructions.prompt}
             </div>
           </div>
         </div>
@@ -1029,10 +1129,145 @@
       return false;
     }
     if (!runtime.finishAt) {
-      runtime.finishAt = now + 900;
+      const configuredDelay =
+        Number(
+          runtime.modeConfig
+            ?.finishDelayMs
+        );
+      const finishDelayMs =
+        Number.isFinite(configuredDelay)
+          ? Math.max(0, configuredDelay)
+          : 900;
+
+      runtime.finishAt =
+        now + finishDelayMs;
       return false;
     }
     return now >= runtime.finishAt;
+  }
+
+  function buildStandardResult(runtime) {
+    const scheduledTotal =
+      Array.isArray(runtime?.scheduled)
+        ? runtime.scheduled.length
+        : 0;
+    const configuredTotal =
+      Number(runtime?.totalCount);
+
+    return {
+      mode:
+        normalizeFeedMode(runtime?.mode),
+      score:
+        Math.max(
+          0,
+          Number(runtime?.score) || 0
+        ),
+      caughtCount:
+        Math.max(
+          0,
+          Number(runtime?.caughtCount) || 0
+        ),
+      totalCount:
+        Number.isFinite(configuredTotal) &&
+          configuredTotal >= 0
+          ? configuredTotal
+          : scheduledTotal,
+      completed: true
+    };
+  }
+
+  function initializeClassicMode() { }
+
+  function updateClassicMode(
+    runtime,
+    dt,
+    now
+  ) {
+    processSpawns(runtime, now);
+    const step = dt / 2;
+    updateBalls(runtime, step, now);
+    updateBalls(runtime, step, now);
+    updatePetLean(runtime, dt);
+  }
+
+  function drawClassicMode(runtime, now) {
+    draw(runtime, now);
+  }
+
+  function handleClassicModeInput(
+    runtime,
+    input
+  ) {
+    if (input?.type === "tilt") {
+      handleTilt(
+        runtime,
+        input.event
+      );
+      return;
+    }
+
+    if (input?.type === "pointer") {
+      setCatcherX(
+        runtime,
+        input.x
+      );
+    }
+  }
+
+  function isClassicModeComplete(
+    runtime,
+    now
+  ) {
+    return maybeFinish(runtime, now);
+  }
+
+  function buildClassicResult(runtime) {
+    return buildStandardResult(runtime);
+  }
+
+  function disposeClassicMode() { }
+
+  const CLASSIC_MODE_CONTROLLER =
+    Object.freeze({
+      id: FEED_MODES.CLASSIC,
+      initialize: initializeClassicMode,
+      update: updateClassicMode,
+      draw: drawClassicMode,
+      handleInput: handleClassicModeInput,
+      isComplete: isClassicModeComplete,
+      buildResult: buildClassicResult,
+      dispose: disposeClassicMode
+    });
+
+  const FEED_MODE_CONTROLLERS =
+    Object.freeze({
+      [FEED_MODES.CLASSIC]:
+        CLASSIC_MODE_CONTROLLER
+    });
+
+  function resolveFeedMode(value) {
+    const mode =
+      normalizeFeedMode(value);
+    const config =
+      getFeedModeConfig(mode);
+
+    if (
+      config?.implemented === true &&
+      FEED_MODE_CONTROLLERS[mode]
+    ) {
+      return mode;
+    }
+
+    return FEED_MODES.CLASSIC;
+  }
+
+  function getModeController(value) {
+    return (
+      FEED_MODE_CONTROLLERS[
+        resolveFeedMode(value)
+      ] ||
+      CLASSIC_MODE_CONTROLLER
+    );
   }
 
   function showResult(runtime, result) {
@@ -1048,6 +1283,7 @@
     }
 
     detachGameplayInput(runtime);
+    disposeMode(runtime);
 
     if (runtime.starAudio) {
       try {
@@ -1094,10 +1330,9 @@
       return;
     }
 
-    const result = {
-      score: runtime.score,
-      caughtCount: runtime.caughtCount
-    };
+    const result =
+      runtime.modeController
+        .buildResult(runtime);
 
     showResult(runtime, result);
     runtime.onComplete?.(result);
@@ -1173,13 +1408,14 @@
     if (!runtime.running || activeRuntime !== runtime) return;
     const dt = clamp((now - runtime.lastFrameAt) / 1000, 0.001, 0.032);
     runtime.lastFrameAt = now;
-    processSpawns(runtime, now);
-    const step = dt / 2;
-    updateBalls(runtime, step, now);
-    updateBalls(runtime, step, now);
-    updatePetLean(runtime, dt);
-    draw(runtime, now);
-    if (maybeFinish(runtime, now)) {
+    runtime.modeController
+      .update(runtime, dt, now);
+    runtime.modeController
+      .draw(runtime, now);
+    if (
+      runtime.modeController
+        .isComplete(runtime, now)
+    ) {
       complete(runtime);
       return;
     }
@@ -1200,6 +1436,15 @@
     preparedAudioContext = savedAudio;
 
     if (!rootEl || !session) return null;
+
+    const requestedMode =
+      normalizeFeedMode(session?.feedMode);
+    const mode =
+      resolveFeedMode(requestedMode);
+    const modeConfig =
+      getFeedModeConfig(mode);
+    const modeController =
+      getModeController(mode);
 
     const gameEl =
       rootEl.querySelector(
@@ -1372,11 +1617,19 @@
     }
 
     const now = performance.now();
+    const scheduled =
+      buildScheduledBalls();
 
     const runtime = {
       running: false,
       roundStarted: false,
       finished: false,
+      requestedMode,
+      mode,
+      modeConfig,
+      modeController,
+      modeDisposed: false,
+      modeTimers: new Set(),
       rafId: 0,
       lastFrameAt: now,
       width,
@@ -1443,8 +1696,9 @@
       ballImages: images.balls,
       balls: [],
       nextBallId: 1,
-      scheduled:
-        buildScheduledBalls(),
+      scheduled,
+      totalCount:
+        scheduled.length,
       scheduledIndex: 0,
       nextScheduledAt: Infinity,
       bursts: [],
@@ -1470,6 +1724,8 @@
     };
 
     activeRuntime = runtime;
+    runtime.modeController
+      .initialize(runtime);
 
     stage.style.backgroundImage =
       `url("${chooseBackground(
@@ -1484,10 +1740,14 @@
 
     runtime.orientationHandler =
       (event) =>
-        handleTilt(
-          runtime,
-          event
-        );
+        runtime.modeController
+          .handleInput(
+            runtime,
+            {
+              type: "tilt",
+              event
+            }
+          );
 
     const moveCatcher =
       (event) => {
@@ -1495,11 +1755,16 @@
           stage
             .getBoundingClientRect();
 
-        setCatcherX(
-          runtime,
-          event.clientX -
-            rect.left
-        );
+        runtime.modeController
+          .handleInput(
+            runtime,
+            {
+              type: "pointer",
+              x:
+                event.clientX -
+                rect.left
+            }
+          );
       };
 
     runtime.pointerDownHandler =
@@ -1615,7 +1880,8 @@
       runtime.resultBackHandler
     );
 
-    draw(runtime, now);
+    runtime.modeController
+      .draw(runtime, now);
 
     if (session.rewardComplete) {
       runtime.score =
@@ -1636,11 +1902,8 @@
 
       showResult(
         runtime,
-        {
-          score: runtime.score,
-          caughtCount:
-            runtime.caughtCount
-        }
+        runtime.modeController
+          .buildResult(runtime)
       );
     }
 

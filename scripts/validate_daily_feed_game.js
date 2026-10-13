@@ -26,12 +26,24 @@ function loadFeedGameForValidation() {
     RAINBOW_BALL,
     TILT_CALIBRATION_MS,
     INTRO_TAP_LOCKOUT_MS,
+    FEED_MODES,
+    FEED_MODE_CONFIGS,
+    normalizeFeedMode,
+    getFeedModeConfig,
+    resolveFeedMode,
+    getModeController,
     buildScheduledBalls,
     chooseBackground,
     createPegField,
     spawnStarBonusBalls,
     ballTouchesPet,
-    maybeFinish
+    maybeFinish,
+    buildStandardResult,
+    disposeMode,
+    setActiveRuntimeForValidation: (runtime) => {
+      activeRuntime = runtime;
+    },
+    getActiveRuntimeForValidation: () => activeRuntime
   });
 
 ${exportMarker}`;
@@ -61,11 +73,21 @@ ${exportMarker}`;
     play() { return Promise.resolve(); }
   }
 
+  const events = {
+    windowAdds: [],
+    windowRemoves: [],
+    cancelledRafs: []
+  };
+
   const window = {
     location: { protocol: "https:" },
     devicePixelRatio: 1,
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener(type) {
+      events.windowAdds.push(type);
+    },
+    removeEventListener(type) {
+      events.windowRemoves.push(type);
+    },
     AudioContext: null,
     webkitAudioContext: null
   };
@@ -77,7 +99,9 @@ ${exportMarker}`;
     fetch: () => Promise.reject(new Error("Network disabled in validation")),
     performance: { now: () => 1000 },
     requestAnimationFrame: () => 1,
-    cancelAnimationFrame() {},
+    cancelAnimationFrame(id) {
+      events.cancelledRafs.push(id);
+    },
     setTimeout,
     clearTimeout,
     console
@@ -92,16 +116,25 @@ ${exportMarker}`;
 
   return {
     api: window.BibloZooDailyFeedGame,
-    hooks: window.__BibloZooDailyFeedGameTestHooks
+    hooks: window.__BibloZooDailyFeedGameTestHooks,
+    events
   };
 }
 
-const { api, hooks } = loadFeedGameForValidation();
+const {
+  api,
+  hooks,
+  events
+} = loadFeedGameForValidation();
 
 function countStars(field) {
   return Array.from(field.pegs)
     .filter((peg) => peg.isStar)
     .length;
+}
+
+function toPlain(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function testPublicApiContract() {
@@ -128,6 +161,328 @@ function testPublicApiContract() {
     });
 }
 
+function testFeedModeRegistryAndNormalization() {
+  assert.deepStrictEqual(
+    toPlain(hooks.FEED_MODES),
+    {
+      CLASSIC: "classic",
+      LABYRINTH: "labyrinth",
+      MELODY: "melody",
+      BOUNCE: "bounce"
+    }
+  );
+
+  [
+    "classic",
+    "labyrinth",
+    "melody",
+    "bounce"
+  ].forEach((mode) => {
+    assert.strictEqual(
+      hooks.normalizeFeedMode(mode),
+      mode
+    );
+  });
+
+  [
+    undefined,
+    null,
+    "",
+    "normal",
+    "music",
+    "paddle",
+    "CLASSIC"
+  ].forEach((value) => {
+    assert.strictEqual(
+      hooks.normalizeFeedMode(value),
+      "classic"
+    );
+  });
+}
+
+function testFeedModeConfigurations() {
+  const configs = hooks.FEED_MODE_CONFIGS;
+
+  assert.deepStrictEqual(
+    Object.keys(configs).sort(),
+    [
+      "bounce",
+      "classic",
+      "labyrinth",
+      "melody"
+    ]
+  );
+
+  assert.strictEqual(configs.classic.implemented, true);
+  assert.strictEqual(configs.classic.schedule, "classic-seven");
+  assert.strictEqual(configs.classic.inputTarget, "pet");
+  assert.strictEqual(configs.classic.catchTarget, "pet");
+  assert.strictEqual(configs.classic.scoring, "points");
+  assert.strictEqual(configs.classic.finishDelayMs, 900);
+  assert.strictEqual(
+    configs.classic.instructions.title,
+    "Catch the BibloSnacks!"
+  );
+  assert.strictEqual(
+    configs.classic.instructions.prompt,
+    "Tilt to steer"
+  );
+
+  ["labyrinth", "melody", "bounce"]
+    .forEach((mode) => {
+      assert.strictEqual(
+        configs[mode].implemented,
+        false,
+        `${mode} must stay unavailable until its gameplay patch lands`
+      );
+    });
+
+  assert.strictEqual(configs.labyrinth.inputTarget, "snacks");
+  assert.strictEqual(configs.melody.scoring, "percentage");
+  assert.strictEqual(configs.bounce.inputTarget, "paddle");
+}
+
+function testUnavailableModesSafelyResolveToClassic() {
+  assert.strictEqual(
+    hooks.resolveFeedMode("classic"),
+    "classic"
+  );
+
+  ["labyrinth", "melody", "bounce"]
+    .forEach((mode) => {
+      assert.strictEqual(
+        hooks.resolveFeedMode(mode),
+        "classic"
+      );
+    });
+
+  assert.strictEqual(
+    hooks.resolveFeedMode("not-a-mode"),
+    "classic"
+  );
+
+  const fallbackMarkup = api.render({
+    session: {
+      petName: "Pip",
+      feedMode: "labyrinth"
+    }
+  });
+
+  assert.ok(
+    fallbackMarkup.includes(
+      'data-daily-feed-mode="classic"'
+    )
+  );
+  assert.ok(
+    fallbackMarkup.includes(
+      "Catch the BibloSnacks!"
+    )
+  );
+  assert.ok(
+    fallbackMarkup.includes(
+      "Tilt to steer"
+    )
+  );
+}
+
+function testClassicModeControllerContract() {
+  const controller =
+    hooks.getModeController("classic");
+
+  assert.strictEqual(controller.id, "classic");
+
+  [
+    "initialize",
+    "update",
+    "draw",
+    "handleInput",
+    "isComplete",
+    "buildResult",
+    "dispose"
+  ].forEach((name) => {
+    assert.strictEqual(
+      typeof controller[name],
+      "function",
+      `Classic controller must provide ${name}()`
+    );
+  });
+
+  ["labyrinth", "melody", "bounce"]
+    .forEach((mode) => {
+      assert.strictEqual(
+        hooks.getModeController(mode),
+        controller
+      );
+    });
+
+  assert.ok(
+    source.includes(
+      "runtime.modeController\n      .update(runtime, dt, now);"
+    )
+  );
+  assert.ok(
+    source.includes(
+      "runtime.modeController\n      .draw(runtime, now);"
+    )
+  );
+  assert.ok(
+    source.includes(
+      ".isComplete(runtime, now)"
+    )
+  );
+}
+
+function testStandardResultContract() {
+  assert.deepStrictEqual(
+    toPlain(
+      hooks.buildStandardResult({
+        mode: "classic",
+        score: 8,
+        caughtCount: 4,
+        totalCount: 7,
+        scheduled: new Array(7)
+      })
+    ),
+    {
+      mode: "classic",
+      score: 8,
+      caughtCount: 4,
+      totalCount: 7,
+      completed: true
+    }
+  );
+
+  assert.deepStrictEqual(
+    toPlain(
+      hooks.buildStandardResult({
+        mode: "not-a-mode",
+        score: -2,
+        caughtCount: -3,
+        scheduled: new Array(7)
+      })
+    ),
+    {
+      mode: "classic",
+      score: 0,
+      caughtCount: 0,
+      totalCount: 7,
+      completed: true
+    }
+  );
+}
+
+function testModeDisposalAndStopAreIdempotent() {
+  let disposeCount = 0;
+  const timerId = setTimeout(() => {}, 10000);
+  const modeRuntime = {
+    modeDisposed: false,
+    modeTimers: new Set([timerId]),
+    modeController: {
+      dispose() {
+        disposeCount += 1;
+      }
+    }
+  };
+
+  hooks.disposeMode(modeRuntime);
+  hooks.disposeMode(modeRuntime);
+
+  assert.strictEqual(disposeCount, 1);
+  assert.strictEqual(modeRuntime.modeDisposed, true);
+  assert.strictEqual(modeRuntime.modeTimers.size, 0);
+
+  events.windowRemoves.length = 0;
+  events.cancelledRafs.length = 0;
+
+  const stageRemoves = [];
+  const overlayRemoves = [];
+  const resultRemoves = [];
+  let releasedPointer = 0;
+  let audioClosed = 0;
+  let stopDisposeCount = 0;
+
+  const runtime = {
+    running: true,
+    rafId: 77,
+    orientationHandler() {},
+    pointerDownHandler() {},
+    pointerMoveHandler() {},
+    pointerEndHandler() {},
+    activePointerId: 3,
+    dragging: true,
+    stage: {
+      removeEventListener(type) {
+        stageRemoves.push(type);
+      },
+      releasePointerCapture() {
+        releasedPointer += 1;
+      }
+    },
+    startOverlay: {
+      removeEventListener(type) {
+        overlayRemoves.push(type);
+      }
+    },
+    startOverlayHandler() {},
+    resultBackButton: {
+      removeEventListener(type) {
+        resultRemoves.push(type);
+      }
+    },
+    resultBackHandler() {},
+    starAudio: null,
+    chompAudio: null,
+    audioContext: {
+      state: "running",
+      close() {
+        audioClosed += 1;
+      }
+    },
+    modeDisposed: false,
+    modeTimers: new Set(),
+    modeController: {
+      dispose() {
+        stopDisposeCount += 1;
+      }
+    },
+    onComplete() {},
+    onBackToZoo() {}
+  };
+
+  hooks.setActiveRuntimeForValidation(runtime);
+  api.stop();
+  api.stop();
+
+  assert.strictEqual(
+    hooks.getActiveRuntimeForValidation(),
+    null
+  );
+  assert.strictEqual(runtime.running, false);
+  assert.deepStrictEqual(events.cancelledRafs, [77]);
+  assert.deepStrictEqual(
+    events.windowRemoves,
+    ["deviceorientation"]
+  );
+  assert.deepStrictEqual(
+    stageRemoves,
+    [
+      "pointerdown",
+      "pointermove",
+      "pointerup",
+      "pointercancel"
+    ]
+  );
+  assert.deepStrictEqual(overlayRemoves, ["click"]);
+  assert.deepStrictEqual(resultRemoves, ["click"]);
+  assert.strictEqual(releasedPointer, 1);
+  assert.strictEqual(audioClosed, 1);
+  assert.strictEqual(stopDisposeCount, 1);
+  assert.strictEqual(runtime.onComplete, null);
+  assert.strictEqual(runtime.onBackToZoo, null);
+  assert.strictEqual(runtime.startOverlayHandler, null);
+  assert.strictEqual(runtime.resultBackHandler, null);
+}
+
 function testClassicRenderContract() {
   const normal = api.render({
     session: { petName: "Pip" },
@@ -135,6 +490,7 @@ function testClassicRenderContract() {
   });
 
   assert.ok(normal.includes("data-daily-feed-game"));
+  assert.ok(normal.includes('data-daily-feed-mode="classic"'));
   assert.ok(normal.includes("data-daily-feed-stage"));
   assert.ok(normal.includes("data-daily-feed-canvas"));
   assert.ok(normal.includes("data-daily-feed-catcher"));
@@ -337,6 +693,12 @@ function testClassicStartRejectsMissingInputs() {
 function main() {
   const tests = [
     testPublicApiContract,
+    testFeedModeRegistryAndNormalization,
+    testFeedModeConfigurations,
+    testUnavailableModesSafelyResolveToClassic,
+    testClassicModeControllerContract,
+    testStandardResultContract,
+    testModeDisposalAndStopAreIdempotent,
     testClassicRenderContract,
     testClassicScheduledBalls,
     testClassicPegField,
