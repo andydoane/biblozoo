@@ -8,8 +8,15 @@ const vm = require("vm");
 const rootDir = path.resolve(__dirname, "..");
 const feedGamePath = path.join(rootDir, "daily_questions_feed_game.js");
 const appPath = path.join(rootDir, "app.js");
+const verseTyperPath = path.join(
+  rootDir,
+  "verse_playground",
+  "verse_typer",
+  "game.js"
+);
 const source = fs.readFileSync(feedGamePath, "utf8");
 const appSource = fs.readFileSync(appPath, "utf8");
+const verseTyperSource = fs.readFileSync(verseTyperPath, "utf8");
 
 function loadFeedGameForValidation() {
   const exportMarker =
@@ -38,6 +45,14 @@ function loadFeedGameForValidation() {
     LABYRINTH_PLATFORM_RESTITUTION,
     LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE,
     LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE,
+    MELODY_BPM,
+    MELODY_BEAT_MS,
+    MELODY_TRAVEL_MS,
+    MELODY_BACKGROUND_GAP_MS,
+    MELODY_LANE_FRACTIONS,
+    MELODY_HOLD_LENGTHS,
+    MELODY_TRANSITION_NOTES,
+    FEED_MELODIES,
     FEED_MODES,
     FEED_MODE_CONFIGS,
     normalizeFeedMode,
@@ -49,6 +64,15 @@ function loadFeedGameForValidation() {
     collideLabyrinthBallWithSegment,
     getLabyrinthLandingBounceVelocity,
     updateLabyrinthMode,
+    normalizeFeedMelodyNotes,
+    createMelodyLanePath,
+    createMelodyTimeline,
+    midiToFrequency,
+    calculateMelodyCatchPercent,
+    initializeMelodyMode,
+    updateMelodyMode,
+    buildMelodyResult,
+    disposeMelodyMode,
     advanceLabyrinthPet,
     recoverStuckLabyrinthBall,
     buildScheduledBalls,
@@ -262,7 +286,7 @@ function testFeedModeConfigurations() {
     "Tilt to guide the snacks"
   );
 
-  ["melody", "bounce"]
+  ["bounce"]
     .forEach((mode) => {
       assert.strictEqual(
         configs[mode].implemented,
@@ -271,7 +295,12 @@ function testFeedModeConfigurations() {
       );
     });
 
+  assert.strictEqual(configs.melody.implemented, true);
+  assert.strictEqual(configs.melody.schedule, "melody");
+  assert.strictEqual(configs.melody.inputTarget, "pet");
+  assert.strictEqual(configs.melody.catchTarget, "pet");
   assert.strictEqual(configs.melody.scoring, "percentage");
+  assert.strictEqual(configs.melody.finishDelayMs, 900);
   assert.strictEqual(configs.bounce.inputTarget, "paddle");
 }
 
@@ -285,7 +314,12 @@ function testUnavailableModesSafelyResolveToClassic() {
     "labyrinth"
   );
 
-  ["melody", "bounce"]
+  assert.strictEqual(
+    hooks.resolveFeedMode("melody"),
+    "melody"
+  );
+
+  ["bounce"]
     .forEach((mode) => {
       assert.strictEqual(
         hooks.resolveFeedMode(mode),
@@ -344,13 +378,18 @@ function testClassicModeControllerContract() {
     );
   });
 
-  ["melody", "bounce"]
+  ["bounce"]
     .forEach((mode) => {
       assert.strictEqual(
         hooks.getModeController(mode),
         controller
       );
     });
+
+  assert.notStrictEqual(
+    hooks.getModeController("melody"),
+    controller
+  );
 
   assert.notStrictEqual(
     hooks.getModeController("labyrinth"),
@@ -995,6 +1034,240 @@ function testLabyrinthAlwaysReachesCompletion() {
   );
 }
 
+function extractVerseTyperOdeToJoy() {
+  const match = verseTyperSource.match(
+    /id:\s*"odeToJoy"\s*,\s*melody:\s*\[([\s\S]*?)\]\s*\}/
+  );
+  assert.ok(match, "Verse Typer must still expose the odeToJoy melody block");
+  return (match[1].match(/-?\d+/g) || []).map(Number);
+}
+
+function testMelodyExactOdeToJoySequence() {
+  const reference = extractVerseTyperOdeToJoy();
+  const feeding = Array.from(hooks.FEED_MELODIES[0].notes);
+
+  assert.strictEqual(hooks.FEED_MELODIES[0].id, "odeToJoy");
+  assert.strictEqual(reference.length, 60);
+  assert.deepStrictEqual(feeding, reference);
+}
+
+function testMelodyRenderAndControllerContract() {
+  const markup = api.render({
+    session: {
+      petName: "Pip",
+      feedMode: "melody"
+    }
+  });
+
+  assert.ok(markup.includes('data-daily-feed-mode="melody"'));
+  assert.ok(markup.includes("Catch the BibloSnacks!"));
+  assert.ok(markup.includes("Tilt to make music"));
+  assert.ok(markup.includes("falling musical snacks"));
+  assert.ok(markup.includes("Caught</span>"));
+  assert.ok(markup.includes(">0%</strong>"));
+
+  const controller = hooks.getModeController("melody");
+  assert.strictEqual(controller.id, "melody");
+  [
+    "initialize",
+    "update",
+    "draw",
+    "handleInput",
+    "isComplete",
+    "buildResult",
+    "dispose"
+  ].forEach((name) => {
+    assert.strictEqual(
+      typeof controller[name],
+      "function",
+      `Melody controller must provide ${name}()`
+    );
+  });
+}
+
+function testMelodyTimingModel() {
+  assert.strictEqual(hooks.MELODY_BPM, 116);
+  assert.strictEqual(hooks.MELODY_BEAT_MS, 60000 / 116);
+  assert.strictEqual(hooks.MELODY_TRAVEL_MS, 2400);
+  assert.strictEqual(hooks.MELODY_BACKGROUND_GAP_MS, 250);
+
+  const timeline = hooks.createMelodyTimeline(
+    [60, 62, { midi: 64, beats: 2 }, { midi: null, beats: 0.5 }, 65],
+    400
+  );
+
+  assert.strictEqual(timeline[0].spawnOffsetMs, 0);
+  assert.ok(Math.abs(timeline[1].spawnOffsetMs - hooks.MELODY_BEAT_MS) < 0.001);
+  assert.ok(Math.abs(timeline[2].spawnOffsetMs - hooks.MELODY_BEAT_MS * 2) < 0.001);
+  assert.ok(Math.abs(timeline[3].spawnOffsetMs - hooks.MELODY_BEAT_MS * 4) < 0.001);
+  assert.strictEqual(timeline[3].midi, null);
+  assert.strictEqual(timeline[3].laneFraction, null);
+  assert.ok(Math.abs(timeline[4].spawnOffsetMs - hooks.MELODY_BEAT_MS * 4.5) < 0.001);
+  assert.strictEqual(
+    timeline[0].arrivalOffsetMs - timeline[0].spawnOffsetMs,
+    hooks.MELODY_TRAVEL_MS
+  );
+}
+
+function testMelodyLanePathIsReadable() {
+  const path = hooks.createMelodyLanePath(60);
+  assert.strictEqual(path.length, 60);
+  assert.deepStrictEqual(
+    toPlain(hooks.MELODY_HOLD_LENGTHS),
+    [7, 9, 8, 6]
+  );
+  assert.strictEqual(hooks.MELODY_TRANSITION_NOTES, 4);
+  assert.deepStrictEqual(
+    toPlain(hooks.MELODY_LANE_FRACTIONS),
+    { left: 0.3, middle: 0.5, right: 0.7 }
+  );
+
+  path.forEach((fraction) => {
+    assert.ok(fraction >= 0.3 && fraction <= 0.7);
+  });
+
+  for (let index = 1; index < path.length; index += 1) {
+    assert.ok(
+      Math.abs(path[index] - path[index - 1]) <= 0.1 + 1e-9,
+      "Melody lane transitions must move gradually"
+    );
+  }
+
+  assert.deepStrictEqual(
+    toPlain(path.slice(0, 7)),
+    new Array(7).fill(0.3)
+  );
+  assert.deepStrictEqual(
+    toPlain(
+      path.slice(7, 11)
+        .map((value) => Number(value.toFixed(2)))
+    ),
+    [0.4, 0.5, 0.6, 0.7]
+  );
+}
+
+function testMelodyMidiFrequencyMatchesVerseTyper() {
+  assert.ok(Math.abs(hooks.midiToFrequency(69) - 440) < 0.000001);
+  assert.ok(Math.abs(hooks.midiToFrequency(60) - 261.625565) < 0.001);
+  assert.ok(
+    verseTyperSource.includes(
+      "440 * Math.pow(2, (midi - 69) / 12)"
+    )
+  );
+  assert.ok(
+    source.includes(
+      "440 * Math.pow(2, (Number(midi) - 69) / 12)"
+    )
+  );
+}
+
+function testMelodyPercentageScoring() {
+  assert.strictEqual(hooks.calculateMelodyCatchPercent(60, 60), 100);
+  assert.strictEqual(hooks.calculateMelodyCatchPercent(0, 60), 0);
+  assert.strictEqual(hooks.calculateMelodyCatchPercent(46, 60), 77);
+
+  const result = hooks.buildMelodyResult({
+    mode: "melody",
+    score: 0,
+    caughtCount: 46,
+    totalCount: 60,
+    scheduled: []
+  });
+
+  assert.deepStrictEqual(
+    toPlain(result),
+    {
+      mode: "melody",
+      score: 77,
+      caughtCount: 46,
+      totalCount: 60,
+      completed: true,
+      catchPercent: 77
+    }
+  );
+  assert.ok(
+    source.includes("`Snacks Caught: ${Number(result.catchPercent) || 0}%`")
+  );
+}
+
+function testMelodyIgnoresQuestionStars() {
+  const runtime = makeLabyrinthRuntime(2);
+  runtime.mode = "melody";
+  runtime.scoreEl = { textContent: "" };
+
+  hooks.initializeMelodyMode(runtime);
+
+  assert.deepStrictEqual(toPlain(runtime.pegs), []);
+  assert.deepStrictEqual(toPlain(runtime.bursts), []);
+  assert.strictEqual(runtime.totalCount, 60);
+  assert.strictEqual(runtime.scheduled.length, 0);
+  assert.strictEqual(runtime.scoreEl.textContent, "0%");
+}
+
+function testMelodyCompletionWaitsForFinalArrival() {
+  const runtime = makeLabyrinthRuntime(0);
+  runtime.mode = "melody";
+  runtime.modeConfig = hooks.FEED_MODE_CONFIGS.melody;
+  runtime.scoreEl = { textContent: "" };
+  hooks.initializeMelodyMode(runtime);
+
+  const controller = hooks.getModeController("melody");
+  runtime.melody.classifiedCount = 59;
+  assert.strictEqual(controller.isComplete(runtime, 1000), false);
+  assert.strictEqual(runtime.finishAt, 0);
+
+  runtime.melody.classifiedCount = 60;
+  assert.strictEqual(controller.isComplete(runtime, 1000), false);
+  assert.strictEqual(runtime.finishAt, 1900);
+  assert.strictEqual(controller.isComplete(runtime, 1899), false);
+  assert.strictEqual(controller.isComplete(runtime, 1900), true);
+}
+
+function testMelodyAudioAndBackgroundSafety() {
+  const catchStart = source.indexOf("function catchMelodyNote");
+  const catchEnd = source.indexOf("function updateMelodyMode", catchStart);
+  const catchSource = source.slice(catchStart, catchEnd);
+
+  assert.ok(catchStart >= 0 && catchEnd > catchStart);
+  assert.ok(catchSource.includes("playMelodyTone(runtime, entry.midi);"));
+  assert.ok(!catchSource.includes("playChompSound"));
+  assert.ok(
+    source.includes(
+      "now - state.lastUpdateAt > MELODY_BACKGROUND_GAP_MS"
+    )
+  );
+  assert.ok(
+    source.includes(
+      "if (resumedAfterGap) {\n          classifyMelodyMiss(runtime, entry);"
+    )
+  );
+
+  let stopCount = 0;
+  let disconnectCount = 0;
+  const runtime = {
+    melody: {
+      activeVoices: new Set([
+        {
+          oscillator: {
+            stop() { stopCount += 1; },
+            disconnect() { disconnectCount += 1; }
+          },
+          gain: {
+            disconnect() { disconnectCount += 1; }
+          }
+        }
+      ]),
+      lastUpdateAt: 100
+    }
+  };
+
+  hooks.disposeMelodyMode(runtime);
+  assert.strictEqual(stopCount, 1);
+  assert.strictEqual(disconnectCount, 2);
+  assert.strictEqual(runtime.melody.activeVoices.size, 0);
+  assert.strictEqual(runtime.melody.lastUpdateAt, 0);
+}
+
 function testStandardResultContract() {
   assert.deepStrictEqual(
     toPlain(
@@ -1190,8 +1463,8 @@ function testFeedingGameTesterModesAndStars() {
         /enabled: false/g
       ) || []
     ).length,
-    2,
-    "Classic and Labyrinth should be enabled after Patch 04"
+    1,
+    "Only Bounce should remain disabled after Patch 05"
   );
 
   assert.ok(
@@ -1199,6 +1472,12 @@ function testFeedingGameTesterModesAndStars() {
       'id: "labyrinth",\n          label: "Labyrinth",\n          enabled: true'
     ),
     "Labyrinth must be launchable from the Feeding Game Tester"
+  );
+  assert.ok(
+    testerSource.includes(
+      'id: "melody",\n          label: "Melody",\n          enabled: true'
+    ),
+    "Melody must be launchable from the Feeding Game Tester"
   );
 
   assert.ok(
@@ -1583,6 +1862,15 @@ function main() {
     testLabyrinthOldBallsDoNotExpire,
     testLabyrinthStuckRecoveryNudgesTowardGap,
     testLabyrinthAlwaysReachesCompletion,
+    testMelodyExactOdeToJoySequence,
+    testMelodyRenderAndControllerContract,
+    testMelodyTimingModel,
+    testMelodyLanePathIsReadable,
+    testMelodyMidiFrequencyMatchesVerseTyper,
+    testMelodyPercentageScoring,
+    testMelodyIgnoresQuestionStars,
+    testMelodyCompletionWaitsForFinalArrival,
+    testMelodyAudioAndBackgroundSafety,
     testStandardResultContract,
     testModeDisposalAndStopAreIdempotent,
     testFeedingGameTesterRegistration,

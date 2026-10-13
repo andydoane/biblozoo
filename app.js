@@ -14576,7 +14576,7 @@ function screenTitle(idx) {
         Object.freeze({
           id: "melody",
           label: "Melody",
-          enabled: false
+          enabled: true
         }),
         Object.freeze({
           id: "bounce",
@@ -14756,7 +14756,7 @@ function screenTitle(idx) {
       showDialog({
         title: "Feeding Game Tester",
         body:
-          "Choose a feeding mode. Classic and Labyrinth are playable now; Melody and Bounce are listed for upcoming gameplay patches.",
+          "Choose a feeding mode. Classic, Labyrinth, and Melody are playable now; Bounce is listed for its upcoming gameplay patch.",
         actionsClass:
           "daily-preview-dialog-actions",
         actions: [

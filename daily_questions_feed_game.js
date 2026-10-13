@@ -63,7 +63,7 @@
     }),
     [FEED_MODES.MELODY]: Object.freeze({
       id: FEED_MODES.MELODY,
-      implemented: false,
+      implemented: true,
       schedule: "melody",
       inputTarget: "pet",
       catchTarget: "pet",
@@ -110,6 +110,47 @@
   const LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE = 6.5;
   const LABYRINTH_RELEASE_SPEED_SCALE = 0.32;
 
+  const MELODY_BPM = 116;
+  const MELODY_BEAT_MS = 60000 / MELODY_BPM;
+  const MELODY_TRAVEL_MS = 2400;
+  const MELODY_BACKGROUND_GAP_MS = 250;
+  const MELODY_LANE_FRACTIONS = Object.freeze({
+    left: 0.30,
+    middle: 0.50,
+    right: 0.70
+  });
+  const MELODY_HOLD_LENGTHS = Object.freeze([7, 9, 8, 6]);
+  const MELODY_TRANSITION_NOTES = 4;
+  const MELODY_TONE_DURATION = 0.22;
+  const MELODY_TONE_VOLUME = 0.12;
+
+  const FEED_MELODIES = Object.freeze([
+    Object.freeze({
+      id: "odeToJoy",
+      notes: Object.freeze([
+        64,64,65,67,
+        67,65,64,62,
+        60,60,62,64,
+        64,62,62,
+
+        64,64,65,67,
+        67,65,64,62,
+        60,60,62,64,
+        62,60,60,
+
+        62,62,64,60,
+        62,64,65,60,
+        62,64,64,62,
+        60,62,55,
+
+        64,64,65,67,
+        67,65,64,62,
+        60,60,62,64,
+        62,60,60
+      ])
+    })
+  ]);
+
   let activeRuntime = null;
   let preparedAudioContext = null;
   let preparedStarBuffer = null;
@@ -121,6 +162,149 @@
   const randomFrom = (items) => items?.length
     ? items[Math.floor(Math.random() * items.length)]
     : null;
+
+  function normalizeFeedMelodyNotes(notes) {
+    return (Array.isArray(notes) ? notes : [])
+      .map((note) => {
+        if (Number.isFinite(note)) {
+          return { midi: Number(note), beats: 1 };
+        }
+
+        const beats =
+          Number.isFinite(Number(note?.beats)) &&
+          Number(note.beats) > 0
+            ? Number(note.beats)
+            : 1;
+        const rawMidi = note?.midi;
+        const midi =
+          rawMidi === null ||
+          rawMidi === undefined ||
+          rawMidi === ""
+            ? null
+            : Number.isFinite(Number(rawMidi))
+              ? Number(rawMidi)
+              : null;
+
+        return { midi, beats };
+      });
+  }
+
+  function createMelodyLanePath(noteCount) {
+    const count =
+      Math.max(0, Math.floor(Number(noteCount) || 0));
+    if (!count) return [];
+
+    const targetSequence = [
+      MELODY_LANE_FRACTIONS.left,
+      MELODY_LANE_FRACTIONS.right,
+      MELODY_LANE_FRACTIONS.middle,
+      MELODY_LANE_FRACTIONS.left,
+      MELODY_LANE_FRACTIONS.right,
+      MELODY_LANE_FRACTIONS.middle
+    ];
+    const path = [];
+    let targetIndex = 0;
+    let current = targetSequence[0];
+
+    while (path.length < count) {
+      const holdLength =
+        MELODY_HOLD_LENGTHS[
+          targetIndex % MELODY_HOLD_LENGTHS.length
+        ];
+
+      for (
+        let index = 0;
+        index < holdLength && path.length < count;
+        index += 1
+      ) {
+        path.push(current);
+      }
+
+      if (path.length >= count) break;
+
+      const next =
+        targetSequence[
+          (targetIndex + 1) % targetSequence.length
+        ];
+
+      for (
+        let step = 1;
+        step <= MELODY_TRANSITION_NOTES && path.length < count;
+        step += 1
+      ) {
+        path.push(
+          current +
+          (next - current) *
+          (step / MELODY_TRANSITION_NOTES)
+        );
+      }
+
+      current = next;
+      targetIndex += 1;
+    }
+
+    return path;
+  }
+
+  function createMelodyTimeline(
+    notes,
+    width,
+    {
+      bpm = MELODY_BPM,
+      travelMs = MELODY_TRAVEL_MS
+    } = {}
+  ) {
+    const normalized =
+      normalizeFeedMelodyNotes(notes);
+    const playableCount =
+      normalized.filter((note) => Number.isFinite(note.midi)).length;
+    const lanePath =
+      createMelodyLanePath(playableCount);
+    const safeWidth = Math.max(120, Number(width) || 0);
+    const safeBpm = Math.max(1, Number(bpm) || MELODY_BPM);
+    const beatMs = 60000 / safeBpm;
+    const safeTravelMs = Math.max(250, Number(travelMs) || MELODY_TRAVEL_MS);
+    let beatOffset = 0;
+    let playableIndex = 0;
+
+    return normalized.map((note, index) => {
+      const laneFraction =
+        Number.isFinite(note.midi)
+          ? lanePath[playableIndex++]
+          : null;
+      const spawnOffsetMs = beatOffset * beatMs;
+      const entry = {
+        index,
+        midi: note.midi,
+        beats: note.beats,
+        laneFraction,
+        x: laneFraction === null
+          ? null
+          : safeWidth * laneFraction,
+        spawnOffsetMs,
+        arrivalOffsetMs: spawnOffsetMs + safeTravelMs,
+        status: "pending"
+      };
+
+      beatOffset += note.beats;
+      return entry;
+    });
+  }
+
+  function midiToFrequency(midi) {
+    return 440 * Math.pow(2, (Number(midi) - 69) / 12);
+  }
+
+  function calculateMelodyCatchPercent(caughtCount, totalCount) {
+    const total = Math.max(0, Number(totalCount) || 0);
+    if (!total) return 0;
+    const caught = clamp(
+      Math.max(0, Number(caughtCount) || 0),
+      0,
+      total
+    );
+    return Math.round(100 * caught / total);
+  }
 
   function normalizeFeedMode(value) {
     return Object.values(FEED_MODES).includes(value)
@@ -618,12 +802,14 @@
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
         ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
-        : `Tilt or drag ${petName} left and right to catch the falling food`;
+        : mode === FEED_MODES.MELODY
+          ? `Tilt or drag ${petName} left and right to catch the falling musical snacks`
+          : `Tilt or drag ${petName} left and right to catch the falling food`;
     return `
       <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-feed-mode="${mode}" data-daily-session-phase="reward_game">
         <div class="daily-feed-score-badge" aria-live="polite" aria-label="Score">
-          <span class="daily-feed-score-label">Score</span>
-          <strong class="daily-feed-score-value" data-daily-feed-score>0</strong>
+          <span class="daily-feed-score-label">${mode === FEED_MODES.MELODY ? "Caught" : "Score"}</span>
+          <strong class="daily-feed-score-value" data-daily-feed-score>${mode === FEED_MODES.MELODY ? "0%" : "0"}</strong>
         </div>
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
@@ -2138,6 +2324,379 @@
       dispose: disposeLabyrinthMode
     });
 
+  function getMelodySnackConfig(index) {
+    const configs = [...SOLID_BALLS, RAINBOW_BALL];
+    return configs[index % configs.length];
+  }
+
+  function updateMelodyScore(runtime) {
+    const state = runtime?.melody;
+    if (!state) return;
+
+    runtime.score =
+      calculateMelodyCatchPercent(
+        runtime.caughtCount,
+        runtime.totalCount
+      );
+
+    if (!runtime.scoreEl) return;
+    runtime.scoreEl.textContent = `${runtime.score}%`;
+    const badge =
+      runtime.scoreEl.closest(
+        ".daily-feed-score-badge"
+      );
+    if (!badge) return;
+    badge.classList.remove("is-bumped");
+    void badge.offsetWidth;
+    badge.classList.add("is-bumped");
+  }
+
+  function playMelodyTone(runtime, midi) {
+    const context = runtime?.audioContext;
+    const state = runtime?.melody;
+
+    if (
+      !state ||
+      !context ||
+      context.state === "closed" ||
+      !Number.isFinite(Number(midi))
+    ) {
+      return false;
+    }
+
+    if (context.state !== "running") {
+      context.resume?.().catch?.(() => {});
+      return false;
+    }
+
+    try {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startAt = context.currentTime;
+      const voice = { oscillator, gain };
+
+      oscillator.type = "triangle";
+      oscillator.frequency.setValueAtTime(
+        midiToFrequency(midi),
+        startAt
+      );
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(
+        MELODY_TONE_VOLUME,
+        startAt + 0.012
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        startAt + MELODY_TONE_DURATION
+      );
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      state.activeVoices.add(voice);
+
+      oscillator.onended = () => {
+        state.activeVoices.delete(voice);
+        try { oscillator.disconnect(); } catch (err) { }
+        try { gain.disconnect(); } catch (err) { }
+      };
+
+      oscillator.start(startAt);
+      oscillator.stop(
+        startAt + MELODY_TONE_DURATION + 0.04
+      );
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function stopMelodyVoices(runtime) {
+    const voices = runtime?.melody?.activeVoices;
+    if (!voices) return;
+
+    for (const voice of voices) {
+      try { voice.oscillator?.stop?.(); } catch (err) { }
+      try { voice.oscillator?.disconnect?.(); } catch (err) { }
+      try { voice.gain?.disconnect?.(); } catch (err) { }
+    }
+    voices.clear();
+  }
+
+  function initializeMelodyMode(runtime) {
+    const tune = FEED_MELODIES[0];
+    const timeline =
+      createMelodyTimeline(
+        tune?.notes,
+        runtime.width,
+        {
+          bpm: MELODY_BPM,
+          travelMs: MELODY_TRAVEL_MS
+        }
+      );
+    const totalCount =
+      timeline.filter(
+        (entry) => Number.isFinite(entry.midi)
+      ).length;
+
+    runtime.pegs = [];
+    runtime.bursts = [];
+    runtime.balls = [];
+    runtime.scheduled = [];
+    runtime.scheduledIndex = 0;
+    runtime.nextScheduledAt = Infinity;
+    runtime.score = 0;
+    runtime.caughtCount = 0;
+    runtime.totalCount = totalCount;
+    runtime.melody = {
+      tuneId: tune?.id || "odeToJoy",
+      bpm: MELODY_BPM,
+      beatMs: MELODY_BEAT_MS,
+      travelMs: MELODY_TRAVEL_MS,
+      timeline,
+      startTime: null,
+      lastUpdateAt: 0,
+      classifiedCount: 0,
+      activeVoices: new Set()
+    };
+
+    if (runtime.scoreEl) {
+      runtime.scoreEl.textContent = "0%";
+    }
+  }
+
+  function spawnMelodyNote(runtime, entry) {
+    const radius = runtime.pegRadius * 0.66;
+    const config = getMelodySnackConfig(entry.index);
+    const x = clamp(
+      Number(entry.x) || runtime.width / 2,
+      radius * 1.25,
+      runtime.width - radius * 1.25
+    );
+
+    entry.status = "active";
+    runtime.balls.push({
+      id: runtime.nextBallId++,
+      config,
+      melodyEntry: entry,
+      x,
+      y: -radius * 1.25,
+      vx: 0,
+      vy: 0,
+      radius,
+      rotation: 0,
+      angularVelocity: 0,
+      points: 0,
+      trail: [],
+      lastTrailAt: 0
+    });
+  }
+
+  function classifyMelodyMiss(runtime, entry) {
+    if (!entry || entry.status === "missed" || entry.status === "caught") {
+      return;
+    }
+    entry.status = "missed";
+    runtime.melody.classifiedCount += 1;
+    updateMelodyScore(runtime);
+  }
+
+  function catchMelodyNote(runtime, ball) {
+    const entry = ball?.melodyEntry;
+    if (!entry || entry.status !== "active") return;
+
+    entry.status = "caught";
+    runtime.caughtCount += 1;
+    runtime.melody.classifiedCount += 1;
+    updateMelodyScore(runtime);
+    playMelodyTone(runtime, entry.midi);
+
+    runtime.catcher.classList.remove("is-catching");
+    void runtime.catcher.offsetWidth;
+    runtime.catcher.classList.add("is-catching");
+  }
+
+  function updateMelodyMode(
+    runtime,
+    dt,
+    now
+  ) {
+    const state = runtime.melody;
+    if (!state) return;
+
+    if (!Number.isFinite(state.startTime)) {
+      state.startTime = now;
+      state.lastUpdateAt = now;
+    }
+
+    const resumedAfterGap =
+      state.lastUpdateAt > 0 &&
+      now - state.lastUpdateAt > MELODY_BACKGROUND_GAP_MS;
+    state.lastUpdateAt = now;
+
+    const elapsed = now - state.startTime;
+
+    for (const entry of state.timeline) {
+      if (entry.status !== "pending") continue;
+
+      if (!Number.isFinite(entry.midi)) {
+        if (elapsed >= entry.spawnOffsetMs) {
+          entry.status = "rest";
+        }
+        continue;
+      }
+
+      if (elapsed >= entry.arrivalOffsetMs) {
+        classifyMelodyMiss(runtime, entry);
+        continue;
+      }
+
+      if (elapsed >= entry.spawnOffsetMs) {
+        spawnMelodyNote(runtime, entry);
+      }
+    }
+
+    const nextBalls = [];
+    const startY = -runtime.pegRadius;
+    const arrivalY = runtime.petCenterY;
+
+    for (const ball of runtime.balls) {
+      const entry = ball.melodyEntry;
+      if (!entry || entry.status !== "active") continue;
+
+      const progress =
+        (elapsed - entry.spawnOffsetMs) /
+        Math.max(1, state.travelMs);
+
+      if (progress >= 1) {
+        if (resumedAfterGap) {
+          classifyMelodyMiss(runtime, entry);
+        } else {
+          const catchHalfWidth =
+            runtime.petRadius +
+            ball.radius * 0.65;
+          if (
+            Math.abs(ball.x - runtime.catcherX) <=
+            catchHalfWidth
+          ) {
+            catchMelodyNote(runtime, ball);
+          } else {
+            classifyMelodyMiss(runtime, entry);
+          }
+        }
+        continue;
+      }
+
+      const visibleProgress = clamp(progress, 0, 1);
+      ball.y =
+        startY +
+        (arrivalY - startY) * visibleProgress;
+      ball.rotation = visibleProgress * Math.PI * 2;
+      nextBalls.push(ball);
+    }
+
+    runtime.balls = nextBalls;
+    updatePetLean(runtime, dt);
+  }
+
+  function drawMelodyMode(runtime) {
+    const ctx = runtime.ctx;
+
+    ctx.setTransform(
+      runtime.dpr,
+      0,
+      0,
+      runtime.dpr,
+      0,
+      0
+    );
+    ctx.clearRect(
+      0,
+      0,
+      runtime.width,
+      runtime.height
+    );
+
+    for (const ball of runtime.balls) {
+      drawBall(runtime, ball);
+    }
+  }
+
+  function handleMelodyModeInput(
+    runtime,
+    input
+  ) {
+    if (input?.type === "tilt") {
+      handleTilt(runtime, input.event);
+      return;
+    }
+
+    if (input?.type === "pointer") {
+      setCatcherX(runtime, input.x);
+    }
+  }
+
+  function isMelodyModeComplete(
+    runtime,
+    now
+  ) {
+    const state = runtime.melody;
+    if (
+      !state ||
+      state.classifiedCount < runtime.totalCount ||
+      runtime.balls.length
+    ) {
+      runtime.finishAt = 0;
+      return false;
+    }
+
+    if (!runtime.finishAt) {
+      runtime.finishAt =
+        now +
+        (
+          Number(runtime.modeConfig?.finishDelayMs) ||
+          900
+        );
+      return false;
+    }
+
+    return now >= runtime.finishAt;
+  }
+
+  function buildMelodyResult(runtime) {
+    const catchPercent =
+      calculateMelodyCatchPercent(
+        runtime.caughtCount,
+        runtime.totalCount
+      );
+    runtime.score = catchPercent;
+
+    return {
+      ...buildStandardResult(runtime),
+      score: catchPercent,
+      totalCount: runtime.totalCount,
+      catchPercent
+    };
+  }
+
+  function disposeMelodyMode(runtime) {
+    stopMelodyVoices(runtime);
+    if (runtime?.melody) {
+      runtime.melody.lastUpdateAt = 0;
+    }
+  }
+
+  const MELODY_MODE_CONTROLLER =
+    Object.freeze({
+      id: FEED_MODES.MELODY,
+      initialize: initializeMelodyMode,
+      update: updateMelodyMode,
+      draw: drawMelodyMode,
+      handleInput: handleMelodyModeInput,
+      isComplete: isMelodyModeComplete,
+      buildResult: buildMelodyResult,
+      dispose: disposeMelodyMode
+    });
+
   function initializeClassicMode() { }
 
   function updateClassicMode(
@@ -2206,7 +2765,9 @@
       [FEED_MODES.CLASSIC]:
         CLASSIC_MODE_CONTROLLER,
       [FEED_MODES.LABYRINTH]:
-        LABYRINTH_MODE_CONTROLLER
+        LABYRINTH_MODE_CONTROLLER,
+      [FEED_MODES.MELODY]:
+        MELODY_MODE_CONTROLLER
     });
 
   function resolveFeedMode(value) {
@@ -2282,7 +2843,9 @@
         ? `Thanks for the snack, ${runtime.zookeeperName}!`
         : copy.title;
     runtime.resultScoreEl.textContent =
-      `Score: ${result.score}`;
+      result.mode === FEED_MODES.MELODY
+        ? `Snacks Caught: ${Number(result.catchPercent) || 0}%`
+        : `Score: ${result.score}`;
     runtime.resultOverlay.hidden = false;
   }
 
