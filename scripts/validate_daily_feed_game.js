@@ -18,6 +18,10 @@ const verseTyperPath = path.join(
 const source = fs.readFileSync(feedGamePath, "utf8");
 const feedGameCssSource = fs.readFileSync(feedGameCssPath, "utf8");
 const appSource = fs.readFileSync(appPath, "utf8");
+const dailyTodo = require(path.join(rootDir, "daily_zoo_todo.js"));
+const dailyTodoSource = fs.readFileSync(
+  path.join(rootDir, "daily_zoo_todo.js"), "utf8"
+);
 const verseTyperSource = fs.readFileSync(verseTyperPath, "utf8");
 
 function loadFeedGameForValidation() {
@@ -1394,8 +1398,10 @@ function testBounceOverlayLifecycleAndRealDailyIsolation() {
     appSource.indexOf("async function startDailyTodoSnack("),
     appSource.indexOf("function claimDailyTodoSnack(")
   );
-  assert.ok(realDaily.includes('feedMode: "classic"'),
-    "Real Daily snack remains Classic despite Bounce becoming testable");
+  assert.ok(realDaily.includes("feedMode: selectedFeedMode"),
+    "Real Daily uses the saved selected mode");
+  assert.ok(realDaily.includes("ENABLE_DAILY_FEEDING_VARIETY"),
+    "Classic-only fallback must remain available");
 }
 
 function testBounceGrayBricksCannotFinishWhileSnacksRemain() {
@@ -2264,27 +2270,278 @@ function testFeedingGamePreviewSessionIsolation() {
   );
 }
 
-function testRealDailySnackExplicitlyUsesClassic() {
-  const start =
-    appSource.indexOf(
-      "async function startDailyTodoSnack("
-    );
-  const end =
-    appSource.indexOf(
-      "function claimDailyTodoSnack(",
-      start
-    );
-  const startSource =
-    appSource.slice(start, end);
-
+function testRealDailySnackUsesPersistedRotationAndHasClassicFallback() {
+  const start = appSource.indexOf("async function startDailyTodoSnack(");
+  const end = appSource.indexOf("function claimDailyTodoSnack(", start);
+  const startSource = appSource.slice(start, end);
   assert.ok(start >= 0 && end > start);
-  assert.ok(
-    startSource.includes(
-      'dailyTodoSnack: true,\n    feedMode: "classic",'
-    ),
-    "Normal Daily snack sessions must explicitly launch Classic"
-  );
+  assert.ok(appSource.includes("const ENABLE_DAILY_FEEDING_VARIETY = true;"));
+  assert.ok(startSource.includes("ready.plan.feedMode"));
+  assert.ok(startSource.includes("ready.engine.DAILY_FEED_MODES?.includes"));
+  assert.ok(startSource.includes("ENABLE_DAILY_FEEDING_VARIETY"));
+  assert.ok(startSource.includes('      : "classic";'));
+  assert.ok(startSource.includes("feedMode: selectedFeedMode"));
+  assert.ok(startSource.includes("ready.plan.earnedStarPegCount"));
+  assert.ok(!startSource.includes("dailyTodoPreview: true"));
 }
+
+function feedRotationState() {
+  return dailyTodo.normalizeState({
+    activePlan: null,
+    stats: { feedRotation: { order: [], index: 0 } }
+  });
+}
+
+function feedingPlan(mode, now, id = "feeding-test") {
+  const completed = {
+    status: "complete", startedAt: 1, pendingAt: 0,
+    completedAt: 1, launchToken: "", pendingData: null
+  };
+  return {
+    kind: "care", id, profileId: "profile-A",
+    day: dailyTodo.localDayKey(now), verseId: "john_3_16",
+    activity: { kind: "game", id: "verse_game", mode: "easy" },
+    requiredTaskIds: ["review", "questions", "activity"],
+    tasks: {
+      review: { ...completed }, questions: { ...completed },
+      activity: { ...completed }
+    },
+    educationalCompletedAt: 1,
+    earnedStarPegCount: 2,
+    feedMode: mode,
+    snack: { unlocked: true, claimed: false, claimedAt: 0 }
+  };
+}
+
+function testDailyFeedRotationIsPermutationAndSurvivesPersistence() {
+  let state = feedRotationState();
+  const expected = ["classic", "labyrinth", "melody", "bounce"];
+  assert.deepStrictEqual(Array.from(dailyTodo.DAILY_FEED_MODES), expected);
+  const first = dailyTodo.nextDailyFeedMode(state.stats, () => 0.3);
+  assert.ok(expected.includes(first));
+  const before = JSON.stringify(state);
+  const restored = dailyTodo.normalizeState(JSON.parse(before));
+  assert.strictEqual(dailyTodo.nextDailyFeedMode(restored.stats), first);
+  assert.strictEqual(JSON.stringify(restored), before);
+  assert.strictEqual(new Set(restored.stats.feedRotation.order).size, 4);
+  assert.strictEqual(restored.stats.feedRotation.index, 0);
+}
+
+function testFourClaimedFeedingDaysGetEveryMode() {
+  let state = feedRotationState();
+  const modes = [];
+  const now = new Date(2026, 9, 14, 12, 0);
+  for (let index = 0; index < 8; index += 1) {
+    const selected = dailyTodo.nextDailyFeedMode(state.stats, () => 0.2);
+    modes.push(selected);
+    state.activePlan = feedingPlan(selected, now, `plan-${index}`);
+    const claimed = dailyTodo.markSnackClaimed(state, {
+      planId: `plan-${index}`, now, feedMode: selected, random: () => 0.2
+    });
+    assert.strictEqual(claimed.changed, true);
+    state = claimed.state;
+    assert.strictEqual(state.activePlan.snack.claimed, true);
+    assert.strictEqual(state.activePlan.earnedStarPegCount, 2);
+  }
+  assert.deepStrictEqual(
+    modes.slice(0, 4).sort(),
+    Array.from(dailyTodo.DAILY_FEED_MODES).sort()
+  );
+  assert.deepStrictEqual(
+    modes.slice(4, 8).sort(),
+    Array.from(dailyTodo.DAILY_FEED_MODES).sort()
+  );
+  assert.notStrictEqual(modes[3], modes[4],
+    "Adjacent four-day rotations should not repeat across the boundary");
+}
+
+function testFeedRotationDoesNotAdvanceForSkippedDaysOrDuplicateClaims() {
+  let state = feedRotationState();
+  const now = new Date(2026, 9, 14, 12, 0);
+  const selected = dailyTodo.nextDailyFeedMode(state.stats, () => 0.4);
+  const persisted = JSON.stringify(state.stats.feedRotation);
+  assert.strictEqual(dailyTodo.nextDailyFeedMode(state.stats), selected);
+  assert.strictEqual(JSON.stringify(state.stats.feedRotation), persisted);
+  state.activePlan = feedingPlan(selected, now);
+  const claimed = dailyTodo.markSnackClaimed(state, {
+    planId: "feeding-test", now, feedMode: selected,
+    random: () => 0.4
+  });
+  assert.strictEqual(claimed.changed, true);
+  const afterFirst = JSON.stringify(claimed.state.stats.feedRotation);
+  const again = dailyTodo.markSnackClaimed(claimed.state, {
+    planId: "feeding-test", now, feedMode: selected
+  });
+  assert.strictEqual(again.changed, false);
+  assert.strictEqual(JSON.stringify(again.state.stats.feedRotation), afterFirst);
+}
+
+function testClassicFallbackCanClaimWithoutAdvancingHiddenRotation() {
+  let state = feedRotationState();
+  const now = new Date(2026, 9, 14, 12, 0);
+  const selected = dailyTodo.nextDailyFeedMode(state.stats, () => 0.5);
+  state.activePlan = feedingPlan(selected, now);
+  const before = JSON.stringify(state.stats.feedRotation);
+  const fallback = dailyTodo.markSnackClaimed(state, {
+    planId: "feeding-test", now, feedMode: ""
+  });
+  assert.strictEqual(fallback.changed, true);
+  assert.strictEqual(JSON.stringify(fallback.state.stats.feedRotation), before);
+
+  // Even a cycle whose next scheduled mode is Classic must not
+  // advance while the emergency Classic-only switch is off.
+  const classicState = feedRotationState();
+  const classic = dailyTodo.nextDailyFeedMode(classicState.stats, () => 0.9999);
+  assert.strictEqual(classic, "classic");
+  classicState.activePlan = feedingPlan(classic, now);
+  const classicBefore = JSON.stringify(classicState.stats.feedRotation);
+  const classicFallback = dailyTodo.markSnackClaimed(classicState, {
+    planId: "feeding-test", now, feedMode: ""
+  });
+  assert.strictEqual(classicFallback.changed, true);
+  assert.strictEqual(JSON.stringify(classicFallback.state.stats.feedRotation),
+    classicBefore);
+}
+
+function testLegacyPlanAndInvalidRotationDataAreSafe() {
+  const now = new Date(2026, 9, 14, 12, 0);
+  const oldPlan = feedingPlan("classic", now);
+  delete oldPlan.feedMode;
+  const normalized = dailyTodo.normalizeState({
+    activePlan: oldPlan,
+    stats: { feedRotation: { order: ["bounce", "bounce"], index: 99 } }
+  });
+  assert.strictEqual(normalized.activePlan.feedMode, "classic");
+  assert.deepStrictEqual(normalized.stats.feedRotation, { order: [], index: 0 });
+  assert.strictEqual(dailyTodo.normalizeFeedRotation({
+    order: ["classic", "labyrinth", "melody", "bounce"], index: 8
+  }).index, 0);
+}
+
+function carePlanOptions(progress, now) {
+  return {
+    progress, profileId: "profile-A", verseList: [{ id: "john_3_16" }],
+    gameRegistry: [{ manifest: {
+      id: "verse_game", modes: ["easy"],
+      visibleInCarousel: true, progressType: "standard"
+    } }],
+    playgroundRegistry: [], isPetUnlocked: () => true,
+    getPetStatus: () => "hungry", tutorialActive: true,
+    now, random: () => 0.31
+  };
+}
+
+function testRealCarePlanAssignsGameOnceAndRestoresIt() {
+  const now = new Date(2026, 9, 14, 12, 0);
+  const progress = { verses: { john_3_16: {
+    learnCompleted: true, learnedAt: now.getTime(),
+    lastPracticedAt: now.getTime()
+  } } };
+  const created = dailyTodo.getOrCreatePlan(carePlanOptions(progress, now));
+  assert.strictEqual(created.created, true);
+  assert.strictEqual(created.plan.kind, "care");
+  assert.ok(dailyTodo.DAILY_FEED_MODES.includes(created.plan.feedMode));
+  assert.strictEqual(created.plan.feedMode,
+    created.state.stats.feedRotation.order[0]);
+  const saved = JSON.parse(JSON.stringify(created.progress));
+  const reopened = dailyTodo.getOrCreatePlan(
+    carePlanOptions(saved, now)
+  );
+  assert.strictEqual(reopened.created, false);
+  assert.strictEqual(reopened.plan.id, created.plan.id);
+  assert.strictEqual(reopened.plan.feedMode, created.plan.feedMode);
+  assert.strictEqual(reopened.state.stats.feedRotation.index, 0);
+}
+
+function testPersistedDailyPlanKeepsFeedAssignment() {
+  const now = new Date(2026, 9, 14, 12, 0);
+  let storage = { verses: { john_3_16: {
+    learnCompleted: true, learnedAt: now.getTime()
+  } } };
+  const options = carePlanOptions(null, now);
+  delete options.progress;
+  const callbacks = {
+    loadProgress: () => JSON.parse(JSON.stringify(storage)),
+    saveProgress: (data) => {
+      storage = JSON.parse(JSON.stringify(data));
+      return true;
+    }
+  };
+  const first = dailyTodo.getOrCreatePersistedPlan({ ...options, ...callbacks });
+  assert.strictEqual(first.ok, true);
+  assert.strictEqual(first.created, true);
+  const second = dailyTodo.getOrCreatePersistedPlan({ ...options, ...callbacks });
+  assert.strictEqual(second.ok, true);
+  assert.strictEqual(second.created, false);
+  assert.strictEqual(second.plan.feedMode, first.plan.feedMode);
+  assert.deepStrictEqual(second.state.stats.feedRotation,
+    first.state.stats.feedRotation);
+}
+
+function testIncompleteSnackCannotAdvanceRotation() {
+  const now = new Date(2026, 9, 14, 12, 0);
+  const state = feedRotationState();
+  const selected = dailyTodo.nextDailyFeedMode(state.stats, () => 0.25);
+  state.activePlan = feedingPlan(selected, now);
+  state.activePlan.tasks.questions.status = "open";
+  const before = JSON.stringify(state.stats.feedRotation);
+  const rejected = dailyTodo.markSnackClaimed(state, {
+    planId: "feeding-test", now, feedMode: selected
+  });
+  assert.strictEqual(rejected.changed, false);
+  assert.strictEqual(rejected.state.activePlan.snack.claimed, false);
+  assert.strictEqual(JSON.stringify(rejected.state.stats.feedRotation), before);
+}
+
+function testExpiredSnackCannotAdvanceRotation() {
+  const now = new Date(2026, 9, 14, 12, 0);
+  const nextDay = new Date(2026, 9, 15, 12, 0);
+  const state = feedRotationState();
+  const selected = dailyTodo.nextDailyFeedMode(state.stats, () => 0.25);
+  state.activePlan = feedingPlan(selected, now);
+  const before = JSON.stringify(state.stats.feedRotation);
+  const rejected = dailyTodo.markSnackClaimed(state, {
+    planId: "feeding-test", now: nextDay, feedMode: selected
+  });
+  assert.strictEqual(rejected.changed, false);
+  assert.strictEqual(rejected.state.activePlan.snack.claimed, false);
+  assert.strictEqual(JSON.stringify(rejected.state.stats.feedRotation), before);
+}
+
+function testDailyRotationAssignmentAndClaimPathAreSeparated() {
+  const creationStart = dailyTodoSource.indexOf("  function getOrCreatePlan(");
+  const creationEnd = dailyTodoSource.indexOf("  function getOrCreatePersistedPlan(", creationStart);
+  const creation = dailyTodoSource.slice(creationStart, creationEnd);
+  assert.ok(creation.includes("plan.feedMode = nextDailyFeedMode(state.stats, random)"));
+  assert.ok(creation.indexOf("if (state.activePlan)") < creation.indexOf("plan.feedMode ="));
+  const claimStart = appSource.indexOf("function claimDailyTodoSnack(");
+  const claimEnd = appSource.indexOf("function markLearnCompleted(", claimStart);
+  const claimSource = appSource.slice(claimStart, claimEnd);
+  assert.ok(claimSource.includes("session.rewardClaimed"));
+  assert.ok(claimSource.includes("markSnackClaimed("));
+  assert.ok(claimSource.includes("feedMode: ENABLE_DAILY_FEEDING_VARIETY"));
+  assert.ok(claimSource.includes('? session.feedMode\n          : ""'));
+
+  assert.ok(claimSource.includes("saveDailyTodoRuntime("));
+  assert.ok(claimSource.includes("session.planDay !== plan?.day"));
+}
+
+function testDailyFeedModeSpecificStarAndMelodyBehavior() {
+  const realStart = appSource.indexOf("async function startDailyTodoSnack(");
+  const realEnd = appSource.indexOf("function claimDailyTodoSnack(", realStart);
+  const real = appSource.slice(realStart, realEnd);
+  assert.ok(real.includes("ready.plan.earnedStarPegCount"));
+  assert.ok(!real.includes("feedMelodyId:"),
+    "Real Melody sessions should randomly choose between registered tunes");
+  assert.ok(source.includes("session.feedMelodyId || \"\""));
+  const config = hooks.FEED_MODE_CONFIGS;
+  for (const mode of dailyTodo.DAILY_FEED_MODES) {
+    assert.strictEqual(config[mode].implemented, true);
+  }
+  assert.strictEqual(config.bounce.schedule, "bounce-bricks");
+  assert.strictEqual(config.melody.schedule, "melody");
+}
+
 
 function testPreviewClaimPathStaysTemporary() {
   const start =
@@ -2875,7 +3132,18 @@ function main() {
     testFeedingGameTesterModesAndStars,
     testFeedingGamePreviewTuneSelector,
     testFeedingGamePreviewSessionIsolation,
-    testRealDailySnackExplicitlyUsesClassic,
+    testRealDailySnackUsesPersistedRotationAndHasClassicFallback,
+    testDailyFeedRotationIsPermutationAndSurvivesPersistence,
+    testFourClaimedFeedingDaysGetEveryMode,
+    testFeedRotationDoesNotAdvanceForSkippedDaysOrDuplicateClaims,
+    testClassicFallbackCanClaimWithoutAdvancingHiddenRotation,
+    testLegacyPlanAndInvalidRotationDataAreSafe,
+    testRealCarePlanAssignsGameOnceAndRestoresIt,
+    testPersistedDailyPlanKeepsFeedAssignment,
+    testIncompleteSnackCannotAdvanceRotation,
+    testExpiredSnackCannotAdvanceRotation,
+    testDailyRotationAssignmentAndClaimPathAreSeparated,
+    testDailyFeedModeSpecificStarAndMelodyBehavior,
     testPreviewClaimPathStaysTemporary,
     testClassicRenderContract,
     testClassicScheduledBalls,

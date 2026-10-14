@@ -48,6 +48,9 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // Set DEBUG_MODE = false when you’re ready to remove this.
 // =========================================================
 const DEBUG_MODE = false;
+// Release fallback: set false to restore Classic-only Daily feeding.
+// Developer Preview remains independent of this switch.
+const ENABLE_DAILY_FEEDING_VARIETY = true;
 const FEATURES = Object.freeze({
   DAILY_PET_QUESTIONS: true,
   DAILY_PET_QUESTIONS_DEBUG: false,
@@ -6582,9 +6585,15 @@ async function startDailyTodoSnack(
     getProfileApi()
       ?.getActiveProfile?.();
 
+  const selectedFeedMode =
+    ENABLE_DAILY_FEEDING_VARIETY &&
+    ready.engine.DAILY_FEED_MODES?.includes(ready.plan.feedMode)
+      ? ready.plan.feedMode
+      : "classic";
+
   State.dailySnackSession = {
     dailyTodoSnack: true,
-    feedMode: "classic",
+    feedMode: selectedFeedMode,
     profileId: ready.profileId,
     planId: ready.plan.id,
     planDay: ready.plan.day,
@@ -6675,7 +6684,12 @@ function claimDailyTodoSnack(
       loaded.state,
       {
         planId: session.planId,
-        now: new Date()
+        now: new Date(),
+        // The emergency Classic-only switch must not consume
+        // a rotation turn, even when Classic was already assigned.
+        feedMode: ENABLE_DAILY_FEEDING_VARIETY
+          ? session.feedMode
+          : ""
       }
     );
 

@@ -12,6 +12,9 @@
   "use strict";
 
   const STATE_VERSION = 3;
+  const DAILY_FEED_MODES = Object.freeze([
+    "classic", "labyrinth", "melody", "bounce"
+  ]);
   const RECENT_ASSIGNMENT_DAYS = 3;
   const RECENT_ASSIGNMENT_HISTORY_LIMIT = 40;
   const RECENT_QUESTION_TYPE_HISTORY_LIMIT = 6;
@@ -546,6 +549,73 @@
     };
   }
 
+  function normalizeDailyFeedMode(value) {
+    return DAILY_FEED_MODES.includes(value)
+      ? value
+      : "classic";
+  }
+
+  function normalizeFeedRotation(value) {
+    const order = Array.isArray(value?.order)
+      ? value.order
+      : [];
+    const index = Number(value?.index);
+    const validOrder =
+      order.length === DAILY_FEED_MODES.length &&
+      new Set(order).size === DAILY_FEED_MODES.length &&
+      DAILY_FEED_MODES.every((mode) => order.includes(mode));
+
+    return {
+      order: validOrder ? [...order] : [],
+      index: validOrder && Number.isInteger(index) &&
+        index >= 0 && index < order.length ? index : 0
+    };
+  }
+
+  function shuffleDailyFeedModes(random = Math.random, previousMode = "") {
+    const order = [...DAILY_FEED_MODES];
+    for (let i = order.length - 1; i > 0; i -= 1) {
+      const j = randomIndex(i + 1, random);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    // Avoid a repeated game across consecutive four-game cycles.
+    if (order[0] === previousMode) {
+      [order[0], order[1]] = [order[1], order[0]];
+    }
+    return order;
+  }
+
+  function nextDailyFeedMode(stats, random = Math.random) {
+    if (!stats) return "classic";
+    const rotation = normalizeFeedRotation(stats.feedRotation);
+    if (!rotation.order.length) {
+      rotation.order = shuffleDailyFeedModes(random);
+    }
+    stats.feedRotation = rotation;
+    return rotation.order[rotation.index];
+  }
+
+  function advanceDailyFeedRotation(
+    stats,
+    completedMode,
+    random = Math.random
+  ) {
+    if (!stats) return false;
+    const rotation = normalizeFeedRotation(stats.feedRotation);
+    if (!rotation.order.length ||
+        rotation.order[rotation.index] !== completedMode) {
+      return false;
+    }
+    rotation.index += 1;
+    if (rotation.index === rotation.order.length) {
+      const lastMode = rotation.order[rotation.order.length - 1];
+      rotation.order = shuffleDailyFeedModes(random, lastMode);
+      rotation.index = 0;
+    }
+    stats.feedRotation = rotation;
+    return true;
+  }
+
   function createDefaultStats() {
     return {
       currentStreak: 0,
@@ -554,7 +624,8 @@
       totalTasks: 0,
       earnedStreakBadges: [],
       earnedTaskBadges: [],
-      recentAssignments: []
+      recentAssignments: [],
+      feedRotation: { order: [], index: 0 }
     };
   }
 
@@ -602,7 +673,8 @@
         raw.earnedStreakBadges,
       earnedTaskBadges:
         raw.earnedTaskBadges,
-      recentAssignments
+      recentAssignments,
+      feedRotation: normalizeFeedRotation(raw.feedRotation)
     };
 
     refreshEarnedBadges(stats);
@@ -824,6 +896,8 @@
           rawPlan.earnedStarPegCount
         )
       ),
+      // Older saved plans retain the original Classic-only behavior.
+      feedMode: normalizeDailyFeedMode(rawPlan.feedMode),
       tasks,
       educationalCompletedAt,
       snack,
@@ -1592,6 +1666,7 @@
       activity: safeActivity,
       questionSession: null,
       earnedStarPegCount: 0,
+      feedMode: "classic",
       tasks,
       educationalCompletedAt: 0,
       snack:
@@ -2388,6 +2463,9 @@
       };
     }
 
+    // Assign once per new care plan; skipped days do not advance
+    // the four-game cycle. Reopening a saved plan preserves its mode.
+    plan.feedMode = nextDailyFeedMode(state.stats, random);
     state.activePlan = plan;
     recordRecentAssignment(state.stats, day, activity);
     refreshCurrentStreakForDay(state.stats, day);
@@ -2725,7 +2803,9 @@
     rawState,
     {
       planId = "",
-      now = new Date()
+      now = new Date(),
+      feedMode = "",
+      random = Math.random
     } = {}
   ) {
     const state = normalizeState(rawState);
@@ -2749,11 +2829,22 @@
     plan.snack.claimed = true;
     plan.snack.claimedAt = now.getTime();
 
+    // Progress only a *real*, successfully claimed feeding game.
+    // Preview sessions cannot call this path, and a Classic-only
+    // fallback does not consume a hidden rotation turn.
+    if (feedMode === plan.feedMode) {
+      advanceDailyFeedRotation(state.stats, feedMode, random);
+    }
+
     return { state, changed: true };
   }
 
   return Object.freeze({
     STATE_VERSION,
+    DAILY_FEED_MODES,
+    normalizeFeedRotation,
+    nextDailyFeedMode,
+    advanceDailyFeedRotation,
     RECENT_ASSIGNMENT_DAYS,
     NEW_PET_MISSION_AUTOMATIC_CREATION_ENABLED,
     NEW_PET_MISSION_RULES,
