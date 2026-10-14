@@ -76,8 +76,8 @@
     }),
     [FEED_MODES.BOUNCE]: Object.freeze({
       id: FEED_MODES.BOUNCE,
-      implemented: false,
-      schedule: "classic-seven",
+      implemented: true,
+      schedule: "bounce-bricks",
       inputTarget: "paddle",
       catchTarget: "pet",
       scoring: "points",
@@ -109,6 +109,14 @@
   const LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE = 4;
   const LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE = 6.5;
   const LABYRINTH_RELEASE_SPEED_SCALE = 0.32;
+
+  const BOUNCE_COLUMNS = 5;
+  const BOUNCE_ROWS = 4;
+  const BOUNCE_SERVES = 3;
+  const BOUNCE_STEP = 1 / 120;
+  const BOUNCE_SNACK_SPEED_SCALE = 0.14;
+  const BOUNCE_BALL_SPEED_SCALE = 0.39;
+  const BOUNCE_MIN_VERTICAL_FRACTION = 0.48;
 
   const MELODY_BPM = 116;
   const MELODY_BEAT_MS = 60000 / MELODY_BPM;
@@ -143,6 +151,8 @@
   const FEED_MELODIES = Object.freeze([
     Object.freeze({
       id: "odeToJoy",
+      label: "Ode to Joy",
+      bpm: MELODY_BPM,
       notes: Object.freeze([
         64,64,65,67,
         67,65,64,62,
@@ -164,6 +174,80 @@
         60,60,62,64,
         62,60,60
       ])
+    }),
+    Object.freeze({
+      id: "turkeyInTheStraw",
+      label: "Turkey in the Straw",
+      bpm: 132,
+      /*
+        A strain / verse melody in G major.
+        Beat values are quarter-note beats; the
+        final rest closes the 4/4 phrase after
+        the verse ending instead of restarting
+        into the pickup.
+      */
+      notes: Object.freeze([
+        { midi: 71, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+
+        { midi: 67, beats: 0.5 },
+        { midi: 66, beats: 0.5 },
+        { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+        { midi: 67, beats: 1 },
+        { midi: 59, beats: 0.5 },
+        { midi: 60, beats: 0.5 },
+
+        { midi: 62, beats: 0.5 },
+        { midi: 64, beats: 0.5 },
+        { midi: 62, beats: 0.5 },
+        { midi: 59, beats: 0.5 },
+        { midi: 62, beats: 1 },
+        { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+
+        { midi: 71, beats: 1 },
+        { midi: 71, beats: 1 },
+        { midi: 71, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+        { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+
+        { midi: 71, beats: 1 },
+        { midi: 69, beats: 1 },
+        { midi: 69, beats: 1 },
+        { midi: 71, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+
+        { midi: 67, beats: 0.5 },
+        { midi: 66, beats: 0.5 },
+        { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+        { midi: 67, beats: 1 },
+        { midi: 59, beats: 0.5 },
+        { midi: 60, beats: 0.5 },
+
+        { midi: 62, beats: 0.5 },
+        { midi: 64, beats: 0.5 },
+        { midi: 62, beats: 0.5 },
+        { midi: 59, beats: 0.5 },
+        { midi: 62, beats: 1 },
+        { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+
+        { midi: 71, beats: 0.5 },
+        { midi: 74, beats: 1 },
+        { midi: 76, beats: 0.5 },
+        { midi: 74, beats: 0.5 },
+        { midi: 71, beats: 0.5 },
+        { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 0.5 },
+
+        { midi: 71, beats: 1 },
+        { midi: 69, beats: 1 },
+        { midi: 67, beats: 1 },
+        { midi: null, beats: 1 }
+      ])
     })
   ]);
 
@@ -178,6 +262,46 @@
   const randomFrom = (items) => items?.length
     ? items[Math.floor(Math.random() * items.length)]
     : null;
+
+  function getFeedMelodyById(value) {
+    const id = String(value || "").trim();
+    return FEED_MELODIES.find(
+      (tune) => tune.id === id
+    ) || null;
+  }
+
+  function selectFeedMelody(
+    requestedId,
+    random = Math.random
+  ) {
+    const requested =
+      getFeedMelodyById(requestedId);
+
+    if (requested) return requested;
+    if (!FEED_MELODIES.length) return null;
+
+    let sample = 0;
+    try {
+      sample =
+        typeof random === "function"
+          ? Number(random())
+          : 0;
+    } catch (err) {
+      sample = 0;
+    }
+
+    const normalized =
+      Number.isFinite(sample)
+        ? clamp(sample, 0, 0.999999999)
+        : 0;
+    const index =
+      Math.floor(
+        normalized * FEED_MELODIES.length
+      );
+
+    return FEED_MELODIES[index] ||
+      FEED_MELODIES[0];
+  }
 
   function normalizeFeedMelodyNotes(notes) {
     return (Array.isArray(notes) ? notes : [])
@@ -817,7 +941,9 @@
         ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
         : mode === FEED_MODES.MELODY
           ? `Tilt or drag ${petName} left and right to catch the falling musical snacks`
-          : `Tilt or drag ${petName} left and right to catch the falling food`;
+          : mode === FEED_MODES.BOUNCE
+            ? `Tilt or drag ${petName} to bounce the white ball and catch colored snacks`
+            : `Tilt or drag ${petName} left and right to catch the falling food`;
     return `
       <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-feed-mode="${mode}" data-daily-session-phase="reward_game">
         <div class="daily-feed-score-badge" aria-live="polite" aria-label="Score">
@@ -874,11 +1000,11 @@
               >
             </div>
 
-            <div class="daily-feed-start-title">
+            <div class="daily-feed-start-title" data-daily-feed-start-title>
               ${modeConfig.instructions.title}
             </div>
 
-            <div class="daily-feed-start-instruction">
+            <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
               ${modeConfig.instructions.prompt}
             </div>
           </div>
@@ -970,7 +1096,11 @@
     runtime.tiltSamples = [];
     runtime.tiltCalibrationUntil =
       performance.now() + TILT_CALIBRATION_MS;
-    setCatcherX(runtime, runtime.width / 2);
+    if (runtime.mode === FEED_MODES.BOUNCE) {
+      setBouncePaddleX(runtime, runtime.width / 2);
+    } else {
+      setCatcherX(runtime, runtime.width / 2);
+    }
   }
 
   function handleTilt(runtime, event) {
@@ -1006,10 +1136,13 @@
     const relative = clamp(gamma - runtime.neutralGamma, -25, 25);
     runtime.smoothedTilt = runtime.smoothedTilt * 0.85 + relative * 0.15;
     const travel = Math.max(0, runtime.width / 2 - runtime.petRadius);
-    setCatcherX(
-      runtime,
-      runtime.width / 2 + (runtime.smoothedTilt / 25) * travel
-    );
+    const targetX =
+      runtime.width / 2 + (runtime.smoothedTilt / 25) * travel;
+    if (runtime.mode === FEED_MODES.BOUNCE) {
+      setBouncePaddleX(runtime, targetX);
+    } else {
+      setCatcherX(runtime, targetX);
+    }
   }
 
   function playPegTone(runtime, now) {
@@ -1303,7 +1436,11 @@
       popup.classList.add("is-rainbow");
     }
     popup.textContent = `+${ball.points}`;
-    popup.style.left = `${runtime.catcherX}px`;
+    popup.style.left = `${
+      runtime.mode === FEED_MODES.BOUNCE
+        ? runtime.bounce.paddleX
+        : runtime.catcherX
+    }px`;
     popup.style.top = `${runtime.petCenterY - runtime.petRadius * 0.65}px`;
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
     runtime.scorePopupsEl.appendChild(popup);
@@ -2436,13 +2573,21 @@
   }
 
   function initializeMelodyMode(runtime) {
-    const tune = FEED_MELODIES[0];
+    const tune =
+      selectFeedMelody(
+        runtime.requestedMelodyId
+      );
+    const bpm =
+      Math.max(
+        1,
+        Number(tune?.bpm) || MELODY_BPM
+      );
     const timeline =
       createMelodyTimeline(
         tune?.notes,
         runtime.width,
         {
-          bpm: MELODY_BPM,
+          bpm,
           travelMs: MELODY_TRAVEL_MS
         }
       );
@@ -2462,8 +2607,10 @@
     runtime.totalCount = totalCount;
     runtime.melody = {
       tuneId: tune?.id || "odeToJoy",
-      bpm: MELODY_BPM,
-      beatMs: MELODY_BEAT_MS,
+      tuneLabel:
+        String(tune?.label || "").trim(),
+      bpm,
+      beatMs: 60000 / bpm,
       travelMs: MELODY_TRAVEL_MS,
       timeline,
       startTime: null,
@@ -2710,6 +2857,462 @@
       dispose: disposeMelodyMode
     });
 
+  // Bounce (Breakout): white balls and falling snacks have separate physics.
+  // The pet position is kept in bounce.paddleX, not Classic's catcherX.
+  function createBounceBrickField(
+    width,
+    height,
+    earnedStars = 0,
+    random = Math.random
+  ) {
+    const gap = clamp(width * 0.008, 4, 8);
+    const margin = Math.max(8, width * 0.015);
+    const brickWidth =
+      (width - margin * 2 - gap * (BOUNCE_COLUMNS - 1)) /
+      BOUNCE_COLUMNS;
+    const brickHeight = clamp(height * 0.045, 26, 54);
+    const top = Math.max(72, height * 0.09);
+    const slots = [];
+    for (let row = 0; row < BOUNCE_ROWS; row += 1) {
+      for (let column = 0; column < BOUNCE_COLUMNS; column += 1) {
+        slots.push({
+          row, column,
+          x: margin + column * (brickWidth + gap),
+          y: top + row * (brickHeight + gap),
+          width: brickWidth,
+          height: brickHeight,
+          config: null,
+          isStar: false,
+          active: true
+        });
+      }
+    }
+
+    // Exactly one of each normal snack, plus one rainbow brick.
+    const indices = slots.map((_, index) => index);
+    for (let i = indices.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(clamp(random(), 0, 0.999999) * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    [...SOLID_BALLS, RAINBOW_BALL].forEach((config, index) => {
+      slots[indices[index]].config = config;
+    });
+
+    // Question-earned stars belong to gray bricks, with no base star.
+    const starCount = clamp(
+      Math.floor(Number(earnedStars) || 0), 0, 2
+    );
+    indices.slice(7, 7 + starCount).forEach((index) => {
+      slots[index].isStar = true;
+    });
+    return slots;
+  }
+
+  function setBouncePaddleX(runtime, nextX) {
+    if (!runtime?.bounce) return;
+    const x = Number(nextX);
+    const safeX = clamp(
+      Number.isFinite(x) ? x : runtime.width / 2,
+      runtime.petRadius,
+      runtime.width - runtime.petRadius
+    );
+    runtime.bounce.paddleX = safeX;
+    runtime.catcher.style.left = `${safeX}px`;
+  }
+
+  function makeBounceWhiteBall(runtime, x, y, downward = true) {
+    const state = runtime.bounce;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const horizontal = side * (0.28 + Math.random() * 0.43);
+    const vertical = Math.sqrt(1 - horizontal * horizontal);
+    return {
+      id: state.nextWhiteId++,
+      x: clamp(x, state.ballRadius, runtime.width - state.ballRadius),
+      y,
+      vx: state.ballSpeed * horizontal,
+      vy: state.ballSpeed * vertical * (downward ? 1 : -1),
+      radius: state.ballRadius
+    };
+  }
+
+  function initializeBounceMode(runtime) {
+    runtime.pegs = [];
+    runtime.bursts = [];
+    runtime.balls = [];
+    runtime.scheduled = [];
+    runtime.scheduledIndex = 0;
+    runtime.nextScheduledAt = Infinity;
+    runtime.score = 0;
+    runtime.caughtCount = 0;
+    runtime.totalCount = 7;
+    const bricks = createBounceBrickField(
+      runtime.width, runtime.height, runtime.earnedStarPegCount
+    );
+    const bottom = Math.max(...bricks.map((brick) => brick.y + brick.height));
+    runtime.bounce = {
+      bricks,
+      whiteBalls: [],
+      pendingWhiteBalls: [],
+      nextWhiteId: 1,
+      paddleX: runtime.width / 2,
+      lastPaddleX: runtime.width / 2,
+      smoothedVelocity: 0,
+      petTilt: 0,
+      ballRadius: clamp(runtime.width * 0.023, 8, 14),
+      ballSpeed: Math.max(runtime.width * 0.62, runtime.height * BOUNCE_BALL_SPEED_SCALE),
+      snackSpeed: runtime.height * BOUNCE_SNACK_SPEED_SCALE,
+      serveY: bottom + clamp(runtime.height * 0.035, 24, 44),
+      livesLeft: BOUNCE_SERVES,
+      waitingServe: true,
+      cleared: false,
+      ended: false
+    };
+  }
+
+  function launchBounceServe(runtime) {
+    const state = runtime?.bounce;
+    if (!state?.waitingServe || state.livesLeft <= 0 || state.ended || state.cleared) {
+      return false;
+    }
+    state.waitingServe = false;
+    state.whiteBalls.push(
+      makeBounceWhiteBall(
+        runtime,
+        runtime.width * (0.35 + Math.random() * 0.30),
+        state.serveY
+      )
+    );
+    runtime.startOverlay.hidden = true;
+    runtime.finishAt = 0;
+    return true;
+  }
+
+  function spawnBounceSnack(runtime, brick) {
+    const config = brick.config;
+    if (!config) return;
+    const radius = runtime.pegRadius * 0.66;
+    runtime.balls.push({
+      id: runtime.nextBallId++,
+      config,
+      x: brick.x + brick.width / 2,
+      y: brick.y + brick.height / 2,
+      vx: 0,
+      vy: runtime.bounce.snackSpeed,
+      radius,
+      rotation: 0,
+      angularVelocity: 0,
+      points: config.points || 1,
+      trail: [],
+      lastTrailAt: 0
+    });
+  }
+
+  function breakBounceBrick(runtime, brick, ball, now) {
+    if (!brick.active) return;
+    brick.active = false;
+    if (brick.config) spawnBounceSnack(runtime, brick);
+    if (brick.isStar) {
+      const state = runtime.bounce;
+      const bonus = makeBounceWhiteBall(
+        runtime,
+        brick.x + brick.width / 2,
+        brick.y + brick.height + state.ballRadius * 2 + 3
+      );
+      state.pendingWhiteBalls.push(bonus);
+      playStarSound(runtime);
+    } else {
+      playPegTone(runtime, now);
+    }
+  }
+
+  // Circle/rectangle collision; resolve outside the brick before reflecting.
+  // One brick can be destroyed only once, including during multiball.
+  function collideBounceBallWithBricks(runtime, ball, previousX, previousY, now) {
+    for (const brick of runtime.bounce.bricks) {
+      if (!brick.active) continue;
+      const nearestX = clamp(ball.x, brick.x, brick.x + brick.width);
+      const nearestY = clamp(ball.y, brick.y, brick.y + brick.height);
+      const dx = ball.x - nearestX;
+      const dy = ball.y - nearestY;
+      if (dx * dx + dy * dy >= ball.radius * ball.radius) continue;
+
+      if (previousY + ball.radius <= brick.y && ball.vy > 0) {
+        ball.y = brick.y - ball.radius;
+        ball.vy = -Math.abs(ball.vy);
+      } else if (previousY - ball.radius >= brick.y + brick.height && ball.vy < 0) {
+        ball.y = brick.y + brick.height + ball.radius;
+        ball.vy = Math.abs(ball.vy);
+      } else if (previousX + ball.radius <= brick.x && ball.vx > 0) {
+        ball.x = brick.x - ball.radius;
+        ball.vx = -Math.abs(ball.vx);
+      } else if (previousX - ball.radius >= brick.x + brick.width && ball.vx < 0) {
+        ball.x = brick.x + brick.width + ball.radius;
+        ball.vx = Math.abs(ball.vx);
+      } else {
+        // Corner/overlap fallback for a ball launched very near a brick.
+        const horizontalPenetration = ball.radius - Math.abs(dx);
+        const verticalPenetration = ball.radius - Math.abs(dy);
+        if (horizontalPenetration < verticalPenetration) {
+          const direction = ball.x < brick.x + brick.width / 2 ? -1 : 1;
+          ball.x += direction * Math.max(0, horizontalPenetration);
+          ball.vx = direction * Math.abs(ball.vx);
+        } else {
+          const direction = ball.y < brick.y + brick.height / 2 ? -1 : 1;
+          ball.y += direction * Math.max(0, verticalPenetration);
+          ball.vy = direction * Math.abs(ball.vy);
+        }
+      }
+      breakBounceBrick(runtime, brick, ball, now);
+      return true;
+    }
+    return false;
+  }
+
+  function normalizeBounceBallVelocity(ball, speed) {
+    const direction = ball.vy < 0 ? -1 : 1;
+    let vx = Number(ball.vx) || 0;
+    let vy = Number(ball.vy) || direction;
+    let magnitude = Math.hypot(vx, vy);
+    if (magnitude < 0.00001) {
+      vx = speed * 0.4;
+      vy = direction * speed * 0.9165;
+      magnitude = Math.hypot(vx, vy);
+    }
+    vx = vx / magnitude * speed;
+    vy = vy / magnitude * speed;
+    const minimum = speed * BOUNCE_MIN_VERTICAL_FRACTION;
+    if (Math.abs(vy) < minimum) {
+      vy = direction * minimum;
+      const side = vx < 0 ? -1 : 1;
+      vx = side * Math.sqrt(speed * speed - minimum * minimum);
+    }
+    // Avoid an endless perfectly vertical orbit.
+    const minHorizontal = speed * 0.12;
+    if (Math.abs(vx) < minHorizontal) {
+      vx = (vx < 0 ? -1 : 1) * minHorizontal;
+      vy = direction * Math.sqrt(speed * speed - minHorizontal * minHorizontal);
+    }
+    ball.vx = vx;
+    ball.vy = vy;
+  }
+
+  function updateBounceWhiteBall(runtime, ball, dt, now) {
+    const state = runtime.bounce;
+    const previousX = ball.x;
+    const previousY = ball.y;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    if (ball.x - ball.radius < 0) {
+      ball.x = ball.radius;
+      ball.vx = Math.abs(ball.vx);
+    } else if (ball.x + ball.radius > runtime.width) {
+      ball.x = runtime.width - ball.radius;
+      ball.vx = -Math.abs(ball.vx);
+    }
+    if (ball.y - ball.radius < 0) {
+      ball.y = ball.radius;
+      ball.vy = Math.abs(ball.vy);
+    }
+
+    // Treat the top of the pet's circle as a forgiving Breakout paddle.
+    const paddleY = runtime.petCenterY - runtime.petRadius * 0.68;
+    const paddleHalfWidth = runtime.petRadius * 0.95;
+    if (
+      ball.vy > 0 &&
+      previousY + ball.radius <= paddleY &&
+      ball.y + ball.radius >= paddleY &&
+      Math.abs(ball.x - state.paddleX) <= paddleHalfWidth + ball.radius * 0.5
+    ) {
+      ball.y = paddleY - ball.radius;
+      const offset = clamp(
+        (ball.x - state.paddleX) / paddleHalfWidth, -1, 1
+      );
+      ball.vx = state.ballSpeed * clamp(offset * 0.78, -0.78, 0.78);
+      ball.vy = -Math.sqrt(state.ballSpeed ** 2 - ball.vx ** 2);
+    } else {
+      collideBounceBallWithBricks(runtime, ball, previousX, previousY, now);
+    }
+    normalizeBounceBallVelocity(ball, state.ballSpeed);
+    return ball.y - ball.radius <= runtime.height;
+  }
+
+  function bounceSnackTouchesPet(runtime, ball) {
+    const dx = ball.x - runtime.bounce.paddleX;
+    const dy = ball.y - runtime.petCenterY;
+    const radius = ball.radius + runtime.petRadius * 0.9;
+    return dx * dx + dy * dy <= radius * radius;
+  }
+
+  function updateBounceSnacks(runtime, dt) {
+    runtime.balls = runtime.balls.filter((ball) => {
+      ball.y += ball.vy * dt;
+      ball.rotation += dt * 1.4;
+      if (bounceSnackTouchesPet(runtime, ball)) {
+        catchBall(runtime, ball);
+        return false;
+      }
+      return ball.y - ball.radius <= runtime.height;
+    });
+  }
+
+  function updateBouncePetLean(runtime, dt) {
+    const state = runtime.bounce;
+    const velocity = (state.paddleX - state.lastPaddleX) / Math.max(dt, 0.008);
+    state.lastPaddleX = state.paddleX;
+    state.smoothedVelocity = state.smoothedVelocity * 0.76 + velocity * 0.24;
+    const targetLean = clamp(
+      state.smoothedVelocity / Math.max(1, runtime.width * 1.5) * 13,
+      -15, 15
+    );
+    state.petTilt += (targetLean - state.petTilt) * 0.25;
+    if (Math.abs(state.petTilt) < 0.12 && Math.abs(targetLean) < 0.12) {
+      state.petTilt = 0;
+    }
+    runtime.petCircle.style.setProperty(
+      "--daily-feed-pet-tilt", `${state.petTilt}deg`
+    );
+  }
+
+  function showBounceNextServe(runtime, now) {
+    const state = runtime.bounce;
+    state.waitingServe = true;
+    runtime.introUnlockAt = now + 550;
+    runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
+    runtime.startInstructionEl.textContent = "Tap to launch";
+    runtime.startOverlay.hidden = false;
+  }
+
+  function updateBounceMode(runtime, dt, now) {
+    const state = runtime.bounce;
+    if (!state) return;
+    if (!state.ended && !state.cleared && !state.waitingServe) {
+      const steps = Math.max(1, Math.ceil(dt / BOUNCE_STEP));
+      const step = dt / steps;
+      for (let i = 0; i < steps; i += 1) {
+        state.whiteBalls = state.whiteBalls.filter(
+          (ball) => updateBounceWhiteBall(runtime, ball, step, now)
+        );
+        if (state.pendingWhiteBalls.length) {
+          state.whiteBalls.push(...state.pendingWhiteBalls);
+          state.pendingWhiteBalls.length = 0;
+        }
+        if (!state.bricks.some((brick) => brick.active)) {
+          state.cleared = true;
+          state.whiteBalls = [];
+          break;
+        }
+        if (!state.whiteBalls.length) break;
+      }
+      if (!state.cleared && !state.whiteBalls.length) {
+        state.livesLeft -= 1;
+        if (state.livesLeft > 0) {
+          showBounceNextServe(runtime, now);
+        } else {
+          state.ended = true;
+          runtime.balls = [];
+        }
+      }
+    }
+    if (!state.waitingServe && !state.ended) {
+      updateBounceSnacks(runtime, dt);
+    }
+    updateBouncePetLean(runtime, dt);
+  }
+
+  function drawBounceMode(runtime, now) {
+    const state = runtime.bounce;
+    const ctx = runtime.ctx;
+    ctx.setTransform(runtime.dpr, 0, 0, runtime.dpr, 0, 0);
+    ctx.clearRect(0, 0, runtime.width, runtime.height);
+
+    for (const brick of state.bricks) {
+      if (!brick.active) continue;
+      const { x, y, width, height } = brick;
+      ctx.save();
+      ctx.fillStyle = brick.config?.color || "rgba(49, 66, 79, 0.68)";
+      if (brick.config?.id === "rainbow") {
+        ctx.globalAlpha = 0.78 + 0.22 * (0.5 + 0.5 * Math.sin(now / 240));
+        const gradient = ctx.createLinearGradient(x, y, x + width, y);
+        RAINBOW_BALL.trailColors.forEach((color, index) => {
+          gradient.addColorStop(index / (RAINBOW_BALL.trailColors.length - 1), color);
+        });
+        ctx.fillStyle = gradient;
+      }
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x, y, width, height);
+      if (brick.isStar) {
+        const size = Math.min(height * 0.87, width * 0.64);
+        if (runtime.starImage?.complete && runtime.starImage.naturalWidth) {
+          ctx.drawImage(
+            runtime.starImage,
+            x + (width - size) / 2, y + (height - size) / 2,
+            size, size
+          );
+        } else {
+          ctx.fillStyle = "#ffd061";
+          ctx.font = `bold ${size}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("★", x + width / 2, y + height / 2);
+        }
+      }
+      ctx.restore();
+    }
+    for (const snack of runtime.balls) drawBall(runtime, snack);
+    for (const ball of state.whiteBalls) {
+      ctx.save();
+      ctx.shadowColor = "rgba(255, 255, 255, 0.85)";
+      ctx.shadowBlur = ball.radius * 1.5;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.radius, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function handleBounceModeInput(runtime, input) {
+    if (input?.type === "tilt") {
+      handleTilt(runtime, input.event);
+    } else if (input?.type === "pointer") {
+      setBouncePaddleX(runtime, input.x);
+    }
+  }
+
+  function isBounceModeComplete(runtime, now) {
+    const state = runtime.bounce;
+    if (!state?.ended && !(state?.cleared && runtime.balls.length === 0)) {
+      runtime.finishAt = 0;
+      return false;
+    }
+    if (!runtime.finishAt) {
+      runtime.finishAt = now + runtime.modeConfig.finishDelayMs;
+      return false;
+    }
+    return now >= runtime.finishAt;
+  }
+
+  function disposeBounceMode(runtime) {
+    if (!runtime?.bounce) return;
+    runtime.bounce.whiteBalls = [];
+    runtime.bounce.pendingWhiteBalls = [];
+    runtime.bounce.waitingServe = false;
+  }
+
+  const BOUNCE_MODE_CONTROLLER = Object.freeze({
+    id: FEED_MODES.BOUNCE,
+    initialize: initializeBounceMode,
+    update: updateBounceMode,
+    draw: drawBounceMode,
+    handleInput: handleBounceModeInput,
+    isComplete: isBounceModeComplete,
+    buildResult: buildStandardResult,
+    dispose: disposeBounceMode
+  });
+
   function initializeClassicMode() { }
 
   function updateClassicMode(
@@ -2780,7 +3383,9 @@
       [FEED_MODES.LABYRINTH]:
         LABYRINTH_MODE_CONTROLLER,
       [FEED_MODES.MELODY]:
-        MELODY_MODE_CONTROLLER
+        MELODY_MODE_CONTROLLER,
+      [FEED_MODES.BOUNCE]:
+        BOUNCE_MODE_CONTROLLER
     });
 
   function resolveFeedMode(value) {
@@ -2892,7 +3497,7 @@
     runtime.running = true;
     runtime.startOverlay.hidden = true;
 
-    if (runtime.startOverlayHandler) {
+    if (runtime.startOverlayHandler && runtime.mode !== FEED_MODES.BOUNCE) {
       runtime.startOverlay.removeEventListener(
         "click",
         runtime.startOverlayHandler
@@ -2936,6 +3541,10 @@
       "pointercancel",
       runtime.pointerEndHandler
     );
+
+    if (runtime.mode === FEED_MODES.BOUNCE) {
+      launchBounceServe(runtime);
+    }
 
     runtime.rafId =
       requestAnimationFrame(
@@ -3165,6 +3774,11 @@
       roundStarted: false,
       finished: false,
       requestedMode,
+      earnedStarPegCount,
+      requestedMelodyId:
+        String(
+          session.feedMelodyId || ""
+        ).trim(),
       mode,
       modeConfig,
       modeController,
@@ -3184,6 +3798,8 @@
       scoreEl,
       scorePopupsEl,
       startOverlay,
+      startTitleEl: startOverlay.querySelector("[data-daily-feed-start-title]"),
+      startInstructionEl: startOverlay.querySelector("[data-daily-feed-start-instruction]"),
       resultOverlay,
       resultTitleEl,
       resultScoreEl,
@@ -3273,10 +3889,11 @@
         height
       )}")`;
 
-    setCatcherX(
-      runtime,
-      width / 2
-    );
+    if (mode === FEED_MODES.BOUNCE) {
+      setBouncePaddleX(runtime, width / 2);
+    } else {
+      setCatcherX(runtime, width / 2);
+    }
 
     runtime.orientationHandler =
       (event) =>
@@ -3388,7 +4005,11 @@
           return;
         }
 
-        startRound(runtime);
+        if (runtime.mode === FEED_MODES.BOUNCE && runtime.roundStarted) {
+          launchBounceServe(runtime);
+        } else {
+          startRound(runtime);
+        }
       };
 
     runtime.resultBackHandler =

@@ -14561,6 +14561,18 @@ function screenTitle(idx) {
       });
     };
 
+    const FEEDING_GAME_TEST_MELODIES =
+      Object.freeze([
+        Object.freeze({
+          id: "odeToJoy",
+          label: "Ode to Joy"
+        }),
+        Object.freeze({
+          id: "turkeyInTheStraw",
+          label: "Turkey in the Straw"
+        })
+      ]);
+
     const FEEDING_GAME_TEST_MODES =
       Object.freeze([
         Object.freeze({
@@ -14581,13 +14593,14 @@ function screenTitle(idx) {
         Object.freeze({
           id: "bounce",
           label: "Bounce",
-          enabled: false
+          enabled: true
         })
       ]);
 
     const launchFeedingGameTest = async (
       mode,
-      earnedStarPegCount
+      earnedStarPegCount,
+      melodyTuneId = ""
     ) => {
       const selectedMode =
         FEEDING_GAME_TEST_MODES.find(
@@ -14595,6 +14608,21 @@ function screenTitle(idx) {
         );
 
       if (!selectedMode?.enabled) {
+        return false;
+      }
+
+      const selectedMelody =
+        selectedMode.id === "melody"
+          ? FEEDING_GAME_TEST_MELODIES.find(
+            (entry) =>
+              entry.id === melodyTuneId
+          )
+          : null;
+
+      if (
+        selectedMode.id === "melody" &&
+        !selectedMelody
+      ) {
         return false;
       }
 
@@ -14673,6 +14701,8 @@ function screenTitle(idx) {
             profile?.name || "Zookeeper"
           ).trim() || "Zookeeper",
         feedMode: selectedMode.id,
+        feedMelodyId:
+          selectedMelody?.id || "",
         earnedStarPegCount:
           selectedStars,
         rewardTiltEnabled,
@@ -14702,7 +14732,9 @@ function screenTitle(idx) {
       showDialog({
         title: "Choose Question Stars",
         body:
-          "Question stars affect Classic only. Choose the count to use for this preview session.",
+          selectedMode.id === "classic" || selectedMode.id === "bounce"
+            ? "Question stars add extra star pegs in Classic or multiball star bricks in Bounce."
+            : "Question stars do not affect Labyrinth. Choose a test count.",
         actionsClass:
           "daily-preview-dialog-actions",
         actions: [
@@ -14728,6 +14760,37 @@ function screenTitle(idx) {
       });
     };
 
+    const showFeedingGameTuneDialog = () => {
+      showDialog({
+        title: "Choose Melody Tune",
+        body:
+          "Choose the tune to use for this Melody preview.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...FEEDING_GAME_TEST_MELODIES.map(
+            (tune) =>
+              dlgBtn(
+                tune.label,
+                {
+                  onClick: () =>
+                    launchFeedingGameTest(
+                      "melody",
+                      0,
+                      tune.id
+                    )
+                }
+              )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showFeedingGameTesterDialog
+          })
+        ]
+      });
+    };
+
     const showFeedingGameTesterDialog = () => {
       const modeButtons =
         FEEDING_GAME_TEST_MODES.map(
@@ -14737,9 +14800,11 @@ function screenTitle(idx) {
                 mode.label,
                 {
                   onClick: () =>
-                    showFeedingGameStarDialog(
-                      mode.id
-                    )
+                    mode.id === "melody"
+                      ? showFeedingGameTuneDialog()
+                      : showFeedingGameStarDialog(
+                        mode.id
+                      )
                 }
               );
 
@@ -14756,7 +14821,7 @@ function screenTitle(idx) {
       showDialog({
         title: "Feeding Game Tester",
         body:
-          "Choose a feeding mode. Classic, Labyrinth, and Melody are playable now; Bounce is listed for its upcoming gameplay patch.",
+          "Choose a feeding mode. Classic, Labyrinth, Melody, and Bounce are playable in Preview.",
         actionsClass:
           "daily-preview-dialog-actions",
         actions: [

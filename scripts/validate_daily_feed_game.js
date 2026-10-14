@@ -45,6 +45,25 @@ function loadFeedGameForValidation() {
     LABYRINTH_PLATFORM_RESTITUTION,
     LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE,
     LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE,
+    BOUNCE_COLUMNS,
+    BOUNCE_ROWS,
+    BOUNCE_SERVES,
+    BOUNCE_STEP,
+    BOUNCE_MIN_VERTICAL_FRACTION,
+    createBounceBrickField,
+    initializeBounceMode,
+    setBouncePaddleX,
+    makeBounceWhiteBall,
+    launchBounceServe,
+    spawnBounceSnack,
+    breakBounceBrick,
+    collideBounceBallWithBricks,
+    normalizeBounceBallVelocity,
+    updateBounceWhiteBall,
+    updateBounceSnacks,
+    updateBounceMode,
+    isBounceModeComplete,
+    disposeBounceMode,
     MELODY_BPM,
     MELODY_BEAT_MS,
     MELODY_TRAVEL_MS,
@@ -54,6 +73,8 @@ function loadFeedGameForValidation() {
     MELODY_TRANSITION_NOTES,
     MELODY_TARGET_LANE_SEQUENCE,
     FEED_MELODIES,
+    getFeedMelodyById,
+    selectFeedMelody,
     FEED_MODES,
     FEED_MODE_CONFIGS,
     normalizeFeedMode,
@@ -287,14 +308,10 @@ function testFeedModeConfigurations() {
     "Tilt to guide the snacks"
   );
 
-  ["bounce"]
-    .forEach((mode) => {
-      assert.strictEqual(
-        configs[mode].implemented,
-        false,
-        `${mode} must stay unavailable until its gameplay patch lands`
-      );
-    });
+  assert.strictEqual(configs.bounce.implemented, true);
+  assert.strictEqual(configs.bounce.schedule, "bounce-bricks");
+  assert.strictEqual(configs.bounce.inputTarget, "paddle");
+  assert.strictEqual(configs.bounce.scoring, "points");
 
   assert.strictEqual(configs.melody.implemented, true);
   assert.strictEqual(configs.melody.schedule, "melody");
@@ -320,13 +337,7 @@ function testUnavailableModesSafelyResolveToClassic() {
     "melody"
   );
 
-  ["bounce"]
-    .forEach((mode) => {
-      assert.strictEqual(
-        hooks.resolveFeedMode(mode),
-        "classic"
-      );
-    });
+  assert.strictEqual(hooks.resolveFeedMode("bounce"), "bounce");
 
   assert.strictEqual(
     hooks.resolveFeedMode("not-a-mode"),
@@ -336,7 +347,7 @@ function testUnavailableModesSafelyResolveToClassic() {
   const fallbackMarkup = api.render({
     session: {
       petName: "Pip",
-      feedMode: "bounce"
+      feedMode: "unknown-mode"
     }
   });
 
@@ -379,13 +390,7 @@ function testClassicModeControllerContract() {
     );
   });
 
-  ["bounce"]
-    .forEach((mode) => {
-      assert.strictEqual(
-        hooks.getModeController(mode),
-        controller
-      );
-    });
+  assert.notStrictEqual(hooks.getModeController("bounce"), controller);
 
   assert.notStrictEqual(
     hooks.getModeController("melody"),
@@ -1043,13 +1048,443 @@ function extractVerseTyperOdeToJoy() {
   return (match[1].match(/-?\d+/g) || []).map(Number);
 }
 
+function makeBounceRuntime(earnedStarPegCount = 0) {
+  return {
+    mode: "bounce",
+    modeConfig: hooks.FEED_MODE_CONFIGS.bounce,
+    width: 390,
+    height: 844,
+    earnedStarPegCount,
+    pegRadius: 16,
+    petRadius: 48,
+    petCenterY: 775,
+    catcherX: 195,
+    catcher: { style: { left: "" }, classList: { remove() {}, add() {} }, offsetWidth: 1 },
+    petCircle: { style: { setProperty() {} } },
+    startOverlay: { hidden: true },
+    startTitleEl: { textContent: "" },
+    startInstructionEl: { textContent: "" },
+    pegs: [],
+    balls: [],
+    bursts: [],
+    scheduled: [],
+    nextBallId: 1,
+    score: 0,
+    caughtCount: 0,
+    finishAt: 0,
+    introUnlockAt: 0,
+    scoreEl: null,
+    scorePopupsEl: null,
+    audioContext: null,
+    starAudio: null,
+    chompAudio: null,
+    ctx: null
+  };
+}
+
+function testBounceRenderAndControllerContract() {
+  const markup = api.render({
+    session: { feedMode: "bounce", petName: "Pip" }
+  });
+  assert.ok(markup.includes('data-daily-feed-mode="bounce"'));
+  assert.ok(markup.includes("Bounce the BibloSnacks!"));
+  assert.ok(markup.includes("Tilt to move the paddle"));
+  assert.ok(markup.includes("bounce the white ball and catch colored snacks"));
+  assert.ok(markup.includes("data-daily-feed-start-title"));
+  assert.ok(markup.includes("data-daily-feed-start-instruction"));
+  const controller = hooks.getModeController("bounce");
+  assert.strictEqual(controller.id, "bounce");
+  ["initialize", "update", "draw", "handleInput", "isComplete", "buildResult", "dispose"]
+    .forEach((method) => assert.strictEqual(typeof controller[method], "function"));
+}
+
+function testBounceBrickLayoutAndQuestionStars() {
+  assert.strictEqual(hooks.BOUNCE_COLUMNS, 5);
+  assert.strictEqual(hooks.BOUNCE_ROWS, 4);
+  assert.strictEqual(hooks.BOUNCE_SERVES, 3);
+  assert.strictEqual(hooks.BOUNCE_STEP, 1 / 120);
+  for (const starCount of [0, 1, 2]) {
+    const runtime = makeBounceRuntime(starCount);
+    hooks.initializeBounceMode(runtime);
+    const bricks = runtime.bounce.bricks;
+    assert.strictEqual(bricks.length, 20);
+    assert.strictEqual(bricks.filter((b) => b.config).length, 7);
+    assert.deepStrictEqual(
+      toPlain(bricks.filter((b) => b.config).map((b) => b.config.id)).sort(),
+      ["red", "yellow", "orange", "green", "blue", "purple", "rainbow"].sort()
+    );
+    assert.strictEqual(bricks.filter((b) => b.isStar).length, starCount);
+    assert.ok(bricks.filter((b) => b.isStar).every((b) => !b.config));
+    assert.strictEqual(runtime.totalCount, 7);
+    assert.deepStrictEqual(toPlain(runtime.pegs), []);
+    assert.strictEqual(runtime.bounce.livesLeft, 3);
+    assert.strictEqual(runtime.bounce.waitingServe, true);
+    assert.ok(bricks.every((b) => b.x > 0 && b.y > 0 && b.width > 0 && b.height > 0));
+  }
+  const a = hooks.createBounceBrickField(390, 844, 2, () => 0.23);
+  const b = hooks.createBounceBrickField(390, 844, 2, () => 0.23);
+  assert.deepStrictEqual(toPlain(a), toPlain(b));
+}
+
+function testBounceSeparatePetPaddleAndServe() {
+  const runtime = makeBounceRuntime(2);
+  hooks.initializeBounceMode(runtime);
+  hooks.setBouncePaddleX(runtime, 65);
+  assert.strictEqual(runtime.bounce.paddleX, 65);
+  assert.strictEqual(runtime.catcher.style.left, "65px");
+  assert.strictEqual(runtime.catcherX, 195,
+    "Bounce paddle must not repurpose Classic's catcherX");
+  assert.strictEqual(hooks.launchBounceServe(runtime), true);
+  assert.strictEqual(runtime.startOverlay.hidden, true);
+  assert.strictEqual(runtime.bounce.whiteBalls.length, 1);
+  const ball = runtime.bounce.whiteBalls[0];
+  assert.ok(ball.vy > 0, "Serve initially travels down toward the pet");
+  assert.ok(ball.y > Math.max(...runtime.bounce.bricks.map((b) => b.y + b.height)));
+  assert.ok(Math.abs(ball.vx) > 0);
+  assert.strictEqual(hooks.launchBounceServe(runtime), false,
+    "Cannot serve twice during an active rally");
+}
+
+function testBounceCollisionRemovesBricksAndDropsCorrectSnacks() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const gray = runtime.bounce.bricks.find((b) => !b.config && !b.isStar);
+  const red = runtime.bounce.bricks.find((b) => b.config?.id === "red");
+  const rainbow = runtime.bounce.bricks.find((b) => b.config?.id === "rainbow");
+  hooks.breakBounceBrick(runtime, gray, {}, 1000);
+  assert.strictEqual(gray.active, false);
+  assert.strictEqual(runtime.balls.length, 0);
+  hooks.breakBounceBrick(runtime, red, {}, 1000);
+  hooks.breakBounceBrick(runtime, rainbow, {}, 1000);
+  hooks.breakBounceBrick(runtime, rainbow, {}, 1001);
+  assert.deepStrictEqual(toPlain(runtime.balls.map((ball) => ball.points)), [1, 5]);
+  assert.deepStrictEqual(toPlain(runtime.balls.map((ball) => ball.config.id)), ["red", "rainbow"]);
+  assert.strictEqual(runtime.balls.length, 2, "Bricks cannot be broken twice");
+}
+
+function testBounceBrickImpactReboundsAndSingleDrop() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const brick = runtime.bounce.bricks.find((b) => b.config?.id === "yellow");
+  runtime.bounce.bricks.forEach((other) => {
+    if (other !== brick) other.active = false;
+  });
+  const radius = runtime.bounce.ballRadius;
+  const ball = {
+    x: brick.x + brick.width / 2,
+    y: brick.y - radius + 0.5,
+    vx: 0,
+    vy: 200,
+    radius
+  };
+  assert.strictEqual(
+    hooks.collideBounceBallWithBricks(
+      runtime, ball, ball.x, brick.y - radius - 1, 1000
+    ),
+    true
+  );
+  assert.strictEqual(brick.active, false);
+  assert.ok(ball.vy < 0);
+  assert.ok(ball.y <= brick.y - radius);
+  assert.strictEqual(runtime.balls.length, 1);
+  assert.strictEqual(runtime.balls[0].config.id, "yellow");
+  assert.strictEqual(runtime.balls[0].points, 1);
+  runtime.bounce.bricks.forEach((other) => { other.active = false; });
+  assert.strictEqual(
+    hooks.collideBounceBallWithBricks(
+      runtime, ball, ball.x, brick.y - radius - 1, 1001
+    ),
+    false,
+    "Removed bricks cannot collide or release a second snack"
+  );
+}
+
+function testBounceSnackCatchUsesPaddleAndScoresRainbow() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const rainbow = runtime.bounce.bricks.find((b) => b.config?.id === "rainbow");
+  hooks.spawnBounceSnack(runtime, rainbow);
+  const snack = runtime.balls[0];
+  assert.strictEqual(snack.points, 5);
+  runtime.bounce.paddleX = 220;
+  snack.x = 220;
+  snack.y = runtime.petCenterY - 5;
+  hooks.updateBounceSnacks(runtime, 1 / 120);
+  assert.strictEqual(runtime.balls.length, 0);
+  assert.strictEqual(runtime.score, 5);
+  assert.strictEqual(runtime.caughtCount, 1);
+  assert.strictEqual(runtime.catcherX, 195);
+
+  hooks.spawnBounceSnack(runtime, rainbow);
+  runtime.balls[0].x = 10;
+  runtime.balls[0].y = runtime.height + 50;
+  hooks.updateBounceSnacks(runtime, 1 / 120);
+  assert.strictEqual(runtime.balls.length, 0);
+  assert.strictEqual(runtime.score, 5, "Missing snacks must not score");
+}
+
+function testBounceStarBricksCreateBonusNotLives() {
+  const runtime = makeBounceRuntime(2);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  const star = state.bricks.find((b) => b.isStar);
+  hooks.breakBounceBrick(runtime, star, {}, 1000);
+  assert.strictEqual(star.active, false);
+  assert.strictEqual(state.pendingWhiteBalls.length, 1);
+  const bonus = state.pendingWhiteBalls[0];
+  assert.ok(bonus.vy > 0);
+  assert.ok(bonus.y > star.y + star.height);
+  assert.strictEqual(state.livesLeft, 3);
+  assert.strictEqual(runtime.balls.length, 0);
+  state.waitingServe = false;
+  state.whiteBalls = [
+    { ...hooks.makeBounceWhiteBall(runtime, 150, 400), y: 400 },
+    { ...hooks.makeBounceWhiteBall(runtime, 160, 400), y: 900 }
+  ];
+  hooks.updateBounceMode(runtime, 1 / 120, 1000);
+  assert.strictEqual(state.livesLeft, 3,
+    "Losing one white ball during multiball does not cost a life");
+  assert.ok(state.whiteBalls.length >= 1);
+  assert.strictEqual(state.pendingWhiteBalls.length, 0);
+}
+
+function testBouncePhysicsAndPaddleRebound() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  const speed = state.ballSpeed;
+  const ball = { x: 195, y: 500, vx: speed, vy: 1, radius: state.ballRadius };
+  hooks.normalizeBounceBallVelocity(ball, speed);
+  assert.ok(Math.abs(ball.vy) >= speed * hooks.BOUNCE_MIN_VERTICAL_FRACTION - 0.001);
+  assert.ok(Math.abs(ball.vx) >= speed * 0.12 - 0.001);
+  state.paddleX = 195;
+  const paddleY = runtime.petCenterY - runtime.petRadius * 0.68;
+  const paddleBall = {
+    x: 195, y: paddleY - state.ballRadius - 1,
+    vx: 20, vy: speed, radius: state.ballRadius
+  };
+  hooks.updateBounceWhiteBall(runtime, paddleBall, 0.008, 1000);
+  assert.ok(paddleBall.vy < 0, "Pet paddle must reflect descending white balls upward");
+  assert.ok(Math.abs(Math.hypot(paddleBall.vx, paddleBall.vy) - speed) < 0.01);
+}
+
+function testBounceThreeLivesAndPopup() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  for (const lives of [2, 1, 0]) {
+    assert.strictEqual(hooks.launchBounceServe(runtime), true);
+    state.whiteBalls[0].y = runtime.height + 50;
+    hooks.updateBounceMode(runtime, 0.008, 1000 + lives * 1000);
+    assert.strictEqual(state.livesLeft, lives);
+    if (lives) {
+      assert.strictEqual(state.waitingServe, true);
+      assert.strictEqual(runtime.startTitleEl.textContent, `${lives} Balls Left!`);
+      assert.strictEqual(runtime.startInstructionEl.textContent, "Tap to launch");
+      assert.strictEqual(runtime.startOverlay.hidden, false);
+    } else {
+      assert.strictEqual(state.ended, true);
+      assert.strictEqual(hooks.launchBounceServe(runtime), false);
+    }
+  }
+}
+
+function testBounceOverlayLifecycleAndRealDailyIsolation() {
+  assert.ok(
+    source.includes(
+      'runtime.startOverlayHandler && runtime.mode !== FEED_MODES.BOUNCE'
+    ),
+    "Bounce must retain its overlay click handler for extra serves"
+  );
+  assert.ok(
+    source.includes(
+      'runtime.mode === FEED_MODES.BOUNCE && runtime.roundStarted'
+    ),
+    "Next-ball overlay taps must serve rather than restart the game"
+  );
+  assert.ok(
+    source.includes(
+      'if (runtime.mode === FEED_MODES.BOUNCE) {\n      launchBounceServe(runtime);'
+    ),
+    "Starting Bounce must launch exactly one opening white ball"
+  );
+  const previewSource = appSource.slice(
+    appSource.indexOf("const FEEDING_GAME_TEST_MODES"),
+    appSource.indexOf("const showDailyPreviewDialog", appSource.indexOf("const FEEDING_GAME_TEST_MODES"))
+  );
+  assert.ok(previewSource.includes('selectedMode.id === "classic" || selectedMode.id === "bounce"'));
+  assert.ok(previewSource.includes('"Question stars add extra star pegs in Classic or multiball star bricks in Bounce."'));
+  const realDaily = appSource.slice(
+    appSource.indexOf("async function startDailyTodoSnack("),
+    appSource.indexOf("function claimDailyTodoSnack(")
+  );
+  assert.ok(realDaily.includes('feedMode: "classic"'),
+    "Real Daily snack remains Classic despite Bounce becoming testable");
+}
+
+function testBounceClearingBoardWaitsForSnacks() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  state.cleared = true;
+  state.whiteBalls = [];
+  runtime.balls = [{ x: 100, y: 300, vy: 120, radius: 10, rotation: 0 }];
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1000), false);
+  runtime.balls = [];
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1000), false);
+  assert.strictEqual(runtime.finishAt, 1900);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1900), true);
+  const result = hooks.getModeController("bounce").buildResult({
+    mode: "bounce", score: 7, caughtCount: 3, totalCount: 7
+  });
+  assert.deepStrictEqual(toPlain(result), {
+    mode: "bounce", score: 7, caughtCount: 3,
+    totalCount: 7, completed: true
+  });
+}
+
 function testMelodyExactOdeToJoySequence() {
   const reference = extractVerseTyperOdeToJoy();
   const feeding = Array.from(hooks.FEED_MELODIES[0].notes);
 
   assert.strictEqual(hooks.FEED_MELODIES[0].id, "odeToJoy");
+  assert.strictEqual(hooks.FEED_MELODIES[0].label, "Ode to Joy");
+  assert.strictEqual(hooks.FEED_MELODIES[0].bpm, 116);
   assert.strictEqual(reference.length, 60);
   assert.deepStrictEqual(feeding, reference);
+}
+
+function testMelodyTuneRegistryAndSelection() {
+  assert.deepStrictEqual(
+    Array.from(hooks.FEED_MELODIES)
+      .map((tune) => tune.id),
+    ["odeToJoy", "turkeyInTheStraw"]
+  );
+
+  const turkey =
+    hooks.getFeedMelodyById(
+      "turkeyInTheStraw"
+    );
+
+  assert.ok(turkey);
+  assert.strictEqual(
+    turkey.label,
+    "Turkey in the Straw"
+  );
+  assert.strictEqual(turkey.bpm, 132);
+  assert.strictEqual(
+    hooks.getFeedMelodyById("missing"),
+    null
+  );
+
+  assert.strictEqual(
+    hooks.selectFeedMelody(
+      "turkeyInTheStraw",
+      () => 0
+    ).id,
+    "turkeyInTheStraw",
+    "An explicit Preview tune must override random selection"
+  );
+  assert.strictEqual(
+    hooks.selectFeedMelody("", () => 0).id,
+    "odeToJoy"
+  );
+  assert.strictEqual(
+    hooks.selectFeedMelody("", () => 0.999).id,
+    "turkeyInTheStraw"
+  );
+}
+
+function testTurkeyInTheStrawVerseTimeline() {
+  const tune =
+    hooks.getFeedMelodyById(
+      "turkeyInTheStraw"
+    );
+  const notes =
+    hooks.normalizeFeedMelodyNotes(
+      tune.notes
+    );
+  const playable =
+    notes.filter(
+      (note) => Number.isFinite(note.midi)
+    );
+  const totalBeats =
+    notes.reduce(
+      (sum, note) => sum + note.beats,
+      0
+    );
+
+  assert.strictEqual(notes.length, 52);
+  assert.strictEqual(playable.length, 51);
+  assert.strictEqual(totalBeats, 33);
+  assert.deepStrictEqual(
+    toPlain(notes.slice(0, 9)),
+    [
+      { midi: 71, beats: 0.5 },
+      { midi: 69, beats: 0.5 },
+      { midi: 67, beats: 0.5 },
+      { midi: 66, beats: 0.5 },
+      { midi: 67, beats: 0.5 },
+      { midi: 69, beats: 0.5 },
+      { midi: 67, beats: 1 },
+      { midi: 59, beats: 0.5 },
+      { midi: 60, beats: 0.5 }
+    ]
+  );
+  assert.deepStrictEqual(
+    toPlain(notes.slice(-4)),
+    [
+      { midi: 71, beats: 1 },
+      { midi: 69, beats: 1 },
+      { midi: 67, beats: 1 },
+      { midi: null, beats: 1 }
+    ]
+  );
+
+  const timeline =
+    hooks.createMelodyTimeline(
+      tune.notes,
+      400,
+      { bpm: tune.bpm }
+    );
+  const beatMs = 60000 / tune.bpm;
+
+  assert.ok(
+    Math.abs(
+      timeline[1].spawnOffsetMs -
+      beatMs * 0.5
+    ) < 0.001
+  );
+  assert.ok(
+    Math.abs(
+      (
+        timeline[7].spawnOffsetMs -
+        timeline[6].spawnOffsetMs
+      ) -
+      beatMs
+    ) < 0.001,
+    "Quarter-note values must create wider snack spacing than eighth notes"
+  );
+  assert.strictEqual(timeline.at(-1).midi, null);
+  assert.strictEqual(timeline.at(-1).laneFraction, null);
+
+  const runtime = makeLabyrinthRuntime(0);
+  runtime.mode = "melody";
+  runtime.requestedMelodyId =
+    "turkeyInTheStraw";
+  runtime.scoreEl = { textContent: "" };
+  hooks.initializeMelodyMode(runtime);
+
+  assert.strictEqual(
+    runtime.melody.tuneId,
+    "turkeyInTheStraw"
+  );
+  assert.strictEqual(runtime.melody.bpm, 132);
+  assert.strictEqual(runtime.totalCount, 51);
+  assert.strictEqual(
+    runtime.melody.timeline.length,
+    52
+  );
 }
 
 function testMelodyRenderAndControllerContract() {
@@ -1246,6 +1681,7 @@ function testMelodyPercentageScoring() {
 function testMelodyIgnoresQuestionStars() {
   const runtime = makeLabyrinthRuntime(2);
   runtime.mode = "melody";
+  runtime.requestedMelodyId = "odeToJoy";
   runtime.scoreEl = { textContent: "" };
 
   hooks.initializeMelodyMode(runtime);
@@ -1253,6 +1689,8 @@ function testMelodyIgnoresQuestionStars() {
   assert.deepStrictEqual(toPlain(runtime.pegs), []);
   assert.deepStrictEqual(toPlain(runtime.bursts), []);
   assert.strictEqual(runtime.totalCount, 60);
+  assert.strictEqual(runtime.melody.tuneId, "odeToJoy");
+  assert.strictEqual(runtime.melody.bpm, 116);
   assert.strictEqual(runtime.scheduled.length, 0);
   assert.strictEqual(runtime.scoreEl.textContent, "0%");
 }
@@ -1261,6 +1699,7 @@ function testMelodyCompletionWaitsForFinalArrival() {
   const runtime = makeLabyrinthRuntime(0);
   runtime.mode = "melody";
   runtime.modeConfig = hooks.FEED_MODE_CONFIGS.melody;
+  runtime.requestedMelodyId = "odeToJoy";
   runtime.scoreEl = { textContent: "" };
   hooks.initializeMelodyMode(runtime);
 
@@ -1511,13 +1950,14 @@ function testFeedingGameTesterModesAndStars() {
     });
 
   assert.strictEqual(
-    (
-      testerSource.match(
-        /enabled: false/g
-      ) || []
-    ).length,
-    1,
-    "Only Bounce should remain disabled after Patch 05"
+    (testerSource.match(/enabled: false/g) || []).length,
+    0,
+    "All four feeding modes should be enabled in Preview"
+  );
+  assert.ok(
+    testerSource.includes(
+      'id: "bounce",\n          label: "Bounce",\n          enabled: true'
+    )
   );
 
   assert.ok(
@@ -1542,6 +1982,49 @@ function testFeedingGameTesterModesAndStars() {
     testerSource.includes(
       "`${starCount} ★`"
     )
+  );
+}
+
+function testFeedingGamePreviewTuneSelector() {
+  const start =
+    appSource.indexOf(
+      "const FEEDING_GAME_TEST_MELODIES"
+    );
+  const end =
+    appSource.indexOf(
+      "const showDailyPreviewDialog",
+      start
+    );
+  const testerSource =
+    appSource.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.ok(
+    testerSource.includes(
+      'id: "odeToJoy",\n          label: "Ode to Joy"'
+    )
+  );
+  assert.ok(
+    testerSource.includes(
+      'id: "turkeyInTheStraw",\n          label: "Turkey in the Straw"'
+    )
+  );
+  assert.ok(
+    testerSource.includes(
+      'title: "Choose Melody Tune"'
+    )
+  );
+  assert.ok(
+    testerSource.includes(
+      'mode.id === "melody"\n                      ? showFeedingGameTuneDialog()'
+    ),
+    "Melody Preview must open the tune selector before launch"
+  );
+  assert.ok(
+    testerSource.includes(
+      'feedMelodyId:\n          selectedMelody?.id || ""'
+    ),
+    "Preview session must carry its explicit Melody tune"
   );
 }
 
@@ -1593,6 +2076,17 @@ function testFeedingGamePreviewSessionIsolation() {
   assert.ok(
     launchSource.includes(
       "feedMode: selectedMode.id"
+    )
+  );
+  assert.ok(
+    launchSource.includes(
+      'selectedMode.id === "melody" &&\n        !selectedMelody'
+    ),
+    "Preview Melody launches must reject unknown tune ids"
+  );
+  assert.ok(
+    launchSource.includes(
+      'feedMelodyId:\n          selectedMelody?.id || ""'
     )
   );
   assert.ok(
@@ -1915,7 +2409,20 @@ function main() {
     testLabyrinthOldBallsDoNotExpire,
     testLabyrinthStuckRecoveryNudgesTowardGap,
     testLabyrinthAlwaysReachesCompletion,
+    testBounceRenderAndControllerContract,
+    testBounceBrickLayoutAndQuestionStars,
+    testBounceSeparatePetPaddleAndServe,
+    testBounceCollisionRemovesBricksAndDropsCorrectSnacks,
+    testBounceBrickImpactReboundsAndSingleDrop,
+    testBounceSnackCatchUsesPaddleAndScoresRainbow,
+    testBounceStarBricksCreateBonusNotLives,
+    testBouncePhysicsAndPaddleRebound,
+    testBounceThreeLivesAndPopup,
+    testBounceClearingBoardWaitsForSnacks,
+    testBounceOverlayLifecycleAndRealDailyIsolation,
     testMelodyExactOdeToJoySequence,
+    testMelodyTuneRegistryAndSelection,
+    testTurkeyInTheStrawVerseTimeline,
     testMelodyRenderAndControllerContract,
     testMelodyTimingModel,
     testMelodyLanePathIsReadable,
@@ -1929,6 +2436,7 @@ function main() {
     testModeDisposalAndStopAreIdempotent,
     testFeedingGameTesterRegistration,
     testFeedingGameTesterModesAndStars,
+    testFeedingGamePreviewTuneSelector,
     testFeedingGamePreviewSessionIsolation,
     testRealDailySnackExplicitlyUsesClassic,
     testPreviewClaimPathStaysTemporary,
