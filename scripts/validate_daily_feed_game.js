@@ -7,6 +7,7 @@ const vm = require("vm");
 
 const rootDir = path.resolve(__dirname, "..");
 const feedGamePath = path.join(rootDir, "daily_questions_feed_game.js");
+const feedGameCssPath = path.join(rootDir, "daily_questions_feed_game.css");
 const appPath = path.join(rootDir, "app.js");
 const verseTyperPath = path.join(
   rootDir,
@@ -15,6 +16,7 @@ const verseTyperPath = path.join(
   "game.js"
 );
 const source = fs.readFileSync(feedGamePath, "utf8");
+const feedGameCssSource = fs.readFileSync(feedGameCssPath, "utf8");
 const appSource = fs.readFileSync(appPath, "utf8");
 const verseTyperSource = fs.readFileSync(verseTyperPath, "utf8");
 
@@ -50,6 +52,9 @@ function loadFeedGameForValidation() {
     BOUNCE_SERVES,
     BOUNCE_STEP,
     BOUNCE_MIN_VERTICAL_FRACTION,
+    BOUNCE_SPEED_GAIN_PER_SECOND,
+    BOUNCE_MAX_SPEED_MULTIPLIER,
+    BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE,
     createBounceBrickField,
     initializeBounceMode,
     setBouncePaddleX,
@@ -59,6 +64,7 @@ function loadFeedGameForValidation() {
     breakBounceBrick,
     collideBounceBallWithBricks,
     normalizeBounceBallVelocity,
+    getBounceBallSpeed,
     updateBounceWhiteBall,
     updateBounceSnacks,
     updateBounceMode,
@@ -1088,8 +1094,22 @@ function testBounceRenderAndControllerContract() {
   });
   assert.ok(markup.includes('data-daily-feed-mode="bounce"'));
   assert.ok(markup.includes("Bounce the BibloSnacks!"));
+  assert.ok(markup.includes("data-daily-feed-paddle"));
+  assert.ok(!markup.includes("daily-feed-shadow"));
+  const paddleCssStart = feedGameCssSource.indexOf(".daily-feed-paddle");
+  const paddleCssEnd = feedGameCssSource.indexOf(
+    ".daily-feed-catcher.is-catching",
+    paddleCssStart
+  );
+  const paddleCss = feedGameCssSource.slice(paddleCssStart, paddleCssEnd);
+  assert.ok(paddleCssStart >= 0 && paddleCssEnd > paddleCssStart);
+  assert.ok(paddleCss.includes("border-radius: 999px"));
+  assert.ok(paddleCss.includes("box-sizing: border-box"));
+  assert.ok(paddleCss.includes("var(--daily-feed-pet-size"));
   assert.ok(markup.includes("Tilt to move the paddle"));
-  assert.ok(markup.includes("bounce the white ball and catch colored snacks"));
+  assert.ok(markup.includes(
+    "bounce the white ball while Pip catches colored snacks"
+  ));
   assert.ok(markup.includes("data-daily-feed-start-title"));
   assert.ok(markup.includes("data-daily-feed-start-instruction"));
   const controller = hooks.getModeController("bounce");
@@ -1129,9 +1149,11 @@ function testBounceBrickLayoutAndQuestionStars() {
 function testBounceSeparatePetPaddleAndServe() {
   const runtime = makeBounceRuntime(2);
   hooks.initializeBounceMode(runtime);
-  hooks.setBouncePaddleX(runtime, 65);
-  assert.strictEqual(runtime.bounce.paddleX, 65);
-  assert.strictEqual(runtime.catcher.style.left, "65px");
+  assert.ok(runtime.bounce.paddleHalfWidth > runtime.petRadius);
+  assert.ok(runtime.bounce.paddleTopY > runtime.petCenterY + runtime.petRadius);
+  hooks.setBouncePaddleX(runtime, 100);
+  assert.strictEqual(runtime.bounce.paddleX, 100);
+  assert.strictEqual(runtime.catcher.style.left, "100px");
   assert.strictEqual(runtime.catcherX, 195,
     "Bounce paddle must not repurpose Classic's catcherX");
   assert.strictEqual(hooks.launchBounceServe(runtime), true);
@@ -1199,7 +1221,7 @@ function testBounceBrickImpactReboundsAndSingleDrop() {
   );
 }
 
-function testBounceSnackCatchUsesPaddleAndScoresRainbow() {
+function testBounceSnackCatchUsesPetAndScoresRainbow() {
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const rainbow = runtime.bounce.bricks.find((b) => b.config?.id === "rainbow");
@@ -1207,6 +1229,15 @@ function testBounceSnackCatchUsesPaddleAndScoresRainbow() {
   const snack = runtime.balls[0];
   assert.strictEqual(snack.points, 5);
   runtime.bounce.paddleX = 220;
+
+  // The paddle is not an eater: a snack touching only the paddle stays active.
+  snack.x = 220;
+  snack.y = runtime.bounce.paddleTopY + runtime.bounce.paddleHeight / 2;
+  hooks.updateBounceSnacks(runtime, 1 / 120);
+  assert.strictEqual(runtime.balls.length, 1);
+  assert.strictEqual(runtime.score, 0);
+
+  // The pet above the paddle remains the snack catcher.
   snack.x = 220;
   snack.y = runtime.petCenterY - 5;
   hooks.updateBounceSnacks(runtime, 1 / 120);
@@ -1257,15 +1288,49 @@ function testBouncePhysicsAndPaddleRebound() {
   hooks.normalizeBounceBallVelocity(ball, speed);
   assert.ok(Math.abs(ball.vy) >= speed * hooks.BOUNCE_MIN_VERTICAL_FRACTION - 0.001);
   assert.ok(Math.abs(ball.vx) >= speed * 0.12 - 0.001);
+
   state.paddleX = 195;
-  const paddleY = runtime.petCenterY - runtime.petRadius * 0.68;
+  const oldPetPaddleY = runtime.petCenterY - runtime.petRadius * 0.68;
+  const petOnlyBall = {
+    x: 195, y: oldPetPaddleY - state.ballRadius - 1,
+    vx: 20, vy: speed, radius: state.ballRadius, ageSeconds: 0
+  };
+  hooks.updateBounceWhiteBall(runtime, petOnlyBall, 0.008, 1000);
+  assert.ok(petOnlyBall.vy > 0,
+    "The pet circle itself must no longer rebound white balls");
+
   const paddleBall = {
-    x: 195, y: paddleY - state.ballRadius - 1,
-    vx: 20, vy: speed, radius: state.ballRadius
+    x: 195, y: state.paddleTopY - state.ballRadius - 1,
+    vx: 20, vy: speed, radius: state.ballRadius, ageSeconds: 0
   };
   hooks.updateBounceWhiteBall(runtime, paddleBall, 0.008, 1000);
-  assert.ok(paddleBall.vy < 0, "Pet paddle must reflect descending white balls upward");
-  assert.ok(Math.abs(Math.hypot(paddleBall.vx, paddleBall.vy) - speed) < 0.01);
+  const currentSpeed = hooks.getBounceBallSpeed(runtime, paddleBall);
+  assert.ok(paddleBall.vy < 0,
+    "The rounded-rectangle paddle must reflect descending white balls upward");
+  assert.ok(Math.abs(Math.hypot(paddleBall.vx, paddleBall.vy) - currentSpeed) < 0.01);
+}
+
+function testBounceWhiteBallsAccelerateIndependently() {
+  const runtime = makeBounceRuntime(0);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  assert.strictEqual(hooks.BOUNCE_SPEED_GAIN_PER_SECOND, 0.025);
+  assert.strictEqual(hooks.BOUNCE_MAX_SPEED_MULTIPLIER, 1.6);
+  assert.strictEqual(hooks.BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE, 1.5);
+
+  const young = hooks.makeBounceWhiteBall(runtime, 150, 400);
+  const older = hooks.makeBounceWhiteBall(runtime, 240, 400);
+  older.ageSeconds = 10;
+  assert.strictEqual(young.ageSeconds, 0);
+  assert.ok(Math.abs(hooks.getBounceBallSpeed(runtime, young) - state.ballSpeed) < 0.001);
+  assert.ok(Math.abs(hooks.getBounceBallSpeed(runtime, older) - state.ballSpeed * 1.25) < 0.001);
+
+  older.ageSeconds = 100;
+  assert.ok(Math.abs(
+    hooks.getBounceBallSpeed(runtime, older) - state.ballSpeed * 1.6
+  ) < 0.001, "White-ball acceleration must stop at the 160% cap");
+  assert.ok(Math.abs(hooks.getBounceBallSpeed(runtime, young) - state.ballSpeed) < 0.001,
+    "Each multiball white ball must keep its own age and speed curve");
 }
 
 function testBounceThreeLivesAndPopup() {
@@ -2195,6 +2260,8 @@ function testClassicRenderContract() {
   assert.ok(normal.includes("data-daily-feed-stage"));
   assert.ok(normal.includes("data-daily-feed-canvas"));
   assert.ok(normal.includes("data-daily-feed-catcher"));
+  assert.ok(normal.includes("daily-feed-shadow"));
+  assert.ok(!normal.includes("data-daily-feed-paddle"));
   assert.ok(normal.includes("Catch the BibloSnacks!"));
   assert.ok(normal.includes("Tilt to steer"));
   assert.ok(normal.includes("Great Catching!"));
@@ -2414,9 +2481,10 @@ function main() {
     testBounceSeparatePetPaddleAndServe,
     testBounceCollisionRemovesBricksAndDropsCorrectSnacks,
     testBounceBrickImpactReboundsAndSingleDrop,
-    testBounceSnackCatchUsesPaddleAndScoresRainbow,
+    testBounceSnackCatchUsesPetAndScoresRainbow,
     testBounceStarBricksCreateBonusNotLives,
     testBouncePhysicsAndPaddleRebound,
+    testBounceWhiteBallsAccelerateIndependently,
     testBounceThreeLivesAndPopup,
     testBounceClearingBoardWaitsForSnacks,
     testBounceOverlayLifecycleAndRealDailyIsolation,

@@ -117,6 +117,11 @@
   const BOUNCE_SNACK_SPEED_SCALE = 0.14;
   const BOUNCE_BALL_SPEED_SCALE = 0.39;
   const BOUNCE_MIN_VERTICAL_FRACTION = 0.48;
+  const BOUNCE_SPEED_GAIN_PER_SECOND = 0.025;
+  const BOUNCE_MAX_SPEED_MULTIPLIER = 1.60;
+  const BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE = 1.50;
+  const BOUNCE_PADDLE_HEIGHT_RADIUS_SCALE = 0.36;
+  const BOUNCE_PADDLE_GAP_RADIUS_SCALE = 0.08;
 
   const MELODY_BPM = 116;
   const MELODY_BEAT_MS = 60000 / MELODY_BPM;
@@ -942,7 +947,7 @@
         : mode === FEED_MODES.MELODY
           ? `Tilt or drag ${petName} left and right to catch the falling musical snacks`
           : mode === FEED_MODES.BOUNCE
-            ? `Tilt or drag ${petName} to bounce the white ball and catch colored snacks`
+            ? `Tilt or drag the paddle to bounce the white ball while ${petName} catches colored snacks`
             : `Tilt or drag ${petName} left and right to catch the falling food`;
     return `
       <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-feed-mode="${mode}" data-daily-session-phase="reward_game">
@@ -960,7 +965,9 @@
               ${profilePictureHtml}
             </div>
 
-            <img class="daily-feed-shadow" src="${ASSET_BASE}dq_feed_shadow.png" alt="" draggable="false">
+            ${mode === FEED_MODES.BOUNCE
+              ? `<div class="daily-feed-paddle" data-daily-feed-paddle></div>`
+              : `<img class="daily-feed-shadow" src="${ASSET_BASE}dq_feed_shadow.png" alt="" draggable="false">`}
           </div>
 
           <div class="daily-feed-score-popups" data-daily-feed-score-popups aria-hidden="true"></div>
@@ -2911,10 +2918,11 @@
   function setBouncePaddleX(runtime, nextX) {
     if (!runtime?.bounce) return;
     const x = Number(nextX);
+    const halfWidth = runtime.bounce.paddleHalfWidth;
     const safeX = clamp(
       Number.isFinite(x) ? x : runtime.width / 2,
-      runtime.petRadius,
-      runtime.width - runtime.petRadius
+      halfWidth,
+      runtime.width - halfWidth
     );
     runtime.bounce.paddleX = safeX;
     runtime.catcher.style.left = `${safeX}px`;
@@ -2931,7 +2939,8 @@
       y,
       vx: state.ballSpeed * horizontal,
       vy: state.ballSpeed * vertical * (downward ? 1 : -1),
-      radius: state.ballRadius
+      radius: state.ballRadius,
+      ageSeconds: 0
     };
   }
 
@@ -2949,6 +2958,18 @@
       runtime.width, runtime.height, runtime.earnedStarPegCount
     );
     const bottom = Math.max(...bricks.map((brick) => brick.y + brick.height));
+    const paddleHalfWidth =
+      runtime.petRadius * BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE;
+    const paddleHeight = clamp(
+      runtime.petRadius * BOUNCE_PADDLE_HEIGHT_RADIUS_SCALE,
+      16,
+      28
+    );
+    const paddleGap = clamp(
+      runtime.petRadius * BOUNCE_PADDLE_GAP_RADIUS_SCALE,
+      4,
+      8
+    );
     runtime.bounce = {
       bricks,
       whiteBalls: [],
@@ -2956,6 +2977,10 @@
       nextWhiteId: 1,
       paddleX: runtime.width / 2,
       lastPaddleX: runtime.width / 2,
+      paddleHalfWidth,
+      paddleHeight,
+      paddleGap,
+      paddleTopY: runtime.petCenterY + runtime.petRadius + paddleGap,
       smoothedVelocity: 0,
       petTilt: 0,
       ballRadius: clamp(runtime.width * 0.023, 8, 14),
@@ -3096,8 +3121,20 @@
     ball.vy = vy;
   }
 
+  function getBounceBallSpeed(runtime, ball) {
+    const ageSeconds = Math.max(0, Number(ball?.ageSeconds) || 0);
+    const multiplier = Math.min(
+      BOUNCE_MAX_SPEED_MULTIPLIER,
+      1 + ageSeconds * BOUNCE_SPEED_GAIN_PER_SECOND
+    );
+    return runtime.bounce.ballSpeed * multiplier;
+  }
+
   function updateBounceWhiteBall(runtime, ball, dt, now) {
     const state = runtime.bounce;
+    ball.ageSeconds = Math.max(0, Number(ball.ageSeconds) || 0) + dt;
+    const currentSpeed = getBounceBallSpeed(runtime, ball);
+    normalizeBounceBallVelocity(ball, currentSpeed);
     const previousX = ball.x;
     const previousY = ball.y;
     ball.x += ball.vx * dt;
@@ -3115,9 +3152,9 @@
       ball.vy = Math.abs(ball.vy);
     }
 
-    // Treat the top of the pet's circle as a forgiving Breakout paddle.
-    const paddleY = runtime.petCenterY - runtime.petRadius * 0.68;
-    const paddleHalfWidth = runtime.petRadius * 0.95;
+    // White balls rebound only from the rounded-rectangle paddle below the pet.
+    const paddleY = state.paddleTopY;
+    const paddleHalfWidth = state.paddleHalfWidth;
     if (
       ball.vy > 0 &&
       previousY + ball.radius <= paddleY &&
@@ -3128,12 +3165,12 @@
       const offset = clamp(
         (ball.x - state.paddleX) / paddleHalfWidth, -1, 1
       );
-      ball.vx = state.ballSpeed * clamp(offset * 0.78, -0.78, 0.78);
-      ball.vy = -Math.sqrt(state.ballSpeed ** 2 - ball.vx ** 2);
+      ball.vx = currentSpeed * clamp(offset * 0.78, -0.78, 0.78);
+      ball.vy = -Math.sqrt(currentSpeed ** 2 - ball.vx ** 2);
     } else {
       collideBounceBallWithBricks(runtime, ball, previousX, previousY, now);
     }
-    normalizeBounceBallVelocity(ball, state.ballSpeed);
+    normalizeBounceBallVelocity(ball, currentSpeed);
     return ball.y - ball.radius <= runtime.height;
   }
 

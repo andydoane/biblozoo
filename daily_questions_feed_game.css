@@ -455,6 +455,35 @@
   pointer-events: none;
 }
 
+.daily-feed-paddle {
+  width: calc(
+    var(--daily-feed-pet-size, 104px) * 1.5
+  );
+  height: clamp(
+    16px,
+    calc(var(--daily-feed-pet-size, 104px) * 0.18),
+    28px
+  );
+  margin-top: clamp(
+    4px,
+    calc(var(--daily-feed-pet-size, 104px) * 0.04),
+    8px
+  );
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  border: 3px solid rgba(51, 41, 95, 0.88);
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(219, 225, 247, 0.98)
+  );
+  box-shadow:
+    0 4px 0 rgba(51, 41, 95, 0.24),
+    0 7px 14px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
 .daily-feed-catcher.is-catching .daily-feed-pet-circle {
   animation: daily-feed-catch-pop 300ms ease-out;
 }
