@@ -2989,14 +2989,14 @@
       serveY: bottom + clamp(runtime.height * 0.035, 24, 44),
       livesLeft: BOUNCE_SERVES,
       waitingServe: true,
-      cleared: false,
+      snacksReleased: false,
       ended: false
     };
   }
 
   function launchBounceServe(runtime) {
     const state = runtime?.bounce;
-    if (!state?.waitingServe || state.livesLeft <= 0 || state.ended || state.cleared) {
+    if (!state?.waitingServe || state.livesLeft <= 0 || state.ended || state.snacksReleased) {
       return false;
     }
     state.waitingServe = false;
@@ -3223,7 +3223,7 @@
   function updateBounceMode(runtime, dt, now) {
     const state = runtime.bounce;
     if (!state) return;
-    if (!state.ended && !state.cleared && !state.waitingServe) {
+    if (!state.ended && !state.snacksReleased && !state.waitingServe) {
       const steps = Math.max(1, Math.ceil(dt / BOUNCE_STEP));
       const step = dt / steps;
       for (let i = 0; i < steps; i += 1) {
@@ -3234,14 +3234,18 @@
           state.whiteBalls.push(...state.pendingWhiteBalls);
           state.pendingWhiteBalls.length = 0;
         }
-        if (!state.bricks.some((brick) => brick.active)) {
-          state.cleared = true;
+        // Feeding, not clearing gray bricks, is the objective.
+        // Stop the rally after the seventh snack brick is broken;
+        // let released snacks finish falling before showing results.
+        if (!state.bricks.some((brick) => brick.active && brick.config)) {
+          state.snacksReleased = true;
           state.whiteBalls = [];
+          state.pendingWhiteBalls = [];
           break;
         }
         if (!state.whiteBalls.length) break;
       }
-      if (!state.cleared && !state.whiteBalls.length) {
+      if (!state.snacksReleased && !state.whiteBalls.length) {
         state.livesLeft -= 1;
         if (state.livesLeft > 0) {
           showBounceNextServe(runtime, now);
@@ -3321,7 +3325,7 @@
 
   function isBounceModeComplete(runtime, now) {
     const state = runtime.bounce;
-    if (!state?.ended && !(state?.cleared && runtime.balls.length === 0)) {
+    if (!state?.ended && !(state?.snacksReleased && runtime.balls.length === 0)) {
       runtime.finishAt = 0;
       return false;
     }
