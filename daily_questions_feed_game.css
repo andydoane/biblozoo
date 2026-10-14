@@ -258,6 +258,15 @@
     0 5px 0 rgba(0, 0, 0, 0.16);
 }
 
+.daily-feed-result-catches {
+  font-size: clamp(17px, 4.3vw, 23px);
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.daily-feed-result-catches[hidden] { display: none; }
+
 .daily-feed-result-complete {
   color: var(--purple);
 
@@ -519,7 +528,16 @@
   }
 
   .daily-feed-score-popup {
-    animation-duration: 350ms;
+    animation: none;
+    opacity: 1;
+  }
+
+  .daily-feed-pet-circle {
+    transform: none;
+  }
+
+  .daily-feed-start-ball {
+    filter: none;
   }
 }
 
@@ -543,4 +561,24 @@
   font-weight: 900;
   line-height: 1.12;
   text-wrap: balance;
+}
+
+/* Keep instruction and result cards usable in iPad landscape and short viewports. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .daily-feed-start-overlay,
+  .daily-feed-result-overlay {
+    padding: 8px 16px;
+    overflow-y: auto;
+  }
+  .daily-feed-start-card,
+  .daily-feed-result-card {
+    gap: 8px;
+    padding: 12px 20px;
+    max-height: calc(100% - 12px);
+  }
+  .daily-feed-start-ball { width: clamp(30px, 8vh, 48px); }
+  .daily-feed-start-title,
+  .daily-feed-result-title { font-size: clamp(23px, 5vh, 32px); }
+  .daily-feed-start-instruction { font-size: clamp(17px, 4vh, 25px); }
+  .daily-feed-result-pet-art { width: clamp(60px, 14vh, 90px); }
 }

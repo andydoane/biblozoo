@@ -55,6 +55,15 @@ function loadFeedGameForValidation() {
     BOUNCE_SPEED_GAIN_PER_SECOND,
     BOUNCE_MAX_SPEED_MULTIPLIER,
     BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE,
+    normalizeFeedAxis,
+    pointerFeedAxis,
+    feedTiltAngle,
+    readNormalizedTilt,
+    feedInstructionPrompt,
+    bounceBrickGeometry,
+    resizeFeedStage,
+    createStarBurst,
+    showResult,
     createBounceBrickField,
     initializeBounceMode,
     setBouncePaddleX,
@@ -188,14 +197,16 @@ ${exportMarker}`;
   return {
     api: window.BibloZooDailyFeedGame,
     hooks: window.__BibloZooDailyFeedGameTestHooks,
-    events
+    events,
+    sandboxWindow: window
   };
 }
 
 const {
   api,
   hooks,
-  events
+  events,
+  sandboxWindow
 } = loadFeedGameForValidation();
 
 function countStars(field) {
@@ -296,7 +307,7 @@ function testFeedModeConfigurations() {
   );
   assert.strictEqual(
     configs.classic.instructions.prompt,
-    "Tilt to steer"
+    "Steer to catch snacks"
   );
 
   assert.strictEqual(configs.labyrinth.implemented, true);
@@ -311,7 +322,7 @@ function testFeedModeConfigurations() {
   );
   assert.strictEqual(
     configs.labyrinth.instructions.prompt,
-    "Tilt to guide the snacks"
+    "Guide snacks through the gaps!"
   );
 
   assert.strictEqual(configs.bounce.implemented, true);
@@ -369,7 +380,7 @@ function testUnavailableModesSafelyResolveToClassic() {
   );
   assert.ok(
     fallbackMarkup.includes(
-      "Tilt to steer"
+      "Drag to steer and catch the snacks!"
     )
   );
 }
@@ -445,7 +456,7 @@ function testLabyrinthRenderAndControllerContract() {
   );
   assert.ok(
     markup.includes(
-      "Tilt to guide the snacks"
+      "Drag to guide snacks through the gaps!"
     )
   );
   assert.ok(
@@ -767,7 +778,7 @@ function testLabyrinthSteeringAcceleratesAllSnacks() {
   );
   assert.ok(
     source.includes(
-      "runtime.smoothedTilt * 0.72"
+      "readNormalizedTilt(runtime, event, 0.28)"
     ),
     "Labyrinth tilt smoothing should react faster than the original tuning"
   );
@@ -1106,7 +1117,7 @@ function testBounceRenderAndControllerContract() {
   assert.ok(paddleCss.includes("border-radius: 999px"));
   assert.ok(paddleCss.includes("box-sizing: border-box"));
   assert.ok(paddleCss.includes("var(--daily-feed-pet-size"));
-  assert.ok(markup.includes("Tilt to move the paddle"));
+  assert.ok(markup.includes("Drag to rebound the white ball; feed your pet the colored snacks!"));
   assert.ok(markup.includes(
     "bounce the white ball while Pip catches colored snacks"
   ));
@@ -1630,7 +1641,7 @@ function testMelodyRenderAndControllerContract() {
 
   assert.ok(markup.includes('data-daily-feed-mode="melody"'));
   assert.ok(markup.includes("Catch the BibloSnacks!"));
-  assert.ok(markup.includes("Tilt to make music"));
+  assert.ok(markup.includes("Drag to catch snacks and play the tune!"));
   assert.ok(markup.includes("falling musical snacks"));
   assert.ok(markup.includes("Caught</span>"));
   assert.ok(markup.includes(">0%</strong>"));
@@ -1959,6 +1970,7 @@ function testModeDisposalAndStopAreIdempotent() {
   const overlayRemoves = [];
   const resultRemoves = [];
   let releasedPointer = 0;
+  let disconnected = 0;
   let audioClosed = 0;
   let stopDisposeCount = 0;
 
@@ -1966,6 +1978,8 @@ function testModeDisposalAndStopAreIdempotent() {
     running: true,
     rafId: 77,
     orientationHandler() {},
+    resizeHandler() {},
+    resizeObserver: { disconnect() { disconnected += 1; } },
     pointerDownHandler() {},
     pointerMoveHandler() {},
     pointerEndHandler() {},
@@ -2022,8 +2036,9 @@ function testModeDisposalAndStopAreIdempotent() {
   assert.deepStrictEqual(events.cancelledRafs, [77]);
   assert.deepStrictEqual(
     events.windowRemoves,
-    ["deviceorientation"]
+    ["deviceorientation", "resize", "orientationchange"]
   );
+  assert.strictEqual(disconnected, 1);
   assert.deepStrictEqual(
     stageRemoves,
     [
@@ -2331,7 +2346,7 @@ function testClassicRenderContract() {
   assert.ok(normal.includes("daily-feed-shadow"));
   assert.ok(!normal.includes("data-daily-feed-paddle"));
   assert.ok(normal.includes("Catch the BibloSnacks!"));
-  assert.ok(normal.includes("Tilt to steer"));
+  assert.ok(normal.includes("Drag to steer and catch the snacks!"));
   assert.ok(normal.includes("Great Catching!"));
   assert.ok(normal.includes("Back to Zoo"));
   assert.ok(normal.includes("Tilt or drag Pip left and right"));
@@ -2508,8 +2523,8 @@ function testClassicTimingAndPhysicsConstants() {
 }
 
 function testClassicInputAndCleanupContract() {
-  assert.ok(source.includes('window.addEventListener(\n        "deviceorientation"'));
-  assert.ok(source.includes('window.removeEventListener(\n        "deviceorientation"'));
+  assert.ok(source.includes('window.addEventListener("deviceorientation", runtime.orientationHandler)'));
+  assert.ok(source.includes('window.removeEventListener(\n        "deviceorientation"') || source.includes('window.removeEventListener("deviceorientation", runtime.orientationHandler)'));
   assert.ok(source.includes('stage.addEventListener(\n      "pointerdown"'));
   assert.ok(source.includes('stage.addEventListener(\n      "pointermove"'));
   assert.ok(source.includes('stage.addEventListener(\n      "pointerup"'));
@@ -2524,6 +2539,290 @@ function testClassicStartRejectsMissingInputs() {
   assert.strictEqual(api.start(null, { session: {} }), null);
   assert.strictEqual(api.start({}, {}), null);
   assert.strictEqual(api.start({}, { session: null }), null);
+}
+
+function testModeAwareInstructionsAndTiltFallback() {
+  const expected = {
+    classic: "Drag to steer and catch the snacks!",
+    labyrinth: "Drag to guide snacks through the gaps!",
+    melody: "Drag to catch snacks and play the tune!",
+    bounce: "Drag to rebound the white ball; feed your pet the colored snacks!"
+  };
+  Object.entries(expected).forEach(([mode, instruction]) => {
+    assert.ok(api.render({ session: { feedMode: mode } }).includes(instruction));
+    assert.ok(hooks.feedInstructionPrompt(mode, false).startsWith("Drag"));
+    assert.ok(hooks.feedInstructionPrompt(mode, true).startsWith("Tilt or drag"));
+  });
+  const prior = sandboxWindow.DeviceOrientationEvent;
+  sandboxWindow.DeviceOrientationEvent = function DeviceOrientationEvent() {};
+  try {
+    for (const mode of Object.keys(expected)) {
+      assert.ok(api.render({ session: { feedMode: mode, rewardTiltEnabled: true } })
+        .includes(hooks.feedInstructionPrompt(mode, true)));
+    }
+  } finally {
+    sandboxWindow.DeviceOrientationEvent = prior;
+  }
+  assert.ok(source.includes('runtime.tiltObserved = true;'));
+  assert.ok(source.includes('!runtime.tiltObserved'));
+}
+
+function testNormalizedPointerAndLandscapeTilt() {
+  assert.strictEqual(hooks.normalizeFeedAxis(-2), -1);
+  assert.strictEqual(hooks.normalizeFeedAxis(3), 1);
+  assert.strictEqual(hooks.normalizeFeedAxis(NaN), 0);
+  assert.strictEqual(hooks.pointerFeedAxis(0, 390), -1);
+  assert.strictEqual(hooks.pointerFeedAxis(195, 390), 0);
+  assert.strictEqual(hooks.pointerFeedAxis(390, 390), 1);
+  assert.strictEqual(hooks.pointerFeedAxis(500, 390), 1);
+  assert.strictEqual(hooks.feedTiltAngle({ gamma: null, beta: null }), null);
+  sandboxWindow.screen = { orientation: { angle: 90 } };
+  assert.strictEqual(hooks.feedTiltAngle({ gamma: 10, beta: 25 }), -25);
+  sandboxWindow.screen.orientation.angle = 270;
+  assert.strictEqual(hooks.feedTiltAngle({ gamma: 10, beta: 25 }), 25);
+  sandboxWindow.screen.orientation.angle = 0;
+  assert.strictEqual(hooks.feedTiltAngle({ gamma: -15, beta: 30 }), -15);
+  delete sandboxWindow.screen;
+}
+
+function testUnifiedControlsAreModeSpecific() {
+  const bounce = makeBounceRuntime(0);
+  hooks.initializeBounceMode(bounce);
+  hooks.getModeController("bounce").handleInput(bounce, { type: "pointer", axis: -1 });
+  assert.strictEqual(bounce.bounce.paddleX, bounce.bounce.paddleHalfWidth);
+  const labyrinth = makeLabyrinthRuntime(0);
+  hooks.initializeLabyrinthMode(labyrinth);
+  hooks.getModeController("labyrinth").handleInput(labyrinth, { type: "pointer", axis: 0.8 });
+  assert.strictEqual(labyrinth.labyrinth.steering, 1);
+  hooks.getModeController("labyrinth").handleInput(labyrinth, { type: "pointerend" });
+  assert.strictEqual(labyrinth.labyrinth.steering, 0);
+  const classic = makeBounceRuntime(0);
+  hooks.getModeController("classic").handleInput(classic, { type: "pointer", axis: 1 });
+  assert.strictEqual(classic.catcherX, classic.width - classic.petRadius);
+  hooks.getModeController("melody").handleInput(classic, { type: "pointer", axis: -1 });
+  assert.strictEqual(classic.catcherX, classic.petRadius);
+}
+
+function makeResizableRuntime(mode) {
+  const runtime = makeBounceRuntime(1);
+  runtime.mode = mode;
+  runtime.width = 390;
+  runtime.height = 844;
+  runtime.dpr = 1;
+  runtime.pegRadius = 16;
+  runtime.petRadius = 48;
+  runtime.petCenterY = 775;
+  runtime.catcher.style.setProperty = () => {};
+  runtime.petCircle.getBoundingClientRect = () => ({ left: 0, top: 490, width: 96, height: 96 });
+  runtime.stage = {
+    clientWidth: 844,
+    clientHeight: 390,
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 844, height: 390 })
+  };
+  runtime.canvas = { width: 390, height: 844 };
+  runtime.modeController = { draw() {} };
+  runtime.tiltEnabled = true;
+  runtime.neutralGamma = 12;
+  runtime.smoothedTilt = 7;
+  runtime.tiltSamples = [10, 12];
+  runtime.bursts = [];
+  runtime.pegs = [];
+  runtime.balls = [];
+  return runtime;
+}
+
+function testResizeBouncePreservesLiveBoardAndMultiball() {
+  const runtime = makeResizableRuntime("bounce");
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  const oldIds = state.bricks.map((brick) => [brick.row, brick.column, brick.config?.id, brick.isStar]);
+  const brick = state.bricks.find((item) => item.config);
+  brick.active = false;
+  state.livesLeft = 2;
+  state.waitingServe = false;
+  state.whiteBalls.push(hooks.makeBounceWhiteBall(runtime, 195, 400));
+  state.whiteBalls[0].ageSeconds = 17;
+  state.pendingWhiteBalls.push(hooks.makeBounceWhiteBall(runtime, 100, 250));
+  const snackBrick = state.bricks.find((item) => item.config && item.active);
+  hooks.spawnBounceSnack(runtime, snackBrick);
+  const originalSnackId = runtime.balls[0].id;
+  hooks.setActiveRuntimeForValidation(runtime);
+  assert.strictEqual(hooks.resizeFeedStage(runtime), true);
+  assert.strictEqual(runtime.width, 844);
+  assert.strictEqual(runtime.height, 390);
+  assert.strictEqual(runtime.canvas.width, 844);
+  assert.strictEqual(runtime.canvas.height, 390);
+  assert.strictEqual(state.livesLeft, 2);
+  assert.strictEqual(state.waitingServe, false);
+  assert.strictEqual(brick.active, false);
+  assert.deepStrictEqual(
+    state.bricks.map((item) => [item.row, item.column, item.config?.id, item.isStar]),
+    oldIds
+  );
+  for (const item of state.bricks) {
+    const rect = hooks.bounceBrickGeometry(844, 390, item.row, item.column);
+    assert.strictEqual(item.x, rect.x);
+    assert.strictEqual(item.y, rect.y);
+  }
+  assert.strictEqual(state.whiteBalls.length, 1);
+  assert.strictEqual(state.pendingWhiteBalls.length, 1);
+  assert.strictEqual(state.whiteBalls[0].ageSeconds, 17);
+  assert.strictEqual(runtime.balls[0].id, originalSnackId);
+  assert.ok(runtime.balls[0].x >= 0 && runtime.balls[0].x <= 844);
+  assert.strictEqual(runtime.tiltSamples.length, 0);
+  assert.strictEqual(runtime.neutralGamma, null);
+  assert.strictEqual(hooks.resizeFeedStage(runtime), false,
+    "No-op resize must leave the in-progress game unchanged");
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testResizeLabyrinthPreservesGapsAndSnackState() {
+  const runtime = makeResizableRuntime("labyrinth");
+  hooks.initializeLabyrinthMode(runtime);
+  runtime.labyrinth.platformRows[0].gapPosition = "right";
+  runtime.labyrinth.steering = 0.5;
+  runtime.score = 4;
+  runtime.balls.push({
+    id: 1, x: 100, y: 120, vx: 20, vy: 45,
+    radius: 10, trail: [], labyrinthProgressX: 95, labyrinthProgressY: 110
+  });
+  const rows = runtime.labyrinth.platformRows;
+  hooks.setActiveRuntimeForValidation(runtime);
+  assert.strictEqual(hooks.resizeFeedStage(runtime), true);
+  assert.strictEqual(runtime.labyrinth.platformRows, rows,
+    "Do not replace platform rows after resizing");
+  assert.strictEqual(rows[0].gapPosition, "right");
+  assert.strictEqual(runtime.labyrinth.steering, 0.5);
+  assert.strictEqual(runtime.balls[0].id, 1);
+  assert.strictEqual(runtime.score, 4);
+  assert.ok(runtime.balls[0].x > 100);
+  assert.ok(runtime.balls[0].labyrinthProgressX > 95);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testResizeMelodyPreservesTimingAndNoteStatus() {
+  const runtime = makeResizableRuntime("melody");
+  runtime.requestedMelodyId = "turkeyInTheStraw";
+  hooks.initializeMelodyMode(runtime);
+  const state = runtime.melody;
+  const timeline = state.timeline;
+  state.startTime = 1000;
+  state.classifiedCount = 2;
+  timeline[0].status = "caught";
+  timeline[1].status = "missed";
+  runtime.caughtCount = 1;
+  runtime.score = 1;
+  hooks.setActiveRuntimeForValidation(runtime);
+  assert.strictEqual(hooks.resizeFeedStage(runtime), true);
+  assert.strictEqual(state.timeline, timeline);
+  assert.strictEqual(state.startTime, 1000);
+  assert.strictEqual(state.classifiedCount, 2);
+  assert.strictEqual(timeline[0].status, "caught");
+  assert.strictEqual(timeline[1].status, "missed");
+  assert.strictEqual(runtime.caughtCount, 1);
+  assert.strictEqual(runtime.score, 1);
+  const nextNote = timeline.find((entry) => entry.laneFraction !== null);
+  assert.strictEqual(nextNote.x, 844 * nextNote.laneFraction);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testPreviewNeverClaimsDailyCompletion() {
+  const preview = api.render({ session: {
+    feedMode: "bounce", dailyTodoSnack: true, dailyTodoPreview: true, petName: "Pip"
+  } });
+  assert.ok(!preview.includes("Zoo To-Do Complete!"));
+  assert.ok(!preview.includes("Thanks for the snack!"));
+  assert.ok(!preview.includes("is-daily-todo-snack"));
+  assert.ok(preview.includes("Back to Zoo"));
+  const daily = api.render({ session: { feedMode: "classic", dailyTodoSnack: true } });
+  assert.ok(daily.includes("Zoo To-Do Complete!"));
+  assert.ok(daily.includes("Back Home"));
+  const target = (mode, isPreview) => {
+    const runtime = {
+      mode, dailyTodoSnack: true, dailyTodoPreview: isPreview,
+      zookeeperName: "Someone", petName: "Pip", running: true,
+      rafId: 0, stage: {}, startOverlay: { hidden: false },
+      resultOverlay: { hidden: true }, resultTitleEl: { textContent: "" },
+      resultScoreEl: { textContent: "" },
+      resultCatchesEl: { textContent: "", hidden: false },
+      gameEl: { classList: { add() {} } },
+      modeTimers: new Set(), modeController: { dispose() {} }
+    };
+    hooks.setActiveRuntimeForValidation(runtime);
+    hooks.showResult(runtime, {
+      mode, score: 5, caughtCount: 3, totalCount: 7, catchPercent: 71
+    });
+    return runtime;
+  };
+  const previewRuntime = target("bounce", true);
+  assert.ok(!previewRuntime.resultTitleEl.textContent.includes("Thanks for the snack"));
+  assert.strictEqual(previewRuntime.resultScoreEl.textContent, "Score: 5");
+  assert.strictEqual(previewRuntime.resultCatchesEl.textContent, "Caught 3 of 7 snacks");
+  const melodyRuntime = target("melody", true);
+  assert.strictEqual(melodyRuntime.resultScoreEl.textContent, "Snacks Caught: 71%");
+  assert.strictEqual(melodyRuntime.resultCatchesEl.hidden, true);
+  const dailyRuntime = target("classic", false);
+  assert.ok(dailyRuntime.resultTitleEl.textContent.includes("Thanks for the snack, Someone!"));
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testResizeClassicPreservesStarsBallsAndScore() {
+  const runtime = makeResizableRuntime("classic");
+  runtime.pegs = [{ id: "star", x: 140, y: 200, radius: 16, isStar: true }];
+  runtime.balls = [{
+    id: 5, config: { id: "red" }, x: 100, y: 300,
+    radius: 10, vx: 30, vy: 60, bornAt: 555, trail: []
+  }];
+  runtime.score = 6;
+  runtime.caughtCount = 2;
+  runtime.scheduledIndex = 3;
+  hooks.setActiveRuntimeForValidation(runtime);
+  assert.strictEqual(hooks.resizeFeedStage(runtime), true);
+  assert.strictEqual(runtime.pegs.length, 1);
+  assert.strictEqual(runtime.pegs[0].id, "star");
+  assert.strictEqual(runtime.pegs[0].isStar, true);
+  assert.strictEqual(runtime.balls.length, 1);
+  assert.strictEqual(runtime.balls[0].id, 5);
+  assert.strictEqual(runtime.balls[0].bornAt, 555);
+  assert.ok(runtime.balls[0].x > 100);
+  assert.strictEqual(runtime.score, 6);
+  assert.strictEqual(runtime.caughtCount, 2);
+  assert.strictEqual(runtime.scheduledIndex, 3);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testTiltTouchSwitchingAndSensorUnavailability() {
+  const runtime = makeResizableRuntime("classic");
+  runtime.tiltEnabled = true;
+  runtime.dragging = false;
+  runtime.tiltCalibrationUntil = 0;
+  runtime.neutralGamma = null;
+  runtime.smoothedTilt = 0;
+  runtime.tiltSamples = [];
+  hooks.setActiveRuntimeForValidation(runtime);
+  assert.strictEqual(hooks.readNormalizedTilt(runtime, { gamma: null }), null);
+  assert.strictEqual(runtime.tiltObserved, undefined);
+  assert.strictEqual(hooks.readNormalizedTilt(runtime, { gamma: 5 }), 0);
+  const steered = hooks.readNormalizedTilt(runtime, { gamma: 30 });
+  assert.ok(steered > 0 && steered <= 1);
+  runtime.dragging = true;
+  assert.strictEqual(hooks.readNormalizedTilt(runtime, { gamma: -20 }), null);
+  assert.ok(hooks.pointerFeedAxis(0, runtime.width) < 0);
+  runtime.dragging = false;
+  runtime.neutralGamma = null;
+  assert.strictEqual(hooks.readNormalizedTilt(runtime, { gamma: 12 }), 0);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testReducedMotionPreservesGameplayAndAudioSafety() {
+  const runtime = { reducedMotion: true, bursts: [], pegRadius: 16 };
+  hooks.createStarBurst(runtime, { x: 40, y: 50 }, 1000);
+  assert.strictEqual(runtime.bursts.length, 0);
+  assert.ok(source.includes('if (runtime.reducedMotion) return;'));
+  assert.ok(source.includes('if (runtime.reducedMotion) setTimeout(() => popup.remove(), 850)'));
+  assert.ok(feedGameCssSource.includes('@media (prefers-reduced-motion: reduce)'));
+  assert.ok(feedGameCssSource.includes('animation: none'));
+  assert.ok(source.includes('if (!context || context.state === "closed") return;'));
 }
 
 function main() {
@@ -2589,7 +2888,17 @@ function main() {
     testClassicResultCopyThresholds,
     testClassicTimingAndPhysicsConstants,
     testClassicInputAndCleanupContract,
-    testClassicStartRejectsMissingInputs
+    testClassicStartRejectsMissingInputs,
+    testModeAwareInstructionsAndTiltFallback,
+    testNormalizedPointerAndLandscapeTilt,
+    testUnifiedControlsAreModeSpecific,
+    testResizeBouncePreservesLiveBoardAndMultiball,
+    testResizeLabyrinthPreservesGapsAndSnackState,
+    testResizeMelodyPreservesTimingAndNoteStatus,
+    testResizeClassicPreservesStarsBallsAndScore,
+    testTiltTouchSwitchingAndSensorUnavailability,
+    testPreviewNeverClaimsDailyCompletion,
+    testReducedMotionPreservesGameplayAndAudioSafety
   ];
 
   tests.forEach((test) => test());

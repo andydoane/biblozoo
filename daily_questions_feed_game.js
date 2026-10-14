@@ -45,7 +45,7 @@
       finishDelayMs: 900,
       instructions: Object.freeze({
         title: "Catch the BibloSnacks!",
-        prompt: "Tilt to steer"
+        prompt: "Steer to catch snacks"
       })
     }),
     [FEED_MODES.LABYRINTH]: Object.freeze({
@@ -58,7 +58,7 @@
       finishDelayMs: 900,
       instructions: Object.freeze({
         title: "Guide the BibloSnacks!",
-        prompt: "Tilt to guide the snacks"
+        prompt: "Guide snacks through the gaps!"
       })
     }),
     [FEED_MODES.MELODY]: Object.freeze({
@@ -71,7 +71,7 @@
       finishDelayMs: 900,
       instructions: Object.freeze({
         title: "Catch the BibloSnacks!",
-        prompt: "Tilt to make music"
+        prompt: "Catch the snacks to play the tune!"
       })
     }),
     [FEED_MODES.BOUNCE]: Object.freeze({
@@ -84,7 +84,7 @@
       finishDelayMs: 900,
       instructions: Object.freeze({
         title: "Bounce the BibloSnacks!",
-        prompt: "Tilt to move the paddle"
+        prompt: "Bounce the white ball and catch the snacks!"
       })
     })
   });
@@ -833,6 +833,11 @@
       runtime.running = false;
       if (runtime.rafId) cancelAnimationFrame(runtime.rafId);
       detachGameplayInput(runtime);
+      if (runtime.resizeHandler) {
+        window.removeEventListener("resize", runtime.resizeHandler);
+        window.removeEventListener("orientationchange", runtime.resizeHandler);
+      }
+      runtime.resizeObserver?.disconnect();
       disposeMode(runtime);
 
       if (
@@ -933,10 +938,50 @@
     runtime.activePointerId = null;
   }
 
+  // Shared normalized input: every mode receives a horizontal axis in [-1, 1].
+  // Mode controllers remain responsible for how that axis affects gameplay.
+  function normalizeFeedAxis(value) {
+    return clamp(Number.isFinite(Number(value)) ? Number(value) : 0, -1, 1);
+  }
+
+  function pointerFeedAxis(x, width) {
+    return normalizeFeedAxis((Number(x) / Math.max(1, width) - 0.5) * 2);
+  }
+
+  function feedTiltAngle(event) {
+    const orientation = Number(
+      window.screen?.orientation?.angle ?? window.orientation ?? 0
+    );
+    const angle = ((orientation % 360) + 360) % 360;
+    const gamma = event?.gamma == null ? NaN : Number(event.gamma);
+    const beta = event?.beta == null ? NaN : Number(event.beta);
+    // A landscape display changes which physical device axis is horizontal.
+    if (angle === 90 && Number.isFinite(beta)) return -beta;
+    if (angle === 270 && Number.isFinite(beta)) return beta;
+    return Number.isFinite(gamma) ? gamma : null;
+  }
+
+  function feedInstructionPrompt(mode, tiltEnabled) {
+    const control = tiltEnabled ? "Tilt or drag" : "Drag";
+    switch (mode) {
+      case FEED_MODES.LABYRINTH:
+        return `${control} to guide snacks through the gaps!`;
+      case FEED_MODES.MELODY:
+        return `${control} to catch snacks and play the tune!`;
+      case FEED_MODES.BOUNCE:
+        return `${control} to rebound the white ball; feed your pet the colored snacks!`;
+      default:
+        return `${control} to steer and catch the snacks!`;
+    }
+  }
+
   function render({ session, profilePictureHtml = "" } = {}) {
     const petName = String(session?.petName || "BibloPet").trim() || "BibloPet";
     const isDailyTodoSnack =
-      session?.dailyTodoSnack === true;
+      session?.dailyTodoSnack === true && session?.dailyTodoPreview !== true;
+    const tiltAvailable =
+      session?.rewardTiltEnabled === true &&
+      typeof window.DeviceOrientationEvent !== "undefined";
     const mode =
       resolveFeedMode(session?.feedMode);
     const modeConfig =
@@ -1012,7 +1057,7 @@
             </div>
 
             <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
-              ${modeConfig.instructions.prompt}
+              ${feedInstructionPrompt(mode, tiltAvailable)}
             </div>
           </div>
         </div>
@@ -1044,7 +1089,11 @@
               class="daily-feed-result-score"
               data-daily-feed-result-score
             >
-              Score: 0
+              ${mode === FEED_MODES.MELODY ? "Snacks Caught: 0%" : "Score: 0"}
+            </div>
+            <div class="daily-feed-result-catches" data-daily-feed-result-catches
+              ${mode === FEED_MODES.MELODY ? "hidden" : ""}>
+              Caught 0 of 7 snacks
             </div>
 
             ${isDailyTodoSnack ? `
@@ -1103,53 +1152,38 @@
     runtime.tiltSamples = [];
     runtime.tiltCalibrationUntil =
       performance.now() + TILT_CALIBRATION_MS;
-    if (runtime.mode === FEED_MODES.BOUNCE) {
-      setBouncePaddleX(runtime, runtime.width / 2);
-    } else {
-      setCatcherX(runtime, runtime.width / 2);
-    }
   }
 
-  function handleTilt(runtime, event) {
-    if (!runtime || !runtime.tiltEnabled || runtime.dragging || activeRuntime !== runtime) return;
-    const gamma = Number(event?.gamma);
-    if (!Number.isFinite(gamma)) return;
-
-    const now = performance.now();
-
-    if (now < runtime.tiltCalibrationUntil) {
-      runtime.tiltSamples.push(gamma);
-      if (runtime.tiltSamples.length > 24) {
-        runtime.tiltSamples.shift();
-      }
-      return;
+  function readNormalizedTilt(runtime, event, smoothing = 0.15) {
+    if (!runtime?.tiltEnabled || runtime.dragging || activeRuntime !== runtime) {
+      return null;
     }
-
+    const angle = feedTiltAngle(event);
+    if (angle === null) return null;
+    runtime.tiltObserved = true;
+    const now = performance.now();
+    if (now < runtime.tiltCalibrationUntil) {
+      runtime.tiltSamples.push(angle);
+      if (runtime.tiltSamples.length > 24) runtime.tiltSamples.shift();
+      return null;
+    }
     if (!Number.isFinite(runtime.neutralGamma)) {
-      const samples = runtime.tiltSamples.length
-        ? runtime.tiltSamples
-        : [gamma];
-      const average = samples.reduce(
-        (sum, value) => sum + value,
-        0
-      ) / samples.length;
-
-      // Use the phone's actual resting angle as its neutral position.
-      runtime.neutralGamma = average;
+      const samples = runtime.tiltSamples.length ? runtime.tiltSamples : [angle];
+      runtime.neutralGamma = samples.reduce((sum, value) => sum + value, 0) / samples.length;
       runtime.tiltSamples = [];
       runtime.smoothedTilt = 0;
     }
+    const relative = clamp(angle - runtime.neutralGamma, -25, 25);
+    runtime.smoothedTilt = runtime.smoothedTilt * (1 - smoothing) + relative * smoothing;
+    return normalizeFeedAxis(runtime.smoothedTilt / 25);
+  }
 
-    const relative = clamp(gamma - runtime.neutralGamma, -25, 25);
-    runtime.smoothedTilt = runtime.smoothedTilt * 0.85 + relative * 0.15;
-    const travel = Math.max(0, runtime.width / 2 - runtime.petRadius);
-    const targetX =
-      runtime.width / 2 + (runtime.smoothedTilt / 25) * travel;
-    if (runtime.mode === FEED_MODES.BOUNCE) {
-      setBouncePaddleX(runtime, targetX);
-    } else {
-      setCatcherX(runtime, targetX);
-    }
+  function handleTilt(runtime, event) {
+    const axis = readNormalizedTilt(runtime, event);
+    if (axis === null) return;
+    const targetX = runtime.width / 2 + axis * Math.max(0, runtime.width / 2 - runtime.petRadius);
+    if (runtime.mode === FEED_MODES.BOUNCE) setBouncePaddleX(runtime, targetX);
+    else setCatcherX(runtime, targetX);
   }
 
   function playPegTone(runtime, now) {
@@ -1272,6 +1306,7 @@
   }
 
   function createStarBurst(runtime, peg, now) {
+    if (runtime.reducedMotion) return;
     const colors = ["#ffc751", "#ffffff", "#ff5a51", "#78ad4f", "#46aef0", "#7f66c6"];
     const particles = [];
     for (let index = 0; index < 28; index += 1) {
@@ -1451,6 +1486,14 @@
     popup.style.top = `${runtime.petCenterY - runtime.petRadius * 0.65}px`;
     popup.addEventListener("animationend", () => popup.remove(), { once: true });
     runtime.scorePopupsEl.appendChild(popup);
+    if (runtime.reducedMotion) setTimeout(() => popup.remove(), 850);
+  }
+
+  function pulseFeedPet(runtime) {
+    if (!runtime?.catcher) return;
+    runtime.catcher.classList.remove("is-catching");
+    void runtime.catcher.offsetWidth;
+    runtime.catcher.classList.add("is-catching");
   }
 
   function catchBall(runtime, ball) {
@@ -1459,9 +1502,7 @@
     updateScoreBadge(runtime);
     showCatchScore(runtime, ball);
     playChompSound(runtime);
-    runtime.catcher.classList.remove("is-catching");
-    void runtime.catcher.offsetWidth;
-    runtime.catcher.classList.add("is-catching");
+    pulseFeedPet(runtime);
   }
 
   function updateBall(runtime, ball, dt, now) {
@@ -1499,6 +1540,7 @@
   }
 
   function drawTrail(runtime, ball, now) {
+    if (runtime.reducedMotion) return;
     const ctx = runtime.ctx;
     const colors = ball.config.trailColors || [ball.config.color];
     ball.trail = ball.trail.filter((point) => now - point.bornAt < 520);
@@ -1598,7 +1640,9 @@
     for (const ball of runtime.balls) drawTrail(runtime, ball, now);
     for (const peg of runtime.pegs) drawPeg(runtime, peg);
     runtime.bursts = runtime.bursts.filter((burst) => now - burst.startedAt < burst.duration);
-    for (const burst of runtime.bursts) drawBurst(runtime, burst, now);
+    if (!runtime.reducedMotion) {
+      for (const burst of runtime.bursts) drawBurst(runtime, burst, now);
+    }
     for (const ball of runtime.balls) drawBall(runtime, ball);
   }
 
@@ -2362,59 +2406,10 @@
     }
   }
 
-  function handleLabyrinthTilt(
-    runtime,
-    event
-  ) {
-    if (
-      !runtime ||
-      !runtime.labyrinth ||
-      !runtime.tiltEnabled ||
-      runtime.dragging ||
-      activeRuntime !== runtime
-    ) {
-      return;
-    }
-
-    const gamma = Number(event?.gamma);
-    if (!Number.isFinite(gamma)) return;
-
-    const now = performance.now();
-
-    if (now < runtime.tiltCalibrationUntil) {
-      runtime.tiltSamples.push(gamma);
-      if (runtime.tiltSamples.length > 24) {
-        runtime.tiltSamples.shift();
-      }
-      return;
-    }
-
-    if (!Number.isFinite(runtime.neutralGamma)) {
-      const samples =
-        runtime.tiltSamples.length
-          ? runtime.tiltSamples
-          : [gamma];
-      const average =
-        samples.reduce(
-          (sum, value) => sum + value,
-          0
-        ) / samples.length;
-
-      runtime.neutralGamma = average;
-      runtime.tiltSamples = [];
-      runtime.smoothedTilt = 0;
-    }
-
-    const relative = clamp(
-      gamma - runtime.neutralGamma,
-      -25,
-      25
-    );
-    runtime.smoothedTilt =
-      runtime.smoothedTilt * 0.72 +
-      relative * 0.28;
-    runtime.labyrinth.steering =
-      runtime.smoothedTilt / 25;
+  function handleLabyrinthTilt(runtime, event) {
+    if (!runtime?.labyrinth) return;
+    const axis = readNormalizedTilt(runtime, event, 0.28);
+    if (axis !== null) runtime.labyrinth.steering = axis;
   }
 
   function handleLabyrinthModeInput(
@@ -2432,18 +2427,10 @@
     }
 
     if (input?.type === "pointer") {
-      const halfWidth =
-        Math.max(1, runtime.width / 2);
-      runtime.labyrinth.steering =
-        clamp(
-          (
-            Number(input.x) -
-            halfWidth
-          ) /
-          (halfWidth * 0.72),
-          -1,
-          1
-        );
+      const axis = input.axis === undefined
+        ? pointerFeedAxis(input.x, runtime.width)
+        : normalizeFeedAxis(input.axis);
+      runtime.labyrinth.steering = normalizeFeedAxis(axis / 0.72);
       return;
     }
 
@@ -2677,9 +2664,9 @@
     updateMelodyScore(runtime);
     playMelodyTone(runtime, entry.midi);
 
-    runtime.catcher.classList.remove("is-catching");
-    void runtime.catcher.offsetWidth;
-    runtime.catcher.classList.add("is-catching");
+    // The melody note takes the place of a chomp sound, but pet feedback is shared.
+    showCatchScore(runtime, { config: ball.config, points: 1 });
+    pulseFeedPet(runtime);
   }
 
   function updateMelodyMode(
@@ -2798,7 +2785,10 @@
     }
 
     if (input?.type === "pointer") {
-      setCatcherX(runtime, input.x);
+      const axis = input.axis === undefined
+        ? pointerFeedAxis(input.x, runtime.width)
+        : normalizeFeedAxis(input.axis);
+      setCatcherX(runtime, runtime.width * (axis + 1) / 2);
     }
   }
 
@@ -2866,31 +2856,33 @@
 
   // Bounce (Breakout): white balls and falling snacks have separate physics.
   // The pet position is kept in bounce.paddleX, not Classic's catcherX.
+  function bounceBrickGeometry(width, height, row, column) {
+    const gap = clamp(width * 0.008, 4, 8);
+    const margin = Math.max(8, width * 0.015);
+    const brickWidth = (width - margin * 2 - gap * (BOUNCE_COLUMNS - 1)) / BOUNCE_COLUMNS;
+    const brickHeight = clamp(height * 0.045, 26, 54);
+    const top = Math.max(72, height * 0.09);
+    return {
+      x: margin + column * (brickWidth + gap),
+      y: top + row * (brickHeight + gap),
+      width: brickWidth,
+      height: brickHeight
+    };
+  }
+
   function createBounceBrickField(
     width,
     height,
     earnedStars = 0,
     random = Math.random
   ) {
-    const gap = clamp(width * 0.008, 4, 8);
-    const margin = Math.max(8, width * 0.015);
-    const brickWidth =
-      (width - margin * 2 - gap * (BOUNCE_COLUMNS - 1)) /
-      BOUNCE_COLUMNS;
-    const brickHeight = clamp(height * 0.045, 26, 54);
-    const top = Math.max(72, height * 0.09);
     const slots = [];
     for (let row = 0; row < BOUNCE_ROWS; row += 1) {
       for (let column = 0; column < BOUNCE_COLUMNS; column += 1) {
         slots.push({
           row, column,
-          x: margin + column * (brickWidth + gap),
-          y: top + row * (brickHeight + gap),
-          width: brickWidth,
-          height: brickHeight,
-          config: null,
-          isStar: false,
-          active: true
+          ...bounceBrickGeometry(width, height, row, column),
+          config: null, isStar: false, active: true
         });
       }
     }
@@ -3319,7 +3311,10 @@
     if (input?.type === "tilt") {
       handleTilt(runtime, input.event);
     } else if (input?.type === "pointer") {
-      setBouncePaddleX(runtime, input.x);
+      const axis = input.axis === undefined
+        ? pointerFeedAxis(input.x, runtime.width)
+        : normalizeFeedAxis(input.axis);
+      setBouncePaddleX(runtime, runtime.width * (axis + 1) / 2);
     }
   }
 
@@ -3385,10 +3380,10 @@
     }
 
     if (input?.type === "pointer") {
-      setCatcherX(
-        runtime,
-        input.x
-      );
+      const axis = input.axis === undefined
+        ? pointerFeedAxis(input.x, runtime.width)
+        : normalizeFeedAxis(input.axis);
+      setCatcherX(runtime, runtime.width * (axis + 1) / 2);
     }
   }
 
@@ -3498,13 +3493,19 @@
 
     runtime.startOverlay.hidden = true;
     runtime.resultTitleEl.textContent =
-      runtime.dailyTodoSnack
+      runtime.dailyTodoSnack && !runtime.dailyTodoPreview
         ? `Thanks for the snack, ${runtime.zookeeperName}!`
         : copy.title;
     runtime.resultScoreEl.textContent =
       result.mode === FEED_MODES.MELODY
         ? `Snacks Caught: ${Number(result.catchPercent) || 0}%`
         : `Score: ${result.score}`;
+    if (runtime.resultCatchesEl) {
+      const caught = Math.max(0, Number(result.caughtCount) || 0);
+      const total = Math.max(0, Number(result.totalCount) || 0);
+      runtime.resultCatchesEl.textContent = `Caught ${caught} of ${total} snacks`;
+      runtime.resultCatchesEl.hidden = result.mode === FEED_MODES.MELODY;
+    }
     runtime.resultOverlay.hidden = false;
   }
 
@@ -3560,10 +3561,17 @@
 
     if (runtime.tiltEnabled) {
       beginTiltCalibration(runtime);
-      window.addEventListener(
-        "deviceorientation",
-        runtime.orientationHandler
-      );
+      window.addEventListener("deviceorientation", runtime.orientationHandler);
+      // Permission alone is not proof that the browser delivers sensor data.
+      const fallbackTimer = setTimeout(() => {
+        runtime.modeTimers.delete(fallbackTimer);
+        if (activeRuntime === runtime && !runtime.tiltObserved) {
+          runtime.tiltEnabled = false;
+          runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, false);
+          window.removeEventListener("deviceorientation", runtime.orientationHandler);
+        }
+      }, 2000);
+      runtime.modeTimers.add(fallbackTimer);
     }
 
     runtime.stage.addEventListener(
@@ -3610,6 +3618,126 @@
       return;
     }
     runtime.rafId = requestAnimationFrame((nextNow) => runFrame(runtime, nextNow));
+  }
+
+  // Maintain the same live game when orientation or viewport dimensions change.
+  // Bricks are repositioned by row/column, never reshuffled or reactivated.
+  function resizeFeedStage(runtime) {
+    if (!runtime || activeRuntime !== runtime || runtime.finished) return false;
+    const width = runtime.stage.clientWidth;
+    const height = runtime.stage.clientHeight;
+    if (width < 120 || height < 260) return false;
+    const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
+    if (width === runtime.width && height === runtime.height && dpr === runtime.dpr) return false;
+
+    const oldWidth = runtime.width;
+    const oldHeight = runtime.height;
+    const oldPegRadius = runtime.pegRadius;
+    const sx = width / oldWidth;
+    const sy = height / oldHeight;
+    const fieldRadius = clamp(width * 0.04, 14, 26);
+    const radiusScale = fieldRadius / oldPegRadius;
+    const petFraction = (runtime.mode === FEED_MODES.BOUNCE
+      ? runtime.bounce.paddleX : runtime.catcherX) / oldWidth;
+    runtime.width = width;
+    runtime.height = height;
+    runtime.dpr = dpr;
+    runtime.canvas.width = Math.round(width * dpr);
+    runtime.canvas.height = Math.round(height * dpr);
+    runtime.pegRadius = fieldRadius;
+    runtime.catcher.style.setProperty("--daily-feed-pet-size", `${fieldRadius * 4}px`);
+
+    const stageRect = runtime.stage.getBoundingClientRect();
+    const petRect = runtime.petCircle.getBoundingClientRect();
+    runtime.petRadius = petRect.width / 2;
+    runtime.petCenterY = petRect.top - stageRect.top + petRect.height / 2;
+    runtime.gravity = height * 0.31;
+    runtime.lastCatcherX = width * petFraction;
+    runtime.smoothedPetVelocity = 0;
+
+    const scalePoint = (point) => {
+      point.x *= sx;
+      point.y *= sy;
+    };
+    const scaleBall = (ball) => {
+      scalePoint(ball);
+      ball.x = clamp(ball.x, ball.radius * radiusScale, width - ball.radius * radiusScale);
+      ball.vx = (Number(ball.vx) || 0) * sx;
+      ball.vy = (Number(ball.vy) || 0) * sy;
+      ball.radius *= radiusScale;
+      if (Number.isFinite(ball.labyrinthProgressX)) ball.labyrinthProgressX *= sx;
+      if (Number.isFinite(ball.labyrinthProgressY)) ball.labyrinthProgressY *= sy;
+      if (Array.isArray(ball.trail)) ball.trail.forEach(scalePoint);
+    };
+    runtime.balls.forEach(scaleBall);
+    runtime.pegs.forEach((peg) => {
+      scalePoint(peg);
+      peg.radius *= radiusScale;
+    });
+    runtime.bursts.forEach(scalePoint);
+
+    if (runtime.labyrinth) {
+      const state = runtime.labyrinth;
+      for (const row of state.platformRows) {
+        row.y *= sy;
+        row.thickness *= sy;
+        row.gapCenter *= sx;
+        row.gapWidth *= sx;
+        row.gapLeft *= sx;
+        row.gapRight *= sx;
+        for (const segment of row.segments) {
+          segment.x *= sx;
+          segment.y *= sy;
+          segment.width *= sx;
+          segment.height *= sy;
+        }
+      }
+      state.steerAcceleration = width * LABYRINTH_STEER_ACCELERATION_SCALE;
+      state.maxHorizontalSpeed = width * LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE;
+      state.gravity = height * 0.24;
+      state.maxVerticalSpeed = height * 0.29;
+      state.petSpeed = width * 0.19;
+    }
+    if (runtime.melody) {
+      for (const entry of runtime.melody.timeline) {
+        if (entry.x !== null) entry.x = width * entry.laneFraction;
+      }
+      // Keep the existing startTime and note statuses; no tune restart.
+    }
+    if (runtime.bounce) {
+      const state = runtime.bounce;
+      state.bricks.forEach((brick) => {
+        Object.assign(brick, bounceBrickGeometry(width, height, brick.row, brick.column));
+      });
+      for (const ball of [...state.whiteBalls, ...state.pendingWhiteBalls]) {
+        scaleBall(ball);
+      }
+      state.ballRadius = clamp(width * 0.023, 8, 14);
+      state.ballSpeed = Math.max(width * 0.62, height * BOUNCE_BALL_SPEED_SCALE);
+      state.snackSpeed = height * BOUNCE_SNACK_SPEED_SCALE;
+      runtime.balls.forEach((snack) => { snack.vy = state.snackSpeed; });
+      state.paddleHalfWidth = runtime.petRadius * BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE;
+      state.paddleHeight = clamp(runtime.petRadius * BOUNCE_PADDLE_HEIGHT_RADIUS_SCALE, 16, 28);
+      state.paddleGap = clamp(runtime.petRadius * BOUNCE_PADDLE_GAP_RADIUS_SCALE, 4, 8);
+      state.paddleTopY = runtime.petCenterY + runtime.petRadius + state.paddleGap;
+      const bottom = Math.max(...state.bricks.map((brick) => brick.y + brick.height));
+      state.serveY = bottom + clamp(height * 0.035, 24, 44);
+      state.lastPaddleX = width * petFraction;
+      state.smoothedVelocity = 0;
+      setBouncePaddleX(runtime, width * petFraction);
+      state.whiteBalls.forEach((ball) => normalizeBounceBallVelocity(ball, getBounceBallSpeed(runtime, ball)));
+      state.pendingWhiteBalls.forEach((ball) => normalizeBounceBallVelocity(ball, getBounceBallSpeed(runtime, ball)));
+    } else {
+      setCatcherX(runtime, width * petFraction);
+    }
+    if (runtime.tiltEnabled) {
+      runtime.neutralGamma = null;
+      runtime.smoothedTilt = 0;
+      runtime.tiltSamples = [];
+      runtime.tiltCalibrationUntil = performance.now() + TILT_CALIBRATION_MS;
+    }
+    runtime.modeController.draw(runtime, performance.now());
+    return true;
   }
 
   function start(
@@ -3694,6 +3822,10 @@
     const resultBackButton =
       rootEl.querySelector(
         "[data-daily-feed-result-back]"
+      );
+    const resultCatchesEl =
+      rootEl.querySelector(
+        "[data-daily-feed-result-catches]"
       );
 
     if (
@@ -3845,6 +3977,7 @@
       resultTitleEl,
       resultScoreEl,
       resultBackButton,
+      resultCatchesEl,
       startOverlayHandler: null,
       resultBackHandler: null,
       introUnlockAt:
@@ -3857,6 +3990,8 @@
         "BibloPet",
       dailyTodoSnack:
         session.dailyTodoSnack === true,
+      dailyTodoPreview:
+        session.dailyTodoPreview === true,
       zookeeperName:
         String(
           session.zookeeperName ||
@@ -3877,8 +4012,9 @@
       dragging: false,
       activePointerId: null,
       tiltEnabled:
-        session.rewardTiltEnabled ===
-        true,
+        session.rewardTiltEnabled === true &&
+        typeof window.DeviceOrientationEvent !== "undefined",
+      tiltObserved: false,
       neutralGamma: null,
       smoothedTilt: 0,
       tiltSamples: [],
@@ -3887,6 +4023,9 @@
       pointerDownHandler: null,
       pointerMoveHandler: null,
       pointerEndHandler: null,
+      resizeHandler: null,
+      resizeObserver: null,
+      reducedMotion: !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches,
       pegs: field.pegs,
       pegRadius: field.pegRadius,
       starImage: images.star,
@@ -3936,16 +4075,21 @@
       setCatcherX(runtime, width / 2);
     }
 
-    runtime.orientationHandler =
-      (event) =>
-        runtime.modeController
-          .handleInput(
-            runtime,
-            {
-              type: "tilt",
-              event
-            }
-          );
+    runtime.orientationHandler = (event) => {
+      if (activeRuntime !== runtime || !runtime.roundStarted || runtime.finished) return;
+      runtime.modeController.handleInput(runtime, { type: "tilt", event });
+    };
+
+    runtime.resizeHandler = () => {
+      if (activeRuntime !== runtime) return;
+      resizeFeedStage(runtime);
+    };
+    window.addEventListener("resize", runtime.resizeHandler);
+    window.addEventListener("orientationchange", runtime.resizeHandler);
+    if (typeof ResizeObserver !== "undefined") {
+      runtime.resizeObserver = new ResizeObserver(runtime.resizeHandler);
+      runtime.resizeObserver.observe(stage);
+    }
 
     const moveCatcher =
       (event) => {
@@ -3960,7 +4104,8 @@
               type: "pointer",
               x:
                 event.clientX -
-                rect.left
+                rect.left,
+              axis: pointerFeedAxis(event.clientX - rect.left, rect.width)
             }
           );
       };
@@ -4024,6 +4169,9 @@
 
         if (runtime.tiltEnabled) {
           runtime.smoothedTilt = 0;
+          runtime.neutralGamma = null;
+          runtime.tiltSamples = [];
+          runtime.tiltCalibrationUntil = performance.now() + TILT_CALIBRATION_MS;
         }
 
         try {
