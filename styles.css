@@ -8521,3 +8521,63 @@ button *,
 [role="button"] * {
   font-family: "Baloo 2", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
 }
+
+/* Shared New Verse picker: independent selection and audio-preview targets. */
+.new-verse-picker-screen .new-verse-card-shell {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.new-verse-picker-screen .new-verse-card-shell > .new-verse-card {
+  width: 100%;
+}
+.new-verse-picker-screen .new-verse-preview-audio {
+  position: absolute;
+  z-index: 4;
+  top: clamp(10px, 2.4vw, 16px);
+  right: clamp(10px, 2.4vw, 16px);
+  width: 44px;
+  height: 44px;
+  padding: 5px;
+  border: 2px solid #7f66c6;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #333333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.new-verse-picker-screen .new-verse-preview-audio.is-playing {
+  background: #fff1bc;
+  border-color: #333333;
+  box-shadow: 0 0 0 3px rgba(127, 102, 198, 0.22);
+}
+.new-verse-picker-screen .new-verse-preview-audio:focus-visible {
+  outline: 3px solid #333333;
+  outline-offset: 3px;
+}
+.new-verse-picker-screen .new-verse-preview-icon {
+  display: block;
+  width: 30px;
+  height: 30px;
+  font-size: 25px;
+  line-height: 30px;
+  text-align: center;
+}
+.new-verse-picker-screen .new-verse-preview-icon.has-image {
+  background: url("./verse_images/verse_preview_speaker.png") center / contain no-repeat;
+}
+/* Change Verse uses the upper-left for the learned checkmark. */
+.new-verse-picker-screen .new-verse-card-learned {
+  right: auto;
+  left: clamp(10px, 2.4vw, 16px);
+}
+@media (max-width: 380px) {
+  .new-verse-picker-screen .new-verse-preview-audio {
+    top: 8px;
+    right: 8px;
+  }
+}

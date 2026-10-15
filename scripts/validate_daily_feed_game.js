@@ -2093,7 +2093,7 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
     false,
     "Feeding assets must not be in the fail-fast shell cache list"
   );
-  assert.ok(sw.includes('2026_Oct_15_feed_game_hardening_n'));
+  assert.ok(sw.includes('2026_Oct_15_verse_picker_audio_o'));
 }
 
 async function testDailyFeedPrecacheSurvivesIndividualFailures() {
