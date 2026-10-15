@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_14_daily_feed_rotation_m";
+const CACHE_VERSION = "2026_Oct_15_feed_game_hardening_n";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -150,9 +150,43 @@ const CORE_PATHS = [
   "./favicon.ico"
 ];
 
+// Feed art is deliberately cached separately from the essential app shell.
+// A temporarily missing decorative asset must not block SW installation.
+const FEED_BACKGROUND_SCENES = [
+  "beach", "canyon", "clouds", "glacier", "hills", "mesa",
+  "moon", "mountain", "swamp", "volcano", "waterfall"
+];
+const FEED_ASSET_PATHS = [
+  ...FEED_BACKGROUND_SCENES.flatMap((scene) =>
+    ["phone", "tablet"].map((format) =>
+      `./verse_images/daily_questions/dq_feed_bg_${scene}_${format}.jpg`
+    )
+  ),
+  ...["red", "yellow", "orange", "green", "blue", "purple", "rainbow"]
+    .map((color) => `./verse_images/daily_questions/dq_feed_ball_${color}.png`),
+  "./verse_images/daily_questions/dq_feed_star_peg.png",
+  "./verse_images/daily_questions/dq_feed_shadow.png",
+  "./verse_images/daily_questions/dq_feed_star.mp3",
+  "./verse_images/daily_questions/dq_feed_chomp.mp3"
+];
+
 const CORE_URLS = CORE_PATHS.map(
   (path) => new URL(path, APP_ROOT).href
 );
+
+async function precacheDailyFeedAssets(cache) {
+  const results = await Promise.allSettled(
+    FEED_ASSET_PATHS.map((path) =>
+      cache.add(new URL(path, APP_ROOT).href)
+    )
+  );
+  const failed = FEED_ASSET_PATHS.filter(
+    (_, index) => results[index].status === "rejected"
+  );
+  if (failed.length) {
+    console.warn("Some Daily feeding assets could not be precached", failed);
+  }
+}
 
 function isCacheableResponse(response) {
   return !!(
@@ -257,6 +291,7 @@ self.addEventListener(
         await caches.open(SHELL_CACHE);
 
       await cache.addAll(CORE_URLS);
+      await precacheDailyFeedAssets(cache);
       await cacheAllVerseData(cache);
     })());
   }

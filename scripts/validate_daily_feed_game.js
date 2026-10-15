@@ -114,6 +114,10 @@ function loadFeedGameForValidation() {
     updateMelodyMode,
     buildMelodyResult,
     disposeMelodyMode,
+    pauseMelodyForInterruption,
+    resumeMelodyAfterInterruption,
+    attachMelodyInterruptionHandlers,
+    detachMelodyInterruptionHandlers,
     advanceLabyrinthPet,
     recoverStuckLabyrinthBall,
     buildScheduledBalls,
@@ -160,6 +164,8 @@ ${exportMarker}`;
   const events = {
     windowAdds: [],
     windowRemoves: [],
+    documentAdds: [],
+    documentRemoves: [],
     cancelledRafs: []
   };
 
@@ -176,8 +182,19 @@ ${exportMarker}`;
     webkitAudioContext: null
   };
 
+  const document = {
+    hidden: false,
+    addEventListener(type) {
+      events.documentAdds.push(type);
+    },
+    removeEventListener(type) {
+      events.documentRemoves.push(type);
+    }
+  };
+
   const sandbox = {
     window,
+    document,
     Image: StubImage,
     Audio: StubAudio,
     fetch: () => Promise.reject(new Error("Network disabled in validation")),
@@ -202,7 +219,8 @@ ${exportMarker}`;
     api: window.BibloZooDailyFeedGame,
     hooks: window.__BibloZooDailyFeedGameTestHooks,
     events,
-    sandboxWindow: window
+    sandboxWindow: window,
+    sandboxDocument: document
   };
 }
 
@@ -210,7 +228,8 @@ const {
   api,
   hooks,
   events,
-  sandboxWindow
+  sandboxWindow,
+  sandboxDocument
 } = loadFeedGameForValidation();
 
 function countStars(field) {
@@ -1874,14 +1893,13 @@ function testMelodyAudioAndBackgroundSafety() {
   assert.ok(catchSource.includes("playMelodyTone(runtime, entry.midi);"));
   assert.ok(!catchSource.includes("playChompSound"));
   assert.ok(
-    source.includes(
-      "now - state.lastUpdateAt > MELODY_BACKGROUND_GAP_MS"
-    )
+    source.includes("gapMs > MELODY_BACKGROUND_GAP_MS")
   );
   assert.ok(
-    source.includes(
-      "if (resumedAfterGap) {\n          classifyMelodyMiss(runtime, entry);"
-    )
+    source.includes("state.startTime += gapMs;")
+  );
+  assert.ok(
+    !source.includes("if (resumedAfterGap) {\n          classifyMelodyMiss(runtime, entry);")
   );
 
   let stopCount = 0;
@@ -1908,6 +1926,233 @@ function testMelodyAudioAndBackgroundSafety() {
   assert.strictEqual(disconnectCount, 2);
   assert.strictEqual(runtime.melody.activeVoices.size, 0);
   assert.strictEqual(runtime.melody.lastUpdateAt, 0);
+}
+
+function makeInterruptedMelodyRuntime() {
+  const runtime = {
+    mode: "melody",
+    modeConfig: hooks.FEED_MODE_CONFIGS.melody,
+    requestedMelodyId: "odeToJoy",
+    roundStarted: true,
+    running: true,
+    finished: false,
+    rafId: 77,
+    width: 390,
+    height: 844,
+    petCenterY: 780,
+    pegRadius: 16,
+    petRadius: 48,
+    catcherX: 195,
+    lastCatcherX: 195,
+    scoreEl: { textContent: "", closest() { return null; } },
+    petCircle: { style: { setProperty() {} } },
+    balls: [],
+    nextBallId: 1,
+    score: 0,
+    caughtCount: 0,
+    finishAt: 0,
+    lastFrameAt: 1000
+  };
+  hooks.initializeMelodyMode(runtime);
+  runtime.melody.startTime = 1000;
+  runtime.melody.lastUpdateAt = 1000;
+  hooks.setActiveRuntimeForValidation(runtime);
+  return runtime;
+}
+
+function testMelodyInterruptionFreezesTimelineAndFinishingDelay() {
+  const runtime = makeInterruptedMelodyRuntime();
+  const entry = runtime.melody.timeline[0];
+  entry.status = "active";
+  runtime.balls = [{
+    x: entry.x, y: 30, radius: 10,
+    melodyEntry: entry
+  }];
+  runtime.finishAt = 2000;
+  let stopped = 0;
+  runtime.melody.activeVoices.add({
+    oscillator: {
+      stop() { stopped += 1; }, disconnect() {}
+    },
+    gain: { disconnect() {} }
+  });
+
+  events.cancelledRafs.length = 0;
+  assert.strictEqual(hooks.pauseMelodyForInterruption(runtime, 1500), true);
+  assert.strictEqual(hooks.pauseMelodyForInterruption(runtime, 1800), false);
+  assert.strictEqual(runtime.melody.pausedAt, 1500);
+  assert.strictEqual(runtime.rafId, 0);
+  assert.deepStrictEqual(events.cancelledRafs, [77]);
+  assert.strictEqual(stopped, 1);
+  hooks.updateMelodyMode(runtime, 0.016, 9000);
+  assert.strictEqual(entry.status, "active");
+
+  sandboxDocument.hidden = true;
+  assert.strictEqual(hooks.resumeMelodyAfterInterruption(runtime, 10000), false);
+  sandboxDocument.hidden = false;
+  assert.strictEqual(hooks.resumeMelodyAfterInterruption(runtime, 10000), true);
+  assert.strictEqual(hooks.resumeMelodyAfterInterruption(runtime, 10001), false);
+  assert.strictEqual(runtime.melody.pausedAt, null);
+  assert.strictEqual(runtime.melody.startTime, 9500);
+  assert.strictEqual(runtime.finishAt, 10500);
+  assert.strictEqual(runtime.melody.lastUpdateAt, 10000);
+  assert.strictEqual(runtime.lastFrameAt, 10000);
+  assert.strictEqual(runtime.rafId, 1);
+
+  hooks.updateMelodyMode(runtime, 0.016, 10016);
+  assert.strictEqual(entry.status, "active");
+  assert.strictEqual(runtime.caughtCount, 0);
+  assert.strictEqual(runtime.melody.classifiedCount, 0);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testMelodyPageLifecycleAndCleanup() {
+  const runtime = makeInterruptedMelodyRuntime();
+  runtime.rafId = 101;
+  const adds = events.documentAdds.length;
+  const removes = events.documentRemoves.length;
+  const windowAdds = events.windowAdds.length;
+  const windowRemoves = events.windowRemoves.length;
+  hooks.attachMelodyInterruptionHandlers(runtime);
+  assert.deepStrictEqual(events.documentAdds.slice(adds), ["visibilitychange"]);
+  assert.deepStrictEqual(events.windowAdds.slice(windowAdds), ["pagehide", "pageshow"]);
+
+  runtime.melodyPageHideHandler();
+  assert.strictEqual(runtime.melodyPageHidden, true);
+  assert.strictEqual(runtime.melody.pausedAt, 1000);
+  assert.strictEqual(hooks.resumeMelodyAfterInterruption(runtime, 3000), false);
+  sandboxDocument.hidden = true;
+  runtime.melodyPageShowHandler();
+  assert.strictEqual(runtime.melody.pausedAt, 1000);
+  sandboxDocument.hidden = false;
+  runtime.melodyVisibilityHandler();
+  assert.strictEqual(runtime.melody.pausedAt, null);
+
+  hooks.detachMelodyInterruptionHandlers(runtime);
+  hooks.detachMelodyInterruptionHandlers(runtime);
+  assert.deepStrictEqual(events.documentRemoves.slice(removes), ["visibilitychange"]);
+  assert.deepStrictEqual(events.windowRemoves.slice(windowRemoves), ["pagehide", "pageshow"]);
+  assert.strictEqual(runtime.melodyVisibilityHandler, null);
+  assert.strictEqual(runtime.melodyPageHideHandler, null);
+  assert.strictEqual(runtime.melodyPageShowHandler, null);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testMelodyLongFrameStallPreservesNotes() {
+  const runtime = makeInterruptedMelodyRuntime();
+  const entry = runtime.melody.timeline[0];
+  entry.status = "active";
+  runtime.balls = [{ x: entry.x, y: 40, radius: 10, melodyEntry: entry }];
+  runtime.finishAt = 1800;
+  // No pagehide event: a heavily throttled frame is still treated as a pause.
+  hooks.updateMelodyMode(runtime, 0.016, 9000);
+  assert.strictEqual(runtime.melody.startTime, 9000);
+  assert.strictEqual(runtime.finishAt, 9800);
+  assert.strictEqual(entry.status, "active");
+  assert.strictEqual(runtime.caughtCount, 0);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
+  const sw = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
+  const sandbox = {
+    self: {
+      location: { href: "https://example.org/biblozoo/service-worker.js" },
+      addEventListener() {}
+    },
+    URL,
+    console
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(sw, sandbox, { filename: "service-worker.js" });
+  const paths = toPlain(vm.runInContext("FEED_ASSET_PATHS", sandbox));
+  const prefix = "./verse_images/daily_questions/";
+  const expected = [
+    ...Array.from(hooks.BACKGROUND_SCENES).flatMap((scene) =>
+      ["phone", "tablet"].map((format) =>
+        `${prefix}dq_feed_bg_${scene}_${format}.jpg`
+      )
+    ),
+    ...Array.from(hooks.SOLID_BALLS).map((ball) =>
+      `${prefix}dq_feed_ball_${ball.id}.png`
+    ),
+    `${prefix}dq_feed_ball_rainbow.png`,
+    `${prefix}dq_feed_star_peg.png`,
+    `${prefix}dq_feed_shadow.png`,
+    `${prefix}dq_feed_star.mp3`,
+    `${prefix}dq_feed_chomp.mp3`
+  ];
+  assert.strictEqual(expected.length, 33);
+  assert.deepStrictEqual(paths, expected);
+  assert.strictEqual(new Set(paths).size, paths.length);
+  assert.ok(sw.includes("await precacheDailyFeedAssets(cache);"));
+  assert.ok(sw.includes("Promise.allSettled("));
+  assert.ok(sw.includes("cache.add(new URL(path, APP_ROOT).href)"));
+  assert.strictEqual(
+    vm.runInContext('CORE_PATHS.includes("./verse_images/daily_questions/dq_feed_ball_red.png")', sandbox),
+    false,
+    "Feeding assets must not be in the fail-fast shell cache list"
+  );
+  assert.ok(sw.includes('2026_Oct_15_feed_game_hardening_n'));
+}
+
+async function testDailyFeedPrecacheSurvivesIndividualFailures() {
+  const sw = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
+
+  async function simulateInstall(failOne) {
+    const handlers = {};
+    const cached = new Map();
+    const warnings = [];
+    const cache = {
+      async addAll(urls) {
+        urls.forEach((url) => cached.set(url, "shell"));
+      },
+      async add(url) {
+        if (failOne && url.endsWith("dq_feed_bg_beach_phone.jpg")) {
+          throw new Error("optional image temporarily unavailable");
+        }
+        cached.set(url, "feed");
+      },
+      async put(url) {
+        cached.set(url, "verse");
+      }
+    };
+    const sandbox = {
+      self: {
+        location: {
+          href: "https://example.org/biblozoo/service-worker.js",
+          origin: "https://example.org"
+        },
+        addEventListener(type, handler) { handlers[type] = handler; }
+      },
+      URL,
+      console: {
+        warn(...items) { warnings.push(items); }
+      },
+      caches: { async open() { return cache; } },
+      fetch: async () => ({
+        ok: true,
+        clone() { return this; },
+        async json() { return []; }
+      })
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(sw, sandbox, { filename: "service-worker.js" });
+
+    let installing = null;
+    handlers.install({ waitUntil(promise) { installing = promise; } });
+    assert.ok(installing, "Service-worker install must call waitUntil");
+    await installing;
+    assert.strictEqual(
+      [...cached.values()].filter((value) => value === "feed").length,
+      failOne ? 32 : 33
+    );
+    assert.ok(cached.has("https://example.org/biblozoo/daily_questions_feed_game.js"));
+    assert.strictEqual(warnings.length, failOne ? 1 : 0);
+  }
+
+  await simulateInstall(false);
+  await simulateInstall(true);
 }
 
 function testStandardResultContract() {
@@ -3082,7 +3327,7 @@ function testReducedMotionPreservesGameplayAndAudioSafety() {
   assert.ok(source.includes('if (!context || context.state === "closed") return;'));
 }
 
-function main() {
+async function main() {
   const tests = [
     testPublicApiContract,
     testFeedModeRegistryAndNormalization,
@@ -3126,6 +3371,11 @@ function main() {
     testMelodyIgnoresQuestionStars,
     testMelodyCompletionWaitsForFinalArrival,
     testMelodyAudioAndBackgroundSafety,
+    testMelodyInterruptionFreezesTimelineAndFinishingDelay,
+    testMelodyPageLifecycleAndCleanup,
+    testMelodyLongFrameStallPreservesNotes,
+    testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall,
+    testDailyFeedPrecacheSurvivesIndividualFailures,
     testStandardResultContract,
     testModeDisposalAndStopAreIdempotent,
     testFeedingGameTesterRegistration,
@@ -3169,11 +3419,16 @@ function main() {
     testReducedMotionPreservesGameplayAndAudioSafety
   ];
 
-  tests.forEach((test) => test());
+  for (const test of tests) {
+    await test();
+  }
 
   console.log(
     `Daily feeding game validation passed (${tests.length} checks).`
   );
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

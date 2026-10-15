@@ -886,6 +886,8 @@
   function detachGameplayInput(runtime) {
     if (!runtime) return;
 
+    detachMelodyInterruptionHandlers(runtime);
+
     if (runtime.orientationHandler) {
       window.removeEventListener(
         "deviceorientation",
@@ -2609,12 +2611,110 @@
       timeline,
       startTime: null,
       lastUpdateAt: 0,
+      pausedAt: null,
       classifiedCount: 0,
       activeVoices: new Set()
     };
 
     if (runtime.scoreEl) {
       runtime.scoreEl.textContent = "0%";
+    }
+  }
+
+  // Keep Melody's musical clock frozen while the app is backgrounded.
+  // The other modes retain their existing frame-time-based behavior.
+  function pauseMelodyForInterruption(runtime, now = performance.now()) {
+    const state = runtime?.melody;
+    if (
+      !state ||
+      activeRuntime !== runtime ||
+      runtime.mode !== FEED_MODES.MELODY ||
+      !runtime.roundStarted ||
+      !runtime.running ||
+      runtime.finished ||
+      state.pausedAt !== null
+    ) {
+      return false;
+    }
+
+    state.pausedAt = now;
+    stopMelodyVoices(runtime);
+    if (runtime.rafId) {
+      cancelAnimationFrame(runtime.rafId);
+      runtime.rafId = 0;
+    }
+    return true;
+  }
+
+  function resumeMelodyAfterInterruption(runtime, now = performance.now()) {
+    const state = runtime?.melody;
+    if (
+      !state ||
+      activeRuntime !== runtime ||
+      runtime.finished ||
+      !runtime.running ||
+      state.pausedAt === null ||
+      runtime.melodyPageHidden ||
+      (typeof document !== "undefined" && document.hidden)
+    ) {
+      return false;
+    }
+
+    const pauseDuration = Math.max(0, now - state.pausedAt);
+    state.pausedAt = null;
+    if (Number.isFinite(state.startTime)) {
+      state.startTime += pauseDuration;
+    }
+    if (runtime.finishAt > 0) {
+      runtime.finishAt += pauseDuration;
+    }
+    state.lastUpdateAt = now;
+    runtime.lastFrameAt = now;
+    if (!runtime.rafId) {
+      runtime.rafId = requestAnimationFrame(
+        (frameNow) => runFrame(runtime, frameNow)
+      );
+    }
+    return true;
+  }
+
+  function attachMelodyInterruptionHandlers(runtime) {
+    if (runtime?.mode !== FEED_MODES.MELODY) return;
+
+    runtime.melodyVisibilityHandler = () => {
+      if (document.hidden) {
+        pauseMelodyForInterruption(runtime);
+      } else {
+        resumeMelodyAfterInterruption(runtime);
+      }
+    };
+    runtime.melodyPageHideHandler = () => {
+      runtime.melodyPageHidden = true;
+      pauseMelodyForInterruption(runtime);
+    };
+    runtime.melodyPageShowHandler = () => {
+      runtime.melodyPageHidden = false;
+      resumeMelodyAfterInterruption(runtime);
+    };
+
+    document.addEventListener("visibilitychange", runtime.melodyVisibilityHandler);
+    window.addEventListener("pagehide", runtime.melodyPageHideHandler);
+    window.addEventListener("pageshow", runtime.melodyPageShowHandler);
+  }
+
+  function detachMelodyInterruptionHandlers(runtime) {
+    if (!runtime) return;
+    if (runtime.melodyVisibilityHandler) {
+      document.removeEventListener("visibilitychange", runtime.melodyVisibilityHandler);
+      runtime.melodyVisibilityHandler = null;
+    }
+    if (runtime.melodyPageHideHandler) {
+      window.removeEventListener("pagehide", runtime.melodyPageHideHandler);
+      runtime.melodyPageHideHandler = null;
+    }
+    if (runtime.melodyPageShowHandler) {
+      window.removeEventListener("pageshow", runtime.melodyPageShowHandler);
+      runtime.melodyPageShowHandler = null;
     }
   }
 
@@ -2675,16 +2775,22 @@
     now
   ) {
     const state = runtime.melody;
-    if (!state) return;
+    if (!state || state.pausedAt != null) return;
 
     if (!Number.isFinite(state.startTime)) {
       state.startTime = now;
       state.lastUpdateAt = now;
     }
 
-    const resumedAfterGap =
+    // Also handle long frame stalls that occur without a visibility event.
+    const gapMs = now - state.lastUpdateAt;
+    if (
       state.lastUpdateAt > 0 &&
-      now - state.lastUpdateAt > MELODY_BACKGROUND_GAP_MS;
+      gapMs > MELODY_BACKGROUND_GAP_MS
+    ) {
+      state.startTime += gapMs;
+      if (runtime.finishAt > 0) runtime.finishAt += gapMs;
+    }
     state.lastUpdateAt = now;
 
     const elapsed = now - state.startTime;
@@ -2722,20 +2828,16 @@
         Math.max(1, state.travelMs);
 
       if (progress >= 1) {
-        if (resumedAfterGap) {
-          classifyMelodyMiss(runtime, entry);
+        const catchHalfWidth =
+          runtime.petRadius +
+          ball.radius * 0.65;
+        if (
+          Math.abs(ball.x - runtime.catcherX) <=
+          catchHalfWidth
+        ) {
+          catchMelodyNote(runtime, ball);
         } else {
-          const catchHalfWidth =
-            runtime.petRadius +
-            ball.radius * 0.65;
-          if (
-            Math.abs(ball.x - runtime.catcherX) <=
-            catchHalfWidth
-          ) {
-            catchMelodyNote(runtime, ball);
-          } else {
-            classifyMelodyMiss(runtime, entry);
-          }
+          classifyMelodyMiss(runtime, entry);
         }
         continue;
       }
@@ -2839,6 +2941,7 @@
     stopMelodyVoices(runtime);
     if (runtime?.melody) {
       runtime.melody.lastUpdateAt = 0;
+      runtime.melody.pausedAt = null;
     }
   }
 
@@ -3603,7 +3706,12 @@
   }
 
   function runFrame(runtime, now) {
-    if (!runtime.running || activeRuntime !== runtime) return;
+    if (
+      !runtime.running ||
+      activeRuntime !== runtime ||
+      (runtime.mode === FEED_MODES.MELODY &&
+        runtime.melody?.pausedAt != null)
+    ) return;
     const dt = clamp((now - runtime.lastFrameAt) / 1000, 0.001, 0.032);
     runtime.lastFrameAt = now;
     runtime.modeController
@@ -4062,6 +4170,7 @@
     activeRuntime = runtime;
     runtime.modeController
       .initialize(runtime);
+    attachMelodyInterruptionHandlers(runtime);
 
     stage.style.backgroundImage =
       `url("${chooseBackground(
