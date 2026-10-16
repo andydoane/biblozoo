@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_16_profile_picture_random_r";
+const CACHE_VERSION = "2026_Oct_16_daily_audio_diagnostics_s";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -46,6 +46,7 @@ const CORE_PATHS = [
   "./daily_zoo_todo_ui.js",
   "./verse_games/shared/daily-todo-parent.js",
   "./verse_games/shared/bridge.js",
+  "./verse_games/shared/audio-diagnostics.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",

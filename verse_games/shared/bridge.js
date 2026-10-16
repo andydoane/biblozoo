@@ -16,6 +16,23 @@
   );
 })();
 
+// Load diagnostics only when explicitly enabled by a developer.
+(function loadAudioDiagnostics(){
+  if (
+    document.readyState !== "loading" ||
+    !document.currentScript?.src
+  ) return;
+
+  try {
+    if (window.localStorage?.getItem("biblozooAudioDiagnostics") !== "1") return;
+  } catch (err) {
+    return;
+  }
+
+  const src = new URL("audio-diagnostics.js", document.currentScript.src).href;
+  document.write(`<script src="${src}"><\/script>`);
+})();
+
 (function(){
   const PROFILE_PROGRESS_STORAGE_KEY_BASE = "biblozooPwaProgress";
   const PAGE_TRANSITION_MS = 300;

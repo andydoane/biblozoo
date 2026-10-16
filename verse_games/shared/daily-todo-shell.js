@@ -209,6 +209,10 @@
         typeof options.onSelect === "function"
       ) {
         showStarting(options.app);
+        root.BibloZooAudioDiagnostics?.record?.(
+          "daily-mode-auto-selected",
+          { activity: context.dailyActivityId, mode: assignedMode }
+        );
         options.onSelect(assignedMode);
         return;
       }

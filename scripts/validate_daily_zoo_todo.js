@@ -2649,7 +2649,395 @@ function testDefensiveNormalization() {
   );
 }
 
-function main() {
+// Patch 13: exercise the actual Daily To-Do wrapper callbacks without a browser.
+function makeDailyAudioShellHarness(params) {
+  const events = [];
+  const original = {
+    renderTitleScreen(options) {
+      events.push("title-rendered");
+      this.titleOptions = options;
+    },
+    renderModeSelect() {
+      events.push("normal-mode-rendered");
+    },
+    renderCompleteScreen() {
+      events.push("normal-complete-rendered");
+    }
+  };
+  const root = {
+    VerseGameShell: original,
+    VerseGameBridge: {
+      getLaunchParams: () => params,
+      returnToDailyTodo(data) {
+        events.push(`returned:${data.status}`);
+        return true;
+      }
+    },
+    BibloZooAudioDiagnostics: {
+      record(type) { events.push(type); }
+    }
+  };
+  const relativePath = "verse_games/shared/daily-todo-shell.js";
+  const sandbox = { window: root };
+  vm.createContext(sandbox);
+  vm.runInContext(
+    fs.readFileSync(path.join(rootDir, relativePath), "utf8"),
+    sandbox,
+    { filename: relativePath }
+  );
+  return { root, events };
+}
+
+function makeAssignedDailyAudioParams(overrides = {}) {
+  return {
+    todoSource: "daily_todo",
+    dailyProfileId: "profile-a",
+    dailyPlanId: "plan-a",
+    dailyPlanDay: "2026-10-16",
+    dailyTaskId: "activity",
+    dailyLaunchToken: "token-a",
+    dailyVerseId: "verse_a",
+    dailyActivityKind: "game",
+    dailyActivityId: "bible_bugs",
+    dailyActivityMode: "medium",
+    dailyReturnContext: "daily_tasks_clipboard",
+    ...overrides
+  };
+}
+
+function testDailyAudioAutoModePreservesStart() {
+  const { root, events } = makeDailyAudioShellHarness(
+    makeAssignedDailyAudioParams()
+  );
+  const app = { innerHTML: "" };
+  let startCount = 0;
+  const titleOptions = { app, onStart: () => { startCount += 1; } };
+
+  root.VerseGameShell.renderTitleScreen(titleOptions);
+  assert.strictEqual(startCount, 0, "Daily launch must not click Start automatically");
+  assert.deepStrictEqual(events, ["title-rendered"]);
+  assert.strictEqual(root.VerseGameShell.titleOptions.onStart, titleOptions.onStart);
+
+  // The real shell must still wire its Start button to the supplied handler.
+  const gameShellSource = fs.readFileSync(
+    path.join(rootDir, "verse_games/shared/game-shell.js"), "utf8"
+  );
+  assert.match(gameShellSource, /startBtn\.onclick\s*=\s*onStart/);
+
+  titleOptions.onStart();
+  assert.strictEqual(startCount, 1);
+  const selected = [];
+  root.VerseGameShell.renderModeSelect({
+    app,
+    onSelect: mode => selected.push(mode)
+  });
+  assert.deepStrictEqual(selected, ["medium"]);
+  assert.match(app.innerHTML, /Starting Daily To-Do/);
+  assert.ok(events.includes("daily-mode-auto-selected"));
+  assert.ok(!events.includes("normal-mode-rendered"));
+}
+
+function testDailyAudioInvalidModeAndNormalLaunchKeepButtons() {
+  for (const params of [
+    makeAssignedDailyAudioParams({ dailyActivityMode: "unknown" }),
+    makeAssignedDailyAudioParams({ todoSource: "ordinary_launch" })
+  ]) {
+    const { root, events } = makeDailyAudioShellHarness(params);
+    const selected = [];
+    root.VerseGameShell.renderModeSelect({
+      app: { innerHTML: "" },
+      onSelect: mode => selected.push(mode)
+    });
+    assert.deepStrictEqual(selected, []);
+    assert.ok(events.includes("normal-mode-rendered"));
+    assert.ok(!events.includes("daily-mode-auto-selected"));
+  }
+}
+
+function testDailyAudioPlaygroundModeAlias() {
+  const { root } = makeDailyAudioShellHarness(makeAssignedDailyAudioParams({
+    dailyActivityKind: "playground",
+    dailyActivityId: "verse_typer",
+    dailyActivityMode: "beginner"
+  }));
+  const selected = [];
+  root.VerseGameShell.renderModeSelect({
+    app: { innerHTML: "" },
+    modes: [{ id: "easy" }, { id: "hard" }],
+    onSelect: mode => selected.push(mode)
+  });
+  assert.deepStrictEqual(selected, ["easy"]);
+}
+
+function testDailyAudioCompletionRoutingUnchanged() {
+  const { root, events } = makeDailyAudioShellHarness(
+    makeAssignedDailyAudioParams()
+  );
+  const completion = {
+    ok: true,
+    verseId: "verse_a",
+    gameId: "bible_bugs",
+    mode: "medium"
+  };
+  root.VerseGameShell.renderCompleteScreen({ completion });
+  assert.ok(events.includes("returned:success"));
+  assert.ok(!events.includes("normal-complete-rendered"));
+
+  root.VerseGameShell.renderCompleteScreen({
+    completion: { ...completion, mode: "hard" }
+  });
+  assert.ok(events.includes("normal-complete-rendered"));
+}
+
+function makeAudioDiagnosticsHarness(enabled) {
+  const store = new Map();
+  class TestAudioContext {
+    constructor() { this.state = "suspended"; this.listeners = []; }
+    addEventListener(type, handler) {
+      if (type === "statechange") this.listeners.push(handler);
+    }
+    resume() {
+      return Promise.resolve().then(() => {
+        this.state = "running";
+        for (const handler of this.listeners) handler();
+      });
+    }
+    decodeAudioData() {
+      return Promise.reject(Object.assign(new Error("bad audio"), {
+        name: "EncodingError"
+      }));
+    }
+  }
+  class TestMediaElement {
+    constructor() { this.src = "https://example.test/sound.mp3"; }
+    play() {
+      return Promise.reject(Object.assign(new Error("blocked"), {
+        name: "NotAllowedError"
+      }));
+    }
+  }
+  const nativeCtor = TestAudioContext;
+  const nativePlay = TestMediaElement.prototype.play;
+  const root = {
+    AudioContext: TestAudioContext,
+    HTMLMediaElement: TestMediaElement,
+    localStorage: { getItem: () => enabled ? "1" : null },
+    sessionStorage: {
+      getItem: key => store.get(key) || null,
+      setItem: (key, value) => store.set(key, value),
+      removeItem: key => store.delete(key)
+    },
+    location: {
+      href: "https://example.test/verse_games/bible_bugs/index.html",
+      pathname: "/verse_games/bible_bugs/index.html",
+      protocol: "https:"
+    },
+    console: { debug() { } },
+    fetch: () => Promise.resolve({ ok: false, status: 404 }),
+    URL
+  };
+  const source = fs.readFileSync(
+    path.join(rootDir, "verse_games/shared/audio-diagnostics.js"), "utf8"
+  );
+  const sandbox = { window: root, URL };
+  vm.createContext(sandbox);
+  vm.runInContext(source, sandbox, {
+    filename: "verse_games/shared/audio-diagnostics.js"
+  });
+  return { root, store, nativeCtor, nativePlay };
+}
+
+function testDailyAudioDiagnosticsDisabledByDefault() {
+  const { root, nativeCtor, nativePlay } = makeAudioDiagnosticsHarness(false);
+  assert.strictEqual(root.BibloZooAudioDiagnostics, undefined);
+  assert.strictEqual(root.AudioContext, nativeCtor);
+  assert.strictEqual(root.HTMLMediaElement.prototype.play, nativePlay);
+}
+
+async function testDailyAudioDiagnosticsFailureSignals() {
+  const { root, store } = makeAudioDiagnosticsHarness(true);
+  const api = root.BibloZooAudioDiagnostics;
+  assert.ok(api, "An opt-in diagnostic API should be available");
+
+  const ctx = new root.AudioContext();
+  await ctx.resume();
+  const media = new root.HTMLMediaElement();
+  await assert.rejects(media.play(), { name: "NotAllowedError" });
+  const response = await root.fetch("https://example.test/missing.mp3");
+  assert.strictEqual(response.status, 404, "Diagnostic must preserve fetch result");
+  await assert.rejects(ctx.decodeAudioData(new ArrayBuffer(5)), {
+    name: "EncodingError"
+  });
+  await Promise.resolve();
+
+  const types = api.getEvents().map(entry => entry.type);
+  for (const type of [
+    "diagnostics-enabled", "context-created", "context-resume-attempt",
+    "context-state", "context-resume-settled", "media-play-rejected",
+    "sound-fetch-failed", "sound-decode-failed"
+  ]) assert.ok(types.includes(type), `Missing diagnostic: ${type}`);
+  assert.strictEqual(ctx.state, "running");
+  assert.ok(store.has("biblozooAudioDiagnosticsLog"));
+  api.clear();
+  assert.deepStrictEqual(Array.from(api.getEvents()), []);
+  assert.ok(!store.has("biblozooAudioDiagnosticsLog"));
+}
+
+function makeDailyAudioParentHarness() {
+  const params = makeAssignedDailyAudioParams();
+  const activity = {
+    kind: params.dailyActivityKind,
+    id: params.dailyActivityId,
+    mode: params.dailyActivityMode
+  };
+  const plan = {
+    kind: "care",
+    profileId: params.dailyProfileId,
+    id: params.dailyPlanId,
+    day: params.dailyPlanDay,
+    verseId: params.dailyVerseId,
+    activity,
+    tasks: {
+      activity: {
+        status: "running",
+        launchToken: params.dailyLaunchToken,
+        startedAt: 12
+      }
+    }
+  };
+  const store = new Map([
+    ["biblozooPwaProgress:profile-a", JSON.stringify({
+      dailyZooTodo: { activePlan: plan }, verses: {}
+    })]
+  ]);
+  const root = {
+    location: {
+      href: "https://example.test/index.html",
+      search: ""
+    },
+    localStorage: {
+      getItem: key => store.get(key) || null,
+      setItem: (key, value) => store.set(key, value)
+    },
+    history: { replaceState() {}, state: null },
+    BibloZooDailyTodo: {
+      normalizeState: state => state,
+      setPendingCompletion(state, data) {
+        const pendingState = JSON.parse(JSON.stringify(state));
+        const task = pendingState.activePlan.tasks[data.taskId];
+        task.status = "pending";
+        task.pendingData = data.pendingData;
+        return { changed: true, state: pendingState };
+      }
+    }
+  };
+  const relativePath = "verse_games/shared/daily-todo-parent.js";
+  const sandbox = { window: root, URL, URLSearchParams };
+  vm.createContext(sandbox);
+  vm.runInContext(
+    fs.readFileSync(path.join(rootDir, relativePath), "utf8"),
+    sandbox,
+    { filename: relativePath }
+  );
+  const search = new URLSearchParams({
+    ...params,
+    dailyReturnStatus: "success"
+  });
+  return { root, plan, store, search };
+}
+
+function testDailyAudioParentAcceptsAndRejectsReturns() {
+  const success = makeDailyAudioParentHarness();
+  const api = success.root.BibloZooDailyTodoParent;
+  assert.strictEqual(api.matchesPersistedLaunch(
+    success.plan,
+    success.plan.tasks.activity,
+    api.getReturnData(`?${success.search}`)
+  ), true);
+  const accepted = api.processReturn(`?${success.search}`);
+  assert.strictEqual(accepted.handled, true);
+  assert.strictEqual(accepted.accepted, true);
+  assert.strictEqual(accepted.status, "success");
+  const stored = JSON.parse(success.store.get("biblozooPwaProgress:profile-a"));
+  assert.strictEqual(stored.dailyZooTodo.activePlan.tasks.activity.status, "pending");
+  assert.strictEqual(stored.dailyZooTodo.activePlan.tasks.activity.pendingData.activityId, "bible_bugs");
+
+  const quit = makeDailyAudioParentHarness();
+  quit.search.set("dailyReturnStatus", "quit");
+  const quitResult = quit.root.BibloZooDailyTodoParent.processReturn(`?${quit.search}`);
+  assert.strictEqual(quitResult.accepted, true);
+  const quitProgress = JSON.parse(quit.store.get("biblozooPwaProgress:profile-a"));
+  assert.strictEqual(quitProgress.dailyZooTodo.activePlan.tasks.activity.status, "open");
+  assert.strictEqual(quitProgress.dailyZooTodo.activePlan.tasks.activity.launchToken, "");
+
+  const tampered = makeDailyAudioParentHarness();
+  tampered.search.set("dailyLaunchToken", "wrong-token");
+  assert.strictEqual(
+    tampered.root.BibloZooDailyTodoParent.processReturn(`?${tampered.search}`).accepted,
+    false
+  );
+  assert.strictEqual(
+    JSON.parse(tampered.store.get("biblozooPwaProgress:profile-a"))
+      .dailyZooTodo.activePlan.tasks.activity.status,
+    "running"
+  );
+}
+
+function testDailyAudioActualGameShellStartButton() {
+  const params = makeAssignedDailyAudioParams();
+  const startButton = { onclick: null };
+  const app = { innerHTML: "", style: { setProperty() {} } };
+  const style = { setProperty() {} };
+  const document = {
+    documentElement: { style },
+    body: { style },
+    head: { appendChild() {} },
+    querySelector() { return null; },
+    createElement() { return { setAttribute() {} }; },
+    getElementById(id) {
+      if (id === "app") return app;
+      if (id === "gameShellStartBtn") return startButton;
+      return null;
+    },
+    querySelectorAll() { return []; }
+  };
+  const root = {
+    VerseGameBridge: { getLaunchParams: () => params }
+  };
+  const sandbox = { window: root, document };
+  vm.createContext(sandbox);
+  for (const relativePath of [
+    "verse_games/shared/game-shell.js",
+    "verse_games/shared/daily-todo-shell.js"
+  ]) {
+    vm.runInContext(fs.readFileSync(
+      path.join(rootDir, relativePath), "utf8"
+    ), sandbox, { filename: relativePath });
+  }
+  let started = 0;
+  let selected = "";
+  root.VerseGameShell.renderTitleScreen({
+    app,
+    title: "Bible Bugs",
+    onStart() {
+      started += 1;
+      root.VerseGameShell.renderModeSelect({
+        app,
+        onSelect: mode => { selected = mode; }
+      });
+    }
+  });
+  assert.match(app.innerHTML, /id="gameShellStartBtn"/);
+  assert.strictEqual(typeof startButton.onclick, "function");
+  assert.strictEqual(started, 0);
+  assert.strictEqual(selected, "");
+  startButton.onclick();
+  assert.strictEqual(started, 1);
+  assert.strictEqual(selected, "medium");
+  assert.match(app.innerHTML, /Starting Daily To-Do/);
+}
+
+async function main() {
   const tests = [
     testLocalDayMath,
     testPetPriorityAndOldestSelection,
@@ -2692,14 +3080,25 @@ function main() {
     testPerVerseHistoryAdvancesOnConfirmationOnly,
     testReadActivityAssignmentRotation,
     testReadReadFlashcardCadence,
-    testDefensiveNormalization
+    testDefensiveNormalization,
+    testDailyAudioAutoModePreservesStart,
+    testDailyAudioActualGameShellStartButton,
+    testDailyAudioInvalidModeAndNormalLaunchKeepButtons,
+    testDailyAudioPlaygroundModeAlias,
+    testDailyAudioCompletionRoutingUnchanged,
+    testDailyAudioParentAcceptsAndRejectsReturns,
+    testDailyAudioDiagnosticsDisabledByDefault,
+    testDailyAudioDiagnosticsFailureSignals
   ];
 
   for (const test of tests) {
-    test();
+    await test();
   }
 
   console.log(`Daily Zoo To-Do validation passed (${tests.length} checks).`);
 }
 
-main();
+main().catch(err => {
+  console.error(err);
+  process.exitCode = 1;
+});
