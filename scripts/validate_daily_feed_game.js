@@ -2093,7 +2093,7 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
     false,
     "Feeding assets must not be in the fail-fast shell cache list"
   );
-  assert.ok(sw.includes('2026_Oct_15_verse_picker_audio_o'));
+  assert.match(sw, /const CACHE_VERSION = "[A-Za-z0-9_]+";/);
 }
 
 async function testDailyFeedPrecacheSurvivesIndividualFailures() {

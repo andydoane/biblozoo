@@ -19159,6 +19159,10 @@ function screenTodoDev(idx) {
   wrap.className = "todo-dev-screen";
 
   const tutorialActive = isTutorialActive();
+  // Only the first-time clipboard uses the tutorial background treatment.
+  if (tutorialActive) {
+    wrap.classList.add("is-tutorial-mode");
+  }
   const dailyTodoUi = window.BibloZooDailyTodoUI;
   let dailyPreviewMode = !tutorialActive
     ? dailyTodoUi?.getPreviewMode?.(

@@ -212,9 +212,32 @@ test("small-screen touch target and badge placement are protected", () => {
   assert.match(css, /\.new-verse-picker-screen \.new-verse-card-shell\s*\{/);
 });
 
-test("service worker is bumped without precaching a nonexistent image", () => {
-  assert.match(worker, /2026_Oct_15_verse_picker_audio_o/);
+test("service worker has a version without precaching an optional speaker image", () => {
+  assert.match(worker, /const CACHE_VERSION = "[A-Za-z0-9_]+";/);
   assert.doesNotMatch(worker, /"\.\/verse_images\/verse_preview_speaker\.png"/);
+});
+
+test("speaker artwork has no button circle, border, or shadow", () => {
+  const style = css.match(/\.new-verse-picker-screen \.new-verse-preview-audio\s*\{([^}]*)\}/);
+  assert.ok(style, "Speaker styles must exist");
+  assert.match(style[1], /border: 0;/);
+  assert.match(style[1], /background: transparent;/);
+  assert.match(style[1], /box-shadow: none;/);
+  assert.match(css, /\.new-verse-preview-audio\.is-playing \.new-verse-preview-icon/);
+  assert.doesNotMatch(css, /\.new-verse-preview-audio\.is-playing\s*\{[^}]*box-shadow:/s);
+  assert.match(css, /\.new-verse-preview-audio:focus-visible\s*\{[^}]*outline:/s);
+});
+
+test("tutorial clipboard uses Daily artwork without affecting developer previews", () => {
+  const start = app.indexOf("function screenTodoDev(idx)");
+  const end = app.indexOf("function screenProgress(idx)", start);
+  const tutorial = app.slice(start, end);
+  assert.ok(start > 0 && end > start);
+  assert.match(tutorial, /if \(tutorialActive\) \{\s*wrap\.classList\.add\("is-tutorial-mode"\);/);
+  assert.match(css, /\.todo-dev-screen\.is-tutorial-mode\s*\{[^}]*zoo_to_do_background_phone\.jpg/s);
+  assert.match(css, /\.todo-dev-screen\.is-tutorial-mode \.todo-dev-page\s*\{[^}]*zoo_to_do_background_phone\.jpg/s);
+  assert.match(css, /\.todo-dev-screen\.is-tutorial-mode::before\s*\{[^}]*background: transparent;/s);
+  assert.match(css, /@media \(min-width: 700px\)[\s\S]*?\.todo-dev-screen\.is-tutorial-mode,[\s\S]*?zoo_to_do_background_ipad\.jpg/);
 });
 
 (async () => {

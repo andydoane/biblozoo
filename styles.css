@@ -8539,21 +8539,20 @@ button *,
   width: 44px;
   height: 44px;
   padding: 5px;
-  border: 2px solid #7f66c6;
-  border-radius: 50%;
-  background: #ffffff;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #333333;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   cursor: pointer;
   touch-action: manipulation;
 }
-.new-verse-picker-screen .new-verse-preview-audio.is-playing {
-  background: #fff1bc;
-  border-color: #333333;
-  box-shadow: 0 0 0 3px rgba(127, 102, 198, 0.22);
+/* Keep a subtle playing cue without a border, disk, or shadow. */
+.new-verse-picker-screen .new-verse-preview-audio.is-playing .new-verse-preview-icon {
+  transform: scale(1.08);
 }
 .new-verse-picker-screen .new-verse-preview-audio:focus-visible {
   outline: 3px solid #333333;
@@ -8566,6 +8565,7 @@ button *,
   font-size: 25px;
   line-height: 30px;
   text-align: center;
+  transition: transform 160ms ease;
 }
 .new-verse-picker-screen .new-verse-preview-icon.has-image {
   background: url("./verse_images/verse_preview_speaker.png") center / contain no-repeat;
@@ -8579,5 +8579,50 @@ button *,
   .new-verse-picker-screen .new-verse-preview-audio {
     top: 8px;
     right: 8px;
+  }
+}
+
+/* The first-time Zoo To-Do clipboard shares Daily's illustrated background.
+   Keep the plain green treatment for non-tutorial/legacy clipboard views. */
+.todo-dev-screen.is-tutorial-mode {
+  background-color: #1f2d26 !important;
+  background-image: url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg") !important;
+  background-size: cover !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+}
+
+.todo-dev-screen.is-tutorial-mode .todo-dev-page {
+  background-color: #1f2d26;
+  background-image: url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg");
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+/* Remove the green strip previously painted over the iOS top inset. */
+.todo-dev-screen.is-tutorial-mode::before {
+  background: transparent;
+}
+
+html:has(#app .todo-dev-screen.is-tutorial-mode),
+body:has(#app .todo-dev-screen.is-tutorial-mode),
+#app:has(.todo-dev-screen.is-tutorial-mode),
+.slide:has(.todo-dev-screen.is-tutorial-mode) {
+  background-color: #1f2d26 !important;
+}
+
+.slide:has(.todo-dev-screen.is-tutorial-mode) {
+  background-image: url("verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg") !important;
+  background-size: cover !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+}
+
+@media (min-width: 700px) {
+  .todo-dev-screen.is-tutorial-mode,
+  .todo-dev-screen.is-tutorial-mode .todo-dev-page,
+  .slide:has(.todo-dev-screen.is-tutorial-mode) {
+    background-image: url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg") !important;
   }
 }
