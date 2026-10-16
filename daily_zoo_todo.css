@@ -290,6 +290,15 @@
   text-wrap: balance;
 }
 
+.daily-zoo-todo-mission-complete {
+  margin: clamp(20px, 4vw, 32px) auto 0;
+  color: #24783c;
+  font-size: clamp(24px, 5.5vw, 36px);
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.15;
+}
+
 .daily-zoo-todo-empty {
   padding:
     clamp(24px, 6vw, 40px)

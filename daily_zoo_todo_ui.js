@@ -1211,6 +1211,16 @@
     row.disabled = false;
   }
 
+  function unlockNewPetPackageRow(engine) {
+    const packageTaskId = engine?.TASK_IDS?.PACKAGE || "package";
+    const row = root?.document?.querySelector?.(
+      `.daily-zoo-todo-row[data-daily-todo-preview-task="${packageTaskId}"]`
+    );
+    if (!row) return;
+    row.classList.remove("is-faded");
+    row.disabled = false;
+  }
+
   function removeCompletionLayer(
     planId,
     taskId
@@ -1410,6 +1420,13 @@
           "learn")
     ) {
       unlockNewPetActivityRow(engine);
+    }
+    if (
+      confirmed.state?.activePlan?.kind ===
+        (engine.PLAN_KINDS?.NEW_PET || "new_pet") &&
+      taskId === (engine.TASK_IDS?.ACTIVITY || "activity")
+    ) {
+      unlockNewPetPackageRow(engine);
     }
 
     removeCompletionLayer(
@@ -2094,6 +2111,8 @@
       taskIds.ACTIVITY || "activity";
     const learnId =
       taskIds.LEARN || "learn";
+    const packageId =
+      taskIds.PACKAGE || "package";
     const isNewPetMission =
       displayPlan.kind === "new_pet";
 
@@ -2189,6 +2208,9 @@
     const learnComplete =
       displayPlan.tasks?.[learnId]
         ?.status === completeStatus;
+    const activityComplete =
+      displayPlan.tasks?.[activityId]
+        ?.status === completeStatus;
     const taskRows = {
       [reviewId]: {
         text:
@@ -2229,6 +2251,13 @@
         image: "",
         emoji: "📖",
         rowColor: "#7f66c6"
+      },
+      [packageId]: {
+        text: "You've Got a Package!",
+        image: "verse_images/biblopet_box.png",
+        emoji: "📦",
+        rowColor: "#f6b940",
+        rowTextColor: "#333333"
       }
     };
     const taskRowsHtml =
@@ -2251,12 +2280,12 @@
             completeStatus,
             disabled:
               isNewPetMission &&
-              taskId === activityId &&
-              !learnComplete,
+              ((taskId === activityId && !learnComplete) ||
+               (taskId === packageId && !activityComplete)),
             faded:
               isNewPetMission &&
-              taskId === activityId &&
-              !learnComplete
+              ((taskId === activityId && !learnComplete) ||
+               (taskId === packageId && !activityComplete))
           });
         })
         .join("");
@@ -2332,6 +2361,11 @@
         ${taskRowsHtml}
         ${snackRowHtml}
       </div>
+      ${isNewPetMission &&
+        displayPlan.tasks?.[packageId]?.status === completeStatus &&
+        displayPlan.educationalCompletedAt > 0
+          ? '<div class="daily-zoo-todo-mission-complete">🎉 Mission Complete!</div>'
+          : ""}
 
       ${renderPendingCompletionHtml({
         plan: displayPlan,

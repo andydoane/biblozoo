@@ -1786,8 +1786,9 @@ function testNewPetMissionPlanSelectionAndUi() {
   assert.strictEqual(plan.verseId, "");
   assert.deepStrictEqual(
     plan.requiredTaskIds,
-    ["learn", "activity"]
+    ["learn", "activity", "package"]
   );
+  assert.strictEqual(plan.tasks.package.status, "open");
   assert.strictEqual(plan.reviewAssignment, null);
   assert.strictEqual(plan.questionSession, null);
   assert.strictEqual(plan.snack, null);
@@ -1835,10 +1836,16 @@ function testNewPetMissionPlanSelectionAndUi() {
   assert.match(html, /Unlock a New BibloPet!/);
   assert.match(html, /Continue Learning/);
   assert.match(html, /Play a Game/);
+  assert.match(html, /You&#39;ve Got a Package!/);
+  assert.match(html, /verse_images\/biblopet_box\.png/);
   assert.match(
     html,
     /data-daily-todo-preview-task="activity"[\s\S]*?disabled/
   );
+  const packageIndex = html.indexOf('data-daily-todo-preview-task="package"');
+  assert.ok(packageIndex > 0);
+  assert.match(html.slice(packageIndex, html.indexOf('</button>', packageIndex)), /disabled/);
+  assert.match(html.slice(packageIndex - 75, packageIndex), /is-faded/);
   assert.doesNotMatch(html, /Feed me a snack/);
 
   const progress = {
@@ -1964,12 +1971,13 @@ function testNewPetMissionMidnightAndLearnConfirmation() {
     ),
     {
       kind: "new_pet",
-      requiredTaskIds: ["learn", "activity"],
-      requiredCount: 2,
+      requiredTaskIds: ["learn", "activity", "package"],
+      requiredCount: 3,
       completeCount: 1,
       taskComplete: {
         learn: true,
-        activity: false
+        activity: false,
+        package: false
       },
       educationalComplete: false,
       feedingTime: false,
@@ -2009,6 +2017,198 @@ function testNewPetMissionMidnightAndLearnConfirmation() {
     activityButtonHtml,
     /disabled/
   );
+}
+
+// A completed game earns the pet, but does not finish the Daily mission.
+// The saved package survives a reload and rollover, and opens only once.
+function testNewPetPackageSequenceAndPersistence() {
+  const registries = makeSimpleRegistries();
+  const plan = DailyTodo.createNewPetMissionPlan({
+    profileId: "profile-a",
+    day: "2026-10-05",
+    gameRegistry: registries.games,
+    idFactory: () => "package-mission",
+    random: () => 0
+  });
+  let state = DailyTodo.normalizeState({ activePlan: plan });
+  state = DailyTodo.selectNewPetMissionVerse(state, {
+    planId: plan.id, verseId: "verse_new"
+  }).state;
+  const now = new Date(2026, 9, 5, 8);
+  const open = (taskId, time) => {
+    const started = DailyTodo.beginTask(state, {
+      planId: plan.id, taskId, now: time, random: () => 0.314159
+    });
+    assert.ok(started.launchToken);
+    const pending = DailyTodo.setPendingCompletion(started.state, {
+      planId: plan.id, taskId, launchToken: started.launchToken,
+      now: new Date(time.getTime() + 1000)
+    });
+    assert.strictEqual(pending.changed, true);
+    const result = DailyTodo.confirmPendingCompletion(pending.state, {
+      planId: plan.id, taskId, now: new Date(time.getTime() + 2000)
+    });
+    assert.strictEqual(result.taskCompleted, true);
+    state = result.state;
+    return result;
+  };
+  assert.strictEqual(DailyTodo.beginTask(state, {
+    planId: plan.id, taskId: "activity", now
+  }).changed, false);
+  assert.strictEqual(DailyTodo.beginTask(state, {
+    planId: plan.id, taskId: "package", now
+  }).changed, false);
+  assert.strictEqual(DailyTodo.openNewPetPackage(state, {
+    planId: plan.id, verseId: "verse_new", now
+  }).changed, false);
+  open("learn", now);
+  assert.strictEqual(DailyTodo.openNewPetPackage(state, {
+    planId: plan.id, verseId: "verse_new", now
+  }).changed, false);
+  const completedGame = open("activity", new Date(2026, 9, 5, 9));
+  assert.strictEqual(completedGame.educationalCompleted, false);
+  assert.strictEqual(state.activePlan.educationalCompletedAt, 0);
+  assert.strictEqual(state.activePlan.tasks.package.status, "open");
+  assert.strictEqual(state.stats.totalTasks, 2);
+  assert.strictEqual(state.stats.lastCompletedDay, "");
+
+  const waiting = DailyTodo.getPlanProgress(state.activePlan);
+  assert.strictEqual(waiting.requiredCount, 3);
+  assert.strictEqual(waiting.completeCount, 2);
+  assert.strictEqual(waiting.educationalComplete, false);
+  const html = DailyTodoUI.renderPreview({
+    mode: "actual", plan: state.activePlan, engine: DailyTodo
+  });
+  const marker = 'data-daily-todo-preview-task="package"';
+  const at = html.indexOf(marker);
+  assert.ok(at > 0);
+  assert.doesNotMatch(html.slice(at, html.indexOf('</button>', at)), /disabled/);
+  assert.doesNotMatch(html.slice(at - 75, at), /is-faded/);
+  assert.strictEqual(DailyTodo.shouldShowFocusedPlan(state.activePlan), true);
+
+  // Simulate app restart with persisted JSON, followed by midnight.
+  state = DailyTodo.normalizeState(JSON.parse(JSON.stringify(state)));
+  const rollover = DailyTodo.expireOldPlanIfNeeded(state, "2026-10-06");
+  assert.strictEqual(rollover.preserved, true);
+  state = rollover.state;
+  assert.strictEqual(DailyTodo.openNewPetPackage(state, {
+    planId: plan.id, verseId: "not_the_same_verse",
+    now: new Date(2026, 9, 6, 8)
+  }).changed, false);
+  assert.strictEqual(DailyTodo.setPendingCompletion(state, {
+    planId: plan.id, taskId: "package"
+  }).changed, false);
+  const opened = DailyTodo.openNewPetPackage(state, {
+    planId: plan.id, verseId: "verse_new", now: new Date(2026, 9, 6, 8)
+  });
+  assert.strictEqual(opened.changed, true);
+  assert.strictEqual(opened.educationalCompleted, true);
+  state = opened.state;
+  assert.strictEqual(state.activePlan.tasks.package.status, "complete");
+  assert.ok(state.activePlan.educationalCompletedAt > 0);
+  assert.strictEqual(state.stats.totalTasks, 3);
+  assert.strictEqual(state.stats.lastCompletedDay, "2026-10-05");
+  assert.strictEqual(DailyTodo.getPlanProgress(state.activePlan).educationalComplete, true);
+  assert.strictEqual(DailyTodo.shouldShowFocusedPlan(state.activePlan), false);
+  assert.match(DailyTodoUI.renderPreview({
+    mode: "actual", plan: state.activePlan, engine: DailyTodo
+  }), /Mission Complete!/);
+  const again = DailyTodo.openNewPetPackage(state, {
+    planId: plan.id, verseId: "verse_new", now: new Date(2026, 9, 6, 9)
+  });
+  assert.strictEqual(again.changed, false);
+  assert.strictEqual(again.state.stats.totalTasks, 3);
+}
+
+function testAppPackageClickAndPreviewIsolation() {
+  const app = fs.readFileSync(path.join(rootDir, "app.js"), "utf8");
+  const start = app.indexOf("function openDailyNewPetPackage(");
+  const end = app.indexOf("function completeDailyNewPetLearn()", start);
+  assert.ok(start > 0 && end > start);
+  const functions = app.slice(start, end);
+  const engine = DailyTodo;
+  const plan = engine.createNewPetMissionPlan({
+    profileId: "profile-a", day: "2026-10-05",
+    gameRegistry: makeSimpleRegistries().games,
+    idFactory: () => "app-package", random: () => 0
+  });
+  let real = engine.normalizeState({ activePlan: plan });
+  real = engine.selectNewPetMissionVerse(real, {
+    planId: plan.id, verseId: "verse_new"
+  }).state;
+  real.activePlan.tasks.learn.status = "complete";
+  real.activePlan.tasks.activity.status = "complete";
+  const test = engine.normalizeState({ activePlan: {
+    ...real.activePlan, id: "preview-package"
+  }});
+  const state = { pendingPetUnlockVerseId: null, dailyNewPetUnlockContext: null };
+  const nav = [];
+  let unlocked = true;
+  let realSaves = 0;
+  let previewSaves = 0;
+  const loadRuntime = (scope) => ({
+    engine,
+    state: scope === "new_pet_test" ? test : real,
+    previewScope: scope
+  });
+  const api = new Function(
+    "State", "loadDailyNewPetMissionRuntime", "getProfileApi",
+    "isBibloPetUnlocked", "getVerseProgress", "go", "Screen",
+    "saveDailyNewPetMissionRuntime", functions +
+    "\nreturn { openDailyNewPetPackage, completeDailyNewPetPackage };"
+  )(
+    state, loadRuntime,
+    () => ({ getActiveProfileId: () => "profile-a" }),
+    () => unlocked, () => ({ learnCompleted: true }),
+    (screen) => nav.push(screen), { PET_UNLOCK: "pet_unlock" },
+    (runtime, next) => {
+      if (runtime.previewScope === "new_pet_test") {
+        previewSaves++;
+        test.activePlan = next.activePlan;
+      } else {
+        realSaves++;
+        real = next;
+      }
+      return true;
+    }
+  );
+
+  assert.strictEqual(api.openDailyNewPetPackage(plan), true);
+  assert.deepStrictEqual(nav, ["pet_unlock"]);
+  assert.strictEqual(real.activePlan.tasks.package.status, "open");
+  // Navigating to the box alone must not complete the mission.
+  assert.strictEqual(realSaves, 0);
+  assert.strictEqual(api.completeDailyNewPetPackage(), true);
+  assert.strictEqual(real.activePlan.tasks.package.status, "complete");
+  assert.strictEqual(realSaves, 1);
+  assert.strictEqual(api.completeDailyNewPetPackage(), false);
+  assert.strictEqual(realSaves, 1);
+  assert.strictEqual(api.openDailyNewPetPackage(plan), false);
+
+  unlocked = false;
+  assert.strictEqual(api.openDailyNewPetPackage(test.activePlan), false);
+  assert.strictEqual(
+    api.openDailyNewPetPackage(test.activePlan, "new_pet_test"),
+    true
+  );
+  assert.strictEqual(api.completeDailyNewPetPackage(), true);
+  assert.strictEqual(previewSaves, 1);
+  assert.strictEqual(realSaves, 1);
+}
+
+function testPackageIntegrationGuards() {
+  const app = fs.readFileSync(path.join(rootDir, "app.js"), "utf8");
+  const ui = fs.readFileSync(path.join(rootDir, "daily_zoo_todo_ui.js"), "utf8");
+  const worker = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
+  assert.match(app, /function openDailyNewPetPackage\(/);
+  assert.match(app, /function completeDailyNewPetPackage\(/);
+  assert.match(app, /Back to Mission/);
+  assert.match(app, /setDailyTodoPreviewMode\(missionScope\)/);
+  assert.match(app, /isDailyMissionUnlock && !completeDailyNewPetPackage\(\)/);
+  assert.doesNotMatch(app, /"biblozoo:daily-task-confirmed"/);
+  assert.match(ui, /function unlockNewPetPackageRow\(/);
+  assert.match(ui, /verse_images\/biblopet_box\.png/);
+  assert.match(worker, /2026_Oct_16_new_pet_package_q/);
 }
 
 function testPerVerseHistoryAdvancesOnConfirmationOnly() {
@@ -2486,6 +2686,9 @@ function main() {
     testNewPetMissionReadinessRules,
     testNewPetMissionPlanSelectionAndUi,
     testNewPetMissionMidnightAndLearnConfirmation,
+    testNewPetPackageSequenceAndPersistence,
+    testAppPackageClickAndPreviewIsolation,
+    testPackageIntegrationGuards,
     testPerVerseHistoryAdvancesOnConfirmationOnly,
     testReadActivityAssignmentRotation,
     testReadReadFlashcardCadence,

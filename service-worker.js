@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_15_picker_onboarding_polish_p";
+const CACHE_VERSION = "2026_Oct_16_new_pet_package_q";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -132,6 +132,7 @@ const CORE_PATHS = [
   "./verse_images/title_biblozoo.png",
   "./verse_images/title_biblozoo_animals.png",
   "./verse_images/settings_gear.png",
+  "./verse_images/biblopet_box.png",
 
   "./verse_images/daily_zoo_todo/zoo_to_do_background_phone.jpg",
   "./verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg",

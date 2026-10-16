@@ -68,7 +68,8 @@
     REVIEW: "review",
     QUESTIONS: "questions",
     ACTIVITY: "activity",
-    LEARN: "learn"
+    LEARN: "learn",
+    PACKAGE: "package"
   });
 
   const REVIEW_KINDS = Object.freeze({
@@ -95,7 +96,8 @@
     ]),
     [PLAN_KINDS.NEW_PET]: Object.freeze([
       TASK_IDS.LEARN,
-      TASK_IDS.ACTIVITY
+      TASK_IDS.ACTIVITY,
+      TASK_IDS.PACKAGE
     ])
   });
 
@@ -2566,7 +2568,13 @@
       plan,
       resolvedTaskId
     );
+    // A package may only be opened via openNewPetPackage, not launched
+    // as a normal activity. This also blocks an early or repeated launch.
     if (
+      resolvedTaskId === TASK_IDS.PACKAGE ||
+      (plan.kind === PLAN_KINDS.NEW_PET &&
+        resolvedTaskId === TASK_IDS.ACTIVITY &&
+        plan.tasks?.[TASK_IDS.LEARN]?.status !== TASK_STATUSES.COMPLETE) ||
       !task ||
       task.status === TASK_STATUSES.PENDING ||
       task.status === TASK_STATUSES.COMPLETE
@@ -2626,7 +2634,8 @@
       taskId
     );
 
-    if (!plan || plan.id !== cleanString(planId)) {
+    if (!plan || plan.id !== cleanString(planId) ||
+      resolvedTaskId === TASK_IDS.PACKAGE) {
       return { state, changed: false };
     }
 
@@ -2773,6 +2782,49 @@
     };
   }
 
+  // Completing the reveal is a saved Daily mission task, not a second
+  // pet award. The game has already earned the pet before this point.
+  function openNewPetPackage(
+    rawState,
+    { planId = "", verseId = "", now = new Date() } = {}
+  ) {
+    const state = normalizeState(rawState);
+    const plan = state.activePlan;
+    const packageTask = plan?.tasks?.[TASK_IDS.PACKAGE];
+
+    if (
+      plan?.kind !== PLAN_KINDS.NEW_PET ||
+      plan.id !== cleanString(planId) ||
+      !cleanString(verseId) ||
+      plan.verseId !== cleanString(verseId) ||
+      !getRequiredTaskIds(plan).includes(TASK_IDS.PACKAGE) ||
+      plan.tasks?.[TASK_IDS.LEARN]?.status !== TASK_STATUSES.COMPLETE ||
+      plan.tasks?.[TASK_IDS.ACTIVITY]?.status !== TASK_STATUSES.COMPLETE ||
+      packageTask?.status !== TASK_STATUSES.OPEN
+    ) {
+      return { state, changed: false, taskCompleted: false };
+    }
+
+    packageTask.status = TASK_STATUSES.COMPLETE;
+    packageTask.startedAt = now.getTime();
+    packageTask.completedAt = now.getTime();
+    packageTask.pendingAt = 0;
+    packageTask.launchToken = "";
+    packageTask.pendingData = null;
+
+    state.stats.totalTasks = toNonNegativeInteger(
+      state.stats.totalTasks
+    ) + 1;
+    recordConfirmedTaskHistory(
+      state, plan, TASK_IDS.PACKAGE,
+      { source: "new_pet_package" }, now
+    );
+    const educationalCompleted = completeEducationalPlanIfReady(state, now);
+    refreshEarnedBadges(state.stats);
+
+    return { state, changed: true, taskCompleted: true, educationalCompleted };
+  }
+
   function releaseRolloverHold(
     rawState,
     {
@@ -2890,6 +2942,7 @@
     beginTask,
     setPendingCompletion,
     confirmPendingCompletion,
+    openNewPetPackage,
     releaseRolloverHold,
     markSnackClaimed
   });

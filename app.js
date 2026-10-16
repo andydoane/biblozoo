@@ -5387,6 +5387,70 @@ async function selectDailyNewPetMissionVerse(
   );
 }
 
+// The game earns the pet; opening its package only completes the mission.
+// Test previews use separate storage and cannot award a real pet.
+function openDailyNewPetPackage(requestedPlan, previewScope = "") {
+  const scope = previewScope === "new_pet_test" ? "new_pet_test" : "";
+  const runtime = loadDailyNewPetMissionRuntime(scope);
+  const plan = runtime?.state?.activePlan;
+  const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+  const engine = runtime?.engine;
+  const complete = engine?.TASK_STATUSES?.COMPLETE || "complete";
+
+  if (
+    !profileId || !plan ||
+    plan.kind !== (engine?.PLAN_KINDS?.NEW_PET || "new_pet") ||
+    plan.id !== requestedPlan?.id ||
+    plan.profileId !== profileId ||
+    !plan.verseId ||
+    plan.tasks?.[engine.TASK_IDS?.LEARN || "learn"]?.status !== complete ||
+    plan.tasks?.[engine.TASK_IDS?.ACTIVITY || "activity"]?.status !== complete ||
+    plan.tasks?.[engine.TASK_IDS?.PACKAGE || "package"]?.status !==
+      (engine.TASK_STATUSES?.OPEN || "open") ||
+    (!scope && !isBibloPetUnlocked(getVerseProgress(plan.verseId)))
+  ) {
+    return false;
+  }
+
+  State.dailyNewPetUnlockContext = {
+    profileId,
+    planId: plan.id,
+    verseId: plan.verseId,
+    previewScope: scope
+  };
+  State.pendingPetUnlockVerseId = plan.verseId;
+  go(Screen.PET_UNLOCK);
+  return true;
+}
+
+function completeDailyNewPetPackage() {
+  const context = State.dailyNewPetUnlockContext;
+  const scope = context?.previewScope === "new_pet_test" ? "new_pet_test" : "";
+  const runtime = loadDailyNewPetMissionRuntime(scope);
+  const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+  const plan = runtime?.state?.activePlan;
+
+  if (
+    !context || !runtime?.engine?.openNewPetPackage ||
+    !profileId || context.profileId !== profileId ||
+    plan?.profileId !== profileId ||
+    plan.id !== context.planId ||
+    plan.verseId !== context.verseId ||
+    State.pendingPetUnlockVerseId !== context.verseId ||
+    (!scope && !isBibloPetUnlocked(getVerseProgress(context.verseId)))
+  ) {
+    return false;
+  }
+
+  const opened = runtime.engine.openNewPetPackage(runtime.state, {
+    planId: context.planId,
+    verseId: context.verseId,
+    now: new Date()
+  });
+  return opened.changed &&
+    saveDailyNewPetMissionRuntime(runtime, opened.state);
+}
+
 function completeDailyNewPetLearn() {
   const context =
     getDailyNewPetMissionContext();
@@ -19570,6 +19634,32 @@ function screenTodoDev(idx) {
       };
     }
 
+    const packageTaskId = engine?.TASK_IDS?.PACKAGE || "package";
+    const packageTask = dailyPreviewPlan.tasks?.[packageTaskId];
+    const packageRow = wrap.querySelector(
+      `.daily-zoo-todo-row[data-daily-todo-preview-task="${packageTaskId}"]`
+    );
+    if (
+      dailyPreviewPlan.kind === (engine?.PLAN_KINDS?.NEW_PET || "new_pet") &&
+      packageRow &&
+      packageTask?.status === (engine?.TASK_STATUSES?.OPEN || "open")
+    ) {
+      packageRow.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!openDailyNewPetPackage(
+          dailyPreviewPlan,
+          dailyPreviewMode === "new_pet_test" ? "new_pet_test" : ""
+        )) {
+          showDialog({
+            title: "Package Not Ready",
+            body: "Finish learning and your game before opening your package.",
+            actions: [dlgBtn("OK", { onClick: closeDialog })]
+          });
+        }
+      };
+    }
+
     const snackRow =
       wrap.querySelector(
         '.daily-zoo-todo-row[data-daily-todo-preview-task="snack"]'
@@ -20270,30 +20360,6 @@ function spawnBibloPetUnlockPoofAtElement(targetEl, opts = {}) {
   window.setTimeout(() => burst.remove(), duration + 160);
 }
 
-window.addEventListener(
-  "biblozoo:daily-task-confirmed",
-  (event) => {
-    const detail = event?.detail || {};
-    const pendingData = detail.pendingData || {};
-
-    if (
-      detail.planKind !== "new_pet" ||
-      detail.taskId !== "activity" ||
-      pendingData.petUnlockTriggered !== true ||
-      !detail.verseId
-    ) {
-      return;
-    }
-
-    State.dailyNewPetUnlockContext = {
-      planId: detail.planId,
-      verseId: detail.verseId
-    };
-    State.pendingPetUnlockVerseId = detail.verseId;
-    go(Screen.PET_UNLOCK);
-  }
-);
-
 function screenPetUnlock(idx) {
   const verseId = State.pendingPetUnlockVerseId;
   const verseItem = getVerseListItemById(verseId);
@@ -20370,7 +20436,7 @@ function screenPetUnlock(idx) {
         <div class="celebration-actions pet-unlock-reveal-actions">
           ${isDailyMissionUnlock ? `
             <button class="carousel-main no-zoom" id="btnPetUnlockHome" type="button">
-              Back Home
+              Back to Mission
             </button>
           ` : `
             <button class="carousel-main no-zoom" id="btnPetUnlockVisit" type="button">
@@ -20391,6 +20457,14 @@ function screenPetUnlock(idx) {
   const openPackage = (event) => {
     if (event?.button !== undefined && event.button !== 0) return;
     if (packageOpened) return;
+    if (isDailyMissionUnlock && !completeDailyNewPetPackage()) {
+      showDialog({
+        title: "Package Could Not Be Opened",
+        body: "Your package is still waiting. Return to your Daily To-Do and try again.",
+        actions: [dlgBtn("OK", { onClick: closeDialog })]
+      });
+      return;
+    }
     packageOpened = true;
 
     // Use the click user gesture for the package MP3.
@@ -20451,9 +20525,14 @@ function screenPetUnlock(idx) {
   const btnHome = wrap.querySelector("#btnPetUnlockHome");
   if (btnHome) {
     btnHome.onclick = () => {
+      const missionScope =
+        State.dailyNewPetUnlockContext?.previewScope === "new_pet_test"
+          ? "new_pet_test"
+          : "actual";
       State.pendingPetUnlockVerseId = null;
       State.dailyNewPetUnlockContext = null;
-      go(Screen.TITLE);
+      setDailyTodoPreviewMode(missionScope);
+      go(Screen.TODO_DEV);
     };
   }
 
