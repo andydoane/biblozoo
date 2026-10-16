@@ -294,7 +294,7 @@ async function main() {
   }
   testGameSpecificGuards();
   const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
-  assert.match(worker, /2026_Oct_16_patch17a_audio_focus_race_aa/);
+  assert.match(worker, /2026_Oct_16_(?:patch17a_audio_focus_race_aa|patch18(?:b_verse_jam_resume_beat_ad|a_verse_jam_phrase_resume_ac|_verse_jam_audio_recovery_ab))/);
   console.log("Patch 17A Verse Game audio validation passed (47 checks).");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

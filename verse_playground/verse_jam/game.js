@@ -324,6 +324,18 @@
   let lastGameplayActivityAt = 0;
   let recoveringFromStuckGameplay = false;
   let audioUnlocked = false;
+  let audioUnlockPromise = null;
+  let audioUnlockAttempt = 0;
+  let audioUnlockRequestedAt = 0;
+  let audioForegroundRecoveryPending = false;
+  let audioForegroundRecoveryGeneration = 0;
+  let audioForegroundRecoveryTimer = 0;
+  let audioNeedsGestureRefresh = false;
+  const AUDIO_UNLOCK_TIMEOUT_MS = 1200;
+  const AUDIO_FOREGROUND_RECOVERY_DELAY_MS = 650;
+  const AUDIO_CLOCK_PROBE_MS = 100;
+  let resumeBeatInFlight = false;
+  let resumeBeatGestureGeneration = 0;
   let htmlAudioEl = null;
   let htmlAudioPrimed = false;
   let htmlAudioPrimePromise = null;
@@ -460,59 +472,225 @@
     masterGain.connect(compressor);
     compressor.connect(outputGain);
     outputGain.connect(audioCtx.destination);
+
+    audioCtx.addEventListener?.("statechange", () => {
+      if (audioCtx.state !== "running") {
+        audioUnlocked = false;
+        audioForegroundRecoveryPending = true;
+      }
+    });
+  }
+
+  // A resolved resume() is not proof that iOS is outputting audio.
+  // Keep unlock attempts bounded and never report success before state=running.
+  function requestVerseJamAudioResume(ctx, { refresh = false } = {}) {
+    if (!ctx || ctx.state === "closed") return Promise.resolve(false);
+
+    let operation;
+    try {
+      if (refresh && ctx.state === "running" && typeof ctx.suspend === "function") {
+        // Refresh the existing graph, rather than recreating the song or round.
+        operation = Promise.resolve(ctx.suspend()).then(() => ctx.resume());
+      } else if (ctx.state !== "running") {
+        // This call is synchronous with the original gesture when applicable.
+        operation = ctx.resume();
+      } else {
+        return Promise.resolve(true);
+      }
+    } catch (err) {
+      console.warn("Verse Jam: audio resume request failed", err);
+      return Promise.resolve(false);
+    }
+
+    return new Promise(resolve => {
+      let finished = false;
+      const timeoutId = setTimeout(() => finish(false), AUDIO_UNLOCK_TIMEOUT_MS);
+      function finish(ok) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeoutId);
+        resolve(!!ok && ctx.state === "running");
+      }
+      Promise.resolve(operation).then(() => finish(true), () => finish(false));
+    });
+  }
+
+  function primeVerseJamWebAudioSource() {
+    if (!audioCtx || !masterGain) return;
+    // Starting a real source in the gesture remains important for iOS.
+    try {
+      const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+      const source = audioCtx.createBufferSource();
+      const gain = audioCtx.createGain();
+      source.buffer = buffer;
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      source.connect(gain);
+      gain.connect(masterGain);
+      trackAudioSource(source);
+      source.start(0);
+    } catch (err) { }
   }
 
   function unlockAudioFromGesture() {
     primeHtmlAudio();
     createAudioGraph();
+    if (!audioCtx || !masterGain) return Promise.resolve(false);
 
-    if (!audioCtx || !masterGain) return;
-
-    if (audioCtx.state !== "running") {
-      const resumePromise = audioCtx.resume();
-      if (resumePromise?.catch) {
-        resumePromise.catch(err => {
-          console.warn("Verse Jam: audio resume failed", err);
-        });
-      }
+    const ctx = audioCtx;
+    const now = performance.now();
+    // Pointer/touch/click may be delivered for one physical interaction.
+    // Share those, but let a later tap overtake a stuck resume attempt.
+    if (audioUnlockPromise && now - audioUnlockRequestedAt < 180) {
+      return audioUnlockPromise;
+    }
+    if (
+      !audioForegroundRecoveryPending &&
+      !audioNeedsGestureRefresh &&
+      ctx.state === "running"
+    ) {
+      audioUnlocked = true;
+      // A successful audio unlock alone must not restart a paused rhythm.
+      return Promise.resolve(true);
     }
 
-    // iPhone/Safari often unlocks most reliably when a real source node
-    // is started directly inside a user gesture.
-    try {
-      const buffer = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
-      const source = audioCtx.createBufferSource();
-      const gain = audioCtx.createGain();
+    audioUnlockAttempt += 1;
+    const attempt = audioUnlockAttempt;
+    audioUnlockRequestedAt = now;
+    // A gesture takes priority over a scheduled foreground refresh.
+    audioForegroundRecoveryGeneration += 1;
+    clearTimeout(audioForegroundRecoveryTimer);
+    audioForegroundRecoveryTimer = 0;
+    const recovering = audioForegroundRecoveryPending || audioNeedsGestureRefresh;
+    const refresh = audioNeedsGestureRefresh ||
+      (audioForegroundRecoveryPending && ctx.state === "running");
+    audioUnlocked = false;
 
-      source.buffer = buffer;
-      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-
-      source.connect(gain);
-      gain.connect(masterGain);
-
-      trackAudioSource(source);
-      source.start(0);
-    } catch (err) { }
-
-    audioUnlocked = true;
-
-    // Load short samples, but do not block the tap gesture.
+    const resume = requestVerseJamAudioResume(ctx, { refresh });
+    primeVerseJamWebAudioSource();
+    // Load sound buffers concurrently, never before requesting resume().
     loadSoundBitBuffers();
     loadUiTapBuffers();
+
+    const promise = resume.then(async ok => {
+      if (attempt !== audioUnlockAttempt || ctx !== audioCtx || document.hidden) return false;
+      if (ok && recovering) {
+        // iOS can report "running" while its hardware audio clock is frozen.
+        const sampledAt = ctx.currentTime;
+        await new Promise(resolve => setTimeout(resolve, AUDIO_CLOCK_PROBE_MS));
+        if (attempt !== audioUnlockAttempt || ctx !== audioCtx || document.hidden) return false;
+        ok = ctx.state === "running" && ctx.currentTime - sampledAt > 0.01;
+      }
+      audioUnlocked = !!ok && ctx.state === "running";
+      if (audioUnlocked) {
+        audioForegroundRecoveryPending = false;
+        audioNeedsGestureRefresh = false;
+        // The explicit Resume Beat gesture owns musical restart.
+      } else {
+        audioForegroundRecoveryPending = true;
+        if (recovering) audioNeedsGestureRefresh = true;
+      }
+      return audioUnlocked;
+    }).catch(() => {
+      if (attempt === audioUnlockAttempt) {
+        audioUnlocked = false;
+        audioForegroundRecoveryPending = true;
+      }
+      return false;
+    }).finally(() => {
+      if (audioUnlockPromise === promise) audioUnlockPromise = null;
+    });
+    audioUnlockPromise = promise;
+    return promise;
+  }
+
+  function markVerseJamAudioBackgrounded() {
+    // Freeze synchronized music before iOS can throttle JS or Web Audio.
+    // A later foreground event shows Resume Beat; it never auto-replays.
+    if (typeof pauseVerseJamForInterruption === "function") {
+      pauseVerseJamForInterruption();
+    }
+    resumeBeatGestureGeneration += 1;
+    resumeBeatInFlight = false;
+    state.resumeBeatApproved = false;
+    audioForegroundRecoveryGeneration += 1;
+    clearTimeout(audioForegroundRecoveryTimer);
+    audioForegroundRecoveryTimer = 0;
+    audioUnlockAttempt += 1;
+    audioUnlockPromise = null;
+    audioUnlocked = false;
+    if (audioCtx && audioCtx.state !== "closed") {
+      audioForegroundRecoveryPending = true;
+    }
+    // Background time must never trigger the gameplay-stuck watchdog.
+    noteGameplayActivity();
+  }
+
+  function scheduleVerseJamForegroundRecovery() {
+    if (document.hidden) return;
+    if (state.resumeAfterInterruption) showResumeBeatOverlay();
+    if (!audioCtx || audioCtx.state === "closed") return;
+    if (!audioForegroundRecoveryPending) return;
+    clearTimeout(audioForegroundRecoveryTimer);
+    const generation = ++audioForegroundRecoveryGeneration;
+    const ctx = audioCtx;
+    const stillCurrent = () =>
+      generation === audioForegroundRecoveryGeneration &&
+      !document.hidden && audioCtx === ctx;
+
+    audioForegroundRecoveryTimer = setTimeout(() => {
+      if (!stillCurrent()) return;
+      const sampledAt = ctx.currentTime;
+      // A running AudioContext with a frozen clock is not healthy on iOS.
+      setTimeout(async () => {
+        if (!stillCurrent()) return;
+        if (ctx.state === "running" && ctx.currentTime - sampledAt > 0.01) {
+          audioUnlocked = true;
+          audioForegroundRecoveryPending = false;
+          audioNeedsGestureRefresh = false;
+          // Readiness can improve automatically, but playback stays paused
+          // until the player explicitly chooses Resume Beat.
+          return;
+        }
+        const refresh = ctx.state === "running";
+        const ok = await requestVerseJamAudioResume(ctx, { refresh });
+        if (!stillCurrent()) return;
+        if (!ok) {
+          audioUnlocked = false;
+          audioNeedsGestureRefresh = true;
+          return;
+        }
+        const resumedAt = ctx.currentTime;
+        setTimeout(() => {
+          if (!stillCurrent()) return;
+          const advancing = ctx.state === "running" &&
+            ctx.currentTime - resumedAt > 0.01;
+          audioUnlocked = advancing;
+          audioForegroundRecoveryPending = !advancing;
+          audioNeedsGestureRefresh = !advancing;
+          // Never restart a phrase here: foreground callbacks are not
+          // trustworthy user gestures and can arrive out of order.
+        }, AUDIO_CLOCK_PROBE_MS);
+      }, AUDIO_CLOCK_PROBE_MS);
+    }, AUDIO_FOREGROUND_RECOVERY_DELAY_MS);
   }
 
   function installAudioUnlockHandlers() {
-    const unlock = () => {
-      primeHtmlAudio();
-      unlockAudioFromGesture();
+    const unlock = event => {
+      // Resume Beat's own button owns this gesture. Avoid two competing
+      // unlock requests from document capture and the button handler.
+      if (event?.target?.closest?.("#verseJamResumeBeatButton")) return;
+      void unlockAudioFromGesture();
     };
-
-    ["pointerdown", "touchstart", "mousedown", "click"].forEach(eventName => {
-      document.addEventListener(eventName, unlock, {
-        capture: true,
-        passive: true
-      });
+    ["pointerdown", "touchstart", "mousedown", "click", "keydown"].forEach(eventName => {
+      document.addEventListener(eventName, unlock, { capture: true, passive: true });
     });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) markVerseJamAudioBackgrounded();
+      else scheduleVerseJamForegroundRecovery();
+    });
+    window.addEventListener("pagehide", markVerseJamAudioBackgrounded);
+    window.addEventListener("pageshow", scheduleVerseJamForegroundRecovery);
+    window.addEventListener("focus", scheduleVerseJamForegroundRecovery);
   }
 
   const state = {
@@ -540,6 +718,9 @@
     helpBackMode: false,
     paused: false,
     resumeAfterMenu: false,
+    resumeAfterInterruption: false,
+    resumeBeatApproved: false,
+    interruptedPhase: "",
     busy: false,
     completed: false,
     startTime: 0,
@@ -579,7 +760,8 @@
       flowId === gameplayGeneration &&
       state.screen === "game" &&
       !state.completed &&
-      !state.paused
+      !state.paused &&
+      !document.hidden
     );
   }
 
@@ -600,6 +782,8 @@
 
     gameplayWatchdogTimer = setInterval(() => {
       if (
+        document.hidden ||
+        audioForegroundRecoveryPending ||
         state.screen !== "game" ||
         state.completed ||
         state.paused ||
@@ -1560,28 +1744,19 @@
   }
 
   async function ensureAudio() {
-    primeHtmlAudio();
-    createAudioGraph();
-
-    if (!audioCtx) return;
-
-    unlockAudioFromGesture();
-
-    if (audioCtx.state !== "running") {
-      try {
-        await audioCtx.resume();
-      } catch (err) {
-        console.warn("Verse Jam: audio resume failed in ensureAudio", err);
-      }
-    }
-    loadSoundBitBuffers();
-
+    // Runs from real Start/Mode/Menu gestures; a failed or stalled unlock
+    // must not hang the gameplay flow or falsely report readiness.
+    return unlockAudioFromGesture();
   }
 
   function setMuted(value) {
     muted = !!value;
-    if (masterGain) {
+    if (masterGain && audioCtx && audioCtx.state !== "closed") {
       masterGain.gain.setValueAtTime(muted ? 0 : 0.72, audioCtx.currentTime);
+    }
+    // An unmute gesture should also retry audio activation after interruption.
+    if (!muted && (!audioUnlocked || audioCtx?.state !== "running")) {
+      void unlockAudioFromGesture();
     }
   }
 
@@ -1658,7 +1833,7 @@
   }
 
   function playUiTapFallback() {
-    if (!audioCtx || !masterGain || muted) return;
+    if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
 
     const now = audioCtx.currentTime;
 
@@ -1673,7 +1848,7 @@
   }
 
   function playUiTapSound() {
-    if (!audioCtx || !masterGain || muted) return false;
+    if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return false;
 
     const availableBuffers = uiTapBuffers.filter(Boolean);
 
@@ -1727,7 +1902,7 @@
 
 
   function playSoundBitSample(sound, when = audioCtx?.currentTime || 0, volume = VOICE_SOUND_BIT_VOLUME) {
-    if (!audioCtx || !masterGain || muted || !sound?.filename) return false;
+    if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted || !sound?.filename) return false;
 
     const buffer = soundBitBuffers[sound.filename];
     if (!buffer) return false;
@@ -1748,7 +1923,7 @@
   }
 
   function playTone({ midi = 60, when = audioCtx?.currentTime || 0, duration = 0.22, volume = 0.16, type = "triangle" } = {}) {
-    if (!audioCtx || !masterGain || muted) return;
+    if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
 
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -1771,7 +1946,7 @@
     if (generation !== musicGeneration) return;
 
     // Generated chiptune drums.
-    if (!audioCtx || !masterGain || muted) return;
+    if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
 
     if (sound === "kick") {
       const osc = audioCtx.createOscillator();
@@ -1870,8 +2045,19 @@
     state.nextScheduledBeatTime = state.musicStartTime;
 
     const tick = () => {
-      if (!audioCtx || generation !== musicGeneration) return;
+      if (!audioCtx || audioCtx.state !== "running" || document.hidden ||
+          generation !== musicGeneration) return;
       const lookAhead = 0.18;
+      // A backgrounded device can advance the clock without running this timer.
+      // Skip stale beats rather than bursting all missed drums on return.
+      const beatSeconds = secondsPerBeat();
+      if (state.nextScheduledBeatTime < audioCtx.currentTime - beatSeconds) {
+        const missedBeats = Math.floor(
+          (audioCtx.currentTime - state.nextScheduledBeatTime) / beatSeconds
+        );
+        state.nextScheduledBeatTime += missedBeats * beatSeconds;
+        state.beatCount += missedBeats;
+      }
       while (state.nextScheduledBeatTime < audioCtx.currentTime + lookAhead) {
         scheduleBeat(state.beatCount, state.nextScheduledBeatTime, generation);
         state.nextScheduledBeatTime += secondsPerBeat();
@@ -2132,6 +2318,8 @@
       onClose: () => {
         state.menuOpen = false;
         resumeGameFromMenu();
+        // A background-interrupted phrase still requires Resume Beat;
+        // menu closing must not auto-start a hidden musical timeline.
       },
       onBackFromHelp: () => {
         state.helpOpen = false;
@@ -2147,6 +2335,185 @@
       !state.completed &&
       !state.paused
     );
+  }
+
+  // The audio clock is the musical clock. Recovering it automatically is
+  // useful, but only an explicit gesture should restart a paused performance.
+  function hideResumeBeatOverlay() {
+    document.getElementById("verseJamResumeBeatOverlay")?.remove();
+  }
+
+  function showResumeBeatOverlay() {
+    if (document.hidden || state.screen !== "game" ||
+        !state.resumeAfterInterruption || state.completed) return;
+    if (document.getElementById("verseJamResumeBeatOverlay")) {
+      const existing = document.getElementById("verseJamResumeBeatButton");
+      if (existing && !resumeBeatInFlight) {
+        existing.disabled = false;
+        existing.textContent = "Resume Beat";
+      }
+      return;
+    }
+    const overlay = document.createElement("div");
+    overlay.id = "verseJamResumeBeatOverlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Resume Verse Jam");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;" +
+      "display:flex;align-items:center;justify-content:center;" +
+      "padding:24px;padding-top:max(24px,env(safe-area-inset-top));" +
+      "padding-bottom:max(24px,env(safe-area-inset-bottom));" +
+      "box-sizing:border-box;background:rgba(9,6,25,.88);";
+    overlay.innerHTML = `
+      <section style="box-sizing:border-box;width:min(100%,370px);padding:28px 22px;
+        border-radius:22px;border:2px solid #8df7ff;background:#221447;
+        color:#fff;text-align:center;box-shadow:0 12px 44px rgba(0,0,0,.45)"
+        aria-labelledby="verseJamResumeBeatTitle">
+        <style>
+          #verseJamResumeBeatOverlay .verse-jam-resume-icon img {
+            width:80px !important;height:80px !important;
+            max-width:100%;object-fit:contain;
+          }
+        </style>
+        <div class="verse-jam-resume-icon" aria-hidden="true"
+          style="display:flex;align-items:center;justify-content:center;
+            min-height:80px;margin:0 0 14px;font-size:64px;line-height:1">
+          ${GAME_ICON_HTML}
+        </div>
+        <h2 id="verseJamResumeBeatTitle" style="margin:0 0 24px;font-size:28px;line-height:1.15;color:#8df7ff">Ready to Jam?</h2>
+        <p id="verseJamResumeBeatStatus" role="status" aria-live="polite" hidden
+          style="margin:0 0 16px;font-size:16px;line-height:1.4"></p>
+        <button id="verseJamResumeBeatButton" type="button"
+          style="appearance:none;border:0;border-radius:16px;padding:15px 26px;
+          font:inherit;font-weight:800;font-size:20px;
+          background:#ffe27a;color:#221447;min-height:54px;cursor:pointer">
+          ▶ Resume Beat
+        </button>
+      </section>`;
+    // No source HTML or CSS file changes required. The overlay remains over
+    // all game controls until the audio clock is proven healthy.
+    document.body.appendChild(overlay);
+    const button = document.getElementById("verseJamResumeBeatButton");
+    // pointerdown gives iOS the earliest genuine user activation; click also
+    // supports keyboard/assistive technology and non-pointer devices.
+    button?.addEventListener("pointerdown", () => { void attemptResumeBeat(); });
+    button?.addEventListener("click", () => { void attemptResumeBeat(); });
+    button?.focus?.({ preventScroll: true });
+  }
+
+  async function attemptResumeBeat() {
+    if (resumeBeatInFlight || document.hidden ||
+        !state.resumeAfterInterruption || state.screen !== "game") return false;
+    resumeBeatInFlight = true;
+    const generation = ++resumeBeatGestureGeneration;
+    const button = document.getElementById("verseJamResumeBeatButton");
+    const status = document.getElementById("verseJamResumeBeatStatus");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Restoring beat…";
+    }
+    if (status) {
+      status.hidden = false;
+      status.textContent = "Checking audio…";
+    }
+    try {
+      // Call immediately in the user gesture, before awaiting anything.
+      const ok = await unlockAudioFromGesture();
+      if (generation !== resumeBeatGestureGeneration || document.hidden ||
+          !state.resumeAfterInterruption) return false;
+      if (!ok || !audioUnlocked || audioForegroundRecoveryPending ||
+          audioCtx?.state !== "running") return false;
+      state.resumeBeatApproved = true;
+      return await resumeVerseJamAfterInterruption();
+    } catch (err) {
+      console.warn("Verse Jam: Resume Beat could not restore audio", err);
+      state.resumeBeatApproved = false;
+      return false;
+    } finally {
+      if (generation === resumeBeatGestureGeneration) {
+        resumeBeatInFlight = false;
+        if (state.resumeAfterInterruption && !document.hidden) {
+          if (button) {
+            button.disabled = false;
+            button.textContent = "▶ Resume Beat";
+          }
+          if (status) {
+            status.hidden = false;
+            status.textContent = "Audio isn't ready yet. Tap Resume Beat again.";
+          }
+        }
+      }
+    }
+  }
+
+  // Pause *all* unfinished musical phrases, including the opening intro and
+  // between-round transition. No round/score/progress/reward mutations occur.
+  function pauseVerseJamForInterruption() {
+    if (state.screen !== "game" || state.completed || state.paused ||
+        state.menuOpen || state.helpOpen) return;
+    const activePhrase = state.phase === "intro" ||
+      state.phase === "round_transition" ||
+      state.phase === "ending_sequence" ||
+      (["spawn_chunk", "countdown", "play_chunk"].includes(state.phase) &&
+       state.currentButtons.length > 0);
+    if (!activePhrase) return;
+
+    beginGameplayFlow();
+    state.interruptedPhase = state.phase;
+    state.paused = true;
+    state.resumeAfterInterruption = true;
+    state.resumeBeatApproved = false;
+    state.acceptingInput = false;
+    state.busy = false;
+    clearSleeps();
+    stopMusic();
+    stopGameplayWatchdog();
+  }
+
+  // Only Resume Beat's *verified* user gesture can restart a performance.
+  // A foreground audio probe never resumes a musical phrase on its own.
+  async function resumeVerseJamAfterInterruption() {
+    if (!state.resumeBeatApproved ||
+        !state.resumeAfterInterruption || !state.paused ||
+        state.resumeAfterMenu || state.menuOpen || state.helpOpen ||
+        state.screen !== "game" || state.completed || document.hidden ||
+        !audioUnlocked || audioForegroundRecoveryPending ||
+        audioCtx?.state !== "running") return false;
+
+    const phase = state.interruptedPhase;
+    state.resumeAfterInterruption = false;
+    state.resumeBeatApproved = false;
+    state.interruptedPhase = "";
+    state.paused = false;
+    state.acceptingInput = false;
+    state.busy = false;
+    hideResumeBeatOverlay();
+    const flowId = beginGameplayFlow();
+    startGameplayWatchdog();
+
+    if (phase === "intro") {
+      state.phase = "intro";
+      startBeatLoop();
+      await runIntroSequence(flowId);
+      if (isGameplayFlowActive(flowId)) await startNextPlayableGroup(flowId);
+    } else if (phase === "ending_sequence") {
+      // Re-show the unfinished closing phrase, then display the earned
+      // result only once. Do not re-mark progress or replay past rewards.
+      startBeatLoop();
+      await finishAfterEndingSequence(flowId);
+    } else if (phase === "round_transition") {
+      // The round index was already advanced *before* the transition began.
+      // Replay only its musical cue, never the round-advance/reward logic.
+      const nextDownbeat = await showRoundTransition({ alreadyAligned: true });
+      if (!isGameplayFlowActive(flowId)) return true;
+      startBeatLoop({ cleanRestart: false, startAt: nextDownbeat });
+      await waitUntilAudioTime(nextDownbeat);
+      if (isGameplayFlowActive(flowId)) await startNextPlayableGroup(flowId);
+    } else {
+      startBeatLoop();
+      await startNextPlayableGroup(flowId);
+    }
+    return true;
   }
 
   function pauseGameForMenu() {
@@ -2192,6 +2559,9 @@
   }
 
   function stopRun() {
+    resumeBeatGestureGeneration += 1;
+    resumeBeatInFlight = false;
+    hideResumeBeatOverlay();
     beginGameplayFlow();
     stopGameplayWatchdog();
     clearSleeps();
@@ -2200,6 +2570,9 @@
     state.busy = false;
     state.paused = false;
     state.resumeAfterMenu = false;
+    state.resumeAfterInterruption = false;
+    state.resumeBeatApproved = false;
+    state.interruptedPhase = "";
     state.currentButtons = [];
   }
 
@@ -2213,6 +2586,9 @@
     state.completed = false;
     state.paused = false;
     state.resumeAfterMenu = false;
+    state.resumeAfterInterruption = false;
+    state.resumeBeatApproved = false;
+    state.interruptedPhase = "";
     state.busy = false;
     state.acceptingInput = false;
     state.currentButtons = [];
@@ -2905,16 +3281,7 @@
 
       if (!isGameplayFlowActive(flowId)) return;
 
-      await showEndingSequence(flowId);
-
-      if (!isGameplayFlowActive(flowId)) return;
-
-      if (state.groovyScore <= 0) {
-        await finishToEndScreen();
-        return;
-      }
-
-      await showGroovyScoreScreen(flowId);
+      await finishAfterEndingSequence(flowId);
       return;
     }
   }
@@ -3134,6 +3501,7 @@
 
   async function showGroovyScoreScreen(flowId = gameplayGeneration) {
     if (!isGameplayFlowActive(flowId)) return;
+    state.phase = "score";
 
     const area = document.getElementById("versejamMainArea");
     if (!area) return;
@@ -3172,8 +3540,20 @@
   }
 
 
+  async function finishAfterEndingSequence(flowId = gameplayGeneration) {
+    if (!isGameplayFlowActive(flowId)) return;
+    await showEndingSequence(flowId);
+    if (!isGameplayFlowActive(flowId)) return;
+    if (state.groovyScore <= 0) {
+      await finishToEndScreen();
+    } else {
+      await showGroovyScoreScreen(flowId);
+    }
+  }
+
   async function showEndingSequence(flowId = gameplayGeneration) {
     if (!isGameplayFlowActive(flowId)) return;
+    state.phase = "ending_sequence";
 
     const area = document.getElementById("versejamMainArea");
     if (!area) return;
