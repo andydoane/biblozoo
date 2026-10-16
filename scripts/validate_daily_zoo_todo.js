@@ -2208,7 +2208,7 @@ function testPackageIntegrationGuards() {
   assert.doesNotMatch(app, /"biblozoo:daily-task-confirmed"/);
   assert.match(ui, /function unlockNewPetPackageRow\(/);
   assert.match(ui, /verse_images\/biblopet_box\.png/);
-  assert.match(worker, /2026_Oct_16_new_pet_package_q/);
+  assert.match(worker, /const CACHE_VERSION = "2026_[^"\r\n]+";/);
 }
 
 function testPerVerseHistoryAdvancesOnConfirmationOnly() {
