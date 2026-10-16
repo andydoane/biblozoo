@@ -48,6 +48,9 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // Set DEBUG_MODE = false when you’re ready to remove this.
 // =========================================================
 const DEBUG_MODE = false;
+// Release fallback: set false to restore Classic-only Daily feeding.
+// Developer Preview remains independent of this switch.
+const ENABLE_DAILY_FEEDING_VARIETY = true;
 const FEATURES = Object.freeze({
   DAILY_PET_QUESTIONS: true,
   DAILY_PET_QUESTIONS_DEBUG: false,
@@ -1438,7 +1441,8 @@ function toggleMute() {
   muted = !muted;
   applyMute();
 
-  // stop current verse/instruction audio immediately
+  // stop current verse/instruction and picker preview audio immediately
+  if (muted) stopNewVersePickerPreviewAudio();
   try { audioEl.pause(); } catch (e) { }
   try { audioEl.currentTime = 0; } catch (e) { }
 
@@ -6582,8 +6586,15 @@ async function startDailyTodoSnack(
     getProfileApi()
       ?.getActiveProfile?.();
 
+  const selectedFeedMode =
+    ENABLE_DAILY_FEEDING_VARIETY &&
+    ready.engine.DAILY_FEED_MODES?.includes(ready.plan.feedMode)
+      ? ready.plan.feedMode
+      : "classic";
+
   State.dailySnackSession = {
     dailyTodoSnack: true,
+    feedMode: selectedFeedMode,
     profileId: ready.profileId,
     planId: ready.plan.id,
     planDay: ready.plan.day,
@@ -6674,7 +6685,12 @@ function claimDailyTodoSnack(
       loaded.state,
       {
         planId: session.planId,
-        now: new Date()
+        now: new Date(),
+        // The emergency Classic-only switch must not consume
+        // a rotation turn, even when Classic was already assigned.
+        feedMode: ENABLE_DAILY_FEEDING_VARIETY
+          ? session.feedMode
+          : ""
       }
     );
 
@@ -10458,6 +10474,9 @@ function go(nextScreen) {
   if (from === Screen.DAILY_SNACK) {
     window.BibloZooDailyFeedGame?.stop?.();
   }
+  if (from === Screen.NEW_VERSE_PICKER) {
+    stopNewVersePickerPreviewAudio();
+  }
   State.isSliding = true;
 
   // stop any learn audio/echo sequence when leaving a screen
@@ -10598,6 +10617,12 @@ function setScreen(screen) {
     screen !== Screen.DAILY_SNACK
   ) {
     window.BibloZooDailyFeedGame?.stop?.();
+  }
+  if (
+    State.screen === Screen.NEW_VERSE_PICKER &&
+    screen !== Screen.NEW_VERSE_PICKER
+  ) {
+    stopNewVersePickerPreviewAudio();
   }
   State.screen = screen;
   State.slideX = screenToIndex(screen);
@@ -14560,6 +14585,279 @@ function screenTitle(idx) {
       });
     };
 
+    const FEEDING_GAME_TEST_MELODIES =
+      Object.freeze([
+        Object.freeze({
+          id: "odeToJoy",
+          label: "Ode to Joy"
+        }),
+        Object.freeze({
+          id: "turkeyInTheStraw",
+          label: "Turkey in the Straw"
+        })
+      ]);
+
+    const FEEDING_GAME_TEST_MODES =
+      Object.freeze([
+        Object.freeze({
+          id: "classic",
+          label: "Classic",
+          enabled: true
+        }),
+        Object.freeze({
+          id: "labyrinth",
+          label: "Labyrinth",
+          enabled: true
+        }),
+        Object.freeze({
+          id: "melody",
+          label: "Melody",
+          enabled: true
+        }),
+        Object.freeze({
+          id: "bounce",
+          label: "Bounce",
+          enabled: true
+        })
+      ]);
+
+    const launchFeedingGameTest = async (
+      mode,
+      earnedStarPegCount,
+      melodyTuneId = ""
+    ) => {
+      const selectedMode =
+        FEEDING_GAME_TEST_MODES.find(
+          (entry) => entry.id === mode
+        );
+
+      if (!selectedMode?.enabled) {
+        return false;
+      }
+
+      const selectedMelody =
+        selectedMode.id === "melody"
+          ? FEEDING_GAME_TEST_MELODIES.find(
+            (entry) =>
+              entry.id === melodyTuneId
+          )
+          : null;
+
+      if (
+        selectedMode.id === "melody" &&
+        !selectedMelody
+      ) {
+        return false;
+      }
+
+      const feedGame =
+        window.BibloZooDailyFeedGame;
+      const templatePlan =
+        getOrCreateDailyTodoPreviewPlan({
+          persist: false
+        });
+      const profile =
+        getProfileApi()?.getActiveProfile?.();
+      const verseId = String(
+        templatePlan?.verseId || ""
+      ).trim();
+
+      if (
+        !templatePlan ||
+        !verseId ||
+        !feedGame?.render ||
+        !feedGame?.start
+      ) {
+        showDialog({
+          title: "Feeding Game Tester Unavailable",
+          body:
+            "Unlock a BibloPet and create today's Daily To-Do before using the Feeding Game Tester.",
+          actions: [
+            dlgBtn("OK", {
+              onClick: closeDialog
+            })
+          ]
+        });
+        return false;
+      }
+
+      const selectedStars =
+        Math.min(
+          2,
+          Math.max(
+            0,
+            Math.floor(
+              Number(earnedStarPegCount) || 0
+            )
+          )
+        );
+
+      feedGame.stop?.();
+      State.dailySnackSession = null;
+      feedGame.prepareAudio?.();
+
+      const rewardTiltEnabled =
+        await requestDailySnackTiltPermission();
+
+      window.BibloZooDailyTodoUI
+        ?.clearTemporaryPreviewState?.();
+
+      State.dailySnackSession = {
+        dailyTodoSnack: true,
+        dailyTodoPreview: true,
+        profileId: String(
+          templatePlan.profileId ||
+          profile?.id ||
+          "preview"
+        ),
+        planId:
+          `daily-feed-preview-${Date.now()}`,
+        planDay: String(
+          templatePlan.day || "preview"
+        ),
+        verseId,
+        petName:
+          getBibloPetDisplayNameForVerseId(
+            verseId
+          ),
+        zookeeperName:
+          String(
+            profile?.name || "Zookeeper"
+          ).trim() || "Zookeeper",
+        feedMode: selectedMode.id,
+        feedMelodyId:
+          selectedMelody?.id || "",
+        earnedStarPegCount:
+          selectedStars,
+        rewardTiltEnabled,
+        rewardScore: 0,
+        rewardCaught: 0,
+        rewardComplete: false,
+        rewardClaimed: false
+      };
+
+      closeDialog();
+      go(Screen.DAILY_SNACK);
+      return true;
+    };
+
+    const showFeedingGameStarDialog = (
+      mode
+    ) => {
+      const selectedMode =
+        FEEDING_GAME_TEST_MODES.find(
+          (entry) => entry.id === mode
+        );
+
+      if (!selectedMode?.enabled) {
+        return;
+      }
+
+      showDialog({
+        title: "Choose Question Stars",
+        body:
+          selectedMode.id === "classic" || selectedMode.id === "bounce"
+            ? "Question stars add extra star pegs in Classic or multiball star bricks in Bounce."
+            : "Question stars do not affect Labyrinth. Choose a test count.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...[0, 1, 2].map(
+            (starCount) =>
+              dlgBtn(
+                `${starCount} ★`,
+                {
+                  onClick: () =>
+                    launchFeedingGameTest(
+                      selectedMode.id,
+                      starCount
+                    )
+                }
+              )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showFeedingGameTesterDialog
+          })
+        ]
+      });
+    };
+
+    const showFeedingGameTuneDialog = () => {
+      showDialog({
+        title: "Choose Melody Tune",
+        body:
+          "Choose the tune to use for this Melody preview.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...FEEDING_GAME_TEST_MELODIES.map(
+            (tune) =>
+              dlgBtn(
+                tune.label,
+                {
+                  onClick: () =>
+                    launchFeedingGameTest(
+                      "melody",
+                      0,
+                      tune.id
+                    )
+                }
+              )
+          ),
+          dlgBtn("Back", {
+            secondary: true,
+            onClick:
+              showFeedingGameTesterDialog
+          })
+        ]
+      });
+    };
+
+    const showFeedingGameTesterDialog = () => {
+      const modeButtons =
+        FEEDING_GAME_TEST_MODES.map(
+          (mode) => {
+            const button =
+              dlgBtn(
+                mode.label,
+                {
+                  onClick: () =>
+                    mode.id === "melody"
+                      ? showFeedingGameTuneDialog()
+                      : showFeedingGameStarDialog(
+                        mode.id
+                      )
+                }
+              );
+
+            if (!mode.enabled) {
+              button.disabled = true;
+              button.title =
+                "This feeding mode will be enabled after its gameplay patch is complete.";
+            }
+
+            return button;
+          }
+        );
+
+      showDialog({
+        title: "Feeding Game Tester",
+        body:
+          "Choose a feeding mode. Classic, Labyrinth, Melody, and Bounce are playable in Preview.",
+        actionsClass:
+          "daily-preview-dialog-actions",
+        actions: [
+          ...modeButtons,
+          dlgBtn("Back", {
+            secondary: true,
+            onClick: showDailyPreviewDialog
+          })
+        ]
+      });
+    };
+
     const showDailyPreviewDialog = () => {
       showDialog({
         title: "Daily To-Do Preview",
@@ -16404,6 +16702,14 @@ function screenTitle(idx) {
         showNewPetMissionPreviewDialog
     });
 
+    registerDailyTodoPreviewMenuEntry({
+      id: "feeding",
+      label: "Feeding Game Tester",
+      order: 90,
+      onSelect:
+        showFeedingGameTesterDialog
+    });
+
     titleTodoBtn.onclick = (e) => {
       e.stopPropagation();
       const plan =
@@ -18034,6 +18340,121 @@ window.addEventListener("resize", () => {
   });
 });
 
+/* Shared New Verse audio preview. The picker never changes the selected verse. */
+const NEW_VERSE_SPEAKER_IMAGE = `${IMG_DIR}verse_preview_speaker.png`;
+let newVerseSpeakerImageChecked = false;
+let newVerseSpeakerImageReady = false;
+let newVersePreviewAudio = null;
+let newVersePreviewVerseId = "";
+let newVersePreviewToken = 0;
+
+function updateNewVersePickerSpeakerArtwork(root = document) {
+  root.querySelectorAll(".new-verse-preview-icon").forEach((icon) => {
+    icon.classList.toggle("has-image", newVerseSpeakerImageReady);
+    icon.textContent = newVerseSpeakerImageReady ? "" : "🔈";
+  });
+}
+
+function checkNewVersePickerSpeakerImage() {
+  if (newVerseSpeakerImageChecked) return;
+  newVerseSpeakerImageChecked = true;
+
+  // Probe only once: until the optional PNG exists, keep the emoji visible.
+  const probe = new Image();
+  probe.onload = () => {
+    newVerseSpeakerImageReady = true;
+    updateNewVersePickerSpeakerArtwork();
+  };
+  probe.onerror = () => {
+    newVerseSpeakerImageReady = false;
+  };
+  probe.src = NEW_VERSE_SPEAKER_IMAGE;
+}
+
+function updateNewVersePickerAudioButtons(root = document) {
+  root.querySelectorAll("[data-new-verse-preview-id]").forEach((button) => {
+    const playing = !!newVersePreviewAudio &&
+      newVersePreviewVerseId === button.dataset.newVersePreviewId;
+    const reference = button.dataset.versePreviewRef || "this verse";
+    button.classList.toggle("is-playing", playing);
+    button.setAttribute("aria-pressed", String(playing));
+    button.setAttribute(
+      "aria-label",
+      `${playing ? "Stop listening to" : "Listen to"} ${reference}`
+    );
+  });
+}
+
+function stopNewVersePickerPreviewAudio() {
+  ++newVersePreviewToken;
+  const audio = newVersePreviewAudio;
+  newVersePreviewAudio = null;
+  newVersePreviewVerseId = "";
+  if (audio) {
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (err) { }
+  }
+  updateNewVersePickerAudioButtons();
+}
+
+function toggleNewVersePickerPreviewAudio(verseId) {
+  if (!verseId || State.screen !== Screen.NEW_VERSE_PICKER) return;
+
+  const wasPlaying = !!newVersePreviewAudio &&
+    newVersePreviewVerseId === verseId;
+  stopNewVersePickerPreviewAudio();
+  if (wasPlaying) return;
+
+  if (muted) {
+    showDialog({
+      title: "Sound is off",
+      body: "Turn on sound to hear this verse.",
+      actions: [dlgBtn("OK", { onClick: closeDialog })]
+    });
+    return;
+  }
+
+  const audio = new Audio(`${AUDIO_DIR}${encodeURIComponent(verseId)}.mp3`);
+  const token = ++newVersePreviewToken;
+  audio.preload = "auto";
+  audio.muted = muted;
+  newVersePreviewAudio = audio;
+  newVersePreviewVerseId = verseId;
+
+  const isCurrent = () =>
+    token === newVersePreviewToken && newVersePreviewAudio === audio;
+  const finish = () => {
+    if (isCurrent()) stopNewVersePickerPreviewAudio();
+  };
+  const failed = () => {
+    if (!isCurrent()) return;
+    stopNewVersePickerPreviewAudio();
+    showDialog({
+      title: "Verse audio unavailable",
+      body: "This verse couldn't play right now. You can still choose it.",
+      actions: [dlgBtn("OK", { onClick: closeDialog })]
+    });
+  };
+
+  audio.addEventListener("ended", finish, { once: true });
+  audio.addEventListener("error", failed, { once: true });
+  updateNewVersePickerAudioButtons();
+
+  try {
+    Promise.resolve(audio.play()).catch(failed);
+  } catch (err) {
+    failed();
+  }
+}
+
+// A single pair of listeners serves every picker visit (no per-tile leaks).
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopNewVersePickerPreviewAudio();
+});
+window.addEventListener("pagehide", stopNewVersePickerPreviewAudio);
+
 function newVersePickerCardHtml(
   item,
   {
@@ -18051,12 +18472,13 @@ function newVersePickerCardHtml(
     changeVerseMode ? "Select" : "Learn";
 
   return `
-    <button
-      class="new-verse-card no-zoom"
-      type="button"
-      data-new-verse-id="${escapeHtml(verseId)}"
-      aria-label="${actionLabel} ${escapeHtml(ref)}${learned ? ", learned" : ""}"
-    >
+    <div class="new-verse-card-shell">
+      <button
+        class="new-verse-card no-zoom"
+        type="button"
+        data-new-verse-id="${escapeHtml(verseId)}"
+        aria-label="${actionLabel} ${escapeHtml(ref)}${learned ? ", learned" : ""}"
+      >
       ${
         changeVerseMode && learned
           ? `
@@ -18084,7 +18506,18 @@ function newVersePickerCardHtml(
       >
         ${escapeHtml(ref)}
       </div>
-    </button>
+      </button>
+      <button
+        class="new-verse-preview-audio no-zoom"
+        type="button"
+        data-new-verse-preview-id="${escapeHtml(verseId)}"
+        data-verse-preview-ref="${escapeHtml(ref)}"
+        aria-label="Listen to ${escapeHtml(ref)}"
+        aria-pressed="false"
+      >
+        <span class="new-verse-preview-icon${newVerseSpeakerImageReady ? " has-image" : ""}" aria-hidden="true">${newVerseSpeakerImageReady ? "" : "🔈"}</span>
+      </button>
+    </div>
   `;
 }
 
@@ -18529,12 +18962,23 @@ function screenNewVersePicker(idx) {
 
   bindNewVersePickerHomePill(wrap);
   schedulePickerReferenceFitting(wrap);
+  checkNewVersePickerSpeakerImage();
+
+  wrap.querySelectorAll("[data-new-verse-preview-id]").forEach((button) => {
+    button.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleNewVersePickerPreviewAudio(button.dataset.newVersePreviewId);
+    };
+  });
+  updateNewVersePickerAudioButtons(wrap);
 
   wrap.querySelectorAll("[data-new-verse-id]").forEach((btn) => {
     btn.onclick = async (e) => {
       e.stopPropagation();
 
       const verseId = btn.getAttribute("data-new-verse-id") || "";
+      stopNewVersePickerPreviewAudio();
 
       if (changeVerseMode) {
         await selectVerseAndReturnHome(verseId);
