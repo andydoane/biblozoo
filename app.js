@@ -13585,22 +13585,16 @@ function screenProfileEditor(idx) {
           )}
         </div>
 
-        ${
-          isAdd || isEdit
-            ? `
-              <div
-                class="profile-avatar-count profile-avatar-count-above"
-                aria-live="polite"
-              >
-                ${
-                  catalog.length
-                    ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length}`
-                    : "Picture unavailable"
-                }
-              </div>
-            `
-            : ""
-        }
+        <div
+          class="profile-avatar-count profile-avatar-count-above"
+          aria-live="polite"
+        >
+          ${
+            catalog.length
+              ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length}`
+              : "Picture unavailable"
+          }
+        </div>
 
         <div
           class="profile-avatar-controls"
@@ -13616,31 +13610,14 @@ function screenProfileEditor(idx) {
             ${SVG_BACK}
           </button>
 
-          ${
-              isAdd || isEdit
-              ? `
-                <button
-                  class="profile-avatar-random no-zoom"
-                  type="button"
-                  data-profile-picture-random
-                  ${arrowsDisabled ? "disabled" : ""}
-                >
-                  Random
-                </button>
-              `
-              : `
-                <div
-                  class="profile-avatar-count"
-                  aria-live="polite"
-                >
-                  ${
-                    catalog.length
-                      ? `${normalizeProfilePictureIndex() + 1} of ${catalog.length}`
-                      : "Picture unavailable"
-                  }
-                </div>
-              `
-          }
+          <button
+            class="profile-avatar-random no-zoom"
+            type="button"
+            data-profile-picture-random
+            ${arrowsDisabled ? "disabled" : ""}
+          >
+            Random
+          </button>
 
           <button
             class="profile-avatar-arrow no-zoom"
