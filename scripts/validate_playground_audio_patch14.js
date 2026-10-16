@@ -15,7 +15,7 @@ const slice = (source, start, end) => {
   return source.slice(a, b);
 };
 const run = (source, globals, exports) => {
-  const sandbox = { Promise, queueMicrotask, console, ...globals };
+  const sandbox = { Promise, queueMicrotask, setTimeout, clearTimeout, console, ...globals };
   vm.createContext(sandbox);
   vm.runInContext(source + `\nthis.exports = { ${exports.join(", ")} };`, sandbox);
   return sandbox.exports;
@@ -151,6 +151,212 @@ async function testWheelRecordedVerseDirectAndBlockedResult() {
   assert.strictEqual(await retry, true);
 }
 
+async function testGhostBackgroundPausesPlaybackAndRecoversSound() {
+  const ghost = read("ghost_writer");
+  const handlers = slice(ghost,
+    "  function noteGhostAudioInterruption() {",
+    "  function escapeHtml(value) {");
+  const calls = [];
+  let hidden = false;
+  let now = 1000;
+  let unlockResult = false;
+  const audio = { state: "running" };
+  const playback = {
+    running: true, options: { spookySounds: "on" },
+    backgroundPausedAt: null, charStart: 800, pauseUntil: 1300
+  };
+  const api = run(`let audioUnlocked = true, spookySoundActive = true;
+    let spookyRecoveryPending = false, playbackRaf = 17, muted = false;
+    let playbackState = playback, audioContext = audio;
+    function getAudioContext() { return audioContext; }
+    function stopGhostSpookySounds() { calls.push("stop"); spookySoundActive = false; }
+    function unlockAudio() { calls.push("unlock"); if (unlockResult.value) audioContext.state = "running"; return Promise.resolve(unlockResult.value); }
+    function startGhostSpookySounds() { calls.push("restart"); spookySoundActive = true; }
+    function playbackFrame() {}
+    ${handlers}`, {
+      playback, calls, audio, unlockResult: { get value() { return unlockResult; } },
+      document: { get hidden() { return hidden; } },
+      performance: { now: () => now },
+      cancelAnimationFrame: id => calls.push(`cancel:${id}`),
+      requestAnimationFrame: () => { calls.push("raf"); return 18; }
+    }, ["pauseGhostPlaybackForBackground", "restoreGhostPlaybackFromBackground",
+        "recoverGhostSpookyAudio", "onGhostAudioStateChange"]);
+  hidden = true;
+  api.pauseGhostPlaybackForBackground();
+  assert.deepStrictEqual(calls, ["stop", "cancel:17"]);
+  assert.strictEqual(playback.backgroundPausedAt, 1000);
+  audio.state = "interrupted";
+  now = 6000;
+  hidden = false;
+  api.restoreGhostPlaybackFromBackground();
+  await flush();
+  assert.strictEqual(playback.charStart, 5800, "Background time must not skip writing");
+  assert.strictEqual(playback.pauseUntil, 6300, "Preserve intentional word pauses");
+  assert.strictEqual(calls.filter(x => x === "unlock").length, 0,
+    "Foreground events must not issue a resume without user activation");
+  assert.strictEqual(calls.filter(x => x === "restart").length, 0);
+  api.recoverGhostSpookyAudio({ fromGesture: true });
+  await flush();
+  assert.strictEqual(calls.filter(x => x === "restart").length, 0,
+    "A rejected user gesture must preserve the pending recovery");
+  unlockResult = true;
+  api.recoverGhostSpookyAudio({ fromGesture: true });
+  await flush();
+  assert.strictEqual(calls.filter(x => x === "restart").length, 1,
+    "First successful gesture must recover the soundtrack");
+  api.recoverGhostSpookyAudio({ fromGesture: true });
+  await flush();
+  assert.strictEqual(calls.filter(x => x === "restart").length, 1,
+    "Do not double-start spooky playback");
+}
+
+async function testGhostStaleReplayCannotRestartSounds() {
+  const ghost = read("ghost_writer");
+  const handlers = slice(ghost,
+    "  function noteGhostAudioInterruption() {",
+    "  function escapeHtml(value) {");
+  const pending = { resolve: null, starts: 0 };
+  const playback = {
+    running: true, options: { spookySounds: "on" },
+    backgroundPausedAt: null, charStart: 0, pauseUntil: 0
+  };
+  const api = run(`let audioUnlocked = false, spookySoundActive = true;
+    let spookyRecoveryPending = false, playbackRaf = 0, muted = false;
+    let playbackState = playback, audioContext = { state: "suspended" };
+    function getAudioContext() { return audioContext; }
+    function stopGhostSpookySounds() { spookySoundActive = false; }
+    function unlockAudio() { return new Promise(resolve => { pending.resolve = resolve; }); }
+    function startGhostSpookySounds() { pending.starts++; }
+    function playbackFrame() {}
+    ${handlers}`, {
+      playback, pending, document: { hidden: false },
+      performance: { now: () => 100 },
+      requestAnimationFrame: () => 1, cancelAnimationFrame() {}
+    }, ["noteGhostAudioInterruption", "recoverGhostSpookyAudio"]);
+  api.noteGhostAudioInterruption();
+  api.recoverGhostSpookyAudio({ fromGesture: true });
+  // The child left this playback while the resume promise was pending.
+  playback.running = false;
+  pending.resolve(true);
+  await flush();
+  assert.strictEqual(pending.starts, 0,
+    "An obsolete background resume must not start sounds on another screen");
+}
+
+async function testGhostHangingResumeCanRetryOnNextTap() {
+  const ghost = read("ghost_writer");
+  const code = slice(ghost, "  async function unlockAudio() {", "  async function loadSoundBuffers() {");
+  const timerCallbacks = [];
+  let allowsResume = false;
+  let resumes = 0;
+  const ac = {
+    state: "interrupted", currentTime: 0, destination: {},
+    resume() {
+      resumes++;
+      if (!allowsResume) return new Promise(() => {});
+      this.state = "running";
+      return Promise.resolve();
+    },
+    createOscillator() { return { connect() {}, start() {}, stop() {} }; },
+    createGain() { return { gain: { value: 0 }, connect() {} }; }
+  };
+  class SilentAudio {
+    setAttribute() {}
+    play() { return Promise.resolve(); }
+    pause() {}
+  }
+  const api = run(`let audioUnlocked = false, audioUnlockPromise = null, silenceAudio = null;
+    const AUDIO_UNLOCK_SRC = "silence.mp3";
+    function getAudioContext() { return ac; }
+    function loadSoundBuffers() { return Promise.resolve(); }
+    ${code}`, {
+      ac, Audio: SilentAudio, console: { warn() {} },
+      setTimeout: callback => { timerCallbacks.push(callback); return timerCallbacks.length; },
+      clearTimeout() {}
+    }, ["unlockAudio"]);
+  const first = api.unlockAudio();
+  assert.strictEqual(resumes, 1);
+  assert.strictEqual(timerCallbacks.length, 1);
+  timerCallbacks[0]();
+  assert.strictEqual(await first, false, "A pending iOS resume must time out, not block future taps");
+  allowsResume = true;
+  assert.strictEqual(await api.unlockAudio(), true);
+  assert.strictEqual(resumes, 2, "Next tap must attempt a new resume()");
+}
+
+function testGhostInterruptedSourceRequiresRecovery() {
+  const ghost = read("ghost_writer");
+  const code = slice(ghost,
+    "  function playNextGhostSpookySound(token) {",
+    "  function startGhostSpookySounds() {");
+  const calls = [];
+  const api = run(`let spookySoundActive = true, spookySoundToken = 4, muted = false;
+    function getAudioContext() { return { state: "interrupted" }; }
+    function noteGhostAudioInterruption() { calls.push("recovery"); }
+    function chooseGhostSpookySoundKey() { calls.push("choose"); return "spooky1"; }
+    ${code}`, { calls }, ["playNextGhostSpookySound"]);
+  api.playNextGhostSpookySound(4);
+  assert.deepStrictEqual(calls, ["recovery"],
+    "Suspended sources must not silently consume spooky cues");
+}
+
+async function testGhostDeferredSoundStartAfterBlockedReplay() {
+  const code = slice(read("ghost_writer"),
+    "  function startGhostSpookySounds() {",
+    "  // App switching can leave");
+  const calls = [];
+  const audio = { state: "interrupted" };
+  const api = run(`let spookySoundActive = false, spookySoundToken = 0;
+    let spookySoundQueue = [], spookyRecoveryPending = false;
+    let muted = false, audioUnlockPromise = null;
+    function stopGhostSpookySounds() { spookySoundActive = false; spookySoundToken++; calls.push("stop"); }
+    function getAudioContext() { return audio; }
+    function loadSoundBuffers() { calls.push("load"); return Promise.resolve(); }
+    function playNextGhostSpookySound() { calls.push("play"); }
+    ${code}
+    function flags() { return { spookyRecoveryPending, spookySoundActive }; }
+    function gestureResume(promise) { audioUnlockPromise = promise; }
+  `, { calls, audio, document: { hidden: false } },
+    ["startGhostSpookySounds", "flags", "gestureResume"]);
+
+  api.startGhostSpookySounds();
+  await flush();
+  assert.strictEqual(api.flags().spookyRecoveryPending, true,
+    "A failed deferred Replay start must remain retryable");
+  assert.strictEqual(api.flags().spookySoundActive, false);
+  assert.strictEqual(calls.includes("play"), false);
+
+  audio.state = "suspended";
+  api.gestureResume(Promise.resolve(true));
+  api.startGhostSpookySounds();
+  audio.state = "running";
+  await flush();
+  await flush();
+  assert.strictEqual(calls.filter(x => x === "play").length, 1,
+    "The gesture's pending resume should be reused after requestAnimationFrame");
+}
+
+async function testGhostDeferredRejectedResumeKeepsRecovery() {
+  const code = slice(read("ghost_writer"),
+    "  function startGhostSpookySounds() {",
+    "  // App switching can leave");
+  const audio = { state: "interrupted" };
+  const api = run(`let spookySoundActive = false, spookySoundToken = 0;
+    let spookySoundQueue = [], spookyRecoveryPending = false;
+    let muted = false, audioUnlockPromise = Promise.resolve(false);
+    function stopGhostSpookySounds() { spookySoundActive = false; spookySoundToken++; }
+    function getAudioContext() { return audio; }
+    function loadSoundBuffers() { throw new Error("must not load"); }
+    function playNextGhostSpookySound() { throw new Error("must not play"); }
+    ${code}
+    function flags() { return { spookyRecoveryPending, spookySoundActive }; }
+  `, { audio, document: { hidden: false } }, ["startGhostSpookySounds", "flags"]);
+  api.startGhostSpookySounds();
+  await flush();
+  assert.strictEqual(api.flags().spookyRecoveryPending, true,
+    "A rejected Resume during Replay must not permanently silence the next tap");
+}
+
 function testSourceGuards() {
   const ghost = read("ghost_writer");
   const typer = read("verse_typer");
@@ -164,15 +370,21 @@ function testSourceGuards() {
   assert.match(wheel, /offerSpokenAudioRetry\("Tap to hear the reference"/);
   assert.match(wheel, /void unlockAudio\(\);\s*void playVerseIntro\(\);/);
   const worker = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
-  assert.match(worker, /2026_Oct_16_playground_audio_sequence_t/);
+  assert.match(worker, /2026_Oct_16_ghost_audio_gesture_recovery_v/);
 }
 
 async function main() {
   await testGhostUnlockOnGestureAndRetry();
+  await testGhostBackgroundPausesPlaybackAndRecoversSound();
+  await testGhostStaleReplayCannotRestartSounds();
+  await testGhostHangingResumeCanRetryOnNextTap();
+  testGhostInterruptedSourceRequiresRecovery();
+  await testGhostDeferredSoundStartAfterBlockedReplay();
+  await testGhostDeferredRejectedResumeKeepsRecovery();
   await testTyperSilentPrimeIsDirectAndRetryable();
   await testTyperRecordedVerseRetry();
   await testWheelRecordedVerseDirectAndBlockedResult();
   testSourceGuards();
-  console.log("Patch 14 audio sequencing validation passed (5 checks).");
+  console.log("Patch 14 audio sequencing validation passed (11 checks).");
 }
 main().catch(err => { console.error(err); process.exitCode = 1; });

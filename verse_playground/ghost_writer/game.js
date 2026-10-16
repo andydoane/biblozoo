@@ -75,7 +75,7 @@
     on: { label: "On" },
     off: { label: "Off" }
   };
-  
+
 
   const COLOR_PALETTE = {
     red: { label: "Red", value: "#ff5a51" },
@@ -728,6 +728,7 @@
   let audioContext = null;
   let audioUnlocked = false;
   let audioUnlockPromise = null;
+  let spookyRecoveryPending = false;
   let silenceAudio = null;
   let soundLoadPromise = null;
   let uiSoundFlip = false;
@@ -805,6 +806,12 @@
   }
 
   function getAudioContext() {
+    // A closed iOS audio context cannot be resumed. A later genuine gesture
+    // may create a new one while retaining the already decoded sound buffers.
+    if (audioContext?.state === "closed") {
+      audioContext = null;
+      audioUnlocked = false;
+    }
     if (audioContext) return audioContext;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -815,6 +822,7 @@
 
     try {
       audioContext = new AudioContextClass();
+      audioContext.addEventListener?.("statechange", onGhostAudioStateChange);
       return audioContext;
     } catch (err) {
       console.warn("Ghost Writer could not create audio context", err);
@@ -865,8 +873,17 @@
           // Retry on the next Start, button tap, or drawing gesture.
         }
 
-        await resumePromise;
-        audioUnlocked = ac.state === "running";
+        // On iOS, resume() can remain pending throughout an interruption.
+        // Release this attempt so a later real tap can issue a fresh resume().
+        let resumeTimeoutId = 0;
+        const resumed = await Promise.race([
+          Promise.resolve(resumePromise).then(() => true, () => false),
+          new Promise(resolve => {
+            resumeTimeoutId = setTimeout(() => resolve(false), 1200);
+          })
+        ]);
+        if (resumeTimeoutId) clearTimeout(resumeTimeoutId);
+        audioUnlocked = resumed && ac.state === "running";
         if (audioUnlocked) void loadSoundBuffers();
         return audioUnlocked;
       } catch (err) {
@@ -970,6 +987,8 @@
   }
 
   function playUiTapSound() {
+    // Recover an interrupted spooky sequence on the child's next tap.
+    recoverGhostSpookyAudio({ fromGesture: true });
     // Run the unlock path before the async sound-buffer work on this tap.
     void unlockAudio();
     const key = uiSoundFlip ? "uiTap2" : "uiTap1";
@@ -1065,6 +1084,10 @@
     const ac = getAudioContext();
 
     if (!ac) return;
+    if (ac.state !== "running") {
+      noteGhostAudioInterruption();
+      return;
+    }
 
     const key = chooseGhostSpookySoundKey();
     const buffer = key ? soundBuffers.get(key) : null;
@@ -1106,22 +1129,109 @@
     if (muted) return;
 
     spookySoundActive = true;
+    spookyRecoveryPending = false;
     spookySoundToken += 1;
     spookySoundQueue = [];
 
     const token = spookySoundToken;
 
     void (async () => {
-      const unlocked = await unlockAudio();
+      // Playback starts in requestAnimationFrame, outside the Replay tap.
+      // Reuse the resume started by that tap, but never issue a fresh resume
+      // here: on iOS that can block the next actual user gesture.
+      const ac = getAudioContext();
+      const unlocked = ac?.state === "running"
+        ? true
+        : audioUnlockPromise
+          ? await audioUnlockPromise
+          : false;
 
-      if (!unlocked || !spookySoundActive || token !== spookySoundToken || muted) return;
+      if (!spookySoundActive || token !== spookySoundToken || muted) return;
+      if (!unlocked || ac?.state !== "running") {
+        // The interrupted context may be restored by a later real tap.
+        // Keep this recovery pending rather than silently losing the queue.
+        spookyRecoveryPending = true;
+        stopGhostSpookySounds();
+        return;
+      }
 
       await loadSoundBuffers();
 
-      if (!spookySoundActive || token !== spookySoundToken || muted) return;
-
+      if (!spookySoundActive || token !== spookySoundToken || muted || document.hidden) return;
       playNextGhostSpookySound(token);
     })();
+  }
+
+  // App switching can leave a started AudioBufferSource waiting forever for
+  // onended, so invalidate that source and recreate the spooky sound queue.
+  // Do not play sounds while the app is hidden or restart an earlier replay.
+  function noteGhostAudioInterruption() {
+    audioUnlocked = false;
+    if (spookySoundActive) {
+      spookyRecoveryPending = true;
+      stopGhostSpookySounds();
+    }
+  }
+
+  function recoverGhostSpookyAudio({ fromGesture = false } = {}) {
+    if (document.hidden || !spookyRecoveryPending) return;
+    const ps = playbackState;
+    if (!ps?.running || ps.options.spookySounds === "off" || muted) {
+      spookyRecoveryPending = false;
+      return;
+    }
+    if (ps.backgroundPausedAt !== null) return;
+
+    const ac = getAudioContext();
+    if (!ac) return;
+    // Foreground events are not gestures. A resume() started there can remain
+    // pending and steal the next Replay tap's only chance to unlock audio.
+    // Resume without a tap only if iOS has already restored the context.
+    if (!fromGesture && ac.state !== "running") return;
+
+    // From a real tap, call resume() synchronously, before click/render work.
+    const recovered = ac.state === "running"
+      ? Promise.resolve(true)
+      : unlockAudio();
+    void recovered.then(ok => {
+      if (!ok || document.hidden || playbackState !== ps || !ps.running || !spookyRecoveryPending) return;
+      if (getAudioContext()?.state !== "running") return;
+      spookyRecoveryPending = false;
+      startGhostSpookySounds();
+    });
+  }
+
+  function onGhostAudioStateChange() {
+    if (!audioContext || audioContext.state !== "running") {
+      noteGhostAudioInterruption();
+      return;
+    }
+    audioUnlocked = true;
+    recoverGhostSpookyAudio();
+  }
+
+  function pauseGhostPlaybackForBackground() {
+    noteGhostAudioInterruption();
+    const ps = playbackState;
+    if (!ps?.running || ps.backgroundPausedAt !== null) return;
+    ps.backgroundPausedAt = performance.now();
+    if (playbackRaf) {
+      cancelAnimationFrame(playbackRaf);
+      playbackRaf = 0;
+    }
+  }
+
+  function restoreGhostPlaybackFromBackground() {
+    if (document.hidden) return;
+    const ps = playbackState;
+    if (ps?.running && ps.backgroundPausedAt !== null) {
+      const elapsed = Math.max(0, performance.now() - ps.backgroundPausedAt);
+      ps.backgroundPausedAt = null;
+      ps.charStart += elapsed;
+      if (ps.pauseUntil) ps.pauseUntil += elapsed;
+      if (!playbackRaf) playbackRaf = requestAnimationFrame(playbackFrame);
+    }
+    recoverGhostSpookyAudio();
   }
 
   function escapeHtml(value) {
@@ -2614,7 +2724,7 @@
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               ${selectOptionHtml("ghostExportSizeSelect", "Picture Shape", state.remix.exportSize || "square", EXPORT_SIZES)}
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
-              
+
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
           </div>
@@ -5682,6 +5792,7 @@
 
     playbackState = {
       running: true,
+      backgroundPausedAt: null,
       c,
       width: rect.width,
       height: rect.height,
@@ -5787,6 +5898,11 @@
   function playbackFrame(now) {
     const ps = playbackState;
     if (!ps || !ps.running) return;
+    if (document.hidden) {
+      pauseGhostPlaybackForBackground();
+      return;
+    }
+    if (ps.backgroundPausedAt !== null) return;
 
     const placements = ps.placements;
 
@@ -5817,6 +5933,7 @@
       stopGhostSpookySounds({ finishCurrent: true });
 
       const done = ps.onDone;
+      spookyRecoveryPending = false;
       playbackState = null;
       playbackRaf = 0;
 
@@ -6178,6 +6295,7 @@
   }
 
   function stopPlayback() {
+    spookyRecoveryPending = false;
     stopGhostSpookySounds();
 
     if (playbackState) {
@@ -6314,6 +6432,20 @@
       guideTimer = null;
     }
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseGhostPlaybackForBackground();
+    else restoreGhostPlaybackFromBackground();
+  });
+  window.addEventListener("pagehide", pauseGhostPlaybackForBackground);
+  window.addEventListener("pageshow", restoreGhostPlaybackFromBackground);
+  window.addEventListener("focus", restoreGhostPlaybackFromBackground);
+
+  // Capture the next genuine interaction before any async click/render work.
+  // Keyboard activation is covered by the regular playUiTapSound() handler.
+  app.addEventListener("pointerdown", () => {
+    recoverGhostSpookyAudio({ fromGesture: true });
+  }, { capture: true });
 
   window.addEventListener("resize", () => {
     if (state.screen === "remix") drawRemixPreview();
