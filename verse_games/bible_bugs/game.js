@@ -157,6 +157,14 @@
 
   let audioCtx = null;
   let audioUnlocked = false;
+  let audioUnlockPromise = null;
+  let audioUnlockAttempt = 0;
+  // iOS can foreground the WebView before another app has released audio output.
+  let audioForegroundRecoveryPending = false;
+  let audioForegroundRecoveryTimer = 0;
+  let audioForegroundRecoveryGeneration = 0;
+  let audioForegroundRecoveryInFlight = false;
+  let audioForegroundFreshContextOnGesture = false;
   let silenceAudio = null;
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
@@ -282,46 +290,180 @@
     return silenceAudio;
   }
 
-  async function unlockAudio() {
-    const ctx = getAudioContext();
-    if (!ctx) return false;
-
-    try {
-      const silent = ensureSilenceAudio();
-      silent.currentTime = 0;
-
-      const silentPlay = silent.play();
-      if (silentPlay && typeof silentPlay.catch === "function") {
-        silentPlay.catch(() => { });
-      }
-    } catch (err) {
-      // Best effort only.
+  function unlockAudio() {
+    // A real gesture takes priority over an automatic foreground refresh.
+    if (audioForegroundRecoveryInFlight) {
+      audioForegroundRecoveryGeneration += 1;
+      audioForegroundRecoveryInFlight = false;
+      audioForegroundFreshContextOnGesture = true;
     }
-
-    try {
-      if (ctx.state === "suspended") {
-        await ctx.resume();
+    let ctx = getAudioContext();
+    if (!ctx) return Promise.resolve(false);
+    // A previous post-foreground refresh failed: a genuine gesture is the
+    // safest opportunity to replace an iOS context whose output is stuck.
+    if (audioForegroundFreshContextOnGesture) {
+      audioForegroundFreshContextOnGesture = false;
+      const oldCtx = ctx;
+      audioCtx = null;
+      ctx = getAudioContext();
+      if (!ctx) {
+        audioCtx = oldCtx;
+        return Promise.resolve(false);
       }
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      gain.gain.value = 0.0001;
-      osc.frequency.value = 440;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.03);
-
-      audioUnlocked = true;
-      preloadSoundBuffers();
-
-      return true;
-    } catch (err) {
-      return false;
+      try {
+        const close = oldCtx.close?.();
+        if (close && typeof close.catch === "function") close.catch(() => {});
+      } catch (err) { /* Old context cleanup must never block playback. */ }
     }
+    if (audioUnlocked && ctx.state === "running" && !audioForegroundRecoveryPending) return Promise.resolve(true);
+    if (audioUnlockPromise) return audioUnlockPromise;
+
+    // iOS may report "interrupted", or leave resume() unsettled after task switching.
+    // Request Web Audio immediately in the gesture, before awaiting any media work.
+    audioUnlocked = false;
+    const attempt = ++audioUnlockAttempt;
+    let timeoutId = 0;
+    audioUnlockPromise = (async () => {
+      try {
+        const resume = ctx.state === "running" ? Promise.resolve() : ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        gain.gain.value = 0.0001;
+        osc.frequency.value = 440;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        // Release short-lived priming nodes after their 30 ms tone.
+        osc.onended = () => {
+          try { osc.disconnect(); } catch (err) { /* Cleanup only. */ }
+          try { gain.disconnect(); } catch (err) { /* Cleanup only. */ }
+        };
+        osc.start();
+        osc.stop(ctx.currentTime + 0.03);
+        // Decode sound files concurrently with resume, so early gameplay
+        // effects do not wait until the unlock promise has settled.
+        preloadSoundBuffers();
+
+        try {
+          const silent = ensureSilenceAudio();
+          silent.currentTime = 0;
+          const play = silent.play();
+          if (play && typeof play.then === "function") {
+            play.then(() => {
+              silent.pause();
+              silent.currentTime = 0;
+            }).catch(() => { /* Optional HTML prime may be blocked. */ });
+          }
+        } catch (err) { /* Web Audio can still unlock. */ }
+
+        // Do not let an indefinitely pending iOS resume block later gestures.
+        await Promise.race([
+          Promise.resolve(resume).catch(() => false),
+          new Promise(resolve => { timeoutId = setTimeout(() => resolve(false), 1000); })
+        ]);
+        if (attempt !== audioUnlockAttempt) return false;
+        audioUnlocked = ctx.state === "running";
+        // A failed automatic foreground refresh is recoverable on this tap.
+        if (audioUnlocked && !audioForegroundRecoveryTimer) {
+          audioForegroundRecoveryPending = false;
+        }
+        return audioUnlocked;
+      } catch (err) {
+        if (attempt === audioUnlockAttempt) audioUnlocked = false;
+        return false;
+      } finally {
+        clearTimeout(timeoutId);
+        if (attempt === audioUnlockAttempt) audioUnlockPromise = null;
+      }
+    })();
+    return audioUnlockPromise;
   }
+
+  // Retry from genuine touches/keys; never rely on automatic game-timer sounds
+  // to reauthorize playback after iOS interrupts the audio context.
+  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  function markAudioBackgrounded() {
+    if (!audioCtx) return;
+    audioForegroundRecoveryPending = true;
+    audioForegroundRecoveryGeneration += 1;
+    audioForegroundRecoveryInFlight = false;
+    clearTimeout(audioForegroundRecoveryTimer);
+    audioForegroundRecoveryTimer = 0;
+    audioUnlocked = false;
+    audioUnlockAttempt += 1;
+    audioUnlockPromise = null;
+  }
+
+  // A short delay gives iOS time to release another app's media session.
+  // The context may say "running" even though its audio clock/output stalled.
+  function scheduleForegroundAudioRecovery() {
+    if (!audioCtx || !audioForegroundRecoveryPending || document.hidden) return;
+    const generation = ++audioForegroundRecoveryGeneration;
+    clearTimeout(audioForegroundRecoveryTimer);
+    audioForegroundRecoveryTimer = setTimeout(() => {
+      audioForegroundRecoveryTimer = 0;
+      void refreshForegroundAudio(generation);
+    }, 650);
+  }
+
+  async function refreshForegroundAudio(generation) {
+    const ctx = audioCtx;
+    if (!ctx || document.hidden || generation !== audioForegroundRecoveryGeneration) return;
+    audioForegroundRecoveryInFlight = true;
+    audioUnlocked = false;
+    audioUnlockAttempt += 1;
+    audioUnlockPromise = null;
+
+    const settle = (promise, ms) => new Promise(resolve => {
+      const timeout = setTimeout(() => resolve(false), ms);
+      Promise.resolve(promise).then(
+        () => { clearTimeout(timeout); resolve(true); },
+        () => { clearTimeout(timeout); resolve(false); }
+      );
+    });
+    let restored = false;
+    try {
+      // Recycle even a nominally "running" context: iOS can retain that
+      // state when a rapid return leaves hardware playback stalled.
+      let cycled = ctx.state !== "running";
+      if (!cycled) {
+        await settle(ctx.suspend(), 600);
+        cycled = ctx.state === "suspended" || ctx.state === "interrupted";
+      }
+      if (generation !== audioForegroundRecoveryGeneration || document.hidden || audioCtx !== ctx) {
+        if (generation === audioForegroundRecoveryGeneration) audioForegroundRecoveryInFlight = false;
+        return;
+      }
+      if (cycled && (ctx.state === "suspended" || ctx.state === "interrupted")) {
+        await settle(ctx.resume(), 900);
+      }
+      if (generation !== audioForegroundRecoveryGeneration || document.hidden || audioCtx !== ctx) {
+        if (generation === audioForegroundRecoveryGeneration) audioForegroundRecoveryInFlight = false;
+        return;
+      }
+      if (cycled && ctx.state === "running") {
+        const clockBefore = ctx.currentTime;
+        await new Promise(resolve => setTimeout(resolve, 90));
+        // A running-but-frozen Web Audio clock is not a successful recovery.
+        restored = ctx.state === "running" && ctx.currentTime > clockBefore + 0.001;
+      }
+    } catch (err) { /* A future user gesture can retry recovery. */ }
+    if (generation === audioForegroundRecoveryGeneration) audioForegroundRecoveryInFlight = false;
+    if (generation !== audioForegroundRecoveryGeneration || document.hidden || audioCtx !== ctx) return;
+    audioUnlocked = restored;
+    audioForegroundRecoveryPending = !restored;
+    audioForegroundFreshContextOnGesture = !restored;
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) markAudioBackgrounded();
+    else scheduleForegroundAudioRecovery();
+  });
+  window.addEventListener("blur", markAudioBackgrounded);
+  window.addEventListener("focus", scheduleForegroundAudioRecovery);
+  window.addEventListener("pageshow", scheduleForegroundAudioRecovery);
 
   function soundVolume(key) {
     const master = Number(SOUND_TUNING.masterVolume);
@@ -388,12 +530,14 @@
     if (!ctx) return;
 
     try {
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
+      if (audioForegroundRecoveryPending) return;
+      // A delayed/timer-triggered sound must not try to unlock iOS audio.
+      // If the current gesture is still unlocking, share its result.
+      if (audioUnlockPromise && !(await audioUnlockPromise)) return;
+      if (ctx.state !== "running") return;
 
       const buffer = await loadSoundBuffer(key);
-      if (!buffer) return;
+      if (!buffer || ctx.state !== "running") return;
 
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
@@ -919,6 +1063,8 @@
     if (!field) return;
 
     field.addEventListener("pointerdown", (event) => {
+      // A bug tap must request recovery before its tongue/pop sequence.
+      void unlockAudio();
       if (state.bonusScoreRevealActive) {
         event.preventDefault();
         continueAfterBonusScoreReveal();
