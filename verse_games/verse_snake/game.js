@@ -243,6 +243,7 @@
   let miniSnakeHeadSvgPromise = null;
   let audioContext = null;
   let audioUnlocked = false;
+  let audioUnlockPromise = null;
   let silenceAudio = null;
   let uiTapToggle = false;
   let orbToneIndex = 0;
@@ -498,16 +499,30 @@
 
   function unlockAudio() {
     const ctx = getAudioContext();
-
-    if (
-      audioUnlocked &&
-      ctx &&
-      ctx.state === "running"
-    ) {
+    if (!ctx || ctx.state === "closed") return Promise.resolve(false);
+    if (ctx.state === "running") {
+      audioUnlocked = true;
+      preloadSoundBuffers();
       return Promise.resolve(true);
     }
+    if (audioUnlockPromise) return audioUnlockPromise;
 
-    const tasks = [];
+    audioUnlocked = false;
+    // Request resume BEFORE waiting for any HTML media or network work.
+    // iOS requires this call to happen during the original user gesture.
+    let resume;
+    try {
+      resume = ctx.resume();
+      const source = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.start(0);
+      source.stop(ctx.currentTime + 0.03);
+    } catch (err) {
+      return Promise.resolve(false);
+    }
 
     try {
       if (!silenceAudio) {
@@ -516,60 +531,52 @@
         silenceAudio.volume = 0.001;
         silenceAudio.muted = false;
       }
-
       silenceAudio.currentTime = 0;
-      tasks.push(
-        silenceAudio
-          .play()
-          .catch(() => false)
-      );
-    } catch (_) { }
-
-    if (ctx) {
-      if (
-        ctx.state !== "running" &&
-        ctx.state !== "closed"
-      ) {
-        try {
-          const resumePromise = ctx.resume();
-
-          if (
-            resumePromise &&
-            typeof resumePromise.then === "function"
-          ) {
-            tasks.push(
-              resumePromise.catch(() => false)
-            );
-          }
-        } catch (_) { }
-      }
-
-      try {
-        const source = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        gain.gain.value = 0.0001;
-        source.connect(gain);
-        gain.connect(ctx.destination);
-        source.start(0);
-        source.stop(ctx.currentTime + 0.03);
-      } catch (_) { }
+      const silentPlay = silenceAudio.play();
+      Promise.resolve(silentPlay).then(() => {
+        silenceAudio.pause();
+        silenceAudio.currentTime = 0;
+      }).catch(() => {});
+    } catch (err) {
+      // HTML priming is optional; it must never block Web Audio unlocking.
     }
 
-    return Promise.all(tasks)
-      .catch(() => [])
-      .then(() => {
-        audioUnlocked =
-          !!ctx &&
-          ctx.state === "running";
-
-        if (audioUnlocked) {
-          preloadSoundBuffers();
-        }
-
-        return audioUnlocked;
-      });
+    const pending = new Promise(resolve => {
+      let settled = false;
+      const finish = success => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        audioUnlocked = success && ctx.state === "running";
+        if (audioUnlocked) preloadSoundBuffers();
+        resolve(audioUnlocked);
+      };
+      // An interrupted iOS resume may never settle. The next tap must retry.
+      const timeout = setTimeout(() => finish(false), 1200);
+      Promise.resolve(resume).then(
+        () => finish(ctx.state === "running"),
+        () => finish(false)
+      );
+    });
+    audioUnlockPromise = pending;
+    void pending.then(() => {
+      if (audioUnlockPromise === pending) audioUnlockPromise = null;
+    });
+    return pending;
   }
+
+  // Capture the next legitimate gesture after an iOS audio interruption,
+  // including a Menu/Remix tap that does not reach the playing field.
+  function recoverSnakeAudioOnGesture() {
+    if (!audioContext || audioContext.state !== "running") void unlockAudio();
+  }
+  document.addEventListener("pointerdown", recoverSnakeAudioOnGesture, true);
+  document.addEventListener("keydown", recoverSnakeAudioOnGesture, true);
+  document.addEventListener("click", recoverSnakeAudioOnGesture, true);
+  if (!window.PointerEvent) document.addEventListener("touchstart", recoverSnakeAudioOnGesture, true);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) audioUnlocked = false;
+  });
 
   function loadSoundBuffer(key) {
     const src = SOUND_FILES[key];
@@ -600,7 +607,8 @@
         soundBuffers.set(key, buffer);
         return buffer;
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => soundLoadPromises.delete(key));
 
     soundLoadPromises.set(key, promise);
     return promise;
@@ -621,9 +629,8 @@
     loadSoundBuffer(key).then((buffer) => {
       if (!buffer || muted) return;
 
-      if (ctx.state === "suspended") {
-        ctx.resume().catch(() => { });
-      }
+      // Non-gesture sound effects must not issue an iOS resume themselves.
+      if (ctx.state !== "running") return;
 
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
@@ -647,9 +654,7 @@
     const ctx = getAudioContext();
     if (!ctx) return;
 
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => { });
-    }
+    if (ctx.state !== "running") return;
 
     const notes = ORB_TONE_TUNING.notes;
     const note = notes[orbToneIndex % notes.length];

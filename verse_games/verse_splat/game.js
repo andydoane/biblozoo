@@ -206,6 +206,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const VerseSplatAudioContext = window.AudioContext || window.webkitAudioContext;
   let verseSplatAudioContext = null;
   let verseSplatAudioUnlocked = false;
+  let verseSplatAudioResumePromise = null;
 
   const VERSE_SPLAT_SOUND_COOLDOWNS = {
     uiTap: 80,
@@ -246,17 +247,41 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
 
   function resumeVerseSplatAudioContext(){
     const ctx = getVerseSplatAudioContext();
-    if (!ctx) return null;
+    if (!ctx || ctx.state === "closed") return null;
+    if (ctx.state === "running") {
+      verseSplatAudioUnlocked = true;
+      return ctx;
+    }
 
+    verseSplatAudioUnlocked = false;
+    if (verseSplatAudioResumePromise) return ctx;
     try {
-      if (ctx.state === "suspended" || ctx.state === "interrupted"){
-        const resumePromise = ctx.resume();
-        if (resumePromise && typeof resumePromise.catch === "function"){
-          resumePromise.catch(() => {});
-        }
-      }
-    } catch (err) {}
-
+      // Called synchronously from pointerdown/key events when needed.
+      const request = ctx.resume();
+      // A native interruption can leave resume() unsettled indefinitely.
+      // Bound that attempt so a later real gesture can call resume() again.
+      const pending = new Promise(resolve => {
+        let settled = false;
+        const finish = success => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          verseSplatAudioUnlocked = success && ctx.state === "running";
+          resolve(verseSplatAudioUnlocked);
+        };
+        const timeout = setTimeout(() => finish(false), 1200);
+        Promise.resolve(request).then(
+          () => finish(ctx.state === "running"),
+          () => finish(false)
+        );
+      });
+      verseSplatAudioResumePromise = pending;
+      void pending.then(() => {
+        if (verseSplatAudioResumePromise === pending) verseSplatAudioResumePromise = null;
+      });
+    } catch (err) {
+      verseSplatAudioUnlocked = false;
+    }
     return ctx;
   }
 
@@ -345,21 +370,26 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function unlockVerseSplatAudio(){
-    const wasUnlocked = verseSplatAudioUnlocked;
-
-    verseSplatAudioUnlocked = true;
-    resumeVerseSplatAudioContext();
-
-    if (wasUnlocked) return;
-
-    Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(file => {
-      primeVerseSplatSound(file);
-    });
+    const ctx = resumeVerseSplatAudioContext();
+    // Do not label an interrupted or suspended context as unlocked.
+    verseSplatAudioUnlocked = !!ctx && ctx.state === "running";
+    if (!verseSplatAudioPrimed) {
+      verseSplatAudioPrimed = true;
+      Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(file => {
+        primeVerseSplatSound(file);
+      });
+    }
   }
 
-  document.addEventListener("pointerdown", unlockVerseSplatAudio, { capture:true, once:true });
-  document.addEventListener("touchstart", unlockVerseSplatAudio, { capture:true, once:true });
-  document.addEventListener("keydown", unlockVerseSplatAudio, { capture:true, once:true });
+  let verseSplatAudioPrimed = false;
+  // Keep these listeners after the first gesture so iOS interruptions recover.
+  document.addEventListener("pointerdown", unlockVerseSplatAudio, true);
+  document.addEventListener("keydown", unlockVerseSplatAudio, true);
+  document.addEventListener("click", unlockVerseSplatAudio, true);
+  if (!window.PointerEvent) document.addEventListener("touchstart", unlockVerseSplatAudio, true);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) verseSplatAudioUnlocked = false;
+  });
 
   function chooseVerseSplatSound(groupName){
     const group = VERSE_SPLAT_SOUNDS[groupName];
@@ -417,9 +447,10 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     const cooldownMs = Math.max(0, Number(options.cooldownMs || 0));
 
     try {
-      unlockVerseSplatAudio();
-
-      const ctx = resumeVerseSplatAudioContext();
+      // Only genuine capture-phase user input may request iOS audio resume.
+      // A scheduled blob sound must not create a hanging resume request.
+      const ctx = getVerseSplatAudioContext();
+      if (ctx && ctx.state !== "running" && !verseSplatAudioResumePromise) return;
 
       if (ctx){
         const buffer = verseSplatAudioBufferCache.get(src);
@@ -3512,6 +3543,8 @@ function spawnWrongFaceParticleBurst(){
     if (!state.bonusIntroVisible && !state.bonusEnding) startBonusLoop();
   }
 
+  // Warm up decoded Web Audio buffers before the child's first Start tap.
+  Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
   initVerseData();
   render();
 })();

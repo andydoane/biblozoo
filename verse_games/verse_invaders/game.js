@@ -220,6 +220,7 @@
   let audioCtx = null;
   let silenceAudio = null;
   let audioUnlocked = false;
+  let audioUnlockPromise = null;
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
@@ -339,46 +340,78 @@
     return silenceAudio;
   }
 
-  async function unlockAudio() {
+  function unlockAudio() {
     const ctx = getAudioContext();
-    if (!ctx) return false;
-
-    try {
-      const silent = ensureSilenceAudio();
-      silent.currentTime = 0;
-
-      const silentPlay = silent.play();
-      if (silentPlay && typeof silentPlay.catch === "function") {
-        silentPlay.catch(() => { });
-      }
-    } catch (err) {
-      // Best effort only.
+    if (!ctx || ctx.state === "closed") return Promise.resolve(false);
+    if (ctx.state === "running") {
+      audioUnlocked = true;
+      preloadSoundBuffers();
+      return Promise.resolve(true);
     }
+    if (audioUnlockPromise) return audioUnlockPromise;
 
+    audioUnlocked = false;
+    let resume;
     try {
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
-
+      // Resume and the silent oscillator both start in the tap call stack.
+      resume = ctx.resume();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
       gain.gain.value = 0.0001;
       osc.frequency.value = 440;
       osc.connect(gain);
       gain.connect(ctx.destination);
-
       osc.start();
       osc.stop(ctx.currentTime + 0.03);
-
-      audioUnlocked = true;
-      preloadSoundBuffers();
-
-      return true;
     } catch (err) {
-      return false;
+      return Promise.resolve(false);
     }
+
+    try {
+      const silent = ensureSilenceAudio();
+      silent.currentTime = 0;
+      const playback = silent.play();
+      Promise.resolve(playback).then(() => {
+        silent.pause();
+        silent.currentTime = 0;
+      }).catch(() => {});
+    } catch (err) {
+      // HTML priming is optional, never a prerequisite for Web Audio.
+    }
+
+    const pending = new Promise(resolve => {
+      let settled = false;
+      const finish = success => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        audioUnlocked = success && ctx.state === "running";
+        if (audioUnlocked) preloadSoundBuffers();
+        resolve(audioUnlocked);
+      };
+      const timeout = setTimeout(() => finish(false), 1200);
+      Promise.resolve(resume).then(
+        () => finish(ctx.state === "running"),
+        () => finish(false)
+      );
+    });
+    audioUnlockPromise = pending;
+    void pending.then(() => {
+      if (audioUnlockPromise === pending) audioUnlockPromise = null;
+    });
+    return pending;
   }
+
+  function recoverInvadersAudioOnGesture() {
+    if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
+  }
+  document.addEventListener("pointerdown", recoverInvadersAudioOnGesture, true);
+  document.addEventListener("keydown", recoverInvadersAudioOnGesture, true);
+  document.addEventListener("click", recoverInvadersAudioOnGesture, true);
+  if (!window.PointerEvent) document.addEventListener("touchstart", recoverInvadersAudioOnGesture, true);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) audioUnlocked = false;
+  });
 
   function soundVolume(key) {
     const master = Number(SOUND_TUNING.masterVolume);
@@ -445,12 +478,11 @@
     if (!ctx) return;
 
     try {
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
-
+      // Timed game effects may fire without a user gesture. Resume only
+      // from the capture listener or explicit Start/Select interaction.
+      if (ctx.state !== "running") return;
       const buffer = await loadSoundBuffer(key);
-      if (!buffer) return;
+      if (!buffer || muted || ctx.state !== "running") return;
 
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
@@ -469,7 +501,10 @@
   function playUiTapSound() {
     const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
     state.uiSoundFlip = !state.uiSoundFlip;
-    playGameSound(key, "uiTap");
+    // Preserve the sound from the tap that reactivates an interrupted context.
+    void unlockAudio().then(unlocked => {
+      if (unlocked && !muted) void playGameSound(key, "uiTap");
+    });
   }
 
   function playRandomBonusPopSound() {

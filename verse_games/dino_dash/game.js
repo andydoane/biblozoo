@@ -313,6 +313,8 @@
   let dinoSvgText = "";
   let audioCtx = null;
   let audioUnlocked = false;
+  let audioUnlockPromise = null;
+  let silenceAudio = null;
   let audioPreloadStarted = false;
   let uiPopToggle = false;
   const audioBuffers = new Map();
@@ -1152,8 +1154,8 @@
         lastAcceptedTapAt = now;
 
         const audioReady =
-          audioUnlocked
-            ? Promise.resolve()
+          audioUnlocked && getAudioContext()?.state === "running"
+            ? Promise.resolve(true)
             : unlockAudio();
 
         tapCount += 1;
@@ -1453,6 +1455,8 @@
 
 
   function renderIntro(){
+    // Fetch and decode short game effects before the first Start tap.
+    preloadSounds();
     stopLoop();
     cleanupResize();
     state.phase = "title";
@@ -3026,10 +3030,9 @@
 
   function preloadSounds() {
     if (audioPreloadStarted) return;
-    audioPreloadStarted = true;
-
     const ctx = getAudioContext();
     if (!ctx) return;
+    audioPreloadStarted = true;
 
     for (const [key, file] of Object.entries(SOUND_FILES)) {
       loadSoundBuffer(key, getSoundUrl(key, file));
@@ -3077,7 +3080,7 @@
           err
         );
 
-        audioBuffers.set(key, null);
+        // Allow later attempts if a resource was temporarily unavailable.
         return null;
       } finally {
         audioBufferPromises.delete(key);
@@ -3089,64 +3092,115 @@
     return loadPromise;
   }
 
-  async function unlockAudio() {
-    if (audioUnlocked) return;
-
+  function unlockAudio() {
     const ctx = getAudioContext();
-    if (!ctx) return;
-
-    try {
-      if (ctx.state === "suspended") await ctx.resume();
-
-      const silence = new Audio(SILENCE_PATH);
-      silence.muted = true;
-      silence.playsInline = true;
-      silence.volume = 0;
-      await silence.play().catch(() => { });
-
+    if (!ctx || ctx.state === "closed") return Promise.resolve(false);
+    if (ctx.state === "running") {
       audioUnlocked = true;
       preloadSounds();
-    } catch (err) {
-      console.warn("Dino Dash audio unlock failed", err);
+      return Promise.resolve(true);
     }
+    if (audioUnlockPromise) return audioUnlockPromise;
+
+    audioUnlocked = false;
+    let resume;
+    try {
+      // iOS must see resume() in the real pointer/key event, not after
+      // silent MP3 playback or other awaited initialization work.
+      resume = ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.03);
+    } catch (err) {
+      return Promise.resolve(false);
+    }
+
+    try {
+      if (!silenceAudio) {
+        silenceAudio = new Audio(SILENCE_PATH);
+        silenceAudio.preload = "auto";
+        silenceAudio.playsInline = true;
+        silenceAudio.volume = 0.001;
+      }
+      silenceAudio.currentTime = 0;
+      const play = silenceAudio.play();
+      Promise.resolve(play).then(() => silenceAudio.pause()).catch(() => {});
+    } catch (err) {
+      // Optional HTML audio prime must not stall or falsely unlock Web Audio.
+    }
+
+    const pending = new Promise(resolve => {
+      let settled = false;
+      const finish = success => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        audioUnlocked = success && ctx.state === "running";
+        if (audioUnlocked) preloadSounds();
+        resolve(audioUnlocked);
+      };
+      const timeout = setTimeout(() => finish(false), 1200);
+      Promise.resolve(resume).then(
+        () => finish(ctx.state === "running"),
+        () => finish(false)
+      );
+    });
+    audioUnlockPromise = pending;
+    void pending.then(() => {
+      if (audioUnlockPromise === pending) audioUnlockPromise = null;
+    });
+    return pending;
   }
+
+  function recoverDinoAudioOnGesture() {
+    if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
+  }
+  document.addEventListener("pointerdown", recoverDinoAudioOnGesture, true);
+  document.addEventListener("keydown", recoverDinoAudioOnGesture, true);
+  document.addEventListener("click", recoverDinoAudioOnGesture, true);
+  if (!window.PointerEvent) document.addEventListener("touchstart", recoverDinoAudioOnGesture, true);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) audioUnlocked = false;
+  });
 
   async function playSound(key, options = {}) {
     if (muted) return;
-
     const ctx = getAudioContext();
-    if (!ctx) return;
-
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => { });
-    }
+    if (!ctx || ctx.state !== "running") return;
 
     const file = SOUND_FILES[key];
     if (!file) return;
-
     const buffer = audioBuffers.get(key) || await loadSoundBuffer(key, getSoundUrl(key, file));
-    if (!buffer) return;
+    if (!buffer || ctx.state !== "running" || muted) return;
 
-    const source = ctx.createBufferSource();
-    const gain = ctx.createGain();
-
-    source.buffer = buffer;
-    gain.gain.value = options.volume ?? 0.85;
-
-    source.connect(gain);
-    gain.connect(ctx.destination);
-
-    source.onended = () => {
-      try { source.disconnect(); } catch (err) { }
-      try { gain.disconnect(); } catch (err) { }
-    };
-
-    source.start(0);
+    try {
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      source.buffer = buffer;
+      gain.gain.value = options.volume ?? 0.85;
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      source.onended = () => {
+        try { source.disconnect(); } catch (err) { }
+        try { gain.disconnect(); } catch (err) { }
+      };
+      source.start(0);
+    } catch (err) {
+      // A dropped sound cue must never interrupt gameplay.
+    }
   }
 
   function playUiSound() {
     uiPopToggle = !uiPopToggle;
-    playSound(uiPopToggle ? "uiPop1" : "uiPop2", { volume: 0.55 });
+    const key = uiPopToggle ? "uiPop1" : "uiPop2";
+    // Don't lose the first pop after an iOS interruption.
+    void unlockAudio().then(unlocked => {
+      if (unlocked && !muted) void playSound(key, { volume: 0.55 });
+    });
   }
 
   function renderHelpOverlay(body){
@@ -3289,7 +3343,11 @@
     if (state.jumpsUsed >= 2) return;
 
     const isDoubleJump = state.jumpsUsed === 1;
-    playSound(isDoubleJump ? "jump2" : "jump");
+    const jumpSound = isDoubleJump ? "jump2" : "jump";
+    // The jump itself stays immediate; only its audio waits for resume.
+    void unlockAudio().then(unlocked => {
+      if (unlocked && !muted) void playSound(jumpSound);
+    });
 
     if (!isDoubleJump) maybeStartBackflip();
 
