@@ -59,6 +59,7 @@
   let masterGain = null;
   let chunkAudio = null;
   let chunkAudioEl = null;
+  let silenceAudioEl = null;
   let audioUnlocked = false;
   let audioUnlockPromise = null;
   let htmlAudioPrimed = false;
@@ -316,96 +317,63 @@
     return chunkAudioEl;
   }
 
-  // iPadOS Safari may not fully enable Web Audio until an HTML audio element
-  // has successfully played from a user gesture. This silent MP3 primes that path.
-
+  // Prime HTML media on the actual tap, independent of the spoken verse
+  // element. Switching screens must not cancel an in-flight silent prime.
   function primeHtmlAudio() {
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
 
-    const audio = createChunkAudioElement();
+    if (!silenceAudioEl) {
+      silenceAudioEl = document.createElement("audio");
+      silenceAudioEl.preload = "auto";
+      silenceAudioEl.playsInline = true;
+      silenceAudioEl.setAttribute("playsinline", "");
+      silenceAudioEl.style.display = "none";
+      document.body.appendChild(silenceAudioEl);
+    }
+    const audio = silenceAudioEl;
 
     htmlAudioPrimePromise = new Promise(resolve => {
-      let done = false;
-      let fallbackId = null;
-
-      const cleanup = () => {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.oncanplay = null;
-        audio.oncanplaythrough = null;
-        if (fallbackId) clearTimeout(fallbackId);
-      };
-
+      let finished = false;
+      let timeoutId = null;
       const finish = (ok, reason) => {
-        if (done) return;
-        done = true;
-        cleanup();
+        if (finished) return;
+        finished = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        audio.onerror = null;
+        // Let the silent file finish naturally once playback has started.
+        if (!ok) audio.pause();
         htmlAudioPrimed = !!ok;
-        htmlAudioPrimePromise = null;
-        audioDebug("html audio prime finish", { ok, reason, htmlAudioPrimed });
+        queueMicrotask(() => { htmlAudioPrimePromise = null; });
+        audioDebug("html audio prime finish", { ok, reason });
         resolve(!!ok);
       };
 
-      const tryPlay = () => {
-        audioDebug("html audio prime tryPlay", {
-          readyState: audio.readyState,
-          networkState: audio.networkState
-        });
-
-        const playPromise = audio.play();
-
-        if (playPromise?.then) {
-          playPromise
-            .then(() => {
-              audioDebug("html audio prime play resolved");
-            })
-            .catch(err => {
-              console.warn("Verse Typer silent audio prime rejected", err);
-              finish(false, "play rejected");
-            });
-        }
-      };
-
       try {
-        audioDebug("html audio prime start", SILENCE_AUDIO_FILE);
-
         audio.pause();
         audio.currentTime = 0;
         audio.muted = false;
         audio.volume = 0.01;
         audio.src = SILENCE_AUDIO_FILE;
+        audio.onerror = () => finish(false, "error");
         audio.load();
-
-        audio.onended = () => finish(true, "ended");
-
-        audio.onerror = () => {
-          console.warn("Verse Typer silent audio prime failed", SILENCE_AUDIO_FILE, audio.error);
-          finish(false, "error");
-        };
-
-        if (audio.readyState >= 3) {
-          tryPlay();
-        } else {
-          audio.oncanplay = tryPlay;
-          audio.oncanplaythrough = tryPlay;
-        }
-
-        fallbackId = setTimeout(() => {
-          if (!done) {
-            audioDebug("html audio prime timeout", {
-              readyState: audio.readyState,
-              networkState: audio.networkState
+        // Do not defer play() to canplay: that event is outside the gesture.
+        const playback = audio.play();
+        if (playback?.then) {
+          playback.then(() => finish(true, "started"))
+            .catch(err => {
+              console.warn("Verse Typer silent audio prime rejected", err);
+              finish(false, "play rejected");
             });
-            finish(false, "timeout");
-          }
-        }, 1800);
+        } else {
+          finish(true, "started");
+        }
+        if (!finished) timeoutId = setTimeout(() => finish(false, "timeout"), 1800);
       } catch (err) {
         console.warn("Verse Typer silent audio prime exception", err);
         finish(false, "exception");
       }
     });
-
     return htmlAudioPrimePromise;
   }
 
@@ -2756,8 +2724,7 @@
         audio.pause();
         audio.removeAttribute("src");
         audio.load();
-        htmlAudioPrimed = false;
-        htmlAudioPrimePromise = null;
+        // HTML priming uses its own audio element and survives screen changes.
       } catch (err) { }
     }
 
@@ -2771,78 +2738,77 @@
       const audio = createChunkAudioElement();
       let done = false;
       let fallbackId = null;
+      let retryButton = null;
 
-      const cleanup = () => {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.oncanplay = null;
-        audio.oncanplaythrough = null;
-        clearTrackedTimeout(fallbackId);
+      const clearRetry = () => {
+        retryButton?.remove();
+        retryButton = null;
       };
-
       const finish = (reason = "ended") => {
         if (done) return;
         done = true;
-        cleanup();
+        audio.onended = null;
+        audio.onerror = null;
+        clearRetry();
+        clearTrackedTimeout(fallbackId);
         audioDebug("chunk finish", reason, file);
         resolve();
       };
 
-      try {
-        audioDebug("chunk start", file);
+      const tryPlay = () => {
+        if (done || !isLiveRun(runToken)) return;
+        clearRetry();
+        // Give each explicit replay attempt a fresh playback timeout.
+        clearTrackedTimeout(fallbackId);
+        fallbackId = trackedTimeout(() => {
+          if (!done) {
+            console.warn("Verse Typer chunk audio timed out", file);
+            finish("timeout");
+          }
+        }, 9000, runToken);
+        // Call play() synchronously in the retry tap; don't wait for canplay.
+        try {
+          const playback = audio.play();
+          playback?.catch(err => {
+            if (done || !isLiveRun(runToken)) return;
+            if (err?.name === "NotAllowedError") {
+              clearTrackedTimeout(fallbackId);
+              fallbackId = null;
+              const card = document.getElementById("vtReviewCard");
+              if (!card) { finish("blocked without review card"); return; }
+              retryButton = document.createElement("button");
+              retryButton.type = "button";
+              retryButton.className = "vt-audio-retry no-zoom";
+              retryButton.textContent = "Tap to hear the verse";
+              retryButton.addEventListener("click", () => {
+                void unlockAudio();
+                tryPlay();
+              });
+              card.appendChild(retryButton);
+            } else {
+              console.warn("Verse Typer chunk audio could not play", file, err);
+              finish("play rejected");
+            }
+          });
+        } catch (err) {
+          console.warn("Verse Typer chunk audio failed", file, err);
+          finish("exception");
+        }
+      };
 
+      try {
         audio.pause();
         audio.currentTime = 0;
         audio.muted = muted;
         audio.volume = 1;
         audio.src = file;
-        audio.load();
-
         audio.onended = () => finish("ended");
-
         audio.onerror = () => {
           console.warn("Verse Typer chunk audio missing or failed", file, audio.error);
           finish("error");
         };
-
-        const tryPlay = () => {
-          audioDebug("chunk tryPlay", {
-            file,
-            readyState: audio.readyState,
-            networkState: audio.networkState,
-            muted: audio.muted
-          });
-
-          const playPromise = audio.play();
-
-          if (playPromise?.then) {
-            playPromise
-              .then(() => {
-                audioDebug("chunk play resolved", file);
-              })
-              .catch(err => {
-                console.warn("Verse Typer chunk audio could not play", file, err);
-                finish("play rejected");
-              });
-          }
-        };
-
-        if (audio.readyState >= 3) {
-          tryPlay();
-        } else {
-          audio.oncanplay = tryPlay;
-          audio.oncanplaythrough = tryPlay;
-        }
-
-        fallbackId = trackedTimeout(() => {
-          if (!done) {
-            console.warn("Verse Typer chunk audio timed out", file, {
-              readyState: audio.readyState,
-              networkState: audio.networkState
-            });
-            finish("timeout");
-          }
-        }, 9000, runToken);
+        audio.load();
+        tryPlay();
       } catch (err) {
         console.warn("Verse Typer chunk audio failed", file, err);
         finish("exception");

@@ -124,6 +124,8 @@
   let audioUnlocked = false;
   let audioUnlockPromise = null;
   let verseAudioEl = null;
+  let silenceAudioEl = null;
+  let referenceAudioPreload = null;
   let sleepIds = [];
   let finalTimerId = null;
   let currentFitRaf = 0;
@@ -652,20 +654,60 @@
   function primeHtmlAudio() {
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
-    const audio = createVerseAudioElement();
+    if (!silenceAudioEl) {
+      silenceAudioEl = document.createElement("audio");
+      silenceAudioEl.preload = "auto";
+      silenceAudioEl.playsInline = true;
+      silenceAudioEl.setAttribute("playsinline", "");
+      silenceAudioEl.style.display = "none";
+      document.body.appendChild(silenceAudioEl);
+    }
+    const audio = silenceAudioEl;
     htmlAudioPrimePromise = new Promise(resolve => {
-      let done = false, fallbackId = null;
-      const cleanup = () => { audio.onended = null; audio.onerror = null; audio.oncanplay = null; audio.oncanplaythrough = null; if (fallbackId) clearTimeout(fallbackId); };
-      const finish = ok => { if (done) return; done = true; cleanup(); htmlAudioPrimed = !!ok; htmlAudioPrimePromise = null; resolve(!!ok); };
-      const tryPlay = () => { const p = audio.play(); if (p?.then) p.then(() => { }).catch(() => finish(false)); };
+      let done = false;
+      let fallbackId = null;
+      const finish = ok => {
+        if (done) return;
+        done = true;
+        if (fallbackId) clearTimeout(fallbackId);
+        audio.onerror = null;
+        // Let the silent file finish naturally once playback has started.
+        if (!ok) audio.pause();
+        htmlAudioPrimed = !!ok;
+        queueMicrotask(() => { htmlAudioPrimePromise = null; });
+        resolve(!!ok);
+      };
       try {
-        audio.pause(); audio.currentTime = 0; audio.muted = false; audio.volume = 0.01; audio.src = SILENCE_AUDIO_FILE; audio.load();
-        audio.onended = () => finish(true); audio.onerror = () => finish(false);
-        if (audio.readyState >= 3) tryPlay(); else { audio.oncanplay = tryPlay; audio.oncanplaythrough = tryPlay; }
-        fallbackId = setTimeout(() => finish(false), 1800);
+        audio.pause(); audio.currentTime = 0; audio.muted = false;
+        audio.volume = 0.01; audio.src = SILENCE_AUDIO_FILE;
+        audio.onerror = () => finish(false);
+        audio.load();
+        // HTML media permission must be requested before the gesture ends.
+        const playback = audio.play();
+        if (playback?.then) playback.then(() => finish(true)).catch(() => finish(false));
+        else finish(true);
+        if (!done) fallbackId = setTimeout(() => finish(false), 1800);
       } catch (err) { finish(false); }
     });
     return htmlAudioPrimePromise;
+  }
+
+  function preloadSpokenVerse() {
+    const verse = getVerseAudioCandidates()[0];
+    if (verse) {
+      const audio = createVerseAudioElement();
+      if (audio.getAttribute("src") !== verse) {
+        audio.src = verse;
+        audio.load();
+      }
+    }
+    const reference = getReferenceAudioCandidates()[0];
+    if (reference) {
+      if (!referenceAudioPreload) referenceAudioPreload = new Audio();
+      referenceAudioPreload.preload = "auto";
+      referenceAudioPreload.src = reference;
+      referenceAudioPreload.load();
+    }
   }
 
   async function unlockAudio() {
@@ -862,54 +904,41 @@
       try {
         audio.pause();
         audio.currentTime = 0;
-        audio.src = src;
-        audio.load();
+        // Preserve the preloaded first recording instead of restarting its load.
+        if (audio.getAttribute("src") !== src) {
+          audio.src = src;
+          audio.load();
+        }
 
-        await new Promise(resolve => {
-          let done = false;
-          const finish = () => {
-            if (done) return;
-            done = true;
-            cleanup();
-            resolve();
-          };
-          const cleanup = () => {
-            audio.removeEventListener("loadedmetadata", finish);
-            audio.removeEventListener("canplay", finish);
-            audio.removeEventListener("error", finish);
-          };
-          audio.addEventListener("loadedmetadata", finish);
-          audio.addEventListener("canplay", finish);
-          audio.addEventListener("error", finish);
-          setTimeout(finish, 1200);
-        });
+        // This play() request must be issued in the Meet/Retry button gesture.
+        // Waiting for canplay/metadata first loses transient iOS activation.
+        await audio.play();
 
         const durationMs = Number.isFinite(Number(audio.duration)) && Number(audio.duration) > 0
           ? clamp(Number(audio.duration) * 1000, 500, 30000)
           : Math.max(500, Number(fallbackMs) || 1200);
 
-        await audio.play();
-
         await new Promise(resolve => {
           let done = false;
+          let timeoutId = null;
           const finish = () => {
             if (done) return;
             done = true;
-            cleanup();
-            resolve();
-          };
-          const cleanup = () => {
             audio.removeEventListener("ended", finish);
             audio.removeEventListener("error", finish);
             if (timeoutId) clearTimeout(timeoutId);
+            resolve();
           };
           audio.addEventListener("ended", finish);
           audio.addEventListener("error", finish);
-          const timeoutId = setTimeout(finish, durationMs + 900);
+          timeoutId = setTimeout(finish, durationMs + 900);
         });
 
         return true;
-      } catch (err) { }
+      } catch (err) {
+        if (err?.name === "NotAllowedError") return "blocked";
+        console.warn("Wheel of Bible recording unavailable", src, err);
+      }
     }
 
     return false;
@@ -998,6 +1027,7 @@
     await loadVerseJson();
     buildVerseModel();
     resetRunState();
+    preloadSpokenVerse();
     preloadSpinResultImages();
     await playIntroSequence();
   }
@@ -1041,7 +1071,10 @@
       </div>
     `, { status: "Today's Verse", rootClass: "is-simple-screen is-meet-screen" });
     wireGameMenu();
-    document.getElementById("meetVerseBtn")?.addEventListener("click", async () => { await unlockAudio(); await playVerseIntro(); });
+    document.getElementById("meetVerseBtn")?.addEventListener("click", () => {
+      void unlockAudio();
+      void playVerseIntro();
+    });
   }
 
   async function playVerseIntro() {
@@ -1062,12 +1095,44 @@
       renderSpinScreen();
     });
 
-    const versePlayed = await tryPlayVerseAudio();
-    if (!versePlayed) await sleep(1800);
+    await playVerseIntroRecordings();
+  }
 
+  function offerSpokenAudioRetry(label, retry) {
+    if (state.screen !== "verseIntro") return;
+    const wrap = document.querySelector(".wob-verse-wrap");
+    if (!wrap) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "wob-btn no-zoom";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      button.remove();
+      void unlockAudio();
+      // Run retry synchronously in the child's new tap gesture.
+      void retry();
+    });
+    wrap.appendChild(button);
+  }
+
+  async function playVerseIntroRecordings(phase = "verse") {
+    if (state.screen !== "verseIntro") return;
+    if (phase === "verse") {
+      const versePlayed = await tryPlayVerseAudio();
+      if (versePlayed === "blocked") {
+        offerSpokenAudioRetry("Tap to hear the verse", () => playVerseIntroRecordings("verse"));
+        return;
+      }
+      if (!versePlayed) await sleep(1800);
+    }
+
+    if (state.screen !== "verseIntro") return;
     const refPlayed = await tryPlayAudioCandidatesAndWait(getReferenceAudioCandidates(), 1600);
+    if (refPlayed === "blocked") {
+      offerSpokenAudioRetry("Tap to hear the reference", () => playVerseIntroRecordings("reference"));
+      return;
+    }
     if (!refPlayed) await sleep(250);
-
     showVerseIntroSpinPrompt();
   }
 

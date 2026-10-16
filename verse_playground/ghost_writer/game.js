@@ -823,15 +823,28 @@
   }
 
   async function unlockAudio() {
-    if (audioUnlocked) return true;
+    const ac = getAudioContext();
+    if (!ac) return false;
+    if (audioUnlocked && ac.state === "running") return true;
     if (audioUnlockPromise) return audioUnlockPromise;
 
+    audioUnlocked = false;
     audioUnlockPromise = (async () => {
-      const ac = getAudioContext();
-
-      if (!ac) return false;
-
       try {
+        // Request Web Audio and start the priming oscillator in the gesture
+        // itself. Awaiting HTML media playback first loses iOS activation.
+        const resumePromise = ac.state === "running"
+          ? Promise.resolve()
+          : ac.resume();
+
+        const oscillator = ac.createOscillator();
+        const gain = ac.createGain();
+        gain.gain.value = 0.0001;
+        oscillator.connect(gain);
+        gain.connect(ac.destination);
+        oscillator.start();
+        oscillator.stop(ac.currentTime + 0.03);
+
         if (!silenceAudio) {
           silenceAudio = new Audio(AUDIO_UNLOCK_SRC);
           silenceAudio.preload = "auto";
@@ -839,35 +852,25 @@
           silenceAudio.volume = 0.001;
           silenceAudio.setAttribute("playsinline", "true");
         }
-
         try {
           silenceAudio.currentTime = 0;
-          await silenceAudio.play();
-          silenceAudio.pause();
-          silenceAudio.currentTime = 0;
+          const playback = silenceAudio.play();
+          playback?.then(() => {
+            silenceAudio.pause();
+            silenceAudio.currentTime = 0;
+          }).catch(() => {
+            // The optional HTML prime may be blocked; Web Audio can still work.
+          });
         } catch (err) {
-          // iOS sometimes blocks the silence file even during valid gestures.
-          // The oscillator below still gives Web Audio a chance to unlock.
+          // Retry on the next Start, button tap, or drawing gesture.
         }
 
-        if (ac.state === "suspended") {
-          await ac.resume();
-        }
-
-        const oscillator = ac.createOscillator();
-        const gain = ac.createGain();
-
-        gain.gain.value = 0.0001;
-        oscillator.connect(gain);
-        gain.connect(ac.destination);
-        oscillator.start();
-        oscillator.stop(ac.currentTime + 0.03);
-
-        audioUnlocked = true;
-        void loadSoundBuffers();
-
-        return true;
+        await resumePromise;
+        audioUnlocked = ac.state === "running";
+        if (audioUnlocked) void loadSoundBuffers();
+        return audioUnlocked;
       } catch (err) {
+        audioUnlocked = false;
         console.warn("Ghost Writer audio unlock failed", err);
         return false;
       } finally {
@@ -967,6 +970,8 @@
   }
 
   function playUiTapSound() {
+    // Run the unlock path before the async sound-buffer work on this tap.
+    void unlockAudio();
     const key = uiSoundFlip ? "uiTap2" : "uiTap1";
     uiSoundFlip = !uiSoundFlip;
     playGameSound(key, "uiTap");
