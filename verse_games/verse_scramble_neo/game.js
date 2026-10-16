@@ -729,14 +729,34 @@
   }
 
   function unlockAudio() {
-    primeHtmlAudio();
-
     const ctx = ensureAudioContext();
-    if (!ctx || !masterGain) return;
-
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => { });
+    if (!ctx || !masterGain) {
+      audioUnlocked = false;
+      return false;
     }
+
+    // Request resume synchronously in the user's gesture. In iOS the context
+    // can also be "interrupted", and starting an oscillator is not proof that
+    // the device has started producing audio.
+    if (ctx.state !== "running") {
+      audioUnlocked = false;
+      try {
+        const resume = ctx.resume();
+        if (resume && typeof resume.then === "function") {
+          void resume.then(() => {
+            audioUnlocked = ctx.state === "running";
+            if (audioUnlocked) preloadUiSounds();
+          }).catch(() => {
+            audioUnlocked = ctx.state === "running";
+          });
+        }
+      } catch (err) {
+        audioUnlocked = false;
+      }
+    }
+
+    // HTML media priming is optional and must not delay the Web Audio request.
+    primeHtmlAudio();
 
     try {
       const t = ctx.currentTime + 0.01;
@@ -751,12 +771,15 @@
       gain.connect(masterGain);
       osc.start(t);
       osc.stop(t + 0.03);
-
-      audioUnlocked = true;
-      preloadUiSounds();
     } catch (err) {
-      // Unlock blip is best-effort.
+      // A best-effort oscillator may fail without invalidating a running context.
     }
+
+    audioUnlocked = ctx.state === "running";
+    if (audioUnlocked) preloadUiSounds();
+    // A failed or pending resume is not a successful unlock; later gestures
+    // will attempt resume again while the context remains non-running.
+    return audioUnlocked;
   }
 
   function soundEnvelope(eventId, start, duration, peak = 0.2, attack = 0.005, release = 0.06) {

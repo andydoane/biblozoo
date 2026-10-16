@@ -432,14 +432,14 @@
   function playZoomSound() {
     if (muted) return;
 
-    unlockAudio();
-
     try {
       const volume = getZoomVolume();
       if (volume <= 0) return;
 
       const ctx = ensureAudioContext();
-      if (!ctx || !masterGain) return;
+      // Sound callbacks can run after a task switch; only a real gesture
+      // should attempt recovery. Do not queue sounds on an interrupted context.
+      if (!ctx || !masterGain || ctx.state !== "running") return;
 
       if (!zoomAudioBuffer) {
         loadZoomAudioBuffer();
@@ -512,12 +512,12 @@
       const ctx = ensureAudioContext();
       if (!ctx || !masterGain) return;
 
-      if (ctx.state === "suspended") {
-        await ctx.resume();
-      }
+      // The document-level gesture listener already requested resume in the
+      // user gesture. A late UI buffer must not play after another interruption.
+      if (ctx.state !== "running") return;
 
       const buffer = await loadUiSoundBuffer(key);
-      if (!buffer) return;
+      if (!buffer || muted || ctx !== audioCtx || ctx.state !== "running") return;
 
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
@@ -548,51 +548,154 @@
     playUiBufferSound(key, "uiTap");
   }
 
+  let audioUnlockInFlight = false;
+  let audioUnlockAttempt = 0;
+  let audioUnlockTimeout = 0;
+  let audioResumeFailures = 0;
+
   function ensureAudioContext() {
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return null;
 
-    audioCtx = new AudioContextClass();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = SOUND_TUNING.masterVolume;
-    masterGain.connect(audioCtx.destination);
+    try {
+      const ctx = new AudioContextClass();
+      const gain = ctx.createGain();
+      gain.gain.value = SOUND_TUNING.masterVolume;
+      gain.connect(ctx.destination);
+      audioCtx = ctx;
+      masterGain = gain;
+      ctx.onstatechange = () => {
+        if (audioCtx !== ctx) return;
+        audioUnlocked = ctx.state === "running";
+        if (audioUnlocked) audioResumeFailures = 0;
+      };
+    } catch (err) {
+      return null;
+    }
 
     return audioCtx;
   }
 
+  function replaceStuckTrafficTapAudioContext() {
+    const previous = audioCtx;
+    const previousGain = masterGain;
+    audioCtx = null;
+    masterGain = null;
+    if (!ensureAudioContext()) {
+      audioCtx = previous;
+      masterGain = previousGain;
+      return false;
+    }
+
+    // Web Audio buffers are reusable across contexts, so keep the existing
+    // zoom and UI audio buffers; only the broken output graph is replaced.
+    if (previous && previous !== audioCtx) {
+      previous.onstatechange = null;
+      if (typeof previous.close === "function") {
+        void Promise.resolve().then(() => previous.close()).catch(() => {});
+      }
+    }
+    return true;
+  }
+
   function unlockAudio() {
+    let ctx = ensureAudioContext();
+    if (!ctx || !masterGain) {
+      audioUnlocked = false;
+      return false;
+    }
+    if (audioUnlocked && ctx.state === "running") return true;
+
+    // When iOS interrupts Web Audio, a resume() can reject or remain pending
+    // forever. Never start overlapping requests against that same context.
+    if (ctx.state !== "running") {
+      audioUnlocked = false;
+      if (audioUnlockInFlight) return false;
+
+      // Two failed gesture requests indicate an unusable iOS audio session.
+      // Rebuild the output context on a subsequent gesture, not in a timer.
+      if (audioResumeFailures >= 2) {
+        if (replaceStuckTrafficTapAudioContext()) {
+          ctx = audioCtx;
+          audioResumeFailures = 0;
+        }
+      }
+
+      const attempt = ++audioUnlockAttempt;
+      audioUnlockInFlight = true;
+      try {
+        // Call resume synchronously from the user's pointer/touch/key event.
+        const pending = ctx.resume();
+        const finish = () => {
+          if (attempt !== audioUnlockAttempt) return;
+          clearTimeout(audioUnlockTimeout);
+          audioUnlockTimeout = 0;
+          audioUnlockInFlight = false;
+          audioUnlocked = ctx === audioCtx && ctx.state === "running";
+          audioResumeFailures = audioUnlocked ? 0 : audioResumeFailures + 1;
+        };
+        // Promise settlement must not block another genuine tap indefinitely.
+        audioUnlockTimeout = setTimeout(() => {
+          if (attempt !== audioUnlockAttempt) return;
+          audioUnlockAttempt += 1; // Ignore any stale eventual settlement.
+          audioUnlockInFlight = false;
+          audioUnlockTimeout = 0;
+          audioUnlocked = ctx === audioCtx && ctx.state === "running";
+          audioResumeFailures = audioUnlocked ? 0 : audioResumeFailures + 1;
+        }, 1200);
+        void Promise.resolve(pending).then(finish, finish);
+      } catch (err) {
+        clearTimeout(audioUnlockTimeout);
+        audioUnlockTimeout = 0;
+        audioUnlockInFlight = false;
+        audioUnlocked = ctx.state === "running";
+        if (!audioUnlocked) audioResumeFailures += 1;
+      }
+    }
+
+    // Prime both Web Audio and optional HTML media in the *same* gesture.
+    // Do not infer successful unlocking from scheduling the oscillator.
     primeHtmlAudio();
     primeZoomAudio();
     preloadUiSoundBuffers();
-
-    const ctx = ensureAudioContext();
-    if (!ctx || !masterGain) return;
-
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => { });
-    }
-
     try {
       const t = ctx.currentTime + 0.01;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
       osc.type = "sine";
       osc.frequency.setValueAtTime(440, t);
       gain.gain.setValueAtTime(0.0001, t);
-
       osc.connect(gain);
       gain.connect(masterGain);
       osc.start(t);
       osc.stop(t + 0.03);
-
-      audioUnlocked = true;
     } catch (err) {
-      // Unlock blip is best-effort.
+      // Priming is best-effort; a running context is the success condition.
+    }
+
+    audioUnlocked = ctx.state === "running";
+    return audioUnlocked;
+  }
+
+  function onTrafficTapAudioGesture() {
+    if (!muted && (!audioUnlocked || !audioCtx || audioCtx.state !== "running")) {
+      unlockAudio();
     }
   }
+
+  // Capture gestures before game/UI handlers so even the first tap after
+  // returning from another app can ask iOS for audio activation.
+  document.addEventListener("pointerdown", onTrafficTapAudioGesture, { capture: true, passive: true });
+  document.addEventListener("touchstart", onTrafficTapAudioGesture, { capture: true, passive: true });
+  document.addEventListener("keydown", onTrafficTapAudioGesture, true);
+  document.addEventListener("visibilitychange", () => {
+    // Do not attempt resume from a background/foreground lifecycle callback:
+    // iOS can leave that promise pending and lose the next user activation.
+    audioUnlocked = false;
+  });
+  window.addEventListener("pageshow", () => { audioUnlocked = false; });
 
   function soundEnvelope(eventId, start, duration, peak = 0.2, attack = 0.005, release = 0.06) {
     const ctx = ensureAudioContext();
@@ -763,11 +866,11 @@
   function playGameSound(eventId) {
     if (muted) return;
 
-    unlockAudio();
-
+    // An animation/timer may fire this without user activation. Only the
+    // captured pointer/touch/key handler may recover an interrupted context.
     const ctx = ensureAudioContext();
     const player = SOUND_PLAYERS[eventId];
-    if (!ctx || !masterGain || !player) return;
+    if (!ctx || !masterGain || !player || ctx.state !== "running") return;
 
     masterGain.gain.value = SOUND_TUNING.masterVolume;
 

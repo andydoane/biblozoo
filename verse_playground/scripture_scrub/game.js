@@ -400,7 +400,7 @@
 
   let audioCtx = null;
   let audioUnlocked = false;
-  let audioUnlockStarted = false;
+  let audioUnlockPromise = null;
   let silenceAudio = null;
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
@@ -489,47 +489,71 @@
     return silenceAudio;
   }
 
-  async function unlockAudio() {
-    if (audioUnlockStarted) return;
-    audioUnlockStarted = true;
+  function unlockAudio() {
+    const ctx = getAudioContext();
+    if (!ctx) {
+      audioUnlocked = false;
+      return Promise.resolve(false);
+    }
 
+    if (ctx.state === "running") {
+      audioUnlocked = true;
+      return Promise.resolve(true);
+    }
+
+    audioUnlocked = false;
+    // Overlapping callers share the result instead of returning undefined.
+    // Bound stalled iOS resume promises so a later tap can retry.
+    if (audioUnlockPromise) return audioUnlockPromise;
+
+    let resume;
     try {
-      const ctx = getAudioContext();
+      // Ask Web Audio to resume *before* awaiting anything or playing HTML media.
+      resume = ctx.resume();
+
+      // Prime the real audio graph while the gesture is still active.
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const now = ctx.currentTime;
+      gain.gain.setValueAtTime(0.0001, now);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.03);
+    } catch (err) {
+      console.warn("Scripture Scrub: audio unlock failed", err);
+      return Promise.resolve(false);
+    }
+
+    // The silent HTML prime is optional; a rejection does not mean Web Audio
+    // failed, and it must never hold up the Web Audio resume request.
+    try {
       const silent = ensureSilenceAudio();
-
-      try {
-        silent.currentTime = 0;
-      } catch (err) {
-        // Some iOS versions can object if the media is not ready yet.
-      }
-
+      try { silent.currentTime = 0; } catch (err) { /* not ready yet */ }
       const silentPlay = silent.play();
       if (silentPlay && typeof silentPlay.catch === "function") {
         silentPlay.catch(() => { });
       }
-
-      if (ctx?.state === "suspended") {
-        await ctx.resume().catch(() => { });
-      }
-
-      if (ctx) {
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const now = ctx.currentTime;
-
-        gain.gain.setValueAtTime(0.0001, now);
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-        oscillator.start(now);
-        oscillator.stop(now + 0.03);
-      }
-
-      audioUnlocked = true;
     } catch (err) {
-      console.warn("Scripture Scrub: audio unlock failed", err);
-    } finally {
-      audioUnlockStarted = false;
+      // Allow Web Audio to proceed without HTML-media priming.
     }
+
+    let timeoutId;
+    const attempt = Promise.race([
+      Promise.resolve(resume).then(() => true, () => false),
+      new Promise(resolve => {
+        timeoutId = setTimeout(() => resolve(false), 1200);
+      })
+    ]).then(() => {
+      audioUnlocked = ctx.state === "running";
+      return audioUnlocked;
+    }).finally(() => {
+      clearTimeout(timeoutId);
+      if (audioUnlockPromise === attempt) audioUnlockPromise = null;
+    });
+
+    audioUnlockPromise = attempt;
+    return attempt;
   }
 
   function soundVolume(key) {
@@ -586,19 +610,14 @@
   async function playGameSound(key, volumeKey = key) {
     if (muted) return;
 
-    if (!audioUnlocked) {
-      await unlockAudio();
-    }
-
     const ctx = getAudioContext();
     if (!ctx) return;
 
-    if (ctx.state === "suspended") {
-      await ctx.resume().catch(() => { });
-    }
+    if (ctx.state !== "running" && !await unlockAudio()) return;
+    if (ctx.state !== "running") return;
 
     const buffer = await loadSoundBuffer(key);
-    if (!buffer || muted || ctx.state === "suspended") return;
+    if (!buffer || muted || ctx.state !== "running") return;
 
     try {
       const source = ctx.createBufferSource();
@@ -761,8 +780,10 @@
       }
     };
 
-    if (ctx.state === "suspended") {
-      ctx.resume().then(startWarmup).catch(() => { });
+    if (ctx.state !== "running") {
+      void unlockAudio().then(ready => {
+        if (ready && ctx.state === "running") startWarmup();
+      });
       return;
     }
 
@@ -812,8 +833,10 @@
         }
       };
 
-      if (ctx.state === "suspended") {
-        ctx.resume().then(startTone).catch(() => { });
+      if (ctx.state !== "running") {
+        void unlockAudio().then(ready => {
+          if (ready && ctx.state === "running") startTone();
+        });
         return;
       }
 
@@ -831,23 +854,18 @@
     const generation = ++mowerSoundGeneration;
 
     try {
-      if (!audioUnlocked) {
-        await unlockAudio();
-      }
-
       const ctx = getAudioContext();
       if (!ctx || muted) return;
-
-      if (ctx.state === "suspended") {
-        await ctx.resume().catch(() => { });
-      }
+      if (ctx.state !== "running" && !await unlockAudio()) return;
+      if (ctx.state !== "running") return;
 
       const buffer = await loadSoundBuffer("mower");
 
       if (
         !buffer ||
         muted ||
-        generation !== mowerSoundGeneration
+        generation !== mowerSoundGeneration ||
+        ctx.state !== "running"
       ) {
         return;
       }
