@@ -2014,15 +2014,41 @@
   async function transitionQuestionPage(wrap, advance) {
     if (questionPageTransition || !wrap.isConnected) return;
 
+    const sessionAtStart = dailySession;
+    const indexAtStart = sessionAtStart?.questionIndex;
+    let advanced = false;
+
+    // A popup or audio UI rerender can replace the old DOM node while the
+    // page is fading. Only an actual session/screen change should cancel Next.
+    const advanceOnce = () => {
+      const visibleWrap = wrap.isConnected
+        ? wrap
+        : document.querySelector(".daily-question-session");
+
+      if (
+        advanced ||
+        !visibleWrap?.isConnected ||
+        dailySession !== sessionAtStart ||
+        sessionAtStart?.phase !== SESSION_PHASES.QUESTION ||
+        sessionAtStart?.questionIndex !== indexAtStart ||
+        !sessionAtStart?.answered
+      ) {
+        return false;
+      }
+
+      advanced = true;
+      advance();
+      return true;
+    };
+
     if (
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
       typeof wrap.animate !== "function"
     ) {
-      advance();
+      advanceOnce();
       return;
     }
 
-    const sessionAtStart = dailySession;
     const overlay = document.createElement("div");
     overlay.className = "daily-question-page-transition";
     overlay.style.backgroundColor = getComputedStyle(wrap).backgroundColor;
@@ -2040,10 +2066,10 @@
         { duration: 225, easing: "ease-in", fill: "forwards" }
       ).finished;
 
-      if (dailySession !== sessionAtStart || !wrap.isConnected) return;
+      // Advance even if a harmless rerender replaced the outgoing page.
+      if (!advanceOnce()) return;
 
       // Replace the page only after the overlay is completely opaque.
-      advance();
       nextWrap = document.querySelector(".daily-question-session");
       if (nextWrap) nextWrap.inert = true;
       await new Promise((resolve) => setTimeout(resolve, 75));
@@ -2054,6 +2080,8 @@
       ).finished;
     } catch (error) {
       console.warn("Daily Question page transition interrupted", error);
+      // WebKit can interrupt animations. Do not consume a valid Next tap.
+      advanceOnce();
     } finally {
       overlay.remove();
       wrap.inert = wasInert;
@@ -2951,6 +2979,11 @@
           ) {
             return;
           }
+
+          // A star popup expires after 900 ms and rerenders this screen.
+          // Cancel it before the Next fade so it cannot replace the page.
+          clearDailyQuestionRewardPopupTimer();
+          dailySession.showStarRewardPopup = false;
 
           const nextIndex =
             dailySession.questionIndex + 1;
