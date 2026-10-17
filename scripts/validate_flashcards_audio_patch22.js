@@ -508,7 +508,10 @@ async function testReplayEligibility() {
 }
 
 (async () => {
-  check(workerSource.includes('patch22c_wacky_output_health'), 'PWA cache version bumped for Patch 22C');
+  check(/const CACHE_VERSION = "[A-Za-z0-9_]+";/.test(workerSource) &&
+    workerSource.includes('"./flashcards/flashcards.js"') &&
+    workerSource.includes('"./flashcards/audio-effects.js"'),
+    'PWA cache still versioned and precaches Flashcards audio code');
   check(recordingSource.includes('if (["requesting", "preparing", "recording", "stopping"].includes(status))'),
     'active microphone recording still interrupts on pagehide');
   check(!flashcardsSource.includes('    consumeWackyReplay();\n    wackyReplayPlaying = true;'),

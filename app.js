@@ -10826,6 +10826,10 @@ function setScreen(screen) {
     stopNewVersePickerPreviewAudio();
   }
   if (State.screen !== screen) {
+    // Direct navigation must release Learn audio just like go().
+    // Otherwise a pending narration/echo can outlive its screen when a
+    // profile change, Game Mix or a non-sliding transition uses setScreen().
+    cancelLearnAudio();
     learnAudioInterrupted = null;
     if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
     learnAudioResumeAttempt = null;

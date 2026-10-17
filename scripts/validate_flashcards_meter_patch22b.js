@@ -124,7 +124,9 @@ function fixture({ modes = [], failFirstAnalyser = false, throwFirstSample = fal
 }
 
 async function run() {
-  check(/patch22[b-z]_/.test(sw), 'PWA cache version updated for meter fix');
+  check(/const CACHE_VERSION = "[A-Za-z0-9_]+";/.test(sw) &&
+    sw.includes('"./flashcards/recording.js"'),
+    'PWA cache stays versioned and precaches recording code');
   check(ui.includes('const value = recording.readLevel();'), 'recording levels still sampled with Reduced Motion');
   check(!ui.includes('reduced.matches ? null : recording.readLevel()'), 'Reduced Motion cannot force a blank meter');
   check(css.includes('.flashcards-meter-bars .is-lit'), 'meter bar appearance preserved');

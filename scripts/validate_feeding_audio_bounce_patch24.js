@@ -271,8 +271,8 @@ function testSnackGeometryAndScoring() {
 }
 
 function testSourceSafety() {
-  ok(serviceWorker.includes('2026_Oct_17_patch24_feed_audio_bounce'),
-    "Cache version refreshed for new script");
+  ok(/const CACHE_VERSION = "[A-Za-z0-9_]+";/.test(serviceWorker),
+    "Service worker retains a valid version across subsequent patches");
   ok(serviceWorker.includes('"./daily_questions_feed_game.js"'),
     "Feeding script remains in service worker core assets");
   ok(!source.includes('document.querySelector("#feedingMixer")'),
