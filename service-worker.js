@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_16_patch18b_verse_jam_resume_beat_ad";
+const CACHE_VERSION = "2026_Oct_16_patch19a_learn_resume_overlay";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =

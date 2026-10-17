@@ -996,6 +996,7 @@ function openLearnMenu() {
   if (!menu) return;
 
   learnMenuOpen = true;
+  syncLearnAudioResumeOverlay();
   learnMenuPausedAudio = !audioEl.paused;
 
   try {
@@ -1014,6 +1015,7 @@ function closeLearnMenu() {
   menu.setAttribute("aria-hidden", "true");
 
   learnMenuOpen = false;
+  syncLearnAudioResumeOverlay();
 
   if (learnMenuPausedAudio) {
     learnMenuPausedAudio = false;
@@ -1058,12 +1060,24 @@ const UI_PET_UNLOCK_VOLUME = 0.55;
 
 let learnMenuOpen = false;
 let learnMenuPausedAudio = false;
+// A backgrounded spoken lesson waits for a deliberate tap in a fixed overlay.
+// Short instruction narration is optional and never needs its own retry UI.
+let learnAudioInterrupted = null;
+let learnAudioResumeAttempt = null;
+let learnAudioResumeError = "";
+let learnShortInstructionNeedsRender = false;
+let activeLearnInstructionRequest = null;
+let activeLearnAudioWaitCancel = null;
 
 let muted = false;
 
 let appAudioContext = null;
 let appAudioUnlocked = false;
 let appAudioUnlockPromise = null;
+let appAudioUnlockGeneration = 0;
+let appAudioRecoveryPending = false;
+let appAudioFreshContextOnGesture = false;
+let appAudioRecoveryFailures = 0;
 let appSilenceAudio = null;
 
 let uiTapBuffers = [];
@@ -1080,6 +1094,11 @@ function getAppAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
   if (!AudioContextClass) return null;
+
+  if (appAudioContext?.state === "closed") {
+    appAudioContext = null;
+    appAudioUnlocked = false;
+  }
 
   if (!appAudioContext) {
     try {
@@ -1163,14 +1182,9 @@ function playUiTapFallbackNow() {
   lastUiTapFallbackAt = nowMs;
 
   const ctx = getAppAudioContext();
-  if (!ctx) return;
+  if (!ctx || ctx.state !== "running" || appAudioRecoveryPending) return;
 
   try {
-    // Do this inside the same gesture, but do not wait for the promise.
-    if (ctx.state === "suspended" && typeof ctx.resume === "function") {
-      ctx.resume().catch(() => { });
-    }
-
     const now = ctx.currentTime || 0;
 
     const popGain = ctx.createGain();
@@ -1206,17 +1220,13 @@ function playUiTapFallbackNow() {
 }
 
 function primeAppAudioFromGesture({ playFeedback = false } = {}) {
-  const ctx = getAppAudioContext();
-
-  if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
-    ctx.resume().catch(() => { });
-  }
-
-  if (playFeedback) {
-    playUiTapFallbackNow();
-  }
-
-  unlockAppAudio();
+  // Start activation inside the gesture; optional tap feedback follows once
+  // the context is confirmed to be running, never on a suspended context.
+  const started = performance.now();
+  void unlockAppAudio().then(ready => {
+    if (playFeedback && ready && !document.hidden &&
+        performance.now() - started < 300) playUiTapFallbackNow();
+  });
   preloadUiTapSoundBuffers();
 }
 
@@ -1342,52 +1352,126 @@ function preloadUiTapSoundBuffers() {
   return uiTapBuffersPromise;
 }
 
-async function unlockAppAudio() {
-  const existingCtx = getAppAudioContext();
+// Foreground lifecycle handlers only invalidate prior activation. iOS must be
+// reactivated by a genuine user gesture, not by an automatic visibility event.
+function markAppAudioInterrupted() {
+  appAudioUnlockGeneration += 1;
+  appAudioUnlocked = false;
+  appAudioUnlockPromise = null;
+  appAudioRecoveryPending = true;
+}
 
-  if (
-    appAudioUnlocked &&
-    existingCtx &&
-    existingCtx.state === "running"
-  ) {
-    return true;
+function markAppAudioForegrounded() {
+  if (appAudioRecoveryPending) appAudioUnlocked = false;
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) markAppAudioInterrupted();
+  else markAppAudioForegrounded();
+});
+window.addEventListener("pagehide", markAppAudioInterrupted);
+window.addEventListener("pageshow", markAppAudioForegrounded);
+
+function resetAppAudioContextOnGesture() {
+  const oldContext = appAudioContext;
+  appAudioContext = null;
+  appAudioUnlocked = false;
+  appAudioFreshContextOnGesture = false;
+  if (oldContext && oldContext.state !== "closed") {
+    try { oldContext.close()?.catch?.(() => {}); } catch (err) { }
   }
+  // AudioBuffers can be reused by another AudioContext; keep decoded UI assets.
+  return getAppAudioContext();
+}
 
-  if (
-    appAudioUnlocked &&
-    existingCtx &&
-    existingCtx.state !== "running"
-  ) {
-    appAudioUnlocked = false;
+function waitForAppAudioAttempt(promise, timeoutMs = 1100) {
+  return new Promise((resolve) => {
+    let finished = false;
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    const finish = (ok) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      resolve(ok);
+    };
+    Promise.resolve(promise).then(() => finish(true), () => finish(false));
+  });
+}
+
+function appAudioClockAdvances(ctx, durationMs = 90) {
+  const before = Number(ctx.currentTime) || 0;
+  return new Promise(resolve => {
+    setTimeout(() => resolve(
+      ctx.state === "running" && Number(ctx.currentTime) > before + 0.012
+    ), durationMs);
+  });
+}
+
+function unlockAppAudio() {
+  if (document.hidden) return Promise.resolve(false);
+
+  if (appAudioFreshContextOnGesture) resetAppAudioContextOnGesture();
+  const ctx = getAppAudioContext();
+  if (!ctx) return Promise.resolve(false);
+
+  if (appAudioUnlocked && ctx.state === "running" && !appAudioRecoveryPending) {
+    return Promise.resolve(true);
   }
-
   if (appAudioUnlockPromise) return appAudioUnlockPromise;
 
-  appAudioUnlockPromise = (async () => {
-    const silencePromise = playAppSilenceUnlock();
-    const ctx = getAppAudioContext();
+  const generation = ++appAudioUnlockGeneration;
+  const wasInterrupted = appAudioRecoveryPending;
+  appAudioUnlocked = false;
 
-    try {
-      if (ctx && ctx.state === "suspended") {
-        await ctx.resume();
-      }
+  // Start resume() synchronously within the user gesture. Silent HTML audio
+  // and buffer loading are optional; neither gates Web Audio activation.
+  let resume;
+  try {
+    resume = ctx.state === "running" ? Promise.resolve() : ctx.resume();
+  } catch (err) {
+    resume = Promise.reject(err);
+  }
+  playTinyUnlockBlip(ctx);
+  void playAppSilenceUnlock();
+  void preloadUiTapSoundBuffers();
 
-      playTinyUnlockBlip(ctx);
-
-      appAudioUnlocked = true;
-      preloadUiTapSoundBuffers();
-
-      await silencePromise;
-      return true;
-    } catch (err) {
-      console.warn("Could not unlock app audio yet", err);
+  const promise = (async () => {
+    const resumed = await waitForAppAudioAttempt(resume);
+    if (generation !== appAudioUnlockGeneration || appAudioContext !== ctx || document.hidden) {
       return false;
-    } finally {
-      appAudioUnlockPromise = null;
     }
-  })();
+    if (!resumed || ctx.state !== "running") {
+      appAudioRecoveryFailures += 1;
+      if (appAudioRecoveryFailures >= 2) appAudioFreshContextOnGesture = true;
+      return false;
+    }
 
-  return appAudioUnlockPromise;
+    // WebKit can report "running" while its hardware clock remains frozen
+    // after rapid switching to another media app. Verify on foreground return.
+    if (wasInterrupted) {
+      const clockReady = await appAudioClockAdvances(ctx);
+      if (generation !== appAudioUnlockGeneration || appAudioContext !== ctx || document.hidden) {
+        return false;
+      }
+      if (!clockReady) {
+        appAudioFreshContextOnGesture = true;
+        return false;
+      }
+    }
+
+    appAudioUnlocked = true;
+    appAudioRecoveryFailures = 0;
+    appAudioFreshContextOnGesture = false;
+    appAudioRecoveryPending = false;
+    return true;
+  })().catch((err) => {
+    console.warn("Could not unlock app audio yet", err);
+    return false;
+  }).finally(() => {
+    if (appAudioUnlockPromise === promise) appAudioUnlockPromise = null;
+  });
+  appAudioUnlockPromise = promise;
+  return promise;
 }
 
 function playUiTapSound({ force = false } = {}) {
@@ -1396,9 +1480,9 @@ function playUiTapSound({ force = false } = {}) {
   const ctx = getAppAudioContext();
   if (!ctx) return;
 
-  if (ctx.state === "suspended" && typeof ctx.resume === "function") {
-    ctx.resume().catch(() => { });
-  }
+  // The capture-phase gesture handler calls unlockAppAudio(). Do not start
+  // unverified sounds (or attempt off-gesture resumes) in this effect callback.
+  if (ctx.state !== "running" || appAudioRecoveryPending || !appAudioUnlocked) return;
 
   // Do not wait for async loading here. If the MP3 buffers are not ready,
   // the gesture handler will use the instant generated fallback instead.
@@ -1440,6 +1524,16 @@ function applyMute() {
 function toggleMute() {
   muted = !muted;
   applyMute();
+  if (!muted) void unlockAppAudio();
+  if (muted) {
+    // The existing mute control pauses audioEl. Also release a lesson that
+    // would otherwise remain forever waiting for a now-impossible ended event.
+    pauseLearnAudioForInterruption();
+    if (learnAudioInterrupted || learnShortInstructionNeedsRender) {
+      learnShortInstructionNeedsRender = false;
+      if (!document.hidden) render();
+    }
+  }
 
   // stop current verse/instruction and picker preview audio immediately
   if (muted) stopNewVersePickerPreviewAudio();
@@ -1451,7 +1545,21 @@ function toggleMute() {
 
 function safePlay() {
   applyMute();
-  return audioEl.play().catch((err) => {
+  return audioEl.play().then((result) => {
+    const attempt = learnAudioResumeAttempt;
+    if (attempt && State.screen === attempt.recovery.screen && !document.hidden) {
+      attempt.playStarted = true;
+      finishLearnAudioResumeAttempt(attempt);
+    }
+    return result;
+  }).catch((err) => {
+    if (learnAudioResumeAttempt) failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+    // Learn's playback controllers own their own retry/error UI; do not stack
+    // the generic "can't play" dialog on top of a Resume Audio control.
+    if (document.hidden || learnAudioInterrupted || [
+      Screen.LEARN_INSTRUCTION, Screen.LISTEN, Screen.MEANING,
+      Screen.CHUNKS, Screen.ECHO
+    ].includes(State.screen)) throw err;
     showDialog({
       title: "Audio can’t play yet",
       body: "Your browser blocked playback. Tap play again (or make sure the mp3 exists).",
@@ -1571,11 +1679,10 @@ function preloadLearnInstructionImages() {
 }
 
 function updateLearnInstructionReadyUi(root = document) {
-  const ready = !!State.learnInstructionReady;
-
   root
     .querySelectorAll(".learn-instruction-btn")
     .forEach((btn) => {
+      const ready = !!State.learnInstructionReady;
       btn.disabled = !ready;
       btn.setAttribute(
         "aria-disabled",
@@ -1692,8 +1799,9 @@ function startLearnInstruction(key) {
 }
 
 async function playLearnInstructionAudio() {
-  if (State.screen !== Screen.LEARN_INSTRUCTION) return;
+  if (State.screen !== Screen.LEARN_INSTRUCTION || document.hidden) return;
   if (State.learnInstructionAudioStarted) return;
+  const my = echoCancelToken;
 
   const cfg = getLearnInstructionConfig(State.learnInstructionKey);
   if (!cfg) return;
@@ -1711,6 +1819,22 @@ async function playLearnInstructionAudio() {
   try {
     await safePlay();
   } catch (e) {
+    if (my !== echoCancelToken || document.hidden) return;
+    State.instructionPlaying = false;
+    State.instructionKey = "";
+    State.audioMode = null;
+    // The short instruction is also printed on screen. A blocked or missing
+    // narration must never require replay before the normal button works.
+    State.learnInstructionReady = true;
+    updateLearnInstructionReadyUi();
+    return;
+  }
+
+  if (my !== echoCancelToken || document.hidden) return;
+  const ended = await waitForAudioEnd();
+  if (my !== echoCancelToken || document.hidden ||
+      State.screen !== Screen.LEARN_INSTRUCTION) return;
+  if (!ended) {
     State.instructionPlaying = false;
     State.instructionKey = "";
     State.audioMode = null;
@@ -1718,16 +1842,6 @@ async function playLearnInstructionAudio() {
     updateLearnInstructionReadyUi();
     return;
   }
-
-  await new Promise((resolve) => {
-    const onEnd = () => {
-      audioEl.removeEventListener("ended", onEnd);
-      resolve();
-    };
-    audioEl.addEventListener("ended", onEnd);
-  });
-
-  if (State.screen !== Screen.LEARN_INSTRUCTION) return;
 
   State.instructionPlaying = false;
   State.instructionKey = "";
@@ -10420,6 +10534,12 @@ function renderPracticeGameCard(game, verseProgress) {
 
 
 function resetLearn(goTitle = false) {
+  learnAudioInterrupted = null;
+  if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
+  learnAudioResumeAttempt = null;
+  learnAudioResumeError = "";
+  learnShortInstructionNeedsRender = false;
+  syncLearnAudioResumeOverlay();
   const keepLearnLevel = State.learnLevel;
   const keepLearnStartScreen = State.learnStartScreen;
 
@@ -10543,6 +10663,13 @@ function go(nextScreen) {
   }
   State.isSliding = true;
 
+  // A screen change invalidates any pending overlay and unlock result.
+  learnAudioInterrupted = null;
+  if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
+  learnAudioResumeAttempt = null;
+  learnAudioResumeError = "";
+  learnShortInstructionNeedsRender = false;
+  syncLearnAudioResumeOverlay();
   // stop any learn audio/echo sequence when leaving a screen
   cancelLearnAudio();
 
@@ -10687,6 +10814,13 @@ function setScreen(screen) {
     screen !== Screen.NEW_VERSE_PICKER
   ) {
     stopNewVersePickerPreviewAudio();
+  }
+  if (State.screen !== screen) {
+    learnAudioInterrupted = null;
+    if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
+    learnAudioResumeAttempt = null;
+    learnAudioResumeError = "";
+    learnShortInstructionNeedsRender = false;
   }
   State.screen = screen;
   State.slideX = screenToIndex(screen);
@@ -11173,44 +11307,281 @@ function instructionAudioFile(key) {
   return `${AUDIO_DIR}instructions_${key}.mp3`;
 }
 
+// The overlay lives outside #app, so rendering a recovery control never
+// changes the verse card's fit measurements or the bottom coach region.
+function isLearnAudioOverlayRecovery(recovery) {
+  return !!recovery && recovery.screen === State.screen &&
+    ["listen", "chunk", "echo"].includes(recovery.mode);
+}
+
+function ensureLearnAudioResumeOverlay() {
+  let overlay = document.getElementById("learnAudioResumeOverlay");
+  if (overlay) return overlay;
+  if (!document.body) return null;
+
+  const style = document.createElement("style");
+  style.id = "learnAudioResumeStyle";
+  style.textContent = `
+    #learnAudioResumeOverlay[hidden] { display: none !important; }
+    #learnAudioResumeOverlay {
+      position: fixed; inset: 0; z-index: 10020;
+      display: flex; align-items: center; justify-content: center;
+      padding: max(20px, env(safe-area-inset-top)) 20px
+        max(20px, env(safe-area-inset-bottom));
+      background: rgba(24, 15, 44, .76); box-sizing: border-box;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-card {
+      box-sizing: border-box; width: min(100%, 390px);
+      padding: 26px 24px 28px; text-align: center;
+      border-radius: 24px; background: #fdf7eb;
+      color: #302247; box-shadow: 0 16px 44px rgba(0,0,0,.35);
+      font-family: 'Baloo 2', 'Baloo2', system-ui, sans-serif;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-icon {
+      display: block; width: 88px; height: 88px;
+      object-fit: contain; margin: 0 auto 10px;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-title {
+      margin: 0 0 18px; font-size: clamp(27px, 7vw, 34px);
+      line-height: 1.15; font-weight: 800;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-button {
+      display: block; width: 100%; min-height: 56px;
+      border: none; border-radius: 16px; cursor: pointer;
+      background: #ffc751; color: #302247;
+      font: 800 21px/1.2 'Baloo 2', 'Baloo2', system-ui, sans-serif;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-button:disabled {
+      opacity: .68; cursor: wait;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-status {
+      margin: 12px 0 0; font-size: 14px; line-height: 1.35;
+    }
+    #learnAudioResumeOverlay .learn-audio-resume-status[hidden] {
+      display: none;
+    }
+  `;
+  document.head.appendChild(style);
+
+  overlay = document.createElement("div");
+  overlay.id = "learnAudioResumeOverlay";
+  overlay.hidden = true;
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "learnAudioResumeTitle");
+  overlay.innerHTML = `
+    <div class="learn-audio-resume-card">
+      <img class="learn-audio-resume-icon" src="${IMG_DIR}button_learn.png"
+        alt="" draggable="false" onerror="this.hidden=true">
+      <h2 class="learn-audio-resume-title" id="learnAudioResumeTitle">Ready to Continue?</h2>
+      <button class="learn-audio-resume-button no-zoom"
+        id="learnAudioResumeButton" type="button" data-no-ui-sound>
+        ▶ Resume Audio
+      </button>
+      <p class="learn-audio-resume-status" id="learnAudioResumeStatus"
+        role="status" aria-live="polite" hidden></p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.querySelector("#learnAudioResumeButton").onclick = resumeInterruptedLearnAudio;
+  return overlay;
+}
+
+function syncLearnAudioResumeOverlay() {
+  const recovery = learnAudioResumeAttempt?.recovery || learnAudioInterrupted;
+  const show = !document.hidden && !learnMenuOpen &&
+    isLearnAudioOverlayRecovery(recovery);
+  const existing = document.getElementById("learnAudioResumeOverlay");
+  if (!show) {
+    if (existing) existing.hidden = true;
+    return;
+  }
+  const overlay = ensureLearnAudioResumeOverlay();
+  if (!overlay) return;
+  overlay.hidden = false;
+  const button = overlay.querySelector("#learnAudioResumeButton");
+  button.disabled = !!learnAudioResumeAttempt;
+  button.textContent = muted ? "Unmute & Resume Audio" : "▶ Resume Audio";
+  const status = overlay.querySelector("#learnAudioResumeStatus");
+  status.textContent = learnAudioResumeAttempt
+    ? "Restoring audio…"
+    : learnAudioResumeError;
+  status.hidden = !status.textContent;
+}
+
+function finishLearnAudioResumeAttempt(attempt) {
+  if (learnAudioResumeAttempt !== attempt || !attempt.playStarted ||
+      !attempt.audioReady || document.hidden || State.screen !== attempt.recovery.screen) {
+    return;
+  }
+  clearTimeout(attempt.watchdog);
+  learnAudioResumeAttempt = null;
+  learnAudioResumeError = "";
+  syncLearnAudioResumeOverlay();
+}
+
+function failLearnAudioResumeAttempt(attempt) {
+  if (learnAudioResumeAttempt !== attempt) return;
+  clearTimeout(attempt.watchdog);
+  learnAudioResumeAttempt = null;
+  cancelLearnAudio();
+  if (State.screen !== attempt.recovery.screen) {
+    syncLearnAudioResumeOverlay();
+    return;
+  }
+  learnAudioInterrupted = attempt.recovery;
+  learnAudioResumeError = "Audio isn't ready yet. Tap Resume Audio to try again.";
+  if (!document.hidden) render();
+}
+
+function resumeInterruptedLearnAudio() {
+  const recovery = learnAudioInterrupted;
+  if (document.hidden || learnMenuOpen || learnAudioResumeAttempt ||
+      !isLearnAudioOverlayRecovery(recovery)) return false;
+
+  // Both operations begin inside this genuine tap: Web Audio may need resume,
+  // while HTMLAudioElement.play() must not be deferred until after an await.
+  if (muted) toggleMute();
+  const audioReady = unlockAppAudio();
+  const attempt = { recovery, playStarted: false, audioReady: false };
+  learnAudioResumeAttempt = attempt;
+  learnAudioInterrupted = null;
+  learnAudioResumeError = "";
+
+  if (recovery.mode === "listen") {
+    listenPlay(recovery.listenMode);
+  } else if (recovery.mode === "chunk") {
+    learnAudioInterrupted = recovery;
+    void startChunkFlow();
+  } else if (recovery.mode === "echo") {
+    learnAudioInterrupted = recovery;
+    void startEchoFlow();
+  }
+
+  // HTMLMediaElement.play() itself can hang while WebKit restores media.
+  // Never leave the overlay button disabled indefinitely.
+  attempt.watchdog = setTimeout(() => failLearnAudioResumeAttempt(attempt), 3500);
+  void Promise.resolve(audioReady).then(ready => {
+    if (learnAudioResumeAttempt !== attempt) return;
+    if (!ready) return failLearnAudioResumeAttempt(attempt);
+    attempt.audioReady = true;
+    finishLearnAudioResumeAttempt(attempt);
+  }, () => failLearnAudioResumeAttempt(attempt));
+  syncLearnAudioResumeOverlay();
+  return true;
+}
+
+function pauseLearnAudioForInterruption() {
+  if (learnMenuOpen) return;
+  if (learnAudioResumeAttempt) {
+    // A second background event while restoration is pending cannot be
+    // allowed to complete the old attempt after a later foreground return.
+    const recovery = learnAudioResumeAttempt.recovery;
+    clearTimeout(learnAudioResumeAttempt.watchdog);
+    learnAudioResumeAttempt = null;
+    cancelLearnAudio();
+    learnAudioInterrupted = recovery;
+    return;
+  }
+  if (learnAudioInterrupted) return;
+  const screen = State.screen;
+
+  // These short narrations are also printed on screen. End their audio-only
+  // wait and make the ORIGINAL instruction button available on return.
+  if (screen === Screen.LEARN_INSTRUCTION && !State.learnInstructionReady) {
+    cancelLearnAudio();
+    State.learnInstructionAudioStarted = true;
+    State.learnInstructionReady = true;
+    learnShortInstructionNeedsRender = true;
+    return;
+  }
+  if (State.instructionPlaying && activeLearnInstructionRequest &&
+      [Screen.LISTEN, Screen.MEANING].includes(screen)) {
+    const request = activeLearnInstructionRequest;
+    cancelLearnAudio();
+    if (request.doneFlag) State[request.doneFlag] = true;
+    learnShortInstructionNeedsRender = true;
+    return;
+  }
+
+  let recovery = null;
+  if (screen === Screen.CHUNKS && (State.chunkRunning || State.chunkAutoStarting)) {
+    recovery = { screen, mode: "chunk", index: State.chunkRunning ? State.chunkIndex : 0 };
+  } else if (screen === Screen.ECHO && (State.echoRunning || State.echoAutoStarting)) {
+    recovery = { screen, mode: "echo", index: State.echoRunning ? State.echoIndex : 0 };
+  } else if (screen === Screen.LISTEN && (State.listenPlaying || State.listenAutoStarting)) {
+    recovery = { screen, mode: "listen", listenMode: State.listenPlaying ? State.audioMode : "listen_ref" };
+  }
+  if (!recovery) return;
+
+  cancelLearnAudio();
+  learnAudioInterrupted = recovery;
+  learnAudioResumeError = "";
+  State.listenAutoStarting = false;
+  State.listenAutoFallbackReady = true;
+  State.chunkAutoStarting = false;
+  State.chunkAutoFallbackReady = true;
+  State.echoAutoStarting = false;
+  State.echoAutoFallbackReady = true;
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseLearnAudioForInterruption();
+  else if (learnAudioInterrupted || learnShortInstructionNeedsRender) {
+    learnShortInstructionNeedsRender = false;
+    render();
+  }
+});
+window.addEventListener("pagehide", pauseLearnAudioForInterruption);
+window.addEventListener("pageshow", () => {
+  if (!document.hidden && (learnAudioInterrupted || learnShortInstructionNeedsRender)) {
+    learnShortInstructionNeedsRender = false;
+    render();
+  }
+});
+
 function waitForAudioEnd() {
   return new Promise((resolve) => {
-    const onEnd = () => {
+    let settled = false;
+    const finish = (completed) => {
+      if (settled) return;
+      settled = true;
       audioEl.removeEventListener("ended", onEnd);
-      resolve();
+      audioEl.removeEventListener("error", onError);
+      if (activeLearnAudioWaitCancel === cancel) activeLearnAudioWaitCancel = null;
+      resolve(completed);
     };
+    const onEnd = () => finish(true);
+    const onError = () => finish(false);
+    const cancel = () => finish(false);
+    if (activeLearnAudioWaitCancel) activeLearnAudioWaitCancel();
+    activeLearnAudioWaitCancel = cancel;
     audioEl.addEventListener("ended", onEnd);
+    audioEl.addEventListener("error", onError);
   });
 }
 
-function waitForPausableDelay(ms) {
+function waitForPausableDelay(ms, generation = echoCancelToken) {
   return new Promise((resolve) => {
     let remaining = ms;
     let last = performance.now();
 
     function tick() {
+      if (generation !== echoCancelToken) return resolve(false);
       const now = performance.now();
-
-      if (!learnMenuOpen) {
-        remaining -= (now - last);
-      }
-
+      if (!learnMenuOpen && !document.hidden) remaining -= now - last;
       last = now;
-
-      if (remaining <= 0) {
-        resolve();
-        return;
-      }
-
+      if (remaining <= 0) return resolve(true);
       setTimeout(tick, 50);
     }
-
     tick();
   });
 }
 
 async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null } = {}) {
+  if (document.hidden) return;
   const my = ++echoCancelToken;
+  activeLearnInstructionRequest = { key, doneFlag, delayMs, after };
 
   State.instructionPlaying = true;
   State.instructionKey = key;
@@ -11230,6 +11601,13 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
     try {
       await safePlay();
     } catch (e) {
+      if (my !== echoCancelToken || document.hidden) return;
+      if (e?.name === "NotAllowedError" || e?.name === "AbortError") {
+        // Short instructions are readable on screen. The next normal
+        // activity button provides the gesture for reactivating audio.
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
       showDialog({
         title: "Instruction audio missing",
         body: `Couldn't play: ${file}`,
@@ -11238,8 +11616,12 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
       return;
     }
 
-    await waitForAudioEnd();
-    if (my !== echoCancelToken) return;
+    const ended = await waitForAudioEnd();
+    if (my !== echoCancelToken || document.hidden) return;
+    if (!ended) {
+      if (doneFlag) State[doneFlag] = true;
+      return;
+    }
 
     if (doneFlag) {
       State[doneFlag] = true;
@@ -11256,6 +11638,7 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
     }
   } finally {
     if (my === echoCancelToken) {
+      activeLearnInstructionRequest = null;
       State.instructionPlaying = false;
       State.instructionKey = "";
       if (State.audioMode === "instruction") {
@@ -11267,27 +11650,32 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
   }
 }
 
-function listenPlay() {
+function listenPlay(resumeMode = "listen_ref") {
+  if (document.hidden) return;
+  const mode = resumeMode === "listen_verse" ? "listen_verse" : "listen_ref";
+  learnAudioInterrupted = null;
   State.listenAutoStarting = false;
   State.listenAutoFallbackReady = false;
   State.listenPlaying = true;
   State.listenDone = false;
-  State.audioMode = "listen_ref";
+  State.audioMode = mode;
 
-  setAudioSrc(refAudioFile());
+  setAudioSrc(mode === "listen_verse" ? AUDIO_FILE : refAudioFile());
   audioEl.currentTime = 0;
 
   safePlay()
     .then(() => {
-      render();
+      if (State.screen === Screen.LISTEN && State.listenPlaying && !document.hidden) render();
     })
     .catch(() => {
+      if (document.hidden || learnAudioInterrupted || State.screen !== Screen.LISTEN) return;
       State.listenPlaying = false;
       State.listenAutoStarting = false;
       State.listenAutoFallbackReady = true;
       State.audioMode = null;
       render();
 
+      if (document.hidden || learnAudioInterrupted || State.screen !== Screen.LISTEN) return;
       showDialog({
         title: "Reference audio missing",
         body: `Couldn't play: ${refAudioFile()}`,
@@ -11297,7 +11685,8 @@ function listenPlay() {
 }
 
 audioEl.addEventListener("ended", () => {
-  if (State.screen === Screen.LISTEN && State.audioMode === "listen_ref") {
+  if (document.hidden || learnAudioInterrupted) return;
+  if (State.screen === Screen.LISTEN && State.listenPlaying && State.audioMode === "listen_ref") {
     State.audioMode = "listen_verse";
 
     setAudioSrc(AUDIO_FILE);
@@ -11305,9 +11694,10 @@ audioEl.addEventListener("ended", () => {
 
     safePlay()
       .then(() => {
-        render();
+        if (State.screen === Screen.LISTEN && State.listenPlaying && !document.hidden) render();
       })
       .catch(() => {
+        if (document.hidden || learnAudioInterrupted || State.screen !== Screen.LISTEN) return;
         State.listenPlaying = false;
         State.audioMode = null;
         render();
@@ -11322,7 +11712,7 @@ audioEl.addEventListener("ended", () => {
     return;
   }
 
-  if (State.screen === Screen.LISTEN && State.audioMode === "listen_verse") {
+  if (State.screen === Screen.LISTEN && State.listenPlaying && State.audioMode === "listen_verse") {
     State.listenPlaying = false;
     State.audioMode = null;
     State.listenDone = true;
@@ -11450,7 +11840,8 @@ function goToListenAndStart() {
       State.screen === Screen.LISTEN &&
       State.listenAutoStarting &&
       !State.listenPlaying &&
-      !State.listenDone
+      !State.listenDone &&
+      !learnAudioInterrupted && !learnAudioResumeAttempt
     ) {
       listenPlay();
     }
@@ -11461,7 +11852,8 @@ function goToListenAndStart() {
       State.screen === Screen.LISTEN &&
       State.listenAutoStarting &&
       !State.listenPlaying &&
-      !State.listenDone
+      !State.listenDone &&
+      !learnAudioInterrupted && !learnAudioResumeAttempt
     ) {
       State.listenAutoFallbackReady = true;
       render();
@@ -11481,7 +11873,8 @@ function goToChunksAndStart() {
       State.screen === Screen.CHUNKS &&
       State.chunkAutoStarting &&
       !State.chunkRunning &&
-      State.chunkPassCount < 2
+      State.chunkPassCount < 2 &&
+      !learnAudioInterrupted && !learnAudioResumeAttempt
     ) {
       startChunkFlow();
     } else {
@@ -11496,7 +11889,8 @@ function goToChunksAndStart() {
       State.screen === Screen.CHUNKS &&
       State.chunkAutoStarting &&
       !State.chunkRunning &&
-      State.chunkPassCount < 2
+      State.chunkPassCount < 2 &&
+      !learnAudioInterrupted && !learnAudioResumeAttempt
     ) {
       State.chunkAutoFallbackReady = true;
       render();
@@ -11526,7 +11920,8 @@ function goToEchoAndStart() {
     if (
       State.echoAutoStarting &&
       !State.echoRunning &&
-      !State.echoDone
+      !State.echoDone &&
+      !learnAudioInterrupted && !learnAudioResumeAttempt
     ) {
       startEchoFlow();
     }
@@ -11537,7 +11932,8 @@ function goToEchoAndStart() {
       State.screen === Screen.ECHO &&
       State.echoAutoStarting &&
       !State.echoRunning &&
-      !State.echoDone
+      !State.echoDone &&
+      !learnAudioInterrupted && !learnAudioResumeAttempt
     ) {
       State.echoAutoFallbackReady = true;
       render();
@@ -11791,7 +12187,11 @@ async function startFinalRecallFlow() {
 }
 
 async function startChunkFlow() {
-  if (State.chunkRunning) return;
+  if (State.chunkRunning || document.hidden) return;
+  const startIndex = learnAudioInterrupted?.mode === "chunk" &&
+    learnAudioInterrupted.screen === Screen.CHUNKS
+    ? learnAudioInterrupted.index : 0;
+  learnAudioInterrupted = null;
 
   State.chunkAutoStarting = false;
   State.chunkAutoFallbackReady = false;
@@ -11799,22 +12199,23 @@ async function startChunkFlow() {
   // cancel any prior learn audio sequence
   cancelLearnAudio();
 
-  await runChunkSequence();
+  await runChunkSequence(startIndex);
 }
 
-async function runChunkSequence() {
+async function runChunkSequence(startIndex = 0) {
   const my = ++echoCancelToken;
+  let completed = false;
 
   State.chunkDone = false;
   State.chunkRunning = true;
-  State.chunkIndex = 0;
+  State.chunkIndex = startIndex;
   State.audioMode = "chunk";
   render();
 
   try {
     const learnParts = getLearnAudioParts();
 
-    for (let i = 0; i < learnParts.length; i++) {
+    for (let i = startIndex; i < learnParts.length; i++) {
       if (my !== echoCancelToken) return;
 
       const part = learnParts[i];
@@ -11829,45 +12230,40 @@ async function runChunkSequence() {
       try {
         await safePlay();
       } catch (e) {
-        showDialog({
-          title: "Learn audio missing",
-          body: `Couldn't play: ${file}`,
-          actions: [dlgBtn("OK", { onClick: closeDialog })]
-        });
+        if (my !== echoCancelToken || document.hidden) return;
+        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
         return;
       }
 
-      await new Promise((resolve) => {
-        const onEnd = () => {
-          audioEl.removeEventListener("ended", onEnd);
-          resolve();
-        };
-        audioEl.addEventListener("ended", onEnd);
-      });
-
-      if (my !== echoCancelToken) return;
+      const ended = await waitForAudioEnd();
+      if (my !== echoCancelToken || document.hidden) return;
+      if (!ended) {
+        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
+        return;
+      }
 
       const d = await waitForDuration();
       const pauseMs = (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
-      await waitForPausableDelay(pauseMs);
+      const elapsed = await waitForPausableDelay(pauseMs, my);
 
-      if (my !== echoCancelToken) return;
+      if (!elapsed || my !== echoCancelToken || document.hidden) return;
     }
 
     setAudioSrc(AUDIO_FILE);
     State.audioMode = null;
     State.chunkDone = true;
     State.chunkPassCount = Math.min(2, State.chunkPassCount + 1);
+    completed = true;
   } finally {
     if (my === echoCancelToken) {
       State.chunkRunning = false;
 
-      if (State.screen === Screen.CHUNKS && State.chunkPassCount === 1) {
+      if (completed && State.screen === Screen.CHUNKS && State.chunkPassCount === 1) {
         startLearnInstruction("chunks2");
         return;
       }
 
-      if (State.screen === Screen.CHUNKS && State.chunkPassCount >= 2) {
+      if (completed && State.screen === Screen.CHUNKS && State.chunkPassCount >= 2) {
         startLearnInstruction("echo1");
         return;
       }
@@ -11878,7 +12274,11 @@ async function runChunkSequence() {
 }
 
 async function startEchoFlow() {
-  if (State.echoRunning) return;
+  if (State.echoRunning || document.hidden) return;
+  const startIndex = learnAudioInterrupted?.mode === "echo" &&
+    learnAudioInterrupted.screen === Screen.ECHO
+    ? learnAudioInterrupted.index : 0;
+  learnAudioInterrupted = null;
 
   State.echoAutoStarting = false;
   State.echoAutoFallbackReady = false;
@@ -11886,13 +12286,15 @@ async function startEchoFlow() {
   // cancel any prior
   cancelLearnAudio();
 
-  await runEchoSequence();
+  await runEchoSequence(startIndex);
 }
 
 let echoCancelToken = 0;
 
 function cancelLearnAudio() {
   echoCancelToken++;
+  activeLearnInstructionRequest = null;
+  if (activeLearnAudioWaitCancel) activeLearnAudioWaitCancel();
   try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) { }
 
   State.audioMode = null;
@@ -11905,13 +12307,13 @@ function cancelLearnAudio() {
   State.echoSpeaking = false;
 }
 
-async function runEchoSequence() {
+async function runEchoSequence(startIndex = 0) {
   const my = ++echoCancelToken;
 
   State.echoDone = false;
   State.echoRunning = true;
   State.echoSpeaking = false;
-  State.echoIndex = 0;
+  State.echoIndex = startIndex;
   State.audioMode = "echo";
 
   if (document.querySelector(".learn-screen-echo #btnEcho")) {
@@ -11923,7 +12325,7 @@ async function runEchoSequence() {
   try {
     const learnParts = getLearnAudioParts();
 
-    for (let i = 0; i < learnParts.length; i++) {
+    for (let i = startIndex; i < learnParts.length; i++) {
       if (my !== echoCancelToken) return;
 
       const part = learnParts[i];
@@ -11939,23 +12341,17 @@ async function runEchoSequence() {
       try {
         await safePlay();
       } catch (e) {
-        showDialog({
-          title: "Learn audio missing",
-          body: `Couldn't play: ${file}`,
-          actions: [dlgBtn("OK", { onClick: closeDialog })]
-        });
+        if (my !== echoCancelToken || document.hidden) return;
+        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
         return;
       }
 
-      await new Promise((resolve) => {
-        const onEnd = () => {
-          audioEl.removeEventListener("ended", onEnd);
-          resolve();
-        };
-        audioEl.addEventListener("ended", onEnd);
-      });
-
-      if (my !== echoCancelToken) return;
+      const ended = await waitForAudioEnd();
+      if (my !== echoCancelToken || document.hidden) return;
+      if (!ended) {
+        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+        return;
+      }
 
       State.echoSpeaking = true;
       updateEchoStageState();
@@ -11963,9 +12359,9 @@ async function runEchoSequence() {
       // Give the child time to repeat: duration × 1.25 (fallback 2s if unknown)
       const d = await waitForDuration();
       const repeatMs = (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
-      await waitForPausableDelay(repeatMs);
+      const elapsed = await waitForPausableDelay(repeatMs, my);
 
-      if (my !== echoCancelToken) return;
+      if (!elapsed || my !== echoCancelToken || document.hidden) return;
 
       State.echoSpeaking = false;
       updateEchoStageState();
@@ -20842,6 +21238,7 @@ function screenLearnInstruction(idx) {
   const title = cfg?.title || "";
   const subtext = cfg?.subtext || "";
   const button = cfg?.button || "Continue";
+  const instructionButtonEnabled = State.learnInstructionReady;
   const isGamesInstruction = State.learnInstructionKey === "games";
   const actionsClassName =
     `learn-instruction-actions${isGamesInstruction ? " is-split" : ""}`;
@@ -20885,11 +21282,11 @@ function screenLearnInstruction(idx) {
           ${homeButtonHtml}
 
           <button
-            class="carousel-main no-zoom learn-instruction-btn ${State.learnInstructionReady ? "is-ready" : "is-waiting"}"
+            class="carousel-main no-zoom learn-instruction-btn ${instructionButtonEnabled ? "is-ready" : "is-waiting"}"
             id="btnLearnInstructionContinue"
             type="button"
-            ${State.learnInstructionReady ? "" : "disabled"}
-            aria-disabled="${State.learnInstructionReady ? "false" : "true"}"
+            ${instructionButtonEnabled ? "" : "disabled"}
+            aria-disabled="${instructionButtonEnabled ? "false" : "true"}"
           >
             ${button}
           </button>
@@ -20946,6 +21343,9 @@ function screenListen(idx) {
     State.listenAutoStarting ||
     State.listenPlaying ||
     State.listenDone ||
+    isLearnAudioOverlayRecovery(learnAudioInterrupted) ||
+    !!learnAudioResumeAttempt?.recovery &&
+      learnAudioResumeAttempt.recovery.screen === Screen.LISTEN ||
     isListenSlideExiting ||
     (State.instructionPlaying && State.instructionKey === "meaning");
 
@@ -20988,6 +21388,9 @@ function screenListen(idx) {
         isListenSlideExiting ||
         State.listenPlaying ||
         State.instructionPlaying ||
+        isLearnAudioOverlayRecovery(learnAudioInterrupted) ||
+        !!learnAudioResumeAttempt?.recovery &&
+          learnAudioResumeAttempt.recovery.screen === Screen.LISTEN ||
         (State.listenAutoStarting && !State.listenAutoFallbackReady)
       )
         ? ``
@@ -20996,8 +21399,8 @@ function screenListen(idx) {
                     ${State.listenDone
           ? "What It Means"
           : State.listenAutoFallbackReady
-            ? "Tap to Play Verse"
-            : "🔊 Read it to me"
+              ? "Tap to Play Verse"
+              : "🔊 Read it to me"
         }
                   </button>
                 `
@@ -21082,7 +21485,6 @@ function screenChunks(idx) {
   const isChunkSlideExiting = State.screen !== Screen.CHUNKS;
 
   let buttonLabel = "▶ Start";
-
   if (State.chunkPassCount === 1) {
     buttonLabel = "One More Time";
   } else if (State.chunkPassCount >= 2) {
@@ -21092,6 +21494,9 @@ function screenChunks(idx) {
   const showChunkAction = !(
     isChunkSlideExiting ||
     State.chunkRunning ||
+    isLearnAudioOverlayRecovery(learnAudioInterrupted) ||
+    !!learnAudioResumeAttempt?.recovery &&
+      learnAudioResumeAttempt.recovery.screen === Screen.CHUNKS ||
     State.instructionPlaying ||
     (State.chunkAutoStarting && !State.chunkAutoFallbackReady)
   );
@@ -21153,6 +21558,9 @@ function screenEcho(idx) {
   const showEchoAction = !(
     isEchoSlideExiting ||
     State.echoRunning ||
+    isLearnAudioOverlayRecovery(learnAudioInterrupted) ||
+    !!learnAudioResumeAttempt?.recovery &&
+      learnAudioResumeAttempt.recovery.screen === Screen.ECHO ||
     State.instructionPlaying ||
     (State.echoAutoStarting && !State.echoAutoFallbackReady)
   );
@@ -21993,6 +22401,7 @@ function render() {
       }
     });
   }
+  syncLearnAudioResumeOverlay();
 }
 
 /* =========================
@@ -22050,22 +22459,22 @@ function setupAppUiTapSounds() {
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget) return;
 
-    // Start/resume the context immediately inside the gesture.
-    const ctx = getAppAudioContext();
-    if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
-      ctx.resume().catch(() => { });
-    }
-
-    // Still unlock/prime the shared app audio path.
-    unlockAppAudio();
+    // Start/resume from the touch gesture. A newly unlocked context may
+    // settle just after this handler, so provide one short-lived tap response.
+    const unlockPromise = unlockAppAudio();
     preloadUiTapSoundBuffers();
-
-    // If the MP3 pop buffers are ready, use the real shared pop sounds.
-    // Otherwise, play a generated pop immediately inside this same gesture.
-    if (uiTapBuffers.length) {
+    if (appAudioUnlocked && !appAudioRecoveryPending && uiTapBuffers.length) {
       playUiTapSound({ force: true });
-    } else {
+    } else if (appAudioUnlocked && !appAudioRecoveryPending) {
       playUiTapFallbackNow();
+    } else {
+      void unlockPromise.then(ready => {
+        if (ready && !document.hidden && !muted &&
+            performance.now() - now < 300) {
+          if (uiTapBuffers.length) playUiTapSound({ force: true });
+          else playUiTapFallbackNow();
+        }
+      });
     }
   }
 
@@ -22079,25 +22488,16 @@ function setupAppUiTapSounds() {
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget) return;
 
-    const ctx = getAppAudioContext();
-    if (ctx && ctx.state === "suspended" && typeof ctx.resume === "function") {
-      ctx.resume().catch(() => { });
-    }
-
+    const started = performance.now();
     const unlockPromise = unlockAppAudio();
     preloadUiTapSoundBuffers();
 
-    if (uiTapBuffers.length) {
-      void unlockPromise.then((unlocked) => {
-        if (unlocked) {
-          playUiTapSound({ force: true });
-        } else {
-          playUiTapFallbackNow();
-        }
-      });
-    } else {
-      playUiTapFallbackNow();
-    }
+    void unlockPromise.then((unlocked) => {
+      if (!unlocked || muted || document.hidden ||
+          performance.now() - started >= 300) return;
+      if (uiTapBuffers.length) playUiTapSound({ force: true });
+      else playUiTapFallbackNow();
+    });
   }, true);
 }
 

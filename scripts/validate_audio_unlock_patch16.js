@@ -364,7 +364,8 @@ function testTrafficTapEffectsDontAutoResume() {
 
 function testCacheVersion() {
   const sw = read("service-worker.js");
-  assert.match(sw, /2026_Oct_16_traffic_tap_audio_recovery_y/);
+  // Later patches legitimately change the cache key. Verify it stays versioned.
+  assert.match(sw, /const CACHE_VERSION = "\d{4}_[^"]+";/);
 }
 
 async function main() {
