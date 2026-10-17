@@ -175,6 +175,18 @@
     wackyReplayPlaying = false;
   }
 
+  // A return from the background never restarts recorded audio automatically.
+  function interruptWackyPlayback() {
+    if (!wackyReplayPlaying) return;
+    stopWackyPlayback();
+    requestRender();
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) interruptWackyPlayback();
+  });
+  window.addEventListener("pagehide", interruptWackyPlayback);
+
   function resetWackyReplayRun() {
     stopWackyPlayback();
     wackyReplayUnlocked = false;
@@ -971,7 +983,6 @@
       return;
     }
 
-    consumeWackyReplay();
     wackyReplayPlaying = true;
     wackyReplayMessage = "";
 
@@ -979,22 +990,43 @@
     const request =
       ++wackyPlaybackRequest;
 
+    // A stalled browser promise must not hold the Wacky button disabled.
+    // The timeout guards *startup*, not the full length of the verse.
+    let started = false;
+    let startupTimer = null;
+    const startupTimeout = new Promise((resolve) => {
+      startupTimer = window.setTimeout(() => resolve("timeout"), 18000);
+    });
+    const playback = recording.playFun(preset, () => {
+      if (request !== wackyPlaybackRequest || document.hidden) return;
+      started = true;
+      if (startupTimer !== null) {
+        window.clearTimeout(startupTimer);
+        startupTimer = null;
+      }
+      consumeWackyReplay();
+    }).then((result) => result === true ? "completed" : "failed", () => "failed");
+
+    // Begin context activation directly on the tap, before re-rendering UI.
     requestRender();
-
-    const completed =
-      await recording.playFun(preset);
-
-    if (
-      request !== wackyPlaybackRequest
-    ) {
+    const outcome = await Promise.race([playback, startupTimeout]);
+    if (outcome === "timeout" && !started && request === wackyPlaybackRequest) {
+      // Invalidates outstanding async audio setup before it can start later.
+      stopWackyPlayback();
+      wackyReplayMessage = "Wacky Replay couldn't start. Tap Wacky Replay to try again.";
+      requestRender();
       return;
     }
+    if (startupTimer !== null) window.clearTimeout(startupTimer);
 
+    if (request !== wackyPlaybackRequest) return;
     wackyReplayPlaying = false;
 
+    const completed = outcome === "completed";
     if (!completed) {
-      wackyReplayMessage =
-        "Wacky Replay couldn't play, but you can still continue.";
+      wackyReplayMessage = wackyReplayConsumed
+        ? "Wacky Replay stopped. You can still continue."
+        : "Wacky Replay couldn't start. Tap Wacky Replay to try again.";
     }
 
     requestRender();
@@ -1005,7 +1037,8 @@
     const bars = wrap.querySelectorAll(".flashcards-meter-bars i");
     const meter = wrap.querySelector(".flashcards-meter");
     if (!meter || recording?.snapshot().status !== "recording") return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // Level feedback confirms capture even when Reduced Motion is enabled.
+    // Only the comparison transitions, not this essential meter, are decorative.
     let level = 0;
     const sample = () => {
       if (!wrap.isConnected || recording.snapshot().status !== "recording") return;
@@ -1013,7 +1046,7 @@
       const label = meter.querySelector(".flashcards-meter-label");
       const text = remaining <= 10 ? `● ${remaining}s left` : "● Recording";
       if (label && label.textContent !== text) label.textContent = text;
-      const value = reduced.matches ? null : recording.readLevel();
+      const value = recording.readLevel();
       meter.classList.toggle("is-static", value === null);
       level = value === null ? 0 : Math.max(value, level * 0.85);
       bars.forEach((bar, index) => bar.classList.toggle("is-lit", index < Math.ceil(level * bars.length)));

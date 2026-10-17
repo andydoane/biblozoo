@@ -28,17 +28,79 @@
     let message = "";
     let playbackComplete = false;
     let playbackFailed = false;
+    let playbackRequest = 0;
     let meterContext = null;
     let meterSource = null;
+    let meterSink = null;
     let analyser = null;
     let samples = null;
+    let meterResumeAttempts = 0;
+    let meterResumePending = false;
+    let meterActivationToken = 0;
+    let meterResumeTimeout = null;
+    let meterRetryTimer = null;
+    let meterReconnectTimer = null;
+    let meterReconnectAttempts = 0;
+    const METER_MAX_RESUME_ATTEMPTS = 4;
+
+    function meterMayRun() {
+      return !document.hidden &&
+        ["requesting", "preparing", "recording"].includes(status);
+    }
 
     function closeMeter() {
+      // Invalidate old resume promises and reconnect timers before closing.
+      meterActivationToken += 1;
+      meterResumePending = false;
+      clearTimeout(meterResumeTimeout);
+      clearTimeout(meterRetryTimer);
+      clearTimeout(meterReconnectTimer);
+      meterResumeTimeout = meterRetryTimer = meterReconnectTimer = null;
       try { meterSource?.disconnect(); } catch (_) {}
       try { analyser?.disconnect(); } catch (_) {}
+      try { meterSink?.disconnect(); } catch (_) {}
       const context = meterContext;
-      meterContext = meterSource = analyser = samples = null;
-      if (context) void context.close().catch(() => {});
+      meterContext = meterSource = meterSink = analyser = samples = null;
+      if (context) {
+        try { Promise.resolve(context.close()).catch(() => {}); } catch (_) {}
+      }
+    }
+
+    function resumeMeter() {
+      const context = meterContext;
+      if (!context || !meterMayRun() || context.state === "running" ||
+          context.state === "closed" || meterResumePending ||
+          meterRetryTimer !== null ||
+          meterResumeAttempts >= METER_MAX_RESUME_ATTEMPTS) return;
+
+      meterResumePending = true;
+      meterResumeAttempts += 1;
+      const token = ++meterActivationToken;
+      const finish = () => {
+        if (token !== meterActivationToken || context !== meterContext ||
+            !meterResumePending) return;
+        clearTimeout(meterResumeTimeout);
+        meterResumeTimeout = null;
+        meterResumePending = false;
+        if (context.state !== "running" && stream && meterMayRun() &&
+            meterResumeAttempts < METER_MAX_RESUME_ATTEMPTS &&
+            meterRetryTimer === null) {
+          // Short, bounded recovery window; never repeatedly restart the mic.
+          meterRetryTimer = setTimeout(() => {
+            meterRetryTimer = null;
+            resumeMeter();
+          }, 450);
+        }
+      };
+
+      // Invoke resume synchronously on the initial Record tap when possible.
+      // iOS may reject, suspend again on microphone acquisition, or never settle.
+      try {
+        Promise.resolve(context.resume()).then(finish, finish);
+      } catch (_) {
+        finish();
+      }
+      if (meterResumePending) meterResumeTimeout = setTimeout(finish, 1500);
     }
 
     function prepareMeter() {
@@ -46,37 +108,71 @@
         const Context = window.AudioContext || window.webkitAudioContext;
         if (!Context) return;
         meterContext = new Context();
-        // Called from the Record/Re-record gesture for iOS audio activation.
-        void meterContext.resume().catch(() => {});
+        resumeMeter();
       } catch (_) { closeMeter(); }
+    }
+
+    function reconnectMeterOnce() {
+      if (!stream || !meterMayRun() || meterReconnectAttempts >= 1 ||
+          meterReconnectTimer !== null) return;
+      meterReconnectAttempts += 1;
+      const current = generation;
+      meterReconnectTimer = setTimeout(() => {
+        meterReconnectTimer = null;
+        if (current !== generation || !stream || !meterMayRun()) return;
+        prepareMeter();
+        connectMeter();
+      }, 400);
     }
 
     function connectMeter() {
       try {
-        if (!meterContext) return;
+        if (!stream || !meterContext) {
+          reconnectMeterOnce();
+          return;
+        }
         analyser = meterContext.createAnalyser();
         analyser.fftSize = 256;
         samples = new Uint8Array(analyser.fftSize);
         meterSource = meterContext.createMediaStreamSource(stream);
+        // Safari needs the graph to be pulled by an output. A zero-gain sink
+        // keeps the meter active without sending microphone sound to speakers.
+        meterSink = meterContext.createGain();
+        meterSink.gain.value = 0;
         meterSource.connect(analyser);
-        // Never connect the microphone to the speakers.
-      } catch (_) { closeMeter(); }
+        analyser.connect(meterSink);
+        meterSink.connect(meterContext.destination);
+        // Recheck after getUserMedia: iOS may suspend the earlier activation.
+        resumeMeter();
+      } catch (_) {
+        closeMeter();
+        reconnectMeterOnce();
+      }
     }
 
     function readLevel() {
-      if (status !== "recording" || meterContext?.state !== "running" || !analyser) return null;
+      if (status !== "recording") return null;
+      if (meterContext?.state !== "running" || !analyser) {
+        resumeMeter();
+        return null;
+      }
       try {
         analyser.getByteTimeDomainData(samples);
         let sum = 0;
         for (const sample of samples) sum += ((sample - 128) / 128) ** 2;
         const rms = Math.sqrt(sum / samples.length);
         return Math.max(0, Math.min(1, (20 * Math.log10(Math.max(rms, 0.00001)) + 55) / 55));
-      } catch (_) { closeMeter(); return null; }
+      } catch (_) {
+        closeMeter();
+        reconnectMeterOnce();
+        return null;
+      }
     }
     const notify = () => onChange?.();
     const stopTracks = (value) => value?.getTracks().forEach((track) => track.stop());
 
     function dispose() {
+      playbackRequest += 1;
       stopFun();
       playbackComplete = false;
       playbackFailed = false;
@@ -85,6 +181,8 @@
       recordingDeadline = 0;
       generation += 1;
       closeMeter();
+      meterResumeAttempts = 0;
+      meterReconnectAttempts = 0;
       clearTimeout(stopTimer);
       stopTimer = null;
       if (recorder) {
@@ -119,8 +217,9 @@
       dispose();
       const current = generation;
       let requestingMicrophonePermission = false;
-      prepareMeter();
       status = "requesting";
+      // Start Web Audio on the user's Record gesture, not a later promise.
+      prepareMeter();
       notify();
       try {
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
@@ -167,7 +266,8 @@
           url = URL.createObjectURL(blob);
           player = new Audio(url);
           player.onended = () => {
-            if (current !== generation) return;
+            if (current !== generation || document.hidden ||
+              (status !== "playing" && status !== "loading")) return;
             playbackComplete = true;
             playbackFailed = false;
             message = "";
@@ -175,7 +275,7 @@
             notify();
           };
           player.onerror = () => {
-            if (current !== generation) return;
+            if (current !== generation || document.hidden) return;
             playbackFailed = true;
             status = "ready";
             message = "This recording couldn't play. You can re-record or continue.";
@@ -200,6 +300,8 @@
         if (current !== generation) return "cancelled";
         recorder.start();
         status = "recording";
+        // Microphone startup can change the iOS audio session a second time.
+        resumeMeter();
         const requestedLimit = getLimitMs();
         const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 120000;
         recordingDeadline = performance.now() + limit;
@@ -238,6 +340,7 @@
     }
 
     function pause() {
+      playbackRequest += 1; // A late play() result cannot revive paused audio.
       if (!player) return;
       player.pause();
       if (status === "playing" || status === "loading") {
@@ -251,6 +354,7 @@
       if (status === "playing") { pause(); return; }
       stopFun();
       const current = generation;
+      const request = ++playbackRequest;
       const audio = player;
       playbackFailed = false;
       message = "";
@@ -259,10 +363,15 @@
       try {
         audio.currentTime = 0;
         await audio.play();
-        if (current !== generation || status !== "loading") { audio.pause(); return; }
+        // A late result from an older attempt must not pause a newer one.
+        if (current !== generation || request !== playbackRequest) return;
+        if (document.hidden || status !== "loading") {
+          audio.pause();
+          return;
+        }
         status = "playing";
       } catch (_) {
-        if (current !== generation) return;
+        if (current !== generation || request !== playbackRequest || document.hidden) return;
         status = "ready";
         message = "Playback couldn't start. Tap Play to try again.";
         playbackFailed = true;
@@ -276,7 +385,7 @@
         ?.stop?.() === true;
     }
 
-    async function playFun(preset) {
+    async function playFun(preset, onStarted) {
       if (!blob?.size) return false;
 
       const effects =
@@ -296,7 +405,8 @@
         return (
           await effects.playRecordedVerse(
             blob,
-            preset
+            preset,
+            onStarted
           )
         ) === true;
       } catch (_) {
@@ -313,7 +423,14 @@
       }
     });
     window.addEventListener("pagehide", () => {
-      if (status !== "idle" || url) interrupt();
+      // Pagehide can occur with a completed recording (e.g. iOS app switching).
+      // Do not revoke its Blob URL unless the microphone is still active.
+      if (["requesting", "preparing", "recording", "stopping"].includes(status)) {
+        interrupt();
+      } else {
+        pause();
+        stopFun();
+      }
     });
 
     return Object.freeze({

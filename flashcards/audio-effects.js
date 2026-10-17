@@ -380,6 +380,47 @@
   let processorRegistrationPromise = null;
   let activePlayback = null;
   let playbackGeneration = 0;
+  const AUDIO_RESUME_TIMEOUT_MS = 3000;
+  const AUDIO_SETUP_TIMEOUT_MS = 7000;
+  const AUDIO_DECODE_TIMEOUT_MS = 15000;
+  // SoundTouch reports a render heartbeat about every 100 audio blocks.
+  // These limits allow for WKWebView startup latency and quieter recordings.
+  const PROCESSOR_HEARTBEAT_TIMEOUT_MS = 3500;
+  const PROCESSOR_OUTPUT_TIMEOUT_MS = 6000;
+
+  function hasEarlyRecordingSignal(audioBuffer) {
+    // Only treat silence as suspicious if the *recording itself* contains
+    // reasonably strong audio near its start. Pauses and quiet verses count.
+    if (!audioBuffer?.getChannelData || !audioBuffer?.sampleRate) return false;
+    try {
+      const frames = Math.min(
+        audioBuffer.length,
+        Math.ceil(audioBuffer.sampleRate * 1.5)
+      );
+      const stride = Math.max(1, Math.floor(audioBuffer.sampleRate / 300));
+      for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+        const samples = audioBuffer.getChannelData(channel);
+        for (let i = 0; i < frames; i += stride) {
+          if (Math.abs(samples[i]) > 0.015) return true;
+        }
+      }
+    } catch (_) { /* Uninspectable audio must not block playback. */ }
+    return false;
+  }
+
+  // Keep failed/suspended iOS activation from leaving Wacky Replay waiting forever.
+  function awaitAudioSetup(promise, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const timer = window.setTimeout(
+        () => reject(new Error("Wacky Replay audio setup timed out.")),
+        timeoutMs
+      );
+      Promise.resolve(promise).then(
+        (value) => { window.clearTimeout(timer); resolve(value); },
+        (error) => { window.clearTimeout(timer); reject(error); }
+      );
+    });
+  }
 
   function getAudioContextConstructor() {
     return (
@@ -407,6 +448,23 @@
 
     clearTimeout(playback.finishTimer);
     playback.finishTimer = null;
+    clearTimeout(playback.watchdogTimer);
+    playback.watchdogTimer = null;
+    clearTimeout(playback.heartbeatTimer);
+    playback.heartbeatTimer = null;
+    clearTimeout(playback.outputTimer);
+    playback.outputTimer = null;
+    try {
+      playback.soundTouch?.removeEventListener(
+        "metrics", playback.onMetrics
+      );
+      playback.soundTouch?.removeEventListener(
+        "processorerror", playback.onProcessorError
+      );
+      playback.context?.removeEventListener(
+        "statechange", playback.onContextStateChange
+      );
+    } catch (_) { /* Worklet may already be torn down. */ }
 
     try {
       playback.source.onended = null;
@@ -435,6 +493,17 @@
     try {
       playback.gain.disconnect();
     } catch (_) { }
+  }
+
+  function discardUnhealthyAudioContext(failedContext) {
+    if (context !== failedContext) return;
+    // A stalled AudioWorklet may stay unusable even if its context reports
+    // "running". Recreate only on the *next* deliberate Wacky Replay tap.
+    context = null;
+    processorRegistrationPromise = null;
+    try {
+      void Promise.resolve(failedContext.close?.()).catch(() => {});
+    } catch (_) { /* A broken iOS audio session may also reject close(). */ }
   }
 
   function stop() {
@@ -475,8 +544,13 @@
       });
     }
 
-    if (context.state !== "running") {
-      await context.resume();
+    const audioContext = context;
+    if (audioContext.state !== "running") {
+      // Call resume() on the Wacky Replay tap, before the first await.
+      await awaitAudioSetup(audioContext.resume(), AUDIO_RESUME_TIMEOUT_MS);
+    }
+    if (audioContext.state !== "running" || document.hidden) {
+      throw new Error("Wacky Replay audio is not ready.");
     }
 
     if (!soundTouchModulePromise) {
@@ -489,7 +563,7 @@
 
     try {
       module =
-        await soundTouchModulePromise;
+        await awaitAudioSetup(soundTouchModulePromise, AUDIO_SETUP_TIMEOUT_MS);
     } catch (error) {
       soundTouchModulePromise = null;
       throw error;
@@ -504,20 +578,23 @@
     if (!processorRegistrationPromise) {
       processorRegistrationPromise =
         module.SoundTouchNode.register(
-          context,
+          audioContext,
           soundTouchProcessorUrl
         );
     }
 
     try {
-      await processorRegistrationPromise;
+      await awaitAudioSetup(processorRegistrationPromise, AUDIO_SETUP_TIMEOUT_MS);
     } catch (error) {
       processorRegistrationPromise = null;
       throw error;
     }
 
+    if (audioContext !== context || audioContext.state !== "running" || document.hidden) {
+      throw new Error("Wacky Replay audio is not ready.");
+    }
     return {
-      context,
+      context: audioContext,
       SoundTouchNode:
         module.SoundTouchNode
     };
@@ -1322,7 +1399,8 @@
 
   async function playRecordedVerse(
     blob,
-    presetName
+    presetName,
+    onStarted
   ) {
     stop();
 
@@ -1350,149 +1428,254 @@
     }
 
     const encodedAudio =
-      await blob.arrayBuffer();
+      await awaitAudioSetup(blob.arrayBuffer(), AUDIO_SETUP_TIMEOUT_MS);
 
     if (generation !== playbackGeneration) {
       return false;
     }
 
     const audioBuffer =
-      await runtime.context.decodeAudioData(
-        encodedAudio
+      await awaitAudioSetup(
+        runtime.context.decodeAudioData(encodedAudio),
+        AUDIO_DECODE_TIMEOUT_MS
       );
 
-    if (generation !== playbackGeneration) {
+    if (generation !== playbackGeneration || document.hidden ||
+      runtime.context.state !== "running") {
       return false;
     }
 
-    const source =
-      runtime.context.createBufferSource();
-    const soundTouch =
-      new runtime.SoundTouchNode({
-        context: runtime.context,
-        outputChannelCount: 2
-      });
-    const gain =
-      runtime.context.createGain();
+    let source = null;
+    let soundTouch = null;
+    let gain = null;
+    let effectChain = null;
+    try {
+      source =
+        runtime.context.createBufferSource();
+      soundTouch =
+        new runtime.SoundTouchNode({
+          context: runtime.context,
+          outputChannelCount: 2
+        });
+      gain =
+        runtime.context.createGain();
 
-    source.buffer = audioBuffer;
-    source.playbackRate.value =
-      preset.speed;
-    soundTouch.playbackRate.value =
-      preset.speed;
-    gain.gain.value = 0.88;
+      source.buffer = audioBuffer;
+      source.playbackRate.value =
+        preset.speed;
+      soundTouch.playbackRate.value =
+        preset.speed;
+      gain.gain.value = 0.88;
 
-    const startTime =
-      runtime.context.currentTime;
-    const expectedDuration =
-      Math.max(
-        0.1,
-        audioBuffer.duration /
-          preset.speed
-      );
-    const tailSeconds =
-      Math.max(
-        0,
-        Number(preset.tailSeconds) || 0
-      );
-    const effectStopTime =
-      startTime +
-      expectedDuration +
-      tailSeconds +
-      0.25;
-
-    if (
-      preset.pitchTargets?.length ||
-      (
-        Number.isFinite(
-          preset.pitchRampStart
-        ) &&
-        Number.isFinite(
-          preset.pitchRampEnd
-        )
-      )
-    ) {
-      scheduleDynamicPitch(
-        soundTouch.pitchSemitones,
-        startTime,
-        expectedDuration,
-        preset
-      );
-    } else {
-      soundTouch.pitchSemitones
-        .setValueAtTime(
-          preset.semitones,
-          startTime
+      const startTime =
+        runtime.context.currentTime;
+      const expectedDuration =
+        Math.max(
+          0.1,
+          audioBuffer.duration /
+            preset.speed
         );
-    }
+      const tailSeconds =
+        Math.max(
+          0,
+          Number(preset.tailSeconds) || 0
+        );
+      const effectStopTime =
+        startTime +
+        expectedDuration +
+        tailSeconds +
+        0.25;
 
-    source.connect(soundTouch);
-    const effectChain =
-      createCharacterEffectChain(
-        runtime.context,
-        preset,
-        startTime,
-        effectStopTime
+      if (
+        preset.pitchTargets?.length ||
+        (
+          Number.isFinite(
+            preset.pitchRampStart
+          ) &&
+          Number.isFinite(
+            preset.pitchRampEnd
+          )
+        )
+      ) {
+        scheduleDynamicPitch(
+          soundTouch.pitchSemitones,
+          startTime,
+          expectedDuration,
+          preset
+        );
+      } else {
+        soundTouch.pitchSemitones
+          .setValueAtTime(
+            preset.semitones,
+            startTime
+          );
+      }
+
+      source.connect(soundTouch);
+      effectChain =
+        createCharacterEffectChain(
+          runtime.context,
+          preset,
+          startTime,
+          effectStopTime
+        );
+
+      if (effectChain) {
+        soundTouch.connect(
+          effectChain.input
+        );
+        effectChain.output.connect(gain);
+      } else {
+        soundTouch.connect(gain);
+      }
+      gain.connect(
+        runtime.context.destination
       );
 
-    if (effectChain) {
-      soundTouch.connect(
-        effectChain.input
-      );
-      effectChain.output.connect(gain);
-    } else {
-      soundTouch.connect(gain);
-    }
-    gain.connect(
-      runtime.context.destination
-    );
+      return new Promise((resolve) => {
+        const playback = {
+          source,
+          soundTouch,
+          gain,
+          effectNodes:
+            effectChain?.nodes || [],
+          effectSources:
+            effectChain?.sources || [],
+          finishTimer: null,
+          watchdogTimer: null,
+          heartbeatTimer: null,
+          outputTimer: null,
+          context: runtime.context,
+          started: false,
+          lastBlockCount: -1,
+          onMetrics: null,
+          onProcessorError: null,
+          onContextStateChange: null,
+          resolve
+        };
 
-    return new Promise((resolve) => {
-      const playback = {
-        source,
-        soundTouch,
-        gain,
-        effectNodes:
-          effectChain?.nodes || [],
-        effectSources:
-          effectChain?.sources || [],
-        finishTimer: null,
-        resolve
-      };
+        const confirmStart = () => {
+          if (activePlayback !== playback || playback.started) return;
+          playback.started = true;
+          clearTimeout(playback.outputTimer);
+          playback.outputTimer = null;
+          // Eligibility is spent only after the processor has rendered.
+          try { onStarted?.(); } catch (_) { /* UI updates cannot stop audio. */ }
+        };
 
-      const finish = () => {
-        if (
-          activePlayback !== playback
-        ) {
+        const fail = (reason) => {
+          if (activePlayback !== playback) return;
+          if (reason) console.warn("Wacky Replay audio stopped:", reason);
+          activePlayback = null;
+          try { source.stop(); } catch (_) { }
+          disconnectPlayback(playback);
+          discardUnhealthyAudioContext(runtime.context);
+          resolve(false);
+        };
+
+        const armHeartbeatWatch = () => {
+          clearTimeout(playback.heartbeatTimer);
+          playback.heartbeatTimer = window.setTimeout(() => {
+            fail("No AudioWorklet processing heartbeat.");
+          }, PROCESSOR_HEARTBEAT_TIMEOUT_MS);
+        };
+
+        const expectEarlyAudio = hasEarlyRecordingSignal(audioBuffer);
+        playback.onMetrics = (event) => {
+          if (activePlayback !== playback) return;
+          const metrics = event?.detail || soundTouch.metrics;
+          const count = Number(metrics?.blockCount);
+          if (!Number.isFinite(count) || count <= playback.lastBlockCount) return;
+          playback.lastBlockCount = count;
+          armHeartbeatWatch();
+          // No output signal is required for a naturally quiet recording.
+          const hasOutput = Number(metrics?.outputPeak) > 0.0001 ||
+            Number(metrics?.outputRms) > 0.00005;
+          if (hasOutput || !expectEarlyAudio) confirmStart();
+        };
+        playback.onProcessorError = () => fail("AudioWorklet processor error.");
+        playback.onContextStateChange = () => {
+          if (runtime.context.state !== "running") {
+            fail("AudioContext was interrupted.");
+          }
+        };
+        activePlayback = playback;
+        try {
+          soundTouch.addEventListener("metrics", playback.onMetrics);
+          soundTouch.addEventListener("processorerror", playback.onProcessorError);
+          runtime.context.addEventListener(
+            "statechange", playback.onContextStateChange
+          );
+        } catch (_) {
+          // Treat missing monitoring support as a startup failure rather
+          // than silently spending a replay with an unobservable processor.
+          fail("AudioWorklet monitoring unavailable.");
           return;
         }
 
-        activePlayback = null;
-        disconnectPlayback(playback);
-        resolve(true);
-      };
+        const finish = () => {
+          if (activePlayback !== playback) return;
+          activePlayback = null;
+          const succeeded = playback.started;
+          disconnectPlayback(playback);
+          if (!succeeded) discardUnhealthyAudioContext(runtime.context);
+          resolve(succeeded);
+        };
 
-      source.onended = () => {
-        playback.finishTimer =
-          window.setTimeout(
-            finish,
-            Math.max(
-              180,
-              tailSeconds * 1000
-            )
+        source.onended = () => {
+          playback.finishTimer =
+            window.setTimeout(
+              finish,
+              Math.max(
+                650, // Let short recordings emit their first worklet metrics.
+                tailSeconds * 1000
+              )
+            );
+        };
+
+        try {
+          if (activePlayback !== playback || generation !== playbackGeneration || document.hidden ||
+            runtime.context.state !== "running") {
+            activePlayback = null;
+            disconnectPlayback(playback);
+            resolve(false);
+            return;
+          }
+          source.start();
+          armHeartbeatWatch();
+          if (expectEarlyAudio) {
+            playback.outputTimer = window.setTimeout(() => {
+              if (!playback.started) {
+                fail("Processed audio stayed silent despite recorded speech.");
+              }
+            }, PROCESSOR_OUTPUT_TIMEOUT_MS);
+          }
+          // Some WKWebView versions fail to dispatch onended after an audio
+          // interruption. Never leave the replay button disabled indefinitely.
+          const maximumPlaybackMs = Math.ceil(
+            (expectedDuration + tailSeconds + 5) * 1000
           );
-      };
-
-      activePlayback = playback;
-
-      try {
-        source.start();
-      } catch (error) {
-        activePlayback = null;
-        disconnectPlayback(playback);
-        resolve(false);
-      }
-    });
+          playback.watchdogTimer = window.setTimeout(() => {
+            if (activePlayback !== playback) return;
+            activePlayback = null;
+            try { source.stop(); } catch (_) { }
+            disconnectPlayback(playback);
+            resolve(false);
+          }, maximumPlaybackMs);
+        } catch (error) {
+          activePlayback = null;
+          disconnectPlayback(playback);
+          resolve(false);
+        }
+      });
+    } catch (error) {
+      disconnectPlayback({
+        source, soundTouch, gain,
+        effectNodes: effectChain?.nodes || [],
+        effectSources: effectChain?.sources || []
+      });
+      return false;
+    }
   }
 
   document.addEventListener(
