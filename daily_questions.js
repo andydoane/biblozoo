@@ -81,6 +81,9 @@
   let correctAnswerAudio = null;
   let incorrectAnswerAudio = null;
   let generatedQuestionAudio = null;
+  let questionAudioStartupTimer = 0;
+  let questionAudioProgressTimer = 0;
+  let questionAudioNeedsForegroundRender = false;
   let rewardPopupTimeoutId = 0;
 
   const LATER_STORAGE_PREFIX =
@@ -117,36 +120,165 @@
     }
   }
 
-  function playDailyQuestionAnswerSound(isCorrect) {
-    prepareDailyQuestionAnswerSounds();
+  function isDailyQuestionAudioMuted() {
+    return document.hidden || appApi?.isMuted?.() === true;
+  }
 
-    const audio =
-      isCorrect
-        ? correctAnswerAudio
-        : incorrectAnswerAudio;
-
-    if (!audio) {
-      return;
+  function stopDailyQuestionAnswerSounds() {
+    for (const audio of [correctAnswerAudio, incorrectAnswerAudio]) {
+      if (!audio) continue;
+      try { audio.pause(); } catch (err) { }
+      try { audio.currentTime = 0; } catch (err) { }
     }
+  }
 
+  function playDailyQuestionAnswerSound(isCorrect) {
+    if (isDailyQuestionAudioMuted()) return;
+
+    prepareDailyQuestionAnswerSounds();
+    const audio = isCorrect ? correctAnswerAudio : incorrectAnswerAudio;
+    if (!audio) return;
+
+    stopDailyQuestionAnswerSounds();
     try {
+      audio.muted = false;
       audio.currentTime = 0;
-      audio.play().catch?.(() => {});
+      // Sounds are optional: failures must never change answers or rewards.
+      Promise.resolve(audio.play()).catch(() => {});
     } catch (err) { }
   }
 
   function stopGeneratedQuestionAudio() {
-    if (!generatedQuestionAudio) return;
+    clearTimeout(questionAudioStartupTimer);
+    clearInterval(questionAudioProgressTimer);
+    questionAudioStartupTimer = 0;
+    questionAudioProgressTimer = 0;
 
-    try {
-      generatedQuestionAudio.pause();
-      generatedQuestionAudio.currentTime = 0;
-    } catch (err) { }
-
+    const audio = generatedQuestionAudio;
     generatedQuestionAudio = null;
+    const wasPlaying = dailySession?.questionAudioPlaying === true;
 
-    if (dailySession) {
-      dailySession.questionAudioPlaying = false;
+    if (audio) {
+      try { audio.pause(); } catch (err) { }
+      try { audio.currentTime = 0; } catch (err) { }
+    }
+    if (dailySession) dailySession.questionAudioPlaying = false;
+    return wasPlaying;
+  }
+
+  function playGeneratedQuestionAudio(source, session) {
+    if (
+      !source ||
+      !session ||
+      session !== dailySession ||
+      session.answered ||
+      session.questionAudioPlaying ||
+      isDailyQuestionAudioMuted() ||
+      typeof Audio === "undefined"
+    ) return;
+
+    stopGeneratedQuestionAudio();
+    let audio;
+    try { audio = new Audio(source); } catch (err) { return; }
+
+    generatedQuestionAudio = audio;
+    session.questionAudioPlaying = true;
+    let lastPlaybackTime = 0;
+    let lastProgressAt = Date.now();
+
+    const isCurrent = () =>
+      generatedQuestionAudio === audio && dailySession === session;
+
+    const finish = () => {
+      if (!isCurrent()) return;
+      stopGeneratedQuestionAudio();
+      if (!document.hidden && session.phase === SESSION_PHASES.QUESTION) {
+        appApi?.renderApp?.();
+      }
+    };
+
+    // A resolved play() does not guarantee that media time will advance.
+    // Cancel stalled starts and playback without losing the retry button.
+    const trackProgress = () => {
+      if (!isCurrent()) return;
+      const time = Number(audio.currentTime) || 0;
+      if (time > lastPlaybackTime + 0.02) {
+        lastPlaybackTime = time;
+        lastProgressAt = Date.now();
+      }
+    };
+
+    audio.addEventListener("ended", finish, { once: true });
+    audio.addEventListener("error", finish, { once: true });
+    audio.addEventListener("pause", () => {
+      if (isCurrent() && !audio.ended) finish();
+    });
+    audio.addEventListener("timeupdate", trackProgress);
+    audio.addEventListener("playing", trackProgress);
+
+    questionAudioStartupTimer = setTimeout(() => {
+      // After a delayed play() or a silent iOS stall, always allow retry.
+      if (isCurrent() && (Number(audio.currentTime) || 0) <= 0) finish();
+    }, 8000);
+
+    questionAudioProgressTimer = setInterval(() => {
+      if (!isCurrent()) return;
+      if (isDailyQuestionAudioMuted() || audio.ended) {
+        finish();
+        return;
+      }
+      trackProgress();
+      if (Date.now() - lastProgressAt > 10000) finish();
+    }, 1500);
+
+    let attempt;
+    try {
+      // Invoke play() directly in the user's tap gesture, before rendering.
+      attempt = audio.play();
+    } catch (err) {
+      finish();
+      return;
+    }
+    appApi?.renderApp?.();
+
+    Promise.resolve(attempt).then(() => {
+      if (!isCurrent() || isDailyQuestionAudioMuted()) {
+        // A late success must not start audio after navigation or locking.
+        try { audio.pause(); } catch (err) { }
+        if (isCurrent()) finish();
+      }
+    }, finish);
+  }
+
+  function interruptDailyQuestionAudio() {
+    stopDailyQuestionAnswerSounds();
+    if (stopGeneratedQuestionAudio()) {
+      questionAudioNeedsForegroundRender = true;
+    }
+  }
+
+  function restoreDailyQuestionAudioUI() {
+    if (document.hidden || !questionAudioNeedsForegroundRender) return;
+    questionAudioNeedsForegroundRender = false;
+    if (dailySession?.phase === SESSION_PHASES.QUESTION) {
+      appApi?.renderApp?.();
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) interruptDailyQuestionAudio();
+    else restoreDailyQuestionAudioUI();
+  });
+  window.addEventListener("pagehide", interruptDailyQuestionAudio);
+  window.addEventListener("pageshow", restoreDailyQuestionAudioUI);
+
+  function onMuteChanged(isMuted) {
+    if (!isMuted) return;
+    stopDailyQuestionAnswerSounds();
+    const wasPlaying = stopGeneratedQuestionAudio();
+    if (wasPlaying && !document.hidden &&
+        dailySession?.phase === SESSION_PHASES.QUESTION) {
+      appApi?.renderApp?.();
     }
   }
 
@@ -1341,6 +1473,8 @@
   }
 
   function stopDailySessionRuntime() {
+    questionAudioNeedsForegroundRender = false;
+    stopDailyQuestionAnswerSounds();
     stopGeneratedQuestionAudio();
 
     if (feedGameStartRafId) {
@@ -2786,68 +2920,15 @@
       );
 
     if (questionAudioButton) {
-      questionAudioButton.onclick =
-        async (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-
-          const sessionAtStart = dailySession;
-          const questionAtStart =
-            getSessionQuestion(
-              sessionAtStart
-            );
-          const source = String(
-            questionAtStart?.media?.src || ""
-          ).trim();
-
-          if (
-            !sessionAtStart ||
-            sessionAtStart.answered ||
-            sessionAtStart.questionAudioPlaying ||
-            !source ||
-            typeof Audio === "undefined"
-          ) {
-            return;
-          }
-
-          stopGeneratedQuestionAudio();
-
-          const audio = new Audio(source);
-          generatedQuestionAudio = audio;
-          sessionAtStart.questionAudioPlaying = true;
-          appApi?.renderApp?.();
-
-          const finish = () => {
-            if (generatedQuestionAudio === audio) {
-              generatedQuestionAudio = null;
-            }
-
-            if (
-              dailySession === sessionAtStart &&
-              sessionAtStart.questionAudioPlaying
-            ) {
-              sessionAtStart.questionAudioPlaying = false;
-              appApi?.renderApp?.();
-            }
-          };
-
-          audio.addEventListener(
-            "ended",
-            finish,
-            { once: true }
-          );
-          audio.addEventListener(
-            "error",
-            finish,
-            { once: true }
-          );
-
-          try {
-            await audio.play();
-          } catch (err) {
-            finish();
-          }
-        };
+      questionAudioButton.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const session = dailySession;
+        const source = String(
+          getSessionQuestion(session)?.media?.src || ""
+        ).trim();
+        playGeneratedQuestionAudio(source, session);
+      };
     }
 
     const nextQuestionButton =
@@ -3332,6 +3413,7 @@
     Object.freeze({
       version: MODULE_VERSION,
       initialize,
+      onMuteChanged,
       isFeatureEnabled,
       isDebugEnabled,
       isDebugLongPressEnabled,

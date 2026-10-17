@@ -1524,6 +1524,7 @@ function applyMute() {
 function toggleMute() {
   muted = !muted;
   applyMute();
+  window.BibloZooDailyQuestions?.onMuteChanged?.(muted);
   if (!muted) void unlockAppAudio();
   if (muted) {
     // The existing mute control pauses audioEl. Also release a lesson that
@@ -7251,6 +7252,8 @@ window.BibloZooDailyQuestions
 
     isDebugEnabled: () =>
       FEATURES.DAILY_PET_QUESTIONS_DEBUG === true,
+
+    isMuted: () => muted,
 
     isDebugLongPressEnabled: () =>
       FEATURES.DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true,
