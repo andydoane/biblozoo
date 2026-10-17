@@ -1089,6 +1089,15 @@ let lastUiTapFallbackAt = 0;
 
 let petUnlockAudioEl = null;
 let lastPetUnlockSoundAt = 0;
+let petUnlockSoundGeneration = 0;
+
+function stopPetUnlockPackageSound() {
+  petUnlockSoundGeneration += 1;
+  try {
+    petUnlockAudioEl?.pause();
+    if (petUnlockAudioEl) petUnlockAudioEl.currentTime = 0;
+  } catch (err) { }
+}
 
 function getAppAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -1268,7 +1277,7 @@ function preloadPetUnlockSoundBuffer() {
 }
 
 function playPetUnlockPackageSound({ allowFallback = true } = {}) {
-  if (muted) return;
+  if (muted || document.hidden) return;
 
   const nowMs = performance.now();
 
@@ -1276,7 +1285,17 @@ function playPetUnlockPackageSound({ allowFallback = true } = {}) {
   if (nowMs - lastPetUnlockSoundAt < 180) return;
   lastPetUnlockSoundAt = nowMs;
 
+  const generation = ++petUnlockSoundGeneration;
   const audio = ensurePetUnlockAudio();
+  const fallbackIfCurrent = (err) => {
+    console.warn("Could not play BibloPet unlock sound", err);
+    // A delayed play() rejection must never make noise on a later screen.
+    if (allowFallback && generation === petUnlockSoundGeneration &&
+        State.screen === Screen.PET_UNLOCK && !muted && !document.hidden &&
+        performance.now() - nowMs < 1200) {
+      playUiTapFallbackNow();
+    }
+  };
 
   try {
     audio.muted = false;
@@ -1287,20 +1306,10 @@ function playPetUnlockPackageSound({ allowFallback = true } = {}) {
     const playPromise = audio.play();
 
     if (playPromise && typeof playPromise.catch === "function") {
-      playPromise.catch((err) => {
-        console.warn("Could not play BibloPet unlock sound", err);
-
-        if (allowFallback) {
-          playUiTapFallbackNow();
-        }
-      });
+      playPromise.catch(fallbackIfCurrent);
     }
   } catch (err) {
-    console.warn("Could not play BibloPet unlock sound", err);
-
-    if (allowFallback) {
-      playUiTapFallbackNow();
-    }
+    fallbackIfCurrent(err);
   }
 }
 
@@ -1366,7 +1375,10 @@ function markAppAudioForegrounded() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) markAppAudioInterrupted();
+  if (document.hidden) {
+    markAppAudioInterrupted();
+    if (typeof stopPetUnlockPackageSound === "function") stopPetUnlockPackageSound();
+  }
   else markAppAudioForegrounded();
 });
 window.addEventListener("pagehide", markAppAudioInterrupted);
@@ -1537,11 +1549,22 @@ function toggleMute() {
   }
 
   // stop current verse/instruction and picker preview audio immediately
-  if (muted) stopNewVersePickerPreviewAudio();
+  if (muted) {
+    stopNewVersePickerPreviewAudio();
+    if (typeof stopPetUnlockPackageSound === "function") stopPetUnlockPackageSound();
+    if (typeof stopZooTodoTutorialPageAudio === "function") {
+      stopZooTodoTutorialPageAudio({ offerRetry: true });
+    }
+    if (typeof verseDetailListenActive !== "undefined" && verseDetailListenActive) {
+      cancelVerseDetailListen();
+    }
+  }
   try { audioEl.pause(); } catch (e) { }
   try { audioEl.currentTime = 0; } catch (e) { }
 
   renderNav(); // update icon
+  if (typeof State !== "undefined" && typeof Screen !== "undefined" &&
+      State.screen === Screen.TODO_DEV && isTutorialActive()) render();
 }
 
 function safePlay() {
@@ -8496,9 +8519,11 @@ function clearPetAnimationCycle() {
 
 let verseDetailListenToken = 0;
 let cancelVerseDetailListenWait = null;
+let verseDetailListenActive = false;
 
 function cancelVerseDetailListen() {
   verseDetailListenToken += 1;
+  verseDetailListenActive = false;
 
   const cancelWait =
     cancelVerseDetailListenWait;
@@ -8523,58 +8548,37 @@ function cancelVerseDetailListen() {
   return verseDetailListenToken;
 }
 
-function waitForVerseDetailAudioEnd(
-  token
-) {
+function waitForVerseDetailAudioEnd(token) {
   return new Promise((resolve) => {
     let settled = false;
 
-    const finish = () => {
-      if (settled) {
-        return;
-      }
-
+    const finish = (completed = false) => {
+      if (settled) return;
       settled = true;
-
-      audioEl.removeEventListener(
-        "ended",
-        onEnd
-      );
-
-      if (
-        cancelVerseDetailListenWait ===
-        finish
-      ) {
-        cancelVerseDetailListenWait =
-          null;
+      audioEl.removeEventListener("ended", onEnd);
+      audioEl.removeEventListener("error", onError);
+      if (cancelVerseDetailListenWait === cancel) {
+        cancelVerseDetailListenWait = null;
       }
-
-      resolve();
+      resolve(completed);
     };
 
-    const onEnd = () => {
-      finish();
-    };
+    const onEnd = () => finish(true);
+    const onError = () => finish(false);
+    const cancel = () => finish(false);
+    cancelVerseDetailListenWait = cancel;
+    audioEl.addEventListener("ended", onEnd);
+    audioEl.addEventListener("error", onError);
 
-    cancelVerseDetailListenWait =
-      finish;
-
-    audioEl.addEventListener(
-      "ended",
-      onEnd
-    );
-
-    if (
-      token !== verseDetailListenToken
-    ) {
-      finish();
-    }
+    if (token !== verseDetailListenToken || document.hidden) cancel();
   });
 }
 
 async function playVerseDetailListen(verseId) {
   const listenToken =
     cancelVerseDetailListen();
+  if (muted || document.hidden) return false;
+  verseDetailListenActive = true;
 
   const verseRefAudioFile =
     `${AUDIO_DIR}${verseId}_ref.mp3`;
@@ -8595,14 +8599,9 @@ async function playVerseDetailListen(verseId) {
       return false;
     }
 
-    await waitForVerseDetailAudioEnd(
-      listenToken
-    );
+    const referenceCompleted = await waitForVerseDetailAudioEnd(listenToken);
 
-    if (
-      listenToken !==
-      verseDetailListenToken
-    ) {
+    if (!referenceCompleted || listenToken !== verseDetailListenToken) {
       return false;
     }
 
@@ -8618,14 +8617,9 @@ async function playVerseDetailListen(verseId) {
       return false;
     }
 
-    await waitForVerseDetailAudioEnd(
-      listenToken
-    );
+    const verseCompleted = await waitForVerseDetailAudioEnd(listenToken);
 
-    return (
-      listenToken ===
-      verseDetailListenToken
-    );
+    return verseCompleted && listenToken === verseDetailListenToken;
   } catch (err) {
     if (
       listenToken ===
@@ -8639,17 +8633,21 @@ async function playVerseDetailListen(verseId) {
 
     return false;
   } finally {
-    if (
-      listenToken ===
-      verseDetailListenToken
-    ) {
-      cancelVerseDetailListenWait =
-        null;
-
+    if (listenToken === verseDetailListenToken) {
+      verseDetailListenActive = false;
+      cancelVerseDetailListenWait = null;
       setAudioSrc(AUDIO_FILE);
     }
   }
 }
+
+// Verse-detail reference and verse segments must not bridge interruptions.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && verseDetailListenActive) cancelVerseDetailListen();
+});
+window.addEventListener("pagehide", () => {
+  if (verseDetailListenActive) cancelVerseDetailListen();
+});
 
 // tokenization (copied conceptually from old engine)
 const TokenType = { SPACE: "space", WORD: "word", PUNCT: "punct", OTHER: "other" };
@@ -10654,6 +10652,9 @@ function go(nextScreen) {
     return;
   }
 
+  if (from === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
+  if (from === Screen.VERSE_DETAIL) cancelVerseDetailListen();
+  if (from === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
   if (from === Screen.FLASHCARDS) window.BibloZooFlashcards?.stopSession?.();
   if (from === Screen.READ_MY_VERSE) {
     window.BibloZooReadMyVerse
@@ -10797,6 +10798,11 @@ function go(nextScreen) {
 
 /* If you jump directly (no transition), call this */
 function setScreen(screen) {
+  if (State.screen !== screen) {
+    if (State.screen === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
+    if (State.screen === Screen.VERSE_DETAIL) cancelVerseDetailListen();
+    if (State.screen === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
+  }
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
     window.BibloZooFlashcards?.stopSession?.();
   }
@@ -13417,13 +13423,8 @@ function closeProfileEditor() {
 
 function stopProfileTransitionAudio() {
   cancelVerseDetailListen();
-
-  try {
-    petUnlockAudioEl?.pause?.();
-    if (petUnlockAudioEl) {
-      petUnlockAudioEl.currentTime = 0;
-    }
-  } catch (err) { }
+  stopPetUnlockPackageSound();
+  stopZooTodoTutorialPageAudio();
 }
 
 function clearTransientStateForProfileActivation() {
@@ -17927,6 +17928,41 @@ function renderZooTodoTutorialMissionRow({
   `;
 }
 
+// The tutorial shares audioEl with learning and verse playback. Never mark a
+// page heard until its narration ENDS, and never auto-replay after interruption.
+let zooTodoTutorialAudioGeneration = 0;
+let zooTodoTutorialAudioAttempt = null;
+const zooTodoTutorialAutoAttempted = new Set();
+const zooTodoTutorialNeedsRetry = new Set();
+
+function renderZooTodoTutorialAudioRetry(pageNumber) {
+  if (!zooTodoTutorialNeedsRetry.has(pageNumber) ||
+      hasPlayedZooTodoTutorialPageAudio(pageNumber)) return "";
+  return `<div class="todo-tutorial-actions" style="margin-top:10px">
+    <button type="button" class="todo-tutorial-next-btn no-zoom"
+      style="min-width:0;font-size:18px;padding:10px 20px"
+      data-tutorial-audio-retry="${pageNumber}">🔊 Hear Instructions</button>
+  </div>`;
+}
+
+function stopZooTodoTutorialPageAudio({ offerRetry = false } = {}) {
+  const attempt = zooTodoTutorialAudioAttempt;
+  if (!attempt) return;
+  zooTodoTutorialAudioAttempt = null;
+  zooTodoTutorialAudioGeneration += 1;
+  clearTimeout(attempt.startupTimer);
+  audioEl.removeEventListener("ended", attempt.onEnd);
+  audioEl.removeEventListener("error", attempt.onError);
+  audioEl.removeEventListener("pause", attempt.onPause);
+  if (offerRetry && !hasPlayedZooTodoTutorialPageAudio(attempt.pageNumber)) {
+    zooTodoTutorialNeedsRetry.add(attempt.pageNumber);
+  }
+  try {
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  } catch (err) { }
+}
+
 function renderZooTodoTutorialHtml(pageOverride = null, options = {}) {
   const pageNumber = pageOverride === null || pageOverride === undefined
     ? getZooTodoTutorialPageNumber()
@@ -17947,6 +17983,7 @@ function renderZooTodoTutorialHtml(pageOverride = null, options = {}) {
           </p>
         </div>
 
+        ${renderZooTodoTutorialAudioRetry(1)}
         <div class="todo-tutorial-actions">
           <button
             class="todo-tutorial-next-btn no-zoom"
@@ -17975,6 +18012,7 @@ function renderZooTodoTutorialHtml(pageOverride = null, options = {}) {
           </ol>
         </div>
 
+        ${renderZooTodoTutorialAudioRetry(2)}
         <div class="todo-tutorial-actions">
           <button
             class="todo-tutorial-next-btn no-zoom"
@@ -18008,6 +18046,7 @@ function renderZooTodoTutorialHtml(pageOverride = null, options = {}) {
           </p>
         </div>
 
+        ${renderZooTodoTutorialAudioRetry(3)}
         <div class="todo-tutorial-mission-list">
           ${renderZooTodoTutorialMissionRow({
         action: "learn-new-verse",
@@ -18063,6 +18102,7 @@ function renderZooTodoTutorialHtml(pageOverride = null, options = {}) {
           }
         </div>
 
+        ${renderZooTodoTutorialAudioRetry(4)}
         <div class="todo-tutorial-mission-list">
           ${renderZooTodoTutorialMissionRow({
       action: "practice-verse",
@@ -18132,40 +18172,93 @@ function equalizeZooTodoTutorialClipboardPages(rootEl = document) {
   });
 }
 
-function playZooTodoTutorialPageAudio(pageNumber) {
+function playZooTodoTutorialPageAudio(pageNumber, { explicit = false } = {}) {
   const src = TUTORIAL_PAGE_AUDIO[pageNumber];
+  if (!src || State.screen !== Screen.TODO_DEV ||
+      getZooTodoTutorialPageNumber() !== pageNumber ||
+      hasPlayedZooTodoTutorialPageAudio(pageNumber)) return;
 
-  if (!src || muted || hasPlayedZooTodoTutorialPageAudio(pageNumber)) {
+  if (zooTodoTutorialAudioAttempt?.pageNumber === pageNumber) return;
+  if (!explicit && zooTodoTutorialAutoAttempted.has(pageNumber)) return;
+  zooTodoTutorialAutoAttempted.add(pageNumber);
+
+  if (muted || document.hidden) {
+    zooTodoTutorialNeedsRetry.add(pageNumber);
     return;
   }
+
+  stopZooTodoTutorialPageAudio();
+  const generation = ++zooTodoTutorialAudioGeneration;
+  const attempt = {
+    pageNumber,
+    generation,
+    startupTimer: null,
+    onEnd: null,
+    onError: null,
+    onPause: null
+  };
+  zooTodoTutorialAudioAttempt = attempt;
+  const isCurrent = () => zooTodoTutorialAudioAttempt === attempt &&
+    zooTodoTutorialAudioGeneration === generation;
+  const fail = (err) => {
+    if (!isCurrent()) return;
+    if (err) console.warn("Could not play Zoo To-Do tutorial audio", err);
+    stopZooTodoTutorialPageAudio({ offerRetry: true });
+    if (!document.hidden && State.screen === Screen.TODO_DEV &&
+        getZooTodoTutorialPageNumber() === pageNumber) render();
+  };
+  attempt.onEnd = () => {
+    if (!isCurrent()) return;
+    stopZooTodoTutorialPageAudio();
+    if (State.screen !== Screen.TODO_DEV || document.hidden || muted ||
+        getZooTodoTutorialPageNumber() !== pageNumber) return;
+    markZooTodoTutorialPageAudioPlayed(pageNumber);
+    zooTodoTutorialNeedsRetry.delete(pageNumber);
+    if (explicit) render();
+  };
+  attempt.onError = () => fail();
+  // An earlier pause event can arrive after the next play() starts. Ignore it
+  // unless this audio element is actually paused right now.
+  attempt.onPause = () => {
+    if (audioEl.paused && !audioEl.ended) fail();
+  };
 
   try {
     audioEl.pause();
     audioEl.currentTime = 0;
-  } catch (err) { }
-
-  try {
     setAudioSrc(src);
     audioEl.currentTime = 0;
     applyMute();
-
-    const playPromise = audioEl.play();
-
-    if (playPromise && typeof playPromise.then === "function") {
-      playPromise
-        .then(() => {
-          markZooTodoTutorialPageAudioPlayed(pageNumber);
-        })
-        .catch((err) => {
-          console.warn("Could not play Zoo To-Do tutorial audio", err);
-        });
-    } else {
-      markZooTodoTutorialPageAudioPlayed(pageNumber);
-    }
+    audioEl.addEventListener("ended", attempt.onEnd);
+    audioEl.addEventListener("error", attempt.onError);
+    audioEl.addEventListener("pause", attempt.onPause);
+    // play() can remain unresolved on iOS after audio-session changes.
+    attempt.startupTimer = setTimeout(() => fail(new Error("Tutorial audio did not start")), 6500);
+    Promise.resolve(audioEl.play()).then(() => {
+      if (!isCurrent()) return;
+      clearTimeout(attempt.startupTimer);
+      if (document.hidden || muted || State.screen !== Screen.TODO_DEV ||
+          getZooTodoTutorialPageNumber() !== pageNumber) fail();
+    }, fail);
   } catch (err) {
-    console.warn("Could not play Zoo To-Do tutorial audio", err);
+    fail(err);
   }
 }
+
+// Do not restart narration automatically after a lock or app switch.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopZooTodoTutorialPageAudio({ offerRetry: true });
+  else if (State.screen === Screen.TODO_DEV && isTutorialActive() &&
+           zooTodoTutorialNeedsRetry.has(getZooTodoTutorialPageNumber())) render();
+});
+window.addEventListener("pagehide", () => {
+  stopZooTodoTutorialPageAudio({ offerRetry: true });
+  stopPetUnlockPackageSound();
+});
+window.addEventListener("pageshow", () => {
+  if (State.screen === Screen.TODO_DEV && isTutorialActive() &&
+      !document.hidden && zooTodoTutorialNeedsRetry.has(getZooTodoTutorialPageNumber())) render();
+});
 
 function refreshZooTodoTutorialPage(rootEl) {
   const paperBody =
@@ -18206,11 +18299,24 @@ function refreshZooTodoTutorialPage(rootEl) {
 
 
 function bindZooTodoTutorial(rootEl) {
+  rootEl.querySelectorAll("[data-tutorial-audio-retry]").forEach((btn) => {
+    btn.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const pageNumber = Number(btn.dataset.tutorialAudioRetry);
+      if (State.screen !== Screen.TODO_DEV ||
+          getZooTodoTutorialPageNumber() !== pageNumber || muted) return;
+      btn.disabled = true;
+      btn.textContent = "Playing…";
+      playZooTodoTutorialPageAudio(pageNumber, { explicit: true });
+    };
+  });
   rootEl.querySelectorAll("[data-tutorial-next]").forEach((btn) => {
     btn.onclick = (e) => {
       e.stopPropagation();
 
       const nextPage = Number(btn.getAttribute("data-tutorial-next") || 1);
+      stopZooTodoTutorialPageAudio();
 
       if (nextPage === 2) {
         State.todoTutorialPage = 2;
@@ -18232,10 +18338,7 @@ function bindZooTodoTutorial(rootEl) {
 
       const action = btn.getAttribute("data-tutorial-action") || "";
 
-      try {
-        audioEl.pause();
-        audioEl.currentTime = 0;
-      } catch (err) { }
+      stopZooTodoTutorialPageAudio({ offerRetry: true });
 
       if (action === "learn-new-verse") {
         const selectedVerseId = getTutorialSelectedVerseId();
@@ -22462,6 +22565,7 @@ function setupAppUiTapSounds() {
 
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget) return;
+    const gestureScreen = State.screen;
 
     // Start/resume from the touch gesture. A newly unlocked context may
     // settle just after this handler, so provide one short-lived tap response.
@@ -22474,6 +22578,7 @@ function setupAppUiTapSounds() {
     } else {
       void unlockPromise.then(ready => {
         if (ready && !document.hidden && !muted &&
+            State.screen === gestureScreen && tapTarget.isConnected &&
             performance.now() - now < 300) {
           if (uiTapBuffers.length) playUiTapSound({ force: true });
           else playUiTapFallbackNow();
@@ -22491,6 +22596,7 @@ function setupAppUiTapSounds() {
 
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget) return;
+    const gestureScreen = State.screen;
 
     const started = performance.now();
     const unlockPromise = unlockAppAudio();
@@ -22498,6 +22604,7 @@ function setupAppUiTapSounds() {
 
     void unlockPromise.then((unlocked) => {
       if (!unlocked || muted || document.hidden ||
+          State.screen !== gestureScreen || !tapTarget.isConnected ||
           performance.now() - started >= 300) return;
       if (uiTapBuffers.length) playUiTapSound({ force: true });
       else playUiTapFallbackNow();

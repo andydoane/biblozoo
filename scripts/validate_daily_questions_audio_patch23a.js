@@ -373,8 +373,10 @@ async function main() {
     "Mute callback remains in module public API");
   ok(/playDailyQuestionAnswerSound\(\s*dailySession\.answerCorrect\s*\);[\s\S]{0,120}if \(dailySession\.answerCorrect\)/.test(moduleSource),
     "Rewards remain independent from answer sound playback");
-  ok(workerSource.includes("2026_Oct_17_patch23a_daily_questions_audio"),
-    "PWA cache advances with patch");
+  ok(/const CACHE_VERSION = "[^"]+";/.test(workerSource) &&
+    workerSource.includes('"./daily_questions.js"') &&
+    workerSource.includes('"./app.js"'),
+    "PWA cache still versions Daily Questions and app assets");
 
   console.log(`Patch 23A: ${checks} focused Daily Questions audio assertions passed.`);
 }

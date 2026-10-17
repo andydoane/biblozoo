@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_17_patch23a_daily_questions_audio";
+const CACHE_VERSION = "2026_Oct_17_patch23b_app_audio_reliability";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
