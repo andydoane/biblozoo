@@ -9481,6 +9481,7 @@ window.BibloZooReadMyVerse
     makeSlide,
     scheduleSmartLearnTextFit,
     isMuted: () => muted,
+    unlockAudio: unlockAppAudio,
     requestRender: () => render(),
     onWordActivated: () => true,
     onContextComplete:

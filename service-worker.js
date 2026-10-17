@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_16_patch19a_learn_resume_overlay";
+const CACHE_VERSION = "2026_Oct_17_patch20l_stable_resume_label";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -104,6 +104,8 @@ const CORE_PATHS = [
   "./verse_images/read_my_verse/keyboard_7.mp3",
   "./verse_images/daily_questions/dq_incorrect.mp3",
   "./verse_images/read_my_verse/verse_crawl_theme.mp3",
+  "./verse_images/read_my_verse/verse_crawl_theme_ducked.mp3",
+  "./verse_images/read_my_verse/verse_crawl_theme_ending.mp3",
   "./verse_images/read_my_verse/starfield_phone.png",
   "./verse_images/read_my_verse/starfield_ipad.png",
   "./verse_images/read_my_verse/cloud_phone.jpg",

@@ -650,7 +650,7 @@ function testChunkAudioMatchingPlaybackGlow() {
   assert.match(css,
     /\.read-chunk-arcade-button\.is-pushed,\s*\.read-chunk-arcade-button\.is-helped\s*\{\s*animation:\s*readChunkSequenceHelp/);
   assert.match(css,
-    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.read-chunk-arcade-button\.is-pushed,\s*\.read-chunk-arcade-button\.is-helped\s*\{\s*animation: none;/);
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.read-chunk-arcade-button\.is-pushed,\s*\.read-chunk-arcade-button\.is-helped,\s*\.read-chunk-arcade-button\.is-glow-fading\s*\{\s*animation: none;/);
   const glow = css.match(/@keyframes readChunkSequenceHelp \{([\s\S]*?)\n\}/)?.[1];
   assert.ok(glow?.includes("drop-shadow") && !glow.includes("transform:"),
     "Playing audio must glow without resizing the button");
@@ -1501,14 +1501,17 @@ function testVerseCrawlMotion() {
   const tablet = ReadMyVerse.getCrawlMotion(890, 180, 120, 1180);
   assert.ok(tablet.travel > phone.travel);
   assert.ok(tablet.durationMs >= 10500 && tablet.durationMs <= 22000);
-  // The new font must be cached for offline PWA use.
+  // The new font and both baked-envelope MP3s must be cached for offline PWA use.
   const sw = fs.readFileSync(path.join(rootDir, "service-worker.js"), "utf8");
   assert.ok(sw.includes('"./verse_fonts/NewsCycle-Bold.ttf"'));
-  assert.ok(sw.includes('"./verse_images/read_my_verse/verse_crawl_theme.mp3"'));
+  assert.ok(sw.includes('"./verse_images/read_my_verse/verse_crawl_theme_ducked.mp3"'));
+  assert.ok(sw.includes('"./verse_images/read_my_verse/verse_crawl_theme_ending.mp3"'));
   assert.ok(fs.existsSync(path.join(rootDir,
-    "verse_images/read_my_verse/verse_crawl_theme.mp3")));
+    "verse_images/read_my_verse/verse_crawl_theme_ducked.mp3")));
+  assert.ok(fs.existsSync(path.join(rootDir,
+    "verse_images/read_my_verse/verse_crawl_theme_ending.mp3")));
   const source = fs.readFileSync(path.join(rootDir, "read_my_verse.js"), "utf8");
-  assert.ok(source.includes("const CRAWL_FANFARE_SECONDS = 8;"));
+  assert.ok(source.includes("const CRAWL_FANFARE_SECONDS = 7;"));
   assert.ok(source.includes("audio.loop = false;"));
   const styles = fs.readFileSync(path.join(rootDir, "read_my_verse.css"), "utf8");
   assert.ok(styles.includes('font-family: "News Cycle Bold", sans-serif !important'));

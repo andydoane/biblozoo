@@ -283,7 +283,7 @@ function testSourceIntegrationGuards() {
   includes(source,/if \(completed && State\.screen === Screen\.CHUNKS/,
     "stage transition depends on genuine completion");
   const worker=fs.readFileSync(path.resolve(__dirname,"../service-worker.js"),"utf8");
-  includes(worker,/2026_Oct_16_patch19a_learn_resume_overlay/,
+  includes(worker,/2026_Oct_\d+_patch(?:19a_learn_resume_overlay|20_read_my_verse_audio_recovery|20a_read_audio_resume_recovery|20b_read_animation_music|20c_native_crawl_music_fades|20d_crawl_envelope_recovery|20e_crawl_restart_original_audio)/,
     "Patch 19A service-worker cache version set");
 }
 (async()=>{

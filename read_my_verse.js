@@ -38,10 +38,13 @@
   const TYPEWRITER_INTRO_KEY_MS = 75;
   const TYPEWRITER_INTRO_HOLD_MS = 3000;
   const TYPEWRITER_INTRO_FADE_MS = 300;
-  const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme.mp3`;
-  const CRAWL_FANFARE_SECONDS = 8;
-  const CRAWL_UNDERSCORE_VOLUME = 0.22;
-  const CRAWL_DUCK_FADE_MS = 1350;
+  // The quiet underscore and the horn's one-second fade-in are in the MP3s.
+  // Verse Crawl uses ordinary HTML audio for PWA, iOS and Android alike.
+  const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme_ducked.mp3`;
+  const CRAWL_ENDING_SRC = `${ASSET_BASE}verse_crawl_theme_ending.mp3`;
+  const CRAWL_FANFARE_SECONDS = 7;
+  const CRAWL_RESUME_SECONDS = 9;
+  const CRAWL_ENDING_OVERLAP_MS = 1000;
   const CHUNK_SEQUENCE_COLORS =
     Object.freeze([
       Object.freeze({
@@ -257,6 +260,16 @@
   const KEY_SOUND_FALLBACK_VOICES = 2;
   let negativeFeedbackAudio = null;
   let audioRequest = 0;
+  let readAudioRecovery = null;
+  let readAudioRecoveryAttempt = null;
+  let readAudioRecoveryGeneration = 0;
+  let readAudioStartPromise = null;
+  let readActiveAnimatedNarration = null;
+  let readActiveSequenceReplay = null;
+  let readDeferredNarrationFinish = null;
+  let readEffectRecoveryPending = false;
+  let readKeyResumeFailures = 0;
+  let readToneResumeFailures = 0;
   let pauseTimer = 0;
   let animationTimer = 0;
   let wordFeedbackTimer = 0;
@@ -267,6 +280,11 @@
   let completionReported = false;
   let crawlSession = null;
   let crawlMusic = null;
+  let crawlEnding = null;
+  // Patch 20F was temporary. Discard any saved diagnostic report now that
+  // the production HTML-media soundtrack has replaced the experiment.
+  try { root?.localStorage?.removeItem?.("biblozooPatch20FAudioLog"); }
+  catch (err) { /* Private browsing may block storage; playback is unaffected. */ }
   let balloonSession = null;
   let fishSession = null;
   let scrambleAudioContext = null;
@@ -1451,10 +1469,410 @@
       : null;
   }
 
+  // Patch 20: preserve a reading session when WebKit interrupts spoken audio.
+  // These helpers never advance a chunk or grant completion credit.
+  function readNarrationBlocked(error) {
+    return !!root?.document?.hidden ||
+      ["NotAllowedError", "AbortError", "InvalidStateError", "NotReadableError"]
+        .includes(String(error?.name || ""));
+  }
+
+  function beginReadNarration(audio, fallback) {
+    let result;
+    try { result = audio.play(); } catch (error) { result = Promise.reject(error); }
+    const promise = Promise.resolve(result);
+    readDeferredNarrationFinish = null;
+    readAudioStartPromise = promise;
+    promise.catch((error) => {
+      if (activeAudio !== audio || completionReported) return;
+      if (readNarrationBlocked(error)) pauseReadForInterruption();
+      else fallback?.();
+    });
+    return promise;
+  }
+
+  // Timers for the persistent animated scenes retain their remaining delay
+  // while iOS is backgrounded or the Resume Audio overlay is visible.
+  function scheduleReadSceneTimer(session, current, callback, delayMs) {
+    const entry = {
+      id: 0, remaining: Math.max(0, delayMs), startedAt: 0,
+      callback, current
+    };
+    const arm = () => {
+      entry.startedAt = Date.now();
+      entry.id = setTimeout(() => {
+        entry.id = 0;
+        if (!session.active || !current()) {
+          session.timers.delete(entry);
+          return;
+        }
+        // A visibility event may race a timer callback. Keep it queued
+        // instead of silently losing the next chunk while recovery is open.
+        if (readAudioRecovery) {
+          entry.remaining = 0;
+          return;
+        }
+        session.timers.delete(entry);
+        callback();
+      }, entry.remaining);
+    };
+    entry.arm = arm;
+    session.timers.add(entry);
+    if (!readAudioRecovery) arm();
+    return entry;
+  }
+
+  function freezeReadScene(session) {
+    if (!session?.active) return;
+    session.wrap?.classList.add("read-audio-paused");
+    // WebKit can advance CSS animations while backgrounded even with a paused
+    // ancestor style. Snapshot each actual animation timeline and pause it
+    // directly; on pageshow, restore the saved times before the next paint.
+    const frozen = session.pausedAnimations ||= new Map();
+    let animations = [];
+    try { animations = session.wrap?.getAnimations?.({ subtree: true }) || []; }
+    catch (err) { /* CSS pause remains the fallback. */ }
+    for (const animation of animations) {
+      try {
+        if (!frozen.has(animation)) frozen.set(animation, animation.currentTime);
+        animation.pause();
+        // Set after pause(): Safari may otherwise overwrite our restored
+        // position with its already-advanced background timeline.
+        if (frozen.get(animation) !== null) animation.currentTime = frozen.get(animation);
+      } catch (err) { /* A finished or detached animation is harmless. */ }
+    }
+    for (const entry of session.timers) {
+      if (!entry.id) continue;
+      clearTimeout(entry.id);
+      entry.id = 0;
+      entry.remaining = Math.max(0, entry.remaining - (Date.now() - entry.startedAt));
+    }
+  }
+
+  function thawReadScene(session, pausedMs = 0) {
+    if (!session?.active) return;
+    // Balloon collision tracks use wall-clock times, unlike CSS animations.
+    for (const track of [...(session.wordTracks || []), ...(session.balloonTracks || [])]) {
+      track.startMs += pausedMs;
+    }
+    session.fanfareLastProgress = Date.now();
+    session.wrap?.classList.remove("read-audio-paused");
+    for (const [animation, originalTime] of session.pausedAnimations || []) {
+      try {
+        if (originalTime !== null) animation.currentTime = originalTime;
+        animation.play();
+      } catch (err) { /* The element may have left the scene. */ }
+    }
+    session.pausedAnimations?.clear();
+    for (const entry of session.timers) if (!entry.id) entry.arm();
+  }
+
+  function stopReadNarration() {
+    audioRequest += 1;
+    const audio = activeAudio;
+    activeAudio = null;
+    readAudioStartPromise = null;
+    readDeferredNarrationFinish = null;
+    if (!audio) return;
+    try { audio.pause(); audio.currentTime = 0; } catch (err) { }
+  }
+
+  function activeReadScene() {
+    if (state.activityId === VERSE_CRAWL_ACTIVITY_ID) return crawlSession;
+    if (state.activityId === BALLOONS_ACTIVITY_ID) return balloonSession;
+    if (state.activityId === FISH_ACTIVITY_ID) return fishSession;
+    return null;
+  }
+
+  function attachReadRecoveryScene(session) {
+    if (readAudioRecovery?.kind !== "animated") return;
+    if (readAudioRecovery.scene && readAudioRecovery.scene !== session) {
+      readAudioRecovery.narration = null; // Original slide was replaced.
+    }
+    readAudioRecovery.scene = session;
+    freezeReadScene(session);
+  }
+
+  function ensureReadAudioOverlay() {
+    const doc = root?.document;
+    if (!doc?.body) return null;
+    let overlay = doc.getElementById("readAudioResumeOverlay");
+    if (overlay) return overlay;
+    overlay = doc.createElement("div");
+    overlay.id = "readAudioResumeOverlay";
+    overlay.className = "read-audio-resume-overlay";
+    overlay.hidden = true;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "readAudioResumeTitle");
+    overlay.innerHTML = `
+      <button class="read-my-verse-back read-audio-overlay-back no-zoom"
+        type="button" id="readAudioOverlayBack" data-no-ui-sound aria-label="Back to activities">‹</button>
+      <div class="read-audio-resume-card">
+        <h2 id="readAudioResumeTitle">Ready to Continue?</h2>
+        <button id="readAudioResumeButton" type="button" data-no-ui-sound>Resume Audio</button>
+        <p id="readAudioResumeStatus" role="status" hidden></p>
+      </div>`;
+    overlay.querySelector("#readAudioResumeButton").onclick = resumeReadAudioFromGesture;
+    // The card has only Resume Audio; the familiar top-left Back control
+    // remains accessible if a device cannot recover its audio.
+    overlay.querySelector("#readAudioOverlayBack").onclick = exitSession;
+    doc.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function syncReadAudioOverlay() {
+    const overlay = readAudioRecovery ? ensureReadAudioOverlay() :
+      root?.document?.getElementById?.("readAudioResumeOverlay");
+    if (!overlay) return;
+    const show = !!readAudioRecovery && !root.document.hidden &&
+      state.phase !== "idle" && !completionReported;
+    overlay.hidden = !show;
+    if (!show) return;
+    const button = overlay.querySelector("#readAudioResumeButton");
+    const status = overlay.querySelector("#readAudioResumeStatus");
+    button.disabled = !!readAudioRecoveryAttempt;
+    const crawlResume = readAudioRecovery.kind === "animated" &&
+      state.activityId === VERSE_CRAWL_ACTIVITY_ID;
+    const heading = overlay.querySelector("#readAudioResumeTitle");
+    if (heading) heading.textContent = crawlResume ? "Ready to Continue Verse Crawl?" : "Ready to Continue?";
+    // Keep the child-facing label stable while the playback request completes.
+    button.textContent = crawlResume ? "Resume" : "Resume Audio";
+    status.textContent = readAudioRecovery.error || "";
+    status.hidden = !status.textContent;
+  }
+
+  function pauseReadForInterruption() {
+    if (!state.verseId || state.phase === "idle" || completionReported) return false;
+    if (readAudioRecovery) {
+      // Another background event invalidates a pending Resume Audio attempt.
+      if (root?.document?.hidden) {
+        readAudioRecoveryGeneration += 1;
+        readAudioRecoveryAttempt = null;
+        stopReadNarration();
+        if (readAudioRecovery.kind === "animated") {
+          freezeReadScene(readAudioRecovery.scene);
+          if (readAudioRecovery.narration) readAudioRecovery.narration.item.audioStarted = false;
+          if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
+          if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
+        } else if (readAudioRecovery.kind === "sequence") {
+          readAudioRecovery.data.activeButtonIndex = -1;
+          readActiveSequenceReplay = null;
+        } else if (readAudioRecovery.kind === "chunk") {
+          state.phase = "pause";
+        }
+      }
+      syncReadAudioOverlay();
+      return false;
+    }
+    readEffectRecoveryPending = true;
+    const scene = activeReadScene();
+    let recovery = null;
+    if (isAnimatedActivity(state.activityId)) {
+      recovery = { kind: "animated", scene: scene?.active ? scene : null,
+        narration: scene?.active && readActiveAnimatedNarration?.session === scene
+          ? readActiveAnimatedNarration : null };
+    } else if (readActiveSequenceReplay && state.activityData === readActiveSequenceReplay.data) {
+      recovery = { kind: "sequence", ...readActiveSequenceReplay };
+    } else if (state.phase === "playing" || state.phase === "pause") {
+      recovery = { kind: "chunk" };
+    }
+    if (!recovery) {
+      // A typing introduction doesn't have narration to resume.
+      if (isTypingActivity(state.activityId) && state.typewriterIntroPhase !== "done") {
+        finishTypewriterIntro();
+      }
+      stopKeySoundVoices();
+      stopScrambleRewards();
+      readEffectRecoveryPending = true;
+      return false;
+    }
+    recovery.startedAt = Date.now();
+    recovery.error = "";
+    readAudioRecovery = recovery;
+    readAudioRecoveryGeneration += 1;
+    readAudioRecoveryAttempt = null;
+    if (recovery.kind === "animated") {
+      freezeReadScene(scene);
+      if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
+        if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
+      if (recovery.narration) recovery.narration.item.audioStarted = false;
+    } else if (recovery.kind === "sequence") {
+      recovery.data.activeButtonIndex = -1;
+      readActiveSequenceReplay = null;
+    } else {
+      clearTimeout(pauseTimer);
+      pauseTimer = 0;
+      state.phase = "pause";
+    }
+    stopReadNarration();
+    stopKeySoundVoices();
+    stopScrambleRewards();
+    syncReadAudioOverlay();
+    return true;
+  }
+
+  function waitReadRecoveryResult(promise, ms = 1500) {
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(value);
+      };
+      const timeout = setTimeout(() => finish(false), ms);
+      Promise.resolve(promise).then(value => finish(value !== false), () => finish(false));
+    });
+  }
+
+  // Patch 20J: restore the frozen verse scene, not the old Web Audio graph.
+  // The HTML soundtrack restarts at the configurable, already-ducked mark
+  // from this user gesture. No native plugin and no scene reset are involved.
+  function resumeInterruptedCrawlFromGesture(recovery, generation) {
+    const scene = recovery.scene;
+    stopCrawlMusic();
+    const hadEnding = !!crawlEnding;
+    stopCrawlEnding();
+    readAudioStartPromise = null;
+    // Play BEFORE awaiting any promise, so iOS sees this as a direct tap.
+    startCrawlMusic("interruption-resume", CRAWL_RESUME_SECONDS);
+    const song = crawlMusic;
+    if (recovery.narration && recovery.narration.session.active) {
+      const { session, item } = recovery.narration;
+      item.audioStarted = false;
+      playCrawlAudio(session, item);
+    }
+    const narrationStart = readAudioStartPromise;
+    if (hadEnding && scene?.active) {
+      scene.endingStarted = false;
+      startCrawlEnding(scene);
+    }
+    // UI effects are separate; they must not veto a successful media restart.
+    if (!appApi?.isMuted?.() && typeof appApi?.unlockAudio === "function") {
+      try { void Promise.resolve(appApi.unlockAudio()).catch(() => {}); }
+      catch (err) { /* Nonessential UI sound. */ }
+    }
+    syncReadAudioOverlay();
+    void (async () => {
+      const started = !!appApi?.isMuted?.() || !!song &&
+        await waitReadRecoveryResult(song.startPromise, 3000);
+      const narrated = !narrationStart ||
+        await waitReadRecoveryResult(narrationStart, 3000);
+      if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
+      readAudioRecoveryAttempt = null;
+      if (!started || !narrated || root?.document?.hidden) {
+        stopReadNarration();
+        if (recovery.narration) recovery.narration.item.audioStarted = false;
+        stopCrawlMusic();
+        stopCrawlEnding();
+        recovery.error = "Audio isn't ready yet. Tap Resume Verse Crawl to try again.";
+        syncReadAudioOverlay();
+        return;
+      }
+      readAudioRecovery = null;
+      thawReadScene(scene, Date.now() - recovery.startedAt);
+      syncReadAudioOverlay();
+      const delayedFinish = readDeferredNarrationFinish;
+      readDeferredNarrationFinish = null;
+      delayedFinish?.();
+    })();
+    return true;
+  }
+
+  function resumeReadAudioFromGesture() {
+    const recovery = readAudioRecovery;
+    if (!recovery || readAudioRecoveryAttempt || root?.document?.hidden) return false;
+    const generation = readAudioRecoveryGeneration;
+    readAudioRecoveryAttempt = { generation };
+    recovery.error = "";
+    if (recovery.kind === "animated" &&
+        state.activityId === VERSE_CRAWL_ACTIVITY_ID) {
+      return resumeInterruptedCrawlFromGesture(recovery, generation);
+    }
+    // Start the real narration / music first in this user gesture. App UI
+    // Web Audio is a separate sound system and must not preempt this playback.
+    const kind = recovery.kind;
+    readAudioStartPromise = null;
+    let media = Promise.resolve();
+    if (kind === "chunk") {
+      state.phase = "pause";
+      playCurrentChunk();
+      media = readAudioStartPromise || Promise.resolve();
+    } else if (kind === "sequence") {
+      recovery.data.activeButtonIndex = -1;
+      playChunkSequenceAudio(recovery.buttonIndex, recovery.onFinished);
+      media = readAudioStartPromise || Promise.resolve();
+    } else if (kind === "animated") {
+      if (recovery.narration && recovery.narration.session.active) {
+        const { session, item } = recovery.narration;
+        item.audioStarted = false;
+        if (state.activityId === VERSE_CRAWL_ACTIVITY_ID) playCrawlAudio(session, item);
+        else if (state.activityId === BALLOONS_ACTIVITY_ID) playBalloonAudio(session, item);
+        else if (state.activityId === FISH_ACTIVITY_ID) playFishAudio(session, item);
+        media = readAudioStartPromise || Promise.resolve();
+      }
+    }
+    // Prime app UI effects as best effort, AFTER starting the requested media.
+    // A frozen app AudioContext must never veto a successfully playing verse.
+    if (!appApi?.isMuted?.() && typeof appApi?.unlockAudio === "function") {
+      try { void Promise.resolve(appApi.unlockAudio()).catch(() => {}); }
+      catch (err) { /* UI effects can retry on a later gesture. */ }
+    }
+    syncReadAudioOverlay();
+    void (async () => {
+      const heard = await waitReadRecoveryResult(media);
+      if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
+      readAudioRecoveryAttempt = null;
+      if (!heard || root?.document?.hidden) {
+        stopReadNarration();
+        if (kind === "sequence") {
+          recovery.data.activeButtonIndex = -1;
+          readActiveSequenceReplay = null;
+        }
+        if (kind === "animated" && recovery.narration) recovery.narration.item.audioStarted = false;
+        if (kind === "chunk") state.phase = "pause";
+        if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
+        if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
+        recovery.error = "Audio isn't ready yet. Tap Resume Audio to try again.";
+        syncReadAudioOverlay();
+        return;
+      }
+      readAudioRecovery = null;
+      if (kind === "animated") thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
+      syncReadAudioOverlay();
+      const delayedFinish = readDeferredNarrationFinish;
+      readDeferredNarrationFinish = null;
+      delayedFinish?.();
+    })();
+    return true;
+  }
+
+  function restorePausedReadSceneOnReturn() {
+    // Reassert the exact animation clock captured before iOS backgrounding.
+    if (readAudioRecovery?.kind === "animated") freezeReadScene(readAudioRecovery.scene);
+    syncReadAudioOverlay();
+  }
+  root?.document?.addEventListener?.("visibilitychange", () => {
+    if (root.document.hidden) pauseReadForInterruption();
+    else restorePausedReadSceneOnReturn();
+  });
+  root?.addEventListener?.("pagehide", pauseReadForInterruption);
+  root?.addEventListener?.("pageshow", restorePausedReadSceneOnReturn);
+
   function stopAudio() {
+    readAudioRecoveryGeneration += 1;
+    readAudioRecovery = null;
+    readAudioRecoveryAttempt = null;
+    readActiveAnimatedNarration = null;
+    readActiveSequenceReplay = null;
+    readAudioStartPromise = null;
+    readDeferredNarrationFinish = null;
+    syncReadAudioOverlay();
     audioRequest += 1;
     stopCrawlSequence();
     stopCrawlMusic();
+    stopCrawlEnding();
     stopBalloonSequence();
     stopFishSequence();
     typingFitCache = null;
@@ -1604,7 +2022,7 @@
 
     // Start in the launch gesture so iOS permits music playback.
     if (safeActivityId === VERSE_CRAWL_ACTIVITY_ID) {
-      startCrawlMusic();
+      startCrawlMusic("activity-launch");
     }
 
     if (
@@ -1661,6 +2079,38 @@
   }
 
   // Key clicks may overlap during rapid taps; never rewind all players on a tap.
+  function resumeReadEffects(context, kind) {
+    if (!context || root?.document?.hidden || readAudioRecovery) return Promise.resolve(false);
+    if (context.state === "running") return Promise.resolve(true);
+    let started;
+    try { started = context.resume(); }
+    catch (err) { started = Promise.reject(err); }
+    // An interrupted iOS context may never settle. Do not cache that promise.
+    return waitReadRecoveryResult(started, 900).then((ok) => {
+      if (ok && context.state === "running") {
+        if (kind === "key") readKeyResumeFailures = 0;
+        else readToneResumeFailures = 0;
+        return true;
+      }
+      if (kind === "key" && keySoundContext === context) {
+        if (++readKeyResumeFailures >= 2) {
+          keySoundContext = null;
+          keySoundBuffers = [];
+          keySoundLoadAttempted = false;
+          keySoundGeneration += 1;
+          void context.close?.()?.catch?.(() => {});
+        }
+      }
+      if (kind === "tone" && scrambleAudioContext === context) {
+        if (++readToneResumeFailures >= 2) {
+          scrambleAudioContext = null;
+          void context.close?.()?.catch?.(() => {});
+        }
+      }
+      return false;
+    });
+  }
+
   function stopKeySoundVoices() {
     keySoundVoices.forEach(({ source, gain }) => {
       try { source.onended = null; source.stop(); } catch (err) { }
@@ -1745,10 +2195,27 @@
     const buffer = keySoundBuffers[index];
 
     if (context && buffer) {
-      if (context.state === "suspended") {
-        context.resume().catch(() => {});
+      if (readEffectRecoveryPending && context.state === "running") {
+        const before = context.currentTime;
+        setTimeout(() => {
+          if (keySoundContext !== context) return;
+          if (context.state === "running" && context.currentTime > before + 0.012) {
+            readEffectRecoveryPending = false;
+          } else {
+            // A frozen output must not masquerade as a working context.
+            keySoundContext = null;
+            keySoundBuffers = [];
+            keySoundLoadAttempted = false;
+            keySoundGeneration += 1;
+            void context.close?.()?.catch?.(() => {});
+            readEffectRecoveryPending = false;
+          }
+        }, 90);
       }
-      if (context.state === "running") {
+      if (context.state !== "running") {
+        void resumeReadEffects(context, "key");
+      }
+      if (context.state === "running" && !readEffectRecoveryPending) {
         try {
           const source = context.createBufferSource();
           const gain = context.createGain();
@@ -1812,7 +2279,8 @@
     try {
       scrambleAudioContext ||= new AudioContextClass();
       const context = scrambleAudioContext;
-      if (context.state === "suspended") context.resume()?.catch?.(() => {});
+      if (context.state !== "running") void resumeReadEffects(context, "tone");
+      if (context.state !== "running") return;
       const base = [60, 62, 64, 67, 69, 72][(solvedCount - 1) % 6];
       const notes = complete
         ? [[base, 0], [base + 4, 0.09], [base + 7, 0.19], [base + 12, 0.3]]
@@ -1853,7 +2321,8 @@
     try {
       scrambleAudioContext ||= new AudioContextClass();
       const context = scrambleAudioContext;
-      if (context.state === "suspended") context.resume()?.catch?.(() => {});
+      if (context.state !== "running") void resumeReadEffects(context, "tone");
+      if (context.state !== "running") return;
       const scale = [60, 62, 64, 67, 69, 72];
       const midi = wrong ? 48 : scale[(Math.max(1, nextIndex) - 1) % scale.length];
       const notes = wrong ? [[midi, 0]] : complete
@@ -1949,7 +2418,12 @@
     if (!AudioContextClass) return;
 
     try {
-      const context = new AudioContextClass();
+      scrambleAudioContext ||= new AudioContextClass();
+      const context = scrambleAudioContext;
+      if (context.state !== "running") {
+        void resumeReadEffects(context, "tone");
+        return;
+      }
       const oscillator =
         context.createOscillator();
       const gain = context.createGain();
@@ -1971,11 +2445,17 @@
       );
       oscillator.connect(gain);
       gain.connect(context.destination);
+      const voice = { oscillator, gain };
+      scrambleSoundVoices.add(voice);
       oscillator.start(now);
       oscillator.stop(now + 0.15);
       oscillator.addEventListener(
         "ended",
-        () => context.close?.(),
+        () => {
+          scrambleSoundVoices.delete(voice);
+          try { oscillator.disconnect(); } catch (err) { }
+          try { gain.disconnect(); } catch (err) { }
+        },
         { once: true }
       );
     } catch (err) { }
@@ -2130,6 +2610,10 @@
 
     completionReported = true;
     state.phase = "complete";
+    readAudioRecoveryGeneration += 1;
+    readAudioRecovery = null;
+    readAudioRecoveryAttempt = null;
+    syncReadAudioOverlay();
 
     const handled =
       appApi?.onContextComplete?.({
@@ -2256,6 +2740,10 @@
 
       const finish = () => {
         if (request !== audioRequest) return;
+        if (readAudioRecovery) {
+          if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
+          return;
+        }
         activeAudio = null;
         advanceAfterChunk();
       };
@@ -2267,19 +2755,16 @@
       );
       activeAudio.addEventListener(
         "error",
-        finish,
+        () => {
+          if (root?.document?.hidden) pauseReadForInterruption();
+          else finish();
+        },
         { once: true }
       );
 
-      const playPromise =
-        activeAudio.play();
-
-      playPromise?.catch?.(() => {
+      beginReadNarration(activeAudio, () => {
         if (request !== audioRequest) return;
-        pauseTimer = setTimeout(
-          finish,
-          650
-        );
+        pauseTimer = setTimeout(finish, 650);
       });
     } catch (err) {
       pauseTimer = setTimeout(
@@ -2369,6 +2854,7 @@
   }
 
   function handleTypeTap() {
+    if (readAudioRecovery) return false;
     if (state.phase !== "typing") {
       return false;
     }
@@ -2464,6 +2950,7 @@
   }
 
   function handleUnscrambleTap(tokenId) {
+    if (readAudioRecovery) return false;
     if (
       state.phase !== "interacting" ||
       state.activityId !==
@@ -2516,6 +3003,7 @@
   }
 
   function handleTapOrderTap(tokenId) {
+    if (readAudioRecovery) return false;
     if (
       state.phase !== "interacting" ||
       state.activityId !==
@@ -2605,6 +3093,7 @@
       data.fadeButtonIndex = -1;
     }
     data.activeButtonIndex = buttonIndex;
+    readActiveSequenceReplay = { data, buttonIndex, onFinished };
     appApi?.requestRender?.();
 
     const request = ++audioRequest;
@@ -2625,8 +3114,13 @@
         return;
       }
 
+      if (readAudioRecovery) {
+        if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
+        return;
+      }
       finished = true;
       activeAudio = null;
+      if (readActiveSequenceReplay?.data === data) readActiveSequenceReplay = null;
       data.activeButtonIndex = -1;
       // Let the halo settle after the sound ends; never lock input for it.
       data.fadeButtonIndex = buttonIndex;
@@ -2667,16 +3161,16 @@
       );
       activeAudio.addEventListener(
         "error",
-        finish,
+        () => {
+          if (root?.document?.hidden) pauseReadForInterruption();
+          else finish();
+        },
         { once: true }
       );
-      activeAudio.play()
-        .catch?.(() => {
-          pauseTimer = setTimeout(
-            finish,
-            520
-          );
-        });
+      beginReadNarration(activeAudio, () => {
+        if (request !== audioRequest) return;
+        pauseTimer = setTimeout(finish, 520);
+      });
     } catch (err) {
       pauseTimer = setTimeout(
         finish,
@@ -2688,6 +3182,7 @@
   }
 
   function chooseChunkSequenceMode(mode) {
+    if (readAudioRecovery) return false;
     const data = state.activityData;
     const safeMode = cleanString(mode);
 
@@ -2712,6 +3207,7 @@
   function handleChunkSequenceExplore(
     buttonIndex
   ) {
+    if (readAudioRecovery) return false;
     const data = state.activityData;
 
     if (
@@ -2742,6 +3238,7 @@
   }
 
   function beginChunkSequenceChallenge() {
+    if (readAudioRecovery) return false;
     const data = state.activityData;
 
     if (
@@ -2792,6 +3289,7 @@
   function handleChunkSequenceChallenge(
     buttonIndex
   ) {
+    if (readAudioRecovery) return false;
     const data = state.activityData;
 
     if (
@@ -3079,44 +3577,37 @@
     `;
   }
 
-  // Music is independent of spoken chunk audio. It starts in the launch tap,
-  // before the crawl screen is mounted, to satisfy iOS playback restrictions.
-  function startCrawlMusic() {
+  // The pre-ducked track is intentionally played without Web Audio or JS
+  // volume automation. Direct HTML media is the proven Patch 20B recovery path.
+  function startCrawlMusic(reason = "unspecified", resumeAt = 0) {
     if (appApi?.isMuted?.() || !root?.Audio) return;
     try {
       const audio = new root.Audio(CRAWL_MUSIC_SRC);
       audio.preload = "auto";
       audio.loop = false;
-      audio.volume = 1;
-      audio.setAttribute("playsinline", "");
-      audio.setAttribute("webkit-playsinline", "");
-      const music = {
-        audio, context: null, gain: null,
-        failed: false, fadeFrame: 0
-      };
+      audio.setAttribute?.("playsinline", "");
+      audio.setAttribute?.("webkit-playsinline", "");
+      const music = { audio, context: null, gain: null,
+        engine: "html-media-direct-20j", failed: false };
       crawlMusic = music;
-      audio.addEventListener("error", () => { music.failed = true; });
-
-      // iOS WebKit may ignore HTMLMediaElement.volume. Route the music
-      // through a GainNode so the fanfare and spoken verse can be balanced.
-      const AudioContextClass = root.AudioContext || root.webkitAudioContext;
-      if (AudioContextClass) {
-        let context = null;
-        try {
-          context = new AudioContextClass();
-          const source = context.createMediaElementSource(audio);
-          const gain = context.createGain();
-          source.connect(gain);
-          gain.connect(context.destination);
-          music.context = context;
-          music.gain = gain;
-          context.resume()?.catch?.(() => { music.failed = true; });
-        } catch (err) {
-          context?.close?.()?.catch?.(() => {});
-        }
+      audio.addEventListener?.("error", () => {
+        music.failed = true;
+      });
+      if (resumeAt > 0) {
+        const seek = () => {
+          if (crawlMusic !== music) return;
+          try { audio.currentTime = resumeAt; }
+          catch (err) { /* Metadata can arrive later; retry the seek then. */ }
+        };
+        // iOS may ignore seeks before metadata; retry after metadata arrives.
+        audio.addEventListener?.("loadedmetadata", seek, { once: true });
+        seek();
       }
-      audio.play()?.catch?.(() => { music.failed = true; });
-    } catch (err) {
+      // play() is invoked synchronously during the launch/resume gesture.
+      music.startPromise = Promise.resolve(audio.play()).then(
+        () => true,
+        () => { music.failed = true; return false; });
+    } catch (error) {
       stopCrawlMusic();
     }
   }
@@ -3125,52 +3616,85 @@
     const music = crawlMusic;
     crawlMusic = null;
     if (!music) return;
-    if (music.fadeFrame) root?.cancelAnimationFrame?.(music.fadeFrame);
     try {
       music.audio.pause();
       music.audio.removeAttribute?.("src");
       music.audio.load?.();
-    } catch (err) { }
-    music.context?.close?.()?.catch?.(() => {});
+    } catch (error) { /* Audio teardown remains best effort. */ }
   }
 
-  function fadeCrawlMusic(target, durationMs) {
-    const music = crawlMusic;
-    if (!music || music.failed || music.audio.ended) return;
-    const level = Math.max(0, Math.min(1, target));
-    const seconds = Math.max(0.01, durationMs / 1000);
-    if (music.gain && music.context) {
-      const now = music.context.currentTime;
-      const param = music.gain.gain;
-      param.cancelScheduledValues(now);
-      param.setValueAtTime(param.value, now);
-      param.linearRampToValueAtTime(level, now + seconds);
+  function stopCrawlEnding() {
+    const ending = crawlEnding;
+    crawlEnding = null;
+    if (!ending) return;
+    try { ending.pause(); ending.removeAttribute?.("src"); ending.load?.(); }
+    catch (error) { /* Audio teardown remains best effort. */ }
+  }
+
+  function startCrawlEnding(session) {
+    if (!session?.active || session.endingStarted) return;
+    session.endingStarted = true;
+    session.endingDone = false;
+    if (appApi?.isMuted?.() || !root?.Audio) {
+      session.endingDone = true;
+      completeCrawlIfReady(session);
       return;
     }
-    // Compatible fallback for browsers where element volume is writable.
-    if (music.fadeFrame) root?.cancelAnimationFrame?.(music.fadeFrame);
-    const startVolume = music.audio.volume;
-    const startedAt = Date.now();
-    const tick = () => {
-      if (crawlMusic !== music) return;
-      const fraction = Math.min(1, (Date.now() - startedAt) / (seconds * 1000));
-      music.audio.volume = startVolume + (level - startVolume) * fraction;
-      music.fadeFrame = fraction < 1 ? root.requestAnimationFrame(tick) : 0;
-    };
-    tick();
+    let ending;
+    try {
+      ending = new root.Audio(CRAWL_ENDING_SRC);
+      ending.preload = "auto";
+      ending.setAttribute?.("playsinline", "");
+      ending.setAttribute?.("webkit-playsinline", "");
+      crawlEnding = ending;
+      const finish = () => {
+        if (crawlEnding !== ending) return;
+        session.endingDone = true;
+        stopCrawlMusic();
+        stopCrawlEnding();
+        completeCrawlIfReady(session);
+      };
+      ending.addEventListener?.("ended", finish, { once: true });
+      ending.addEventListener?.("error", finish, { once: true });
+      Promise.resolve(ending.play()).then(
+        () => {
+          if (crawlEnding !== ending) return;
+          // Count the one-second overlap from actual playback, not from an
+          // asynchronous iOS media-load request that may take time to start.
+          crawlTimer(session, () => {
+            if (crawlEnding === ending) {
+              stopCrawlMusic();
+            }
+          }, CRAWL_ENDING_OVERLAP_MS);
+        },
+        () => finish());
+      // Never strand completion if WebKit omits ended/error.
+      crawlTimer(session, finish, 6500);
+    } catch (error) {
+      session.endingDone = true;
+      stopCrawlEnding();
+      completeCrawlIfReady(session);
+    }
   }
 
   function waitForCrawlFanfare(session, start) {
-    const music = crawlMusic;
+    let music = crawlMusic;
     if (!music || music.failed || appApi?.isMuted?.()) {
       if (music?.failed || appApi?.isMuted?.()) stopCrawlMusic();
       start();
       return;
     }
-    let lastProgress = Date.now();
+    session.fanfareLastProgress = Date.now();
     let lastTime = -1;
     const check = () => {
       if (!session.active || crawlSession !== session) return;
+      // A recovery tap can rebuild the soundtrack without restarting the
+      // crawl scene. Follow its replacement rather than stopping it.
+      if (crawlMusic !== music && crawlMusic) {
+        music = crawlMusic;
+        lastTime = -1;
+        session.fanfareLastProgress = Date.now();
+      }
       if (crawlMusic !== music || music.failed || music.audio.ended ||
           appApi?.isMuted?.()) {
         stopCrawlMusic();
@@ -3179,16 +3703,15 @@
       }
       const elapsed = music.audio.currentTime || 0;
       if (elapsed >= CRAWL_FANFARE_SECONDS) {
-        fadeCrawlMusic(CRAWL_UNDERSCORE_VOLUME, CRAWL_DUCK_FADE_MS);
         start();
         return;
       }
       if (elapsed > lastTime + 0.02) {
         lastTime = elapsed;
-        lastProgress = Date.now();
+        session.fanfareLastProgress = Date.now();
       }
       // A blocked or stalled soundtrack must never strand the activity.
-      if (Date.now() - lastProgress > 3500) {
+      if (Date.now() - session.fanfareLastProgress > 3500) {
         stopCrawlMusic();
         start();
         return;
@@ -3389,7 +3912,7 @@
     const session = crawlSession;
     if (!session) return;
     session.active = false;
-    session.timers.forEach((timer) => clearTimeout(timer));
+    session.timers.forEach((entry) => clearTimeout(entry.id));
     session.timers.clear();
     session.items.forEach((item) => {
       item.node.style.animation = "none";
@@ -3399,29 +3922,21 @@
   }
 
   function crawlTimer(session, callback, delayMs) {
-    const timer = setTimeout(() => {
-      session.timers.delete(timer);
-      if (session.active && crawlSession === session) callback();
-    }, delayMs);
-    session.timers.add(timer);
-    return timer;
+    return scheduleReadSceneTimer(session, () => crawlSession === session,
+      callback, delayMs);
   }
 
   function completeCrawlIfReady(session) {
     const last = session.items.get(state.chunks.length - 1);
-    if (
-      session.active &&
-      crawlSession === session &&
-      !completionReported &&
-      last?.audioDone &&
-      last?.vanished
-    ) {
-      reportCompletion();
+    if (session.active && crawlSession === session && !completionReported &&
+        last?.audioDone && last?.vanished) {
+      if (!session.endingStarted) startCrawlEnding(session);
+      if (session.endingDone) reportCompletion();
     }
   }
 
   function markCrawlVanished(session, item) {
-    if (!session.active || item.vanished) return;
+    if (!session.active || readAudioRecovery || item.vanished) return;
     item.vanished = true;
     item.node.remove();
     completeCrawlIfReady(session);
@@ -3432,8 +3947,7 @@
     item.audioDone = true;
     if (item.index === state.chunks.length - 1 &&
         (item.pausedForAudio || state.reducedMotion)) {
-      fadeCrawlMusic(0, state.reducedMotion ? 450 :
-        Math.ceil(item.durationMs * 0.16));
+      startCrawlEnding(session);
     }
     if (item.pausedForAudio) {
       item.node.style.animationPlayState = "running";
@@ -3457,11 +3971,17 @@
     if (!session.active || item.audioStarted || item.vanished) return;
     item.audioStarted = true;
     state.phase = "playing";
+    readActiveAnimatedNarration = { session, item };
     const request = ++audioRequest;
     const src = animatedItemAudioPath(item);
     const finish = () => {
       if (!session.active || request !== audioRequest) return;
+      if (readAudioRecovery) {
+        if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
+        return;
+      }
       activeAudio = null;
+      if (readActiveAnimatedNarration?.item === item) readActiveAnimatedNarration = null;
       finishCrawlAudio(session, item);
     };
     if (!src || typeof Audio === "undefined" || appApi?.isMuted?.()) {
@@ -3472,8 +3992,11 @@
       activeAudio = new Audio(src);
       activeAudio.preload = "auto";
       activeAudio.addEventListener("ended", finish, { once: true });
-      activeAudio.addEventListener("error", finish, { once: true });
-      activeAudio.play()?.catch?.(() => crawlTimer(session, finish, 650));
+      activeAudio.addEventListener("error", () => {
+        if (root?.document?.hidden) pauseReadForInterruption();
+        else finish();
+      }, { once: true });
+      beginReadNarration(activeAudio, () => crawlTimer(session, finish, 650));
     } catch (err) {
       crawlTimer(session, finish, 650);
     }
@@ -3522,10 +4045,10 @@
       }
     }, Math.round(motion.durationMs * 0.84));
     if (index === state.chunks.length - 1) {
-      // Match the music fade to the last 15% of the final crawl fade.
+      // Start the baked-fade horn in the last part of the final visual fade.
       crawlTimer(session, () => {
         if (item.audioDone && !item.pausedForAudio && !item.vanished) {
-          fadeCrawlMusic(0, motion.durationMs * 0.15);
+          startCrawlEnding(session);
         }
       }, Math.round(motion.durationMs * 0.85));
     }
@@ -3571,17 +4094,19 @@
       items: new Map(), timers: new Set()
     };
     crawlSession = session;
+    attachReadRecoveryScene(session);
     let started = false;
     const start = () => {
       if (started || !session.active) return;
       started = true;
       root.requestAnimationFrame(() => {
         if (session.active && crawlSession === session && wrap.isConnected) {
-          launchCrawlChunk(session, -1);
+          if (readAudioRecovery) crawlTimer(session, () => launchCrawlChunk(session, -1), 0);
+          else launchCrawlChunk(session, -1);
         }
       });
     };
-    // Wait for both font layout and eight seconds of actual music playback.
+    // Wait for both font layout and seven seconds of actual music playback.
     // A stalled/blocked soundtrack falls back to the normal silent crawl.
     let waiting = false;
     const ready = () => {
@@ -3605,18 +4130,14 @@
     const session = balloonSession;
     if (!session) return;
     session.active = false;
-    session.timers.forEach((timer) => clearTimeout(timer));
+    session.timers.forEach((entry) => clearTimeout(entry.id));
     session.timers.clear();
     balloonSession = null;
   }
 
   function balloonTimer(session, callback, delayMs) {
-    const timer = setTimeout(() => {
-      session.timers.delete(timer);
-      if (session.active && balloonSession === session) callback();
-    }, delayMs);
-    session.timers.add(timer);
-    return timer;
+    return scheduleReadSceneTimer(session, () => balloonSession === session,
+      callback, delayMs);
   }
 
   function completeBalloonsIfReady(session) {
@@ -3628,7 +4149,7 @@
   }
 
   function markBalloonWordsVanished(session, item) {
-    if (!session.active || item.vanished) return;
+    if (!session.active || readAudioRecovery || item.vanished) return;
     item.vanished = true;
     item.group.remove();
     completeBalloonsIfReady(session);
@@ -3653,12 +4174,18 @@
     if (!session.active || item.audioStarted) return;
     item.audioStarted = true;
     state.phase = "playing";
+    readActiveAnimatedNarration = { session, item };
     const request = ++audioRequest;
     const src = animatedItemAudioPath(item);
     const finish = () => {
       if (!session.active || balloonSession !== session ||
           request !== audioRequest) return;
+      if (readAudioRecovery) {
+        if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
+        return;
+      }
       activeAudio = null;
+      if (readActiveAnimatedNarration?.item === item) readActiveAnimatedNarration = null;
       finishBalloonAudio(session, item);
     };
     if (!src || typeof Audio === "undefined" || appApi?.isMuted?.()) {
@@ -3670,8 +4197,11 @@
       activeAudio = new Audio(src);
       activeAudio.preload = "auto";
       activeAudio.addEventListener("ended", finish, { once: true });
-      activeAudio.addEventListener("error", finish, { once: true });
-      activeAudio.play()?.catch?.(() => balloonTimer(session, finish, 650));
+      activeAudio.addEventListener("error", () => {
+        if (root?.document?.hidden) pauseReadForInterruption();
+        else finish();
+      }, { once: true });
+      beginReadNarration(activeAudio, () => balloonTimer(session, finish, 650));
     } catch (err) {
       balloonTimer(session, finish, 650);
     }
@@ -3924,9 +4454,11 @@
       items: new Map(), timers: new Set()
     };
     balloonSession = session;
+    attachReadRecoveryScene(session);
     root.requestAnimationFrame(() => {
       if (session.active && balloonSession === session && wrap.isConnected) {
-        launchBalloonChunk(session, -1);
+        if (readAudioRecovery) balloonTimer(session, () => launchBalloonChunk(session, -1), 0);
+        else launchBalloonChunk(session, -1);
       }
     });
     return appApi.makeSlide({ idx, bg: "#82d7f4", navHidden: true, inner: wrap });
@@ -3952,18 +4484,14 @@
     const session = fishSession;
     if (!session) return;
     session.active = false;
-    session.timers.forEach((timer) => clearTimeout(timer));
+    session.timers.forEach((entry) => clearTimeout(entry.id));
     session.timers.clear();
     fishSession = null;
   }
 
   function fishTimer(session, callback, delayMs) {
-    const timer = setTimeout(() => {
-      session.timers.delete(timer);
-      if (session.active && fishSession === session) callback();
-    }, delayMs);
-    session.timers.add(timer);
-    return timer;
+    return scheduleReadSceneTimer(session, () => fishSession === session,
+      callback, delayMs);
   }
 
   function completeFishIfReady(session) {
@@ -3975,7 +4503,7 @@
   }
 
   function markFishWordsVanished(session, item) {
-    if (!session.active || item.vanished) return;
+    if (!session.active || readAudioRecovery || item.vanished) return;
     item.vanished = true;
     item.group.remove();
     completeFishIfReady(session);
@@ -4000,12 +4528,18 @@
     if (!session.active || item.audioStarted) return;
     item.audioStarted = true;
     state.phase = "playing";
+    readActiveAnimatedNarration = { session, item };
     const request = ++audioRequest;
     const src = animatedItemAudioPath(item);
     const finish = () => {
       if (!session.active || fishSession !== session ||
           request !== audioRequest) return;
+      if (readAudioRecovery) {
+        if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
+        return;
+      }
       activeAudio = null;
+      if (readActiveAnimatedNarration?.item === item) readActiveAnimatedNarration = null;
       finishFishAudio(session, item);
     };
     if (!src || typeof Audio === "undefined" || appApi?.isMuted?.()) {
@@ -4017,8 +4551,11 @@
       activeAudio = new Audio(src);
       activeAudio.preload = "auto";
       activeAudio.addEventListener("ended", finish, { once: true });
-      activeAudio.addEventListener("error", finish, { once: true });
-      activeAudio.play()?.catch?.(() => fishTimer(session, finish, 650));
+      activeAudio.addEventListener("error", () => {
+        if (root?.document?.hidden) pauseReadForInterruption();
+        else finish();
+      }, { once: true });
+      beginReadNarration(activeAudio, () => fishTimer(session, finish, 650));
     } catch (err) {
       fishTimer(session, finish, 650);
     }
@@ -4190,9 +4727,11 @@
       fishGroupZoneOffset: Math.floor(Math.random() * 3)
     };
     fishSession = session;
+    attachReadRecoveryScene(session);
     root.requestAnimationFrame(() => {
       if (session.active && fishSession === session && wrap.isConnected) {
-        launchFishChunk(session, -1);
+        if (readAudioRecovery) fishTimer(session, () => launchFishChunk(session, -1), 0);
+        else launchFishChunk(session, -1);
       }
     });
     return appApi.makeSlide({ idx, bg: "#197ea7", navHidden: true, inner: wrap });
