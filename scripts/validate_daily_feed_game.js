@@ -1271,7 +1271,7 @@ function testBounceBrickImpactReboundsAndSingleDrop() {
   );
 }
 
-function testBounceSnackCatchUsesPetAndScoresRainbow() {
+function testBounceSnackCatchUsesPetOrPaddleAndScoresRainbow() {
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const rainbow = runtime.bounce.bricks.find((b) => b.config?.id === "rainbow");
@@ -1280,20 +1280,22 @@ function testBounceSnackCatchUsesPetAndScoresRainbow() {
   assert.strictEqual(snack.points, 5);
   runtime.bounce.paddleX = 220;
 
-  // The paddle is not an eater: a snack touching only the paddle stays active.
-  snack.x = 220;
+  // Paddle-only contact catches a snack even beyond the pet's round hitbox.
+  snack.x = runtime.bounce.paddleX + runtime.bounce.paddleHalfWidth - 3;
   snack.y = runtime.bounce.paddleTopY + runtime.bounce.paddleHeight / 2;
-  hooks.updateBounceSnacks(runtime, 1 / 120);
-  assert.strictEqual(runtime.balls.length, 1);
-  assert.strictEqual(runtime.score, 0);
-
-  // The pet above the paddle remains the snack catcher.
-  snack.x = 220;
-  snack.y = runtime.petCenterY - 5;
   hooks.updateBounceSnacks(runtime, 1 / 120);
   assert.strictEqual(runtime.balls.length, 0);
   assert.strictEqual(runtime.score, 5);
   assert.strictEqual(runtime.caughtCount, 1);
+
+  // The pet above the paddle must remain a valid catcher too.
+  hooks.spawnBounceSnack(runtime, rainbow);
+  runtime.balls[0].x = 220;
+  runtime.balls[0].y = runtime.petCenterY - 5;
+  hooks.updateBounceSnacks(runtime, 1 / 120);
+  assert.strictEqual(runtime.balls.length, 0);
+  assert.strictEqual(runtime.score, 10);
+  assert.strictEqual(runtime.caughtCount, 2);
   assert.strictEqual(runtime.catcherX, 195);
 
   hooks.spawnBounceSnack(runtime, rainbow);
@@ -1301,7 +1303,7 @@ function testBounceSnackCatchUsesPetAndScoresRainbow() {
   runtime.balls[0].y = runtime.height + 50;
   hooks.updateBounceSnacks(runtime, 1 / 120);
   assert.strictEqual(runtime.balls.length, 0);
-  assert.strictEqual(runtime.score, 5, "Missing snacks must not score");
+  assert.strictEqual(runtime.score, 10, "Missing snacks must not score");
 }
 
 function testBounceStarBricksCreateBonusNotLives() {
@@ -2363,7 +2365,10 @@ function testInterruptionStopsOldEffectsWithoutChangingVolume() {
   try {
     hooks.playStarSound(runtime);
     assert.strictEqual(effectStarts, 1);
-    assert.strictEqual(volume, 0.78);
+    const volumeMasterMatch = source.match(/const FEED_AUDIO_MASTER_VOLUME = ([0-9.]+);/);
+    assert.ok(volumeMasterMatch, "Feeding master volume remains editable");
+    const master = Number(volumeMasterMatch[1]);
+    assert.strictEqual(volume, Math.max(0, Math.min(1, 0.78 * master)));
     hooks.pauseFeedingGame(runtime, 1000);
     assert.strictEqual(effectStops, 1);
     assert.strictEqual(runtime.feedSoundNodes.size, 0);
@@ -3717,7 +3722,7 @@ async function main() {
     testBounceSeparatePetPaddleAndServe,
     testBounceCollisionRemovesBricksAndDropsCorrectSnacks,
     testBounceBrickImpactReboundsAndSingleDrop,
-    testBounceSnackCatchUsesPetAndScoresRainbow,
+    testBounceSnackCatchUsesPetOrPaddleAndScoresRainbow,
     testBounceStarBricksCreateBonusNotLives,
     testBouncePhysicsAndPaddleRebound,
     testBounceWhiteBallsAccelerateIndependently,

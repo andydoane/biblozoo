@@ -24,6 +24,18 @@
   const PEG_NOTE_FREQUENCIES = Object.freeze([
     523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
   ]);
+
+  // Feeding Game audio tuning knobs. Edit these values to balance the sounds
+  // on your iPhone; no developer UI is required. 1.00 = normal overall level.
+  // The master scales ALL Feeding effects, including the existing MP3 sounds.
+  // Keep the master at or below 1.00 to avoid clipping overlapping effects.
+  const FEED_AUDIO_MASTER_VOLUME = 1.00;
+  const FEED_COLLISION_TONE_VOLUME = 0.20; // Classic pegs + Bounce bricks/walls/paddle.
+  const FEED_MELODY_TONE_VOLUME = 0.25;    // Melody notes only.
+
+  function feedingSoundVolume(baseVolume) {
+    return clamp(baseVolume * FEED_AUDIO_MASTER_VOLUME, 0, 1);
+  }
   const TILT_CALIBRATION_MS = 750;
   const INTRO_TAP_LOCKOUT_MS = 800;
 
@@ -151,7 +163,7 @@
     "middle"
   ]);
   const MELODY_TONE_DURATION = 0.22;
-  const MELODY_TONE_VOLUME = 0.12;
+  const MELODY_TONE_VOLUME = FEED_MELODY_TONE_VOLUME;
 
   const FEED_MELODIES = Object.freeze([
     Object.freeze({
@@ -1277,7 +1289,10 @@
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(PEG_NOTE_FREQUENCIES[noteIndex], startAt);
       gain.gain.setValueAtTime(0.0001, startAt);
-      gain.gain.exponentialRampToValueAtTime(0.042, startAt + 0.008);
+      gain.gain.exponentialRampToValueAtTime(
+        Math.max(0.0001, feedingSoundVolume(FEED_COLLISION_TONE_VOLUME)),
+        startAt + 0.008
+      );
       gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.095);
       oscillator.connect(gain);
       gain.connect(context.destination);
@@ -1308,7 +1323,7 @@
             preparedStarBuffer;
 
           gain.gain.setValueAtTime(
-            0.78,
+            feedingSoundVolume(0.78),
             context.currentTime
           );
 
@@ -1352,7 +1367,7 @@
           const source = context.createBufferSource();
           const gain = context.createGain();
           source.buffer = preparedChompBuffer;
-          gain.gain.setValueAtTime(0.85, context.currentTime);
+          gain.gain.setValueAtTime(feedingSoundVolume(0.85), context.currentTime);
           source.connect(gain);
           gain.connect(context.destination);
           trackFeedingEffect(runtime, source);
@@ -2590,7 +2605,7 @@
       );
       gain.gain.setValueAtTime(0.0001, startAt);
       gain.gain.exponentialRampToValueAtTime(
-        MELODY_TONE_VOLUME,
+        Math.max(0.0001, feedingSoundVolume(MELODY_TONE_VOLUME)),
         startAt + 0.012
       );
       gain.gain.exponentialRampToValueAtTime(
@@ -3480,17 +3495,23 @@
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
 
+    let hitBoundary = false;
     if (ball.x - ball.radius < 0) {
       ball.x = ball.radius;
       ball.vx = Math.abs(ball.vx);
+      hitBoundary = true;
     } else if (ball.x + ball.radius > runtime.width) {
       ball.x = runtime.width - ball.radius;
       ball.vx = -Math.abs(ball.vx);
+      hitBoundary = true;
     }
     if (ball.y - ball.radius < 0) {
       ball.y = ball.radius;
       ball.vy = Math.abs(ball.vy);
+      hitBoundary = true;
     }
+    // A wall-and-ceiling corner is one collision cue, not two overlapping beeps.
+    if (hitBoundary) playPegTone(runtime, now);
 
     // White balls rebound only from the rounded-rectangle paddle below the pet.
     const paddleY = state.paddleTopY;
@@ -3507,6 +3528,7 @@
       );
       ball.vx = currentSpeed * clamp(offset * 0.78, -0.78, 0.78);
       ball.vy = -Math.sqrt(currentSpeed ** 2 - ball.vx ** 2);
+      playPegTone(runtime, now);
     } else {
       collideBounceBallWithBricks(runtime, ball, previousX, previousY, now);
     }
@@ -3521,11 +3543,28 @@
     return dx * dx + dy * dy <= radius * radius;
   }
 
+  function bounceSnackTouchesPaddle(runtime, ball) {
+    const paddle = runtime.bounce;
+    const nearestX = clamp(
+      ball.x,
+      paddle.paddleX - paddle.paddleHalfWidth,
+      paddle.paddleX + paddle.paddleHalfWidth
+    );
+    const nearestY = clamp(
+      ball.y, paddle.paddleTopY, paddle.paddleTopY + paddle.paddleHeight
+    );
+    const dx = ball.x - nearestX;
+    const dy = ball.y - nearestY;
+    return dx * dx + dy * dy <= ball.radius * ball.radius;
+  }
+
   function updateBounceSnacks(runtime, dt) {
     runtime.balls = runtime.balls.filter((ball) => {
       ball.y += ball.vy * dt;
       ball.rotation += dt * 1.4;
-      if (bounceSnackTouchesPet(runtime, ball)) {
+      if (bounceSnackTouchesPet(runtime, ball) ||
+          bounceSnackTouchesPaddle(runtime, ball)) {
+        // Reuse the existing single-collection scoring and chomp path.
         catchBall(runtime, ball);
         return false;
       }
@@ -4320,7 +4359,7 @@
 
     if (starAudio) {
       starAudio.preload = "auto";
-      starAudio.volume = 0.82;
+      starAudio.volume = feedingSoundVolume(0.82);
 
       try {
         starAudio.load();
@@ -4333,7 +4372,7 @@
 
     if (chompAudio) {
       chompAudio.preload = "auto";
-      chompAudio.volume = 0.85;
+      chompAudio.volume = feedingSoundVolume(0.85);
       try { chompAudio.load(); } catch (err) { }
     }
 
