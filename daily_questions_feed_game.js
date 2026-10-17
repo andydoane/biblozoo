@@ -784,18 +784,33 @@
     return chompBufferPromise;
   }
 
+  // A resume request is not proof that Web Audio is usable. Retry only on
+  // fresh gestures; automatic, obsolete collision effects never call resume().
+  function resumeFeedAudioContext(context) {
+    if (!context || context.state === "closed") return Promise.resolve(false);
+    if (context.state === "running") return Promise.resolve(true);
+    try {
+      return Promise.resolve(context.resume?.()).then(
+        () => context.state === "running",
+        () => false
+      );
+    } catch (err) {
+      return Promise.resolve(false);
+    }
+  }
+
   function prepareAudio() {
     const Ctor = window.AudioContext || window.webkitAudioContext;
     if (!Ctor) return null;
     if (preparedAudioContext && preparedAudioContext.state !== "closed") {
-      preparedAudioContext.resume?.().catch?.(() => {});
+      void resumeFeedAudioContext(preparedAudioContext);
       loadStarBuffer(preparedAudioContext);
       loadChompBuffer(preparedAudioContext);
       return preparedAudioContext;
     }
     try {
       preparedAudioContext = new Ctor();
-      preparedAudioContext.resume?.().catch?.(() => {});
+      void resumeFeedAudioContext(preparedAudioContext);
       loadStarBuffer(preparedAudioContext);
       loadChompBuffer(preparedAudioContext);
       return preparedAudioContext;
@@ -838,6 +853,12 @@
         window.removeEventListener("orientationchange", runtime.resizeHandler);
       }
       runtime.resizeObserver?.disconnect();
+      runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+      runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
+      clearTimeout(runtime.feedStartAudioWatchdog);
+      clearTimeout(runtime.feedResumeWatchdog);
+      stopFeedingEffects(runtime);
+      runtime.gameEl?.classList?.remove?.("is-interruption-paused");
       disposeMode(runtime);
 
       if (
@@ -848,6 +869,13 @@
           "click",
           runtime.startOverlayHandler
         );
+      }
+
+      if (runtime.resumeButton && runtime.resumeButtonHandler) {
+        runtime.resumeButton.removeEventListener("click", runtime.resumeButtonHandler);
+      }
+      if (runtime.resumeBackButton && runtime.resumeBackHandler) {
+        runtime.resumeBackButton.removeEventListener("click", runtime.resumeBackHandler);
       }
 
       if (
@@ -887,6 +915,7 @@
     if (!runtime) return;
 
     detachMelodyInterruptionHandlers(runtime);
+    detachFeedInterruptionHandlers(runtime);
 
     if (runtime.orientationHandler) {
       window.removeEventListener(
@@ -1065,6 +1094,27 @@
         </div>
 
         <div
+          class="daily-feed-resume-overlay"
+          data-daily-feed-resume-overlay
+          role="dialog"
+          aria-modal="true"
+          aria-label="Feeding game paused"
+          hidden
+        >
+          <button
+            class="daily-feed-resume-back no-zoom"
+            type="button"
+            data-daily-feed-resume-back
+            aria-label="${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}"
+          >&#8592;</button>
+          <button
+            class="daily-feed-resume-button no-zoom"
+            type="button"
+            data-daily-feed-resume
+          >Resume</button>
+        </div>
+
+        <div
           class="daily-feed-result-overlay"
           data-daily-feed-result-overlay
           role="dialog"
@@ -1188,9 +1238,30 @@
     else setCatcherX(runtime, targetX);
   }
 
+  function trackFeedingEffect(runtime, source) {
+    if (!runtime || !source) return;
+    if (!runtime.feedSoundNodes) runtime.feedSoundNodes = new Set();
+    runtime.feedSoundNodes.add(source);
+    const finish = () => runtime.feedSoundNodes?.delete(source);
+    try { source.addEventListener?.("ended", finish, { once: true }); }
+    catch (err) { /* Some audio-node stubs do not support listeners. */ }
+  }
+
+  function stopFeedingEffects(runtime) {
+    for (const source of runtime?.feedSoundNodes || []) {
+      try { source.stop?.(); } catch (err) { /* Already ended. */ }
+      try { source.disconnect?.(); } catch (err) { }
+    }
+    runtime?.feedSoundNodes?.clear();
+    for (const audio of [runtime?.starAudio, runtime?.chompAudio]) {
+      if (!audio) continue;
+      try { audio.pause(); audio.currentTime = 0; } catch (err) { }
+    }
+  }
+
   function playPegTone(runtime, now) {
     const context = runtime.audioContext;
-    if (!context || context.state === "closed" || now - runtime.lastPegSoundAt < 55) return;
+    if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
 
     let noteIndex = Math.floor(Math.random() * PEG_NOTE_FREQUENCIES.length);
     if (noteIndex === runtime.lastPegNoteIndex) {
@@ -1200,7 +1271,6 @@
     runtime.lastPegSoundAt = now;
 
     try {
-      if (context.state === "suspended") context.resume?.().catch?.(() => {});
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       const startAt = context.currentTime;
@@ -1211,6 +1281,7 @@
       gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.095);
       oscillator.connect(gain);
       gain.connect(context.destination);
+      trackFeedingEffect(runtime, oscillator);
       oscillator.start(startAt);
       oscillator.stop(startAt + 0.105);
     } catch (err) { }
@@ -1223,14 +1294,9 @@
       context &&
       context.state !== "closed"
     ) {
+      // Keep earned rewards, but never queue a chomp/star to play after unlock.
+      if (context.state !== "running") return;
       try {
-        if (
-          context.state === "suspended" ||
-          context.state === "interrupted"
-        ) {
-          context.resume?.().catch?.(() => {});
-        }
-
         if (preparedStarBuffer) {
           const source =
             context.createBufferSource();
@@ -1251,6 +1317,7 @@
             context.destination
           );
 
+          trackFeedingEffect(runtime, source);
           source.start();
           return;
         }
@@ -1279,18 +1346,16 @@
     const context = runtime.audioContext;
 
     if (context && context.state !== "closed") {
+      if (context.state !== "running") return;
       if (preparedChompBuffer) {
         try {
-          if (context.state === "suspended" || context.state === "interrupted") {
-            context.resume?.().catch?.(() => {});
-          }
-
           const source = context.createBufferSource();
           const gain = context.createGain();
           source.buffer = preparedChompBuffer;
           gain.gain.setValueAtTime(0.85, context.currentTime);
           source.connect(gain);
           gain.connect(context.destination);
+          trackFeedingEffect(runtime, source);
           source.start();
           return;
         } catch (err) { }
@@ -2510,10 +2575,7 @@
       return false;
     }
 
-    if (context.state !== "running") {
-      context.resume?.().catch?.(() => {});
-      return false;
-    }
+    if (context.state !== "running") return false;
 
     try {
       const oscillator = context.createOscillator();
@@ -2671,9 +2733,7 @@
     state.lastUpdateAt = now;
     runtime.lastFrameAt = now;
     if (!runtime.rafId) {
-      runtime.rafId = requestAnimationFrame(
-        (frameNow) => runFrame(runtime, frameNow)
-      );
+      runtime.rafId = scheduleFeedFrame(runtime);
     }
     return true;
   }
@@ -2715,6 +2775,191 @@
     if (runtime.melodyPageShowHandler) {
       window.removeEventListener("pageshow", runtime.melodyPageShowHandler);
       runtime.melodyPageShowHandler = null;
+    }
+  }
+
+  // Patch 21A: the four Feeding modes share one intentional interruption
+  // pause. Keep the existing mode state and advance its deadlines by precisely
+  // the real time spent away instead of simulating missed gameplay frames.
+  function shiftFeedingDeadlines(runtime, durationMs) {
+    const shift = (owner, key) => {
+      if (owner && Number.isFinite(owner[key]) && owner[key] > 0) {
+        owner[key] += durationMs;
+      }
+    };
+    shift(runtime, "nextScheduledAt");
+    shift(runtime, "introUnlockAt");
+    shift(runtime, "tiltCalibrationUntil");
+    shift(runtime, "lastPegSoundAt");
+    // Melody's existing precise musical-clock recovery owns finishAt.
+    if (runtime.mode !== FEED_MODES.MELODY) shift(runtime, "finishAt");
+    for (const ball of runtime.balls || []) {
+      shift(ball, "bornAt");
+      shift(ball, "labyrinthProgressAt");
+      shift(ball, "lastTrailAt");
+      for (const point of ball.trail || []) shift(point, "bornAt");
+    }
+    for (const burst of runtime.bursts || []) shift(burst, "startedAt");
+  }
+
+  function armTiltObservationFallback(runtime) {
+    if (!runtime?.tiltEnabled || runtime.tiltObserved || runtime.tiltFallbackId) return;
+    const timer = setTimeout(() => {
+      runtime.modeTimers?.delete(timer);
+      if (runtime.tiltFallbackId === timer) runtime.tiltFallbackId = null;
+      if (activeRuntime !== runtime || !runtime.running ||
+          runtime.feedPausedAt != null || runtime.tiltObserved) return;
+      runtime.tiltEnabled = false;
+      runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, false);
+      window.removeEventListener("deviceorientation", runtime.orientationHandler);
+    }, 2000);
+    runtime.tiltFallbackId = timer;
+    runtime.modeTimers?.add(timer);
+  }
+
+  function pauseFeedingGame(runtime, now = performance.now()) {
+    if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
+        !runtime.running || runtime.finished || runtime.feedPausedAt != null) return false;
+    runtime.feedPausedAt = now;
+    runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+    runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
+    clearTimeout(runtime.feedStartAudioWatchdog);
+    runtime.feedStartAudioWatchdog = null;
+    runtime.feedResumePending = false;
+    if (runtime.mode === FEED_MODES.MELODY) {
+      pauseMelodyForInterruption(runtime, now);
+    }
+    if (runtime.rafId) {
+      cancelAnimationFrame(runtime.rafId);
+      runtime.rafId = 0;
+    }
+    if (runtime.tiltFallbackId) {
+      clearTimeout(runtime.tiltFallbackId);
+      runtime.modeTimers?.delete(runtime.tiltFallbackId);
+      runtime.tiltFallbackId = null;
+    }
+    if (runtime.activePointerId != null) {
+      try { runtime.stage?.releasePointerCapture?.(runtime.activePointerId); }
+      catch (err) { }
+    }
+    runtime.dragging = false;
+    runtime.activePointerId = null;
+    // A pointerup may never arrive once the app is hidden. Drop stale
+    // Labyrinth steering rather than moving the ball after the next Resume.
+    runtime.modeController?.handleInput?.(runtime, { type: "pointerend" });
+    stopFeedingEffects(runtime);
+    runtime.gameEl?.classList?.add?.("is-interruption-paused");
+    if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = false;
+    if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+    return true;
+  }
+
+  function continueFeedingAfterGesture(runtime, now = performance.now()) {
+    if (!runtime || activeRuntime !== runtime || !runtime.running ||
+        runtime.finished || runtime.feedPausedAt == null ||
+        runtime.feedPageHidden || document.hidden ||
+        (runtime.audioContext && runtime.audioContext.state !== "running")) return false;
+    const elapsed = Math.max(0, now - runtime.feedPausedAt);
+    // Shift time-dependent effects, including Classic's 22s expiry and
+    // Labyrinth's stuck-ball timer. Never touch positions or rewards.
+    shiftFeedingDeadlines(runtime, elapsed);
+    runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
+    if (runtime.mode === FEED_MODES.MELODY) {
+      if (!resumeMelodyAfterInterruption(runtime, now)) return false;
+    } else {
+      runtime.lastFrameAt = now;
+      if (!runtime.rafId) runtime.rafId = scheduleFeedFrame(runtime);
+    }
+    runtime.feedPausedAt = null;
+    runtime.feedResumePending = false;
+    runtime.gameEl?.classList?.remove?.("is-interruption-paused");
+    if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
+    if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+    if (runtime.tiltEnabled) {
+      // Keep the child's original neutral angle. Returning while the phone
+      // is tilted must not redefine what "center" means. A fresh sensor
+      // event still confirms that motion controls are available after unlock.
+      runtime.tiltObserved = false;
+      armTiltObservationFallback(runtime);
+    }
+    return true;
+  }
+
+  // Called by a real click, never automatically on pageshow. Do not queue
+  // stale effects; the same button remains usable if iOS rejects resume().
+  function attemptFeedingResumeFromGesture(runtime) {
+    if (!runtime || activeRuntime !== runtime || runtime.finished ||
+        runtime.feedPausedAt == null || runtime.feedPageHidden ||
+        document.hidden || runtime.feedResumePending) return false;
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if ((!runtime.audioContext || runtime.audioContext.state === "closed") && Ctor) {
+      try {
+        runtime.audioContext = new Ctor();
+        void loadStarBuffer(runtime.audioContext);
+        void loadChompBuffer(runtime.audioContext);
+      } catch (err) {
+        runtime.audioContext = null;
+      }
+    }
+    runtime.feedResumePending = true;
+    if (runtime.resumeButton) runtime.resumeButton.disabled = true;
+    const generation = ++runtime.feedResumeGeneration;
+    let settled = false;
+    const settle = (ready) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(runtime.feedResumeWatchdog);
+      runtime.feedResumeWatchdog = null;
+      if (activeRuntime !== runtime || runtime.feedResumeGeneration !== generation ||
+          runtime.feedPausedAt == null) return;
+      runtime.feedResumePending = false;
+      if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      if (ready && !document.hidden && !runtime.feedPageHidden) {
+        continueFeedingAfterGesture(runtime);
+      }
+    };
+    // No Web Audio implementation: allow existing HTML-audio fallback and
+    // gameplay rather than trapping older browsers behind Resume forever.
+    if (!Ctor && !runtime.audioContext) {
+      settle(true);
+      return true;
+    }
+    // A pending iOS resume promise must not disable the button indefinitely.
+    runtime.feedResumeWatchdog = setTimeout(() => settle(false), 2500);
+    void resumeFeedAudioContext(runtime.audioContext).then(settle, () => settle(false));
+    return true;
+  }
+
+  function attachFeedInterruptionHandlers(runtime) {
+    runtime.feedVisibilityHandler = () => {
+      if (document.hidden) pauseFeedingGame(runtime);
+      // Returning never automatically unfreezes the round.
+    };
+    runtime.feedPageHideHandler = () => {
+      runtime.feedPageHidden = true;
+      pauseFeedingGame(runtime);
+    };
+    runtime.feedPageShowHandler = () => {
+      runtime.feedPageHidden = false;
+    };
+    document.addEventListener("visibilitychange", runtime.feedVisibilityHandler);
+    window.addEventListener("pagehide", runtime.feedPageHideHandler);
+    window.addEventListener("pageshow", runtime.feedPageShowHandler);
+  }
+
+  function detachFeedInterruptionHandlers(runtime) {
+    if (!runtime) return;
+    if (runtime.feedVisibilityHandler) {
+      document.removeEventListener("visibilitychange", runtime.feedVisibilityHandler);
+      runtime.feedVisibilityHandler = null;
+    }
+    if (runtime.feedPageHideHandler) {
+      window.removeEventListener("pagehide", runtime.feedPageHideHandler);
+      runtime.feedPageHideHandler = null;
+    }
+    if (runtime.feedPageShowHandler) {
+      window.removeEventListener("pageshow", runtime.feedPageShowHandler);
+      runtime.feedPageShowHandler = null;
     }
   }
 
@@ -3558,6 +3803,12 @@
     runtime.finished = true;
     runtime.roundStarted = false;
     runtime.running = false;
+    runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+    runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
+    clearTimeout(runtime.feedStartAudioWatchdog);
+    clearTimeout(runtime.feedResumeWatchdog);
+    runtime.gameEl?.classList?.remove?.("is-interruption-paused");
+    if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
 
     if (runtime.rafId) {
       cancelAnimationFrame(runtime.rafId);
@@ -3665,16 +3916,7 @@
     if (runtime.tiltEnabled) {
       beginTiltCalibration(runtime);
       window.addEventListener("deviceorientation", runtime.orientationHandler);
-      // Permission alone is not proof that the browser delivers sensor data.
-      const fallbackTimer = setTimeout(() => {
-        runtime.modeTimers.delete(fallbackTimer);
-        if (activeRuntime === runtime && !runtime.tiltObserved) {
-          runtime.tiltEnabled = false;
-          runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, false);
-          window.removeEventListener("deviceorientation", runtime.orientationHandler);
-        }
-      }, 2000);
-      runtime.modeTimers.add(fallbackTimer);
+      armTiltObservationFallback(runtime);
     }
 
     runtime.stage.addEventListener(
@@ -3698,20 +3940,62 @@
       launchBounceServe(runtime);
     }
 
-    runtime.rafId =
-      requestAnimationFrame(
-        (frameNow) =>
-          runFrame(runtime, frameNow)
-      );
+    // Starting is itself a gesture. Give its Web Audio resume promise a
+    // chance to settle BEFORE advancing game time, rather than flashing a
+    // needless second Resume prompt during an ordinary new round.
+    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+      const beganAt = performance.now();
+      runtime.feedStartAudioWatchdog = setTimeout(() => {
+        runtime.feedStartAudioWatchdog = null;
+        if (activeRuntime === runtime && runtime.running &&
+            !runtime.finished && runtime.feedPausedAt == null && !runtime.rafId) {
+          pauseFeedingGame(runtime, beganAt);
+        }
+      }, 1000);
+      void resumeFeedAudioContext(runtime.audioContext).then((ready) => {
+        clearTimeout(runtime.feedStartAudioWatchdog);
+        runtime.feedStartAudioWatchdog = null;
+        if (activeRuntime !== runtime || !runtime.running ||
+            runtime.finished || runtime.feedPausedAt != null || runtime.rafId) return;
+        if (!ready) {
+          pauseFeedingGame(runtime, beganAt);
+          return;
+        }
+        const nowReady = performance.now();
+        shiftFeedingDeadlines(runtime, Math.max(0, nowReady - beganAt));
+        runtime.lastFrameAt = nowReady;
+        runtime.rafId = scheduleFeedFrame(runtime);
+      });
+    } else {
+      runtime.rafId = scheduleFeedFrame(runtime);
+    }
   }
 
-  function runFrame(runtime, now) {
+  function scheduleFeedFrame(runtime) {
+    const generation = runtime.feedFrameGeneration || 0;
+    return requestAnimationFrame((now) => runFrame(runtime, now, generation));
+  }
+
+  function runFrame(runtime, now, generation = runtime.feedFrameGeneration || 0) {
     if (
+      generation !== (runtime.feedFrameGeneration || 0) ||
       !runtime.running ||
       activeRuntime !== runtime ||
+      runtime.feedPausedAt != null ||
       (runtime.mode === FEED_MODES.MELODY &&
         runtime.melody?.pausedAt != null)
     ) return;
+    // iOS occasionally suspends JS without dispatching pagehide. A very long
+    // rAF gap is treated as time away, beginning at the last good frame.
+    if (document.hidden || runtime.feedPageHidden ||
+        now - runtime.lastFrameAt > 1500) {
+      pauseFeedingGame(runtime, runtime.lastFrameAt);
+      return;
+    }
+    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+      pauseFeedingGame(runtime, now);
+      return;
+    }
     const dt = clamp((now - runtime.lastFrameAt) / 1000, 0.001, 0.032);
     runtime.lastFrameAt = now;
     runtime.modeController
@@ -3725,7 +4009,7 @@
       complete(runtime);
       return;
     }
-    runtime.rafId = requestAnimationFrame((nextNow) => runFrame(runtime, nextNow));
+    runtime.rafId = scheduleFeedFrame(runtime);
   }
 
   // Maintain the same live game when orientation or viewport dimensions change.
@@ -3912,6 +4196,10 @@
         "[data-daily-feed-start-overlay]"
       );
 
+    const resumeOverlay = rootEl.querySelector("[data-daily-feed-resume-overlay]");
+    const resumeButton = rootEl.querySelector("[data-daily-feed-resume]");
+    const resumeBackButton = rootEl.querySelector("[data-daily-feed-resume-back]");
+
     const resultOverlay =
       rootEl.querySelector(
         "[data-daily-feed-result-overlay]"
@@ -3945,6 +4233,9 @@
       !scoreEl ||
       !scorePopupsEl ||
       !startOverlay ||
+      !resumeOverlay ||
+      !resumeButton ||
+      !resumeBackButton ||
       !resultOverlay ||
       !resultTitleEl ||
       !resultScoreEl ||
@@ -4079,6 +4370,20 @@
       scoreEl,
       scorePopupsEl,
       startOverlay,
+      resumeOverlay,
+      resumeButton,
+      resumeBackButton,
+      resumeButtonHandler: null,
+      resumeBackHandler: null,
+      feedPausedAt: null,
+      feedResumePending: false,
+      feedResumeGeneration: 0,
+      feedFrameGeneration: 0,
+      feedStartAudioWatchdog: null,
+      feedResumeWatchdog: null,
+      feedPageHidden: false,
+      tiltFallbackId: null,
+      feedSoundNodes: new Set(),
       startTitleEl: startOverlay.querySelector("[data-daily-feed-start-title]"),
       startInstructionEl: startOverlay.querySelector("[data-daily-feed-start-instruction]"),
       resultOverlay,
@@ -4170,7 +4475,7 @@
     activeRuntime = runtime;
     runtime.modeController
       .initialize(runtime);
-    attachMelodyInterruptionHandlers(runtime);
+    attachFeedInterruptionHandlers(runtime);
 
     stage.style.backgroundImage =
       `url("${chooseBackground(
@@ -4185,7 +4490,8 @@
     }
 
     runtime.orientationHandler = (event) => {
-      if (activeRuntime !== runtime || !runtime.roundStarted || runtime.finished) return;
+      if (activeRuntime !== runtime || !runtime.roundStarted || runtime.finished ||
+          runtime.feedPausedAt != null) return;
       runtime.modeController.handleInput(runtime, { type: "tilt", event });
     };
 
@@ -4224,7 +4530,8 @@
         if (
           activeRuntime !== runtime ||
           !runtime.roundStarted ||
-          runtime.finished
+          runtime.finished ||
+          runtime.feedPausedAt != null
         ) {
           return;
         }
@@ -4249,7 +4556,8 @@
         if (
           !runtime.dragging ||
           activeRuntime !== runtime ||
-          runtime.finished
+          runtime.finished ||
+          runtime.feedPausedAt != null
         ) {
           return;
         }
@@ -4261,7 +4569,8 @@
     runtime.pointerEndHandler =
       (event) => {
         if (
-          activeRuntime !== runtime
+          activeRuntime !== runtime ||
+          runtime.feedPausedAt != null
         ) {
           return;
         }
@@ -4297,6 +4606,7 @@
 
         if (
           activeRuntime !== runtime ||
+          runtime.feedPausedAt != null ||
           performance.now() <
             runtime.introUnlockAt
         ) {
@@ -4309,6 +4619,19 @@
           startRound(runtime);
         }
       };
+
+    runtime.resumeButtonHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      attemptFeedingResumeFromGesture(runtime);
+    };
+    runtime.resumeBackHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (activeRuntime !== runtime || runtime.feedPausedAt == null) return;
+      const shouldClose = runtime.onBackToZoo?.();
+      if (shouldClose !== false) stop();
+    };
 
     runtime.resultBackHandler =
       (event) => {
@@ -4339,6 +4662,9 @@
       "click",
       runtime.startOverlayHandler
     );
+
+    resumeButton.addEventListener("click", runtime.resumeButtonHandler);
+    resumeBackButton.addEventListener("click", runtime.resumeBackHandler);
 
     resultBackButton.addEventListener(
       "click",

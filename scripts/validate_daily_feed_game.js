@@ -116,6 +116,22 @@ function loadFeedGameForValidation() {
     disposeMelodyMode,
     pauseMelodyForInterruption,
     resumeMelodyAfterInterruption,
+    resumeFeedAudioContext,
+    pauseFeedingGame,
+    continueFeedingAfterGesture,
+    attemptFeedingResumeFromGesture,
+    attachFeedInterruptionHandlers,
+    detachFeedInterruptionHandlers,
+    shiftFeedingDeadlines,
+    runFrame,
+    playPegTone,
+    playStarSound,
+    playChompSound,
+    playMelodyTone,
+    setPreparedBuffersForValidation: (star, chomp) => {
+      preparedStarBuffer = star;
+      preparedChompBuffer = chomp;
+    },
     attachMelodyInterruptionHandlers,
     detachMelodyInterruptionHandlers,
     advanceLabyrinthPet,
@@ -2006,6 +2022,357 @@ function testMelodyInterruptionFreezesTimelineAndFinishingDelay() {
   hooks.setActiveRuntimeForValidation(null);
 }
 
+// Patch 21A: isolate actual runtime timekeeping from the long JS validation.
+function makePausedFeedRuntime(mode = "classic") {
+  const classes = new Set();
+  const runtime = {
+    mode, modeConfig: hooks.FEED_MODE_CONFIGS[mode],
+    roundStarted: true, running: true, finished: false, rafId: 77,
+    feedPausedAt: null, feedPageHidden: false,
+    feedResumePending: false, feedResumeGeneration: 0,
+    audioContext: { state: "running", resume() { return Promise.resolve(); } },
+    resumeOverlay: { hidden: true }, resumeButton: { disabled: false },
+    gameEl: { classList: {
+      add(name) { classes.add(name); }, remove(name) { classes.delete(name); }
+    } },
+    stage: { releasePointerCapture() {} },
+    modeController: { update() { throw Error("Paused physics advanced"); },
+      draw() {}, isComplete() { return false; } },
+    lastFrameAt: 1000, nextScheduledAt: 2600, introUnlockAt: 1700,
+    tiltCalibrationUntil: 0, lastPegSoundAt: 800,
+    balls: [{ x: 120, y: 200, radius: 10, vx: 10, vy: 25,
+      bornAt: 500, labyrinthProgressAt: 700, lastTrailAt: 900,
+      trail: [{ bornAt: 850, x: 100, y: 100 }] }],
+    bursts: [{ startedAt: 850, duration: 780 }],
+    finishAt: 2000, score: 3, caughtCount: 2,
+    dragging: false, activePointerId: null,
+    tiltEnabled: false, tiltObserved: false,
+    modeTimers: new Set(), feedSoundNodes: new Set(),
+    startOverlay: { hidden: false }
+  };
+  hooks.setActiveRuntimeForValidation(runtime);
+  return { runtime, classes };
+}
+
+function testUniversalResumeOverlayIsMinimalAndSeparateFromBounceServe() {
+  for (const mode of ["classic", "labyrinth", "melody", "bounce"]) {
+    const markup = api.render({ session: { feedMode: mode, petName: "Pip" } });
+    assert.strictEqual((markup.match(/data-daily-feed-resume-overlay/g) || []).length, 1);
+    assert.strictEqual((markup.match(/data-daily-feed-resume\s*>/g) || []).length, 1);
+    assert.ok(markup.includes('>Resume</button>'));
+    assert.ok(markup.includes('data-daily-feed-resume-back'));
+    assert.ok(markup.includes('aria-label="Back to Zoo"'));
+    assert.ok(markup.includes('data-daily-feed-start-overlay'),
+      "Bounce must retain its separate tap-to-serve instructions");
+  }
+  assert.ok(feedGameCssSource.includes(".daily-feed-resume-overlay[hidden]"));
+  assert.ok(feedGameCssSource.includes(".daily-feed-game.is-interruption-paused *"));
+  assert.ok(source.includes('2026_Oct_17_patch21a_universal_feed_pause') === false,
+    "Cache version belongs in service-worker.js, not the game implementation");
+}
+
+function testAllModesPreserveTimeAndBoardWhenPaused() {
+  for (const mode of ["classic", "labyrinth", "bounce"]) {
+    const {runtime, classes} = makePausedFeedRuntime(mode);
+    events.cancelledRafs.length = 0;
+    assert.strictEqual(hooks.pauseFeedingGame(runtime, 1000), true);
+    assert.strictEqual(hooks.pauseFeedingGame(runtime, 1200), false);
+    assert.strictEqual(runtime.rafId, 0);
+    assert.deepStrictEqual(events.cancelledRafs, [77]);
+    assert.strictEqual(runtime.resumeOverlay.hidden, false);
+    assert.ok(classes.has("is-interruption-paused"));
+    const ballBefore = {x: runtime.balls[0].x, y: runtime.balls[0].y,
+      score: runtime.score, caught: runtime.caughtCount};
+    hooks.runFrame(runtime, 31000); // Must not run physics or expire Classic balls.
+    assert.deepStrictEqual({x: runtime.balls[0].x, y: runtime.balls[0].y,
+      score: runtime.score, caught: runtime.caughtCount}, ballBefore);
+    assert.strictEqual(hooks.continueFeedingAfterGesture(runtime, 31000), true);
+    assert.strictEqual(runtime.balls[0].bornAt, 30500);
+    assert.strictEqual(31000 - runtime.balls[0].bornAt, 500,
+      "Classic's 22-second expiry uses only active game time");
+    assert.strictEqual(runtime.balls[0].labyrinthProgressAt, 30700);
+    assert.strictEqual(runtime.balls[0].lastTrailAt, 30900);
+    assert.strictEqual(runtime.balls[0].trail[0].bornAt, 30850);
+    assert.strictEqual(runtime.bursts[0].startedAt, 30850);
+    assert.strictEqual(runtime.nextScheduledAt, 32600);
+    assert.strictEqual(runtime.finishAt, 32000);
+    assert.strictEqual(runtime.lastFrameAt, 31000);
+    assert.strictEqual(runtime.resumeOverlay.hidden, true);
+    assert.ok(!classes.has("is-interruption-paused"));
+    assert.strictEqual(runtime.startOverlay.hidden, false,
+      "Bounce's serve overlay must not be dismissed by a game resume");
+    assert.strictEqual(runtime.score, 3);
+    assert.strictEqual(runtime.caughtCount, 2);
+    assert.strictEqual(hooks.pauseFeedingGame(runtime, 31010), true);
+    assert.strictEqual(hooks.continueFeedingAfterGesture(runtime, 35010), true);
+    assert.strictEqual(runtime.balls[0].bornAt, 34500);
+  }
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testMelodyUniversalPauseKeepsExactNoteAndRewardState() {
+  const runtime = makeInterruptedMelodyRuntime();
+  runtime.feedPausedAt = null;
+  runtime.feedPageHidden = false;
+  runtime.resumeOverlay = { hidden: true };
+  runtime.resumeButton = { disabled: false };
+  runtime.gameEl = { classList: { add() {}, remove() {} } };
+  runtime.feedSoundNodes = new Set();
+  runtime.startOverlay = { hidden: true };
+  runtime.audioContext = { state: "running", resume() { return Promise.resolve(); } };
+  const first = runtime.melody.timeline[0];
+  first.status = "active";
+  runtime.balls = [{ x: first.x, y: 50, radius: 10,
+    melodyEntry: first, trail: [], lastTrailAt: 0 }];
+  runtime.score = 38;
+  runtime.caughtCount = 3;
+  runtime.finishAt = 1600;
+  assert.strictEqual(hooks.pauseFeedingGame(runtime, 1100), true);
+  assert.strictEqual(runtime.melody.pausedAt, 1100);
+  assert.strictEqual(runtime.resumeOverlay.hidden, false);
+  hooks.runFrame(runtime, 29000);
+  assert.strictEqual(first.status, "active");
+  assert.strictEqual(hooks.continueFeedingAfterGesture(runtime, 31100), true);
+  assert.strictEqual(runtime.melody.startTime, 31000);
+  assert.strictEqual(runtime.finishAt, 31600);
+  assert.strictEqual(runtime.melody.pausedAt, null);
+  assert.strictEqual(first.status, "active");
+  assert.strictEqual(runtime.score, 38);
+  assert.strictEqual(runtime.caughtCount, 3);
+  assert.strictEqual(runtime.balls.length, 1);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+async function testResumeAudioFailureNeedsAnotherTapNotLostProgress() {
+  const { runtime } = makePausedFeedRuntime("classic");
+  let calls = 0;
+  runtime.audioContext = {
+    state: "suspended",
+    resume() { calls++; return Promise.reject(new Error("Gesture required")); }
+  };
+  assert.strictEqual(hooks.pauseFeedingGame(runtime, 1000), true);
+  assert.strictEqual(hooks.attemptFeedingResumeFromGesture(runtime), true);
+  assert.strictEqual(runtime.resumeButton.disabled, true);
+  assert.strictEqual(hooks.attemptFeedingResumeFromGesture(runtime), false,
+    "Double taps must not issue duplicate resume promises");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(calls, 1);
+  assert.strictEqual(runtime.feedPausedAt, 1000);
+  assert.strictEqual(runtime.resumeButton.disabled, false);
+  assert.strictEqual(runtime.score, 3);
+  runtime.audioContext.resume = function () {
+    calls++; this.state = "running"; return Promise.resolve();
+  };
+  assert.strictEqual(hooks.attemptFeedingResumeFromGesture(runtime), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(calls, 2);
+  assert.strictEqual(runtime.feedPausedAt, null);
+  assert.strictEqual(runtime.resumeOverlay.hidden, true);
+  assert.strictEqual(runtime.score, 3);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+async function testOldAudioRecoveryCannotResumeDifferentGame() {
+  const { runtime } = makePausedFeedRuntime("classic");
+  let finishResume;
+  runtime.audioContext = {
+    state: "suspended",
+    resume() { return new Promise(resolve => { finishResume = resolve; }); }
+  };
+  hooks.pauseFeedingGame(runtime, 1000);
+  hooks.attemptFeedingResumeFromGesture(runtime);
+  hooks.setActiveRuntimeForValidation(null);
+  runtime.audioContext.state = "running";
+  finishResume();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(runtime.feedPausedAt, 1000);
+  assert.strictEqual(runtime.resumeOverlay.hidden, false);
+}
+
+function testLifecycleSuspendsAllModesWithoutAutoResuming() {
+  const {runtime} = makePausedFeedRuntime("labyrinth");
+  const adds = events.documentAdds.length;
+  const windowAdds = events.windowAdds.length;
+  const removes = events.documentRemoves.length;
+  const windowRemoves = events.windowRemoves.length;
+  hooks.attachFeedInterruptionHandlers(runtime);
+  assert.deepStrictEqual(events.documentAdds.slice(adds), ["visibilitychange"]);
+  assert.deepStrictEqual(events.windowAdds.slice(windowAdds), ["pagehide", "pageshow"]);
+  sandboxDocument.hidden = true;
+  runtime.feedVisibilityHandler();
+  assert.strictEqual(runtime.feedPausedAt, 1000);
+  runtime.feedPageHideHandler();
+  runtime.feedPageShowHandler();
+  assert.strictEqual(runtime.feedPageHidden, false);
+  sandboxDocument.hidden = false;
+  runtime.feedVisibilityHandler();
+  assert.strictEqual(runtime.feedPausedAt, 1000,
+    "Visibility restoration alone must not resume physics");
+  hooks.detachFeedInterruptionHandlers(runtime);
+  assert.deepStrictEqual(events.documentRemoves.slice(removes), ["visibilitychange"]);
+  assert.deepStrictEqual(events.windowRemoves.slice(windowRemoves), ["pagehide", "pageshow"]);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testSilentAudioEffectsAreNotQueuedDuringInterruption() {
+  const {runtime} = makePausedFeedRuntime("classic");
+  let started = 0;
+  let resumes = 0;
+  runtime.audioContext = {
+    state: "suspended", currentTime: 2, destination: {},
+    resume() { resumes++; return Promise.reject(Error("off gesture")); },
+    createOscillator() { return { connect(){},start(){started++;},stop(){} }; },
+    createBufferSource() { return { connect(){},start(){started++;},stop(){} }; },
+    createGain() { return { connect(){},gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}} }; }
+  };
+  hooks.setPreparedBuffersForValidation({sound:'star'}, {sound:'chomp'});
+  try {
+    hooks.playStarSound(runtime);
+    hooks.playChompSound(runtime);
+    hooks.playPegTone(runtime, 1200);
+    assert.strictEqual(started, 0);
+    assert.strictEqual(resumes, 0);
+  } finally {
+    hooks.setPreparedBuffersForValidation(null, null);
+    hooks.setActiveRuntimeForValidation(null);
+  }
+}
+
+function testLongFrameGapFreezesBeforeCollisionOrExpiration() {
+  const { runtime } = makePausedFeedRuntime("classic");
+  hooks.runFrame(runtime, 41000, 0);
+  assert.strictEqual(runtime.feedPausedAt, 1000,
+    "A lost visibility event must not charge 40 seconds to Classic balls");
+  assert.strictEqual(runtime.resumeOverlay.hidden, false);
+  assert.strictEqual(runtime.score, 3);
+  assert.strictEqual(runtime.balls[0].bornAt, 500);
+  assert.strictEqual(hooks.continueFeedingAfterGesture(runtime, 41000), true);
+  assert.strictEqual(runtime.balls[0].bornAt, 40500);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testStaleAnimationFrameCannotScoreAfterAnotherResume() {
+  const { runtime } = makePausedFeedRuntime("bounce");
+  const oldFrameGeneration = runtime.feedFrameGeneration || 0;
+  hooks.pauseFeedingGame(runtime, 1000);
+  hooks.continueFeedingAfterGesture(runtime, 6000);
+  assert.notStrictEqual(runtime.feedFrameGeneration, oldFrameGeneration);
+  assert.doesNotThrow(() => hooks.runFrame(runtime, 6016, oldFrameGeneration),
+    "A queued pre-pause RAF must never create a second physics loop");
+  assert.strictEqual(runtime.score, 3);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testLabyrinthReleasesInterruptedTouchSteering() {
+  const { runtime } = makePausedFeedRuntime("labyrinth");
+  runtime.labyrinth = { steering: 1 };
+  runtime.modeController = hooks.getModeController("labyrinth");
+  runtime.dragging = true;
+  runtime.activePointerId = 12;
+  hooks.pauseFeedingGame(runtime, 1000);
+  assert.strictEqual(runtime.labyrinth.steering, 0,
+    "A cancelled touch must not keep steering after the lock screen");
+  assert.strictEqual(runtime.dragging, false);
+  assert.strictEqual(runtime.activePointerId, null);
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+function testTiltCalibrationStaysFixedAfterReturning() {
+  // Resume is a recovery gesture, NOT a request for another tilt baseline.
+  for (const mode of ["classic", "labyrinth", "bounce", "melody"]) {
+    const { runtime } = makePausedFeedRuntime(mode);
+    runtime.tiltEnabled = true;
+    runtime.tiltObserved = true;
+    runtime.neutralGamma = 5;
+    runtime.smoothedTilt = 4;
+    runtime.tiltSamples = [];
+    runtime.tiltCalibrationUntil = 0;
+    runtime.orientationHandler = () => {};
+    runtime.startInstructionEl = { textContent: "" };
+    if (mode === "melody") {
+      // Only the timeline clock differs on Melody; the tilt state is shared.
+      runtime.melody = { pausedAt: null, startTime: 700,
+        lastUpdateAt: 1000, timeline: [], activeVoices: new Set() };
+    }
+    assert.strictEqual(hooks.pauseFeedingGame(runtime, 1000), true);
+    assert.strictEqual(hooks.continueFeedingAfterGesture(runtime, 5000), true);
+    assert.strictEqual(runtime.tiltObserved, false,
+      "Verify motion events resume after unlock without losing the baseline");
+    assert.strictEqual(runtime.neutralGamma, 5,
+      `${mode}: Resume must preserve the original neutral angle`);
+    assert.strictEqual(runtime.smoothedTilt, 4,
+      `${mode}: Resume must not reset motion smoothing`);
+    assert.strictEqual(runtime.tiltCalibrationUntil, 0,
+      `${mode}: No second calibration window after Resume`);
+    assert.ok(runtime.tiltFallbackId,
+      `${mode}: Existing drag fallback is rearmed if sensor never returns`);
+    const axis = hooks.readNormalizedTilt(runtime, { gamma: 20 }, 0.5);
+    assert.ok(axis > 0.3,
+      `${mode}: Holding phone at an angle when returning must steer relative to old center`);
+    assert.strictEqual(runtime.neutralGamma, 5,
+      `${mode}: A new sensor reading must not change the neutral angle`);
+    assert.strictEqual(runtime.tiltObserved, true);
+    clearTimeout(runtime.tiltFallbackId);
+    runtime.modeTimers?.delete(runtime.tiltFallbackId);
+    runtime.tiltFallbackId = null;
+    hooks.setActiveRuntimeForValidation(null);
+  }
+}
+
+function testInterruptedInitialTiltCalibrationIsPreserved() {
+  // If the phone locks *during* the first calibration, preserve the samples
+  // and shift the remaining deadline instead of starting a fresh calibration.
+  const { runtime } = makePausedFeedRuntime("classic");
+  runtime.tiltEnabled = true;
+  runtime.tiltObserved = true;
+  runtime.neutralGamma = null;
+  runtime.smoothedTilt = 0;
+  runtime.tiltSamples = [3, 6];
+  runtime.tiltCalibrationUntil = 1400;
+  runtime.orientationHandler = () => {};
+  runtime.startInstructionEl = { textContent: "" };
+  assert.strictEqual(hooks.pauseFeedingGame(runtime, 1000), true);
+  assert.strictEqual(hooks.continueFeedingAfterGesture(runtime, 5000), true);
+  assert.strictEqual(runtime.neutralGamma, null);
+  assert.deepStrictEqual(Array.from(runtime.tiltSamples), [3, 6],
+    "Samples from the initial calibration are not discarded");
+  assert.strictEqual(runtime.tiltCalibrationUntil, 5400,
+    "Only active calibration time should count against the 750ms window");
+  clearTimeout(runtime.tiltFallbackId);
+  runtime.modeTimers?.delete(runtime.tiltFallbackId);
+  runtime.tiltFallbackId = null;
+  hooks.setActiveRuntimeForValidation(null);
+}
+
+
+function testInterruptionStopsOldEffectsWithoutChangingVolume() {
+  const {runtime} = makePausedFeedRuntime("classic");
+  let effectStops = 0;
+  let effectStarts = 0;
+  let volume = null;
+  runtime.audioContext = {
+    state: "running", currentTime: 2, destination: {},
+    createBufferSource() { return {
+      connect() {}, start() { effectStarts++; },
+      stop() { effectStops++; }, disconnect() {}
+    }; },
+    createGain() { return { connect() {},
+      gain: { setValueAtTime(v) { volume = v; } } }; }
+  };
+  hooks.setPreparedBuffersForValidation({ star: true }, null);
+  try {
+    hooks.playStarSound(runtime);
+    assert.strictEqual(effectStarts, 1);
+    assert.strictEqual(volume, 0.78);
+    hooks.pauseFeedingGame(runtime, 1000);
+    assert.strictEqual(effectStops, 1);
+    assert.strictEqual(runtime.feedSoundNodes.size, 0);
+  } finally {
+    hooks.setPreparedBuffersForValidation(null, null);
+    hooks.setActiveRuntimeForValidation(null);
+  }
+}
+
 function testMelodyPageLifecycleAndCleanup() {
   const runtime = makeInterruptedMelodyRuntime();
   runtime.rafId = 101;
@@ -3066,7 +3433,7 @@ function testModeAwareInstructionsAndTiltFallback() {
     sandboxWindow.DeviceOrientationEvent = prior;
   }
   assert.ok(source.includes('runtime.tiltObserved = true;'));
-  assert.ok(source.includes('!runtime.tiltObserved'));
+  assert.ok(source.includes('runtime.tiltObserved || runtime.tiltFallbackId'));
 }
 
 function testNormalizedPointerAndLandscapeTilt() {
@@ -3372,6 +3739,19 @@ async function main() {
     testMelodyCompletionWaitsForFinalArrival,
     testMelodyAudioAndBackgroundSafety,
     testMelodyInterruptionFreezesTimelineAndFinishingDelay,
+    testUniversalResumeOverlayIsMinimalAndSeparateFromBounceServe,
+    testAllModesPreserveTimeAndBoardWhenPaused,
+    testMelodyUniversalPauseKeepsExactNoteAndRewardState,
+    testResumeAudioFailureNeedsAnotherTapNotLostProgress,
+    testOldAudioRecoveryCannotResumeDifferentGame,
+    testLifecycleSuspendsAllModesWithoutAutoResuming,
+    testSilentAudioEffectsAreNotQueuedDuringInterruption,
+    testLongFrameGapFreezesBeforeCollisionOrExpiration,
+    testStaleAnimationFrameCannotScoreAfterAnotherResume,
+    testLabyrinthReleasesInterruptedTouchSteering,
+    testTiltCalibrationStaysFixedAfterReturning,
+    testInterruptedInitialTiltCalibrationIsPreserved,
+    testInterruptionStopsOldEffectsWithoutChangingVolume,
     testMelodyPageLifecycleAndCleanup,
     testMelodyLongFrameStallPreservesNotes,
     testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall,

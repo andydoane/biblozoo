@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_17_patch20l_stable_resume_label";
+const CACHE_VERSION = "2026_Oct_17_patch21b_preserve_tilt_center";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
