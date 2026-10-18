@@ -12812,7 +12812,15 @@ function makeSlide({ idx, bg, navHidden = false, inner }) {
   }
 
   const s = document.createElement("div");
-  s.className = "slide" + (navHidden ? " nav-hidden" : "");
+  // Use the actual slide index, not State.screen: transitions render both
+  // the outgoing and incoming slides at the same time.
+  const slideScreen = SCREEN_ORDER[idx];
+  const hasLearnVerseArtwork =
+    slideScreen === Screen.LEARN_LEVEL ||
+    isLearnFlowScreen(slideScreen) ||
+    slideScreen === Screen.CELEBRATION;
+  s.className = "slide" + (navHidden ? " nav-hidden" : "") +
+    (hasLearnVerseArtwork ? " learn-verse-artwork" : "");
 
   s.style.setProperty("--bg", bg);
   s.style.backgroundColor =
