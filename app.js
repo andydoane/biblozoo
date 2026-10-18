@@ -19058,8 +19058,7 @@ window.addEventListener("pagehide", stopNewVersePickerPreviewAudio);
 function newVersePickerCardHtml(
   item,
   {
-    changeVerseMode = false,
-    hideFuturePet = false
+    changeVerseMode = false
   } = {}
 ) {
   const verseId = item?.id || "";
@@ -19093,11 +19092,7 @@ function newVersePickerCardHtml(
       }
 
       <div class="new-verse-card-pet" aria-hidden="true">
-        ${
-          hideFuturePet
-            ? '<span class="new-verse-card-mission-paw">🐾</span>'
-            : bibloPetVisualHtml(verseId, petEmoji)
-        }
+        ${bibloPetVisualHtml(verseId, petEmoji)}
       </div>
 
       <div
@@ -19518,11 +19513,7 @@ function screenNewVersePicker(idx) {
         ${verseItems.map((item) =>
           newVersePickerCardHtml(
             item,
-            {
-              changeVerseMode,
-              hideFuturePet:
-                missionPicker
-            }
+            { changeVerseMode }
           )
         ).join("")}
       </div>
