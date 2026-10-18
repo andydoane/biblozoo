@@ -265,7 +265,205 @@
         { midi: 67, beats: 1 },
         { midi: null, beats: 1 }
       ])
-    })
+    }),
+
+    // Beethoven, WoO 59: opening A-theme with repeat. Sixteenth-note notation is deliberately spaced as half-beat catches.
+    // Original melody reference: https://abcnotation.com/tunePage?a=trillian.mit.edu%2F~jc%2Fmusic%2Fabc%2Fmirror%2Fmusicaviva.com%2Ftunes%2Fbeethoven-ludwig-van%2Fbe059%2Fbe059-pno2%2F0000
+    Object.freeze({
+      id: "furElise",
+      label: "Für Elise",
+      bpm: 116,
+      notes: Object.freeze([
+        { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 69, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 60, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 68, beats: 0.5 }, { midi: 71, beats: 0.5 },
+        { midi: 72, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 69, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 60, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 71, beats: 0.5 },
+        { midi: 69, beats: 1 }, { midi: null, beats: 1 },
+        { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 69, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 60, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 68, beats: 0.5 }, { midi: 71, beats: 0.5 },
+        { midi: 72, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 75, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 69, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 60, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 1 }, { midi: null, beats: 0.5 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 71, beats: 0.5 },
+        { midi: 69, beats: 1 },
+      ])
+    }),
+    // Scott Joplin (1902), first A strain: the recognizable syncopated lead, without copyrighted later harmonizations.
+    // Original melody reference: https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=263
+    Object.freeze({
+      id: "theEntertainer",
+      label: "The Entertainer",
+      bpm: 126,
+      notes: Object.freeze([
+        { midi: 62, beats: 0.5 }, { midi: 63, beats: 0.5 },
+        { midi: 64, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 72, beats: 2 }, { midi: 72, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 75, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 1 },
+        { midi: 72, beats: 3 }, { midi: 62, beats: 0.5 }, { midi: 63, beats: 0.5 },
+        { midi: 64, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 72, beats: 3 }, { midi: 69, beats: 0.5 }, { midi: 67, beats: 0.5 },
+        { midi: 66, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 69, beats: 0.5 },
+        { midi: 74, beats: 3 }, { midi: 62, beats: 0.5 }, { midi: 63, beats: 0.5 },
+        { midi: 64, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 64, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 72, beats: 2 }, { midi: 72, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 75, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 1 },
+        { midi: 72, beats: 3 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 1 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 1 }, { midi: 74, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 1 },
+        { midi: 72, beats: 4 },
+      ])
+    }),
+    // Traditional song, from 1882 Ryan’s Mammoth Collection, verse strain twice.
+    // Original melody reference: https://abcnotation.com/tunePage?a=trillian.mit.edu%2F~jc%2Fmusic%2Fabc%2Fmirror%2Fsbigraf.tamu.edu%2FPopGoesTheWeasel%2F0000
+    Object.freeze({
+      id: "popGoesTheWeasel",
+      label: "Pop Goes the Weasel",
+      bpm: 126,
+      notes: Object.freeze([
+        { midi: 67, beats: 1 }, { midi: 67, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 67, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 71, beats: 1.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 67, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 76, beats: 1.5 }, { midi: 69, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 71, beats: 1.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 67, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 67, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 71, beats: 1.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 67, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: null, beats: 0.5 },
+        { midi: 76, beats: 1.5 }, { midi: 69, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 71, beats: 1.5 }, { midi: 67, beats: 1.5 },
+      ])
+    }),
+    // Public-domain 19th-century tune “When Johnny Comes Marching Home” (Kerr c.1880), familiar children’s-song verse; no later lyrics.
+    // Original melody reference: https://abcnotation.com/tunePage?a=tunearch.org%2Fwiki%2FWhen_Johnny_comes_marching_home.no-ext%2F0001
+    Object.freeze({
+      id: "theAntsGoMarching",
+      label: "The Ants Go Marching",
+      bpm: 132,
+      notes: Object.freeze([
+        { midi: 69, beats: 0.5 },
+        { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 71, beats: 0.5 },
+        { midi: 72, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 67, beats: 1.5 }, { midi: 67, beats: 1 }, { midi: 64, beats: 0.5 },
+        { midi: 67, beats: 1.5 }, { midi: 67, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 71, beats: 0.5 },
+        { midi: 72, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 72, beats: 1 }, { midi: 74, beats: 0.5 },
+        { midi: 76, beats: 1.5 }, { midi: 76, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 76, beats: 1.5 }, { midi: 76, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 76, beats: 1 }, { midi: 76, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 74, beats: 1 }, { midi: 74, beats: 0.5 }, { midi: 74, beats: 1 }, { midi: 71, beats: 0.5 },
+        { midi: 72, beats: 1 }, { midi: 72, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 69, beats: 0.5 },
+        { midi: 71, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 71, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 76, beats: 1.5 }, { midi: 74, beats: 1.5 },
+        { midi: 72, beats: 1.5 }, { midi: 71, beats: 1.5 },
+        { midi: 64, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 69, beats: 0.5 }, { midi: 69, beats: 1 }, { midi: 68, beats: 0.5 },
+        { midi: 69, beats: 1.5 },
+      ])
+    }),
+    // Traditional nursery-song melody, one complete verse; only the melody, without recent lyrics or arrangements.
+    // Original melody reference: https://abcnotation.com/tunePage?a=trillian.mit.edu%2F~jc%2Fmusic%2Fabc%2Fsong%2FItsy_Bitsy_Spider_F%2F0000
+    Object.freeze({
+      id: "itsyBitsySpider",
+      label: "The Itsy Bitsy Spider",
+      bpm: 126,
+      notes: Object.freeze([
+        { midi: 60, beats: 0.5 },
+        { midi: 65, beats: 1 }, { midi: 65, beats: 0.5 }, { midi: 65, beats: 1 }, { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 1.5 }, { midi: 69, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 65, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 65, beats: 1.5 }, { midi: null, beats: 1 }, { midi: 65, beats: 0.5 },
+        { midi: 69, beats: 1.5 }, { midi: 69, beats: 1 }, { midi: 70, beats: 0.5 },
+        { midi: 72, beats: 1.5 }, { midi: 72, beats: 1.5 },
+        { midi: 70, beats: 1 }, { midi: 69, beats: 0.5 }, { midi: 70, beats: 1 }, { midi: 72, beats: 0.5 },
+        { midi: 69, beats: 1.5 }, { midi: null, beats: 1.5 },
+        { midi: 65, beats: 1.5 }, { midi: 65, beats: 1 }, { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 1.5 }, { midi: 69, beats: 1.5 },
+        { midi: 67, beats: 1 }, { midi: 65, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 65, beats: 1.5 }, { midi: 60, beats: 1 }, { midi: 60, beats: 0.5 },
+        { midi: 65, beats: 1 }, { midi: 65, beats: 0.5 }, { midi: 65, beats: 1 }, { midi: 67, beats: 0.5 },
+        { midi: 69, beats: 1.5 }, { midi: 69, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 67, beats: 1 }, { midi: 65, beats: 0.5 }, { midi: 67, beats: 1 }, { midi: 69, beats: 0.5 },
+        { midi: 65, beats: 1.5 },
+      ])
+    }),
+    // Grieg, Peer Gynt, Op. 46 No. 4: opening B-minor theme repeated
+    // in a shortened, single-voice gameplay excerpt at an even tempo.
+    // Historical piano score (public domain):
+    // https://www.mutopiaproject.org/cgibin/piece-info.cgi?id=1888
+    Object.freeze({
+      id: "inTheHallOfTheMountainKing",
+      label: "In the Hall of the Mountain King",
+      bpm: 122,
+      notes: Object.freeze([
+        { midi: 71, beats: 0.5 }, { midi: 73, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 78, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 78, beats: 1 }, { midi: 77, beats: 0.5 }, { midi: 73, beats: 0.5 },
+        { midi: 77, beats: 1 }, { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 },
+        { midi: 77, beats: 1 }, { midi: 71, beats: 0.5 }, { midi: 73, beats: 0.5 },
+        { midi: 74, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 78, beats: 0.5 },
+        { midi: 74, beats: 0.5 }, { midi: 78, beats: 0.5 }, { midi: 83, beats: 0.5 },
+        { midi: 81, beats: 0.5 }, { midi: 78, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 78, beats: 0.5 }, { midi: 81, beats: 2 }, { midi: 71, beats: 0.5 },
+        { midi: 73, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 0.5 },
+        { midi: 78, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 78, beats: 1 },
+        { midi: 77, beats: 0.5 }, { midi: 73, beats: 0.5 }, { midi: 77, beats: 1 },
+        { midi: 76, beats: 0.5 }, { midi: 72, beats: 0.5 }, { midi: 77, beats: 1 },
+        { midi: 71, beats: 0.5 }, { midi: 73, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 76, beats: 0.5 }, { midi: 78, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 78, beats: 0.5 }, { midi: 83, beats: 0.5 }, { midi: 81, beats: 0.5 },
+        { midi: 78, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 78, beats: 0.5 },
+        { midi: 81, beats: 2 }, { midi: 71, beats: 0.5 }, { midi: 73, beats: 0.5 },
+        { midi: 74, beats: 0.5 }, { midi: 76, beats: 0.5 }, { midi: 78, beats: 0.5 },
+        { midi: 74, beats: 0.5 }, { midi: 78, beats: 1 }, { midi: 77, beats: 0.5 },
+        { midi: 73, beats: 0.5 }, { midi: 77, beats: 1 }, { midi: 76, beats: 0.5 },
+        { midi: 72, beats: 0.5 }, { midi: 77, beats: 1 }, { midi: 71, beats: 0.5 },
+        { midi: 73, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 76, beats: 0.5 },
+        { midi: 78, beats: 0.5 }, { midi: 74, beats: 0.5 }, { midi: 78, beats: 0.5 },
+        { midi: 83, beats: 0.5 }, { midi: 81, beats: 0.5 }, { midi: 78, beats: 0.5 },
+        { midi: 74, beats: 0.5 }, { midi: 78, beats: 0.5 }, { midi: 71, beats: 2 }
+      ])
+    }),
+    // "NEW BRITAIN", the traditional melody sung to Amazing Grace;
+    // a single hymn stanza in G. Pitch/rhythm from historical hymn notation.
+    // Reference: https://hymnary.org/tune/new_britain
+    Object.freeze({
+      id: "amazingGrace",
+      label: "Amazing Grace",
+      bpm: 104,
+      notes: Object.freeze([
+        { midi: 62, beats: 1 }, { midi: 67, beats: 2 }, { midi: 71, beats: 0.5 },
+        { midi: 67, beats: 0.5 }, { midi: 71, beats: 2 }, { midi: 69, beats: 1 },
+        { midi: 67, beats: 2 }, { midi: 64, beats: 1 }, { midi: 62, beats: 2 },
+        { midi: 62, beats: 1 }, { midi: 67, beats: 2 }, { midi: 71, beats: 0.5 },
+        { midi: 67, beats: 0.5 }, { midi: 71, beats: 2 }, { midi: 69, beats: 1 },
+        { midi: 74, beats: 4 }, { midi: null, beats: 1 }, { midi: 71, beats: 1 },
+        { midi: 74, beats: 1.5 }, { midi: 71, beats: 0.5 }, { midi: 74, beats: 0.5 },
+        { midi: 71, beats: 0.5 }, { midi: 67, beats: 2 }, { midi: 62, beats: 1 },
+        { midi: 64, beats: 1.5 }, { midi: 67, beats: 0.5 }, { midi: 67, beats: 0.5 },
+        { midi: 64, beats: 0.5 }, { midi: 62, beats: 2 }, { midi: 62, beats: 1 },
+        { midi: 67, beats: 2 }, { midi: 71, beats: 0.5 }, { midi: 67, beats: 0.5 },
+        { midi: 71, beats: 2 }, { midi: 69, beats: 1 }, { midi: 67, beats: 4 }
+      ])
+    }),
+  ]);
+
+  // Only these approved tunes may be chosen in regular Daily Feeding.
+  // All FEED_MELODIES entries remain selectable by explicit id in Preview.
+  const FEED_MELODY_ROTATION_IDS = Object.freeze([
+    "odeToJoy", "turkeyInTheStraw", "furElise", "theEntertainer",
+    "popGoesTheWeasel", "theAntsGoMarching", "itsyBitsySpider",
+    "inTheHallOfTheMountainKing", "amazingGrace"
   ]);
 
   let activeRuntime = null;
@@ -295,7 +493,11 @@
       getFeedMelodyById(requestedId);
 
     if (requested) return requested;
-    if (!FEED_MELODIES.length) return null;
+
+    const rotation = FEED_MELODIES.filter(
+      (tune) => FEED_MELODY_ROTATION_IDS.includes(tune.id)
+    );
+    if (!rotation.length) return null;
 
     let sample = 0;
     try {
@@ -313,11 +515,11 @@
         : 0;
     const index =
       Math.floor(
-        normalized * FEED_MELODIES.length
+        normalized * rotation.length
       );
 
-    return FEED_MELODIES[index] ||
-      FEED_MELODIES[0];
+    return rotation[index] ||
+      rotation[0];
   }
 
   function normalizeFeedMelodyNotes(notes) {
@@ -2648,7 +2850,7 @@
   function initializeMelodyMode(runtime) {
     const tune =
       selectFeedMelody(
-        runtime.requestedMelodyId
+        runtime.dailyTodoPreview ? runtime.requestedMelodyId : ""
       );
     const bpm =
       Math.max(

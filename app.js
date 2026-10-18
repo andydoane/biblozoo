@@ -671,7 +671,8 @@ function showDialog({
 
   dlgActions.classList.remove(
     "import-dialog-actions",
-    "daily-preview-dialog-actions"
+    "daily-preview-dialog-actions",
+    "melody-preview-tune-actions"
   );
 
   if (actionsClass) {
@@ -689,7 +690,8 @@ function closeDialog() {
   dlgActions.classList.remove(
     "pet-name-dialog-actions",
     "import-dialog-actions",
-    "daily-preview-dialog-actions"
+    "daily-preview-dialog-actions",
+    "melody-preview-tune-actions"
   );
 }
 overlay.addEventListener("click", (e) => { if (e.target === overlay) closeDialog(); });
@@ -13173,6 +13175,21 @@ function clearInternalReturnIdentityParams() {
   }
 }
 
+// A petUnlock URL is a one-time navigation request.  Leaving its marker in
+// the address allows Daily To-Do's game return URL to replay the same unlock.
+// Keep the captured route in memory so the real first-time unlock still opens.
+function clearConsumedPetUnlockRoute() {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("petUnlock")) return;
+
+    url.searchParams.delete("petUnlock");
+    history.replaceState(history.state, "", url.href);
+  } catch (err) {
+    console.warn("Could not clear consumed BibloPet unlock route", err);
+  }
+}
+
 function discardUnsafeInternalReturnCompletion(route) {
   if (!route || !route.internalReturn) return route;
 
@@ -13193,6 +13210,11 @@ function discardUnsafeInternalReturnCompletion(route) {
 async function resumePendingBootRoute() {
   const route = State.pendingBootRoute || {};
   State.pendingBootRoute = null;
+
+  // Consume the URL marker before any asynchronous verse load or screen change.
+  // A Daily To-Do return may contain an obsolete petUnlock alongside its own
+  // screen=todo_dev destination; that must not reopen an already-shown pet.
+  if (route.petUnlock) clearConsumedPetUnlockRoute();
 
   const routedVerseId =
     String(route.verseId || "").trim();
@@ -13257,7 +13279,9 @@ async function resumePendingBootRoute() {
     if (handled) return;
   }
 
-  if (route.petUnlock) {
+  // Legitimate external-game unlock requests have no competing destination.
+  // Daily To-Do returns explicitly request screen=todo_dev and take priority.
+  if (route.petUnlock && !route.screen) {
     State.pendingPetUnlockVerseId =
       route.petUnlock;
     State.selectedVerseId =
@@ -15040,6 +15064,34 @@ function screenTitle(idx) {
         Object.freeze({
           id: "turkeyInTheStraw",
           label: "Turkey in the Straw"
+        }),
+        Object.freeze({
+          id: "furElise",
+          label: "Für Elise"
+        }),
+        Object.freeze({
+          id: "theEntertainer",
+          label: "The Entertainer"
+        }),
+        Object.freeze({
+          id: "popGoesTheWeasel",
+          label: "Pop Goes the Weasel"
+        }),
+        Object.freeze({
+          id: "theAntsGoMarching",
+          label: "The Ants Go Marching"
+        }),
+        Object.freeze({
+          id: "itsyBitsySpider",
+          label: "The Itsy Bitsy Spider"
+        }),
+        Object.freeze({
+          id: "inTheHallOfTheMountainKing",
+          label: "In the Hall of the Mountain King"
+        }),
+        Object.freeze({
+          id: "amazingGrace",
+          label: "Amazing Grace"
         })
       ]);
 
@@ -15236,7 +15288,7 @@ function screenTitle(idx) {
         body:
           "Choose the tune to use for this Melody preview.",
         actionsClass:
-          "daily-preview-dialog-actions",
+          "melody-preview-tune-actions",
         actions: [
           ...FEEDING_GAME_TEST_MELODIES.map(
             (tune) =>

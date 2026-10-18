@@ -92,6 +92,7 @@ function loadFeedGameForValidation() {
     MELODY_TRANSITION_NOTES,
     MELODY_TARGET_LANE_SEQUENCE,
     FEED_MELODIES,
+    FEED_MELODY_ROTATION_IDS,
     getFeedMelodyById,
     selectFeedMelody,
     FEED_MODES,
@@ -1542,44 +1543,249 @@ function testMelodyExactOdeToJoySequence() {
 }
 
 function testMelodyTuneRegistryAndSelection() {
+  const expectedIds = [
+    "odeToJoy", "turkeyInTheStraw", "furElise", "theEntertainer",
+    "popGoesTheWeasel", "theAntsGoMarching", "itsyBitsySpider",
+    "inTheHallOfTheMountainKing", "amazingGrace"
+  ];
   assert.deepStrictEqual(
-    Array.from(hooks.FEED_MELODIES)
-      .map((tune) => tune.id),
-    ["odeToJoy", "turkeyInTheStraw"]
+    Array.from(hooks.FEED_MELODIES, (tune) => tune.id),
+    expectedIds,
+    "Exactly nine approved tunes must be registered"
   );
+  assert.deepStrictEqual(
+    Array.from(hooks.FEED_MELODY_ROTATION_IDS),
+    expectedIds,
+    "All nine tunes must be eligible for normal Daily Feeding"
+  );
+  assert.strictEqual(new Set(expectedIds).size, 9);
+  assert.strictEqual(hooks.getFeedMelodyById("richardsTune"), null,
+    "Richard's Tune must not exist in the released music registry");
+  assert.ok(!source.includes('id: "richardsTune"'),
+    "Remove Richard's actual melody data, not merely its rotation id");
+  assert.ok(!source.includes("Never gonna give you up"),
+    "Do not ship the excluded tune's note block or accompanying comments");
+  assert.ok(!appSource.includes('id: "richardsTune"'),
+    "Remove Richard's Tune from the hidden Preview selector too");
 
-  const turkey =
-    hooks.getFeedMelodyById(
-      "turkeyInTheStraw"
-    );
-
+  const turkey = hooks.getFeedMelodyById("turkeyInTheStraw");
   assert.ok(turkey);
-  assert.strictEqual(
-    turkey.label,
-    "Turkey in the Straw"
-  );
+  assert.strictEqual(turkey.label, "Turkey in the Straw");
   assert.strictEqual(turkey.bpm, 132);
-  assert.strictEqual(
-    hooks.getFeedMelodyById("missing"),
-    null
-  );
+  assert.strictEqual(hooks.getFeedMelodyById("missing"), null);
+  assert.strictEqual(hooks.selectFeedMelody("turkeyInTheStraw", () => 0).id,
+    "turkeyInTheStraw", "Preview must keep explicit tune selection");
 
-  assert.strictEqual(
-    hooks.selectFeedMelody(
-      "turkeyInTheStraw",
-      () => 0
-    ).id,
-    "turkeyInTheStraw",
-    "An explicit Preview tune must override random selection"
-  );
-  assert.strictEqual(
-    hooks.selectFeedMelody("", () => 0).id,
-    "odeToJoy"
-  );
-  assert.strictEqual(
-    hooks.selectFeedMelody("", () => 0.999).id,
-    "turkeyInTheStraw"
-  );
+  // Every approved tune must be reachable through normal random selection.
+  for (let i = 0; i < expectedIds.length; i += 1) {
+    const random = () => (i + 0.5) / expectedIds.length;
+    assert.strictEqual(hooks.selectFeedMelody("", random).id, expectedIds[i],
+      `Rotation slot ${i} must select ${expectedIds[i]}`);
+    assert.strictEqual(hooks.selectFeedMelody("invalid", random).id, expectedIds[i],
+      "Unknown explicit IDs must fall back to the approved rotation");
+  }
+  assert.strictEqual(hooks.selectFeedMelody("", () => 0).id, "odeToJoy");
+  assert.strictEqual(hooks.selectFeedMelody("", () => 0.999).id, "amazingGrace");
+  assert.strictEqual(hooks.selectFeedMelody("", () => 1).id, "amazingGrace");
+  assert.strictEqual(hooks.selectFeedMelody("", () => NaN).id, "odeToJoy");
+  assert.strictEqual(hooks.selectFeedMelody("", () => { throw Error(); }).id,
+    "odeToJoy");
+  assert.strictEqual(hooks.selectFeedMelody("richardsTune", () => 0.999).id,
+    "amazingGrace", "Richard's ID must not force a tune even in Preview");
+}
+
+function testFiveNewMelodiesInRotation() {
+  const expected = [
+    { id: "furElise", label: "Für Elise", bpm: 116, count: 70,
+      events: 81, beats: 47, first: [76, 75, 76, 75, 76, 71, 74, 72] },
+    { id: "theEntertainer", label: "The Entertainer", bpm: 126, count: 83,
+      events: 83, beats: 65, first: [62, 63, 64, 72, 64, 72, 64, 72] },
+    { id: "popGoesTheWeasel", label: "Pop Goes the Weasel", bpm: 126,
+      count: 54, events: 61, beats: 48, first: [67, 67, 69, 69, 71, 74, 71, 67] },
+    { id: "theAntsGoMarching", label: "The Ants Go Marching", bpm: 132,
+      count: 60, events: 60, beats: 47, first: [69, 64, 69, 69, 69, 71, 72, 71] },
+    { id: "itsyBitsySpider", label: "The Itsy Bitsy Spider", bpm: 126,
+      count: 48, events: 50, beats: 47, first: [60, 65, 65, 65, 67, 69, 69, 69] }
+  ];
+
+  assert.ok(Object.isFrozen(hooks.FEED_MELODIES));
+  for (const tune of expected) {
+    const entry = hooks.getFeedMelodyById(tune.id);
+    assert.ok(entry, `${tune.id} must be in the tune registry`);
+    assert.strictEqual(entry.label, tune.label);
+    assert.strictEqual(entry.bpm, tune.bpm);
+    assert.ok(Object.isFrozen(entry.notes));
+    assert.strictEqual(entry.notes.length, tune.events);
+
+    const notes = hooks.normalizeFeedMelodyNotes(entry.notes);
+    const playable = notes.filter((note) => Number.isFinite(note.midi));
+    assert.strictEqual(playable.length, tune.count);
+    assert.strictEqual(notes.reduce((sum, note) => sum + note.beats, 0), tune.beats);
+    assert.deepStrictEqual(toPlain(playable.slice(0, 8).map((note) => note.midi)),
+      tune.first, `${tune.id} must preserve its recognizable opening`);
+    assert.ok(Number.isFinite(notes.at(-1).midi),
+      `${tune.id} must finish on a playable note, not an uncounted trailing rest`);
+    assert.ok(notes.every((note) => note.beats >= 0.5 && note.beats <= 4));
+    assert.ok(playable.every((note) => Number.isInteger(note.midi) &&
+      note.midi >= 60 && note.midi <= 84));
+
+    const timeline = hooks.createMelodyTimeline(entry.notes, 400,
+      { bpm: entry.bpm });
+    assert.strictEqual(timeline.length, tune.events);
+    assert.strictEqual(timeline.filter((item) => Number.isFinite(item.midi)).length,
+      tune.count);
+    for (let i = 1; i < timeline.length; i += 1) {
+      assert.ok(timeline[i].spawnOffsetMs > timeline[i - 1].spawnOffsetMs,
+        `${tune.id} must keep an ordered, positive-duration musical timeline`);
+    }
+    assert.ok(timeline.every((item) => item.laneFraction === null ||
+      (item.laneFraction >= 0.2 && item.laneFraction <= 0.8)));
+
+    const runtime = makeLabyrinthRuntime(0);
+    runtime.mode = "melody";
+    runtime.dailyTodoPreview = true;
+    runtime.requestedMelodyId = tune.id;
+    runtime.scoreEl = { textContent: "" };
+    hooks.initializeMelodyMode(runtime);
+    assert.strictEqual(runtime.melody.tuneId, tune.id);
+    assert.strictEqual(runtime.totalCount, tune.count);
+    assert.strictEqual(runtime.melody.bpm, tune.bpm);
+    hooks.disposeMelodyMode(runtime);
+
+    assert.strictEqual(hooks.selectFeedMelody(tune.id, () => 0).id,
+      tune.id, `${tune.id} must remain explicitly selectable in Preview`);
+  }
+
+  // All five tunes can be selected in Preview or drawn in a real game.
+  const released = Array.from(hooks.FEED_MELODY_ROTATION_IDS);
+  for (let i = 0; i <= 100; i += 1) {
+    const selected = hooks.selectFeedMelody("", () => i / 100);
+    assert.ok(released.includes(selected.id),
+      "Real Daily Feeding must choose an approved tune");
+  }
+  assert.strictEqual(hooks.selectFeedMelody("invalid", () => 0.999).id,
+    "amazingGrace", "Unknown IDs use the complete released rotation");
+  assert.strictEqual(hooks.selectFeedMelody("", () => NaN).id, "odeToJoy");
+  assert.strictEqual(hooks.selectFeedMelody("", () => { throw Error(); }).id,
+    "odeToJoy");
+
+  const realRuntime = makeLabyrinthRuntime(0);
+  realRuntime.mode = "melody";
+  realRuntime.dailyTodoPreview = false;
+  realRuntime.requestedMelodyId = "richardsTune";
+  realRuntime.scoreEl = { textContent: "" };
+  hooks.initializeMelodyMode(realRuntime);
+  assert.ok(released.includes(realRuntime.melody.tuneId),
+    "An old Richard's ID must be ignored in normal gameplay");
+  hooks.disposeMelodyMode(realRuntime);
+}
+
+
+function testTwoAdditionalMelodiesInRotation() {
+  const specs = [
+    { id: "amazingGrace", label: "Amazing Grace", bpm: 104,
+      events: 36, playable: 35, rests: 1, beats: 47,
+      first: [62, 67, 71, 67, 71, 69], last: 67 },
+    { id: "inTheHallOfTheMountainKing",
+      label: "In the Hall of the Mountain King", bpm: 122,
+      events: 78, playable: 78, rests: 0, beats: 48,
+      first: [71, 73, 74, 76, 78, 74], last: 71 }
+  ];
+
+  assert.strictEqual(hooks.FEED_MELODIES.length, 9);
+  const ids = Array.from(hooks.FEED_MELODIES, (tune) => tune.id);
+  assert.strictEqual(new Set(ids).size, 9, "Every tune must have a unique ID");
+  assert.deepStrictEqual(Array.from(hooks.FEED_MELODY_ROTATION_IDS), ids,
+    "Every registered tune must be available in real Daily Feeding");
+
+  for (const spec of specs) {
+    const tune = hooks.getFeedMelodyById(spec.id);
+    assert.ok(tune, `Missing released tune ${spec.id}`);
+    assert.strictEqual(tune.label, spec.label);
+    assert.strictEqual(tune.bpm, spec.bpm);
+    assert.ok(Object.isFrozen(tune) && Object.isFrozen(tune.notes));
+    assert.strictEqual(tune.notes.length, spec.events);
+    const notes = hooks.normalizeFeedMelodyNotes(tune.notes);
+    const playable = notes.filter((note) => Number.isFinite(note.midi));
+    assert.strictEqual(playable.length, spec.playable);
+    assert.strictEqual(notes.length - playable.length, spec.rests);
+    assert.ok(Math.abs(notes.reduce((sum, note) => sum + note.beats, 0) -
+      spec.beats) < 0.000001, `Wrong total beats for ${spec.id}`);
+    assert.deepStrictEqual(toPlain(playable.slice(0, 6).map((note) => note.midi)),
+      spec.first);
+    assert.strictEqual(playable.at(-1).midi, spec.last);
+    assert.ok(notes.every((note) => Number.isFinite(note.beats) &&
+      note.beats > 0), `Nonpositive note/rest duration in ${spec.id}`);
+    assert.ok(playable.every((note) => Number.isInteger(note.midi) &&
+      note.midi >= 56 && note.midi <= 92));
+
+    const timeline = hooks.createMelodyTimeline(tune.notes, 400,
+      { bpm: tune.bpm });
+    assert.strictEqual(timeline.length, spec.events);
+    assert.strictEqual(timeline.filter((note) => note.midi !== null).length,
+      spec.playable);
+    assert.strictEqual(timeline.filter((note) => note.laneFraction === null).length,
+      spec.rests);
+    for (let i = 1; i < timeline.length; i += 1) {
+      assert.ok(timeline[i].spawnOffsetMs > timeline[i - 1].spawnOffsetMs,
+        `Events must remain ordered for ${spec.id}`);
+    }
+    assert.ok(timeline.every((note) => note.laneFraction === null ||
+      (note.laneFraction >= 0.2 && note.laneFraction <= 0.8)));
+
+    const runtime = makeLabyrinthRuntime(0);
+    runtime.mode = "melody";
+    runtime.dailyTodoPreview = true;
+    runtime.requestedMelodyId = spec.id;
+    runtime.scoreEl = { textContent: "" };
+    hooks.initializeMelodyMode(runtime);
+    assert.strictEqual(runtime.melody.tuneId, spec.id);
+    assert.strictEqual(runtime.melody.bpm, spec.bpm);
+    assert.strictEqual(runtime.totalCount, spec.playable,
+      "Rests must never count toward catch percentage");
+    hooks.disposeMelodyMode(runtime);
+
+    const releasedIndex = ids.indexOf(spec.id);
+    assert.strictEqual(
+      hooks.selectFeedMelody("", () => (releasedIndex + 0.5) / ids.length).id,
+      spec.id,
+      `${spec.id} must be reachable by real Daily Feeding random selection`
+    );
+  }
+}
+
+function testTwoAdditionalMelodiesFinishAfterAllNotes() {
+  for (const id of [
+    "inTheHallOfTheMountainKing", "amazingGrace"
+  ]) {
+    const runtime = makeLabyrinthRuntime(0);
+    runtime.mode = "melody";
+    runtime.modeConfig = hooks.FEED_MODE_CONFIGS.melody;
+    runtime.dailyTodoPreview = true;
+    runtime.requestedMelodyId = id;
+    runtime.catcherX = -1000; // Deliberately miss every snack.
+    hooks.initializeMelodyMode(runtime);
+    hooks.updateMelodyMode(runtime, 0.05, 1000);
+    const last = runtime.melody.timeline.at(-1);
+    const endAt = 1000 + last.arrivalOffsetMs + 100;
+
+    for (let now = 1050; now < endAt; now += 50) {
+      hooks.updateMelodyMode(runtime, .05, now);
+    }
+    hooks.updateMelodyMode(runtime, .05, endAt);
+    assert.strictEqual(runtime.melody.classifiedCount, runtime.totalCount,
+      `${id} must classify every playable note and ignore rests`);
+    assert.strictEqual(runtime.balls.length, 0,
+      `${id} must not strand any active snacks`);
+    assert.strictEqual(runtime.score, 0);
+    assert.strictEqual(hooks.getModeController("melody").isComplete(runtime, endAt), false,
+      "The final arrival must still be followed by the usual finish delay");
+    assert.strictEqual(hooks.getModeController("melody").isComplete(runtime, endAt + 1000), true);
+    const result = hooks.buildMelodyResult(runtime);
+    assert.strictEqual(result.catchPercent, 0);
+    assert.strictEqual(result.totalCount, runtime.totalCount);
+    hooks.disposeMelodyMode(runtime);
+  }
 }
 
 function testTurkeyInTheStrawVerseTimeline() {
@@ -1657,6 +1863,7 @@ function testTurkeyInTheStrawVerseTimeline() {
 
   const runtime = makeLabyrinthRuntime(0);
   runtime.mode = "melody";
+  runtime.dailyTodoPreview = true;
   runtime.requestedMelodyId =
     "turkeyInTheStraw";
   runtime.scoreEl = { textContent: "" };
@@ -1868,6 +2075,7 @@ function testMelodyPercentageScoring() {
 function testMelodyIgnoresQuestionStars() {
   const runtime = makeLabyrinthRuntime(2);
   runtime.mode = "melody";
+  runtime.dailyTodoPreview = true;
   runtime.requestedMelodyId = "odeToJoy";
   runtime.scoreEl = { textContent: "" };
 
@@ -1886,6 +2094,7 @@ function testMelodyCompletionWaitsForFinalArrival() {
   const runtime = makeLabyrinthRuntime(0);
   runtime.mode = "melody";
   runtime.modeConfig = hooks.FEED_MODE_CONFIGS.melody;
+  runtime.dailyTodoPreview = true;
   runtime.requestedMelodyId = "odeToJoy";
   runtime.scoreEl = { textContent: "" };
   hooks.initializeMelodyMode(runtime);
@@ -1950,6 +2159,7 @@ function makeInterruptedMelodyRuntime() {
   const runtime = {
     mode: "melody",
     modeConfig: hooks.FEED_MODE_CONFIGS.melody,
+    dailyTodoPreview: true,
     requestedMelodyId: "odeToJoy",
     roundStarted: true,
     running: true,
@@ -2780,6 +2990,25 @@ function testFeedingGamePreviewTuneSelector() {
       'id: "turkeyInTheStraw",\n          label: "Turkey in the Straw"'
     )
   );
+  const previewTuneIds = Array.from(hooks.FEED_MELODIES)
+    .map((tune) => tune.id);
+  assert.strictEqual(previewTuneIds.length, 9);
+  assert.ok(!testerSource.includes('id: "richardsTune"'),
+    "Richard's Tune must no longer appear in Preview");
+  for (const tune of hooks.FEED_MELODIES) {
+    assert.ok(testerSource.includes(
+      `id: "${tune.id}",\n          label: "${tune.label}"`
+    ), `Preview must offer ${tune.label}`);
+  }
+  assert.ok(!testerSource.includes("FEED_MELODY_ROTATION_IDS"),
+    "Preview must not use the released-tune filter");
+  assert.ok(testerSource.includes('actionsClass:\n          "melody-preview-tune-actions"'),
+    "Long Preview tune lists need a phone-friendly grid");
+  assert.ok(appSource.includes('"melody-preview-tune-actions"'),
+    "Tune-only dialog style must be removed when another dialog opens");
+  assert.ok(feedGameCssSource.includes(
+    '#dlgActions.melody-preview-tune-actions'),
+    "Preview tune actions must fit and scroll on narrow devices");
   assert.ok(
     testerSource.includes(
       'title: "Choose Melody Tune"'
@@ -3576,6 +3805,7 @@ function testResizeLabyrinthPreservesGapsAndSnackState() {
 
 function testResizeMelodyPreservesTimingAndNoteStatus() {
   const runtime = makeResizableRuntime("melody");
+  runtime.dailyTodoPreview = true;
   runtime.requestedMelodyId = "turkeyInTheStraw";
   hooks.initializeMelodyMode(runtime);
   const state = runtime.melody;
@@ -3733,6 +3963,9 @@ async function main() {
     testBounceOverlayLifecycleAndRealDailyIsolation,
     testMelodyExactOdeToJoySequence,
     testMelodyTuneRegistryAndSelection,
+    testFiveNewMelodiesInRotation,
+    testTwoAdditionalMelodiesInRotation,
+    testTwoAdditionalMelodiesFinishAfterAllNotes,
     testTurkeyInTheStrawVerseTimeline,
     testMelodyRenderAndControllerContract,
     testMelodyTimingModel,

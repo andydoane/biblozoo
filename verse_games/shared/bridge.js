@@ -770,6 +770,9 @@ function markCompleted(payload){
       );
     }
 
+    // A previous pet unlock may still be present in a copied returnTo URL.
+    // Daily To-Do completion must never replay that one-time navigation route.
+    target.searchParams.delete("petUnlock");
     target.searchParams.set("screen", "todo_dev");
     target.searchParams.set(
       "dailyTodoPreview",
