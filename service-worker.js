@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_18_patch34_learn_verse_background_artwork";
+const CACHE_VERSION = "2026_Oct_18_patch35_read_typing_chunk_alerts";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -97,6 +97,7 @@ const CORE_PATHS = [
   "./verse_images/read_my_verse/typewriter_1.mp3",
   "./verse_images/read_my_verse/typewriter_2.mp3",
   "./verse_images/read_my_verse/typewriter_3.mp3",
+  "./verse_images/read_my_verse/typewriter_alert.mp3",
   "./verse_images/read_my_verse/keyboard_1.mp3",
   "./verse_images/read_my_verse/keyboard_2.mp3",
   "./verse_images/read_my_verse/keyboard_3.mp3",
@@ -104,6 +105,7 @@ const CORE_PATHS = [
   "./verse_images/read_my_verse/keyboard_5.mp3",
   "./verse_images/read_my_verse/keyboard_6.mp3",
   "./verse_images/read_my_verse/keyboard_7.mp3",
+  "./verse_images/read_my_verse/keyboard_alert.mp3",
   "./verse_images/daily_questions/dq_incorrect.mp3",
   "./verse_images/read_my_verse/verse_crawl_theme.mp3",
   "./verse_images/read_my_verse/verse_crawl_theme_ducked.mp3",

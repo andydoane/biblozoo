@@ -149,6 +149,7 @@
           `${ASSET_BASE}typewriter_2.mp3`,
           `${ASSET_BASE}typewriter_3.mp3`
         ]),
+        chunkAlert: `${ASSET_BASE}typewriter_alert.mp3`,
         font:
           "./verse_fonts/SpecialElite-Regular.ttf"
       }),
@@ -212,6 +213,7 @@
           `${ASSET_BASE}keyboard_6.mp3`,
           `${ASSET_BASE}keyboard_7.mp3`
         ]),
+        chunkAlert: `${ASSET_BASE}keyboard_alert.mp3`,
         font:
           "./verse_fonts/VT323-Regular.ttf"
       }),
@@ -2111,13 +2113,17 @@
     });
   }
 
-  function stopKeySoundVoices() {
-    keySoundVoices.forEach(({ source, gain }) => {
+  function stopKeySoundVoices({ keepChunkAlert = false } = {}) {
+    keySoundVoices = keySoundVoices.filter(({ source, gain, isChunkAlert }) => {
+      if (keepChunkAlert && isChunkAlert) return true;
       try { source.onended = null; source.stop(); } catch (err) { }
       try { source.disconnect(); gain.disconnect(); } catch (err) { }
+      return false;
     });
-    keySoundVoices = [];
-    keySoundAudio.forEach((audio) => {
+    const keyCount = READ_ACTIVITY_MANIFEST[keySoundActivityId]
+      ?.keySounds?.length || 0;
+    keySoundAudio.forEach((audio, index) => {
+      if (keepChunkAlert && index >= keyCount * KEY_SOUND_FALLBACK_VOICES) return;
       try { audio.pause(); audio.currentTime = 0; } catch (err) { }
     });
   }
@@ -2129,7 +2135,9 @@
       isTypingActivity(activityId)
         ? activityId
         : TYPEWRITER_ACTIVITY_ID;
-    const sources = READ_ACTIVITY_MANIFEST[safeActivityId].keySounds;
+    const manifest = READ_ACTIVITY_MANIFEST[safeActivityId];
+    // The alert uses its own sample/voices, so it can overlap the last key.
+    const sources = [...manifest.keySounds, manifest.chunkAlert];
 
     if (keySoundActivityId !== safeActivityId) {
       stopKeySoundVoices();
@@ -2154,9 +2162,14 @@
           const context = keySoundContext;
           const generation = keySoundGeneration;
           Promise.all(sources.map(async (src) => {
-            const response = await root.fetch(src);
-            if (!response.ok) throw new Error("Key sound unavailable");
-            return context.decodeAudioData(await response.arrayBuffer());
+            try {
+              const response = await root.fetch(src);
+              if (!response.ok) throw new Error("Key sound unavailable");
+              return await context.decodeAudioData(await response.arrayBuffer());
+            } catch (err) {
+              // Missing alerts must not prevent the keystroke samples decoding.
+              return null;
+            }
           })).then((buffers) => {
             if (generation === keySoundGeneration) {
               keySoundBuffers = buffers;
@@ -2184,13 +2197,10 @@
     return keySoundAudio;
   }
 
-  function playKeySound() {
+  function playTypingSample(index, isChunkAlert = false) {
     if (appApi?.isMuted?.()) return;
 
     const sounds = ensureKeySoundAudio(state.activityId);
-    const variants = READ_ACTIVITY_MANIFEST[state.activityId]?.keySounds;
-    if (!variants?.length) return;
-    const index = chooseKeySoundIndex(variants.length);
     const context = keySoundContext;
     const buffer = keySoundBuffers[index];
 
@@ -2220,7 +2230,7 @@
           const source = context.createBufferSource();
           const gain = context.createGain();
           source.buffer = buffer;
-          gain.gain.value = 0.58;
+          gain.gain.value = isChunkAlert ? 0.7 : 0.58;
           source.connect(gain);
           gain.connect(context.destination);
           if (keySoundVoices.length >= KEY_SOUND_MAX_VOICES) {
@@ -2228,7 +2238,7 @@
             oldest.gain.gain.setTargetAtTime(0, context.currentTime, 0.006);
             oldest.source.stop(context.currentTime + 0.03);
           }
-          const voice = { source, gain };
+          const voice = { source, gain, isChunkAlert };
           keySoundVoices.push(voice);
           source.onended = () => {
             keySoundVoices = keySoundVoices.filter((item) => item !== voice);
@@ -2252,9 +2262,22 @@
       audio.pause();
       audio.currentTime = 0;
       audio.muted = false;
-      audio.volume = 0.7;
+      audio.volume = isChunkAlert ? 0.85 : 0.7;
       audio.play().catch?.(() => { });
     } catch (err) { }
+  }
+
+  function playKeySound() {
+    if (appApi?.isMuted?.()) return;
+    const count = READ_ACTIVITY_MANIFEST[state.activityId]?.keySounds?.length || 0;
+    if (count) playTypingSample(chooseKeySoundIndex(count));
+  }
+
+  function playChunkAlertSound() {
+    const manifest = READ_ACTIVITY_MANIFEST[state.activityId];
+    if (manifest?.chunkAlert) {
+      playTypingSample(manifest.keySounds.length, true);
+    }
   }
 
   function stopScrambleRewards() {
@@ -2697,7 +2720,8 @@
   function playCurrentChunk() {
     if (state.phase !== "pause") return;
 
-    stopKeySoundVoices();
+    // Let the completion alert finish while spoken chunk audio begins.
+    stopKeySoundVoices({ keepChunkAlert: true });
     stopScrambleRewards();
     if (negativeFeedbackAudio) {
       try {
@@ -2909,6 +2933,8 @@
     }
 
     if (nextCount >= characters.length) {
+      // Start alongside the last keystroke, not after the narration pause.
+      playChunkAlertSound();
       finishCurrentChunk();
     }
 
