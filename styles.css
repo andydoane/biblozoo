@@ -128,6 +128,28 @@ body.page-transition-chrome-black {
   padding-bottom: 0;
 }
 
+/* Learn the Verse only: preserve the existing purple if artwork is unavailable.
+   The image is applied to the slide, behind all existing learning content. */
+.slide.learn-verse-artwork {
+  background-color: var(--purple);
+  background-image: url("./verse_images/bg_learn_the_verse_phone.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* Only Learn Level has an opaque title-screen wrapper over the slide. */
+.slide.learn-verse-artwork > .learn-level-screen {
+  background: transparent;
+}
+
+/* Match the app's existing phone-versus-iPad artwork aspect-ratio convention. */
+@media (min-aspect-ratio: 2 / 3) {
+  .slide.learn-verse-artwork {
+    background-image: url("./verse_images/bg_learn_the_verse_ipad.png");
+  }
+}
+
 .top {
   padding: calc(14px + var(--safeT)) 18px 10px;
   display: flex;

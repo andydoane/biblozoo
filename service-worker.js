@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_18_patch33_mission_verse_pet_portraits";
+const CACHE_VERSION = "2026_Oct_18_patch34_learn_verse_background_artwork";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -90,6 +90,8 @@ const CORE_PATHS = [
   "./verse_fonts/VT323-Regular.ttf",
   "./verse_fonts/NewsCycle-Bold.ttf",
 
+  "./verse_images/bg_learn_the_verse_phone.png",
+  "./verse_images/bg_learn_the_verse_ipad.png",
   "./verse_images/read_my_verse/paper_phone.png",
   "./verse_images/read_my_verse/paper_ipad.png",
   "./verse_images/read_my_verse/typewriter_1.mp3",
