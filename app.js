@@ -22465,6 +22465,18 @@ function render() {
     }
   }
 
+  // Keep the *actual* revealed unlock slide during its exit transition.
+  // Rebuilding it would lose "is-revealed", restart the box-drop animation,
+  // and lose the pet's identity after pendingPetUnlockVerseId is cleared.
+  const petUnlockIdx = screenToIndex(Screen.PET_UNLOCK);
+  const departingPetUnlockSlide =
+    State.isSliding && State.transitionFromIdx === petUnlockIdx
+      ? Array.from(app.children).find((child) =>
+          child.classList.contains("slide") &&
+          Number(child.dataset.idx) === petUnlockIdx
+        )
+      : null;
+
   app.innerHTML = "";
 
   const currentIdx = screenToIndex(State.screen);
@@ -22480,7 +22492,7 @@ function render() {
   for (const idx of uniq) {
     const screen =
       SCREEN_ORDER[idx];
-    let slide = null;
+    let slide = idx === petUnlockIdx ? departingPetUnlockSlide : null;
     if (screen === Screen.INTRO) slide = screenIntro(idx);
     if (screen === Screen.TITLE_SEQUENCE) slide = screenTitleSequence(idx);
     if (screen === Screen.PROFILE_WELCOME) slide = screenProfileWelcome(idx);
@@ -22519,7 +22531,7 @@ function render() {
     if (screen === Screen.HIDE) slide = screenHide(idx);
     if (screen === Screen.FINAL_RECALL) slide = screenFinalRecall(idx);
     if (screen === Screen.CELEBRATION) slide = screenCelebration(idx);
-    if (screen === Screen.PET_UNLOCK) slide = screenPetUnlock(idx);
+    if (screen === Screen.PET_UNLOCK && !slide) slide = screenPetUnlock(idx);
     if (screen === Screen.PRACTICE_HUB) slide = screenPracticeHub(idx);
     if (screen === Screen.PRACTICE) slide = screenPractice(idx);
     if (screen === Screen.PLAYGROUND) slide = screenPlayground(idx);

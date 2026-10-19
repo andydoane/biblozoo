@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_19_patch36_learn_instruction_progress";
+const CACHE_VERSION = "2026_Oct_19_patch37_pet_unlock_exit_animation";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
