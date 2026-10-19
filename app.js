@@ -21393,6 +21393,33 @@ function screenLearnLevel(idx) {
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
+// The tutorial and New Pet Mission finish at Final Test rather than Practice.
+// Show the steps that actually occur, without exposing navigation controls.
+function learnInstructionProgressHtml(instructionKey, title) {
+  const finishesAtFinal = isTutorialActive() ||
+    getDailyNewPetMissionContext()?.source === "daily_new_pet";
+  const steps = finishesAtFinal
+    ? LEARN_INSTRUCTION_KEYS.slice(0, -1)
+    : LEARN_INSTRUCTION_KEYS;
+  const activeStep = steps.indexOf(instructionKey);
+  if (activeStep < 0) return "";
+
+  return `
+    <div
+      class="learn-instruction-progress"
+      role="img"
+      aria-label="Step ${activeStep + 1} of ${steps.length}: ${escapeHtml(title)}"
+    >
+      ${steps.map((_, index) => `
+        <span
+          class="learn-instruction-progress-dot${index === activeStep ? " is-current" : ""}"
+          aria-hidden="true"
+        ></span>
+      `).join("")}
+    </div>
+  `;
+}
+
 function screenLearnInstruction(idx) {
   const cfg = getLearnInstructionConfig(State.learnInstructionKey);
 
@@ -21439,6 +21466,7 @@ function screenLearnInstruction(idx) {
 
         <div class="learn-instruction-title">${title}</div>
         <div class="learn-instruction-subtext">${subtext}</div>
+        ${learnInstructionProgressHtml(State.learnInstructionKey, title)}
 
         <div class="${actionsClassName}">
           ${homeButtonHtml}

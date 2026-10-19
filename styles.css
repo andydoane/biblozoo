@@ -369,6 +369,31 @@ Learn Instruction Screens
   text-wrap: balance;
 }
 
+/* A non-interactive map of Learn the Verse instruction screens. */
+.learn-instruction-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 2vw, 14px);
+  flex: 0 0 auto;
+  min-height: 18px;
+  width: 100%;
+}
+
+.learn-instruction-progress-dot {
+  flex: 0 0 auto;
+  width: clamp(12px, 2.8vw, 17px);
+  aspect-ratio: 1;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.38);
+}
+
+.learn-instruction-progress-dot.is-current {
+  background: #ffffff;
+}
+
 .learn-instruction-actions {
   width: 100%;
   min-height: 58px;
