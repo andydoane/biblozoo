@@ -9844,6 +9844,8 @@ const GAME_MIX_PRIORITY_POOL_SIZE = 3;
 const GAME_MIX_LOADING_MIN_MS = 600;
 
 let gameMixLaunchTimer = null;
+// The debug shortcut displays the real ending without changing saved Mix progress.
+let gameMixFinishedPreview = false;
 
 function createGameMixState(verseId) {
   const profileId =
@@ -10131,6 +10133,7 @@ function continueGameMixAfterCompletion(completedGameId) {
   }
 
   cleanGameMixUrlParams();
+  gameMixFinishedPreview = false;
   setScreen(Screen.GAME_MIX_FINISHED);
   return true;
 }
@@ -12513,6 +12516,7 @@ function renderNav() {
     State.screen !== Screen.PLAYGROUND &&
     State.screen !== Screen.FLASHCARDS &&
     State.screen !== Screen.READ_MY_VERSE &&
+    State.screen !== Screen.GAME_MIX_FINISHED &&
     State.screen !== Screen.PROGRESS &&
     State.screen !== Screen.VERSE_DETAIL &&
     State.screen !== Screen.PET_STATS &&
@@ -17214,6 +17218,16 @@ function screenTitle(idx) {
       order: 90,
       onSelect:
         showFeedingGameTesterDialog
+    });
+    registerDailyTodoPreviewMenuEntry({
+      id: "game_mix_finished",
+      label: "Game Mix Finished Screen",
+      order: 75,
+      onSelect: () => {
+        closeDialog();
+        gameMixFinishedPreview = true;
+        go(Screen.GAME_MIX_FINISHED);
+      }
     });
 
     titleTodoBtn.onclick = (e) => {
@@ -22419,6 +22433,11 @@ function screenGameMixFinished(idx) {
   const playAnotherBtn = wrap.querySelector("#btnPlayAnotherMix");
   if (playAnotherBtn) {
     playAnotherBtn.onclick = () => {
+      if (gameMixFinishedPreview) {
+        gameMixFinishedPreview = false;
+        go(Screen.TITLE);
+        return;
+      }
       startGameMix();
     };
   }
@@ -22426,6 +22445,11 @@ function screenGameMixFinished(idx) {
   const endBtn = wrap.querySelector("#btnEndMix");
   if (endBtn) {
     endBtn.onclick = () => {
+      if (gameMixFinishedPreview) {
+        gameMixFinishedPreview = false;
+        go(Screen.TITLE);
+        return;
+      }
       clearGameMixState();
       go(Screen.TITLE);
     };
