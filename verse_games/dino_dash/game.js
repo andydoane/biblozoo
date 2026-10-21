@@ -119,25 +119,23 @@
   const HALFWAY_FEED_BLACK_FADE_MS = 320;
   const HALFWAY_FEED_BLACK_HOLD_MS = 140;
   const HALFWAY_FEED_SCENE_FADE_MS = 420;
-  const HALFWAY_FEED_MESSAGE_MS = 4000;
-  const HALFWAY_FEED_TAP_COOLDOWN_MS = 650;
-  const HALFWAY_FEED_FINAL_HOLD_MS = 1500;
+  const DAY_NIGHT_ORBIT_MS = 1800;
+  const DAY_NIGHT_MOON_HOLD_MS = 1000;
   const HALFWAY_FEED_RESUME_FADE_MS = 360;
 
   const BONUS_INTRO_AFTER_FINAL_TABLET_MS = 850;
   const BONUS_PROGRESS_PREP_LEAD_MS = 250;
 
   const HALFWAY_FEED_IMAGES = [
-    "dino_dash_hungry.png",
-    "dino_dash_steak_1.png",
-    "dino_dash_steak_2.png",
-    "dino_dash_steak_3.png"
+    "dino_dash_cutscene_sun.png",
+    "dino_dash_cutscene_moon.png"
   ];
 
   const HALFWAY_FEED_RESUME_IMAGES = [
-    "dino_dash_back_hill.svg",
-    "dino_dash_hill.svg",
-    "dino_dash_ground_small.png",
+    "dino_dash_back_hill_night.svg",
+    "dino_dash_hill_night.svg",
+    "dino_dash_ground_small_night.png",
+    "dino_dash_moon.png",
     "dino_dash_ground_gap.png",
     "dino_dash_tablet_compact.png",
     "dino_dash_tablet_normal.png",
@@ -326,6 +324,8 @@
   const groundImage = new Image();
   groundImage.src =
     `${IMAGE_PATH}dino_dash_ground_small.png`;
+  // Only request the night tile in the fresh, post-midpoint document.
+  const nightGroundImage = new Image();
 
   const DIAGNOSTIC_STORAGE_KEY =
     "biblozooDebug:dino_dash:v1";
@@ -431,6 +431,8 @@
     worldX: 0,
     hillX: 0,
     backHillX: 0,
+    nightMoonX: null,
+    nightMode: false,
     nextItemId: 1,
     tablets: [],
     obstacles: [],
@@ -478,15 +480,18 @@
     resultShown: false
   };
 
-  const halfwayFeedImagesReady =
-    preloadHalfwayFeedImages();
-
   void warmGameplayObstacleImages();
 
   const halfwayFeedCheckpoint =
     readHalfwayFeedCheckpoint();
 
   if (halfwayFeedCheckpoint) {
+    nightGroundImage.src =
+      `${IMAGE_PATH}dino_dash_ground_small_night.png`;
+
+    const halfwayFeedImagesReady =
+      preloadHalfwayFeedImages();
+
     selectedMode =
       halfwayFeedCheckpoint.mode;
 
@@ -906,65 +911,23 @@
     state.halfwayFeedPending = false;
     state.halfwayFeedReadyAt = 0;
     state.halfwayFeedExitSpeed = 0;
+    state.nightMode = true;
   }
 
+  // Keep the old checkpoint key/stage for compatibility with installs that
+  // reload into an already-saved halfway checkpoint.
   function halfwayFeedScreenHtml() {
     return `
-      <div
-        class="dd2-feed-screen"
-        id="dd2FeedScreen"
-      >
-        <button
-          class="dd2-feed-tap-target"
-          id="dd2FeedTapTarget"
-          type="button"
-          aria-label="Dino is hungry"
-          disabled
-        >
-          <div
-            class="dd2-feed-art"
-            aria-hidden="true"
-          >
-            <img
-              class="dd2-feed-image dd2-feed-dino"
-              src="${IMAGE_PATH}dino_dash_hungry.png"
-              alt=""
-              draggable="false"
-            >
-
-            <img
-              class="dd2-feed-image dd2-feed-steak"
-              data-dd2-steak="1"
-              src="${IMAGE_PATH}dino_dash_steak_1.png"
-              alt=""
-              draggable="false"
-            >
-
-            <img
-              class="dd2-feed-image dd2-feed-steak"
-              data-dd2-steak="2"
-              src="${IMAGE_PATH}dino_dash_steak_2.png"
-              alt=""
-              draggable="false"
-            >
-
-            <img
-              class="dd2-feed-image dd2-feed-steak"
-              data-dd2-steak="3"
-              src="${IMAGE_PATH}dino_dash_steak_3.png"
-              alt=""
-              draggable="false"
-            >
-          </div>
-
-          <div
-            class="dd2-feed-message"
-            id="dd2FeedMessage"
-            aria-live="polite"
-          >
-            This is a long verse. Dino is hungry!
-          </div>
+      <div class="dd2-day-night-scene" id="dd2DayNightScene">
+        <div class="dd2-day-night-background" aria-hidden="true"></div>
+        <button class="dd2-day-night-orbit dd2-day-night-sun" id="dd2SunOrbit"
+          type="button" aria-label="Tap the sun to bring nighttime" disabled>
+          <img src="${IMAGE_PATH}dino_dash_cutscene_sun.png" alt="" draggable="false">
         </button>
+        <div class="dd2-day-night-orbit dd2-day-night-moon" id="dd2MoonOrbit"
+          aria-hidden="true">
+          <img src="${IMAGE_PATH}dino_dash_cutscene_moon.png" alt="" draggable="false">
+        </div>
       </div>
     `;
   }
@@ -975,300 +938,133 @@
   ) {
     stopLoop();
     cleanupResize();
-
     state.field = null;
     state.phase = "feed";
 
-    let blackout =
-      document.getElementById(
-        "dd2ReloadFirstPaint"
-      );
-
+    let blackout = document.getElementById("dd2ReloadFirstPaint");
     if (!blackout) {
-      blackout =
-        document.createElement(
-          "div"
-        );
-
-      blackout.id =
-        "dd2ReloadFirstPaint";
-
-      blackout.className =
-        "dd2-reload-first-paint";
-
-      blackout.setAttribute(
-        "aria-hidden",
-        "true"
-      );
-
-      app.appendChild(
-        blackout
-      );
+      blackout = document.createElement("div");
+      blackout.id = "dd2ReloadFirstPaint";
+      blackout.className = "dd2-reload-first-paint";
+      blackout.setAttribute("aria-hidden", "true");
+      app.appendChild(blackout);
     }
 
+    // Allow the fresh document to settle beneath the black first-paint cover.
     try {
       await imagesReady;
     } catch (err) {
-      // Normal image loading remains
-      // available as a fallback.
+      // Individual images retain normal loading fallbacks.
     }
 
-    if (
-      !document.getElementById(
-        "dd2FeedScreen"
-      )
-    ) {
-      app.insertAdjacentHTML(
-        "beforeend",
-        halfwayFeedScreenHtml()
+    app.insertAdjacentHTML("beforeend", halfwayFeedScreenHtml());
+    const screen = document.getElementById("dd2DayNightScene");
+    const sun = document.getElementById("dd2SunOrbit");
+    const moon = document.getElementById("dd2MoonOrbit");
+    const nightSky = screen?.querySelector(".dd2-day-night-background");
+    if (!screen || !sun || !moon || !nightSky) return;
+
+    // Use one shared elliptical orbit centred 33% above the bottom.
+    // The horizontal radius grows on iPad so the bodies fully clear the edges.
+    function positionOrbit(progress) {
+      const width = screen.clientWidth;
+      const height = screen.clientHeight;
+      const radiusY = height * 0.33;
+      const radiusX = Math.max(
+        radiusY,
+        width * 0.5 + Math.max(sun.offsetWidth, moon.offsetWidth) * 0.5 + 20
       );
+      const centerX = width * 0.5;
+      const centerY = height * 0.67;
+      const sunAngle = progress * Math.PI * 0.5;
+      const moonAngle = (progress - 1) * Math.PI * 0.5;
+      sun.style.left = `${centerX + Math.sin(sunAngle) * radiusX}px`;
+      sun.style.top = `${centerY - Math.cos(sunAngle) * radiusY}px`;
+      moon.style.left = `${centerX + Math.sin(moonAngle) * radiusX}px`;
+      moon.style.top = `${centerY - Math.cos(moonAngle) * radiusY}px`;
+      nightSky.style.opacity = String(progress);
     }
 
-    const screen =
-      document.getElementById(
-        "dd2FeedScreen"
-      );
+    positionOrbit(0);
 
-    const target =
-      document.getElementById(
-        "dd2FeedTapTarget"
-      );
-
-    const message =
-      document.getElementById(
-        "dd2FeedMessage"
-      );
-
-    const steaks =
-      Array.from(
-        document.querySelectorAll(
-          "[data-dd2-steak]"
-        )
-      );
-
-    if (
-      !screen ||
-      !target ||
-      !message ||
-      steaks.length !== 3
-    ) {
-      return;
-    }
-
-    target.disabled = true;
-
-    let feedReady = false;
-    let tapCount = 0;
-    let lastAcceptedTapAt = 0;
+    // Warm the new game's sprites and font while the player sees the scene.
+    // We still wait for the warmup under black before restarting gameplay.
+    const resumeAssetsReady = warmHalfwayFeedResumeAssets()
+      .catch(() => false);
 
     await new Promise(resolve => {
-      window.setTimeout(
-        resolve,
-        HALFWAY_FEED_BLACK_HOLD_MS
-      );
+      window.setTimeout(resolve, HALFWAY_FEED_BLACK_HOLD_MS);
     });
 
     requestAnimationFrame(() => {
-      screen.classList.add(
-        "is-visible"
-      );
-
-      blackout.classList.add(
-        "is-leaving"
-      );
+      screen.classList.add("is-visible");
+      blackout.classList.add("is-leaving");
     });
 
-    window.setTimeout(
-      () => {
-        blackout.remove();
+    window.setTimeout(() => {
+      blackout.remove();
+      document.documentElement.classList.remove("dd2-midpoint-black");
+      sun.disabled = false;
+      recordHalfwayFeedDiagnosticEvent("night-scene-visible");
+    }, HALFWAY_FEED_SCENE_FADE_MS + 80);
 
-        document.documentElement
-          .classList.remove(
-            "dd2-midpoint-black"
-          );
+    let transitioning = false;
+    sun.addEventListener("click", () => {
+      if (transitioning || sun.disabled) return;
+      transitioning = true;
+      sun.disabled = true;
+      screen.classList.add("is-transitioning");
+      // A user gesture after document reload is important for iOS Web Audio.
+      void unlockAudio();
+      recordHalfwayFeedDiagnosticEvent("sun-tapped");
 
-        recordHalfwayFeedDiagnosticEvent(
-          "feed-visible"
-        );
-      },
-      HALFWAY_FEED_SCENE_FADE_MS +
-      80
-    );
+      const startedAt = performance.now();
+      const frame = now => {
+        if (!screen.isConnected) return;
+        const raw = Math.min(1, Math.max(0,
+          (now - startedAt) / DAY_NIGHT_ORBIT_MS
+        ));
+        const eased = raw * raw * (3 - 2 * raw);
+        positionOrbit(eased);
+        if (raw < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          recordHalfwayFeedDiagnosticEvent("night-transition-complete");
+          window.setTimeout(() => {
+            void resumeUnderBlack();
+          }, DAY_NIGHT_MOON_HOLD_MS);
+        }
+      };
+      requestAnimationFrame(frame);
+    });
 
-    const resumeAssetsReady =
-      new Promise(resolve => {
-        window.setTimeout(
-          () => {
-            void warmHalfwayFeedResumeAssets()
-              .then(resolve)
-              .catch(() => resolve(false));
-          },
-          HALFWAY_FEED_SCENE_FADE_MS +
-          300
-        );
+    async function resumeUnderBlack() {
+      if (!screen.isConnected) return;
+      const resumeBlackout = document.createElement("div");
+      resumeBlackout.className = "dd2-feed-blackout";
+      resumeBlackout.setAttribute("aria-hidden", "true");
+      document.body.appendChild(resumeBlackout);
+
+      requestAnimationFrame(() => {
+        resumeBlackout.classList.add("is-visible");
       });
 
-    window.setTimeout(
-      () => {
-        if (
-          !document.body.contains(
-            target
-          )
-        ) {
-          return;
-        }
+      await new Promise(resolve => {
+        window.setTimeout(resolve, HALFWAY_FEED_RESUME_FADE_MS + 40);
+      });
+      await resumeAssetsReady;
+      if (!resumeBlackout.isConnected) return;
 
-        feedReady = true;
-        target.disabled = false;
-
-        target.setAttribute(
-          "aria-label",
-          "Tap to feed Dino"
-        );
-
-        message.textContent =
-          "Tap to feed Dino.";
-      },
-      HALFWAY_FEED_SCENE_FADE_MS +
-      HALFWAY_FEED_MESSAGE_MS
-    );
-
-    target.addEventListener(
-      "click",
-      () => {
-        if (!feedReady) {
-          return;
-        }
-
-        const now =
-          performance.now();
-
-        if (
-          now -
-          lastAcceptedTapAt <
-          HALFWAY_FEED_TAP_COOLDOWN_MS
-        ) {
-          return;
-        }
-
-        lastAcceptedTapAt = now;
-
-        const audioReady =
-          audioUnlocked && getAudioContext()?.state === "running"
-            ? Promise.resolve(true)
-            : unlockAudio();
-
-        tapCount += 1;
-
-        const steak =
-          steaks[
-          tapCount - 1
-          ];
-
-        if (steak) {
-          steak.classList.add(
-            "is-fed"
-          );
-        }
-
-        const tapSound =
-          tapCount >= 3
-            ? "streak"
-            : "correct";
-
-        void Promise
-          .resolve(audioReady)
-          .then(
-            () => {
-              playSound(
-                tapSound
-              );
-            }
-          );
-
-        if (tapCount < 3) {
-          return;
-        }
-
-        feedReady = false;
-        target.disabled = true;
-
-        recordHalfwayFeedDiagnosticEvent(
-          "feed-complete"
-        );
-
-        window.setTimeout(
-          async () => {
-            try {
-              await resumeAssetsReady;
-            } catch (err) {
-              // Normal loading remains
-              // available as a fallback.
-            }
-
-            const resumeBlackout =
-              document.createElement(
-                "div"
-              );
-
-            resumeBlackout.className =
-              "dd2-feed-blackout";
-
-            resumeBlackout.setAttribute(
-              "aria-hidden",
-              "true"
-            );
-
-            document.body.appendChild(
-              resumeBlackout
-            );
-
-            requestAnimationFrame(
-              () => {
-                resumeBlackout
-                  .classList.add(
-                    "is-visible"
-                  );
-
-                window.setTimeout(
-                  () => {
-                    startGame(
-                      checkpoint.mode,
-                      checkpoint
-                    );
-
-                    requestAnimationFrame(
-                      () => {
-                        requestAnimationFrame(
-                          () => {
-                            resumeBlackout
-                              .classList
-                              .remove(
-                                "is-visible"
-                              );
-
-                            window.setTimeout(
-                              () => {
-                                resumeBlackout
-                                  .remove();
-                              },
-                              HALFWAY_FEED_RESUME_FADE_MS +
-                              80
-                            );
-                          }
-                        );
-                      }
-                    );
-                  },
-                  HALFWAY_FEED_RESUME_FADE_MS
-                );
-              }
-            );
-          },
-          HALFWAY_FEED_FINAL_HOLD_MS
-        );
-      }
-    );
+      startGame(checkpoint.mode, checkpoint);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          resumeBlackout.classList.remove("is-visible");
+          window.setTimeout(() => {
+            resumeBlackout.remove();
+          }, HALFWAY_FEED_RESUME_FADE_MS + 80);
+        });
+      });
+    }
   }
 
   function beginHalfwayFeedExit() {
@@ -2778,7 +2574,7 @@
         : "";
 
     app.innerHTML = `
-      <div class="dd2-root${diagnosticRootClass}">
+      <div class="dd2-root${diagnosticRootClass}${resumeCheckpoint ? " is-night" : ""}">
         <div class="dd2-stage">
           <div class="dd2-build-wrap">
             <div class="dd2-build vm-build vm-build--${BUILD_AREA}" id="dd2Build">
@@ -2788,6 +2584,8 @@
 
           <div class="dd2-field-wrap">
             <div class="dd2-field" id="dd2Field">
+              ${resumeCheckpoint ? `<img class="dd2-night-moon" id="dd2NightMoon"
+                src="${IMAGE_PATH}dino_dash_moon.png" alt="" draggable="false">` : ""}
               <div class="dd2-back-hills" id="dd2BackHills">
                 <div class="dd2-back-hill-strip" id="dd2BackHillA"></div>
                 <div class="dd2-back-hill-strip" id="dd2BackHillB"></div>
@@ -2838,6 +2636,9 @@
     updateBuildText();
     installResize();
     recalcLayout();
+    if (resumeCheckpoint) {
+      state.nightMoonX = state.layout.width + state.layout.groundH;
+    }
     renderDinoAsset();
 
     if (resumeCheckpoint) {
@@ -2888,6 +2689,8 @@
     state.worldX = 0;
     state.hillX = 0;
     state.backHillX = 0;
+    state.nightMoonX = null;
+    state.nightMode = false;
     state.nextItemId = 1;
     state.tablets = [];
     state.obstacles = [];
@@ -4107,6 +3910,9 @@
     state.worldX -= speed * dt;
     state.hillX -= speed * dt;
     state.backHillX -= speed * 0.5 * dt;
+    if (state.nightMode && Number.isFinite(state.nightMoonX)) {
+      state.nightMoonX -= speed * 0.01 * dt;
+    }
   }
 
   function updateDino(dt, ts){
@@ -5140,6 +4946,8 @@
   }
 
   function missCorrectTablet(ts){
+    playSound("wrong");
+
     if (selectedMode !== "easy"){
       state.streak = 0;
       clearTrail();
@@ -5755,12 +5563,16 @@
         "dd2GroundCanvas"
       );
 
+    const tileImage = state.nightMode
+      ? nightGroundImage
+      : groundImage;
+
     if (
       !canvas ||
       !state.layout ||
-      !groundImage.complete ||
-      !groundImage.naturalWidth ||
-      !groundImage.naturalHeight
+      !tileImage.complete ||
+      !tileImage.naturalWidth ||
+      !tileImage.naturalHeight
     ) {
       return false;
     }
@@ -5839,8 +5651,8 @@
         1,
         Math.ceil(
           state.layout.groundH *
-          groundImage.naturalWidth /
-          groundImage.naturalHeight
+          tileImage.naturalWidth /
+          tileImage.naturalHeight
         )
       );
 
@@ -5855,7 +5667,7 @@
       x += groundTileW
     ) {
       context.drawImage(
-        groundImage,
+        tileImage,
         x,
         0,
         groundTileW,
@@ -5874,6 +5686,12 @@
       diagnosticOptions.disableBackground
     ) {
       return;
+    }
+
+    const nightMoon = document.getElementById("dd2NightMoon");
+    if (nightMoon && Number.isFinite(state.nightMoonX)) {
+      nightMoon.style.transform =
+        `translate3d(${state.nightMoonX}px, 0, 0)`;
     }
 
     const freezeGround =
@@ -7308,12 +7126,15 @@
       return Promise.resolve([]);
     }
 
+    const nightBackground = window.matchMedia(
+      "(min-aspect-ratio: 2/3)"
+    ).matches
+      ? "dino_dash_night_background_ipad.jpg"
+      : "dino_dash_night_background_phone.jpg";
+
     return Promise.all(
-      HALFWAY_FEED_IMAGES.map(
-        filename =>
-          preloadDecodedFeedImage(
-            filename
-          )
+      [...HALFWAY_FEED_IMAGES, nightBackground].map(
+        filename => preloadDecodedFeedImage(filename)
       )
     );
   }
