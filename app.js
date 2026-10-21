@@ -22414,7 +22414,13 @@ function screenGameMixFinished(idx) {
 
   wrap.innerHTML = `
     <div class="game-mix-finished-card">
-      <div class="game-mix-finished-emoji" aria-hidden="true">🎉</div>
+      <img
+        class="game-mix-finished-image"
+        src="${IMG_DIR}icon_game_mix_ending.png"
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+      >
       <div class="game-mix-finished-title">Mix Finished!</div>
       <div class="game-mix-finished-text">You completed every game.</div>
 

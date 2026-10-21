@@ -2372,10 +2372,16 @@ Game Mix Finished Screen
   text-align: center;
 }
 
-.game-mix-finished-emoji {
-  font-size: clamp(72px, 20vw, 130px);
-  line-height: 1;
+.game-mix-finished-image {
+  display: block;
+  width: clamp(100px, 30vw, 200px);
+  max-width: 100%;
+  max-height: 26dvh;
+  height: auto;
+  object-fit: contain;
   filter: drop-shadow(0 7px 0 rgba(0, 0, 0, 0.18));
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .game-mix-finished-title {
