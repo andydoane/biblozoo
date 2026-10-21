@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_21_patch41_dino_dash_moon_missed_word_audio";
+const CACHE_VERSION = "2026_Oct_21_patch42_dino_dash_moon_start_position";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =

@@ -2637,7 +2637,12 @@
     installResize();
     recalcLayout();
     if (resumeCheckpoint) {
-      state.nightMoonX = state.layout.width + state.layout.groundH;
+      // Start fully onscreen: inset the moon's right edge by half its width.
+      // The image's native aspect ratio (256 x 275) covers pre-decode layout.
+      const moonWidth =
+        document.getElementById("dd2NightMoon")?.getBoundingClientRect().width ||
+        state.layout.groundH * (256 / 275);
+      state.nightMoonX = state.layout.width - moonWidth * 1.5;
     }
     renderDinoAsset();
 
