@@ -200,6 +200,58 @@ body {
   z-index: 4;
 }
 
+/* A separate top layer keeps the bomb tappable above the frenzy tower. */
+.tb-frenzy-bomb-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.tb-frenzy-bomb {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  width: clamp(70px, 18vw, 106px);
+  height: clamp(70px, 11dvh, 106px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, .23));
+  animation: tbBombTempt 1.8s ease-in-out infinite;
+}
+
+.tb-frenzy-bomb[hidden] {
+  display: none;
+}
+
+.tb-frenzy-bomb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.tb-frenzy-bomb:focus-visible {
+  outline: 3px solid #333333;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+@keyframes tbBombTempt {
+  0%, 100% { scale: 1; }
+  50% { scale: 1.08; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-frenzy-bomb { animation: none; }
+}
+
 .tb-enter-layer {
   z-index: 5;
   pointer-events: none;
@@ -336,19 +388,6 @@ body {
   transform: translateX(-50%) scaleY(-1);
 }
 
-
-
-.tb-center-indicator-top {
-  animation: tbCenterIndicatorTop 900ms ease-in-out infinite alternate;
-}
-
-.tb-center-indicator-bottom {
-  animation: tbCenterIndicatorBottom 900ms ease-in-out infinite alternate;
-}
-
-.tb-center-indicator-wrap.is-intro-reveal {
-  animation: tbIntroIndicatorReveal 720ms cubic-bezier(.18, 1.35, .28, 1) both;
-}
 
 .tb-center-overlay-msg {
   position: absolute;
@@ -568,6 +607,21 @@ body {
 
 .tb-tower-layer.is-frenzy .tb-tower-brick:active {
   filter: brightness(1.08);
+}
+
+/* Auto demolition preserves the manual visuals, but plays them 1.5x faster. */
+.tb-tower-layer.is-auto-frenzy,
+.tb-tower-layer.is-auto-frenzy .tb-tower-brick {
+  pointer-events: none;
+}
+
+.tb-tower-layer.is-auto-frenzy .tb-tower-brick {
+  cursor: default;
+  transition-duration: 253ms;
+}
+
+.tb-tower-layer.is-auto-frenzy .tb-tower-settle {
+  animation-duration: 147ms;
 }
 
 .tb-warning-overlay {
@@ -1303,52 +1357,6 @@ body {
 
   100% {
     transform: translateX(calc(100vw + 40px));
-  }
-}
-
-@keyframes tbIntroIndicatorReveal {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) scale(.35);
-    filter: brightness(1.4);
-  }
-
-  45% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1.18);
-    filter: brightness(1.25);
-  }
-
-  70% {
-    opacity: 1;
-    transform: translateX(-50%) scale(.94);
-    filter: brightness(1.08);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-    filter: brightness(1);
-  }
-}
-
-@keyframes tbCenterIndicatorTop {
-  0% {
-    transform: translateX(-50%) translateY(0);
-  }
-
-  100% {
-    transform: translateX(-50%) translateY(3px);
-  }
-}
-
-@keyframes tbCenterIndicatorBottom {
-  0% {
-    transform: translateX(-50%) scaleY(-1) translateY(0);
-  }
-
-  100% {
-    transform: translateX(-50%) scaleY(-1) translateY(3px);
   }
 }
 

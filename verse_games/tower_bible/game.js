@@ -106,6 +106,9 @@
     }
   };
 
+  const FRENZY_BOMB_UNLOCK_BREAKS = 5;
+  const FRENZY_BOMB_SPEED_MULTIPLIER = 1.5;
+
   const BRICK_BREAK_TUNING = {
     particleCount: 11,
     minSizePctOfBrickHeight: 0.12,
@@ -270,6 +273,7 @@
     enteringId: 0,
     done: false,
     frenzyActive: false,
+    frenzyAutoActive: false,
     frenzyInputLockedUntil: 0,
     frenzyBreakSeq: 0,
     frenzyDropDelays: {},
@@ -508,7 +512,7 @@
       overlayMessage: "", overlayTone: "", overlayStartedAt: 0, overlayUntil: 0,
       warningLevel: 0, warningOverlayLevel: 0, warningOverlayStartedAt: 0, warningOverlayUntil: 0, hadWarning2BeforePlacement: false, beltRespawnLockUntil: 0, beltNeedsFreshSpawn: false, collapseTriggered: false, collapseEndsAt: 0, collapseStartedAt: 0, collapseDir: 1, collapseBasePose: null, lastStableTowerPose: null, pendingPreCollapsePose: null, collapseBurstFired: {}, collapseDebugFramesLeft: 0,
       stream: [], streamId: 0, fx: [], enteringBrick: null, enteringId: 0,
-      done: false, frenzyActive: false, frenzyInputLockedUntil: 0, frenzyBreakSeq: 0, frenzyDropDelays: {}, frenzyDropMotion: {}, pendingCorrectLabel: "", pendingCorrectType: "word",
+      done: false, frenzyActive: false, frenzyAutoActive: false, frenzyInputLockedUntil: 0, frenzyBreakSeq: 0, frenzyDropDelays: {}, frenzyDropMotion: {}, pendingCorrectLabel: "", pendingCorrectType: "word",
       pendingCorrectVisible: 0, spawnIndex: 0,
       correctStreak: 0, streakMilestonesShown: {}
     });
@@ -536,6 +540,22 @@
               <div class="tb-warning-layer" id="tbWarningLayer"></div>
               <div class="tb-guide-layer" id="tbGuideLayer"></div>
               <div class="tb-conveyor-layer" id="tbConveyorLayer"></div>
+              <div class="tb-frenzy-bomb-layer">
+                <button
+                  class="tb-frenzy-bomb"
+                  id="tbFrenzyBomb"
+                  type="button"
+                  aria-label="Use bomb to finish breaking the tower"
+                  hidden
+                >
+                  <img
+                    src="tower_bible_images/tower_of_bible_bomb.png"
+                    alt=""
+                    draggable="false"
+                    aria-hidden="true"
+                  >
+                </button>
+              </div>
               <div class="tb-enter-layer" id="tbEnterLayer"></div>
               <div class="tb-smoke-layer" id="tbSmokeLayer"></div>
               <div class="tb-popup-layer" id="tbPopupLayer"></div>
@@ -740,12 +760,25 @@
       };
     }
 
+    const bomb = document.getElementById("tbFrenzyBomb");
+    if (bomb) {
+      const activateBomb = (e) => {
+        // Pointerdown handles touch/mouse; click with detail 0 handles keyboard.
+        if (e.type === "click" && e.detail !== 0) return;
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        activateFrenzyBomb();
+      };
+      bomb.onpointerdown = activateBomb;
+      bomb.onclick = activateBomb;
+    }
+
     const field = document.getElementById("tbField");
     if (field) {
       field.onpointerdown = (e) => {
         const menuPillEl = document.getElementById("tbMenuPill");
         if (menuPillEl && menuPillEl.contains(e.target)) return;
-        if (state.frenzyActive) {
+        if (state.frenzyActive && !state.frenzyAutoActive) {
           if (e.cancelable) e.preventDefault();
           e.stopPropagation();
           handleFrenzyTap();
@@ -1230,9 +1263,29 @@
     }
 
     syncSpeedControlVisibility();
+    syncFrenzyBomb();
     renderField();
   }
 
+
+  function syncFrenzyBomb() {
+    const bomb = document.getElementById("tbFrenzyBomb");
+    if (!bomb) return;
+
+    const available =
+      state.frenzyActive &&
+      !state.frenzyAutoActive &&
+      !state.done &&
+      state.frenzyBreakSeq >= FRENZY_BOMB_UNLOCK_BREAKS &&
+      state.progress.length > 0;
+
+    bomb.hidden = !available;
+    if (!available) return;
+
+    // Center the image inside the conveyor lane, not the full playfield.
+    const laneBottom = clamp(state.fieldWidth * 0.055, 24, 42);
+    bomb.style.bottom = `${laneBottom + state.laneHeight * 0.5}px`;
+  }
 
   function syncSpeedControlVisibility() {
     const speedButton =
@@ -1887,6 +1940,7 @@
   function renderTower(layer) {
     const now = performance.now();
     layer.classList.toggle("is-frenzy", state.frenzyActive);
+    layer.classList.toggle("is-auto-frenzy", state.frenzyAutoActive);
     const towerShellClass = ["tb-tower-shell"];
     if (!state.collapseTriggered) {
       if (state.towerShakeUntil > now) towerShellClass.push("tb-tower-shake");
@@ -2002,7 +2056,7 @@
         }
       }
 
-      const frenzyAttrs = state.frenzyActive
+      const frenzyAttrs = state.frenzyActive && !state.frenzyAutoActive
         ? ` data-frenzy-index="${i}" role="button" aria-label="Break ${escapeHtml(brick.label)} brick"`
         : "";
 
@@ -2031,7 +2085,7 @@
     html += `</div>`;
     layer.innerHTML = html;
 
-    if (state.frenzyActive) {
+    if (state.frenzyActive && !state.frenzyAutoActive) {
       layer.querySelectorAll("[data-frenzy-index]").forEach((el) => {
         const index = Number(el.dataset.frenzyIndex);
         const onBreak = (e) => {
@@ -2066,7 +2120,7 @@
 
     for (const fx of state.fx) {
       if (fx.kind === "chunk") {
-        const life = Math.max(0, (fx.until - now) / 480);
+        const life = Math.max(0, (fx.until - now) / (480 / (fx.speedMultiplier || 1)));
         const t = 1 - life;
         const x = fx.x + (fx.dx || 0) * t;
         const y = fx.y + (fx.dy || 0) * t + 18 * t * t;
@@ -2141,7 +2195,14 @@
       return;
     }
 
-    if (state.frenzyActive) return;
+    if (state.frenzyActive) {
+      if (state.frenzyAutoActive) {
+        // The existing frame loop keeps the auto-breaks synchronized and
+        // naturally suspends them while the menu has paused the game.
+        handleFrenzyTap(null, true);
+      }
+      return;
+    }
 
     if (state.collapseTriggered) {
       stepCollapse(dt);
@@ -2375,7 +2436,7 @@
 
   function handleBrickTap(id) {
     if (state.frenzyActive) {
-      handleFrenzyTap();
+      if (!state.frenzyAutoActive) handleFrenzyTap();
       return;
     }
 
@@ -2834,7 +2895,7 @@
     state.fx.push({ x, y, until: performance.now() + 420, scale: 1, kind: "smoke" });
   }
 
-  function addChunkBurst(x, y, scale = 1) {
+  function addChunkBurst(x, y, scale = 1, speedMultiplier = 1) {
     const now = performance.now();
     const count = BRICK_BREAK_TUNING.particleCount;
     const minSize = state.brickHeight * BRICK_BREAK_TUNING.minSizePctOfBrickHeight;
@@ -2855,7 +2916,8 @@
         size,
         color,
         rot: (Math.random() * 80) - 40,
-        until: now + 380 + Math.random() * 130
+        until: now + (380 + Math.random() * 130) / speedMultiplier,
+        speedMultiplier
       });
     }
   }
@@ -3070,6 +3132,7 @@
     const now = performance.now();
 
     state.frenzyActive = true;
+    state.frenzyAutoActive = false;
     state.frenzyInputLockedUntil = now + 250;
     state.frenzyBreakSeq = 0;
     state.frenzyDropDelays = {};
@@ -3089,16 +3152,36 @@
     state.warningOverlayUntil = 0;
   }
 
-  function handleFrenzyTap(index = null) {
+  function activateFrenzyBomb() {
+    if (
+      !state.frenzyActive ||
+      state.frenzyAutoActive ||
+      state.paused ||
+      state.done ||
+      state.frenzyBreakSeq < FRENZY_BOMB_UNLOCK_BREAKS ||
+      !state.progress.length
+    ) return;
+
+    state.frenzyAutoActive = true;
+    state.frenzyInputLockedUntil = performance.now();
+    syncFrenzyBomb();
+  }
+
+  function handleFrenzyTap(index = null, automatic = false) {
     const now = performance.now();
-    if (!state.frenzyActive) return;
+    if (!state.frenzyActive || state.paused || state.done) return;
+    // Once the bomb is active, no manual tap may break any tower brick.
+    if (state.frenzyAutoActive !== automatic) return;
     if (now < state.frenzyInputLockedUntil) return;
     if (!state.progress.length) return;
+    const speedMultiplier = automatic ? FRENZY_BOMB_SPEED_MULTIPLIER : 1;
 
     const oldCount = state.progress.length;
-    const breakIndex = Number.isFinite(index)
-      ? clamp(Math.round(index), 0, oldCount - 1)
-      : oldCount - 1;
+    const breakIndex = automatic
+      ? oldCount - 1  // The bomb always works from the top down.
+      : Number.isFinite(index)
+        ? clamp(Math.round(index), 0, oldCount - 1)
+        : oldCount - 1;
 
     if (state.overlayMessage) {
       state.overlayMessage = "";
@@ -3111,7 +3194,7 @@
     const oldInfos = state.progress.map((brick, i) => getTowerBrickRenderInfo(i, oldCount));
 
     playGameSound("brickBreak");
-    addChunkBurst(breakInfo.x, breakInfo.y, Math.max(0.95, breakInfo.scale));
+    addChunkBurst(breakInfo.x, breakInfo.y, Math.max(0.95, breakInfo.scale), speedMultiplier);
 
     state.progress.splice(breakIndex, 1);
     state.frenzyBreakSeq += 1;
@@ -3123,23 +3206,23 @@
     for (let i = breakIndex; i < newCount; i++) {
       const oldInfo = oldInfos[i + 1];
       const newInfo = getTowerBrickRenderInfo(i, newCount);
-      const delay = Math.min((i - breakIndex) * 48, 280);
+      const delay = Math.min((i - breakIndex) * 48, 280) / speedMultiplier;
 
       state.frenzyDropDelays[i] = delay;
       state.frenzyDropMotion[i] = {
         startedAt: now,
         delay,
-        duration: 360,
+        duration: 360 / speedMultiplier,
         fromBottomOffset: oldInfo ? oldInfo.bottom - newInfo.bottom : 0
       };
     }
 
     const longestDelay = newCount > breakIndex
-      ? Math.min((newCount - 1 - breakIndex) * 48, 280)
+      ? Math.min((newCount - 1 - breakIndex) * 48, 280) / speedMultiplier
       : 0;
 
-    state.towerSettleUntil = now + longestDelay + 360;
-    state.frenzyInputLockedUntil = now + longestDelay + 430;
+    state.towerSettleUntil = now + longestDelay + 360 / speedMultiplier;
+    state.frenzyInputLockedUntil = now + longestDelay + 430 / speedMultiplier;
 
     if (!state.progress.length) {
       state.frenzyDropDelays = {};
@@ -3148,13 +3231,14 @@
       state.overlayTone = "";
       state.overlayStartedAt = 0;
       state.overlayUntil = 0;
-      state.frenzyInputLockedUntil = performance.now() + 350;
+      const finishDelay = 350 / speedMultiplier;
+      state.frenzyInputLockedUntil = performance.now() + finishDelay;
 
       window.setTimeout(() => {
-        if (!state.done) {
+        if (state.frenzyActive && !state.progress.length && !state.done) {
           finishGame();
         }
-      }, 350);
+      }, finishDelay);
     }
   }
 
@@ -3162,6 +3246,7 @@
     state.running = false;
     state.done = true;
     state.frenzyActive = false;
+    state.frenzyAutoActive = false;
     stopLoop();
 
     let reward = { ok: false, petUnlockTriggered: false };
