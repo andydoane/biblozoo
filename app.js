@@ -5925,6 +5925,38 @@ function completeDailyTodoFlashcard({
   return true;
 }
 
+// Flashcards launched from post-Daily Zoo To-Do care tasks award the
+// same per-profile, once-per-pet/action/day credit as external activities.
+function completeZooTodoFlashcard({ context = null, verseId = "", grade = "" } = {}) {
+  if (context?.source !== "zoo_todo" ||
+      !["feed_pet", "wake_pet"].includes(context.type) ||
+      context.verseId !== verseId ||
+      !grade ||
+      context.profileId !== getProfileApi()?.getActiveProfileId?.()) {
+    return false;
+  }
+
+  const loaded = loadDailyTodoRuntime();
+  if (!loaded?.engine?.creditExtraZooTodoTask || !loaded.progress) return false;
+
+  const award = loaded.engine.creditExtraZooTodoTask(loaded.state, {
+    type: context.type,
+    verseId
+  });
+  // A duplicate can still finish its activity, but never award another task.
+  if (award.changed && !saveDailyTodoRuntime(loaded.progress, award.state)) {
+    return false;
+  }
+  return { handled: true, credited: award.changed };
+}
+
+function completeFlashcardContext(result = {}) {
+  if (result.context?.source === "daily_todo") {
+    return completeDailyTodoFlashcard(result);
+  }
+  return completeZooTodoFlashcard(result);
+}
+
 function exitDailyTodoFlashcard(
   context = null
 ) {
@@ -6924,16 +6956,37 @@ function claimDailyTodoSnack(
 }
 
 function markLearnCompleted(verseId) {
-  updateVerseProgress(verseId, (verseProgress) => {
-    const now = Date.now();
+  if (!verseId) return;
+  const progress = loadProgress();
+  if (!progress.verses[verseId]) {
+    progress.verses[verseId] = { learnCompleted: false, games: {} };
+  }
+  const verseProgress = progress.verses[verseId];
+  const firstCompletion = !verseProgress.learnCompleted;
+  const now = Date.now();
 
-    verseProgress.learnCompleted = true;
-    verseProgress.lastPracticedAt = now;
+  verseProgress.learnCompleted = true;
+  verseProgress.lastPracticedAt = now;
+  if (!verseProgress.learnedAt) verseProgress.learnedAt = now;
 
-    if (!verseProgress.learnedAt) {
-      verseProgress.learnedAt = now;
+  // A Zoo To-Do learn task is complete only after the actual learning flow
+  // finishes, never merely when the verse is selected from the picker.
+  if (firstCompletion &&
+      State.activeTodo?.type === "learn_new_verse" &&
+      State.activeTodo.verseId === verseId) {
+    const engine = window.BibloZooDailyTodo;
+    if (engine?.creditExtraZooTodoTask) {
+      const award = engine.creditExtraZooTodoTask(progress.dailyZooTodo, {
+        type: "learn_new_verse", verseId
+      });
+      if (award.changed) progress.dailyZooTodo = award.state;
     }
-  });
+  }
+  if (State.activeTodo?.type === "learn_new_verse" &&
+      State.activeTodo.verseId === verseId) {
+    State.activeTodo = null;
+  }
+  saveProgress(progress);
 }
 
 function markStandardGameCompleted(verseId, gameId, mode) {
@@ -9431,9 +9484,16 @@ window.BibloZooFlashcards
     stopVersePreview: cancelVerseDetailListen,
     recordFlashcardAttempt,
     onContextComplete:
-      completeDailyTodoFlashcard,
+      completeFlashcardContext,
     onContextExit:
       exitDailyTodoFlashcard,
+    goToZooTodo: () => {
+      State.activeTodo = null;
+      State.todoInfoPage = "";
+      // Return to the *post-Daily* Zoo To-Do list, not the Daily preview.
+      setDailyTodoPreviewMode("");
+      transitionToAppScreen(Screen.TODO_DEV);
+    },
     showRecordingFallback: (continueWithoutRecording) => showDialog({
       title: "Continue without recording?",
       body: "The microphone is unavailable or permission wasn't granted. You can still practice this verse.",
@@ -10975,22 +11035,24 @@ function getReturnToPlaygroundUrl() {
   return getReturnToScreenUrl("playground");
 }
 
-function appendZooTodoLaunchParams(params) {
+function appendZooTodoLaunchParams(params, { gameId = "" } = {}) {
   if (!params || !State.activeTodo) return;
-
   const activeTodo = State.activeTodo;
+  if (!activeTodo.verseId || activeTodo.verseId !== VERSE_ID) return;
 
-  if (
-    !activeTodo.verseId ||
-    activeTodo.verseId !== VERSE_ID ||
-    (activeTodo.type !== "feed_pet" && activeTodo.type !== "wake_pet")
-  ) {
-    return;
-  }
+  const isCare = activeTodo.type === "feed_pet" ||
+    activeTodo.type === "wake_pet";
+  const isMedal = activeTodo.type === "earn_medal" &&
+    !!gameId && activeTodo.gameId === gameId;
+  if (!isCare && !isMedal) return;
 
   params.set("todoSource", "zoo_todo");
   params.set("todoType", activeTodo.type);
   params.set("todoVerseId", activeTodo.verseId);
+  if (isMedal) {
+    params.set("todoGameId", activeTodo.gameId);
+    return;
+  }
   params.set("todoPetName", activeTodo.petName || getBibloPetDisplayNameForVerseId(activeTodo.verseId));
   params.set("todoPetEmoji", activeTodo.petEmoji || getBibloPetEmojiForVerseId(activeTodo.verseId));
   params.set("todoText", activeTodo.text || getZooTodoActionText(activeTodo.type, activeTodo.petName || "BibloPet"));
@@ -11019,7 +11081,7 @@ function launchExternalGame(manifest, options = {}) {
     params.set("mode", options.mode);
   }
 
-  appendZooTodoLaunchParams(params);
+  appendZooTodoLaunchParams(params, { gameId: manifest.id });
 
   navigateToExternalPage(
   `${manifest.launchUrl}?${params.toString()}`
@@ -18589,20 +18651,6 @@ function getMedalSuggestionTodos(progress, verseId) {
     });
 }
 
-function shouldShowLearnNewVerseTodo(progress) {
-  const DAY_MS = 1000 * 60 * 60 * 24;
-
-  if (!hasAnyLearnedVerse(progress)) return true;
-
-  const mostRecentLearnedAt = getMostRecentLearnedAt(progress);
-
-  // If we cannot determine when the last verse was learned,
-  // gently suggest learning a new one.
-  if (!mostRecentLearnedAt) return true;
-
-  return Date.now() - mostRecentLearnedAt >= 10 * DAY_MS;
-}
-
 function generateZooTodos() {
   const progress = loadProgress();
   const todos = [];
@@ -18641,14 +18689,6 @@ function generateZooTodos() {
     } else {
       hungryTodos.push(todo);
     }
-  }
-
-  if (shouldShowLearnNewVerseTodo(progress)) {
-    todos.push({
-      type: "learn_new_verse",
-      image: `${IMG_DIR}clipboard_bible.png`,
-      text: "Learn a New Verse"
-    });
   }
 
   sleepingTodos.sort(sortZooTodosOldestFirst);
@@ -18692,7 +18732,7 @@ async function startZooMedalTodo(verseId, gameId) {
   const game = getPracticeGames().find((item) => item.id === gameId);
   if (!game || game.source !== "external" || !game.manifest) return;
 
-  State.activeTodo = null;
+  State.activeTodo = { type: "earn_medal", verseId, gameId };
   State.selectedVerseId = verseId;
 
   try {
@@ -18708,6 +18748,7 @@ async function startZooMedalTodo(verseId, gameId) {
     launchExternalGame(game.manifest);
   } catch (err) {
     console.error(err);
+    State.activeTodo = null;
 
     showDialog({
       title: "Verse JSON not found",
@@ -18726,16 +18767,6 @@ async function startZooTodo(todoType, verseId) {
   if (todoType === "care_info") {
     State.todoInfoPage = "care";
     render();
-    return;
-  }
-
-  if (todoType === "learn_new_verse") {
-    State.activeTodo = {
-      type: "learn_new_verse",
-      text: "Learn a New Verse"
-    };
-
-    go(Screen.NEW_VERSE_PICKER);
     return;
   }
 
@@ -19182,7 +19213,13 @@ async function startLearningNewVerse(
     markTutorialVerseSelected(verseId);
   }
 
-  State.activeTodo = null;
+  // Preserve only an explicitly selected Zoo To-Do learning task.
+  // Other learning flows must not inherit extra-task credit.
+  const fromZooTodo = State.activeTodo?.type === "learn_new_verse" &&
+    !isTutorialActive();
+  State.activeTodo = fromZooTodo
+    ? { type: "learn_new_verse", verseId }
+    : null;
   State.selectedVerseId = verseId;
   State.learnLevel = "not_at_all";
   State.learnStartScreen = Screen.LISTEN;
@@ -22245,8 +22282,26 @@ function screenPracticeHub(idx) {
       }
 
       if (choice === "flashcards") {
-        window.BibloZooFlashcards
-          ?.start?.();
+        const flashcards = window.BibloZooFlashcards;
+        const todo = State.activeTodo;
+        const careTask = todo && todo.verseId === VERSE_ID &&
+          (todo.type === "feed_pet" || todo.type === "wake_pet");
+        const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+
+        // Flashcards are internal; unlike external games, they need the
+        // Zoo To-Do launch context explicitly passed into their session.
+        if (careTask && profileId) {
+          if (!flashcards?.startForVerse?.(VERSE_ID, {
+            source: "zoo_todo",
+            type: todo.type,
+            verseId: VERSE_ID,
+            petName: todo.petName,
+            petEmoji: todo.petEmoji,
+            profileId
+          })) return;
+        } else {
+          flashcards?.start?.();
+        }
 
         go(Screen.FLASHCARDS);
         return;

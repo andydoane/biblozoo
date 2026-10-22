@@ -385,10 +385,13 @@
   }
 
   function isDailyTodoSession() {
-    return (
-      state.context?.source ===
-      "daily_todo"
-    );
+    return state.context?.source === "daily_todo";
+  }
+
+  function isZooTodoSession() {
+    return state.context?.source === "zoo_todo" &&
+      ["feed_pet", "wake_pet"].includes(state.context?.type) &&
+      state.context?.verseId === state.selectedVerseId;
   }
 
   function resetSession() {
@@ -404,6 +407,7 @@
     state.grade = "";
     state.themeId = "purple";
     state.context = null;
+    state.zooTodoCredited = false;
   }
 
   function start() {
@@ -1182,7 +1186,7 @@
         }
 
         if (
-          isDailyTodoSession() &&
+          (isDailyTodoSession() || isZooTodoSession()) &&
           typeof api?.onContextComplete ===
             "function"
         ) {
@@ -1196,7 +1200,13 @@
               grade: state.grade
             });
 
-          if (handled !== false) {
+          if (isZooTodoSession() && handled?.handled === true) {
+            state.zooTodoCredited = handled.credited === true;
+            state.view = "zoo_todo_complete";
+            requestRender();
+            return;
+          }
+          if (isDailyTodoSession() && handled !== false) {
             return;
           }
         }
@@ -1207,6 +1217,46 @@
     });
   }
 
+
+  function renderZooTodoComplete(wrap) {
+    const context = getSessionContext() || {};
+    const escapedName = escapeHtml(context.petName || "BibloPet");
+    const petVerseId = String(context.verseId || state.selectedVerseId || "").trim();
+    const petImage = `profile_pictures/profile_picture_${encodeURIComponent(petVerseId)}.png`;
+    const petEmoji = escapeHtml(context.petEmoji || "🐾");
+    const action = context.type === "wake_pet" ? "woke up" : "fed";
+    wrap.innerHTML = `
+      <div class="flashcards-stage-shell">
+        <section class="flashcards-panel flashcards-overlap-panel flashcards-next-panel">
+          <img
+            class="flashcards-overlap-mascot flashcards-zoo-todo-profile-image"
+            src="${escapeHtml(petImage)}"
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            onerror="this.style.display='none';this.nextElementSibling.hidden=false"
+          >
+          <span class="flashcards-zoo-todo-pet-fallback" aria-hidden="true" hidden>${petEmoji}</span>
+          <h1 class="flashcards-next-title">Zoo To-Do Complete!</h1>
+          <div class="flashcards-zoo-todo-confirmation">
+            <img
+              class="flashcards-zoo-todo-checkmark"
+              src="verse_images/daily_zoo_todo/completion_checkmark.png"
+              alt=""
+              aria-hidden="true"
+              draggable="false"
+            >
+            <p class="flashcards-next-copy">You ${action} ${escapedName}!</p>
+          </div>
+          <button class="flashcards-primary-btn" id="flashcardsCheckZooTodoBtn" type="button">Check Zoo To-Do</button>
+        </section>
+      </div>
+    `;
+    wrap.querySelector("#flashcardsCheckZooTodoBtn")?.addEventListener("click", () => {
+      leaveFlashcards();
+      api?.goToZooTodo?.();
+    });
+  }
 
   function renderResult(wrap) {
     const bestLevel = api.getVerseProgress(state.selectedVerseId)?.flashcards?.bestMemoryLevel;
@@ -1329,6 +1379,8 @@
       renderComparison(wrap);
     } else if (state.view === "challenge_complete") {
       renderChallengeComplete(wrap);
+    } else if (state.view === "zoo_todo_complete") {
+      renderZooTodoComplete(wrap);
     } else if (state.view === "result") {
       renderResult(wrap);
     } else {

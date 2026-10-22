@@ -258,6 +258,44 @@ Patch 2: themed visual system + difficulty flow
   width: var(--stage-mascot);
 }
 
+/* Post-Daily Zoo To-Do: show the practiced verse's profile picture above the card. */
+.flashcards-zoo-todo-profile-image {
+  height: var(--stage-mascot);
+  object-fit: contain;
+}
+
+.flashcards-zoo-todo-pet-fallback {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--stage-mascot);
+  height: var(--stage-mascot);
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--stage-mascot) * 0.72);
+  line-height: 1;
+}
+
+.flashcards-zoo-todo-pet-fallback[hidden] {
+  display: none;
+}
+
+.flashcards-zoo-todo-confirmation {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.8vh, 14px);
+}
+
+.flashcards-zoo-todo-checkmark {
+  display: block;
+  width: clamp(68px, 13vw, 96px);
+  height: auto;
+}
+
 .flashcards-stage-shell .flashcards-reference-pill {
   padding: 10px 20px;
   font-size: clamp(1.25rem, 5vw, 2rem);

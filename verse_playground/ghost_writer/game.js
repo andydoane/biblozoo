@@ -2591,6 +2591,25 @@
           }
         }
 
+        // Keep the Ghost Writer playback experience intact; only after
+        // a genuine first playback finishes do we show its Zoo To-Do result.
+        const todo = window.VerseGameBridge.getZooTodoCompletionFeedback?.({
+          verseId: ctx.verseId
+        });
+        if (markPractice && todo && shell().renderCompleteScreen) {
+          shell().renderCompleteScreen({
+            app,
+            verseId: ctx.verseId,
+            title: "Zoo To-Do Complete!",
+            icon: GAME_ICON,
+            iconHtml: GAME_ICON_HTML,
+            theme: GAME_THEME,
+            moreGamesText: "Remix Ghost Writer",
+            onMoreGames: () => renderRemix(),
+            onChangeVerse: () => bridge().returnToVersePicker?.()
+          });
+          return;
+        }
         showPlaybackRemixButton();
       });
     });

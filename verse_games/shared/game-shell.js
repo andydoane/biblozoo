@@ -272,30 +272,18 @@
     return ["easy", "medium", "hard"].includes(mode) ? mode : "";
   }
 
-  function isZooTodoLaunchForVerse(verseId = "") {
-    const params = getLaunchParams();
-
-    if (params.todoSource !== "zoo_todo") return false;
-    if (params.todoType !== "feed_pet" && params.todoType !== "wake_pet") return false;
-
-    const safeVerseId = String(verseId || params.verseId || "").trim();
-    const todoVerseId = String(params.todoVerseId || "").trim();
-
-    if (!safeVerseId || !todoVerseId) return false;
-
-    return safeVerseId === todoVerseId;
+  function getZooTodoCompletionFeedback(verseId = "", gameId = "", mode = "") {
+    return window.VerseGameBridge?.getZooTodoCompletionFeedback?.({
+      verseId, gameId, mode
+    }) || null;
   }
 
-  function getZooTodoActionText() {
+  function getZooTodoActionText(feedback = null) {
     const params = getLaunchParams();
-
-    if (params.todoText) return params.todoText;
-
+    if (feedback?.type === "earn_medal") return "You earned a new medal!";
     const petName = params.todoPetName || "BibloPet";
-
-    if (params.todoType === "wake_pet") return `You woke up ${petName}!`;
-    if (params.todoType === "feed_pet") return `You fed ${petName}!`;
-
+    if (feedback?.type === "wake_pet") return `You woke up ${petName}!`;
+    if (feedback?.type === "feed_pet") return `You fed ${petName}!`;
     return "You helped your BibloPet!";
   }
 
@@ -308,10 +296,17 @@
     `;
   }
 
-  function getZooTodoCompleteSubtitleMarkup() {
+  function getZooTodoCompleteSubtitleMarkup(feedback) {
     return `
       <div class="vm-zoo-todo-complete-subtitle">
-        ✅ ${escapeHtml(getZooTodoActionText())}
+        <img
+          class="vm-zoo-todo-complete-checkmark"
+          src="../../verse_images/daily_zoo_todo/completion_checkmark.png"
+          alt=""
+          aria-hidden="true"
+          draggable="false"
+        >
+        <div>${escapeHtml(getZooTodoActionText(feedback))}</div>
       </div>
     `;
   }
@@ -1874,8 +1869,12 @@
 
     syncGameShellTheme(theme);
 
-    const useStandardComplete = !!(mode || completion || gameMessage || gameId || verseId || gameIcon);
     const gameMix = isGameMixLaunch();
+    const zooTodoFeedback = !gameMix
+      ? getZooTodoCompletionFeedback(verseId, gameId, mode)
+      : null;
+    const zooTodoComplete = !!zooTodoFeedback;
+    const useStandardComplete = !!(mode || completion || gameMessage || gameId || verseId || gameIcon || zooTodoComplete);
 
     const status = getCompletionStatusFromBridge({ verseId, gameId });
     const normalizedMode = String(mode || completion?.mode || "").trim();
@@ -1896,8 +1895,6 @@
       }
     }
 
-    const zooTodoComplete = !petUnlocked && isZooTodoLaunchForVerse(verseId);
-
     const displayIcon = petUnlocked
       ? "📦"
       : zooTodoComplete
@@ -1907,7 +1904,9 @@
           : medal;
 
     const zooTodoIconHtml = zooTodoComplete
-      ? getZooTodoCompleteIconHtml(verseId)
+      ? zooTodoFeedback.type === "earn_medal"
+        ? medalIconHtml(normalizedMode, "vm-complete-large-medal")
+        : getZooTodoCompleteIconHtml(verseId)
       : "";
 
     const completeIconMarkup = zooTodoComplete
@@ -1929,7 +1928,7 @@
       : "";
 
     const zooTodoMessageMarkup = zooTodoComplete
-      ? getZooTodoCompleteSubtitleMarkup()
+      ? getZooTodoCompleteSubtitleMarkup(zooTodoFeedback)
       : "";
 
     if (!useStandardComplete) {
@@ -2006,7 +2005,7 @@
       </button>
     `;
 
-    const medalPillMarkup = petUnlocked
+    const medalPillMarkup = petUnlocked || (zooTodoComplete && !normalizedMode)
       ? ""
       : renderCompleteMedalPill(status, normalizedMode);
 

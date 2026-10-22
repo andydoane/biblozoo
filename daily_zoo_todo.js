@@ -624,6 +624,7 @@
       bestStreak: 0,
       lastCompletedDay: "",
       totalTasks: 0,
+      zooTodoExtraCreditKeys: [],
       earnedStreakBadges: [],
       earnedTaskBadges: [],
       recentAssignments: [],
@@ -671,6 +672,12 @@
         ? raw.lastCompletedDay
         : "",
       totalTasks: toNonNegativeInteger(raw.totalTasks),
+      // Keep verified extra-task awards alongside the profile's task total.
+      zooTodoExtraCreditKeys: Array.isArray(raw.zooTodoExtraCreditKeys)
+        ? [...new Set(raw.zooTodoExtraCreditKeys.filter(
+            (key) => typeof key === "string" && key.length > 0 && key.length <= 256
+          ))].slice(-5000)
+        : [],
       earnedStreakBadges:
         raw.earnedStreakBadges,
       earnedTaskBadges:
@@ -681,6 +688,44 @@
 
     refreshEarnedBadges(stats);
     return stats;
+  }
+
+  // Award only a confirmed Zoo To-Do activity; callers must verify that the
+  // original task was launched from Zoo To-Do and actually completed.
+  // The key ledger protects against replayed completion events and restores.
+  function creditExtraZooTodoTask(
+    rawState,
+    { type = "", verseId = "", gameId = "", mode = "", day = localDayKey() } = {}
+  ) {
+    const state = normalizeState(rawState);
+    const verse = cleanString(verseId);
+    const game = cleanString(gameId);
+    const tier = cleanString(mode);
+    const safeDay = cleanString(day);
+    let key = "";
+
+    if (!verse) return { state, changed: false };
+
+    if ((type === "feed_pet" || type === "wake_pet") &&
+        isValidDayKey(safeDay)) {
+      key = `care:${safeDay}:${type}:${verse}`;
+    } else if (type === "earn_medal" && game &&
+               ["easy", "medium", "hard"].includes(tier)) {
+      key = `medal:${verse}:${game}:${tier}`;
+    } else if (type === "learn_new_verse") {
+      key = `learn:${verse}`;
+    }
+
+    if (!key || state.stats.zooTodoExtraCreditKeys.includes(key)) {
+      return { state, changed: false };
+    }
+
+    state.stats.zooTodoExtraCreditKeys.push(key);
+    state.stats.zooTodoExtraCreditKeys =
+      state.stats.zooTodoExtraCreditKeys.slice(-5000);
+    state.stats.totalTasks += 1;
+    refreshEarnedBadges(state.stats);
+    return { state, changed: true };
   }
 
   function normalizeActivity(rawActivity) {
@@ -2935,6 +2980,7 @@
     getOrCreatePersistedPlan,
     getStatsForDay,
     getEarnedBadgeDefinitions,
+    creditExtraZooTodoTask,
     getPlanProgress,
     shouldShowFocusedPlan,
     resetActivePlanProgress,

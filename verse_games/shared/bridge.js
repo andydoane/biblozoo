@@ -36,6 +36,7 @@
 (function(){
   const PROFILE_PROGRESS_STORAGE_KEY_BASE = "biblozooPwaProgress";
   const PAGE_TRANSITION_MS = 300;
+  let lastZooTodoCompletion = null;
 
   let pageTransitionStarted = false;
 
@@ -193,6 +194,7 @@
       todoSource: params.get("todoSource") || "",
       todoType: params.get("todoType") || "",
       todoVerseId: params.get("todoVerseId") || "",
+      todoGameId: params.get("todoGameId") || "",
       todoPetName: params.get("todoPetName") || "",
       todoPetEmoji: params.get("todoPetEmoji") || "",
       todoText: params.get("todoText") || "",
@@ -357,6 +359,50 @@ function isTrackedGameCompleted(gameId, gameProgress){
   return !!(gameProgress.easyCompleted || gameProgress.mediumCompleted || gameProgress.hardCompleted);
 }
 
+  // The bridge is standalone inside an external game, so it credits the
+  // same per-profile ledger used by BibloZooDailyTodo without loading app.js.
+  // No credit is awarded for opening a task or quitting a game.
+  function creditCompletedZooTodoInProgress(progress, {
+    verseId = "", gameId = "", mode = "", newlyCompleted = false
+  } = {}) {
+    const params = getParams();
+    if (params.todoSource !== "zoo_todo" ||
+        params.todoVerseId !== verseId || !verseId ||
+        params.todoType === "learn_new_verse") return false;
+
+    let key = "";
+    if (params.todoType === "feed_pet" || params.todoType === "wake_pet") {
+      const localDay = new Date();
+      const day = [localDay.getFullYear(),
+        String(localDay.getMonth() + 1).padStart(2, "0"),
+        String(localDay.getDate()).padStart(2, "0")].join("-");
+      key = `care:${day}:${params.todoType}:${verseId}`;
+    } else if (params.todoType === "earn_medal" && newlyCompleted &&
+               gameId && params.todoGameId === gameId &&
+               ["easy", "medium", "hard"].includes(mode)) {
+      key = `medal:${verseId}:${gameId}:${mode}`;
+    }
+
+    if (!key) return false;
+    if (!progress.dailyZooTodo || typeof progress.dailyZooTodo !== "object") {
+      progress.dailyZooTodo = { version: 3 };
+    }
+    const state = progress.dailyZooTodo;
+    if (!state.stats || typeof state.stats !== "object") state.stats = {};
+    const stats = state.stats;
+    const keys = Array.isArray(stats.zooTodoExtraCreditKeys)
+      ? stats.zooTodoExtraCreditKeys.filter((k) => typeof k === "string")
+      : [];
+    if (keys.includes(key)) return false;
+
+    stats.zooTodoExtraCreditKeys = [...keys, key].slice(-5000);
+    const count = Number(stats.totalTasks);
+    stats.totalTasks = (Number.isSafeInteger(count) && count >= 0 ? count : 0) + 1;
+    // Daily streak, activity history and snack claims stay untouched.
+    // The Daily To-Do engine refreshes task badges when stats are loaded.
+    return true;
+  }
+
 function markCompleted(payload){
   if (!payload || !payload.verseId || !payload.gameId || !payload.mode) {
     return { ok: false, petUnlockTriggered: false };
@@ -394,6 +440,11 @@ function markCompleted(payload){
   }
 
   const gameProgress = verseProgress.games[payload.gameId];
+  const wasModeCompleted = payload.mode === "easy"
+    ? !!gameProgress.easyCompleted
+    : payload.mode === "medium"
+      ? !!gameProgress.mediumCompleted
+      : !!gameProgress.hardCompleted;
 
   if (payload.mode === "easy") gameProgress.easyCompleted = true;
   if (payload.mode === "medium") gameProgress.mediumCompleted = true;
@@ -427,11 +478,29 @@ function markCompleted(payload){
     petUnlockTriggered = true;
   }
 
-  saveProgress(progress);
+  // The completion screen needs the *actual* award outcome, not just
+  // the launch URL. A repeated activity still completes but earns no +1.
+  const awarded = creditCompletedZooTodoInProgress(progress, {
+    verseId: payload.verseId,
+    gameId: payload.gameId,
+    mode: payload.mode,
+    newlyCompleted: !wasModeCompleted
+  });
+  const params = getParams();
+  lastZooTodoCompletion = {
+    verseId: payload.verseId,
+    gameId: payload.gameId,
+    mode: payload.mode,
+    type: params.todoType,
+    completedMedal: !wasModeCompleted,
+    credited: awarded,
+    saved: saveProgress(progress)
+  };
 
   return {
-    ok: true,
-    petUnlockTriggered
+    ok: lastZooTodoCompletion.saved,
+    petUnlockTriggered,
+    zooTodoTaskCredited: awarded && lastZooTodoCompletion.saved
   };
 }
 
@@ -525,14 +594,23 @@ function markCompleted(payload){
     verseProgress.playground[safeActivityId] = true;
     verseProgress.lastPracticedAt = Date.now();
 
-    saveProgress(progress);
+    const awarded = creditCompletedZooTodoInProgress(progress, { verseId: safeVerseId });
+    const zooParams = getParams();
+    lastZooTodoCompletion = {
+      verseId: safeVerseId,
+      activityId: safeActivityId,
+      type: zooParams.todoType,
+      credited: awarded,
+      saved: saveProgress(progress)
+    };
 
     const completion = {
       ok: true,
       verseId: safeVerseId,
       activityId: safeActivityId,
       alreadyCompleted,
-      newlyCompleted: !alreadyCompleted
+      newlyCompleted: !alreadyCompleted,
+      zooTodoTaskCredited: awarded && lastZooTodoCompletion.saved
     };
 
     const params = getParams();
@@ -945,6 +1023,28 @@ function markCompleted(payload){
     navigateWithTransition(target.href);
   }
 
+  // Only verified completion events may display a Zoo To-Do success.
+  // Medal suggestions must match the requested game and earn a new tier.
+  function getZooTodoCompletionFeedback({ verseId = "", gameId = "", mode = "" } = {}) {
+    const params = getParams();
+    const record = lastZooTodoCompletion;
+    const safeVerseId = String(verseId || params.verseId || "").trim();
+    if (!record?.saved || params.todoSource !== "zoo_todo" ||
+        !safeVerseId || params.todoVerseId !== safeVerseId ||
+        record.verseId !== safeVerseId || record.type !== params.todoType) {
+      return null;
+    }
+    if (record.gameId && gameId && record.gameId !== gameId) return null;
+    if (record.mode && mode && record.mode !== mode) return null;
+    if (params.todoType === "earn_medal") {
+      if (!record.gameId || record.gameId !== params.todoGameId ||
+          !record.completedMedal || !record.mode) return null;
+    } else if (!["feed_pet", "wake_pet"].includes(params.todoType)) {
+      return null;
+    }
+    return { type: params.todoType, credited: record.credited === true };
+  }
+
 function exitGame(){
   const params = getParams();
 
@@ -987,6 +1087,7 @@ function exitGame(){
     markCompleted,
     markVersePracticed,
     markPlaygroundCompleted,
+    getZooTodoCompletionFeedback,
     completeGameRun,
     returnToTitle,
     returnToVersePicker,

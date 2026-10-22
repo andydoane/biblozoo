@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_21_patch45_game_mix_ending_image";
+const CACHE_VERSION = "2026_Oct_22_patch49_zoo_todo_completion_polish";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =

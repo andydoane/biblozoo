@@ -385,12 +385,23 @@ body.page-transition-chrome-black {
 
 .vm-zoo-todo-complete-subtitle {
   width: min(100%, 400px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 1.8vh, 14px);
   color: rgba(255, 255, 255, 0.98);
   font-size: clamp(24px, 6.4vw, 34px);
   font-weight: 900;
   line-height: 1.05;
   text-align: center;
   text-wrap: balance;
+}
+
+.vm-zoo-todo-complete-checkmark {
+  display: block;
+  width: clamp(68px, 13vw, 96px);
+  height: auto;
+  flex: none;
 }
 
 /* Shared completion screen v2 */
@@ -683,6 +694,10 @@ button.vm-complete-icon.is-pet-box:focus-visible {
   .vm-zoo-todo-complete-subtitle {
     font-size: clamp(20px, 5.7vw, 27px);
     margin-bottom: 8px;
+  }
+
+  .vm-zoo-todo-complete-checkmark {
+    width: clamp(56px, 10vh, 72px);
   }
 
   .vm-complete-actions {
