@@ -86,9 +86,9 @@
     { name: "Taco Tuesday", value: 1100, image: "./wheel_of_bible_images/wheel_of_bible_prize_taco_tuesday.png" }
   ];
 
-  const NORMAL_ROUND_MIN_SELECTED = 6;
-  const NORMAL_ROUND_MAX_SELECTED = 10;
-  const NORMAL_ROUND_UNIQUE_RATIO = 0.55;
+  const NORMAL_ROUND_MIN_SELECTED = 3;
+  const NORMAL_ROUND_MAX_SELECTED = 6;
+  const NORMAL_ROUND_UNIQUE_RATIO = 0.35;
   const FINAL_ROUND_HIDE_RATIO = 0.5;
   const FINAL_ROUND_SECONDS = 60;
 

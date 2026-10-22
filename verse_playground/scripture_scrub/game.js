@@ -249,6 +249,14 @@
     }
   ];
 
+  // Four varied activities, followed by the always-final Archaeology round.
+  // The source ROUNDS list stays unchanged so each activity keeps its setup.
+  const SCRUB_ROUND_GROUPS = [
+    ["mud", "paint", "fog"],
+    ["stickers", "leaves", "cookies", "mower"],
+    ["glow", "chalkboard", "rainbow"]
+  ];
+
   const IMAGE_BASE = "./scripture_scrub_images/";
   const GRASS_BG_IMAGE = "scripture_scrub_grass_bg_1.jpg";
   const MOWED_GRASS_BG_IMAGE = "scripture_scrub_grass_bg_2.jpg";
@@ -362,6 +370,8 @@
   let paintBlobImages = [];
 
   let currentRoundIndex = 0;
+  let runRounds = [];
+  let hasStartedScrubRun = false;
   let muted = false;
   let menuOpen = false;
   let stageEl = null;
@@ -433,12 +443,22 @@
     return window.VerseGameShell.clamp(value, min, max);
   }
 
+  function buildScrubRunRounds() {
+    const byId = new Map(ROUNDS.map((round) => [round.id, round]));
+    const pick = (choices) => choices[Math.floor(Math.random() * choices.length)];
+    const chosen = SCRUB_ROUND_GROUPS.map((ids) => pick(ids.map((id) => byId.get(id))));
+    const remaining = ROUNDS.filter((round) => round.id !== "archaeology" && !chosen.includes(round));
+    chosen.push(pick(remaining));
+    chosen.push(byId.get("archaeology"));
+    return chosen;
+  }
+
   function roundConfig() {
-    return ROUNDS[currentRoundIndex] || ROUNDS[0];
+    return runRounds[currentRoundIndex] || runRounds[0] || ROUNDS[0];
   }
 
   function totalRounds() {
-    return ROUNDS.length;
+    return runRounds.length;
   }
 
   function currentThreshold() {
@@ -1262,7 +1282,7 @@
       const jobs = [];
 
       for (let offset = 1; offset <= lookahead; offset += 1) {
-        const round = ROUNDS[startIndex + offset];
+        const round = runRounds[startIndex + offset];
         if (!round) continue;
 
         jobs.push(ensureRoundAssets(round));
@@ -1291,6 +1311,10 @@
   }
 
   function renderTitleScreen() {
+    // Select once for the first playthrough so title-screen asset preloads
+    // match the activities the player will actually see.
+    runRounds = buildScrubRunRounds();
+    hasStartedScrubRun = false;
     window.VerseGameShell.renderTitleScreen({
       app,
       title: GAME_TITLE,
@@ -1365,19 +1389,26 @@
   }
 
   function jumpToDebugRound() {
-    const targetIndex = ROUNDS.findIndex((round) => round.id === DEBUG_SKIP_ROUND_ID);
+    const target = ROUNDS.find((round) => round.id === DEBUG_SKIP_ROUND_ID);
 
-    if (targetIndex < 0) {
+    if (!target) {
       console.warn("Scripture Scrub: unknown DEBUG_SKIP_ROUND_ID", DEBUG_SKIP_ROUND_ID);
       return;
     }
 
-    currentRoundIndex = targetIndex;
+    // Debug can still jump to a round omitted by this run's random selection.
+    const archaeology = ROUNDS.find((round) => round.id === "archaeology");
+    runRounds = target === archaeology ? [target] : [target, archaeology];
+    hasStartedScrubRun = true;
+    currentRoundIndex = 0;
     archaeologyScore = null;
     void renderRound();
   }
 
   function beginScrubRun() {
+    // Keep the preloaded first selection; randomize afresh for Play Again.
+    if (hasStartedScrubRun) runRounds = buildScrubRunRounds();
+    hasStartedScrubRun = true;
     currentRoundIndex = 0;
     archaeologyScore = null;
     void renderRound();
