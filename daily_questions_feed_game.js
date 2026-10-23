@@ -112,6 +112,10 @@
   const LABYRINTH_ROW_COUNT = 6;
   const LABYRINTH_DEFAULT_SEED = 0x4c425a;
   const LABYRINTH_PHYSICS_STEP = 1 / 120;
+  // Labyrinth only: double snack diameter without changing other feeding modes.
+  const LABYRINTH_BALL_SIZE_MULTIPLIER = 2;
+  const LABYRINTH_GRAVITY_SCALE = 0.60;
+  const LABYRINTH_MAX_VERTICAL_SPEED_SCALE = 0.55;
   const LABYRINTH_STUCK_MS = 3500;
   const LABYRINTH_STEER_ACCELERATION_SCALE = 3.2;
   const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
@@ -1091,6 +1095,9 @@
       if (runtime.resumeBackButton && runtime.resumeBackHandler) {
         runtime.resumeBackButton.removeEventListener("click", runtime.resumeBackHandler);
       }
+      if (runtime.exitButton && runtime.exitHandler) {
+        runtime.exitButton.removeEventListener("click", runtime.exitHandler);
+      }
 
       if (
         runtime.resultBackButton &&
@@ -1114,6 +1121,7 @@
       runtime.onBackToZoo = null;
       runtime.startOverlayHandler = null;
       runtime.resultBackHandler = null;
+      runtime.exitHandler = null;
     }
     if (preparedAudioContext) {
       stopAudioContext(preparedAudioContext);
@@ -1241,6 +1249,12 @@
             : `Tilt or drag ${petName} left and right to catch the falling food`;
     return `
       <div class="daily-feed-game${isDailyTodoSnack ? " is-daily-todo-snack" : ""}" data-daily-feed-game data-daily-feed-mode="${mode}" data-daily-session-phase="reward_game">
+        <button
+          class="daily-feed-exit no-zoom"
+          type="button"
+          data-daily-feed-exit
+          aria-label="${isDailyTodoSnack ? "Exit feeding game and return Home" : "Back to Zoo"}"
+        >◀</button>
         <div class="daily-feed-score-badge" aria-live="polite" aria-label="Score">
           <span class="daily-feed-score-label">${mode === FEED_MODES.MELODY ? "Caught" : "Score"}</span>
           <strong class="daily-feed-score-value" data-daily-feed-score>${mode === FEED_MODES.MELODY ? "0%" : "0"}</strong>
@@ -1320,7 +1334,7 @@
             type="button"
             data-daily-feed-resume-back
             aria-label="${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}"
-          >&#8592;</button>
+          >◀</button>
           <button
             class="daily-feed-resume-button no-zoom"
             type="button"
@@ -2005,9 +2019,12 @@
     ) >>> 0;
   }
 
+  function getLabyrinthBallRadius(runtime) {
+    return runtime.pegRadius * 0.66 * LABYRINTH_BALL_SIZE_MULTIPLIER;
+  }
+
   function initializeLabyrinthMode(runtime) {
-    const ballRadius =
-      runtime.pegRadius * 0.66;
+    const ballRadius = getLabyrinthBallRadius(runtime);
     const platformRows =
       createLabyrinthPlatformRows(
         runtime.width,
@@ -2030,9 +2047,9 @@
       horizontalDamping:
         LABYRINTH_HORIZONTAL_DAMPING,
       gravity:
-        runtime.height * 0.24,
+        runtime.height * LABYRINTH_GRAVITY_SCALE,
       maxVerticalSpeed:
-        runtime.height * 0.29,
+        runtime.height * LABYRINTH_MAX_VERTICAL_SPEED_SCALE,
       petDirection: 1,
       petSpeed:
         runtime.width * 0.19
@@ -2052,8 +2069,7 @@
   ) {
     if (!config) return;
 
-    const radius =
-      runtime.pegRadius * 0.66;
+    const radius = getLabyrinthBallRadius(runtime);
     const lanes = [
       0.22, 0.5, 0.78,
       0.36, 0.64, 0.5, 0.28
@@ -4327,8 +4343,8 @@
       }
       state.steerAcceleration = width * LABYRINTH_STEER_ACCELERATION_SCALE;
       state.maxHorizontalSpeed = width * LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE;
-      state.gravity = height * 0.24;
-      state.maxVerticalSpeed = height * 0.29;
+      state.gravity = height * LABYRINTH_GRAVITY_SCALE;
+      state.maxVerticalSpeed = height * LABYRINTH_MAX_VERTICAL_SPEED_SCALE;
       state.petSpeed = width * 0.19;
     }
     if (runtime.melody) {
@@ -4401,6 +4417,7 @@
       rootEl.querySelector(
         "[data-daily-feed-game]"
       );
+    const exitButton = rootEl.querySelector("[data-daily-feed-exit]");
 
     const stage =
       rootEl.querySelector(
@@ -4467,6 +4484,7 @@
 
     if (
       !gameEl ||
+      !exitButton ||
       !stage ||
       !canvas ||
       !catcher ||
@@ -4604,6 +4622,8 @@
       dpr,
       ctx,
       gameEl,
+      exitButton,
+      exitHandler: null,
       stage,
       canvas,
       catcher,
@@ -4861,6 +4881,14 @@
         }
       };
 
+    runtime.exitHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (activeRuntime !== runtime || runtime.finished || runtime.feedPausedAt != null) return;
+      const shouldClose = runtime.onBackToZoo?.();
+      if (shouldClose !== false) stop();
+    };
+
     runtime.resumeButtonHandler = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -4904,6 +4932,7 @@
       runtime.startOverlayHandler
     );
 
+    exitButton.addEventListener("click", runtime.exitHandler);
     resumeButton.addEventListener("click", runtime.resumeButtonHandler);
     resumeBackButton.addEventListener("click", runtime.resumeBackHandler);
 

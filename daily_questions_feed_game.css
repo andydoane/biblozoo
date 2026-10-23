@@ -321,6 +321,42 @@
   opacity: 0;
 }
 
+/* Match the external game title screen's vm-game-back-pill without loading
+   the external shell on the Daily To-Do feeding screen. */
+.daily-feed-exit,
+.daily-feed-resume-back {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  left: calc(14px + env(safe-area-inset-left));
+  min-width: 58px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #7f66c6;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+/* Above start instructions (z=20); pause and result screens use their own back. */
+.daily-feed-exit { z-index: 22; }
+.daily-feed-resume-back { z-index: 1; }
+.daily-feed-exit:active,
+.daily-feed-resume-back:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+.daily-feed-game.is-finished .daily-feed-exit,
+.daily-feed-game.is-interruption-paused .daily-feed-exit { display: none; }
+
 .daily-feed-score-badge {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));
@@ -613,20 +649,6 @@
   cursor: pointer;
 }
 .daily-feed-resume-button:disabled { opacity: .8; cursor: default; }
-.daily-feed-resume-back {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top));
-  left: calc(12px + env(safe-area-inset-left));
-  width: 52px;
-  height: 52px;
-  border: 0;
-  border-radius: 50%;
-  padding: 0 0 4px;
-  background: rgba(255, 248, 232, .95);
-  color: #382b22;
-  font: 700 38px/1 system-ui, sans-serif;
-  cursor: pointer;
-}
 
 /* Preview-only Melody tune chooser: seven songs need readable buttons on
    small iPhones. Scroll inside the selector rather than clipping the modal. */

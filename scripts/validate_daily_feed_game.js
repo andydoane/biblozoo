@@ -44,6 +44,9 @@ function loadFeedGameForValidation() {
     LABYRINTH_GAP_POSITIONS,
     LABYRINTH_ROW_COUNT,
     LABYRINTH_PHYSICS_STEP,
+    LABYRINTH_BALL_SIZE_MULTIPLIER,
+    getLabyrinthBallRadius,
+    spawnLabyrinthBall,
     LABYRINTH_STUCK_MS,
     LABYRINTH_STEER_ACCELERATION_SCALE,
     LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE,
@@ -2802,6 +2805,7 @@ function testModeDisposalAndStopAreIdempotent() {
   const stageRemoves = [];
   const overlayRemoves = [];
   const resultRemoves = [];
+  const exitRemoves = [];
   let releasedPointer = 0;
   let disconnected = 0;
   let audioClosed = 0;
@@ -2832,6 +2836,10 @@ function testModeDisposalAndStopAreIdempotent() {
       }
     },
     startOverlayHandler() {},
+    exitButton: {
+      removeEventListener(type) { exitRemoves.push(type); }
+    },
+    exitHandler() {},
     resultBackButton: {
       removeEventListener(type) {
         resultRemoves.push(type);
@@ -2882,6 +2890,7 @@ function testModeDisposalAndStopAreIdempotent() {
     ]
   );
   assert.deepStrictEqual(overlayRemoves, ["click"]);
+  assert.deepStrictEqual(exitRemoves, ["click"]);
   assert.deepStrictEqual(resultRemoves, ["click"]);
   assert.strictEqual(releasedPointer, 1);
   assert.strictEqual(audioClosed, 1);
@@ -2890,6 +2899,7 @@ function testModeDisposalAndStopAreIdempotent() {
   assert.strictEqual(runtime.onBackToZoo, null);
   assert.strictEqual(runtime.startOverlayHandler, null);
   assert.strictEqual(runtime.resultBackHandler, null);
+  assert.strictEqual(runtime.exitHandler, null);
 }
 
 function testFeedingGameTesterRegistration() {
@@ -3929,6 +3939,145 @@ function testReducedMotionPreservesGameplayAndAudioSafety() {
   assert.ok(source.includes('if (!context || context.state === "closed") return;'));
 }
 
+function testFeedingEscapeButtonInAllModes() {
+  for (const mode of Object.values(hooks.FEED_MODES)) {
+    const markup = api.render({
+      session: { feedMode: mode, dailyTodoSnack: true, petName: "Buffy" }
+    });
+    assert.ok(markup.includes('data-daily-feed-exit'),
+      `${mode}: active gameplay must offer a Back button`);
+    assert.ok(markup.includes('aria-label="Exit feeding game and return Home"'));
+    assert.strictEqual((markup.match(/data-daily-feed-exit/g) || []).length, 1);
+  }
+  const preview = api.render({ session: { feedMode: "labyrinth", dailyTodoPreview: true } });
+  assert.ok(preview.includes('aria-label="Back to Zoo"'));
+  assert.ok(feedGameCssSource.includes('z-index: 22;'),
+    "Back must sit above the opening instructions overlay");
+  assert.ok(feedGameCssSource.includes('.daily-feed-game.is-finished .daily-feed-exit'),
+    "Hide duplicate Back after finishing");
+  assert.ok(feedGameCssSource.includes('.daily-feed-game.is-interruption-paused .daily-feed-exit'),
+    "Paused view retains its own Back button");
+  assert.ok(source.includes('exitButton.addEventListener("click", runtime.exitHandler)'));
+  assert.ok(source.includes('runtime.exitButton.removeEventListener("click", runtime.exitHandler)'));
+  assert.ok(source.includes('if (shouldClose !== false) stop();'),
+    "Existing callback must retain the ability to block an exit");
+}
+
+function testDailySnackEarlyExitDoesNotClaimReward() {
+  const dailyScreen = appSource.slice(appSource.indexOf('function screenDailySnack(idx)'));
+  const backStart = dailyScreen.indexOf('onBackToZoo: () => {');
+  assert.ok(backStart > 0, "Expected Daily To-Do feeding exit callback");
+  const backEnd = dailyScreen.indexOf('\n          }', backStart);
+  assert.ok(backEnd > backStart);
+  const callback = dailyScreen.slice(backStart, backEnd);
+  assert.ok(callback.includes('State.dailySnackSession = null;'));
+  assert.ok(callback.includes('go(Screen.TITLE);'));
+  assert.ok(!callback.includes('rewardClaimed'),
+    "An incomplete reward must not trap the player");
+  assert.ok(!callback.includes('claimDailyTodoSnack'),
+    "Back must never consume or claim the feeding reward");
+  assert.ok(dailyScreen.slice(0, backStart).includes('onComplete: (result = {}) => {'));
+  assert.ok(dailyScreen.slice(0, backStart).includes('claimDailyTodoSnack('),
+    "Successful game completion is still the only claim path");
+
+  // Execute the actual app callback with an unclaimed reward: leaving cannot
+  // mark it claimed, and should return to the title screen immediately.
+  const callbackBody = callback.slice(callback.indexOf('{') + 1);
+  const State = { dailySnackSession: { rewardComplete: false, rewardClaimed: false } };
+  let destination = null;
+  const go = (next) => { destination = next; };
+  const Screen = { TITLE: 'home' };
+  const back = new Function('State', 'go', 'Screen', `return () => {${callbackBody}}`)(State, go, Screen);
+  assert.strictEqual(back(), true);
+  assert.strictEqual(State.dailySnackSession, null);
+  assert.strictEqual(destination, 'home');
+}
+
+function testLabyrinthDoubleDiameterAndPassableGaps() {
+  const runtime = makeLabyrinthRuntime(0);
+  const classicBallRadius = runtime.pegRadius * 0.66;
+  assert.strictEqual(hooks.LABYRINTH_BALL_SIZE_MULTIPLIER, 2);
+  assert.strictEqual(hooks.getLabyrinthBallRadius(runtime), classicBallRadius * 2,
+    "Only Labyrinth snacks should double in diameter");
+
+  hooks.initializeLabyrinthMode(runtime);
+  hooks.spawnLabyrinthBall(runtime, { id: "red", color: "#f00" }, 1000, 0);
+  assert.strictEqual(runtime.balls.length, 1);
+  assert.strictEqual(runtime.balls[0].radius, classicBallRadius * 2);
+  assert.ok(runtime.balls[0].x >= runtime.balls[0].radius);
+  assert.ok(runtime.balls[0].x <= runtime.width - runtime.balls[0].radius);
+  for (const row of runtime.labyrinth.platformRows) {
+    assert.ok(row.gapWidth > runtime.balls[0].radius * 2,
+      "Labyrinth platform gap must clear the enlarged ball");
+  }
+
+  // The actual page uses a clamped peg radius, so test phone + tablet widths.
+  for (const [width, height] of [[320, 568], [375, 667], [390, 844], [430, 932], [768, 1024], [844, 390]]) {
+    const pegRadius = Math.min(26, Math.max(14, width * 0.04));
+    const radius = hooks.getLabyrinthBallRadius({ pegRadius });
+    for (const row of hooks.createLabyrinthPlatformRows(width, height, radius, 54321)) {
+      assert.ok(row.gapWidth >= radius * 2 + 8,
+        `${width}x${height}: enlarged snack needs an 8px clearance margin`);
+    }
+  }
+  const classicRuntime = { pegRadius: runtime.pegRadius, width: 390, height: 844 };
+  const classicRadius = classicRuntime.pegRadius * 0.66;
+  assert.ok(source.includes("function spawnBall(runtime, config, now"));
+  assert.ok(source.includes("const radius = runtime.pegRadius * 0.66;"),
+    "Classic spawn radius must remain unchanged");
+  assert.strictEqual(classicRadius, classicBallRadius);
+}
+
+function testBackButtonMatchesExternalGameTitle() {
+  const sharedCss = fs.readFileSync(path.join(rootDir, "verse_games", "shared", "shell.css"), "utf8");
+  const sharedGameShell = fs.readFileSync(path.join(rootDir, "verse_games", "shared", "game-shell.js"), "utf8");
+  const css = feedGameCssSource.slice(feedGameCssSource.indexOf(".daily-feed-exit,"), feedGameCssSource.indexOf(".daily-feed-score-badge {"));
+  assert.ok(sharedCss.includes(".vm-game-back-pill {"));
+  assert.ok(sharedGameShell.includes('class="vm-game-back-pill no-zoom"'));
+  for (const [style, val] of [
+    ["min-width", "58px"], ["min-height", "42px"],
+    ["border-radius", "999px"], ["font-size", "22px"],
+    ["box-shadow", "0 6px 0 rgba(0, 0, 0, 0.25)"],
+    ["left", "calc(14px + env(safe-area-inset-left))"]
+  ]) {
+    assert.ok(css.includes(`${style}: ${val}`), `Feeding Back style missing ${style}`);
+    if (style === "box-shadow") {
+      assert.ok(sharedCss.includes(`--vm-shadow-btn: ${val}`),
+        "Reference Back shadow should come from the shared CSS variable");
+    } else {
+      assert.ok(sharedCss.includes(`${style}: ${val}`), `Reference Back style missing ${style}`);
+    }
+  }
+  assert.ok(css.includes(".daily-feed-resume-back"), "Paused Back button should match");
+  assert.ok(css.includes(".daily-feed-exit { z-index: 22; }"), "Button must remain above instructions");
+  for (const mode of Object.values(hooks.FEED_MODES)) {
+    const markup = api.render({ session: { feedMode: mode, dailyTodoSnack: true } });
+    assert.match(markup, /data-daily-feed-exit[\s\S]*?>◀<\/button>/);
+    assert.match(markup, /data-daily-feed-resume-back[\s\S]*?>◀<\/button>/);
+  }
+}
+
+function testLabyrinthStrongerGravityAndResizeSafety() {
+  const runtime = makeLabyrinthRuntime(0);
+  hooks.initializeLabyrinthMode(runtime);
+  assert.strictEqual(runtime.labyrinth.gravity, runtime.height * 0.60);
+  assert.strictEqual(runtime.labyrinth.maxVerticalSpeed, runtime.height * 0.55);
+  assert.ok(runtime.labyrinth.gravity > runtime.height * 0.24);
+  assert.ok(runtime.labyrinth.maxVerticalSpeed > runtime.height * 0.29);
+  const resized = makeResizableRuntime("labyrinth");
+  hooks.initializeLabyrinthMode(resized);
+  hooks.setActiveRuntimeForValidation(resized);
+  try {
+    assert.strictEqual(hooks.resizeFeedStage(resized), true);
+    assert.strictEqual(resized.labyrinth.gravity, resized.height * 0.60);
+    assert.strictEqual(resized.labyrinth.maxVerticalSpeed, resized.height * 0.55);
+  } finally {
+    hooks.setActiveRuntimeForValidation(null);
+  }
+  assert.ok(source.includes('dt / LABYRINTH_PHYSICS_STEP'),
+    "Substepping should remain enabled with stronger gravity");
+}
+
 async function main() {
   const tests = [
     testPublicApiContract,
@@ -3947,6 +4096,9 @@ async function main() {
     testLabyrinthOldBallsDoNotExpire,
     testLabyrinthStuckRecoveryNudgesTowardGap,
     testLabyrinthAlwaysReachesCompletion,
+    testLabyrinthDoubleDiameterAndPassableGaps,
+    testBackButtonMatchesExternalGameTitle,
+    testLabyrinthStrongerGravityAndResizeSafety,
     testBounceRenderAndControllerContract,
     testBounceBrickLayoutAndQuestionStars,
     testBounceSeparatePetPaddleAndServe,
@@ -4024,6 +4176,8 @@ async function main() {
     testClassicResultCopyThresholds,
     testClassicTimingAndPhysicsConstants,
     testClassicInputAndCleanupContract,
+    testFeedingEscapeButtonInAllModes,
+    testDailySnackEarlyExitDoesNotClaimReward,
     testClassicStartRejectsMissingInputs,
     testModeAwareInstructionsAndTiltFallback,
     testNormalizedPointerAndLandscapeTilt,

@@ -19780,13 +19780,9 @@ function screenDailySnack(idx) {
             });
           },
           onBackToZoo: () => {
-            if (
-              !session.rewardComplete ||
-              !session.rewardClaimed
-            ) {
-              return false;
-            }
-
+            // Quitting a feeding game is always allowed. Reward progress
+            // is claimed only by onComplete; an unfinished snack remains
+            // available to play again from Daily To-Do.
             State.dailySnackSession = null;
             go(Screen.TITLE);
             return true;
