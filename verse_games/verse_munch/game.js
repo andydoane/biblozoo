@@ -2652,15 +2652,10 @@ function backToMenuFromHelp(){
     if (!await waitForBonusScoreContinue(runToken)) return false;
     if (!isActiveRun(runToken)) return false;
 
-    state.bonusPhase = "";
-    state.bonusIntroText = "";
-    state.bonusTargetFruit = null;
-    state.beltHidden = false;
-    state.inputLocked = false;
-    bonusRunning = false;
-
-    renderFrame(performance.now());
-
+    // Keep the bonus score card visible while completion is saved and the
+    // next page is opened. Clearing it here exposes the 🥳 face underneath
+    // for a frame (or for the duration of the Daily To-Do page fade).
+    // renderComplete() will replace the card for ordinary game launches.
     return true;
   }
 
@@ -3576,7 +3571,9 @@ function updateBuildText(){
   }
 
   function randomBonusSpawnDelay() {
-    return 0.42 + Math.random() * 0.22;
+    // Keep fruit spacing roughly constant as the bonus belt accelerates.
+    // The 70px minimum gap is still enforced when each fruit is placed.
+    return (0.42 + Math.random() * 0.22) / getBonusSpeedMultiplier();
   }
 
   function spawnBonusFoodItem(cfg) {
@@ -3668,7 +3665,8 @@ function updateBuildText(){
 
     let guard = 0;
     while (shouldAddBeltItem(cfg) && guard < 4) {
-      spawnBeltItem(cfg);
+      // If no safe choice can be spawned yet, retry on a later frame.
+      if (!spawnBeltItem(cfg)) break;
       guard += 1;
     }
   }
@@ -3709,7 +3707,19 @@ function updateBuildText(){
 
     let makeCorrect = false;
 
-    if (visibleCorrectCount < cfg.maxCorrectVisible && state.beltForceCorrectIn <= 0) {
+    // A queued word may still be off-screen during a belt refill. Checking
+    // only visibleCorrectCount lets two correct words queue back-to-back,
+    // especially when the belt is primed immediately after a selection.
+    const previousItem = state.beltItems[state.beltItems.length - 1];
+    const previousIsCorrect =
+      !!previousItem &&
+      normalizeWord(previousItem.label) === normalizeWord(correctLabel);
+
+    if (
+      !previousIsCorrect &&
+      visibleCorrectCount < cfg.maxCorrectVisible &&
+      state.beltForceCorrectIn <= 0
+    ) {
       makeCorrect = true;
     }
 
@@ -3727,6 +3737,9 @@ function updateBuildText(){
         label = decoyLabel;
         state.beltForceCorrectIn -= 1;
       } else {
+        // Never fall back to an adjacent correct word when the decoy pool
+        // is temporarily exhausted. A fresh choice can be tried next frame.
+        if (previousIsCorrect) return false;
         makeCorrect = true;
         state.beltForceCorrectIn =
           getNextCorrectDelay(
@@ -3766,6 +3779,7 @@ function updateBuildText(){
       wrongUntil: 0,
       removeAt: 0
     });
+    return true;
   }
 
   function estimateBeltItemWidth(label, cfg) {
