@@ -1,5 +1,15 @@
 (async function () {
   const app = document.getElementById("app");
+  // Patch 64: virtual activity time excludes task-switch and recovery waits.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let returnAnimating = [];
+  // Native gameNow() is intentionally not replaced globally.
+
   const ctx = await window.VerseGameBridge.getVerseContext();
   const GAME_ID = "tower_bible";
 
@@ -199,6 +209,8 @@
   let silenceAudioEl = null;
   let audioUnlocked = false;
   let uiSoundFlip = false;
+  let returnPriorPauseReason = null;
+  let returnWasLooping = false;
 
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
@@ -1173,9 +1185,10 @@
   };
 
   function setPaused(paused, reason = "") {
+    if (returnPaused && !paused) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
-    if (!paused) state.lastTs = performance.now();
+    if (!paused) state.lastTs = gameNow();
   }
 
   function getLongVerseBeltSpeedMultiplier() {
@@ -1439,7 +1452,7 @@
     const shouldReveal =
       state.introActive &&
       state.introGuideVisible &&
-      performance.now() -
+      gameNow() -
         state.introGuidePoppedAt <
         900;
 
@@ -1464,7 +1477,7 @@
   }
 
   function renderOverlayMessage(layer) {
-    const now = performance.now();
+    const now = gameNow();
     if (!layer) return;
 
     const hasTimingOverlay = state.overlayMessage && now < state.overlayUntil;
@@ -1938,7 +1951,7 @@
   }
 
   function renderTower(layer) {
-    const now = performance.now();
+    const now = gameNow();
     layer.classList.toggle("is-frenzy", state.frenzyActive);
     layer.classList.toggle("is-auto-frenzy", state.frenzyAutoActive);
     const towerShellClass = ["tb-tower-shell"];
@@ -2106,7 +2119,7 @@
   }
 
   function renderEffects(layer) {
-    const now = performance.now();
+    const now = gameNow();
     state.fx = state.fx.filter((fx) => fx.until > now);
 
     let html = "";
@@ -2175,6 +2188,7 @@
   function stopLoop() { if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = 0; } }
 
   function frame(ts) {
+    ts = gameNow();
     if (!state.running) return;
     if (!state.lastTs) state.lastTs = ts;
     const dt = Math.min(34, ts - state.lastTs);
@@ -2220,7 +2234,7 @@
     for (const brick of state.stream) {
       brick.left -= distance;
       brick.center = brick.left + brick.width / 2;
-      if (brick.flashWrongUntil && performance.now() >= brick.flashWrongUntil) {
+      if (brick.flashWrongUntil && gameNow() >= brick.flashWrongUntil) {
         brick.flashWrong = false;
         brick.flashWrongUntil = 0;
       }
@@ -2230,7 +2244,7 @@
     state.stream = state.stream.filter((brick) => brick.left > leftCull);
     state.pendingCorrectVisible = state.stream.filter((brick) => brick.isCorrect).length;
 
-    if (performance.now() >= state.beltRespawnLockUntil) {
+    if (gameNow() >= state.beltRespawnLockUntil) {
       ensureStreamFilled();
     }
   }
@@ -2264,7 +2278,7 @@
       playGameSound("brickLand");
       state.enteringBrick = null;
 
-      state.towerSettleUntil = performance.now() + 220;
+      state.towerSettleUntil = gameNow() + 220;
 
       advancePhaseAfterPlacement();
 
@@ -2449,9 +2463,9 @@
       playGameSound("wrongWord");
       resetCorrectStreak();
       brick.flashWrong = true;
-      brick.flashWrongUntil = performance.now() + 260;
-      state.towerShakeUntil = performance.now() + 300;
-      state.guideFlashUntil = performance.now() + 300;
+      brick.flashWrongUntil = gameNow() + 260;
+      state.towerShakeUntil = gameNow() + 300;
+      state.guideFlashUntil = gameNow() + 300;
       clearStreamWithBurst();
       return;
     }
@@ -2782,7 +2796,7 @@
     playGameSound("collapse");
 
     state.collapseTriggered = true;
-    state.collapseStartedAt = performance.now();
+    state.collapseStartedAt = gameNow();
     state.collapseDir = lean < 0 ? -1 : 1;
     state.collapseBurstFired = {};
 
@@ -2880,7 +2894,7 @@
     const scale = Math.max(0.26, Math.pow(0.95, level));
     const height = Math.max(34, state.brickHeight * 0.9 * scale);
     const baseOffsetX = count <= 1 ? 0 : lean * maxLeanPx * curve;
-    const sway = getBrickWarningSway(performance.now(), safeIndex, count);
+    const sway = getBrickWarningSway(gameNow(), safeIndex, count);
 
     return {
       x: state.fieldWidth * 0.5 + baseOffsetX + sway.x,
@@ -2892,11 +2906,11 @@
   }
 
   function addSmoke(x, y) {
-    state.fx.push({ x, y, until: performance.now() + 420, scale: 1, kind: "smoke" });
+    state.fx.push({ x, y, until: gameNow() + 420, scale: 1, kind: "smoke" });
   }
 
   function addChunkBurst(x, y, scale = 1, speedMultiplier = 1) {
-    const now = performance.now();
+    const now = gameNow();
     const count = BRICK_BREAK_TUNING.particleCount;
     const minSize = state.brickHeight * BRICK_BREAK_TUNING.minSizePctOfBrickHeight;
     const maxSize = state.brickHeight * BRICK_BREAK_TUNING.maxSizePctOfBrickHeight;
@@ -2929,11 +2943,11 @@
     state.stream = [];
     state.pendingCorrectVisible = 0;
     state.beltNeedsFreshSpawn = true;
-    state.beltRespawnLockUntil = performance.now() + 520;
+    state.beltRespawnLockUntil = gameNow() + 520;
   }
 
   function startIntroSequence() {
-    const now = performance.now();
+    const now = gameNow();
 
     state.introActive = true;
     state.introStepIndex = 0;
@@ -3006,7 +3020,7 @@
   }
 
   function startIntroBrick(label, textureClass = "tb-intro-green") {
-    const now = performance.now();
+    const now = gameNow();
     const width = state.towerWidth * 0.76;
     const height = state.brickHeight * 0.9;
     const fontSize = Math.max(14, state.brickHeight * 0.33);
@@ -3077,7 +3091,7 @@
       });
       playGameSound("brickLand");
       state.enteringBrick = null;
-      state.towerSettleUntil = performance.now() + 220;
+      state.towerSettleUntil = gameNow() + 220;
     }
   }
 
@@ -3124,12 +3138,12 @@
     seedPendingCorrect();
     fillInitialStream();
 
-    state.lastTs = performance.now();
+    state.lastTs = gameNow();
     renderHud();
   }
 
   function startDestroyFrenzy() {
-    const now = performance.now();
+    const now = gameNow();
 
     state.frenzyActive = true;
     state.frenzyAutoActive = false;
@@ -3163,12 +3177,12 @@
     ) return;
 
     state.frenzyAutoActive = true;
-    state.frenzyInputLockedUntil = performance.now();
+    state.frenzyInputLockedUntil = gameNow();
     syncFrenzyBomb();
   }
 
   function handleFrenzyTap(index = null, automatic = false) {
-    const now = performance.now();
+    const now = gameNow();
     if (!state.frenzyActive || state.paused || state.done) return;
     // Once the bomb is active, no manual tap may break any tower brick.
     if (state.frenzyAutoActive !== automatic) return;
@@ -3232,13 +3246,13 @@
       state.overlayStartedAt = 0;
       state.overlayUntil = 0;
       const finishDelay = 350 / speedMultiplier;
-      state.frenzyInputLockedUntil = performance.now() + finishDelay;
+      state.frenzyInputLockedUntil = gameNow() + finishDelay;
 
-      window.setTimeout(() => {
+      welcomeClock.sleep(finishDelay).then(() => {
         if (state.frenzyActive && !state.progress.length && !state.done) {
           finishGame();
         }
-      }, finishDelay);
+      });
     }
   }
 
@@ -3387,9 +3401,9 @@
 
     layer.appendChild(group);
 
-    window.setTimeout(() => {
+    welcomeClock.sleep(duration + 300).then(() => {
       group.remove();
-    }, duration + 300);
+    });
   }
 
   function renderStreakConfetti(streak, config, brick) {
@@ -3600,7 +3614,7 @@
   }
 
   function showOverlay(message, duration = 1400, tone = "") {
-    const now = performance.now();
+    const now = gameNow();
     state.overlayMessage = message;
     state.overlayTone = tone;
     state.overlayStartedAt = now;
@@ -3608,7 +3622,7 @@
   }
 
   function showWarningOverlay(level) {
-    const now = performance.now();
+    const now = gameNow();
     state.warningOverlayLevel = level;
     state.warningOverlayStartedAt = now;
     state.warningOverlayUntil = now + (level >= 2 ? 2300 : 2100);
@@ -3722,4 +3736,82 @@
 
   function escapeHtml(str) { return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
 
+
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    returnWasLooping = !!state.rafId;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    suspendWelcomeAnimations();
+    setPaused(true, "welcome-back");
+    stopLoop();
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements += 1;
+      const old = audioCtx;
+      audioCtx = null;
+      masterGain = null;
+      audioUnlocked = false;
+      audioBuffers.clear();
+      audioBufferPromises.clear();
+      try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
+    }
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures += 1;
+        return false;
+      }
+      welcomeClock.resume();
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      restoreWelcomeAnimations();
+      setPaused(returnPriorPauseReason !== null, returnPriorPauseReason || "");
+      returnPriorPauseReason = null;
+      if (returnWasLooping && state.running) startLoop();
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !state.done,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    // Invalidate any pending audio attempt before navigating away.
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
+
+  function suspendWelcomeAnimations() {
+    returnAnimating = [];
+    if (typeof document.getAnimations !== "function") return;
+    for (const animation of document.getAnimations()) {
+      if (animation.playState !== "running") continue;
+      try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+    }
+  }
+
+  function restoreWelcomeAnimations() {
+    for (const animation of returnAnimating) {
+      try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+    }
+    returnAnimating = [];
+  }
 })();

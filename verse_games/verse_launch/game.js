@@ -1,5 +1,17 @@
 (async function () {
   const app = document.getElementById("app");
+  // Patch 64: virtual activity time excludes task-switch and recovery waits.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let returnAnimating = [];
+  let returnConveyorWasRunning = false;
+  let returnAstroWasRunning = false;
+  // Native gameNow() is intentionally not replaced globally.
+
   if (app) app.classList.add("vm-shell", "vl-shell");
 
   const ctx = await window.VerseGameBridge.getVerseContext();
@@ -260,7 +272,7 @@
   ];
 
   const $ = (s) => document.querySelector(s);
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const sleep = (ms) => welcomeClock.sleep(ms);
   const rand = (min, max) => min + Math.random() * (max - min);
   const pickRandom = (items) => items[Math.floor(Math.random() * items.length)];
 
@@ -975,7 +987,7 @@
   }
 
   function formatMode(mode) { return mode ? mode.charAt(0).toUpperCase() + mode.slice(1) : "Mode"; }
-  function totalElapsedMs() { return Math.max(1, (state.endTime || performance.now()) - state.startTime); }
+  function totalElapsedMs() { return Math.max(1, (state.endTime || gameNow()) - state.startTime); }
 
   function helpHtml() {
     return `
@@ -1549,6 +1561,8 @@
   }
 
   function conveyorTick(ts) {
+    ts = gameNow();
+    if (returnPaused) { state.conveyorRaf = 0; return; }
     if (state.screen !== "game" || state.bonusReady) {
       stopConveyorLoop();
       return;
@@ -1662,7 +1676,7 @@
         state.mode = mode;
         window.VerseGameShell.resetGameSpeed();
         initVerseData();
-        state.startTime = performance.now();
+        state.startTime = gameNow();
         buildChoices();
         setScreen("game");
       }
@@ -2484,7 +2498,7 @@
 
   async function finalizeBonusOutcome(success) {
     state.completed = true;
-    state.endTime = performance.now();
+    state.endTime = gameNow();
     state.bonusOutcome = success ? "success" : "crash";
 
     try {
@@ -3101,11 +3115,11 @@
       cloud.classList.add("is-live");
       burst.querySelectorAll(".vl-word-burst-particle").forEach((particle) => {
         const delay = Number.parseInt(particle.style.getPropertyValue("--vl-word-burst-delay"), 10) || 0;
-        window.setTimeout(() => particle.classList.add("is-live"), delay);
+        sleep(delay).then(() => particle.classList.add("is-live"));
       });
     });
 
-    window.setTimeout(() => burst.remove(), duration + 140);
+    sleep(duration + 140).then(() => burst.remove());
   }
 
 
@@ -3978,6 +3992,8 @@
   }
 
   function astroTick(ts) {
+    ts = gameNow();
+    if (returnPaused) { state.astroRaf = 0; return; }
     if (!state.astroRunning) return;
     if (!state.astroLastTs) state.astroLastTs = ts;
     const dtMs = Math.min(
@@ -4203,7 +4219,7 @@
 
   async function finishGame() {
     state.completed = true;
-    state.endTime = performance.now();
+    state.endTime = gameNow();
 
     try {
       state.completionResult = await window.VerseGameBridge.completeGameRun({
@@ -4244,7 +4260,7 @@
   }
 
   async function handleLaunch(choiceId) {
-    if (state.busy || state.menuOpen || state.helpOpen || state.completed) return;
+    if (returnPaused || state.busy || state.menuOpen || state.helpOpen || state.completed) return;
 
     unlockAudio();
 
@@ -4341,4 +4357,82 @@
   }
 
   setScreen("intro");
+
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    suspendWelcomeAnimations();
+    returnConveyorWasRunning = !!state.conveyorRaf;
+    returnAstroWasRunning = !!state.astroRaf;
+    if (state.conveyorRaf) cancelAnimationFrame(state.conveyorRaf);
+    state.conveyorRaf = 0;
+    if (state.astroRaf) cancelAnimationFrame(state.astroRaf);
+    state.astroRaf = 0;
+    resetAstroInput();
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements += 1;
+      audioForegroundFreshContextOnGesture = true;
+      audioUnlocked = false;
+    }
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures += 1;
+        return false;
+      }
+      welcomeClock.resume();
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      restoreWelcomeAnimations();
+      if (returnConveyorWasRunning && state.screen === "game" && !state.bonusReady) startConveyorLoop();
+      if (returnAstroWasRunning && state.screen === "asteroids" && state.astroRunning && !state.astroRaf) {
+        state.astroLastTs = 0;
+        state.astroRaf = requestAnimationFrame(astroTick);
+      }
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => ["game", "travel", "asteroids"].includes(state.screen) && !state.completed,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    // Invalidate any pending audio attempt before navigating away.
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
+
+  function suspendWelcomeAnimations() {
+    returnAnimating = [];
+    if (typeof document.getAnimations !== "function") return;
+    for (const animation of document.getAnimations()) {
+      if (animation.playState !== "running") continue;
+      try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+    }
+  }
+
+  function restoreWelcomeAnimations() {
+    for (const animation of returnAnimating) {
+      try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+    }
+    returnAnimating = [];
+  }
 })();

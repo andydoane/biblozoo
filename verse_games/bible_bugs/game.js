@@ -3120,6 +3120,7 @@
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });

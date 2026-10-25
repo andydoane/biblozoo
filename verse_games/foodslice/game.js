@@ -1,5 +1,15 @@
 (async function () {
   const app = document.getElementById("app");
+  // Patch 64: virtual activity time excludes task-switch and recovery waits.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let returnAnimating = [];
+  // Native gameNow() is intentionally not replaced globally.
+
   const ctx = await window.VerseGameBridge.getVerseContext();
   const GAME_ID = "foodslice";
 
@@ -199,6 +209,8 @@
   let foodSliceZoomLockBound = false;
   let lastFoodSliceTouchEnd = 0;
   let endScreenUnlockTimer = 0;
+  let returnPriorPauseReason = null;
+  let returnWasLooping = false;
 
 
 
@@ -265,7 +277,8 @@
 
   renderIntro();
 
-  function renderIntro() {
+  function renderIntro(reason = "initial") {
+    recordFoodSliceCompletion("title-rendered", { reason });
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -471,12 +484,14 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        recordFoodSliceCompletion("menu-mode-select");
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
         renderModeSelect();
       },
       onExit: () => {
+        recordFoodSliceCompletion("menu-exit");
         playUiTapSound();
         stopLoop();
         window.VerseGameBridge.exitGame();
@@ -616,9 +631,15 @@
   }
 
   function setPaused(paused, reason = "") {
+    if (returnPaused && !paused) {
+      // A wrong-tap/bomb animation may complete while away. Do not unpause
+      // gameplay until the child's verified Let's go! gesture.
+      if (["wrong", "bomb"].includes(returnPriorPauseReason)) returnPriorPauseReason = null;
+      return;
+    }
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
-    if (!paused) state.lastTs = performance.now();
+    if (!paused) state.lastTs = gameNow();
   }
 
   function recalcField() {
@@ -721,7 +742,7 @@
     const text = document.getElementById("fsBuildText");
     if (!build || !text) return;
 
-    build.classList.toggle("is-shake", state.buildShakeUntil > performance.now());
+    build.classList.toggle("is-shake", state.buildShakeUntil > gameNow());
     if (state.bonusRound) {
       clearBuildTextFit(text);
       text.className = "fs-build-text vm-build-text fs-bonus-build-text";
@@ -752,7 +773,7 @@
     const field = document.getElementById("fsField");
     if (!playLayer || !sliceLayer || !bannerLayer || !field) return;
 
-    field.classList.toggle("is-flash-bad", state.fieldFlashUntil > performance.now());
+    field.classList.toggle("is-flash-bad", state.fieldFlashUntil > gameNow());
 
     let playHtml = "";
     if (state.messagePill?.alive) playHtml += renderMessagePill(state.messagePill);
@@ -816,7 +837,7 @@
 
     sliceLayer.innerHTML = slicePiecesHtml + messageSlicePiecesHtml + trailSparklesHtml + sliceEffectsHtml;
 
-    bannerLayer.innerHTML = (state.bonusRound && performance.now() < state.bonusBannerUntil)
+    bannerLayer.innerHTML = (state.bonusRound && gameNow() < state.bonusBannerUntil)
       ? `<div class="fs-bonus-banner"><div class="fs-bonus-banner-text">Bonus Round!</div></div>`
       : "";
 
@@ -882,6 +903,7 @@
   }
 
   function frame(ts) {
+    ts = gameNow();
     if (!state.running) return;
     if (!state.lastTs) state.lastTs = ts;
     const dt = Math.min(34, ts - state.lastTs);
@@ -1099,7 +1121,7 @@
   function maybeSpawnTrailSparkle(item) {
     if (!item || item.trailLevel < 3) return;
 
-    const now = performance.now();
+    const now = gameNow();
     if (now - (item.lastTrailSparkleAt || 0) < TRAIL_TUNING.sparkleSpawnGapMs) return;
     if (state.activeTrailSparkles.length >= TRAIL_TUNING.maxSparkles) return;
 
@@ -1161,7 +1183,7 @@
   }
 
   function renderTrailSparkle(sparkle) {
-    const age = performance.now() - sparkle.createdAt;
+    const age = gameNow() - sparkle.createdAt;
     const progress = Math.max(0, Math.min(1, age / sparkle.duration));
     const pop = Math.sin(progress * Math.PI);
     const opacity = Math.max(0, (1 - progress) * 0.92);
@@ -1378,17 +1400,17 @@
     item.rejecting = true;
     state.wrongStreak += 1;
     state.correctStreak = 0;
-    state.buildShakeUntil = performance.now() + 320;
-    state.fieldFlashUntil = performance.now() + 260;
+    state.buildShakeUntil = gameNow() + 320;
+    state.fieldFlashUntil = gameNow() + 260;
 
     setPaused(true, "wrong");
     renderHud();
-    window.setTimeout(() => {
+    welcomeClock.sleep(320).then(() => {
       item.alive = false;
       if (state.activeFruit === item) state.activeFruit = null;
       if (!state.done) setPaused(false, "");
       renderHud();
-    }, 320);
+    });
   }
 
   function handleBombTap() {
@@ -1413,17 +1435,17 @@
 
     updatePhaseFromProgress();
     state.correctStreak = 0;
-    state.buildShakeUntil = performance.now() + 320;
-    state.fieldFlashUntil = performance.now() + 260;
+    state.buildShakeUntil = gameNow() + 320;
+    state.fieldFlashUntil = gameNow() + 260;
     setPaused(true, "bomb");
     renderHud();
     playGameSound("bomb");
     spawnBombBurst(burstX, burstY);
 
-    window.setTimeout(() => {
+    welcomeClock.sleep(320).then(() => {
       if (!state.done) setPaused(false, "");
       renderHud();
-    }, 320);
+    });
   }
 
   function startBonusRound() {
@@ -1447,7 +1469,7 @@
   }
 
   function beginBonusGameplay() {
-    const now = performance.now();
+    const now = gameNow();
 
     state.bonusRound = true;
     state.bonusBannerUntil = 0;
@@ -1457,7 +1479,13 @@
     state.bonusCount = 0;
   }
 
+  function recordFoodSliceCompletion(stage, details = {}) {
+    try { window.BibloZooAudioDiagnostics?.record("foodslice-completion", { stage, ...details }); }
+    catch (_) { /* Diagnostics are optional, never required to finish a game. */ }
+  }
+
   function startBonusScoreOutro() {
+    recordFoodSliceCompletion("score-outro-start", { bonusCount: state.bonusCount });
     state.activeFruit = null;
     state.activeBomb = null;
     state.bonusFruits = [];
@@ -1561,13 +1589,14 @@
     state.messagePill = null;
 
     if (item.endsGameOnSlice) {
+      recordFoodSliceCompletion("final-score-sliced", { bonusCount: state.bonusCount });
       state.done = true;
       state.messageSequence = null;
-      window.setTimeout(() => {
-        finishGame();
-      }, 420);
+      welcomeClock.sleep(420).then(() => {
+        if (!returnPaused) finishGame();
+      });
     } else if (state.messageSequence) {
-      state.messageSequence.nextAt = performance.now() + 90;
+      state.messageSequence.nextAt = gameNow() + 90;
     }
 
     renderHud();
@@ -1705,9 +1734,9 @@
 
     layer.appendChild(wrapper);
 
-    window.setTimeout(() => {
+    welcomeClock.sleep(duration + 220).then(() => {
       wrapper.remove();
-    }, duration + 220);
+    });
   }
 
   function getFireworkColors(item) {
@@ -2014,11 +2043,11 @@
 
       burst.querySelectorAll(".fs-bomb-burst-particle").forEach((particle) => {
         const delay = Number.parseInt(particle.style.getPropertyValue("--fs-bomb-burst-delay"), 10) || 0;
-        window.setTimeout(() => particle.classList.add("is-live"), delay);
+        welcomeClock.sleep(delay).then(() => particle.classList.add("is-live"));
       });
     });
 
-    window.setTimeout(() => burst.remove(), duration + 160);
+    welcomeClock.sleep(duration + 160).then(() => burst.remove());
   }
 
   function randomBetween(min, max) {
@@ -2029,7 +2058,7 @@
   function createSliceEffectFrom(item) {
     if (!item) return;
 
-    const createdAt = performance.now();
+    const createdAt = gameNow();
     const baseAngle = Math.random() * 180;
     const yOffset = item.word ? -state.fruitHitSize * 0.08 : 0;
     const dots = createSliceParticleFan(baseAngle);
@@ -2083,7 +2112,7 @@
 
 
   function renderSliceEffect(effect) {
-    const now = performance.now();
+    const now = gameNow();
     const age = Math.max(0, now - effect.createdAt);
     const slashProgress = clamp(age / SLICE_EFFECT_TUNING.slashDuration, 0, 1);
     const slashOpacity = slashProgress < 0.22
@@ -2132,6 +2161,7 @@
 
 
   async function finishGame() {
+    recordFoodSliceCompletion("finish-start", { bonusCount: state.bonusCount });
     state.running = false;
     state.done = true;
     stopLoop();
@@ -2171,6 +2201,11 @@
       }
     }
 
+    recordFoodSliceCompletion("render-completion", {
+      recorded: completionMarked,
+      completed: completionResult?.ok === true,
+      petUnlock: reward?.petUnlockTriggered === true
+    });
     renderEndScreen(reward);
   }
 
@@ -2615,7 +2650,7 @@
   }
 
   function playUiTapSound() {
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastUiTapAt < 70) return;
 
     lastUiTapAt = now;
@@ -2633,7 +2668,7 @@
   }
 
   function playRandomSwooshSound() {
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastSwooshAt < SOUND_TUNING.minSwooshGapMs) return;
 
     const key = pickRandomSoundKey("swoosh", lastSwooshSound);
@@ -2658,5 +2693,78 @@
       .replace(/>/g, "&gt;")
       .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    returnWasLooping = !!state.rafId;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    suspendWelcomeAnimations();
+    setPaused(true, "welcome-back");
+    stopLoop();
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements += 1;
+      audioForegroundFreshContextOnGesture = true;
+      audioUnlocked = false;
+    }
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures += 1;
+        return false;
+      }
+      welcomeClock.resume();
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      restoreWelcomeAnimations();
+      setPaused(returnPriorPauseReason !== null, returnPriorPauseReason || "");
+      returnPriorPauseReason = null;
+      if (returnWasLooping && state.running) startLoop();
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !state.done,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    // Invalidate any pending audio attempt before navigating away.
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
+
+  function suspendWelcomeAnimations() {
+    returnAnimating = [];
+    if (typeof document.getAnimations !== "function") return;
+    for (const animation of document.getAnimations()) {
+      if (animation.playState !== "running") continue;
+      try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+    }
+  }
+
+  function restoreWelcomeAnimations() {
+    for (const animation of returnAnimating) {
+      try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+    }
+    returnAnimating = [];
   }
 })();

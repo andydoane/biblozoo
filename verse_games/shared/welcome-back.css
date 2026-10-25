@@ -121,3 +121,19 @@
     max(20px, env(safe-area-inset-bottom));
   background: rgba(25, 18, 34, .65);
 }
+
+/* Patch 64.1: Never trap a child after a failed or prolonged audio recovery.
+ * This unobtrusive escape is hidden during normal Welcome Back operation. */
+.bz-welcome-escape {
+  background: transparent;
+  color: #333333;
+  font: 800 18px/1.2 "Baloo 2", "Baloo2", system-ui, sans-serif;
+  border: 0;
+  border-bottom: 2px solid currentColor;
+  border-radius: 0;
+  padding: 6px 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.bz-welcome-escape[hidden] { display: none !important; }
+.bz-welcome-escape:focus-visible { outline: 3px solid #333333; outline-offset: 3px; }

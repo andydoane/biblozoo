@@ -37,6 +37,7 @@ function harness({ profile = {name: "Alexandria", avatarVerseId: "john_3_16"} } 
   const name = makeNode(), nameLine = makeNode(), status = makeNode();
   const overlay = makeNode();
   overlay.bind("[data-welcome-back-action]", button);
+  overlay.bind("[data-welcome-back-card]", {appendChild() {}});
   overlay.bind("[data-welcome-back-picture]", picture);
   overlay.bind("[data-welcome-back-picture-fallback]", paw);
   overlay.bind("[data-welcome-back-name]", name);
@@ -46,12 +47,12 @@ function harness({ profile = {name: "Alexandria", avatarVerseId: "john_3_16"} } 
   const document = {
     hidden: false,
     body: { appendChild(child) { children.push(child); } },
-    createElement() { return overlay; },
+    createElement(tag) { return tag === "button" ? makeNode() : overlay; },
     addEventListener(k, fn) { docListeners.set(k, fn); },
     removeEventListener(k, fn) { if (docListeners.get(k) === fn) docListeners.delete(k); }
   };
   const window = {
-    document,
+    document, setTimeout, clearTimeout,
     BibloZooProfiles: {
       getProfileById: id => id === "z-1" ? profile : null,
       getActiveProfile: () => ({name: "Wrong User", avatarVerseId: "wrong"}),
@@ -155,7 +156,7 @@ async function tests() {
   ok(game.includes('source: "app"') && game.includes('isCurrent: () =>'),
     "Guarded Patch 60 coordination is available on native iOS only");
   ok(feeding.includes('data-welcome-back-name-line'), "Feeding inherits new color and no-wrap line");
-  ok(sw.includes('2026_Oct_25_patch63_bugs_munch_splat_welcome_back') &&
+  ok(sw.includes('2026_Oct_25_patch64_1_recovery_escape_diagnostics') &&
      sw.includes('"./verse_games/shared/welcome-back-return.js"'),
      "Service worker version and new resource updated");
 

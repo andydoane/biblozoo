@@ -1563,3 +1563,9 @@ body {
     padding: 18px 16px;
   }
 }
+
+/* Patch 64: preserve game sprite animations while Welcome Back is pending. */
+body.bz-return-activity-paused #app *,
+body.bz-return-activity-paused .vl-flight-unit {
+  animation-play-state: paused !important;
+}

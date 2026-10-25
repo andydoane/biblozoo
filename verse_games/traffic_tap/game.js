@@ -1,5 +1,15 @@
 (async function () {
   const app = document.getElementById("app");
+  // Patch 64: virtual activity time excludes task-switch and recovery waits.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let returnAnimating = [];
+  // Native gameNow() is intentionally not replaced globally.
+
   const ctx = await window.VerseGameBridge.getVerseContext();
 
   const GAME_ID = "traffic_tap_external";
@@ -257,6 +267,8 @@
   let resizeBound = false;
   let endScreenUnlockTimer = 0;
   let itemsClickBound = false;
+  let returnPriorPauseReason = null;
+  let returnWasLooping = false;
   const bonusItemNodes = new Map();
   let bonusItemsLayerInitialized = false;
   let roadRenderKey = "";
@@ -537,7 +549,7 @@
   function playUiTapSound() {
     if (muted) return;
 
-    const now = performance.now();
+    const now = gameNow();
     if (now - lastUiSoundAt < 80) return;
     lastUiSoundAt = now;
 
@@ -1220,7 +1232,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
       onChange: () => {
         state.lastSpawnAt =
-          performance.now();
+          gameNow();
 
         state.nextSpawnDelay =
           randomSpawnDelay();
@@ -1354,6 +1366,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function setPaused(paused, reason = "") {
+    // A delayed game callback cannot dismiss the task-switch pause.
+    if (returnPaused && !paused) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
 
@@ -1362,7 +1376,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       field.classList.toggle("is-paused", !!paused);
     }
 
-    if (!paused) state.lastTs = performance.now();
+    if (!paused) state.lastTs = gameNow();
   }
 
   function recalcField() {
@@ -1404,7 +1418,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const text = document.getElementById("ttBuildText");
     if (!build || !text) return;
 
-    const now = performance.now();
+    const now = gameNow();
     build.classList.toggle("is-shake", state.buildShakeUntil > now);
     build.classList.toggle("is-pop", state.buildPopUntil > now);
 
@@ -1550,7 +1564,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const marks = document.getElementById("ttRoadMarks");
     if (!roads || !marks) return;
 
-    const now = performance.now();
+    const now = gameNow();
     const topIsCrashing = state.roadCrashUntil[0] > now;
     const bottomIsCrashing = state.roadCrashUntil[1] > now;
     const nextRoadRenderKey = [
@@ -1617,7 +1631,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       bonusItemsLayerInitialized = true;
     }
 
-    const now = performance.now();
+    const now = gameNow();
     const activeIds = new Set();
 
     for (const item of state.bonusItems) {
@@ -1682,11 +1696,11 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       const y = roadTopY(item.road);
       const cls = ["tt-item", item.direction > 0 ? "is-flipped" : "", item.crashing ? "is-crashing" : ""];
       const unitCls = ["tt-unit"];
-      if (item.flashWrongUntil > performance.now()) unitCls.push("is-wrong");
-      if (item.swerveUntil > performance.now()) unitCls.push("is-swerve");
-      if (item.vanishUntil > performance.now()) unitCls.push("is-vanish");
-      if (item.bonkUntil > performance.now()) unitCls.push("is-bonk");
-      const now = performance.now();
+      if (item.flashWrongUntil > gameNow()) unitCls.push("is-wrong");
+      if (item.swerveUntil > gameNow()) unitCls.push("is-swerve");
+      if (item.vanishUntil > gameNow()) unitCls.push("is-vanish");
+      if (item.bonkUntil > gameNow()) unitCls.push("is-bonk");
+      const now = gameNow();
 
       let rideBob = 0;
       let rideScaleX = 1;
@@ -1875,9 +1889,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       });
     });
 
-    window.setTimeout(() => {
+    welcomeClock.sleep(duration + 120).then(() => {
       burst.remove();
-    }, duration + 120);
+    });
   }
 
   function rand(min, max) {
@@ -1899,11 +1913,11 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     layer.appendChild(puff);
 
     requestAnimationFrame(() => puff.classList.add("is-live"));
-    window.setTimeout(() => puff.remove(), 280);
+    welcomeClock.sleep(280).then(() => puff.remove());
   }
 
   function boostCarsAheadForSuccessLaunch(tappedItem) {
-    const now = performance.now();
+    const now = gameNow();
     const launchSpeed = tappedItem.launchSpeed || SUCCESS_LAUNCH_SPEED;
 
     for (const item of state.mainItems) {
@@ -1927,7 +1941,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function startSuccessLaunch(item) {
-    const now = performance.now();
+    const now = gameNow();
     const launchSpeed = Math.max(item.speed || item.targetSpeed || item.baseSpeed || 120, SUCCESS_LAUNCH_SPEED);
 
     item.launching = true;
@@ -2022,7 +2036,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     };
   }
 
-  function startBonusTruckIntro(now = performance.now()) {
+  function startBonusTruckIntro(now = gameNow()) {
     state.bonusTruckMode = "intro";
 
     const metrics = bonusTruckMetrics("intro");
@@ -2042,7 +2056,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     if (introTarget) introTarget.innerHTML = vehicleImgHtml(state.bonusIntroTarget, "tt-bonus-target-img");
   }
 
-  function startBonusTruckOutro(now = performance.now()) {
+  function startBonusTruckOutro(now = gameNow()) {
     state.bonusTruckMode = "outro";
 
     const metrics = bonusTruckMetrics("outro");
@@ -2062,7 +2076,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function startBonusRound() {
-    const now = performance.now();
+    const now = gameNow();
 
     state.bonusRound = true;
     state.bonusShowScore = false;
@@ -2226,7 +2240,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       (item.height * carCenterPct);
 
     if (item.isRainbowBonus) {
-      const now = performance.now();
+      const now = gameNow();
       const points = item.bonusPoints || 10;
 
       item.vanishUntil = now + 140;
@@ -2239,8 +2253,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       playGameSound("rainbowJackpot");
       spawnRainbowJackpot(x, y, points);
     } else if (item.isTarget) {
-      item.vanishUntil = performance.now() + 140;
-      item.removeAt = performance.now() + 150;
+      item.vanishUntil = gameNow() + 140;
+      item.removeAt = gameNow() + 150;
       state.bonusCorrectHits += 1;
       state.bonusStreak += 1;
       state.bonusBestStreak = Math.max(state.bonusBestStreak, state.bonusStreak);
@@ -2249,7 +2263,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       addPopup(x, y, "+1", true);
       spawnBonusSuccessBurst(x, y, item);
     } else {
-      const now = performance.now();
+      const now = gameNow();
       item.flashWrongUntil = now + 260;
       item.vanishUntil = now + 140;
       item.removeAt = now + 150;
@@ -2286,8 +2300,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       showCloud: false
     });
 
-    window.setTimeout(() => flash.remove(), 760);
-    window.setTimeout(() => banner.remove(), 980);
+    welcomeClock.sleep(760).then(() => flash.remove());
+    welcomeClock.sleep(980).then(() => banner.remove());
   }
 
   function cappedBonusSpeed(road, slot, proposedSpeed) {
@@ -2398,7 +2412,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function finishBonusRound() {
-    const now = performance.now();
+    const now = gameNow();
 
     state.bonusStopSpawn = true;
     state.bonusEnding = true;
@@ -2427,7 +2441,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     const metrics = bonusTruckMetrics();
     const target = state.bonusIntroTarget || state.bonusTargetEmoji || DEFAULT_VEHICLE;
-    const now = performance.now();
+    const now = gameNow();
     const cycleMs = 1680;
     const t = ((now % cycleMs) / cycleMs);
 
@@ -2513,7 +2527,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     const bonusIntro = document.getElementById("ttBonusIntroOverlay");
     if (!overlay || !bonusIntro) return;
 
-    if (state.overlayUntil > performance.now() && state.overlayMessage) {
+    if (state.overlayUntil > gameNow() && state.overlayMessage) {
       const current = overlay.firstElementChild;
       if (!current || current.textContent !== state.overlayMessage) {
         overlay.innerHTML = `<div class="tt-overlay-pill is-show">${escapeHtml(state.overlayMessage)}</div>`;
@@ -2539,6 +2553,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function loop(ts) {
+    ts = gameNow();
     if (!state.running) {
       state.rafId = 0;
       return;
@@ -2912,8 +2927,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     if (item.label !== target) {
       state.correctStreak = 0;
-      item.flashWrongUntil = performance.now() + 280;
-      state.buildShakeUntil = performance.now() + 260;
+      item.flashWrongUntil = gameNow() + 280;
+      state.buildShakeUntil = gameNow() + 260;
       playGameSound("wrongTap");
       crashRoad(item.road, item.id);
       return;
@@ -2921,7 +2936,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     playGameSound("correctTap");
     playZoomSound();
-    state.buildPopUntil = performance.now() + 200;
+    state.buildPopUntil = gameNow() + 200;
     startSuccessLaunch(item);
 
     if (item.label === target) {
@@ -2960,12 +2975,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       item.isCorrect = false;
       item.label = nextDecoyLabel(nextTarget || previousTarget);
       item.styleClass = DECOY_CLASSES[(item.id + 1) % DECOY_CLASSES.length];
-      item.bonkUntil = performance.now() + 260;
+      item.bonkUntil = gameNow() + 260;
     }
   }
 
   function crashRoad(road, tappedId) {
-    const now = performance.now();
+    const now = gameNow();
     state.roadCrashUntil[road] = now + 330;
     const roadItems = state.mainItems.filter(item => item.road === road && !item.crashing);
     roadItems.sort((a, b) => {
@@ -2982,9 +2997,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       item.swerveUntil = now + 180 + index * 40;
       item.removeAt = now + 240 + index * 90;
       const center = itemCenter(item);
-      window.setTimeout(() => {
+      welcomeClock.sleep(index * 85).then(() => {
         spawnCrashBurst(center.x, center.y, crashBurstOptionsForItem(item));
-      }, index * 85);
+      });
     });
   }
 
@@ -3002,7 +3017,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     }
 
     state.bonusTruckPending = true;
-    state.bonusClearStartedAt = performance.now();
+    state.bonusClearStartedAt = gameNow();
     state.overlayMessage = "";
     state.overlayUntil = 0;
 
@@ -3248,14 +3263,14 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     layer.appendChild(el);
 
-    window.setTimeout(() => {
+    welcomeClock.sleep(620).then(() => {
       el.remove();
-    }, 620);
+    });
   }
 
   function showPhaseOverlay(text) {
     state.overlayMessage = text;
-    state.overlayUntil = performance.now() + 900;
+    state.overlayUntil = gameNow() + 900;
   }
 
   function getItemMetrics(label) {
@@ -3376,5 +3391,79 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       .replace(/>/g, "&gt;")
       .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    returnWasLooping = !!state.rafId;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    suspendWelcomeAnimations();
+    setPaused(true, "welcome-back");
+    stopLoop();
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements += 1;
+      // Reuse the existing bounded new-context-on-gesture path.
+      replaceStuckTrafficTapAudioContext();
+      audioUnlocked = false;
+    }
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures += 1;
+        return false;
+      }
+      welcomeClock.resume();
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      restoreWelcomeAnimations();
+      setPaused(returnPriorPauseReason !== null, returnPriorPauseReason || "");
+      returnPriorPauseReason = null;
+      if (returnWasLooping && state.running) startLoop();
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    // Invalidate any pending audio attempt before navigating away.
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
+
+  function suspendWelcomeAnimations() {
+    returnAnimating = [];
+    if (typeof document.getAnimations !== "function") return;
+    for (const animation of document.getAnimations()) {
+      if (animation.playState !== "running") continue;
+      try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+    }
+  }
+
+  function restoreWelcomeAnimations() {
+    for (const animation of returnAnimating) {
+      try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+    }
+    returnAnimating = [];
   }
 })();

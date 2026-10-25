@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_25_patch63_bugs_munch_splat_welcome_back";
+const CACHE_VERSION = "2026_Oct_25_patch64_1_recovery_escape_diagnostics";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -52,6 +52,7 @@ const CORE_PATHS = [
   "./verse_games/shared/welcome-back.css",
   "./verse_games/shared/welcome-back.js",
   "./verse_games/shared/welcome-back-return.js",
+  "./verse_games/shared/welcome-back-clock.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",

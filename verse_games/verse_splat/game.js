@@ -3635,6 +3635,7 @@ function spawnWrongFaceParticleBurst(){
     shouldPrompt: () => ["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen),
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
