@@ -1283,3 +1283,10 @@ body{
   .vsp-actions{flex-direction:row;justify-content:center;width:min(100%,520px)}
   .vsp-actions .vm-btn{flex:1 1 0}
 }
+
+/* Patch 63: freeze CSS motion behind the shared task-switch dialog. */
+body.bz-return-activity-paused #app *,
+body.bz-return-activity-paused #app *::before,
+body.bz-return-activity-paused #app *::after {
+  animation-play-state: paused !important;
+}

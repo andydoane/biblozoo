@@ -101,5 +101,44 @@
     });
   }
 
-  root.BibloZooWelcomeBackReturn = Object.freeze({ attach });
+  // Game-owned unlock() executes synchronously in the actual button click.
+  // A context being "running" is insufficient; wait for its audio clock to move.
+  function resumeAudioOnGesture({ unlock, getContext, isCurrent, muted = false } = {}) {
+    let request;
+    try { request = typeof unlock === "function" ? unlock() : null; }
+    catch (_) { return Promise.resolve(false); }
+    const context = getContext?.();
+    if (muted) return Promise.resolve(true);
+    if (!context) return Promise.resolve(false);
+
+    const probe = async () => {
+      if (!isCurrent?.() || context.state !== "running") return false;
+      const before = context.currentTime;
+      await new Promise(resolve => setTimeout(resolve, 190));
+      return isCurrent() && getContext() === context &&
+        context.state === "running" && context.currentTime - before >= 0.02;
+    };
+
+    return (async () => {
+      // A suspended resume() can remain unresolved indefinitely on iOS.
+      if (request && typeof request.then === "function") {
+        await Promise.race([
+          Promise.resolve(request).catch(() => false),
+          new Promise(resolve => setTimeout(resolve, 1300))
+        ]);
+      }
+      if (!isCurrent?.()) return false;
+      if (await probe()) return true;
+      const coordinator = root.BibloZooAudioRecoveryCoordinator;
+      if (!coordinator?.isAvailable?.() || !isCurrent()) return false;
+      try {
+        const result = await coordinator.recoverAfterStall({
+          source: "app", probe, isCurrent: () => isCurrent() && getContext() === context
+        });
+        return result?.recovered === true && isCurrent() && getContext() === context;
+      } catch (_) { return false; }
+    })();
+  }
+
+  root.BibloZooWelcomeBackReturn = Object.freeze({ attach, resumeAudioOnGesture });
 })(window);

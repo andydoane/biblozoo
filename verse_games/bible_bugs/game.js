@@ -154,6 +154,12 @@
   let bonusRevealCompletionPromise = Promise.resolve();
   let bonusRevealContinuePending = false;
   let resizeBound = false;
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let priorPauseReason = null;
+
 
   let audioCtx = null;
   let audioUnlocked = false;
@@ -1065,6 +1071,7 @@
     field.addEventListener("pointerdown", (event) => {
       // A bug tap must request recovery before its tongue/pop sequence.
       void unlockAudio();
+      if (returnPaused) { event.preventDefault(); return; }
       if (state.bonusScoreRevealActive) {
         event.preventDefault();
         continueAfterBonusScoreReveal();
@@ -2230,7 +2237,7 @@
       update(dt, ts);
     }
 
-    renderFrame();
+    if (!returnPaused) renderFrame();
     state.rafId = requestAnimationFrame(loop);
   }
 
@@ -3067,4 +3074,53 @@
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
   }
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    priorPauseReason = state.paused ? state.pauseReason : null;
+    document.body.classList.add("bz-return-activity-paused");
+    if (!state.paused) setPaused(true, "welcome-back");
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements++;
+      audioForegroundFreshContextOnGesture = true;
+      audioUnlocked = false;
+    }
+    // Execute the gesture-owned unlock before yielding to any promise.
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures++;
+        return false;
+      }
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      if (priorPauseReason === null) setPaused(false);
+      else state.pauseReason = priorPauseReason;
+      priorPauseReason = null;
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !state.done,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
 })();

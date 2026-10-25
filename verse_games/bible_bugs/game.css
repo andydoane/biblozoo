@@ -1314,3 +1314,9 @@ html.bb-native-capacitor .bb-field-wrap {
 #bbHelpOverlay.is-open {
   z-index: 1002;
 }
+/* Patch 63: freeze CSS motion behind the shared task-switch dialog. */
+body.bz-return-activity-paused #app *,
+body.bz-return-activity-paused #app *::before,
+body.bz-return-activity-paused #app *::after {
+  animation-play-state: paused !important;
+}

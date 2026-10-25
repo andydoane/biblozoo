@@ -372,6 +372,12 @@ const FACE_MAP = {
   let audioForegroundRecoveryGeneration = 0;
   let audioForegroundRecoveryInFlight = false;
   let audioForegroundFreshContextOnGesture = false;
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let priorPauseReason = null;
+  let returnPausedAt = 0;
   let uiSoundFlip = false;
   let wordTapSoundFlip = false;
   let chewSoundIndex = 0;
@@ -1334,7 +1340,7 @@ function backToMenuFromHelp(){
       updateConfetti(dt);
     }
 
-    renderFrame(ts);
+    if (!returnPaused) renderFrame(ts);
     state.rafId = requestAnimationFrame(loop);
   }
 
@@ -2537,7 +2543,7 @@ function backToMenuFromHelp(){
       };
 
       const onPointerDown = (event) => {
-        if (!armed) return;
+        if (!armed || returnPaused) return;
         if (state.bonusPhase !== "score") return;
 
         if (event.cancelable) event.preventDefault();
@@ -2546,7 +2552,7 @@ function backToMenuFromHelp(){
       };
 
       const onKeyDown = (event) => {
-        if (!armed) return;
+        if (!armed || returnPaused) return;
         if (state.bonusPhase !== "score") return;
         if (event.key !== "Enter" && event.key !== " ") return;
 
@@ -4521,4 +4527,56 @@ const shuffle = window.VerseGameShell.shuffle;
   }
 
 
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    priorPauseReason = state.paused ? state.pauseReason : null;
+    returnPausedAt = performance.now();
+    document.body.classList.add("bz-return-activity-paused");
+    setPaused(true, "welcome-back");
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements++;
+      audioForegroundFreshContextOnGesture = true;
+      audioUnlocked = false;
+    }
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures++;
+        return false;
+      }
+      const elapsed = Math.max(0, performance.now() - returnPausedAt);
+      for (const key of ["feedbackUntil", "reactionFlashUntil", "streakSunburstUntil", "buildShakeUntil"]) {
+        if (state[key] > 0) state[key] += elapsed;
+      }
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      setPaused(priorPauseReason !== null, priorPauseReason || "");
+      priorPauseReason = null;
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !completed,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
 })();

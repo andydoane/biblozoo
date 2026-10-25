@@ -170,6 +170,12 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
 
   let muted = false;
   let lastBoardPressAt = 0;
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let returnPausedAt = 0;
+
 
   const VERSE_SPLAT_SOUND_BASE = "./verse_splat_sounds/";
   const SHARED_UI_SOUND_BASE = "../../ui_audio/";
@@ -567,7 +573,20 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
 
   const $ = (s, root=document) => root.querySelector(s);
   const escapeHtml = (str) => String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#39;");
-  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  // Pause-aware game delays. Returning from a suspended WebView must not
+  // consume tutorial, refill, ceremony, or bonus-intro time.
+  const sleep = (ms) => new Promise(resolve => {
+    const duration = Math.max(0, Number(ms) || 0);
+    let elapsed = 0;
+    let last = performance.now();
+    const step = now => {
+      if (!returnPaused && !document.hidden) elapsed += Math.max(0, Math.min(now - last, 80));
+      last = now;
+      if (elapsed >= duration) resolve();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
   const afterNextPaint = () => new Promise(resolve => {
     requestAnimationFrame(() => {
       window.setTimeout(resolve, 0);
@@ -1002,7 +1021,7 @@ function applyBuildTextRender(){
     if (!boardMain || boardMain.dataset.boundVerseSplatPress === "1") return;
 
     const onPress = (event) => {
-      if (state.menuOpen || state.helpOpen || state.busy) return;
+      if (returnPaused || state.menuOpen || state.helpOpen || state.busy) return;
       if (state.screen !== "game" && state.screen !== "bonus") return;
 
       const now = performance.now();
@@ -1319,7 +1338,8 @@ function gameplayShell({ bonus=false }){
     }
 
     for (const timer of state.coverageResultTimers) {
-      clearTimeout(timer);
+      if (timer && typeof timer === "object") timer.cancelled = true;
+      else clearTimeout(timer);
     }
 
     state.coverageResultTimers = [];
@@ -1336,14 +1356,17 @@ function gameplayShell({ bonus=false }){
     const fill = $("#vspCoverageResultFill");
     const label = $("#vspCoverageResultPercent");
     const duration = 1550;
-    const started = performance.now();
+    let elapsed = 0;
+    let previous = performance.now();
 
     function easeOutCubic(t) {
       return 1 - Math.pow(1 - t, 3);
     }
 
     function step(now) {
-      const t = clamp((now - started) / duration, 0, 1);
+      if (!returnPaused && !document.hidden) elapsed += Math.max(0, Math.min(now - previous, 80));
+      previous = now;
+      const t = clamp(elapsed / duration, 0, 1);
       const value = Math.round(target * easeOutCubic(t));
 
       state.coverageResultBarPercent = value;
@@ -1359,13 +1382,14 @@ function gameplayShell({ bonus=false }){
       state.coverageResultRafId = 0;
       state.coverageResultBarPercent = target;
 
-      const cardTimer = setTimeout(() => {
+      const cardTimer = { cancelled: false };
+      state.coverageResultTimers.push(cardTimer);
+      void sleep(260).then(() => {
+        if (cardTimer.cancelled || state.screen !== "coverage_result") return;
         state.coverageResultPhase = "card";
         playPositiveSound();
         render();
-      }, 260);
-
-      state.coverageResultTimers.push(cardTimer);
+      });
     }
 
     state.coverageResultRafId = requestAnimationFrame(step);
@@ -2135,10 +2159,10 @@ function render(){
     if (state.tutorialStep === "tap") {
       state.tutorialPending = true;
 
-      setTimeout(() => {
+      void sleep(360).then(() => {
         if (!state.tutorialActive || state.screen !== "game") return;
         startTutorialStep("fill");
-      }, 360);
+      });
 
       return;
     }
@@ -2146,16 +2170,16 @@ function render(){
     if (state.tutorialStep === "fill" && !state.blobs.length) {
       state.tutorialPending = true;
 
-      setTimeout(() => {
+      void sleep(360).then(() => {
         if (!state.tutorialActive || state.screen !== "game") return;
 
         spawnTutorialGoPopup();
 
-        setTimeout(() => {
+        void sleep(760).then(() => {
           if (!state.tutorialActive || state.screen !== "game") return;
           clearTutorialPaintAndStartGame();
-        }, 760);
-      }, 360);
+        });
+      });
     }
   }
 
@@ -3132,7 +3156,7 @@ function spawnWrongFaceParticleBurst(){
   }
 
   function tickGame(ts){
-    if (state.screen !== "game" || state.menuOpen || state.helpOpen) return;
+    if (returnPaused || state.screen !== "game" || state.menuOpen || state.helpOpen) return;
     const bounds = currentBounds();
     const dt = state.lastTs ? Math.min((ts - state.lastTs) / 1000, 0.032) : 0.016;
     state.lastTs = ts;
@@ -3156,6 +3180,7 @@ function spawnWrongFaceParticleBurst(){
 
   function startGameLoop(){
     stopGameLoop();
+    if (returnPaused) return;
     state.lastTs = 0;
     state.rafId = requestAnimationFrame(tickGame);
   }
@@ -3267,15 +3292,18 @@ function spawnWrongFaceParticleBurst(){
 
   function clearBonusRespawnTimers() {
     for (const timer of state.bonusRespawnTimers || []) {
-      clearTimeout(timer);
+      if (timer && typeof timer === "object") timer.cancelled = true;
+      else clearTimeout(timer);
     }
 
     state.bonusRespawnTimers = [];
   }
 
   function scheduleBonusBlobRespawn() {
-    const timer = window.setTimeout(() => {
+    const timer = { cancelled: false };
+    void sleep(BONUS_RESPAWN_DELAY_MS).then(() => {
       state.bonusRespawnTimers = state.bonusRespawnTimers.filter(entry => entry !== timer);
+      if (timer.cancelled) return;
 
       if (state.screen !== "bonus" || state.bonusEnding) return;
 
@@ -3288,7 +3316,7 @@ function spawnWrongFaceParticleBurst(){
 
       state.bonusBlobs.push(blob);
       appendBonusBlobNode(blob, bounds);
-    }, BONUS_RESPAWN_DELAY_MS);
+    });
 
     state.bonusRespawnTimers.push(timer);
   }
@@ -3323,7 +3351,7 @@ function spawnWrongFaceParticleBurst(){
   }
 
   function tickBonus(ts) {
-    if (state.screen !== "bonus" || state.menuOpen || state.helpOpen || state.bonusEnding) return;
+    if (returnPaused || state.screen !== "bonus" || state.menuOpen || state.helpOpen || state.bonusEnding) return;
     if (!state.bonusStartedAt) state.bonusStartedAt = ts;
 
     const elapsed = ts - state.bonusStartedAt;
@@ -3358,6 +3386,7 @@ function spawnWrongFaceParticleBurst(){
 
   function startBonusLoop() {
     stopBonusLoop();
+    if (returnPaused) return;
 
     state.lastTs = 0;
     const elapsedBeforePause = BONUS_TIME_LIMIT_MS - state.bonusRemainingMs;
@@ -3547,4 +3576,66 @@ function spawnWrongFaceParticleBurst(){
   Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
   initVerseData();
   render();
+
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    returnPausedAt = performance.now();
+    document.body.classList.add("bz-return-activity-paused");
+    stopGameLoop();
+    stopBonusLoop();
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+      returnContextReplacements++;
+      const old = verseSplatAudioContext;
+      verseSplatAudioContext = null;
+      verseSplatAudioUnlocked = false;
+      verseSplatAudioResumePromise = null;
+      verseSplatAudioPrimed = false;
+      verseSplatAudioBufferCache.clear();
+      verseSplatAudioBufferPromises.clear();
+      try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
+    }
+    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => {
+        verseSplatAudioUnlocked = false;
+        unlockVerseSplatAudio();
+        return verseSplatAudioResumePromise;
+      },
+      getContext: () => verseSplatAudioContext,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      muted
+    });
+    return Promise.resolve(restore).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) {
+        returnRecoveryFailures++;
+        return false;
+      }
+      const duration = Math.max(0, performance.now() - returnPausedAt);
+      if (state.inputLockedUntil > 0) state.inputLockedUntil += duration;
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      state.lastTs = 0;
+      if (state.screen === "game" && !state.menuOpen && !state.helpOpen) startGameLoop();
+      if (state.screen === "bonus" && !state.menuOpen && !state.helpOpen &&
+          !state.bonusIntroVisible && !state.bonusEnding) startBonusLoop();
+      returnRecoveryFailures = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => ["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen),
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
 })();
