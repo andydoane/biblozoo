@@ -24,6 +24,10 @@
   ) return;
 
   try {
+    // The same opt-in URL works for direct game and playground PWA links.
+    const setting = new URLSearchParams(window.location.search).get("audioDiag");
+    if (setting === "on") window.localStorage?.setItem("biblozooAudioDiagnostics", "1");
+    else if (setting === "off") window.localStorage?.setItem("biblozooAudioDiagnostics", "0");
     if (window.localStorage?.getItem("biblozooAudioDiagnostics") !== "1") return;
   } catch (err) {
     return;

@@ -32,6 +32,13 @@
   const FEED_AUDIO_MASTER_VOLUME = 1.00;
   const FEED_COLLISION_TONE_VOLUME = 0.20; // Classic pegs + Bounce bricks/walls/paddle.
   const FEED_MELODY_TONE_VOLUME = 0.25;    // Melody notes only.
+  // Recovery happens only after a deliberate Resume gesture. An advancing
+  // Web Audio clock is necessary (but not sufficient) evidence of usable sound.
+  const FEED_AUDIO_CLOCK_PROBE_MS = 180;
+  const FEED_AUDIO_CLOCK_MIN_ADVANCE = 0.012;
+  const FEED_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
+  const FEED_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
+  const FEED_AUDIO_REPLACEMENT_BACKOFF_MS = 15000;
 
   function feedingSoundVolume(baseVolume) {
     return clamp(baseVolume * FEED_AUDIO_MASTER_VOLUME, 0, 1);
@@ -1002,6 +1009,29 @@
     return chompBufferPromise;
   }
 
+  // Diagnostic events are opt-in. The PWA and Capacitor use the same web path.
+  function recordFeedAudioRecovery(type, runtime, details = {}) {
+    try {
+      window.BibloZooAudioDiagnostics?.record(type, {
+        activity: "feeding", mode: runtime?.mode || "unknown", ...details
+      });
+    } catch (err) { /* Diagnostics must never affect gameplay. */ }
+  }
+
+  function feedAudioClockAdvances(context) {
+    if (!context || context.state !== "running" || document.hidden)
+      return Promise.resolve(false);
+    const before = Number(context.currentTime);
+    if (!Number.isFinite(before)) return Promise.resolve(false);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const after = Number(context.currentTime);
+        resolve(!document.hidden && context.state === "running" &&
+          Number.isFinite(after) && after - before > FEED_AUDIO_CLOCK_MIN_ADVANCE);
+      }, FEED_AUDIO_CLOCK_PROBE_MS);
+    });
+  }
+
   // A resume request is not proof that Web Audio is usable. Retry only on
   // fresh gestures; automatic, obsolete collision effects never call resume().
   function resumeFeedAudioContext(context) {
@@ -1335,11 +1365,15 @@
             data-daily-feed-resume-back
             aria-label="${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}"
           >◀</button>
-          <button
-            class="daily-feed-resume-button no-zoom"
-            type="button"
-            data-daily-feed-resume
-          >Resume</button>
+          <div class="daily-feed-resume-content">
+            <button
+              class="daily-feed-resume-button no-zoom"
+              type="button"
+              data-daily-feed-resume
+            >Resume</button>
+            <p class="daily-feed-resume-status" data-daily-feed-resume-status
+               role="status" aria-live="polite" hidden></p>
+          </div>
         </div>
 
         <div
@@ -3050,6 +3084,14 @@
     runtime.modeTimers?.add(timer);
   }
 
+  function setFeedingResumeStatus(runtime, message = "") {
+    if (runtime.resumeStatus) {
+      runtime.resumeStatus.textContent = message;
+      runtime.resumeStatus.hidden = !message;
+    }
+    if (runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try Again" : "Resume";
+  }
+
   function pauseFeedingGame(runtime, now = performance.now()) {
     if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
         !runtime.running || runtime.finished || runtime.feedPausedAt != null) return false;
@@ -3059,6 +3101,9 @@
     clearTimeout(runtime.feedStartAudioWatchdog);
     runtime.feedStartAudioWatchdog = null;
     runtime.feedResumePending = false;
+    // A paused round is never declared recovered until a gesture-driven
+    // clock probe succeeds. Preserve this marker across unrelated redraws.
+    runtime.feedAudioRecoveryVerified = false;
     if (runtime.mode === FEED_MODES.MELODY) {
       pauseMelodyForInterruption(runtime, now);
     }
@@ -3084,6 +3129,7 @@
     runtime.gameEl?.classList?.add?.("is-interruption-paused");
     if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = false;
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+    setFeedingResumeStatus(runtime);
     return true;
   }
 
@@ -3108,6 +3154,7 @@
     runtime.gameEl?.classList?.remove?.("is-interruption-paused");
     if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+    setFeedingResumeStatus(runtime);
     if (runtime.tiltEnabled) {
       // Keep the child's original neutral angle. Returning while the phone
       // is tilted must not redefine what "center" means. A fresh sensor
@@ -3125,41 +3172,154 @@
         runtime.feedPausedAt == null || runtime.feedPageHidden ||
         document.hidden || runtime.feedResumePending) return false;
     const Ctor = window.AudioContext || window.webkitAudioContext;
-    if ((!runtime.audioContext || runtime.audioContext.state === "closed") && Ctor) {
-      try {
-        runtime.audioContext = new Ctor();
-        void loadStarBuffer(runtime.audioContext);
-        void loadChompBuffer(runtime.audioContext);
-      } catch (err) {
-        runtime.audioContext = null;
+    const needsReplacement = runtime.feedAudioNeedsFreshContext ||
+      !runtime.audioContext || runtime.audioContext.state === "closed";
+    if (needsReplacement && Ctor) {
+      const now = performance.now();
+      const sinceReplacement = now - runtime.feedAudioLastReplacementAt;
+      if (runtime.feedAudioReplacements > 0 &&
+          sinceReplacement < FEED_AUDIO_REPLACEMENT_COOLDOWN_MS) {
+        recordFeedAudioRecovery("feed-audio-retry-delayed", runtime);
+        setFeedingResumeStatus(runtime, "Sound needs a moment. Please try again.");
+        return false;
+      }
+      const burstExhausted = runtime.feedAudioReplacements >= FEED_AUDIO_REPLACEMENT_BURST_LIMIT &&
+        sinceReplacement < FEED_AUDIO_REPLACEMENT_BACKOFF_MS;
+      if (burstExhausted && runtime.audioContext && runtime.audioContext.state !== "closed") {
+        // A fresh user tap can still test the old context's clock. iOS may
+        // revive it without needing yet another AudioContext allocation.
+        recordFeedAudioRecovery("feed-audio-replacement-deferred", runtime);
+      } else {
+        if (runtime.feedAudioReplacements >= FEED_AUDIO_REPLACEMENT_BURST_LIMIT &&
+            sinceReplacement >= FEED_AUDIO_REPLACEMENT_BACKOFF_MS) {
+          runtime.feedAudioReplacements = 0;
+        }
+        try {
+          // Construct and resume the new context within this same real tap.
+          const fresh = new Ctor();
+          stopFeedingEffects(runtime);
+          stopMelodyVoices(runtime);
+          const old = runtime.audioContext;
+          runtime.audioContext = fresh;
+          runtime.feedAudioNeedsFreshContext = false;
+          runtime.feedAudioReplacements = (runtime.feedAudioReplacements || 0) + 1;
+          runtime.feedAudioLastReplacementAt = now;
+          stopAudioContext(old);
+          void loadStarBuffer(fresh);
+          void loadChompBuffer(fresh);
+          recordFeedAudioRecovery("feed-audio-context-replaced", runtime,
+            { replacements: runtime.feedAudioReplacements });
+        } catch (err) {
+          recordFeedAudioRecovery("feed-audio-context-create-failed", runtime);
+          setFeedingResumeStatus(runtime, "Sound isn't ready. Please try again, or go back.");
+          return false;
+        }
       }
     }
     runtime.feedResumePending = true;
     if (runtime.resumeButton) runtime.resumeButton.disabled = true;
     const generation = ++runtime.feedResumeGeneration;
+    const context = runtime.audioContext;
     let settled = false;
-    const settle = (ready) => {
+    const settle = (ready, reason) => {
       if (settled) return;
       settled = true;
       clearTimeout(runtime.feedResumeWatchdog);
       runtime.feedResumeWatchdog = null;
       if (activeRuntime !== runtime || runtime.feedResumeGeneration !== generation ||
-          runtime.feedPausedAt == null) return;
+          runtime.feedPausedAt == null || runtime.audioContext !== context) return;
       runtime.feedResumePending = false;
       if (runtime.resumeButton) runtime.resumeButton.disabled = false;
-      if (ready && !document.hidden && !runtime.feedPageHidden) {
-        continueFeedingAfterGesture(runtime);
+      if (!ready || document.hidden || runtime.feedPageHidden) {
+        if (!document.hidden && !runtime.feedPageHidden) {
+          runtime.feedAudioNeedsFreshContext = !!Ctor;
+          recordFeedAudioRecovery("feed-audio-resume-failed", runtime,
+            { reason: reason || "unavailable" });
+          setFeedingResumeStatus(runtime,
+            "Sound isn't ready yet. Wait a moment, then try again or go back.");
+        }
+        return;
+      }
+      // Only the verified gesture path can dismiss the interruption overlay.
+      runtime.feedAudioRecoveryVerified = true;
+      if (continueFeedingAfterGesture(runtime)) {
+        runtime.feedAudioNeedsFreshContext = false;
+        runtime.feedAudioReplacements = 0;
+        recordFeedAudioRecovery("feed-audio-resume-verified", runtime);
       }
     };
-    // No Web Audio implementation: allow existing HTML-audio fallback and
-    // gameplay rather than trapping older browsers behind Resume forever.
-    if (!Ctor && !runtime.audioContext) {
+    // Older browsers with no Web Audio continue to use the existing HTML
+    // audio fallback. Do not trap them behind an impossible clock probe.
+    if (!Ctor && !context) {
       settle(true);
       return true;
     }
-    // A pending iOS resume promise must not disable the button indefinitely.
-    runtime.feedResumeWatchdog = setTimeout(() => settle(false), 2500);
-    void resumeFeedAudioContext(runtime.audioContext).then(settle, () => settle(false));
+    if (!context || context.state === "closed") {
+      settle(false, "no-context");
+      return false;
+    }
+    recordFeedAudioRecovery("feed-audio-resume-attempt", runtime);
+    // The watchdog covers BOTH resume() and the clock probe. Old promises
+    // cannot dismiss the overlay or affect a later round once timed out.
+    // Patch 60 coordinator's finite settling windows require a longer
+    // watchdog only on the native iOS path. Browser/PWA/Android stay at 2.5s.
+    const coordinator = window.BibloZooAudioRecoveryCoordinator;
+    runtime.feedResumeWatchdog = setTimeout(() => settle(false, "timeout"),
+      coordinator?.isAvailable?.() ? 4200 : 2500);
+    void resumeFeedAudioContext(context).then(ready => {
+      if (!ready) {
+        settle(false, "resume");
+        return;
+      }
+      if (settled || activeRuntime !== runtime ||
+          runtime.feedResumeGeneration !== generation || runtime.audioContext !== context ||
+          document.hidden || runtime.feedPageHidden) return;
+      void feedAudioClockAdvances(context).then(advanced => {
+        if (advanced) { settle(true, "verified"); return; }
+        // Patch 60: only an actual failed clock check can enter the shared
+        // iOS coordinator. Delayed checks remain owned by this Resume tap;
+        // stale generations cannot dismiss an overlay or alter gameplay.
+        if (coordinator?.isAvailable?.()) {
+          const isCurrent = () => !settled && activeRuntime === runtime &&
+            runtime.feedResumeGeneration === generation &&
+            runtime.audioContext === context && runtime.feedPausedAt != null &&
+            !document.hidden && !runtime.feedPageHidden;
+          void coordinator.recoverAfterStall({
+            source: "feeding",
+            probe: () => feedAudioClockAdvances(context),
+            isCurrent
+          }).then(result => {
+            if (!isCurrent()) return;
+            recordFeedAudioRecovery("feed-audio-coordinated-result", runtime,
+              { recovered: result?.recovered === true, reason: result?.reason });
+            settle(result?.recovered === true,
+              result?.recovered ? "coordinated-verified" : "clock-stalled-after-coordination");
+          }, () => settle(false, "coordination-error"));
+          return;
+        }
+        // Patch 59 fallback: only an *actually frozen* clock may request native
+        // reactivation. A successful native call must pass a second 180 ms
+        // probe before the paused round can resume; no automatic foreground
+        // activation or new context is created in this path.
+        const nativeRecovery = window.BibloZooNativeAudioRecovery;
+        if (!nativeRecovery?.isEnabled?.()) {
+          settle(false, "clock-stalled");
+          return;
+        }
+        void nativeRecovery.tryAfterClockStall("feeding").then(result => {
+          if (!result?.activated || settled || activeRuntime !== runtime ||
+              runtime.feedResumeGeneration !== generation ||
+              runtime.audioContext !== context || document.hidden || runtime.feedPageHidden) {
+            settle(false, "clock-stalled");
+            return;
+          }
+          recordFeedAudioRecovery("feed-audio-native-recheck", runtime);
+          void feedAudioClockAdvances(context).then(rechecked => {
+            settle(rechecked, rechecked ? "native-verified" : "clock-stalled-after-native");
+          }, () => settle(false, "native-clock-error"));
+        }, () => settle(false, "native-bridge-error"));
+      }, () => settle(false, "clock-error"));
+    }, () => settle(false, "resume"));
     return true;
   }
 
@@ -4456,6 +4616,7 @@
 
     const resumeOverlay = rootEl.querySelector("[data-daily-feed-resume-overlay]");
     const resumeButton = rootEl.querySelector("[data-daily-feed-resume]");
+    const resumeStatus = rootEl.querySelector("[data-daily-feed-resume-status]");
     const resumeBackButton = rootEl.querySelector("[data-daily-feed-resume-back]");
 
     const resultOverlay =
@@ -4633,12 +4794,17 @@
       startOverlay,
       resumeOverlay,
       resumeButton,
+      resumeStatus,
       resumeBackButton,
       resumeButtonHandler: null,
       resumeBackHandler: null,
       feedPausedAt: null,
       feedResumePending: false,
       feedResumeGeneration: 0,
+      feedAudioRecoveryVerified: false,
+      feedAudioNeedsFreshContext: false,
+      feedAudioReplacements: 0,
+      feedAudioLastReplacementAt: 0,
       feedFrameGeneration: 0,
       feedStartAudioWatchdog: null,
       feedResumeWatchdog: null,

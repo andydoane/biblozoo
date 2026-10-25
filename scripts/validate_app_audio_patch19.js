@@ -31,7 +31,7 @@ async function flush() { for (let i=0;i<12;i++) await Promise.resolve(); }
 
 function appHarness() {
   const calls = [], timers = new Map(), events = {};
-  let nextId = 0, resumeMode = "success", pending = null;
+  let nextId = 0, resumeMode = "success", pending = null, elapsedMs = 0;
   const contexts = [];
   class MockContext {
     constructor() {
@@ -56,17 +56,22 @@ function appHarness() {
     let appAudioContext = null, appAudioUnlocked = false, appAudioUnlockPromise = null;
     let appAudioUnlockGeneration = 0, appAudioRecoveryPending = false;
     let appAudioFreshContextOnGesture = false, appAudioRecoveryFailures = 0;
+    let appAudioReplacementsThisInterruption = 0, appAudioLastReplacementAt = 0;
+    const APP_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
+    const APP_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
+    const APP_AUDIO_REPLACEMENT_BACKOFF_MS = 15000;
+    function recordAppAudioRecovery() {}
     function playTinyUnlockBlip(){ calls.push("prime-blip"); }
     function playAppSilenceUnlock(){ calls.push("silent-prime"); return Promise.resolve(false); }
     function preloadUiTapSoundBuffers(){ calls.push("preload"); return Promise.resolve([]); }
     ${extract("function getAppAudioContext() {", "function ensureAppSilenceAudio()")}
     ${extract("// Foreground lifecycle handlers only invalidate", "function playUiTapSound(")}
   `;
-  const box = harness(code, { document, window, calls, setTimeout(fn,delay) { const id=++nextId; timers.set(id,{fn,delay}); return id; }, clearTimeout(id) { timers.delete(id); } }, [
-    "unlockAppAudio", "markAppAudioInterrupted", "getAppAudioContext", "appAudioStatus:()=>({unlocked:appAudioUnlocked, pending:appAudioRecoveryPending, fresh:appAudioFreshContextOnGesture, failures:appAudioRecoveryFailures, inflight:!!appAudioUnlockPromise})"
+  const box = harness(code, { document, window, calls, performance: {now:()=>elapsedMs}, setTimeout(fn,delay) { const id=++nextId; timers.set(id,{fn,delay}); return id; }, clearTimeout(id) { timers.delete(id); } }, [
+    "unlockAppAudio", "markAppAudioInterrupted", "getAppAudioContext", "appAudioStatus:()=>({unlocked:appAudioUnlocked, pending:appAudioRecoveryPending, fresh:appAudioFreshContextOnGesture, failures:appAudioRecoveryFailures, inflight:!!appAudioUnlockPromise, replacements:appAudioReplacementsThisInterruption})"
   ]);
   return { api:box.api, calls, contexts, timers, document, window,
-    mode(v) { resumeMode=v; }, resolve() { assert.ok(pending); pending(); pending=null; },
+    mode(v) { resumeMode=v; }, advance(ms) { elapsedMs+=ms; }, resolve() { assert.ok(pending); pending(); pending=null; },
     emit(name) { for(const fn of events[name] || []) fn(); },
     fire(delay) { const next=[...timers].find(([,x])=>x.delay===delay);assert.ok(next,`expected timer ${delay}`);timers.delete(next[0]);next[1].fn(); }
   };
@@ -142,6 +147,25 @@ async function testFrozenClockRequiresFreshGesture() {
   check(await second,true,"new context with advancing clock recovers");
   check(h.contexts[0].state,"closed","old context released");
 }
+async function testPatch56FrozenClockReplacementCooldown() {
+  const h=appHarness();
+  check(await h.api.unlockAppAudio(),true,"baseline context starts normally");
+  h.document.hidden=true;h.emit("document:visibilitychange");
+  h.document.hidden=false;h.emit("window:pageshow");
+  const first=h.api.unlockAppAudio();await flush();h.fire(90);
+  check(await first,false,"frozen old clock requests a fresh gesture");
+  const second=h.api.unlockAppAudio();await flush();h.fire(90);
+  check(await second,false,"fresh replacement can also be frozen on iOS");
+  check(h.contexts.length,2,"one replacement was attempted");
+  check(await h.api.unlockAppAudio(),false,"rapid tap doesn't keep making AudioContexts");
+  check(h.contexts.length,2,"replacement cooldown prevents a context storm");
+  h.advance(1600);
+  const later=h.api.unlockAppAudio();await flush();
+  check(h.contexts.length,3,"a later real gesture can try a new context");
+  h.contexts[2].currentTime=.2;h.fire(90);
+  check(await later,true,"clock eventually advances and recovers after cooldown");
+}
+
 async function testNoHiddenUnlock() {
   const h=appHarness();h.document.hidden=true;
   check(await h.api.unlockAppAudio(),false,"hidden tab never attempts unlock");
@@ -286,12 +310,13 @@ function testSourceIntegrationGuards() {
   includes(worker,/const CACHE_VERSION = "[^"]+";/,
     "Service worker retains an explicit cache version after later patches");
 }
-(async()=>{
+async function runPatch19Tests() {
   await testAppReadyAfterRealRunning();
   await testBlockedAndWrongState();
   await testHangingAndDeduplicated();
   await testRapidAppSwitchAndStaleUnlock();
   await testFrozenClockRequiresFreshGesture();
+  await testPatch56FrozenClockReplacementCooldown();
   await testNoHiddenUnlock();
   testChunkAndEchoInterruption();
   testInstructionAndListenRecovery();
@@ -299,4 +324,6 @@ function testSourceIntegrationGuards() {
   await testChunkCompletionGuard();
   testSourceIntegrationGuards();
   console.log(`Patch 19 shared app and Learn audio validation passed (${checks} checks).`);
-})().catch(err=>{console.error(err);process.exitCode=1;});
+}
+module.exports = { appHarness, flush };
+if (require.main === module) runPatch19Tests().catch(err=>{console.error(err);process.exitCode=1;});

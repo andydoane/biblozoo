@@ -66,6 +66,23 @@
     </div>
   </div>
 <!-- App JavaScript -->
+<!-- Developer-only audio diagnostics: inert unless explicitly enabled. -->
+<script>
+  try {
+    const setting = new URLSearchParams(window.location.search).get("audioDiag");
+    if (setting === "on") localStorage.setItem("biblozooAudioDiagnostics", "1");
+    else if (setting === "off") localStorage.setItem("biblozooAudioDiagnostics", "0");
+    // Patch 60: optional persistent A/B switch, native iOS only.
+    const coord = new URLSearchParams(window.location.search).get("audioCoord");
+    if (coord === "off") localStorage.setItem("biblozooAudioCoordination", "0");
+    else if (coord === "on") localStorage.setItem("biblozooAudioCoordination", "1");
+  } catch (err) { /* Storage restrictions must not block app startup. */ }
+</script>
+<script src="verse_games/shared/audio-diagnostics.js"></script>
+<!-- Optional iOS-only clock-stall experiment; inert on web/PWA/Android. -->
+<script src="verse_games/shared/native-audio-recovery.js"></script>
+<!-- Patch 60: native-only, interruption-aware bounded coordinator. -->
+<script src="verse_games/shared/audio-recovery-coordinator.js"></script>
 <script src="profiles.js"></script>
 <script src="daily_questions_feed_game.js"></script>
 <script src="safe_word_scramble.js"></script>

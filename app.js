@@ -1080,7 +1080,19 @@ let appAudioUnlockGeneration = 0;
 let appAudioRecoveryPending = false;
 let appAudioFreshContextOnGesture = false;
 let appAudioRecoveryFailures = 0;
+let appAudioReplacementsThisInterruption = 0;
+let appAudioLastReplacementAt = 0;
+const APP_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
+// Replacement contexts can all share the same stalled WebKit audio session.
+// After a small burst, probe the existing context until a longer backoff expires.
+const APP_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
+const APP_AUDIO_REPLACEMENT_BACKOFF_MS = 15000;
 let appSilenceAudio = null;
+
+function recordAppAudioRecovery(type, details = {}) {
+  try { window.BibloZooAudioDiagnostics?.record(type, { activity: "app", ...details }); }
+  catch (err) { /* Diagnostic failures never affect playback. */ }
+}
 
 let uiTapBuffers = [];
 let uiTapBuffersPromise = null;
@@ -1370,6 +1382,7 @@ function markAppAudioInterrupted() {
   appAudioUnlocked = false;
   appAudioUnlockPromise = null;
   appAudioRecoveryPending = true;
+  appAudioReplacementsThisInterruption = 0;
 }
 
 function markAppAudioForegrounded() {
@@ -1391,6 +1404,10 @@ function resetAppAudioContextOnGesture() {
   appAudioContext = null;
   appAudioUnlocked = false;
   appAudioFreshContextOnGesture = false;
+  appAudioLastReplacementAt = performance.now();
+  appAudioReplacementsThisInterruption += 1;
+  recordAppAudioRecovery("app-audio-context-replaced",
+    { replacements: appAudioReplacementsThisInterruption });
   if (oldContext && oldContext.state !== "closed") {
     try { oldContext.close()?.catch?.(() => {}); } catch (err) { }
   }
@@ -1421,10 +1438,37 @@ function appAudioClockAdvances(ctx, durationMs = 90) {
   });
 }
 
-function unlockAppAudio() {
-  if (document.hidden) return Promise.resolve(false);
+function feedingResumeOwnsAudioGesture() {
+  // Feeding is a separate Web Audio engine in this same page. Its visible
+  // pause dialog owns Resume gestures; otherwise the app's capture-phase
+  // tap sounds try to recover a second context during the very same tap.
+  const overlay = document.querySelector?.("[data-daily-feed-resume-overlay]");
+  return !!(overlay && !overlay.hidden);
+}
 
-  if (appAudioFreshContextOnGesture) resetAppAudioContextOnGesture();
+function unlockAppAudio() {
+  if (document.hidden || feedingResumeOwnsAudioGesture()) return Promise.resolve(false);
+
+  if (appAudioFreshContextOnGesture) {
+    const now = performance.now();
+    const sinceReplacement = now - appAudioLastReplacementAt;
+    if (appAudioReplacementsThisInterruption > 0 &&
+        sinceReplacement < APP_AUDIO_REPLACEMENT_COOLDOWN_MS) {
+      recordAppAudioRecovery("app-audio-retry-delayed");
+      return Promise.resolve(false);
+    }
+    if (appAudioReplacementsThisInterruption >= APP_AUDIO_REPLACEMENT_BURST_LIMIT &&
+        sinceReplacement < APP_AUDIO_REPLACEMENT_BACKOFF_MS) {
+      // A later gesture can test whether iOS has revived this same context.
+      // Do not create another one until the longer backoff has elapsed.
+      recordAppAudioRecovery("app-audio-replacement-deferred");
+    } else {
+      if (appAudioReplacementsThisInterruption >= APP_AUDIO_REPLACEMENT_BURST_LIMIT) {
+        appAudioReplacementsThisInterruption = 0;
+      }
+      resetAppAudioContextOnGesture();
+    }
+  }
   const ctx = getAppAudioContext();
   if (!ctx) return Promise.resolve(false);
 
@@ -1457,23 +1501,61 @@ function unlockAppAudio() {
     if (!resumed || ctx.state !== "running") {
       appAudioRecoveryFailures += 1;
       if (appAudioRecoveryFailures >= 2) appAudioFreshContextOnGesture = true;
+      recordAppAudioRecovery("app-audio-resume-failed",
+        { reason: !resumed ? "timeout-or-rejection" : "not-running" });
       return false;
     }
 
     // WebKit can report "running" while its hardware clock remains frozen
     // after rapid switching to another media app. Verify on foreground return.
     if (wasInterrupted) {
-      const clockReady = await appAudioClockAdvances(ctx);
+      let clockReady = await appAudioClockAdvances(ctx);
       if (generation !== appAudioUnlockGeneration || appAudioContext !== ctx || document.hidden) {
         return false;
       }
       if (!clockReady) {
+        // Patch 60: native iOS only; a single coordinator owns settling and
+        // the optional Patch 59 activation request across both audio engines.
+        // Web/PWA/Android still use the exact Patch 59 path below.
+        const coordinator = window.BibloZooAudioRecoveryCoordinator;
+        if (coordinator?.isAvailable?.()) {
+          const isCurrent = () => generation === appAudioUnlockGeneration &&
+            appAudioContext === ctx && !document.hidden &&
+            !feedingResumeOwnsAudioGesture();
+          const result = await coordinator.recoverAfterStall({
+            source: "app", probe: () => appAudioClockAdvances(ctx), isCurrent
+          });
+          if (!isCurrent()) return false;
+          clockReady = result?.recovered === true;
+          recordAppAudioRecovery("app-audio-coordinated-result", {
+            recovered: clockReady, reason: result?.reason || "unknown"
+          });
+        } else {
+          // Patch 59 fallback: a native experiment triggered exclusively by
+          // a frozen clock after a user gesture, with a second clock probe.
+          const nativeRecovery = window.BibloZooNativeAudioRecovery;
+          if (nativeRecovery?.isEnabled?.()) {
+            const result = await nativeRecovery.tryAfterClockStall("app");
+            if (generation !== appAudioUnlockGeneration || appAudioContext !== ctx || document.hidden)
+              return false;
+            if (result?.activated) {
+              clockReady = await appAudioClockAdvances(ctx);
+              if (generation !== appAudioUnlockGeneration || appAudioContext !== ctx || document.hidden)
+                return false;
+              recordAppAudioRecovery("app-audio-native-recheck", { clockAdvanced: clockReady });
+            }
+          }
+        }
+      }
+      if (!clockReady) {
         appAudioFreshContextOnGesture = true;
+        recordAppAudioRecovery("app-audio-clock-stalled");
         return false;
       }
     }
 
     appAudioUnlocked = true;
+    if (wasInterrupted) recordAppAudioRecovery("app-audio-resume-verified");
     appAudioRecoveryFailures = 0;
     appAudioFreshContextOnGesture = false;
     appAudioRecoveryPending = false;
@@ -22740,7 +22822,7 @@ function setupAppUiTapSounds() {
     lastUiTapGestureAt = now;
 
     const tapTarget = getUiTapSoundTarget(event.target);
-    if (!tapTarget) return;
+    if (!tapTarget || feedingResumeOwnsAudioGesture()) return;
     const gestureScreen = State.screen;
 
     // Start/resume from the touch gesture. A newly unlocked context may
@@ -22771,7 +22853,7 @@ function setupAppUiTapSounds() {
     if (event.key !== "Enter" && event.key !== " ") return;
 
     const tapTarget = getUiTapSoundTarget(event.target);
-    if (!tapTarget) return;
+    if (!tapTarget || feedingResumeOwnsAudioGesture()) return;
     const gestureScreen = State.screen;
 
     const started = performance.now();

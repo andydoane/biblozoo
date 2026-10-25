@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_22_patch54_verse_munch_bonus_fruit_spacing";
+const CACHE_VERSION = "2026_Oct_25_patch60_interruption_coordinator";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -47,6 +47,8 @@ const CORE_PATHS = [
   "./verse_games/shared/daily-todo-parent.js",
   "./verse_games/shared/bridge.js",
   "./verse_games/shared/audio-diagnostics.js",
+  "./verse_games/shared/native-audio-recovery.js",
+  "./verse_games/shared/audio-recovery-coordinator.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",

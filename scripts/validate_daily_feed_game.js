@@ -2363,6 +2363,9 @@ async function testResumeAudioFailureNeedsAnotherTapNotLostProgress() {
   let calls = 0;
   runtime.audioContext = {
     state: "suspended",
+    // A mock audio engine needs a moving clock after resume, not merely a
+    // successful resume() promise (Patch 56's new recovery contract).
+    get currentTime() { return this.state === "running" ? Date.now() / 1000 : 0; },
     resume() { calls++; return Promise.reject(new Error("Gesture required")); }
   };
   assert.strictEqual(hooks.pauseFeedingGame(runtime, 1000), true);
@@ -2380,6 +2383,9 @@ async function testResumeAudioFailureNeedsAnotherTapNotLostProgress() {
   };
   assert.strictEqual(hooks.attemptFeedingResumeFromGesture(runtime), true);
   await new Promise(resolve => setImmediate(resolve));
+  assert.strictEqual(runtime.feedPausedAt, 1000,
+    "running is not proof of sound before the Web Audio clock advances");
+  await new Promise(resolve => setTimeout(resolve, 225));
   assert.strictEqual(calls, 2);
   assert.strictEqual(runtime.feedPausedAt, null);
   assert.strictEqual(runtime.resumeOverlay.hidden, true);
