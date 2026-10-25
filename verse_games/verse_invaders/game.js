@@ -1,5 +1,15 @@
 (async function () {
   const app = document.getElementById("app");
+  // Patch 66: all gameplay timestamps and frame deltas use virtual time.
+  // Background and Welcome Back waits must never advance bonus/spawn clocks.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnPriorPauseReason = null;
+  let returnWasLooping = false;
+  let returnAnimating = [];
+  let returnContextReplacements = 0;
   const ctx = await window.VerseGameBridge.getVerseContext();
 
   const GAME_ID = "verse_invaders";
@@ -403,6 +413,7 @@
   }
 
   function recoverInvadersAudioOnGesture() {
+    if (returnPaused) return;
     if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
   }
   document.addEventListener("pointerdown", recoverInvadersAudioOnGesture, true);
@@ -450,6 +461,7 @@
       })
       .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
       .then(buffer => {
+        if (ctx !== audioCtx) return null;
         soundBuffers.set(key, buffer);
         return buffer;
       })
@@ -458,7 +470,7 @@
         return null;
       })
       .finally(() => {
-        soundBufferPromises.delete(key);
+        if (soundBufferPromises.get(key) === promise) soundBufferPromises.delete(key);
       });
 
     soundBufferPromises.set(key, promise);
@@ -472,7 +484,7 @@
   }
 
   async function playGameSound(key, volumeKey = key) {
-    if (muted) return;
+    if (muted || returnPaused) return;
 
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -482,7 +494,7 @@
       // from the capture listener or explicit Start/Select interaction.
       if (ctx.state !== "running") return;
       const buffer = await loadSoundBuffer(key);
-      if (!buffer || muted || ctx.state !== "running") return;
+      if (!buffer || muted || ctx !== audioCtx || ctx.state !== "running" || returnPaused) return;
 
       const source = ctx.createBufferSource();
       const gain = ctx.createGain();
@@ -763,10 +775,12 @@
   }
 
   function setPaused(paused, reason = "") {
+    // Menu/help callbacks must not dismiss a task-switch pause.
+    if (returnPaused && !paused) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
     if (!paused) {
-      state.lastTs = performance.now();
+      state.lastTs = gameNow();
     }
   }
 
@@ -970,7 +984,7 @@
     const build = document.getElementById("vinvBuild");
     if (!buildText || !build) return;
 
-    build.classList.toggle("is-shake", state.buildShakeUntil > performance.now());
+    build.classList.toggle("is-shake", state.buildShakeUntil > gameNow());
 
     const buildRender = window.VerseGameShell.renderBuildProgressHtml({
       verseText: ctx.verseText || "",
@@ -1058,7 +1072,7 @@
     state.activeLane = null;
     state.rocket = null;
     state.trails = [];
-    state.effects = state.effects.filter(effect => effect.until > performance.now());
+    state.effects = state.effects.filter(effect => effect.until > gameNow());
     state.scheduledActions = [];
     state.roundSpeed = 0;
     playGameSound("bonusStart");
@@ -1119,7 +1133,7 @@
     state.wrongGuessesThisRound = 0;
     state.rocket = null;
     state.trails = [];
-    state.effects = state.effects.filter(effect => effect.until > performance.now());
+    state.effects = state.effects.filter(effect => effect.until > gameNow());
     state.scheduledActions = [];
     state.roundSpeed = getRoundSpeed();
 
@@ -1167,7 +1181,7 @@
   }
 
   function handleColorPress(buttonLane) {
-    if (!state.running) return;
+    if (!state.running || state.paused || returnPaused) return;
     if (state.buttonsLocked) return;
 
     if (state.bonusMode) {
@@ -1300,10 +1314,10 @@
     state.streak = 0;
     state.mistakes += 1;
     state.wrongGuessesThisRound += 1;
-    state.flashBadUntil = performance.now() + 260;
-    state.buildShakeUntil = performance.now() + 280;
+    state.flashBadUntil = gameNow() + 260;
+    state.buildShakeUntil = gameNow() + 280;
     state.overlayMessage = state.wrongGuessesThisRound >= 2 ? "Too many wrong guesses!" : "Wrong color!";
-    state.overlayUntil = performance.now() + 420;
+    state.overlayUntil = gameNow() + 420;
     target.visible = false;
     playGameSound("wrongHit");
     const targetPoint = getEntityHitPoint(target);
@@ -1391,7 +1405,7 @@
   }
 
   function makeStreakMilestonePopupEffect(x, y, streak, config) {
-    const born = performance.now();
+    const born = gameNow();
     const life = 980;
 
     return {
@@ -1410,7 +1424,7 @@
   }
 
   function makeStreakMilestoneBurstEffect(x, y) {
-    const born = performance.now();
+    const born = gameNow();
     const unit = getAlienUnit();
     const life = 1050;
     const count = 34;
@@ -1459,9 +1473,9 @@
     state.buttonsLocked = true;
     state.activeLane = null;
     state.overlayMessage = "Abducted!";
-    state.overlayUntil = performance.now() + 720;
-    state.flashBadUntil = performance.now() + 260;
-    state.buildShakeUntil = performance.now() + 280;
+    state.overlayUntil = gameNow() + 720;
+    state.flashBadUntil = gameNow() + 260;
+    state.buildShakeUntil = gameNow() + 280;
 
     state.entities.forEach(item => {
       item.visible = false;
@@ -1503,7 +1517,7 @@
     state.entityRenderSignature = "";
     state.rocket = null;
     state.trails = [];
-    state.effects = state.effects.filter(effect => effect.until > performance.now());
+    state.effects = state.effects.filter(effect => effect.until > gameNow());
 
     renderHud();
     renderDynamic();
@@ -1534,7 +1548,7 @@
   async function startBonusRound() {
     if (state.bonusMode) return;
 
-    const now = performance.now();
+    const now = gameNow();
 
     state.bonusIntroMode = false;
     state.bonusIntroMessage = "";
@@ -1790,7 +1804,7 @@
 
   function getBonusProgress() {
     if (!state.bonusStartedAt || !state.bonusEndsAt) return 0;
-    return clamp((performance.now() - state.bonusStartedAt) / BONUS_SWARM_DURATION_MS, 0, 1);
+    return clamp((gameNow() - state.bonusStartedAt) / BONUS_SWARM_DURATION_MS, 0, 1);
   }
 
   function getBonusSpawnIntervalSec() {
@@ -1933,6 +1947,8 @@
 
   function loop(ts) {
     if (!state.running && !state.bonusMode) return;
+    // requestAnimationFrame supplies wall time; virtual time excludes absences.
+    ts = gameNow();
     if (!state.lastTs) state.lastTs = ts;
     const dt = Math.min(0.032, (ts - state.lastTs) / 1000);
     state.lastTs = ts;
@@ -2002,7 +2018,7 @@
     const field = document.getElementById("vinvField");
     if (!entitiesEl || !rocketsEl || !effectsEl || !overlayEl || !field || !bonusEl || !tutorialEl) return;
 
-    const now = performance.now();
+    const now = gameNow();
     field.classList.toggle("is-flash-bad", state.flashBadUntil > now);
 
     const entityRenderSignature = getEntityRenderSignature();
@@ -2059,7 +2075,9 @@
 
       const revealCard = tutorialEl.querySelector(".vinv-bonus-reveal");
       if (revealCard) {
-        revealCard.onclick = continueFromBonusReveal;
+        revealCard.onclick = () => {
+          if (!returnPaused && !state.paused) continueFromBonusReveal();
+        };
       }
     } else if (state.tutorialMode) {
       renderTutorialLayer(tutorialEl);
@@ -2187,7 +2205,7 @@
     return "";
   }
 
-  function getEntityStyle(entity, now = performance.now()) {
+  function getEntityStyle(entity, now = gameNow()) {
     const hidden = entity.visible ? "" : "opacity:0;";
     const motion = getEntityMotionState(entity, now);
 
@@ -2265,7 +2283,7 @@
     );
   }
 
-  function renderEntityHtml(entity, now = performance.now()) {
+  function renderEntityHtml(entity, now = gameNow()) {
     const className = getEntityClassName(entity);
 
     return `
@@ -2282,7 +2300,7 @@
     `;
   }
 
-  function updateEntityElements(entitiesEl, now = performance.now()) {
+  function updateEntityElements(entitiesEl, now = gameNow()) {
     state.entities.forEach((entity) => {
       const entityEl = entitiesEl.querySelector(`[data-entity-id="${entity.id}"]`);
       if (!entityEl) return;
@@ -2420,7 +2438,7 @@
     return state.fieldWidth * ((index + 0.5) / 3);
   }
 
-  function getEntityMotionState(entity, now = performance.now()) {
+  function getEntityMotionState(entity, now = gameNow()) {
     const phase = entity.motionPhase || 0;
     const sway = Math.sin(now * 0.0032 + phase) * 18;
     const pulse = Math.sin(now * 0.0044 + phase * 0.7);
@@ -2435,7 +2453,7 @@
     };
   }
 
-  function getEntityHitPoint(entity, now = performance.now()) {
+  function getEntityHitPoint(entity, now = gameNow()) {
     const motion = getEntityMotionState(entity, now);
     return {
       x: motion.renderX,
@@ -2516,7 +2534,7 @@
       size: randBetween(unit * 0.06, unit * 0.13),
       opacity: white ? randBetween(0.48, 0.78) : randBetween(0.54, 0.9),
       white: !!white,
-      until: performance.now() + randBetween(190, 290)
+      until: gameNow() + randBetween(190, 290)
     });
 
     if (state.trails.length > 42) state.trails.shift();
@@ -2528,7 +2546,7 @@
   }
 
   function makeScorePopupEffect(x, y, text, tone) {
-    const born = performance.now();
+    const born = gameNow();
     const life = 820;
 
     return {
@@ -2545,7 +2563,7 @@
 
 
   function makePoofEffect(x, y) {
-    const born = performance.now();
+    const born = gameNow();
     const unit = getAlienUnit();
     const life = POOF_LIFE_MS;
     const count = 9;
@@ -2594,7 +2612,7 @@
   }
 
   function makeAlienBurstEffect(x, y, baseColor, streak) {
-    const born = performance.now();
+    const born = gameNow();
     const unit = getAlienUnit();
     const strong = streak >= 4;
     const life = strong ? STRONG_ALIEN_BURST_LIFE_MS : ALIEN_BURST_LIFE_MS;
@@ -2657,7 +2675,7 @@
 
 
   function makeParticleEffect(preset, x, y, baseColor, streak, group) {
-    const born = performance.now();
+    const born = gameNow();
     const strong = streak >= 4;
     const configMap = {
       alienPop: { life: 620, count: strong ? 16 : 12, speedMin: 88, speedMax: 162, sizeMin: 4, sizeMax: 9, gravity: 6, ring: 0, center: 0, style: "dot", shell: false, flash: false, cross: false },
@@ -2721,7 +2739,7 @@
   }
 
   function makeAbductionEffect(x, y, color, onDone) {
-    const born = performance.now();
+    const born = gameNow();
     const unit = getAlienUnit();
 
     return {
@@ -3072,7 +3090,7 @@
   }
 
   function scheduleAction(delayMs, fn) {
-    state.scheduledActions.push({ at: performance.now() + delayMs, run: fn });
+    state.scheduledActions.push({ at: gameNow() + delayMs, run: fn });
   }
 
   function processScheduledActions(ts) {
@@ -3097,6 +3115,89 @@
     if (state.rafId) cancelAnimationFrame(state.rafId);
     state.rafId = requestAnimationFrame(loop);
   }
+
+  // Preserve existing menu/help pause and exact alien/rocket state. Only the
+  // foreground verified audio gesture can release the task-switch pause.
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    returnWasLooping = !!state.rafId;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    returnAnimating = [];
+    if (typeof document.getAnimations === "function") {
+      for (const animation of document.getAnimations()) {
+        if (animation.playState !== "running") continue;
+        try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+      }
+    }
+    setPaused(true, "welcome-back");
+    // Cancel rather than run idle frames while away; unlike stopLoop(), this
+    // does not reset the game, current wave, score, or checkpoint state.
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+    state.rafId = 0;
+  }
+
+  function replaceWelcomeAudioContext() {
+    if (returnContextReplacements >= 1) return false;
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return false;
+    let fresh;
+    try { fresh = new AudioCtor(); } catch (_) { return false; }
+    const previous = audioCtx;
+    returnContextReplacements += 1;
+    audioCtx = fresh;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    // AudioBuffers are associated with their decoding context on some WebKit
+    // releases. Do not reuse stale or in-flight buffers on the new context.
+    soundBuffers.clear();
+    soundBufferPromises.clear();
+    try { Promise.resolve(previous?.close?.()).catch(() => {}); } catch (_) {}
+    return true;
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    // Synchronously initiate Web Audio unlock from this child's actual tap.
+    const recovery = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      replaceContext: replaceWelcomeAudioContext,
+      muted
+    });
+    return Promise.resolve(recovery).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) return false;
+      welcomeClock.resume();
+      returnPaused = false;
+      document.body.classList.remove("bz-return-activity-paused");
+      for (const animation of returnAnimating) {
+        try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+      }
+      returnAnimating = [];
+      state.paused = returnPriorPauseReason !== null;
+      state.pauseReason = returnPriorPauseReason || "";
+      returnPriorPauseReason = null;
+      state.lastTs = 0;
+      if (returnWasLooping && (state.running || state.bonusMode)) startLoop();
+      returnWasLooping = false;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !completionMarked,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  });
 
   const clamp = window.VerseGameShell.clamp;
   function randomFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }

@@ -3095,7 +3095,7 @@
       runtime.resumeStatus.textContent = message;
       runtime.resumeStatus.hidden = !message;
     }
-    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay, { retry: !!message });
+    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay, { retry: !!message, busy: !!runtime.feedResumePending });
     if (!window.BibloZooWelcomeBack && runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try again!" : "Let's go!";
   }
 
@@ -3227,6 +3227,8 @@
       }
     }
     runtime.feedResumePending = true;
+    // Share the same spinning zookeeper feedback while Feeding verifies sound.
+    setFeedingResumeStatus(runtime);
     if (runtime.resumeButton) runtime.resumeButton.disabled = true;
     const generation = ++runtime.feedResumeGeneration;
     const context = runtime.audioContext;

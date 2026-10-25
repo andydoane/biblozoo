@@ -156,7 +156,7 @@ async function tests() {
   ok(game.includes('source: "app"') && game.includes('isCurrent: () =>'),
     "Guarded Patch 60 coordination is available on native iOS only");
   ok(feeding.includes('data-welcome-back-name-line'), "Feeding inherits new color and no-wrap line");
-  ok(sw.includes('2026_Oct_25_patch65_motion_audio_one_tap') &&
+  ok(sw.includes('2026_Oct_25_patch66_invaders_shared_spinner') &&
      sw.includes('"./verse_games/shared/welcome-back-return.js"'),
      "Service worker version and new resource updated");
 

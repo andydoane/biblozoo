@@ -62,6 +62,9 @@
       // result; a hung iOS promise must not block a fresh tap on return.
       attemptSerial += 1;
       processing = false;
+      // A previous attempt might have started spinning before the second
+      // task switch. Stop feedback immediately while offscreen.
+      root.BibloZooWelcomeBack.setAction(overlay);
       if (escapeTimer) { root.clearTimeout(escapeTimer); escapeTimer = 0; }
       try { onPause(); } catch (_) { /* Do not crash app lifecycle. */ }
       log("welcome-back-backgrounded");
@@ -81,6 +84,7 @@
       if (disposed || exiting) return;
       if (escapeTimer) { root.clearTimeout(escapeTimer); escapeTimer = 0; }
       processing = false;
+      root.BibloZooWelcomeBack.setAction(overlay, { retry: ok !== true });
       log("welcome-back-recovery-result", { recovered: ok === true });
       if (ok === true && !document.hidden) {
         pending = false;
@@ -115,7 +119,10 @@
         log("welcome-back-recovery-slow");
       }, ESCAPE_WATCHDOG_MS);
       root.BibloZooWelcomeBack.setAction(overlay, { busy: true });
-      if (status) { status.hidden = true; status.textContent = ""; }
+      if (status) {
+        status.hidden = false;
+        status.textContent = "Getting sound ready...";
+      }
       // Invoke synchronously from the real tap before awaiting the promise.
       // AudioContext.resume() must be initiated by onContinue during gesture.
       try {
@@ -132,6 +139,7 @@
       attemptSerial += 1;
       if (escapeTimer) { root.clearTimeout(escapeTimer); escapeTimer = 0; }
       escape.disabled = true;
+      root.BibloZooWelcomeBack.setAction(overlay);
       if (button) button.disabled = true;
       if (status) {
         status.hidden = false;
@@ -162,6 +170,7 @@
         disposed = true;
         attemptSerial += 1;
         if (escapeTimer) root.clearTimeout(escapeTimer);
+        root.BibloZooWelcomeBack.setAction(overlay);
         document.removeEventListener("visibilitychange", visible);
         root.removeEventListener("pagehide", pageHidden);
         root.removeEventListener("pageshow", visible);

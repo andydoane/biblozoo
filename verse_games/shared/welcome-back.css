@@ -137,3 +137,23 @@
 }
 .bz-welcome-escape[hidden] { display: none !important; }
 .bz-welcome-escape:focus-visible { outline: 3px solid #333333; outline-offset: 3px; }
+
+/* Patch 66: the zookeeper portrait itself shows that audio recovery is active.
+ * The yellow card and its white picture frame never move. */
+.bz-welcome-card.is-recovering .bz-welcome-avatar-image:not([hidden]),
+.bz-welcome-card.is-recovering .bz-welcome-avatar-fallback:not([hidden]) {
+  animation: bz-welcome-picture-recover 950ms linear infinite;
+  /* Some games pause all body animations while awaiting recovery. Their
+   * freeze rule must not freeze this feedback outside the gameplay area. */
+  animation-play-state: running !important;
+  transform-origin: center center;
+}
+@keyframes bz-welcome-picture-recover {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bz-welcome-card.is-recovering .bz-welcome-avatar-image:not([hidden]),
+  .bz-welcome-card.is-recovering .bz-welcome-avatar-fallback:not([hidden]) {
+    animation: none;
+  }
+}

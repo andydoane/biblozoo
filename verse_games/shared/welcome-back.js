@@ -69,6 +69,12 @@
     if (!button) return;
     button.textContent = retry ? RETRY_TEXT : BUTTON_TEXT;
     button.disabled = !!busy;
+    // Shared recovery feedback: spin only the picture, not the popup itself.
+    // Setting this in the common action API keeps every connected game alike.
+    const card = root.querySelector?.("[data-welcome-back-card]") ||
+      button.closest?.(".bz-welcome-card");
+    card?.classList?.toggle("is-recovering", !!busy);
+    card?.setAttribute?.("aria-busy", busy ? "true" : "false");
   }
 
   // One markup template for non-Feeding activities. Feeding's existing HTML

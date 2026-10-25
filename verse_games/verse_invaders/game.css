@@ -1504,3 +1504,11 @@ body {
 .vm-btn {
   touch-action: manipulation;
 }
+/* Patch 66: CSS and SVG keyframe animations freeze along with game physics.
+ * Scope to #app so the shared Welcome Back portrait can keep spinning. */
+body.bz-return-activity-paused #app *,
+body.bz-return-activity-paused #app *::before,
+body.bz-return-activity-paused #app *::after {
+  animation-play-state: paused !important;
+  transition-duration: 0s !important;
+}
