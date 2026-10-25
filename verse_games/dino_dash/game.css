@@ -987,3 +987,9 @@ body{
 .dd2-diagnostic-simple-character .dd2-dino img {
   display: none !important;
 }
+/* Patch 65: the task-switch overlay must freeze decorative CSS motion, too. */
+body.bz-return-activity-paused *,
+body.bz-return-activity-paused *::before,
+body.bz-return-activity-paused *::after {
+  animation-play-state: paused !important;
+}

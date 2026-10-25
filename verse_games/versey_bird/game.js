@@ -1,5 +1,14 @@
 (async function(){
   const app = document.getElementById("app");
+  // Patch 65: no movement, collisions, or animation deadlines advance away.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnContextReplacements = 0;
+  let returnPriorPauseReason = null;
+  let returnAnimating = [];
+
   const launch = window.VerseGameBridge.getLaunchParams();
   const ctx = await window.VerseGameBridge.getVerseContext();
 
@@ -1030,7 +1039,7 @@
             : unlockAudio();
 
         const now =
-          performance.now();
+          gameNow();
 
         if (
           now -
@@ -1156,7 +1165,7 @@
 
     state.phase = "napExit";
     state.phaseStartedAt =
-      performance.now();
+      gameNow();
 
     state.wordCloud = null;
     state.wordCloudFollower = null;
@@ -1307,7 +1316,7 @@
       window.setTimeout(
         () => {
           saveDiagnosticHeartbeat(
-            performance.now(),
+            gameNow(),
             true
           );
 
@@ -1947,7 +1956,7 @@
         0.28;
 
       const diagnosticNow =
-        performance.now();
+        gameNow();
 
       diagnosticState.lastHeartbeatAt =
         diagnosticNow;
@@ -2042,7 +2051,7 @@
 
   function enterIntroPhase(){
     state.phase = "intro";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.introStartedAt = state.phaseStartedAt;
     state.wordCloud = null;
     state.wordCloudFollower = null;
@@ -2054,7 +2063,7 @@
 
   function enterVersePhase(){
     state.phase = "verse";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.wordCloud = null;
     state.wordCloudFollower = null;
     state.obstacles = [];
@@ -2066,7 +2075,7 @@
 
   function enterBonusIntroPhase() {
     state.phase = "bonusIntro";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.bonusIntroUnlockAt = 0;
     state.wordCloud = null;
     state.wordCloudFollower = null;
@@ -2085,7 +2094,7 @@
 
   function enterBonusPhase() {
     state.phase = "bonus";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.bonusStartedAt = state.phaseStartedAt;
     state.bonusIntroUnlockAt = 0;
     state.bonusPipes = [];
@@ -2102,7 +2111,7 @@
   function enterBonusCrashPhase(){
     if (state.phase !== "bonus") return;
     state.phase = "bonusCrash";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.crashStartedAt = state.phaseStartedAt;
     state.birdSpinUntil = state.crashStartedAt + 1500;
     state.birdVY = -2.2 * state.layout.unit;
@@ -2281,6 +2290,7 @@
   }
 
   function setPaused(paused, reason = ""){
+    if (returnPaused && !paused) return;
     if (!state.running && state.phase !== "bonusIntro") return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
@@ -2308,7 +2318,7 @@
   }
 
   function handleInput(event){
-    const now = performance.now();
+    const now = gameNow();
     if (now - state.lastInputAt < 70) return;
     state.lastInputAt = now;
 
@@ -2330,7 +2340,7 @@
   function flap(){
     if (!state.layout) return;
     state.birdVY = getDifficulty().flapU * state.layout.unit;
-    state.birdFlapUntil = performance.now() + 160;
+    state.birdFlapUntil = gameNow() + 160;
 
     if (
       state.phase !== "napExit"
@@ -2509,7 +2519,7 @@
     archiveCurrentDiagnosticReport();
 
     const now =
-      performance.now();
+      gameNow();
 
     diagnosticState.active = true;
     diagnosticState.renderCount = 0;
@@ -3006,7 +3016,7 @@
       ) || 0;
 
     const now =
-      performance.now();
+      gameNow();
 
     diagnosticState.lastHeartbeatAt =
       now;
@@ -3032,7 +3042,7 @@
     }
 
     saveDiagnosticHeartbeat(
-      performance.now(),
+      gameNow(),
       true
     );
 
@@ -3579,7 +3589,7 @@
     stopLoop();
     state.running = true;
     state.lastTs = 0;
-    state.startTs = performance.now();
+    state.startTs = gameNow();
     state.rafId = requestAnimationFrame(tick);
   }
 
@@ -3593,6 +3603,7 @@
 
 
   function tick(ts) {
+    ts = gameNow();
     if (!state.running) {
       state.rafId = 0;
       return;
@@ -5071,7 +5082,7 @@
 
     updateBuildText();
 
-    setTimeout(() => {
+    void welcomeClock.sleep(220).then(() => {
       if (
         !removeVerseCloudById(
           cloud.id
@@ -5115,7 +5126,7 @@
                 BONUS_SCORE_PREP_LEAD_MS
             );
 
-          window.setTimeout(
+          void welcomeClock.sleep(scorePrepDelay).then(
             () => {
               if (
                 !bonusStillReady()
@@ -5124,11 +5135,10 @@
               }
 
               renderBonusScoreBuild();
-            },
-            scorePrepDelay
+            }
           );
 
-          window.setTimeout(
+          void welcomeClock.sleep(BONUS_INTRO_AFTER_FINAL_CLOUD_MS).then(
             () => {
               if (
                 !bonusStillReady()
@@ -5137,12 +5147,11 @@
               }
 
               enterBonusIntroPhase();
-            },
-            BONUS_INTRO_AFTER_FINAL_CLOUD_MS
+            }
           );
         }
       }
-    }, 220);
+    });
   }
 
   function collectDecoyCloud(cloud, ts) {
@@ -5169,7 +5178,7 @@
       130
     );
 
-    setTimeout(() => {
+    void welcomeClock.sleep(230).then(() => {
       if (
         !removeVerseCloudById(
           cloud.id
@@ -5181,7 +5190,7 @@
       if (!hasActiveVerseClouds()) {
         state.cloudCooldown = 0.24;
       }
-    }, 230);
+    });
   }
 
 
@@ -6844,7 +6853,7 @@
 
   function flash(color, ms){
     state.flashColor = color;
-    state.flashUntil = performance.now() + ms;
+    state.flashUntil = gameNow() + ms;
   }
 
   function preloadDecodedImageAsset(
@@ -7560,4 +7569,71 @@
     }
     return Math.min(max, Math.max(min, value));
   }
+
+  // Existing menu/help pauses stay in force after a task switch.
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    returnAnimating = [];
+    if (typeof document.getAnimations === "function") {
+      for (const animation of document.getAnimations()) {
+        if (animation.playState !== "running") continue;
+        try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+      }
+    }
+    setPaused(true, "welcome-back");
+  }
+
+  function replaceWelcomeAudioContext() {
+    if (returnContextReplacements >= 1 || !audioCtx) return false;
+    returnContextReplacements += 1;
+    audioForegroundFreshContextOnGesture = true;
+    audioUnlockAttempt += 1;
+    audioUnlockPromise = null;
+    audioUnlocked = false;
+    return true;
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    // Unlock/prime now, inside the actual child's button gesture.
+    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      replaceContext: replaceWelcomeAudioContext,
+      muted
+    });
+    return Promise.resolve(attempt).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) return false;
+      returnPaused = false;
+      welcomeClock.resume();
+      document.body.classList.remove("bz-return-activity-paused");
+      for (const animation of returnAnimating) {
+        try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+      }
+      returnAnimating = [];
+      setPaused(returnPriorPauseReason !== null, returnPriorPauseReason || "");
+      returnPriorPauseReason = null;
+      // RAF is still scheduled and the virtual clock has not advanced while away.
+      // Reset first-frame deltas so no physics catch-up occurs.
+      state.lastTs = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !completed,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: launch.profileId,
+    pictureBase: "../../"
+  });
 })();

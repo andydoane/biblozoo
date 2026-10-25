@@ -174,11 +174,11 @@
 
   // Game-owned unlock() executes synchronously in the actual button click.
   // A context being "running" is insufficient; wait for its audio clock to move.
-  function resumeAudioOnGesture({ unlock, getContext, isCurrent, muted = false } = {}) {
+  function resumeAudioOnGesture({ unlock, getContext, isCurrent, replaceContext, muted = false } = {}) {
     let request;
     try { request = typeof unlock === "function" ? unlock() : null; }
     catch (_) { return Promise.resolve(false); }
-    const context = getContext?.();
+    let context = getContext?.();
     if (muted) return Promise.resolve(true);
     if (!context) return Promise.resolve(false);
 
@@ -201,13 +201,46 @@
       if (!isCurrent?.()) return false;
       if (await probe()) return true;
       const coordinator = root.BibloZooAudioRecoveryCoordinator;
-      if (!coordinator?.isAvailable?.() || !isCurrent()) return false;
+      if (coordinator?.isAvailable?.() && isCurrent()) {
+        try {
+          const result = await coordinator.recoverAfterStall({
+            source: "app", probe, isCurrent: () => isCurrent() && getContext() === context
+          });
+          if (result?.recovered === true && await probe()) return true;
+        } catch (_) { /* Fall back only when the clock has not recovered. */ }
+      }
+      // One bounded best-effort replacement as part of this same tap's
+      // recovery sequence. WebKit may still require a fresh gesture; never
+      // dismiss the prompt until the *new* clock actually advances.
+      if (typeof replaceContext !== "function" || !isCurrent()) return false;
+      let replaced = false;
+      try { replaced = replaceContext() === true; } catch (_) {}
       try {
-        const result = await coordinator.recoverAfterStall({
-          source: "app", probe, isCurrent: () => isCurrent() && getContext() === context
+        root.BibloZooAudioDiagnostics?.record("welcome-back-context-replacement", {
+          attempted: true, replaced
         });
-        return result?.recovered === true && isCurrent() && getContext() === context;
+      } catch (_) {}
+      if (!replaced || !isCurrent()) return false;
+      try {
+        const fresh = unlock?.();
+        if (fresh && typeof fresh.then === "function") {
+          await Promise.race([
+            Promise.resolve(fresh).catch(() => false),
+            new Promise(resolve => setTimeout(resolve, 1300))
+          ]);
+        }
       } catch (_) { return false; }
+      if (!isCurrent()) return false;
+      const freshContext = getContext?.();
+      if (!freshContext || freshContext === context) return false;
+      context = freshContext;
+      const advanced = await probe();
+      try {
+        root.BibloZooAudioDiagnostics?.record("welcome-back-context-replacement-check", {
+          clockAdvanced: advanced
+        });
+      } catch (_) {}
+      return advanced;
     })();
   }
 

@@ -1,5 +1,14 @@
 (async function(){
   const app = document.getElementById("app");
+  // Patch 65: no movement, collisions, or animation deadlines advance away.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnContextReplacements = 0;
+  let returnPriorPauseReason = null;
+  let returnAnimating = [];
+
   const launch = window.VerseGameBridge.getLaunchParams();
   const ctx = await window.VerseGameBridge.getVerseContext();
 
@@ -547,7 +556,7 @@
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
-        audioUnlocked = success && ctx.state === "running";
+        audioUnlocked = success && ctx === audioContext && ctx.state === "running";
         if (audioUnlocked) preloadSoundBuffers();
         resolve(audioUnlocked);
       };
@@ -716,16 +725,17 @@
   }
 
   function setPaused(paused, reason = ""){
+    if (returnPaused && !paused) return;
     if (paused){
       if (state.paused) return;
       state.paused = true;
       state.pauseReason = reason;
-      state.pauseStartedAt = performance.now();
+      state.pauseStartedAt = gameNow();
       return;
     }
 
     if (!state.paused) return;
-    const deltaMs = performance.now() - (state.pauseStartedAt || performance.now());
+    const deltaMs = gameNow() - (state.pauseStartedAt || gameNow());
     state.paused = false;
     state.pauseReason = "";
     state.pauseStartedAt = 0;
@@ -1404,9 +1414,10 @@
 
   function startLoop(){
     state.running = true;
-    let lastTs = performance.now();
+    let lastTs = gameNow();
 
     function tick(ts){
+      ts = gameNow();
       if (!state.running) return;
       const dt = Math.min(34, ts - lastTs);
       lastTs = ts;
@@ -1474,7 +1485,7 @@
   }
 
   function shortenCurrentBoostCooldownForGrowth(
-    now = performance.now()
+    now = gameNow()
   ) {
     const nextDuration =
       getCurrentBoostCooldownMs();
@@ -1511,16 +1522,16 @@
     }
   }
 
-  function isBoostActive(now = performance.now()) {
+  function isBoostActive(now = gameNow()) {
     return now < state.boostActiveUntil;
   }
 
-  function isBoostReady(now = performance.now()) {
+  function isBoostReady(now = gameNow()) {
     return now >= state.boostActiveUntil && now >= state.boostCooldownUntil;
   }
 
   function handleBoostTap(clientX, clientY, pointerType = "touch") {
-    const now = performance.now();
+    const now = gameNow();
     const dt = now - state.lastTapAt;
     const move = Math.hypot(clientX - state.lastTapX, clientY - state.lastTapY);
 
@@ -1542,7 +1553,7 @@
     }
   }
 
-  function activateBoost(now = performance.now()) {
+  function activateBoost(now = gameNow()) {
     if (
       !state.running ||
       state.paused ||
@@ -1576,7 +1587,7 @@
     playGameSound("boostStart");
   }
 
-  function getBoostMeterValue(now = performance.now()) {
+  function getBoostMeterValue(now = gameNow()) {
     if (isBoostActive(now)) {
       return clamp((state.boostActiveUntil - now) / BOOST_TUNING.durationMs, 0, 1);
     }
@@ -1749,7 +1760,7 @@
   }
 
   function updateMotion(dt){
-    const now = performance.now();
+    const now = gameNow();
 
     if (now < state.yuckUntil){
       updateYuckMotion(dt, now);
@@ -1946,7 +1957,7 @@
       baseCenter: { ...center },
       driftAngle: angle + Math.PI / 2,
       driftPhase: Math.random() * Math.PI * 2,
-      bornAt: performance.now(),
+      bornAt: gameNow(),
       collapsed: false
     };
 
@@ -2219,7 +2230,7 @@
       if (d <= orb.r + getSnakeHeadCollisionRadius()) {
         orb.collectedAt = ts;
         growSnakeByHeadLengths(orb.growthHeads);
-        state.headPopUntil = performance.now() + 180;
+        state.headPopUntil = gameNow() + 180;
         playOrbTone(orb.sizeRatio);
       }
     }
@@ -2254,7 +2265,7 @@
       let opacity = 1;
 
       if (orb.collectedAt) {
-        const t = clamp((performance.now() - orb.collectedAt) / ORB_TUNING.collectPopDuration, 0, 1);
+        const t = clamp((gameNow() - orb.collectedAt) / ORB_TUNING.collectPopDuration, 0, 1);
         collectScale = 1 + easeOutCubic(t) * 1.8;
         opacity = 1 - t;
       }
@@ -2267,7 +2278,7 @@
   }
 
   function startBonusRound() {
-    const now = performance.now();
+    const now = gameNow();
 
     playGameSound("bonusStart");
 
@@ -2331,7 +2342,7 @@
   }
 
   function startBonusExit() {
-    const now = performance.now();
+    const now = gameNow();
 
     state.bonusActive = false;
     state.bonusEnding = true;
@@ -2467,7 +2478,7 @@
       speed: randRange(BONUS_TUNING.miniSpeedMin, BONUS_TUNING.miniSpeedMax) * getSpeedScale() * getWorldSpeedMultiplier(),
       turnPhase: Math.random() * Math.PI * 2,
       turnWobble: randRange(0.8, 1.35),
-      entryGraceUntil: performance.now() + BONUS_TUNING.entryGraceMs,
+      entryGraceUntil: gameNow() + BONUS_TUNING.entryGraceMs,
       lengthPx,
       width,
       stripeWidth,
@@ -2546,7 +2557,7 @@
     const seconds = dt / 1000;
     snake.turnPhase += seconds * snake.turnWobble;
 
-    const entering = performance.now() < snake.entryGraceUntil;
+    const entering = gameNow() < snake.entryGraceUntil;
     const entryWanderScale = entering ? 0.35 : 1;
     const wander = Math.sin(snake.turnPhase * 1.9) * BONUS_TUNING.miniTurnRate * entryWanderScale;
     snake.angle += wander * seconds;
@@ -2589,7 +2600,7 @@
   }
 
   function isMiniSnakeTooFar(snake) {
-    if (performance.now() < snake.entryGraceUntil) {
+    if (gameNow() < snake.entryGraceUntil) {
       return false;
     }
 
@@ -2620,7 +2631,7 @@
 
   function eatMiniSnake(snake, hitPoint, ts) {
     state.bonusScore += 1;
-    state.headPopUntil = performance.now() + 180;
+    state.headPopUntil = gameNow() + 180;
     playGameSound("miniSnakeEat");
 
     showCorrectBurst(hitPoint.x, hitPoint.y);
@@ -2849,7 +2860,7 @@
       state.fruitCount += 1;
       playGameSound("fruit");
       advanceSnakeStyle();
-      state.headPopUntil = performance.now() + 340;
+      state.headPopUntil = gameNow() + 340;
       applySnakeStyle();
     }
   }
@@ -2876,7 +2887,7 @@
     const dx = decoy.x - state.head.x;
     const dy = decoy.y - state.head.y;
     const d = Math.hypot(dx, dy) || 1;
-    const now = performance.now();
+    const now = gameNow();
 
     state.escapingTargets.push({
       ...decoy,
@@ -2935,7 +2946,7 @@
     state.progressIndex += 1;
     state.targets = [];
     state.encounter = null;
-    state.headPopUntil = performance.now() + 260;
+    state.headPopUntil = gameNow() + 260;
     updateBuildHud();
 
     if (state.progressIndex >= state.segments.length){
@@ -2965,7 +2976,7 @@
     state.flashText = "";
     state.flashUntil = 0;
 
-    setTimeout(() => {
+    void welcomeClock.sleep(180).then(() => {
       if (!state.running || completed) return;
       state.targets = state.targets.filter((item) => item.id !== target.id);
       const correct = state.targets.find((item) => item.isCorrect);
@@ -2976,7 +2987,7 @@
         correct.freeAnchor = null;
         if (state.encounter) state.encounter.collapsed = true;
       }
-    }, 180);
+    });
   }
 
   function finishGame(){
@@ -3020,11 +3031,11 @@
       }
     }
 
-    setTimeout(() => {
+    void welcomeClock.sleep(220).then(() => {
       state.bonusEnding = false;
       renderBonusResult(false);
       renderDone();
-    }, 220);
+    });
   }
 
   function renderDone(){
@@ -3063,7 +3074,7 @@
     });
   }
 
-  function updateBonusHud(ts = performance.now()) {
+  function updateBonusHud(ts = gameNow()) {
     const line =
       document.getElementById(
         "vslBuildLine"
@@ -3242,7 +3253,7 @@
     const dy = state.head.y - target.y;
     const d = Math.hypot(dx, dy) || 1;
 
-    state.yuckStartedAt = performance.now();
+    state.yuckStartedAt = gameNow();
     state.yuckUntil = state.yuckStartedAt + YUCK_BODY_TUNING.durationMs;
     state.yuckVector = {
       x: dx / d,
@@ -3300,7 +3311,7 @@
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       x,
       y,
-      bornAt: performance.now(),
+      bornAt: gameNow(),
       duration: 760,
       puffs,
       particles,
@@ -3421,7 +3432,7 @@
       let extraTransform = "";
 
       if (target.escaping){
-        const age = performance.now() - target.escapeStartedAt;
+        const age = gameNow() - target.escapeStartedAt;
         const t = clamp(age / DECOY_ESCAPE_TUNING.durationMs, 0, 1);
         const spin = target.escapeSpin * DECOY_ESCAPE_TUNING.spinRate * t;
         const scale = 1 - t * 0.34;
@@ -3429,7 +3440,7 @@
       }
 
       el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) translate(-50%, -50%)${extraTransform}`;
-      el.classList.toggle("is-wrong-hit", performance.now() < target.wrongHitUntil);
+      el.classList.toggle("is-wrong-hit", gameNow() < target.wrongHitUntil);
       el.classList.toggle("is-escaping", !!target.escaping);
     }
   }
@@ -3517,7 +3528,7 @@
       kind,
       x,
       y,
-      bornAt: performance.now(),
+      bornAt: gameNow(),
       duration: 720
     });
   }
@@ -3808,7 +3819,7 @@
     stripe.setAttribute("d", d);
 
     const head = worldToScreen(state.head);
-    const now = performance.now();
+    const now = gameNow();
     const headPulse = now < state.headPopUntil ? 1.14 : 1;
     const headArt = document.getElementById("vslSnakeHeadArt");
 
@@ -3855,9 +3866,9 @@
   }
 
   function getYuckBodyIntensity() {
-    if (!state.yuckStartedAt || performance.now() >= state.yuckUntil) return 0;
+    if (!state.yuckStartedAt || gameNow() >= state.yuckUntil) return 0;
 
-    const elapsed = performance.now() - state.yuckStartedAt;
+    const elapsed = gameNow() - state.yuckStartedAt;
     const duration = YUCK_BODY_TUNING.durationMs;
     const attack = YUCK_BODY_TUNING.attackMs;
     const hold = YUCK_BODY_TUNING.holdMs;
@@ -4024,7 +4035,7 @@
     if (!colors || colors.length === 0) return null;
     if (colors.length === 1) return colors[0];
 
-    const now = performance.now();
+    const now = gameNow();
     const cycle = now / speedMs;
     const index = Math.floor(cycle) % colors.length;
     const nextIndex = (index + 1) % colors.length;
@@ -4193,4 +4204,76 @@
   }
 
   renderIntroScreen();
+
+  // Existing menu/help pauses stay in force after a task switch.
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    returnAnimating = [];
+    if (typeof document.getAnimations === "function") {
+      for (const animation of document.getAnimations()) {
+        if (animation.playState !== "running") continue;
+        try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+      }
+    }
+    setPaused(true, "welcome-back");
+  }
+
+  function replaceWelcomeAudioContext() {
+    if (returnContextReplacements >= 1) return false;
+    const previous = audioContext;
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return false;
+    let fresh;
+    try { fresh = new AudioCtor(); } catch (_) { return false; }
+    returnContextReplacements += 1;
+    audioContext = fresh;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    try { Promise.resolve(previous?.close?.()).catch(() => {}); } catch (_) {}
+    return true;
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    // Unlock/prime now, inside the actual child's button gesture.
+    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioContext,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      replaceContext: replaceWelcomeAudioContext,
+      muted
+    });
+    return Promise.resolve(attempt).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) return false;
+      returnPaused = false;
+      welcomeClock.resume();
+      document.body.classList.remove("bz-return-activity-paused");
+      for (const animation of returnAnimating) {
+        try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+      }
+      returnAnimating = [];
+      setPaused(returnPriorPauseReason !== null, returnPriorPauseReason || "");
+      returnPriorPauseReason = null;
+      // RAF is still scheduled and the virtual clock has not advanced while away.
+      // Reset first-frame deltas so no physics catch-up occurs.
+      state.pauseStartedAt = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !completed,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: launch.profileId,
+    pictureBase: "../../"
+  });
 })();

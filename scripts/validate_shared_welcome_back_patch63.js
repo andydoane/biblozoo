@@ -14,7 +14,7 @@ function eq(a,b,reason) { checks++; assert.equal(a,b,reason); }
 
 function sourceChecks() {
   const sw = read("service-worker.js");
-  ok(sw.includes("2026_Oct_25_patch64_1_recovery_escape_diagnostics"), "Fresh PWA version");
+  ok(sw.includes("2026_Oct_25_patch65_motion_audio_one_tap"), "Fresh PWA version");
   const helper = read("verse_games/shared/welcome-back-return.js");
   ok(helper.includes("resumeAudioOnGesture"), "One gesture-owned audio check for standalone games");
   ok(helper.includes("context.currentTime - before >= 0.02"), "Audio clock must advance");

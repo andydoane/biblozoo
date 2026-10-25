@@ -3422,6 +3422,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       unlock: () => { audioUnlocked = false; return unlockAudio(); },
       getContext: () => audioCtx,
       isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      replaceContext: () => {
+        if (returnContextReplacements >= 1) return false;
+        returnContextReplacements += 1;
+        audioUnlocked = false;
+        return replaceStuckTrafficTapAudioContext();
+      },
       muted
     });
     return Promise.resolve(restore).then(ok => {

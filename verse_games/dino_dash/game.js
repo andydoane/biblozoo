@@ -1,5 +1,14 @@
 (async function(){
   const app = document.getElementById("app");
+  // Patch 65: no movement, collisions, or animation deadlines advance away.
+  const welcomeClock = window.BibloZooWelcomeBackClock.create();
+  const gameNow = () => welcomeClock.now();
+  let returnPaused = false;
+  let returnSession = 0;
+  let returnContextReplacements = 0;
+  let returnPriorPauseReason = null;
+  let returnAnimating = [];
+
   const launch = window.VerseGameBridge.getLaunchParams();
   const ctx = await window.VerseGameBridge.getVerseContext();
 
@@ -1018,8 +1027,9 @@
       void unlockAudio();
       recordHalfwayFeedDiagnosticEvent("sun-tapped");
 
-      const startedAt = performance.now();
-      const frame = now => {
+      const startedAt = gameNow();
+      const frame = () => {
+        const now = gameNow();
         if (!screen.isConnected) return;
         const raw = Math.min(1, Math.max(0,
           (now - startedAt) / DAY_NIGHT_ORBIT_MS
@@ -1090,7 +1100,7 @@
 
     state.phase = "feedExit";
     state.phaseStartedAt =
-      performance.now();
+      gameNow();
 
     clearMovingItems();
     clearTrail();
@@ -1231,7 +1241,7 @@
       window.setTimeout(
         () => {
           saveDiagnosticHeartbeat(
-            performance.now(),
+            gameNow(),
             true
           );
 
@@ -1457,7 +1467,7 @@
   ){
     diagnosticState
       .frameWindowStartedAt =
-      ts || performance.now();
+      ts || gameNow();
 
     diagnosticState.frameCount = 0;
     diagnosticState.frameTotalMs = 0;
@@ -1471,7 +1481,7 @@
     ts
   ){
     const now =
-      ts || performance.now();
+      ts || gameNow();
 
     const elapsedMs =
       Math.max(
@@ -1646,7 +1656,7 @@
     }
 
     const now =
-      ts || performance.now();
+      ts || gameNow();
 
     if (
       !force &&
@@ -1865,7 +1875,7 @@
     };
 
     resetDiagnosticFrameWindow(
-      performance.now()
+      gameNow()
     );
 
     writeDiagnosticReport();
@@ -1986,7 +1996,7 @@
     };
 
     const now =
-      performance.now();
+      gameNow();
 
     diagnosticState.lastHeartbeatAt =
       now;
@@ -2015,7 +2025,7 @@
     }
 
     saveDiagnosticHeartbeat(
-      performance.now(),
+      gameNow(),
       true
     );
 
@@ -2740,7 +2750,7 @@
 
   function enterIntroPhase(){
     state.phase = "intro";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.introStartedAt = state.phaseStartedAt;
     clearMovingItems();
     resetDino();
@@ -2748,7 +2758,7 @@
 
   function enterVersePhase(){
     state.phase = "verse";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     clearMovingItems();
     state.spawnCooldown = 0.35;
     state.spawnPause = 0;
@@ -2756,7 +2766,7 @@
 
   function enterBonusIntroPhase(){
     state.phase = "bonusIntro";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
 
     lockLongVerseBonus30fps(
       state.phaseStartedAt
@@ -2775,7 +2785,7 @@
 
   function enterBonusPhase(){
     state.phase = "bonus";
-    state.phaseStartedAt = performance.now();
+    state.phaseStartedAt = gameNow();
     state.bonusStartedAt = state.phaseStartedAt;
     clearMovingItems();
     state.spawnCooldown = 0.35;
@@ -2798,7 +2808,7 @@
 
     playSound("fall");
     state.phase = "fall";
-    state.fallStartedAt = performance.now();
+    state.fallStartedAt = gameNow();
     state.respawnAt = state.fallStartedAt + 1050;
     state.spawnPause = 1.1;
     state.dinoVY = state.layout.unit * 1.2;
@@ -2947,7 +2957,7 @@
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
-        audioUnlocked = success && ctx.state === "running";
+        audioUnlocked = success && ctx === audioCtx && ctx.state === "running";
         if (audioUnlocked) preloadSounds();
         resolve(audioUnlocked);
       };
@@ -3101,6 +3111,7 @@
   }
 
   function setPaused(paused, reason = ""){
+    if (returnPaused && !paused) return;
     if (!state.running && state.phase !== "bonusIntro") return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
@@ -3128,7 +3139,7 @@
 
   function handleInput(){
     unlockAudio();
-    const now = performance.now();
+    const now = gameNow();
     if (now - state.lastInputAt < 70) return;
     state.lastInputAt = now;
     if (state.paused) return;
@@ -3176,7 +3187,7 @@
     const d = getDifficulty();
     const expectedAirSeconds = (2 * Math.abs(d.jumpU)) / Math.max(0.1, d.gravityU);
 
-    state.dinoBackflipStartedAt = performance.now();
+    state.dinoBackflipStartedAt = gameNow();
     state.dinoBackflipDuration = clamp(expectedAirSeconds * 1000, 620, 950);
   }
 
@@ -3673,6 +3684,7 @@
   }
 
   function tick(ts){
+    ts = gameNow();
     if (!state.running){
       state.rafId = 0;
       return;
@@ -5333,7 +5345,7 @@
         Math.max(
           0,
           (
-            performance.now() -
+            gameNow() -
             state.bonusStartedAt
           ) /
           1000
@@ -5548,7 +5560,7 @@
 
   function flash(color, duration){
     state.flashColor = color;
-    state.flashUntil = performance.now() + duration;
+    state.flashUntil = gameNow() + duration;
   }
 
   function render(ts){
@@ -6231,7 +6243,7 @@
     }
 
     if (state.paused){
-      if (!state.pausedRenderTs) state.pausedRenderTs = ts || performance.now();
+      if (!state.pausedRenderTs) state.pausedRenderTs = ts || gameNow();
       ts = state.pausedRenderTs;
     } else {
       state.pausedRenderTs = 0;
@@ -6806,7 +6818,7 @@
     if (state.phase === "bonusResult") return clamp(state.bonusResultProgress || 0, 0, 1);
     if (state.phase !== "bonus" || !state.bonusStartedAt) return 0;
 
-    const elapsed = Math.max(0, (performance.now() - state.bonusStartedAt) / 1000);
+    const elapsed = Math.max(0, (gameNow() - state.bonusStartedAt) / 1000);
     return clamp(elapsed / FLAG_FINISH_SECONDS, 0, 1);
   }
 
@@ -7453,4 +7465,77 @@
   function clamp(value, min, max){
     return Math.min(max, Math.max(min, value));
   }
+
+  // Existing menu/help pauses stay in force after a task switch.
+  function pauseForTaskSwitch() {
+    returnSession += 1;
+    if (returnPaused) return;
+    returnPaused = true;
+    returnContextReplacements = 0;
+    returnPriorPauseReason = state.paused ? state.pauseReason : null;
+    welcomeClock.pause();
+    document.body.classList.add("bz-return-activity-paused");
+    returnAnimating = [];
+    if (typeof document.getAnimations === "function") {
+      for (const animation of document.getAnimations()) {
+        if (animation.playState !== "running") continue;
+        try { animation.pause(); returnAnimating.push(animation); } catch (_) {}
+      }
+    }
+    setPaused(true, "welcome-back");
+  }
+
+  function replaceWelcomeAudioContext() {
+    if (returnContextReplacements >= 1) return false;
+    const previous = audioCtx;
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtor) return false;
+    let fresh;
+    try { fresh = new AudioCtor(); } catch (_) { return false; }
+    returnContextReplacements += 1;
+    audioCtx = fresh;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    try { Promise.resolve(previous?.close?.()).catch(() => {}); } catch (_) {}
+    return true;
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    // Unlock/prime now, inside the actual child's button gesture.
+    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+      unlock: () => { audioUnlocked = false; return unlockAudio(); },
+      getContext: () => audioCtx,
+      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+      replaceContext: replaceWelcomeAudioContext,
+      muted
+    });
+    return Promise.resolve(attempt).then(ok => {
+      if (!ok || document.hidden || session !== returnSession) return false;
+      returnPaused = false;
+      welcomeClock.resume();
+      document.body.classList.remove("bz-return-activity-paused");
+      for (const animation of returnAnimating) {
+        try { if (animation.playState === "paused") animation.play(); } catch (_) {}
+      }
+      returnAnimating = [];
+      setPaused(returnPriorPauseReason !== null, returnPriorPauseReason || "");
+      returnPriorPauseReason = null;
+      // RAF is still scheduled and the virtual clock has not advanced while away.
+      // Reset first-frame deltas so no physics catch-up occurs.
+      state.lastTs = 0;
+      state.pausedRenderTs = 0;
+      return true;
+    });
+  }
+
+  window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.running && !completed,
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    profileId: launch.profileId,
+    pictureBase: "../../"
+  });
 })();
