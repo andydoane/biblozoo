@@ -27,7 +27,7 @@ function makeDom() {
     tagName:tag.toUpperCase(), hidden:false, disabled:false, textContent:"", innerHTML:"",
     setAttribute(key,value){ this[key]=value; },
     querySelector(selector) {
-      if (selector === "#learnAudioResumeButton") return this.button;
+      if (selector === "#learnAudioResumeButton" || selector === "[data-welcome-back-action]") return this.button;
       if (selector === "#learnAudioResumeStatus") return this.status;
       return null;
     },
@@ -91,7 +91,9 @@ function makeHarness(mode="chunk") {
   const box={Promise,console,calls,State,Screen,IMG_DIR:"verse_images/",document:dom.document,
     window:dom.window,audioEl,audioQueue,unlockQueue,muted:false, setTimeout(fn,ms){const id=++timerId;timers.set(id,{fn,ms});return id;},
     clearTimeout(id){timers.delete(id);}};
-  vm.createContext(box);vm.runInContext(code,box);
+  vm.createContext(box);
+  vm.runInContext(fs.readFileSync(path.resolve(__dirname,"../verse_games/shared/welcome-back.js"),"utf8"),box);
+  vm.runInContext(code,box);
   return {...dom,calls,timers,State,Screen,api:box.api,
     overlay(){return dom.document.getElementById("learnAudioResumeOverlay");},
     pushAudio(p){audioQueue.push(p);},pushUnlock(p){unlockQueue.push(p);},
@@ -105,12 +107,13 @@ async function testOverlayIndependentOfLayout() {
   const overlay=h.overlay();
   check(overlay !== null,true,"return creates a recovery overlay");
   check(h.bodyNodes.includes(overlay),true,"overlay is appended to document.body, not lesson slide");
-  check(h.headNodes.length,1,"overlay styles are installed once");
-  match(h.headNodes[0].textContent,/position: fixed; inset: 0; z-index:/,"overlay doesn't consume lesson layout space");
-  match(overlay.innerHTML,/button_learn\.png/,"existing Learn icon appears above title");
-  match(overlay.innerHTML,/Ready to Continue\?/,"simple recovery title");
+  check(h.headNodes.length,0,"Learn no longer duplicates shared CSS in an inline style");
+  const css=fs.readFileSync(path.resolve(__dirname,"../verse_games/shared/welcome-back.css"),"utf8");
+  match(css,/#learnAudioResumeOverlay[\s\S]*position: fixed/,'overlay stays fixed outside lesson layout');
+  match(overlay.innerHTML,/data-welcome-back-picture/,"shared profile picture placeholder");
+  match(overlay.innerHTML,/Welcome back,/,"child-friendly greeting");
   check(overlay.hidden,false,"overlay visible on returning");
-  check(overlay.button.textContent,"▶ Resume Audio","button uses Resume Audio label");
+  check(overlay.button.textContent,"Let's go!","button uses shared child-friendly label");
   check(overlay.button.disabled,false,"ready for actual user tap");
   check(overlay.status.hidden,true,"no unnecessary subtitle");
   check(h.bodyNodes.length,1,"one overlay element");
@@ -190,7 +193,7 @@ async function testMuteAndShortInstructions() {
   check(h.overlay(),null,"short instruction never creates a modal");
   const second=makeHarness("listen");second.hide();second.show();
   second.api.setMuted(true);second.api.syncLearnAudioResumeOverlay();
-  check(second.overlay().button.textContent,"Unmute & Resume Audio","muted state is explicitly disclosed");
+  check(second.overlay().button.textContent,"Let's go!","shared action label stays consistent when muted");
   const a=deferred(),b=deferred();second.pushAudio(a);second.pushUnlock(b);
   second.api.resumeInterruptedLearnAudio();
   check(second.calls.includes("unmute"),true,"resume tap unmutes only with explicit button label");
@@ -225,7 +228,7 @@ function testLayoutAndSourceContracts() {
   match(source,/syncLearnAudioResumeOverlay\(\);\n}\n\n\/\* =========================\n   App-wide UI tap sounds/,"overlay synced after render rather than inside slides");
   match(source,/if \(learnAudioResumeAttempt\) clearTimeout\(learnAudioResumeAttempt\.watchdog\);/,"navigation clears recovery watchdog");
   const sw=fs.readFileSync(path.resolve(__dirname,"../service-worker.js"),"utf8");
-  match(sw,/2026_Oct_\d+_patch(?:19a_learn_resume_overlay|20_read_my_verse_audio_recovery|20a_read_audio_resume_recovery|20b_read_animation_music|20c_native_crawl_music_fades|20d_crawl_envelope_recovery|20e_crawl_restart_original_audio)/,"new service-worker version guarantees fresh web assets");
+  match(sw,/2026_Oct_\d+_patch(?:19a_learn_resume_overlay|20_read_my_verse_audio_recovery|20a_read_audio_resume_recovery|20b_read_animation_music|20c_native_crawl_music_fades|20d_crawl_envelope_recovery|20e_crawl_restart_original_audio|61_shared_welcome_back|62_scramble_welcome_back)/,"new service-worker version guarantees fresh web assets");
 }
 (async()=>{
   await testOverlayIndependentOfLayout();

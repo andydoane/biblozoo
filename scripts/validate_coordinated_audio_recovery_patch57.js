@@ -96,7 +96,7 @@ async function feedingBurstDeferralAndRecovery() {
   eq(await attempt(), true, "Initial Resume gesture checked");
   eq(r.feedPausedAt, 10000, "Frozen clock keeps Labyrinth paused");
   eq(r.resumeStatus.hidden, false, "Friendly recovery message appears after failure");
-  eq(r.resumeButton.textContent, "Try Again", "Retry button has actionable label");
+  eq(r.resumeButton.textContent, "Try again!", "Retry button has actionable label");
   ok(r.resumeStatus.textContent.includes("go back"), "Exit option is explained");
   eq(await attempt(), true, "First replacement attempt accepted");
   eq(h.contexts.length, 2, "One fresh Feeding context");
@@ -122,7 +122,7 @@ async function feedingBurstDeferralAndRecovery() {
   eq(r.feedPausedAt, null, "Healthy clock lets game resume");
   eq(r.resumeOverlay.hidden, true, "Recovery closes overlay");
   eq(r.resumeStatus.hidden, true, "Recovery clears failure message");
-  eq(r.resumeButton.textContent, "Resume", "Default button text restored");
+  eq(r.resumeButton.textContent, "Let's go!", "Default button text restored");
   eq(r.feedAudioReplacements, 0, "Successful recovery clears replacement count");
   h.api.discard();
 }
@@ -159,8 +159,9 @@ function markupAndPwaChecks() {
   ok(feeding.includes("FEED_AUDIO_REPLACEMENT_BURST_LIMIT"), "Feeding burst cap exists");
   ok(feeding.includes('data-daily-feed-resume-status'), "All four modes share retry status");
   ok(feeding.includes('data-daily-feed-resume-back'), "Pause dialog retains Exit/back button");
-  ok(css.includes(".daily-feed-resume-status[hidden]"), "Normal pause has no new message");
-  ok(/2026_Oct_25_patch(?:58_native_audio_session_diagnostics|59_native_reactivation_experiment|60_interruption_coordinator)/.test(sw),
+  ok(css.includes(".daily-feed-resume-overlay[hidden]") &&
+    require("node:fs").readFileSync(require("node:path").resolve(__dirname,"../verse_games/shared/welcome-back.css"),"utf8").includes(".bz-welcome-status[hidden]"), "Normal pause has no new message");
+  ok(/2026_Oct_25_patch(?:58_native_audio_session_diagnostics|59_native_reactivation_experiment|60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back)/.test(sw),
     "New PWA cache version will install edited files");
   ok(sw.includes('"./daily_questions_feed_game.css"'), "Resume styling cached offline");
   ok(sw.includes('"./daily_questions_feed_game.js"'), "Feeding script cached offline");

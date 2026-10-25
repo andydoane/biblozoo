@@ -1365,13 +1365,19 @@
             data-daily-feed-resume-back
             aria-label="${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}"
           >◀</button>
-          <div class="daily-feed-resume-content">
-            <button
-              class="daily-feed-resume-button no-zoom"
-              type="button"
-              data-daily-feed-resume
-            >Resume</button>
-            <p class="daily-feed-resume-status" data-daily-feed-resume-status
+          <div class="daily-feed-resume-content bz-welcome-card" data-welcome-back-card>
+            <div class="bz-welcome-avatar" aria-hidden="true">
+              <span class="bz-welcome-avatar-fallback" data-welcome-back-picture-fallback>🐾</span>
+              <img class="bz-welcome-avatar-image" data-welcome-back-picture
+                   alt="" draggable="false" hidden>
+            </div>
+            <h2 class="bz-welcome-title">Welcome back,<span class="bz-welcome-name-line"
+                data-welcome-back-name-line><span class="bz-welcome-name"
+                data-welcome-back-name>Zookeeper</span><span class="bz-welcome-punctuation">!</span></span></h2>
+            <button class="daily-feed-resume-button bz-welcome-action no-zoom"
+              type="button" data-welcome-back-action data-daily-feed-resume>Let's go!</button>
+            <p class="daily-feed-resume-status bz-welcome-status"
+               data-welcome-back-status data-daily-feed-resume-status
                role="status" aria-live="polite" hidden></p>
           </div>
         </div>
@@ -3089,7 +3095,8 @@
       runtime.resumeStatus.textContent = message;
       runtime.resumeStatus.hidden = !message;
     }
-    if (runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try Again" : "Resume";
+    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay, { retry: !!message });
+    if (!window.BibloZooWelcomeBack && runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try again!" : "Let's go!";
   }
 
   function pauseFeedingGame(runtime, now = performance.now()) {
@@ -3127,7 +3134,10 @@
     runtime.modeController?.handleInput?.(runtime, { type: "pointerend" });
     stopFeedingEffects(runtime);
     runtime.gameEl?.classList?.add?.("is-interruption-paused");
-    if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = false;
+    if (runtime.resumeOverlay) {
+      window.BibloZooWelcomeBack?.populate?.(runtime.resumeOverlay, { name: runtime.zookeeperName });
+      runtime.resumeOverlay.hidden = false;
+    }
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
     setFeedingResumeStatus(runtime);
     return true;

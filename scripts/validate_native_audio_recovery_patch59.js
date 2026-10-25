@@ -113,7 +113,7 @@ async function feedingRecovery() {
     h.api.attemptFeedingResumeFromGesture(r);
     await flush(); await h.advance(180); await h.advance(180);
     eq(r.feedPausedAt,10000,'Native activation without clock advancement stays paused');
-    eq(r.resumeButton.textContent,'Try Again','Failed second check uses child-friendly retry');
+    eq(r.resumeButton.textContent,'Try again!','Failed second check uses child-friendly retry');
     eq(r.feedAudioNeedsFreshContext,true,'Verified failure retains context recovery path');
     ok(h.log.some(e=>e.reason==='clock-stalled-after-native'), 'Distinct post-native stall logged');
     h.api.discard();
@@ -207,7 +207,7 @@ async function appRecovery() {
 function sourcePolicy() {
   ok(html.includes('src="verse_games/shared/native-audio-recovery.js"'), 'Optional integration loaded');
   ok(html.indexOf('native-audio-recovery.js') < html.indexOf('daily_questions_feed_game.js'), 'Native helper loads before feeding');
-  ok(/2026_Oct_25_patch(?:59_native_reactivation_experiment|60_interruption_coordinator)/.test(sw), 'Fresh PWA cache version');
+  ok(/2026_Oct_25_patch(?:59_native_reactivation_experiment|60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back)/.test(sw), 'Fresh PWA cache version');
   ok(sw.includes('"./verse_games/shared/native-audio-recovery.js"'), 'Fallback JS cached offline');
   ok(!/import\s+.*@capacitor|from\s+["']@capacitor/.test(helper), 'No mandatory native import');
   ok(!/Capacitor\.Plugins/.test(feed), 'Feeding remains web-first');

@@ -1044,3 +1044,9 @@ select{ font:inherit; }
     width:clamp(8px, 2vw, 14px);
   }
 }
+
+/* Patch 62: freeze Scramble's magnet/instruction animations when backgrounded.
+ * The external-game Welcome Back dialog lives outside #app. */
+#app.is-welcome-return-paused * {
+  animation-play-state: paused !important;
+}

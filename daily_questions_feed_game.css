@@ -636,38 +636,8 @@
   background: rgba(25, 18, 34, 0.56);
   touch-action: manipulation;
 }
-.daily-feed-resume-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  width: min(88vw, 340px);
-  max-height: 80%;
-}
-.daily-feed-resume-status[hidden] { display: none !important; }
-.daily-feed-resume-status {
-  margin: 0;
-  border-radius: 16px;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, .96);
-  color: #413254;
-  text-align: center;
-  font: 800 clamp(16px, 4vw, 20px)/1.35 "Baloo 2", system-ui, sans-serif;
-}
-.daily-feed-resume-button {
-  width: min(78vw, 300px);
-  min-height: 76px;
-  border: 0;
-  border-radius: 25px;
-  padding: 14px 30px;
-  color: #333333;
-  background: #ffc751;
-  box-shadow: 0 8px 0 rgba(0,0,0,.22);
-  font: 900 clamp(30px, 7vw, 42px)/1.1 "Baloo 2", system-ui, sans-serif;
-  cursor: pointer;
-}
-.daily-feed-resume-button:disabled { opacity: .8; cursor: default; }
-
+/* Card, avatar, heading, action and status now use welcome-back.css.
+   Only the full-screen Feeding overlay and its Back button live here. */
 /* Preview-only Melody tune chooser: seven songs need readable buttons on
    small iPhones. Scroll inside the selector rather than clipping the modal. */
 .dialog > #dlgActions.melody-preview-tune-actions {

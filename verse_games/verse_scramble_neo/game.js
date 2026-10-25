@@ -95,6 +95,15 @@
   let masterGain = null;
   let silenceAudioEl = null;
   let audioUnlocked = false;
+  // Patch 62: the separate game page uses the shared Welcome Back design.
+  // The game's virtual clock stops while its Welcome Back overlay is pending.
+  let returnPaused = false;
+  let returnPausedAt = 0;
+  let totalReturnPauseMs = 0;
+  let returnRecoveryFailures = 0;
+  let returnContextReplacements = 0;
+  let returnSession = 0;
+  let welcomeBackController = null;
   let currentCorrectMelody = [];
   let uiSoundFlip = false;
   let profilePictureVerseIds = [];
@@ -195,8 +204,24 @@
       .replace(/'/g, "&#39;");
   }
 
-  function sleep(ms){
-    return new Promise(resolve => setTimeout(resolve, ms));
+  function gameNow() {
+    const now = performance.now();
+    return now - totalReturnPauseMs -
+      (returnPaused ? now - returnPausedAt : 0);
+  }
+
+  // Instructions, animated letter falls and the bonus pointer must not use
+  // elapsed wall time while BibloZoo is in the background or waiting on tap.
+  async function sleep(ms) {
+    const deadline = gameNow() + ms;
+    while (returnPaused || gameNow() < deadline) {
+      await new Promise(resolve => setTimeout(resolve,
+        Math.min(100, Math.max(16, deadline - gameNow()))));
+    }
+  }
+
+  async function waitUntilGameActive() {
+    while (returnPaused) await new Promise(resolve => setTimeout(resolve, 80));
   }
 
   async function waitForMagnetFont() {
@@ -1811,7 +1836,7 @@
     clearMenuAndHelpState();
     state.bonusStage = "round";
     state.tiles = makeBonusTiles();
-    state.bonusDeadline = performance.now() + bonusTimeWithWiggle();
+    state.bonusDeadline = gameNow() + bonusTimeWithWiggle();
     state.busy = false;
     render();
   }
@@ -1948,9 +1973,10 @@
   }
 
   function handleBonusTileTap(btn) {
+    if (returnPaused) return;
     unlockAudio();
 
-    if (state.busy || state.menuOpen || state.helpOpen || state.bonusStage !== "round") return;
+    if (returnPaused || state.busy || state.menuOpen || state.helpOpen || state.bonusStage !== "round") return;
 
     const tile = tileObjectForButton(btn);
     if (!tile || btn.classList.contains("is-used")) return;
@@ -1960,7 +1986,7 @@
       return;
     }
 
-    state.bonusDeadline = Math.max(performance.now() + 900, state.bonusDeadline - 1000);
+    state.bonusDeadline = Math.max(gameNow() + 900, state.bonusDeadline - 1000);
     shakeElement(btn);
   }
 
@@ -1996,6 +2022,7 @@
     }
 
     await sleep(1500);
+    await waitUntilGameActive();
 
     state.busy = false;
     startBonusRound();
@@ -2009,6 +2036,8 @@
   }
 
   async function runBonusPointerLoop(token) {
+    await waitUntilGameActive();
+    if (!isCurrentBonusToken(token)) return;
     const pointer = document.getElementById("vsnBonusPointer");
     const board = document.getElementById("vsnBoard");
     if (!pointer || !board) return;
@@ -2016,7 +2045,9 @@
     positionPointerOffscreen(pointer, board);
     await sleep(80);
 
-    while (isCurrentBonusToken(token) && state.bonusStage === "round" && performance.now() < state.bonusDeadline) {
+    while (isCurrentBonusToken(token) && state.bonusStage === "round") {
+      await waitUntilGameActive();
+      if (!isCurrentBonusToken(token) || gameNow() >= state.bonusDeadline) break;
       const decoys = visibleBonusButtons(false);
       if (decoys.length) {
         movePointerToButton(pointer, board, randomItem(decoys), false);
@@ -2026,6 +2057,7 @@
       );
     }
 
+    await waitUntilGameActive();
     if (!isCurrentBonusToken(token) || state.bonusStage !== "round") return;
 
     const targetBtn = visibleBonusButtons(true)[0];
@@ -2723,7 +2755,7 @@
     if (selectedMode !== "easy") return;
     if (state.screen !== "game") return;
     if (state.bonusActive || state.showingInstruction) return;
-    if (state.busy || state.menuOpen || state.helpOpen || state.completed) return;
+    if (returnPaused || state.busy || state.menuOpen || state.helpOpen || state.completed) return;
     if (!state.currentTarget) return;
 
     easyHintTimer = setTimeout(() => {
@@ -2737,7 +2769,7 @@
     if (selectedMode !== "easy") return;
     if (state.screen !== "game") return;
     if (state.bonusActive || state.showingInstruction) return;
-    if (state.busy || state.menuOpen || state.helpOpen || state.completed) return;
+    if (returnPaused || state.busy || state.menuOpen || state.helpOpen || state.completed) return;
 
     const expected = expectedChar();
     if (!expected) return;
@@ -2782,6 +2814,7 @@
   }
 
   async function handleTileTap(btn){
+    if (returnPaused) return;
     unlockAudio();
 
     if (state.bonusActive){
@@ -2789,7 +2822,7 @@
       return;
     }
 
-    if (state.busy || state.menuOpen || state.helpOpen || state.completed) return;
+    if (returnPaused || state.busy || state.menuOpen || state.helpOpen || state.completed) return;
 
     const tile = tileObjectForButton(btn);
 
@@ -2883,6 +2916,7 @@
           bestStreak: state.bestStreak
         }
       });
+      await waitUntilGameActive();
       state.busy = false;
       startBonusIntro();
       return;
@@ -3009,6 +3043,85 @@
     };
   }
 
+  // Only a task switch while actually playing prompts the child. Starting a
+  // page, visiting an internal menu, or the game's end screen does not.
+  function pauseForTaskSwitch() {
+    // A second task switch invalidates a recovery attempt still in flight.
+    if (returnPaused) {
+      returnSession += 1;
+      returnRecoveryFailures = 0;
+      return;
+    }
+    returnPaused = true;
+    app?.classList.add("is-welcome-return-paused");
+    returnPausedAt = performance.now();
+    returnSession += 1;
+    returnRecoveryFailures = 0;
+    returnContextReplacements = 0;
+    clearEasyHint();
+  }
+
+  async function audioClockAdvances(context) {
+    if (!context || context.state !== "running") return false;
+    const start = context.currentTime;
+    await new Promise(resolve => setTimeout(resolve, 190));
+    return audioCtx === context && context.state === "running" &&
+      context.currentTime - start >= 0.02;
+  }
+
+  function replaceStalledContextForNewGesture() {
+    const old = audioCtx;
+    audioCtx = null;
+    masterGain = null;
+    audioUnlocked = false;
+    uiSoundBuffers.clear();
+    uiSoundBufferPromises.clear();
+    // Never wait for close() inside the tap: the replacement AudioContext
+    // must be constructed during the child-initiated gesture on iOS.
+    try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
+  }
+
+  function continueFromWelcomeBack() {
+    if (!returnPaused || document.hidden) return false;
+    const session = returnSession;
+    // A replacement is allowed only on a NEW actual gesture after a failure.
+    if (returnRecoveryFailures && !returnContextReplacements) {
+      returnContextReplacements = 1;
+      replaceStalledContextForNewGesture();
+    }
+    // Gesture-owned, synchronous Web Audio resume + optional media priming.
+    unlockAudio();
+    const context = audioCtx;
+    return (async () => {
+      if (!muted) {
+        let good = await audioClockAdvances(context);
+        if (!good && !document.hidden && session === returnSession &&
+            window.BibloZooAudioRecoveryCoordinator?.isAvailable?.()) {
+          const recovery = await window.BibloZooAudioRecoveryCoordinator.recoverAfterStall({
+            source: "app",
+            probe: () => audioClockAdvances(context),
+            isCurrent: () => returnPaused && session === returnSession &&
+              audioCtx === context
+          });
+          good = recovery.recovered === true;
+        }
+        if (!good || document.hidden || session !== returnSession) {
+          returnRecoveryFailures += 1;
+          return false;
+        }
+      }
+      if (document.hidden || session !== returnSession) return false;
+      const duration = performance.now() - returnPausedAt;
+      totalReturnPauseMs += duration;
+      if (state.startTime) state.startTime += duration;
+      returnPaused = false;
+      app?.classList.remove("is-welcome-return-paused");
+      returnRecoveryFailures = 0;
+      if (state.screen === "game" && !state.bonusActive) scheduleEasyHint();
+      return true;
+    })();
+  }
+
   function render(){
     if (state.screen === "intro") return renderIntro();
     if (state.screen === "mode") return renderMode();
@@ -3035,4 +3148,11 @@
   });
 
   setScreen("intro");
+  welcomeBackController = window.BibloZooWelcomeBackReturn?.attach?.({
+    shouldPrompt: () => state.screen === "game",
+    onPause: pauseForTaskSwitch,
+    onContinue: continueFromWelcomeBack,
+    profileId: window.VerseGameBridge.getLaunchParams().profileId,
+    pictureBase: "../../"
+  }) || null;
 })();

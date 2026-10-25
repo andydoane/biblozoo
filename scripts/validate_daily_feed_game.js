@@ -2274,7 +2274,9 @@ function testUniversalResumeOverlayIsMinimalAndSeparateFromBounceServe() {
     const markup = api.render({ session: { feedMode: mode, petName: "Pip" } });
     assert.strictEqual((markup.match(/data-daily-feed-resume-overlay/g) || []).length, 1);
     assert.strictEqual((markup.match(/data-daily-feed-resume\s*>/g) || []).length, 1);
-    assert.ok(markup.includes('>Resume</button>'));
+    assert.ok(markup.includes(">Let's go!</button>"));
+    assert.ok(markup.includes('data-welcome-back-picture'));
+    assert.ok(markup.includes('data-welcome-back-name'));
     assert.ok(markup.includes('data-daily-feed-resume-back'));
     assert.ok(markup.includes('aria-label="Back to Zoo"'));
     assert.ok(markup.includes('data-daily-feed-start-overlay'),

@@ -11482,69 +11482,20 @@ function ensureLearnAudioResumeOverlay() {
   if (overlay) return overlay;
   if (!document.body) return null;
 
-  const style = document.createElement("style");
-  style.id = "learnAudioResumeStyle";
-  style.textContent = `
-    #learnAudioResumeOverlay[hidden] { display: none !important; }
-    #learnAudioResumeOverlay {
-      position: fixed; inset: 0; z-index: 10020;
-      display: flex; align-items: center; justify-content: center;
-      padding: max(20px, env(safe-area-inset-top)) 20px
-        max(20px, env(safe-area-inset-bottom));
-      background: rgba(24, 15, 44, .76); box-sizing: border-box;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-card {
-      box-sizing: border-box; width: min(100%, 390px);
-      padding: 26px 24px 28px; text-align: center;
-      border-radius: 24px; background: #fdf7eb;
-      color: #302247; box-shadow: 0 16px 44px rgba(0,0,0,.35);
-      font-family: 'Baloo 2', 'Baloo2', system-ui, sans-serif;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-icon {
-      display: block; width: 88px; height: 88px;
-      object-fit: contain; margin: 0 auto 10px;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-title {
-      margin: 0 0 18px; font-size: clamp(27px, 7vw, 34px);
-      line-height: 1.15; font-weight: 800;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-button {
-      display: block; width: 100%; min-height: 56px;
-      border: none; border-radius: 16px; cursor: pointer;
-      background: #ffc751; color: #302247;
-      font: 800 21px/1.2 'Baloo 2', 'Baloo2', system-ui, sans-serif;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-button:disabled {
-      opacity: .68; cursor: wait;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-status {
-      margin: 12px 0 0; font-size: 14px; line-height: 1.35;
-    }
-    #learnAudioResumeOverlay .learn-audio-resume-status[hidden] {
-      display: none;
-    }
-  `;
-  document.head.appendChild(style);
-
   overlay = document.createElement("div");
   overlay.id = "learnAudioResumeOverlay";
   overlay.hidden = true;
   overlay.setAttribute("role", "dialog");
   overlay.setAttribute("aria-modal", "true");
   overlay.setAttribute("aria-labelledby", "learnAudioResumeTitle");
-  overlay.innerHTML = `
-    <div class="learn-audio-resume-card">
-      <img class="learn-audio-resume-icon" src="${IMG_DIR}button_learn.png"
-        alt="" draggable="false" onerror="this.hidden=true">
-      <h2 class="learn-audio-resume-title" id="learnAudioResumeTitle">Ready to Continue?</h2>
-      <button class="learn-audio-resume-button no-zoom"
-        id="learnAudioResumeButton" type="button" data-no-ui-sound>
-        ▶ Resume Audio
-      </button>
-      <p class="learn-audio-resume-status" id="learnAudioResumeStatus"
-        role="status" aria-live="polite" hidden></p>
-    </div>
-  `;
+  overlay.innerHTML = window.BibloZooWelcomeBack?.markup?.("learn") || `
+    <div class="learn-audio-resume-card bz-welcome-card">
+      <h2 class="bz-welcome-title" id="learnAudioResumeTitle">Welcome back!</h2>
+      <button class="learn-audio-resume-button bz-welcome-action no-zoom"
+        type="button" id="learnAudioResumeButton" data-no-ui-sound>Let's go!</button>
+      <p class="learn-audio-resume-status bz-welcome-status"
+        id="learnAudioResumeStatus" role="status" aria-live="polite" hidden></p>
+    </div>`;
   document.body.appendChild(overlay);
   overlay.querySelector("#learnAudioResumeButton").onclick = resumeInterruptedLearnAudio;
   return overlay;
@@ -11561,10 +11512,14 @@ function syncLearnAudioResumeOverlay() {
   }
   const overlay = ensureLearnAudioResumeOverlay();
   if (!overlay) return;
+  window.BibloZooWelcomeBack?.populate?.(overlay);
   overlay.hidden = false;
   const button = overlay.querySelector("#learnAudioResumeButton");
-  button.disabled = !!learnAudioResumeAttempt;
-  button.textContent = muted ? "Unmute & Resume Audio" : "▶ Resume Audio";
+  window.BibloZooWelcomeBack?.setAction?.(overlay, {
+    busy: !!learnAudioResumeAttempt,
+    retry: !!learnAudioResumeError
+  });
+  if (button) button.disabled = !!learnAudioResumeAttempt;
   const status = overlay.querySelector("#learnAudioResumeStatus");
   status.textContent = learnAudioResumeAttempt
     ? "Restoring audio…"
@@ -11593,7 +11548,7 @@ function failLearnAudioResumeAttempt(attempt) {
     return;
   }
   learnAudioInterrupted = attempt.recovery;
-  learnAudioResumeError = "Audio isn't ready yet. Tap Resume Audio to try again.";
+  learnAudioResumeError = "Sound isn't ready yet. Please try again.";
   if (!document.hidden) render();
 }
 
