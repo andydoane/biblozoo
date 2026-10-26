@@ -6,7 +6,7 @@
 (function installWelcomeBackReturn(root) {
   "use strict";
 
-  function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, escapeText, preserveFocus = false } = {}) {
+  function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, escapeText, preserveFocus = false, suppressUiSound = false } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
@@ -23,13 +23,16 @@
     document.body.appendChild(overlay);
     const button = overlay.querySelector("[data-welcome-back-action]");
     const status = overlay.querySelector("[data-welcome-back-status]");
+    if (suppressUiSound) button?.setAttribute("data-no-ui-sound", "");
     // The standard popup stays one-button. Only after recovery has failed (or
     // taken unusually long) does a safe way back to the Games screen appear.
     const escape = document.createElement("button");
     escape.type = "button";
     escape.className = "bz-welcome-escape no-zoom";
-    escape.textContent = escapeText === "Back to Playground" ? "Back to Playground" : "Back to Games";
+    escape.textContent = ["Back to Playground", "Back to Title"].includes(escapeText)
+      ? escapeText : "Back to Games";
     escape.hidden = true;
+    if (suppressUiSound) escape.setAttribute("data-no-ui-sound", "");
     overlay.querySelector("[data-welcome-back-card]")?.appendChild(escape);
     const card = overlay.querySelector("[data-welcome-back-card]");
     const oopsCard = document.createElement("section");
@@ -43,6 +46,7 @@
       <button type="button" class="bz-welcome-action no-zoom" data-welcome-back-title>Back to Title</button>`;
     overlay.appendChild(oopsCard);
     const titleButton = oopsCard.querySelector("[data-welcome-back-title]");
+    if (suppressUiSound) titleButton?.setAttribute("data-no-ui-sound", "");
     const activityLabel = oopsCard.querySelector("[data-welcome-back-activity]");
     if (activityLabel) activityLabel.textContent = String(document.title || "BibloZoo").slice(0, 80);
     const ESCAPE_WATCHDOG_MS = 7500;

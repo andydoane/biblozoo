@@ -9554,6 +9554,7 @@ const SCREEN_ORDER = Object.freeze([
 
 window.BibloZooFlashcards
   ?.initialize?.({
+    isActive: () => State.screen === Screen.FLASHCARDS,
     getVerseList: () =>
       VERSE_LIST,
 

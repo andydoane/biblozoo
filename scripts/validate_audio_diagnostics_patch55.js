@@ -342,7 +342,7 @@ async function main() {
     "Enable and disable URL options work on main and standalone pages");
   ok(sw.includes('"./verse_games/shared/audio-diagnostics.js"'),
     "Existing PWA cache includes the shared diagnostics module");
-  ok(sw.includes("2026_Oct_26_patch68_2_wheel_spin_audio_cleanup"),
+  ok(sw.includes("2026_Oct_26_patch69_flashcards_recording_replay_welcome"),
     "PWA cache includes Patch 55 diagnostics and has a valid update version");
   ok(!/import\s+.*@capacitor|from\s+["']@capacitor|AVAudioSession|@capacitor\/app/.test(code),
     "Diagnostics require no native-only audio dependency");

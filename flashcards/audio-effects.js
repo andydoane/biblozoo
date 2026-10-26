@@ -383,6 +383,23 @@
   const AUDIO_RESUME_TIMEOUT_MS = 3000;
   const AUDIO_SETUP_TIMEOUT_MS = 7000;
   const AUDIO_DECODE_TIMEOUT_MS = 15000;
+  const IOS_CLOCK_PROBE_MS = 190;
+
+  function log(type, details = {}) {
+    try { window.BibloZooAudioDiagnostics?.record(type, details); } catch (_) {}
+  }
+
+  // Wacky Replay's playback context is distinct from the microphone meter.
+  // A running state alone is not evidence of advancing audio on iOS.
+  async function verifyPlaybackClock(audioContext) {
+    if (window.Capacitor?.getPlatform?.() !== "ios" ||
+        !window.Capacitor?.isNativePlatform?.() ||
+        !Number.isFinite(audioContext.currentTime)) return true;
+    const before = audioContext.currentTime;
+    await new Promise(resolve => window.setTimeout(resolve, IOS_CLOCK_PROBE_MS));
+    return !document.hidden && audioContext.state === "running" &&
+      audioContext.currentTime > before + 0.012;
+  }
   // SoundTouch reports a render heartbeat about every 100 audio blocks.
   // These limits allow for WKWebView startup latency and quieter recordings.
   const PROCESSOR_HEARTBEAT_TIMEOUT_MS = 3500;
@@ -550,7 +567,13 @@
       await awaitAudioSetup(audioContext.resume(), AUDIO_RESUME_TIMEOUT_MS);
     }
     if (audioContext.state !== "running" || document.hidden) {
+      discardUnhealthyAudioContext(audioContext);
       throw new Error("Wacky Replay audio is not ready.");
+    }
+    if (!await verifyPlaybackClock(audioContext)) {
+      log("flashcards-wacky-clock-stalled");
+      discardUnhealthyAudioContext(audioContext);
+      throw new Error("Wacky Replay audio clock is stalled.");
     }
 
     if (!soundTouchModulePromise) {
@@ -1461,8 +1484,10 @@
         runtime.context.createGain();
 
       source.buffer = audioBuffer;
-      source.playbackRate.value =
-        preset.speed;
+      // SoundTouch owns tempo modification. Applying the speed to both
+      // the input source and processor double-speeds playback, truncating
+      // short recordings before the processor can report its first output.
+      source.playbackRate.value = 1;
       soundTouch.playbackRate.value =
         preset.speed;
       gain.gain.value = 0.88;
@@ -1565,7 +1590,10 @@
 
         const fail = (reason) => {
           if (activePlayback !== playback) return;
-          if (reason) console.warn("Wacky Replay audio stopped:", reason);
+          if (reason) {
+            console.warn("Wacky Replay audio stopped:", reason);
+            log("flashcards-wacky-playback-failed", { reason });
+          }
           activePlayback = null;
           try { source.stop(); } catch (_) { }
           disconnectPlayback(playback);
@@ -1669,6 +1697,8 @@
         }
       });
     } catch (error) {
+      log("flashcards-wacky-playback-failed", { reason: "audio-graph-setup" });
+      discardUnhealthyAudioContext(runtime.context);
       disconnectPlayback({
         source, soundTouch, gain,
         effectNodes: effectChain?.nodes || [],

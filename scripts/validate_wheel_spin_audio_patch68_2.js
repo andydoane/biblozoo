@@ -186,7 +186,7 @@ async function testAsyncDeferredToneInvalidation(){
   includes(game,'cancelGameTimeout(token)','Queued spin sounds actually canceled');
   includes(game,'spinStartedAt + i * SPIN_TICK_SPACING_MS - gameNow()','Rescheduling uses virtual remaining time');
   const sw=read('service-worker.js');
-  includes(sw,'2026_Oct_26_patch68_2_wheel_spin_audio_cleanup','Service worker invalidates cached wheel code');
+  includes(sw,'2026_Oct_26_patch69_flashcards_recording_replay_welcome','Service worker invalidates cached wheel code');
   includes(sw,'./verse_playground/wheel_of_bible/game.js','Wheel of Bible code stays in offline precache');
 }
 

@@ -42,6 +42,13 @@
     let meterReconnectTimer = null;
     let meterReconnectAttempts = 0;
     const METER_MAX_RESUME_ATTEMPTS = 4;
+    const METER_STALL_MS = 900;
+    let meterClockAt = null;
+    let meterClockWallAt = 0;
+
+    function log(type, details = {}) {
+      try { window.BibloZooAudioDiagnostics?.record(type, details); } catch (_) {}
+    }
 
     function meterMayRun() {
       return !document.hidden &&
@@ -51,6 +58,8 @@
     function closeMeter() {
       // Invalidate old resume promises and reconnect timers before closing.
       meterActivationToken += 1;
+      meterClockAt = null;
+      meterClockWallAt = 0;
       meterResumePending = false;
       clearTimeout(meterResumeTimeout);
       clearTimeout(meterRetryTimer);
@@ -143,6 +152,8 @@
         analyser.connect(meterSink);
         meterSink.connect(meterContext.destination);
         // Recheck after getUserMedia: iOS may suspend the earlier activation.
+        meterClockAt = null;
+        meterClockWallAt = 0;
         resumeMeter();
       } catch (_) {
         closeMeter();
@@ -157,6 +168,22 @@
         return null;
       }
       try {
+        // On WKWebView, a meter context may report `running` even though
+        // its audio clock froze during microphone setup. Rebuild only this
+        // analyser graph; never request a new microphone or restart recording.
+        const clock = Number(meterContext.currentTime);
+        const wall = performance.now();
+        if (Number.isFinite(clock)) {
+          if (meterClockAt === null || clock > meterClockAt + 0.005) {
+            meterClockAt = clock;
+            meterClockWallAt = wall;
+          } else if (wall - meterClockWallAt >= METER_STALL_MS) {
+            log("flashcards-meter-clock-stalled", { attempts: meterReconnectAttempts });
+            closeMeter();
+            reconnectMeterOnce();
+            return null;
+          }
+        }
         analyser.getByteTimeDomainData(samples);
         let sum = 0;
         for (const sample of samples) sum += ((sample - 128) / 128) ** 2;
@@ -435,6 +462,9 @@
 
     return Object.freeze({
       start, stop, play, pause, playFun, stopFun, dispose, readLevel,
+      interruptCapture() {
+        if (["requesting", "preparing", "recording", "stopping"].includes(status)) interrupt();
+      },
       snapshot: () => ({ status, hasRecording: !!url, message, playbackComplete, playbackFailed,
         remainingSeconds: status === "recording" ? Math.max(0, Math.ceil((recordingDeadline - performance.now()) / 1000)) : null })
     });

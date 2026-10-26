@@ -161,7 +161,7 @@ function markupAndPwaChecks() {
   ok(feeding.includes('data-daily-feed-resume-back'), "Pause dialog retains Exit/back button");
   ok(css.includes(".daily-feed-resume-overlay[hidden]") &&
     require("node:fs").readFileSync(require("node:path").resolve(__dirname,"../verse_games/shared/welcome-back.css"),"utf8").includes(".bz-welcome-status[hidden]"), "Normal pause has no new message");
-  ok(sw.includes("2026_Oct_26_patch68_2_wheel_spin_audio_cleanup"),
+  ok(sw.includes("2026_Oct_26_patch69_flashcards_recording_replay_welcome"),
     "New PWA cache version will install edited files");
   ok(sw.includes('"./daily_questions_feed_game.css"'), "Resume styling cached offline");
   ok(sw.includes('"./daily_questions_feed_game.js"'), "Feeding script cached offline");

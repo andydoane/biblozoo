@@ -89,6 +89,40 @@
   let wackyPlaybackRequest = 0;
   let lastWackyPreset = "";
   let finishCountdown = null;
+  let welcomeBack = null;
+
+  function stopFlashcardAudioForReturn() {
+    // Only the current activity is affected. Preserve card/difficulty/grade.
+    // Capturing the microphone is never resumed without a fresh Record tap.
+    interruptCountdown();
+    recording?.interruptCapture?.();
+    recording?.pause?.();
+    stopWackyPlayback();
+    try { api?.stopVersePreview?.(); } catch (_) {}
+  }
+
+  function ensureFlashcardWelcomeBack() {
+    if (welcomeBack || !api?.isActive ||
+        !window.BibloZooWelcomeBackReturn?.attach) return;
+    welcomeBack = window.BibloZooWelcomeBackReturn.attach({
+      shouldPrompt: () => api?.isActive?.() === true,
+      onPause: stopFlashcardAudioForReturn,
+      // Returning acknowledges an interrupted session. Narration and
+      // Wacky Replay are never restarted implicitly; the child's next Play
+      // tap owns their audio activation. No getUserMedia() here.
+      onContinue: () => true,
+      onExit: () => {
+        const prompt = welcomeBack;
+        welcomeBack = null;
+        prompt?.destroy();
+        api?.goToHome?.();
+      },
+      escapeText: "Back to Title",
+      name: "Zookeeper",
+      preserveFocus: true,
+      suppressUiSound: true
+    });
+  }
 
   function cancelCountdown() {
     clearTimeout(countdownTimer);
@@ -195,6 +229,8 @@
   }
 
   function leaveFlashcards() {
+    welcomeBack?.destroy();
+    welcomeBack = null;
     resetSession();
     lastWackyPreset = "";
   }
@@ -412,6 +448,7 @@
 
   function start() {
     resetSession();
+    ensureFlashcardWelcomeBack();
     const currentId = api?.getCurrentVerseId?.();
     state.selectedVerseId = getEligibleVerses().some((verse) => verse.id === currentId)
       ? currentId : "";
@@ -422,6 +459,7 @@
     context = null
   ) {
     resetSession();
+    ensureFlashcardWelcomeBack();
 
     const selected =
       getEligibleVerses().find(
@@ -1418,6 +1456,7 @@
 
   function initialize(nextApi) {
     api = nextApi || null;
+    ensureFlashcardWelcomeBack();
     if (!recording) recording = window.BibloZooRecording.create({
       onChange: () => {
         const audio =
