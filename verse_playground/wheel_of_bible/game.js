@@ -141,6 +141,85 @@
   let wheelSpinPending = false;
   const gameNow = () => welcomeClock.now();
 
+  // Patch 68.2: spin sound is a *separate* cancellable timeline from the
+  // pause-aware wheel animation. Muting a spin reliably avoided the iOS
+  // interruption seen on device, so no live or queued spin oscillators may
+  // survive the transition to the Welcome Back screen.
+  const SPIN_TICK_COUNT = 22;
+  const SPIN_TICK_SPACING_MS = 95;
+  const spinTickTimers = new Set();
+  const activeToneSources = new Set();
+  let spinStartedAt = null;
+  let nextSpinTick = 0;
+  let spinSoundGeneration = 0;
+  let toneGeneration = 0;
+  function logWheelAudio(type, data = {}) {
+    try { window.BibloZooAudioDiagnostics?.record(type, data); } catch (_) {}
+  }
+
+  function cancelQueuedSpinTicks() {
+    const cancelled = spinTickTimers.size;
+    spinSoundGeneration += 1;
+    for (const token of spinTickTimers) cancelGameTimeout(token);
+    spinTickTimers.clear();
+    return cancelled;
+  }
+
+  // Stop actual Web Audio nodes, rather than merely muting masterGain or
+  // stopping future JS timers. Every oscillator is disconnected on ended/stop.
+  function stopLiveTones() {
+    toneGeneration += 1; // Invalidates any earlier async unlock/play promise.
+    const stopped = activeToneSources.size;
+    for (const source of Array.from(activeToneSources)) {
+      source.osc.onended = null;
+      try { source.osc.stop(); } catch (_) {}
+      try { source.osc.disconnect(); } catch (_) {}
+      try { source.gain.disconnect(); } catch (_) {}
+      activeToneSources.delete(source);
+    }
+    return stopped;
+  }
+
+  function remainingSpinTickIndex() {
+    if (spinStartedAt === null) return nextSpinTick;
+    // Elapsed *game* time excludes background time. Drop any tick that was
+    // already due when interrupted: never play it late on foreground.
+    const due = Math.floor(Math.max(0, gameNow() - spinStartedAt) / SPIN_TICK_SPACING_MS) + 1;
+    return Math.min(SPIN_TICK_COUNT, Math.max(nextSpinTick, due));
+  }
+
+  function scheduleRemainingSpinTicks({ initial = false } = {}) {
+    if (!wheelSpinPending || spinStartedAt === null || welcomePaused || document.hidden || muted) return;
+    // A new generation makes even an already-dispatched old callback inert.
+    cancelQueuedSpinTicks();
+    nextSpinTick = initial ? nextSpinTick : remainingSpinTickIndex();
+    const generation = spinSoundGeneration;
+    const first = nextSpinTick;
+    for (let i = first; i < SPIN_TICK_COUNT; i += 1) {
+      const remaining = Math.max(0, spinStartedAt + i * SPIN_TICK_SPACING_MS - gameNow());
+      const token = gameTimeout(() => {
+        spinTickTimers.delete(token);
+        if (spinSoundGeneration !== generation || !wheelSpinPending || welcomePaused || document.hidden) return;
+        nextSpinTick = Math.max(nextSpinTick, i + 1);
+        // A tick never starts its own asynchronous unlock while iOS is
+        // recovering: a missed tick is simply skipped, not played later.
+        playTone({ midi: 50 + (i % 3) * 3, duration: .045, volume: .12,
+          type: "square", tag: "spin", allowDeferred: false });
+      }, remaining);
+      spinTickTimers.add(token);
+    }
+    logWheelAudio("wheel-spin-sound-scheduled", {
+      firstTick: first, remainingTicks: SPIN_TICK_COUNT - first, spinActive: wheelSpinPending
+    });
+  }
+
+  function clearSpinAudio() {
+    const cancelled = cancelQueuedSpinTicks();
+    spinStartedAt = null;
+    nextSpinTick = 0;
+    return cancelled;
+  }
+
   // Timer callbacks and their remaining delays are frozen with the wheel.
   // Native recovery/probes use their own unpaused timeouts, not this queue.
   function gameTimeout(callback, ms) {
@@ -191,6 +270,15 @@
     if (welcomePaused) return;
     welcomePaused = true;
     welcomeClock.pause();
+    const remaining = remainingSpinTickIndex();
+    const cancelled = cancelQueuedSpinTicks();
+    nextSpinTick = remaining;
+    const stopped = stopLiveTones();
+    logWheelAudio("wheel-spin-audio-paused", {
+      spinActive: wheelSpinPending, cancelledTicks: cancelled, stoppedTones: stopped,
+      nextTick: nextSpinTick, spinElapsedMs: spinStartedAt === null ? null :
+        Math.max(0, Math.round(gameNow() - spinStartedAt))
+    });
     freezeGameTimers();
     pausedVisualAnimations = Array.from(app?.getAnimations?.({ subtree: true }) || [])
       .filter(anim => anim.playState === "running");
@@ -206,6 +294,9 @@
     pausedVisualAnimations.forEach(anim => { try { anim.play(); } catch (_) {} });
     pausedVisualAnimations = [];
     thawGameTimers();
+    // Only future ticks are re-created, relative to frozen *game* time.
+    // Previously played or interrupted oscillators are never restarted.
+    if (wheelSpinPending) scheduleRemainingSpinTicks();
     // Do not automatically replay speech: a fresh tap is required by iOS.
     pausedVerseRecording = false;
     return true;
@@ -338,6 +429,7 @@
   function clearSleeps() { sleepIds.forEach(cancelGameTimeout); sleepIds = []; }
 
   function clearTimers() {
+    clearSpinAudio();
     clearSleeps();
     if (finalTimerId) { clearInterval(finalTimerId); finalTimerId = null; }
     if (currentFitRaf) { cancelAnimationFrame(currentFitRaf); currentFitRaf = 0; }
@@ -815,6 +907,10 @@
   function replaceWheelWelcomeContext() {
     const old = audioCtx;
     if (!old || !(window.AudioContext || window.webkitAudioContext)) return false;
+    // Web Audio nodes and pending unlock promises from the old context must
+    // never bleed into the replacement context's recovery gesture.
+    const stopped = stopLiveTones();
+    logWheelAudio("wheel-spin-old-context-cleaned", { stoppedTones: stopped });
     audioCtx = null;
     masterGain = null;
     audioUnlocked = false;
@@ -826,19 +922,39 @@
   }
 
   function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
-  function playTone({ midi = 60, duration = 0.12, volume = 0.18, type = "triangle" } = {}) {
+  function playTone({ midi = 60, duration = 0.12, volume = 0.18, type = "triangle",
+    tag = "effect", allowDeferred = true } = {}) {
     if (muted || welcomePaused || document.hidden) return;
     createAudio();
     if (!audioCtx || !masterGain) return;
-    if (audioCtx.state !== "running") { unlockAudio().then(ok => { if (ok) playTone({ midi, duration, volume, type }); }); return; }
+    if (audioCtx.state !== "running") {
+      if (!allowDeferred) return;
+      const generation = toneGeneration;
+      const originalContext = audioCtx;
+      unlockAudio().then(ok => {
+        if (ok && generation === toneGeneration && audioCtx === originalContext &&
+          !welcomePaused && !document.hidden) playTone({ midi, duration, volume, type, tag, allowDeferred: false });
+      }).catch(() => {});
+      return;
+    }
     const now = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = type; osc.frequency.setValueAtTime(midiToFreq(midi), now);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.001, volume), now + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(gain); gain.connect(masterGain); osc.start(now); osc.stop(now + duration + 0.04);
+    const source = { osc, gain, tag };
+    const release = () => {
+      activeToneSources.delete(source);
+      try { osc.disconnect(); } catch (_) {}
+      try { gain.disconnect(); } catch (_) {}
+    };
+    activeToneSources.add(source);
+    osc.onended = release;
+    try {
+      osc.type = type; osc.frequency.setValueAtTime(midiToFreq(midi), now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.001, volume), now + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain); gain.connect(masterGain); osc.start(now); osc.stop(now + duration + 0.04);
+    } catch (_) { release(); try { osc.stop(); } catch (_) {} }
   }
   function playBeep(index = 0) { playTone({ midi: 67 + (index % 3) * 4, duration: .10, volume: .24 }); }
   function playGood() { playTone({ midi: 72, duration: .10, volume: .28 }); gameTimeout(() => playTone({ midi: 79, duration: .14, volume: .22 }), 70); }
@@ -1092,6 +1208,13 @@
         muted = !muted;
         if (masterGain && audioCtx) masterGain.gain.setValueAtTime(muted ? 0 : WEB_AUDIO_MASTER_VOLUME, audioCtx.currentTime);
         if (verseAudioEl) verseAudioEl.muted = muted;
+        if (muted) {
+          nextSpinTick = remainingSpinTickIndex();
+          cancelQueuedSpinTicks();
+          stopLiveTones();
+        } else if (wheelSpinPending && !welcomePaused) {
+          scheduleRemainingSpinTicks();
+        }
         return muted;
       },
       onHowToPlay: () => { document.getElementById(MENU_OVERLAY_ID)?.classList.remove("is-open"); shell().openHelp?.(HELP_OVERLAY_ID, "back", "Back"); },
@@ -1277,10 +1400,17 @@
     const step = 360 / WHEEL_VALUES.length;
     const degrees = 360 * 5 + ((360 - (index * step)) % 360);
     document.getElementById("gameWheel")?.style.setProperty("--spin-deg", `${degrees}deg`);
-    for (let i = 0; i < 22; i += 1) gameTimeout(() => playTone({ midi: 50 + (i % 3) * 3, duration: .045, volume: .12, type: "square" }), i * 95);
+    spinStartedAt = gameNow();
+    nextSpinTick = 0;
+    // Include tick zero at the start of an uninterrupted spin. Scheduled
+    // future ticks are still cancellable the instant the app goes away.
+    scheduleRemainingSpinTicks({ initial: true });
+    logWheelAudio("wheel-spin-start", { tickCount: SPIN_TICK_COUNT, muted });
     await sleep(3300);
     if (welcomePaused) await welcomeClock.sleep(0);
+    clearSpinAudio();
     wheelSpinPending = false;
+    logWheelAudio("wheel-spin-finished", { resultIndex: index });
     const raw = WHEEL_VALUES[index];
     let result = { ...raw };
     if (raw.kind === "prize") {
