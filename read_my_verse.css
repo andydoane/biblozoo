@@ -2189,37 +2189,10 @@ button.read-unscramble-token.is-solved {
   font-family: "Baloo 2", system-ui, sans-serif;
   text-align: center;
 }
-.read-audio-resume-card {
-  width: min(100%, 360px);
-  padding: 26px 20px;
-  border-radius: 22px;
-  background: #fff8e8;
-  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.34);
-  color: #382b22;
-}
-.read-audio-resume-card h2 {
-  margin: 0 0 20px;
-  font-family: "Baloo 2", system-ui, sans-serif;
-  font-size: clamp(27px, 7vw, 34px);
-  line-height: 1.1;
-}
-#readAudioResumeButton {
-  display: block;
-  width: 100%;
-  min-height: 54px;
-  padding: 9px 16px;
-  border: 0;
-  border-radius: 15px;
-  background: #287c61;
-  color: #fff;
-  font: 700 22px/1.2 "Baloo 2", system-ui, sans-serif;
-  cursor: pointer;
-}
-#readAudioResumeButton:disabled { opacity: 0.65; cursor: wait; }
-#readAudioResumeStatus { margin: 13px 0 0; font: 15px/1.35 system-ui, sans-serif; }
-
+/* Patch 70: the greeting, portrait, and action are styled only by the
+   shared welcome-back.css. Read My Verse owns this overlay's Back control. */
 /* Same Back control as other activities, above the full-screen resume overlay.
-   It is outside the dialog card, which contains only the Resume Audio button. */
+   It is outside the shared Welcome Back dialog card. */
 .read-audio-resume-overlay .read-audio-overlay-back {
   position: fixed;
   z-index: 1;

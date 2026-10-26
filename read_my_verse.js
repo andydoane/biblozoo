@@ -272,7 +272,11 @@
   let readEffectRecoveryPending = false;
   let readKeyResumeFailures = 0;
   let readToneResumeFailures = 0;
+  let readToneClockProbe = null;
+  let balloonNarrationWatchdog = null;
+  let chunkNarrationWatchdog = null;
   let pauseTimer = 0;
+  let readPauseTimerTask = null;
   let animationTimer = 0;
   let wordFeedbackTimer = 0;
   let typewriterIntroTimer = 0;
@@ -1569,7 +1573,25 @@
     for (const entry of session.timers) if (!entry.id) entry.arm();
   }
 
+  function recordReadRecoveryCheck(phase, details = {}) {
+    try { root?.BibloZooAudioDiagnostics?.record?.("read-my-verse-recovery", {
+      activity: state.activityId, phase, ...details
+    }); } catch (_) { /* Diagnostics must never prevent playback. */ }
+  }
+
+  function clearBalloonNarrationWatchdog() {
+    if (balloonNarrationWatchdog?.timer) clearTimeout(balloonNarrationWatchdog.timer);
+    balloonNarrationWatchdog = null;
+  }
+
+  function clearReadChunkNarrationWatchdog() {
+    if (chunkNarrationWatchdog?.timer) clearTimeout(chunkNarrationWatchdog.timer);
+    chunkNarrationWatchdog = null;
+  }
+
   function stopReadNarration() {
+    clearBalloonNarrationWatchdog();
+    clearReadChunkNarrationWatchdog();
     audioRequest += 1;
     const audio = activeAudio;
     activeAudio = null;
@@ -1595,6 +1617,9 @@
     freezeReadScene(session);
   }
 
+  // Patch 70: Read My Verse already owns lifecycle and media continuation.
+  // Reuse only the shared Welcome Back *presentation* here. Attaching another
+  // lifecycle controller would double-pause narration and frozen scene clocks.
   function ensureReadAudioOverlay() {
     const doc = root?.document;
     if (!doc?.body) return null;
@@ -1607,17 +1632,37 @@
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-labelledby", "readAudioResumeTitle");
+    // Plain emergency fallback only for a missing shared script; no second
+    // styling system or competing recovery implementation is introduced.
+    const card = root?.BibloZooWelcomeBack?.markup?.("game") || `
+      <div class="bz-welcome-card" data-welcome-back-card>
+        <h2 class="bz-welcome-title" id="readAudioResumeTitle">Welcome back!</h2>
+        <button type="button" id="readAudioResumeButton" data-no-ui-sound
+          data-welcome-back-action>Let's go!</button>
+        <p id="readAudioResumeStatus" data-welcome-back-status role="status" hidden></p>
+      </div>`;
     overlay.innerHTML = `
       <button class="read-my-verse-back read-audio-overlay-back no-zoom"
         type="button" id="readAudioOverlayBack" data-no-ui-sound aria-label="Back to activities">‹</button>
-      <div class="read-audio-resume-card">
-        <h2 id="readAudioResumeTitle">Ready to Continue?</h2>
-        <button id="readAudioResumeButton" type="button" data-no-ui-sound>Resume Audio</button>
-        <p id="readAudioResumeStatus" role="status" hidden></p>
-      </div>`;
-    overlay.querySelector("#readAudioResumeButton").onclick = resumeReadAudioFromGesture;
-    // The card has only Resume Audio; the familiar top-left Back control
-    // remains accessible if a device cannot recover its audio.
+      ${card}`;
+    // Shared markup supplies data hooks, while the existing Read My Verse
+    // selectors continue to own the same action and status elements.
+    const button = overlay.querySelector("[data-welcome-back-action]") ||
+      overlay.querySelector("#readAudioResumeButton");
+    const status = overlay.querySelector("[data-welcome-back-status]") ||
+      overlay.querySelector("#readAudioResumeStatus");
+    const title = overlay.querySelector(".bz-welcome-title") ||
+      overlay.querySelector("#readAudioResumeTitle");
+    if (button) {
+      button.id = "readAudioResumeButton";
+      // The app-wide capture listener must not play an extra UI sound before
+      // this gesture starts the required narration or soundtrack.
+      button.setAttribute?.("data-no-ui-sound", "");
+    }
+    if (status) status.id = "readAudioResumeStatus";
+    if (title) title.id = "readAudioResumeTitle";
+    if (button) button.onclick = resumeReadAudioFromGesture;
+    // Keep the existing Back escape path if audio cannot be recovered.
     overlay.querySelector("#readAudioOverlayBack").onclick = exitSession;
     doc.body.appendChild(overlay);
     return overlay;
@@ -1630,18 +1675,67 @@
     const show = !!readAudioRecovery && !root.document.hidden &&
       state.phase !== "idle" && !completionReported;
     overlay.hidden = !show;
-    if (!show) return;
+    if (!show) {
+      root?.BibloZooWelcomeBack?.setAction?.(overlay, { busy: false });
+      return;
+    }
     const button = overlay.querySelector("#readAudioResumeButton");
     const status = overlay.querySelector("#readAudioResumeStatus");
-    button.disabled = !!readAudioRecoveryAttempt;
-    const crawlResume = readAudioRecovery.kind === "animated" &&
-      state.activityId === VERSE_CRAWL_ACTIVITY_ID;
-    const heading = overlay.querySelector("#readAudioResumeTitle");
-    if (heading) heading.textContent = crawlResume ? "Ready to Continue Verse Crawl?" : "Ready to Continue?";
-    // Keep the child-facing label stable while the playback request completes.
-    button.textContent = crawlResume ? "Resume" : "Resume Audio";
-    status.textContent = readAudioRecovery.error || "";
-    status.hidden = !status.textContent;
+    const error = readAudioRecovery.error || "";
+    if (status) {
+      status.textContent = error;
+      status.hidden = !error;
+    }
+    root?.BibloZooWelcomeBack?.populate?.(overlay, {
+      profileId: state.context?.profileId
+    });
+    root?.BibloZooWelcomeBack?.setAction?.(overlay, {
+      retry: !!error,
+      busy: !!readAudioRecoveryAttempt
+    });
+    // When the shared module is absent, the fallback remains usable.
+    if (!root?.BibloZooWelcomeBack?.setAction && button) {
+      button.textContent = error ? "Try again!" : "Let's go!";
+      button.disabled = !!readAudioRecoveryAttempt;
+    }
+  }
+
+  // The short completion/feedback timers used by word and sequence games must
+  // not consume their remaining delay while a quiet Welcome Back is open.
+  // Playback and animated-scene timers retain their existing separate owners.
+  function scheduleReadPauseTimer(callback, delayMs) {
+    const task = { id: 0, remaining: Math.max(0, delayMs), startedAt: 0 };
+    task.arm = () => {
+      task.startedAt = Date.now();
+      task.id = setTimeout(() => {
+        task.id = 0;
+        if (readPauseTimerTask !== task) return;
+        if (readAudioRecovery) {
+          task.remaining = 0;
+          return;
+        }
+        readPauseTimerTask = null;
+        callback();
+      }, task.remaining);
+      pauseTimer = task.id;
+    };
+    readPauseTimerTask = task;
+    task.arm();
+    return task.id;
+  }
+
+  function freezeReadPauseTimer() {
+    const task = readPauseTimerTask;
+    if (!task?.id) return;
+    clearTimeout(task.id);
+    task.remaining = Math.max(0, task.remaining - (Date.now() - task.startedAt));
+    task.id = 0;
+    pauseTimer = 0;
+  }
+
+  function thawReadPauseTimer() {
+    const task = readPauseTimerTask;
+    if (task && !task.id) task.arm();
   }
 
   function pauseReadForInterruption() {
@@ -1668,6 +1762,7 @@
       return false;
     }
     readEffectRecoveryPending = true;
+    readToneClockProbe = null;
     const scene = activeReadScene();
     let recovery = null;
     if (isAnimatedActivity(state.activityId)) {
@@ -1680,14 +1775,12 @@
       recovery = { kind: "chunk" };
     }
     if (!recovery) {
-      // A typing introduction doesn't have narration to resume.
+      // Typing and word activities need acknowledgement, not an invented
+      // audio replay or a new game pause state. Keep the existing intro policy.
       if (isTypingActivity(state.activityId) && state.typewriterIntroPhase !== "done") {
         finishTypewriterIntro();
       }
-      stopKeySoundVoices();
-      stopScrambleRewards();
-      readEffectRecoveryPending = true;
-      return false;
+      recovery = { kind: "ack" };
     }
     recovery.startedAt = Date.now();
     recovery.error = "";
@@ -1695,15 +1788,23 @@
     readAudioRecoveryGeneration += 1;
     readAudioRecoveryAttempt = null;
     if (recovery.kind === "animated") {
+      freezeReadPauseTimer();
       freezeReadScene(scene);
       if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
         if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
       if (recovery.narration) recovery.narration.item.audioStarted = false;
     } else if (recovery.kind === "sequence") {
+      // This replay starts afresh from the next deliberate tap.
+      clearTimeout(pauseTimer);
+      readPauseTimerTask = null;
+      pauseTimer = 0;
       recovery.data.activeButtonIndex = -1;
       readActiveSequenceReplay = null;
+    } else if (recovery.kind === "ack") {
+      freezeReadPauseTimer();
     } else {
       clearTimeout(pauseTimer);
+      readPauseTimerTask = null;
       pauseTimer = 0;
       state.phase = "pause";
     }
@@ -1712,6 +1813,26 @@
     stopScrambleRewards();
     syncReadAudioOverlay();
     return true;
+  }
+
+  // play() fulfilling only means the request was accepted by WebKit. A
+  // foregrounded iOS media element may still have a frozen playback clock.
+  // Do not thaw moving scenes on that unverified promise alone. This probe
+  // intentionally observes the same media element the tap just started.
+  async function waitReadMediaProgress(audio, isCurrent, maxChecks = 6) {
+    if (!audio || appApi?.isMuted?.()) return true;
+    const initial = Number(audio.currentTime);
+    if (!Number.isFinite(initial)) return false;
+    for (let check = 0; check < maxChecks; check += 1) {
+      if (!isCurrent() || root?.document?.hidden) return false;
+      if (readDeferredNarrationFinish || audio.ended) return true;
+      const current = Number(audio.currentTime);
+      if (Number.isFinite(current) && current > initial + 0.035) return true;
+      await new Promise(resolve => setTimeout(resolve, 220));
+    }
+    const finished = !!readDeferredNarrationFinish || !!audio.ended;
+    if (!finished && isCurrent()) recordReadRecoveryCheck("media-clock-stalled");
+    return finished;
   }
 
   function waitReadRecoveryResult(promise, ms = 1500) {
@@ -1746,6 +1867,7 @@
       playCrawlAudio(session, item);
     }
     const narrationStart = readAudioStartPromise;
+    const narrationAudio = activeAudio;
     if (hadEnding && scene?.active) {
       scene.endingStarted = false;
       startCrawlEnding(scene);
@@ -1761,18 +1883,30 @@
         await waitReadRecoveryResult(song.startPromise, 3000);
       const narrated = !narrationStart ||
         await waitReadRecoveryResult(narrationStart, 3000);
-      if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
+      const current = () => generation === readAudioRecoveryGeneration &&
+        readAudioRecovery === recovery;
+      // Verse Crawl's direct HTML soundtrack is distinct from its narration.
+      // Recheck both clocks before releasing the frozen scene.
+      const movingSong = started && (appApi?.isMuted?.() ||
+        await waitReadMediaProgress(song?.audio, current));
+      const movingNarration = narrated && (!narrationStart ||
+        await waitReadMediaProgress(narrationAudio, current));
+      if (!current()) return;
+      recordReadRecoveryCheck("crawl-resume-check", {
+        soundtrackClockAdvanced: !!movingSong, narrationClockAdvanced: !!movingNarration
+      });
       readAudioRecoveryAttempt = null;
-      if (!started || !narrated || root?.document?.hidden) {
+      if (!movingSong || !movingNarration || root?.document?.hidden) {
         stopReadNarration();
         if (recovery.narration) recovery.narration.item.audioStarted = false;
         stopCrawlMusic();
         stopCrawlEnding();
-        recovery.error = "Audio isn't ready yet. Tap Resume Verse Crawl to try again.";
+        recovery.error = "Audio isn't ready yet. Try again!";
         syncReadAudioOverlay();
         return;
       }
       readAudioRecovery = null;
+      thawReadPauseTimer();
       thawReadScene(scene, Date.now() - recovery.startedAt);
       syncReadAudioOverlay();
       const delayedFinish = readDeferredNarrationFinish;
@@ -1788,6 +1922,42 @@
     const generation = readAudioRecoveryGeneration;
     readAudioRecoveryAttempt = { generation };
     recovery.error = "";
+    if (recovery.kind === "ack") {
+      // Nothing must replay. This real tap can prime nonessential UI effects,
+      // but no asynchronous unlock can restart input or stall acknowledgement.
+      if (!appApi?.isMuted?.() && typeof appApi?.unlockAudio === "function") {
+        try { void Promise.resolve(appApi.unlockAudio()).catch(() => {}); }
+        catch (err) { /* A later activity gesture can retry UI effects. */ }
+      }
+      const needsToneRecovery = !appApi?.isMuted?.() &&
+        (state.activityId === TAP_WORDS_ORDER_ACTIVITY_ID ||
+          state.activityId === UNSCRAMBLE_ACTIVITY_ID) &&
+        !!(root?.AudioContext || root?.webkitAudioContext);
+      if (!needsToneRecovery) {
+        if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery ||
+            root?.document?.hidden) return false;
+        readAudioRecoveryAttempt = null;
+        readAudioRecovery = null;
+        thawReadPauseTimer();
+        syncReadAudioOverlay();
+        return true;
+      }
+      // Starting context.resume() here retains the original user gesture.
+      const toneCheck = prepareReadTonesFromGesture();
+      void Promise.resolve(toneCheck).then(ready => {
+        if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
+        readAudioRecoveryAttempt = null;
+        if (!ready || root?.document?.hidden) {
+          recovery.error = "Audio isn't ready yet. Try again!";
+          syncReadAudioOverlay();
+          return;
+        }
+        readAudioRecovery = null;
+        thawReadPauseTimer();
+        syncReadAudioOverlay();
+      });
+      return true;
+    }
     if (recovery.kind === "animated" &&
         state.activityId === VERSE_CRAWL_ACTIVITY_ID) {
       return resumeInterruptedCrawlFromGesture(recovery, generation);
@@ -1815,18 +1985,32 @@
         media = readAudioStartPromise || Promise.resolve();
       }
     }
+    const narrationAudio = activeAudio;
     // Prime app UI effects as best effort, AFTER starting the requested media.
     // A frozen app AudioContext must never veto a successfully playing verse.
     if (!appApi?.isMuted?.() && typeof appApi?.unlockAudio === "function") {
       try { void Promise.resolve(appApi.unlockAudio()).catch(() => {}); }
       catch (err) { /* UI effects can retry on a later gesture. */ }
     }
+    // Narration and the word-button notes use different audio engines.
+    // Start tone recovery within the SAME deliberate Welcome Back gesture,
+    // after the essential HTML narration has been started. Do not dismiss the
+    // prompt with a still-frozen tone clock, or the first word tap is silent.
+    const needsWordTones = kind === "chunk" && !appApi?.isMuted?.() &&
+      (state.activityId === TAP_WORDS_ORDER_ACTIVITY_ID ||
+        state.activityId === UNSCRAMBLE_ACTIVITY_ID);
+    const toneReady = needsWordTones ? prepareReadTonesFromGesture() : Promise.resolve(true);
     syncReadAudioOverlay();
     void (async () => {
-      const heard = await waitReadRecoveryResult(media);
-      if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
+      const started = await waitReadRecoveryResult(media);
+      const current = () => generation === readAudioRecoveryGeneration &&
+        readAudioRecovery === recovery;
+      const heard = started && (appApi?.isMuted?.() || !narrationAudio ||
+        await waitReadMediaProgress(narrationAudio, current));
+      const tonesReady = await toneReady;
+      if (!current()) return;
       readAudioRecoveryAttempt = null;
-      if (!heard || root?.document?.hidden) {
+      if (!heard || !tonesReady || root?.document?.hidden) {
         stopReadNarration();
         if (kind === "sequence") {
           recovery.data.activeButtonIndex = -1;
@@ -1836,11 +2020,12 @@
         if (kind === "chunk") state.phase = "pause";
         if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
         if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
-        recovery.error = "Audio isn't ready yet. Tap Resume Audio to try again.";
+        recovery.error = "Audio isn't ready yet. Try again!";
         syncReadAudioOverlay();
         return;
       }
       readAudioRecovery = null;
+      thawReadPauseTimer();
       if (kind === "animated") thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
       syncReadAudioOverlay();
       const delayedFinish = readDeferredNarrationFinish;
@@ -1870,6 +2055,10 @@
     readActiveSequenceReplay = null;
     readAudioStartPromise = null;
     readDeferredNarrationFinish = null;
+    readPauseTimerTask = null;
+    readToneClockProbe = null;
+    clearBalloonNarrationWatchdog();
+    clearReadChunkNarrationWatchdog();
     syncReadAudioOverlay();
     audioRequest += 1;
     stopCrawlSequence();
@@ -2280,6 +2469,76 @@
     }
   }
 
+  function retireReadToneContext(context) {
+    if (scrambleAudioContext !== context) return;
+    scrambleAudioContext = null;
+    readToneResumeFailures = 0;
+    readToneClockProbe = null;
+    stopScrambleRewards();
+    try { void Promise.resolve(context.close?.()).catch(() => {}); }
+    catch (_) { /* Interruption teardown remains best effort. */ }
+  }
+
+  function waitReadToneClock(context, ms = 300) {
+    const before = Number(context?.currentTime);
+    if (context?.state !== "running" || !Number.isFinite(before))
+      return Promise.resolve(false);
+    return new Promise(resolve => setTimeout(() => {
+      resolve(context.state === "running" &&
+        Number(context.currentTime) > before + 0.015);
+    }, ms));
+  }
+
+  // Used after a note is scheduled. A running-but-frozen context is retired
+  // only after a *second* settled clock check; no notes are replayed later.
+  function monitorReadToneClock(context) {
+    if (readToneClockProbe || root?.document?.hidden || readAudioRecovery) return;
+    const probe = { context };
+    readToneClockProbe = probe;
+    void (async () => {
+      let advanced = await waitReadToneClock(context);
+      if (!advanced && scrambleAudioContext === context &&
+          !root?.document?.hidden && !readAudioRecovery)
+        advanced = await waitReadToneClock(context, 350);
+      if (readToneClockProbe !== probe) return;
+      readToneClockProbe = null;
+      if (scrambleAudioContext !== context || root?.document?.hidden || readAudioRecovery) return;
+      if (!advanced && context.state === "running") {
+        recordReadRecoveryCheck("tone-clock-stalled", { during: "word-tap" });
+        retireReadToneContext(context);
+      }
+    })();
+  }
+
+  // The quiet Welcome Back gesture must also restore the separate Web Audio
+  // tone context used by Tap Words in Order and Unscramble. Restoring only the
+  // app UI context leaves the word taps silent despite audible chunk audio.
+  function prepareReadTonesFromGesture() {
+    if (state.activityId !== TAP_WORDS_ORDER_ACTIVITY_ID &&
+        state.activityId !== UNSCRAMBLE_ACTIVITY_ID) return Promise.resolve(true);
+    const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
+    if (!AudioContextClass || appApi?.isMuted?.()) return Promise.resolve(true);
+    let context = scrambleAudioContext;
+    try { context ||= (scrambleAudioContext = new AudioContextClass()); }
+    catch (_) { return Promise.resolve(false); }
+    let request;
+    try { request = context.state === "running" ? true : context.resume(); }
+    catch (_) { request = false; }
+    return (async () => {
+      const resumed = await waitReadRecoveryResult(request, 950);
+      if (!resumed || context !== scrambleAudioContext ||
+          root?.document?.hidden) return false;
+      let advanced = await waitReadToneClock(context, 360);
+      if (!advanced && context === scrambleAudioContext && !root?.document?.hidden)
+        advanced = await waitReadToneClock(context, 420);
+      if (context !== scrambleAudioContext || root?.document?.hidden) return false;
+      recordReadRecoveryCheck(advanced ? "tone-gesture-verified" : "tone-gesture-stalled");
+      if (!advanced) retireReadToneContext(context);
+      else readEffectRecoveryPending = false;
+      return advanced;
+    })();
+  }
+
   function stopScrambleRewards() {
     scrambleSoundVoices.forEach(({ oscillator, gain }) => {
       try { oscillator.onended = null; oscillator.stop(); } catch (err) { }
@@ -2332,6 +2591,7 @@
         oscillator.start(begin);
         oscillator.stop(end + 0.01);
       });
+      monitorReadToneClock(context);
     } catch (err) { /* Unsupported Web Audio: continue silently. */ }
   }
 
@@ -2342,10 +2602,26 @@
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
     if (!AudioContextClass) return;
     try {
+      if (scrambleAudioContext?.state === "closed")
+        retireReadToneContext(scrambleAudioContext);
       scrambleAudioContext ||= new AudioContextClass();
       const context = scrambleAudioContext;
-      if (context.state !== "running") void resumeReadEffects(context, "tone");
-      if (context.state !== "running") return;
+      // A freshly created context is usually suspended on iOS. Queue the
+      // FIRST note in this real tap, after requesting resume synchronously;
+      // otherwise the old early return silently discarded the first note.
+      // Interrupted contexts are instead prepared by Welcome Back first.
+      const startingSuspended = context.state === "suspended";
+      if (context.state !== "running") {
+        const resume = resumeReadEffects(context, "tone");
+        if (!startingSuspended) return;
+        void resume.then(ok => {
+          if (ok && context === scrambleAudioContext &&
+              !root?.document?.hidden && !readAudioRecovery)
+            monitorReadToneClock(context);
+        });
+      }
+      const firstClock = Number(context.currentTime) || 0;
+      const queuedVoices = [];
       const scale = [60, 62, 64, 67, 69, 72];
       const midi = wrong ? 48 : scale[(Math.max(1, nextIndex) - 1) % scale.length];
       const notes = wrong ? [[midi, 0]] : complete
@@ -2367,6 +2643,7 @@
         gain.connect(context.destination);
         const voice = { oscillator, gain };
         scrambleSoundVoices.add(voice);
+        queuedVoices.push(voice);
         oscillator.onended = () => {
           scrambleSoundVoices.delete(voice);
           oscillator.disconnect();
@@ -2375,6 +2652,22 @@
         oscillator.start(start);
         oscillator.stop(end + 0.01);
       });
+      if (startingSuspended) {
+        // No sound may unexpectedly arrive seconds after an abandoned tap.
+        // A note queued on a still-frozen clock is canceled, not replayed.
+        setTimeout(() => {
+          if (context === scrambleAudioContext && context.state === "running" &&
+              Number(context.currentTime) > firstClock + 0.015) return;
+          for (const voice of queuedVoices) {
+            if (!scrambleSoundVoices.delete(voice)) continue;
+            try { voice.oscillator.onended = null; voice.oscillator.stop(); } catch (_) {}
+            try { voice.oscillator.disconnect(); voice.gain.disconnect(); } catch (_) {}
+          }
+          recordReadRecoveryCheck("tone-first-gesture-expired");
+        }, 600);
+      } else {
+        monitorReadToneClock(context);
+      }
     } catch (err) { /* Audio is optional on locked-down devices. */ }
   }
 
@@ -2717,8 +3010,60 @@
     }
   }
 
+  // Ordinary spoken chunks (including Tap Words in Order) also depend on
+  // an HTML audio ended event to reveal the next chunk. If WebKit loses that
+  // event, advance ONLY once the media clock is stably at the actual end;
+  // if the clock stalls mid-chunk, reopen Welcome Back for a deliberate retry.
+  // This never guesses a duration or grants completion to unfinished audio.
+  function watchReadChunkNarration(audio, request, finish) {
+    clearReadChunkNarrationWatchdog();
+    const watch = { timer: 0, lastTime: Number(audio.currentTime) || 0,
+      stallChecks: 0 };
+    chunkNarrationWatchdog = watch;
+    const tick = () => {
+      if (chunkNarrationWatchdog !== watch || request !== audioRequest ||
+          activeAudio !== audio || completionReported) {
+        if (chunkNarrationWatchdog === watch) clearReadChunkNarrationWatchdog();
+        return;
+      }
+      const time = Number(audio.currentTime) || 0;
+      if (root?.document?.hidden || readAudioRecovery) {
+        // A frozen foreground scene must not consume watchdog checks while
+        // the child is outside BibloZoo or the resume attempt is pending.
+        watch.lastTime = time;
+        watch.stallChecks = 0;
+        watch.timer = setTimeout(tick, 950);
+        return;
+      }
+      const duration = Number(audio.duration);
+      const atEnd = Number.isFinite(duration) && duration > 0 &&
+        time >= duration - 0.06;
+      if (audio.ended || (atEnd && time <= watch.lastTime + 0.015)) {
+        clearReadChunkNarrationWatchdog();
+        if (!audio.ended) recordReadRecoveryCheck("chunk-ended-fallback", {
+          chunkIndex: state.chunkIndex
+        });
+        finish();
+        return;
+      }
+      watch.stallChecks = time > watch.lastTime + 0.025 ? 0 : watch.stallChecks + 1;
+      watch.lastTime = time;
+      if (watch.stallChecks >= 3) {
+        clearReadChunkNarrationWatchdog();
+        recordReadRecoveryCheck("chunk-media-stalled", {
+          chunkIndex: state.chunkIndex, mediaTime: time
+        });
+        pauseReadForInterruption();
+        return;
+      }
+      watch.timer = setTimeout(tick, 950);
+    };
+    watch.timer = setTimeout(tick, 950);
+  }
+
   function playCurrentChunk() {
     if (state.phase !== "pause") return;
+    clearReadChunkNarrationWatchdog();
 
     // Let the completion alert finish while spoken chunk audio begins.
     stopKeySoundVoices({ keepChunkAlert: true });
@@ -2750,7 +3095,7 @@
       typeof Audio === "undefined" ||
       appApi?.isMuted?.()
     ) {
-      pauseTimer = setTimeout(
+      pauseTimer = scheduleReadPauseTimer(
         advanceAfterChunk,
         650
       );
@@ -2768,6 +3113,7 @@
           if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
           return;
         }
+        clearReadChunkNarrationWatchdog();
         activeAudio = null;
         advanceAfterChunk();
       };
@@ -2788,10 +3134,11 @@
 
       beginReadNarration(activeAudio, () => {
         if (request !== audioRequest) return;
-        pauseTimer = setTimeout(finish, 650);
+        pauseTimer = scheduleReadPauseTimer(finish, 650);
       });
+      watchReadChunkNarration(activeAudio, request, finish);
     } catch (err) {
-      pauseTimer = setTimeout(
+      pauseTimer = scheduleReadPauseTimer(
         advanceAfterChunk,
         650
       );
@@ -2805,7 +3152,7 @@
     if (!syncTypingScreen()) {
       appApi?.requestRender?.();
     }
-    pauseTimer = setTimeout(
+    pauseTimer = scheduleReadPauseTimer(
       playCurrentChunk,
       CHUNK_PAUSE_MS
     );
@@ -2818,7 +3165,7 @@
 
     state.phase = "pause";
     appApi?.requestRender?.();
-    pauseTimer = setTimeout(
+    pauseTimer = scheduleReadPauseTimer(
       playCurrentChunk,
       CHUNK_PAUSE_MS
     );
@@ -2831,7 +3178,7 @@
 
     state.phase = "pause";
     appApi?.requestRender?.();
-    pauseTimer = setTimeout(
+    pauseTimer = scheduleReadPauseTimer(
       playCurrentChunk,
       state.reducedMotion ? 80 : 180
     );
@@ -3019,7 +3366,7 @@
 
     if (complete) {
       clearTimeout(pauseTimer);
-      pauseTimer = setTimeout(
+      pauseTimer = scheduleReadPauseTimer(
         finishInteractiveChunk,
         280
       );
@@ -3080,7 +3427,7 @@
       result.complete
     ) {
       clearTimeout(pauseTimer);
-      pauseTimer = setTimeout(
+      pauseTimer = scheduleReadPauseTimer(
         finishInteractiveChunk,
         440 // Let the CRT collapse and final melody finish before continuing.
       );
@@ -3165,7 +3512,7 @@
       !root?.Audio ||
       appApi?.isMuted?.()
     ) {
-      pauseTimer = setTimeout(
+      pauseTimer = scheduleReadPauseTimer(
         finish,
         520
       );
@@ -3195,10 +3542,10 @@
       );
       beginReadNarration(activeAudio, () => {
         if (request !== audioRequest) return;
-        pauseTimer = setTimeout(finish, 520);
+        pauseTimer = scheduleReadPauseTimer(finish, 520);
       });
     } catch (err) {
-      pauseTimer = setTimeout(
+      pauseTimer = scheduleReadPauseTimer(
         finish,
         520
       );
@@ -3302,7 +3649,7 @@
     setChunkSequencePhase("feedback");
     appApi?.requestRender?.();
     clearTimeout(pauseTimer);
-    pauseTimer = setTimeout(() => {
+    pauseTimer = scheduleReadPauseTimer(() => {
       data.wrongAt = -1;
       data.message = data.helpActive
         ? "Try the glowing button."
@@ -3377,6 +3724,8 @@
     }
 
     clearTimeout(pauseTimer);
+    readPauseTimerTask = null;
+    pauseTimer = 0;
     data.wrongAt = -1;
     data.helpActive = true;
     data.helpAvailable = false;
@@ -4196,6 +4545,55 @@
     }
   }
 
+  // The reference's first verse chunk is scheduled by the audio-ended
+  // callback. If iOS stalls *after* an accepted play(), no callback arrives;
+  // the reference can float away with no next chunk. A bounded, scene-owned
+  // watcher detects this state and returns to the same Welcome Back prompt.
+  // An element at the end of its duration can also lose the WebKit ended event.
+  function watchBalloonNarration(session, item, audio, request, finish) {
+    clearBalloonNarrationWatchdog();
+    const watch = { timer: 0, lastTime: Number(audio.currentTime) || 0,
+      stallChecks: 0 };
+    balloonNarrationWatchdog = watch;
+    const tick = () => {
+      if (balloonNarrationWatchdog !== watch || !session.active ||
+          balloonSession !== session || audioRequest !== request ||
+          activeAudio !== audio || item.audioDone) {
+        if (balloonNarrationWatchdog === watch) clearBalloonNarrationWatchdog();
+        return;
+      }
+      if (root?.document?.hidden || readAudioRecovery) {
+        clearBalloonNarrationWatchdog();
+        return;
+      }
+      const time = Number(audio.currentTime) || 0;
+      const duration = Number(audio.duration);
+      const nearlyEnded = Number.isFinite(duration) && duration > 0 &&
+        time >= duration - 0.06;
+      if (audio.ended || (nearlyEnded && time <= watch.lastTime + 0.015)) {
+        clearBalloonNarrationWatchdog();
+        if (!audio.ended) recordReadRecoveryCheck("balloon-ended-fallback", {
+          reference: item.index === -1
+        });
+        finish();
+        return;
+      }
+      watch.stallChecks = time > watch.lastTime + 0.025 ? 0 : watch.stallChecks + 1;
+      watch.lastTime = time;
+      if (watch.stallChecks >= 2) {
+        clearBalloonNarrationWatchdog();
+        recordReadRecoveryCheck("balloon-media-stalled", {
+          reference: item.index === -1, mediaTime: time
+        });
+        // A second visible prompt is safer than losing the remaining verse.
+        pauseReadForInterruption();
+        return;
+      }
+      watch.timer = setTimeout(tick, 1100);
+    };
+    watch.timer = setTimeout(tick, 1100);
+  }
+
   function playBalloonAudio(session, item) {
     if (!session.active || item.audioStarted) return;
     item.audioStarted = true;
@@ -4210,6 +4608,7 @@
         if (readAudioRecoveryAttempt) readDeferredNarrationFinish = finish;
         return;
       }
+      clearBalloonNarrationWatchdog();
       activeAudio = null;
       if (readActiveAnimatedNarration?.item === item) readActiveAnimatedNarration = null;
       finishBalloonAudio(session, item);
@@ -4228,6 +4627,7 @@
         else finish();
       }, { once: true });
       beginReadNarration(activeAudio, () => balloonTimer(session, finish, 650));
+      watchBalloonNarration(session, item, activeAudio, request, finish);
     } catch (err) {
       balloonTimer(session, finish, 650);
     }
