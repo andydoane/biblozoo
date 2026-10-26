@@ -742,6 +742,7 @@
   let playbackRaf = 0;
   let trainingResizeRaf = 0;
   let playbackState = null;
+  let playgroundWelcome = null;
   let builtInPunctuationGlyphs = {};
   const openingQuoteGlyphCache = new WeakMap();
   const backgroundImageCache = new Map();
@@ -927,7 +928,7 @@
 
           const data = await response.arrayBuffer();
           const buffer = await ac.decodeAudioData(data.slice(0));
-          soundBuffers.set(key, buffer);
+          if (ac === audioContext) soundBuffers.set(key, buffer);
         } catch (err) {
           console.warn(`Ghost Writer could not load sound: ${key}`, err);
         }
@@ -1222,7 +1223,9 @@
   }
 
   function restoreGhostPlaybackFromBackground() {
-    if (document.hidden) return;
+    // Focus/pageshow is not permission to continue handwriting playback.
+    // Wait for the shared acknowledgement and any required audio check.
+    if (document.hidden || document.documentElement?.classList?.contains("bz-playground-welcome-paused")) return;
     const ps = playbackState;
     if (ps?.running && ps.backgroundPausedAt !== null) {
       const elapsed = Math.max(0, performance.now() - ps.backgroundPausedAt);
@@ -6451,6 +6454,32 @@
       guideTimer = null;
     }
   }
+
+  // Ghost Writer has no arcade clock. Keep handwritten strokes and current
+  // character intact; only the optional playback must actually pause.
+  function replaceGhostWelcomeContext() {
+    const old = audioContext;
+    if (!old) return false;
+    try { old.removeEventListener?.("statechange", onGhostAudioStateChange); } catch (_) {}
+    audioContext = null;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    soundLoadPromise = null;
+    soundBuffers.clear();
+    noteGhostAudioInterruption();
+    const fresh = getAudioContext();
+    if (old !== fresh) { try { void old.close?.().catch?.(() => {}); } catch (_) {} }
+    return !!fresh && fresh !== old;
+  }
+  playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
+    isActive: () => ["training", "punctuationRecorder", "ready", "playback", "remix"].includes(state.screen),
+    onPause: pauseGhostPlaybackForBackground,
+    onResume: restoreGhostPlaybackFromBackground,
+    getAudioContext: () => audioContext,
+    unlockAudio,
+    replaceAudioContext: replaceGhostWelcomeContext,
+    isMuted: () => muted
+  });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) pauseGhostPlaybackForBackground();

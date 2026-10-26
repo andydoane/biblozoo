@@ -2684,6 +2684,62 @@
   }
 
 
+  // Patch 67: a lightweight adapter for non-arcade Playground work.
+  // The existing shared return controller owns lifecycle, popup and gesture;
+  // each activity supplies only its in-memory pause/resume and audio handles.
+  function attachPlaygroundWelcomeBack(options = {}) {
+    const controllerApi = window.BibloZooWelcomeBackReturn;
+    if (!controllerApi?.attach) return null;
+    let controller = null;
+    let returnGeneration = 0;
+    const keepPaused = () => !!controller?.isPaused() && !document.hidden;
+    const profileId = window.VerseGameBridge?.getLaunchParams?.()?.profileId || "";
+    const controllerOptions = {
+      profileId,
+      pictureBase: "../../",
+      escapeText: "Back to Playground",
+      preserveFocus: true,
+      shouldPrompt: () => !!options.isActive?.(),
+      onPause() {
+        returnGeneration += 1;
+        document.documentElement.classList.add("bz-playground-welcome-paused");
+        options.onPause?.();
+      },
+      onContinue() {
+        const thisGeneration = returnGeneration;
+        // A silent activity or one that has never created Web Audio needs
+        // acknowledgement, not a newly created context or artificial delay.
+        const currentContext = options.getAudioContext?.();
+        const muted = options.isMuted?.() === true;
+        const recovery = !currentContext || muted
+          ? Promise.resolve(true)
+          : controllerApi.resumeAudioOnGesture({
+            unlock: options.unlockAudio,
+            getContext: options.getAudioContext,
+            replaceContext: options.replaceAudioContext,
+            isCurrent: keepPaused
+          });
+        return Promise.resolve(recovery).then(async ok => {
+          // A second task switch invalidates any older recovery result.
+          if (!ok || thisGeneration !== returnGeneration || !keepPaused()) return false;
+          // No re-render: preserve typed letters, canvases, verse positions,
+          // input selection and any activity-owned pause state.
+          // Activities may refuse continuation when a musical timeline has
+          // not been safely re-synchronized.
+          try {
+            const resumed = await options.onResume?.();
+            if (resumed === false || thisGeneration !== returnGeneration || !keepPaused()) return false;
+          } catch (_) { return false; }
+          document.documentElement.classList.remove("bz-playground-welcome-paused");
+          return true;
+        });
+      },
+      onExit: () => window.VerseGameBridge?.exitGame?.()
+    };
+    controller = controllerApi.attach(controllerOptions);
+    return controller;
+  }
+
   window.VerseGameShell = {
     escapeHtml,
     getFunDecoys,
@@ -2731,6 +2787,7 @@
     medalSetIconHtml,
     renderTitleScreen,
     renderModeSelect,
-    renderCompleteScreen
+    renderCompleteScreen,
+    attachPlaygroundWelcomeBack
   };
 })();

@@ -19,7 +19,13 @@ function element(tag = 'div') {
     setAttribute() {}, remove() { this.removed = true; },
     addEventListener(name, fn) { listeners[name] = fn; },
     removeEventListener(name, fn) { if (listeners[name] === fn) delete listeners[name]; },
-    focus() {}, appendChild(child) { this.children.push(child); },
+    focus() {}, querySelector(selector) {
+      if (selector === "[data-welcome-back-title]") {
+        if (!this.titleButton) this.titleButton = element('button');
+        return this.titleButton;
+      }
+      return null;
+    }, appendChild(child) { this.children.push(child); },
     click() { listeners.click?.(); }
   };
 }
@@ -109,7 +115,7 @@ async function test() {
   const b = scenario();
   b.goAwayAndBack(); b.action.click(); b.showWatchdog();
   ok(!b.escape.hidden, 'Long-running audio recovery reveals the escape');
-  eq(b.status.textContent, 'Sound is taking longer than expected.', 'Status reports stalled recovery without pretending it worked');
+  eq(b.status.textContent, 'Those sloths are taking their time...', 'Status reports slow recovery in a child-friendly way');
   b.escape.click();
   eq(b.exitCount(), 1, 'The child can leave even if audio promise never settles');
   b.resolve(true);
@@ -152,7 +158,7 @@ async function test() {
     'Food Slice reports pet unlock navigation separately from crash');
   ok(read('verse_games/shared/welcome-back.css').includes('.bz-welcome-escape[hidden]'),
     'Escape styling is hidden during ordinary use');
-  ok(read('service-worker.js').includes('2026_Oct_25_patch66_invaders_shared_spinner'),
+  ok(read('service-worker.js').includes('2026_Oct_25_patch68_playground_rhythm_wheel_zoo'),
     'Offline cache refreshes changed shared files');
   console.log(`Patch 64.1 targeted regression tests passed (${checks} checks).`);
 }

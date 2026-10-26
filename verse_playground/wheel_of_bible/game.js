@@ -129,6 +129,87 @@
   let sleepIds = [];
   let finalTimerId = null;
   let currentFitRaf = 0;
+  let playgroundWelcome = null;
+  let welcomePaused = false;
+  const welcomeClock = window.BibloZooWelcomeBackClock?.create?.() || {
+    now: () => performance.now(), pause() {}, resume() {}
+  };
+  let nextGameTimerId = 0;
+  const gameTimers = new Map();
+  let pausedVisualAnimations = [];
+  let pausedVerseRecording = false;
+  let wheelSpinPending = false;
+  const gameNow = () => welcomeClock.now();
+
+  // Timer callbacks and their remaining delays are frozen with the wheel.
+  // Native recovery/probes use their own unpaused timeouts, not this queue.
+  function gameTimeout(callback, ms) {
+    const token = ++nextGameTimerId;
+    const record = { callback, deadline: gameNow() + Math.max(0, Number(ms) || 0), nativeId: 0 };
+    const run = () => {
+      record.nativeId = 0;
+      if (!gameTimers.has(token) || welcomePaused || document.hidden) return;
+      const remaining = record.deadline - gameNow();
+      if (remaining > 1) {
+        record.nativeId = window.setTimeout(run, remaining);
+        return;
+      }
+      gameTimers.delete(token);
+      record.callback();
+    };
+    gameTimers.set(token, record);
+    if (!welcomePaused && !document.hidden) record.nativeId = window.setTimeout(run, Math.max(0, record.deadline - gameNow()));
+    return token;
+  }
+  function cancelGameTimeout(token) {
+    const record = gameTimers.get(token);
+    if (!record) return;
+    window.clearTimeout(record.nativeId);
+    gameTimers.delete(token);
+  }
+  function freezeGameTimers() {
+    for (const record of gameTimers.values()) {
+      window.clearTimeout(record.nativeId);
+      record.nativeId = 0;
+    }
+  }
+  function thawGameTimers() {
+    // Scheduling a fresh timeout at the preserved virtual deadline avoids
+    // replaying missed sounds, prize awards or transition callbacks.
+    for (const [token, record] of gameTimers) {
+      if (record.nativeId) continue;
+      const remaining = Math.max(0, record.deadline - gameNow());
+      record.nativeId = window.setTimeout(() => {
+        record.nativeId = 0;
+        if (welcomePaused || document.hidden || !gameTimers.has(token)) return;
+        gameTimers.delete(token);
+        record.callback();
+      }, remaining);
+    }
+  }
+  function pauseWheelForReturn() {
+    if (welcomePaused) return;
+    welcomePaused = true;
+    welcomeClock.pause();
+    freezeGameTimers();
+    pausedVisualAnimations = Array.from(app?.getAnimations?.({ subtree: true }) || [])
+      .filter(anim => anim.playState === "running");
+    pausedVisualAnimations.forEach(anim => { try { anim.pause(); } catch (_) {} });
+    pausedVerseRecording = !!verseAudioEl && !verseAudioEl.paused;
+    if (pausedVerseRecording) { try { verseAudioEl.pause(); } catch (_) {} }
+    // A paused iOS audio context must never keep a delayed tone alive.
+  }
+  function resumeWheelAfterReturn() {
+    if (!welcomePaused) return true;
+    welcomeClock.resume();
+    welcomePaused = false;
+    pausedVisualAnimations.forEach(anim => { try { anim.play(); } catch (_) {} });
+    pausedVisualAnimations = [];
+    thawGameTimers();
+    // Do not automatically replay speech: a fresh tap is required by iOS.
+    pausedVerseRecording = false;
+    return true;
+  }
 
   let smartVerseRowsCacheKey = "";
   let smartVerseRowsCacheValue = null;
@@ -247,14 +328,14 @@
 
 
   const sleep = (ms) => new Promise(resolve => {
-    const id = setTimeout(() => {
+    const id = gameTimeout(() => {
       sleepIds = sleepIds.filter(item => item !== id);
       resolve();
-    }, Math.max(0, Number(ms) || 0));
+    }, ms);
     sleepIds.push(id);
   });
 
-  function clearSleeps() { sleepIds.forEach(id => clearTimeout(id)); sleepIds = []; }
+  function clearSleeps() { sleepIds.forEach(cancelGameTimeout); sleepIds = []; }
 
   function clearTimers() {
     clearSleeps();
@@ -731,9 +812,22 @@
     return audioUnlockPromise;
   }
 
+  function replaceWheelWelcomeContext() {
+    const old = audioCtx;
+    if (!old || !(window.AudioContext || window.webkitAudioContext)) return false;
+    audioCtx = null;
+    masterGain = null;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    createAudio();
+    const replaced = !!audioCtx && audioCtx !== old;
+    if (replaced) { try { void old.close?.().catch?.(() => {}); } catch (_) {} }
+    return replaced;
+  }
+
   function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
   function playTone({ midi = 60, duration = 0.12, volume = 0.18, type = "triangle" } = {}) {
-    if (muted) return;
+    if (muted || welcomePaused || document.hidden) return;
     createAudio();
     if (!audioCtx || !masterGain) return;
     if (audioCtx.state !== "running") { unlockAudio().then(ok => { if (ok) playTone({ midi, duration, volume, type }); }); return; }
@@ -747,7 +841,7 @@
     osc.connect(gain); gain.connect(masterGain); osc.start(now); osc.stop(now + duration + 0.04);
   }
   function playBeep(index = 0) { playTone({ midi: 67 + (index % 3) * 4, duration: .10, volume: .24 }); }
-  function playGood() { playTone({ midi: 72, duration: .10, volume: .28 }); setTimeout(() => playTone({ midi: 79, duration: .14, volume: .22 }), 70); }
+  function playGood() { playTone({ midi: 72, duration: .10, volume: .28 }); gameTimeout(() => playTone({ midi: 79, duration: .14, volume: .22 }), 70); }
   
   function keywordMelodyPoolsForLength(length) {
     const pools = {
@@ -884,14 +978,14 @@
     });
   }
   
-  function playBad() { playTone({ midi: 43, duration: .13, volume: .32, type: "sine" }); setTimeout(() => playTone({ midi: 38, duration: .12, volume: .24, type: "sine" }), 58); }
+  function playBad() { playTone({ midi: 43, duration: .13, volume: .32, type: "sine" }); gameTimeout(() => playTone({ midi: 38, duration: .12, volume: .24, type: "sine" }), 58); }
   function playPop(i = 0) { playTone({ midi: 64 + (i % 5) * 2, duration: .08, volume: .18 }); }
-  function playPrize() { playTone({ midi: 72, duration: .10, volume: .25 }); setTimeout(() => playTone({ midi: 76, duration: .10, volume: .24 }), 70); setTimeout(() => playTone({ midi: 84, duration: .18, volume: .28 }), 145); }
+  function playPrize() { playTone({ midi: 72, duration: .10, volume: .25 }); gameTimeout(() => playTone({ midi: 76, duration: .10, volume: .24 }), 70); gameTimeout(() => playTone({ midi: 84, duration: .18, volume: .28 }), 145); }
 
   function playHint() {
     playTone({ midi: 67, duration: .08, volume: .18, type: "triangle" });
-    setTimeout(() => playTone({ midi: 72, duration: .09, volume: .18, type: "triangle" }), 70);
-    setTimeout(() => playTone({ midi: 76, duration: .12, volume: .16, type: "triangle" }), 145);
+    gameTimeout(() => playTone({ midi: 72, duration: .09, volume: .18, type: "triangle" }), 70);
+    gameTimeout(() => playTone({ midi: 76, duration: .12, volume: .16, type: "triangle" }), 145);
   }
 
   function stopVerseAudio() { if (!verseAudioEl) return; try { verseAudioEl.pause(); verseAudioEl.currentTime = 0; } catch (err) { } }
@@ -1155,7 +1249,7 @@
   }
 
   function renderSpinScreen() {
-    clearTimers(); state.screen = "spin";
+    clearTimers(); wheelSpinPending = false; state.screen = "spin";
     if (normalRoundComplete()) { renderFinalIntro(); return; }
     state.selectedSpin = null;
     const remainingSpins = Math.max(0, normalRoundTarget() - state.revealedLetters.size);
@@ -1174,13 +1268,19 @@
   }
 
   async function spinWheel() {
-    const btn = document.getElementById("spinWheelBtn"); if (btn) btn.disabled = true; await unlockAudio();
+    if (welcomePaused || wheelSpinPending || document.hidden) return;
+    wheelSpinPending = true;
+    const btn = document.getElementById("spinWheelBtn"); if (btn) btn.disabled = true;
+    await unlockAudio();
+    if (welcomePaused) await welcomeClock.sleep(0);
     const index = Math.floor(Math.random() * WHEEL_VALUES.length);
     const step = 360 / WHEEL_VALUES.length;
     const degrees = 360 * 5 + ((360 - (index * step)) % 360);
     document.getElementById("gameWheel")?.style.setProperty("--spin-deg", `${degrees}deg`);
-    for (let i = 0; i < 22; i += 1) setTimeout(() => playTone({ midi: 50 + (i % 3) * 3, duration: .045, volume: .12, type: "square" }), i * 95);
+    for (let i = 0; i < 22; i += 1) gameTimeout(() => playTone({ midi: 50 + (i % 3) * 3, duration: .045, volume: .12, type: "square" }), i * 95);
     await sleep(3300);
+    if (welcomePaused) await welcomeClock.sleep(0);
+    wheelSpinPending = false;
     const raw = WHEEL_VALUES[index];
     let result = { ...raw };
     if (raw.kind === "prize") {
@@ -1235,7 +1335,7 @@
             `;
           }
 
-          waitForSpinResultImage(popCard).then(() => setTimeout(resolve, 2500));
+          waitForSpinResultImage(popCard).then(() => gameTimeout(resolve, 2500));
         }, { once: true });
       });
 
@@ -1442,7 +1542,7 @@
     el.className = "wob-floating-money";
     el.textContent = text;
     card.appendChild(el);
-    setTimeout(() => el.remove(), 950);
+    gameTimeout(() => el.remove(), 950);
   }
 
   function showFloatingMoneyAtPosition(
@@ -1505,7 +1605,7 @@
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     card.appendChild(el);
-    setTimeout(() => el.remove(), 900);
+    gameTimeout(() => el.remove(), 900);
   }
 
   async function showChallengeBonusPopup(bonus) {
@@ -1591,7 +1691,7 @@
       bill.style.setProperty("--delay", `${delay}ms`);
       card.appendChild(bill);
 
-      setTimeout(() => bill.remove(), delay + fallMs + 80);
+      gameTimeout(() => bill.remove(), delay + fallMs + 80);
     }
 
     return { totalMs: rainSpanMs + fallMs };
@@ -1647,7 +1747,7 @@
       bill.style.setProperty("--duration", `${durationMs}ms`);
       bill.style.setProperty("--delay", `${path.delay || 0}ms`);
       card.appendChild(bill);
-      setTimeout(() => bill.remove(), durationMs + (path.delay || 0) + 40);
+      gameTimeout(() => bill.remove(), durationMs + (path.delay || 0) + 40);
     }
   }
 
@@ -3228,7 +3328,7 @@
   function startFinalRound() {
     state.screen = "finalRound";
     preloadImage(CLOCK_IMAGE);
-    state.finalStartedAt = Date.now();
+    state.finalStartedAt = gameNow();
     state.finalTimeLeft = FINAL_ROUND_SECONDS;
     state.finalActiveWord = null;
     state.finalInputIndex = 0;
@@ -3238,7 +3338,8 @@
     updateFinalProgressBar();
 
     finalTimerId = setInterval(() => {
-      const elapsedMs = Date.now() - state.finalStartedAt;
+      if (welcomePaused || document.hidden) return;
+      const elapsedMs = gameNow() - state.finalStartedAt;
       state.finalTimeLeft = Math.max(0, FINAL_ROUND_SECONDS - Math.floor(elapsedMs / 1000));
       updateFinalProgressBar();
 
@@ -3252,8 +3353,8 @@
 
 
   function finalRoundProgressRatio() {
-    const startedAt = Number(state.finalStartedAt) || Date.now();
-    const elapsedMs = Math.max(0, Date.now() - startedAt);
+    const startedAt = Number(state.finalStartedAt) || gameNow();
+    const elapsedMs = Math.max(0, gameNow() - startedAt);
     return clamp(1 - (elapsedMs / (FINAL_ROUND_SECONDS * 1000)), 0, 1);
   }
 
@@ -3526,9 +3627,10 @@
 
   function animateMoneyCount(el, from, to, ms) {
     return new Promise(resolve => {
-      if (!el) return resolve(); const start = performance.now(); const duration = Math.max(120, Number(ms) || 500);
+      if (!el) return resolve(); const start = gameNow(); const duration = Math.max(120, Number(ms) || 500);
       const step = now => {
-        const t = clamp((now - start) / duration, 0, 1); const eased = 1 - Math.pow(1 - t, 3); const value = from + (to - from) * eased; el.textContent = formatMoney(value);
+        if (welcomePaused || document.hidden) { requestAnimationFrame(step); return; }
+        const t = clamp((gameNow() - start) / duration, 0, 1); const eased = 1 - Math.pow(1 - t, 3); const value = from + (to - from) * eased; el.textContent = formatMoney(value);
         if (t < 1) { if (Math.random() < .18) playTone({ midi: 72 + Math.floor(Math.random() * 7), duration: .035, volume: .07 }); requestAnimationFrame(step); }
         else { el.textContent = formatMoney(to); resolve(); }
       };
@@ -3574,6 +3676,18 @@
       document.getElementById("backBtn")?.addEventListener("click", () => bridge().exitGame?.());
     }
   }
+
+  // Patch 68: shared Playground return, with a frozen spin/bonus clock.
+  // Progress and selected wheel segment remain in memory throughout recovery.
+  playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
+    isActive: () => !state.completed && !["intro", "meetVerse", "verseIntro"].includes(state.screen),
+    onPause: pauseWheelForReturn,
+    onResume: resumeWheelAfterReturn,
+    getAudioContext: () => audioCtx,
+    unlockAudio,
+    replaceAudioContext: replaceWheelWelcomeContext,
+    isMuted: () => muted
+  });
 
   renderIntro();
 })();

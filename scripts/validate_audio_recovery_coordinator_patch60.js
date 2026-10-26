@@ -253,7 +253,7 @@ function sourcePolicies() {
   ok(!/setCategory\(|setMode\(|setActive\(false\)/.test(scene),
     'Category, mode, and deactivation not modified');
   ok(!/setActive\(/.test(diag),'Patch 58 observer remains read-only');
-  ok(/2026_Oct_25_patch(?:60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner)/.test(sw), 'Cache updated');
+  ok(/2026_Oct_25_patch(?:60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner|67_playground_welcome_back|68_playground_rhythm_wheel_zoo)/.test(sw), 'Cache updated');
   ok(sw.includes('"./verse_games/shared/audio-recovery-coordinator.js"'),
     'New web helper cached for offline PWA');
   ok(html.includes('audioCoord') && html.includes('biblozooAudioCoordination'),

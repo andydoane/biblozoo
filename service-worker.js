@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_25_patch66_invaders_shared_spinner";
+const CACHE_VERSION = "2026_Oct_25_patch68_playground_rhythm_wheel_zoo";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -53,6 +53,21 @@ const CORE_PATHS = [
   "./verse_games/shared/welcome-back.js",
   "./verse_games/shared/welcome-back-return.js",
   "./verse_games/shared/welcome-back-clock.js",
+  "./verse_playground/ghost_writer/index.html",
+  "./verse_playground/ghost_writer/game.js",
+  "./verse_playground/ghost_writer/game.css",
+  "./verse_playground/scripture_scrub/index.html",
+  "./verse_playground/scripture_scrub/game.js",
+  "./verse_playground/scripture_scrub/game.css",
+  "./verse_playground/verse_typer/index.html",
+  "./verse_playground/verse_typer/game.js",
+  "./verse_playground/verse_typer/game.css",
+  "./verse_playground/verse_jam/index.html",
+  "./verse_playground/verse_jam/game.js",
+  "./verse_playground/verse_jam/game.css",
+  "./verse_playground/wheel_of_bible/index.html",
+  "./verse_playground/wheel_of_bible/game.js",
+  "./verse_playground/wheel_of_bible/game.css",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",

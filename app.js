@@ -11522,7 +11522,7 @@ function syncLearnAudioResumeOverlay() {
   if (button) button.disabled = !!learnAudioResumeAttempt;
   const status = overlay.querySelector("#learnAudioResumeStatus");
   status.textContent = learnAudioResumeAttempt
-    ? "Restoring audio…"
+    ? (window.BibloZooWelcomeBack?.getMessage?.(overlay) || "Cleaning the zoo...")
     : learnAudioResumeError;
   status.hidden = !status.textContent;
 }

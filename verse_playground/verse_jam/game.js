@@ -336,6 +336,8 @@
   const AUDIO_CLOCK_PROBE_MS = 100;
   let resumeBeatInFlight = false;
   let resumeBeatGestureGeneration = 0;
+  let playgroundWelcome = null;
+  let sharedWelcomeEnabled = false;
   let htmlAudioEl = null;
   let htmlAudioPrimed = false;
   let htmlAudioPrimePromise = null;
@@ -627,7 +629,7 @@
 
   function scheduleVerseJamForegroundRecovery() {
     if (document.hidden) return;
-    if (state.resumeAfterInterruption) showResumeBeatOverlay();
+    if (state.resumeAfterInterruption && !sharedWelcomeEnabled) showResumeBeatOverlay();
     if (!audioCtx || audioCtx.state === "closed") return;
     if (!audioForegroundRecoveryPending) return;
     clearTimeout(audioForegroundRecoveryTimer);
@@ -678,7 +680,7 @@
     const unlock = event => {
       // Resume Beat's own button owns this gesture. Avoid two competing
       // unlock requests from document capture and the button handler.
-      if (event?.target?.closest?.("#verseJamResumeBeatButton")) return;
+      if (event?.target?.closest?.("#verseJamResumeBeatButton, .bz-welcome-overlay")) return;
       void unlockAudioFromGesture();
     };
     ["pointerdown", "touchstart", "mousedown", "click", "keydown"].forEach(eventName => {
@@ -1749,6 +1751,27 @@
     return unlockAudioFromGesture();
   }
 
+  function replaceJamWelcomeContext() {
+    const old = audioCtx;
+    if (!old || !audioContextConstructor()) return false;
+    stopMusic();
+    audioCtx = null;
+    masterGain = null;
+    compressor = null;
+    outputGain = null;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    audioUnlockAttempt += 1;
+    soundBitLoadPromise = null;
+    uiTapLoadPromise = null;
+    Object.keys(soundBitBuffers).forEach(key => { delete soundBitBuffers[key]; });
+    uiTapBuffers.length = 0;
+    createAudioGraph();
+    const replaced = !!audioCtx && audioCtx !== old;
+    if (replaced) { try { void old.close?.().catch?.(() => {}); } catch (_) {} }
+    return replaced;
+  }
+
   function setMuted(value) {
     muted = !!value;
     if (masterGain && audioCtx && audioCtx.state !== "closed") {
@@ -1770,6 +1793,7 @@
 
   async function loadSoundBitBuffers() {
     if (!audioCtx) return;
+    const decodingContext = audioCtx;
     if (soundBitLoadPromise) return soundBitLoadPromise;
 
     soundBitLoadPromise = Promise.all(SOUND_BITS.map(async (sound) => {
@@ -1790,10 +1814,11 @@
         }
 
         const arrayBuffer = await res.arrayBuffer();
-        soundBitBuffers[sound.filename] = await audioCtx.decodeAudioData(arrayBuffer);
+        const buffer = await decodingContext.decodeAudioData(arrayBuffer);
+        if (audioCtx === decodingContext) soundBitBuffers[sound.filename] = buffer;
       } catch (err) {
         console.warn(`Verse Jam could not load sound bit: ${sound.filename}`, err);
-        soundBitBuffers[sound.filename] = null;
+        if (audioCtx === decodingContext) soundBitBuffers[sound.filename] = null;
       }
     }));
 
@@ -1802,6 +1827,7 @@
 
   async function loadUiTapBuffers() {
     if (!audioCtx) return;
+    const decodingContext = audioCtx;
     if (uiTapLoadPromise) return uiTapLoadPromise;
 
     uiTapLoadPromise = Promise.all(UI_TAP_SOUNDS.map(async (url, index) => {
@@ -1822,10 +1848,11 @@
         }
 
         const arrayBuffer = await res.arrayBuffer();
-        uiTapBuffers[index] = await audioCtx.decodeAudioData(arrayBuffer);
+        const buffer = await decodingContext.decodeAudioData(arrayBuffer);
+        if (audioCtx === decodingContext) uiTapBuffers[index] = buffer;
       } catch (err) {
         console.warn(`Verse Jam could not load UI tap sound: ${url}`, err);
-        uiTapBuffers[index] = null;
+        if (audioCtx === decodingContext) uiTapBuffers[index] = null;
       }
     }));
 
@@ -2451,11 +2478,10 @@
   function pauseVerseJamForInterruption() {
     if (state.screen !== "game" || state.completed || state.paused ||
         state.menuOpen || state.helpOpen) return;
-    const activePhrase = state.phase === "intro" ||
-      state.phase === "round_transition" ||
-      state.phase === "ending_sequence" ||
-      (["spawn_chunk", "countdown", "play_chunk"].includes(state.phase) &&
-       state.currentButtons.length > 0);
+    const activePhrase = [
+      "intro", "round_transition", "ending_sequence",
+      "spawn_chunk", "countdown", "play_chunk"
+    ].includes(state.phase);
     if (!activePhrase) return;
 
     beginGameplayFlow();
@@ -3888,6 +3914,35 @@
     if (state.screen === "end") return renderEnd();
   }
 
+  // The shared Welcome Back gesture verifies audio before a clean downbeat.
+  // Keep the existing Resume Beat modal only as a fallback for web clients
+  // where the shared files are not available.
+  playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
+    isActive: () => state.screen === "game" && !state.completed,
+    onPause: () => {
+      markVerseJamAudioBackgrounded();
+      hideResumeBeatOverlay();
+    },
+    onResume: () => {
+      if (!state.resumeAfterInterruption) return true;
+      if (muted) {
+        audioUnlocked = true;
+        audioForegroundRecoveryPending = false;
+      }
+      if (!audioUnlocked || audioForegroundRecoveryPending ||
+          audioCtx?.state !== "running") return false;
+      state.resumeBeatApproved = true;
+      // A phrase can last several seconds. Start its clean downbeat now,
+      // but do not keep the Welcome Back popup waiting for the whole verse.
+      void resumeVerseJamAfterInterruption();
+      return true;
+    },
+    getAudioContext: () => audioCtx,
+    unlockAudio: unlockAudioFromGesture,
+    replaceAudioContext: replaceJamWelcomeContext,
+    isMuted: () => muted
+  });
+  sharedWelcomeEnabled = !!playgroundWelcome;
   installAudioUnlockHandlers();
   setScreen("intro");
 })();

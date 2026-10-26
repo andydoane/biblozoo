@@ -6,7 +6,7 @@
 (function installWelcomeBackReturn(root) {
   "use strict";
 
-  function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name } = {}) {
+  function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, escapeText, preserveFocus = false } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
@@ -28,9 +28,23 @@
     const escape = document.createElement("button");
     escape.type = "button";
     escape.className = "bz-welcome-escape no-zoom";
-    escape.textContent = "Back to Games";
+    escape.textContent = escapeText === "Back to Playground" ? "Back to Playground" : "Back to Games";
     escape.hidden = true;
     overlay.querySelector("[data-welcome-back-card]")?.appendChild(escape);
+    const card = overlay.querySelector("[data-welcome-back-card]");
+    const oopsCard = document.createElement("section");
+    oopsCard.className = "bz-welcome-card bz-welcome-oops-card";
+    oopsCard.hidden = true;
+    oopsCard.setAttribute("aria-labelledby", "bzWelcomeOopsTitle");
+    oopsCard.innerHTML = `<h2 class="bz-welcome-oops-title" id="bzWelcomeOopsTitle">Oops!</h2>
+      <p class="bz-welcome-oops-activity" data-welcome-back-activity></p>
+      <p class="bz-welcome-oops-message">The monkeys got into the music!</p>
+      <p class="bz-welcome-oops-note">Let's head back and try again.</p>
+      <button type="button" class="bz-welcome-action no-zoom" data-welcome-back-title>Back to Title</button>`;
+    overlay.appendChild(oopsCard);
+    const titleButton = oopsCard.querySelector("[data-welcome-back-title]");
+    const activityLabel = oopsCard.querySelector("[data-welcome-back-activity]");
+    if (activityLabel) activityLabel.textContent = String(document.title || "BibloZoo").slice(0, 80);
     const ESCAPE_WATCHDOG_MS = 7500;
     let escapeTimer = 0;
     let exiting = false;
@@ -42,22 +56,34 @@
     let pending = false;
     let processing = false;
     let attemptSerial = 0;
+    let failedAttempts = 0;
+    let terminalFailure = false;
     let disposed = false;
 
     function show() {
-      if (!pending || disposed || exiting || document.hidden) return;
+      if (!pending || disposed || exiting || document.hidden || !overlay.hidden) return;
+      card.hidden = terminalFailure;
+      oopsCard.hidden = !terminalFailure;
       root.BibloZooWelcomeBack.populate(overlay, { profileId, pictureBase, name });
       root.BibloZooWelcomeBack.setAction(overlay);
-      if (status) { status.textContent = ""; status.hidden = true; }
-      escape.hidden = true;
+      if (status && !processing && !terminalFailure) { status.textContent = ""; status.hidden = true; }
+      escape.hidden = !terminalFailure;
       overlay.hidden = false;
-      button?.focus?.({ preventScroll: true });
+      // Playground text/drawing activities keep their existing focus/selection.
+      // A forced focus here can dismiss the iOS keyboard mid-verse.
+      if (!preserveFocus) button?.focus?.({ preventScroll: true });
     }
 
     function leave() {
       if (disposed || !hasBeenVisible || away || !shouldPrompt()) return;
       away = true;
       pending = true;
+      failedAttempts = 0;
+      terminalFailure = false;
+      card.hidden = false;
+      oopsCard.hidden = true;
+      overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
+      overlay.hidden = true;
       // A second task switch invalidates the older gesture's asynchronous
       // result; a hung iOS promise must not block a fresh tap on return.
       attemptSerial += 1;
@@ -92,16 +118,27 @@
         escape.hidden = true;
         return;
       }
+      failedAttempts += 1;
+      if (failedAttempts >= 2) {
+        terminalFailure = true;
+        card.hidden = true;
+        oopsCard.hidden = false;
+        overlay.setAttribute("aria-labelledby", "bzWelcomeOopsTitle");
+        escape.hidden = true;
+        log("welcome-back-terminal-recovery", { failedAttempts });
+        titleButton?.focus?.({ preventScroll: true });
+        return;
+      }
       escape.hidden = false;
       root.BibloZooWelcomeBack.setAction(overlay, { retry: true });
       if (status) {
         status.hidden = false;
-        status.textContent = "Sound isn't ready. Let's try again!";
+        status.textContent = "Oops! Let's try that again.";
       }
     }
 
     function action() {
-      if (disposed || processing || !pending || document.hidden) return;
+      if (disposed || processing || !pending || terminalFailure || document.hidden) return;
       processing = true;
       const thisAttempt = ++attemptSerial;
       escape.hidden = true;
@@ -114,15 +151,12 @@
         escape.hidden = false;
         if (status) {
           status.hidden = false;
-          status.textContent = "Sound is taking longer than expected.";
+          status.textContent = "Those sloths are taking their time...";
         }
         log("welcome-back-recovery-slow");
       }, ESCAPE_WATCHDOG_MS);
       root.BibloZooWelcomeBack.setAction(overlay, { busy: true });
-      if (status) {
-        status.hidden = false;
-        status.textContent = "Getting sound ready...";
-      }
+      // The shared UI now owns playful progress text and rotates it while busy.
       // Invoke synchronously from the real tap before awaiting the promise.
       // AudioContext.resume() must be initiated by onContinue during gesture.
       try {
@@ -133,12 +167,13 @@
       } catch (_) { if (thisAttempt === attemptSerial) result(false); }
     }
 
-    function exit() {
-      if (disposed || exiting || escape.hidden || document.hidden) return;
+    function exit(fromTerminal = false) {
+      if (disposed || exiting || (!fromTerminal && escape.hidden) || document.hidden) return;
       exiting = true;
       attemptSerial += 1;
       if (escapeTimer) { root.clearTimeout(escapeTimer); escapeTimer = 0; }
       escape.disabled = true;
+      if (titleButton) titleButton.disabled = true;
       root.BibloZooWelcomeBack.setAction(overlay);
       if (button) button.disabled = true;
       if (status) {
@@ -153,6 +188,7 @@
         // Failed navigation must not turn a recoverable prompt into a trap.
         exiting = false;
         escape.disabled = false;
+        if (titleButton) titleButton.disabled = false;
         if (status) status.textContent = "Couldn't leave the game. Try again.";
       }
     }
@@ -161,7 +197,10 @@
     root.addEventListener("pagehide", pageHidden);
     root.addEventListener("pageshow", visible);
     button?.addEventListener("click", action);
-    escape.addEventListener("click", exit);
+    const exitEscape = () => exit(false);
+    escape.addEventListener("click", exitEscape);
+    const exitTitle = () => exit(true);
+    titleButton?.addEventListener("click", exitTitle);
 
     return Object.freeze({
       isPaused: () => pending,
@@ -175,7 +214,8 @@
         root.removeEventListener("pagehide", pageHidden);
         root.removeEventListener("pageshow", visible);
         button?.removeEventListener("click", action);
-        escape.removeEventListener("click", exit);
+        escape.removeEventListener("click", exitEscape);
+        titleButton?.removeEventListener("click", exitTitle);
         overlay.remove();
       }
     });

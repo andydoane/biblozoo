@@ -201,6 +201,15 @@
     return gameAssetPreloadPromise;
   }
 
+  let playgroundWelcome = null;
+  let returnPaused = false;
+  let wasPausedBeforeReturn = false;
+  const welcomeClock = window.BibloZooWelcomeBackClock?.create?.() || {
+    now: () => performance.now(), pause() {}, resume() {}, isPaused: () => false
+  };
+  const scheduledActions = new Map();
+  let nextScheduledId = 0;
+
   const state = {
     screen: "intro",
     verseJson: null,
@@ -252,17 +261,35 @@
 
   function clearTrackedTimeout(id) {
     if (!id) return;
-    clearTimeout(id);
+    const job = scheduledActions.get(id);
+    if (job?.timer) clearTimeout(job.timer);
+    scheduledActions.delete(id);
     state.sleepIds = state.sleepIds.filter(item => item !== id);
   }
 
   function trackedTimeout(callback, ms, runToken = state.runToken) {
-    const id = setTimeout(() => {
-      state.sleepIds = state.sleepIds.filter(item => item !== id);
-      if (runToken !== null && state.runToken !== runToken) return;
-      callback();
-    }, ms);
+    const id = ++nextScheduledId;
+    const deadline = welcomeClock.now() + Math.max(0, Number(ms) || 0);
+    const job = { timer: 0 };
+    scheduledActions.set(id, job);
     state.sleepIds.push(id);
+    const check = () => {
+      job.timer = 0;
+      if (!scheduledActions.has(id)) return;
+      if (runToken !== null && state.runToken !== runToken) {
+        clearTrackedTimeout(id);
+        return;
+      }
+      if (!returnPaused && welcomeClock.now() >= deadline) {
+        clearTrackedTimeout(id);
+        callback();
+        return;
+      }
+      job.timer = setTimeout(check, returnPaused ? 80 : Math.max(0, deadline - welcomeClock.now()));
+    };
+    // Ordinary typing keeps its original precise delay; only the interrupted
+    // state polls briefly while time is frozen.
+    job.timer = setTimeout(check, Math.max(0, deadline - welcomeClock.now()));
     return id;
   }
 
@@ -271,8 +298,7 @@
   });
 
   function clearSleeps() {
-    state.sleepIds.forEach(id => clearTimeout(id));
-    state.sleepIds = [];
+    [...state.sleepIds].forEach(clearTrackedTimeout);
   }
 
   function invalidateRun() {
@@ -537,6 +563,8 @@
         )
       )
       .then(buffer => {
+        // Ignore a buffer decoded for a replaced Web Audio context.
+        if (targetCtx !== (IS_NATIVE_CAPACITOR ? audioCtx : uiPopAudioCtx)) return null;
         uiPopAudioBufferPromises[index] =
           null;
 
@@ -548,6 +576,7 @@
         return buffer;
       })
       .catch(() => {
+        if (targetCtx !== (IS_NATIVE_CAPACITOR ? audioCtx : uiPopAudioCtx)) return null;
         uiPopAudioBufferPromises[index] =
           null;
         return null;
@@ -1110,7 +1139,7 @@
     state.entranceDone = false;
     state.pendingCompleteAfterEntrance = false;
     state.paused = false;
-    state.startTime = performance.now();
+    state.startTime = welcomeClock.now();
     state.correctLetters = 0;
     state.typos = 0;
     state.streak = 0;
@@ -1307,7 +1336,7 @@
 
   function wirePhysicalKeyboard() {
     window.onkeydown = (event) => {
-      if (state.screen !== "game") return;
+      if (state.screen !== "game" || returnPaused) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const key = String(event.key || "").toUpperCase();
@@ -2175,7 +2204,7 @@
         : -1;
 
       return `
-        <span class="vt-head ${state.headShakeUntil > performance.now() ? "is-no" : ""}">${faceHtml()}</span>
+        <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
         <span class="vt-body vt-reference-body">
           ${item.chars.map((char, index) => {
         const isDigit = /\d/.test(char);
@@ -2197,7 +2226,7 @@
 
     if (item.kind === "mega") {
       return `
-        <span class="vt-head ${state.headShakeUntil > performance.now() ? "is-no" : ""}">${faceHtml()}</span>
+        <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
         <span class="vt-body vt-mega-body">
           ${(item.parts || []).map(part => {
         if (part.kind === "space") {
@@ -2222,7 +2251,7 @@
       : -1;
 
     return `
-      <span class="vt-head ${state.headShakeUntil > performance.now() ? "is-no" : ""}">${faceHtml()}</span>
+      <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
       <span class="vt-body">
         ${letters.map((letter, index) => {
       const typed = index < state.typedIndex;
@@ -2304,14 +2333,17 @@
   }
 
   function startRippleDelayLoop(durationMs, item) {
-    const startedAt = performance.now();
+    const startedAt = welcomeClock.now();
 
     const tick = () => {
       if (state.screen !== "game" || state.currentItem !== item) return;
-
+      if (returnPaused) {
+        // Preserve the remaining ripple without updating behind the popup.
+        setTimeout(() => requestAnimationFrame(tick), 80);
+        return;
+      }
       updateRippleDelays();
-
-      if (performance.now() - startedAt < durationMs - 40) {
+      if (welcomeClock.now() - startedAt < durationMs - 40) {
         requestAnimationFrame(tick);
       }
     };
@@ -2468,7 +2500,7 @@
   }
 
   function handleKey(rawKey) {
-    if (state.paused || state.transitionLocked || !state.acceptingInput || !state.currentItem) return;
+    if (returnPaused || state.paused || state.transitionLocked || !state.acceptingInput || !state.currentItem) return;
     if (state.currentItem.kind === "reference" && !/^\d$/.test(rawKey)) return;
     if (state.currentItem.kind !== "reference" && !/^[A-Z]$/.test(rawKey)) return;
 
@@ -2588,7 +2620,7 @@
     state.streak = 0;
     state.keyFlash = key;
     state.keyFlashBad = true;
-    state.headShakeUntil = performance.now() + 420;
+    state.headShakeUntil = welcomeClock.now() + 420;
 
     playWrongSound();
     renderHud();
@@ -2980,6 +3012,34 @@
     `;
   }
 
+  function replaceTyperWelcomeContext() {
+    const old = audioCtx;
+    if (!old) return false;
+    audioCtx = null;
+    masterGain = null;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    uiPopAudioCtx = null;
+    uiPopAudioBuffers.length = 0;
+    uiPopAudioBufferPromises.length = 0;
+    createAudio();
+    if (old !== audioCtx) { try { void old.close?.().catch?.(() => {}); } catch (_) {} }
+    return !!audioCtx && audioCtx !== old;
+  }
+  function pauseTyperForReturn() {
+    if (returnPaused) return;
+    returnPaused = true;
+    wasPausedBeforeReturn = state.paused;
+    state.paused = true;
+    welcomeClock.pause();
+  }
+  function continueTyperAfterReturn() {
+    welcomeClock.resume();
+    returnPaused = false;
+    state.paused = wasPausedBeforeReturn;
+    if (state.screen === "game") scheduleCaterpillarPositionUpdate({ instant: true });
+  }
+
   function setScreen(screen) {
     if (screen !== "game") {
       invalidateRun();
@@ -2999,6 +3059,16 @@
   }, { capture: true, passive: true });
   window.addEventListener("resize", () => {
     scheduleCaterpillarPositionUpdate();
+  });
+
+  playgroundWelcome = window.VerseGameShell.attachPlaygroundWelcomeBack?.({
+    isActive: () => state.screen === "game",
+    onPause: pauseTyperForReturn,
+    onResume: continueTyperAfterReturn,
+    getAudioContext: () => audioCtx,
+    unlockAudio,
+    replaceAudioContext: replaceTyperWelcomeContext,
+    isMuted: () => muted
   });
 
   setScreen("intro");

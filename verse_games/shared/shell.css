@@ -1727,3 +1727,10 @@ button.vm-complete-icon.is-pet-box:focus-visible {
     animation: none;
   }
 }
+
+/* Patch 67: pause activity-only CSS motion during a Playground return.
+ * The shared portrait is outside #app and can still spin during recovery. */
+.bz-playground-welcome-paused #app,
+.bz-playground-welcome-paused #app * {
+  animation-play-state: paused !important;
+}

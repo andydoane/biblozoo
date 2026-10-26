@@ -7,6 +7,65 @@
 
   const BUTTON_TEXT = "Let's go!";
   const RETRY_TEXT = "Try again!";
+  const ZOO_MESSAGES = Object.freeze([
+    "Cleaning the zoo...",
+    "Feeding the hippos...",
+    "Chasing the monkeys...",
+    "Waking up the sloths...",
+    "Counting the penguins...",
+    "Brushing the lions...",
+    "Tickling the giraffes...",
+    "Finding the flamingos...",
+    "Polishing the turtle shells...",
+    "Giving the elephants a bath...",
+    "Untangling the snakes...",
+    "Hiding snacks from the raccoons...",
+    "Teaching the parrots Bible verses...",
+    "Convincing the kangaroos to share..."
+  ]);
+  const MESSAGE_INTERVAL_MS = 2500;
+  const messageSessions = new WeakMap();
+  let messageStartIndex = 0;
+
+  function getMessage(root) {
+    const card = root?.querySelector?.("[data-welcome-back-card]");
+    return messageSessions.get(card)?.message || "";
+  }
+
+  function setMessagesRunning(root, busy) {
+    const card = root?.querySelector?.("[data-welcome-back-card]");
+    const status = root?.querySelector?.("[data-welcome-back-status]");
+    if (!card || !status) return;
+    const previous = messageSessions.get(card);
+    if (!busy) {
+      if (previous) {
+        window.clearInterval(previous.timer);
+        messageSessions.delete(card);
+      }
+      return;
+    }
+    // Idempotent: Learn and Feeding may call setAction repeatedly while busy.
+    if (previous) return;
+    let index = messageStartIndex++ % ZOO_MESSAGES.length;
+    const session = { timer: 0, message: ZOO_MESSAGES[index] };
+    const advance = () => {
+      // A disconnected/hidden card must not retain a ticking interval.
+      if (!card.isConnected || root.hidden || document.hidden ||
+          !card.classList.contains("is-recovering")) {
+        window.clearInterval(session.timer);
+        messageSessions.delete(card);
+        return;
+      }
+      index = (index + 1) % ZOO_MESSAGES.length;
+      session.message = ZOO_MESSAGES[index];
+      status.textContent = session.message;
+      status.hidden = false;
+    };
+    messageSessions.set(card, session);
+    status.textContent = session.message;
+    status.hidden = false;
+    session.timer = window.setInterval(advance, MESSAGE_INTERVAL_MS);
+  }
 
   function getIdentity(nameOverride, profileId) {
     const api = window.BibloZooProfiles;
@@ -75,6 +134,7 @@
       button.closest?.(".bz-welcome-card");
     card?.classList?.toggle("is-recovering", !!busy);
     card?.setAttribute?.("aria-busy", busy ? "true" : "false");
+    setMessagesRunning(root, !!busy);
   }
 
   // One markup template for non-Feeding activities. Feeding's existing HTML
@@ -110,6 +170,6 @@
   }
 
   window.BibloZooWelcomeBack = Object.freeze({
-    getIdentity, populate, setAction, markup, BUTTON_TEXT, RETRY_TEXT
+    getIdentity, populate, setAction, getMessage, markup, BUTTON_TEXT, RETRY_TEXT, ZOO_MESSAGES
   });
 })();

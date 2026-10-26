@@ -27,7 +27,10 @@ function makeNode() {
     removeEventListener(k, fn) { if (listeners.get(k) === fn) listeners.delete(k); },
     emit(k) { listeners.get(k)?.(); },
     focus() { this.focusCalls++; },
-    remove() { this.removed = true; }
+    remove() { this.removed = true; },
+    appendChild(child) { (this.children ||= []).push(child); },
+    classList: { toggle() {}, contains() { return true; } },
+    isConnected: true
   };
   return node;
 }
@@ -37,7 +40,7 @@ function harness({ profile = {name: "Alexandria", avatarVerseId: "john_3_16"} } 
   const name = makeNode(), nameLine = makeNode(), status = makeNode();
   const overlay = makeNode();
   overlay.bind("[data-welcome-back-action]", button);
-  overlay.bind("[data-welcome-back-card]", {appendChild() {}});
+  overlay.bind("[data-welcome-back-card]", makeNode());
   overlay.bind("[data-welcome-back-picture]", picture);
   overlay.bind("[data-welcome-back-picture-fallback]", paw);
   overlay.bind("[data-welcome-back-name]", name);
@@ -47,12 +50,12 @@ function harness({ profile = {name: "Alexandria", avatarVerseId: "john_3_16"} } 
   const document = {
     hidden: false,
     body: { appendChild(child) { children.push(child); } },
-    createElement(tag) { return tag === "button" ? makeNode() : overlay; },
+    createElement(tag) { return tag === "button" || tag === "section" ? makeNode() : overlay; },
     addEventListener(k, fn) { docListeners.set(k, fn); },
     removeEventListener(k, fn) { if (docListeners.get(k) === fn) docListeners.delete(k); }
   };
   const window = {
-    document, setTimeout, clearTimeout,
+    document, setTimeout, clearTimeout, setInterval, clearInterval,
     BibloZooProfiles: {
       getProfileById: id => id === "z-1" ? profile : null,
       getActiveProfile: () => ({name: "Wrong User", avatarVerseId: "wrong"}),
@@ -156,7 +159,7 @@ async function tests() {
   ok(game.includes('source: "app"') && game.includes('isCurrent: () =>'),
     "Guarded Patch 60 coordination is available on native iOS only");
   ok(feeding.includes('data-welcome-back-name-line'), "Feeding inherits new color and no-wrap line");
-  ok(sw.includes('2026_Oct_25_patch66_invaders_shared_spinner') &&
+  ok(sw.includes('2026_Oct_25_patch68_playground_rhythm_wheel_zoo') &&
      sw.includes('"./verse_games/shared/welcome-back-return.js"'),
      "Service worker version and new resource updated");
 

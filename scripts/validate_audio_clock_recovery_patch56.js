@@ -256,7 +256,7 @@ async function testNoWebAudioFallback() {
   eq(h.contexts.length, 0, "No native audio dependency");
 }
 function testPackagingAndCompatibility() {
-  ok(/const CACHE_VERSION = "2026_Oct_25_patch(?:58_native_audio_session_diagnostics|59_native_reactivation_experiment|60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner)"/.test(serviceWorker),
+  ok(/const CACHE_VERSION = "2026_Oct_25_patch(?:58_native_audio_session_diagnostics|59_native_reactivation_experiment|60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner|67_playground_welcome_back|68_playground_rhythm_wheel_zoo)"/.test(serviceWorker),
     "PWA cache version bumped for changed source");
   ok(serviceWorker.includes('"./daily_questions_feed_game.js"'), "Feeding remains cached offline");
   ok(serviceWorker.includes('"./app.js"'), "Main audio remains cached offline");

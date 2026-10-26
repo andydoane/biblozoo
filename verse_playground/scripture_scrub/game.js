@@ -406,6 +406,14 @@
   let mowerActive = false;
   let mowerFromTop = true;
   let mowerAnimationFrame = null;
+  let mowerResumeFrame = null;
+  let mowerEndAt = 0;
+  let welcomePaused = false;
+  let playgroundWelcome = null;
+  let deferredCoverageRound = null;
+  const welcomeClock = window.BibloZooWelcomeBackClock?.create?.() || {
+    now: () => performance.now(), pause() {}, resume() {}
+  };
   let resizeHandler = null;
 
   let audioCtx = null;
@@ -606,11 +614,14 @@
       })
       .then((arrayBuffer) => ctx.decodeAudioData(arrayBuffer))
       .then((buffer) => {
+        // A replacement AudioContext invalidates previous decoded buffers.
+        if (ctx !== audioCtx) return null;
         soundBuffers.set(key, buffer);
         soundBufferPromises.delete(key);
         return buffer;
       })
       .catch((err) => {
+        if (ctx !== audioCtx) return null;
         console.warn("Scripture Scrub: could not load sound", key, err);
         soundBuffers.set(key, null);
         soundBufferPromises.delete(key);
@@ -1308,6 +1319,51 @@
       <p><strong>Reveal the verse!</strong></p>
       <p>Scrub, wipe, rake, peel, mow, and dig to clean up the verse!</p>
     `;
+  }
+
+  function replaceScrubWelcomeContext() {
+    const old = audioCtx;
+    if (!old) return false;
+    stopMowerSound();
+    audioCtx = null;
+    audioUnlocked = false;
+    audioUnlockPromise = null;
+    soundBuffers.clear();
+    soundBufferPromises.clear();
+    generatedTonePrimed = false;
+    const fresh = getAudioContext();
+    if (old !== fresh) { try { void old.close?.().catch?.(() => {}); } catch (_) {} }
+    return !!fresh && fresh !== old;
+  }
+
+  function pauseScrubForReturn() {
+    welcomePaused = true;
+    welcomeClock.pause();
+    pointerDown = false;
+    lastPoint = null;
+    stopMowerSound();
+    if (glowTrailAnimationFrame) cancelAnimationFrame(glowTrailAnimationFrame);
+    if (rainbowTrailAnimationFrame) cancelAnimationFrame(rainbowTrailAnimationFrame);
+    glowTrailAnimationFrame = null;
+    rainbowTrailAnimationFrame = null;
+    glowTrailSpots = [];
+    rainbowTrailParticles = [];
+    if (mowerAnimationFrame) { cancelAnimationFrame(mowerAnimationFrame); mowerAnimationFrame = null; }
+  }
+  function continueScrubAfterReturn() {
+    welcomeClock.resume();
+    welcomePaused = false;
+    const resumeMower = mowerResumeFrame;
+    mowerResumeFrame = null;
+    if (resumeMower) {
+      mowerAnimationFrame = requestAnimationFrame(resumeMower);
+      if (mowerActive && mowerEndAt > welcomeClock.now()) {
+        void startMowerSound(mowerEndAt - welcomeClock.now());
+      }
+    }
+    const round = deferredCoverageRound;
+    deferredCoverageRound = null;
+    if (round && round === roundConfig()) scheduleCoverageCheck(round, true);
   }
 
   function renderTitleScreen() {
@@ -3941,6 +3997,7 @@
     const endY = fromTop ? height + mowerHeight : -mowerHeight;
     const rotation = fromTop ? 180 : 0;
     const duration = 1250;
+    mowerEndAt = welcomeClock.now() + duration;
 
     unlockAudio();
     startMowerSound(duration);
@@ -3950,11 +4007,14 @@
 
     objectLayer.appendChild(mower);
 
-    const startTime = performance.now();
+    const startTime = welcomeClock.now();
     let lastY = startY;
 
-    const animate = (now) => {
-      const elapsed = now - startTime;
+    const animate = () => {
+      mowerAnimationFrame = null;
+      if (welcomePaused) { mowerResumeFrame = animate; return; }
+      mowerResumeFrame = null;
+      const elapsed = welcomeClock.now() - startTime;
       const progress = Math.min(1, elapsed / duration);
       const eased = easeMowerPass(progress);
       const y = startY + ((endY - startY) * eased);
@@ -3968,6 +4028,7 @@
         return;
       }
 
+      mowerResumeFrame = null;
       finishMowerPass({
         mower,
         x,
@@ -3977,6 +4038,7 @@
       });
     };
 
+    mowerResumeFrame = animate;
     mowerAnimationFrame = requestAnimationFrame(animate);
   }
 
@@ -4015,6 +4077,7 @@
 
   function finishMowerPass({ mower, x, width, stageHeight, round }) {
     mowerAnimationFrame = null;
+    mowerEndAt = 0;
     stopMowerSound();
 
     const rectX = x - width / 2;
@@ -4301,6 +4364,7 @@
     const delay = immediate ? 0 : 90;
     coverageCheckTimer = setTimeout(() => {
       coverageCheckTimer = null;
+      if (welcomePaused) { deferredCoverageRound = round; return; }
       const cleared = round.kind === "chalkboard"
         ? measureChalkboardClearedRatio()
         : round.kind === "glow" || round.kind === "rainbow"
@@ -5672,6 +5736,9 @@
 
   function cleanupRound() {
     stopMowerSound();
+    mowerResumeFrame = null;
+    mowerEndAt = 0;
+    deferredCoverageRound = null;
 
     if (coverageCheckTimer) {
       clearTimeout(coverageCheckTimer);
@@ -5735,6 +5802,16 @@
     lastPoint = null;
     menuOpen = false;
   }
+
+  playgroundWelcome = window.VerseGameShell.attachPlaygroundWelcomeBack?.({
+    isActive: () => !!document.getElementById("scrubGame"),
+    onPause: pauseScrubForReturn,
+    onResume: continueScrubAfterReturn,
+    getAudioContext: () => audioCtx,
+    unlockAudio,
+    replaceAudioContext: replaceScrubWelcomeContext,
+    isMuted: () => muted
+  });
 
   verseJson = await loadVerseJson();
   await waitForLocalFonts();

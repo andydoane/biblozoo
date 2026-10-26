@@ -61,7 +61,7 @@ async function auditRegistry() {
   ok(css.includes('body.bz-return-activity-paused #app *'),'Invaders CSS animations freeze');
   ok(clock.includes('elapsedPauseMs'),'Virtual time clock preserved');
   const worker=read('service-worker.js');
-  ok(worker.includes('2026_Oct_25_patch66_invaders_shared_spinner'),'Offline revision changes');
+  ok(worker.includes('2026_Oct_25_patch68_playground_rhythm_wheel_zoo'),'Offline revision changes');
   for (const name of ['welcome-back.css','welcome-back.js','welcome-back-return.js','welcome-back-clock.js'])
     ok(worker.includes('"./verse_games/shared/'+name+'"'),'Service worker caches shared '+name);
 }
@@ -82,7 +82,7 @@ function testSpinner() {
   ok(css.includes('animation: none;'),'Reduced motion has static state');
   ok(!css.includes('.bz-welcome-card.is-recovering {'),'The whole popup does not spin');
   const ctl=read('verse_games/shared/welcome-back-return.js');
-  ok(ctl.includes('Getting sound ready...'),'Visible progress text after tap');
+  ok(!ctl.includes('Getting sound ready...') && widget.includes('ZOO_MESSAGES'),'Child-friendly progress text after tap');
   ok(ctl.includes('root.BibloZooWelcomeBack.setAction(overlay, { busy: true });'),'Spinning begins on first gesture');
   ok(ctl.includes('root.BibloZooWelcomeBack.setAction(overlay, { retry: ok !== true });'),'Spinning stops after recovery');
   ok(ctl.includes('ESCAPE_WATCHDOG_MS'),'Back to Games fallback preserved');

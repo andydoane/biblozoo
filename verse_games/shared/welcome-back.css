@@ -157,3 +157,10 @@
     animation: none;
   }
 }
+
+/* Patch 68: a different, child-friendly end state after two failed attempts. */
+.bz-welcome-oops-card[hidden], .bz-welcome-card[hidden] { display: none !important; }
+.bz-welcome-oops-title { margin: 0; font: 900 46px/1 "Baloo 2", "Baloo2", system-ui, sans-serif; }
+.bz-welcome-oops-activity { margin: 0; font: 800 18px/1.2 "Baloo 2", "Baloo2", system-ui, sans-serif; }
+.bz-welcome-oops-message { margin: 0; font: 900 24px/1.2 "Baloo 2", "Baloo2", system-ui, sans-serif; }
+.bz-welcome-oops-note { margin: 0; font: 800 17px/1.4 "Baloo 2", "Baloo2", system-ui, sans-serif; }
