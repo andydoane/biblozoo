@@ -7470,6 +7470,8 @@ window.BibloZooDailyQuestions
     renderApp:
       render,
 
+    isDailySessionActive: () => State.screen === Screen.DAILY_SESSION,
+
     makeSlide,
 
     goToDailySession: () =>
@@ -11905,17 +11907,87 @@ function waitForDuration(timeoutMs = 2000) {
   });
 }
 
+// Patch 71: app-owned quiet activity return gate. Existing Learn narration,
+// Feeding, Flashcards and Read My Verse retain their own recovery controllers.
+// Informational screens, settings and the title/home screen deliberately do not
+// prompt. Timed Learn exercise clocks remain frozen until the child's gesture.
+let appActivityReturn = null;
+let appReturnPausedAt = 0;
+
+function shouldPromptAppActivityReturn() {
+  if (State.isSliding) return false;
+  if (State.screen === Screen.TODO_DEV) {
+    // Zoo To-Do is an active task hub; separate informational/tutorial details
+    // use their existing retry control rather than an extra modal.
+    return !State.todoInfoPage;
+  }
+  return (State.screen === Screen.HIDE && State.sayVerseActive) ||
+    (State.screen === Screen.FINAL_RECALL && State.finalRecallActive);
+}
+
+function attachAppActivityReturn() {
+  if (appActivityReturn || !window.BibloZooWelcomeBackReturn?.attach) return;
+  appActivityReturn = window.BibloZooWelcomeBackReturn.attach({
+    shouldPrompt: shouldPromptAppActivityReturn,
+    onPause: () => {
+      if (State.screen === Screen.TODO_DEV) {
+        stopZooTodoTutorialPageAudio({ offerRetry: true });
+      } else if (!appReturnPausedAt) {
+        appReturnPausedAt = performance.now();
+      }
+    },
+    onContinue: () => {
+      if (document.hidden) return false;
+      // Navigation may have changed while iOS was away: discard stale prompt.
+      if (![Screen.TODO_DEV, Screen.HIDE, Screen.FINAL_RECALL]
+          .includes(State.screen)) { appReturnPausedAt = 0; return true; }
+      if (appReturnPausedAt) {
+        const delta = Math.max(0, performance.now() - appReturnPausedAt);
+        if (State.screen === Screen.HIDE && State.sayVerseStartedAt)
+          State.sayVerseStartedAt += delta;
+        if (State.screen === Screen.FINAL_RECALL && State.finalRecallStartedAt)
+          State.finalRecallStartedAt += delta;
+        appReturnPausedAt = 0;
+      }
+      return true;
+    },
+    onExit: () => {
+      appReturnPausedAt = 0;
+      go(Screen.TITLE);
+    },
+    escapeText: "Back to Title",
+    suppressUiSound: true
+  });
+}
+
+// These time-limited Learn exercises must not progress during iOS backgrounding
+// or while a genuine Welcome Back prompt is waiting for its first gesture.
+async function waitForActiveLearnTime(ms) {
+  let remaining = Math.max(0, ms);
+  let last = performance.now();
+  while (remaining > 0) {
+    await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
+    const now = performance.now();
+    if (!document.hidden && !appActivityReturn?.isPaused?.()) {
+      remaining -= Math.min(100, now - last);
+    }
+    last = now;
+  }
+}
+
 function getSayVersePct() {
   if (!State.sayVerseActive || !State.sayVerseDurationMs) return 1;
 
-  const elapsed = performance.now() - State.sayVerseStartedAt;
+  const now = appReturnPausedAt ? appReturnPausedAt : performance.now();
+  const elapsed = now - State.sayVerseStartedAt;
   return Math.max(0, 1 - elapsed / State.sayVerseDurationMs);
 }
 
 function getFinalRecallPct() {
   if (!State.finalRecallActive || !State.finalRecallDurationMs) return 1;
 
-  const elapsed = performance.now() - State.finalRecallStartedAt;
+  const now = appReturnPausedAt ? appReturnPausedAt : performance.now();
+  const elapsed = now - State.finalRecallStartedAt;
   return Math.max(0, 1 - elapsed / State.finalRecallDurationMs);
 }
 
@@ -12220,9 +12292,7 @@ async function startHideRound() {
     durationMs - promptFadeMs
   );
 
-  await new Promise(
-    r => setTimeout(r, promptHoldMs)
-  );
+  await waitForActiveLearnTime(promptHoldMs);
 
   if (
     State.screen !== Screen.HIDE ||
@@ -12242,9 +12312,7 @@ async function startHideRound() {
     );
   }
 
-  await new Promise(
-    r => setTimeout(r, promptFadeMs)
-  );
+  await waitForActiveLearnTime(promptFadeMs);
 
   if (
     State.screen !== Screen.HIDE ||
@@ -12288,9 +12356,9 @@ async function startFinalRecallFlow() {
   State.finalRecallDurationMs = durationMs;
   render();
 
-  await new Promise(r => setTimeout(r, durationMs));
+  await waitForActiveLearnTime(durationMs);
 
-  if (State.screen !== Screen.FINAL_RECALL) return;
+  if (State.screen !== Screen.FINAL_RECALL || !State.finalRecallActive) return;
 
   State.finalRecallActive = false;
   State.finalRecallStartedAt = 0;
@@ -19090,6 +19158,19 @@ function stopNewVersePickerPreviewAudio() {
   updateNewVersePickerAudioButtons();
 }
 
+// Other informational previews do not warrant a Welcome Back modal.
+// Cancel them quietly so stale narration cannot follow the child home.
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) return;
+  stopDailyQuestionPreviewAudio();
+  if (State.screen === Screen.NEW_VERSE_PICKER) stopNewVersePickerPreviewAudio();
+  if (State.screen === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
+});
+window.addEventListener("pagehide", () => {
+  stopDailyQuestionPreviewAudio();
+  if (State.screen === Screen.NEW_VERSE_PICKER) stopNewVersePickerPreviewAudio();
+});
+
 function toggleNewVersePickerPreviewAudio(verseId) {
   if (!verseId || State.screen !== Screen.NEW_VERSE_PICKER) return;
 
@@ -23432,6 +23513,7 @@ window.addEventListener(
   preloadZooTodoChromeImages();
   loadPetNameBlocklist();
   setupAppUiTapSounds();
+  attachAppActivityReturn();
 
   await loadVerseList();
 

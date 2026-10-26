@@ -1890,6 +1890,13 @@
 
     globalBindingsInstalled = true;
 
+    // An iOS task switch can strand a pointerdown without pointerup.
+    // Never let its developer-only long press complete while backgrounded.
+    root.document.addEventListener("visibilitychange", () => {
+      if (root.document.hidden) clearDeveloperLongPress();
+    });
+    root.addEventListener?.("pagehide", clearDeveloperLongPress);
+
     root.document.addEventListener(
       "click",
       handleDocumentClick,

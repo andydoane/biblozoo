@@ -85,6 +85,55 @@
   let questionAudioProgressTimer = 0;
   let questionAudioNeedsForegroundRender = false;
   let rewardPopupTimeoutId = 0;
+  let dailyQuestionReturn = null;
+  let cancelQuestionPageTransition = null;
+
+  // The Daily Questions overlay is an activity gate, never a session mutation.
+  // The Feeding reward game has its own independent interruption controller.
+  function dailyQuestionsCanPrompt() {
+    return !!dailySession && appApi?.isDailySessionActive?.() === true &&
+      dailySession.phase !== SESSION_PHASES.REWARD_GAME;
+  }
+
+  function dailyQuestionsReturnPaused() {
+    return dailyQuestionReturn?.isPaused?.() === true;
+  }
+
+  function pauseDailyQuestionsForReturn() {
+    if (!dailyQuestionsCanPrompt()) return;
+    interruptDailyQuestionAudio();
+    cancelQuestionPageTransition?.();
+    clearDailyQuestionRewardPopupTimer();
+    if (dailySession) dailySession.showStarRewardPopup = false;
+    // Verse Help uses app-owned HTML media. Never resume its narration
+    // automatically; the child's original Listen button remains available.
+    if (dailySession?.phase === SESSION_PHASES.VERSE) {
+      appApi?.stopDailyAudio?.();
+      dailySession.verseAudioPlaying = false;
+    }
+  }
+
+  function attachDailyQuestionsReturn() {
+    if (dailyQuestionReturn || !window.BibloZooWelcomeBackReturn?.attach) return;
+    dailyQuestionReturn = window.BibloZooWelcomeBackReturn.attach({
+      shouldPrompt: dailyQuestionsCanPrompt,
+      onPause: pauseDailyQuestionsForReturn,
+      // Acknowledgment, not an automatic narration replay or reward action.
+      onContinue: () => {
+        if (document.hidden) return false;
+        if (!dailyQuestionsCanPrompt()) return true;
+        questionAudioNeedsForegroundRender = false;
+        appApi?.renderApp?.();
+        return true;
+      },
+      onExit: () => {
+        clearSessionState();
+        appApi?.goToTitle?.();
+      },
+      escapeText: "Back to Title",
+      suppressUiSound: true
+    });
+  }
 
   const LATER_STORAGE_PREFIX =
     "biblozooDailyQuestionLater";
@@ -168,6 +217,7 @@
 
   function playGeneratedQuestionAudio(source, session) {
     if (
+      document.hidden || dailyQuestionsReturnPaused() ||
       !source ||
       !session ||
       session !== dailySession ||
@@ -326,6 +376,7 @@
         : null;
 
     prepareDailyQuestionAnswerSounds();
+    attachDailyQuestionsReturn();
 
     return !!appApi;
   }
@@ -1473,6 +1524,8 @@
   }
 
   function stopDailySessionRuntime() {
+    cancelQuestionPageTransition?.();
+    clearDailyQuestionRewardPopupTimer();
     questionAudioNeedsForegroundRender = false;
     stopDailyQuestionAnswerSounds();
     stopGeneratedQuestionAudio();
@@ -2012,11 +2065,13 @@
   }
 
   async function transitionQuestionPage(wrap, advance) {
-    if (questionPageTransition || !wrap.isConnected) return;
+    if (questionPageTransition || !wrap.isConnected ||
+        document.hidden || dailyQuestionsReturnPaused()) return;
 
     const sessionAtStart = dailySession;
     const indexAtStart = sessionAtStart?.questionIndex;
     let advanced = false;
+    let transitionAborted = false;
 
     // A popup or audio UI rerender can replace the old DOM node while the
     // page is fading. Only an actual session/screen change should cancel Next.
@@ -2026,7 +2081,8 @@
         : document.querySelector(".daily-question-session");
 
       if (
-        advanced ||
+        advanced || transitionAborted || document.hidden ||
+        dailyQuestionsReturnPaused() ||
         !visibleWrap?.isConnected ||
         dailySession !== sessionAtStart ||
         sessionAtStart?.phase !== SESSION_PHASES.QUESTION ||
@@ -2058,6 +2114,15 @@
     const wasInert = wrap.inert;
     wrap.inert = true;
     let nextWrap = null;
+    const abort = () => {
+      transitionAborted = true;
+      overlay.getAnimations?.().forEach(animation => animation.cancel());
+      overlay.remove();
+      wrap.inert = wasInert;
+      if (nextWrap) nextWrap.inert = false;
+      questionPageTransition = false;
+    };
+    cancelQuestionPageTransition = abort;
 
     try {
       document.body.appendChild(overlay);
@@ -2066,7 +2131,8 @@
         { duration: 225, easing: "ease-in", fill: "forwards" }
       ).finished;
 
-      // Advance even if a harmless rerender replaced the outgoing page.
+      // An interrupted fade is never permission to advance while away.
+      if (transitionAborted) return;
       if (!advanceOnce()) return;
 
       // Replace the page only after the overlay is completely opaque.
@@ -2083,10 +2149,13 @@
       // WebKit can interrupt animations. Do not consume a valid Next tap.
       advanceOnce();
     } finally {
+      if (cancelQuestionPageTransition === abort) {
+        cancelQuestionPageTransition = null;
+        questionPageTransition = false;
+      }
       overlay.remove();
       wrap.inert = wasInert;
       if (nextWrap) nextWrap.inert = false;
-      questionPageTransition = false;
     }
   }
 
@@ -2971,7 +3040,7 @@
           event.stopPropagation();
 
           if (
-            !dailySession ||
+            !dailySession || document.hidden || dailyQuestionsReturnPaused() ||
             questionPageTransition ||
             dailySession.phase !==
               SESSION_PHASES.QUESTION ||
@@ -3033,7 +3102,7 @@
           event.stopPropagation();
 
           if (
-            !dailySession ||
+            !dailySession || document.hidden || dailyQuestionsReturnPaused() ||
             dailySession.phase !==
               SESSION_PHASES.REFLECTION
           ) {
