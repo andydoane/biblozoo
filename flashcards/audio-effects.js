@@ -384,6 +384,11 @@
   const AUDIO_SETUP_TIMEOUT_MS = 7000;
   const AUDIO_DECODE_TIMEOUT_MS = 15000;
   const IOS_CLOCK_PROBE_MS = 190;
+  // One Wacky tap may outlive native setActive(true) by several seconds.
+  // Settle silently before considering a single fresh playback context.
+  // Keep this comfortably inside Flashcards' 18-second startup watchdog.
+  const WACKY_SETTLE_DELAYS_MS = Object.freeze([450, 700, 950, 1250, 1550]);
+  const WACKY_FRESH_DELAYS_MS = Object.freeze([450, 650, 850]);
 
   function log(type, details = {}) {
     try { window.BibloZooAudioDiagnostics?.record(type, details); } catch (_) {}
@@ -536,12 +541,12 @@
   async function recoverWackyClock(audioContext, generation) {
     const current = () => !document.hidden && context === audioContext &&
       generation === playbackGeneration;
-    if (!current()) return false;
+    if (!current()) return { recovered: false, reason: "stale" };
     const coordinator = window.BibloZooAudioRecoveryCoordinator;
     if (!coordinator?.isAvailable?.() ||
         typeof coordinator.recoverAfterStall !== "function") {
       log("flashcards-wacky-recovery-unavailable");
-      return false;
+      return { recovered: false, reason: "unavailable" };
     }
     // The coordinator is bounded, owns native activation, and never creates
     // AudioContexts. Do NOT replace one while iOS reports an interruption.
@@ -561,7 +566,78 @@
       recovered,
       reason: outcome?.reason || "unknown"
     });
-    return recovered;
+    return { recovered, reason: outcome?.reason || "unknown" };
+  }
+
+  function currentWackyRequest(audioContext, generation) {
+    return !document.hidden && generation === playbackGeneration &&
+      context === audioContext && audioContext?.state !== "closed";
+  }
+
+  async function waitForWackyClock(audioContext, generation, delays, phase) {
+    for (let i = 0; i < delays.length; i++) {
+      if (!currentWackyRequest(audioContext, generation)) return false;
+      await new Promise(resolve => window.setTimeout(resolve, delays[i]));
+      if (!currentWackyRequest(audioContext, generation)) return false;
+      const advanced = await verifyPlaybackClock(audioContext);
+      log("flashcards-wacky-settle-check", { phase, check: i + 1, clockAdvanced: advanced });
+      if (advanced && currentWackyRequest(audioContext, generation)) return true;
+    }
+    return false;
+  }
+
+  // The second manual tap in the iPhone log created a fresh playback context.
+  // Make that *one* replacement possible on the original tap, but only after
+  // the native interruption gate confirms that no interruption is pending.
+  async function replaceWackyContextOnce(audioContext, generation) {
+    if (!currentWackyRequest(audioContext, generation)) return null;
+    const coordinator = window.BibloZooAudioRecoveryCoordinator;
+    if (typeof coordinator?.getInterruptionState !== "function") return null;
+    let state;
+    try { state = await coordinator.getInterruptionState(); } catch (_) { return null; }
+    if (!currentWackyRequest(audioContext, generation)) return null;
+    if (state?.available !== true || state.pending === true) {
+      log("flashcards-wacky-refresh-deferred", {
+        reason: state?.pending ? "native-interruption" : "native-state-unavailable"
+      });
+      return null;
+    }
+    const Context = getAudioContextConstructor();
+    if (!Context) return null;
+    discardUnhealthyAudioContext(audioContext);
+    let replacement;
+    try {
+      replacement = new Context({ latencyHint: "playback" });
+      context = replacement;
+      log("flashcards-wacky-context-refreshed", { replacements: 1 });
+      if (replacement.state !== "running") {
+        await awaitAudioSetup(replacement.resume(), AUDIO_RESUME_TIMEOUT_MS);
+      }
+      if (!currentWackyRequest(replacement, generation) ||
+          replacement.state !== "running") return null;
+      return replacement;
+    } catch (_) {
+      if (replacement) discardUnhealthyAudioContext(replacement);
+      log("flashcards-wacky-refresh-deferred", { reason: "resume-failed" });
+      return null;
+    }
+  }
+
+  // Quietly load processor JavaScript when normal replay finishes. This does
+  // NOT create/resume an AudioContext or interact with microphone capture.
+  function preloadSoundTouch() {
+    if (!isSupported()) return false;
+    if (!soundTouchModulePromise) {
+      soundTouchModulePromise = import(
+        soundTouchModuleUrl
+      ).catch(() => {
+        soundTouchModulePromise = null;
+        log("flashcards-wacky-preload-failed");
+        return null;
+      });
+      log("flashcards-wacky-preload-started");
+    }
+    return true;
   }
 
   function stop() {
@@ -602,7 +678,7 @@
       });
     }
 
-    const audioContext = context;
+    let audioContext = context;
     if (audioContext.state !== "running") {
       // Call resume() on the Wacky Replay tap, before the first await.
       try {
@@ -620,20 +696,37 @@
     }
     if (!await verifyPlaybackClock(audioContext)) {
       log("flashcards-wacky-clock-stalled");
-      if (!await recoverWackyClock(audioContext, generation)) {
-        discardUnhealthyAudioContext(audioContext);
-        throw new Error("Wacky Replay audio clock is stalled.");
+      const coordinated = await recoverWackyClock(audioContext, generation);
+      if (!coordinated.recovered) {
+        // Native activation can succeed before WebKit's audio clock moves.
+        // The first tap waits/rechecks; it never repeats native activation.
+        let ready = await waitForWackyClock(
+          audioContext, generation, WACKY_SETTLE_DELAYS_MS, "after-native"
+        );
+        const deferred = ["interruption-pending", "native-cooldown", "busy", "stale"]
+          .includes(coordinated.reason);
+        if (!ready && !deferred && currentWackyRequest(audioContext, generation)) {
+          const refreshed = await replaceWackyContextOnce(audioContext, generation);
+          if (refreshed) {
+            audioContext = refreshed;
+            ready = await verifyPlaybackClock(audioContext) ||
+              await waitForWackyClock(
+                audioContext, generation, WACKY_FRESH_DELAYS_MS, "fresh-context"
+              );
+          }
+        }
+        if (!ready) {
+          discardUnhealthyAudioContext(audioContext);
+          throw new Error("Wacky Replay audio clock is stalled.");
+        }
+        log("flashcards-wacky-single-tap-recovered");
       }
     }
     if (generation !== playbackGeneration || audioContext !== context || document.hidden) {
       return null;
     }
 
-    if (!soundTouchModulePromise) {
-      soundTouchModulePromise = import(
-        soundTouchModuleUrl
-      );
-    }
+    preloadSoundTouch();
 
     let module = null;
 
@@ -677,8 +770,12 @@
     // transition. Never treat successful registration as proof of live audio.
     if (!await verifyPlaybackClock(audioContext)) {
       log("flashcards-wacky-clock-stalled", { phase: "after-worklet" });
-      discardUnhealthyAudioContext(audioContext);
-      throw new Error("Wacky Replay audio clock stalled during setup.");
+      if (!await waitForWackyClock(
+        audioContext, generation, [400, 650, 850], "after-worklet"
+      )) {
+        discardUnhealthyAudioContext(audioContext);
+        throw new Error("Wacky Replay audio clock stalled during setup.");
+      }
     }
     if (audioContext !== context || generation !== playbackGeneration || document.hidden) {
       throw new Error("Wacky Replay audio setup was interrupted.");
@@ -1823,6 +1920,7 @@
           }
         ),
       playRecordedVerse,
+      preloadSoundTouch,
       stop
     });
 })();

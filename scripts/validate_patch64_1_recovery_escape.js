@@ -158,7 +158,7 @@ async function test() {
     'Food Slice reports pet unlock navigation separately from crash');
   ok(read('verse_games/shared/welcome-back.css').includes('.bz-welcome-escape[hidden]'),
     'Escape styling is hidden during ordinary use');
-  ok(read('service-worker.js').includes('2026_Oct_26_patch69_1_wacky_recovery'),
+  ok(read('service-worker.js').includes('2026_Oct_26_patch69_2_wacky_single_tap'),
     'Offline cache refreshes changed shared files');
   console.log(`Patch 64.1 targeted regression tests passed (${checks} checks).`);
 }

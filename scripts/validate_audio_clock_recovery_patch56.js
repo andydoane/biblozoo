@@ -256,7 +256,7 @@ async function testNoWebAudioFallback() {
   eq(h.contexts.length, 0, "No native audio dependency");
 }
 function testPackagingAndCompatibility() {
-  ok(serviceWorker.includes('const CACHE_VERSION = "2026_Oct_26_patch69_1_wacky_recovery"'),
+  ok(serviceWorker.includes('const CACHE_VERSION = "2026_Oct_26_patch69_2_wacky_single_tap"'),
     "PWA cache version bumped for changed source");
   ok(serviceWorker.includes('"./daily_questions_feed_game.js"'), "Feeding remains cached offline");
   ok(serviceWorker.includes('"./app.js"'), "Main audio remains cached offline");

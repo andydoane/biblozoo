@@ -81,7 +81,7 @@ async function clockChecks() {
 function sourceChecks() {
   const games = ['traffic_tap','foodslice','tower_bible','verse_launch'];
   const worker = read('service-worker.js');
-  ok(worker.includes('2026_Oct_26_patch69_1_wacky_recovery'), 'Patch64 has a fresh offline cache');
+  ok(worker.includes('2026_Oct_26_patch69_2_wacky_single_tap'), 'Patch64 has a fresh offline cache');
   ok(worker.includes('"./verse_games/shared/welcome-back-clock.js"'), 'Shared clock cached offline');
   const helper = read('verse_games/shared/welcome-back-return.js');
   ok(helper.includes('context.currentTime - before >= 0.02'),'Actual advancing Web Audio clock remains required');

@@ -1026,7 +1026,7 @@
     }
 
     wackyReplayPlaying = true;
-    wackyReplayMessage = "";
+    wackyReplayMessage = "Getting your wacky voice ready…";
 
     const preset = pickWackyPreset();
     const request =
@@ -1042,6 +1042,8 @@
     const playback = recording.playFun(preset, () => {
       if (request !== wackyPlaybackRequest || document.hidden) return;
       started = true;
+      wackyReplayMessage = "";
+      requestRender();
       if (startupTimer !== null) {
         window.clearTimeout(startupTimer);
         startupTimer = null;
@@ -1478,6 +1480,9 @@
             ?.isSupported?.() === true
         ) {
           wackyReplayUnlocked = true;
+          // Processor code loads quietly, without allocating a playback
+          // context or touching microphone permission and capture.
+          try { window.BibloZooAudioEffects.preloadSoundTouch?.(); } catch (_) {}
         }
         requestRender();
       },

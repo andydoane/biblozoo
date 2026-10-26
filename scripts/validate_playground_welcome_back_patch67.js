@@ -73,7 +73,7 @@ function audit() {
   check(scrub.includes("const resumeMower = mowerResumeFrame"), "Scrub resumes existing mower pass");
   check(scrub.includes("if (ctx !== audioCtx) return null"), "Scrub ignores stale sound buffers");
   const worker = read("service-worker.js");
-  check(worker.includes('2026_Oct_26_patch69_1_wacky_recovery'), "Cache generation updated");
+  check(worker.includes('2026_Oct_26_patch69_2_wacky_single_tap'), "Cache generation updated");
   for (const id of targets) {
     for (const filename of ["index.html", "game.js", "game.css"])
       check(worker.includes(`"./verse_playground/${id}/${filename}"`), `${id}: ${filename} available offline`);

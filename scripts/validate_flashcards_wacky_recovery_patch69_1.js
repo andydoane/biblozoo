@@ -119,7 +119,7 @@ async function run() {
   const record=read('flashcards/recording.js');
   check(record.includes('interruptCapture()'), 'recording interruption behavior is preserved');
   const sw=read('service-worker.js');
-  check(sw.includes('2026_Oct_26_patch69_1_wacky_recovery'), 'new cache generation delivers Wacky update');
+  check(sw.includes('2026_Oct_26_patch69_2_wacky_single_tap'), 'new cache generation delivers Wacky update');
   console.log(`Patch 69.1 Wacky recovery: ${checks} checks passed.`);
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});

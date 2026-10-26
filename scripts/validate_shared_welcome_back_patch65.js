@@ -80,7 +80,7 @@ function checkSources() {
   ok(shared.includes('context.currentTime - before >= 0.02'), 'Real clock advancement is mandatory');
   ok(shared.includes('Back to Games') && shared.includes('ESCAPE_WATCHDOG_MS'), 'A safe recovery escape remains');
   const worker=read('service-worker.js');
-  ok(worker.includes('2026_Oct_26_patch69_1_wacky_recovery'), 'New offline cache version');
+  ok(worker.includes('2026_Oct_26_patch69_2_wacky_single_tap'), 'New offline cache version');
   for (const game of ['versey_bird','dino_dash','verse_snake']) {
     const prefix = `verse_games/${game}/`;
     const html = read(prefix+'index.html');
