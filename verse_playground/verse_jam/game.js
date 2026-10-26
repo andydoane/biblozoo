@@ -2,6 +2,7 @@
   const app = document.getElementById("app");
   if (app) app.classList.add("vm-shell");
 
+  const shell = () => window.VerseGameShell || {};
   const ctx = await window.VerseGameBridge.getVerseContext();
 
   const GAME_ID = "verse_jam";

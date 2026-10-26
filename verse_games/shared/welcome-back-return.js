@@ -110,6 +110,19 @@
       if (disposed || exiting) return;
       if (escapeTimer) { root.clearTimeout(escapeTimer); escapeTimer = 0; }
       processing = false;
+      // An active native interruption is NOT a completed failed audio
+      // recovery. Keep progress paused and allow an explicit later gesture;
+      // don't consume one of the child's two attempts or allocate again.
+      if (ok?.deferred === true) {
+        root.BibloZooWelcomeBack.setAction(overlay, { retry: true });
+        escape.hidden = false;
+        if (status) {
+          status.hidden = false;
+          status.textContent = "Those sloths are taking their time...";
+        }
+        log("welcome-back-recovery-deferred", { reason: ok.reason || "native-interruption" });
+        return;
+      }
       root.BibloZooWelcomeBack.setAction(overlay, { retry: ok !== true });
       log("welcome-back-recovery-result", { recovered: ok === true });
       if (ok === true && !document.hidden) {
@@ -223,7 +236,8 @@
 
   // Game-owned unlock() executes synchronously in the actual button click.
   // A context being "running" is insufficient; wait for its audio clock to move.
-  function resumeAudioOnGesture({ unlock, getContext, isCurrent, replaceContext, muted = false } = {}) {
+  function resumeAudioOnGesture({ unlock, getContext, isCurrent, replaceContext,
+    muted = false, deferOnNativeInterruption = false } = {}) {
     let request;
     try { request = typeof unlock === "function" ? unlock() : null; }
     catch (_) { return Promise.resolve(false); }
@@ -250,13 +264,40 @@
       if (!isCurrent?.()) return false;
       if (await probe()) return true;
       const coordinator = root.BibloZooAudioRecoveryCoordinator;
+      let cooldownPending = false;
       if (coordinator?.isAvailable?.() && isCurrent()) {
         try {
           const result = await coordinator.recoverAfterStall({
             source: "app", probe, isCurrent: () => isCurrent() && getContext() === context
           });
           if (result?.recovered === true && await probe()) return true;
+          cooldownPending = result?.reason === "native-cooldown";
         } catch (_) { /* Fall back only when the clock has not recovered. */ }
+      }
+      // In the Playground, do not churn through more AudioContexts while
+      // iOS still reports an unresolved interruption-began notification.
+      // This is read-only, bounded, and never claims audio is healthy.
+      const interruptionPending = async phase => {
+        if (!deferOnNativeInterruption || !isCurrent()) return false;
+        const native = await coordinator?.getInterruptionState?.();
+        if (!isCurrent() || native?.pending !== true) return false;
+        try {
+          root.BibloZooAudioDiagnostics?.record("welcome-back-native-interruption-pending", {
+            phase, interruptionSequence: native.interruptionSequence,
+            interruptionAgeMs: native.interruptionAgeMs
+          });
+        } catch (_) {}
+        return true;
+      };
+      if (await interruptionPending("before-context-replacement")) {
+        return { deferred: true, reason: "native-interruption" };
+      }
+      // The native plugin enforces a real 12-second throttle. A retry that
+      // cannot reactivate audio should not burn the child's second attempt
+      // or churn another AudioContext when the earlier one just stalled.
+      if (deferOnNativeInterruption && cooldownPending) {
+        try { root.BibloZooAudioDiagnostics?.record("welcome-back-native-cooldown"); } catch (_) {}
+        return { deferred: true, reason: "native-cooldown" };
       }
       // One bounded best-effort replacement as part of this same tap's
       // recovery sequence. WebKit may still require a fresh gesture; never
@@ -289,6 +330,12 @@
           clockAdvanced: advanced
         });
       } catch (_) {}
+      // A replacement context may itself coincide with a new native
+      // interruption. A running state with a motionless audio clock is NOT
+      // success, and a pending interruption must not count as a bad retry.
+      if (!advanced && await interruptionPending("after-context-replacement")) {
+        return { deferred: true, reason: "native-interruption" };
+      }
       return advanced;
     })();
   }

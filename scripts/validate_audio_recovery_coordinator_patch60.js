@@ -124,7 +124,7 @@ async function testRecentInterruptionAndMissingSignals() {
     probe:async()=>false});
   await h.advance(1700);const result=await task;
   eq(result.recovered,false,'Unresolved interruption never reports success');
-  eq(result.reason,'clock-stalled','Bounded fallback exits without ended event');
+  eq(result.reason,'interruption-pending','Unresolved native interruption is not a completed clock failure');
   eq(h.activation.length,0,'Do not reactivate during a fresh interruption');
   ok(h.events.some(e=>e.phase==='native-deferred' && e.interruptionSequence===7),
     'Native interruption signal recorded and respected');
@@ -253,7 +253,7 @@ function sourcePolicies() {
   ok(!/setCategory\(|setMode\(|setActive\(false\)/.test(scene),
     'Category, mode, and deactivation not modified');
   ok(!/setActive\(/.test(diag),'Patch 58 observer remains read-only');
-  ok(/2026_Oct_25_patch(?:60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner|67_playground_welcome_back|68_playground_rhythm_wheel_zoo)/.test(sw), 'Cache updated');
+  ok(sw.includes("2026_Oct_26_patch68_1_interruption_gate_jam_startup"), "Cache updated");
   ok(sw.includes('"./verse_games/shared/audio-recovery-coordinator.js"'),
     'New web helper cached for offline PWA');
   ok(html.includes('audioCoord') && html.includes('biblozooAudioCoordination'),
@@ -271,7 +271,7 @@ function sourcePolicies() {
   ok(feed.includes('runtime.feedResumeGeneration === generation'), 'Feeding stale generation guard');
   ok(app.includes('generation === appAudioUnlockGeneration'), 'App stale generation guard');
   ok(helper.includes('if (busy)'), 'Single global recovery owner');
-  ok(helper.includes('RECENT_INTERRUPTION_MS = 1400'), 'Bounded notification settling policy');
+  ok(helper.includes('function interruptionPending(state)'), 'Unresolved native interruptions remain guarded');
 }
 (async()=>{
   sourcePolicies();

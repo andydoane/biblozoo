@@ -207,7 +207,7 @@ async function appRecovery() {
 function sourcePolicy() {
   ok(html.includes('src="verse_games/shared/native-audio-recovery.js"'), 'Optional integration loaded');
   ok(html.indexOf('native-audio-recovery.js') < html.indexOf('daily_questions_feed_game.js'), 'Native helper loads before feeding');
-  ok(/2026_Oct_25_patch(?:59_native_reactivation_experiment|60_interruption_coordinator|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner|67_playground_welcome_back|68_playground_rhythm_wheel_zoo)/.test(sw), 'Fresh PWA cache version');
+  ok(sw.includes("2026_Oct_26_patch68_1_interruption_gate_jam_startup"), 'Fresh PWA cache version');
   ok(sw.includes('"./verse_games/shared/native-audio-recovery.js"'), 'Fallback JS cached offline');
   ok(!/import\s+.*@capacitor|from\s+["']@capacitor/.test(helper), 'No mandatory native import');
   ok(!/Capacitor\.Plugins/.test(feed), 'Feeding remains web-first');

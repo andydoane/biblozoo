@@ -61,7 +61,7 @@ async function auditRegistry() {
   ok(css.includes('body.bz-return-activity-paused #app *'),'Invaders CSS animations freeze');
   ok(clock.includes('elapsedPauseMs'),'Virtual time clock preserved');
   const worker=read('service-worker.js');
-  ok(worker.includes('2026_Oct_25_patch68_playground_rhythm_wheel_zoo'),'Offline revision changes');
+  ok(worker.includes('2026_Oct_26_patch68_1_interruption_gate_jam_startup'),'Offline revision changes');
   for (const name of ['welcome-back.css','welcome-back.js','welcome-back-return.js','welcome-back-clock.js'])
     ok(worker.includes('"./verse_games/shared/'+name+'"'),'Service worker caches shared '+name);
 }

@@ -176,6 +176,18 @@ final class BibloZooAudioSessionRecoveryPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             let now = Date()
+            // An unresolved interruption-began event means that iOS has not
+            // told us the session is ready. Never spend a native activation
+            // attempt (or reset its cooldown) while that signal is pending.
+            // Web Audio's moving clock remains the final proof of recovery.
+            if self.lastInterruptionType == "began" {
+                call.resolve([
+                    "attempted": false, "activated": false,
+                    "reason": "interruption-pending",
+                    "interruptionSequence": self.interruptionSequence
+                ])
+                return
+            }
             if let last = self.lastAttemptAt, now.timeIntervalSince(last) < self.minimumInterval {
                 call.resolve(["attempted": false, "activated": false, "reason": "cooldown"])
                 return

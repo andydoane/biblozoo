@@ -2717,11 +2717,14 @@
             unlock: options.unlockAudio,
             getContext: options.getAudioContext,
             replaceContext: options.replaceAudioContext,
-            isCurrent: keepPaused
+            isCurrent: keepPaused,
+            deferOnNativeInterruption: true
           });
         return Promise.resolve(recovery).then(async ok => {
           // A second task switch invalidates any older recovery result.
-          if (!ok || thisGeneration !== returnGeneration || !keepPaused()) return false;
+          if (thisGeneration !== returnGeneration || !keepPaused()) return false;
+          if (ok?.deferred === true) return ok;
+          if (!ok) return false;
           // No re-render: preserve typed letters, canvases, verse positions,
           // input selection and any activity-owned pause state.
           // Activities may refuse continuation when a musical timeline has

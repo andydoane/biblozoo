@@ -228,7 +228,7 @@ function testLayoutAndSourceContracts() {
   match(source,/syncLearnAudioResumeOverlay\(\);\n}\n\n\/\* =========================\n   App-wide UI tap sounds/,"overlay synced after render rather than inside slides");
   match(source,/if \(learnAudioResumeAttempt\) clearTimeout\(learnAudioResumeAttempt\.watchdog\);/,"navigation clears recovery watchdog");
   const sw=fs.readFileSync(path.resolve(__dirname,"../service-worker.js"),"utf8");
-  match(sw,/2026_Oct_\d+_patch(?:19a_learn_resume_overlay|20_read_my_verse_audio_recovery|20a_read_audio_resume_recovery|20b_read_animation_music|20c_native_crawl_music_fades|20d_crawl_envelope_recovery|20e_crawl_restart_original_audio|61_shared_welcome_back|62_scramble_welcome_back|63_bugs_munch_splat_welcome_back|64_action_games_welcome_back|64_1_recovery_escape_diagnostics|65_motion_audio_one_tap|66_invaders_shared_spinner|67_playground_welcome_back|68_playground_rhythm_wheel_zoo)/,"new service-worker version guarantees fresh web assets");
+  match(sw,/2026_Oct_26_patch68_1_interruption_gate_jam_startup/,"new service-worker version guarantees fresh web assets");
 }
 (async()=>{
   await testOverlayIndependentOfLayout();
