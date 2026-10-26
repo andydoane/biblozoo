@@ -105,7 +105,7 @@ function testMarkupAndIntegration() {
   ok(html.includes('href="verse_games/shared/welcome-back.css"'),"document loads shared CSS");
   ok(html.includes('src="verse_games/shared/welcome-back.js"'),"document loads shared module");
   ok(html.indexOf('src="verse_games/shared/welcome-back.js"') < html.indexOf('src="daily_questions_feed_game.js"'),"shared helper loads before Feeding");
-  ok(sw.includes('2026_Oct_26_patch69_flashcards_recording_replay_welcome'),"new offline cache version");
+  ok(sw.includes('2026_Oct_26_patch69_1_wacky_recovery'),"new offline cache version");
   ok(sw.includes('"./verse_games/shared/welcome-back.css"'),"shared stylesheet cached for PWA");
   ok(sw.includes('"./verse_games/shared/welcome-back.js"'),"shared script cached for PWA");
   ok(css.includes('background: #ffc751'),"yellow card");

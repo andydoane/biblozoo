@@ -253,7 +253,7 @@ function sourcePolicies() {
   ok(!/setCategory\(|setMode\(|setActive\(false\)/.test(scene),
     'Category, mode, and deactivation not modified');
   ok(!/setActive\(/.test(diag),'Patch 58 observer remains read-only');
-  ok(sw.includes("2026_Oct_26_patch69_flashcards_recording_replay_welcome"), "Cache updated");
+  ok(sw.includes("2026_Oct_26_patch69_1_wacky_recovery"), "Cache updated");
   ok(sw.includes('"./verse_games/shared/audio-recovery-coordinator.js"'),
     'New web helper cached for offline PWA');
   ok(html.includes('audioCoord') && html.includes('biblozooAudioCoordination'),

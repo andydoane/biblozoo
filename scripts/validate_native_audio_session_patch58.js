@@ -78,7 +78,7 @@ function mockEnvironment({enabled=true, native=false, pwa=false, plugin=null, st
 }
 async function main() {
   // Swift audit-only guarantees, native lifecycle and safe Capacitor registration.
-  ok(sw.includes("2026_Oct_26_patch69_flashcards_recording_replay_welcome"), "Cache version updated");
+  ok(sw.includes("2026_Oct_26_patch69_1_wacky_recovery"), "Cache version updated");
   ok(sw.includes('"./verse_games/shared/audio-diagnostics.js"'), "PWA retains diagnostic asset");
   ok(sw.includes('"./daily_questions_feed_game.js"'), "PWA retains Feeding asset");
   ok(sw.includes('"./app.js"'), "PWA retains main app");

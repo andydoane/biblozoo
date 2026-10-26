@@ -124,7 +124,7 @@ function staticPolicy(){
  ok(coord.includes('getInterruptionState'),'Coordinator exposes read-only state to Playground');
  ok(shell.includes('deferOnNativeInterruption: true'),'All five Playground activities share guarded replacement');
  ok(shell.includes('if (ok?.deferred === true) return ok;'),'Shell preserves deferred status without calling activity resume');
- ok(read('service-worker.js').includes('2026_Oct_26_patch69_flashcards_recording_replay_welcome'),'Cache updated for native rebuild');
+ ok(read('service-worker.js').includes('2026_Oct_26_patch69_1_wacky_recovery'),'Cache updated for native rebuild');
 }
 (async()=>{staticPolicy();await testJamBoot();await testRecoveryGate();await testDeferredOverlay();
  console.log(`Patch 68.1 Jam boot + native interruption gate: ${checks} checks passed.`)})()

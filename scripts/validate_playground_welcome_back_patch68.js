@@ -77,7 +77,7 @@ function audit() {
     [shared, 'MESSAGE_INTERVAL_MS = 2500', 'Playful status rotates every 2.5 seconds'],
     [shared, 'new WeakMap()', 'Shared text timer is per card, not global'],
     [shared, 'getMessage', 'Shared Learning overlay uses playful phrases'],
-    [worker, '2026_Oct_26_patch69_flashcards_recording_replay_welcome', 'Service worker revision changes']
+    [worker, '2026_Oct_26_patch69_1_wacky_recovery', 'Service worker revision changes']
   ]) ok(source.includes(needle), name);
   const pre = './verse_playground/';
   for (const id of wanted)

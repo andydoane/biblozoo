@@ -514,13 +514,54 @@
 
   function discardUnhealthyAudioContext(failedContext) {
     if (context !== failedContext) return;
-    // A stalled AudioWorklet may stay unusable even if its context reports
-    // "running". Recreate only on the *next* deliberate Wacky Replay tap.
+    // Never reuse a failed or pre-background playback context. Keep the
+    // SoundTouch module cached, but registration belongs to each context.
     context = null;
     processorRegistrationPromise = null;
     try {
       void Promise.resolve(failedContext.close?.()).catch(() => {});
-    } catch (_) { /* A broken iOS audio session may also reject close(). */ }
+    } catch (_) { /* A broken iOS audio session may reject close(). */ }
+  }
+
+  function retirePlaybackContext(reason) {
+    // The source may already be finished while its AudioContext survives.
+    // Stopping current output alone isn't enough to invalidate that context.
+    stop();
+    const oldContext = context;
+    if (!oldContext) return;
+    discardUnhealthyAudioContext(oldContext);
+    log("flashcards-wacky-context-retired", { reason });
+  }
+
+  async function recoverWackyClock(audioContext, generation) {
+    const current = () => !document.hidden && context === audioContext &&
+      generation === playbackGeneration;
+    if (!current()) return false;
+    const coordinator = window.BibloZooAudioRecoveryCoordinator;
+    if (!coordinator?.isAvailable?.() ||
+        typeof coordinator.recoverAfterStall !== "function") {
+      log("flashcards-wacky-recovery-unavailable");
+      return false;
+    }
+    // The coordinator is bounded, owns native activation, and never creates
+    // AudioContexts. Do NOT replace one while iOS reports an interruption.
+    log("flashcards-wacky-recovery-start");
+    let outcome;
+    try {
+      outcome = await coordinator.recoverAfterStall({
+        source: "app",
+        probe: () => current() ? verifyPlaybackClock(audioContext) : false,
+        isCurrent: current
+      });
+    } catch (_) {
+      outcome = { recovered: false, reason: "coordination-error" };
+    }
+    const recovered = current() && outcome?.recovered === true;
+    log("flashcards-wacky-recovery-result", {
+      recovered,
+      reason: outcome?.reason || "unknown"
+    });
+    return recovered;
   }
 
   function stop() {
@@ -540,7 +581,7 @@
     return true;
   }
 
-  async function getRuntime() {
+  async function getRuntime(generation) {
     if (!isSupported()) {
       throw new Error(
         "Wacky Replay is not supported on this device."
@@ -564,16 +605,28 @@
     const audioContext = context;
     if (audioContext.state !== "running") {
       // Call resume() on the Wacky Replay tap, before the first await.
-      await awaitAudioSetup(audioContext.resume(), AUDIO_RESUME_TIMEOUT_MS);
+      try {
+        await awaitAudioSetup(audioContext.resume(), AUDIO_RESUME_TIMEOUT_MS);
+      } catch (error) {
+        log("flashcards-wacky-resume-failed", { reason: "resume-timeout-or-error" });
+        discardUnhealthyAudioContext(audioContext);
+        throw error;
+      }
     }
+    if (generation !== playbackGeneration || audioContext !== context) return null;
     if (audioContext.state !== "running" || document.hidden) {
       discardUnhealthyAudioContext(audioContext);
       throw new Error("Wacky Replay audio is not ready.");
     }
     if (!await verifyPlaybackClock(audioContext)) {
       log("flashcards-wacky-clock-stalled");
-      discardUnhealthyAudioContext(audioContext);
-      throw new Error("Wacky Replay audio clock is stalled.");
+      if (!await recoverWackyClock(audioContext, generation)) {
+        discardUnhealthyAudioContext(audioContext);
+        throw new Error("Wacky Replay audio clock is stalled.");
+      }
+    }
+    if (generation !== playbackGeneration || audioContext !== context || document.hidden) {
+      return null;
     }
 
     if (!soundTouchModulePromise) {
@@ -598,6 +651,9 @@
       );
     }
 
+    if (generation !== playbackGeneration || audioContext !== context || document.hidden) {
+      return null;
+    }
     if (!processorRegistrationPromise) {
       processorRegistrationPromise =
         module.SoundTouchNode.register(
@@ -613,8 +669,19 @@
       throw error;
     }
 
-    if (audioContext !== context || audioContext.state !== "running" || document.hidden) {
+    if (audioContext !== context || generation !== playbackGeneration ||
+        audioContext.state !== "running" || document.hidden) {
       throw new Error("Wacky Replay audio is not ready.");
+    }
+    // Worklet installation can outlast a native Bluetooth HFP/A2DP route
+    // transition. Never treat successful registration as proof of live audio.
+    if (!await verifyPlaybackClock(audioContext)) {
+      log("flashcards-wacky-clock-stalled", { phase: "after-worklet" });
+      discardUnhealthyAudioContext(audioContext);
+      throw new Error("Wacky Replay audio clock stalled during setup.");
+    }
+    if (audioContext !== context || generation !== playbackGeneration || document.hidden) {
+      throw new Error("Wacky Replay audio setup was interrupted.");
     }
     return {
       context: audioContext,
@@ -1444,9 +1511,9 @@
 
     const generation =
       ++playbackGeneration;
-    const runtime = await getRuntime();
+    const runtime = await getRuntime(generation);
 
-    if (generation !== playbackGeneration) {
+    if (!runtime || generation !== playbackGeneration) {
       return false;
     }
 
@@ -1711,13 +1778,13 @@
   document.addEventListener(
     "visibilitychange",
     () => {
-      if (document.hidden) stop();
+      if (document.hidden) retirePlaybackContext("visibility-hidden");
     }
   );
 
   window.addEventListener(
     "pagehide",
-    stop
+    () => retirePlaybackContext("pagehide")
   );
 
   window.BibloZooAudioEffects =

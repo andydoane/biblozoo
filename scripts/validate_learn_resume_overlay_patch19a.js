@@ -228,7 +228,7 @@ function testLayoutAndSourceContracts() {
   match(source,/syncLearnAudioResumeOverlay\(\);\n}\n\n\/\* =========================\n   App-wide UI tap sounds/,"overlay synced after render rather than inside slides");
   match(source,/if \(learnAudioResumeAttempt\) clearTimeout\(learnAudioResumeAttempt\.watchdog\);/,"navigation clears recovery watchdog");
   const sw=fs.readFileSync(path.resolve(__dirname,"../service-worker.js"),"utf8");
-  match(sw,/2026_Oct_26_patch69_flashcards_recording_replay_welcome/,"new service-worker version guarantees fresh web assets");
+  match(sw,/2026_Oct_26_patch69_1_wacky_recovery/,"new service-worker version guarantees fresh web assets");
 }
 (async()=>{
   await testOverlayIndependentOfLayout();
