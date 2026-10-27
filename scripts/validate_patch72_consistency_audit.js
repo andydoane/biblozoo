@@ -146,6 +146,8 @@ async function testServiceWorker() {
   let intercepted=false;
   listeners.get("fetch")({request:{method:"GET",cache:"default",mode:"cors",url:base+"verse_audio/a.mp3",headers:{has:h=>h==="range"}},respondWith(){intercepted=true;}});
   ok(!intercepted,"partial audio range requests retain native/browser handling");
-  ok(read("service-worker.js").includes("2026_Oct_26_patch72_activity_offline_audit"),"new cache namespace invalidates old shell");
+  ok(/^2026_[A-Za-z]+_\d+_patch/.test(vm.runInContext("CACHE_VERSION",sandbox)) &&
+     !read("service-worker.js").includes("2026_Oct_26_patch71_daily_app_welcome_back"),
+     "service-worker cache version remains uniquely revisioned");
 }
 testServiceWorker().then(()=>console.log(`Patch 72 consistency audit: ${checks} checks passed`),error=>{console.error(error);process.exitCode=1;});

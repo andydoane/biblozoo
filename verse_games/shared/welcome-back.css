@@ -138,24 +138,12 @@
 .bz-welcome-escape[hidden] { display: none !important; }
 .bz-welcome-escape:focus-visible { outline: 3px solid #333333; outline-offset: 3px; }
 
-/* Patch 66: the zookeeper portrait itself shows that audio recovery is active.
- * The yellow card and its white picture frame never move. */
-.bz-welcome-card.is-recovering .bz-welcome-avatar-image:not([hidden]),
-.bz-welcome-card.is-recovering .bz-welcome-avatar-fallback:not([hidden]) {
-  animation: bz-welcome-picture-recover 950ms linear infinite;
-  /* Some games pause all body animations while awaiting recovery. Their
-   * freeze rule must not freeze this feedback outside the gameplay area. */
-  animation-play-state: running !important;
-  transform-origin: center center;
-}
-@keyframes bz-welcome-picture-recover {
-  to { transform: rotate(360deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .bz-welcome-card.is-recovering .bz-welcome-avatar-image:not([hidden]),
-  .bz-welcome-card.is-recovering .bz-welcome-avatar-fallback:not([hidden]) {
-    animation: none;
-  }
+/* Patch 72.1A: The portrait stays completely still while recovery is checked.
+ * No visual spin and no inferred audio success from any animation. */
+.bz-welcome-card.is-recovering .bz-welcome-avatar-image,
+.bz-welcome-card.is-recovering .bz-welcome-avatar-fallback {
+  animation: none !important;
+  transform: none !important;
 }
 
 /* Patch 68: a different, child-friendly end state after two failed attempts. */
@@ -164,3 +152,185 @@
 .bz-welcome-oops-activity { margin: 0; font: 800 18px/1.2 "Baloo 2", "Baloo2", system-ui, sans-serif; }
 .bz-welcome-oops-message { margin: 0; font: 900 24px/1.2 "Baloo 2", "Baloo2", system-ui, sans-serif; }
 .bz-welcome-oops-note { margin: 0; font: 800 17px/1.4 "Baloo 2", "Baloo2", system-ui, sans-serif; }
+
+/* Patch 72.1A — opt-in Zoo Escape layer, inspired by Traffic Tap's poof,
+ * Food Slice's radial fireworks, and Verse Jam's GROOVY splash. The card's
+ * existing dimensions and content slots are preserved across stages. */
+.bz-zoo-action-slot {
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  flex: 0 0 64px;
+  display: grid;
+  place-items: center;
+}
+.bz-zoo-action-slot > * { grid-area: 1 / 1; }
+.bz-zoo-action-slot .bz-welcome-action { min-height: 64px; }
+.bz-zoo-instruction {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 12px 3px;
+  width: 100%;
+  font: 900 clamp(22px, 6vw, 30px)/1.18 "Baloo 2", system-ui, sans-serif;
+  color: #333;
+}
+.bz-zoo-action-slot [hidden], .bz-zoo-pen[hidden],
+.bz-zoo-exit[hidden] { display: none !important; }
+.bz-zoo-lock-icon { width: 29px; height: 29px; object-fit: contain; vertical-align: -4px; }
+.bz-zoo-active .bz-welcome-title {
+  min-height: 2.12em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.bz-zoo-title-line { display: block; line-height: 1.06; overflow-wrap: anywhere; }
+.bz-zoo-active .bz-welcome-avatar-image,
+.bz-zoo-active .bz-welcome-avatar-fallback { visibility: hidden !important; }
+.bz-zoo-active .bz-welcome-avatar { overflow: visible; }
+.bz-zoo-pen {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  border-radius: inherit;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: #fff;
+  padding: 2px;
+  touch-action: manipulation;
+}
+.bz-zoo-pen img { width: 100%; height: 100%; object-fit: contain; }
+.bz-zoo-pen:focus-visible, .bz-zoo-pet:focus-visible {
+  outline: 4px solid #1d2d50;
+  outline-offset: 4px;
+}
+.bz-zoo-exit {
+  border: 0;
+  padding: 4px 8px;
+  background: transparent;
+  color: #333;
+  font: 800 16px/1.2 "Baloo 2", system-ui, sans-serif;
+  text-decoration: underline;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.bz-zoo-escape .bz-welcome-card { position: relative; z-index: 2; }
+.bz-zoo-field, .bz-zoo-effects {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+  contain: layout style;
+}
+.bz-zoo-field { z-index: 3; }
+.bz-zoo-pet {
+  box-sizing: border-box;
+  position: absolute;
+  left: 0; top: 0;
+  z-index: 1;
+  padding: 0;
+  margin: 0;
+  background: #fff;
+  border: 3px solid #fff;
+  border-radius: 20%;
+  box-shadow: 0 3px 10px rgba(0,0,0,.33);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  pointer-events: auto;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.bz-zoo-pet:disabled { pointer-events: none; }
+.bz-zoo-pet.bz-zoo-catchable { box-shadow: 0 0 0 3px #ffdb56, 0 5px 14px rgba(0,0,0,.3); }
+.bz-zoo-pet.bz-zoo-selected { box-shadow: 0 0 0 5px #51dfff, 0 5px 14px rgba(0,0,0,.3); }
+.bz-zoo-pet img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.bz-zoo-poof, .bz-zoo-firework {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.bz-zoo-poof-cloud {
+  display: block;
+  font-size: 80px;
+  line-height: 1;
+  color: #fff;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.22));
+  animation: bzZooPoofCloud 720ms ease-out forwards;
+}
+.bz-zoo-poof-dot {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 10px; height: 10px;
+  background: white;
+  border-radius: 50%;
+  animation: bzZooPoofDot 680ms ease-out forwards;
+}
+@keyframes bzZooPoofCloud {
+  from { opacity: .95; transform: translate(-50%,-50%) scale(.15); }
+  to { opacity: 0; transform: translate(-50%,-50%) scale(1.5); }
+}
+@keyframes bzZooPoofDot {
+  from { opacity: 1; transform: translate(0,0) scale(.6); }
+  to { opacity: 0; transform: translate(var(--px),var(--py)) scale(1.1); }
+}
+.bz-zoo-firework-ray {
+  position: absolute;
+  left: 0; top: 0;
+  width: 75px; height: 7px;
+  border-radius: 20px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #fff, var(--color), transparent);
+  opacity: 0;
+  animation: bzZooFireworkRay 950ms cubic-bezier(.1,.76,.2,1) forwards;
+}
+@keyframes bzZooFireworkRay {
+  0% { transform: rotate(var(--angle)) translateX(0) scaleX(.05); opacity: 1; }
+  55% { opacity: 1; }
+  100% { transform: rotate(var(--angle)) translateX(30px) scaleX(1.2); opacity: 0; }
+}
+.bz-zoo-break-splash {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%) scale(.25) rotate(-9deg);
+  max-width: calc(100vw - 16px);
+  padding: 18px 22px;
+  border-radius: 28px;
+  font: 900 clamp(32px, 12vw, 68px)/.95 "Titan One", "Baloo 2", system-ui, sans-serif;
+  white-space: nowrap;
+  text-align: center;
+  color: #271841;
+  background: linear-gradient(90deg,#ff7ad9,#ffe27a,#8df7ff,#9dff8d,#ff7ad9);
+  background-size: 260% 100%;
+  text-shadow: 0 2px 0 rgba(255,255,255,.45);
+  box-shadow: 0 20px 48px rgba(0,0,0,.34), 0 0 0 5px rgba(255,255,255,.25);
+  animation: bzZooGroovy 1050ms cubic-bezier(.18,1.35,.3,1) forwards;
+}
+@keyframes bzZooGroovy {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(.25) rotate(-9deg); background-position: 0 50%; }
+  17% { opacity: 1; transform: translate(-50%,-50%) scale(1.1) rotate(3deg); }
+  73% { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(-1deg); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(.73) rotate(5deg); background-position: 100% 50%; }
+}
+.bz-zoo-fade-black::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  background: #000;
+  pointer-events: none;
+  animation: bzZooBlack 400ms ease-in forwards;
+}
+@keyframes bzZooBlack { from { opacity: 0; } to { opacity: 1; } }
+@media (max-height: 580px) {
+  .bz-zoo-action-slot { height: 52px; min-height: 52px; flex-basis: 52px; }
+  .bz-zoo-action-slot .bz-welcome-action { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bz-zoo-poof, .bz-zoo-firework, .bz-zoo-break-splash { display: none !important; }
+  .bz-zoo-fade-black::after { animation-duration: 1ms; }
+}

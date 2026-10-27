@@ -2879,8 +2879,12 @@ async function testDailyAudioDiagnosticsFailureSignals() {
   assert.strictEqual(ctx.state, "running");
   assert.ok(store.has("biblozooAudioDiagnosticsLog"));
   api.clear();
-  assert.deepStrictEqual(Array.from(api.getEvents()), []);
-  assert.ok(!store.has("biblozooAudioDiagnosticsLog"));
+  // Clearing storage deliberately records a new in-memory audit marker.
+  // Check that old events are gone instead of expecting zero events.
+  assert.deepStrictEqual(Array.from(api.getEvents(), entry => entry.type),
+    ["diagnostics-cleared"]);
+  assert.deepStrictEqual(JSON.parse(store.get("biblozooAudioDiagnosticsLog"))
+    .map(entry => entry.type), ["diagnostics-cleared"]);
 }
 
 function makeDailyAudioParentHarness() {

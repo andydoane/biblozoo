@@ -128,8 +128,8 @@
     if (!button) return;
     button.textContent = retry ? RETRY_TEXT : BUTTON_TEXT;
     button.disabled = !!busy;
-    // Shared recovery feedback: spin only the picture, not the popup itself.
-    // Setting this in the common action API keeps every connected game alike.
+    // Preserve the busy/accessibility state but keep the portrait stationary.
+    // Patch 72.1A replaces spinning with a silent-capable rescue flow.
     const card = root.querySelector?.("[data-welcome-back-card]") ||
       button.closest?.(".bz-welcome-card");
     card?.classList?.toggle("is-recovering", !!busy);

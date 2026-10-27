@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_26_patch72_activity_offline_audit";
+const CACHE_VERSION = "2026_Oct_27_patch72_1a_zoo_escape_framework";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -84,6 +84,7 @@ const CORE_PATHS = [
   "./verse_games/shared/audio-recovery-coordinator.js",
   "./verse_games/shared/welcome-back.css",
   "./verse_games/shared/welcome-back.js",
+  "./verse_games/shared/welcome-back-zoo-escape.js",
   "./verse_games/shared/welcome-back-return.js",
   "./verse_games/shared/welcome-back-clock.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
@@ -129,6 +130,8 @@ const CORE_PATHS = [
   "./verse_fonts/VT323-Regular.ttf",
   "./verse_fonts/NewsCycle-Bold.ttf",
 
+  "./verse_images/zoobreak_gate.png",
+  "./verse_images/zoobreak_lock.png",
   "./verse_images/bg_learn_the_verse_phone.png",
   "./verse_images/bg_learn_the_verse_ipad.png",
   "./verse_images/read_my_verse/paper_phone.png",
