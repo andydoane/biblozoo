@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_26_patch71_daily_app_welcome_back";
+const CACHE_VERSION = "2026_Oct_26_patch72_activity_offline_audit";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -21,6 +21,36 @@ const PROFILE_FALLBACK_URL =
     "./profile_pictures/profile_picture_fallback.png",
     APP_ROOT
   ).href;
+
+// Patch 72: The main app navigates to these as standalone HTML pages.
+// Without a first online visit, their HTML/JS/CSS were never cached; an
+// offline navigation fell back to the main index instead of launching a game.
+// Keep this list aligned with the enabled entries in both activity registries.
+// Only the launch shells are mandatory here: large game media continues to
+// use the existing lazy runtime cache instead of blocking SW installation.
+const ACTIVITY_SHELL_DIRECTORIES = [
+  "verse_games/bible_bugs",
+  "verse_games/dino_dash",
+  "verse_games/foodslice",
+  "verse_games/tower_bible",
+  "verse_games/traffic_tap",
+  "verse_games/verse_invaders",
+  "verse_games/verse_launch",
+  "verse_games/verse_munch",
+  "verse_games/verse_scramble_neo",
+  "verse_games/verse_snake",
+  "verse_games/verse_splat",
+  "verse_games/versey_bird",
+  "verse_playground/ghost_writer",
+  "verse_playground/scripture_scrub",
+  "verse_playground/verse_jam",
+  "verse_playground/verse_typer",
+  "verse_playground/wheel_of_bible"
+];
+const ACTIVITY_SHELL_PATHS = ACTIVITY_SHELL_DIRECTORIES.flatMap(
+  (directory) => ["index.html", "game.js", "game.css"]
+    .map((file) => `./${directory}/${file}`)
+);
 
 const CORE_PATHS = [
   "./",
@@ -44,6 +74,9 @@ const CORE_PATHS = [
   "./read_my_verse.js",
   "./daily_zoo_todo.js",
   "./daily_zoo_todo_ui.js",
+  "./verse_games/shared/game-shell.js",
+  "./verse_games/shared/shell.css",
+  "./verse_games/shared/daily-todo-shell.js",
   "./verse_games/shared/daily-todo-parent.js",
   "./verse_games/shared/bridge.js",
   "./verse_games/shared/audio-diagnostics.js",
@@ -53,21 +86,6 @@ const CORE_PATHS = [
   "./verse_games/shared/welcome-back.js",
   "./verse_games/shared/welcome-back-return.js",
   "./verse_games/shared/welcome-back-clock.js",
-  "./verse_playground/ghost_writer/index.html",
-  "./verse_playground/ghost_writer/game.js",
-  "./verse_playground/ghost_writer/game.css",
-  "./verse_playground/scripture_scrub/index.html",
-  "./verse_playground/scripture_scrub/game.js",
-  "./verse_playground/scripture_scrub/game.css",
-  "./verse_playground/verse_typer/index.html",
-  "./verse_playground/verse_typer/game.js",
-  "./verse_playground/verse_typer/game.css",
-  "./verse_playground/verse_jam/index.html",
-  "./verse_playground/verse_jam/game.js",
-  "./verse_playground/verse_jam/game.css",
-  "./verse_playground/wheel_of_bible/index.html",
-  "./verse_playground/wheel_of_bible/game.js",
-  "./verse_playground/wheel_of_bible/game.css",
   "./flashcards/vendor/soundtouchjs-2.1.1/constants.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js",
   "./flashcards/vendor/soundtouchjs-2.1.1/soundtouch-processor.js",
@@ -203,6 +221,25 @@ const CORE_URLS = CORE_PATHS.map(
   (path) => new URL(path, APP_ROOT).href
 );
 
+// These extra launch pages should be available offline immediately after a
+// successful online install, but a temporarily unavailable game must not
+// prevent BibloZoo itself from updating. Match the Feeding-art policy.
+async function precacheActivityShells(cache) {
+  const results = await Promise.allSettled(
+    ACTIVITY_SHELL_PATHS.map((path) =>
+      // One-item addAll keeps these optional requests independent while
+      // preserving the Feeding game's existing cache.add() contract.
+      cache.addAll([new URL(path, APP_ROOT).href])
+    )
+  );
+  const failed = ACTIVITY_SHELL_PATHS.filter(
+    (_, index) => results[index].status === "rejected"
+  );
+  if (failed.length) {
+    console.warn("Some activity launch files could not be precached", failed);
+  }
+}
+
 async function precacheDailyFeedAssets(cache) {
   const results = await Promise.allSettled(
     FEED_ASSET_PATHS.map((path) =>
@@ -320,6 +357,7 @@ self.addEventListener(
         await caches.open(SHELL_CACHE);
 
       await cache.addAll(CORE_URLS);
+      await precacheActivityShells(cache);
       await precacheDailyFeedAssets(cache);
       await cacheAllVerseData(cache);
     })());
