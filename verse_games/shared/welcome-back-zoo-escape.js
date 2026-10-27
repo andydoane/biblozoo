@@ -12,7 +12,12 @@
   const EMERGE_MS = 750;
   const SPAWN_MS = 1000;
   const RECOVERY_WATCHDOG_MS = 7500;
-  const COLORS = ["#fff18f", "#ff87db", "#83edff", "#a2ff9e", "#ffc778", "#b9a5ff"];
+  // Identical vector silhouette used by Traffic Tap and Verse Launch for wrong answers.
+  // No platform-dependent cloud emoji; no dependency on the other game's DOM.
+  const CRASH_CLOUD_SVG = `
+<svg viewBox="0 0 26.458333 26.458333" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path fill="currentColor" d="M 12.949771,1.5464282 A 6.0017493,5.3230522 7.1160496 0 0 6.9820601,6.4190471 5.3405872,4.7400094 7.154063 0 0 6.8563886,6.4134999 5.3405872,4.7400094 7.154063 0 0 1.5243277,11.020646 5.3405872,4.7400094 7.154063 0 0 2.4259083,13.677302 4.0181559,3.5662928 7.1540647 0 0 0.66145837,16.583588 4.0181559,3.5662928 7.1540647 0 0 4.6728467,20.261811 4.0181559,3.5662928 7.1540647 0 0 5.1732885,20.243 a 5.3405872,4.7400094 7.154063 0 0 5.2883005,4.342428 5.3405872,4.7400094 7.154063 0 0 3.656255,-1.210431 4.0181559,3.5662928 7.1540647 0 0 3.300558,1.639798 4.0181559,3.5662928 7.1540647 0 0 4.011389,-3.466536 4.0181559,3.5662928 7.1540647 0 0 -0.416848,-1.594767 5.3405872,4.7400094 7.154063 0 0 4.783932,-4.586787 5.3405872,4.7400094 7.154063 0 0 -1.9322,-3.706541 4.0181559,3.5662928 7.1540647 0 0 0.764128,-2.0624453 4.0181559,3.5662928 7.1540647 0 0 -4.011389,-3.6776624 4.0181559,3.5662928 7.1540647 0 0 -1.744813,0.3148283 6.0017493,5.3230522 7.1160496 0 0 -5.92283,-4.6884523 z"/>
+</svg>`;
   const clampCount = n => Math.min(MAX_PETS, Math.max(MIN_PETS, Math.floor(Number(n) || MIN_PETS)));
   const nextStage = (stage, recovered) => recovered === true ? "recovered" :
     stage === "welcome" ? "escape" : stage === "escape" ? "break" : "exit";
@@ -92,6 +97,7 @@
     let breakCredited = false;
     let pets = [];
     let dragging = null;
+    let lastBounceSoundAt = -Infinity;
     const effectTimers = new Set();
     const laterEffect = (callback, delay) => {
       const id = root.setTimeout(() => { effectTimers.delete(id); callback(); }, delay);
@@ -132,8 +138,10 @@
     function bounds() {
       const r = overlay.getBoundingClientRect();
       const size = Math.min(78, Math.max(54, r.width * .18));
+      // Reserve room for the invisible 16px catch halo. The artwork, not
+      // only its center, must remain fully visible from the first spawn frame.
       return { width: r.width, height: r.height, left: r.left, top: r.top,
-        size, edge: 12 };
+        size, edge: 28 };
     }
     function penCenter() {
       const b = pen.getBoundingClientRect();
@@ -142,52 +150,72 @@
     }
     function poof(x, y) {
       if (reduced || !running()) return;
+      // Traffic Tap spawnCrashBurst: real 26.46-unit SVG cloud, nine white
+      // outward particles, identical burst timing and ripple choreography.
+      const count = 9, distance = 58, jitter = 5, duration = 650;
+      const cloudSize = 74, sizePool = [8, 9, 10, 12, 15, 18];
       const burst = doc.createElement("div");
       burst.className = "bz-zoo-poof";
       burst.style.left = `${x}px`;
       burst.style.top = `${y}px`;
-      // Traffic Tap's expanding white poof, recreated without loading game CSS.
-      const cloud = doc.createElement("span");
+      const boxSize = Math.max(132, Math.ceil((distance + cloudSize) * 2.05));
+      burst.style.width = burst.style.height = `${boxSize}px`;
+      const cloud = doc.createElement("div");
       cloud.className = "bz-zoo-poof-cloud";
-      cloud.textContent = "☁";
+      cloud.style.setProperty("--tt-crash-cloud-size", `${cloudSize}px`);
+      cloud.style.setProperty("--tt-crash-cloud-dur", `${Math.max(520, duration - 90)}ms`);
+      cloud.innerHTML = CRASH_CLOUD_SVG;
       burst.appendChild(cloud);
-      for (let i = 0; i < 12; i++) {
-        const part = doc.createElement("span");
-        part.className = "bz-zoo-poof-dot";
-        const angle = (i / 12) * Math.PI * 2;
-        part.style.setProperty("--px", `${Math.cos(angle) * rand(35, 64)}px`);
-        part.style.setProperty("--py", `${Math.sin(angle) * rand(35, 64)}px`);
-        burst.appendChild(part);
+      const baseAngle = Math.random() * Math.PI * 2;
+      for (let i = 0; i < count; i++) {
+        const angle = baseAngle + (Math.PI * 2 / count) * i + rand(-.12, .12);
+        const dist = distance + rand(-jitter, jitter);
+        const size = sizePool[Math.floor(Math.random() * sizePool.length)] + rand(-.5, .5);
+        const particle = doc.createElement("div");
+        particle.className = "bz-zoo-poof-dot";
+        particle.style.setProperty("--tt-size", `${size.toFixed(1)}px`);
+        particle.style.setProperty("--tt-dur", `${duration}ms`);
+        particle.style.setProperty("--tt-start-scale", `${rand(.68, .82).toFixed(2)}`);
+        particle.style.setProperty("--tt-end-scale", `${(rand(1.02, 1.14) + .08).toFixed(2)}`);
+        particle.style.setProperty("--tt-tx", `${(Math.cos(angle) * dist).toFixed(1)}px`);
+        particle.style.setProperty("--tt-ty", `${(Math.sin(angle) * dist).toFixed(1)}px`);
+        particle.style.setProperty("--tt-delay", `${Math.round(rand(0, 18))}ms`);
+        burst.appendChild(particle);
       }
       effects.appendChild(burst);
-      laterEffect(() => burst.remove(), 800);
-    }
-    function fireworks() {
-      if (reduced || !running()) return;
-      // Food Slice-style radial colored rays with a bright central flash.
-      const center = penCenter();
-      for (let k = 0; k < 3; k++) {
-        const burst = doc.createElement("div");
-        burst.className = "bz-zoo-firework";
-        burst.style.left = `${center.x + (k - 1) * 76}px`;
-        burst.style.top = `${center.y - 45 + (k % 2) * 46}px`;
-        burst.style.animationDelay = `${k * 110}ms`;
-        for (let i = 0; i < 14; i++) {
-          const ray = doc.createElement("span");
-          ray.className = "bz-zoo-firework-ray";
-          ray.style.setProperty("--angle", `${(i * 360) / 14}deg`);
-          ray.style.setProperty("--color", COLORS[(i + k) % COLORS.length]);
-          ray.style.animationDelay = `${k * 110}ms`;
-          burst.appendChild(ray);
+      // Transition start on the next animation frame, as in Traffic Tap.
+      // Unlike the game, this is also safe when interrupted mid-transition.
+      root.requestAnimationFrame(() => {
+        if (!burst.parentNode || !running()) return;
+        cloud.classList.add("is-live");
+        for (const particle of burst.querySelectorAll?.(".bz-zoo-poof-dot") || []) {
+          particle.classList.add("is-live");
         }
-        effects.appendChild(burst);
-        laterEffect(() => burst.remove(), 1400);
-      }
+        // Also works in minimal browser shims with no querySelectorAll.
+        if (!burst.querySelectorAll) {
+          for (const particle of Array.from(burst.children).slice(1)) particle.classList.add("is-live");
+        }
+      });
+      laterEffect(() => burst.remove(), duration + 120);
+    }
+    function announceZooBreak() {
+      if (!running()) return;
+      const center = penCenter();
+      // Three layers keep pen centering, frenetic shake and the Verse Jam
+      // GROOVY scale/rotation independent. There are no fireworks/particles.
+      const anchor = doc.createElement("div");
+      anchor.className = "bz-zoo-break-anchor";
+      anchor.style.left = `${center.x}px`;
+      anchor.style.top = `${center.y}px`;
+      const shake = doc.createElement("div");
+      shake.className = "bz-zoo-break-shake";
       const splash = doc.createElement("div");
       splash.className = "bz-zoo-break-splash";
       splash.textContent = "ZOO BREAK!";
-      effects.appendChild(splash);
-      laterEffect(() => splash.remove(), 1200);
+      shake.appendChild(splash);
+      anchor.appendChild(shake);
+      effects.appendChild(anchor);
+      laterEffect(() => anchor.remove(), 1300);
     }
     function setTitle(first, second) {
       title.replaceChildren();
@@ -218,6 +246,15 @@
       button.disabled = false;
       button.focus?.({ preventScroll: true });
     }
+    function shakeCard(kind) {
+      if (reduced) return;
+      card.classList.remove("bz-zoo-shake-escape", "bz-zoo-shake-break");
+      // Restart on each distinct event, without changing the card's layout.
+      void card.offsetWidth;
+      const cls = kind === "break" ? "bz-zoo-shake-break" : "bz-zoo-shake-escape";
+      card.classList.add(cls);
+      laterEffect(() => card.classList.remove(cls), kind === "break" ? 570 : 360);
+    }
     function setStage(next) {
       stage = next;
       card.classList.toggle("bz-zoo-active", next === "escape" || next === "break");
@@ -226,6 +263,7 @@
       exitButton.hidden = next === "welcome" || next === "recovered" || next === "exiting";
       if (status) status.hidden = true;
       if (next === "escape") {
+        shakeCard("escape");
         setTitle(String(petName || "BibloPet").slice(0, 40), "escaped!");
         setInstruction("Drag them back!");
         total = 1;
@@ -240,7 +278,8 @@
         spawning = 0;
         rescued = 0;
         breakCredited = false;
-        fireworks();
+        shakeCard("break");
+        announceZooBreak();
         spawnNext();
       }
       log("zoo-escape-stage", { stage: next, attemptCount, total });
@@ -277,10 +316,14 @@
       el.appendChild(img);
       field.appendChild(el);
       const pet = { node: el, x: c.x - b.size / 2, y: c.y - b.size / 2,
-        vx: rand(90, 170) * (Math.random() < .5 ? -1 : 1),
-        vy: rand(90, 160) * (Math.random() < .5 ? -1 : 1),
+        vx: rand(300, 440) * Math.max(.78, Math.min(1.15, b.width / 390)) * (Math.random() < .5 ? -1 : 1),
+        vy: rand(290, 420) * Math.max(.78, Math.min(1.15, b.width / 390)) * (Math.random() < .5 ? -1 : 1),
         angle: rand(-12, 12), size: b.size, state: "emerging", born: Date.now(),
         number };
+      const maxX = Math.max(b.edge, b.width - b.size - b.edge);
+      const maxY = Math.max(b.edge, b.height - b.size - b.edge);
+      pet.x = Math.max(b.edge, Math.min(maxX, pet.x));
+      pet.y = Math.max(b.edge, Math.min(maxY, pet.y));
       pets.push(pet);
       place(el, pet.x, pet.y, pet.angle, reduced ? 1 : .15);
       // The expanding portrait signals invincibility. Touch and keyboard
@@ -315,6 +358,27 @@
         raf = root.requestAnimationFrame(tick);
       }
     }
+    function advanceAndBounce(p, b, delta) {
+      p.x += p.vx * delta;
+      p.y += p.vy * delta;
+      let bounced = false;
+      const maxX = Math.max(b.edge, b.width - p.size - b.edge);
+      const maxY = Math.max(b.edge, b.height - p.size - b.edge);
+      if (p.x < b.edge || p.x > maxX) {
+        p.vx = -p.vx;
+        p.x = Math.max(b.edge, Math.min(maxX, p.x));
+        bounced = true;
+      }
+      if (p.y < b.edge || p.y > maxY) {
+        p.vy = -p.vy;
+        p.y = Math.max(b.edge, Math.min(maxY, p.y));
+        bounced = true;
+      }
+      if (bounced && Date.now() - lastBounceSoundAt >= 180) {
+        lastBounceSoundAt = Date.now();
+        sound("bounce");
+      }
+    }
     function tick(now) {
       raf = 0;
       if (!running()) return;
@@ -326,8 +390,7 @@
         if (p.state === "emerging") {
           // Move straight out while scaling; user cannot cheap-catch.
           const ratio = Math.min(1, (Date.now() - p.born) / EMERGE_MS);
-          p.x += p.vx * delta;
-          p.y += p.vy * delta;
+          advanceAndBounce(p, b, delta);
           place(p.node, p.x, p.y, p.angle, reduced ? 1 : Math.max(.15, ratio));
           const c = penCenter();
           const escaped = Math.hypot(p.x + p.size/2 - c.x, p.y + p.size/2 - c.y) >= p.size * .75;
@@ -339,20 +402,7 @@
           }
           continue;
         }
-        p.x += p.vx * delta;
-        p.y += p.vy * delta;
-        let bounced = false;
-        if (p.x < b.edge || p.x > b.width - p.size - b.edge) {
-          p.vx = -p.vx;
-          p.x = Math.max(b.edge, Math.min(b.width - p.size - b.edge, p.x));
-          bounced = true;
-        }
-        if (p.y < b.edge || p.y > b.height - p.size - b.edge) {
-          p.vy = -p.vy;
-          p.y = Math.max(b.edge, Math.min(b.height - p.size - b.edge, p.y));
-          bounced = true;
-        }
-        if (bounced) sound("bounce");
+        advanceAndBounce(p, b, delta);
         p.angle = Math.max(-18, Math.min(18, p.angle + p.vx * delta * .08));
         place(p.node, p.x, p.y, p.angle);
       }
@@ -414,6 +464,7 @@
     }
     function onVisibility() {
       if (disposed) return;
+      overlay.classList.toggle("bz-zoo-backgrounded", !!doc.hidden);
       if (doc.hidden) {
         if (raf) root.cancelAnimationFrame(raf);
         if (dragging) dropPet(dragging.pet);
@@ -505,8 +556,8 @@
       }
     }
     function resetDisplay() {
-      card.classList.remove("bz-zoo-active");
-      overlay.classList.remove("bz-zoo-escape", "bz-zoo-fade-black");
+      card.classList.remove("bz-zoo-active", "bz-zoo-shake-escape", "bz-zoo-shake-break");
+      overlay.classList.remove("bz-zoo-escape", "bz-zoo-fade-black", "bz-zoo-backgrounded");
       title.innerHTML = originalTitle; // original template content, not user data
       root.BibloZooWelcomeBack?.populate?.(overlay, { profileId, name, pictureBase: safeBase });
       button.innerHTML = originalButton;

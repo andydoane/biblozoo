@@ -46,6 +46,13 @@
   const TILT_CALIBRATION_MS = 750;
   const INTRO_TAP_LOCKOUT_MS = 800;
 
+  // Patch 72.1B.1: temporary iPhone pilot harness, deliberately hidden from
+  // ordinary play. Hold the active Feeding score pill for 2.4 seconds.
+  // Set this switch to false (or remove the harness) before public release.
+  const ENABLE_FEED_ZOO_ESCAPE_TEST_HARNESS = true;
+  const FEED_ZOO_TEST_HOLD_MS = 2400;
+
+
   const FEED_MODES = Object.freeze({
     CLASSIC: "classic",
     LABYRINTH: "labyrinth",
@@ -1102,6 +1109,11 @@
       }
       runtime.resizeObserver?.disconnect();
       runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+      destroyFeedZooTestHarness(runtime);
+      // Destroy animations, timers, input captures and overlay handlers before
+      // the Feeding DOM can be replaced by its owning screen.
+      runtime.zooEscape?.destroy?.();
+      runtime.zooEscape = null;
       runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
       clearTimeout(runtime.feedStartAudioWatchdog);
       clearTimeout(runtime.feedResumeWatchdog);
@@ -1527,6 +1539,36 @@
     }
   }
 
+  // Silent-first Zoo Escape effects: no new context, no resume(), no promise
+  // that audio is audible. A passively advancing clock is a prerequisite.
+  function zooEscapeSoundReady(runtime) {
+    const context = runtime?.audioContext;
+    if (!runtime || activeRuntime !== runtime || !context ||
+        context.state !== "running" || document.hidden || runtime.feedPageHidden ||
+        runtime.feedPausedAt == null) return false;
+    const wall = performance.now();
+    const audio = Number(context.currentTime);
+    if (!Number.isFinite(audio)) return false;
+    const previous = runtime.zooSoundClockSample;
+    if (!previous || wall < previous.wall || wall - previous.wall > 1500) {
+      runtime.zooSoundClockSample = { wall, audio };
+      return false;
+    }
+    if (wall - previous.wall < 65) return false;
+    runtime.zooSoundClockSample = { wall, audio };
+    return audio - previous.audio > 0.03;
+  }
+
+  function playZooEscapeSound(runtime, kind) {
+    // Bouncing ten pets could otherwise create dozens of simultaneous notes.
+    const now = performance.now();
+    const minGap = kind === "bounce" ? 180 : 85;
+    if (now - (runtime.zooSoundLastAt || -Infinity) < minGap) return;
+    runtime.zooSoundLastAt = now;
+    // Reuse a bounded, tracked Feeding note; the effects are optional.
+    playPegTone(runtime, now);
+  }
+
   function playPegTone(runtime, now) {
     const context = runtime.audioContext;
     if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
@@ -1590,6 +1632,21 @@
 
           trackFeedingEffect(runtime, source);
           source.start();
+          if (runtime.mode === FEED_MODES.BOUNCE &&
+              activeRuntime === runtime && runtime.feedPausedAt == null) {
+            recordFeedAudioRecovery("feed-bounce-bonus-sound-start", runtime,
+              { contextState: context.state });
+            // Passive clock probe ONLY: do not activate audio or infer that
+            // source.start() proves audible output. If this clock really
+            // stalls during a bonus, freeze gameplay and offer Zoo Escape.
+            void feedAudioClockAdvances(context).then(advanced => {
+              if (activeRuntime !== runtime || runtime.finished ||
+                  !runtime.running || runtime.feedPausedAt != null) return;
+              recordFeedAudioRecovery("feed-bounce-bonus-clock-check", runtime,
+                { clockAdvanced: advanced });
+              if (!advanced) pauseFeedingGame(runtime);
+            });
+          }
           return;
         }
 
@@ -3091,6 +3148,12 @@
   }
 
   function setFeedingResumeStatus(runtime, message = "") {
+    // The opt-in Zoo Escape owns its own stage/action labels. Do not let the
+    // old retry status turn LOCK GATE back into a generic Try again button.
+    if (runtime.zooEscape?.isPaused?.()) {
+      if (runtime.resumeStatus) runtime.resumeStatus.hidden = true;
+      return;
+    }
     if (runtime.resumeStatus) {
       runtime.resumeStatus.textContent = message;
       runtime.resumeStatus.hidden = !message;
@@ -3098,6 +3161,149 @@
     window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay, { retry: !!message, busy: !!runtime.feedResumePending });
     if (!window.BibloZooWelcomeBack && runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try again!" : "Let's go!";
   }
+
+  // Developer-only manual test. Simulated outcomes replace ONLY the Feeding
+  // recovery result at the shared-controller boundary; no AudioContext or
+  // AVAudioSession manipulation takes place in this code path.
+  // The same real UI, rescue hit detection, timers, and navigation are used.
+  function getFeedZooTestResult(runtime) {
+    const test = runtime?.zooDevScenario;
+    if (!test || !Array.isArray(test.results)) return null;
+    const index = test.index++;
+    const wantsSuccess = test.results[index] === true;
+    recordFeedAudioRecovery("feed-zoo-test-simulated-result", runtime,
+      { scenario: test.id, attempt: index + 1, simulatedSuccess: wantsSuccess });
+    if (!wantsSuccess) return false;
+    // Resume the *actual* frozen game loop without claiming the audio probe
+    // succeeded. The normal sound engine is not reset or reactivated here.
+    // In a genuine audio failure, a non-running context is still rejected.
+    const continued = continueFeedingAfterGesture(runtime,
+      performance.now(), true);
+    if (!continued) {
+      recordFeedAudioRecovery("feed-zoo-test-resume-blocked", runtime,
+        { scenario: test.id });
+    }
+    return continued;
+  }
+
+  function destroyFeedZooTestHarness(runtime) {
+    if (!runtime) return;
+    runtime.zooDevTeardown?.();
+    runtime.zooDevTeardown = null;
+    runtime.zooDevScenario = null;
+  }
+
+  function attachFeedZooTestHarness(runtime) {
+    if (!ENABLE_FEED_ZOO_ESCAPE_TEST_HARNESS ||
+        !runtime?.zooEscape || !runtime.gameEl) return;
+    const badge = runtime.gameEl.querySelector(".daily-feed-score-badge");
+    if (!badge) return;
+    badge.classList.add("bz-zoo-test-arm");
+    // A menu is created only after the deliberate, stationary long press.
+    let hold = 0;
+    let tracking = null;
+    let panel = null;
+    const cancelHold = () => {
+      if (hold) clearTimeout(hold);
+      hold = 0;
+      tracking = null;
+    };
+    const removeMenu = () => {
+      panel?.remove();
+      panel = null;
+    };
+    const isActive = () => activeRuntime === runtime &&
+      runtime.running && runtime.roundStarted && !runtime.finished &&
+      runtime.feedPausedAt == null && !runtime.feedPageHidden &&
+      !document.hidden;
+    const choose = (id, results) => {
+      if (!panel || activeRuntime !== runtime ||
+          runtime.feedPausedAt == null || !runtime.zooEscape?.isPaused?.()) return;
+      runtime.zooDevScenario = { id, results, index: 0 };
+      runtime.zooDevTestEverActivated = true;
+      removeMenu();
+      recordFeedAudioRecovery("feed-zoo-test-selected", runtime, { scenario: id });
+      runtime.resumeButton?.focus?.({ preventScroll: true });
+    };
+    const showMenu = () => {
+      hold = 0;
+      tracking = null;
+      if (!isActive() || panel) return;
+      // Freeze gameplay before the selector appears. Its cancel button
+      // leaves the normal Welcome Back gesture intact.
+      if (!pauseFeedingGame(runtime)) return;
+      const doc = runtime.gameEl.ownerDocument || document;
+      panel = doc.createElement("div");
+      panel.className = "bz-zoo-test-menu";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      panel.setAttribute("aria-label", "Zoo Escape developer test scenarios");
+      const card = doc.createElement("div");
+      card.className = "bz-zoo-test-card";
+      const heading = doc.createElement("h2");
+      heading.textContent = "Zoo Escape TEST MODE";
+      card.appendChild(heading);
+      const explain = doc.createElement("p");
+      explain.textContent = "Simulates recovery outcomes, not iOS audio. No daily reward credit.";
+      card.appendChild(explain);
+      const scenarios = [
+        ["Stage 2 → Success", "stage2-success", [false, true]],
+        ["Stage 3 → Success", "stage3-success", [false, false, true]],
+        ["Stage 3 → Zoo Exit", "stage3-exit", [false, false, false]],
+        ["Early Exit (Stage 2)", "early-stage2", [false, false, false]],
+        ["Early Exit (Stage 3)", "early-stage3", [false, false, false]]
+      ];
+      for (const [label, id, results] of scenarios) {
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.addEventListener("click", () => choose(id, results));
+        card.appendChild(button);
+      }
+      const cancel = doc.createElement("button");
+      cancel.type = "button";
+      cancel.className = "bz-zoo-test-cancel";
+      cancel.textContent = "Cancel test / normal resume";
+      cancel.addEventListener("click", removeMenu);
+      card.appendChild(cancel);
+      panel.appendChild(card);
+      runtime.gameEl.appendChild(panel);
+      panel.querySelector("button")?.focus?.({ preventScroll: true });
+    };
+    const pointerDown = e => {
+      if (!isActive() || panel || (e.button != null && e.button !== 0)) return;
+      cancelHold();
+      tracking = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+      hold = setTimeout(showMenu, FEED_ZOO_TEST_HOLD_MS);
+    };
+    const pointerMove = e => {
+      if (tracking && tracking.pointerId === e.pointerId &&
+          Math.hypot(e.clientX - tracking.x, e.clientY - tracking.y) > 14) {
+        cancelHold();
+      }
+    };
+    const pointerEnd = () => cancelHold();
+    const visibility = () => { if (document.hidden) { cancelHold(); removeMenu(); } };
+    badge.addEventListener("pointerdown", pointerDown);
+    badge.addEventListener("pointermove", pointerMove);
+    badge.addEventListener("pointerup", pointerEnd);
+    badge.addEventListener("pointercancel", pointerEnd);
+    badge.addEventListener("contextmenu", preventFeedTestContextMenu);
+    document.addEventListener("visibilitychange", visibility);
+    runtime.zooDevTeardown = () => {
+      cancelHold();
+      removeMenu();
+      badge.removeEventListener("pointerdown", pointerDown);
+      badge.removeEventListener("pointermove", pointerMove);
+      badge.removeEventListener("pointerup", pointerEnd);
+      badge.removeEventListener("pointercancel", pointerEnd);
+      badge.removeEventListener("contextmenu", preventFeedTestContextMenu);
+      document.removeEventListener("visibilitychange", visibility);
+      badge.classList.remove("bz-zoo-test-arm");
+    };
+  }
+
+  function preventFeedTestContextMenu(event) { event.preventDefault(); }
 
   function pauseFeedingGame(runtime, now = performance.now()) {
     if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
@@ -3111,6 +3317,7 @@
     // A paused round is never declared recovered until a gesture-driven
     // clock probe succeeds. Preserve this marker across unrelated redraws.
     runtime.feedAudioRecoveryVerified = false;
+    runtime.zooSoundClockSample = null;
     if (runtime.mode === FEED_MODES.MELODY) {
       pauseMelodyForInterruption(runtime, now);
     }
@@ -3140,10 +3347,13 @@
     }
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
     setFeedingResumeStatus(runtime);
+    // Only start the minigame for a genuinely active, interrupted round.
+    // New interruptions reset its stage and cancel every previous animation.
+    runtime.zooEscape?.start?.();
     return true;
   }
 
-  function continueFeedingAfterGesture(runtime, now = performance.now()) {
+  function continueFeedingAfterGesture(runtime, now = performance.now(), keepOverlay = false) {
     if (!runtime || activeRuntime !== runtime || !runtime.running ||
         runtime.finished || runtime.feedPausedAt == null ||
         runtime.feedPageHidden || document.hidden ||
@@ -3162,9 +3372,13 @@
     runtime.feedPausedAt = null;
     runtime.feedResumePending = false;
     runtime.gameEl?.classList?.remove?.("is-interruption-paused");
-    if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
-    if (runtime.resumeButton) runtime.resumeButton.disabled = false;
-    setFeedingResumeStatus(runtime);
+    // The shared controller dismisses its own overlay only AFTER its
+    // promise resolves to a verified success, not during the audio probe.
+    if (!keepOverlay && runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
+    if (!keepOverlay) {
+      if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      setFeedingResumeStatus(runtime);
+    }
     if (runtime.tiltEnabled) {
       // Keep the child's original neutral angle. Returning while the phone
       // is tilted must not redefine what "center" means. A fresh sensor
@@ -3177,10 +3391,18 @@
 
   // Called by a real click, never automatically on pageshow. Do not queue
   // stale effects; the same button remains usable if iOS rejects resume().
-  function attemptFeedingResumeFromGesture(runtime) {
+  function attemptFeedingResumeFromGesture(runtime, onSettled) {
+    // onSettled is optional: legacy callers still get the old return boolean;
+    // Zoo Escape gets a definitive, clock-verified completion notification.
+    const report = (ok) => {
+      try { onSettled?.(ok === true); } catch (_) { /* caller owns UI */ }
+    };
     if (!runtime || activeRuntime !== runtime || runtime.finished ||
         runtime.feedPausedAt == null || runtime.feedPageHidden ||
-        document.hidden || runtime.feedResumePending) return false;
+        document.hidden || runtime.feedResumePending) {
+      report(false);
+      return false;
+    }
     const Ctor = window.AudioContext || window.webkitAudioContext;
     const needsReplacement = runtime.feedAudioNeedsFreshContext ||
       !runtime.audioContext || runtime.audioContext.state === "closed";
@@ -3191,6 +3413,7 @@
           sinceReplacement < FEED_AUDIO_REPLACEMENT_COOLDOWN_MS) {
         recordFeedAudioRecovery("feed-audio-retry-delayed", runtime);
         setFeedingResumeStatus(runtime, "Sound needs a moment. Please try again.");
+        report(false);
         return false;
       }
       const burstExhausted = runtime.feedAudioReplacements >= FEED_AUDIO_REPLACEMENT_BURST_LIMIT &&
@@ -3222,6 +3445,7 @@
         } catch (err) {
           recordFeedAudioRecovery("feed-audio-context-create-failed", runtime);
           setFeedingResumeStatus(runtime, "Sound isn't ready. Please try again, or go back.");
+          report(false);
           return false;
         }
       }
@@ -3239,7 +3463,10 @@
       clearTimeout(runtime.feedResumeWatchdog);
       runtime.feedResumeWatchdog = null;
       if (activeRuntime !== runtime || runtime.feedResumeGeneration !== generation ||
-          runtime.feedPausedAt == null || runtime.audioContext !== context) return;
+          runtime.feedPausedAt == null || runtime.audioContext !== context) {
+        report(false);
+        return;
+      }
       runtime.feedResumePending = false;
       if (runtime.resumeButton) runtime.resumeButton.disabled = false;
       if (!ready || document.hidden || runtime.feedPageHidden) {
@@ -3250,15 +3477,19 @@
           setFeedingResumeStatus(runtime,
             "Sound isn't ready yet. Wait a moment, then try again or go back.");
         }
+        report(false);
         return;
       }
       // Only the verified gesture path can dismiss the interruption overlay.
       runtime.feedAudioRecoveryVerified = true;
-      if (continueFeedingAfterGesture(runtime)) {
+      const continued = continueFeedingAfterGesture(runtime,
+        performance.now(), !!runtime.zooEscape);
+      if (continued) {
         runtime.feedAudioNeedsFreshContext = false;
         runtime.feedAudioReplacements = 0;
         recordFeedAudioRecovery("feed-audio-resume-verified", runtime);
       }
+      report(continued);
     };
     // Older browsers with no Web Audio continue to use the existing HTML
     // audio fallback. Do not trap them behind an impossible clock probe.
@@ -4305,7 +4536,8 @@
         .buildResult(runtime);
 
     showResult(runtime, result);
-    runtime.onComplete?.(result);
+    // Simulated recovery never awards daily-session or Zoo To-Do progress.
+    if (!runtime.zooDevTestEverActivated) runtime.onComplete?.(result);
   }
 
   function startRound(runtime) {
@@ -4566,7 +4798,8 @@
     {
       session,
       onComplete,
-      onBackToZoo
+      onBackToZoo,
+      onRecoveryExitToZoo
     } = {}
   ) {
     const savedAudio = preparedAudioContext;
@@ -4687,7 +4920,8 @@
             {
               session,
               onComplete,
-              onBackToZoo
+              onBackToZoo,
+              onRecoveryExitToZoo
             }
           );
         }
@@ -4810,6 +5044,12 @@
       resumeBackButton,
       resumeButtonHandler: null,
       resumeBackHandler: null,
+      zooEscape: null,
+      zooDevScenario: null,
+      zooDevTeardown: null,
+      zooDevTestEverActivated: false,
+      zooSoundClockSample: null,
+      zooSoundLastAt: -Infinity,
       feedPausedAt: null,
       feedResumePending: false,
       feedResumeGeneration: 0,
@@ -4908,7 +5148,9 @@
         typeof onBackToZoo ===
         "function"
           ? onBackToZoo
-          : null
+          : null,
+      onRecoveryExitToZoo: typeof onRecoveryExitToZoo === "function"
+        ? onRecoveryExitToZoo : null
     };
 
     activeRuntime = runtime;
@@ -5067,6 +5309,60 @@
       if (shouldClose !== false) stop();
     };
 
+    // Feeding is the first activity to opt into Zoo Escape. The shared
+    // controller supplies UI and a bounded state machine; only Feeding owns
+    // its audio probe, session/score data, and navigation cleanup.
+    if (window.BibloZooZooEscape?.create) {
+      runtime.zooEscape = window.BibloZooZooEscape.create({
+        overlay: runtime.resumeOverlay,
+        name: runtime.zookeeperName,
+        petName: runtime.petName,
+        reducedMotion: runtime.reducedMotion,
+        recover: () => {
+          // A deliberate pilot scenario substitutes only this bool result.
+          // Normal players still enter the unchanged verified audio path.
+          if (runtime.zooDevScenario) {
+            return getFeedZooTestResult(runtime);
+          }
+          return new Promise(resolve => {
+            // Native activation and AudioContext.resume() stay directly
+            // inside the child's click in real (non-test) gameplay.
+            attemptFeedingResumeFromGesture(runtime, resolve);
+          });
+        },
+        onRecovered: () => {
+          // The next *real* interruption must always use verified audio,
+          // never retain this manually chosen developer scenario.
+          runtime.zooDevScenario = null;
+          if (activeRuntime === runtime && runtime.feedPausedAt == null) {
+            runtime.resumeOverlay.hidden = true;
+            runtime.zooSoundClockSample = null;
+          }
+        },
+        onExit: () => {
+          if (activeRuntime !== runtime) return;
+          // Exit is never conditioned on earning a daily reward: the host
+          // may provide an explicit abort path with no completion credit.
+          const exit = runtime.onRecoveryExitToZoo || runtime.onBackToZoo;
+          const handled = exit?.();
+          if (handled !== false) stop();
+          else {
+            recordFeedAudioRecovery("feed-zoo-escape-exit-deferred", runtime);
+            // Never leave the child trapped behind an expired modal.
+            stop();
+          }
+        },
+        // Optional in-mini-game sounds are allowed only after a passive
+        // clock-advance check. They never unlock audio or resume gameplay.
+        soundIsReady: () => zooEscapeSoundReady(runtime),
+        onPop: () => playZooEscapeSound(runtime, "pop"),
+        onBounce: () => playZooEscapeSound(runtime, "bounce")
+      });
+    }
+
+    // Pilot-only hidden entry: hold the active score badge for 2.4s.
+    attachFeedZooTestHarness(runtime);
+
     runtime.resumeButtonHandler = (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -5076,7 +5372,13 @@
       event.preventDefault();
       event.stopPropagation();
       if (activeRuntime !== runtime || runtime.feedPausedAt == null) return;
-      const shouldClose = runtime.onBackToZoo?.();
+      // The visible Back pill is available throughout all three stages.
+      // A Daily Questions reward may decline the normal Back action, so its
+      // owner supplies an explicit abort without awarding completion credit.
+      const exit = runtime.zooEscape?.isPaused?.()
+        ? (runtime.onRecoveryExitToZoo || runtime.onBackToZoo)
+        : runtime.onBackToZoo;
+      const shouldClose = exit?.();
       if (shouldClose !== false) stop();
     };
 
@@ -5092,8 +5394,9 @@
           return;
         }
 
-        const goBack =
-          runtime.onBackToZoo;
+        const goBack = runtime.zooDevTestEverActivated
+          ? (runtime.onRecoveryExitToZoo || runtime.onBackToZoo)
+          : runtime.onBackToZoo;
 
         const shouldClose =
           goBack?.();
@@ -5111,7 +5414,10 @@
     );
 
     exitButton.addEventListener("click", runtime.exitHandler);
-    resumeButton.addEventListener("click", runtime.resumeButtonHandler);
+    if (!runtime.zooEscape) {
+      // Older builds without the shared controller retain a usable resume.
+      resumeButton.addEventListener("click", runtime.resumeButtonHandler);
+    }
     resumeBackButton.addEventListener("click", runtime.resumeBackHandler);
 
     resultBackButton.addEventListener(

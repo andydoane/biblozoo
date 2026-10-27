@@ -3331,6 +3331,15 @@
                       dailySession.rewardComplete =
                         true;
                     },
+                  onRecoveryExitToZoo: () => {
+                    // A failed audio recovery is not a completed reward game.
+                    // Allow a safe exit without manufacturing earned credit.
+                    if (dailySession === session) {
+                      clearSessionState();
+                      appApi?.goToTitle?.();
+                    }
+                    return true;
+                  },
                   onBackToZoo:
                     () => {
                       if (

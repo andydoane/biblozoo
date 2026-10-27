@@ -29,7 +29,7 @@ for(const file of ["verse_games/shared/welcome-back-zoo-escape.js"]) {
 ok(html.indexOf('welcome-back-zoo-escape.js')<html.indexOf('daily_questions_feed_game.js'),"engine available before Feeding");
 ok(css.includes('animation: none !important;') && css.includes('.bz-welcome-card.is-recovering .bz-welcome-avatar-image'),"portrait spin removed for every existing popup");
 ok(!css.includes('@keyframes bz-welcome-picture-recover'),"old spinner animation removed");
-for(const token of ["bz-zoo-pen","bz-zoo-pet","bz-zoo-poof-cloud","bz-zoo-firework-ray","bz-zoo-break-splash","bz-zoo-fade-black","prefers-reduced-motion","touch-action: none","focus-visible"]) ok(css.includes(token),`shared visual and accessibility ${token}`);
+for(const token of ["bz-zoo-pen","bz-zoo-pet","bz-zoo-poof-cloud","bz-zoo-break-anchor","bz-zoo-break-shake","bz-zoo-break-splash","bz-zoo-fade-black","prefers-reduced-motion","touch-action: none","focus-visible"]) ok(css.includes(token),`shared visual and accessibility ${token}`);
 for(const token of ["pointerdown","pointermove","pointerup","pointercancel","setPointerCapture","aria-label","onRescue","onBreakComplete","getProfilePictureCatalog","clearScheduled","onVisibility","RECOVERY_WATCHDOG_MS","soundIsReady","onExit","onRecovered"]) ok(engine.includes(token),`shared interaction and cleanup ${token}`);
 ok(!engine.includes('AudioContext(') && !engine.includes('setCategory('),"no native or JS audio session mutation in presentation");
 ok(read("daily_questions_feed_game.js").includes("attemptFeedingResumeFromGesture"),"Feeding recovery owner remains intact");

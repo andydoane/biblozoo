@@ -153,8 +153,7 @@
 .bz-welcome-oops-message { margin: 0; font: 900 24px/1.2 "Baloo 2", "Baloo2", system-ui, sans-serif; }
 .bz-welcome-oops-note { margin: 0; font: 800 17px/1.4 "Baloo 2", "Baloo2", system-ui, sans-serif; }
 
-/* Patch 72.1A — opt-in Zoo Escape layer, inspired by Traffic Tap's poof,
- * Food Slice's radial fireworks, and Verse Jam's GROOVY splash. The card's
+/* Zoo Escape layer: Traffic Tap's poof and Verse Jam's GROOVY splash. The card's
  * existing dimensions and content slots are preserved across stages. */
 .bz-zoo-action-slot {
   width: 100%;
@@ -216,9 +215,18 @@
   cursor: pointer;
   touch-action: manipulation;
 }
-.bz-zoo-escape .bz-welcome-card { position: relative; z-index: 2; }
+/* Always pivot the whole Welcome Back card around its geometric center.
+ * Unlike a corner pivot, this keeps both stage shakes centered on the pen. */
+.bz-zoo-escape .bz-welcome-card {
+  position: relative;
+  z-index: 2;
+  transform-origin: 50% 50%;
+}
+/* Both layers share the overlay's coordinate system with penCenter().
+ * Feeding's overlay is ABSOLUTE within its game; a fixed viewport layer
+ * shifts poofs, fireworks and pet hit-testing away from the pen. */
 .bz-zoo-field, .bz-zoo-effects {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
@@ -226,6 +234,8 @@
   contain: layout style;
 }
 .bz-zoo-field { z-index: 3; }
+/* Unframed escaped portraits: the image fills the old 78px button footprint.
+ * Only the invisible hit area is rectangular; no white tile or stroke. */
 .bz-zoo-pet {
   box-sizing: border-box;
   position: absolute;
@@ -233,11 +243,11 @@
   z-index: 1;
   padding: 0;
   margin: 0;
-  background: #fff;
-  border: 3px solid #fff;
-  border-radius: 20%;
-  box-shadow: 0 3px 10px rgba(0,0,0,.33);
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
   cursor: grab;
   touch-action: none;
   pointer-events: auto;
@@ -246,75 +256,188 @@
   -webkit-user-select: none;
 }
 .bz-zoo-pet:disabled { pointer-events: none; }
-.bz-zoo-pet.bz-zoo-catchable { box-shadow: 0 0 0 3px #ffdb56, 0 5px 14px rgba(0,0,0,.3); }
-.bz-zoo-pet.bz-zoo-selected { box-shadow: 0 0 0 5px #51dfff, 0 5px 14px rgba(0,0,0,.3); }
+.bz-zoo-pet.bz-zoo-catchable { filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+.bz-zoo-pet.bz-zoo-selected { filter: drop-shadow(0 0 5px #51dfff); }
 .bz-zoo-pet img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-.bz-zoo-poof, .bz-zoo-firework {
+/* A transparent 16px halo enlarges the hit-tested button without drawing a
+ * new white rectangle or changing the portrait's visible size. Pseudo-element
+ * pointer hits are delivered to the originating button on iOS WebKit. */
+.bz-zoo-pet::before {
+  content: "";
   position: absolute;
+  inset: -16px;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+}
+/* Traffic Tap's actual SVG wrong-answer cloud and outward particles.
+ * Ported CSS is scoped here so no external game styles are loaded. */
+.bz-zoo-poof{
+  position:absolute;
+  width:132px;
+  height:132px;
+  transform:translate(-50%, -50%);
+  pointer-events:none;
+  z-index:12;
+}
+
+.bz-zoo-poof-cloud{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:var(--tt-crash-cloud-size, 74px);
+  height:var(--tt-crash-cloud-size, 74px);
+  transform:translate(-50%, -50%) scale(0.14);
+  opacity:0;
+  color:#ffffff;
+  filter:drop-shadow(0 2px 0 rgba(255,255,255,0.22)) drop-shadow(0 6px 10px rgba(0,0,0,0.18));
+}
+
+.bz-zoo-poof-cloud svg{
+  width:100%;
+  height:100%;
+  display:block;
+}
+
+.bz-zoo-poof-cloud path{
+  fill:currentColor;
+}
+
+.bz-zoo-poof-cloud.is-live{
+  animation:bzZooPoofCloudRipple var(--tt-crash-cloud-dur, 560ms) linear forwards;
+}
+
+.bz-zoo-poof-dot{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:var(--tt-size, 12px);
+  height:var(--tt-size, 12px);
+  margin-left:calc(var(--tt-size, 12px) / -2);
+  margin-top:calc(var(--tt-size, 12px) / -2);
+  border-radius:50%;
+  background:#ffffff;
+  opacity:1;
+  transform:translate(0, 0) scale(var(--tt-start-scale, 0.75));
+  filter:drop-shadow(0 1px 0 rgba(255,255,255,0.28));
+  transition:
+    transform var(--tt-dur, 650ms) cubic-bezier(0.12, 0.75, 0.22, 1) var(--tt-delay, 0ms),
+    opacity var(--tt-dur, 650ms) linear var(--tt-delay, 0ms);
+}
+
+.bz-zoo-poof-dot.is-live{
+  opacity:0;
+  transform:translate(var(--tt-tx, 0px), var(--tt-ty, 0px)) scale(var(--tt-end-scale, 1.12));
+}
+
+@keyframes bzZooPoofCloudRipple{
+  0%{
+    opacity:0;
+    transform:translate(-50%, -50%) scale(0.14);
+  }
+  10%{
+    opacity:1;
+    transform:translate(-50%, -50%) scale(1.06);
+  }
+  22%{
+    opacity:1;
+    transform:translate(-50%, -50%) scale(0.97);
+  }
+  48%{
+    opacity:0.86;
+    transform:translate(-50%, -50%) scale(1.02);
+  }
+  72%{
+    opacity:0.34;
+    transform:translate(-50%, -50%) scale(1.06);
+  }
+  100%{
+    opacity:0;
+    transform:translate(-50%, -50%) scale(1.08);
+  }
+}
+
+.bz-zoo-break-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  max-width: calc(100% - 16px);
   transform: translate(-50%, -50%);
+  transform-origin: 50% 50%;
   pointer-events: none;
 }
-.bz-zoo-poof-cloud {
-  display: block;
-  font-size: 80px;
-  line-height: 1;
-  color: #fff;
-  filter: drop-shadow(0 3px 4px rgba(0,0,0,.22));
-  animation: bzZooPoofCloud 720ms ease-out forwards;
-}
-.bz-zoo-poof-dot {
-  position: absolute;
-  left: 50%; top: 50%;
-  width: 10px; height: 10px;
-  background: white;
-  border-radius: 50%;
-  animation: bzZooPoofDot 680ms ease-out forwards;
-}
-@keyframes bzZooPoofCloud {
-  from { opacity: .95; transform: translate(-50%,-50%) scale(.15); }
-  to { opacity: 0; transform: translate(-50%,-50%) scale(1.5); }
-}
-@keyframes bzZooPoofDot {
-  from { opacity: 1; transform: translate(0,0) scale(.6); }
-  to { opacity: 0; transform: translate(var(--px),var(--py)) scale(1.1); }
-}
-.bz-zoo-firework-ray {
-  position: absolute;
-  left: 0; top: 0;
-  width: 75px; height: 7px;
-  border-radius: 20px;
-  transform-origin: left center;
-  background: linear-gradient(90deg, #fff, var(--color), transparent);
-  opacity: 0;
-  animation: bzZooFireworkRay 950ms cubic-bezier(.1,.76,.2,1) forwards;
-}
-@keyframes bzZooFireworkRay {
-  0% { transform: rotate(var(--angle)) translateX(0) scaleX(.05); opacity: 1; }
-  55% { opacity: 1; }
-  100% { transform: rotate(var(--angle)) translateX(30px) scaleX(1.2); opacity: 0; }
+/* An outer shake and inner GROOVY pop require independent transform layers:
+ * otherwise a shake animation replaces the popup's scaling/rotation. */
+.bz-zoo-break-shake {
+  animation: bzZooShakeBreak 550ms ease-in-out both;
 }
 .bz-zoo-break-splash {
-  position: fixed;
-  top: 50%; left: 50%;
-  transform: translate(-50%,-50%) scale(.25) rotate(-9deg);
+  position: relative;
+  transform-origin: 50% 50%;
+  transform: scale(.25) rotate(-9deg);
   max-width: calc(100vw - 16px);
-  padding: 18px 22px;
+  padding: 18px 22px 20px;
   border-radius: 28px;
-  font: 900 clamp(32px, 12vw, 68px)/.95 "Titan One", "Baloo 2", system-ui, sans-serif;
+  font: 400 clamp(26px, 8vw, 60px)/.9 "Titan One", "Baloo 2", system-ui, sans-serif;
+  letter-spacing: .02em;
   white-space: nowrap;
   text-align: center;
   color: #271841;
   background: linear-gradient(90deg,#ff7ad9,#ffe27a,#8df7ff,#9dff8d,#ff7ad9);
   background-size: 260% 100%;
   text-shadow: 0 2px 0 rgba(255,255,255,.45);
-  box-shadow: 0 20px 48px rgba(0,0,0,.34), 0 0 0 5px rgba(255,255,255,.25);
-  animation: bzZooGroovy 1050ms cubic-bezier(.18,1.35,.3,1) forwards;
+  box-shadow: 0 20px 48px rgba(0,0,0,.34), 0 0 0 5px rgba(255,255,255,.25), inset 0 -8px 0 rgba(0,0,0,.12);
+  animation: bzZooGroovy 1250ms cubic-bezier(.18,1.35,.3,1) forwards;
 }
 @keyframes bzZooGroovy {
-  0% { opacity: 0; transform: translate(-50%,-50%) scale(.25) rotate(-9deg); background-position: 0 50%; }
-  17% { opacity: 1; transform: translate(-50%,-50%) scale(1.1) rotate(3deg); }
-  73% { opacity: 1; transform: translate(-50%,-50%) scale(1) rotate(-1deg); }
-  100% { opacity: 0; transform: translate(-50%,-50%) scale(.73) rotate(5deg); background-position: 100% 50%; }
+  0% { opacity: 0; transform: scale(.25) rotate(-9deg); background-position: 0 50%; }
+  16% { opacity: 1; transform: scale(1.12) rotate(3deg); }
+  35% { transform: scale(.98) rotate(-2deg); }
+  72% { opacity: 1; transform: scale(1.02) rotate(1deg); background-position: 180% 50%; }
+  100% { opacity: 0; transform: translateY(-18%) scale(.72) rotate(7deg); background-position: 260% 50%; }
+}
+/* The Feeding round's global pause rule freezes all descendants, including
+ * the Welcome Back overlay. That made the GROOVY splash invisible because
+ * their first animation frame is opacity:0. Keep game physics paused while
+ * allowing ONLY the foreground recovery minigame to animate. */
+.daily-feed-game.is-interruption-paused .daily-feed-resume-overlay.bz-zoo-escape .bz-zoo-effects *,
+.daily-feed-game.is-interruption-paused .daily-feed-resume-overlay.bz-zoo-escape .bz-zoo-active.bz-zoo-shake-escape,
+.daily-feed-game.is-interruption-paused .daily-feed-resume-overlay.bz-zoo-escape .bz-zoo-active.bz-zoo-shake-break {
+  animation-play-state: running !important;
+}
+/* If the child task-switches during a rescue, freeze the cosmetic animations
+ * as well; the JS controller independently stops pet movement and spawning. */
+.daily-feed-game.is-interruption-paused .daily-feed-resume-overlay.bz-zoo-backgrounded .bz-zoo-effects *,
+.daily-feed-game.is-interruption-paused .daily-feed-resume-overlay.bz-zoo-backgrounded .bz-zoo-active {
+  animation-play-state: paused !important;
+}
+/* Patch 72.1B.5: A centered translation shake has no rotational pivot.
+ * The old rotate() keyframes felt bottom-anchored on tall Feeding cards,
+ * even with transform-origin: center. Symmetric x/y jolts keep the entire
+ * card moving around its resting center without tilting around an edge. */
+.bz-zoo-shake-escape,
+.bz-zoo-shake-break,
+.bz-zoo-break-shake {
+  transform-origin: center center;
+}
+.bz-zoo-shake-escape {
+  animation: bzZooShakeEscape 340ms ease-in-out both;
+}
+.bz-zoo-shake-break {
+  animation: bzZooShakeBreak 550ms ease-in-out both;
+}
+@keyframes bzZooShakeEscape {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  16% { transform: translate3d(-7px, -5px, 0); }
+  40% { transform: translate3d(7px, 5px, 0); }
+  66% { transform: translate3d(-5px, 4px, 0); }
+  84% { transform: translate3d(5px, -4px, 0); }
+}
+@keyframes bzZooShakeBreak {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  10%, 40%, 73% { transform: translate3d(-11px, -7px, 0); }
+  23%, 56%, 88% { transform: translate3d(11px, 7px, 0); }
 }
 .bz-zoo-fade-black::after {
   content: "";
@@ -331,6 +454,10 @@
   .bz-zoo-action-slot .bz-welcome-action { min-height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bz-zoo-poof, .bz-zoo-firework, .bz-zoo-break-splash { display: none !important; }
+  .bz-zoo-poof { display: none !important; }
+  .bz-zoo-shake-escape, .bz-zoo-shake-break, .bz-zoo-break-shake,
+  .bz-zoo-break-splash { animation: none !important; }
+  /* Reduced motion retains the announcement, but without scaling or wobble. */
+  .bz-zoo-break-splash { opacity: 1; transform: none; }
   .bz-zoo-fade-black::after { animation-duration: 1ms; }
 }
