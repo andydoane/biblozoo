@@ -189,7 +189,8 @@ function checkSourceContracts() {
   check(returnSource.includes('suppressUiSound = false'), 'shared popup supports optional tap-sound suppression');
   check(index.includes('verse_games/shared/welcome-back-return.js'), 'app loads existing shared Welcome Back controller');
   check(app.includes('isActive: () => State.screen === Screen.FLASHCARDS'), 'host gates prompt to Flashcards');
-  check(serviceWorker.includes('2026_Oct_26_patch69_2_wacky_single_tap'), 'cache refreshed');
+  check(/const CACHE_VERSION = "2026_[^"]*patch72_1/.test(serviceWorker) &&
+    serviceWorker.includes('"./flashcards/flashcards.js"'), 'cache refreshed');
   check(serviceWorker.includes('"./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js"'), 'existing SoundTouch vendor assets remain listed');
   check(!flashcards.includes('navigator.mediaDevices.getUserMedia('), 'Flashcards return does not initiate mic permission');
   check(flashcards.includes('onContinue: () => true'), 'return never auto-replays narration or recording');

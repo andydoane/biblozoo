@@ -3632,6 +3632,8 @@ function spawnWrongFaceParticleBurst(){
   }
 
   window.BibloZooWelcomeBackReturn?.attach?.({
+    getSoundContext: () => verseSplatAudioContext,
+    isSoundMuted: () => muted,
     shouldPrompt: () => ["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen),
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,

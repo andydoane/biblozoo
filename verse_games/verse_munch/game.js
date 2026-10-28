@@ -4573,6 +4573,8 @@ const shuffle = window.VerseGameShell.shuffle;
   }
 
   window.BibloZooWelcomeBackReturn?.attach?.({
+    getSoundContext: () => audioCtx,
+    isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,

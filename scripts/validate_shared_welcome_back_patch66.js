@@ -61,7 +61,7 @@ async function auditRegistry() {
   ok(css.includes('body.bz-return-activity-paused #app *'),'Invaders CSS animations freeze');
   ok(clock.includes('elapsedPauseMs'),'Virtual time clock preserved');
   const worker=read('service-worker.js');
-  ok(worker.includes('2026_Oct_26_patch69_2_wacky_single_tap'),'Offline revision changes');
+  ok(/const CACHE_VERSION = "2026_[^"\n]*patch72_1(?:c|d)/.test(worker),'Offline revision changes');
   for (const name of ['welcome-back.css','welcome-back.js','welcome-back-return.js','welcome-back-clock.js'])
     ok(worker.includes('"./verse_games/shared/'+name+'"'),'Service worker caches shared '+name);
 }
@@ -79,7 +79,7 @@ function testSpinner() {
   action(root);ok(!card.classList.active,'Portrait still when ready');eq(button.textContent,"Let's go!",'Default label preserved');
   ok(css.includes('.bz-welcome-card.is-recovering .bz-welcome-avatar-image'),'Only avatar spins');
   ok(css.includes('prefers-reduced-motion: reduce'),'Reduced motion honored');
-  ok(css.includes('animation: none;'),'Reduced motion has static state');
+  ok(css.includes('animation: none !important;'),'Reduced motion has static state');
   ok(!css.includes('.bz-welcome-card.is-recovering {'),'The whole popup does not spin');
   const ctl=read('verse_games/shared/welcome-back-return.js');
   ok(!ctl.includes('Getting sound ready...') && widget.includes('ZOO_MESSAGES'),'Child-friendly progress text after tap');

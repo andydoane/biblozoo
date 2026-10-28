@@ -7420,6 +7420,9 @@ window.BibloZooDailyQuestions
 
     getVerseList: () =>
       VERSE_LIST,
+    isMuted: () => muted,
+    getExistingAudioContext: () => appAudioUnlocked && !appAudioRecoveryPending
+      ? appAudioContext : null,
 
     getVerseProgress,
     recordFlashcardAttempt,
@@ -9559,6 +9562,9 @@ window.BibloZooFlashcards
     isActive: () => State.screen === Screen.FLASHCARDS,
     getVerseList: () =>
       VERSE_LIST,
+    isMuted: () => muted,
+    getExistingAudioContext: () => appAudioUnlocked && !appAudioRecoveryPending
+      ? appAudioContext : null,
 
     getVerseProgress,
     getVerseProgressSnapshot: () => loadProgress().verses,
@@ -9629,6 +9635,8 @@ window.BibloZooReadMyVerse
     makeSlide,
     scheduleSmartLearnTextFit,
     isMuted: () => muted,
+    getExistingAudioContext: () => appAudioUnlocked && !appAudioRecoveryPending
+      ? appAudioContext : null,
     unlockAudio: unlockAppAudio,
     requestRender: () => render(),
     onWordActivated: () => true,
@@ -11480,6 +11488,32 @@ function isLearnAudioOverlayRecovery(recovery) {
     ["listen", "chunk", "echo"].includes(recovery.mode);
 }
 
+// Patch 72.1C: Learn keeps its original listen/chunk/echo recovery.
+// Zoo Escape presents the pauses, and observes the actual verified outcome.
+let learnZooEscape = null;
+let learnZooRecovery = null;
+function beginLearnZooRecovery() {
+  const recovery = learnAudioInterrupted;
+  if (!isLearnAudioOverlayRecovery(recovery)) return false;
+  const started = resumeInterruptedLearnAudio(); // inside the real click
+  if (!started) return false;
+  return new Promise(resolve => {
+    function check() {
+      if (document.hidden || State.screen !== recovery.screen) return resolve(false);
+      if (learnAudioResumeAttempt?.recovery === recovery) {
+        setTimeout(check, 65);
+      } else if (learnAudioInterrupted === recovery || learnAudioResumeError) {
+        resolve(false);
+      } else {
+        // Both playStarted and audioReady were verified by the original
+        // finishLearnAudioResumeAttempt before it cleared this attempt.
+        resolve(!learnAudioResumeAttempt && !learnAudioInterrupted);
+      }
+    }
+    check();
+  });
+}
+
 function ensureLearnAudioResumeOverlay() {
   let overlay = document.getElementById("learnAudioResumeOverlay");
   if (overlay) return overlay;
@@ -11500,7 +11534,20 @@ function ensureLearnAudioResumeOverlay() {
         id="learnAudioResumeStatus" role="status" aria-live="polite" hidden></p>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.querySelector("#learnAudioResumeButton").onclick = resumeInterruptedLearnAudio;
+  const action = overlay.querySelector("#learnAudioResumeButton");
+  if (window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
+    learnZooEscape = window.BibloZooZooEscape.create({
+      overlay, verseId: () => VERSE_ID,
+      petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),
+      getSoundContext: () => appAudioUnlocked && !appAudioRecoveryPending
+        ? appAudioContext : null,
+      isSoundMuted: () => muted,
+      recover: beginLearnZooRecovery,
+      onRecovered: () => { learnZooRecovery = null; overlay.hidden = true; },
+      onExit: () => { learnZooRecovery = null; go(Screen.TITLE); }
+    });
+  }
+  if (!learnZooEscape && action) action.onclick = resumeInterruptedLearnAudio;
   return overlay;
 }
 
@@ -11510,13 +11557,27 @@ function syncLearnAudioResumeOverlay() {
     isLearnAudioOverlayRecovery(recovery);
   const existing = document.getElementById("learnAudioResumeOverlay");
   if (!show) {
-    if (existing) existing.hidden = true;
+    // The owner may verify playback before the Zoo controller's Promise
+    // settles. Keep its dialog visible for the final verified callback;
+    // otherwise the controller would see a hidden overlay and miss success.
+    const finishingZoo = !!learnZooEscape && !!learnZooRecovery &&
+      !recovery && !document.hidden && State.screen === learnZooRecovery.screen;
+    if (existing && !finishingZoo) existing.hidden = true;
+    if (!finishingZoo && !recovery) learnZooRecovery = null;
     return;
   }
   const overlay = ensureLearnAudioResumeOverlay();
   if (!overlay) return;
   window.BibloZooWelcomeBack?.populate?.(overlay);
   overlay.hidden = false;
+  if (learnZooEscape) {
+    if (learnZooRecovery !== recovery) {
+      learnZooRecovery = recovery;
+      learnZooEscape.start();
+    }
+    // Zoo Escape owns the button, retry count, and staged rescue visuals.
+    return;
+  }
   const button = overlay.querySelector("#learnAudioResumeButton");
   window.BibloZooWelcomeBack?.setAction?.(overlay, {
     busy: !!learnAudioResumeAttempt,
@@ -11928,6 +11989,8 @@ function shouldPromptAppActivityReturn() {
 function attachAppActivityReturn() {
   if (appActivityReturn || !window.BibloZooWelcomeBackReturn?.attach) return;
   appActivityReturn = window.BibloZooWelcomeBackReturn.attach({
+    verseId: () => VERSE_ID,
+    petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),
     shouldPrompt: shouldPromptAppActivityReturn,
     onPause: () => {
       if (State.screen === Screen.TODO_DEV) {
@@ -14831,6 +14894,30 @@ function screenTitle(idx) {
         dailyHomePlan.verseId
       )
     : "";
+  const zooStats = activeProfile
+    ? window.BibloZooZooStats?.get?.(activeProfile.id)
+    : null;
+  // A new rescue is celebrated once, on the home screen. If a Daily To-Do
+  // invitation is occupying the foreground, leave the celebration pending.
+  const zooCelebration = activeProfile && !tutorialActive && !showDailyOffer
+    ? window.BibloZooZooStats?.acknowledgeCelebration?.(activeProfile.id)
+    : null;
+  const zooTallyHtml = zooStats && !tutorialActive
+    ? `<div class="title-zoo-hero-tally" aria-label="Zoo Escape achievements: ${zooStats.petsRescued} BibloPets rescued and ${zooStats.zooBreaksStopped} Zoo Breaks stopped">
+        <span>🐾 ${zooStats.petsRescued} rescued</span>
+        <span>🔒 ${zooStats.zooBreaksStopped} Zoo Breaks stopped</span>
+      </div>`
+    : "";
+  const zooCelebrationHtml = zooCelebration
+    ? `<section class="title-zoo-hero-celebration" role="status" aria-live="polite" aria-label="Zoo rescue celebration">
+        <div class="title-zoo-hero-spark" aria-hidden="true">★</div>
+        <div class="title-zoo-hero-copy"><strong>Zoo Hero!</strong>
+          <span>${zooCelebration.petsRescued ? `${zooCelebration.petsRescued} BibloPet${zooCelebration.petsRescued === 1 ? "" : "s"} rescued!` : ""}
+          ${zooCelebration.zooBreaksStopped ? `${zooCelebration.zooBreaksStopped} Zoo Break${zooCelebration.zooBreaksStopped === 1 ? "" : "s"} stopped!` : ""}</span>
+        </div>
+        <button type="button" class="title-zoo-hero-close no-zoom" aria-label="Dismiss Zoo Hero celebration">Yay!</button>
+      </section>`
+    : "";
   const dailyOfferHtml = showDailyOffer
     ? `
       <div
@@ -15025,6 +15112,8 @@ function screenTitle(idx) {
         ${dailyProgressHtml}
       </button>
 
+      ${zooTallyHtml}
+      ${zooCelebrationHtml}
       <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
     </div>
@@ -15032,6 +15121,9 @@ function screenTitle(idx) {
     ${dailyOfferHtml}
   `;
 
+  wrap.querySelector(".title-zoo-hero-close")?.addEventListener("click", () => {
+    wrap.querySelector(".title-zoo-hero-celebration")?.remove();
+  });
   const titleMyVersesBtn = wrap.querySelector("#titleMyVersesBtn");
   if (titleMyVersesBtn) {
     titleMyVersesBtn.onclick = (e) => {
@@ -21391,6 +21483,8 @@ function screenZookeeperStats(idx) {
   const profile =
     getProfileApi()
       ?.getActiveProfile?.();
+  const zooEscapeStats = window.BibloZooZooStats?.get?.(profile?.id) ||
+    { petsRescued: 0, zooBreaksStopped: 0 };
   const loaded = loadDailyTodoRuntime();
   const engine = loaded?.engine;
   const stats = engine?.getStatsForDay?.(
@@ -21479,6 +21573,18 @@ function screenZookeeperStats(idx) {
             <div class="detail-label">Total Tasks</div>
             <div class="zookeeper-stat-value">
               ${stats.totalTasks}
+            </div>
+          </div>
+          <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">BibloPets Rescued</div>
+            <div class="zookeeper-stat-value">
+              ${zooEscapeStats.petsRescued}
+            </div>
+          </div>
+          <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">Zoo Breaks Stopped</div>
+            <div class="zookeeper-stat-value">
+              ${zooEscapeStats.zooBreaksStopped}
             </div>
           </div>
         </section>

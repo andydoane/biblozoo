@@ -8681,3 +8681,65 @@ body:has(#app .todo-dev-screen.is-tutorial-mode),
     background-image: url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg") !important;
   }
 }
+
+/* Patch 72.1D — accessible home Zoo Hero celebration and persistent tally. */
+.title-zoo-hero-tally {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 8px 0 4px;
+  color: #fff;
+  font: 800 clamp(13px, 3.7vw, 18px)/1.2 "Baloo 2", system-ui, sans-serif;
+}
+.title-zoo-hero-tally span {
+  background: rgba(0, 0, 0, .40);
+  border-radius: 999px;
+  padding: 5px 13px;
+}
+.title-zoo-hero-celebration {
+  width: min(100%, 520px);
+  box-sizing: border-box;
+  margin: 8px auto;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #ffc751;
+  border: 3px solid #fff;
+  border-radius: 22px;
+  color: #302348;
+  box-shadow: 0 6px 0 rgba(0,0,0,.22);
+  font-family: "Baloo 2", system-ui, sans-serif;
+  animation: bzZooHeroCelebrate 480ms cubic-bezier(.2,1.4,.4,1) both;
+}
+.title-zoo-hero-spark {
+  flex: 0 0 auto;
+  color: #a638a8;
+  font-size: 42px;
+  line-height: 1;
+  animation: bzZooHeroTwinkle 1s ease-in-out 2;
+}
+.title-zoo-hero-copy { display: flex; flex-direction: column; align-items: flex-start; text-align: left; min-width: 0; }
+.title-zoo-hero-copy strong { font-size: clamp(22px, 6vw, 32px); line-height: 1; }
+.title-zoo-hero-copy span { font-size: clamp(14px, 3.8vw, 18px); font-weight: 800; line-height: 1.2; }
+.title-zoo-hero-close {
+  flex: 0 0 auto;
+  min-height: 44px;
+  min-width: 55px;
+  padding: 8px;
+  border: none;
+  border-radius: 14px;
+  color: #fff;
+  background: #493363;
+  font: 900 18px/1 "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.title-zoo-hero-close:focus-visible { outline: 4px solid #493363; outline-offset: 4px; }
+@keyframes bzZooHeroCelebrate { from { opacity: 0; transform: translateY(14px) scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes bzZooHeroTwinkle { 50% { transform: scale(1.2); } }
+@media (prefers-reduced-motion: reduce) {
+  .title-zoo-hero-celebration, .title-zoo-hero-spark { animation: none !important; }
+}

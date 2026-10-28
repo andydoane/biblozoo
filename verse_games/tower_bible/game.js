@@ -3790,6 +3790,8 @@
   }
 
   window.BibloZooWelcomeBackReturn?.attach?.({
+    getSoundContext: () => audioCtx,
+    isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,

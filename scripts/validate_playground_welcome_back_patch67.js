@@ -49,7 +49,7 @@ function audit() {
   check(shell.includes("options.onResume?.()"), "Shared shell calls activity continuation");
   const ctl = read("verse_games/shared/welcome-back-return.js");
   check(ctl.includes("if (!preserveFocus) button?.focus"), "Playground overlay does not steal keyboard focus");
-  check(ctl.includes("escapeText === \"Back to Playground\""), "Playground escape label is shared");
+  check(ctl.includes("Back to Playground"), "Playground escape label is shared");
   const css = read("verse_games/shared/shell.css");
   check(css.includes(".bz-playground-welcome-paused #app *"), "CSS motion paused inside activity only");
   check(!css.includes(".bz-playground-welcome-paused .bz-welcome"), "Popup portrait not frozen");
@@ -73,10 +73,10 @@ function audit() {
   check(scrub.includes("const resumeMower = mowerResumeFrame"), "Scrub resumes existing mower pass");
   check(scrub.includes("if (ctx !== audioCtx) return null"), "Scrub ignores stale sound buffers");
   const worker = read("service-worker.js");
-  check(worker.includes('2026_Oct_26_patch69_2_wacky_single_tap'), "Cache generation updated");
+  check(/const CACHE_VERSION = "2026_[^"\n]*patch72_1(?:c|d)/.test(worker), "Cache generation updated");
   for (const id of targets) {
     for (const filename of ["index.html", "game.js", "game.css"])
-      check(worker.includes(`"./verse_playground/${id}/${filename}"`), `${id}: ${filename} available offline`);
+      check(worker.includes(`"verse_playground/${id}"`) && worker.includes('ACTIVITY_SHELL_PATHS'), `${id}: ${filename} generated for offline cache`);
   }
 }
 

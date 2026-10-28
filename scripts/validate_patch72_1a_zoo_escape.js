@@ -163,8 +163,9 @@ async function run(){
   h.ctl.destroy();
 
   h=harness([{deferred:true},true]);h.ctl.start();h.button.trigger("click");await Promise.resolve();
-  eq(h.ctl.getStage(),"escape","native pending does not create endless retry loop");
-  h.advance(1300);h.rescueFirst();h.button.trigger("click");await Promise.resolve();
+  eq(h.ctl.getStage(),"welcome","native pending preserves same recovery stage");
+  eq(h.ctl.getState().attemptCount,0,"native interruption does not consume a retry");
+  h.button.trigger("click");await Promise.resolve();
   eq(h.ctl.getStage(),"recovered","next real gesture can recover from deferred result");h.ctl.destroy();
 
   h=harness([new Promise(()=>{})]);h.ctl.start();h.button.trigger("click");

@@ -511,6 +511,8 @@
       if (progressKey) {
         try {
           localStorage.removeItem(progressKey);
+          // Zoo Escape achievements belong to the same Zookeeper profile.
+          localStorage.removeItem(`biblozooZooEscapeStats:v1:${id}`);
         } catch (err) {
           console.warn("Could not remove Zookeeper progress", err);
         }

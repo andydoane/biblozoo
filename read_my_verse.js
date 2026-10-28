@@ -1617,6 +1617,37 @@
     freezeReadScene(session);
   }
 
+  // Patch 72.1C: the existing Read My Verse owner still verifies media,
+  // soundtrack and tone clocks. Zoo Escape observes the verified result;
+  // a play() promise alone is never a successful recovery.
+  let readZooEscape = null;
+  let readZooRecovery = null;
+  function recoverReadZooFromGesture() {
+    const recovery = readAudioRecovery;
+    const generation = readAudioRecoveryGeneration;
+    if (!recovery || root.document.hidden) return false;
+    const started = resumeReadAudioFromGesture(); // direct user gesture
+    if (!started) return false;
+    return new Promise(resolve => {
+      const deadline = Date.now() + 6900;
+      function check() {
+        if (Date.now() >= deadline) return resolve(false);
+        if (root.document.hidden || generation !== readAudioRecoveryGeneration ||
+            state.phase === "idle" || completionReported) return resolve(false);
+        if (readAudioRecovery === null) {
+          // The owner only clears recovery after its playback/clock checks.
+          return resolve(true);
+        }
+        if (readAudioRecovery !== recovery ||
+            (readAudioRecoveryAttempt === null && !!recovery.error)) {
+          return resolve(false);
+        }
+        root.setTimeout(check, 65);
+      }
+      check();
+    });
+  }
+
   // Patch 70: Read My Verse already owns lifecycle and media continuation.
   // Reuse only the shared Welcome Back *presentation* here. Attaching another
   // lifecycle controller would double-pause narration and frozen scene clocks.
@@ -1661,10 +1692,23 @@
     }
     if (status) status.id = "readAudioResumeStatus";
     if (title) title.id = "readAudioResumeTitle";
-    if (button) button.onclick = resumeReadAudioFromGesture;
     // Keep the existing Back escape path if audio cannot be recovered.
     overlay.querySelector("#readAudioOverlayBack").onclick = exitSession;
     doc.body.appendChild(overlay);
+    if (root?.BibloZooZooEscape?.create && root?.BibloZooWelcomeBack?.markup) {
+      readZooEscape = root.BibloZooZooEscape.create({
+        overlay, profileId: state.context?.profileId,
+        verseId: () => state.verseId,
+        getSoundContext: () => scrambleAudioContext?.state === "running"
+          ? scrambleAudioContext : keySoundContext?.state === "running"
+            ? keySoundContext : appApi?.getExistingAudioContext?.(),
+        isSoundMuted: () => appApi?.isMuted?.() === true,
+        recover: recoverReadZooFromGesture,
+        onRecovered: () => { readZooRecovery = null; overlay.hidden = true; },
+        onExit: exitSession
+      });
+    }
+    if (!readZooEscape && button) button.onclick = resumeReadAudioFromGesture;
     return overlay;
   }
 
@@ -1672,11 +1716,23 @@
     const overlay = readAudioRecovery ? ensureReadAudioOverlay() :
       root?.document?.getElementById?.("readAudioResumeOverlay");
     if (!overlay) return;
-    const show = !!readAudioRecovery && !root.document.hidden &&
-      state.phase !== "idle" && !completionReported;
+    const active = !root.document.hidden && state.phase !== "idle" && !completionReported;
+    // Do not hide the dialog between the owner's verified result and the
+    // Zoo controller consuming it; otherwise successful() sees !running().
+    const finishingZoo = !!readZooEscape && !!readZooRecovery && !readAudioRecovery && active;
+    const show = (!!readAudioRecovery && active) || finishingZoo;
     overlay.hidden = !show;
     if (!show) {
-      root?.BibloZooWelcomeBack?.setAction?.(overlay, { busy: false });
+      if (!readAudioRecovery) readZooRecovery = null;
+      if (!readZooEscape) root?.BibloZooWelcomeBack?.setAction?.(overlay, { busy: false });
+      return;
+    }
+    if (readZooEscape) {
+      if (readAudioRecovery && readZooRecovery !== readAudioRecovery) {
+        readZooRecovery = readAudioRecovery;
+        readZooEscape.start();
+      }
+      // Never overwrite LOCK GATE or restart the staged popup mid-attempt.
       return;
     }
     const button = overlay.querySelector("#readAudioResumeButton");
@@ -2049,6 +2105,7 @@
 
   function stopAudio() {
     readAudioRecoveryGeneration += 1;
+    readZooRecovery = null;
     readAudioRecovery = null;
     readAudioRecoveryAttempt = null;
     readActiveAnimatedNarration = null;

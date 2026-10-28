@@ -5318,6 +5318,7 @@
         name: runtime.zookeeperName,
         petName: runtime.petName,
         reducedMotion: runtime.reducedMotion,
+        isTestRun: () => !!runtime.zooDevScenario,
         recover: () => {
           // A deliberate pilot scenario substitutes only this bool result.
           // Normal players still enter the unchanged verified audio path.

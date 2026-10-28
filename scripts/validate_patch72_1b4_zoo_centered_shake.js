@@ -70,7 +70,7 @@ ok(css.includes('.daily-feed-resume-overlay.bz-zoo-backgrounded .bz-zoo-effects 
 ok(css.includes('.bz-zoo-break-splash { opacity: 1; transform: none; }') &&
    css.includes('.bz-zoo-break-shake {'),
    'Reduced-motion shows a static readable rainbow announcement');
-ok(sw.includes('2026_Oct_27_patch72_1b5_centered_translation_shake'),
+ok(/const CACHE_VERSION = "2026_[^"]*patch72_1/.test(sw),
    'PWA cache bumped for new CSS and JS');
 for (const p of ['verse_games/shared/welcome-back.css',
                  'verse_games/shared/welcome-back-zoo-escape.js'])

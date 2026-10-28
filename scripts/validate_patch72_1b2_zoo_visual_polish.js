@@ -45,7 +45,7 @@ ok(engine.includes("Date.now() - lastBounceSoundAt >= 180"), "Optional bounce so
 ok(engine.includes("vy: rand(290, 420)"), "Fast Y bounce velocity, approx 3x prior");
 ok(engine.includes('const EMERGE_MS = 750') && engine.includes('const SPAWN_MS = 1000'), "Original emergence and spawn cadence unchanged");
 ok(engine.includes('root.requestAnimationFrame(() => {'), "Poof starts on a paint frame like Traffic Tap");
-ok(/2026_Oct_27_patch72_1b(?:[234]_zoo_|5_centered_translation_shake)/.test(sw), "PWA cache covers original visual polish or a newer revision");
+ok(/const CACHE_VERSION = "2026_[^"]*patch72_1/.test(sw), "PWA cache covers original visual polish or a newer revision");
 
 // Drive actual Zoo Escape rendering with the same simulated DOM used in 72.1A.
 // Reusing that tested harness keeps Feeding-specific behavior unchanged.

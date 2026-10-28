@@ -3149,6 +3149,8 @@
 
   setScreen("intro");
   welcomeBackController = window.BibloZooWelcomeBackReturn?.attach?.({
+    getSoundContext: () => audioCtx,
+    isSoundMuted: () => muted,
     shouldPrompt: () => state.screen === "game",
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,

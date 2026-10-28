@@ -111,6 +111,8 @@
       // Wacky Replay are never restarted implicitly; the child's next Play
       // tap owns their audio activation. No getUserMedia() here.
       onContinue: () => true,
+      getSoundContext: () => api?.getExistingAudioContext?.(),
+      isSoundMuted: () => api?.isMuted?.() === true,
       onExit: () => {
         const prompt = welcomeBack;
         welcomeBack = null;

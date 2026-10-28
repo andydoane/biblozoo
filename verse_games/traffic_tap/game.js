@@ -3448,6 +3448,8 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   window.BibloZooWelcomeBackReturn?.attach?.({
+    getSoundContext: () => audioCtx,
+    isSoundMuted: () => muted,
     shouldPrompt: () => state.running,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,

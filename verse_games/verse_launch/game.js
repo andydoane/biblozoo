@@ -4411,6 +4411,8 @@
   }
 
   window.BibloZooWelcomeBackReturn?.attach?.({
+    getSoundContext: () => audioCtx,
+    isSoundMuted: () => muted,
     shouldPrompt: () => ["game", "travel", "asteroids"].includes(state.screen) && !state.completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,

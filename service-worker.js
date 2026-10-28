@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_27_patch72_1b5_centered_translation_shake";
+const CACHE_VERSION = "2026_Oct_27_patch72_1d_zoo_hero_stats";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -174,6 +174,18 @@ const CORE_PATHS = [
 
   "./profile_pictures/profile_pictures.json",
   "./profile_pictures/profile_picture_fallback.png",
+  "./profile_pictures/profile_picture_ephesians_2_8_9.png",
+  "./profile_pictures/profile_picture_galatians_2_20.png",
+  "./profile_pictures/profile_picture_philippians_4_6.png",
+  "./profile_pictures/profile_picture_romans_12_2.png",
+  "./profile_pictures/profile_picture_2_corinthians_5_17.png",
+  "./profile_pictures/profile_picture_psalm_119_105.png",
+  "./profile_pictures/profile_picture_joshua_1_9.png",
+  "./profile_pictures/profile_picture_romans_5_8.png",
+  "./profile_pictures/profile_picture_isaiah_26_3.png",
+  "./profile_pictures/profile_picture_psalm_121_1_2.png",
+  "./profile_pictures/profile_picture_psalm_46_1.png",
+  "./profile_pictures/profile_picture_matthew_11_28.png",
 
   "./verse_data/verse_list.json",
 

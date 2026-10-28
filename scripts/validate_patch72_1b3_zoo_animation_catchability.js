@@ -111,7 +111,7 @@ ok(!source.includes('new AudioContext(') && !source.includes('setCategory('),
   "Zoo Escape cannot change native or Web Audio session policy");
 ok(feedingJs.includes('attemptFeedingResumeFromGesture'),
   "Feeding retains its own real recovery verifier");
-ok(worker.includes('2026_Oct_27_patch72_1b5_centered_translation_shake'),
+ok(/const CACHE_VERSION = "2026_[^"]*patch72_1/.test(worker),
   "Cache revision invalidates old animation JS and CSS");
 for (const resource of ['verse_games/shared/welcome-back.css',
     'verse_games/shared/welcome-back-zoo-escape.js']) {

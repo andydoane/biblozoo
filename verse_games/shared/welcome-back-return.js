@@ -6,11 +6,125 @@
 (function installWelcomeBackReturn(root) {
   "use strict";
 
-  function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, escapeText, preserveFocus = false, suppressUiSound = false } = {}) {
+  // Patch 72.1C: one lifecycle adapter for the 12 verse games, Playground,
+  // Flashcards, and applicable quiet daily tasks. Owners still supply their
+  // own pause, verified recovery/acknowledgement, and navigation callbacks.
+  // The old controller below remains the safe fallback if Zoo Escape is absent.
+  function attachZooReturn(options) {
+    const { shouldPrompt, onPause, onContinue, onExit, profileId,
+      pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
+      preserveFocus = false, suppressUiSound = false } = options;
+    const doc = root.document;
+    const overlay = doc.createElement("div");
+    overlay.className = "bz-welcome-overlay";
+    overlay.hidden = true;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
+    overlay.innerHTML = root.BibloZooWelcomeBack.markup("game");
+    const button = overlay.querySelector("[data-welcome-back-action]");
+    if (suppressUiSound) button?.setAttribute("data-no-ui-sound", "");
+    doc.body.appendChild(overlay);
+    let disposed = false;
+    let pending = false;
+    let away = false;
+    let hasBeenVisible = !doc.hidden;
+    let generation = 0;
+    const zoo = root.BibloZooZooEscape.create({
+      overlay, profileId, pictureBase, name, petName, verseId,
+      getSoundContext, isSoundMuted,
+      recover: () => {
+        const token = generation;
+        // onContinue must run synchronously inside the real LOCK GATE click.
+        let outcome;
+        try { outcome = onContinue(); } catch (_) { return false; }
+        return Promise.resolve(outcome).then(result =>
+          !disposed && pending && token === generation && !doc.hidden ? result : false,
+          () => false);
+      },
+      onRecovered: () => {
+        if (disposed || !pending || doc.hidden) return;
+        pending = false;
+        overlay.hidden = true;
+      },
+      onExit: () => {
+        if (disposed) return;
+        ++generation;
+        pending = false;
+        try {
+          const activityExit = () => {
+            if (typeof onExit === "function") onExit();
+            else root.VerseGameBridge?.exitGame?.();
+          };
+          // Scoped routing for terminal Zoo Escape ONLY. The owner still
+          // cancels pending audio work before calling its usual exitGame().
+          const bridge = root.VerseGameBridge;
+          if (typeof bridge?.withZooEscapeTitleExit === "function")
+            bridge.withZooEscapeTitleExit(activityExit);
+          else activityExit();
+        } catch (_) {
+          // A failing host navigation must not strand a child in a black fade.
+          overlay.hidden = true;
+        }
+      }
+    });
+    if (!zoo) { overlay.remove(); return null; }
+
+    function leave() {
+      if (disposed || away || !hasBeenVisible || !shouldPrompt()) return;
+      away = true;
+      const wasPending = pending;
+      pending = true;
+      ++generation;
+      overlay.hidden = true;
+      if (pending && wasPending) return; // keep rescued pets on mid-escape app switch
+      zoo.start(); // starts a genuinely new recovery session
+      try { onPause(); } catch (_) { /* preserve navigation/lifecycle */ }
+    }
+    function visible() {
+      if (disposed) return;
+      if (doc.hidden) { leave(); return; }
+      hasBeenVisible = true;
+      away = false;
+      if (!pending || !overlay.hidden) return;
+      overlay.hidden = false;
+      zoo.resumeVisible?.(); // preserve stage/pets across a second task switch
+      if (!preserveFocus) button?.focus?.({ preventScroll: true });
+    }
+    const pageHidden = () => leave();
+    doc.addEventListener("visibilitychange", visible);
+    root.addEventListener("pagehide", pageHidden);
+    root.addEventListener("pageshow", visible);
+    return Object.freeze({
+      isPaused: () => pending,
+      destroy() {
+        if (disposed) return;
+        disposed = true;
+        ++generation;
+        pending = false;
+        doc.removeEventListener("visibilitychange", visible);
+        root.removeEventListener("pagehide", pageHidden);
+        root.removeEventListener("pageshow", visible);
+        zoo.destroy();
+        overlay.remove();
+      }
+    });
+  }
+
+  function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
+    getSoundContext, isSoundMuted, escapeText, preserveFocus = false, suppressUiSound = false } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
         typeof onContinue !== "function") return null;
+
+    if (root.BibloZooZooEscape?.create) {
+      const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
+        onExit, profileId, pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
+        escapeText, preserveFocus,
+        suppressUiSound });
+      if (controller) return controller;
+    }
 
     const document = root.document;
     const overlay = document.createElement("div");

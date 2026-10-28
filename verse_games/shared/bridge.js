@@ -43,6 +43,18 @@
   let lastZooTodoCompletion = null;
 
   let pageTransitionStarted = false;
+  let zooEscapeTitleExit = false;
+
+  // Only a terminal Zoo Escape exit uses the title-screen destination.
+  // Callers still perform their ordinary activity-owned cleanup through
+  // exitGame(), including Daily To-Do's special quit handling.
+  function withZooEscapeTitleExit(callback) {
+    if (typeof callback !== "function") return;
+    const previous = zooEscapeTitleExit;
+    zooEscapeTitleExit = true;
+    try { return callback(); }
+    finally { zooEscapeTitleExit = previous; }
+  }
 
   function setExternalPwaThemeColor() {
     if (window.location.protocol === "capacitor:") {
@@ -1056,6 +1068,13 @@ function exitGame(){
     return;
   }
 
+  // Zoo Escape's terminal failure is distinct from a normal Back-to-Games
+  // action. Do not modify normal `returnTo` behavior or daily task exits.
+  if (zooEscapeTitleExit) {
+    returnToTitle();
+    return;
+  }
+
   try {
     const raw = params.returnTo || "";
     const target = raw
@@ -1102,6 +1121,7 @@ function exitGame(){
     endGameMix,
     isDailyTodoLaunch,
     returnToDailyTodo,
-    exitGame
+    exitGame,
+    withZooEscapeTitleExit
   };
 })();

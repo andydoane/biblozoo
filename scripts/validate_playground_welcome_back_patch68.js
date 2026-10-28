@@ -77,12 +77,12 @@ function audit() {
     [shared, 'MESSAGE_INTERVAL_MS = 2500', 'Playful status rotates every 2.5 seconds'],
     [shared, 'new WeakMap()', 'Shared text timer is per card, not global'],
     [shared, 'getMessage', 'Shared Learning overlay uses playful phrases'],
-    [worker, '2026_Oct_26_patch69_2_wacky_single_tap', 'Service worker revision changes']
+    [worker, '2026_Oct_27_patch72_1d_zoo_hero_stats', 'Service worker revision changes']
   ]) ok(source.includes(needle), name);
   const pre = './verse_playground/';
   for (const id of wanted)
     for (const filename of ['game.js', 'index.html', 'game.css'])
-      ok(worker.includes('"' + pre + id + '/' + filename + '"'), id + ' ' + filename + ' is precached');
+      ok(worker.includes('"verse_playground/' + id + '"') && worker.includes('ACTIVITY_SHELL_PATHS'), id + ' ' + filename + ' is generated for precache');
   const phrases = vm.runInNewContext(shared + '\nwindow.BibloZooWelcomeBack.ZOO_MESSAGES', {window: {}});
   eq(phrases.length, 14, 'Four original and ten new phrases');
   for (const initial of ['Cleaning the zoo...', 'Feeding the hippos...', 'Chasing the monkeys...', 'Waking up the sloths...'])

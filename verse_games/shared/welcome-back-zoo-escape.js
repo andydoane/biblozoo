@@ -10,7 +10,21 @@
   const MIN_PETS = 6;
   const MAX_PETS = 10;
   const EMERGE_MS = 750;
+  // Twelve verified real portraits from verse_data/verse_list.json. These are
+  // offline precached and keep standalone game pages varied even when their
+  // normal (main-app-initialized) in-memory picture catalog is empty.
+  const ZOO_BREAK_PORTRAITS = Object.freeze([
+    "ephesians_2_8_9", "galatians_2_20", "philippians_4_6", "romans_12_2",
+    "2_corinthians_5_17", "psalm_119_105", "joshua_1_9", "romans_5_8",
+    "isaiah_26_3", "psalm_121_1_2", "psalm_46_1", "matthew_11_28"
+  ]);
   const SPAWN_MS = 1000;
+  // Patch 72.1C.3: Feeding's six-note pop/bounce palette, played ONLY through
+  // an already-existing, passively advancing activity-owned Web Audio context.
+  // Never allocate, unlock, resume or replace a context to play a cosmetic sound.
+  const ZOO_NOTE_FREQUENCIES = Object.freeze([
+    523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
+  ]);
   const RECOVERY_WATCHDOG_MS = 7500;
   // Identical vector silhouette used by Traffic Tap and Verse Launch for wrong answers.
   // No platform-dependent cloud emoji; no dependency on the other game's DOM.
@@ -19,13 +33,86 @@
   <path fill="currentColor" d="M 12.949771,1.5464282 A 6.0017493,5.3230522 7.1160496 0 0 6.9820601,6.4190471 5.3405872,4.7400094 7.154063 0 0 6.8563886,6.4134999 5.3405872,4.7400094 7.154063 0 0 1.5243277,11.020646 5.3405872,4.7400094 7.154063 0 0 2.4259083,13.677302 4.0181559,3.5662928 7.1540647 0 0 0.66145837,16.583588 4.0181559,3.5662928 7.1540647 0 0 4.6728467,20.261811 4.0181559,3.5662928 7.1540647 0 0 5.1732885,20.243 a 5.3405872,4.7400094 7.154063 0 0 5.2883005,4.342428 5.3405872,4.7400094 7.154063 0 0 3.656255,-1.210431 4.0181559,3.5662928 7.1540647 0 0 3.300558,1.639798 4.0181559,3.5662928 7.1540647 0 0 4.011389,-3.466536 4.0181559,3.5662928 7.1540647 0 0 -0.416848,-1.594767 5.3405872,4.7400094 7.154063 0 0 4.783932,-4.586787 5.3405872,4.7400094 7.154063 0 0 -1.9322,-3.706541 4.0181559,3.5662928 7.1540647 0 0 0.764128,-2.0624453 4.0181559,3.5662928 7.1540647 0 0 -4.011389,-3.6776624 4.0181559,3.5662928 7.1540647 0 0 -1.744813,0.3148283 6.0017493,5.3230522 7.1160496 0 0 -5.92283,-4.6884523 z"/>
 </svg>`;
   const clampCount = n => Math.min(MAX_PETS, Math.max(MIN_PETS, Math.floor(Number(n) || MIN_PETS)));
+  // Patch 72.1C.1: developer-only, in-dialog deterministic failure testing.
+  // DISABLE before a public release. Feeding retains its separate score-badge
+  // harness, which already guards daily reward credit.
+  const ENABLE_ZOO_RETURN_TEST_HARNESS = true;
+  const TEST_HOLD_MS = 2400;
+  const TEST_SCENARIOS = Object.freeze([
+    { id: "stage2-real", label: "Stage 2 → Verify real recovery", results: [false, "real"] },
+    { id: "stage3-real", label: "Stage 3 → Verify real recovery", results: [false, false, "real"] },
+    { id: "stage3-exit", label: "Stage 3 → Zoo Exit", results: [false, false, false] },
+    { id: "deferred-real", label: "Pending interruption → Real recovery", results: ["deferred", "real"] },
+    { id: "early-stage2", label: "Early Exit at Stage 2", results: [false] },
+    { id: "early-stage3", label: "Early Exit at Stage 3", results: [false, false] }
+  ]);
   const nextStage = (stage, recovered) => recovered === true ? "recovered" :
     stage === "welcome" ? "escape" : stage === "escape" ? "break" : "exit";
+  // Patch 72.1D: per-Zookeeper, idempotent-once-per-pet rescue totals.
+  // Independent of the audio/progress store: failed or unavailable storage
+  // never blocks a child from completing a rescue or leaving the overlay.
+  const ZOO_STATS_PREFIX = "biblozooZooEscapeStats:v1:";
+  const emptyStats = () => ({ petsRescued: 0, zooBreaksStopped: 0, pendingPets: 0, pendingBreaks: 0 });
+  const cleanStat = n => Number.isSafeInteger(n) && n >= 0 ? n : 0;
+  function profileForStats(explicitId) {
+    const id = String(explicitId || root.VerseGameBridge?.getLaunchParams?.()?.profileId ||
+      root.BibloZooProfiles?.getActiveProfileId?.() || "").trim();
+    return id && id.length <= 128 && !/[\x00-\x1f]/.test(id) ? id : "";
+  }
+  function statsKey(id) { return id ? ZOO_STATS_PREFIX + id : ""; }
+  function readStats(id) {
+    const key = statsKey(id);
+    if (!key) return emptyStats();
+    try {
+      const parsed = JSON.parse(root.localStorage?.getItem(key) || "{}");
+      const values = emptyStats();
+      for (const name of Object.keys(values)) values[name] = cleanStat(parsed?.[name]);
+      return values;
+    } catch (_) { return emptyStats(); }
+  }
+  function writeStats(id, values) {
+    const key = statsKey(id);
+    if (!key) return false;
+    try {
+      if (!root.localStorage?.setItem) return false;
+      root.localStorage.setItem(key, JSON.stringify(values));
+      return true;
+    }
+    catch (_) { return false; }
+  }
+  function addStat(explicitId, kind) {
+    const id = profileForStats(explicitId);
+    if (!id || (kind !== "pet" && kind !== "break")) return false;
+    const values = readStats(id);
+    const total = kind === "pet" ? "petsRescued" : "zooBreaksStopped";
+    const pending = kind === "pet" ? "pendingPets" : "pendingBreaks";
+    if (values[total] >= Number.MAX_SAFE_INTEGER || values[pending] >= Number.MAX_SAFE_INTEGER)
+      return false;
+    values[total]++;
+    values[pending]++;
+    if (!writeStats(id, values)) return false;
+    try { root.dispatchEvent?.(new CustomEvent("biblozoo-zoo-stats-changed", { detail: { profileId: id } })); }
+    catch (_) { /* A missing CustomEvent implementation is harmless. */ }
+    return true;
+  }
+  function acknowledgeCelebration(explicitId) {
+    const id = profileForStats(explicitId);
+    if (!id) return null;
+    const values = readStats(id);
+    if (!values.pendingPets && !values.pendingBreaks) return null;
+    if (!writeStats(id, { ...values, pendingPets: 0, pendingBreaks: 0 })) return null;
+    return { petsRescued: values.pendingPets, zooBreaksStopped: values.pendingBreaks };
+  }
+  const statsApi = Object.freeze({ get: id => readStats(profileForStats(id)),
+    acknowledgeCelebration, storageKey: id => statsKey(profileForStats(id)) });
+  root.BibloZooZooStats = statsApi;
   const rand = (min, max) => min + Math.random() * (max - min);
 
   function create({ overlay, recover, onRecovered, onExit, onRescue,
-    onBreakComplete, soundIsReady, onPop, onBounce, profileId, pictureBase = "",
-    petName = "BibloPet", name, reducedMotion } = {}) {
+    onBreakComplete, soundIsReady, onPop, onBounce, getSoundContext, isSoundMuted,
+    isTestRun,
+    profileId, pictureBase = "",
+    petName, verseId, name, reducedMotion } = {}) {
     if (!overlay?.querySelector || typeof recover !== "function" ||
         typeof onExit !== "function") return null;
     const doc = overlay.ownerDocument || root.document;
@@ -41,6 +128,56 @@
     const identity = root.BibloZooWelcomeBack?.getIdentity?.(name, profileId) || {};
     const pictureSrc = safeBase + (identity.src || identity.fallback || "");
     const fallbackSrc = safeBase + (identity.fallback || "");
+    // Main app, Learn, Read My Verse and standalone game pages share the
+    // same per-profile verse progress. Read only; never mutate game progress.
+    function activeVerseId() {
+      let selected = typeof verseId === "function" ? verseId() : verseId;
+      if (!selected) selected = root.VerseGameBridge?.getLaunchParams?.()?.verseId;
+      return String(selected || "").trim();
+    }
+    const defaultPetNames = new Map();
+    function activePetName() {
+      const explicit = typeof petName === "function" ? petName() : petName;
+      if (String(explicit || "").trim()) return String(explicit).trim().slice(0, 40);
+      const id = activeVerseId();
+      if (!id) return "BibloPet";
+      try {
+        const api = root.BibloZooProfiles;
+        const profile = profileId || root.VerseGameBridge?.getLaunchParams?.()?.profileId ||
+          api?.getActiveProfileId?.();
+        const key = api?.getProfileProgressStorageKey?.(profile);
+        if (key) {
+          const progress = JSON.parse(root.localStorage?.getItem(key) || "{}");
+          const saved = String(progress?.verses?.[id]?.petName || "")
+            .replace(/\s+/g, " ").trim().slice(0, 40);
+          if (saved) return saved;
+        }
+      } catch (_) { /* Optional saved name; use official verse default. */ }
+      return defaultPetNames.get(id) || "BibloPet";
+    }
+    function preloadDefaultPetName() {
+      const id = activeVerseId();
+      if (!/^[a-z0-9_]+$/.test(id) || defaultPetNames.has(id) ||
+          typeof root.fetch !== "function") return;
+      // The activity's official verse JSON contains its default BibloPet name.
+      // Start loading well before a child reaches Stage 2; never block audio.
+      defaultPetNames.set(id, "");
+      Promise.resolve(root.fetch(safeBase + "verse_data/" + id + ".json"))
+        .then(response => response.ok ? response.json() : null)
+        .then(data => {
+          if (disposed) return;
+          const value = String(data?.biblopetDefaultName || "")
+            .replace(/\s+/g, " ").trim().slice(0, 40);
+          defaultPetNames.set(id, value);
+          if (value && stage === "escape" && id === activeVerseId())
+            setTitle(activePetName(), "escaped!");
+        }).catch(() => { /* Keep safe fallback if verse metadata is unavailable. */ });
+    }
+    function activePetPicture() {
+      const id = activeVerseId();
+      const relative = id && root.BibloZooProfiles?.getProfilePictureSrc?.(id);
+      return relative ? safeBase + relative : pictureSrc || fallbackSrc;
+    }
     const gateSrc = safeBase + "verse_images/zoobreak_gate.png";
     const lockSrc = safeBase + "verse_images/zoobreak_lock.png";
     const reduced = reducedMotion === true || (reducedMotion !== false &&
@@ -48,7 +185,7 @@
     const pen = doc.createElement("button");
     pen.type = "button";
     pen.className = "bz-zoo-pen no-zoom";
-    pen.setAttribute("aria-label", "Return selected BibloPet to the pen");
+    pen.setAttribute("aria-label", "Pen: tap here after selecting an escaped BibloPet to rescue it");
     pen.hidden = true;
     const penImg = doc.createElement("img");
     penImg.src = gateSrc;
@@ -73,8 +210,15 @@
     card.appendChild(exitButton);
     const field = doc.createElement("div");
     field.className = "bz-zoo-field";
-    field.setAttribute("aria-label", "Escaped BibloPets");
+    field.setAttribute("role", "group");
+    field.setAttribute("aria-label", "Escaped BibloPets. Select a pet, then select the pen to rescue it.");
     overlay.appendChild(field);
+    const rescueStatus = doc.createElement("p");
+    rescueStatus.className = "bz-zoo-rescue-status";
+    rescueStatus.setAttribute("role", "status");
+    rescueStatus.setAttribute("aria-live", "polite");
+    rescueStatus.setAttribute("aria-atomic", "true");
+    overlay.appendChild(rescueStatus);
     const effects = doc.createElement("div");
     effects.className = "bz-zoo-effects";
     effects.setAttribute("aria-hidden", "true");
@@ -95,9 +239,17 @@
     let rescued = 0;
     let selected = null;
     let breakCredited = false;
+    let completedBreakStats = false;
     let pets = [];
     let dragging = null;
     let lastBounceSoundAt = -Infinity;
+    let testScenario = null;
+    let testMenu = null;
+    let testHoldTimer = 0;
+    let testPointer = null;
+    const isDeveloperRun = () => !!testScenario || (typeof isTestRun === "function" && isTestRun() === true);
+    const allowTestMenu = ENABLE_ZOO_RETURN_TEST_HARNESS &&
+      !overlay.classList.contains("daily-feed-resume-overlay");
     const effectTimers = new Set();
     const laterEffect = (callback, delay) => {
       const id = root.setTimeout(() => { effectTimers.delete(id); callback(); }, delay);
@@ -108,10 +260,69 @@
       try { root.BibloZooAudioDiagnostics?.record(type, details); } catch (_) {}
     };
     const running = () => !disposed && pending && !doc.hidden && !overlay.hidden;
+    // Feeding continues to own its existing soundIsReady/onPop/onBounce path.
+    // Other activities opt in with getters for EXISTING audio only; simply
+    // constructing an AudioContext here can worsen iOS's stalled-session bug.
+    let soundClockSample = null;
+    let soundLastAt = -Infinity;
+    let soundLastNote = -1;
+    const getVerifiedEffectContext = () => {
+      if (typeof getSoundContext !== "function" || disposed || doc.hidden ||
+          overlay.hidden || (typeof isSoundMuted === "function" && isSoundMuted()))
+        return null;
+      let context;
+      try { context = getSoundContext(); } catch (_) { return null; }
+      if (!context || context.state !== "running") {
+        soundClockSample = null;
+        return null;
+      }
+      const now = root.performance?.now?.() ?? Date.now();
+      const audio = Number(context.currentTime);
+      if (!Number.isFinite(audio)) return null;
+      const prior = soundClockSample;
+      soundClockSample = { context, wall: now, audio };
+      if (!prior || prior.context !== context || now < prior.wall ||
+          now - prior.wall > 1500 || now - prior.wall < 65) return null;
+      return audio - prior.audio > 0.03 ? context : null;
+    };
+    const playPassiveSound = kind => {
+      const context = getVerifiedEffectContext();
+      if (!context) return;
+      const now = root.performance?.now?.() ?? Date.now();
+      if (now - soundLastAt < (kind === "bounce" ? 180 : 85)) return;
+      soundLastAt = now;
+      try {
+        let index = Math.floor(Math.random() * ZOO_NOTE_FREQUENCIES.length);
+        if (index === soundLastNote) index = (index + 1) % ZOO_NOTE_FREQUENCIES.length;
+        soundLastNote = index;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = context.currentTime;
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(ZOO_NOTE_FREQUENCIES[index], start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.20, start + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.095);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.onended = () => {
+          try { oscillator.disconnect(); gain.disconnect(); } catch (_) {}
+        };
+        oscillator.start(start);
+        oscillator.stop(start + 0.105);
+      } catch (_) { /* Missing/blocked audio never breaks Zoo Escape. */ }
+    };
     const sound = kind => {
-      // Strictly optional; never unlock or create audio merely to add an effect.
-      if (typeof soundIsReady !== "function" || soundIsReady() !== true) return;
-      try { if (kind === "bounce") onBounce?.(); else onPop?.(); } catch (_) {}
+      if (typeof soundIsReady === "function") {
+        // Do not change Feeding's owner-verified behavior or fall back to a
+        // different engine when Feeding itself rejects sound playback.
+        try {
+          if (soundIsReady() !== true) return;
+          if (kind === "bounce") onBounce?.(); else onPop?.();
+        } catch (_) {}
+        return;
+      }
+      playPassiveSound(kind);
     };
     function clearScheduled() {
       if (raf) root.cancelAnimationFrame(raf);
@@ -130,6 +341,7 @@
       selected = null;
       dragging = null;
       field.replaceChildren();
+      rescueStatus.textContent = "";
       effects.replaceChildren();
     }
     function place(node, x, y, degrees = 0, scale = 1) {
@@ -263,17 +475,19 @@
       exitButton.hidden = next === "welcome" || next === "recovered" || next === "exiting";
       if (status) status.hidden = true;
       if (next === "escape") {
+        rescueStatus.textContent = "One BibloPet escaped. Select it and the pen to rescue it.";
         shakeCard("escape");
-        setTitle(String(petName || "BibloPet").slice(0, 40), "escaped!");
-        setInstruction("Drag them back!");
+        setTitle(activePetName(), "escaped!");
+        setInstruction("Drag a pet to the pen, or tap a pet and then the pen!");
         total = 1;
         spawning = 0;
         rescued = 0;
-        createPet(pictureSrc || fallbackSrc, 1);
+        createPet(activePetPicture(), 1);
       } else if (next === "break") {
         emptyField();
+        rescueStatus.textContent = "Zoo Break! Select each escaped BibloPet, then select the pen.";
         setTitle("WARNING!", "Zoo BREAK!");
-        setInstruction("Drag them back!");
+        setInstruction("Drag a pet to the pen, or tap a pet and then the pen!");
         total = MIN_PETS + Math.floor(Math.random() * (MAX_PETS - MIN_PETS + 1));
         spawning = 0;
         rescued = 0;
@@ -287,7 +501,10 @@
     function possiblePictures() {
       let catalog = [];
       try { catalog = root.BibloZooProfiles?.getProfilePictureCatalog?.() || []; } catch (_) {}
-      const shuffled = [...new Set(catalog)];
+      // `getProfilePictureCatalog()` is initialized by app.js, not by a
+      // standalone game. Use a verified, offline-ready real portrait pool
+      // rather than falling back to one repeated zookeeper avatar.
+      const shuffled = [...new Set(catalog.length ? catalog : ZOO_BREAK_PORTRAITS)];
       for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
@@ -312,7 +529,16 @@
       img.src = src || fallbackSrc;
       img.alt = "";
       img.draggable = false;
-      img.onerror = () => { if (fallbackSrc && img.src !== new URL(fallbackSrc, doc.baseURI).href) img.src = fallbackSrc; };
+      img.onerror = () => {
+        // If an uncached portrait is missing, try the independently precached
+        // portrait for this pet instead of showing the SAME fallback for all.
+        const id = ZOO_BREAK_PORTRAITS[(number - 1) % ZOO_BREAK_PORTRAITS.length];
+        const distinct = safeBase + "profile_pictures/profile_picture_" + id + ".png";
+        const resolved = new URL(distinct, doc.baseURI).href;
+        if (img.src !== resolved) img.src = distinct;
+        else if (fallbackSrc && img.src !== new URL(fallbackSrc, doc.baseURI).href)
+          img.src = fallbackSrc;
+      };
       el.appendChild(img);
       field.appendChild(el);
       const pet = { node: el, x: c.x - b.size / 2, y: c.y - b.size / 2,
@@ -324,6 +550,19 @@
       const maxY = Math.max(b.edge, b.height - b.size - b.edge);
       pet.x = Math.max(b.edge, Math.min(maxX, pet.x));
       pet.y = Math.max(b.edge, Math.min(maxY, pet.y));
+      if (reduced) {
+        // Reduced Motion: no drifting, bouncing, growth, or invincible wait.
+        // Scatter at full size around the pen while preserving tap/drag rescue.
+        const angle = (number * 2.399963229728653) + (stage === "break" ? 0.4 : 0);
+        const distance = Math.max(b.size * 1.25, Math.min(b.width, b.height) * .28);
+        pet.x = Math.max(b.edge, Math.min(maxX, c.x - b.size / 2 + Math.cos(angle) * distance));
+        pet.y = Math.max(b.edge, Math.min(maxY, c.y - b.size / 2 + Math.sin(angle) * distance));
+        pet.angle = 0;
+        pet.state = "ready";
+        el.disabled = false;
+        el.tabIndex = 0;
+        el.classList.add("bz-zoo-catchable");
+      }
       pets.push(pet);
       place(el, pet.x, pet.y, pet.angle, reduced ? 1 : .15);
       // The expanding portrait signals invincibility. Touch and keyboard
@@ -353,7 +592,7 @@
       }
     }
     function runAnimation() {
-      if (!raf && running() && pets.some(p => p.state !== "rescued")) {
+      if (!reduced && !raf && running() && pets.some(p => p.state !== "rescued")) {
         lastFrame = 0;
         raf = root.requestAnimationFrame(tick);
       }
@@ -446,6 +685,8 @@
       pet.node.remove();
       if (selected === pet) selected = null;
       rescued++;
+      if (!isDeveloperRun()) addStat(profileId, "pet");
+      rescueStatus.textContent = `${rescued} of ${total} BibloPets rescued. ${rescued === total ? "All pets are safe! Lock the gate." : "Select another pet and then the pen."}`;
       const c = penCenter();
       poof(c.x, c.y);
       sound("rescue");
@@ -466,6 +707,8 @@
       if (disposed) return;
       overlay.classList.toggle("bz-zoo-backgrounded", !!doc.hidden);
       if (doc.hidden) {
+        cancelTestHold();
+        closeTestMenu();
         if (raf) root.cancelAnimationFrame(raf);
         if (dragging) dropPet(dragging.pet);
         raf = 0;
@@ -484,6 +727,10 @@
       }
     }
     function successful() {
+      if (stage === "break" && breakCredited && !completedBreakStats && !isDeveloperRun()) {
+        completedBreakStats = true;
+        addStat(profileId, "break");
+      }
       pending = false;
       stage = "recovered";
       emptyField();
@@ -506,6 +753,20 @@
         transitionTimer = root.setTimeout(() => { transitionTimer = 0; exitToZoo(); }, reduced ? 60 : 420);
       }
     }
+    // This never synthesizes success. A scripted failure/deferred result skips
+    // the owner's audio handler. A scripted "real" result invokes the owner's
+    // original recovery SYNCHRONOUSLY inside the real LOCK GATE click.
+    // Thus even in test mode, successful recovery must be verified by its owner.
+    function recoveryForAttempt(info) {
+      if (testScenario && testScenario.index < testScenario.results.length) {
+        const outcome = testScenario.results[testScenario.index++];
+        log("zoo-escape-dev-attempt", { scenario: testScenario.id,
+          index: testScenario.index, outcome: outcome === "real" ? "owner" : outcome });
+        if (outcome === false) return false;
+        if (outcome === "deferred") return { deferred: true, reason: "developer-test" };
+      }
+      return recover(info);
+    }
     function attempt() {
       if (!running() || busy || (stage !== "welcome" && stage !== "escape" && stage !== "break")) return;
       if ((stage === "escape" || stage === "break") && !instruction.hidden) return;
@@ -520,7 +781,7 @@
       // Invoke recovery synchronously while WebKit's direct user activation
       // exists. Do not await a cosmetic animation before calling this.
       let recovery;
-      try { recovery = recover({ stage: from, attempt: attemptCount }); }
+      try { recovery = recoveryForAttempt({ stage: from, attempt: attemptCount }); }
       catch (_) { recovery = false; }
       watchdog = root.setTimeout(() => {
         watchdog = 0;
@@ -533,7 +794,18 @@
         if (disposed || token !== serial || !busy) return;
         busy = false;
         if (watchdog) { root.clearTimeout(watchdog); watchdog = 0; }
-        if (ok === true && running()) successful();
+        if (ok?.deferred === true && running()) {
+          // A native interruption/cooldown is not a failed user attempt.
+          // Keep the same gate, allow another *real* tap, and expose Back.
+          attemptCount = Math.max(0, attemptCount - 1);
+          button.disabled = false;
+          exitButton.hidden = false;
+          if (status) {
+            status.textContent = "Sound isn't ready yet. Try again!";
+            status.hidden = false;
+          }
+          log("zoo-escape-recovery-deferred", { stage: from, reason: ok.reason || "native-interruption" });
+        } else if (ok === true && running()) successful();
         else if (running()) finishFailure(from);
       }, () => {
         if (disposed || token !== serial || !busy) return;
@@ -555,6 +827,77 @@
         overlay.classList.remove("bz-zoo-fade-black");
       }
     }
+    function cancelTestHold() {
+      if (testHoldTimer) root.clearTimeout(testHoldTimer);
+      testHoldTimer = 0;
+      testPointer = null;
+    }
+    function closeTestMenu() {
+      testMenu?.remove();
+      testMenu = null;
+    }
+    function showTestMenu() {
+      cancelTestHold();
+      if (!allowTestMenu || !running() || busy || testMenu) return;
+      const menu = doc.createElement("div");
+      menu.className = "bz-zoo-dev-menu";
+      menu.setAttribute("role", "dialog");
+      menu.setAttribute("aria-modal", "true");
+      menu.setAttribute("aria-label", "Zoo Escape developer test menu");
+      const content = doc.createElement("div");
+      content.className = "bz-zoo-dev-card";
+      const heading = doc.createElement("h2");
+      heading.textContent = "Zoo Escape TEST MODE";
+      content.appendChild(heading);
+      const note = doc.createElement("p");
+      note.textContent = "Simulates failures only. Success always uses the activity's real recovery check. No audio is faked.";
+      content.appendChild(note);
+      for (const item of TEST_SCENARIOS) {
+        const option = doc.createElement("button");
+        option.type = "button";
+        option.textContent = item.label;
+        option.addEventListener("click", () => {
+          if (!running() || busy || testMenu !== menu) return;
+          closeTestMenu();
+          start();
+          testScenario = { id: item.id, results: item.results, index: 0 };
+          log("zoo-escape-dev-selected", { scenario: item.id });
+          button.focus?.({ preventScroll: true });
+        });
+        content.appendChild(option);
+      }
+      const cancel = doc.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel / normal recovery";
+      cancel.addEventListener("click", closeTestMenu);
+      content.appendChild(cancel);
+      menu.appendChild(content);
+      overlay.appendChild(menu);
+      testMenu = menu;
+      content.querySelector?.("button")?.focus?.({ preventScroll: true });
+    }
+    function testPointerDown(event) {
+      if (!allowTestMenu || !running() || busy || testMenu ||
+          (event.button != null && event.button !== 0)) return;
+      cancelTestHold();
+      testPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      testHoldTimer = root.setTimeout(showTestMenu, TEST_HOLD_MS);
+    }
+    function testPointerMove(event) {
+      if (testPointer && testPointer.id === event.pointerId &&
+          Math.hypot(event.clientX - testPointer.x,
+            event.clientY - testPointer.y) > 14) cancelTestHold();
+    }
+    function testPointerEnd() { cancelTestHold(); }
+    function testContextMenu(event) {
+      if (allowTestMenu && running()) event.preventDefault?.();
+    }
+    function resumeVisible() {
+      if (disposed || !running()) return;
+      overlay.classList.remove("bz-zoo-backgrounded");
+      if (stage === "break" && spawning < total && !spawnTimer) spawnNext();
+      runAnimation();
+    }
     function resetDisplay() {
       card.classList.remove("bz-zoo-active", "bz-zoo-shake-escape", "bz-zoo-shake-break");
       overlay.classList.remove("bz-zoo-escape", "bz-zoo-fade-black", "bz-zoo-backgrounded");
@@ -570,6 +913,10 @@
     }
     function start() {
       if (disposed) return false;
+      preloadDefaultPetName();
+      cancelTestHold();
+      closeTestMenu();
+      testScenario = null;
       serial++;
       emptyField();
       pending = true;
@@ -579,6 +926,7 @@
       total = 0;
       spawning = 0;
       breakCredited = false;
+      completedBreakStats = false;
       stage = "welcome";
       resetDisplay();
       log("zoo-escape-start");
@@ -586,24 +934,41 @@
     }
     function destroy() {
       if (disposed) return;
+      cancelTestHold();
+      closeTestMenu();
+      testScenario = null;
       disposed = true;
       pending = false;
       serial++;
       emptyField();
       doc.removeEventListener("visibilitychange", onVisibility);
+      if (allowTestMenu) {
+        title.removeEventListener("pointerdown", testPointerDown);
+        title.removeEventListener("pointermove", testPointerMove);
+        title.removeEventListener("pointerup", testPointerEnd);
+        title.removeEventListener("pointercancel", testPointerEnd);
+        title.removeEventListener("contextmenu", testContextMenu);
+      }
       button.removeEventListener("click", attempt);
       pen.removeEventListener("click", tapPen);
       exitButton.removeEventListener("click", exitToZoo);
-      field.remove(); effects.remove(); pen.remove(); instruction.remove();
+      field.remove(); effects.remove(); rescueStatus.remove(); pen.remove(); instruction.remove();
       slot.parentNode?.insertBefore(button, slot);
       slot.remove(); exitButton.remove();
       resetDisplay();
+    }
+    if (allowTestMenu) {
+      title.addEventListener("pointerdown", testPointerDown);
+      title.addEventListener("pointermove", testPointerMove);
+      title.addEventListener("pointerup", testPointerEnd);
+      title.addEventListener("pointercancel", testPointerEnd);
+      title.addEventListener("contextmenu", testContextMenu);
     }
     button.addEventListener("click", attempt);
     pen.addEventListener("click", tapPen);
     exitButton.addEventListener("click", exitToZoo);
     doc.addEventListener("visibilitychange", onVisibility);
-    return Object.freeze({ start, destroy, exit: exitToZoo,
+    return Object.freeze({ start, resumeVisible, destroy, exit: exitToZoo,
       isPaused: () => pending, getStage: () => stage,
       getState: () => ({ stage, pending, attemptCount, total, spawning, rescued,
         active: pets.filter(p => p.state !== "rescued").length }) });

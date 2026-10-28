@@ -2697,6 +2697,8 @@
     const controllerOptions = {
       profileId,
       pictureBase: "../../",
+      getSoundContext: options.getAudioContext,
+      isSoundMuted: options.isMuted,
       escapeText: "Back to Playground",
       preserveFocus: true,
       shouldPrompt: () => !!options.isActive?.(),
