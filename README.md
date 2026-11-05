@@ -1,5 +1,7 @@
 # BibloZoo
 
+> **Starting a new ChatGPT session or contributing?** Read the [Living Project Handoff](docs/PROJECT-HANDOFF.md), then verify the current `ios-prep` branch, open PRs, and test results. Also see [Audio Recovery Safeguards](docs/AUDIO-RECOVERY.md) and [Testing & iPhone Acceptance](docs/TESTING.md).
+
 BibloZoo is a Bible verse memorization app built around guided learning, practice games, family profiles, and collectible BibloPets. It runs as a web/PWA experience and, on the `ios-prep` branch, as a packaged native iOS app using Capacitor.
 
 The app is designed to keep progress local to the device. It does not require an account, and the current privacy policy states that this version does not use advertising, analytics, or tracking services.
