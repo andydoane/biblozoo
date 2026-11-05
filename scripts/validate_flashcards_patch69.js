@@ -192,7 +192,7 @@ function checkSourceContracts() {
   // Cache revisions have advanced beyond Patch 72.1. Check the durable
   // contract (a versioned cache and preserved Flashcards offline assets),
   // not the name of a historical patch that happened to bump the cache.
-  check(/const CACHE_VERSION = "20\\d{2}_[^"\\n]+";/.test(serviceWorker) &&
+  check(/const CACHE_VERSION = "20[0-9]{2}_[^"]+";/.test(serviceWorker) &&
     serviceWorker.includes('"./flashcards/flashcards.js"'), 'versioned cache retains Flashcards');
   check(serviceWorker.includes('"./flashcards/vendor/soundtouchjs-2.1.1/SoundTouchNode.js"'), 'existing SoundTouch vendor assets remain listed');
   check(!flashcards.includes('navigator.mediaDevices.getUserMedia('), 'Flashcards return does not initiate mic permission');
