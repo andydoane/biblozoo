@@ -1,0 +1,107 @@
+# Run automated checks for BibloZoo's active iOS integration branch.
+# This checks JavaScript and web assets on Linux. It does NOT build the
+# native Xcode app, publish GitHub Pages, or replace physical iPhone testing.
+name: ios-prep validation
+
+on:
+  pull_request:
+    branches:
+      - ios-prep
+  push:
+    branches:
+      - ios-prep
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-prep-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regressions:
+    name: Node regression checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate daily activity and verse flows
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run validate:daily-question-generators
+          npm run validate:daily-question-sessions
+          npm run validate:daily-questions
+          npm run validate:daily-zoo-todo
+          npm run validate:daily-feed-game
+          npm run validate:read-my-verse
+
+      - name: Validate Feeding controls, visuals, and audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate_patch73_feeding_controls.js
+          node scripts/validate_patch73_feeding_controls_polish.js
+          node scripts/validate_patch73_1_feeding_polish.js
+          node scripts/validate_feeding_audio_bounce_patch24.js
+
+      - name: Validate Zoo Escape and cross-app recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate_patch72_1a_zoo_escape.js
+          node scripts/validate_patch72_1b_feeding_zoo_escape.js
+          node scripts/validate_patch72_1c_whole_app_zoo_escape.js
+          node scripts/validate_patch72_1c1_whole_app_test_harness.js
+          node scripts/validate_patch72_1c2_identity_artwork_exit.js
+          node scripts/validate_patch72_1c3_zoo_escape_sounds.js
+          node scripts/validate_patch72_1d_zookeeper_stats.js
+
+      - name: Validate Flashcards, Read My Verse, and app audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate_flashcards_patch69.js
+          node scripts/validate_read_my_verse_audio_patch70_2.js
+          node scripts/validate_app_audio_patch23b.js
+
+  web-build:
+    name: Production web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build production web bundle for Capacitor
+        run: npm run build
+
+      - name: Confirm bundled runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          test -s dist/app.js
+          test -s dist/daily_questions_feed_game.js
+          test -s dist/verse_games/shared/welcome-back-zoo-escape.js
+          test -s dist/profile_pictures/profile_picture_fallback.png
