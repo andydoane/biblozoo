@@ -723,3 +723,121 @@
   touch-action: manipulation;
 }
 .bz-zoo-test-card .bz-zoo-test-cancel { background: #fff; color: #333; }
+
+/* Patch 73: two-step Feeding control selection in the existing intro card. */
+.daily-feed-start-choice[hidden],
+.daily-feed-start-confirm[hidden],
+.daily-feed-control-message[hidden],
+.daily-feed-selected-control-icon[hidden] { display: none !important; }
+.daily-feed-start-card { max-height: calc(100% - 12px); overflow-y: auto; }
+.daily-feed-start-choice,
+.daily-feed-start-confirm {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 2.1vh, 20px);
+}
+.daily-feed-control-heading,
+.daily-feed-control-got-it {
+  border: 0;
+  border-radius: 999px;
+  background: #333333;
+  color: #fff;
+  padding: 8px 24px;
+  font: 900 clamp(21px, 5.5vw, 30px)/1.1 "Baloo 2", system-ui, sans-serif;
+}
+.daily-feed-control-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(12px, 4vw, 28px);
+  width: 100%;
+}
+.daily-feed-control-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  padding: clamp(7px, 1.7vw, 12px);
+  border: 0;
+  border-radius: 22px;
+  background: #fff;
+  color: #333333;
+  font: 900 clamp(18px, 4.5vw, 23px)/1.1 "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+.daily-feed-control-option img {
+  display: block;
+  width: min(100%, 132px);
+  height: clamp(90px, 16vh, 124px);
+  object-fit: contain;
+  pointer-events: none;
+}
+.daily-feed-selected-control-icon {
+  width: clamp(96px, 24vw, 140px);
+  height: clamp(85px, 16vh, 140px);
+  object-fit: contain;
+}
+.daily-feed-control-got-it {
+  cursor: pointer;
+  touch-action: manipulation;
+  pointer-events: auto;
+  min-height: 54px;
+  margin: 4px auto 0;
+}
+.daily-feed-control-option:focus-visible,
+.daily-feed-control-got-it:focus-visible {
+  outline: 4px solid #333333;
+  outline-offset: 4px;
+}
+.daily-feed-control-message {
+  margin: 0;
+  color: #6a241d;
+  font: 800 17px/1.2 "Baloo 2", system-ui, sans-serif;
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .daily-feed-control-option img { height: 60px; }
+  .daily-feed-selected-control-icon { height: 56px; }
+  .daily-feed-start-choice, .daily-feed-start-confirm { gap: 6px; }
+}
+
+/* Patch 73.1: recovered full icons have reserved space above their labels. */
+.daily-feed-control-option { justify-content: space-between; gap: 7px; }
+.daily-feed-control-option img {
+  box-sizing: border-box;
+  width: min(100%, 128px);
+  height: auto;
+  max-height: clamp(75px, 13vh, 115px);
+  object-fit: contain;
+  flex: 0 1 auto;
+}
+.daily-feed-control-option span { flex: 0 0 auto; line-height: 1.1; }
+/* Step two does not contain the three snacks or the title. */
+.daily-feed-start-balls[hidden],
+.daily-feed-start-title[hidden] { display: none !important; }
+.daily-feed-selected-control-tile {
+  box-sizing: border-box;
+  width: clamp(132px, 34vw, 180px);
+  min-height: clamp(122px, 24vh, 166px);
+  padding: 12px;
+  border-radius: 22px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+}
+.daily-feed-selected-control-icon {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: clamp(94px, 19vh, 140px);
+  object-fit: contain;
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .daily-feed-control-option img { max-height: 68px; }
+  .daily-feed-selected-control-tile { min-height: 84px; padding: 7px; }
+  .daily-feed-selected-control-icon { max-height: 76px; }
+}

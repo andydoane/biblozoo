@@ -1413,9 +1413,9 @@ function testBounceThreeLivesAndPopup() {
 function testBounceOverlayLifecycleAndRealDailyIsolation() {
   assert.ok(
     source.includes(
-      'runtime.startOverlayHandler && runtime.mode !== FEED_MODES.BOUNCE'
+      'Keep the intro listener for every mode'
     ),
-    "Bounce must retain its overlay click handler for extra serves"
+    "All Feeding modes must retain the intro listener for missing Tilt sensors"
   );
   assert.ok(
     source.includes(
@@ -2672,10 +2672,12 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
     `${prefix}dq_feed_ball_rainbow.png`,
     `${prefix}dq_feed_star_peg.png`,
     `${prefix}dq_feed_shadow.png`,
+    `${prefix}dq_feed_control_tilt.png`,
+    `${prefix}dq_feed_control_drag.png`,
     `${prefix}dq_feed_star.mp3`,
     `${prefix}dq_feed_chomp.mp3`
   ];
-  assert.strictEqual(expected.length, 33);
+  assert.strictEqual(expected.length, 35);
   assert.deepStrictEqual(paths, expected);
   assert.strictEqual(new Set(paths).size, paths.length);
   assert.ok(sw.includes("await precacheDailyFeedAssets(cache);"));
@@ -2738,7 +2740,7 @@ async function testDailyFeedPrecacheSurvivesIndividualFailures() {
     await installing;
     assert.strictEqual(
       [...cached.values()].filter((value) => value === "feed").length,
-      failOne ? 32 : 33
+      failOne ? 34 : 35
     );
     assert.ok(cached.has("https://example.org/biblozoo/daily_questions_feed_game.js"));
     assert.strictEqual(warnings.length, failOne ? 1 : 0);
@@ -3078,7 +3080,7 @@ function testFeedingGamePreviewSessionIsolation() {
   );
   assert.ok(
     launchSource.includes(
-      "await requestDailySnackTiltPermission();"
+      'typeof window.DeviceOrientationEvent !== "undefined";'
     )
   );
   assert.ok(

@@ -27,15 +27,18 @@ ok(src.includes('if (!isDeveloperRun()) addStat(profileId, "pet")'), "simulated 
 ok(src.includes('if (reduced) {') && src.includes('pet.state = "ready"') && src.includes('if (!reduced && !raf'), "reduced motion uses stationary and instantly catchable pets");
 ok(src.includes('pen.focus?.({ preventScroll: true })'), "keyboard tap-select flow can reach pen");
 ok(src.includes('field.setAttribute("role", "group")'), "escaped pets are grouped for screen readers");
-ok(src.includes('setInstruction("Drag a pet to the pen, or tap a pet and then the pen!")'), "instructions announce non-drag alternative");
+ok(src.includes('setInstruction("Drag the pet to the pen!")') && src.includes('setInstruction("Drag pets to the pen!")'), "short visual instructions preserve card height");
+ok(src.includes('pen.addEventListener("click", tapPen)') && src.includes('el.addEventListener("click", event =>'), "tap-to-rescue support remains available");
 ok(sharedCss.includes(".bz-zoo-rescue-status") && sharedCss.includes("clip-path: inset(50%)"), "accessible rescue status is visually unobtrusive");
 ok(css.includes(".title-zoo-hero-celebration") && css.includes("@media (prefers-reduced-motion: reduce)"), "home celebration with reduced-motion alternative");
-for (const token of ["Zoo Hero!", "title-zoo-hero-tally", "title-zoo-hero-close", "BibloPets Rescued", "Zoo Breaks Stopped", "acknowledgeCelebration", "zooEscapeStats.petsRescued", "zooEscapeStats.zooBreaksStopped"])
+for (const token of ["Zoo Hero!", "title-zoo-hero-close", "BibloPets Rescued", "Zoo Breaks Stopped", "acknowledgeCelebration", "zooEscapeStats.petsRescued", "zooEscapeStats.zooBreaksStopped"])
   ok(app.includes(token), `home / Zookeeper stats UI: ${token}`);
 ok(app.includes('!showDailyOffer') && app.includes('!tutorialActive'), "home celebration respects Daily To-Do dialog and tutorial");
+ok(!app.includes('title-zoo-hero-tally') && !app.includes('zooTallyHtml'), "home no longer displays permanent Zoo Escape statistics");
+ok(!css.includes('.title-zoo-hero-tally'), "obsolete home tally styles removed");
 ok(feeding.includes('isTestRun: () => !!runtime.zooDevScenario'), "Feeding dev harness cannot award real credits");
 ok(profiles.includes('localStorage.removeItem(`biblozooZooEscapeStats:v1:${id}`)'), "profile deletion with progress removes stats");
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch72_1d/.test(sw), "offline cache revised");
+ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw), "offline cache revised");
 for(const asset of ["./styles.css", "./profiles.js", "./verse_games/shared/welcome-back-zoo-escape.js", "./verse_games/shared/welcome-back.css", "./verse_fonts/TitanOne.ttf", "./verse_images/zoobreak_gate.png", "./verse_images/zoobreak_lock.png"])
   ok(sw.includes(`"${asset}"`), `offline asset: ${asset}`);
 ok(index.indexOf('src="profiles.js"') < index.indexOf('src="verse_games/shared/welcome-back-zoo-escape.js"'), "profile storage loads before stats API");

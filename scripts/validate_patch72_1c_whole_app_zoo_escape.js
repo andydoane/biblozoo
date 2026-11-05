@@ -43,7 +43,7 @@ const mainHtml = read("index.html");
 ok(mainHtml.indexOf('src="verse_games/shared/welcome-back-zoo-escape.js"') > 0 &&
   mainHtml.indexOf('src="verse_games/shared/welcome-back-zoo-escape.js"') <
   mainHtml.indexOf('src="app.js"'), "main app preloads Zoo Escape before activity owners");
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch72_1(?:c|d)/.test(sw),
+ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw),
   "fresh PWA cache generation");
 for (const p of ["welcome-back-zoo-escape.js","welcome-back-return.js","welcome-back.css"])
   ok(sw.includes(`"./verse_games/shared/${p}"`), `${p}: offline cached`);

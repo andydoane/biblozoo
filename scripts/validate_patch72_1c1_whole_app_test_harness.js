@@ -24,7 +24,7 @@ ok(src.includes('return recover(info);'),"real result uses owner recovery");
 ok(!src.includes('return true; // test') && !src.includes('return Promise.resolve(true); // test'),
   "test scenario never fabricates audio success");
 ok(css.includes(".bz-zoo-dev-menu") && css.includes("z-index: 100"),"menu sits above escaped portraits");
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch72_1(?:c|d)/.test(sw),"offline asset revision updated");
+ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw),"offline asset revision updated");
 ok(adapter.includes("const wasPending = pending;") && adapter.includes("zoo.resumeVisible?.();"),
   "shared return preserves staged pets on repeated app switches");
 

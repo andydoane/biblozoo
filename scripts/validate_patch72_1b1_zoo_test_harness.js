@@ -121,7 +121,7 @@ function staticContracts(){
  ok(feed.includes('destroyFeedZooTestHarness(runtime);'),"cleanup on stop");
  ok(css.includes('.bz-zoo-test-menu')&&css.includes('env(safe-area-inset-top)'),"small-screen safe test menu styling");
  ok(shared.includes('onBreakComplete?.({ rescued, total })'),"test session does not inject stats callback");
- ok(/const CACHE_VERSION = "[^"]*patch72_1/.test(sw) && sw.includes('"./daily_questions_feed_game.js"'),"versioned PWA precaches current Feeding test harness source");
+ ok(/const CACHE_VERSION = "[^"]*patch(?:72_1|73)/.test(sw) && sw.includes('"./daily_questions_feed_game.js"'),"versioned PWA precaches current Feeding test harness source");
  ok(!feed.includes('AVAudioSessionCategoryPlayback'),"native audio category unchanged");
 }
 function runCase(index,expectedId,results){

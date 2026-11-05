@@ -146,7 +146,7 @@ function staticContracts(){
     'Daily Questions emergency exit returns title, not award completion');
  ok(app.includes('onBackToZoo: () => {'),'Daily snack returns title through current callback');
  ok(!feed.includes('AVAudioSessionCategoryPlayback'),'SoloAmbient policy untouched by Feeding');
- ok(/const CACHE_VERSION = "[^"]*patch72_1/.test(sw) &&
+ ok(/const CACHE_VERSION = "[^"]*patch(?:72_1|73)/.test(sw) &&
     sw.includes('"./daily_questions_feed_game.js"') &&
     sw.includes('"./verse_games/shared/welcome-back-zoo-escape.js"'),
     'Versioned PWA precaches current Feeding and Zoo Escape source');

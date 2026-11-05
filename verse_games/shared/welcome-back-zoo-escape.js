@@ -478,7 +478,7 @@
         rescueStatus.textContent = "One BibloPet escaped. Select it and the pen to rescue it.";
         shakeCard("escape");
         setTitle(activePetName(), "escaped!");
-        setInstruction("Drag a pet to the pen, or tap a pet and then the pen!");
+        setInstruction("Drag the pet to the pen!");
         total = 1;
         spawning = 0;
         rescued = 0;
@@ -487,7 +487,7 @@
         emptyField();
         rescueStatus.textContent = "Zoo Break! Select each escaped BibloPet, then select the pen.";
         setTitle("WARNING!", "Zoo BREAK!");
-        setInstruction("Drag a pet to the pen, or tap a pet and then the pen!");
+        setInstruction("Drag pets to the pen!");
         total = MIN_PETS + Math.floor(Math.random() * (MAX_PETS - MIN_PETS + 1));
         spawning = 0;
         rescued = 0;

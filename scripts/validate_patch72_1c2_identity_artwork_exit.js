@@ -29,7 +29,7 @@ for(const id of ids){
 ok(css.includes('font-family: "Titan One";') && css.includes('url("../../verse_fonts/TitanOne.ttf")'),
   "shared stylesheet defines actual Titan One file instead of relying on Verse Jam");
 ok(fs.statSync(path.join(ROOT,"verse_fonts/TitanOne.ttf")).size>10000,"real font exists");
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch72_1(?:c|d)/.test(sw),"fresh offline cache revision");
+ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw),"fresh offline cache revision");
 ok(adapter.includes('bridge.withZooEscapeTitleExit(activityExit)'),"only Zoo controller wraps owner exit");
 ok(adapter.includes('else activityExit();'),"non-game caller retains its own exit");
 ok(engine.includes('getProfileProgressStorageKey'),"profile-safe progress lookup");

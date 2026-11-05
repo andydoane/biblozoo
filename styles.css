@@ -2489,6 +2489,11 @@ Game Mix Finished Screen
 }
 
 .title-current-verse-panel {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
   width: min(100%, 700px);
   max-width: 700px;
   min-height: clamp(76px, 13vw, 108px);
@@ -8682,21 +8687,7 @@ body:has(#app .todo-dev-screen.is-tutorial-mode),
   }
 }
 
-/* Patch 72.1D — accessible home Zoo Hero celebration and persistent tally. */
-.title-zoo-hero-tally {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin: 8px 0 4px;
-  color: #fff;
-  font: 800 clamp(13px, 3.7vw, 18px)/1.2 "Baloo 2", system-ui, sans-serif;
-}
-.title-zoo-hero-tally span {
-  background: rgba(0, 0, 0, .40);
-  border-radius: 999px;
-  padding: 5px 13px;
-}
+/* Patch 72.1D — accessible one-time home Zoo Hero celebration. */
 .title-zoo-hero-celebration {
   width: min(100%, 520px);
   box-sizing: border-box;
@@ -8742,4 +8733,18 @@ body:has(#app .todo-dev-screen.is-tutorial-mode),
 @keyframes bzZooHeroTwinkle { 50% { transform: scale(1.2); } }
 @media (prefers-reduced-motion: reduce) {
   .title-zoo-hero-celebration, .title-zoo-hero-spark { animation: none !important; }
+}
+
+/* Patch 73: Current Verse is a real accessible My Verses navigation button. */
+.title-current-verse-panel:focus-visible {
+  outline: 4px solid #ffc751;
+  outline-offset: 4px;
+}
+.title-current-verse-panel:disabled { cursor: default; }
+
+/* Patch 73.1: Current Verse became a button in Patch 73. The global button
+ * typography rule must not replace this panel's original Titan One. */
+.home-screen button.title-current-verse-panel,
+.home-screen button.title-current-verse-panel * {
+  font-family: "Titan One", "Baloo 2", system-ui, sans-serif !important;
 }

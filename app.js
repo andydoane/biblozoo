@@ -6889,8 +6889,10 @@ async function startDailyTodoSnack(
   }
 
   feedGame.prepareAudio?.();
+  // Motion permission is requested by the child's Tilt choice inside the
+  // Feeding intro, not before the control-selection popup appears.
   const rewardTiltEnabled =
-    await requestDailySnackTiltPermission();
+    typeof window.DeviceOrientationEvent !== "undefined";
   const ready =
     getReadyDailySnackRuntime(
       requestedPlan
@@ -14894,20 +14896,11 @@ function screenTitle(idx) {
         dailyHomePlan.verseId
       )
     : "";
-  const zooStats = activeProfile
-    ? window.BibloZooZooStats?.get?.(activeProfile.id)
-    : null;
   // A new rescue is celebrated once, on the home screen. If a Daily To-Do
   // invitation is occupying the foreground, leave the celebration pending.
   const zooCelebration = activeProfile && !tutorialActive && !showDailyOffer
     ? window.BibloZooZooStats?.acknowledgeCelebration?.(activeProfile.id)
     : null;
-  const zooTallyHtml = zooStats && !tutorialActive
-    ? `<div class="title-zoo-hero-tally" aria-label="Zoo Escape achievements: ${zooStats.petsRescued} BibloPets rescued and ${zooStats.zooBreaksStopped} Zoo Breaks stopped">
-        <span>🐾 ${zooStats.petsRescued} rescued</span>
-        <span>🔒 ${zooStats.zooBreaksStopped} Zoo Breaks stopped</span>
-      </div>`
-    : "";
   const zooCelebrationHtml = zooCelebration
     ? `<section class="title-zoo-hero-celebration" role="status" aria-live="polite" aria-label="Zoo rescue celebration">
         <div class="title-zoo-hero-spark" aria-hidden="true">★</div>
@@ -15061,10 +15054,12 @@ function screenTitle(idx) {
         </button>
       </div>
 
-      <div class="title-current-verse-panel" aria-label="Current verse">
-        <div class="title-current-verse-label">Current Verse</div>
-        <div class="title-current-verse-ref">${escapeHtml(currentVerseRef)}</div>
-      </div>
+      <button class="title-current-verse-panel no-zoom" id="titleCurrentVerseBtn"
+        type="button" aria-label="Open My Verses, current verse: ${escapeHtml(currentVerseRef)}"
+        ${tutorialActive ? "disabled" : ""}>
+        <span class="title-current-verse-label">Current Verse</span>
+        <span class="title-current-verse-ref">${escapeHtml(currentVerseRef)}</span>
+      </button>
 
       <div class="title-action-row" aria-label="Main actions">
         ${renderTitleActionButton({
@@ -15112,7 +15107,6 @@ function screenTitle(idx) {
         ${dailyProgressHtml}
       </button>
 
-      ${zooTallyHtml}
       ${zooCelebrationHtml}
       <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
@@ -15131,6 +15125,12 @@ function screenTitle(idx) {
       go(Screen.MY_VERSES);
     };
   }
+
+  // The Current Verse card follows the exact same navigation as My Verses.
+  wrap.querySelector("#titleCurrentVerseBtn")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!tutorialActive) go(Screen.MY_VERSES);
+  });
 
   const titleProfileBtn = wrap.querySelector(
     "#titleProfileBtn"
@@ -15467,7 +15467,7 @@ function screenTitle(idx) {
       feedGame.prepareAudio?.();
 
       const rewardTiltEnabled =
-        await requestDailySnackTiltPermission();
+        typeof window.DeviceOrientationEvent !== "undefined";
 
       window.BibloZooDailyTodoUI
         ?.clearTemporaryPreviewState?.();

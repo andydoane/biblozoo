@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_27_patch72_1d_zoo_hero_stats";
+const CACHE_VERSION = "2026_Oct_28_patch73_1_feeding_intro_polish";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -228,6 +228,8 @@ const FEED_ASSET_PATHS = [
     .map((color) => `./verse_images/daily_questions/dq_feed_ball_${color}.png`),
   "./verse_images/daily_questions/dq_feed_star_peg.png",
   "./verse_images/daily_questions/dq_feed_shadow.png",
+  "./verse_images/daily_questions/dq_feed_control_tilt.png",
+  "./verse_images/daily_questions/dq_feed_control_drag.png",
   "./verse_images/daily_questions/dq_feed_star.mp3",
   "./verse_images/daily_questions/dq_feed_chomp.mp3"
 ];

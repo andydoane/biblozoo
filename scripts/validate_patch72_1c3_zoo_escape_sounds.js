@@ -58,7 +58,7 @@ ok(readMy.includes('getSoundContext: () => scrambleAudioContext?.state === "runn
 ok(readMy.includes('appApi?.getExistingAudioContext?.()'), 'Read My Verse fallback reuses existing app engine');
 ok(cards.includes('getSoundContext: () => api?.getExistingAudioContext?.()'), 'Flashcards acknowledgement uses existing app engine only');
 ok(cards.includes('isSoundMuted: () => api?.isMuted?.() === true'), 'Flashcards does not sound when muted');
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch72_1(?:c|d)/.test(sw), 'service worker uses new offline cache revision');
+ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw), 'service worker uses new offline cache revision');
 for(const file of ['welcome-back-zoo-escape.js','welcome-back-return.js'])
   ok(sw.includes(`"./verse_games/shared/${file}"`),`sound changes precached ${file}`);
 // Reuse actual DOM/controller fixture to exercise Web Audio gating, not simply

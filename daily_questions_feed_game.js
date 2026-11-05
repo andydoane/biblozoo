@@ -139,6 +139,13 @@
   const LABYRINTH_PLATFORM_SETTLE_SPEED_RADIUS_SCALE = 4;
   const LABYRINTH_PLATFORM_MAX_BOUNCE_SPEED_RADIUS_SCALE = 6.5;
   const LABYRINTH_RELEASE_SPEED_SCALE = 0.32;
+  // Stable per-ball steering response: a wider 30% spread gives the balls
+  // noticeably different-feeling weights for both tilt and drag. Physics
+  // gravity, maximum speeds, scoring and collision response are unchanged.
+  const LABYRINTH_ACCELERATION_FACTORS = Object.freeze([
+    0.85, 1.15, 0.90, 1.10, 0.95, 1.05, 1.00
+  ]);
+  const LABYRINTH_IMPACT_SOUND_GAP_MS = 135;
 
   const BOUNCE_COLUMNS = 5;
   const BOUNCE_ROWS = 4;
@@ -1257,7 +1264,10 @@
   }
 
   function feedInstructionPrompt(mode, tiltEnabled) {
-    const control = tiltEnabled ? "Tilt or drag" : "Drag";
+    // Boolean compatibility is retained for existing callers and validators.
+    const control = typeof tiltEnabled === "string"
+      ? (tiltEnabled === "tilt" ? "Tilt" : "Drag")
+      : (tiltEnabled ? "Tilt or drag" : "Drag");
     switch (mode) {
       case FEED_MODES.LABYRINTH:
         return `${control} to guide snacks through the gaps!`;
@@ -1357,8 +1367,33 @@
               ${modeConfig.instructions.title}
             </div>
 
-            <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
-              ${feedInstructionPrompt(mode, tiltAvailable)}
+            <div class="daily-feed-start-choice" data-daily-feed-start-choice>
+              <div class="daily-feed-control-heading">Choose Controls</div>
+              <div class="daily-feed-control-options" role="group" aria-label="Choose one steering control">
+                <button class="daily-feed-control-option no-zoom" type="button"
+                  data-daily-feed-control="tilt" aria-label="Choose Tilt controls">
+                  <img src="${ASSET_BASE}dq_feed_control_tilt.png" alt="">
+                  <span>Tilt</span>
+                </button>
+                <button class="daily-feed-control-option no-zoom" type="button"
+                  data-daily-feed-control="drag" aria-label="Choose Drag controls">
+                  <img src="${ASSET_BASE}dq_feed_control_drag.png" alt="">
+                  <span>Drag</span>
+                </button>
+              </div>
+              <p class="daily-feed-control-message" data-daily-feed-control-message
+                role="status" aria-live="polite" hidden></p>
+            </div>
+            <div class="daily-feed-start-confirm" data-daily-feed-start-confirm hidden>
+              <div class="daily-feed-selected-control-tile" aria-hidden="true">
+                <img class="daily-feed-selected-control-icon"
+                  data-daily-feed-selected-icon alt="" hidden>
+              </div>
+              <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
+                ${feedInstructionPrompt(mode, tiltAvailable)}
+              </div>
+              <button class="daily-feed-control-got-it no-zoom" type="button"
+                data-daily-feed-confirm-button>Got It!</button>
             </div>
           </div>
         </div>
@@ -2120,6 +2155,13 @@
     return runtime.pegRadius * 0.66 * LABYRINTH_BALL_SIZE_MULTIPLIER;
   }
 
+  // Exactly the onscreen diameter of the star artwork inside Bounce's gray
+  // brick (not the invisible collision circle around a regular peg).
+  function getFeedStarPegDiameter(runtime) {
+    const brick = bounceBrickGeometry(runtime.width, runtime.height, 0, 0);
+    return Math.min(brick.height * 0.87, brick.width * 0.64);
+  }
+
   function initializeLabyrinthMode(runtime) {
     const ballRadius = getLabyrinthBallRadius(runtime);
     const platformRows =
@@ -2198,6 +2240,10 @@
       angularVelocity: 0,
       points: config.points || 1,
       bonus: false,
+      accelerationFactor: LABYRINTH_ACCELERATION_FACTORS[
+        spawnIndex % LABYRINTH_ACCELERATION_FACTORS.length
+      ],
+      lastPlatformSoundAt: -Infinity,
       bornAt: now,
       labyrinthProgressAt: now,
       labyrinthProgressX: x,
@@ -2553,6 +2599,7 @@
     ball.vx +=
       state.steering *
       state.steerAcceleration *
+      (ball.accelerationFactor ?? 1) *
       dt;
     ball.vx *=
       Math.pow(
@@ -2581,11 +2628,19 @@
       runtime,
       ball
     );
-    collideLabyrinthBallWithPlatforms(
+    const impactSpeed = Math.max(0, ball.vy);
+    const hitPlatform = collideLabyrinthBallWithPlatforms(
       runtime,
       ball,
       previousY
     );
+    // A real downward landing sounds like the existing peg notes; sliding or
+    // resting contacts do not retrigger on every 120Hz physics step.
+    if (hitPlatform && impactSpeed > Math.max(runtime.height * 0.06, ball.radius * 3.5) &&
+        now - (ball.lastPlatformSoundAt ?? -Infinity) >= LABYRINTH_IMPACT_SOUND_GAP_MS) {
+      ball.lastPlatformSoundAt = now;
+      playPegTone(runtime, now);
+    }
     recoverStuckLabyrinthBall(
       runtime,
       ball,
@@ -3140,8 +3195,17 @@
       if (activeRuntime !== runtime || !runtime.running ||
           runtime.feedPausedAt != null || runtime.tiltObserved) return;
       runtime.tiltEnabled = false;
-      runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, false);
       window.removeEventListener("deviceorientation", runtime.orientationHandler);
+      // Never silently change a locked Tilt session into Drag. Suspend the
+      // round at its exact progress and offer a deliberate alternative.
+      runtime.controlStoppedAt = performance.now();
+      if (runtime.startTitleEl) runtime.startTitleEl.textContent = runtime.modeConfig.instructions.title;
+      runtime.controlMode = null;
+      runtime.running = false;
+      if (runtime.rafId) cancelAnimationFrame(runtime.rafId);
+      runtime.rafId = 0;
+      showFeedingControlChoice(runtime,
+        "Tilt isn't responding. Choose Drag to keep playing.");
     }, 2000);
     runtime.tiltFallbackId = timer;
     runtime.modeTimers?.add(timer);
@@ -3600,7 +3664,7 @@
   }
 
   function spawnMelodyNote(runtime, entry) {
-    const radius = runtime.pegRadius * 0.66;
+    const radius = getFeedStarPegDiameter(runtime) / 2;
     const config = getMelodySnackConfig(entry.index);
     const x = clamp(
       Number(entry.x) || runtime.width / 2,
@@ -3698,7 +3762,6 @@
 
     const nextBalls = [];
     const startY = -runtime.pegRadius;
-    const arrivalY = runtime.petCenterY;
 
     for (const ball of runtime.balls) {
       const entry = ball.melodyEntry;
@@ -3724,9 +3787,15 @@
       }
 
       const visibleProgress = clamp(progress, 0, 1);
+      // Patch 73.1: the larger snack must *touch* the pet when its scheduled
+      // note sounds. Previously the ball center reached petCenterY at the
+      // beat, so its larger radius overlapped the portrait long beforehand.
+      // Keep all melody timing and catch scoring unchanged; only shorten the
+      // drawn travel to the pet's top contact boundary.
+      const contactY = runtime.petCenterY - runtime.petRadius - ball.radius;
       ball.y =
         startY +
-        (arrivalY - startY) * visibleProgress;
+        (contactY - startY) * visibleProgress;
       ball.rotation = visibleProgress * Math.PI * 2;
       nextBalls.push(ball);
     }
@@ -3991,7 +4060,7 @@
   function spawnBounceSnack(runtime, brick) {
     const config = brick.config;
     if (!config) return;
-    const radius = runtime.pegRadius * 0.66;
+    const radius = getFeedStarPegDiameter(runtime) / 2;
     runtime.balls.push({
       id: runtime.nextBallId++,
       config,
@@ -4217,6 +4286,11 @@
     runtime.introUnlockAt = now + 550;
     runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
     runtime.startInstructionEl.textContent = "Tap to launch";
+    runtime.controlPhase = "serve";
+    if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
+    if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
+    if (runtime.startSelectedIconEl) runtime.startSelectedIconEl.hidden = true;
+    if (runtime.startConfirmButton) runtime.startConfirmButton.textContent = "Launch!";
     runtime.startOverlay.hidden = false;
   }
 
@@ -4540,27 +4614,93 @@
     if (!runtime.zooDevTestEverActivated) runtime.onComplete?.(result);
   }
 
+  function showFeedingControlChoice(runtime, message = "") {
+    runtime.controlPhase = "choose";
+    // The game branding belongs to the chooser only, not the focused tutorial.
+    if (runtime.startTitleEl) runtime.startTitleEl.hidden = false;
+    if (runtime.startBallsEl) runtime.startBallsEl.hidden = false;
+    if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = false;
+    if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = true;
+    if (runtime.startControlMessageEl) {
+      runtime.startControlMessageEl.textContent = message;
+      runtime.startControlMessageEl.hidden = !message;
+    }
+    runtime.startOverlay.hidden = false;
+  }
+
+  function showFeedingControlInstructions(runtime, choice) {
+    // Keep the selected-method screen minimal and avoid overflowing the card.
+    if (runtime.startTitleEl) runtime.startTitleEl.hidden = true;
+    if (runtime.startBallsEl) runtime.startBallsEl.hidden = true;
+    runtime.controlMode = choice;
+    runtime.tiltEnabled = choice === "tilt";
+    runtime.controlPhase = "instructions";
+    if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
+    if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
+    if (runtime.startSelectedIconEl) {
+      runtime.startSelectedIconEl.src = `${ASSET_BASE}dq_feed_control_${choice}.png`;
+      runtime.startSelectedIconEl.hidden = false;
+    }
+    if (runtime.startInstructionEl) {
+      runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, choice);
+    }
+    if (runtime.startConfirmButton) runtime.startConfirmButton.textContent = "Got It!";
+    runtime.introUnlockAt = performance.now() + 200;
+  }
+
+  // Called directly by a real tap so iOS motion authorization retains user
+  // activation. It never unlocks audio or changes the activity's recovery.
+  async function chooseFeedingControl(runtime, choice) {
+    if (runtime.controlChoicePending || runtime.controlPhase !== "choose") return;
+    if (choice === "drag") {
+      showFeedingControlInstructions(runtime, "drag");
+      return;
+    }
+    const OrientationEvent = window.DeviceOrientationEvent;
+    if (!OrientationEvent) {
+      showFeedingControlChoice(runtime, "Tilt isn't available. Please choose Drag.");
+      return;
+    }
+    runtime.controlChoicePending = true;
+    let allowed = runtime.tiltPermissionPreapproved;
+    if (!allowed) {
+      if (typeof OrientationEvent.requestPermission === "function") {
+        try {
+          allowed = (await OrientationEvent.requestPermission()) === "granted";
+        } catch (_) { allowed = false; }
+      } else {
+        allowed = true;
+      }
+    }
+    runtime.controlChoicePending = false;
+    if (activeRuntime !== runtime || runtime.controlPhase !== "choose") return;
+    if (!allowed) {
+      showFeedingControlChoice(runtime, "Tilt permission wasn't granted. Please choose Drag.");
+      return;
+    }
+    runtime.tiltPermissionPreapproved = true;
+    showFeedingControlInstructions(runtime, "tilt");
+  }
+
   function startRound(runtime) {
     if (
       !runtime ||
       activeRuntime !== runtime ||
       runtime.roundStarted ||
-      runtime.finished
+      runtime.finished ||
+      !["tilt", "drag"].includes(runtime.controlMode) ||
+      runtime.controlPhase !== "instructions"
     ) {
       return;
     }
 
+    runtime.controlPhase = "playing";
     runtime.roundStarted = true;
     runtime.running = true;
     runtime.startOverlay.hidden = true;
 
-    if (runtime.startOverlayHandler && runtime.mode !== FEED_MODES.BOUNCE) {
-      runtime.startOverlay.removeEventListener(
-        "click",
-        runtime.startOverlayHandler
-      );
-      runtime.startOverlayHandler = null;
-    }
+    // Keep the intro listener for every mode: it is needed if a Tilt sensor
+    // stops responding and the player explicitly chooses Drag mid-round.
 
     const now = performance.now();
 
@@ -4752,6 +4892,8 @@
       state.petSpeed = width * 0.19;
     }
     if (runtime.melody) {
+      const radius = getFeedStarPegDiameter(runtime) / 2;
+      for (const ball of runtime.balls) ball.radius = radius;
       for (const entry of runtime.melody.timeline) {
         if (entry.x !== null) entry.x = width * entry.laneFraction;
       }
@@ -4768,7 +4910,12 @@
       state.ballRadius = clamp(width * 0.023, 8, 14);
       state.ballSpeed = Math.max(width * 0.62, height * BOUNCE_BALL_SPEED_SCALE);
       state.snackSpeed = height * BOUNCE_SNACK_SPEED_SCALE;
-      runtime.balls.forEach((snack) => { snack.vy = state.snackSpeed; });
+      const snackRadius = getFeedStarPegDiameter(runtime) / 2;
+      runtime.balls.forEach((snack) => {
+        snack.vy = state.snackSpeed;
+        snack.radius = snackRadius;
+        snack.x = clamp(snack.x, snackRadius, width - snackRadius);
+      });
       state.paddleHalfWidth = runtime.petRadius * BOUNCE_PADDLE_HALF_WIDTH_RADIUS_SCALE;
       state.paddleHeight = clamp(runtime.petRadius * BOUNCE_PADDLE_HEIGHT_RADIUS_SCALE, 16, 28);
       state.paddleGap = clamp(runtime.petRadius * BOUNCE_PADDLE_GAP_RADIUS_SCALE, 4, 8);
@@ -5064,7 +5211,17 @@
       tiltFallbackId: null,
       feedSoundNodes: new Set(),
       startTitleEl: startOverlay.querySelector("[data-daily-feed-start-title]"),
+      startBallsEl: startOverlay.querySelector(".daily-feed-start-balls"),
       startInstructionEl: startOverlay.querySelector("[data-daily-feed-start-instruction]"),
+      startChoiceEl: startOverlay.querySelector("[data-daily-feed-start-choice]"),
+      startConfirmEl: startOverlay.querySelector("[data-daily-feed-start-confirm]"),
+      startSelectedIconEl: startOverlay.querySelector("[data-daily-feed-selected-icon]"),
+      startConfirmButton: startOverlay.querySelector("[data-daily-feed-confirm-button]"),
+      startControlMessageEl: startOverlay.querySelector("[data-daily-feed-control-message]"),
+      controlPhase: "choose",
+      controlMode: null,
+      controlChoicePending: false,
+      controlStoppedAt: null,
       resultOverlay,
       resultTitleEl,
       resultScoreEl,
@@ -5103,9 +5260,9 @@
       smoothedPetVelocity: 0,
       dragging: false,
       activePointerId: null,
-      tiltEnabled:
-        session.rewardTiltEnabled === true &&
-        typeof window.DeviceOrientationEvent !== "undefined",
+      // No input method is active until the child chooses it.
+      tiltEnabled: false,
+      tiltPermissionPreapproved: session.rewardTiltPermissionGranted === true,
       tiltObserved: false,
       neutralGamma: null,
       smoothedTilt: 0,
@@ -5171,7 +5328,8 @@
     }
 
     runtime.orientationHandler = (event) => {
-      if (activeRuntime !== runtime || !runtime.roundStarted || runtime.finished ||
+      if (runtime.controlMode !== "tilt" || activeRuntime !== runtime ||
+          !runtime.roundStarted || runtime.finished ||
           runtime.feedPausedAt != null) return;
       runtime.modeController.handleInput(runtime, { type: "tilt", event });
     };
@@ -5210,6 +5368,7 @@
       (event) => {
         if (
           activeRuntime !== runtime ||
+          runtime.controlMode !== "drag" ||
           !runtime.roundStarted ||
           runtime.finished ||
           runtime.feedPausedAt != null
@@ -5236,6 +5395,7 @@
       (event) => {
         if (
           !runtime.dragging ||
+          runtime.controlMode !== "drag" ||
           activeRuntime !== runtime ||
           runtime.finished ||
           runtime.feedPausedAt != null
@@ -5251,6 +5411,9 @@
       (event) => {
         if (
           activeRuntime !== runtime ||
+          runtime.controlMode !== "drag" ||
+          !runtime.dragging ||
+          runtime.activePointerId !== event.pointerId ||
           runtime.feedPausedAt != null
         ) {
           return;
@@ -5280,26 +5443,48 @@
         } catch (err) { }
       };
 
-    runtime.startOverlayHandler =
-      (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+    runtime.startOverlayHandler = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (activeRuntime !== runtime || runtime.feedPausedAt != null) return;
 
-        if (
-          activeRuntime !== runtime ||
-          runtime.feedPausedAt != null ||
-          performance.now() <
-            runtime.introUnlockAt
-        ) {
-          return;
+      if (runtime.controlPhase === "choose") {
+        const button = event.target?.closest?.("[data-daily-feed-control]");
+        const choice = button?.getAttribute?.("data-daily-feed-control");
+        if (choice === "drag" || choice === "tilt") {
+          void chooseFeedingControl(runtime, choice);
         }
-
-        if (runtime.mode === FEED_MODES.BOUNCE && runtime.roundStarted) {
-          launchBounceServe(runtime);
+        return;
+      }
+      if (performance.now() < runtime.introUnlockAt) return;
+      if (runtime.controlPhase === "instructions") {
+        if (!event.target?.closest?.("[data-daily-feed-confirm-button]")) return;
+        if (runtime.roundStarted && runtime.controlStoppedAt != null) {
+          // Recover the original round, including Melody's song timeline.
+          const now = performance.now();
+          const duration = Math.max(0, now - runtime.controlStoppedAt);
+          shiftFeedingDeadlines(runtime, duration);
+          if (runtime.melody?.startTime != null) runtime.melody.startTime += duration;
+          runtime.controlStoppedAt = null;
+          runtime.controlPhase = "playing";
+          runtime.lastFrameAt = now;
+          runtime.running = true;
+          runtime.startOverlay.hidden = true;
+          if (runtime.tiltEnabled) {
+            beginTiltCalibration(runtime);
+            window.addEventListener("deviceorientation", runtime.orientationHandler);
+            armTiltObservationFallback(runtime);
+          }
+          runtime.rafId = scheduleFeedFrame(runtime);
         } else {
           startRound(runtime);
         }
-      };
+      } else if (runtime.controlPhase === "serve" &&
+                 runtime.mode === FEED_MODES.BOUNCE && runtime.roundStarted) {
+        launchBounceServe(runtime);
+        runtime.controlPhase = "playing";
+      }
+    };
 
     runtime.exitHandler = (event) => {
       event.preventDefault();
