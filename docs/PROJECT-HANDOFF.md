@@ -6,8 +6,8 @@
 
 - **Repository:** https://github.com/andydoane/biblozoo
 - **Active development and PR target:** `ios-prep` (not `main`)
-- **Last verified against `ios-prep`:** 2026-11-05, commit `1e1deb2f8d486e55e95511a4b098d9b3d0aec252` (Patch 73–73.1)
-- **Handoff introduced by:** [PR #2](https://github.com/andydoane/biblozoo/pull/2) from `docs/living-handoff-ios-prep` (open and not merged when last checked)
+- **Last verified against `ios-prep`:** 2026-11-05, commit `8e530c50d6dcf6bed3a376756938cd64a95e1ad9` (merged living handoff PR #2)
+- **Handoff introduced by:** merged [PR #2](https://github.com/andydoane/biblozoo/pull/2) from `docs/living-handoff-ios-prep`
 - **Related guides:** [Audio recovery](AUDIO-RECOVERY.md) · [Testing and PR acceptance](TESTING.md) · [README](../README.md)
 
 ## 1. Product and users
@@ -48,6 +48,7 @@ Progress and profiles are kept locally on the device. Backup export/import is an
 | Production bundle and native packaging | `scripts/build.js`, `capacitor.config.json`, `ios/` |
 | Web/PWA offline cache | `service-worker.js` |
 | Existing regression tests | `scripts/validate_*.js` and `package.json` scripts |
+| Automatic PR and integration-branch checks (new in this PR) | `.github/workflows/ios-prep-validation.yml` |
 
 The production build copies root runtime files and asset folders into ignored `dist/`; **the Capacitor sync does not replace `npm run build`**. Assets live in `profile_pictures/`, `pet_images/`, `verse_images/`, `verse_audio/`, `ui_audio/`, and `verse_fonts/`. Inspect `scripts/build.js` rather than assuming all source assets are bundled automatically.
 
@@ -74,7 +75,7 @@ npx cap open ios
 # Then build/run the App target on the physical iPhone in Xcode
 ```
 
-Run the relevant `npm run validate:...` and `node scripts/validate_*.js` suites for the changed systems. Run a broader regression selection before declaring a risky audio, storage, or daily-reward change safe. Existing `package.json` does not define one complete all-tests command; do not invent one or claim CI coverage that does not exist. CI/test pass and **owner's iPhone verification** are distinct results.
+Run the relevant `npm run validate:...` and `node scripts/validate_*.js` suites for the changed systems. Run a broader regression selection before declaring a risky audio, storage, or daily-reward change safe. Existing `package.json` does not define one complete all-tests command. The initial `ios-prep` workflow adds two automated jobs—selected Node regressions and a production web build—on PRs targeting `ios-prep` and on pushes to `ios-prep`. Its included Flashcards Patch 69 validator was updated to verify versioned caching and offline asset inclusion without depending on the obsolete Patch 72.1 cache name. It does **not** compile the native Xcode target, deploy GitHub Pages, or cover every historical validator. The workflow is introduced in this PR; check GitHub Actions for actual runs before claiming any test passed. CI/test pass and **owner's iPhone verification** are distinct results.
 
 ## 6. PR collaboration workflow (mandatory)
 
@@ -116,11 +117,12 @@ These are historical milestones, **not** an exhaustive change log or evidence of
 
 ## 9. Current work and next actions
 
-**Last checked:** 2026-11-05, `ios-prep` at `1e1deb2`; [PR #2](https://github.com/andydoane/biblozoo/pull/2) is open against it. There were no other open PRs targeting `ios-prep` at the initial audit. Refresh before relying on this table.
+**Last checked:** 2026-11-05, `ios-prep` at `8e530c5` after [PR #2](https://github.com/andydoane/biblozoo/pull/2) merged. [PR #3](https://github.com/andydoane/biblozoo/pull/3) introduces automatic validation, with a successful initial [Actions run](https://github.com/andydoane/biblozoo/actions/runs/42123594275) on commit `5f689c8`; recheck the **final** PR commit and merge status before relying on this table.
 
 | Status at last check | Item | Next action |
 | --- | --- | --- |
-| **Open [PR #2](https://github.com/andydoane/biblozoo/pull/2); not merged** | Establish GitHub PR workflow and living handoff | Owner reviews/merges; future PRs must maintain handoff |
+| **Merged [PR #2](https://github.com/andydoane/biblozoo/pull/2)** | GitHub PR workflow and living handoff | Keep handoff updated in every future PR |
+| **Open [PR #3](https://github.com/andydoane/biblozoo/pull/3); not merged at last check** | Automatic regression and web-build checks on `ios-prep` PRs and pushes | Both jobs passed on an early PR commit; verify current head before merge; keep native/iPhone checks manual |
 | **Merged in `ios-prep` code; device acceptance is separate** | Patch 73–73.1 Feeding refinements | Owner confirms final two-step chooser, tilt/drag isolation, Labyrinth response, Melody contact and Current Verse typography on iPhone |
 | **Implemented in branch; release gate remains** | Zoo Escape developer test harness | Audit and disable/gate whole-app and Feeding hidden test controls before public release |
 | **Not confirmed on a real failure in the prior acceptance conversation** | Genuine Zoo Escape statistics and Zoo Hero celebration | Check with a genuine failure if feasible; never award simulated credit simply to force a test |
