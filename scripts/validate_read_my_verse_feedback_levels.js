@@ -207,7 +207,7 @@ eq(htmlAudio.reduce((n, x) => n + x.played, 0), oldHtmlPlays,
 // No narration, crawl tracks, audio-clock ownership, or route was modified.
 ok(source.includes('const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme_ducked.mp3`'),
   "Verse Crawl soundtrack path stays unchanged");
-ok(source.includes('context.currentTime > firstClock + 0.015'),
+ok(source.includes('Number(context.currentTime) > firstClock + 0.015'),
   "suspended first-gesture note expiry contract preserved");
 ok(source.includes('if (readEffectRecoveryPending && context.state === "running")'),
   "effect-clock recovery gating retained");
