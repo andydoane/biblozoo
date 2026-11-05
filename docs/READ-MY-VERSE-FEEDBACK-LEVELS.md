@@ -2,7 +2,7 @@
 
 **Audited:** 2026-11-05 on `ios-prep` at `3c92f6bdeafb2418acea8e815c354ecfe56992e6`  
 **Purpose:** Balance Read My Verse's activity-feedback effects against existing external games without touching verse narration, audio recovery, speech recordings, Verse Crawl music, or the global device volume.  
-**Implementation status:** Proposed in the Read My Verse feedback-volume PR; verify merge and iPhone acceptance separately.
+**Implementation status:** Proposed in [PR #4](https://github.com/andydoane/biblozoo/pull/4), targeting `ios-prep`. The PR is not merged and the gain balance is not yet iPhone-verified. Verify final CI results and merge status separately.
 
 ## What was compared
 
