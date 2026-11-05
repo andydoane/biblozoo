@@ -117,12 +117,12 @@ These are historical milestones, **not** an exhaustive change log or evidence of
 
 ## 9. Current work and next actions
 
-**Last checked:** 2026-11-05, `ios-prep` at `8e530c5` after [PR #2](https://github.com/andydoane/biblozoo/pull/2) merged. No open PRs at the start of the CI task; draft [PR #3](https://github.com/andydoane/biblozoo/pull/3) proposes the first Actions validation workflow. Refresh before relying on this table.
+**Last checked:** 2026-11-05, `ios-prep` at `8e530c5` after [PR #2](https://github.com/andydoane/biblozoo/pull/2) merged. [PR #3](https://github.com/andydoane/biblozoo/pull/3) introduces automatic validation, with a successful initial [Actions run](https://github.com/andydoane/biblozoo/actions/runs/42123594275) on commit `5f689c8`; recheck the **final** PR commit and merge status before relying on this table.
 
 | Status at last check | Item | Next action |
 | --- | --- | --- |
 | **Merged [PR #2](https://github.com/andydoane/biblozoo/pull/2)** | GitHub PR workflow and living handoff | Keep handoff updated in every future PR |
-| **Draft [PR #3](https://github.com/andydoane/biblozoo/pull/3); not merged; CI outcome to verify** | Automatic regression and web-build checks on `ios-prep` PRs and pushes | Owner reviews/merges after green checks; keep native/iPhone checks manual |
+| **Open [PR #3](https://github.com/andydoane/biblozoo/pull/3); not merged at last check** | Automatic regression and web-build checks on `ios-prep` PRs and pushes | Both jobs passed on an early PR commit; verify current head before merge; keep native/iPhone checks manual |
 | **Merged in `ios-prep` code; device acceptance is separate** | Patch 73–73.1 Feeding refinements | Owner confirms final two-step chooser, tilt/drag isolation, Labyrinth response, Melody contact and Current Verse typography on iPhone |
 | **Implemented in branch; release gate remains** | Zoo Escape developer test harness | Audit and disable/gate whole-app and Feeding hidden test controls before public release |
 | **Not confirmed on a real failure in the prior acceptance conversation** | Genuine Zoo Escape statistics and Zoo Hero celebration | Check with a genuine failure if feasible; never award simulated credit simply to force a test |
