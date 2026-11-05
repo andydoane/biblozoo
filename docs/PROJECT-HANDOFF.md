@@ -6,7 +6,7 @@
 
 - **Repository:** https://github.com/andydoane/biblozoo
 - **Active development and PR target:** `ios-prep` (not `main`)
-- **Last verified against `ios-prep`:** 2026-11-05, commit `8e530c50d6dcf6bed3a376756938cd64a95e1ad9` (merged living handoff PR #2)
+- **Last verified against `ios-prep`:** 2026-11-05, commit `8f6cb23959ebda515615680d25ade01769f7ace5` (after merged PR #3 and a separate image-only upload; the Read My Verse source audited here is unchanged from `3c92f6b`)
 - **Handoff introduced by:** merged [PR #2](https://github.com/andydoane/biblozoo/pull/2) from `docs/living-handoff-ios-prep`
 - **Related guides:** [Audio recovery](AUDIO-RECOVERY.md) · [Testing and PR acceptance](TESTING.md) · [README](../README.md)
 
@@ -48,7 +48,7 @@ Progress and profiles are kept locally on the device. Backup export/import is an
 | Production bundle and native packaging | `scripts/build.js`, `capacitor.config.json`, `ios/` |
 | Web/PWA offline cache | `service-worker.js` |
 | Existing regression tests | `scripts/validate_*.js` and `package.json` scripts |
-| Automatic PR and integration-branch checks (new in this PR) | `.github/workflows/ios-prep-validation.yml` |
+| Automatic PR and integration-branch checks (merged PR #3) | `.github/workflows/ios-prep-validation.yml` |
 
 The production build copies root runtime files and asset folders into ignored `dist/`; **the Capacitor sync does not replace `npm run build`**. Assets live in `profile_pictures/`, `pet_images/`, `verse_images/`, `verse_audio/`, `ui_audio/`, and `verse_fonts/`. Inspect `scripts/build.js` rather than assuming all source assets are bundled automatically.
 
@@ -58,6 +58,7 @@ The production build copies root runtime files and asset folders into ignored `d
 - **Rescue achievements:** `BibloPets Rescued` and `Zoo Breaks Stopped` are per-Zookeeper; simulations must not increase them. The latter counts only after all Stage 3 animals are caught *and* real final-gate recovery succeeds. Stats belong in **Zookeeper Stats**, not as a persistent line beneath Zoo To-Do on the home screen. A genuine new achievement may trigger the one-time Zoo Hero home celebration.
 - **Feeding (73–73.1):** Classic, Labyrinth, Melody, and Bounce use a two-step start: choose **Tilt** or **Drag**, then selected-method instructions and **Got It!**. The choice applies to that game session, including interruption recovery. Bounce re-serves do not reopen control choice. Collision notes and sizes have been tuned; Melody's visual contact should align with the scheduled musical note. Verify real iPhone behavior, especially motion permission and touch/tilt isolation.
 - **Learn, Flashcards and Read My Verse:** These involve sensitive audio/recording state and must not auto-restart a recording or mistake an acknowledgement for audio recovery.
+- **Read My Verse feedback-level audit (proposed PR):** [Detailed comparison](READ-MY-VERSE-FEEDBACK-LEVELS.md) found low synthesized peaks in Unscramble (0.075) and Tap Words in Order (0.072 correct / 0.034 wrong) versus about 0.238 for a comparable Tower of Bible correct-word voice. The PR increases positive peaks to 0.22 and Tap Words wrong to 0.11; typing sample levels receive a modest lift in Web Audio and HTML fallback. This is *not* narration or soundtrack gain normalization; device-level loudness and overlapping voices need owner testing.
 - **PWA vs iOS:** `service-worker.js` is for the web/PWA; the native iOS app uses its bundled `dist/` content. Offline acceptance requires checking the relevant deployment, not just existence of a precache string.
 
 These descriptions summarize the source and earlier project decisions; recheck the active code and tests for changes.
@@ -75,7 +76,7 @@ npx cap open ios
 # Then build/run the App target on the physical iPhone in Xcode
 ```
 
-Run the relevant `npm run validate:...` and `node scripts/validate_*.js` suites for the changed systems. Run a broader regression selection before declaring a risky audio, storage, or daily-reward change safe. Existing `package.json` does not define one complete all-tests command. The initial `ios-prep` workflow adds two automated jobs—selected Node regressions and a production web build—on PRs targeting `ios-prep` and on pushes to `ios-prep`. Its included Flashcards Patch 69 validator was updated to verify versioned caching and offline asset inclusion without depending on the obsolete Patch 72.1 cache name. It does **not** compile the native Xcode target, deploy GitHub Pages, or cover every historical validator. The workflow is introduced in this PR; check GitHub Actions for actual runs before claiming any test passed. CI/test pass and **owner's iPhone verification** are distinct results.
+Run the relevant `npm run validate:...` and `node scripts/validate_*.js` suites for the changed systems. Run a broader regression selection before declaring a risky audio, storage, or daily-reward change safe. Existing `package.json` does not define one complete all-tests command. The initial `ios-prep` workflow adds two automated jobs—selected Node regressions and a production web build—on PRs targeting `ios-prep` and on pushes to `ios-prep`. Its included Flashcards Patch 69 validator was updated to verify versioned caching and offline asset inclusion without depending on the obsolete Patch 72.1 cache name. It does **not** compile the native Xcode target, deploy GitHub Pages, or cover every historical validator. The workflow was merged in [PR #3](https://github.com/andydoane/biblozoo/pull/3); check GitHub Actions for the **current PR commit's actual runs** before claiming new tests passed. CI/test pass and **owner's iPhone verification** are distinct results.
 
 ## 6. PR collaboration workflow (mandatory)
 
@@ -117,12 +118,13 @@ These are historical milestones, **not** an exhaustive change log or evidence of
 
 ## 9. Current work and next actions
 
-**Last checked:** 2026-11-05, `ios-prep` at `8e530c5` after [PR #2](https://github.com/andydoane/biblozoo/pull/2) merged. [PR #3](https://github.com/andydoane/biblozoo/pull/3) introduces automatic validation, with a successful initial [Actions run](https://github.com/andydoane/biblozoo/actions/runs/42123594275) on commit `5f689c8`; recheck the **final** PR commit and merge status before relying on this table.
+**Last checked:** 2026-11-05, `ios-prep` at `8f6cb23`; [PR #2](https://github.com/andydoane/biblozoo/pull/2) and [PR #3](https://github.com/andydoane/biblozoo/pull/3) are merged. The CI workflow passed on [PR #3 final commit](https://github.com/andydoane/biblozoo/actions/runs/42123783334); the proposed Read My Verse sound-volume PR has **not** been merged or iPhone-verified. Recheck GitHub before relying on this table.
 
 | Status at last check | Item | Next action |
 | --- | --- | --- |
 | **Merged [PR #2](https://github.com/andydoane/biblozoo/pull/2)** | GitHub PR workflow and living handoff | Keep handoff updated in every future PR |
-| **Open [PR #3](https://github.com/andydoane/biblozoo/pull/3); not merged at last check** | Automatic regression and web-build checks on `ios-prep` PRs and pushes | Both jobs passed on an early PR commit; verify current head before merge; keep native/iPhone checks manual |
+| **Merged [PR #3](https://github.com/andydoane/biblozoo/pull/3)** | Automatic regression and web-build checks on `ios-prep` PRs and pushes | Check current Actions results before each merge; still require manual native/iPhone acceptance |
+| **Proposed PR; not merged, not iPhone verified** | Read My Verse feedback volume and [audio audit](READ-MY-VERSE-FEEDBACK-LEVELS.md) | Verify new CI test and listen on iPhone against Tower of Bible / Verse Scramble at constant device volume |
 | **Merged in `ios-prep` code; device acceptance is separate** | Patch 73–73.1 Feeding refinements | Owner confirms final two-step chooser, tilt/drag isolation, Labyrinth response, Melody contact and Current Verse typography on iPhone |
 | **Implemented in branch; release gate remains** | Zoo Escape developer test harness | Audit and disable/gate whole-app and Feeding hidden test controls before public release |
 | **Not confirmed on a real failure in the prior acceptance conversation** | Genuine Zoo Escape statistics and Zoo Hero celebration | Check with a genuine failure if feasible; never award simulated credit simply to force a test |
