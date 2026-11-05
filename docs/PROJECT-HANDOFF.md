@@ -7,7 +7,7 @@
 - **Repository:** https://github.com/andydoane/biblozoo
 - **Active development and PR target:** `ios-prep` (not `main`)
 - **Last verified against `ios-prep`:** 2026-11-05, commit `1e1deb2f8d486e55e95511a4b098d9b3d0aec252` (Patch 73–73.1)
-- **Handoff introduced by:** documentation-only PR from `docs/living-handoff-ios-prep`; verify its number/merge status in GitHub
+- **Handoff introduced by:** [PR #2](https://github.com/andydoane/biblozoo/pull/2) from `docs/living-handoff-ios-prep` (open and not merged when last checked)
 - **Related guides:** [Audio recovery](AUDIO-RECOVERY.md) · [Testing and PR acceptance](TESTING.md) · [README](../README.md)
 
 ## 1. Product and users
@@ -116,11 +116,11 @@ These are historical milestones, **not** an exhaustive change log or evidence of
 
 ## 9. Current work and next actions
 
-**Last checked:** 2026-11-05, `ios-prep` at `1e1deb2`; no open PRs targeting `ios-prep` at the time of that check. Refresh before relying on this table.
+**Last checked:** 2026-11-05, `ios-prep` at `1e1deb2`; [PR #2](https://github.com/andydoane/biblozoo/pull/2) is open against it. There were no other open PRs targeting `ios-prep` at the initial audit. Refresh before relying on this table.
 
 | Status at last check | Item | Next action |
 | --- | --- | --- |
-| **Proposed in this documentation PR; not yet merged** | Establish GitHub PR workflow and living handoff | Owner reviews/merges; future PRs must maintain handoff |
+| **Open [PR #2](https://github.com/andydoane/biblozoo/pull/2); not merged** | Establish GitHub PR workflow and living handoff | Owner reviews/merges; future PRs must maintain handoff |
 | **Merged in `ios-prep` code; device acceptance is separate** | Patch 73–73.1 Feeding refinements | Owner confirms final two-step chooser, tilt/drag isolation, Labyrinth response, Melody contact and Current Verse typography on iPhone |
 | **Implemented in branch; release gate remains** | Zoo Escape developer test harness | Audit and disable/gate whole-app and Feeding hidden test controls before public release |
 | **Not confirmed on a real failure in the prior acceptance conversation** | Genuine Zoo Escape statistics and Zoo Hero celebration | Check with a genuine failure if feasible; never award simulated credit simply to force a test |
