@@ -75,7 +75,7 @@ npx cap open ios
 # Then build/run the App target on the physical iPhone in Xcode
 ```
 
-Run the relevant `npm run validate:...` and `node scripts/validate_*.js` suites for the changed systems. Run a broader regression selection before declaring a risky audio, storage, or daily-reward change safe. Existing `package.json` does not define one complete all-tests command. The initial `ios-prep` workflow adds two automated jobs—selected Node regressions and a production web build—on PRs targeting `ios-prep` and on pushes to `ios-prep`. It does **not** compile the native Xcode target, deploy GitHub Pages, or cover every historical validator. The workflow is introduced in this PR; check GitHub Actions for actual runs before claiming any test passed. CI/test pass and **owner's iPhone verification** are distinct results.
+Run the relevant `npm run validate:...` and `node scripts/validate_*.js` suites for the changed systems. Run a broader regression selection before declaring a risky audio, storage, or daily-reward change safe. Existing `package.json` does not define one complete all-tests command. The initial `ios-prep` workflow adds two automated jobs—selected Node regressions and a production web build—on PRs targeting `ios-prep` and on pushes to `ios-prep`. Its included Flashcards Patch 69 validator was updated to verify versioned caching and offline asset inclusion without depending on the obsolete Patch 72.1 cache name. It does **not** compile the native Xcode target, deploy GitHub Pages, or cover every historical validator. The workflow is introduced in this PR; check GitHub Actions for actual runs before claiming any test passed. CI/test pass and **owner's iPhone verification** are distinct results.
 
 ## 6. PR collaboration workflow (mandatory)
 
