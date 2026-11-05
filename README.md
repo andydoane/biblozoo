@@ -1,5 +1,10 @@
 # BibloZoo
 
+> **Working on BibloZoo?** Start with the [Living Project Handoff](docs/PROJECT-HANDOFF.md). For audio and iOS interruption safeguards, read [Audio Recovery](docs/AUDIO-RECOVERY.md); for validation and physical iPhone testing, see [Testing & PR Workflow](docs/TESTING.md).
+>
+> **Development workflow:** Create feature branches from `ios-prep` and submit pull requests **targeting `ios-prep`**. The owner reviews/merges, pulls in GitHub Desktop, and runs the Capacitor/iPhone build. **Every PR must review and update the living handoff in the same PR.** See the [PR template](.github/pull_request_template.md). Do not submit normal feature PRs to `main`.
+
+
 BibloZoo is a Bible verse memorization app built around guided learning, practice games, family profiles, and collectible BibloPets. It runs as a web/PWA experience and, on the `ios-prep` branch, as a packaged native iOS app using Capacitor.
 
 The app is designed to keep progress local to the device. It does not require an account, and the current privacy policy states that this version does not use advertising, analytics, or tracking services.
