@@ -70,7 +70,22 @@ node scripts/validate_app_audio_patch23b.js
 
 This is a **starting selection, not every validator**. There are many historical `scripts/validate_*.js` programs. Choose the suites appropriate to the change, and run broader recovery/regression coverage for shared code. Record precise failures; don't label a failing old test “outdated” without investigating it. Check for actual missing runtime assets versus broken code.
 
-**As of the initial handoff PR, the repository had no `.github/workflows/` directory visible on `ios-prep`.** PRs may therefore have no automatic CI results until workflows are added and enabled. Don't invent a green GitHub Actions run. Adding safe, appropriately scoped CI is a future improvement, not a prerequisite for a documentation-only PR.
+### Automatic GitHub Actions validation for `ios-prep`
+
+The new workflow `[.github/workflows/ios-prep-validation.yml](../.github/workflows/ios-prep-validation.yml)` is introduced in a dedicated CI PR. It runs when **any PR targets `ios-prep`** (including when new commits update that PR) and whenever commits are **pushed or merged to `ios-prep`**. There is no path filter, so documentation-only PRs trigger the checks too.
+
+GitHub will display two separately named jobs:
+
+- **Node regression checks:** `npm ci`, all six existing package validation scripts, Feeding 73–73.1, current Zoo Escape/statistics, Flashcards, Read My Verse, and app audio tests.
+- **Production web build:** `npm ci`, `npm run build`, then checks that key `dist/` runtime files were created.
+
+The jobs use an Ubuntu runner, Node.js 22, read-only repository permissions, npm lockfile, and no deployment credentials. **This is not a native Xcode/iOS build, an App Store release, or a GitHub Pages deployment.** Physical iPhone and offline/audio-interruption tests still belong to the owner.
+
+A few older patch-specific validators hard-code previous service-worker cache version strings (for example an Oct 26 cache stamp). Those are **not** in this initial CI selection; do not mistake their absence for full recovery regression coverage. For related changes, run the relevant older tests deliberately, updating stale assertions only if their original contract is still valid.
+
+**How to see results:** Open [Actions filtered to `ios-prep`](https://github.com/andydoane/biblozoo/actions?query=branch%3Aios-prep) for post-merge push runs. A PR's **Checks** tab (and overall Actions history) shows its PR-triggered run even though its head is a feature branch; filtering Actions by `branch:ios-prep` may not show every pre-merge PR run. Workflow files and run history are separate: when first introduced, confirm the workflow appears and that GitHub reports actual jobs before telling the owner CI passed. Recheck GitHub Actions repository settings if events are disabled.
+
+
 
 ## 4. Physical iPhone smoke tests
 
