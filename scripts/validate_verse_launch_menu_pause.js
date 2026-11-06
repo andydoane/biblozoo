@@ -57,6 +57,7 @@ function makeHarness() {
     "let returnPaused=false,returnSession=0,returnRecoveryFailures=0,returnContextReplacements=0;",
     "let returnConveyorWasRunning=false,returnAstroWasRunning=false;",
     "let audioForegroundFreshContextOnGesture=false,audioUnlocked=false,audioCtx=null,muted=false;",
+    "const HELP_OVERLAY_ID='vlHelpOverlay';",
     "const gameNow=()=>welcomeClock.now();",
     "const $=s=>document.querySelector(s);",
     "function playUiTapSound(){calls.push('tap');}",
