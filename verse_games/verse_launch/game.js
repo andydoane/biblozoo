@@ -140,6 +140,7 @@
     busy: false,
     menuOpen: false,
     helpOpen: false,
+    speedMenuOpen: false,
     helpBackMode: false,
     completed: false,
     startTime: 0,
@@ -744,6 +745,7 @@
     state.busy = false;
     state.menuOpen = false;
     state.helpOpen = false;
+    state.speedMenuOpen = false;
     state.helpBackMode = false;
     state.completed = false;
     state.completionResult = null;
@@ -1028,8 +1030,19 @@
     }
   }
 
+  // A local menu pauses the same virtual clock used for gameplay deadlines
+  // and bonus sleep() delays. Foreground recovery is a separate pause owner:
+  // closing a menu must never resume time while Welcome Back remains open.
+  function syncGameClockPause() {
+    if (returnPaused || state.menuOpen || state.helpOpen || state.speedMenuOpen) {
+      welcomeClock.pause();
+    } else {
+      welcomeClock.resume();
+    }
+  }
+
   function canOpenGameMenu() {
-    if (state.busy) return false;
+    if (returnPaused || state.busy) return false;
     if (state.screen === "travel") return false;
     return true;
   }
@@ -1562,8 +1575,8 @@
 
   function conveyorTick(ts) {
     ts = gameNow();
-    if (returnPaused) { state.conveyorRaf = 0; return; }
-    if (state.screen !== "game" || state.bonusReady) {
+    if (returnPaused || state.menuOpen || state.helpOpen || state.speedMenuOpen ||
+        state.screen !== "game" || state.bonusReady) {
       stopConveyorLoop();
       return;
     }
@@ -1604,7 +1617,10 @@
   }
 
   function startConveyorLoop() {
-    if (state.conveyorRaf) return;
+    // Rendering or a speed-menu callback must not restart gameplay behind
+    // the Game Menu, How to Play, or a pending iOS Welcome Back dialog.
+    if (state.conveyorRaf || returnPaused || state.menuOpen || state.helpOpen ||
+        state.speedMenuOpen || state.screen !== "game" || state.bonusReady) return;
 
     state.conveyorLastTs = 0;
     maybeSpawnConveyorItems();
@@ -1882,6 +1898,7 @@
         state.menuOpen = false;
         state.helpOpen = true;
         state.helpBackMode = true;
+        syncGameClockPause();
 
         const menuOverlay = $("#vlGameMenuOverlay");
         if (menuOverlay) {
@@ -1897,6 +1914,7 @@
         state.helpOpen = false;
         state.helpBackMode = false;
         state.busy = false;
+        syncGameClockPause();
         setScreen("mode");
       },
       onExit: () => {
@@ -1910,16 +1928,21 @@
         state.menuOpen = true;
         state.helpOpen = false;
         state.helpBackMode = false;
+        stopConveyorLoop();
+        syncGameClockPause();
       },
       onClose: () => {
         playUiTapSound();
         state.menuOpen = false;
+        syncGameClockPause();
+        startConveyorLoop();
       },
       onBackFromHelp: () => {
         playUiTapSound();
         state.helpOpen = false;
         state.menuOpen = true;
         state.helpBackMode = false;
+        syncGameClockPause();
       }
     });
 
@@ -1936,20 +1959,18 @@
         }
 
         playUiTapSound();
+        state.speedMenuOpen = true;
         stopConveyorLoop();
+        syncGameClockPause();
 
         return true;
       },
 
       onClose: () => {
         playUiTapSound();
-
-        if (
-          state.screen === "game" &&
-          !state.bonusReady
-        ) {
-          startConveyorLoop();
-        }
+        state.speedMenuOpen = false;
+        syncGameClockPause();
+        startConveyorLoop();
       }
     });
   }
@@ -1973,6 +1994,7 @@
         state.helpOpen = true;
         state.helpBackMode = true;
         state.astroMoveDir = 0;
+        syncGameClockPause();
 
         const menuOverlay = $("#vlGameMenuOverlay");
         if (menuOverlay) {
@@ -1989,6 +2011,7 @@
         state.helpBackMode = false;
         state.busy = false;
         state.astroMoveDir = 0;
+        syncGameClockPause();
         stopAstroLoop();
         setScreen("mode");
       },
@@ -2005,11 +2028,13 @@
         state.helpOpen = false;
         state.helpBackMode = false;
         state.astroMoveDir = 0;
+        syncGameClockPause();
       },
       onClose: () => {
         playUiTapSound();
         state.menuOpen = false;
         state.astroMoveDir = 0;
+        syncGameClockPause();
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -2017,6 +2042,7 @@
         state.menuOpen = true;
         state.helpBackMode = false;
         state.astroMoveDir = 0;
+        syncGameClockPause();
       }
     });
 
@@ -4365,7 +4391,7 @@
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
-    welcomeClock.pause();
+    syncGameClockPause();
     document.body.classList.add("bz-return-activity-paused");
     suspendWelcomeAnimations();
     returnConveyorWasRunning = !!state.conveyorRaf;
@@ -4396,8 +4422,8 @@
         returnRecoveryFailures += 1;
         return false;
       }
-      welcomeClock.resume();
       returnPaused = false;
+      syncGameClockPause();
       document.body.classList.remove("bz-return-activity-paused");
       restoreWelcomeAnimations();
       if (returnConveyorWasRunning && state.screen === "game" && !state.bonusReady) startConveyorLoop();
