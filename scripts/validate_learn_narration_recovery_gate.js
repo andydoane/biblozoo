@@ -112,7 +112,9 @@ async function staleAndSwappedMedia() {
   h.document.hidden=false;h.media(second);h.api.resumeInterruptedLearnAudio();
   first.resolve();await flush();h.audioEl.currentTime=.13;
   ok(!!h.api.getAttempt(),"stale play result cannot verify new attempt");
-  second.resolve();await flush();h.fire(80);
+  second.resolve();await flush();
+  // Playback time already advanced before play() resolved, so the real
+  // verifier should succeed immediately without scheduling another poll.
   eq(h.api.getAttempt(),null,"current media progress verifies current attempt");
   const changed=harness(),p=deferred();changed.media(p);
   changed.api.resumeInterruptedLearnAudio();changed.audioEl.src="unrelated.mp3";
