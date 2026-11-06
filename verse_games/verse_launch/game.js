@@ -4426,7 +4426,11 @@
       syncGameClockPause();
       document.body.classList.remove("bz-return-activity-paused");
       restoreWelcomeAnimations();
-      if (returnConveyorWasRunning && state.screen === "game" && !state.bonusReady) startConveyorLoop();
+      // A menu may have stopped the conveyor before task switching. If it
+      // was closed while Welcome Back still owned pause, restore gameplay
+      // now; startConveyorLoop itself still rejects any remaining overlay.
+      if ((returnConveyorWasRunning || !state.busy) &&
+          state.screen === "game" && !state.bonusReady) startConveyorLoop();
       if (returnAstroWasRunning && state.screen === "asteroids" && state.astroRunning && !state.astroRaf) {
         state.astroLastTs = 0;
         state.astroRaf = requestAnimationFrame(astroTick);
