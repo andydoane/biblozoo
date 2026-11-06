@@ -67,6 +67,7 @@ node scripts/validate_flashcards_patch69.js
 node scripts/validate_read_my_verse_audio_patch70_2.js
 node scripts/validate_read_my_verse_feedback_levels.js
 node scripts/validate_app_audio_patch23b.js
+node scripts/validate_learn_narration_recovery_gate.js
 ```
 
 This is a **starting selection, not every validator**. There are many historical `scripts/validate_*.js` programs. Choose the suites appropriate to the change, and run broader recovery/regression coverage for shared code. Record precise failures; don't label a failing old test “outdated” without investigating it. Check for actual missing runtime assets versus broken code.
@@ -84,6 +85,8 @@ The jobs use an Ubuntu runner, Node.js 22, read-only repository permissions, npm
 
 Some older patch-specific validators hard-code historic service-worker cache version strings (for example an Oct 26 stamp). The included Flashcards Patch 69 validator was updated in this CI PR to check the **durable versioned-cache and offline-asset contract** instead of requiring an obsolete Patch 72.1 substring. Other historical validators with stale patch-version assertions remain outside this initial CI selection; do not mistake their absence for full recovery regression coverage. For related changes, run older tests deliberately, refreshing stale assertions only when their underlying contract still applies.
 
+**Learn narration return gate (focused fix on `fix/learn-narration-recovery-gate`):** `scripts/validate_learn_narration_recovery_gate.js` uses the actual Learn recovery functions in a simulated media-clock harness. It asserts that an advancing narration clock can succeed even when the unrelated UI Web Audio unlock fails or hangs, and that blocked/stalled media, stale attempts, second interruptions and source changes cannot fake success. It is included in CI for this PR; physical iPhone listening remains mandatory. Older `validate_learn_resume_overlay_patch19a.js` has historical expectations for the replaced two-engine gate and is not the acceptance test for this change.
+
 **Read My Verse beep level audit:** [Feedback Sound Level Audit](READ-MY-VERSE-FEEDBACK-LEVELS.md) records the per-activity gain comparison to external games and the owner hearing checklist. This proposed PR also registers `node scripts/validate_read_my_verse_feedback_levels.js` in CI. Static and virtual Web Audio gain tests do **not** measure actual output loudness; compare on a physical iPhone at the same hardware volume.
 
 **How to see results:** Open [Actions filtered to `ios-prep`](https://github.com/andydoane/biblozoo/actions?query=branch%3Aios-prep) for post-merge push runs. A PR's **Checks** tab (and overall Actions history) shows its PR-triggered run even though its head is a feature branch; filtering Actions by `branch:ios-prep` may not show every pre-merge PR run. Workflow files and run history are separate: when first introduced, confirm the workflow appears and that GitHub reports actual jobs before telling the owner CI passed. Recheck GitHub Actions repository settings if events are disabled.
@@ -100,7 +103,7 @@ Choose cases from each affected group and report device/iOS version when useful:
 | Feeding — four modes | Two-step Tilt/Drag chooser, full-size icons, Got It!, selected-input isolation, Tilt permission denial fallback |
 | Bounce and Melody | Larger ball/snack art, collision geometry, Melody note/contact synchronization, Bounce between-serves flow |
 | Labyrinth | Different per-ball acceleration/weight feel and non-overlapping platform impact sounds |
-| Learning and 12 games | Same verse/score/timer after task switch; real audio-clock recovery before resume |
+| Learning and 12 games | Learn Listen/Chunks/Echo: narration time actually advances on return even if UI sounds fail; frozen narration keeps retry/Zoo Escape. Preserve verse, chunk, score and timer across switching; other games retain their own real audio-clock recovery |
 | Playground — 5 activities | Preserve text/drawing/musical state and return cleanup |
 | Flashcards / Read My Verse | Preserve recording/playback state; no auto microphone restart |
 | Zoo Escape | Stage 2 / Stage 3 / pending interruption / safe exit / pet rescue state after repeated backgrounding |

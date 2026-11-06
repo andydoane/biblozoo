@@ -1653,15 +1653,22 @@ function toggleMute() {
 
 function safePlay() {
   applyMute();
+  // Capture the exact Learn attempt and media source BEFORE play() starts.
+  // Late resolutions from a different source or an abandoned retry cannot
+  // release the Welcome Back / Zoo Escape gate.
+  const attempt = learnAudioResumeAttempt;
+  const narrationSrc = audioEl.src;
+  const startingTime = Number(audioEl.currentTime) || 0;
   return audioEl.play().then((result) => {
-    const attempt = learnAudioResumeAttempt;
-    if (attempt && State.screen === attempt.recovery.screen && !document.hidden) {
-      attempt.playStarted = true;
-      finishLearnAudioResumeAttempt(attempt);
+    if (attempt && learnAudioResumeAttempt === attempt &&
+        State.screen === attempt.recovery.screen && !document.hidden &&
+        audioEl.src === narrationSrc) {
+      // HTMLMediaElement.play() resolving is not proof of actual playback.
+      verifyLearnNarrationProgress(attempt, narrationSrc, startingTime);
     }
     return result;
   }).catch((err) => {
-    if (learnAudioResumeAttempt) failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+    if (attempt && learnAudioResumeAttempt === attempt) failLearnAudioResumeAttempt(attempt);
     // Learn's playback controllers own their own retry/error UI; do not stack
     // the generic "can't play" dialog on top of a Resume Audio control.
     if (document.hidden || learnAudioInterrupted || [
@@ -10697,7 +10704,7 @@ function renderPracticeGameCard(game, verseProgress) {
 
 function resetLearn(goTitle = false) {
   learnAudioInterrupted = null;
-  if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
+  clearLearnAudioResumeTimers(learnAudioResumeAttempt);
   learnAudioResumeAttempt = null;
   learnAudioResumeError = "";
   learnShortInstructionNeedsRender = false;
@@ -10830,7 +10837,7 @@ function go(nextScreen) {
 
   // A screen change invalidates any pending overlay and unlock result.
   learnAudioInterrupted = null;
-  if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
+  clearLearnAudioResumeTimers(learnAudioResumeAttempt);
   learnAudioResumeAttempt = null;
   learnAudioResumeError = "";
   learnShortInstructionNeedsRender = false;
@@ -10991,7 +10998,7 @@ function setScreen(screen) {
     // profile change, Game Mix or a non-sliding transition uses setScreen().
     cancelLearnAudio();
     learnAudioInterrupted = null;
-    if (learnAudioResumeAttempt) clearTimeout(learnAudioResumeAttempt.watchdog);
+    clearLearnAudioResumeTimers(learnAudioResumeAttempt);
     learnAudioResumeAttempt = null;
     learnAudioResumeError = "";
     learnShortInstructionNeedsRender = false;
@@ -11507,8 +11514,8 @@ function beginLearnZooRecovery() {
       } else if (learnAudioInterrupted === recovery || learnAudioResumeError) {
         resolve(false);
       } else {
-        // Both playStarted and audioReady were verified by the original
-        // finishLearnAudioResumeAttempt before it cleared this attempt.
+        // Only advancing Learn narration was verified by the activity owner
+        // before finishLearnAudioResumeAttempt cleared this attempt.
         resolve(!learnAudioResumeAttempt && !learnAudioInterrupted);
       }
     }
@@ -11593,12 +11600,43 @@ function syncLearnAudioResumeOverlay() {
   status.hidden = !status.textContent;
 }
 
+function clearLearnAudioResumeTimers(attempt) {
+  if (!attempt) return;
+  clearTimeout(attempt.watchdog);
+  clearTimeout(attempt.progressTimer);
+  attempt.watchdog = null;
+  attempt.progressTimer = null;
+}
+
+// Learn's HTML narration is the audio that must actually be working.
+// A resolved play() or a recovered UI-effect AudioContext is not evidence.
+// The existing 3.5s attempt watchdog bounds these small progress polls.
+function verifyLearnNarrationProgress(attempt, narrationSrc, startingTime) {
+  if (learnAudioResumeAttempt !== attempt || attempt.narrationVerified ||
+      attempt.progressTimer != null) return;
+  const check = () => {
+    attempt.progressTimer = null;
+    if (learnAudioResumeAttempt !== attempt || document.hidden ||
+        State.screen !== attempt.recovery.screen || audioEl.src !== narrationSrc) return;
+    const position = Number(audioEl.currentTime);
+    if (Number.isFinite(position) && position > startingTime + 0.03 &&
+        (!audioEl.paused || audioEl.ended)) {
+      attempt.narrationVerified = true;
+      finishLearnAudioResumeAttempt(attempt);
+      return;
+    }
+    if (audioEl.error) return failLearnAudioResumeAttempt(attempt);
+    attempt.progressTimer = setTimeout(check, 80);
+  };
+  check();
+}
+
 function finishLearnAudioResumeAttempt(attempt) {
-  if (learnAudioResumeAttempt !== attempt || !attempt.playStarted ||
-      !attempt.audioReady || document.hidden || State.screen !== attempt.recovery.screen) {
+  if (learnAudioResumeAttempt !== attempt || !attempt.narrationVerified ||
+      document.hidden || State.screen !== attempt.recovery.screen) {
     return;
   }
-  clearTimeout(attempt.watchdog);
+  clearLearnAudioResumeTimers(attempt);
   learnAudioResumeAttempt = null;
   learnAudioResumeError = "";
   syncLearnAudioResumeOverlay();
@@ -11606,7 +11644,7 @@ function finishLearnAudioResumeAttempt(attempt) {
 
 function failLearnAudioResumeAttempt(attempt) {
   if (learnAudioResumeAttempt !== attempt) return;
-  clearTimeout(attempt.watchdog);
+  clearLearnAudioResumeTimers(attempt);
   learnAudioResumeAttempt = null;
   cancelLearnAudio();
   if (State.screen !== attempt.recovery.screen) {
@@ -11623,11 +11661,13 @@ function resumeInterruptedLearnAudio() {
   if (document.hidden || learnMenuOpen || learnAudioResumeAttempt ||
       !isLearnAudioOverlayRecovery(recovery)) return false;
 
-  // Both operations begin inside this genuine tap: Web Audio may need resume,
-  // while HTMLAudioElement.play() must not be deferred until after an await.
+  // The genuine tap begins optional UI sound recovery and HTML narration.
+  // An unrelated UI AudioContext must never veto successfully advancing
+  // narration. Keep unlockAppAudio() best-effort and non-blocking.
   if (muted) toggleMute();
-  const audioReady = unlockAppAudio();
-  const attempt = { recovery, playStarted: false, audioReady: false };
+  try { void Promise.resolve(unlockAppAudio()).catch(() => {}); }
+  catch (_) { /* Optional UI effects may remain silent. */ }
+  const attempt = { recovery, narrationVerified: false, progressTimer: null, watchdog: null };
   learnAudioResumeAttempt = attempt;
   learnAudioInterrupted = null;
   learnAudioResumeError = "";
@@ -11642,15 +11682,10 @@ function resumeInterruptedLearnAudio() {
     void startEchoFlow();
   }
 
-  // HTMLMediaElement.play() itself can hang while WebKit restores media.
-  // Never leave the overlay button disabled indefinitely.
+  // A play() request can resolve even when the media timeline is frozen.
+  // Only verified currentTime progress clears the gate; the watchdog keeps a
+  // hung play() or frozen timeline retryable, without changing Learn progress.
   attempt.watchdog = setTimeout(() => failLearnAudioResumeAttempt(attempt), 3500);
-  void Promise.resolve(audioReady).then(ready => {
-    if (learnAudioResumeAttempt !== attempt) return;
-    if (!ready) return failLearnAudioResumeAttempt(attempt);
-    attempt.audioReady = true;
-    finishLearnAudioResumeAttempt(attempt);
-  }, () => failLearnAudioResumeAttempt(attempt));
   syncLearnAudioResumeOverlay();
   return true;
 }
