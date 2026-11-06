@@ -76,6 +76,7 @@ jobs:
           node scripts/validate_read_my_verse_audio_patch70_2.js
           node scripts/validate_read_my_verse_feedback_levels.js
           node scripts/validate_app_audio_patch23b.js
+          node scripts/validate_learn_narration_recovery_gate.js
 
   web-build:
     name: Production web build
