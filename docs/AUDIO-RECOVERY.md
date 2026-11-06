@@ -1,6 +1,6 @@
 # BibloZoo — Audio Recovery and Zoo Escape Contract
 
-> **Read with** [the living handoff](PROJECT-HANDOFF.md). This describes the safety boundaries of the current `ios-prep` implementation as checked on 2026-11-05 (base `1e1deb2`). **Source and current tests are authoritative.** Do not replace the activity-owned recovery path with a global approximation.
+> **Read with** [the living handoff](PROJECT-HANDOFF.md). This describes the safety boundaries of the current `ios-prep` implementation as checked on 2026-11-05 (base `1e1deb2`). **Source and current tests are authoritative.** On the focused Learn recovery PR (`fix/learn-narration-recovery-gate`), narration itself—not app UI effects—is the required playback source for Learn's recovery success. Do not replace the activity-owned recovery path with a global approximation.
 
 ## Why this subsystem exists
 
@@ -24,7 +24,7 @@ The shared recovery UI is **not** an audio engine. It must remain fully playable
 4. **Keep a pending interruption distinct from a failed attempt.** If the native signal still says interruption began / recovery deferred, preserve the current LOCK GATE stage and allow another deliberate attempt. Never escalate Zoo Escape just because iOS has not finished the interruption.
 5. **Activity-owned callbacks.** The shared Welcome Back/Zoo Escape controller may display stages and request a recovery, but the owner still pauses physics/audio, checks its own playback, resumes on verified success, and cleans up or navigates on exit.
 6. **Real gesture and bounded deadlines.** On LOCK GATE, the activity-owned recovery callback must run in the real user gesture; avoid introducing deferred synthetic clicks that break iOS unlock behavior. Timeouts and stale-generation guards prevent loops or delayed state changes after exit.
-7. **Respect quiet or microphone activities.** A quiet Daily return may be acknowledgement-only; do not invent an audio test. Flashcards / Read My Verse must never spontaneously begin recording or overwrite a partially completed take.
+7. **Respect quiet or microphone activities.** A quiet Daily return may be acknowledgement-only; do not invent an audio test. Learn's Listen/Chunks/Echo recovery must verify advancement of its actual HTML narration position; an independent app UI Web Audio failure must not veto narration. A fulfilled `HTMLMediaElement.play()` alone is insufficient. Flashcards / Read My Verse must never spontaneously begin recording or overwrite a partially completed take.
 8. **Do not break gameplay on failure.** Zoo Escape may be silent, and rescue stages must still be interactive. On final failure or early exit, execute the owner cleanup and correct route (including special Daily To-Do returns). Preserve score/progress and avoid duplicate rewards.
 9. **Do not credit developer simulations.** The hidden testing harness can force failures or deferred outcomes, but the real recovery owner is still required for success. Simulated rescues must not increase persistent per-Zookeeper rescue statistics.
 
@@ -53,6 +53,7 @@ node scripts/validate_native_audio_session_patch58.js
 node scripts/validate_native_audio_recovery_patch59.js
 node scripts/validate_audio_recovery_coordinator_patch60.js
 node scripts/validate_app_audio_patch23b.js
+node scripts/validate_learn_narration_recovery_gate.js
 node scripts/validate_feeding_audio_bounce_patch24.js
 node scripts/validate_patch72_1b_feeding_zoo_escape.js
 node scripts/validate_patch72_1c_whole_app_zoo_escape.js
