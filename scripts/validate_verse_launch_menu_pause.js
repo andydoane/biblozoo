@@ -182,6 +182,7 @@ async function taskSwitchDoesNotGetOverriddenByMenuClose() {
   const restored=await h.api.continueFromWelcomeBack();
   eq(restored,true,"Welcome Back can complete from genuine owner callback");
   eq(h.clock.paused,false,"clock resumes when final pause owner clears");
+  ok(h.state.conveyorRaf>0,"conveyor restarts even if local menu closed during Welcome Back");
   // If the menu remains open when returning, only its Close unpauses.
   h.menu().onOpen();
   h.api.pauseForTaskSwitch();
