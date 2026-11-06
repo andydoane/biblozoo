@@ -68,6 +68,12 @@ jobs:
           node scripts/validate_patch72_1c3_zoo_escape_sounds.js
           node scripts/validate_patch72_1d_zookeeper_stats.js
 
+      - name: Validate Verse Launch menu and bonus pause
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate_verse_launch_menu_pause.js
+
       - name: Validate Flashcards, Read My Verse, and app audio
         shell: bash
         run: |
