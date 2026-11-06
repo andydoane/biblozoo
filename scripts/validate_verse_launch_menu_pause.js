@@ -152,7 +152,7 @@ async function helpAndSpeedRetainPause() {
 async function bonusMenuPausesClockAndPhysics() {
   const h=makeHarness();h.state.screen="asteroids";h.api.wireBonusMenuOnly();
   h.state.astroRaf=1;h.raf.set(1,h.api.astroTick);
-  h.clock.advance(50);h.tickAstro();
+  h.clock.advance(50);
   const last=h.state.astroTimerMs, now=h.clock.now();
   h.menu().onOpen();
   eq(h.state.menuOpen,true,"bonus Menu opens");
