@@ -109,6 +109,20 @@
       negative:
         "./verse_images/daily_questions/dq_incorrect.mp3"
     });
+  // Read My Verse feedback was much quieter than comparable generated
+  // correct-word tones in Verse Scramble and Tower of Bible (about 0.24 peak).
+  // Tune only short activity feedback here; narration and Verse Crawl music
+  // stay on their existing playback paths and levels.
+  const READ_EFFECT_LEVELS = Object.freeze({
+    typingKey: 0.82,
+    typingAlert: 0.90,
+    typingKeyFallback: 0.92,
+    typingAlertFallback: 1.0,
+    scrambleReward: 0.22,
+    orderCorrect: 0.22,
+    orderWrong: 0.11
+  });
+
   const READ_TEST_MODES =
     Object.freeze([
       "normal",
@@ -2476,7 +2490,9 @@
           const source = context.createBufferSource();
           const gain = context.createGain();
           source.buffer = buffer;
-          gain.gain.value = isChunkAlert ? 0.7 : 0.58;
+          gain.gain.value = isChunkAlert
+            ? READ_EFFECT_LEVELS.typingAlert
+            : READ_EFFECT_LEVELS.typingKey;
           source.connect(gain);
           gain.connect(context.destination);
           if (keySoundVoices.length >= KEY_SOUND_MAX_VOICES) {
@@ -2508,7 +2524,9 @@
       audio.pause();
       audio.currentTime = 0;
       audio.muted = false;
-      audio.volume = isChunkAlert ? 0.85 : 0.7;
+      audio.volume = isChunkAlert
+        ? READ_EFFECT_LEVELS.typingAlertFallback
+        : READ_EFFECT_LEVELS.typingKeyFallback;
       audio.play().catch?.(() => { });
     } catch (err) { }
   }
@@ -2634,7 +2652,7 @@
           440 * 2 ** ((midi - 69) / 12), begin
         );
         gain.gain.setValueAtTime(0.0001, begin);
-        gain.gain.linearRampToValueAtTime(0.075, begin + 0.02);
+        gain.gain.linearRampToValueAtTime(READ_EFFECT_LEVELS.scrambleReward, begin + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, end);
         oscillator.connect(gain);
         gain.connect(context.destination);
@@ -2694,7 +2712,10 @@
           440 * 2 ** ((pitch - 69) / 12), start
         );
         gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.linearRampToValueAtTime(wrong ? 0.034 : 0.072, start + 0.018);
+        gain.gain.linearRampToValueAtTime(
+          wrong ? READ_EFFECT_LEVELS.orderWrong : READ_EFFECT_LEVELS.orderCorrect,
+          start + 0.018
+        );
         gain.gain.exponentialRampToValueAtTime(0.0001, end);
         oscillator.connect(gain);
         gain.connect(context.destination);

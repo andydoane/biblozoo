@@ -65,6 +65,7 @@ node scripts/validate_patch72_1d_zookeeper_stats.js
 node scripts/validate_playground_welcome_back_patch68.js
 node scripts/validate_flashcards_patch69.js
 node scripts/validate_read_my_verse_audio_patch70_2.js
+node scripts/validate_read_my_verse_feedback_levels.js
 node scripts/validate_app_audio_patch23b.js
 ```
 
@@ -72,7 +73,7 @@ This is a **starting selection, not every validator**. There are many historical
 
 ### Automatic GitHub Actions validation for `ios-prep`
 
-The new workflow `[.github/workflows/ios-prep-validation.yml](../.github/workflows/ios-prep-validation.yml)` is introduced in a dedicated CI PR. It runs when **any PR targets `ios-prep`** (including when new commits update that PR) and whenever commits are **pushed or merged to `ios-prep`**. There is no path filter, so documentation-only PRs trigger the checks too.
+The workflow [`.github/workflows/ios-prep-validation.yml`](../.github/workflows/ios-prep-validation.yml) was merged in [PR #3](https://github.com/andydoane/biblozoo/pull/3). It runs when **any PR targets `ios-prep`** (including when new commits update that PR) and whenever commits are **pushed or merged to `ios-prep`**. There is no path filter, so documentation-only PRs trigger the checks too.
 
 GitHub will display two separately named jobs:
 
@@ -82,6 +83,8 @@ GitHub will display two separately named jobs:
 The jobs use an Ubuntu runner, Node.js 22, read-only repository permissions, npm lockfile, and no deployment credentials. **This is not a native Xcode/iOS build, an App Store release, or a GitHub Pages deployment.** Physical iPhone and offline/audio-interruption tests still belong to the owner.
 
 Some older patch-specific validators hard-code historic service-worker cache version strings (for example an Oct 26 stamp). The included Flashcards Patch 69 validator was updated in this CI PR to check the **durable versioned-cache and offline-asset contract** instead of requiring an obsolete Patch 72.1 substring. Other historical validators with stale patch-version assertions remain outside this initial CI selection; do not mistake their absence for full recovery regression coverage. For related changes, run older tests deliberately, refreshing stale assertions only when their underlying contract still applies.
+
+**Read My Verse beep level audit:** [Feedback Sound Level Audit](READ-MY-VERSE-FEEDBACK-LEVELS.md) records the per-activity gain comparison to external games and the owner hearing checklist. This proposed PR also registers `node scripts/validate_read_my_verse_feedback_levels.js` in CI. Static and virtual Web Audio gain tests do **not** measure actual output loudness; compare on a physical iPhone at the same hardware volume.
 
 **How to see results:** Open [Actions filtered to `ios-prep`](https://github.com/andydoane/biblozoo/actions?query=branch%3Aios-prep) for post-merge push runs. A PR's **Checks** tab (and overall Actions history) shows its PR-triggered run even though its head is a feature branch; filtering Actions by `branch:ios-prep` may not show every pre-merge PR run. Workflow files and run history are separate: when first introduced, confirm the workflow appears and that GitHub reports actual jobs before telling the owner CI passed. Recheck GitHub Actions repository settings if events are disabled.
 

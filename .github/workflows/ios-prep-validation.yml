@@ -74,6 +74,7 @@ jobs:
           set -euo pipefail
           node scripts/validate_flashcards_patch69.js
           node scripts/validate_read_my_verse_audio_patch70_2.js
+          node scripts/validate_read_my_verse_feedback_levels.js
           node scripts/validate_app_audio_patch23b.js
 
   web-build:
