@@ -3513,6 +3513,55 @@
       report(false);
       return false;
     }
+    if (runtime.nativePilotBackend === "native") {
+      // No Web clock, no Web AudioRecoveryCoordinator and no audio-driven
+      // Zoo Escape in the opt-in Native-only preview. A fresh Resume gesture
+      // must re-prepare the two native samples before unfreezing this round.
+      runtime.feedResumePending = true;
+      setFeedingResumeStatus(runtime,
+        "Preparing native sounds… This preview has no Web fallback.");
+      if (runtime.resumeButton) runtime.resumeButton.disabled = true;
+      const generation = ++runtime.feedResumeGeneration;
+      let settled = false;
+      const finish = (ready, reason) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(runtime.feedResumeWatchdog);
+        runtime.feedResumeWatchdog = null;
+        if (activeRuntime !== runtime ||
+            runtime.feedResumeGeneration !== generation ||
+            runtime.feedPausedAt == null || runtime.finished ||
+            document.hidden || runtime.feedPageHidden) {
+          report(false);
+          return;
+        }
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        if (!ready) {
+          // No silent backend change. Keep the same frozen round with
+          // explicit retry/Back; never award progress for an audio failure.
+          const detail = typeof reason === "string" &&
+            /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
+          setFeedingResumeStatus(runtime,
+            "Native sounds unavailable (" + detail + "). Tap Resume again or Back.");
+          report(false);
+          return;
+        }
+        runtime.feedAudioRecoveryVerified = true;
+        const resumed = continueFeedingAfterGesture(runtime, performance.now(), false);
+        report(resumed);
+      };
+      runtime.feedResumeWatchdog = setTimeout(
+        () => finish(false, "native-resume-timeout"), 4200);
+      try {
+        void Promise.resolve(runtime.nativePilot?.prepare?.() ||
+          { ready: false, reason: "missing-bridge" }).then(
+          value => finish(value?.ready === true, value?.reason),
+          () => finish(false, "native-prepare-error")
+        );
+      } catch (_) { finish(false, "native-prepare-error"); }
+      return true;
+    }
     const Ctor = window.AudioContext || window.webkitAudioContext;
     const needsReplacement = runtime.feedAudioNeedsFreshContext ||
       !runtime.audioContext || runtime.audioContext.state === "closed";
@@ -5854,9 +5903,16 @@
         },
         // Optional in-mini-game sounds are allowed only after a passive
         // clock-advance check. They never unlock audio or resume gameplay.
-        soundIsReady: () => zooEscapeSoundReady(runtime),
-        onPop: () => playZooEscapeSound(runtime, "pop"),
-        onBounce: () => playZooEscapeSound(runtime, "bounce")
+        soundIsReady: () => runtime.nativePilotBackend !== "native" &&
+          zooEscapeSoundReady(runtime),
+        onPop: () => {
+          if (runtime.nativePilotBackend !== "native")
+            playZooEscapeSound(runtime, "pop");
+        },
+        onBounce: () => {
+          if (runtime.nativePilotBackend !== "native")
+            playZooEscapeSound(runtime, "bounce");
+        }
       });
     }
 
@@ -5875,7 +5931,8 @@
       // The visible Back pill is available throughout all three stages.
       // A Daily Questions reward may decline the normal Back action, so its
       // owner supplies an explicit abort without awarding completion credit.
-      const exit = runtime.zooEscape?.isPaused?.()
+      const exit = runtime.nativePilotBackend === "native" ||
+        runtime.zooEscape?.isPaused?.()
         ? (runtime.onRecoveryExitToZoo || runtime.onBackToZoo)
         : runtime.onBackToZoo;
       const shouldClose = exit?.();
