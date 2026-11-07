@@ -12,7 +12,8 @@ const labyrinth=between(game,"  function updateLabyrinthBall(","  function advan
 const catchBall=between(game,"  function catchBall(runtime, ball) {","  function updateBall(runtime, ball, dt, now) {");
 const resume=between(game,"  function attemptFeedingResumeFromGesture(","  function attachFeedInterruptionHandlers(");
 assert.match(pilot,/const LABYRINTH_IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/);
-assert.match(pilot,/\["classic", "labyrinth", "melody"\]/);
+assert.match(pilot,/\["classic", "labyrinth", "melody", "bounce"\]/,
+  "N4c retains all earlier native sound-mode profiles");
 assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS :/);
 assert.match(pilot,/mode === "bounce" \? BOUNCE_IDS : IDS/);
 assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" :/);
