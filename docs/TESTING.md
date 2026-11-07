@@ -65,6 +65,29 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### N5b.1 — native long narration DEV player: John 3:16 (PR #33; Xcode/iPhone pending)
+
+**Latest owner acceptance:** N5a [PR #32](https://github.com/andydoane/biblozoo/pull/32) owner-merged as `a4ed899e`, and the owner followed all N5a iPhone guide steps: UI taps/pops sound as expected and Feeding popup/regression checks were positive. **Most first UI pops after launch or task switch are silent.** N5a intentionally drops an unprepared pop after 350ms rather than playing it late. That tradeoff is expected but remains N9 first-tap UX/reliability debt, not a fully reliable first-tap audio pass.
+
+**[PR #33](https://github.com/andydoane/biblozoo/pull/33) N5b.1:** One fixed `learn-john-3-16` native AVAudioPlayer long-form narration proof, local Xcode-bundled `verse_audio/john_3_16.mp3`, explicit `purpose:"learn"` activation on DEV Play, requestId/foreground protections and `prepareNarration/playNarration/pauseNarration/seekNarration/getNarrationState/stopNarration`. Native `biblozooNarration` ended/invalidated event must be from the current player and no earlier request. No Web/HTML fallback or automatic playback. UIKit inactive, route, interruption and media reset must stop the voice. **Child-facing Learn screens are not yet migrated in this first slice**; no Learn verse/chunk/Echo progress is awarded by the DEV test.
+
+```sh
+node scripts/validate_native_learn_narration_n5b1.js
+node scripts/validate_native_ui_audio_n5a.js
+node scripts/validate_native_bounce_gameplay_n4c.js
+node scripts/validate_learn_narration_recovery_gate.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build/run **BibloZoo Audio Test** in Xcode on a real iPhone. In the existing **DEV · Native Audio** panel press **Play John 3:16** and *actually hear the verse*, then **Read position** twice to see advancing time, **Pause** (position stable), **Skip +5s** (without restarting), **Continue** (audio resumes), and let playback finish exactly once with its native completion message. Open the App Switcher with a swipe-up-and-**hold** mid-narration: native output must stop and never restart on foreground until a **new explicit Play**. Repeat a full switch; close DEV while voice is playing and ensure it stops and no ghost `ended` event claims Learn progress. Verify original DEV star/chomp/Melody, UI pops, Feeding all four modes still behave correctly. Ordinary Learn output is not yet switched; don't mark it native-complete. If unexpected silence, **DEV → Inspect native state / Copy Audio Timing Report BEFORE restarting** and report what was heard, whether position advanced, and if Xcode compiled. The timing report is primarily for short samples, not acoustic onset proof of narration.
+
+**Separate checks:** final-head GitHub Actions Node regressions + web build; Xcode Swift resource compile; owner real sound/position/seek/pause/completion + interruption. Owner alone merges. Exact [N5b.1 physical test guide](N5B1-NATIVE-LEARN-NARRATION-DEV.md). Later N5b.2 integrates actual Learn Listen (reference + verse) with published-verse manifest and safe completion; chunk/Echo later.
+
+---
+
 ### N5a — app-wide native UI pops + quiet Feeding diagnostic text (PR #32 ready for review; physical iPhone pending)
 
 **N4 final owner evidence:** N4c [PR #31](https://github.com/andydoane/biblozoo/pull/31) was merged as `99130c01` on `experiment/native-ios-audio`. After the merger, the owner reported **all Bounce tests passed**. Earlier owner reports accepted native Classic, actual Melody, Labyrinth and N4a.1 App Switcher inactive/return audio. This is owner-reported device acceptance, not quantified speaker-latency measurements.
