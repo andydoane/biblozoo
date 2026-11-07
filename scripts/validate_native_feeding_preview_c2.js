@@ -754,7 +754,9 @@ async function main() {
   assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-star"/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-chomp"/);
-  assert.match(FEED,/if \(runtime\.nativePilotBackend === "native"\) \{[\s\S]*?Native-only preview/);
+  // N4a preserves real-tap native Resume for Classic and Melody; test the
+  // actual mode-specific gesture/re-prepare branch, not old comment wording.
+  assert.match(FEED,/if \(runtime\.nativePilotBackend === "native"\) \{[\s\S]*?runtime\.nativePilot\?\.prepare\?\.\(\)/);
   assert.match(FEED,/native-resume-timeout/);
   assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
   assert.match(FEED,/runtime\.nativePilot\?\.isReady\?\.\(\) !== true/);
