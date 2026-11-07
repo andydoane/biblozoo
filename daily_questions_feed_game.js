@@ -36,6 +36,10 @@
   // Web Audio clock is necessary (but not sufficient) evidence of usable sound.
   const FEED_AUDIO_CLOCK_PROBE_MS = 180;
   const FEED_AUDIO_CLOCK_MIN_ADVANCE = 0.012;
+  // C.2c experiment: Got It! verifies the existing Web clock before native
+  // samples are prepared. Both deadlines are bounded and test-only.
+  const FEED_NATIVE_CLOCK_READY_TIMEOUT_MS = 900;
+  const FEED_NATIVE_STATE_READ_TIMEOUT_MS = 500;
   const FEED_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
   const FEED_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
   const FEED_AUDIO_REPLACEMENT_BACKOFF_MS = 15000;
@@ -1323,6 +1327,9 @@
         </div>
         ${nativePilotPreview
           ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">Preview audio: Web (default)</div>'
+          : ""}
+        ${nativePilotPreview
+          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native startup trace: select the DEV checkbox</div>'
           : ""}
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
@@ -5341,6 +5348,9 @@
         ? startOverlay.querySelector("[data-daily-feed-native-choice-status]") : null,
       nativePilotBadge: nativePilotAllowed
         ? gameEl.querySelector("[data-daily-feed-native-badge]") : null,
+      nativePilotPhases: nativePilotAllowed
+        ? gameEl.querySelector("[data-daily-feed-native-phases]") : null,
+      nativePilotTrace: [],
       nativePilot: null,
       nativePilotBackend: "web",
       nativePilotChoicePending: false,
