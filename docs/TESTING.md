@@ -65,7 +65,37 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N3c — first launch after build must not silently fail (PR #26; iPhone pending)
+### N3d — DEV native Melody single-note bank, before N4 gameplay wiring (PR #27; iPhone pending)
+
+**N3c [PR #26](https://github.com/andydoane/biblozoo/pull/26) merged** as `3ef3961e`. After merging, the owner reported a fresh-start Native Classic run with **actual sound working and successful mid-round task-switch Resume**; first gesture session `os-accepted`, star/chomp/peg preflights `prepared`, 80 retained gameplay rows all native `scheduled` within 0–2ms, no slow dispatch. **Two additional fresh-start trials with a YouTube video already in Picture-in-Picture (foreground epoch 0)**: first `gesture os-accepted`, star/chomp prepared, `feed-peg stale`; the owner had an initial snafu but successfully re-prepared with `gesture not-needed` and a now `prepared` peg, then heard normal sound. Second PiP trial had `os-accepted` and three successful preloads on the **first attempt** (star 109ms, chomp 42ms, peg 81ms), with no snafu. Both 80-row PiP reports show **0 slow native dispatches** (mostly 1–2ms, up to 3ms), no pending interruption. **`stale` identifies an obsolete preparation request; cause unknown.** PiP is background competing audio, not an app-switch/Resume test. No reports from a newer complete-silence event. This provides positive N3c listening evidence, not an exhaustive repeated first-build reliability gate.
+
+**[PR #27](https://github.com/andydoane/biblozoo/pull/27) N3d** follows the N3 native tone/voice roadmap before N4 Feeding integration. Existing `daily_questions_feed_game.js` Melody gameplay still uses a **browser triangle oscillator** (silent under the experimental iOS global Web output guard), and its schedule, catch percent, clock and interruptions are NOT part of this slice. N3d adds a fixed `feed-melody` Swift triangle-wave **55–83 MIDI bank** (29 prebuilt 220ms PCM notes), **six** prestarted `AVAudioPlayerNode` voices, a validated 55…83 MIDI integer in native `play`, local `backend=avengine-melody`, and one new DEV-panel **Melody E4** button (fixed MIDI 64/volume 0.25). Only a deliberate DEV tap activates/prewarms/plays; no song, auto-play, microphone change, Web fallback or actual Melody-mode routing. Web/PWA/Android unaffected. Classic's existing native star/chomp/peg, N3c startup gate/Copy report, .soloAmbient/interruption/route teardown must not regress.
+
+**After owner review/merge**, use the dedicated `biblozoo-native-audio` GitHub Desktop worktree to Fetch/Pull `experiment/native-ios-audio` and run:
+
+```sh
+node scripts/validate_native_sound_smoke_test.js
+node scripts/validate_native_melody_bank_n3d.js
+node scripts/validate_native_peg_voices_n3b.js
+node scripts/validate_native_first_launch_n3c.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build/run separate **BibloZoo Audio Test** on a **physical iPhone**; GitHub Node/production web CI **does not compile Swift or prove speaker sound**.
+
+1. On **first launch after build**, in DEV tap **Melody E4**. Hear exactly one short musical pitched note (rather than any full tune), note loudness vs Classic pegs and sample star/chomp. Confirm DEV says native request—not falsely “heard.” If refused/silent, **copy DEV Audio Timing Report before restarting**, and report `gesture/session`, `preload/feed-melody` and any `feed-melody/avengine-melody` row plus actual audibility.
+2. Repeat DEV Melody E4 taps to check no stuck/crackling sound; switch out to another app/video and tap again upon return. Only the human tap may reactivate/preload; no automatic foreground sound. Close DEV and verify all prepared notes stop.
+3. Start normal **Native Classic** and confirm star/chomp immediately audible, peg beeps pleasant, game movement smooth, genuine task-switch same-round Resume and correct **Try Again** on any initial native-prep failure. Existing N3c last-18 preflight events and manual Copy report remain intact.
+4. **Melody gameplay not yet migrated**: In isolated iOS it's expected to remain silent due to the native-only output policy; its catch score, tune selection, timers, result overlays/Back must be unchanged. Actual Melody native playback and proper Got It!/Resume timeline ownership are **future N4**, not achieved by this test.
+
+Pass means owner really hears DEV E4 and sees no Classic/lifecycle regression. Keep successful software `scheduleBuffer` distinct from sound reaching ears. Technical/physical guide: [N3d native Melody note bank](N3D-NATIVE-MELODY-NOTE-BANK.md), [AUDIO-RECOVERY](AUDIO-RECOVERY.md), [living handoff](PROJECT-HANDOFF.md).
+
+---
+
+### N3c — first launch after build must not silently fail (PR #26 merged; owner initial startup + PiP testing positive, one stale peg preflight)
 
 **Owner evidence after merged N3b [PR #25](https://github.com/andydoane/biblozoo/pull/25) at `29b424fa`:** Directly after Xcode build the *first* real iPhone launch was **completely silent** (no first-run report was copied). After restarting the app, two separate runs played **all** native sounds and the Classic peg beep was pleasant; both switched apps and both recovered successfully. The owner pasted **two 80-row reports (160 retained events)**: **0** slow dispatches >=120ms, almost all 1–2ms (0–3ms overall) from collision to native `scheduleBuffer` dispatch, zero worker wait, peg `avengine-tone` and chomp `avengine-pcm`. This confirms the audio engine and Resume are working *in those two runs*, not that the first-launch problem is fixed, and no report captured the failure mechanism. Actual acoustic onset is still not directly measured.
 
