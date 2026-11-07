@@ -36,6 +36,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Verify tracked LF line endings
+        run: node scripts/validate_tracked_lf_endings.js
+
       - name: Validate daily activity and verse flows
         shell: bash
         run: |

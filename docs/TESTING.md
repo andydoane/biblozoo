@@ -30,6 +30,12 @@ Capacitor config is `capacitor.config.json`, application ID `com.andydoane.biblo
 
 Do not commit `dist/` or `node_modules/` (both ignored). After changing runtime assets, regenerate `dist/` **before** syncing; avoid interpreting stale bundled files as a code regression.
 
+### macOS worktree: 21 CRLF-only tracked files (November 2026)
+
+The repository already declares `*.js`, `*.css`, `*.html`, `*.json`, `*.md` and `*.txt` as `text eol=lf` in `.gitattributes`. However, the `ios-prep` base at `f4a80c35` still contained 20 JSON files and `verse_playground/ghost_writer/game.css` as CRLF *committed blobs*. A fresh macOS worktree therefore reported 21 modified files immediately. `git ls-files --eol -- <path>` showed `i/crlf w/crlf attr/text eol=lf` even though `git --no-pager diff --ignore-space-at-eol --stat 2>/dev/null` produced no meaningful diff. This is not a source-data change, and changing `core.autocrlf` or repeatedly clicking Discard does not fix the inconsistent index blobs.
+
+The focused `fix/normalize-lf-tracked-text` PR changes only CRLF to LF and adds a Node check of the **committed blob bytes** as well as the checked-out file bytes. After the owner merges it into `ios-prep`, an existing `experiment/native-ios-audio` branch must also be advanced; **Fetch Origin by itself does not move the local branch**. For the specific freshly created experiment branch, only if there are no valuable local edits or separate commits, verify the expected line-ending-only diff, then fetch the merged baseline and run `git reset --hard origin/ios-prep` **inside the experimental worktree**, check `git status --short` and `git ls-files --eol`, and push the updated experiment branch. That reset deliberately discards *all* uncommitted tracked-file changes and resets the branch pointer: never run it if the experiment already contains independent work. Prefer a normal merge or a separate PR to sync a branch containing work.
+
 ## 3. Existing automated validation commands
 
 **Package scripts currently declared in `package.json`:**
@@ -71,6 +77,9 @@ node scripts/validate_learn_narration_recovery_gate.js
 
 # Verse Launch Game Menu / How to Play / Speed Menu / bonus pause
 node scripts/validate_verse_launch_menu_pause.js
+
+# Committed LF source and consistent macOS worktrees
+node scripts/validate_tracked_lf_endings.js
 ```
 
 This is a **starting selection, not every validator**. There are many historical `scripts/validate_*.js` programs. Choose the suites appropriate to the change, and run broader recovery/regression coverage for shared code. Record precise failures; don't label a failing old test “outdated” without investigating it. Check for actual missing runtime assets versus broken code.
@@ -81,7 +90,7 @@ The workflow [`.github/workflows/ios-prep-validation.yml`](../.github/workflows/
 
 GitHub will display two separately named jobs:
 
-- **Node regression checks:** `npm ci`, all six existing package validation scripts, Feeding 73–73.1, current Zoo Escape/statistics, Flashcards, Read My Verse, and app audio tests.
+- **Node regression checks:** `npm ci`, the committed-blob LF line-ending guard, all six existing package validation scripts, Feeding 73–73.1, current Zoo Escape/statistics, Verse Launch menu pause, Flashcards, Read My Verse, and app audio tests.
 - **Production web build:** `npm ci`, `npm run build`, then checks that key `dist/` runtime files were created.
 
 The jobs use an Ubuntu runner, Node.js 22, read-only repository permissions, npm lockfile, and no deployment credentials. **This is not a native Xcode/iOS build, an App Store release, or a GitHub Pages deployment.** Physical iPhone and offline/audio-interruption tests still belong to the owner.
