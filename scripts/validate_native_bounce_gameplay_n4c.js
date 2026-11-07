@@ -47,7 +47,7 @@ assert.match(star,/runtime\.nativePilot\?\.play\("feed-star"/);
 assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(switcher,/pauseFeedingGame\(runtime\)/);
 assert.match(swift,/private let nativePegSoundID = "feed-peg"/);
-assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp"\]/);
+assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"\]/);
 assert.match(workflow,/node scripts\/validate_native_bounce_gameplay_n4c\.js/);
 
 function harness({nativeOnly=true,platform="ios",failSound=""}={}){
@@ -91,7 +91,8 @@ async function main(){
   {
     const e=harness();
     const html=e.hooks.render({session:{feedMode:"bounce",petName:"BibloPet"}});
-    assert.match(html,/Native Bounce: prepare rebounds, bonuses and catches on Got It!/);
+    assert.doesNotMatch(html,/Native Bounce: prepare/);
+    assert.match(html,/data-daily-feed-native-choice-status/);
     assert.doesNotMatch(html,/data-daily-feed-native-opt-in/);
     const w=harness({nativeOnly:false,platform:"web"});
     assert.doesNotMatch(w.hooks.render({session:{feedMode:"bounce"}}),/Native Bounce: prepare/);
@@ -138,7 +139,8 @@ async function main(){
     assert.equal(starts,0);assert.equal(r.roundStarted,false);
     assert.equal(r.controlPhase,"instructions");
     assert.equal(r.startConfirmButton.textContent,"Try Again");
-    assert.match(r.nativePilotChoiceStatus.textContent,/interruption-pending/);
+    assert.match(r.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
+    assert.match(r.nativePilotBadge.textContent,/interruption-pending/);
     assert.ok(!e.calls.some(x=>x[0]==="play"));
     e.api.preload=async({soundId})=>{e.calls.push(["preload",soundId]);return {prepared:true};};
     await e.hooks.startNative(r);
