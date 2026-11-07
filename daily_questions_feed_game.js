@@ -1298,14 +1298,14 @@
       resolveFeedMode(session?.feedMode);
     const modeConfig =
       getFeedModeConfig(mode);
-    // Preserve opt-in Classic; native-only .audiotest now routes Melody
-    // and Labyrinth through their audited fixed native sound banks.
+    // Preserve opt-in Classic; all four Feeding modes in the separate
+    // native-only iOS test app now use an explicit native sound profile.
     // Web/PWA/Android and the original iOS app remain unchanged.
     const nativeOnlyApp = window.BibloZooNativeOnlyOutput?.enabled === true;
     const nativePilotPreview =
       window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
       ((session?.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
-        (nativeOnlyApp && [FEED_MODES.MELODY, FEED_MODES.LABYRINTH].includes(mode)));
+        (nativeOnlyApp && [FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
     const nativeClassicChoice = nativePilotPreview &&
       mode === FEED_MODES.CLASSIC;
     const stageAriaLabel =
@@ -1432,7 +1432,9 @@
                         ? "Native Melody: prepare notes on Got It!; no Web fallback."
                         : mode === FEED_MODES.LABYRINTH
                           ? "Native Labyrinth: prepare impacts and catches on Got It!; no Web fallback."
-                          : "Native ONLY test app: Web effects are disabled.")
+                          : mode === FEED_MODES.BOUNCE
+                            ? "Native Bounce: prepare rebounds, bonuses and catches on Got It!; no Web fallback."
+                            : "Native ONLY test app: Web effects are disabled.")
                     : "Web effects are the default."}</p>
               ` : ""}
               <button class="daily-feed-control-got-it no-zoom" type="button"
@@ -1651,10 +1653,10 @@
   }
 
   function playPegTone(runtime, now) {
-    // Native-only Classic and Labyrinth share six prewarmed sine notes;
-    // Melody has its own triangle bank, and unported Bounce stays silent.
+    // Native-only Classic, Labyrinth and Bounce share six prewarmed
+    // sine notes. Melody's distinct catch notes use a triangle bank.
     const nativePegMode = runtime.nativePilotBackend === "native" &&
-      [FEED_MODES.CLASSIC, FEED_MODES.LABYRINTH].includes(runtime.mode);
+      [FEED_MODES.CLASSIC, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(runtime.mode);
     if (runtime.nativePilotBackend === "native" && !nativePegMode) return;
     const context = runtime.audioContext;
     if (nativePegMode) {
@@ -5082,7 +5084,8 @@
     const factory = window.BibloZooFeedingNativeAudioPilot;
     const pilot = factory?.create?.({
       mode: runtime.mode === FEED_MODES.MELODY ? "melody" :
-        runtime.mode === FEED_MODES.LABYRINTH ? "labyrinth" : "classic",
+        runtime.mode === FEED_MODES.LABYRINTH ? "labyrinth" :
+        runtime.mode === FEED_MODES.BOUNCE ? "bounce" : "classic",
       isCurrent: () => activeRuntime === runtime && !runtime.finished &&
         !document.hidden && !runtime.feedPageHidden,
       onFailure: (reason) => {
@@ -5108,7 +5111,9 @@
           ? "Preparing native Melody notes…"
           : runtime.mode === FEED_MODES.LABYRINTH
             ? "Preparing native Labyrinth impacts and catches…"
-            : "Preparing native star, chomp, and peg sounds…";
+            : runtime.mode === FEED_MODES.BOUNCE
+              ? "Preparing native Bounce rebounds, bonuses and catches…"
+              : "Preparing native star, chomp, and peg sounds…";
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&
       !document.hidden && !runtime.feedPageHidden;
@@ -5165,13 +5170,17 @@
           ? "Native ONLY: Melody notes ready; Web audio OFF"
           : runtime.mode === FEED_MODES.LABYRINTH
             ? "Native ONLY: Labyrinth tones/catches ready; Web audio OFF"
-            : "Native ONLY: star/chomp ready; Web audio OFF";
+            : runtime.mode === FEED_MODES.BOUNCE
+              ? "Native ONLY: Bounce rebounds/bonus/catches ready; Web audio OFF"
+              : "Native ONLY: star/chomp ready; Web audio OFF";
     if (runtime.nativePilotChoiceStatus)
       runtime.nativePilotChoiceStatus.textContent = runtime.mode === FEED_MODES.MELODY
         ? "Native Melody notes prepared."
         : runtime.mode === FEED_MODES.LABYRINTH
           ? "Native Labyrinth impacts and catches prepared."
-          : "Native effects prepared.";
+          : runtime.mode === FEED_MODES.BOUNCE
+            ? "Native Bounce rebounds, bonuses and catches prepared."
+            : "Native effects prepared.";
     startRound(runtime);
     void recordNativePreviewPhase(runtime, "round-start");
   }
@@ -5614,13 +5623,14 @@
     const petRect =
       petCircle.getBoundingClientRect();
 
-    // Retain legacy opt-in Classic preview. Native-only Melody/Labyrinth
-    // prepare on the real Got It! tap; never allocate Web/HTML output.
+    // Retain legacy opt-in Classic preview. Native-only Melody,
+    // Labyrinth and Bounce prepare on a real Got It! user tap;
+    // never allocate Web/HTML output in the isolated iOS app.
     const nativePilotAllowed =
       window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
       ((session.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
         (window.BibloZooNativeOnlyOutput?.enabled === true &&
-         [FEED_MODES.MELODY, FEED_MODES.LABYRINTH].includes(mode)));
+         [FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
     if (nativePilotAllowed && preparedAudioContext) {
       stopAudioContext(preparedAudioContext);
       preparedAudioContext = null;

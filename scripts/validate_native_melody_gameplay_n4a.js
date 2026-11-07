@@ -12,13 +12,16 @@ const continued=between(js,"  function continueFeedingAfterGesture(","  // Calle
 const caught=between(js,"  function catchMelodyNote(runtime, ball) {","  function updateMelodyMode(");
 assert.match(pilot,/const MELODY_IDS = Object\.freeze\(\["feed-melody"\]\)/);
 assert.match(pilot,/const selectedIds = mode === "melody" \? MELODY_IDS :/);
-assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS : IDS/,
-  "N4b must keep Melody profile isolated when adding Labyrinth");
+assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS :/);
+assert.match(pilot,/mode === "bounce" \? BOUNCE_IDS : IDS/,
+  "N4c keeps Melody strictly isolated from Bounce/Classic/Labyrinth");
 assert.match(pilot,/noteIndex < MELODY_MIDI_MIN/);
 assert.match(pilot,/noteIndex > MELODY_MIDI_MAX/);
 assert.match(pilot,/soundId === "feed-melody" \? \{ midi: noteIndex \}/);
 assert.match(begin,/mode: runtime\.mode === FEED_MODES\.MELODY \? "melody" :/);
-assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" : "classic"/);
+assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" :/);
+assert.match(begin,/runtime\.mode === FEED_MODES\.BOUNCE \? "bounce" : "classic"/,
+  "N4c retains Labyrinth and adds Bounce mode without replacing Classic");
 assert.match(begin,/if \(result\?\.ready !== true \|\| !pilot\) \{[\s\S]*?return;/);
 assert.match(melody,/if \(runtime\?\.nativePilotBackend === "native"\)/);
 assert.match(melody,/runtime\.nativePilot\.play\("feed-melody"/);
@@ -29,8 +32,8 @@ assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(resume,/continueFeedingAfterGesture\(runtime, performance\.now\(\), false\)/);
 assert.match(continued,/shiftFeedingDeadlines\(runtime, elapsed\)/);
 assert.match(continued,/resumeMelodyAfterInterruption\(runtime, now\)/);
-assert.match(js,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH\]\.includes\(mode\)/,
-  "N4b preserves N4a Melody's native-only gating alongside Labyrinth");
+assert.match(js,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
+  "N4c preserves N4a native Melody alongside Labyrinth and Bounce");
 assert.match(js,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start/);
 assert.match(ci,/node scripts\/validate_native_melody_gameplay_n4a\.js/);
 

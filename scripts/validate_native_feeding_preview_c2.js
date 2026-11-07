@@ -687,9 +687,9 @@ async function main() {
     assert.equal(stops,1);
   }
   {
-    // Native-only Classic/Labyrinth reuse fixed-ID native sine peg notes,
-    // preserving cooldown/anti-repeat. Web Classic retains its oscillator;
-    // Melody has its own bank and Bounce remains unmigrated.
+    // Classic, Labyrinth and Bounce deliberately reuse fixed-ID native sine
+    // notes, with cooldown/anti-repeat. Melody has its own triangle bank;
+    // browser Classic still uses the unchanged oscillator.
     const h = feedHarness();
     let webBeepAttempts = 0;
     const nativePegs = [];
@@ -743,8 +743,15 @@ async function main() {
       "Labyrinth cannot create a Web oscillator");
     r.mode = "bounce";
     h.hooks.peg(r, 3100);
-    assert.equal(nativePegs.length, 3,
-      "Unmigrated Native Bounce must remain silent, not borrow Classic");
+    assert.equal(nativePegs.length, 4,
+      "N4c Bounce wall/paddle/brick impacts reuse prewarmed native peg tones");
+    assert.equal(nativePegs[3][0], "feed-peg");
+    assert.equal(webBeepAttempts, 1,
+      "Native Bounce cannot create a new Web oscillator");
+    r.mode = "melody";
+    h.hooks.peg(r, 3200);
+    assert.equal(nativePegs.length, 4,
+      "Melody's native catches must not borrow Bounce/Classic sine peg tones");
   }
   // Source contract for the experiment: nothing in the Native branch can
   // reopen the very Web audio context whose clock failures blocked C.2c.

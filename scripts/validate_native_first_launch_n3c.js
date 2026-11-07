@@ -63,8 +63,9 @@ assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "fe
 assert.match(pilot,/api\.activateFromGesture\(\{ purpose: "feeding" \}\)/);
 assert.match(pilot,/for \(const soundId of selectedIds\)/);
 assert.match(pilot,/const selectedIds = mode === "melody" \? MELODY_IDS :/);
-assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS : IDS/,
-  "N4b preserves N3c fixed per-mode preflights");
+assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS :/);
+assert.match(pilot,/mode === "bounce" \? BOUNCE_IDS : IDS/,
+  "N4c retains N3c bounded fixed-ID preflight profiles");
 assert.match(actions,/node scripts\/validate_native_first_launch_n3c\.js/);
 const noComments=swift.replace(/\/\/[^\n]*/g,"");
 assert.doesNotMatch(noComments,/\.setCategory\(|\.setMode\(|\.setActive\(false\)/);
