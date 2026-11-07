@@ -1402,7 +1402,8 @@
                 ${feedInstructionPrompt(mode, tiltAvailable)}
               </div>
               ${nativePilotPreview ? `
-                <label class="daily-feed-native-pilot-opt" data-no-ui-sound>
+                <label class="daily-feed-native-pilot-opt"
+                  data-daily-feed-native-pilot-opt data-no-ui-sound>
                   <input type="checkbox" data-daily-feed-native-opt-in>
                   <span>DEV: Native star + chomp (off by default)</span>
                 </label>
@@ -5606,6 +5607,16 @@
       };
 
     runtime.startOverlayHandler = (event) => {
+      // The ordinary intro uses delegated clicks and preventDefault to
+      // avoid accidental gestures. That same preventDefault canceled the
+      // iPhone's checkbox/label default toggle in the experimental preview.
+      // Let ONLY the native-choice label and its input retain their normal
+      // click default; they never start a round or choose a control.
+      if (runtime.nativePilotAllowed &&
+          event.target?.closest?.("[data-daily-feed-native-pilot-opt]")) {
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       if (activeRuntime !== runtime || runtime.feedPausedAt != null) return;
@@ -5764,6 +5775,21 @@
       "click",
       runtime.startOverlayHandler
     );
+    if (runtime.nativePilotAllowed && runtime.nativePilotCheckbox) {
+      runtime.nativePilotChangeHandler = () => {
+        if (activeRuntime !== runtime || runtime.roundStarted ||
+            runtime.finished || runtime.controlPhase !== "instructions") return;
+        if (runtime.nativePilotChoiceStatus) {
+          runtime.nativePilotChoiceStatus.textContent =
+            runtime.nativePilotCheckbox.checked
+              ? "Native selected. Tap Got It! to check both sounds."
+              : "Web effects selected (default).";
+        }
+      };
+      runtime.nativePilotCheckbox.addEventListener(
+        "change", runtime.nativePilotChangeHandler
+      );
+    }
 
     exitButton.addEventListener("click", runtime.exitHandler);
     if (!runtime.zooEscape) {
