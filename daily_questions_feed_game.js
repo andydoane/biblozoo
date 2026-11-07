@@ -1608,6 +1608,7 @@
   function zooEscapeSoundReady(runtime) {
     const context = runtime?.audioContext;
     if (!runtime || activeRuntime !== runtime || !context ||
+        runtime.nativePilotBackend === "native" ||
         context.state !== "running" || document.hidden || runtime.feedPageHidden ||
         runtime.feedPausedAt == null) return false;
     const wall = performance.now();
@@ -1624,6 +1625,7 @@
   }
 
   function playZooEscapeSound(runtime, kind) {
+    if (runtime?.nativePilotBackend === "native") return;
     // Bouncing ten pets could otherwise create dozens of simultaneous notes.
     const now = performance.now();
     const minGap = kind === "bounce" ? 180 : 85;
@@ -5903,16 +5905,9 @@
         },
         // Optional in-mini-game sounds are allowed only after a passive
         // clock-advance check. They never unlock audio or resume gameplay.
-        soundIsReady: () => runtime.nativePilotBackend !== "native" &&
-          zooEscapeSoundReady(runtime),
-        onPop: () => {
-          if (runtime.nativePilotBackend !== "native")
-            playZooEscapeSound(runtime, "pop");
-        },
-        onBounce: () => {
-          if (runtime.nativePilotBackend !== "native")
-            playZooEscapeSound(runtime, "bounce");
-        }
+        soundIsReady: () => zooEscapeSoundReady(runtime),
+        onPop: () => playZooEscapeSound(runtime, "pop"),
+        onBounce: () => playZooEscapeSound(runtime, "bounce")
       });
     }
 
