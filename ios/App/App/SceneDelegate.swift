@@ -31,6 +31,8 @@ final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(BibloZooAudioSessionDiagnosticsPlugin())
         bridge?.registerPluginInstance(BibloZooAudioSessionRecoveryPlugin())
+        // Branch-only explicit-tap AVAudioPlayer pilot. Never invoked automatically.
+        bridge?.registerPluginInstance(BibloZooNativeSoundPlugin())
     }
 }
 
