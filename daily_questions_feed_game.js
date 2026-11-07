@@ -1675,10 +1675,11 @@
     } catch (err) { }
   }
 
-  function playStarSound(runtime) {
+  function playStarSound(runtime, collisionEpochMs) {
     if (runtime.nativePilotBackend === "native") {
-      // The backend was fixed before this round. Never double-play the star.
-      runtime.nativePilot?.play("feed-star", feedingSoundVolume(0.78));
+      // Same collision frame, now with an approximate timing marker.
+      runtime.nativePilot?.play("feed-star", feedingSoundVolume(0.78),
+        collisionEpochMs);
       return;
     }
     const context = runtime.audioContext;
@@ -1750,10 +1751,11 @@
     } catch (err) { }
   }
 
-  function playChompSound(runtime) {
+  function playChompSound(runtime, collisionEpochMs) {
     if (runtime.nativePilotBackend === "native") {
       // A rejected native call never triggers an in-round web fallback.
-      runtime.nativePilot?.play("feed-chomp", feedingSoundVolume(0.85));
+      runtime.nativePilot?.play("feed-chomp", feedingSoundVolume(0.85),
+        collisionEpochMs);
       return;
     }
     const context = runtime.audioContext;
@@ -1816,9 +1818,11 @@
 
   function triggerStarPeg(runtime, peg, now) {
     if (!peg?.isStar) return;
+    const collisionEpochMs = runtime.nativePilotBackend === "native"
+      ? Date.now() : undefined;
     peg.isStar = false;
     createStarBurst(runtime, peg, now);
-    playStarSound(runtime);
+    playStarSound(runtime, collisionEpochMs);
     spawnStarBonusBalls(runtime, now);
   }
 
@@ -1977,11 +1981,15 @@
   }
 
   function catchBall(runtime, ball) {
+    // Snapshot before DOM score/pop animation: this is the actual physics
+    // collision callback, not a timestamp taken later in the native worker.
+    const collisionEpochMs = runtime.nativePilotBackend === "native"
+      ? Date.now() : undefined;
     runtime.score += ball.points;
     runtime.caughtCount += 1;
     updateScoreBadge(runtime);
     showCatchScore(runtime, ball);
-    playChompSound(runtime);
+    playChompSound(runtime, collisionEpochMs);
     pulseFeedPet(runtime);
   }
 
