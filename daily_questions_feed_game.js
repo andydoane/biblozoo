@@ -1298,12 +1298,16 @@
       resolveFeedMode(session?.feedMode);
     const modeConfig =
       getFeedModeConfig(mode);
-    // Default-off; never expose an experimental backend in real Daily Feeding.
-    const nativePilotPreview =
-      session?.dailyTodoPreview === true &&
-      mode === FEED_MODES.CLASSIC &&
-      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
+    // Preserve the existing opt-in Classic preview. Native-only .audiotest
+    // can now route Melody gameplay through its own audited native bank;
+    // Web/PWA/Android and the original iOS app remain unchanged.
     const nativeOnlyApp = window.BibloZooNativeOnlyOutput?.enabled === true;
+    const nativePilotPreview =
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
+      ((session?.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
+        (nativeOnlyApp && mode === FEED_MODES.MELODY));
+    const nativeClassicChoice = nativePilotPreview &&
+      mode === FEED_MODES.CLASSIC;
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
         ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
@@ -1413,16 +1417,20 @@
               <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
                 ${feedInstructionPrompt(mode, tiltAvailable)}
               </div>
-              ${nativePilotPreview ? `
+              ${nativeClassicChoice ? `
                 <label class="daily-feed-native-pilot-opt"
                   data-daily-feed-native-pilot-opt data-no-ui-sound
                   ${nativeOnlyApp ? "hidden" : ""}>
                   <input type="checkbox" data-daily-feed-native-opt-in>
                   <span>DEV: Native ONLY (no Web fallback; star + chomp)</span>
                 </label>
+              ` : ""}
+              ${nativePilotPreview ? `
                 <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
                   role="status" aria-live="polite">${nativeOnlyApp
-                    ? "Native ONLY test app: Web effects are disabled."
+                    ? (mode === FEED_MODES.MELODY
+                        ? "Native Melody: prepare notes on Got It!; no Web fallback."
+                        : "Native ONLY test app: Web effects are disabled.")
                     : "Web effects are the default."}</p>
               ` : ""}
               <button class="daily-feed-control-got-it no-zoom" type="button"
@@ -3019,6 +3027,17 @@
   }
 
   function playMelodyTone(runtime, midi) {
+    // The .audiotest iOS backend is native-only. Once a Melody note is
+    // caught, request a fixed prewarmed Swift triangle buffer; do not create
+    // an AudioContext or oscillator even if the native bridge refuses.
+    if (runtime?.nativePilotBackend === "native") {
+      if (runtime.mode !== FEED_MODES.MELODY ||
+          runtime.feedPausedAt != null || runtime.melody?.pausedAt != null ||
+          !Number.isInteger(midi) || midi < 55 || midi > 83 ||
+          runtime.nativePilot?.isReady?.() !== true) return false;
+      return runtime.nativePilot.play("feed-melody",
+        feedingSoundVolume(MELODY_TONE_VOLUME), Date.now(), midi);
+    }
     const context = runtime?.audioContext;
     const state = runtime?.melody;
 
@@ -3551,9 +3570,9 @@
       return false;
     }
     if (runtime.nativePilotBackend === "native") {
-      // No Web clock, no Web AudioRecoveryCoordinator and no audio-driven
-      // Zoo Escape in the opt-in Native-only preview. A fresh Resume gesture
-      // must re-prepare the two native samples before unfreezing this round.
+      // No Web clock, Web AudioRecoveryCoordinator or rescue minigame.
+      // The real Resume tap re-prepares exactly this mode's native buffers
+      // (Classic samples/pegs, or Melody note bank) before unfreezing time.
       runtime.feedResumePending = true;
       setFeedingResumeStatus(runtime,
         "Preparing native sounds… This preview has no Web fallback.");
@@ -4986,6 +5005,7 @@
     }
     const factory = window.BibloZooFeedingNativeAudioPilot;
     const pilot = factory?.create?.({
+      mode: runtime.mode === FEED_MODES.MELODY ? "melody" : "classic",
       isCurrent: () => activeRuntime === runtime && !runtime.finished &&
         !document.hidden && !runtime.feedPageHidden,
       onFailure: (reason) => {
@@ -5007,7 +5027,9 @@
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
     if (runtime.nativePilotChoiceStatus)
       runtime.nativePilotChoiceStatus.textContent =
-        "Preparing native star, chomp, and peg sounds…";
+        runtime.mode === FEED_MODES.MELODY
+          ? "Preparing native Melody notes…"
+          : "Preparing native star, chomp, and peg sounds…";
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&
       !document.hidden && !runtime.feedPageHidden;
@@ -5060,9 +5082,12 @@
     runtime.nativePilot = pilot;
     if (runtime.nativePilotBadge)
       runtime.nativePilotBadge.textContent =
-        "Native ONLY: star/chomp ready; Web audio OFF";
+        runtime.mode === FEED_MODES.MELODY
+          ? "Native ONLY: Melody notes ready; Web audio OFF"
+          : "Native ONLY: star/chomp ready; Web audio OFF";
     if (runtime.nativePilotChoiceStatus)
-      runtime.nativePilotChoiceStatus.textContent = "Native effects prepared.";
+      runtime.nativePilotChoiceStatus.textContent = runtime.mode === FEED_MODES.MELODY
+        ? "Native Melody notes prepared." : "Native effects prepared.";
     startRound(runtime);
     void recordNativePreviewPhase(runtime, "round-start");
   }
@@ -5505,14 +5530,14 @@
     const petRect =
       petCircle.getBoundingClientRect();
 
-    // The Native-only Classic tester cannot create/resume a Feeding
-    // AudioContext before the user has even checked the Native box.
-    // Defer Web-only resource allocation until Got It! in the unchecked
-    // comparison run. All other game modes retain their original setup.
+    // Keep legacy opt-in Classic preview; add Native-only Melody on
+    // the isolated .audiotest iOS bundle. No Web Audio context is made
+    // before Got It!, and other modes/browser platforms stay unchanged.
     const nativePilotAllowed =
-      session.dailyTodoPreview === true &&
-      mode === FEED_MODES.CLASSIC &&
-      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
+      ((session.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
+        (window.BibloZooNativeOnlyOutput?.enabled === true &&
+         mode === FEED_MODES.MELODY));
     if (nativePilotAllowed && preparedAudioContext) {
       stopAudioContext(preparedAudioContext);
       preparedAudioContext = null;
