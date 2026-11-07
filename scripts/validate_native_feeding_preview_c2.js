@@ -9,6 +9,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const ROOT = path.resolve(__dirname, "..");
 const read = p => fs.readFileSync(path.join(ROOT, p), "utf8");
+const plain = value => JSON.parse(JSON.stringify(value)); // normalize VM realm objects
 const PILOT = read("verse_games/shared/feeding-native-audio-pilot.js");
 const FEED = read("daily_questions_feed_game.js");
 const HTML = read("index.html");
@@ -128,7 +129,7 @@ async function main() {
     const pilot=a.pilot.create({isCurrent:()=>current});
     assert.equal(pilot.isReady(),false);
     assert.deepEqual(a.calls,[],"creating the pilot must not autoplay or prepare");
-    assert.deepEqual(await pilot.prepare(),{ready:true,reason:"prepared"});
+    assert.deepEqual(plain(await pilot.prepare()),{ready:true,reason:"prepared"});
     assert.deepEqual(a.calls,[["preload","feed-star"],["preload","feed-chomp"]]);
     assert.equal(pilot.isReady(),true);
     assert.equal(pilot.play("feed-star",0.78),true);
@@ -143,14 +144,14 @@ async function main() {
     assert.deepEqual(a.calls.slice(-2),[["stop","feed-star"],["stop","feed-chomp"]]);
     assert.equal(pilot.play("feed-star",0.78),false,"paused players cannot emit effects");
     current=false;
-    assert.deepEqual(await pilot.prepare(),{ready:false,reason:"stale"});
+    assert.deepEqual(plain(await pilot.prepare()),{ready:false,reason:"stale"});
   }
   {
     // A missing bridge or second asset does not start a game mid-preflight.
     const a=makeAdapter();
     a.cap.Plugins={};
     const p=a.pilot.create({isCurrent:()=>true});
-    assert.deepEqual(await p.prepare(),{ready:false,reason:"missing-bridge"});
+    assert.deepEqual(plain(await p.prepare()),{ready:false,reason:"missing-bridge"});
     assert.equal(p.play("feed-star",0.8),false);
   }
   {
@@ -165,7 +166,7 @@ async function main() {
     }});
     const p=a.pilot.create({isCurrent:()=>true});
     const result=await p.prepare();
-    assert.deepEqual(result,{ready:false,reason:"bundled-asset-missing"});
+    assert.deepEqual(plain(result),{ready:false,reason:"bundled-asset-missing"});
     assert.equal(p.play("feed-star",0.78),false);
     assert.ok(calls.includes("stop:feed-star")&&calls.includes("stop:feed-chomp"));
     assert.ok(!calls.includes("play"));
@@ -182,7 +183,7 @@ async function main() {
     const awaiting=p.prepare();
     p.stop();
     pending.resolve({prepared:true});
-    assert.deepEqual(await awaiting,{ready:false,reason:"stale"});
+    assert.deepEqual(plain(await awaiting),{ready:false,reason:"stale"});
     assert.equal(p.isReady(),false);
     assert.equal(p.play("feed-star",0.78),false);
     assert.equal(calls,1,"stop must prevent next asset preload");
@@ -197,7 +198,7 @@ async function main() {
     const p=a.pilot.create({isCurrent:()=>true});
     const awaiting=p.prepare();
     a.expire(1500);
-    assert.deepEqual(await awaiting,{ready:false,reason:"prepare-timeout-or-error"});
+    assert.deepEqual(plain(await awaiting),{ready:false,reason:"prepare-timeout-or-error"});
     assert.equal(p.isReady(),false);
     pending.resolve({prepared:true});
     await Promise.resolve();
