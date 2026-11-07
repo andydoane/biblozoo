@@ -10,7 +10,7 @@ const workflow=read(".github/workflows/ios-prep-validation.yml");
 const between=(src,a,b)=>{const i=src.indexOf(a),j=src.indexOf(b,i+a.length);
   assert.ok(i>=0&&j>i,"Missing source region "+a);return src.slice(i,j);};
 const begin=between(game,"  async function startPreviewRoundWithAudioChoice(runtime) {","  function startRound(runtime) {");
-const round=between(game,"  function startRound(runtime) {","  function resizeFeedingGame(");
+const round=between(game,"  function startRound(runtime) {","  function resizeFeedStage(runtime) {");
 const peg=between(game,"  function playPegTone(runtime, now) {","  function playStarSound(runtime, collisionEpochMs) {");
 const star=between(game,"  function playStarSound(runtime, collisionEpochMs) {","  function playChompSound(runtime, collisionEpochMs) {");
 const brick=between(game,"  function breakBounceBrick(runtime, brick, ball, now) {","  // Circle/rectangle collision");
