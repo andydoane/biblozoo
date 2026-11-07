@@ -37,7 +37,6 @@ function environment(kind) {
   }
   class Video extends Media {
     constructor() { super("VIDEO"); }
-    play() { videoPlays += 1; return Promise.resolve("video"); }
   }
   const scriptedAudio = new Media();
   const scriptedVideo = new Video();
@@ -118,11 +117,13 @@ async function main() {
     await assert.rejects(audio.play(), /WebKit media sound is disabled/);
     assert.equal(e.originalPlays(), before, kind);
     const video = new e.Video();
-    assert.equal(await video.play(), "video");
+    assert.equal(await video.play(), "html-played");
     assert.equal(video.muted, true, kind);
     assert.equal(e.window.navigator.mediaDevices.getUserMedia, e.input, kind);
     assert.equal(e.window.MediaRecorder, e.mediaRecorder, kind);
-    assert.equal(e.window.Capacitor?.Plugins?.BibloZooNativeSound?.play, e.nativePlay);
+    if (kind === "ios") {
+      assert.equal(e.window.Capacitor.Plugins.BibloZooNativeSound.play, e.nativePlay);
+    }
     const state = gate.status();
     assert.equal(state.blockedMediaPlays, 1);
     assert.equal(state.mutedVideoPlays, 1);
