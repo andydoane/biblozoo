@@ -129,7 +129,9 @@
         if (!dismissed && !doc.hidden) detail.textContent = "Native state read failed or timed out.";
       }
     }
-    inspect.addEventListener("click", () => { void inspectNativeState(); });
+    // The browser ignores event-return values; returning the Promise also
+    // lets the Node VM regression await this read-only status inspection.
+    inspect.addEventListener("click", () => inspectNativeState());
 
     function stopQuietly() {
       try {
