@@ -85,6 +85,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_app_switcher_pause_n4a1.js
 
+      - name: Validate N4b native Labyrinth landings, catch effects and retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_labyrinth_gameplay_n4b.js
+
       - name: Validate N1 native-only WebKit sound output isolation
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_only_ios_output.js
