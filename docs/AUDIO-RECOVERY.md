@@ -2,7 +2,7 @@
 
 > **Read with** [the living handoff](PROJECT-HANDOFF.md). This describes the safety boundaries of the current `ios-prep` implementation as checked on 2026-11-05 (base `1e1deb2`). **Source and current tests are authoritative.** On the focused Learn recovery PR (`fix/learn-narration-recovery-gate`), narration itself—not app UI effects—is the required playback source for Learn's recovery success. Do not replace the activity-owned recovery path with a global approximation.
 
-## N5a — native-only app UI pops and quieter Feeding popups (PR #32 draft)
+## N5a — native-only app UI pops and quieter Feeding popups (PR #32 ready for owner review)
 
 **Current owner acceptance:** [N4c PR #31](https://github.com/andydoane/biblozoo/pull/31) was owner-merged into `experiment/native-ios-audio` as `99130c01`. The owner subsequently reported **all Bounce tests passed**, completing the planned four Feeding mode sound slices under the device tests reported. This does not supply measured speaker onset times. Keep the historical N3b silent cold-launch and N3c stale PiP sample-preparation observations as unresolved.
 
@@ -12,7 +12,7 @@
 
 **Feeding UX:** The isolated native-only Feeding screen hides the temporary DEV pilot badge, startup trace and lengthy no-Web descriptions; successful preparation clears its transient status. Real failed Got It! still leaves Instructions / **Try Again** / Back; failed Resume remains frozen on Welcome Back / **Try again!** / Back with a simple failure message. Exact reason is still in the hidden diagnostic state and the manual last-80 native dispatch/last-18 preflight clipboard report. N4 game mechanics, sound IDs, scores, stages, App Switcher freezes and recovery ownership are unchanged.
 
-**Physical iPhone gate pending for N5a:** Owner must Xcode-build **BibloZoo Audio Test** on actual iPhone and hear UI pops on title/menu/buttons; test rapid navigation, mute, App Switcher swipe-and-hold/full task-switch, no ghost/auto sound and subsequent fresh gesture. Retest four Feeding modes and concise dialog text. **DEV → Copy Audio Timing Report BEFORE restarting** if silent; paste report and say what was heard. GitHub Node/production build cannot compile Swift or establish audible output. Full [N5a testing](N5A-NATIVE-UI-TAPS.md) and [living handoff](PROJECT-HANDOFF.md). N5b Learn narration, N6 other activities, N7 mic/DSP, N8 independent Zoo fun are separate phases.
+**Automated source gate:** Node regressions and production web build GREEN on [run #42421152202](https://github.com/andydoane/biblozoo/actions/runs/42421152202) at `241989c3`; final documentation-only HEAD needs confirmation. **Physical iPhone gate pending for N5a:** Owner must Xcode-build **BibloZoo Audio Test** on actual iPhone and hear UI pops on title/menu/buttons; test rapid navigation, mute, App Switcher swipe-and-hold/full task-switch, no ghost/auto sound and subsequent fresh gesture. Retest four Feeding modes and concise dialog text. **DEV → Copy Audio Timing Report BEFORE restarting** if silent; paste report and say what was heard. GitHub Node/production build cannot compile Swift or establish audible output. Full [N5a testing](N5A-NATIVE-UI-TAPS.md) and [living handoff](PROJECT-HANDOFF.md). N5b Learn narration, N6 other activities, N7 mic/DSP, N8 independent Zoo fun are separate phases.
 
 ## N4c — Bounce Feeding native output and app-switcher recovery (PR #31)
 
