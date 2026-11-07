@@ -1291,6 +1291,11 @@
       resolveFeedMode(session?.feedMode);
     const modeConfig =
       getFeedModeConfig(mode);
+    // Default-off; never expose an experimental backend in real Daily Feeding.
+    const nativePilotPreview =
+      session?.dailyTodoPreview === true &&
+      mode === FEED_MODES.CLASSIC &&
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
         ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
@@ -1311,6 +1316,9 @@
           <span class="daily-feed-score-label">${mode === FEED_MODES.MELODY ? "Caught" : "Score"}</span>
           <strong class="daily-feed-score-value" data-daily-feed-score>${mode === FEED_MODES.MELODY ? "0%" : "0"}</strong>
         </div>
+        ${nativePilotPreview
+          ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">Preview audio: Web (default)</div>'
+          : ""}
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
           aria-label="${stageAriaLabel}">
@@ -1335,6 +1343,7 @@
           role="dialog"
           aria-modal="true"
           aria-label="Feeding game instructions"
+          ${nativePilotPreview ? "data-no-ui-sound" : ""}
         >
           <div class="daily-feed-start-card">
             <div
@@ -1392,6 +1401,14 @@
               <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
                 ${feedInstructionPrompt(mode, tiltAvailable)}
               </div>
+              ${nativePilotPreview ? `
+                <label class="daily-feed-native-pilot-opt" data-no-ui-sound>
+                  <input type="checkbox" data-daily-feed-native-opt-in>
+                  <span>DEV: Native star + chomp (off by default)</span>
+                </label>
+                <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
+                  role="status" aria-live="polite">Web effects are the default.</p>
+              ` : ""}
               <button class="daily-feed-control-got-it no-zoom" type="button"
                 data-daily-feed-confirm-button>Got It!</button>
             </div>
@@ -1572,6 +1589,7 @@
       if (!audio) continue;
       try { audio.pause(); audio.currentTime = 0; } catch (err) { }
     }
+    runtime?.nativePilot?.stop?.();
   }
 
   // Silent-first Zoo Escape effects: no new context, no resume(), no promise
@@ -1636,6 +1654,11 @@
   }
 
   function playStarSound(runtime) {
+    if (runtime.nativePilotBackend === "native") {
+      // The backend was fixed before this round. Never double-play the star.
+      runtime.nativePilot?.play("feed-star", feedingSoundVolume(0.78));
+      return;
+    }
     const context = runtime.audioContext;
 
     if (
@@ -1706,6 +1729,11 @@
   }
 
   function playChompSound(runtime) {
+    if (runtime.nativePilotBackend === "native") {
+      // A rejected native call never triggers an in-round web fallback.
+      runtime.nativePilot?.play("feed-chomp", feedingSoundVolume(0.85));
+      return;
+    }
     const context = runtime.audioContext;
 
     if (context && context.state !== "closed") {
@@ -4541,6 +4569,7 @@
     runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
     clearTimeout(runtime.feedStartAudioWatchdog);
     clearTimeout(runtime.feedResumeWatchdog);
+    runtime.nativePilot?.stop?.();
     runtime.gameEl?.classList?.remove?.("is-interruption-paused");
     if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
 
