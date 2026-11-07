@@ -4793,12 +4793,74 @@
     showFeedingControlInstructions(runtime, "tilt");
   }
 
+  // Stage C.2c: snapshots are read-only and in-memory. They show the native
+  // interruption sequence around Web-clock and native-preload boundaries.
+  // Requests are async: "before-web" is captured on the separate checkbox
+  // gesture, not guaranteed to describe the exact instant of Got It!.
+  function nativeFeedDebugNumber(value) {
+    return Number.isInteger(value) && value >= 0 && value < 100000 ? value : "?";
+  }
+
+  function boundedNativeFeedStage(promise, timeoutMs) {
+    let timer;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("stage-timeout")), timeoutMs);
+      })
+    ]).finally(() => clearTimeout(timer));
+  }
+
+  async function recordNativePreviewPhase(runtime, label) {
+    if (!runtime?.nativePilotAllowed || activeRuntime !== runtime ||
+        document.hidden || runtime.feedPageHidden ||
+        !runtime.nativePilotCheckbox?.checked) return;
+    if (!runtime.nativePilotTrace) runtime.nativePilotTrace = [];
+    const step = { label, text: "reading…" };
+    runtime.nativePilotTrace.push(step);
+    // Developer-only counts, not persistent telemetry or user audio content.
+    if (runtime.nativePilotTrace.length > 5) runtime.nativePilotTrace.shift();
+    const paint = () => {
+      if (activeRuntime === runtime && runtime.nativePilotPhases) {
+        runtime.nativePilotPhases.textContent = runtime.nativePilotTrace
+          .map(item => item.label + ": " + item.text).join("\n");
+      }
+    };
+    paint();
+    try {
+      const api = window.Capacitor?.Plugins?.BibloZooNativeSound;
+      if (typeof api?.getDebugState !== "function") {
+        step.text = "bridge-unavailable";
+      } else {
+        const state = await boundedNativeFeedStage(
+          api.getDebugState(), FEED_NATIVE_STATE_READ_TIMEOUT_MS);
+        if (activeRuntime !== runtime || document.hidden ||
+            !runtime.nativePilotCheckbox?.checked) return;
+        const last = typeof state?.lastSignal === "string" &&
+          /^[a-z][a-z0-9-]{0,40}$/.test(state.lastSignal)
+            ? state.lastSignal : "?";
+        const reason = Number.isInteger(state?.lastReasonCode) &&
+          state.lastReasonCode >= -1 && state.lastReasonCode < 10000
+            ? state.lastReasonCode : "?";
+        step.text = state?.available === true
+          ? "pending=" + (state.pending === true ? "YES" : "no") +
+            " began=" + nativeFeedDebugNumber(state.beganCount) +
+            " ended=" + nativeFeedDebugNumber(state.endedCount) +
+            " events=" + nativeFeedDebugNumber(state.eventCount) +
+            " last=" + last + " reason=" + reason
+          : "bridge-unavailable";
+      }
+    } catch (_) {
+      step.text = "read-timeout-or-error";
+    }
+    paint();
+  }
+
   async function startPreviewRoundWithAudioChoice(runtime) {
     if (!runtime || activeRuntime !== runtime ||
         runtime.nativePilotChoicePending || runtime.roundStarted ||
         runtime.finished || runtime.controlPhase !== "instructions") return;
-    // Session flags and UI are both gated: this never runs in earned Daily
-    // Feeding, or in Labyrinth/Melody/Bounce tester previews.
+    // Only explicit iOS Classic *tester previews* may select native effects.
     if (!runtime.nativePilotAllowed ||
         runtime.nativePilotCheckbox?.checked !== true) {
       runtime.nativePilotBackend = "web";
@@ -4812,37 +4874,89 @@
       onFailure: (reason) => {
         if (activeRuntime !== runtime || runtime.finished) return;
         if (runtime.nativePilotBadge) {
-          // Adapter restricts reasons to safe, short ASCII codes. Showing the
-          // actual rejection is diagnostic, NOT an audibility measurement.
           const detail = typeof reason === "string" &&
             /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
           runtime.nativePilotBadge.textContent =
             "Native effect failed (" + detail + "). Exit preview to retry";
         }
+        void recordNativePreviewPhase(runtime, "play-fail");
       }
     });
     runtime.nativePilotChoicePending = true;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = true;
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
     if (runtime.nativePilotChoiceStatus) {
-      runtime.nativePilotChoiceStatus.textContent = "Checking both native sounds…";
+      runtime.nativePilotChoiceStatus.textContent = "Verifying Web Audio clock first…";
     }
-    let result;
-    try { result = await pilot?.prepare?.(); }
-    catch (_) { result = { ready: false, reason: "prepare-error" }; }
-    if (activeRuntime !== runtime || runtime.finished || runtime.roundStarted ||
-        runtime.controlPhase !== "instructions" ||
-        document.hidden || runtime.feedPageHidden) {
+    const live = () => activeRuntime === runtime && !runtime.finished &&
+      !runtime.roundStarted && runtime.controlPhase === "instructions" &&
+      !document.hidden && !runtime.feedPageHidden;
+    const context = runtime.audioContext;
+    // IMPORTANT: call resume synchronously within the real Got It! gesture,
+    // before ANY await. WebKit may require transient user activation.
+    // Native preload must not run until the Web clock has actually advanced.
+    let webResume;
+    try { webResume = resumeFeedAudioContext(context); }
+    catch (_) { webResume = Promise.resolve(false); }
+
+    let webClockReady = false;
+    try {
+      const resumed = await boundedNativeFeedStage(
+        webResume, FEED_NATIVE_CLOCK_READY_TIMEOUT_MS);
+      if (resumed && live()) {
+        webClockReady = await boundedNativeFeedStage(
+          feedAudioClockAdvances(context), FEED_NATIVE_CLOCK_READY_TIMEOUT_MS);
+      }
+    } catch (_) {
+      webClockReady = false;
+    }
+    if (!live()) {
       pilot?.stop?.();
-      runtime.nativePilotChoicePending = false;
-      if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
-      if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
+      if (activeRuntime === runtime) {
+        runtime.nativePilotChoicePending = false;
+        if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+        if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
+      }
+      return;
+    }
+    // Observes state *after* verified clock activity, before any native
+    // preload. A moving clock is not proof the device speaker was audible.
+    await recordNativePreviewPhase(runtime, "after-web");
+    if (!live()) {
+      pilot?.stop?.();
+      return;
+    }
+    if (runtime.nativePilotChoiceStatus) {
+      runtime.nativePilotChoiceStatus.textContent = webClockReady
+        ? "Web clock verified. Preparing native star and chomp…"
+        : "Web clock unavailable; using Web preview sounds.";
+    }
+    let result = { ready: false, reason: "web-clock-unavailable" };
+    if (webClockReady) {
+      try { result = await pilot?.prepare?.() || { ready: false, reason: "missing-bridge" }; }
+      catch (_) { result = { ready: false, reason: "prepare-error" }; }
+    }
+    if (!live()) {
+      pilot?.stop?.();
+      if (activeRuntime === runtime) {
+        runtime.nativePilotChoicePending = false;
+        if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+        if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
+      }
+      return;
+    }
+    // Compare native notification counts with the after-Web snapshot BEFORE
+    // starting gameplay; a rejected preload is a Web fallback, not a voice.
+    await recordNativePreviewPhase(runtime, "after-native");
+    if (!live()) {
+      pilot?.stop?.();
       return;
     }
     runtime.nativePilotChoicePending = false;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
-    if (result?.ready === true && pilot) {
+    if (result?.ready === true && pilot &&
+        context?.state === "running" && runtime.audioContext === context) {
       runtime.nativePilot = pilot;
       runtime.nativePilotBackend = "native";
       if (runtime.nativePilotBadge) {
@@ -4851,14 +4965,20 @@
       }
     } else {
       pilot?.stop?.();
-      // Fallback chosen BEFORE round start; never switch engines mid-round.
       runtime.nativePilot = null;
+      // Any failure selects the old backend BEFORE starting gameplay. Never
+      // silently change engines after the first collision/audio event.
       runtime.nativePilotBackend = "web";
       if (runtime.nativePilotBadge) {
-        runtime.nativePilotBadge.textContent = "Preview audio: Web (native unavailable)";
+        const reason = typeof result?.reason === "string" &&
+          /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
+          ? result.reason : "web-clock-changed";
+        runtime.nativePilotBadge.textContent =
+          "Preview audio: Web (native unavailable: " + reason + ")";
       }
     }
     startRound(runtime);
+    void recordNativePreviewPhase(runtime, "round-start");
   }
 
   function startRound(runtime) {
@@ -5816,8 +5936,17 @@
         if (runtime.nativePilotChoiceStatus) {
           runtime.nativePilotChoiceStatus.textContent =
             runtime.nativePilotCheckbox.checked
-              ? "Native selected. Tap Got It! to check both sounds."
+              ? "Native selected. Tap Got It! to verify Web clock, then both sounds."
               : "Web effects selected (default).";
+        }
+        runtime.nativePilotTrace = [];
+        if (runtime.nativePilotPhases && !runtime.nativePilotCheckbox.checked) {
+          runtime.nativePilotPhases.textContent = "Native startup trace: Web default";
+        }
+        if (runtime.nativePilotCheckbox.checked) {
+          // Separate checkbox gesture precedes Got It!, so this is our
+          // best read-only baseline without consuming Got It's activation.
+          void recordNativePreviewPhase(runtime, "before-web");
         }
       };
       runtime.nativePilotCheckbox.addEventListener(
