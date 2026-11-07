@@ -62,8 +62,9 @@ assert.match(game,/Preview audio: Web \(explicit choice\)/);
 assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/);
 assert.match(pilot,/api\.activateFromGesture\(\{ purpose: "feeding" \}\)/);
 assert.match(pilot,/for \(const soundId of selectedIds\)/);
-assert.match(pilot,/const selectedIds = mode === "melody" \? MELODY_IDS : IDS/,
-  "N4a continues N3c bounded per-mode native preflight");
+assert.match(pilot,/const selectedIds = mode === "melody" \? MELODY_IDS :/);
+assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS : IDS/,
+  "N4b preserves N3c fixed per-mode preflights");
 assert.match(actions,/node scripts\/validate_native_first_launch_n3c\.js/);
 const noComments=swift.replace(/\/\/[^\n]*/g,"");
 assert.doesNotMatch(noComments,/\.setCategory\(|\.setMode\(|\.setActive\(false\)/);
