@@ -33,7 +33,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private let soundResources: [String: String] = [
         "pilot-unlock": "ui_pet_unlock",
         "feed-star": "dq_feed_star",
-        "feed-chomp": "dq_feed_chomp"
+        "feed-chomp": "dq_feed_chomp",
+        "ui-pop-1": "ui_sound_pop_1",
+        "ui-pop-2": "ui_sound_pop_2"
     ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
@@ -47,7 +49,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private var players: [String: AVAudioPlayer] = [:] // pilot-unlock only
     // Only these two fixed IDs use predecoded buffers. Unchanged native
     // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
-    private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp"]
+    private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp",
+                                             "ui-pop-1", "ui-pop-2"]
     private let nativePegSoundID = "feed-peg"
     private let nativeMelodySoundID = "feed-melody"
     // All current Melody tune MIDI notes fall in this bounded 55...83 bank.
@@ -740,7 +743,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                                       soundId: "session")
             }
             let purpose = call.getString("purpose") ?? ""
-            guard purpose == "dev" || purpose == "feeding" else {
+            guard purpose == "dev" || purpose == "feeding" || purpose == "ui" else {
                 finish(["ready": false, "reason": "invalid-purpose"]); return
             }
             if let blocked = self.unavailableReason(), blocked != "interruption-pending",
