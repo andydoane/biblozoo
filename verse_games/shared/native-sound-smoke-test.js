@@ -7,7 +7,9 @@
   const SOUND_ID = "pilot-unlock";
   const STAR_ID = "feed-star";
   const CHOMP_ID = "feed-chomp";
-  const ALL_SOUND_IDS = Object.freeze([SOUND_ID, STAR_ID, CHOMP_ID]);
+  const MELODY_ID = "feed-melody";
+  const MELODY_TEST_MIDI = 64; // E4, a single fixed note, not a tune.
+  const ALL_SOUND_IDS = Object.freeze([SOUND_ID, STAR_ID, CHOMP_ID, MELODY_ID]);
   const PANEL_ID = "biblozoo-native-sound-smoke";
   const DEADLINE_MS = 2500;
   const doc = root.document;
@@ -87,6 +89,7 @@
     }
     const playStar = sampleButton("Play star");
     const playChomp = sampleButton("Play chomp");
+    const playMelody = sampleButton("Melody E4");
 
     const status = doc.createElement("p");
     status.setAttribute("role", "status");
@@ -155,7 +158,9 @@
     let dismissed = false;
     function setBusy(value) {
       busy = value;
-      for (const button of [play, playStar, playChomp]) button.disabled = value;
+      for (const button of [play, playStar, playChomp, playMelody]) {
+        button.disabled = value;
+      }
     }
     function plugin() { return root.Capacitor?.Plugins?.BibloZooNativeSound; }
     function count(value) { return Number.isInteger(value) && value >= 0 ? value : "?"; }
@@ -302,7 +307,8 @@
             safeReason(session?.reason) + ". No sound requested.";
           return;
         }
-        status.textContent = "Preparing native " + label + " MP3…";
+        status.textContent = "Preparing native " + label +
+          (soundId === MELODY_ID ? " tone bank…" : " MP3…");
         const prepared = await bounded(api.preload({ soundId }));
         if (!current(token)) return;
         if (prepared?.prepared !== true) {
@@ -319,7 +325,10 @@
             ? " iOS reported a past suspension."
             : "";
         status.textContent = "Requesting native playback…";
-        const started = await bounded(api.play({ soundId, volume: 0.85 }));
+        const request = soundId === MELODY_ID
+          ? { soundId, volume: 0.25, midi: MELODY_TEST_MIDI }
+          : { soundId, volume: 0.85 };
+        const started = await bounded(api.play(request));
         if (!current(token)) { stopQuietly(); return; }
         status.textContent = started?.accepted === true
           ? "Native " + label + " playback requested. Did you hear the sound?" + note
@@ -336,6 +345,8 @@
     play.addEventListener("click", () => playSelected(SOUND_ID, "pet-unlock"));
     playStar.addEventListener("click", () => playSelected(STAR_ID, "star"));
     playChomp.addEventListener("click", () => playSelected(CHOMP_ID, "chomp"));
+    playMelody.addEventListener("click",
+      () => playSelected(MELODY_ID, "Melody E4"));
   }
 
   if (doc.readyState === "complete") mount();
