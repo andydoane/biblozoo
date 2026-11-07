@@ -5413,14 +5413,24 @@
     const petRect =
       petCircle.getBoundingClientRect();
 
-    const audioContext =
-      preparedAudioContext ||
-      prepareAudio();
-
+    // The Native-only Classic tester cannot create/resume a Feeding
+    // AudioContext before the user has even checked the Native box.
+    // Defer Web-only resource allocation until Got It! in the unchecked
+    // comparison run. All other game modes retain their original setup.
+    const nativePilotAllowed =
+      session.dailyTodoPreview === true &&
+      mode === FEED_MODES.CLASSIC &&
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
+    if (nativePilotAllowed && preparedAudioContext) {
+      stopAudioContext(preparedAudioContext);
+      preparedAudioContext = null;
+    }
+    const audioContext = nativePilotAllowed
+      ? null : (preparedAudioContext || prepareAudio());
     preparedAudioContext = null;
 
     const starAudio =
-      audioContext
+      audioContext || nativePilotAllowed
         ? null
         : new Audio(
           `${ASSET_BASE}dq_feed_star.mp3`
@@ -5435,7 +5445,7 @@
       } catch (err) { }
     }
 
-    const chompAudio = audioContext
+    const chompAudio = audioContext || nativePilotAllowed
       ? null
       : new Audio(`${ASSET_BASE}dq_feed_chomp.mp3`);
 
@@ -5449,10 +5459,6 @@
     const scheduled =
       buildScheduledBalls();
 
-    const nativePilotAllowed =
-      session.dailyTodoPreview === true &&
-      mode === FEED_MODES.CLASSIC &&
-      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
     const runtime = {
       running: false,
       roundStarted: false,
