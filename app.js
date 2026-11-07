@@ -1196,7 +1196,7 @@ function playTinyUnlockBlip(ctx) {
 }
 
 function playUiTapFallbackNow() {
-  if (muted) return;
+  if (muted || isNativeUiAudioMode()) return;
 
   const nowMs = performance.now();
 
@@ -1243,6 +1243,9 @@ function playUiTapFallbackNow() {
 }
 
 function primeAppAudioFromGesture({ playFeedback = false } = {}) {
+  // The capture handler alone activates native UI sound. Never use Web Audio
+  // or a second activation path on the isolated iOS native-only app.
+  if (isNativeUiAudioMode()) return;
   // Start activation inside the gesture; optional tap feedback follows once
   // the context is confirmed to be running, never on a suspended context.
   const started = performance.now();
@@ -1447,6 +1450,7 @@ function feedingResumeOwnsAudioGesture() {
 }
 
 function unlockAppAudio() {
+  if (isNativeUiAudioMode()) return Promise.resolve(false);
   if (document.hidden || feedingResumeOwnsAudioGesture()) return Promise.resolve(false);
 
   if (appAudioFreshContextOnGesture) {
@@ -1571,6 +1575,8 @@ function unlockAppAudio() {
 }
 
 function playUiTapSound({ force = false } = {}) {
+  // Only the genuine capture-phase gesture dispatches native UI sounds.
+  if (isNativeUiAudioMode()) return;
   if (muted) return;
 
   const ctx = getAppAudioContext();
@@ -1621,7 +1627,8 @@ function toggleMute() {
   muted = !muted;
   applyMute();
   window.BibloZooDailyQuestions?.onMuteChanged?.(muted);
-  if (!muted) void unlockAppAudio();
+  if (muted) window.BibloZooNativeUiAudio?.invalidate?.({ stop: true });
+  if (!muted && !isNativeUiAudioMode()) void unlockAppAudio();
   if (muted) {
     // The existing mute control pauses audioEl. Also release a lesson that
     // would otherwise remain forever waiting for a now-impossible ended event.
@@ -22968,6 +22975,10 @@ const UI_TAP_SOUND_SELECTOR = [
 
 let appUiTapSoundsBound = false;
 
+function isNativeUiAudioMode() {
+  return window.BibloZooNativeUiAudio?.isAvailable?.() === true;
+}
+
 function getUiTapSoundTarget(eventTarget) {
   if (!eventTarget || typeof eventTarget.closest !== "function") return null;
 
@@ -22986,9 +22997,9 @@ function setupAppUiTapSounds() {
   if (appUiTapSoundsBound) return;
   appUiTapSoundsBound = true;
 
-  // Start preparing the real MP3 tap sounds before
-  // the user's first interaction.
-  void preloadUiTapSoundBuffers();
+  // Browser/PWA/Android retain decoded Web Audio. Native-only iOS must
+  // defer Swift activation and prewarm to the first actual UI gesture.
+  if (!isNativeUiAudioMode()) void preloadUiTapSoundBuffers();
 
   function handleUiTapGesture(event) {
     if (event.button !== undefined && event.button !== 0) return;
@@ -23002,6 +23013,14 @@ function setupAppUiTapSounds() {
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget || feedingResumeOwnsAudioGesture()) return;
     const gestureScreen = State.screen;
+    if (isNativeUiAudioMode()) {
+      window.BibloZooNativeUiAudio.tapFromGesture({
+        volume: UI_TAP_VOLUME,
+        isCurrent: () => !muted && !document.hidden &&
+          State.screen === gestureScreen && tapTarget.isConnected
+      });
+      return;
+    }
 
     // Start/resume from the touch gesture. A newly unlocked context may
     // settle just after this handler, so provide one short-lived tap response.
@@ -23033,6 +23052,15 @@ function setupAppUiTapSounds() {
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget || feedingResumeOwnsAudioGesture()) return;
     const gestureScreen = State.screen;
+
+    if (isNativeUiAudioMode()) {
+      window.BibloZooNativeUiAudio.tapFromGesture({
+        volume: UI_TAP_VOLUME,
+        isCurrent: () => !muted && !document.hidden &&
+          State.screen === gestureScreen && tapTarget.isConnected
+      });
+      return;
+    }
 
     const started = performance.now();
     const unlockPromise = unlockAppAudio();
