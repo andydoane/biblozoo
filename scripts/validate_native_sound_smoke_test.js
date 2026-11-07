@@ -46,7 +46,7 @@ assert.equal((pbx.match(/BibloZooNativeSoundPlugin\.swift in Sources \*\//g) || 
 assert.match(scene, /registerPluginInstance\(BibloZooNativeSoundPlugin\(\)\)/);
 assert.match(swift, /@objc\(BibloZooNativeSoundPlugin\)/);
 assert.match(swift, /jsName\s*=\s*"BibloZooNativeSound"/);
-for (const method of ["preload", "play", "stop", "getDebugState"]) {
+for (const method of ["preload", "play", "stop", "getDebugState", "activateFromGesture"]) {
   assert.match(swift, new RegExp('CAPPluginMethod\\(name: "' + method + '"'));
   assert.match(swift, new RegExp('@objc func ' + method + '\\('));
 }
@@ -93,15 +93,37 @@ assert.match(handle, /case \.ended:[\s\S]*?interrupted = false/);
 assert.doesNotMatch(handle, /interrupted\s*=\s*kind\s*!=/,
   "unknown notification type previously left the interruption stuck");
 assert.match(swift, /private func returnedToForeground\(\)[\s\S]*?returnedToForegroundDuringInterruption = true/);
-assert.match(swift, /if interrupted \{[\s\S]*?guard returnedToForegroundDuringInterruption else \{[\s\S]*?return "interruption-pending"[\s\S]*?\}[\s\S]*?lastInterruptionSignal = "foreground-tap-retry"/,
-  "never ignore a true interruption without an inactive->active fresh tap");
+// N2: foreground notification alone must never clear a pending interruption.
+const unavailable = swift.slice(swift.indexOf("    private func unavailableReason("),
+  swift.indexOf("    // The ONLY native audio-session activation entrypoint"));
+assert.match(unavailable, /if interrupted \{ return "interruption-pending" \}/);
+assert.doesNotMatch(unavailable, /interrupted\s*=\s*false/,
+  "no implicit latch clearing from preload or foreground");
+const gesture = swift.slice(swift.indexOf("    @objc func activateFromGesture("),
+  swift.indexOf("    private func requestedId("));
+assert.ok(gesture.startsWith("    @objc func activateFromGesture("));
+assert.match(gesture, /guard !self\.interrupted \|\| self\.returnedToForegroundDuringInterruption/);
+assert.match(gesture, /guard self\.activationAttemptsThisForeground/);
+assert.match(gesture, /self\.minimumActivationInterval/);
+assert.match(gesture, /try AVAudioSession\.sharedInstance\(\)\.setActive\(true\)/);
+assert.match(gesture, /self\.interrupted = false/);
+assert.match(gesture, /catch let error as NSError/);
+assert.match(gesture, /"ready": false/);
+assert.match(scene, /Bundle\.main\.bundleIdentifier == "com\.andydoane\.biblozoo\.audiotest"/);
+assert.match(scene, /"legacy-web-recovery-disabled"/);
+assert.match(swift, /private let maxTraceEvents = 28/);
+assert.match(swift, /"recentEvents": self\.eventTrace/);
+assert.match(swift, /mediaServicesWereResetNotification/);
+assert.match(swift, /needsGestureAfterReset = true/);
 assert.match(swift, /"lastInterruptionSignal": self\.lastInterruptionSignal/,
   "return bounded developer diagnostic for the previous session signal");
 assert.match(swift, /volume\.isFinite/);
 assert.match(swift, /invalid-sound-id/);
 const withoutComments = swift.replace(/\/\/[^\n]*/g, "");
-assert.doesNotMatch(withoutComments, /\.setCategory\s*\(|\.setActive\s*\(|\.setMode\s*\(/,
-  "a smoke output plugin must not change the existing AVAudioSession");
+assert.doesNotMatch(withoutComments, /\.setCategory\s*\(|\.setMode\s*\(|\.setActive\(false\)/,
+  "native-output session owner must not change category/mode or deactivate");
+assert.equal((withoutComments.match(/\.setActive\(true\)/g) || []).length, 1,
+  "only one user-tapped native session activation operation");
 assert.match(index, /<script src="verse_games\/shared\/native-sound-smoke-test\.js"><\/script>/);
 assert.match(read("scripts/build.js"), /"verse_games"/);
 
