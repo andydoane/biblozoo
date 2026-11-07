@@ -48,7 +48,8 @@ assert.match(play,/node.scheduleBuffer\(buffer, at: nil,[\s\S]*?options: \[\.int
 assert.match(play,/backend = "avengine-pcm"/);
 assert.match(play,/sound.currentTime = 0/);
 assert.match(play,/started = sound.play\(\)/);
-assert.doesNotMatch(play,/AVAudioFile|AVAudioPCMBuffer\(|AVAudioEngine\(|engine.start\(|node.play\(|prepareToPlay\(|AVAudioPlayer\(contentsOf:/,
+assert.doesNotMatch(play.replace(/\/\/[^\n]*/g,""),
+  /AVAudioFile|AVAudioPCMBuffer\(|AVAudioEngine\(|engine.start\(|node.play\(|prepareToPlay\(|AVAudioPlayer\(contentsOf:/,
   "never decode MP3, start the engine or start a node on collision");
 assert.match(forgotten,/self.discardEffectsOnWorker\(\)/);
 assert.match(stop,/self.discardEffectsOnWorker\(\)/);
