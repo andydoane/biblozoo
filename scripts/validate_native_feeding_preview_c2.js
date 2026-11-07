@@ -366,6 +366,131 @@ async function main() {
     assert.equal(off.nativePilotChoicePending,false);
   }
   {
+    // C.2c: test the ACTUAL Got It! sequencing, not a description of it.
+    // A verified Web Audio clock MUST precede either native sample preload,
+    // and only the existing native-player request may emit star/chomp.
+    const h=feedHarness();
+    const order=[];
+    let snapshots=0;
+    h.window.__testResume=context=>{
+      order.push("web-resume-on-Got-It");
+      assert.equal(context.state,"running");
+      return Promise.resolve(true);
+    };
+    h.window.__testClock=context=>{
+      order.push("web-clock-advancing");
+      return Promise.resolve(true);
+    };
+    h.window.Capacitor={Plugins:{BibloZooNativeSound:{
+      async getDebugState(){
+        snapshots++;
+        order.push("snapshot-"+snapshots);
+        return {
+          available:true,pending:snapshots===2, beganCount:snapshots===2?1:0,
+          endedCount:0,eventCount:snapshots===2?1:0,
+          lastSignal:snapshots===2?"began":"none",lastReasonCode:0
+        };
+      }
+    }}};
+    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
+      async prepare(){order.push("native-preload");return {ready:true};},
+      play:()=>true,stop:()=>{},isReady:()=>true
+    });
+    h.window.__interceptStart=r=>{
+      order.push("start-round");
+      r.roundStarted=true;
+    };
+    const pilot=runtime(true);
+    h.hooks.setRuntime(pilot);
+    await h.hooks.nativeBegin(pilot);
+    // async post-start snapshot is allowed to continue after game start
+    await new Promise(resolve=>setImmediate(resolve));
+    const resume=order.indexOf("web-resume-on-Got-It");
+    const clock=order.indexOf("web-clock-advancing");
+    const preload=order.indexOf("native-preload");
+    const start=order.indexOf("start-round");
+    assert.ok(resume>=0 && clock>resume && preload>clock && start>preload,
+      "web resume AND advancing clock must precede native preload and game start: "+order);
+    assert.equal(pilot.nativePilotBackend,"native");
+    assert.ok(snapshots>=3,"read-only snapshots must bracket Web, native and startup");
+    assert.match(pilot.nativePilotPhases.textContent,/after-web:/);
+    assert.match(pilot.nativePilotPhases.textContent,/after-native:/);
+    assert.match(pilot.nativePilotPhases.textContent,/round-start:/);
+    assert.match(pilot.nativePilotPhases.textContent,/pending=YES/);
+    assert.match(pilot.nativePilotPhases.textContent,/began=1/);
+    assert.equal(pilot.nativePilotChoicePending,false);
+  }
+  {
+    // A WebAudio context that is not demonstrably advancing cannot launch
+    // a native preview; it must choose WEB before the round starts and must
+    // NEVER preload native sounds, even if the bridge would accept them.
+    const h=feedHarness();
+    let preps=0;
+    let starts=[];
+    let resumes=0;
+    h.window.__testResume=()=>{resumes++;return Promise.resolve(true);};
+    h.window.__testClock=()=>Promise.resolve(false);
+    h.window.__interceptStart=r=>{starts.push(r.nativePilotBackend);r.roundStarted=true;};
+    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
+      prepare:()=>{preps++;return Promise.resolve({ready:true});},
+      stop:()=>{}
+    });
+    const r=runtime(true);
+    h.hooks.setRuntime(r);
+    await h.hooks.nativeBegin(r);
+    assert.equal(resumes,1);
+    assert.equal(preps,0,"a stalled Web clock must not prepare native sounds");
+    assert.deepEqual(starts,["web"]);
+    assert.match(r.nativePilotBadge.textContent,/web-clock-unavailable/);
+    assert.equal(r.nativePilotChoicePending,false);
+    assert.equal(r.startConfirmButton.disabled,false);
+    assert.equal(r.nativePilotCheckbox.disabled,false);
+  }
+  {
+    // A Web context that becomes suspended DURING native preparation is
+    // evidence of a changing session. The experiment must fall back to Web
+    // BEFORE beginning the round, not attempt a late Web resume after native.
+    const h=feedHarness();
+    const starts=[];
+    let stopped=0;
+    const r=runtime(true);
+    h.window.__interceptStart=value=>{starts.push(value.nativePilotBackend);value.roundStarted=true;};
+    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
+      async prepare(){r.audioContext.state="suspended";return {ready:true};},
+      stop(){stopped++;}
+    });
+    h.hooks.setRuntime(r);
+    await h.hooks.nativeBegin(r);
+    assert.deepEqual(starts,["web"]);
+    assert.equal(stopped,1);
+    assert.match(r.nativePilotBadge.textContent,/web-clock-changed/);
+  }
+  {
+    // A late read-only debug response must never start an exited game.
+    const h=feedHarness();
+    const pending=later();
+    let starts=0,preps=0,stops=0;
+    h.window.Capacitor={Plugins:{BibloZooNativeSound:{
+      getDebugState:()=>pending.promise
+    }}};
+    h.window.__interceptStart=()=>{starts++;};
+    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
+      prepare:()=>{preps++;return Promise.resolve({ready:true});},
+      stop:()=>{stops++;}
+    });
+    const r=runtime(true);
+    h.hooks.setRuntime(r);
+    const waiting=h.hooks.nativeBegin(r);
+    // Let verified Web clock finish while debug snapshot remains unresolved.
+    await new Promise(resolve=>setImmediate(resolve));
+    h.hooks.setRuntime(null);
+    pending.resolve({available:true,pending:false,beginCount:0});
+    await waiting;
+    assert.equal(starts,0,"stale debug must not launch gameplay");
+    assert.equal(preps,0,"stale debug must not prepare native clips");
+    assert.ok(stops>=1,"stale startup must stop the isolated pilot");
+  }
+  {
     const h=feedHarness();
     const starts=[];
     let preps=0;
