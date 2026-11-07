@@ -20,7 +20,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private let resourceName = "ui_pet_unlock"
     private var player: AVAudioPlayer?
     private var preparedId: String?
+    // Only a confirmed, current .began event blocks a fresh tap. iOS can
+    // deliver delayed "wasSuspended" .began events on resume; those are
+    // historical and must not latch the pilot into a permanent error.
     private var interrupted = false
+    private var leftForegroundDuringInterruption = false
+    private var returnedToForegroundDuringInterruption = false
+    private var lastInterruptionSignal = "none"
     private var observers: [NSObjectProtocol] = []
 
     public override func load() {
@@ -32,21 +38,22 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             forName: UIApplication.willResignActiveNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in self?.forgetPlayback() })
+        ) { [weak self] _ in self?.leftForeground() })
         observers.append(center.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in self?.forgetPlayback() })
+        ) { [weak self] _ in self?.leftForeground() })
+        observers.append(center.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in self?.returnedToForeground() })
         observers.append(center.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: nil,
             queue: .main
-        ) { [weak self] note in
-            self?.forgetPlayback()
-            let kind = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue
-            self?.interrupted = kind != AVAudioSession.InterruptionType.ended.rawValue
-        })
+        ) { [weak self] note in self?.handleInterruption(note) })
         observers.append(center.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
@@ -69,6 +76,54 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         preparedId = nil
     }
 
+    private func leftForeground() {
+        forgetPlayback()
+        if interrupted { leftForegroundDuringInterruption = true }
+    }
+
+    private func returnedToForeground() {
+        // A genuine .began may have no matching .ended after suspension.
+        // Merely becoming active does not resume anything or clear the latch.
+        // Only the NEXT explicit user-tapped preload may attempt a new player.
+        if interrupted && leftForegroundDuringInterruption {
+            returnedToForegroundDuringInterruption = true
+        }
+    }
+
+    private func handleInterruption(_ note: Notification) {
+        forgetPlayback()
+        guard let raw = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
+              let kind = AVAudioSession.InterruptionType(rawValue: raw) else {
+            // An absent/unrecognized type is not evidence of a fresh .began.
+            lastInterruptionSignal = "unrecognized"
+            return
+        }
+        switch kind {
+        case .began:
+            let wasSuspended =
+                (note.userInfo?[AVAudioSessionInterruptionWasSuspendedKey] as? NSNumber)?.boolValue == true
+            if wasSuspended {
+                // iOS 10+: delayed message saying the session was deactivated
+                // WHEN THE PROCESS WAS SUSPENDED. Ignore it as a fresh active
+                // interruption; keep an unrelated earlier pending .began intact.
+                lastInterruptionSignal = "suspended-began"
+                return
+            }
+            interrupted = true
+            leftForegroundDuringInterruption =
+                UIApplication.shared.applicationState != .active
+            returnedToForegroundDuringInterruption = false
+            lastInterruptionSignal = "began"
+        case .ended:
+            interrupted = false
+            leftForegroundDuringInterruption = false
+            returnedToForegroundDuringInterruption = false
+            lastInterruptionSignal = "ended"
+        @unknown default:
+            lastInterruptionSignal = "unrecognized"
+        }
+    }
+
     private func onMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() }
         else { DispatchQueue.main.async(execute: work) }
@@ -76,9 +131,21 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func unavailableReason() -> String? {
         if UIApplication.shared.applicationState != .active { return "not-foreground" }
-        if interrupted { return "interruption-pending" }
         if AVAudioSession.sharedInstance().category != .soloAmbient {
             return "category-not-soloambient"
+        }
+        if interrupted {
+            guard returnedToForegroundDuringInterruption else {
+                return "interruption-pending"
+            }
+            // This check runs ONLY for an explicit new preload/play call.
+            // Clear the stale latch after a full inactive->active transition,
+            // but do not setActive, auto-resume, or claim sound health. The
+            // AVAudioPlayer prepare/play result still decides acceptance.
+            interrupted = false
+            leftForegroundDuringInterruption = false
+            returnedToForegroundDuringInterruption = false
+            lastInterruptionSignal = "foreground-tap-retry"
         }
         return nil
     }
@@ -120,6 +187,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     "prepared": true,
                     "reason": "prepared",
                     "backend": "avfoundation",
+                    "lastInterruptionSignal": self.lastInterruptionSignal,
                     "durationMs": Int(candidate.duration * 1000)
                 ])
             } catch {
