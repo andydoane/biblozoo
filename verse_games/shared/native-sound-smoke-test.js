@@ -5,6 +5,9 @@
   "use strict";
 
   const SOUND_ID = "pilot-unlock";
+  const STAR_ID = "feed-star";
+  const CHOMP_ID = "feed-chomp";
+  const ALL_SOUND_IDS = Object.freeze([SOUND_ID, STAR_ID, CHOMP_ID]);
   const PANEL_ID = "biblozoo-native-sound-smoke";
   const DEADLINE_MS = 2500;
   const doc = root.document;
@@ -69,6 +72,21 @@
       "display:block;width:100%;min-height:40px;margin-top:5px;" +
       "font:600 14px sans-serif;border-radius:8px;background:#235a66;color:white;";
 
+    const samplesRow = doc.createElement("div");
+    samplesRow.style.cssText = "display:flex;gap:5px;margin-top:6px;";
+    function sampleButton(label) {
+      const node = doc.createElement("button");
+      node.type = "button";
+      node.textContent = label;
+      node.style.cssText =
+        "flex:1;min-width:0;min-height:35px;font:600 12px sans-serif;" +
+        "border-radius:7px;background:#dbeef5;color:#153740;";
+      samplesRow.appendChild(node);
+      return node;
+    }
+    const playStar = sampleButton("Play star");
+    const playChomp = sampleButton("Play chomp");
+
     const status = doc.createElement("p");
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
@@ -90,6 +108,7 @@
 
     panel.appendChild(top);
     panel.appendChild(play);
+    panel.appendChild(samplesRow);
     panel.appendChild(status);
     panel.appendChild(inspect);
     panel.appendChild(detail);
@@ -98,6 +117,10 @@
     let epoch = 0;
     let busy = false;
     let dismissed = false;
+    function setBusy(value) {
+      busy = value;
+      for (const button of [play, playStar, playChomp]) button.disabled = value;
+    }
     function plugin() { return root.Capacitor?.Plugins?.BibloZooNativeSound; }
     function count(value) { return Number.isInteger(value) && value >= 0 ? value : "?"; }
     async function inspectNativeState() {
@@ -134,12 +157,14 @@
     inspect.addEventListener("click", () => inspectNativeState());
 
     function stopQuietly() {
-      try {
-        const api = plugin();
-        if (typeof api?.stop === "function") {
-          Promise.resolve(api.stop({ soundId: SOUND_ID })).catch(() => {});
-        }
-      } catch (_) { /* A failed developer stop must never block the app. */ }
+      const api = plugin();
+      if (typeof api?.stop !== "function") return;
+      // All three are fixed allowlisted IDs; no URLs or user-provided paths.
+      for (const soundId of ALL_SOUND_IDS) {
+        try {
+          Promise.resolve(api.stop({ soundId })).catch(() => {});
+        } catch (_) { /* A failed developer stop must never block the app. */ }
+      }
     }
     function current(token) {
       return !dismissed && token === epoch && !doc.hidden;
@@ -147,8 +172,7 @@
     function onHidden() {
       if (!doc.hidden || dismissed) return;
       epoch += 1;
-      busy = false;
-      play.disabled = false;
+      setBusy(false);
       status.textContent = "Stopped on background. Tap again after returning.";
       stopQuietly();
     }
@@ -162,19 +186,18 @@
       panel.remove();
     });
 
-    play.addEventListener("click", async () => {
-      if (busy || dismissed || doc.hidden) return;
+    async function playSelected(soundId, label) {
+      if (busy || dismissed || doc.hidden || !ALL_SOUND_IDS.includes(soundId)) return;
       const api = plugin();
       if (typeof api?.preload !== "function" || typeof api?.play !== "function") {
         status.textContent = "Native bridge missing. Check the Xcode build.";
         return;
       }
       const token = ++epoch;
-      busy = true;
-      play.disabled = true;
-      status.textContent = "Preparing native MP3…";
+      setBusy(true);
+      status.textContent = "Preparing native " + label + " MP3…";
       try {
-        const prepared = await bounded(api.preload({ soundId: SOUND_ID }));
+        const prepared = await bounded(api.preload({ soundId }));
         if (!current(token)) return;
         if (prepared?.prepared !== true) {
           // A blocked prepare NEVER invokes this button's play call.
@@ -190,23 +213,23 @@
             ? " iOS reported a past suspension."
             : "";
         status.textContent = "Requesting native playback…";
-        const started = await bounded(api.play({ soundId: SOUND_ID, volume: 0.85 }));
+        const started = await bounded(api.play({ soundId, volume: 0.85 }));
         if (!current(token)) { stopQuietly(); return; }
         status.textContent = started?.accepted === true
-          ? "Native playback requested. Did you hear the sound?" + note
-          : "Native play failed: " + safeReason(started?.reason);
+          ? "Native " + label + " playback requested. Did you hear the sound?" + note
+          : "Native " + label + " play failed: " + safeReason(started?.reason);
       } catch (_) {
         if (current(token)) {
           status.textContent = "Native bridge error or timeout. No sound confirmed.";
           stopQuietly();
         }
       } finally {
-        if (current(token)) {
-          busy = false;
-          play.disabled = false;
-        }
+        if (current(token)) setBusy(false);
       }
-    });
+    }
+    play.addEventListener("click", () => playSelected(SOUND_ID, "pet-unlock"));
+    playStar.addEventListener("click", () => playSelected(STAR_ID, "star"));
+    playChomp.addEventListener("click", () => playSelected(CHOMP_ID, "chomp"));
   }
 
   if (doc.readyState === "complete") mount();

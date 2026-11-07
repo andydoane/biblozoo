@@ -65,6 +65,33 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### Stage C.1 — independent native Feeding sample preparation (experiment-only)
+
+**Gate for starting C.1:** Following merged [PR #12](https://github.com/andydoane/biblozoo/pull/12), the owner reports **five consecutive native-only pet-unlock taps were all audible in one foreground session** and native sound also played through tested app-switch returns. The DEV test suppresses the normal Web Audio UI pop. The native readout may show a pending, unmatched interruption `.began` after a switch (`began=2`, `ended=1`), but a notification count does not prove the speaker is silent; do not ignore an actual rejected native request. There is no claim the iOS interruption-reporting edge case is completely understood.
+
+**Purpose:** before integrating actual Feeding gameplay, prove that the same isolated `BibloZooNativeSound` bridge can preload and play **two existing, correctly named samples** as well as pet-unlock. This is a *native resource/player proof*, not Stage C.2 Feeding backend routing.
+
+- Existing checked-in `verse_images/daily_questions/dq_feed_star.mp3` and `dq_feed_chomp.mp3` are explicitly included in the Xcode App target's **Copy Bundle Resources**, alongside `ui_pet_unlock.mp3` (separate from `dist` web assets). Logical allowlisted IDs `feed-star` and `feed-chomp` map only to those bundled files.
+- The Capacitor plugin now owns one **independent `AVAudioPlayer` for each allowed ID**; preparing one cannot replace the prepared player for another. At most three known voices can be held; new preload/replay of a given ID restarts that same voice, while different clips can coexist. Invalid IDs, nonfinite/out-of-range volume, interruption/background/route changes and the original `.soloAmbient` category guard retain their existing policies. No app-wide session activation or new category.
+- The **DEV · Native Audio** panel has two additional buttons, **Play star** and **Play chomp**, alongside the existing pet-unlock button and read-only state inspection. All are explicit user-tap-only, separate from normal Web Audio pop and **never called from Feeding**. The developer panel is not production UI.
+- `scripts/validate_native_sound_smoke_test.js` checks the three committed assets, Xcode resource memberships, strict ID-to-resource mapping, independent players and JS tap/timeout/background/dismissal behavior; CI does **not** compile or run native Swift.
+
+**After the owner merges C.1 into `experiment/native-ios-audio` only**, in GitHub Desktop select the `biblozoo-native-audio` worktree (not `ios-prep`), Fetch Origin → Pull Origin, then in VS Code:
+
+```sh
+git branch --show-current                    # experiment/native-ios-audio
+node scripts/validate_native_sound_smoke_test.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+In Xcode's App target check Signing & Capabilities uses `com.andydoane.biblozoo.audiotest`, and Build Phases → Copy Bundle Resources lists `ui_pet_unlock.mp3`, `dq_feed_star.mp3`, and `dq_feed_chomp.mp3`. Run the separate **BibloZoo Audio Test** app on a real iPhone; preserve the original BibloZoo installation and saved profiles.
+
+**Audible acceptance:** With silent mode OFF and hardware volume up, tap **Play native test sound**, **Play star**, **Play chomp** separately; confirm three distinct **actual** sounds, not an ordinary button pop. Repeat each 3–5 times **without task switching**, then switch apps and return, tap again, and inspect optional native state. No sound should play automatically; the DEV panel should never play two samples for one tap. Also try the silent switch on/off; intentional silence under `.soloAmbient` is expected. Any `bundled-asset-missing`, `not-preloaded`, `interruption-pending`, Swift compile errors, or unexpectedly silent sound requires investigation before C.2. Note exactly **which** sample was heard and the panel message; bridge `accepted` is not proof of audibility.
+
+**Stage C.2 remains blocked:** No Feeding game event dispatch, automatic engine switching, default-on behavior, microphone/reward/progress changes, or Zoo Escape/audio-recovery integration has been implemented here. The planned next PR will offer a **default-off, manually opted-in tester preview** only, choose the sound backend before starting a round, and preserve the web path when the native preflight fails. Do not conflate success of a 3-button manual test with actual gameplay reliability.
+
 ### Stage B.2 — isolate the native sound and inspect the *actual* interruption event
 
 **Owner's corrected November 6 iPhone report after merged [PR #11](https://github.com/andydoane/biblozoo/pull/11):** On the developer **Play native test sound** button, **every tap makes a short UI pop**, but the separate **pet-unlock/native MP3** is usually heard only on the **first tap** after launch or after returning from another app. The second consecutive tap plays **only** the pop and reports `No new native sound requested: iOS interruption pending`. After app switch → return, the first tap again plays both sounds, and the cycle repeats. Sometimes even the first native MP3 is silent. **This is a reproducible failure**, not a passing Stage B acceptance. Stage C Feeding remains blocked.
