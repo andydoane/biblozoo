@@ -12,6 +12,7 @@ The shared recovery UI is **not** an audio engine. It must remain fully playable
 
 - **Native diagnostics:** `ios/App/App/AppDelegate.swift` (read-only `BibloZooAudioSessionDiagnostics` plugin).
 - **Native bounded recovery experiment / signal state:** `ios/App/App/SceneDelegate.swift` (`BibloZooAudioSessionRecovery` plugin).
+- **Separate native *output-only* PR B smoke pilot (experiment branch):** `ios/App/App/BibloZooNativeSoundPlugin.swift`, registered in `SceneDelegate.swift`, with a single explicitly packaged `ui_audio/ui_pet_unlock.mp3` test asset and `verse_games/shared/native-sound-smoke-test.js` developer-only tap UI. This has **no call path** from Feeding, Learn, game audio or the activity recovery coordinator.
 - **Shared JS/native adapters:** `verse_games/shared/native-audio-recovery.js`, `audio-recovery-coordinator.js`, `welcome-back-clock.js`, `audio-diagnostics.js`.
 - **Shared UI and standalone bridge:** `verse_games/shared/welcome-back.js`, `welcome-back.css`, `welcome-back-return.js`, `welcome-back-zoo-escape.js`, `bridge.js`.
 - **Activity owners:** `app.js` (Learn/app), `daily_questions_feed_game.js` (Feeding), `read_my_verse.js`, `flashcards/`, individual `verse_games/` and `verse_playground/` controllers.
@@ -75,6 +76,12 @@ These are **commands to run**, not evidence that they were executed for this doc
 ### Release gate
 
 Review both the standalone shared harness flag and Feeding's separate hidden test path before public distribution. In the 2026-11-05 source, `welcome-back-zoo-escape.js` defines `ENABLE_ZOO_RETURN_TEST_HARNESS = true`. A development-branch push does not equal approval for public release.
+
+## Experimental AVFoundation output smoke test (PR B)
+
+On the separate `experiment/native-ios-audio` branch only, PR B proposes a user-tapped `BibloZooNativeSound` `AVAudioPlayer` test. It does not attempt Web Audio recovery, set session category/mode/active state, replace a narration clock, create a UI-audio success gate, or automatically resume. Swift requires foreground + the existing `.soloAmbient` category, accepts only `pilot-unlock`, rejects invalid/nonfinite volume, and stops/forgets playback on inactivity, interruptions, route changes or media resets. The JS test button times out rather than waiting forever, cancels stale playback on background and never runs in browsers/PWA.
+
+A successful `preload` or `play` bridge result means the native request was prepared/accepted, **not** that sound reached the speaker. The actual audible test belongs to the iPhone owner and is tracked in [TESTING.md](TESTING.md) and the living roadmap (§10 of [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md)). **Do not promote the AVAudioPlayer bridge response to the shared Welcome Back or Zoo Escape audio-success gate**; those activity-owned contracts are unchanged and PR C remains blocked until the audible pilot is confirmed.
 
 ## For a future PR changing audio
 
