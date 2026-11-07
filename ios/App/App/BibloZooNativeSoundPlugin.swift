@@ -49,6 +49,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
     private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp"]
     private let nativePegSoundID = "feed-peg"
+    private let nativeMelodySoundID = "feed-melody"
+    // All current Melody tune MIDI notes fall in this bounded 55...83 bank.
+    private let melodyMidiRange = 55...83
+    private let melodyVoiceLimit = 6
     // Matches Classic's existing six-note Web oscillator scale. Never pass
     // raw frequencies/oscillator parameters through the Capacitor bridge.
     private let pegFrequencies: [Double] = [
@@ -59,6 +63,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private var effectsEngine: AVAudioEngine? // playbackQueue only
     private var effectBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
     private var pegToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
+    private var melodyToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var effectNodes: [String: [AVAudioPlayerNode]] = [:] // worker only
     private var nextEffectVoice: [String: Int] = [:] // worker only
     private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
@@ -410,6 +415,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         nextEffectVoice.removeAll()
         effectBuffers.removeAll()
         pegToneBuffers.removeAll()
+        melodyToneBuffers.removeAll()
         effectsEngine = nil
     }
 
@@ -526,6 +532,73 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         } catch {
             discardEffectsOnWorker()
             return (false, 0, "tone-engine-start-failed")
+        }
+    }
+
+
+    // N3d engine groundwork only; real Melody mode routing belongs to N4.
+    // Precompute bounded triangle PCM notes under one explicit DEV gesture.
+    private func prepareMelodyTonesOnWorker()
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        if melodyToneBuffers.count == melodyMidiRange.count,
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[nativeMelodySoundID],
+           nodes.count == melodyVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, 220, "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "melody-format-failed")
+        }
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * 0.22))
+        var buffers: [Int: AVAudioPCMBuffer] = [:]
+        for midi in melodyMidiRange {
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format, frameCapacity: frames),
+                  let samples = buffer.floatChannelData?[0] else {
+                return (false, 0, "melody-allocation-failed")
+            }
+            buffer.frameLength = frames
+            let frequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
+            for frame in 0..<Int(frames) {
+                let time = Double(frame) / format.sampleRate
+                let phase = (frequency * time)
+                    .truncatingRemainder(dividingBy: 1.0)
+                let triangle = 1.0 - 4.0 * abs(phase - 0.5)
+                // 12ms attack then fade to silence at 220ms, like Web Melody.
+                let envelope: Double
+                if time < 0.012 {
+                    envelope = time / 0.012
+                } else {
+                    envelope = max(0.0, (0.22 - time) / (0.22 - 0.012))
+                }
+                samples[frame] = Float(triangle * envelope)
+            }
+            buffers[midi] = buffer
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<melodyVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // warm silently until a deliberate native note
+            }
+            effectsEngine = engine
+            effectNodes[nativeMelodySoundID] = nodes
+            nextEffectVoice[nativeMelodySoundID] = 0
+            melodyToneBuffers = buffers
+            return (true, 220, "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "melody-engine-start-failed")
         }
     }
 
@@ -729,7 +802,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private func requestedId(_ call: CAPPluginCall) -> String? {
         guard let soundId = call.getString("soundId"),
               soundResources[soundId] != nil ||
-              soundId == nativePegSoundID else { return nil }
+              soundId == nativePegSoundID ||
+              soundId == nativeMelodySoundID else { return nil }
         return soundId
     }
 
@@ -811,8 +885,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             let url: URL?
-            if soundId == self.nativePegSoundID {
-                // Generated six-note PCM scale, never a downloaded asset.
+            if soundId == self.nativePegSoundID ||
+               soundId == self.nativeMelodySoundID {
+                // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.soundResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
@@ -850,6 +925,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     durationMs = result.durationMs
                     failed = result.reason
                     backend = "avengine-tone"
+                } else if soundId == self.nativeMelodySoundID {
+                    let result = self.prepareMelodyTonesOnWorker()
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-melody"
                 } else if self.pcmEffectIDs.contains(soundId), let url = url {
                     // MP3 decoding ONLY happens during explicit preflight.
                     let result = self.preparePCMEffectOnWorker(
@@ -940,6 +1021,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             } else {
                 requestedNoteIndex = nil
             }
+            let requestedMidi: Int?
+            if soundId == self.nativeMelodySoundID {
+                guard let midi = call.getInt("midi"),
+                      self.melodyMidiRange.contains(midi) else {
+                    call.resolve(["accepted": false,
+                                  "reason": "invalid-melody-midi"])
+                    return
+                }
+                requestedMidi = midi
+            } else {
+                requestedMidi = nil
+            }
             if let reason = self.unavailableReason() {
                 self.forgetPlayback()
                 call.resolve(["accepted": false, "reason": reason])
@@ -974,7 +1067,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 let backend: String
                 let resultReason: String
                 if self.pcmEffectIDs.contains(soundId) ||
-                   soundId == self.nativePegSoundID {
+                   soundId == self.nativePegSoundID ||
+                   soundId == self.nativeMelodySoundID {
                     // One hot path for sample and note voice pools: choose a
                     // prestarted node and schedule only an in-memory buffer.
                     // No decode, allocation, engine start or Web fallback.
@@ -990,6 +1084,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     let buffer: AVAudioPCMBuffer?
                     if soundId == self.nativePegSoundID {
                         buffer = self.pegToneBuffers[requestedNoteIndex ?? -1]
+                    } else if soundId == self.nativeMelodySoundID {
+                        buffer = self.melodyToneBuffers[requestedMidi ?? -1]
                     } else {
                         buffer = self.effectBuffers[soundId]
                     }
@@ -1011,7 +1107,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     durationMs = Int(Double(readyBuffer.frameLength) /
                                      readyBuffer.format.sampleRate * 1000)
                     backend = soundId == self.nativePegSoundID
-                        ? "avengine-tone" : "avengine-pcm"
+                        ? "avengine-tone"
+                        : (soundId == self.nativeMelodySoundID
+                            ? "avengine-melody" : "avengine-pcm")
                     resultReason = "scheduled"
                 } else {
                     guard let sound = self.players[soundId] else {
@@ -1088,7 +1186,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
                 if self.pcmEffectIDs.contains(soundId) ||
-                   soundId == self.nativePegSoundID {
+                   soundId == self.nativePegSoundID ||
+                   soundId == self.nativeMelodySoundID {
                     // A paused/exited round tears down all prepared effect
                     // voices; the next Got It!/Resume must explicitly warm.
                     self.discardEffectsOnWorker()
