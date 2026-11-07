@@ -22,7 +22,7 @@ for (const [id, sample] of [
   assert.ok(fs.existsSync(path.join(__dirname, "..", "ui_audio", sample + ".mp3")));
   assert.ok(swift.includes('"' + id + '": "' + sample + '"'));
   assert.ok(swift.includes('"' + id + '"'));
-  assert.match(project, new RegExp(sample + String.raw`\\.mp3 in Resources`));
+  assert.ok(project.includes(sample + ".mp3 in Resources"));
 }
 assert.match(swift, /purpose == "dev" \|\| purpose == "feeding" \|\| purpose == "ui"/);
 assert.match(swift, /"feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"/);
