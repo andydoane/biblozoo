@@ -65,9 +65,40 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N2.1 — Native-only Classic Resume and MP3 playback hitch (PR #22; awaiting iPhone)
+### N2.2 — collect a native timing report after playing (PR #23; pending iPhone)
 
-**Current owner evidence after merged [N2 PR #21](https://github.com/andydoane/biblozoo/pull/21):** The DEV panel **actually played all three native samples**. Classic Feeding played **audible native star/chomp MP3 effects**; its Web oscillator **peg beeps were intentionally silent** (native beeps are N3, not a regression). But **each native sound caused about a second of visible game pause**, and after task-switching out/back the Welcome Back action did **nothing**, while Back still exited. This is a **partial N2 audio success and a FAILED smoothness/Resume gate**, not a fully working game. Owner did not supply exact Inspect values; do not invent a native decode timing or claim the hitch's cause is proven.
+**Based on merged [PR #22](https://github.com/andydoane/biblozoo/pull/22) at `07e91e3`. Owner has now tested N2.1:** every star/chomp MP3 **audibly played** in Classic Feeding, and the previous per-sound **visual hitch is gone**. **Open problem:** some chomp sounds start near the pet/snack collision while others sound significantly late. No reliable timestamp/log was supplied; taking screenshots while playing is not reasonable. **Task-switch/Resume after PR #22 was not explicitly reported**, so it remains a required check, not a passed gate. No native peg beeps yet (N3), no Web/HTML fallback.
+
+[PR #23](https://github.com/andydoane/biblozoo/pull/23), branch `experiment/n2-2-native-audio-timing-report`, implements **one-tap native clipboard reporting**, not a new low-latency sound engine. The fixed-schema Swift timing ring keeps only the latest **80** native MP3 playback events in memory; JavaScript sends an event ID plus physics collision and request timestamps on the *existing* native `play()` call. Swift records bridge arrival, serial queue wait and `AVAudioPlayer.play()` return time, and formats a plaintext report. The floating DEV panel's **Copy Audio Timing Report** invokes native Swift `copyTimingReport` and writes the report to `UIPasteboard.general.string`. No automatic network upload, file write, Zookeeper name, verse text, pet data or microphone recording. **Mark last chomp late (optional)** flags only the most recent chomp from the previous 60 seconds; if later sounds happened, it may not tag the sound noticed. Report rows use `-1` for unavailable/skewed wall clock; `AVAudioPlayer.play()` returned **is not equivalent to actual speaker output**. See [N2.2 timing report details](N2-2-NATIVE-AUDIO-TIMING.md).
+
+**After owner review/merge:** in dedicated `biblozoo-native-audio` GitHub Desktop worktree, Fetch/Pull `experiment/native-ios-audio`, then:
+
+```sh
+git branch --show-current          # experiment/native-ios-audio
+node scripts/validate_native_sound_smoke_test.js
+node scripts/validate_native_audio_timing_n22.js
+node scripts/validate_native_feeding_resume_n21.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build/run the **separate BibloZoo Audio Test** (`com.andydoane.biblozoo.audiotest`) on a physical iPhone, not original/stable BibloZoo.
+
+1. Open Daily To-Do Preview → Feeding Game Tester → **Classic**, tap **Got It!** and play normally for **1–2 minutes**. Enjoy the game; **no screenshot, debugger, or report controls during collisions needed**. Observe whether every chomp still plays and animation remains smooth, even when chomp seems late. Peg collision beeps remain intentionally silent.
+2. Optional: after a late-sounding chomp, tap floating DEV → **Mark last chomp late (optional)** *within 60 seconds* if convenient. It flags the last chomp, so if several newer sounds occurred just skip marking; simply copying the report is enough.
+3. When finished, tap floating DEV → **Copy Audio Timing Report** once. It should say **Copied N sounds! Paste into ChatGPT when ready.** This uses native iOS pasteboard to avoid losing WebKit's trusted clipboard gesture after asynchronous bridge reads. Paste into the chat with a sentence about how often you heard the delays. **No data is shared automatically**. As with any clipboard, only paste the report where you want it shared. If count is zero, confirm that the native-only test app played effects in the same app process; a force-quit/relaunch clears the ring.
+4. Separately, **task-switch away and back mid-Classic**, use the Welcome Back/Resume control, verify the same score/round continues, Back works, and there are no double rewards or automatic sound replays. This acceptance check was still unconfirmed following PR #22.
+5. If any native sound stops being audible or gameplay hitches again, report exactly what happened. The new timing feature must **not** affect the fixed output-only policy, mic permissions or user data.
+
+**Report interpretation (for a future assistant/chat):** The report tracks each `feed-N` event's `collision->JS`, `JS->bridge`, `bridge->worker`, `worker play()`, `collision->native dispatch`. `>=120 ms` is an investigative threshold, not acoustic proof. JS Date.now and Swift Date are shared device wall time but may skew; queue/play call durations are monotonic. These logs cannot detect the exact moment of a sound reaching the speaker. **Separate CI static/VM passes, Xcode Swift compile, native request acceptance, actual child-heard audio, animation smoothness and Resume.** After owner test record precise outcome and whether we should address JS/Capacitor/worker/engine latency next. Do not infer automatic native audio success from the copied log.
+
+---
+
+### N2.1 — Native-only Classic Resume and MP3 playback hitch (PR #22 merged; historical test plan)
+
+**Historical owner evidence after merged [N2 PR #21](https://github.com/andydoane/biblozoo/pull/21), before the N2.1 fix:** The DEV panel **actually played all three native samples**. Classic Feeding played **audible native star/chomp MP3 effects**; its Web oscillator **peg beeps were intentionally silent** (native beeps are N3, not a regression). But **each native sound caused about a second of visible game pause**, and after task-switching out/back the Welcome Back action did **nothing**, while Back still exited. This is a **partial N2 audio success and a FAILED smoothness/Resume gate**, not a fully working game. Owner did not supply exact Inspect values; do not invent a native decode timing or claim the hitch's cause is proven.
 
 **[PR #22](https://github.com/andydoane/biblozoo/pull/22), feature branch `experiment/n2-1-feeding-resume-playback-hitch`** corrects the observed source-level button routing: `daily_questions_feed_game.js` created a dormant Zoo Escape controller, which had already attached its own Welcome Back action listener, so Feeding's old `if (!runtime.zooEscape)` condition wrongly omitted the Native-only Resume listener. Feeding now **always registers** its handler, but if the live backend is Web and Zoo Escape owns the button, the Feeding handler exits without interference. The Native-only click calls `attemptFeedingResumeFromGesture` to perform the bounded native session gate + fresh two-sample preload; it never uses a Web clock. The frozen round should unfreeze on successful native prep or stay retryable with Back on a real native failure.
 
