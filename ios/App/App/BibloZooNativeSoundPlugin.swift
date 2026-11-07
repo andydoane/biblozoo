@@ -18,10 +18,16 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise)
     ]
 
-    private let allowlistedId = "pilot-unlock"
-    private let resourceName = "ui_pet_unlock"
-    private var player: AVAudioPlayer?
-    private var preparedId: String?
+    // All MP3s are checked-in project assets explicitly copied into the
+    // iOS app bundle. No URLs or caller-controlled filesystem paths.
+    // C.1 prepares separate players: preloading feed-star cannot evict
+    // feed-chomp or the already-verified pilot-unlock sample.
+    private let soundResources: [String: String] = [
+        "pilot-unlock": "ui_pet_unlock",
+        "feed-star": "dq_feed_star",
+        "feed-chomp": "dq_feed_chomp"
+    ]
+    private var players: [String: AVAudioPlayer] = [:]
     // Only a confirmed, current .began event blocks a fresh tap. iOS can
     // deliver delayed "wasSuspended" .began events on resume; those are
     // historical and must not latch the pilot into a permanent error.
@@ -84,9 +90,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func forgetPlayback() {
-        player?.stop()
-        player = nil
-        preparedId = nil
+        for sound in players.values { sound.stop() }
+        players.removeAll()
     }
 
     private func leftForeground() {
@@ -174,8 +179,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         return nil
     }
 
-    private func validId(_ call: CAPPluginCall) -> Bool {
-        call.getString("soundId") == allowlistedId
+    private func requestedId(_ call: CAPPluginCall) -> String? {
+        guard let soundId = call.getString("soundId"),
+              soundResources[soundId] != nil else { return nil }
+        return soundId
     }
 
     // No audio API is invoked here. This snapshot describes notification
@@ -221,7 +228,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": "unavailable"])
                 return
             }
-            guard self.validId(call) else {
+            guard let soundId = self.requestedId(call),
+                  let resourceName = self.soundResources[soundId] else {
                 call.resolve(["prepared": false, "reason": "invalid-sound-id"])
                 return
             }
@@ -229,11 +237,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": reason])
                 return
             }
-            guard let url = Bundle.main.url(forResource: self.resourceName, withExtension: "mp3") else {
+            guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp3") else {
                 call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
                 return
             }
-            self.forgetPlayback()
+            self.players.removeValue(forKey: soundId)?.stop()
             do {
                 let candidate = try AVAudioPlayer(contentsOf: url)
                 candidate.numberOfLoops = 0
@@ -242,8 +250,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
                 // Preparing a player is not evidence that hardware is audible.
-                self.player = candidate
-                self.preparedId = self.allowlistedId
+                self.players[soundId] = candidate
                 call.resolve([
                     "prepared": true,
                     "reason": "prepared",
@@ -263,7 +270,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["accepted": false, "reason": "unavailable"])
                 return
             }
-            guard self.validId(call) else {
+            guard let soundId = self.requestedId(call) else {
                 call.resolve(["accepted": false, "reason": "invalid-sound-id"])
                 return
             }
@@ -277,7 +284,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["accepted": false, "reason": reason])
                 return
             }
-            guard self.preparedId == self.allowlistedId, let sound = self.player else {
+            guard let sound = self.players[soundId] else {
                 call.resolve(["accepted": false, "reason": "not-preloaded"])
                 return
             }
@@ -302,11 +309,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["stopped": false, "reason": "unavailable"])
                 return
             }
-            guard self.validId(call) else {
+            guard let soundId = self.requestedId(call) else {
                 call.resolve(["stopped": false, "reason": "invalid-sound-id"])
                 return
             }
-            self.forgetPlayback()
+            self.players.removeValue(forKey: soundId)?.stop()
             call.resolve(["stopped": true, "reason": "stopped"])
         }
     }
