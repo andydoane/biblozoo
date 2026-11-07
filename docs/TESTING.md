@@ -65,7 +65,38 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N3b — Native Classic peg notes, bounded overlap and Resume label (PR #25; awaiting iPhone)
+### N3c — first launch after build must not silently fail (PR #26; iPhone pending)
+
+**Owner evidence after merged N3b [PR #25](https://github.com/andydoane/biblozoo/pull/25) at `29b424fa`:** Directly after Xcode build the *first* real iPhone launch was **completely silent** (no first-run report was copied). After restarting the app, two separate runs played **all** native sounds and the Classic peg beep was pleasant; both switched apps and both recovered successfully. The owner pasted **two 80-row reports (160 retained events)**: **0** slow dispatches >=120ms, almost all 1–2ms (0–3ms overall) from collision to native `scheduleBuffer` dispatch, zero worker wait, peg `avengine-tone` and chomp `avengine-pcm`. This confirms the audio engine and Resume are working *in those two runs*, not that the first-launch problem is fixed, and no report captured the failure mechanism. Actual acoustic onset is still not directly measured.
+
+**[PR #26](https://github.com/andydoane/biblozoo/pull/26)** is a focused N3c reliability/diagnostics PR, not Melody/N4 migration. In Swift, the first actual **Got It!/Resume/DEV tap** now explicitly attempts bounded `AVAudioSession.setActive(true)` even if no prior interruption happened; subsequent healthy taps remain `not-needed`. This respects .soloAmbient, foreground/genuine interruption, activation cooldown/attempt caps and user-gesture-only policy. It is a plausible first-launch readiness change, **not proven root cause**. If native star/chomp/peg preparation reports failure, Native-only Classic **stays at the Instructions/Got It! gate** with a sanitized reason and enabled **Try Again** and Back, rather than beginning a round knowingly silent. No automatic recovery, Web/HTML fallback, new mic or silent session category behavior.
+
+**The existing DEV → Copy Audio Timing Report** now includes last **18** native gesture and fixed-ID sample/peg preflight outcomes after the 80-event sound ring. The new preflight section shows `gesture/session os-accepted/not-needed/denied`, `preload/feed-star,feed-chomp,feed-peg prepared/failure`, `prepareMs`, foreground epoch, interruption pending and active app state. It is in memory only and copied manually; a **force quit/restart erases the diagnostic evidence**. A prepared/accepted backend does not prove the speaker actually made a sound.
+
+**Owner after review/merge:** Fetch/Pull `experiment/native-ios-audio` in the dedicated `biblozoo-native-audio` worktree; from repo root:
+
+```sh
+node scripts/validate_native_feeding_preview_c2.js
+node scripts/validate_native_first_launch_n3c.js
+node scripts/validate_native_peg_voices_n3b.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build **BibloZoo Audio Test** (`com.andydoane.biblozoo.audiotest`) in Xcode and run on a physical iPhone, keeping original BibloZoo installed.
+
+1. **First launch after the fresh Xcode build:** open Native Classic, press Got It! once. Confirm *actual audible* star/chomp/peg, smooth ball motion and correct normal game start. Ideally report shows `gesture | session | os-accepted`, three successful preloads. If game stays in Instructions with **Try Again**, that is an intentional preflight refusal, not a passed audio test.
+2. **If completely silent or refused on first launch, do NOT restart the app yet.** While still in the failure state, tap **DEV → Copy Audio Timing Report** and paste here. State clearly whether gameplay had already started silently or the new gate prevented starting. Record the visible native reason. Only afterward optionally wait 4+ seconds (native OS activation retry cooldown), tap **Try Again** once, and report if that attempt restores real sounds. If initial preflight was accepted but speaker output was silent, the cause lies beyond the observed session/prepare success and must be investigated with more device evidence.
+3. With successful sound, play multiple peg/star/chomp events. Ensure pegs are still pleasant, effects remain reliably close to collisions, the worker never blocks the game, and the 80-event timing logger/Copy button works. Native-only app must remain Web/HTML silent for unmigrated content.
+4. **Task-switch and Resume:** while active, switch to another app/video, return, tap **Let's go!**, confirm same round/score/timer, audible sound and Back, with no misleading “Try again!” while *preparing*. A genuine refusal must keep the round paused and allow a deliberate retry instead of auto-resume. No recording, pet/reward or privacy regression.
+
+**Separate evidence gates:** GitHub Node/VM regressions and web build ≠ Xcode Swift compilation ≠ software `scheduled` ≠ human-audible output. First-launch audible output still needs the owner's real test. See [N3c technical guide](N3C-FIRST-LAUNCH-AUDIO.md), [AUDIO-RECOVERY.md](AUDIO-RECOVERY.md), and [living handoff](PROJECT-HANDOFF.md).
+
+---
+
+### N3b — Native Classic peg notes, bounded overlap and Resume label (PR #25 merged; owner peg/Resume tests passed but first launch silent once)
 
 **Confirmed owner N3a iPhone success after merged [PR #24](https://github.com/andydoane/biblozoo/pull/24):** In a manually copied timing report after task switching, there were **19 total native events** (including DEV samples) and **13 actual Feeding game star/chomp events** (2 stars, 11 chomps). All 13 used `avengine-pcm`, returned `scheduled`, took **1–5ms** collision→native dispatch with **0ms native worker queue wait**, and none took >=120ms. Owner said chomp audible timing no longer seemed delayed (or far less delayed), with smooth gameplay. DEV `pilot-unlock` remained native AVAudioPlayer, taking **873ms** for its first call and **31ms** later. **Actual Resume positive observation:** owner switched away to watch a Facebook video, returned, pressed the Feeding action (referred to as Got It!), saw a **brief “Try again!” label flicker**, but the **same game continued and native sounds worked**. Foreground epoch=1 and pending=false at report-copy time. This is strong real-device improvement, not proof of exact speaker onset or multi-cycle reliability.
 
