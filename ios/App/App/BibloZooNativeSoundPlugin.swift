@@ -30,7 +30,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         "feed-star": "dq_feed_star",
         "feed-chomp": "dq_feed_chomp"
     ]
-    private var players: [String: AVAudioPlayer] = [:]
+    // Keep AVAudioPlayer decode/setup/play/stop off the UI thread. Only the
+    // worker touches players; session eligibility remains on main.
+    private let playbackQueue = DispatchQueue(
+        label: "biblozoo.native-output.player", qos: .userInitiated
+    )
+    private let playbackEpochLock = NSLock()
+    private var playbackEpoch = 0
+    private var players: [String: AVAudioPlayer] = [:] // playbackQueue only
+    private var lastNativePrepareMs = -1
+    private var lastNativePlayQueueMs = -1
+    private var lastNativePlayCallMs = -1
+    private var lastNativePlayedSoundId = "none"
     // Only a confirmed, current .began event blocks a fresh tap. iOS can
     // deliver delayed "wasSuspended" .began events on resume; those are
     // historical and must not latch the pilot into a permanent error.
@@ -161,9 +172,29 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    // Lifecycle callbacks immediately invalidate old queued effects. Work
+    // already in flight is stopped by the serial worker, with no auto-replay.
+    private func playbackEpochSnapshot() -> Int {
+        playbackEpochLock.lock()
+        defer { playbackEpochLock.unlock() }
+        return playbackEpoch
+    }
+
+    private func isCurrentPlaybackEpoch(_ token: Int) -> Bool {
+        playbackEpochLock.lock()
+        defer { playbackEpochLock.unlock() }
+        return playbackEpoch == token
+    }
+
     private func forgetPlayback() {
-        for sound in players.values { sound.stop() }
-        players.removeAll()
+        playbackEpochLock.lock()
+        playbackEpoch &+= 1
+        playbackEpochLock.unlock()
+        playbackQueue.async { [weak self] in
+            guard let self = self else { return }
+            for sound in self.players.values { sound.stop() }
+            self.players.removeAll()
+        }
     }
 
     private func leftForeground() {
@@ -382,11 +413,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 "lastRouteReasonCode": self.lastRouteReasonCode,
                 "activationAttemptsThisForeground": self.activationAttemptsThisForeground,
                 "activationAttemptsTotal": self.activationAttemptsTotal,
-                "lastActivationResult": self.lastActivationResult
+                "lastActivationResult": self.lastActivationResult,
+                "lastNativePrepareMs": self.lastNativePrepareMs,
+                "lastNativePlayQueueMs": self.lastNativePlayQueueMs,
+                "lastNativePlayCallMs": self.lastNativePlayCallMs,
+                "lastNativePlayedSoundId": self.lastNativePlayedSoundId
             ])
         }
     }
 
+
+    // Guard native session on main; schedule ALL potentially synchronous
+    // AVAudioPlayer operations on the dedicated serial queue. No Web fallback.
     @objc func preload(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self else {
@@ -406,26 +444,69 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
                 return
             }
-            self.players.removeValue(forKey: soundId)?.stop()
-            do {
-                let candidate = try AVAudioPlayer(contentsOf: url)
-                candidate.numberOfLoops = 0
-                guard candidate.prepareToPlay() else {
-                    call.resolve(["prepared": false, "reason": "prepare-failed"])
+            let epoch = self.playbackEpochSnapshot()
+            self.playbackQueue.async { [weak self] in
+                guard let self = self else {
+                    DispatchQueue.main.async {
+                        call.resolve(["prepared": false, "reason": "unavailable"])
+                    }
                     return
                 }
-                // Preparing a player is not evidence that hardware is audible.
-                self.players[soundId] = candidate
-                call.resolve([
-                    "prepared": true,
-                    "reason": "prepared",
-                    "backend": "avfoundation",
-                    "lastInterruptionSignal": self.lastInterruptionSignal,
-                    "foregroundEpoch": self.foregroundEpoch,
-                    "durationMs": Int(candidate.duration * 1000)
-                ])
-            } catch {
-                call.resolve(["prepared": false, "reason": "decode-error"])
+                guard self.isCurrentPlaybackEpoch(epoch) else {
+                    DispatchQueue.main.async {
+                        call.resolve(["prepared": false, "reason": "stale"])
+                    }
+                    return
+                }
+                self.players.removeValue(forKey: soundId)?.stop()
+                let startedAt = ProcessInfo.processInfo.systemUptime
+                var candidate: AVAudioPlayer?
+                var failed = "prepare-failed"
+                do {
+                    let player = try AVAudioPlayer(contentsOf: url)
+                    player.numberOfLoops = 0
+                    if player.prepareToPlay() {
+                        candidate = player
+                    }
+                } catch { failed = "decode-error" }
+                let prepareMs = max(0, Int(
+                    (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
+                let durationMs = candidate.map { Int($0.duration * 1000) } ?? 0
+                if let player = candidate, self.isCurrentPlaybackEpoch(epoch) {
+                    self.players[soundId] = player
+                } else {
+                    candidate?.stop()
+                }
+                let prepared = candidate != nil
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else {
+                        call.resolve(["prepared": false, "reason": "unavailable"])
+                        return
+                    }
+                    guard self.isCurrentPlaybackEpoch(epoch) else {
+                        call.resolve(["prepared": false, "reason": "stale"])
+                        return
+                    }
+                    if let reason = self.unavailableReason() {
+                        call.resolve(["prepared": false, "reason": reason])
+                        return
+                    }
+                    self.lastNativePrepareMs = prepareMs
+                    guard prepared else {
+                        call.resolve(["prepared": false, "reason": failed])
+                        return
+                    }
+                    // prepareToPlay is NOT human-audible proof.
+                    call.resolve([
+                        "prepared": true,
+                        "reason": "prepared",
+                        "backend": "avfoundation",
+                        "lastInterruptionSignal": self.lastInterruptionSignal,
+                        "foregroundEpoch": self.foregroundEpoch,
+                        "durationMs": durationMs,
+                        "prepareMs": prepareMs
+                    ])
+                }
             }
         }
     }
@@ -450,22 +531,61 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["accepted": false, "reason": reason])
                 return
             }
-            guard let sound = self.players[soundId] else {
-                call.resolve(["accepted": false, "reason": "not-preloaded"])
-                return
+            let epoch = self.playbackEpochSnapshot()
+            let enqueuedAt = ProcessInfo.processInfo.systemUptime
+            self.playbackQueue.async { [weak self] in
+                guard let self = self else {
+                    DispatchQueue.main.async {
+                        call.resolve(["accepted": false, "reason": "unavailable"])
+                    }
+                    return
+                }
+                guard self.isCurrentPlaybackEpoch(epoch) else {
+                    DispatchQueue.main.async {
+                        call.resolve(["accepted": false, "reason": "stale"])
+                    }
+                    return
+                }
+                guard let sound = self.players[soundId] else {
+                    DispatchQueue.main.async {
+                        call.resolve(["accepted": false, "reason": "not-preloaded"])
+                    }
+                    return
+                }
+                let startedAt = ProcessInfo.processInfo.systemUptime
+                let queueMs = max(0, Int((startedAt - enqueuedAt) * 1000))
+                // Rewind without stop(): stop() discards player preparation,
+                // forcing unnecessary setup before the next rapid effect.
+                // N3 will add a small voice pool for overlapping samples.
+                sound.currentTime = 0
+                sound.volume = Float(volume)
+                let started = sound.play()
+                let playCallMs = max(0, Int(
+                    (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
+                let durationMs = Int(sound.duration * 1000)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else {
+                        call.resolve(["accepted": false, "reason": "unavailable"])
+                        return
+                    }
+                    guard self.isCurrentPlaybackEpoch(epoch) else {
+                        call.resolve(["accepted": false, "reason": "stale"])
+                        return
+                    }
+                    self.lastNativePlayedSoundId = soundId
+                    self.lastNativePlayQueueMs = queueMs
+                    self.lastNativePlayCallMs = playCallMs
+                    // AVAudioPlayer.play returning true only means requested.
+                    call.resolve([
+                        "accepted": started,
+                        "reason": started ? "started" : "play-denied",
+                        "backend": "avfoundation",
+                        "durationMs": durationMs,
+                        "queueMs": queueMs,
+                        "playCallMs": playCallMs
+                    ])
+                }
             }
-            if sound.isPlaying { sound.stop() }
-            sound.currentTime = 0
-            sound.volume = Float(volume)
-            let started = sound.play()
-            // AVAudioPlayer.play() returning true is an accepted request,
-            // NEVER proof the user heard a sound.
-            call.resolve([
-                "accepted": started,
-                "reason": started ? "started" : "play-denied",
-                "backend": "avfoundation",
-                "durationMs": Int(sound.duration * 1000)
-            ])
         }
     }
 
@@ -479,8 +599,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["stopped": false, "reason": "invalid-sound-id"])
                 return
             }
-            self.players.removeValue(forKey: soundId)?.stop()
-            call.resolve(["stopped": true, "reason": "stopped"])
+            self.playbackQueue.async { [weak self] in
+                guard let self = self else {
+                    DispatchQueue.main.async {
+                        call.resolve(["stopped": false, "reason": "unavailable"])
+                    }
+                    return
+                }
+                self.players.removeValue(forKey: soundId)?.stop()
+                DispatchQueue.main.async {
+                    call.resolve(["stopped": true, "reason": "stopped"])
+                }
+            }
         }
     }
+
 }
