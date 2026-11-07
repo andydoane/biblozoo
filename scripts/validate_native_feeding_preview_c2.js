@@ -545,7 +545,7 @@ async function main() {
     assert.deepEqual(starts,["web"],"native failure falls back before round only");
     assert.equal(stops,1);
     assert.equal(fallback.nativePilot,null);
-    assert.match(fallback.nativePilotBadge.textContent,/Web \(native unavailable\)/);
+    assert.match(fallback.nativePilotBadge.textContent,/Web \(native unavailable: interruption-pending\)/);
   }
   {
     // Exit/route switch during a deferred prepare must not start another round.
