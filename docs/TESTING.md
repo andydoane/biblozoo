@@ -65,7 +65,37 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N3d — DEV native Melody single-note bank, before N4 gameplay wiring (PR #27; iPhone pending)
+### N4a — native Melody catches & same-song Resume (PR #28; awaiting iPhone)
+
+**Verified owner gate:** N3d [PR #27](https://github.com/andydoane/biblozoo/pull/27) was **merged** as `58698938` into `experiment/native-ios-audio`. The owner physically heard DEV **Melody E4** and said the note played fine; **Classic Feeding worked as expected**. This confirms one native Melody tone and a Classic regression pass, **not** real Melody-game catch-note audio. Earlier N3c first-launch/task-switch sound and two fresh competing-YouTube-PiP starts were positive overall (one initial `feed-peg stale` preflight recovered on the next explicit prep; one clean), but the cause of that stale request remains unknown.
+
+**[PR #28](https://github.com/andydoane/biblozoo/pull/28) N4a** routes actual `melody` Feeding mode on the **isolated native-only iOS test bundle** to the previously prewarmed six-voice, MIDI 55–83 `feed-melody` Swift bank. The activity's existing **Got It!** creates a mode-specific native pilot (only `feed-melody`, rather than Classic's star/chomp/peg IDs), requests Swift session activation, preloads the bank and starts the round **only after success**. Native failure keeps Instructions, Try Again and Back, never Web fallback. Each **caught note** invokes native MIDI output with the unchanged catch-percent/score/timeline/ball motion; missed notes stay silent. Web/PWA/Android original Melody oscillator path remains intact. After a real backgrounding, stop all native voices, freeze original `melody.pausedAt`/round; only a **human Welcome Back tap** re-prepares the bank then resumes **the same song and catch percentage**. Existing Classic, other native modes, Zoo Escape rules, microphone, profiles/rewards and .soloAmbient policy remain unchanged.
+
+**After owner review/merge** using separate `biblozoo-native-audio` worktree: Fetch/Pull `experiment/native-ios-audio`, run:
+
+```sh
+node scripts/validate_native_melody_gameplay_n4a.js
+node scripts/validate_native_melody_bank_n3d.js
+node scripts/validate_native_feeding_preview_c2.js
+node scripts/validate_native_feeding_resume_n21.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build **BibloZoo Audio Test** in Xcode on a physical iPhone. GitHub Node/production build cannot compile Swift or establish audibility.
+
+1. Open Daily To-Do Preview → Feeding → **Melody**; select a tune and Tilt/Drag, tap **Got It!**. Confirm audible **different short pitches on actual catches** (not merely DEV E4), normal score **Caught %**, ball visuals, pet animation and correct missed-note silence. Try at least two tunes including high/low notes. The existing Melody tune/timeline/rewards code should be untouched.
+2. **Mid-song app switch:** After a few catches, note song/percentage, open YouTube/Facebook/video, return. No notes or score should automatically resume; Welcome Back remains until tapping **Let's go!**. One explicit tap must re-preload only `feed-melody` and resume **same tune, next note, percentage, timer**, with audible sounds. Back must exit safely; retry on a real native refusal must keep the frozen round.
+3. **First-launch/blocked audio:** On a cold launch or denied native prep, don't restart immediately. Instructions must display **Try Again** and a safe reason, not begin a known silent round. Tap DEV **Copy Audio Timing Report** and paste the 80-row event ring **plus 18 preflight outcomes**: `preload | feed-melody` and `feed-melody | scheduled | … | avengine-melody`. Distinguish human-heard output from software `scheduleBuffer`. Then deliberately retry. If playback was accepted but silent, say so.
+4. **Classic/other mode regression:** Play Classic with pegged sine beeps, audible star/chomp, smooth animation and app-switch Resume. DEV **Melody E4** still works; Classic shouldn't preload Melody. Web/PWA/Android's original Melody remains identical. Labyrinth/Bounce native tones remain unmigrated; no native Web/HTML fallback, mic prompt, profile/reward changes or surprise Zoo minigame on audio error.
+
+**Separate acceptance gates:** Node source/VM and web build, Xcode Swift compile, and *owner hearing notes during actual Melody gameplay with same-song Resume* are distinct. N4a only migrates Melody within Feeding; later N4 PRs must handle Bounce/Labyrinth. Full owner checklist [N4a native Melody gameplay](N4A-NATIVE-MELODY-GAMEPLAY.md), [AUDIO-RECOVERY](AUDIO-RECOVERY.md), [living handoff](PROJECT-HANDOFF.md).
+
+---
+
+### N3d — DEV native Melody single-note bank, before N4 gameplay wiring (PR #27 merged; DEV E4 audible, Classic passed)
 
 **N3c [PR #26](https://github.com/andydoane/biblozoo/pull/26) merged** as `3ef3961e`. After merging, the owner reported a fresh-start Native Classic run with **actual sound working and successful mid-round task-switch Resume**; first gesture session `os-accepted`, star/chomp/peg preflights `prepared`, 80 retained gameplay rows all native `scheduled` within 0–2ms, no slow dispatch. **Two additional fresh-start trials with a YouTube video already in Picture-in-Picture (foreground epoch 0)**: first `gesture os-accepted`, star/chomp prepared, `feed-peg stale`; the owner had an initial snafu but successfully re-prepared with `gesture not-needed` and a now `prepared` peg, then heard normal sound. Second PiP trial had `os-accepted` and three successful preloads on the **first attempt** (star 109ms, chomp 42ms, peg 81ms), with no snafu. Both 80-row PiP reports show **0 slow native dispatches** (mostly 1–2ms, up to 3ms), no pending interruption. **`stale` identifies an obsolete preparation request; cause unknown.** PiP is background competing audio, not an app-switch/Resume test. No reports from a newer complete-silence event. This provides positive N3c listening evidence, not an exhaustive repeated first-build reliability gate.
 
