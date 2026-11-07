@@ -65,7 +65,7 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N5a — app-wide native UI pops + quiet Feeding diagnostic text (PR #32 draft; physical iPhone pending)
+### N5a — app-wide native UI pops + quiet Feeding diagnostic text (PR #32 ready for review; physical iPhone pending)
 
 **N4 final owner evidence:** N4c [PR #31](https://github.com/andydoane/biblozoo/pull/31) was merged as `99130c01` on `experiment/native-ios-audio`. After the merger, the owner reported **all Bounce tests passed**. Earlier owner reports accepted native Classic, actual Melody, Labyrinth and N4a.1 App Switcher inactive/return audio. This is owner-reported device acceptance, not quantified speaker-latency measurements.
 
@@ -91,7 +91,7 @@ npx cap open ios
 
 Xcode-build **BibloZoo Audio Test** on a physical iPhone; verify separate `.audiotest` bundle. Hear the short alternating UI pops on eligible title/menu/buttons (cold first tap may prewarm silently), then exercise rapid navigation, mute/unmute, swipe-and-**hold** App Switcher without leaving the card, full switch to another app and back: **no delayed/auto foreground sound**, next genuine tap restores pops. Retest Classic/Melody/Labyrinth/Bounce sound, unchanged scoring/serves and same-round Welcome Back/Let's go! with no pilot helper prose in normal native Feeding popups. A denied native sound must never silently fall back to Web. If silent, **DEV → Copy Audio Timing Report BEFORE restarting**, note what you actually heard; Swift scheduled/accepted is not acoustic confirmation. Full [N5a owner protocol](N5A-NATIVE-UI-TAPS.md), [handoff](PROJECT-HANDOFF.md) and [audio recovery](AUDIO-RECOVERY.md).
 
-**Separate gates:** GitHub Actions Node regressions/web build on final PR HEAD; owner Xcode Swift/resource compilation; owner *human-heard* iPhone UI pops + four Feeding regression/mute/App Switcher. Only owner reviews and merges. N5b Learn native verse/chunk/Echo playback comes next, under its own position/completion gate.
+**Separate gates:** GitHub Actions Node regressions and web build passed on [run #42421152202](https://github.com/andydoane/biblozoo/actions/runs/42421152202) at source `241989c3`; confirm final documentation HEAD re-run. Owner Xcode Swift/resource compilation and *human-heard* iPhone UI pops + four Feeding regression/mute/App Switcher remain pending. Only owner reviews and merges. N5b Learn native verse/chunk/Echo playback comes next, under its own position/completion gate.
 
 ---
 
