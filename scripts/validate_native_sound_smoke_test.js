@@ -1,8 +1,8 @@
 "use strict";
 
 // PR B: execute the actual browser smoke UI in a deterministic Node VM.
-// Static guards also verify Xcode has the Swift source and ONE MP3 resource
-// in its App target, not merely in the Capacitor web/public directory.
+// Static guards verify Xcode includes the Swift source and the three
+// allowlisted MP3 resources in its App target, not just the copied web bundle.
 // This does NOT compile Swift or confirm that an iPhone produced sound.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -17,15 +17,30 @@ const scene = read("ios/App/App/SceneDelegate.swift");
 const pbx = read("ios/App/App.xcodeproj/project.pbxproj");
 const index = read("index.html");
 const config = JSON.parse(read("capacitor.config.json"));
-const soundFile = path.join(root, "ui_audio/ui_pet_unlock.mp3");
-
 assert.equal(config.appId, "com.andydoane.biblozoo.audiotest");
-assert.ok(fs.existsSync(soundFile) && fs.statSync(soundFile).size > 1000,
-  "allowlisted MP3 must exist in source");
-assert.equal((pbx.match(/ui_pet_unlock\.mp3 in Resources \*\//g) || []).length, 2,
-  "MP3 needs a build file declaration and one Copy Bundle Resources entry");
-assert.match(pbx, /path = \.\.\/\.\.\/\.\.\/ui_audio\/ui_pet_unlock\.mp3;/,
-  "Xcode resource path must resolve from ios/App/App to the repository MP3");
+const sounds = [
+  ["pilot-unlock", "ui_audio/ui_pet_unlock.mp3", "ui_pet_unlock"],
+  ["feed-star", "verse_images/daily_questions/dq_feed_star.mp3", "dq_feed_star"],
+  ["feed-chomp", "verse_images/daily_questions/dq_feed_chomp.mp3", "dq_feed_chomp"]
+];
+for (const [id, source, name] of sounds) {
+  assert.ok(fs.existsSync(path.join(root, source)) &&
+    fs.statSync(path.join(root, source)).size > 1000,
+    id + ": sample must exist in source");
+  assert.equal((pbx.match(new RegExp(name + '\\.mp3 in Resources \\*\\/', 'g')) || []).length, 2,
+    id + ": expected one build-file and one Copy Bundle Resources entry");
+  assert.match(pbx, new RegExp('path = \\.\\./\\.\\./\\.\\./' +
+    source.replaceAll('.', '\\.') + ';'),
+    id + ": source path must resolve relative to Xcode App group");
+  assert.match(swift, new RegExp('"' + id + '": "' + name + '"'),
+    id + ": bridge mapping must use matching explicitly packaged sample");
+}
+assert.match(swift, /private var players: \[String: AVAudioPlayer\] = \[:\]/);
+assert.match(swift, /self\.players\[soundId\] = candidate/);
+assert.match(swift, /self\.players\[soundId\]/);
+assert.match(swift, /self\.players\.removeValue\(forKey: soundId\)\?\.stop\(\)/);
+assert.doesNotMatch(swift, /private var player: AVAudioPlayer\?/,
+  "a single shared prepared player would evict the other Feeding sound");
 assert.equal((pbx.match(/BibloZooNativeSoundPlugin\.swift in Sources \*\//g) || []).length, 2,
   "Swift plugin needs one build file and one Sources build-phase entry");
 assert.match(scene, /registerPluginInstance\(BibloZooNativeSoundPlugin\(\)\)/);
@@ -35,7 +50,7 @@ for (const method of ["preload", "play", "stop", "getDebugState"]) {
   assert.match(swift, new RegExp('CAPPluginMethod\\(name: "' + method + '"'));
   assert.match(swift, new RegExp('@objc func ' + method + '\\('));
 }
-assert.match(swift, /Bundle\.main\.url\(forResource: self\.resourceName, withExtension: "mp3"\)/);
+assert.match(swift, /Bundle\.main\.url\(forResource: resourceName, withExtension: "mp3"\)/);
 assert.match(swift, /\.soloAmbient/);
 assert.match(swift, /UIApplication\.willResignActiveNotification/);
 assert.match(swift, /AVAudioSession\.interruptionNotification/);
@@ -160,11 +175,14 @@ function environment(options = {}) {
   const top = panel?.children?.[0];
   const close = top?.children?.[1];
   const button = panel?.children?.[1];
-  const status = panel?.children?.[2];
-  const inspect = panel?.children?.[3];
-  const detail = panel?.children?.[4];
+  const sampleRow = panel?.children?.[2];
+  const playStar = sampleRow?.children?.[0];
+  const playChomp = sampleRow?.children?.[1];
+  const status = panel?.children?.[3];
+  const inspect = panel?.children?.[4];
+  const detail = panel?.children?.[5];
   return {
-    panel, button, status, inspect, detail, close, doc, calls, api,
+    panel, button, playStar, playChomp, status, inspect, detail, close, doc, calls, api,
     fireTimers(ms) {
       for (const [id, task] of [...timed]) {
         if (task.ms <= ms) { timed.delete(id); task.cb(); }
@@ -181,8 +199,9 @@ async function run() {
   }
   {
     const e = environment();
-    assert.ok(e.panel && e.button && e.status && e.close && e.inspect && e.detail,
-      "iOS test panel and read-only inspector must exist");
+    assert.ok(e.panel && e.button && e.playStar && e.playChomp &&
+      e.status && e.close && e.inspect && e.detail,
+      "iOS test panel, star/chomp buttons and read-only inspector must exist");
     assert.equal(e.panel.attributes["data-no-ui-sound"], "",
       "Web Audio pop must be excluded for the entire test panel");
     assert.equal(e.calls.length, 0, "native test must not autoplay");
@@ -202,6 +221,17 @@ async function run() {
     assert.match(e.detail.textContent, /began=1 ended=0 suspended=0/);
     assert.match(e.detail.textContent, /reasonCode=1/);
     assert.match(e.detail.textContent, /ageMs=213/);
+    // Independent, explicit tap-only samples: no Feeding event or WebAudio pop.
+    await e.playStar.click();
+    await e.playChomp.click();
+    assert.deepEqual(e.calls.map(x => x[0]),
+      ["preload", "play", "getDebugState", "preload", "play", "preload", "play"]);
+    assert.deepEqual([e.calls[3][1].soundId, e.calls[4][1].soundId],
+      ["feed-star", "feed-star"]);
+    assert.deepEqual([e.calls[5][1].soundId, e.calls[6][1].soundId],
+      ["feed-chomp", "feed-chomp"]);
+    assert.match(e.status.textContent, /native chomp playback requested/i);
+    assert.equal(e.panel.attributes["data-no-ui-sound"], "");
   }
   {
     const e = environment({ missing: true });
@@ -234,6 +264,8 @@ async function run() {
     await e.button.click();
     assert.equal(playCount, 0, "no play before preload");
     assert.equal(e.button.disabled, true, "prevent overlapping taps");
+    assert.equal(e.playStar.disabled, true);
+    assert.equal(e.playChomp.disabled, true);
     pre.resolve({ prepared: true });
     await first;
     assert.equal(playCount, 1);
@@ -254,7 +286,7 @@ async function run() {
     pre.resolve({ prepared: true });
     await first;
     assert.equal(playCount, 0, "backgrounded preload must never play later");
-    assert.equal(stops, 1, "background must stop the plugin");
+    assert.equal(stops, 3, "background must stop every allowlisted sample");
     assert.match(e.status.textContent, /stopped on background/i);
   }
   {
@@ -314,9 +346,9 @@ async function run() {
     } });
     await e.close.click();
     assert.equal(e.doc.getElementById("biblozoo-native-sound-smoke"), null);
-    assert.equal(stops, 1);
+    assert.equal(stops, 3);
   }
-  console.log("Native sound smoke contract passed (Xcode source/resources, interruption states, bridge and UI failure/timeout/lifecycle cases).");
+  console.log("Native sound smoke contract passed (three Xcode samples, independent native players, tap-only UI, interruption/timeout/lifecycle cases).");
 }
 
 run().catch((err) => { console.error(err); process.exitCode = 1; });
