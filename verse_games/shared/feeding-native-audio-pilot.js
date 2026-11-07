@@ -1,0 +1,165 @@
+/* Experiment C.2 — Classic Feeding tester preview ONLY.
+ * Never enable for real Daily Feeding, web/PWA, Android, or public builds.
+ * Native play is dispatched once per event; there is no mid-round web fallback,
+ * no session reactivation, and no "accepted means audible" claim. */
+(function installFeedingNativeAudioPilot(root) {
+  "use strict";
+
+  const IDS = Object.freeze(["feed-star", "feed-chomp"]);
+  const PREFLIGHT_TIMEOUT_MS = 1500;
+  const PLAY_TIMEOUT_MS = 1800;
+
+  function isIOS() {
+    try {
+      return root.Capacitor?.isNativePlatform?.() === true &&
+        root.Capacitor?.getPlatform?.() === "ios";
+    } catch (_) { return false; }
+  }
+
+  function bridge() {
+    return root.Capacitor?.Plugins?.BibloZooNativeSound;
+  }
+
+  function bounded(promise, ms) {
+    let timeout;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timeout = root.setTimeout(() => reject(new Error("timeout")), ms);
+      })
+    ]).finally(() => root.clearTimeout(timeout));
+  }
+
+  function safeReason(value) {
+    return typeof value === "string" && /^[a-z][a-z0-9-]{0,55}$/.test(value)
+      ? value : "bridge-error";
+  }
+
+  function create({ isCurrent, onFailure } = {}) {
+    // No creation, preloading, plugin call or background work on non-iOS.
+    if (!isIOS()) return null;
+
+    let generation = 0;
+    let ready = false;
+    let failed = false;
+    let failureNotified = false;
+
+    function current(token) {
+      return generation === token && typeof isCurrent === "function" &&
+        isCurrent() === true && !root.document?.hidden;
+    }
+
+    function stopNative() {
+      const api = bridge();
+      if (typeof api?.stop !== "function") return;
+      for (const soundId of IDS) {
+        try {
+          Promise.resolve(api.stop({ soundId })).catch(() => {});
+        } catch (_) { /* stop is always best effort; never block navigation */ }
+      }
+    }
+
+    function stop() {
+      generation += 1;
+      ready = false;
+      failed = false;
+      failureNotified = false;
+      stopNative();
+    }
+
+    function markFailed(reason) {
+      if (failed) return;
+      ready = false;
+      failed = true;
+      // No silent switch to web during an active round: the preview keeps
+      // its chosen native backend, with missing effects and a visible warning.
+      stopNative();
+      if (!failureNotified) {
+        failureNotified = true;
+        try { onFailure?.(safeReason(reason)); } catch (_) { }
+      }
+    }
+
+    async function prepare() {
+      const token = ++generation;
+      ready = false;
+      failed = false;
+      failureNotified = false;
+      if (!current(token)) return { ready: false, reason: "stale" };
+      const api = bridge();
+      if (typeof api?.preload !== "function" ||
+          typeof api?.play !== "function" ||
+          typeof api?.stop !== "function") {
+        return { ready: false, reason: "missing-bridge" };
+      }
+      for (const soundId of IDS) {
+        let result;
+        try {
+          // The bridge is fixed-ID only; no caller-controlled file names.
+          result = await bounded(api.preload({ soundId }), PREFLIGHT_TIMEOUT_MS);
+        } catch (_) {
+          if (current(token)) stop();
+          return { ready: false, reason: "prepare-timeout-or-error" };
+        }
+        if (!current(token)) {
+          // A delayed preload can prepare an asset but must never trigger play.
+          stopNative();
+          return { ready: false, reason: "stale" };
+        }
+        if (result?.prepared !== true) {
+          const reason = safeReason(result?.reason);
+          stop();
+          return { ready: false, reason };
+        }
+      }
+      if (!current(token)) {
+        stopNative();
+        return { ready: false, reason: "stale" };
+      }
+      ready = true;
+      return { ready: true, reason: "prepared" };
+    }
+
+    function play(soundId, volume) {
+      if (!IDS.includes(soundId) || !Number.isFinite(volume) ||
+          volume < 0 || volume > 1 || !ready || failed) return false;
+      const token = generation;
+      if (!current(token)) return false;
+      const api = bridge();
+      if (typeof api?.play !== "function") {
+        markFailed("missing-bridge");
+        return false;
+      }
+      try {
+        // Fire exactly once. Do not queue a web/HTML fallback for this event.
+        void bounded(api.play({ soundId, volume }), PLAY_TIMEOUT_MS).then(
+          result => {
+            if (!current(token)) return;
+            if (result?.accepted !== true) {
+              markFailed(safeReason(result?.reason));
+            }
+          },
+          () => { if (current(token)) markFailed("play-timeout-or-error"); }
+        );
+        return true; // dispatched, NOT necessarily audible
+      } catch (_) {
+        markFailed("play-bridge-error");
+        return false;
+      }
+    }
+
+    return Object.freeze({
+      prepare,
+      play,
+      stop,
+      isReady: () => ready && !failed && current(generation),
+      hasFailed: () => failed
+    });
+  }
+
+  root.BibloZooFeedingNativeAudioPilot = Object.freeze({
+    isIOS,
+    create,
+    soundIds: IDS
+  });
+})(window);
