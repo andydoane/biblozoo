@@ -1,6 +1,7 @@
 "use strict";
 
-// Stage C.2d regression: native-only Classic iOS tester and explicit Web comparison.
+// N2 regression: native-only Classic iOS tester, explicit gesture session
+// activation and historical Web comparison source mode (not .audiotest).
 // GitHub Actions verifies JS contracts; native Swift and speaker need the iPhone.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -40,10 +41,22 @@ function makeAdapter({platform = "ios", api, hidden = false} = {}) {
   let nextTimer = 0;
   const doc = { hidden };
   const bridge = api || {
+    async activateFromGesture({purpose}) {
+      calls.push(["activateFromGesture",purpose]);
+      return {ready:true,attempted:false,reason:"not-needed"};
+    },
     async preload({soundId}) { calls.push(["preload",soundId]); return {prepared:true}; },
     async play({soundId,volume}) { calls.push(["play",soundId,volume]); return {accepted:true}; },
     async stop({soundId}) { calls.push(["stop",soundId]); return {stopped:true}; }
   };
+  // Keep the older focused bridge-failure mocks while exercising the N2
+  // native-only gesture gate before any asset is prepared.
+  if (api && !("activateFromGesture" in bridge)) {
+    bridge.activateFromGesture = async ({purpose}) => {
+      calls.push(["activateFromGesture",purpose]);
+      return {ready:true,attempted:false,reason:"not-needed"};
+    };
+  }
   const cap = {
     isNativePlatform: () => platform !== "web",
     getPlatform: () => platform,
@@ -150,7 +163,8 @@ async function main() {
     assert.equal(pilot.isReady(),false);
     assert.deepEqual(a.calls,[],"creating the pilot must not autoplay or prepare");
     assert.deepEqual(plain(await pilot.prepare()),{ready:true,reason:"prepared"});
-    assert.deepEqual(a.calls,[["preload","feed-star"],["preload","feed-chomp"]]);
+    assert.deepEqual(a.calls,[["activateFromGesture","feeding"],
+      ["preload","feed-star"],["preload","feed-chomp"]]);
     assert.equal(pilot.isReady(),true);
     assert.equal(pilot.play("feed-star",0.78),true);
     assert.equal(pilot.play("feed-chomp",0.85),true);
@@ -158,13 +172,38 @@ async function main() {
     assert.equal(pilot.play("feed-star",NaN),false);
     assert.equal(pilot.play("feed-chomp",1.5),false);
     await Promise.resolve();
-    assert.deepEqual(a.calls.slice(2),[["play","feed-star",0.78],["play","feed-chomp",0.85]]);
+    assert.deepEqual(a.calls.slice(3),[["play","feed-star",0.78],["play","feed-chomp",0.85]]);
     pilot.stop();
     assert.equal(pilot.isReady(),false);
     assert.deepEqual(a.calls.slice(-2),[["stop","feed-star"],["stop","feed-chomp"]]);
     assert.equal(pilot.play("feed-star",0.78),false,"paused players cannot emit effects");
     current=false;
     assert.deepEqual(plain(await pilot.prepare()),{ready:false,reason:"stale"});
+  }
+  {
+    // A genuine pending native interruption must block ALL preloads until a
+    // deliberate retry is accepted by the Swift session coordinator.
+    let preloads=0, plays=0, calls=0;
+    const a=makeAdapter({api:{
+      async activateFromGesture({purpose}) {
+        assert.equal(purpose,"feeding");
+        calls++;
+        return calls===1
+          ? {ready:false,attempted:false,reason:"interruption-pending"}
+          : {ready:true,attempted:true,reason:"os-accepted"};
+      },
+      async preload(){preloads++;return {prepared:true};},
+      async play(){plays++;return {accepted:true};},
+      async stop(){return {stopped:true};}
+    }});
+    const pilot=a.pilot.create({isCurrent:()=>true});
+    assert.deepEqual(plain(await pilot.prepare()),
+      {ready:false,reason:"interruption-pending"});
+    assert.equal(preloads,0);
+    assert.equal(plays,0);
+    assert.deepEqual(plain(await pilot.prepare()),{ready:true,reason:"prepared"});
+    assert.equal(preloads,2);
+    assert.equal(calls,2,"only explicit prepares may request native activation");
   }
   {
     // A missing bridge or second asset does not start a game mid-preflight.
@@ -201,6 +240,8 @@ async function main() {
     }});
     const p=a.pilot.create({isCurrent:()=>true});
     const awaiting=p.prepare();
+    // N2 first awaits the resolved native-session gesture before preload.
+    await new Promise(resolve => setImmediate(resolve));
     p.stop();
     pending.resolve({prepared:true});
     assert.deepEqual(plain(await awaiting),{ready:false,reason:"stale"});
@@ -217,6 +258,9 @@ async function main() {
     }});
     const p=a.pilot.create({isCurrent:()=>true});
     const awaiting=p.prepare();
+    // Let the native session check finish before expiring the deliberately
+    // hung sound-preload timer, rather than expiring the gesture timer.
+    await new Promise(resolve => setImmediate(resolve));
     a.expire(1500);
     assert.deepEqual(plain(await awaiting),{ready:false,reason:"prepare-timeout-or-error"});
     assert.equal(p.isReady(),false);

@@ -149,6 +149,16 @@ final class BibloZooAudioSessionRecoveryPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func reactivateAfterClockStall(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
+            // N2: the .audiotest app is native-output ONLY. This legacy
+            // Web-clock recovery bridge must NEVER compete with the
+            // BibloZooNativeSound.activateFromGesture session owner.
+            // Retain the older path for historical source/VM compatibility;
+            // it cannot change the session in this experimental iOS bundle.
+            if Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest" {
+                call.resolve(["attempted": false, "activated": false,
+                              "reason": "legacy-web-recovery-disabled"])
+                return
+            }
             guard let self = self else {
                 call.resolve(["attempted": false, "activated": false, "reason": "unavailable"])
                 return

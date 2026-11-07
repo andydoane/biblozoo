@@ -1,7 +1,7 @@
-/* Experiment C.2 — Classic Feeding tester preview ONLY.
- * Never enable for real Daily Feeding, web/PWA, Android, or public builds.
- * Native play is dispatched once per event; there is no mid-round web fallback,
- * no session reactivation, and no "accepted means audible" claim. */
+/* N2 — Native-only Classic Feeding preview, isolated iOS test app.
+ * The real Got It!/Resume gesture requests the Swift native-only session
+ * coordinator once, then prepares the allowlisted AVAudioPlayer clips.
+ * No Web fallback, automatic playback, or "accepted means audible" claim. */
 (function installFeedingNativeAudioPilot(root) {
   "use strict";
 
@@ -87,10 +87,31 @@
       failureNotified = false;
       if (!current(token)) return { ready: false, reason: "stale" };
       const api = bridge();
-      if (typeof api?.preload !== "function" ||
+      if (typeof api?.activateFromGesture !== "function" ||
+          typeof api?.preload !== "function" ||
           typeof api?.play !== "function" ||
           typeof api?.stop !== "function") {
         return { ready: false, reason: "missing-bridge" };
+      }
+      let session;
+      try {
+        // Called directly as part of the user-tapped Got It!/Resume
+        // sequence. The Swift coordinator decides whether native session
+        // activation is needed; no Web Audio clock or fallback is consulted.
+        session = await bounded(
+          api.activateFromGesture({ purpose: "feeding" }), PREFLIGHT_TIMEOUT_MS);
+      } catch (_) {
+        if (current(token)) stop();
+        return { ready: false, reason: "native-session-timeout-or-error" };
+      }
+      if (!current(token)) {
+        stopNative();
+        return { ready: false, reason: "stale" };
+      }
+      if (session?.ready !== true) {
+        const reason = safeReason(session?.reason);
+        stop();
+        return { ready: false, reason };
       }
       for (const soundId of IDS) {
         let result;
