@@ -69,6 +69,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_peg_voices_n3b.js
 
+      - name: Validate N3c cold native first-launch preflight and explicit retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_first_launch_n3c.js
+
       - name: Validate N1 native-only WebKit sound output isolation
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_only_ios_output.js
