@@ -49,7 +49,7 @@ assert.ok(index.indexOf("shared/native-learn-listen.js") < index.indexOf('src="a
 assert.match(app, /function isNativeLearnListenMode\(/);
 assert.match(app, /handleNativeLearnListenEvent/);
 assert.match(app, /window\.BibloZooNativeLearnListen\.startFromGesture/);
-assert.match(app, /isNativeLearnListenMode\\(\\) && State\\.screen === Screen\\.LISTEN\\)\\) return;/);
+assert.ok(app.includes("(isNativeLearnListenMode() && State.screen === Screen.LISTEN)) return;"));
 assert.match(app, /function goToListenAndStart\(\) \{\s+nativeListenCheckpoint = null/);
 assert.match(app, /State\.listenAutoStarting = !isNativeLearnListenMode\(\)/);
 assert.match(app, /listenPlay\(recovery\.listenMode, recovery\.positionMs \|\| 0\)/);
