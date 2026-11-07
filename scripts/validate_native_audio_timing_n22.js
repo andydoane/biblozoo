@@ -102,7 +102,7 @@ async function run() {
   controller.stop();
   assert.equal(controller.play("feed-chomp",0.8,collisionAt),false,
     "paused pilot never emits a sound or timing row");
-  assert.equal(stops.length,2);
+  assert.equal(stops.length,3); // sample star/chomp plus native generated peg tones
 
   // A missing/stale collision time is represented as absent, not silently
   // mislabelled as a 0ms collision-to-sound success.
