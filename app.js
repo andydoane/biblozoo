@@ -997,9 +997,13 @@ function openLearnMenu() {
   const menu = document.getElementById("learnMenuOverlay");
   if (!menu) return;
 
+  // Native Listen must stop before showing the menu. Never let its
+  // unrelated HTML audio element auto-resume this native track on close.
+  if (isNativeLearnListenMode() && State.screen === Screen.LISTEN &&
+      State.listenPlaying) pauseLearnAudioForInterruption();
   learnMenuOpen = true;
   syncLearnAudioResumeOverlay();
-  learnMenuPausedAudio = !audioEl.paused;
+  learnMenuPausedAudio = !isNativeLearnListenMode() && !audioEl.paused;
 
   try {
     audioEl.pause();
@@ -1070,6 +1074,10 @@ let learnAudioResumeError = "";
 let learnShortInstructionNeedsRender = false;
 let activeLearnInstructionRequest = null;
 let activeLearnAudioWaitCancel = null;
+// N5b.2: native Listen owns its own source/position checkpoint. This is
+// local transient playback state, never user progress or completion.
+let nativeListenCheckpoint = null;
+let nativeListenError = "";
 
 let muted = false;
 
@@ -11680,7 +11688,7 @@ function resumeInterruptedLearnAudio() {
   learnAudioResumeError = "";
 
   if (recovery.mode === "listen") {
-    listenPlay(recovery.listenMode);
+    listenPlay(recovery.listenMode, recovery.positionMs || 0);
   } else if (recovery.mode === "chunk") {
     learnAudioInterrupted = recovery;
     void startChunkFlow();
@@ -11736,7 +11744,17 @@ function pauseLearnAudioForInterruption() {
   } else if (screen === Screen.ECHO && (State.echoRunning || State.echoAutoStarting)) {
     recovery = { screen, mode: "echo", index: State.echoRunning ? State.echoIndex : 0 };
   } else if (screen === Screen.LISTEN && (State.listenPlaying || State.listenAutoStarting)) {
-    recovery = { screen, mode: "listen", listenMode: State.listenPlaying ? State.audioMode : "listen_ref" };
+    const checkpoint = isNativeLearnListenMode() &&
+      nativeListenCheckpoint?.verseId === VERSE_ID
+      ? nativeListenCheckpoint : null;
+    recovery = {
+      screen, mode: "listen",
+      listenMode: checkpoint?.mode ||
+        (State.listenPlaying ? State.audioMode : "listen_ref"),
+      ...(isNativeLearnListenMode() ? {
+        verseId: VERSE_ID, positionMs: checkpoint?.positionMs || 0
+      } : {})
+    };
   }
   if (!recovery) return;
 
@@ -11876,7 +11894,84 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
   }
 }
 
-function listenPlay(resumeMode = "listen_ref") {
+// N5b.2: only packaged .audiotest iOS uses native narration in Listen.
+// Keep the same HTML audio source, timing and completion for Web/PWA/Android.
+function isNativeLearnListenMode() {
+  return window.BibloZooNativeLearnListen?.isAvailable?.() === true;
+}
+
+function handleNativeLearnListenEvent(event) {
+  if (!isNativeLearnListenMode() || !event ||
+      event.verseId !== VERSE_ID || State.screen !== Screen.LISTEN) return;
+
+  // A native UIKit App Switcher inactive signal can arrive while WebKit is
+  // still visibly rendering the thumbnail. Preserve current stage/checkpoint
+  // and enter the existing owner-controlled Welcome Back immediately.
+  if (event.kind === "interrupted") {
+    nativeListenCheckpoint = {
+      verseId: event.verseId,
+      mode: event.stage === "verse" ? "listen_verse" : "listen_ref",
+      positionMs: event.positionMs || 0
+    };
+    if (State.listenPlaying || learnAudioResumeAttempt)
+      pauseLearnAudioForInterruption();
+    if (!document.hidden) render();
+    return;
+  }
+  if (!State.listenPlaying || document.hidden || muted ||
+      learnAudioInterrupted) return;
+
+  const mode = event.stage === "verse" ? "listen_verse" : "listen_ref";
+  if (event.kind === "stage" || event.kind === "playing" ||
+      event.kind === "progress" || event.kind === "stage-ended") {
+    State.audioMode = mode;
+    nativeListenCheckpoint = {
+      verseId: event.verseId, mode,
+      positionMs: event.positionMs || 0
+    };
+    const attempt = learnAudioResumeAttempt;
+    if (attempt?.recovery?.mode === "listen") {
+      // A native player timeline must actually progress before Welcome Back
+      // closes. A resolved AVAudioPlayer.play() / UI pop never passes.
+      const expectedMode = attempt.recovery.listenMode || "listen_ref";
+      const previousMs = Number(attempt.recovery.positionMs) || 0;
+      if (event.kind === "stage-ended" ||
+          (event.kind === "progress" &&
+            (mode !== expectedMode ||
+              event.positionMs > previousMs + 40))) {
+        attempt.narrationVerified = true;
+        finishLearnAudioResumeAttempt(attempt);
+      }
+    }
+    if (event.kind === "stage") render();
+    return;
+  }
+  if (event.kind === "failed") {
+    if (learnAudioResumeAttempt?.recovery?.mode === "listen") {
+      failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+      return;
+    }
+    // Do not start a known-silent Listen pass or award Listen completion.
+    State.listenPlaying = false;
+    State.listenAutoFallbackReady = true;
+    State.audioMode = null;
+    nativeListenError = "Sound isn't ready yet. Tap to try again.";
+    render();
+    return;
+  }
+  if (event.kind === "completed" && event.stage === "verse") {
+    // Only the currently owned, native-validated verse-ended event advances
+    // Learn. A reference end, UI pop, Web HTML ended or stale ID cannot.
+    nativeListenError = "";
+    State.listenPlaying = false;
+    State.audioMode = null;
+    State.listenDone = true;
+    nativeListenCheckpoint = null;
+    startLearnInstruction("meaning");
+  }
+}
+
+function listenPlay(resumeMode = "listen_ref", nativeResumeMs = 0) {
   if (document.hidden) return;
   const mode = resumeMode === "listen_verse" ? "listen_verse" : "listen_ref";
   learnAudioInterrupted = null;
@@ -11885,6 +11980,42 @@ function listenPlay(resumeMode = "listen_ref") {
   State.listenPlaying = true;
   State.listenDone = false;
   State.audioMode = mode;
+
+  if (isNativeLearnListenMode()) {
+    nativeListenError = "";
+    nativeListenCheckpoint = {
+      verseId: VERSE_ID, mode,
+      positionMs: nativeResumeMs
+    };
+    // The genuine Listen/Let's go! click is the ONLY activation entrypoint.
+    // This call invokes Swift activateFromGesture synchronously (pre-await).
+    void window.BibloZooNativeLearnListen.startFromGesture({
+      verseId: VERSE_ID,
+      stage: mode === "listen_verse" ? "verse" : "reference",
+      positionMs: nativeResumeMs,
+      onEvent: handleNativeLearnListenEvent
+    }).then(result => {
+      if (result?.ready !== true && result?.reason !== "stale" &&
+          State.screen === Screen.LISTEN && State.listenPlaying &&
+          !document.hidden && !learnAudioInterrupted) {
+        // The controller also sends a request-owned failure event; this is
+        // only a safe fallback if the bridge failed before event delivery.
+        handleNativeLearnListenEvent({
+          kind: "failed", verseId: VERSE_ID,
+          stage: mode === "listen_verse" ? "verse" : "reference"
+        });
+      }
+    }).catch(() => {
+      if (State.screen === Screen.LISTEN && State.listenPlaying &&
+          !document.hidden && !learnAudioInterrupted) {
+        handleNativeLearnListenEvent({
+          kind: "failed", verseId: VERSE_ID, stage: "reference"
+        });
+      }
+    });
+    render();
+    return;
+  }
 
   setAudioSrc(mode === "listen_verse" ? AUDIO_FILE : refAudioFile());
   audioEl.currentTime = 0;
@@ -11911,7 +12042,9 @@ function listenPlay(resumeMode = "listen_ref") {
 }
 
 audioEl.addEventListener("ended", () => {
-  if (document.hidden || learnAudioInterrupted) return;
+  // A stale HTMLMediaElement ended must not complete native Listen.
+  if (document.hidden || learnAudioInterrupted ||
+      (isNativeLearnListenMode() && State.screen === Screen.LISTEN)) return;
   if (State.screen === Screen.LISTEN && State.listenPlaying && State.audioMode === "listen_ref") {
     State.audioMode = "listen_verse";
 
@@ -12128,10 +12261,15 @@ function runAfterSlide(fn, { timeoutMs = 2200, intervalMs = 50 } = {}) {
 
 function goToListenAndStart() {
   State.listenDone = false;
-  State.listenAutoStarting = true;
-  State.listenAutoFallbackReady = false;
+  State.listenAutoStarting = !isNativeLearnListenMode();
+  State.listenAutoFallbackReady = isNativeLearnListenMode();
 
   go(Screen.LISTEN);
+  if (isNativeLearnListenMode()) {
+    // No implicit activation after runAfterSlide. Show the existing
+    // "Tap to Play Verse" button for a real child gesture instead.
+    return;
+  }
 
   runAfterSlide(() => {
     if (
@@ -12587,6 +12725,7 @@ let echoCancelToken = 0;
 
 function cancelLearnAudio() {
   echoCancelToken++;
+  window.BibloZooNativeLearnListen?.stop?.();
   activeLearnInstructionRequest = null;
   if (activeLearnAudioWaitCancel) activeLearnAudioWaitCancel();
   try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) { }
@@ -21887,6 +22026,10 @@ function screenListen(idx) {
               : ``
           }
 
+          ${isNativeLearnListenMode() && nativeListenError &&
+               !State.listenPlaying ? `
+            <p role="status" class="coach-text">${escapeHtml(nativeListenError)}</p>
+          ` : ""}
           <div class="coach-actions">
             ${(
         isListenSlideExiting ||
