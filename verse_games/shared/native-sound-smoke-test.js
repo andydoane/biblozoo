@@ -91,6 +91,39 @@
     const playChomp = sampleButton("Play chomp");
     const playMelody = sampleButton("Melody E4");
 
+    // N5b.1: isolated long-form narration experiment. These buttons
+    // never change the children's Learn progress or play automatically.
+    const narrationRow = doc.createElement("div");
+    narrationRow.style.cssText =
+      "border-top:1px solid #a6cbd5;margin-top:8px;padding-top:7px;" +
+      "display:flex;gap:4px;flex-wrap:wrap;";
+    const narrationTitle = doc.createElement("strong");
+    narrationTitle.textContent = "N5b.1 · Learn narration";
+    narrationTitle.style.cssText = "width:100%;font-size:12px;";
+    narrationRow.appendChild(narrationTitle);
+    function narrationButton(label) {
+      const button = doc.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.style.cssText =
+        "flex:1 1 45%;min-height:36px;border-radius:7px;" +
+        "font:600 11px sans-serif;background:#dbeef5;color:#153740;";
+      narrationRow.appendChild(button);
+      return button;
+    }
+    const playNarration = narrationButton("Play John 3:16");
+    const pauseNarration = narrationButton("Pause");
+    const seekNarration = narrationButton("Skip +5s");
+    const resumeNarration = narrationButton("Continue");
+    const stateNarration = narrationButton("Read position");
+    const narrationStatus = doc.createElement("p");
+    narrationStatus.setAttribute("role", "status");
+    narrationStatus.setAttribute("aria-live", "polite");
+    narrationStatus.style.cssText = "width:100%;margin:0;font:11px/1.3 sans-serif;";
+    narrationStatus.textContent =
+      "DEV preview only. Learn screens are not migrated in this slice.";
+    narrationRow.appendChild(narrationStatus);
+
     const status = doc.createElement("p");
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
@@ -151,6 +184,8 @@
     timingPanel.appendChild(markLate);
     timingPanel.appendChild(reportStatus);
     panel.appendChild(timingPanel);
+    // Keep the original DEV panel child order for older test/owner controls.
+    panel.appendChild(narrationRow);
     doc.body.appendChild(panel);
 
     let epoch = 0;
@@ -158,7 +193,8 @@
     let dismissed = false;
     function setBusy(value) {
       busy = value;
-      for (const button of [play, playStar, playChomp, playMelody]) {
+      for (const button of [play, playStar, playChomp, playMelody,
+        playNarration, pauseNarration, seekNarration, resumeNarration, stateNarration]) {
         button.disabled = value;
       }
     }
@@ -257,6 +293,9 @@
     inspect.addEventListener("click", () => inspectNativeState());
 
     function stopQuietly() {
+      // The narration player is independent of the fixed Feeding PCM bank.
+      // Closing or hiding DEV must never let a long clip continue.
+      root.BibloZooNativeLearnNarrationPilot?.stop?.();
       const api = plugin();
       if (typeof api?.stop !== "function") return;
       // All three are fixed allowlisted IDs; no URLs or user-provided paths.
@@ -347,6 +386,71 @@
     playChomp.addEventListener("click", () => playSelected(CHOMP_ID, "chomp"));
     playMelody.addEventListener("click",
       () => playSelected(MELODY_ID, "Melody E4"));
+
+    const learnPilot = root.BibloZooNativeLearnNarrationPilot;
+    function narrationFeedback(event) {
+      if (dismissed || doc.hidden) return;
+      if (event.kind === "ended") {
+        narrationStatus.textContent =
+          "Native completion event received. Did you hear the entire clip?";
+      } else if (event.kind === "interrupted") {
+        narrationStatus.textContent =
+          "Narration stopped on interruption. Tap Play again; no auto-replay.";
+      } else if (event.kind === "failed") {
+        narrationStatus.textContent =
+          "Native narrator unavailable (" + safeReason(event.reason) + ").";
+      } else if (event.kind === "playing") {
+        narrationStatus.textContent =
+          "Native playback accepted. Did you hear the verse?";
+      } else if (event.kind === "preparing") {
+        narrationStatus.textContent = "Preparing native verse audio…";
+      }
+    }
+    playNarration.addEventListener("click", async () => {
+      if (busy || dismissed || doc.hidden) return;
+      if (!learnPilot?.isAvailable?.()) {
+        narrationStatus.textContent = "Native Learn pilot missing. Rebuild the test app.";
+        return;
+      }
+      setBusy(true);
+      try {
+        const result = await learnPilot.startFromGesture(narrationFeedback);
+        if (!dismissed && !doc.hidden && result?.ready !== true) {
+          narrationStatus.textContent =
+            "Narrator did not start (" + safeReason(result?.reason) + ").";
+        }
+      } finally { if (!dismissed) setBusy(false); }
+    });
+    pauseNarration.addEventListener("click", async () => {
+      const result = await learnPilot?.pause?.();
+      if (!dismissed && !doc.hidden) narrationStatus.textContent =
+        result?.paused === true
+          ? "Paused at " + Math.round((result.positionMs || 0) / 1000) + " seconds."
+          : "Pause unavailable. Tap Play to start a new request.";
+    });
+    seekNarration.addEventListener("click", async () => {
+      const result = await learnPilot?.seekForward?.();
+      if (!dismissed && !doc.hidden) narrationStatus.textContent =
+        result?.seeked === true
+          ? "Moved to " + Math.round((result.positionMs || 0) / 1000) + " seconds."
+          : "Seek unavailable for this narration.";
+    });
+    resumeNarration.addEventListener("click", async () => {
+      const result = await learnPilot?.resume?.();
+      if (!dismissed && !doc.hidden) narrationStatus.textContent =
+        result?.accepted === true
+          ? "Native narrator continued. Did you hear it?"
+          : "Continue unavailable; tap Play for a fresh request.";
+    });
+    stateNarration.addEventListener("click", async () => {
+      const result = await learnPilot?.state?.();
+      if (!dismissed && !doc.hidden) narrationStatus.textContent =
+        result?.prepared === true
+          ? (result.playing ? "Playing " : result.ended ? "Ended " : "Paused ") +
+            Math.round((result.positionMs || 0) / 1000) + " / " +
+            Math.round((result.durationMs || 0) / 1000) + " seconds."
+          : "No prepared native narration.";
+    });
   }
 
   if (doc.readyState === "complete") mount();

@@ -22,6 +22,7 @@
 		B1B000000000000000000007 /* dq_feed_chomp.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B1B000000000000000000008 /* dq_feed_chomp.mp3 */; };
 		B1B000000000000000000009 /* ui_sound_pop_1.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B1B00000000000000000000A /* ui_sound_pop_1.mp3 */; };
 		B1B00000000000000000000B /* ui_sound_pop_2.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B1B00000000000000000000C /* ui_sound_pop_2.mp3 */; };
+		B1B00000000000000000000D /* john_3_16.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B1B00000000000000000000E /* john_3_16.mp3 */; };
 		E1D990B8305C0D6C0042A277 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E1D990B7305C0D6B0042A277 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -42,6 +43,7 @@
 		B1B000000000000000000008 /* dq_feed_chomp.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = dq_feed_chomp.mp3; path = ../../../verse_images/daily_questions/dq_feed_chomp.mp3; sourceTree = "<group>"; };
 		B1B00000000000000000000A /* ui_sound_pop_1.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = ui_sound_pop_1.mp3; path = ../../../ui_audio/ui_sound_pop_1.mp3; sourceTree = "<group>"; };
 		B1B00000000000000000000C /* ui_sound_pop_2.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = ui_sound_pop_2.mp3; path = ../../../ui_audio/ui_sound_pop_2.mp3; sourceTree = "<group>"; };
+		B1B00000000000000000000E /* john_3_16.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = john_3_16.mp3; path = ../../../verse_audio/john_3_16.mp3; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		E1D990B7305C0D6B0042A277 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = App/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -86,6 +88,7 @@
 				B1B000000000000000000008 /* dq_feed_chomp.mp3 */,
 				B1B00000000000000000000A /* ui_sound_pop_1.mp3 */,
 				B1B00000000000000000000C /* ui_sound_pop_2.mp3 */,
+				B1B00000000000000000000E /* john_3_16.mp3 */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -171,6 +174,7 @@
 				B1B000000000000000000007 /* dq_feed_chomp.mp3 in Resources */,
 				B1B000000000000000000009 /* ui_sound_pop_1.mp3 in Resources */,
 				B1B00000000000000000000B /* ui_sound_pop_2.mp3 in Resources */,
+				B1B00000000000000000000D /* john_3_16.mp3 in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
