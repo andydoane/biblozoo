@@ -180,6 +180,6 @@ Use the same iPhone/iOS version, volume, sound route, mute setting and action se
 
 The owner can say:
 
-> **Read `docs/PROJECT-HANDOFF.md` on the `ios-prep` branch of `andydoane/biblozoo`. Check current branch HEAD, open PRs, recent commits, relevant source and tests. Treat my latest instructions and GitHub as authoritative. Make changes through feature branches and PRs targeting `ios-prep`, leave merges to me, and update the living handoff in every PR.**
+> **For normal BibloZoo work:** Read `docs/PROJECT-HANDOFF.md` on the `ios-prep` branch of `andydoane/biblozoo`. Verify current HEAD, PRs, source and tests; target `ios-prep` and leave merges to me. **For the native-audio experiment:** Read the living roadmap (§10) on `experiment/native-ios-audio`, check its current HEAD and native files, use a short-lived feature branch targeting `experiment/native-ios-audio` (not `ios-prep`), keep the test iPhone app isolated, document source/Node versus actual Xcode/device verification, and update the handoff and roadmap statuses in every PR.**
 
 If this document conflicts with current code or owner feedback, **verify and correct it** in the next PR. The purpose is continuity, not a second repository of truth.
