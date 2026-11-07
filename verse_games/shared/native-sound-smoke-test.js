@@ -196,6 +196,7 @@
           // Timing is diagnostic only: low native timings with a visible
           // hitch imply we must investigate the game/UI or decode elsewhere.
           " lastSound=" + safeReason(state.lastNativePlayedSoundId) +
+          " backend=" + safeReason(state.lastNativeBackend) +
           " prepMs=" + count(state.lastNativePrepareMs) +
           " queueMs=" + count(state.lastNativePlayQueueMs) +
           " playMs=" + count(state.lastNativePlayCallMs) +

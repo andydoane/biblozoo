@@ -3,7 +3,9 @@ import UIKit
 import Capacitor
 import AVFAudio
 
-// N2 native-only iOS session owner and AVAudioPlayer output. No Web Audio or
+// N3a native-only iOS session owner: predecoded PCM-buffer effects on
+// AVAudioEngine/AVAudioPlayerNode for star/chomp; unchanged AVAudioPlayer
+// control sample for pilot-unlock. No Web Audio or
 // HTML fallback. Only an explicit Start/Resume/DEV tap may request a bounded
 // setActive(true) retry AFTER a completed foreground return. This plugin never
 // calls setCategory/setMode, deactivates, or automatically resumes sound.
@@ -33,14 +35,24 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         "feed-star": "dq_feed_star",
         "feed-chomp": "dq_feed_chomp"
     ]
-    // Keep AVAudioPlayer decode/setup/play/stop off the UI thread. Only the
-    // worker touches players; session eligibility remains on main.
+    // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
+    // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
+    // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
+    // preload, NEVER on the hot collision-to-sound path.
     private let playbackQueue = DispatchQueue(
         label: "biblozoo.native-output.player", qos: .userInitiated
     )
     private let playbackEpochLock = NSLock()
     private var playbackEpoch = 0
-    private var players: [String: AVAudioPlayer] = [:] // playbackQueue only
+    private var players: [String: AVAudioPlayer] = [:] // pilot-unlock only
+    // Only these two fixed IDs use predecoded buffers. Unchanged native
+    // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
+    private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp"]
+    private var effectsEngine: AVAudioEngine? // playbackQueue only
+    private var effectBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
+    private var effectNodes: [String: AVAudioPlayerNode] = [:] // worker only
+    private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
+    private var lastNativeBackend = "none"
     private var lastNativePrepareMs = -1
     private var lastNativePlayQueueMs = -1
     private var lastNativePlayCallMs = -1
@@ -245,9 +257,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             "Rows: \(soundTimingEvents.count) of max \(maxSoundTimingEvents) " +
                 "(oldest first). -1 = unavailable/clock skew.",
             "Collision/JS/bridge deltas use device wall time; queue/play use monotonic uptime.",
-            "Native dispatch = AVAudioPlayer.play() returned; NOT proof of speaker audibility.",
+            "Native dispatch = predecoded PCM scheduleBuffer() for star/chomp, " +
+                "AVAudioPlayer.play() for pilot. NOT proof of speaker audibility.",
             "seq | event | sound | result | collision->JS | JS->bridge | " +
-                "bridge->worker | worker play() | collision->native dispatch | marked late"
+                "bridge->worker | worker call | collision->native dispatch | " +
+                "marked late | backend"
         ]
         var slow = 0
         for row in soundTimingEvents {
@@ -265,7 +279,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 String(number("queueMs")),
                 String(number("playCallMs")),
                 String(latency),
-                (row["markedLate"] as? Bool == true) ? "YES" : "no"
+                (row["markedLate"] as? Bool == true) ? "YES" : "no",
+                word("backend")
             ].joined(separator: " | "))
         }
         lines.insert("Native dispatch >=120 ms: \(slow) records (diagnostic threshold, " +
@@ -315,6 +330,65 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    // Worker-only graph reset. Never keep an AVAudioEngine or scheduled PCM
+    // clip alive after background/interruption/route or media-services reset.
+    // A new explicit gesture must preload and warm the engine again.
+    private func discardEffectsOnWorker() {
+        for node in effectNodes.values { node.stop() }
+        effectsEngine?.stop()
+        effectNodes.removeAll()
+        effectBuffers.removeAll()
+        effectsEngine = nil
+    }
+
+    // Already on playbackQueue. At first prepare, decode the fixed bundled
+    // MP3 to an AVAudioPCMBuffer, attach its own node to the native mixer,
+    // start the engine and pre-start the player into silence (no clip queued).
+    // Actual clip scheduling on collision must do NO decoding/engine startup.
+    private func preparePCMEffectOnWorker(soundId: String, url: URL)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        if let buffer = effectBuffers[soundId], effectsEngine?.isRunning == true,
+           let node = effectNodes[soundId], node.isPlaying {
+            return (true, Int(Double(buffer.frameLength) /
+                              buffer.format.sampleRate * 1000), "prepared")
+        }
+        do {
+            let file = try AVAudioFile(forReading: url)
+            guard file.length > 0, file.length <= maximumEffectFrames else {
+                return (false, 0, "effect-too-large-or-empty")
+            }
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: file.processingFormat,
+                frameCapacity: AVAudioFrameCount(file.length)) else {
+                return (false, 0, "pcm-allocation-failed")
+            }
+            try file.read(into: buffer)
+            guard buffer.frameLength > 0 else {
+                return (false, 0, "pcm-empty")
+            }
+            let engine = effectsEngine ?? AVAudioEngine()
+            let node = AVAudioPlayerNode()
+            engine.attach(node)
+            engine.connect(node, to: engine.mainMixerNode,
+                           format: buffer.format)
+            // Start and warm on the user-initiated preflight, not when the
+            // next star/food collision asks for an immediate sound effect.
+            if !engine.isRunning { try engine.start() }
+            node.prepare(withFrameCount: buffer.frameLength)
+            node.play() // no scheduled samples; never an audible autoplay
+            effectsEngine = engine
+            effectNodes[soundId] = node
+            effectBuffers[soundId] = buffer
+            return (true, Int(Double(buffer.frameLength) /
+                              buffer.format.sampleRate * 1000), "prepared")
+        } catch {
+            // Do not silently fall back to AVAudioPlayer/Web audio for effects.
+            // Next user gesture may retry after game exits/reprepares.
+            discardEffectsOnWorker()
+            return (false, 0, "pcm-decode-or-engine-start-failed")
+        }
+    }
+
     private func forgetPlayback() {
         playbackEpochLock.lock()
         playbackEpoch &+= 1
@@ -323,6 +397,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let self = self else { return }
             for sound in self.players.values { sound.stop() }
             self.players.removeAll()
+            self.discardEffectsOnWorker()
         }
     }
 
@@ -547,6 +622,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 "lastNativePlayQueueMs": self.lastNativePlayQueueMs,
                 "lastNativePlayCallMs": self.lastNativePlayCallMs,
                 "lastNativePlayedSoundId": self.lastNativePlayedSoundId,
+                "lastNativeBackend": self.lastNativeBackend,
                 "timingEventCount": self.soundTimingEvents.count,
                 "lateChompMarks": self.lateChompMarks
             ])
@@ -589,26 +665,40 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     return
                 }
-                self.players.removeValue(forKey: soundId)?.stop()
                 let startedAt = ProcessInfo.processInfo.systemUptime
-                var candidate: AVAudioPlayer?
+                var prepared = false
+                var durationMs = 0
                 var failed = "prepare-failed"
-                do {
-                    let player = try AVAudioPlayer(contentsOf: url)
-                    player.numberOfLoops = 0
-                    if player.prepareToPlay() {
-                        candidate = player
-                    }
-                } catch { failed = "decode-error" }
+                let backend: String
+                if self.pcmEffectIDs.contains(soundId) {
+                    // No MP3 decoding is permitted in the later play() path.
+                    let result = self.preparePCMEffectOnWorker(
+                        soundId: soundId, url: url)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-pcm"
+                } else {
+                    // DEV pet-unlock comparison stays native AVAudioPlayer.
+                    self.players.removeValue(forKey: soundId)?.stop()
+                    do {
+                        let player = try AVAudioPlayer(contentsOf: url)
+                        player.numberOfLoops = 0
+                        if player.prepareToPlay() {
+                            prepared = true
+                            durationMs = Int(player.duration * 1000)
+                            if self.isCurrentPlaybackEpoch(epoch) {
+                                self.players[soundId] = player
+                            } else {
+                                prepared = false
+                                player.stop()
+                            }
+                        }
+                    } catch { failed = "decode-error" }
+                    backend = "avfoundation-player"
+                }
                 let prepareMs = max(0, Int(
                     (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
-                let durationMs = candidate.map { Int($0.duration * 1000) } ?? 0
-                if let player = candidate, self.isCurrentPlaybackEpoch(epoch) {
-                    self.players[soundId] = player
-                } else {
-                    candidate?.stop()
-                }
-                let prepared = candidate != nil
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else {
                         call.resolve(["prepared": false, "reason": "unavailable"])
@@ -627,11 +717,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                         call.resolve(["prepared": false, "reason": failed])
                         return
                     }
-                    // prepareToPlay is NOT human-audible proof.
+                    // Prepared engine/player is NOT human-audible proof.
                     call.resolve([
                         "prepared": true,
                         "reason": "prepared",
-                        "backend": "avfoundation",
+                        "backend": backend,
                         "lastInterruptionSignal": self.lastInterruptionSignal,
                         "foregroundEpoch": self.foregroundEpoch,
                         "durationMs": durationMs,
@@ -684,24 +774,54 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     return
                 }
-                guard let sound = self.players[soundId] else {
-                    DispatchQueue.main.async {
-                        call.resolve(["accepted": false, "reason": "not-preloaded"])
-                    }
-                    return
-                }
                 let startedAt = ProcessInfo.processInfo.systemUptime
                 let queueMs = max(0, Int((startedAt - enqueuedAt) * 1000))
-                // Rewind without stop(): stop() discards player preparation,
-                // forcing unnecessary setup before the next rapid effect.
-                // N3 will add a small voice pool for overlapping samples.
-                sound.currentTime = 0
-                sound.volume = Float(volume)
-                let started = sound.play()
+                let started: Bool
+                let durationMs: Int
+                let backend: String
+                let resultReason: String
+                if self.pcmEffectIDs.contains(soundId) {
+                    // Hot path: ONLY set volume and schedule the already-
+                    // decoded memory buffer. No AVAudioPlayer.play(), decoding,
+                    // engine.start(), node.play() or audio-session changes.
+                    guard let engine = self.effectsEngine, engine.isRunning,
+                          let node = self.effectNodes[soundId], node.isPlaying,
+                          let buffer = self.effectBuffers[soundId] else {
+                        DispatchQueue.main.async {
+                            call.resolve(["accepted": false,
+                                          "reason": "pcm-not-preloaded"])
+                        }
+                        return
+                    }
+                    node.volume = Float(volume)
+                    node.scheduleBuffer(buffer, at: nil,
+                                        options: [.interrupts],
+                                        completionHandler: nil)
+                    started = true  // scheduled for native rendering, NOT heard
+                    durationMs = Int(Double(buffer.frameLength) /
+                                     buffer.format.sampleRate * 1000)
+                    backend = "avengine-pcm"
+                    resultReason = "scheduled"
+                } else {
+                    guard let sound = self.players[soundId] else {
+                        DispatchQueue.main.async {
+                            call.resolve(["accepted": false,
+                                          "reason": "not-preloaded"])
+                        }
+                        return
+                    }
+                    // Pilot unlock remains the independent native player
+                    // reference case; do not regress its existing DEV sound.
+                    sound.currentTime = 0
+                    sound.volume = Float(volume)
+                    started = sound.play()
+                    durationMs = Int(sound.duration * 1000)
+                    backend = "avfoundation-player"
+                    resultReason = started ? "started" : "play-denied"
+                }
                 let nativeDispatchEpochMs = Date().timeIntervalSince1970 * 1000
                 let playCallMs = max(0, Int(
                     (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
-                let durationMs = Int(sound.duration * 1000)
                 let collisionToNativeDispatchMs =
                     self.safeAgeMs(nativeDispatchEpochMs, collisionAt)
                 DispatchQueue.main.async { [weak self] in
@@ -716,19 +836,20 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     self.lastNativePlayedSoundId = soundId
                     self.lastNativePlayQueueMs = queueMs
                     self.lastNativePlayCallMs = playCallMs
+                    self.lastNativeBackend = backend
                     self.recordSoundTiming([
                         "eventId": eventId, "soundId": soundId,
-                        "result": started ? "started" : "play-denied",
+                        "result": resultReason, "backend": backend,
                         "collisionToRequestMs": collisionToRequestMs,
                         "bridgeMs": bridgeMs, "queueMs": queueMs,
                         "playCallMs": playCallMs,
                         "collisionToNativeDispatchMs": collisionToNativeDispatchMs
                     ])
-                    // AVAudioPlayer.play returning true only means requested.
+                    // Native scheduling/player request is NOT acoustic proof.
                     call.resolve([
                         "accepted": started,
-                        "reason": started ? "started" : "play-denied",
-                        "backend": "avfoundation",
+                        "reason": resultReason,
+                        "backend": backend,
                         "durationMs": durationMs,
                         "queueMs": queueMs,
                         "playCallMs": playCallMs
@@ -755,7 +876,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     return
                 }
-                self.players.removeValue(forKey: soundId)?.stop()
+                if self.pcmEffectIDs.contains(soundId) {
+                    // A paused/exited round tears down its warm engine. The
+                    // next Got It!/Resume must explicitly prepare it again.
+                    self.discardEffectsOnWorker()
+                } else {
+                    self.players.removeValue(forKey: soundId)?.stop()
+                }
                 DispatchQueue.main.async {
                     call.resolve(["stopped": true, "reason": "stopped"])
                 }

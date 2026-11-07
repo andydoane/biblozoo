@@ -65,9 +65,40 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N2.2 — collect a native timing report after playing (PR #23; pending iPhone)
+### N3a — Native PCM-buffer effects instead of slow AVAudioPlayer.play() (PR #24; iPhone test pending)
 
-**Based on merged [PR #22](https://github.com/andydoane/biblozoo/pull/22) at `07e91e3`. Owner has now tested N2.1:** every star/chomp MP3 **audibly played** in Classic Feeding, and the previous per-sound **visual hitch is gone**. **Open problem:** some chomp sounds start near the pet/snack collision while others sound significantly late. No reliable timestamp/log was supplied; taking screenshots while playing is not reasonable. **Task-switch/Resume after PR #22 was not explicitly reported**, so it remains a required check, not a passed gate. No native peg beeps yet (N3), no Web/HTML fallback.
+**Based on merged [N2.2 PR #23](https://github.com/andydoane/biblozoo/pull/23)** at `1941fb8`. The owner sent **two actual iPhone timing reports**: no-task-switch report 6 slow events of 14; task-switched report 7 of 13, **13 of 27** with `collision->native dispatch >=120ms`. **Twelve** slow events spent approximately **392–744ms in `AVAudioPlayer.play()`**; one other queued sound waited **457ms** behind a prior 459ms star effect. Physics collision→JS request and JS→native bridge were about **0–3ms**. Sounds were heard, and **gameplay remained smooth**, but some chomp acoustic onsets were late. This is a measured native method bottleneck, *not* proof of the acoustic onset instant or the internal reason AVAudioPlayer stalls. Task switching is not needed for delays. The owner **has not explicitly confirmed same-round Resume works after N2.1**, so this remains a test.
+
+**[PR #24](https://github.com/andydoane/biblozoo/pull/24), branch `experiment/n3-predecoded-native-feeding-effects`, target `experiment/native-ios-audio`**, decodes `feed-star` and `feed-chomp` in Swift **during the explicit Got It!/Resume or DEV preload** using `AVAudioFile` → bounded `AVAudioPCMBuffer`, connects `AVAudioPlayerNode`s to one `AVAudioEngine`, starts the engine and warms the nodes (with no scheduled audible samples) **before** the round. On collisions, `scheduleBuffer(..., options:[.interrupts])` schedules the predecoded PCM; no per-event `AVAudioPlayer.play()`, MP3 decode or engine start. DEV pet-unlock **stays a native AVAudioPlayer reference**; Native-only/HTML Web sound isolation stays unchanged. Lifecycle/route/media reset invalidates the worker generation and tears down the engine; *only a new explicit gesture* may warm it again. No extra JS bridge per collision, new microphone permission, category or background entitlement change. One node per effect; future N3 voice pools and native peg beeps are **not** implemented here.
+
+**After owner review/merge**, use dedicated `biblozoo-native-audio` GitHub Desktop worktree, Fetch/Pull `experiment/native-ios-audio`. From repo root:
+
+```sh
+node scripts/validate_native_audio_test_identity.js
+node scripts/validate_native_sound_smoke_test.js
+node scripts/validate_native_audio_timing_n22.js
+node scripts/validate_native_pcm_effects_n3a.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+In Xcode build/run **BibloZoo Audio Test** (`com.andydoane.biblozoo.audiotest`) on a **physical iPhone**, keeping original BibloZoo installed unchanged.
+
+1. **Xcode compile is a separate gate**: the Linux CI source tests and web build cannot compile the AVFAudio Swift APIs. If compile fails, provide the *first Xcode error*, before any sound test.
+2. **DEV**: play star, chomp and pet-unlock. Really listen. For star/chomp, DEV Inspect should indicate `backend=avengine-pcm`; pet-unlock remains `avfoundation-player`. No Web/HTML fallback. Any `pcm-decode-or-engine-start-failed`, `pcm-not-preloaded`, `effect-too-large-or-empty` or other new error is a **failure**, not a reason to resume the Web engine.
+3. **Classic Feeding**: Daily To-Do Preview → Feeding Game Tester → Classic → Got It!. Play 1–2 minutes, including close-together star/chomp events; check every audible effect happens near pet/star contact, visual ball motion remains smooth, and repeated effects are not truncated unexpectedly. Native peg beeps intentionally remain silent until later N3.
+4. **Copy a report** afterward using DEV **Copy Audio Timing Report** and paste it here. Compare rows labeled `avengine-pcm` to the old reports' 400–750ms `AVAudioPlayer.play()` stalls. `worker call` now measures `scheduleBuffer()` for effects; it **does not measure actual speaker onset**. Optional mark-last-chomp-late remains.
+5. **Task-switch and Resume**: switch to another app mid-Classic and return; tap Welcome Back/Resume. Check same score/round resumes, Back works, no automatic/repeated sounds, no duplicate rewards, no interrupted recordings. This gate was not separately accepted after N2.1. Also test route change/silent switch if convenient and check output does not play spontaneously on foreground.
+
+**Pass boundary:** Successful Xcode compile + all native effects audibly work + no visible hitch + tolerably consistent perceived onset + successful explicit same-round Resume. A native `scheduleBuffer` accepted response by itself is **not enough**. Failures need captured DEV status and timing or exact Xcode error, not a Web fallback. Full technical schema and rollback criteria: [N3a PCM effects guide](N3-NATIVE-PCM-EFFECTS.md); [living handoff §§9–10](PROJECT-HANDOFF.md).
+
+---
+
+### N2.2 — collect a native timing report after playing (PR #23 merged; owner reports analyzed)
+
+**Historical test plan after merged [PR #22](https://github.com/andydoane/biblozoo/pull/22) at `07e91e3`, before N2.2 logs:** every star/chomp MP3 **audibly played** in Classic Feeding, and the previous per-sound **visual hitch is gone**. **Open problem:** some chomp sounds start near the pet/snack collision while others sound significantly late. No reliable timestamp/log was supplied; taking screenshots while playing is not reasonable. **Task-switch/Resume after PR #22 was not explicitly reported**, so it remains a required check, not a passed gate. No native peg beeps yet (N3), no Web/HTML fallback.
 
 [PR #23](https://github.com/andydoane/biblozoo/pull/23), branch `experiment/n2-2-native-audio-timing-report`, implements **one-tap native clipboard reporting**, not a new low-latency sound engine. The fixed-schema Swift timing ring keeps only the latest **80** native MP3 playback events in memory; JavaScript sends an event ID plus physics collision and request timestamps on the *existing* native `play()` call. Swift records bridge arrival, serial queue wait and `AVAudioPlayer.play()` return time, and formats a plaintext report. The floating DEV panel's **Copy Audio Timing Report** invokes native Swift `copyTimingReport` and writes the report to `UIPasteboard.general.string`. No automatic network upload, file write, Zookeeper name, verse text, pet data or microphone recording. **Mark last chomp late (optional)** flags only the most recent chomp from the previous 60 seconds; if later sounds happened, it may not tag the sound noticed. Report rows use `-1` for unavailable/skewed wall clock; `AVAudioPlayer.play()` returned **is not equivalent to actual speaker output**. See [N2.2 timing report details](N2-2-NATIVE-AUDIO-TIMING.md).
 
