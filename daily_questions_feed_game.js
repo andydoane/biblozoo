@@ -1658,7 +1658,10 @@
     if (runtime.nativePilotBackend === "native" && !nativePegMode) return;
     const context = runtime.audioContext;
     if (nativePegMode) {
-      if (runtime.nativePilot?.isReady?.() !== true ||
+      // A stale physics callback must not emit a new impact while Welcome
+      // Back is holding the round, even if native stop is still queued.
+      if (runtime.feedPausedAt != null ||
+          runtime.nativePilot?.isReady?.() !== true ||
           now - runtime.lastPegSoundAt < 55) return;
     } else if (!context || context.state !== "running" ||
                now - runtime.lastPegSoundAt < 55) return;
