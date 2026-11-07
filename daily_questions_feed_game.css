@@ -874,7 +874,8 @@
 }
 .daily-feed-native-pilot-badge {
   position: absolute;
-  top: calc(10px + env(safe-area-inset-top));
+  /* The separate DEV Native Audio test panel occupies the top-right. */
+  bottom: calc(10px + env(safe-area-inset-bottom));
   right: 12px;
   z-index: 15;
   max-width: 44vw;
