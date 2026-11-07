@@ -15,7 +15,9 @@ assert.match(pilot,/const LABYRINTH_IDS = Object\.freeze\(\["feed-star", "feed-c
 assert.match(pilot,/\["classic", "labyrinth", "melody"\]/);
 assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS :/);
 assert.match(pilot,/mode === "bounce" \? BOUNCE_IDS : IDS/);
-assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" : "classic"/);
+assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" :/);
+assert.match(begin,/runtime\.mode === FEED_MODES\.BOUNCE \? "bounce" : "classic"/,
+  "N4c retains Labyrinth and adds Bounce mode without replacing Classic");
 assert.match(begin,/if \(result\?\.ready !== true \|\| !pilot\) \{[\s\S]*?return;/);
 assert.match(peg,/FEED_MODES\.LABYRINTH/);
 assert.match(peg,/runtime\.nativePilot\?\.play\("feed-peg"/);
