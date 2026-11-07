@@ -3,9 +3,11 @@ import UIKit
 import Capacitor
 import AVFAudio
 
-// Experimental output ONLY. Never call setCategory, setMode, setActive or
-// reactivate the existing Web Audio recovery path from this plugin.
-// The one allowlisted MP3 must be copied into the app by Xcode's Resources phase.
+// N2 native-only iOS session owner and AVAudioPlayer output. No Web Audio or
+// HTML fallback. Only an explicit Start/Resume/DEV tap may request a bounded
+// setActive(true) retry AFTER a completed foreground return. This plugin never
+// calls setCategory/setMode, deactivates, or automatically resumes sound.
+// Three allowlisted MP3 resources are packaged in the app target.
 @objc(BibloZooNativeSoundPlugin)
 final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "BibloZooNativeSoundPlugin"
@@ -14,7 +16,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "preload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
-        // Read-only test diagnostics; no audio engine or session modification.
+        CAPPluginMethod(name: "activateFromGesture", returnType: CAPPluginReturnPromise),
+        // Read-only, bounded native session history; never activates audio.
         CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise)
     ]
 
@@ -43,6 +46,24 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private var lastInterruptionAt: Date?
     private var lastInterruptionReasonCode = -1
     private var lastInterruptionRawType = -1
+    // Single authoritative native-output session state in this app. The older
+    // Web-clock recovery bridge remains registered for compatibility but is
+    // disabled in the .audiotest bundle; read-only diagnostics may also observe.
+    private let createdAt = Date()
+    private let maxTraceEvents = 28
+    private var eventSequence = 0
+    private var eventTrace: [[String: Any]] = []
+    private var foregroundEpoch = 0
+    private var wasOutsideForeground = false
+    private var mediaResetCount = 0
+    private var needsGestureAfterReset = false
+    private var lastRouteReasonCode = -1
+    private let minimumActivationInterval: TimeInterval = 4
+    private let maximumActivationAttemptsPerForeground = 2
+    private var lastActivationAt: Date?
+    private var activationAttemptsThisForeground = 0
+    private var activationAttemptsTotal = 0
+    private var lastActivationResult = "none"
     private var observers: [NSObjectProtocol] = []
 
     public override func load() {
@@ -59,7 +80,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in self?.leftForeground() })
+        ) { [weak self] _ in
+            self?.leftForeground()
+            // Count at most two OS reactivation attempts between backgrounds.
+            self?.activationAttemptsThisForeground = 0
+            self?.lastActivationAt = nil
+            self?.appendTrace("app-background")
+        })
         observers.append(center.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,
@@ -74,19 +101,64 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
             queue: .main
+        ) { [weak self] note in
+            guard let self = self else { return }
+            self.routeEventCount += 1
+            self.lastRouteReasonCode =
+                (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.intValue ?? -1
+            self.forgetPlayback()
+            self.appendTrace("route-changed")
+        })
+        observers.append(center.addObserver(
+            forName: AVAudioSession.mediaServicesWereLostNotification,
+            object: nil,
+            queue: .main
         ) { [weak self] _ in
-            self?.routeEventCount += 1
             self?.forgetPlayback()
+            self?.appendTrace("media-services-lost")
         })
         observers.append(center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in self?.forgetPlayback() })
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.forgetPlayback()
+            self.mediaResetCount += 1
+            self.needsGestureAfterReset = true
+            self.appendTrace("media-services-reset")
+        })
+        appendTrace("plugin-loaded")
     }
 
     deinit {
         for token in observers { NotificationCenter.default.removeObserver(token) }
+    }
+
+    // Fixed-schema in-memory trace. The only fields are event code, monotonic
+    // sequence, elapsed time, public app lifecycle and numeric session codes.
+    // Never include verse text, pet names, microphone data or device IDs.
+    private func appendTrace(_ kind: String) {
+        eventSequence += 1
+        let appState: String
+        switch UIApplication.shared.applicationState {
+        case .active: appState = "active"
+        case .inactive: appState = "inactive"
+        case .background: appState = "background"
+        @unknown default: appState = "unknown"
+        }
+        eventTrace.append([
+            "seq": eventSequence,
+            "kind": kind,
+            "elapsedMs": max(0, Int(Date().timeIntervalSince(createdAt) * 1000)),
+            "appState": appState,
+            "foregroundEpoch": foregroundEpoch,
+            "pending": interrupted,
+            "reasonCode": lastInterruptionReasonCode
+        ])
+        if eventTrace.count > maxTraceEvents {
+            eventTrace.removeFirst(eventTrace.count - maxTraceEvents)
+        }
     }
 
     private func forgetPlayback() {
@@ -96,16 +168,25 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func leftForeground() {
         forgetPlayback()
+        if !wasOutsideForeground {
+            wasOutsideForeground = true
+            appendTrace("app-left-active")
+        }
         if interrupted { leftForegroundDuringInterruption = true }
     }
 
     private func returnedToForeground() {
-        // A genuine .began may have no matching .ended after suspension.
-        // Merely becoming active does not resume anything or clear the latch.
-        // Only the NEXT explicit user-tapped preload may attempt a new player.
-        if interrupted && leftForegroundDuringInterruption {
-            returnedToForegroundDuringInterruption = true
+        // Foreground is evidence of a lifecycle transition, NOT audio health.
+        // A new explicit tap may now ask the OS to activate; this method
+        // never clears a pending interruption and never starts playback.
+        if wasOutsideForeground {
+            wasOutsideForeground = false
+            foregroundEpoch += 1
+            if interrupted && leftForegroundDuringInterruption {
+                returnedToForegroundDuringInterruption = true
+            }
         }
+        appendTrace("app-active")
     }
 
     private func handleInterruption(_ note: Notification) {
@@ -122,6 +203,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
               let kind = AVAudioSession.InterruptionType(rawValue: raw) else {
             // An absent/unrecognized type is not evidence of a fresh .began.
             lastInterruptionSignal = "unrecognized"
+            appendTrace("interruption-unrecognized")
             return
         }
         switch kind {
@@ -135,6 +217,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 // WHEN THE PROCESS WAS SUSPENDED. Ignore it as a fresh active
                 // interruption; keep an unrelated earlier pending .began intact.
                 lastInterruptionSignal = "suspended-began"
+                appendTrace("interruption-suspended-history")
                 return
             }
             interrupted = true
@@ -142,14 +225,17 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 UIApplication.shared.applicationState != .active
             returnedToForegroundDuringInterruption = false
             lastInterruptionSignal = "began"
+            appendTrace("interruption-began")
         case .ended:
             endedEventCount += 1
             interrupted = false
             leftForegroundDuringInterruption = false
             returnedToForegroundDuringInterruption = false
             lastInterruptionSignal = "ended"
+            appendTrace("interruption-ended")
         @unknown default:
             lastInterruptionSignal = "unrecognized"
+            appendTrace("interruption-unrecognized")
         }
     }
 
@@ -163,20 +249,90 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         if AVAudioSession.sharedInstance().category != .soloAmbient {
             return "category-not-soloambient"
         }
-        if interrupted {
-            guard returnedToForegroundDuringInterruption else {
-                return "interruption-pending"
-            }
-            // This check runs ONLY for an explicit new preload/play call.
-            // Clear the stale latch after a full inactive->active transition,
-            // but do not setActive, auto-resume, or claim sound health. The
-            // AVAudioPlayer prepare/play result still decides acceptance.
-            interrupted = false
-            leftForegroundDuringInterruption = false
-            returnedToForegroundDuringInterruption = false
-            lastInterruptionSignal = "foreground-tap-retry"
-        }
+        // Never clear a genuine .began merely because the app became active.
+        // See activateFromGesture: a bounded OS decision is required after a
+        // full inactive->active transition, or wait for a real .ended event.
+        if interrupted { return "interruption-pending" }
+        if needsGestureAfterReset { return "media-reset-requires-gesture" }
         return nil
+    }
+
+    // The ONLY native audio-session activation entrypoint in the .audiotest
+    // app. Called explicitly from Got It!/Resume or a DEV sound tap; no
+    // foreground observer, status inspection or queued effect invokes this.
+    @objc func activateFromGesture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["ready": false, "reason": "unavailable"]); return
+            }
+            let purpose = call.getString("purpose") ?? ""
+            guard purpose == "dev" || purpose == "feeding" else {
+                call.resolve(["ready": false, "reason": "invalid-purpose"]); return
+            }
+            if let blocked = self.unavailableReason(), blocked != "interruption-pending",
+               blocked != "media-reset-requires-gesture" {
+                self.lastActivationResult = blocked
+                self.appendTrace("activation-denied")
+                call.resolve(["ready": false, "reason": blocked]); return
+            }
+            let needsRecovery = self.interrupted || self.needsGestureAfterReset
+            if !needsRecovery {
+                self.lastActivationResult = "not-needed"
+                self.appendTrace("activation-not-needed")
+                call.resolve(["ready": true, "attempted": false, "reason": "not-needed"])
+                return
+            }
+            // A real pending .began remains protected until either iOS sends
+            // .ended OR the app has fully left/returned and the child taps.
+            guard !self.interrupted || self.returnedToForegroundDuringInterruption else {
+                self.lastActivationResult = "interruption-pending"
+                self.appendTrace("activation-deferred")
+                call.resolve(["ready": false, "attempted": false,
+                              "reason": "interruption-pending"])
+                return
+            }
+            let now = Date()
+            if let last = self.lastActivationAt,
+               now.timeIntervalSince(last) < self.minimumActivationInterval {
+                self.lastActivationResult = "activation-cooldown"
+                self.appendTrace("activation-deferred")
+                call.resolve(["ready": false, "attempted": false,
+                              "reason": "activation-cooldown"])
+                return
+            }
+            guard self.activationAttemptsThisForeground <
+                    self.maximumActivationAttemptsPerForeground else {
+                self.lastActivationResult = "foreground-attempt-limit"
+                self.appendTrace("activation-deferred")
+                call.resolve(["ready": false, "attempted": false,
+                              "reason": "foreground-attempt-limit"])
+                return
+            }
+            self.lastActivationAt = now
+            self.activationAttemptsThisForeground += 1
+            self.activationAttemptsTotal += 1
+            do {
+                // This is OS acceptance only, not speaker audibility. Category
+                // and mode are never changed, even after media-services reset.
+                try AVAudioSession.sharedInstance().setActive(true)
+                self.interrupted = false
+                self.needsGestureAfterReset = false
+                self.leftForegroundDuringInterruption = false
+                self.returnedToForegroundDuringInterruption = false
+                self.lastInterruptionSignal = "foreground-activation-accepted"
+                self.lastActivationResult = "os-accepted"
+                self.appendTrace("activation-os-accepted")
+                call.resolve(["ready": true, "attempted": true,
+                              "reason": "os-accepted", "backend": "avfoundation"])
+            } catch let error as NSError {
+                // Never clear pending state or claim sound output on failure.
+                self.lastActivationResult = "activation-os-rejected"
+                self.appendTrace("activation-os-rejected")
+                call.resolve(["ready": false, "attempted": true,
+                              "reason": "activation-os-rejected",
+                              "errorDomain": error.domain, "errorCode": error.code])
+            }
+        }
     }
 
     private func requestedId(_ call: CAPPluginCall) -> String? {
@@ -217,7 +373,16 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 "routeCount": self.routeEventCount,
                 "lastReasonCode": self.lastInterruptionReasonCode,
                 "lastRawType": self.lastInterruptionRawType,
-                "lastAgeMs": ageMs
+                "lastAgeMs": ageMs,
+                "foregroundEpoch": self.foregroundEpoch,
+                "eventSequence": self.eventSequence,
+                "recentEvents": self.eventTrace,
+                "mediaResetCount": self.mediaResetCount,
+                "needsGestureAfterReset": self.needsGestureAfterReset,
+                "lastRouteReasonCode": self.lastRouteReasonCode,
+                "activationAttemptsThisForeground": self.activationAttemptsThisForeground,
+                "activationAttemptsTotal": self.activationAttemptsTotal,
+                "lastActivationResult": self.lastActivationResult
             ])
         }
     }
@@ -256,6 +421,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     "reason": "prepared",
                     "backend": "avfoundation",
                     "lastInterruptionSignal": self.lastInterruptionSignal,
+                    "foregroundEpoch": self.foregroundEpoch,
                     "durationMs": Int(candidate.duration * 1000)
                 ])
             } catch {
