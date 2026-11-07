@@ -44,7 +44,8 @@ assert.match(css, /daily-feed-native-pilot-phases\[hidden\]/);
 assert.match(workflow, /validate_native_ui_audio_n5a\.js/);
 
 function harness({ platform = "ios", nativeOnly = true, activation = null } = {}) {
-  const calls = [], listeners = {}, document = { hidden: false };
+  const calls = [], listeners = {};
+  const document = { hidden: false, addEventListener(name, cb) { listeners[name] = cb; } };
   let clock = 1000;
   let activationImpl = activation || (async () => ({ ready: true }));
   const api = {
