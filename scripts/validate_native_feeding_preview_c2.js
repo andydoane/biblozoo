@@ -240,6 +240,8 @@ async function main() {
     }});
     const p=a.pilot.create({isCurrent:()=>true});
     const awaiting=p.prepare();
+    // N2 first awaits the resolved native-session gesture before preload.
+    await new Promise(resolve => setImmediate(resolve));
     p.stop();
     pending.resolve({prepared:true});
     assert.deepEqual(plain(await awaiting),{ready:false,reason:"stale"});
@@ -256,6 +258,9 @@ async function main() {
     }});
     const p=a.pilot.create({isCurrent:()=>true});
     const awaiting=p.prepare();
+    // Let the native session check finish before expiring the deliberately
+    // hung sound-preload timer, rather than expiring the gesture timer.
+    await new Promise(resolve => setImmediate(resolve));
     a.expire(1500);
     assert.deepEqual(plain(await awaiting),{ready:false,reason:"prepare-timeout-or-error"});
     assert.equal(p.isReady(),false);
