@@ -339,7 +339,7 @@ async function main() {
     assert.equal(typeof changed, "function");
     changed();
     assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
-      /native selected.*tap got it/i);
+      /Native ONLY selected.*Got It! tests native/i);
     assert.deepEqual(snapshots, ["selected-native"],
       "checkbox selection must capture a read-only native baseline");
     nativeRuntime.nativePilotCheckbox.checked = false;
