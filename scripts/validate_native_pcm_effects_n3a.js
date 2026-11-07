@@ -21,7 +21,7 @@ const preload=section("    @objc func preload(","    @objc func play(");
 const play=section("    @objc func play(","    @objc func stop(");
 const stop=section("    @objc func stop(","\n}");
 const forgotten=section("    private func forgetPlayback(","    private func leftForeground()");
-assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp"\]/);
+assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"\]/);
 assert.match(swift,/"pilot-unlock": "ui_pet_unlock"/);
 assert.match(swift,/private var effectsEngine: AVAudioEngine\?/);
 assert.match(swift,/private var effectBuffers: \[String: AVAudioPCMBuffer\]/);

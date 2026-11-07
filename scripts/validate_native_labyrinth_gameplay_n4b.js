@@ -31,7 +31,7 @@ assert.match(catchBall,/runtime\.caughtCount \+= 1/);
 assert.match(catchBall,/playChompSound\(runtime, collisionEpochMs\)/);
 assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(swift,/private let nativePegSoundID = "feed-peg"/);
-assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp"\]/);
+assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"\]/);
 assert.match(workflow,/node scripts\/validate_native_labyrinth_gameplay_n4b\.js/);
 
 function harness({platform="ios",nativeOnly=true,failSound=""}={}){
@@ -69,7 +69,8 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 async function main(){
   {
     const e=harness(),html=e.hooks.render({session:{feedMode:"labyrinth",petName:"BibloPet"}});
-    assert.match(html,/Native Labyrinth: prepare impacts and catches on Got It!/);
+    assert.doesNotMatch(html,/Native Labyrinth: prepare/);
+    assert.match(html,/data-daily-feed-native-choice-status/);
     assert.doesNotMatch(html,/data-daily-feed-native-opt-in/);
     const w=harness({platform:"web",nativeOnly:false});
     assert.doesNotMatch(w.hooks.render({session:{feedMode:"labyrinth"}}),/Native Labyrinth: prepare/);
@@ -111,7 +112,8 @@ async function main(){
     assert.equal(starts,0);assert.equal(r.roundStarted,false);
     assert.equal(r.controlPhase,"instructions");
     assert.equal(r.startConfirmButton.textContent,"Try Again");
-    assert.match(r.nativePilotChoiceStatus.textContent,/native-preload-refused/);
+    assert.match(r.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
+    assert.match(r.nativePilotBadge.textContent,/native-preload-refused/);
     assert.ok(!e.calls.some(x=>x[0]==="play"));
     e.api.preload=async({soundId})=>{e.calls.push(["preload",soundId]);return {prepared:true};};
     await e.hooks.startNative(r);assert.equal(starts,1);

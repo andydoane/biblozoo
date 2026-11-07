@@ -197,7 +197,7 @@ async function run() {
     assert.equal(h.runtime.resumeOverlay.hidden,false);
     assert.equal(h.runtime.resumeButton.disabled,false);
     assert.equal(h.continuation(),0);
-    assert.ok(h.messages.some(x=>x.includes("interruption-pending")));
+    assert.ok(h.messages.some(x=>x.includes("Sound isn\'t ready yet")));
     h.setPrepared(()=>Promise.resolve({ready:true,reason:"prepared"}));
     assert.equal(h.resume(),true);
     await flush();

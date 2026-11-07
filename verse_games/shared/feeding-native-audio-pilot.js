@@ -62,6 +62,10 @@
     }
 
     function stopNative() {
+      // Swift's legacy stop(soundId) discards the shared PCM engine rather
+      // than one voice family. Notify N5a UI pops so they never assume their
+      // old prewarmed samples survived a Feeding pause, failure or exit.
+      root.BibloZooNativeUiAudio?.invalidate?.();
       const api = bridge();
       if (typeof api?.stop !== "function") return;
       for (const soundId of selectedIds) {

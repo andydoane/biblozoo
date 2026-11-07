@@ -469,7 +469,8 @@ async function main() {
     assert.equal(r.controlPhase,"instructions");
     assert.match(r.nativePilotBadge.textContent,/Native ONLY unavailable \(interruption-pending\); round not started/);
     assert.match(r.nativePilotChoiceStatus.textContent,/Tap Try Again or Back/);
-    assert.match(r.nativePilotChoiceStatus.textContent,/Copy Audio Timing Report/);
+    assert.doesNotMatch(r.nativePilotChoiceStatus.textContent,/Copy Audio Timing Report/);
+    assert.match(r.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
     assert.equal(r.nativePilotChoicePending,false);
     assert.equal(r.startConfirmButton.disabled,false);
     assert.equal(r.startConfirmButton.textContent,"Try Again");
@@ -494,7 +495,7 @@ async function main() {
     assert.equal(starts,0);
     assert.equal(r.roundStarted,false);
     assert.equal(r.startConfirmButton.textContent,"Try Again");
-    assert.match(r.nativePilotChoiceStatus.textContent,/activation-os-rejected/);
+    assert.match(r.nativePilotBadge.textContent,/activation-os-rejected/);
     assert.equal(stops,1);
     await h.hooks.nativeBegin(r); // deliberate second Got It!/Try Again tap
     assert.equal(starts,1,"only successful native preflight may start round");
@@ -663,7 +664,7 @@ async function main() {
     assert.equal(continued,0);
     assert.equal(r.feedPausedAt,1234);
     assert.equal(r.resumeButton.disabled,false);
-    assert.match(r.resumeStatus.textContent,/Native sounds unavailable \(interruption-pending\)/);
+    assert.match(r.resumeStatus.textContent,/Sound isn\'t ready yet/);
   }
   {
     // Exit/route switch during a deferred prepare must not start another round.
