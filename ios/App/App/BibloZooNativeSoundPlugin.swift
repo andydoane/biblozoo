@@ -11,7 +11,7 @@ import AVFAudio
 // calls setCategory/setMode, deactivates, or automatically resumes sound.
 // Three allowlisted MP3 resources are packaged; peg notes are Swift-generated PCM.
 @objc(BibloZooNativeSoundPlugin)
-final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
+final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlayerDelegate {
     public let identifier = "BibloZooNativeSoundPlugin"
     public let jsName = "BibloZooNativeSound"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -23,7 +23,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise),
         // N2.2 one-tap user-initiated diagnostics. No logging to disk/network.
         CAPPluginMethod(name: "copyTimingReport", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "markRecentChompLate", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "markRecentChompLate", returnType: CAPPluginReturnPromise),
+        // N5b.1 DEV-only long narration contract. Not wired to Learn UI yet.
+        CAPPluginMethod(name: "prepareNarration", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playNarration", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pauseNarration", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "seekNarration", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getNarrationState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopNarration", returnType: CAPPluginReturnPromise)
     ]
 
     // All MP3s are checked-in project assets explicitly copied into the
@@ -47,6 +54,15 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private let playbackEpochLock = NSLock()
     private var playbackEpoch = 0
     private var players: [String: AVAudioPlayer] = [:] // pilot-unlock only
+    // N5b.1: long-form narration is an independent AVAudioPlayer, not a
+    // short PCM effect. Exactly one fixed local DEV clip is permitted here;
+    // no arbitrary URLs, paths or client-supplied verse IDs. Later N5b
+    // slices will review a bundled verse manifest before wiring Learn.
+    private let narrationSoundID = "learn-john-3-16"
+    private let narrationResourceName = "john_3_16"
+    private var narrationPlayer: AVAudioPlayer? // main thread only
+    private var narrationRequestId: Int? // opaque local ID, never a verse/profile
+    private var narrationCompleted = false
     // Only these two fixed IDs use predecoded buffers. Unchanged native
     // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
     private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp",
@@ -613,6 +629,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func forgetPlayback() {
+        // Stop long narration immediately with UIKit inactivity/interruptions;
+        // invalidate the request before an old player completion can fire.
+        stopNarrationPlayer(reason: "interrupted")
         playbackEpochLock.lock()
         playbackEpoch &+= 1
         playbackEpochLock.unlock()
@@ -743,7 +762,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                                       soundId: "session")
             }
             let purpose = call.getString("purpose") ?? ""
-            guard purpose == "dev" || purpose == "feeding" || purpose == "ui" else {
+            guard purpose == "dev" || purpose == "feeding" || purpose == "ui" ||
+                  purpose == "learn" else {
                 finish(["ready": false, "reason": "invalid-purpose"]); return
             }
             if let blocked = self.unavailableReason(), blocked != "interruption-pending",
@@ -1183,6 +1203,198 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     ])
                 }
             }
+        }
+    }
+
+
+    // N5b.1: One fixed packaged John 3:16 narrator proves the long-form
+    // player contract before touching child-facing Learn progress. All
+    // methods execute on main, matching AVAudioPlayerDelegate's run loop.
+    // These outcomes are player state, never proof of speaker audibility.
+    private func stopNarrationPlayer(reason: String? = nil) {
+        let oldId = narrationRequestId
+        narrationPlayer?.delegate = nil
+        narrationPlayer?.stop()
+        narrationPlayer = nil
+        narrationRequestId = nil
+        narrationCompleted = false
+        if let reason = reason, let oldId = oldId {
+            notifyListeners("biblozooNarration", data: [
+                "type": "invalidated",
+                "requestId": oldId,
+                "reason": reason
+            ])
+        }
+    }
+
+    private func narrationSnapshot() -> [String: Any] {
+        guard let player = narrationPlayer,
+              let requestId = narrationRequestId else {
+            return ["prepared": false, "playing": false,
+                    "ended": false, "positionMs": 0, "durationMs": 0]
+        }
+        let durationMs = max(0, Int(player.duration * 1000))
+        let positionMs = max(0, min(durationMs, Int(player.currentTime * 1000)))
+        return [
+            "prepared": true,
+            "soundId": narrationSoundID,
+            "requestId": requestId,
+            "playing": player.isPlaying,
+            "ended": narrationCompleted,
+            "positionMs": positionMs,
+            "durationMs": durationMs,
+            "foregroundEpoch": foregroundEpoch
+        ]
+    }
+
+    @objc func prepareNarration(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["prepared": false, "reason": "unavailable"]); return
+            }
+            guard call.getString("soundId") == self.narrationSoundID,
+                  let requestId = call.getInt("requestId"),
+                  requestId > 0 else {
+                call.resolve(["prepared": false, "reason": "invalid-request"]); return
+            }
+            if let reason = self.unavailableReason() {
+                call.resolve(["prepared": false, "reason": reason]); return
+            }
+            guard let url = Bundle.main.url(
+                forResource: self.narrationResourceName, withExtension: "mp3") else {
+                call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
+                return
+            }
+            self.stopNarrationPlayer()
+            do {
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.delegate = self
+                player.numberOfLoops = 0
+                guard player.prepareToPlay(), player.duration > 0 else {
+                    call.resolve(["prepared": false, "reason": "prepare-failed"])
+                    return
+                }
+                self.narrationPlayer = player
+                self.narrationRequestId = requestId
+                self.narrationCompleted = false
+                call.resolve([
+                    "prepared": true,
+                    "reason": "prepared",
+                    "soundId": self.narrationSoundID,
+                    "requestId": requestId,
+                    "durationMs": Int(player.duration * 1000),
+                    "backend": "avfoundation-narration"
+                ])
+            } catch {
+                call.resolve(["prepared": false, "reason": "decode-error"])
+            }
+        }
+    }
+
+    @objc func playNarration(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["accepted": false, "reason": "unavailable"]); return
+            }
+            guard let requestId = call.getInt("requestId"),
+                  requestId > 0, requestId == self.narrationRequestId,
+                  let player = self.narrationPlayer else {
+                call.resolve(["accepted": false, "reason": "stale-request"]); return
+            }
+            if let reason = self.unavailableReason() {
+                self.stopNarrationPlayer(reason: reason)
+                call.resolve(["accepted": false, "reason": reason]); return
+            }
+            // End is terminal for this request: only a fresh human DEV tap
+            // may prepare another one. Do not silently restart completed audio.
+            guard !self.narrationCompleted else {
+                call.resolve(["accepted": false, "reason": "already-ended"]); return
+            }
+            let accepted = player.play()
+            var state = self.narrationSnapshot()
+            state["accepted"] = accepted
+            state["reason"] = accepted ? "started" : "play-denied"
+            call.resolve(state)
+        }
+    }
+
+    @objc func pauseNarration(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self,
+                  let requestId = call.getInt("requestId"),
+                  requestId > 0, requestId == self.narrationRequestId,
+                  let player = self.narrationPlayer else {
+                call.resolve(["paused": false, "reason": "stale-request"]); return
+            }
+            player.pause()
+            var state = self.narrationSnapshot()
+            state["paused"] = true
+            call.resolve(state)
+        }
+    }
+
+    @objc func seekNarration(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self,
+                  let requestId = call.getInt("requestId"),
+                  requestId > 0, requestId == self.narrationRequestId,
+                  let player = self.narrationPlayer else {
+                call.resolve(["seeked": false, "reason": "stale-request"]); return
+            }
+            guard let positionMs = call.getInt("positionMs"),
+                  positionMs >= 0, positionMs <= Int(player.duration * 1000) else {
+                call.resolve(["seeked": false, "reason": "invalid-position"]); return
+            }
+            guard !self.narrationCompleted else {
+                call.resolve(["seeked": false, "reason": "already-ended"]); return
+            }
+            // Seeking does not start playback or activate the iOS session.
+            player.currentTime = Double(positionMs) / 1000
+            var state = self.narrationSnapshot()
+            state["seeked"] = true
+            call.resolve(state)
+        }
+    }
+
+    @objc func getNarrationState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["prepared": false, "reason": "unavailable"]); return
+            }
+            call.resolve(self.narrationSnapshot())
+        }
+    }
+
+    @objc func stopNarration(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["stopped": false, "reason": "unavailable"]); return
+            }
+            // Reject a stale request instead of cutting a newer narrator.
+            guard let requestId = call.getInt("requestId"),
+                  requestId > 0, requestId == self.narrationRequestId else {
+                call.resolve(["stopped": false, "reason": "stale-request"]); return
+            }
+            self.stopNarrationPlayer()
+            call.resolve(["stopped": true, "reason": "stopped"])
+        }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        onMain { [weak self] in
+            guard let self = self,
+                  self.narrationPlayer === player,
+                  let requestId = self.narrationRequestId,
+                  UIApplication.shared.applicationState == .active,
+                  !self.interrupted else { return }
+            self.narrationCompleted = flag
+            self.notifyListeners("biblozooNarration", data: [
+                "type": flag ? "ended" : "failed",
+                "requestId": requestId,
+                "soundId": self.narrationSoundID,
+                "positionMs": max(0, Int(player.currentTime * 1000)),
+                "durationMs": max(0, Int(player.duration * 1000))
+            ])
         }
     }
 
