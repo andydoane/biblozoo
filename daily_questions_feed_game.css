@@ -911,3 +911,11 @@
   overflow-wrap: anywhere;
   pointer-events: none;
 }
+
+/* N5a: pilot trace/badges never leak into normal native-only Feeding UI.
+   A real preflight failure may reveal the short retry status explicitly. */
+.daily-feed-native-pilot-badge[hidden],
+.daily-feed-native-pilot-phases[hidden],
+.daily-feed-native-pilot-status[hidden] {
+  display: none !important;
+}
