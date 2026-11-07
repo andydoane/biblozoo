@@ -83,8 +83,11 @@
       })).catch(() => {});
       Promise.resolve(bridge?.addListener?.("biblozooNarration", event => {
         const a = active;
-        if (!a || !isCurrent(a) || a.requestId !== event?.requestId ||
-            event?.soundId !== a.soundId) return;
+        if (!a || !isCurrent(a) || a.requestId !== event?.requestId) return;
+        // N5b.1 Swift invalidated events deliberately contain only requestId
+        // and reason, no soundId. Route/media-reset must still pause Learn.
+        if (event.type === "invalidated") { interrupt(); return; }
+        if (event?.soundId !== a.soundId) return;
         if (event.type === "ended") {
           stopTimers(a);
           if (a.stage === "reference") {
