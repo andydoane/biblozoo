@@ -11973,6 +11973,14 @@ function handleNativeLearnListenEvent(event) {
 
 function listenPlay(resumeMode = "listen_ref", nativeResumeMs = 0) {
   if (document.hidden) return;
+  if (isNativeLearnListenMode() && muted) {
+    State.listenPlaying = false;
+    State.listenAutoFallbackReady = true;
+    State.audioMode = null;
+    nativeListenError = "Unmute to hear this verse.";
+    render();
+    return;
+  }
   const mode = resumeMode === "listen_verse" ? "listen_verse" : "listen_ref";
   learnAudioInterrupted = null;
   State.listenAutoStarting = false;
@@ -12260,6 +12268,8 @@ function runAfterSlide(fn, { timeoutMs = 2200, intervalMs = 50 } = {}) {
 }
 
 function goToListenAndStart() {
+  nativeListenCheckpoint = null;
+  nativeListenError = "";
   State.listenDone = false;
   State.listenAutoStarting = !isNativeLearnListenMode();
   State.listenAutoFallbackReady = isNativeLearnListenMode();
