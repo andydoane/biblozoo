@@ -1,5 +1,7 @@
 # N2.2 — Capture Native Feeding Sound Latency Without Screenshots
 
+> **N3a update (PR #24):** The original N2.2 report's `worker play()` column measured `AVAudioPlayer.play()` for all effects. N3a now uses **predecoded `AVAudioEngine` PCM scheduling** for star/chomp and retains native AVAudioPlayer only for pet unlock. The same copyable 80-event report now labels `worker call` and adds a final `backend` column (`avengine-pcm` or `avfoundation-player`). For PCM effects, dispatch means `AVAudioPlayerNode.scheduleBuffer()` returned, **not that the speaker produced sound**. The original N2.2 owner reports are historical and must not be compared as if the method measured were identical. See [N3a technical guide](N3-NATIVE-PCM-EFFECTS.md).
+
 > **Experimental `.audiotest` iOS app only.** [PR #23](https://github.com/andydoane/biblozoo/pull/23) targets `experiment/native-ios-audio` after merged [PR #22](https://github.com/andydoane/biblozoo/pull/22) (`07e91e3`). No stable iOS `ios-prep`, Web/PWA, Android or recording changes. See [living handoff §§9–10](PROJECT-HANDOFF.md) and [TESTING.md](TESTING.md).
 
 ## Why we added this
