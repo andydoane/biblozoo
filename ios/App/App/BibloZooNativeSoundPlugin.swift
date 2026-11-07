@@ -18,7 +18,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "activateFromGesture", returnType: CAPPluginReturnPromise),
         // Read-only, bounded native session history; never activates audio.
-        CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise),
+        // N2.2 one-tap user-initiated diagnostics. No logging to disk/network.
+        CAPPluginMethod(name: "copyTimingReport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "markRecentChompLate", returnType: CAPPluginReturnPromise)
     ]
 
     // All MP3s are checked-in project assets explicitly copied into the
@@ -42,6 +45,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private var lastNativePlayQueueMs = -1
     private var lastNativePlayCallMs = -1
     private var lastNativePlayedSoundId = "none"
+    // Bounded in-memory diagnostics. No pet/profile/verse, media audio,
+    // permissions, device identifiers or route names. Main thread only.
+    private let maxSoundTimingEvents = 80
+    private var soundTimingEvents: [[String: Any]] = []
+    private var timingEventSequence = 0
+    private var lateChompMarks = 0
     // Only a confirmed, current .began event blocks a fresh tap. iOS can
     // deliver delayed "wasSuspended" .began events on resume; those are
     // historical and must not latch the pilot into a permanent error.
@@ -184,6 +193,126 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         playbackEpochLock.lock()
         defer { playbackEpochLock.unlock() }
         return playbackEpoch == token
+    }
+
+    // Cross-bridge wall-clock times are approximate: JavaScript Date.now()
+    // and Swift Date share the device clock but may be affected by clock
+    // adjustments. Invalid/skewed values are reported as -1, not a real
+    // playback delay. Worker queue and play call time use monotonic uptime.
+    private func safeAgeMs(_ newer: Double, _ older: Double?) -> Int {
+        guard let older = older, older.isFinite, older > 0,
+              newer.isFinite else { return -1 }
+        let delta = newer - older
+        return delta >= 0 && delta <= 60000 ? Int(delta) : -1
+    }
+
+    private func optionalEpochMs(_ call: CAPPluginCall, key: String) -> Double? {
+        guard let value = call.getDouble(key), value.isFinite,
+              value > 1_500_000_000_000, value < 4_000_000_000_000 else { return nil }
+        return value
+    }
+
+    private func timingId(_ call: CAPPluginCall) -> String {
+        guard let value = call.getString("eventId"),
+              value.range(of: #"^(?:feed|dev)-[0-9]{1,10}$"#,
+                          options: .regularExpression) != nil else {
+            return "unlabeled"
+        }
+        return value
+    }
+
+    private func recordSoundTiming(_ event: [String: Any]) {
+        timingEventSequence += 1
+        var row = event
+        row["seq"] = timingEventSequence
+        row["markedLate"] = false
+        // Internal only, for "Mark recent chomp late" within 60 seconds.
+        row["recordedAtUptime"] = ProcessInfo.processInfo.systemUptime
+        soundTimingEvents.append(row)
+        if soundTimingEvents.count > maxSoundTimingEvents {
+            soundTimingEvents.removeFirst(soundTimingEvents.count - maxSoundTimingEvents)
+        }
+    }
+
+    private func timingReportText() -> String {
+        let appState = UIApplication.shared.applicationState == .active
+            ? "active" : "not-active"
+        var lines = [
+            "BibloZoo Audio Test | N2.2 Native Timing Report",
+            "Manually copied from DEV panel; no automatic upload.",
+            "App state: \(appState); interruption pending: \(interrupted); " +
+                "foreground epoch: \(foregroundEpoch); late chomp marks: \(lateChompMarks)",
+            "Rows: \(soundTimingEvents.count) of max \(maxSoundTimingEvents) " +
+                "(oldest first). -1 = unavailable/clock skew.",
+            "Collision/JS/bridge deltas use device wall time; queue/play use monotonic uptime.",
+            "Native dispatch = AVAudioPlayer.play() returned; NOT proof of speaker audibility.",
+            "seq | event | sound | result | collision->JS | JS->bridge | " +
+                "bridge->worker | worker play() | collision->native dispatch | marked late"
+        ]
+        var slow = 0
+        for row in soundTimingEvents {
+            func number(_ key: String) -> Int { row[key] as? Int ?? -1 }
+            func word(_ key: String) -> String { row[key] as? String ?? "unknown" }
+            let latency = number("collisionToNativeDispatchMs")
+            if latency >= 120 { slow += 1 }
+            lines.append([
+                String(number("seq")),
+                word("eventId"),
+                word("soundId"),
+                word("result"),
+                String(number("collisionToRequestMs")),
+                String(number("bridgeMs")),
+                String(number("queueMs")),
+                String(number("playCallMs")),
+                String(latency),
+                (row["markedLate"] as? Bool == true) ? "YES" : "no"
+            ].joined(separator: " | "))
+        }
+        lines.insert("Native dispatch >=120 ms: \(slow) records (diagnostic threshold, " +
+                     "not an audible-delay verdict).", at: 4)
+        return lines.joined(separator: "\n")
+    }
+
+    // Copy synchronously on the native main thread *after* the user's actual
+    // button tap. WKWebView clipboard permission or lost JS gesture cannot
+    // cause a misleading success message. Clipboard stays on the device
+    // until the user explicitly pastes it into a chat.
+    @objc func copyTimingReport(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["copied": false, "reason": "unavailable"]); return
+            }
+            guard UIApplication.shared.applicationState == .active else {
+                call.resolve(["copied": false, "reason": "not-foreground"]); return
+            }
+            UIPasteboard.general.string = self.timingReportText()
+            call.resolve(["copied": true, "count": self.soundTimingEvents.count,
+                          "lateChompMarks": self.lateChompMarks])
+        }
+    }
+
+    // Optional owner feedback, only if they can conveniently return to the
+    // panel within one minute. Marks the newest chomp, never fabricates a
+    // measured latency or alters playback. No personal content is stored.
+    @objc func markRecentChompLate(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["marked": false, "reason": "unavailable"]); return
+            }
+            let now = ProcessInfo.processInfo.systemUptime
+            guard let index = self.soundTimingEvents.lastIndex(where: {
+                ($0["soundId"] as? String) == "feed-chomp"
+            }), let stamped = self.soundTimingEvents[index]["recordedAtUptime"] as? Double,
+                now - stamped <= 60, now - stamped >= 0 else {
+                call.resolve(["marked": false, "reason": "no-recent-chomp"]); return
+            }
+            if self.soundTimingEvents[index]["markedLate"] as? Bool != true {
+                self.soundTimingEvents[index]["markedLate"] = true
+                self.lateChompMarks += 1
+            }
+            call.resolve(["marked": true,
+                          "seq": self.soundTimingEvents[index]["seq"] ?? 0])
+        }
     }
 
     private func forgetPlayback() {
@@ -417,7 +546,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 "lastNativePrepareMs": self.lastNativePrepareMs,
                 "lastNativePlayQueueMs": self.lastNativePlayQueueMs,
                 "lastNativePlayCallMs": self.lastNativePlayCallMs,
-                "lastNativePlayedSoundId": self.lastNativePlayedSoundId
+                "lastNativePlayedSoundId": self.lastNativePlayedSoundId,
+                "timingEventCount": self.soundTimingEvents.count,
+                "lateChompMarks": self.lateChompMarks
             ])
         }
     }
@@ -533,6 +664,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             let epoch = self.playbackEpochSnapshot()
             let enqueuedAt = ProcessInfo.processInfo.systemUptime
+            let receivedAtEpochMs = Date().timeIntervalSince1970 * 1000
+            let collisionAt = self.optionalEpochMs(call, key: "collisionEpochMs")
+            let requestedAt = self.optionalEpochMs(call, key: "requestEpochMs")
+            let eventId = self.timingId(call)
+            let bridgeMs = self.safeAgeMs(receivedAtEpochMs, requestedAt)
+            let collisionToRequestMs = self.safeAgeMs(
+                requestedAt ?? -1, collisionAt)
             self.playbackQueue.async { [weak self] in
                 guard let self = self else {
                     DispatchQueue.main.async {
@@ -560,9 +698,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 sound.currentTime = 0
                 sound.volume = Float(volume)
                 let started = sound.play()
+                let nativeDispatchEpochMs = Date().timeIntervalSince1970 * 1000
                 let playCallMs = max(0, Int(
                     (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
                 let durationMs = Int(sound.duration * 1000)
+                let collisionToNativeDispatchMs =
+                    self.safeAgeMs(nativeDispatchEpochMs, collisionAt)
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else {
                         call.resolve(["accepted": false, "reason": "unavailable"])
@@ -575,6 +716,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     self.lastNativePlayedSoundId = soundId
                     self.lastNativePlayQueueMs = queueMs
                     self.lastNativePlayCallMs = playCallMs
+                    self.recordSoundTiming([
+                        "eventId": eventId, "soundId": soundId,
+                        "result": started ? "started" : "play-denied",
+                        "collisionToRequestMs": collisionToRequestMs,
+                        "bridgeMs": bridgeMs, "queueMs": queueMs,
+                        "playCallMs": playCallMs,
+                        "collisionToNativeDispatchMs": collisionToNativeDispatchMs
+                    ])
                     // AVAudioPlayer.play returning true only means requested.
                     call.resolve([
                         "accepted": started,
