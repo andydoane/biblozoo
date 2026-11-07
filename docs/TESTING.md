@@ -65,6 +65,40 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### Stage C.2 — default-off native Feeding **Classic tester preview** (experiment-only)
+
+**Owner acceptance of merged [PR #13 / C.1](https://github.com/andydoane/biblozoo/pull/13):** The original pet-unlock and both **actual Feeding star/chomp MP3s** were audible on the iPhone through numerous rapid, consecutive presses and after task switches. User reports occasional first-launch Xcode-app lag that also occurred across earlier builds and went away after closing/relaunching; **this is an observation, not a proven C.1 audio bug or performance measurement**. Stage C.2 may proceed as an experiment, not as proof that a full Feeding game now works reliably.
+
+**What C.2 implements:** On the **separate BibloZoo Audio Test** iOS app, only in **Daily To-Do Preview → Feeding Game Tester → Classic**, the two-step Feeding intro shows a **DEV: Native star + chomp (off by default)** checkbox after choosing Tilt/Drag. Checking it is explicit per-preview consent, never saved to progress or reused for another game. The button and intro deliberately opt out of the global Web Audio UI pop to keep this comparison isolated. **Other modes (Labyrinth, Melody, Bounce), real Daily Feeding, the public app, web/PWA and Android remain web-only**. No app or iOS audio-session category/mode/activation changes.
+
+When the checkbox is ON, **Got It!** first calls the fixed-ID Capacitor plugin to preload *both* `feed-star` and `feed-chomp` with bounded deadlines. If plugin, interruption state or bundled sound is unavailable, **before gameplay starts** it chooses the normal web sounds instead; a small preview-only label says **Preview audio: Web (native unavailable)**. On success the label says **Preview audio: Native star/chomp** and only these two events use the native player. Classic's regular peg/collision tones remain Web Audio. The native play path never also dispatches a web/HTML MP3 for the same event. A failure **during** a native round does *not* silently change backends: the event stays silent and the label asks the tester to exit/retry. Gameplay score, timing, progress and earned rewards are unchanged.
+
+Native players stop on exit, finish, background and existing Feeding pause. Upon **explicit Resume** after switching away, the same activity-owned Web Audio clock recovery still runs; a native preview additionally must re-prepare **both** samples from that gesture before the original frozen round may continue. Neither `preload`, `play`, an advancing Web Audio clock nor a successful bridge result is proof of hardware audibility. The existing Zoo Escape recovery/exit remains available and does not award simulated points. The experiment may reveal remaining interactions between Web Audio collision tones and native effects; do not hide a genuine failure.
+
+After owner merges this PR **only into `experiment/native-ios-audio`**, in GitHub Desktop choose `biblozoo-native-audio` → Fetch Origin → Pull Origin, then in the VS Code terminal:
+
+```sh
+git branch --show-current                 # experiment/native-ios-audio
+node scripts/validate_native_sound_smoke_test.js
+node scripts/validate_native_feeding_preview_c2.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+Xcode: Build and Run the **BibloZoo Audio Test** App target on a physical iPhone, bundle ID `com.andydoane.biblozoo.audiotest`; do not overwrite the normal BibloZoo app. All C.1 MP3 resources are unchanged.
+
+**A/B acceptance on the same iPhone, same hardware volume, sound route, and mode:**
+
+1. Enter **Daily To-Do Preview → Feeding Game Tester → Classic → 1 or 2 question stars** to guarantee star pegs. Choose **Drag** initially. Leave the new native checkbox **OFF**, tap Got It, and catch snacks/hit star pegs. This is the untouched **Web** baseline, identified by the small status label.
+2. Exit preview and repeat the identical setup, this time **check DEV: Native star + chomp**, then Got It. Expect a bounded loading moment before the round, status **Native star/chomp**, distinct audible star/chomp samples on gameplay events, no doubled MP3s and no unexpected native sound at startup. Continue to catch multiple snacks. Ordinary collision tones still use Web Audio; do not confuse those with native star/chomp.
+3. Repeat a few Classic previews to compare lag/latency. Observe whether a first-launch lag appears **in both Web and Native runs** before attributing it to the native pilot. Test silent switch deliberately; `.soloAmbient` may mute audio normally.
+4. During an **opted-in native** round, switch to another app and back. The round should remain frozen and present the existing Welcome Back / Zoo Escape process, **not** resume by itself. Press the real Resume control: Web Audio's established recovery *and* native re-preparation must succeed before the same game continues. Listen for new star/chomp effects (never stale/replayed ones). If native preflight fails, the overlay must let you retry or exit—no web backend flip, no lost daily progress.
+5. Try an error scenario only if it occurs naturally: if label says **Web (native unavailable)**, the fallback happened **before** start and the round should still make normal web effects. If **Native effect failed**, note the event, label and device state; exit the preview instead of relying on a silent mid-round replacement. Testing the DEV preview must not award actual Daily To-Do completion or second prizes.
+6. Confirm **real Daily Feeding** and tester **Labyrinth, Melody and Bounce** behave as before, without any opt-in controls; exiting or backgrounding a preview must not leave stale native voices.
+
+**Source/CI regression:** `scripts/validate_native_feeding_preview_c2.js` tests missing plugin, invalid IDs/volume, timeout, dual preload, late/stale responses, one backend per effect, native failures, web fallback before round, and preview-only UI. It is experiment-only in GitHub CI alongside existing Feeding/Zoo Escape tests. **Linux CI cannot compile Xcode, reproduce the iOS interruption sequence, or verify actual sound, reward persistence or first-launch performance.** Report audible quality and exact label/status if something fails; keep this experiment isolated until iPhone acceptance is reported.
+
 ### Stage C.1 — independent native Feeding sample preparation (experiment-only)
 
 **Gate for starting C.1:** Following merged [PR #12](https://github.com/andydoane/biblozoo/pull/12), the owner reports **five consecutive native-only pet-unlock taps were all audible in one foreground session** and native sound also played through tested app-switch returns. The DEV test suppresses the normal Web Audio UI pop. The native readout may show a pending, unmatched interruption `.began` after a switch (`began=2`, `ended=1`), but a notification count does not prove the speaker is silent; do not ignore an actual rejected native request. There is no claim the iOS interruption-reporting edge case is completely understood.
