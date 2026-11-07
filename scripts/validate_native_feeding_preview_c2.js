@@ -325,9 +325,9 @@ async function main() {
     changed();
     assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
       /web effects selected/i);
-    assert.match(FEED, /runtime\\.nativePilotCheckbox\\.removeEventListener\\(\\s*"change"/,
+    assert.match(FEED, /runtime\.nativePilotCheckbox\.removeEventListener\(\s*"change"/,
       "change listener must detach on Feeding exit");
-    assert.match(FEED, /runtime\\.nativePilotCheckbox\\.disabled = true/,
+    assert.match(FEED, /runtime\.nativePilotCheckbox\.disabled = true/,
       "checkbox must not change in the middle of async preflight");
   }
 
