@@ -49,6 +49,7 @@
     panel.style.cssText =
       "position:fixed;top:calc(env(safe-area-inset-top, 0px) + 8px);right:8px;" +
       "z-index:12000;box-sizing:border-box;max-width:min(235px,70vw);" +
+      "max-height:min(72vh,560px);overflow-y:auto;" +
       "padding:9px;border:2px solid #235a66;border-radius:12px;" +
       "background:#f5fcff;color:#122c34;font:14px/1.3 sans-serif;" +
       "box-shadow:0 2px 8px rgba(0,0,0,.35);";
@@ -112,6 +113,41 @@
     panel.appendChild(status);
     panel.appendChild(inspect);
     panel.appendChild(detail);
+
+    // N2.2: NO report recording/upload or clipboard read on load. The native
+    // plugin keeps a fixed-schema last-80-event in-memory ring. User taps
+    // Copy only after playing; Swift writes text to the iOS clipboard.
+    const timingPanel = doc.createElement("div");
+    timingPanel.style.cssText =
+      "border-top:1px solid #a6cbd5;margin-top:7px;padding-top:7px;";
+    const timingTitle = doc.createElement("strong");
+    timingTitle.textContent = "DEV · Audio Timing";
+    const timingHelp = doc.createElement("p");
+    timingHelp.textContent =
+      "Play normally, then copy the last 80 sounds to paste into chat. No screenshots.";
+    timingHelp.style.cssText = "font:11px/1.3 sans-serif;margin:4px 0;";
+    const copyTiming = doc.createElement("button");
+    copyTiming.type = "button";
+    copyTiming.textContent = "Copy Audio Timing Report";
+    copyTiming.setAttribute("aria-label", "Copy recent native audio timing report");
+    copyTiming.style.cssText =
+      "width:100%;min-height:40px;border-radius:8px;font:600 12px sans-serif;";
+    const markLate = doc.createElement("button");
+    markLate.type = "button";
+    markLate.textContent = "Mark last chomp late (optional)";
+    markLate.style.cssText =
+      "width:100%;min-height:34px;margin-top:4px;border-radius:7px;font:11px sans-serif;";
+    const reportStatus = doc.createElement("p");
+    reportStatus.setAttribute("role", "status");
+    reportStatus.setAttribute("aria-live", "polite");
+    reportStatus.style.cssText = "font:11px/1.3 sans-serif;margin:4px 0 0;";
+    reportStatus.textContent = "Report stays on this iPhone until you choose to copy it.";
+    timingPanel.appendChild(timingTitle);
+    timingPanel.appendChild(timingHelp);
+    timingPanel.appendChild(copyTiming);
+    timingPanel.appendChild(markLate);
+    timingPanel.appendChild(reportStatus);
+    panel.appendChild(timingPanel);
     doc.body.appendChild(panel);
 
     let epoch = 0;
@@ -168,6 +204,48 @@
         if (!dismissed && !doc.hidden) detail.textContent = "Native state read failed or timed out.";
       }
     }
+    copyTiming.addEventListener("click", async () => {
+      const api = plugin();
+      if (typeof api?.copyTimingReport !== "function") {
+        reportStatus.textContent = "Native report bridge missing. Rebuild the test app.";
+        return;
+      }
+      copyTiming.disabled = true;
+      reportStatus.textContent = "Copying recent native timings…";
+      try {
+        const result = await bounded(api.copyTimingReport());
+        if (dismissed) return;
+        reportStatus.textContent = result?.copied === true
+          ? "Copied " + count(result.count) + " sounds! Paste into ChatGPT when ready."
+          : "Not copied: " + safeReason(result?.reason);
+      } catch (_) {
+        if (!dismissed) reportStatus.textContent = "Copy failed. Try again.";
+      } finally {
+        copyTiming.disabled = false;
+      }
+    });
+
+    markLate.addEventListener("click", async () => {
+      const api = plugin();
+      if (typeof api?.markRecentChompLate !== "function") {
+        reportStatus.textContent = "Native late-sound marker unavailable. Rebuild app.";
+        return;
+      }
+      markLate.disabled = true;
+      try {
+        const result = await bounded(api.markRecentChompLate());
+        if (dismissed) return;
+        reportStatus.textContent = result?.marked === true
+          ? "Most recent chomp flagged late (#" + count(result.seq) +
+            "). Copy report when finished."
+          : "No chomp played in the last minute. You can still copy the report.";
+      } catch (_) {
+        if (!dismissed) reportStatus.textContent = "Marker failed; report remains available.";
+      } finally {
+        markLate.disabled = false;
+      }
+    });
+
     // The browser ignores event-return values; returning the Promise also
     // lets the Node VM regression await this read-only status inspection.
     inspect.addEventListener("click", () => inspectNativeState());
