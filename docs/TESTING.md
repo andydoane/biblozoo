@@ -6,7 +6,7 @@
 
 1. Before work, check current `ios-prep` HEAD, latest commits, open PRs and owner instructions. Local uncommitted changes are **not** visible to GitHub; have the owner push relevant work first when necessary.
 2. Branch from latest `ios-prep`, **not `main`**. Make focused edits with tests and an update to [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md) **in the same PR**. Update this guide/audio guide if contracts change.
-3. Open a PR with **base `ios-prep`**; draft while incomplete. Include risk, changed behavior, exact validators run, their results, and what needs the iPhone.
+3. Open a PR with **base `ios-prep`** for ordinary development, or **base `experiment/native-ios-audio`** for the isolated native-audio experiment. Draft while incomplete. Include risk, changed behavior, exact validators run, their results, and what needs the iPhone.
 4. Inspect the PR diff and available Actions status on the **final commit**. If checks don't exist, don't imply they ran. A docs-only PR need not alter runtime code or bump an app version.
 5. **The owner reviews and merges**; the assistant does not merge or push directly to `ios-prep` unless separately instructed.
 6. In GitHub Desktop: switch to `ios-prep` → **Fetch Origin / Pull Origin**. Build, sync, run on iPhone, and report failures; address those in a focused follow-up PR.
@@ -26,7 +26,7 @@ npx cap sync ios                   # copies dist/ and syncs Capacitor project
 npx cap open ios                   # then build/run App target in Xcode
 ```
 
-Capacitor config is `capacitor.config.json`, application ID `com.andydoane.biblozoo`, web directory `dist`. A successful `npm run build` doesn't prove native playback or layout is correct. The native iOS bundle uses copied assets; the web/PWA separately uses `service-worker.js` caching. Check both if offline behavior changes.
+On `ios-prep`, Capacitor config is `capacitor.config.json`, application ID `com.andydoane.biblozoo`, web directory `dist`. The isolated native-audio experiment instead uses `com.andydoane.biblozoo.audiotest` after the experimental identity PR is merged. A successful `npm run build` doesn't prove native playback or layout is correct. The native iOS bundle uses copied assets; the web/PWA separately uses `service-worker.js` caching. Check both if offline behavior changes.
 
 Do not commit `dist/` or `node_modules/` (both ignored). After changing runtime assets, regenerate `dist/` **before** syncing; avoid interpreting stale bundled files as a code regression.
 
@@ -35,6 +35,35 @@ Do not commit `dist/` or `node_modules/` (both ignored). After changing runtime 
 The repository already declares `*.js`, `*.css`, `*.html`, `*.json`, `*.md` and `*.txt` as `text eol=lf` in `.gitattributes`. However, the `ios-prep` base at `f4a80c35` still contained 20 JSON files and `verse_playground/ghost_writer/game.css` as CRLF *committed blobs*. A fresh macOS worktree therefore reported 21 modified files immediately. `git ls-files --eol -- <path>` showed `i/crlf w/crlf attr/text eol=lf` even though `git --no-pager diff --ignore-space-at-eol --stat 2>/dev/null` produced no meaningful diff. This is not a source-data change, and changing `core.autocrlf` or repeatedly clicking Discard does not fix the inconsistent index blobs.
 
 The focused `fix/normalize-lf-tracked-text` PR changes only CRLF to LF and adds a Node check of the **committed blob bytes** as well as the checked-out file bytes. After the owner merges it into `ios-prep`, an existing `experiment/native-ios-audio` branch must also be advanced; **Fetch Origin by itself does not move the local branch**. For the specific freshly created experiment branch, only if there are no valuable local edits or separate commits, verify the expected line-ending-only diff, then fetch the merged baseline and run `git reset --hard origin/ios-prep` **inside the experimental worktree**, check `git status --short` and `git ls-files --eol`, and push the updated experiment branch. That reset deliberately discards *all* uncommitted tracked-file changes and resets the branch pointer: never run it if the experiment already contains independent work. Prefer a normal merge or a separate PR to sync a branch containing work.
+
+### Isolated native-audio experiment — Mac/Xcode smoke check
+
+The `experiment/native-ios-audio` branch has a dedicated macOS worktree (`biblozoo-native-audio`). Its **test app identity must be different from the existing installed BibloZoo app**:
+
+| Property | Stable `ios-prep` | Native-audio experiment |
+| --- | --- | --- |
+| App label | BibloZoo | BibloZoo Audio Test |
+| Capacitor `appId` | `com.andydoane.biblozoo` | `com.andydoane.biblozoo.audiotest` |
+| Xcode Debug + Release `PRODUCT_BUNDLE_IDENTIFIER` | `com.andydoane.biblozoo` | `com.andydoane.biblozoo.audiotest` |
+| Info.plist `CFBundleDisplayName` | BibloZoo | BibloZoo Audio Test |
+
+After the experiment-specific setup PR is **merged into `experiment/native-ios-audio`**, switch to that worktree in GitHub Desktop, Fetch/Pull Origin, and in **that folder** use:
+
+```sh
+git branch --show-current            # experiment/native-ios-audio
+git status --short                   # should be clean before syncing
+npm ci                               # if new worktree dependencies not yet installed
+node scripts/validate_native_audio_test_identity.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+In Xcode, select the **App** target, open **Signing & Capabilities**, confirm the **Bundle Identifier** ends in `.audiotest`, select the owner's valid Apple development **Team**, and enable **Automatically manage signing** as needed. The existing project's team setting has deliberately *not* been changed in source. Select the physical iPhone as the run destination, then Build/Run and confirm **BibloZoo** and **BibloZoo Audio Test** appear as separate apps. Do **not** run/install a test build if Xcode still shows `com.andydoane.biblozoo`; that identifier could replace the existing app. Export a family backup first, and don't assume existing profiles/progress carry over to the separate bundle ID. The test icon currently shares artwork with the normal app—read the home-screen labels.
+
+The setup PR changes **only identity**, not native playback. Check a normal verse/game and ordinary sound, plus basic foreground/background behavior before adding experimental audio code. No native app compile or on-device signing can be validated by web/Node CI.
+
+The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
 ## 3. Existing automated validation commands
 
@@ -80,6 +109,9 @@ node scripts/validate_verse_launch_menu_pause.js
 
 # Committed LF source and consistent macOS worktrees
 node scripts/validate_tracked_lf_endings.js
+
+# Experimental iOS app identity (only on the native-audio experiment branch)
+node scripts/validate_native_audio_test_identity.js
 ```
 
 This is a **starting selection, not every validator**. There are many historical `scripts/validate_*.js` programs. Choose the suites appropriate to the change, and run broader recovery/regression coverage for shared code. Record precise failures; don't label a failing old test “outdated” without investigating it. Check for actual missing runtime assets versus broken code.
