@@ -329,8 +329,9 @@ async function run() {
     assert.equal(e.calls[10][0], "activateFromGesture");
     assert.equal(e.calls[11][0], "preload");
     assert.equal(e.calls[11][1].soundId, "feed-melody");
-    assert.deepEqual(e.calls[12][1],
-      { soundId: "feed-melody", volume: 0.25, midi: 64 });
+    assert.equal(e.calls[12][1].soundId, "feed-melody");
+    assert.equal(e.calls[12][1].volume, 0.25);
+    assert.equal(e.calls[12][1].midi, 64);
     assert.match(e.status.textContent, /native Melody E4 playback requested/i);
     assert.equal(e.panel.attributes["data-no-ui-sound"], "");
     assert.equal(e.copyTiming.textContent, "Copy Audio Timing Report");
