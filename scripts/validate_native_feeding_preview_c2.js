@@ -164,7 +164,7 @@ async function main() {
     assert.deepEqual(a.calls,[],"creating the pilot must not autoplay or prepare");
     assert.deepEqual(plain(await pilot.prepare()),{ready:true,reason:"prepared"});
     assert.deepEqual(a.calls,[["activateFromGesture","feeding"],
-      ["preload","feed-star"],["preload","feed-chomp"]]);
+      ["preload","feed-star"],["preload","feed-chomp"],["preload","feed-peg"]]);
     assert.equal(pilot.isReady(),true);
     assert.equal(pilot.play("feed-star",0.78),true);
     assert.equal(pilot.play("feed-chomp",0.85),true);
@@ -172,10 +172,10 @@ async function main() {
     assert.equal(pilot.play("feed-star",NaN),false);
     assert.equal(pilot.play("feed-chomp",1.5),false);
     await Promise.resolve();
-    assert.deepEqual(a.calls.slice(3),[["play","feed-star",0.78],["play","feed-chomp",0.85]]);
+    assert.deepEqual(a.calls.slice(4),[["play","feed-star",0.78],["play","feed-chomp",0.85]]);
     pilot.stop();
     assert.equal(pilot.isReady(),false);
-    assert.deepEqual(a.calls.slice(-2),[["stop","feed-star"],["stop","feed-chomp"]]);
+    assert.deepEqual(a.calls.slice(-3),[["stop","feed-star"],["stop","feed-chomp"],["stop","feed-peg"]]);
     assert.equal(pilot.play("feed-star",0.78),false,"paused players cannot emit effects");
     current=false;
     assert.deepEqual(plain(await pilot.prepare()),{ready:false,reason:"stale"});
@@ -202,7 +202,7 @@ async function main() {
     assert.equal(preloads,0);
     assert.equal(plays,0);
     assert.deepEqual(plain(await pilot.prepare()),{ready:true,reason:"prepared"});
-    assert.equal(preloads,2);
+    assert.equal(preloads,3);
     assert.equal(calls,2,"only explicit prepares may request native activation");
   }
   {
@@ -227,7 +227,7 @@ async function main() {
     const result=await p.prepare();
     assert.deepEqual(plain(result),{ready:false,reason:"bundled-asset-missing"});
     assert.equal(p.play("feed-star",0.78),false);
-    assert.ok(calls.includes("stop:feed-star")&&calls.includes("stop:feed-chomp"));
+    assert.ok(calls.includes("stop:feed-star")&&calls.includes("stop:feed-chomp")&&calls.includes("stop:feed-peg"));
     assert.ok(!calls.includes("play"));
   }
   {
@@ -651,30 +651,57 @@ async function main() {
     assert.equal(stops,1);
   }
   {
-    // Real Classic non-star pegs generate Web Audio beeps. Isolate only the
-    // opted-in native preview; preserve default Web and paused Zoo Escape.
+    // Native-only Classic must now emit a fixed-ID native peg note (not a
+    // Web oscillator), with the original cooldown/repeated-pitch avoidance.
+    // Web Classic keeps its exact old oscillator; other Native modes remain
+    // silent until separately migrated.
     const h = feedHarness();
     let webBeepAttempts = 0;
+    const nativePegs = [];
     const r = {
       mode: "classic", nativePilotBackend: "native",
       feedPausedAt: null, lastPegSoundAt: 0, lastPegNoteIndex: -1,
+      nativePilot: {
+        isReady: () => true,
+        play: (...args) => {nativePegs.push(args); return true;}
+      },
       audioContext: {
         state: "running", currentTime: 12,
         createOscillator() { webBeepAttempts++; throw Error("instrumented"); }
       }
     };
     h.hooks.peg(r, 1000);
+    assert.equal(nativePegs.length, 1);
+    assert.equal(nativePegs[0][0], "feed-peg");
+    assert.equal(nativePegs[0][1], 0.20);
+    assert.ok(Number.isInteger(nativePegs[0][3]) &&
+      nativePegs[0][3] >= 0 && nativePegs[0][3] < 6);
+    h.hooks.peg(r, 1020);
+    assert.equal(nativePegs.length, 1, "Native peg tone retains 55ms cooldown");
+    h.hooks.peg(r, 1060);
+    assert.equal(nativePegs.length, 2);
+    assert.notEqual(nativePegs[0][3], nativePegs[1][3],
+      "Native pegs must not immediately repeat the same note");
     assert.equal(webBeepAttempts, 0,
-      "opted-in native Classic must make no Web oscillator collision beeps");
+      "Native Classic must never create a Web oscillator");
     r.nativePilotBackend = "web";
+    r.lastPegSoundAt = 0;
     h.hooks.peg(r, 1000);
     assert.equal(webBeepAttempts, 1,
-      "unchecked Web Classic must retain its original synthesized pegs");
+      "Web Classic still uses its original oscillator");
     r.nativePilotBackend = "native";
     r.feedPausedAt = 1500;
+    r.nativePilot.isReady = () => false;
     h.hooks.peg(r, 2000);
+    assert.equal(nativePegs.length, 2,
+      "Paused/unprepared native peg cannot enqueue more sounds");
     assert.equal(webBeepAttempts, 1,
-      "Native-only tester must not make Web sounds even while paused");
+      "Never create Web audio while Native is paused");
+    r.mode = "labyrinth";
+    r.nativePilot.isReady = () => true;
+    h.hooks.peg(r, 3000);
+    assert.equal(nativePegs.length, 2,
+      "Other Native modes must not silently inherit Classic tones");
   }
   // Source contract for the experiment: nothing in the Native branch can
   // reopen the very Web audio context whose clock failures blocked C.2c.
