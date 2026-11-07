@@ -1,5 +1,7 @@
 # N3a — Predecoded Native PCM Star/Chomp Effects
 
+> **Owner accepted N3a on iPhone after merged [PR #24](https://github.com/andydoane/biblozoo/pull/24) (`d49919bc`):** 13 genuine Feeding events all scheduled via `avengine-pcm` within **1–5ms** collision→native dispatch (0ms queue wait), no >=120ms events; star/chomp audible and noticeably more responsive. Owner switched apps, returned and resumed the game with sound, but the button briefly displayed **“Try again!”** during normal preparation. **N3b [PR #25](https://github.com/andydoane/biblozoo/pull/25)** extends this engine with Classic-only native peg notes and bounded voice pools and corrects that label; see [N3b guide](N3B-NATIVE-PEG-VOICES.md). N3a's single-voice-per-sound detail below is historical, not the proposed N3b design. Acoustic onset isn't measured by scheduleBuffer return.
+
 > Isolated iOS `BibloZoo Audio Test` only; experimental [PR #24](https://github.com/andydoane/biblozoo/pull/24) targets `experiment/native-ios-audio`. Not a new engine for the web, PWA, Android or stable `ios-prep`. The original BibloZoo installation, sessions, pet profiles, recording data and rewards must remain intact.
 
 ## Why this slice

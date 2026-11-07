@@ -1641,12 +1641,17 @@
   }
 
   function playPegTone(runtime, now) {
-    // Native-only Classic does not emit a Web oscillator, even while paused.
-    // Peg tones have not yet been migrated and are intentionally silent.
-    if (runtime.nativePilotBackend === "native" &&
-        runtime.mode === FEED_MODES.CLASSIC) return;
+    // Native-only Classic now uses six prewarmed Swift PCM sine notes,
+    // never a Web oscillator. Other unported native modes stay silent.
+    const nativeClassic = runtime.nativePilotBackend === "native" &&
+      runtime.mode === FEED_MODES.CLASSIC;
+    if (runtime.nativePilotBackend === "native" && !nativeClassic) return;
     const context = runtime.audioContext;
-    if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
+    if (nativeClassic) {
+      if (runtime.nativePilot?.isReady?.() !== true ||
+          now - runtime.lastPegSoundAt < 55) return;
+    } else if (!context || context.state !== "running" ||
+               now - runtime.lastPegSoundAt < 55) return;
 
     let noteIndex = Math.floor(Math.random() * PEG_NOTE_FREQUENCIES.length);
     if (noteIndex === runtime.lastPegNoteIndex) {
@@ -1654,6 +1659,14 @@
     }
     runtime.lastPegNoteIndex = noteIndex;
     runtime.lastPegSoundAt = now;
+
+    if (nativeClassic) {
+      // Reuse the same per-hit event metadata as star/chomp. The note
+      // index is a bounded allowlisted pitch, not an oscillator frequency.
+      runtime.nativePilot?.play("feed-peg",
+        feedingSoundVolume(FEED_COLLISION_TONE_VOLUME), Date.now(), noteIndex);
+      return;
+    }
 
     try {
       const oscillator = context.createOscillator();
@@ -3280,8 +3293,17 @@
       runtime.resumeStatus.textContent = message;
       runtime.resumeStatus.hidden = !message;
     }
-    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay, { retry: !!message, busy: !!runtime.feedResumePending });
-    if (!window.BibloZooWelcomeBack && runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try again!" : "Let's go!";
+    // "Preparing native sounds..." is progress, not an error. Keep the
+    // button's Let's go! label while disabled; show Try again! only when
+    // native preparation actually fails and the user can retry.
+    const nativePreparing = runtime.nativePilotBackend === "native" &&
+      runtime.feedResumePending === true;
+    const retry = !!message && !nativePreparing;
+    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay,
+      { retry, busy: !!runtime.feedResumePending });
+    if (!window.BibloZooWelcomeBack && runtime.resumeButton) {
+      runtime.resumeButton.textContent = retry ? "Try again!" : "Let's go!";
+    }
   }
 
   // Developer-only manual test. Simulated outcomes replace ONLY the Feeding

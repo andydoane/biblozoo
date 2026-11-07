@@ -51,7 +51,7 @@ for (const method of ["preload", "play", "stop", "getDebugState",
   assert.match(swift, new RegExp('CAPPluginMethod\\(name: "' + method + '"'));
   assert.match(swift, new RegExp('@objc func ' + method + '\\('));
 }
-assert.match(swift, /Bundle\.main\.url\(forResource: resourceName, withExtension: "mp3"\)/);
+assert.match(swift, /Bundle\.main\.url\(\s*forResource: resourceName, withExtension: "mp3"\)/);
 assert.match(swift, /\.soloAmbient/);
 assert.match(swift, /UIApplication\.willResignActiveNotification/);
 assert.match(swift, /AVAudioSession\.interruptionNotification/);

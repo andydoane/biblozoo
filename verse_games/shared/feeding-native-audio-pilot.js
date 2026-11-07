@@ -1,11 +1,12 @@
-/* N2 — Native-only Classic Feeding preview, isolated iOS test app.
- * The real Got It!/Resume gesture requests the Swift native-only session
- * coordinator once, then prepares the allowlisted AVAudioPlayer clips.
+/* N3b — Native-only Classic Feeding in isolated iOS Audio Test.
+ * Got It!/Resume prepares fixed PCM star/chomp and six native peg tones
+ * in a warmed native AVAudioEngine (DEV unlock stays AVAudioPlayer).
  * No Web fallback, automatic playback, or "accepted means audible" claim. */
 (function installFeedingNativeAudioPilot(root) {
   "use strict";
 
-  const IDS = Object.freeze(["feed-star", "feed-chomp"]);
+  const IDS = Object.freeze(["feed-star", "feed-chomp", "feed-peg"]);
+  const PEG_NOTE_COUNT = 6;
   const PREFLIGHT_TIMEOUT_MS = 1500;
   const PLAY_TIMEOUT_MS = 1800;
 
@@ -142,9 +143,12 @@
       return { ready: true, reason: "prepared" };
     }
 
-    function play(soundId, volume, collisionEpochMs) {
+    function play(soundId, volume, collisionEpochMs, noteIndex) {
       if (!IDS.includes(soundId) || !Number.isFinite(volume) ||
           volume < 0 || volume > 1 || !ready || failed) return false;
+      if (soundId === "feed-peg" &&
+          (!Number.isInteger(noteIndex) ||
+           noteIndex < 0 || noteIndex >= PEG_NOTE_COUNT)) return false;
       const token = generation;
       if (!current(token)) return false;
       const api = bridge();
@@ -161,9 +165,12 @@
         const validCollision = Number.isFinite(collisionEpochMs) &&
           collisionEpochMs > 0 && collisionEpochMs <= requestEpochMs;
         const timing = validCollision ? { collisionEpochMs } : {};
+        // The note number is a closed 0–5 mapping to Swift's fixed six
+        // frequencies. No user-supplied oscillator/asset is ever accepted.
+        const note = soundId === "feed-peg" ? { noteIndex } : {};
         // Fire exactly once. Never queue a Web/HTML fallback.
         void bounded(api.play({
-          soundId, volume, eventId, requestEpochMs, ...timing
+          soundId, volume, eventId, requestEpochMs, ...timing, ...note
         }), PLAY_TIMEOUT_MS).then(
           result => {
             if (!current(token)) return;
