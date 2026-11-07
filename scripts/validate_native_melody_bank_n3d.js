@@ -69,7 +69,6 @@ assert.match(game,/session\.dailyTodoPreview === true && mode === FEED_MODES\.CL
   "Classic preview selection must remain intact in N4a");
 assert.match(game,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH\]\.includes\(mode\)/,
   "N4b must preserve the native Melody route while adding Labyrinth on isolated iOS");
-  "actual Melody native routing must remain isolated to .audiotest");
 assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/,
   "Classic pilot remains unaffected by DEV Melody bank");
 assert.match(workflow,/node scripts\/validate_native_melody_bank_n3d\.js/);
