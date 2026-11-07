@@ -1137,6 +1137,11 @@
           runtime.startOverlayHandler
         );
       }
+      if (runtime.nativePilotCheckbox && runtime.nativePilotChangeHandler) {
+        runtime.nativePilotCheckbox.removeEventListener(
+          "change", runtime.nativePilotChangeHandler
+        );
+      }
 
       if (runtime.resumeButton && runtime.resumeButtonHandler) {
         runtime.resumeButton.removeEventListener("click", runtime.resumeButtonHandler);
@@ -4797,6 +4802,7 @@
     });
     runtime.nativePilotChoicePending = true;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = true;
+    if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
     if (runtime.nativePilotChoiceStatus) {
       runtime.nativePilotChoiceStatus.textContent = "Checking both native sounds…";
     }
@@ -4809,10 +4815,12 @@
       pilot?.stop?.();
       runtime.nativePilotChoicePending = false;
       if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+      if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
       return;
     }
     runtime.nativePilotChoicePending = false;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+    if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
     if (result?.ready === true && pilot) {
       runtime.nativePilot = pilot;
       runtime.nativePilotBackend = "native";
@@ -5321,6 +5329,7 @@
       nativePilot: null,
       nativePilotBackend: "web",
       nativePilotChoicePending: false,
+      nativePilotChangeHandler: null,
       requestedMode,
       earnedStarPegCount,
       requestedMelodyId:
