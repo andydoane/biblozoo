@@ -65,11 +65,41 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N4a.1 — stop Feeding in the iPhone App Switcher (PR #29; owner device test pending)
+### N4b — native Labyrinth landings/catches and same-round Resume (PR #30; iPhone pending)
+
+**Actual owner acceptance of preceding [PR #29](https://github.com/andydoane/biblozoo/pull/29), merged `ee7cbae6`:** The iOS App Switcher **swipe-up-and-hold** issue is fixed on physical iPhone: the moment the user swipes up, the game **pauses** and **Welcome Back is already visible in its thumbnail**. The owner reports native audio **recovered as expected on both test returns**. Previous Melody live catches and Classic ordinary/full-task-switch audio were also owner accepted. This is **not** a N4b Labyrinth hearing pass. The exact gesture was never confirmed on older stable `ios-prep` and this PR leaves that branch untouched.
+
+**N4b [PR #30](https://github.com/andydoane/biblozoo/pull/30)** adds Labyrinth as the next N4 native-only Feeding mode. The **existing** platform impact uses `playPegTone`, which now sends Classic's six prewarmed fixed `feed-peg` sine notes in Labyrinth too; both the game-level **135ms per-ball hard-impact gate** and **55ms peg-tone cooldown**, anti-repeat and volume remain. **Chomp** for caught snacks and star bonuses reuse already-native `feed-chomp`/`feed-star`. Got It! prepares exactly those three fixed native IDs, and refuses to start a known silent round on failure (Try Again/Back). Existing mode-specific Melody retains only `feed-melody`, Classic remains separate, **Bounce still unmigrated**. On App Switcher inactive or full background, the activity-owned pause and explicit Let's go! preflight keep Labyrinth score/ball positions/time, without auto-play or Web/HTML fallback. Web/PWA/Android and original stable app unchanged.
+
+**After owner review/merge**, in the separate `biblozoo-native-audio` worktree Fetch/Pull `experiment/native-ios-audio` and:
+
+```sh
+node scripts/validate_native_labyrinth_gameplay_n4b.js
+node scripts/validate_native_feeding_preview_c2.js
+node scripts/validate_native_melody_gameplay_n4a.js
+node scripts/validate_native_app_switcher_pause_n4a1.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build `BibloZoo Audio Test` on physical iPhone (Node/production web CI cannot compile Swift or hear native output).
+
+1. **Labyrinth first tap:** Choose Labyrinth Tilt/Drag; Got It! must prepare native tones. On **actual hard platform landings**, short pleasant peg tones should sound. Resting/sliding contacts must not chirp continuously. Catches should sound chomp; bonuses if they occur use star. Same moving platforms/gaps, ball speeds, snack/pet physics, score, reward logic, feedback and Back.
+2. **iPhone App Switcher cards:** Swipe UP and HOLD mid-Labyrinth. Observe frozen balls, **Welcome Back visible in thumbnail** without selecting another app. Tap own BibloZoo card and then **Let's go!**. The **same** Labyrinth score, positions and clock should continue with native impact/chomp audio; never auto-play on return. Also verify full switch to YouTube/Facebook and Back.
+3. **Classic/Melody regression:** Classic still hears pleasant pegs/star/chomp and holds scores across the switcher. Melody still hears actual caught notes and holds tune/Caught % across both gestures. Bounce still silent for intentionally-unmigrated native effects, never Web/HTML fallback.
+4. **Failure diagnosis:** Failed native preflight leaves Instructions and **Try Again**, not a knowingly silent round. If the first run, landing, or return is silent, tap DEV → **Copy Audio Timing Report BEFORE restarting**; paste 80 event rows + 18 preflight outcomes, and state what the speaker actually did. `scheduled` or 1–3ms native dispatch is software evidence, not proof of audibility.
+
+**Gates:** VM/source tests for N4b and prior N4a.1; final GitHub Node regression/production web build; **separate owner Xcode Swift compile + human-heard Labyrinth impacts/catches and App Switcher recovery**. N4c Bounce only after Labyrinth device gate. Detailed [N4b owner protocol](N4B-NATIVE-LABYRINTH-FEEDING.md), [Audio recovery](AUDIO-RECOVERY.md), [living handoff](PROJECT-HANDOFF.md).
+
+---
+
+### N4a.1 — stop Feeding in the iPhone App Switcher (PR #29 merged; owner App Switcher pause and two audio recoveries passed)
 
 **Owner's newest physical iPhone finding after owner-merged [N4a #28](https://github.com/andydoane/biblozoo/pull/28), merge `436c3c26`:** Actual Melody gameplay sound **worked as intended**, and a **full task switch into another app and back** recovered sound with the existing **Let's go!** button. Classic also worked after that full app switch. However, **swiping up and holding** to view the iOS **App Switcher cards**, **without opening another app**, seems to allow **both Classic and Melody** to continue running while native sound is stopped. Immediately tapping the *same BibloZoo card* does **not** display Welcome Back, and the continuing round is silent with no obvious recovery. This is a different gesture from the previously passing full background-switch path. Owner did **not** perform this exact gesture on stable `ios-prep`, whose JavaScript source also listens for `visibilitychange/pagehide` only; **stable physical behavior is unknown**. Do not infer a Melody-only regression or definite stable bug.
 
-**[PR #29](https://github.com/andydoane/biblozoo/pull/29) N4a.1** is an experiment-only **inactive-vs-background lifecycle fix**. Existing Swift `UIApplication.willResignActiveNotification` already invalidates native voices when the switcher opens; now Swift also emits a fixed `biblozooAppLifecycle` state-only plugin event on inactive and resumed-active (the latter catches delayed WebKit delivery). **Native-only Classic and Melody** Feeding runtimes subscribe, call their *existing* `pauseFeedingGame` for either event, cancel current rAF, preserve original score/song/balls and show Welcome Back; no automatic reactivation. `window.blur/focus` supplement the native signal for the card case where `document.hidden=false`. A second inactivity while a Resume preflight is pending invalidates its gesture generation, so only a **new real tap** may re-prepare. The plugin callback and focus/blur handlers are removed on game exit, including delayed listener registrations. No Web/HTML fallback or audio-session policy change.
+**[PR #29](https://github.com/andydoane/biblozoo/pull/29) N4a.1**, now owner-merged and iPhone-tested, is an experiment-only **inactive-vs-background lifecycle fix**. Existing Swift `UIApplication.willResignActiveNotification` already invalidates native voices when the switcher opens; now Swift also emits a fixed `biblozooAppLifecycle` state-only plugin event on inactive and resumed-active (the latter catches delayed WebKit delivery). **Native-only Classic and Melody** Feeding runtimes subscribe, call their *existing* `pauseFeedingGame` for either event, cancel current rAF, preserve original score/song/balls and show Welcome Back; no automatic reactivation. `window.blur/focus` supplement the native signal for the card case where `document.hidden=false`. A second inactivity while a Resume preflight is pending invalidates its gesture generation, so only a **new real tap** may re-prepare. The plugin callback and focus/blur handlers are removed on game exit, including delayed listener registrations. No Web/HTML fallback or audio-session policy change.
 
 **After owner reviews/merges PR #29**, Fetch/Pull `experiment/native-ios-audio` in the **`biblozoo-native-audio`** worktree, then:
 
