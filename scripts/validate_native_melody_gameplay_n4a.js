@@ -29,7 +29,8 @@ assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(resume,/continueFeedingAfterGesture\(runtime, performance\.now\(\), false\)/);
 assert.match(continued,/shiftFeedingDeadlines\(runtime, elapsed\)/);
 assert.match(continued,/resumeMelodyAfterInterruption\(runtime, now\)/);
-assert.match(js,/nativeOnlyApp && mode === FEED_MODES\.MELODY/);
+assert.match(js,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH\]\.includes\(mode\)/,
+  "N4b preserves N4a Melody's native-only gating alongside Labyrinth");
 assert.match(js,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start/);
 assert.match(ci,/node scripts\/validate_native_melody_gameplay_n4a\.js/);
 
