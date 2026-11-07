@@ -63,7 +63,7 @@ In Xcode, select the **App** target, open **Signing & Capabilities**, confirm th
 
 The setup PR changes **only identity**, not native playback. Check a normal verse/game and ordinary sound, plus basic foreground/background behavior before adding experimental audio code. No native app compile or on-device signing can be validated by web/Node CI.
 
-The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there (without breaking `ios-prep` if it is later merged). **GitHub PR workflows use the base branch's workflow triggers**, so the *initial identity setup PR itself* may have no Actions checks: the experiment branch won't have the new trigger until the owner merges this setup PR. After that, verify the experiment branch's **post-merge push run** and subsequent experimental PR checks. Do not report a green run when none has executed.
+The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
 ## 3. Existing automated validation commands
 
