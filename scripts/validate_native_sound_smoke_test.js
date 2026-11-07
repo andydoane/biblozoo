@@ -36,7 +36,7 @@ for (const [id, source, name] of sounds) {
     id + ": bridge mapping must use matching explicitly packaged sample");
 }
 assert.match(swift, /private var players: \[String: AVAudioPlayer\] = \[:\]/);
-assert.match(swift, /self\.players\[soundId\] = candidate/);
+assert.match(swift, /self\.players\[soundId\] = player/);
 assert.match(swift, /self\.players\[soundId\]/);
 assert.match(swift, /self\.players\.removeValue\(forKey: soundId\)\?\.stop\(\)/);
 assert.doesNotMatch(swift, /private var player: AVAudioPlayer\?/,
@@ -115,6 +115,35 @@ assert.match(swift, /private let maxTraceEvents = 28/);
 assert.match(swift, /"recentEvents": self\.eventTrace/);
 assert.match(swift, /mediaServicesWereResetNotification/);
 assert.match(swift, /needsGestureAfterReset = true/);
+// N2.1: AVAudioPlayer decode/replay must not block JavaScript frame drawing.
+// Static source policy is not proof of a zero-hitch iPhone experience.
+assert.match(swift, /private let playbackQueue = DispatchQueue\(/);
+assert.match(swift, /private let playbackEpochLock = NSLock\(\)/);
+assert.match(swift, /playbackEpoch \&\+= 1/);
+assert.match(swift, /"lastNativePlayQueueMs": self\.lastNativePlayQueueMs/);
+assert.match(swift, /"lastNativePlayCallMs": self\.lastNativePlayCallMs/);
+const nativePreload = swift.slice(swift.indexOf("    @objc func preload("),
+  swift.indexOf("    @objc func play("));
+const nativePlay = swift.slice(swift.indexOf("    @objc func play("),
+  swift.indexOf("    @objc func stop("));
+for (const [name, section, op] of [
+  ["preload", nativePreload, "prepareToPlay"],
+  ["play", nativePlay, "sound.play"]
+]) {
+  assert.match(section, /self\.playbackQueue\.async/, name + " queues native player work");
+  assert.match(section, /self\.isCurrentPlaybackEpoch\(epoch\)/,
+    name + " rejects old lifecycle work");
+  const start = section.indexOf("self.playbackQueue.async");
+  assert.ok(section.indexOf(op, start) > start,
+    name + " executes the expensive AVAudioPlayer operation only on the worker");
+}
+assert.doesNotMatch(nativePlay, /if sound\.isPlaying \{ sound\.stop\(\) \}/,
+  "rapid replay must not discard the prepared player");
+assert.match(nativePlay, /"queueMs": queueMs/);
+assert.match(nativePlay, /"playCallMs": playCallMs/);
+assert.match(js, /" prepMs=" \+ count\(state\.lastNativePrepareMs\)/);
+assert.match(js, /" queueMs=" \+ count\(state\.lastNativePlayQueueMs\)/);
+assert.match(js, /" playMs=" \+ count\(state\.lastNativePlayCallMs\)/);
 assert.match(swift, /"lastInterruptionSignal": self\.lastInterruptionSignal/,
   "return bounded developer diagnostic for the previous session signal");
 assert.match(swift, /volume\.isFinite/);
