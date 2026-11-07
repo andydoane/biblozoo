@@ -65,6 +65,39 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### N1 — globally silence WebKit sound output in the separate iOS audio experiment (current)
+
+**Status:** implementation proposed on feature branch `experiment/n1-native-only-output-isolation` (not yet merged or iPhone-verified), based on merged roadmap [PR #19](https://github.com/andydoane/biblozoo/pull/19), 2026-11-07. See [living handoff §§9–10](PROJECT-HANDOFF.md) and [the source inventory](NATIVE-ONLY-IOS-AUDIO-INVENTORY.md). This **supersedes the C.2d same-app Web-A/B instructions below**: after N1 the separate `.audiotest` app intentionally has **no Web audio fallback**, and the experimental Classic tester automatically selects Native. Use the **original stable BibloZoo app** for a separate Web comparison.
+
+**Implementation to verify:** `npm run build` copies web sources into ignored `dist/` and, *only when* Capacitor `appId` is `com.andydoane.biblozoo.audiotest`, inserts `verse_games/shared/native-only-ios-output.js` as the **very first HTML script** in every packaged root/game/Playground/utility HTML. The guard becomes active only under native Capacitor iOS/`capacitor:` origin: `AudioContext` and `webkitAudioContext` are unavailable; `HTMLMediaElement.play()` for **audio** rejects rather than reporting false success; HTML videos run muted; parsed/dynamically added autoplay audio is suppressed. The Swift AVAudioPlayer plugin and DEV native sample buttons are unchanged. **No** `getUserMedia` or `MediaRecorder` interception is introduced, but Web Audio microphone metering and HTML recorded-take playback may be unavailable while unmigrated. Some older `new Audio()` and `load()` calls still exist and may still affect the native session **without playing sound**. N1 does **not** claim to fix `interruption-pending`.
+
+From the **`biblozoo-native-audio` worktree** after owner merge:
+
+```sh
+git branch --show-current                 # experiment/native-ios-audio
+node scripts/validate_native_only_ios_output.js
+node scripts/validate_native_feeding_preview_c2.js
+node scripts/validate_native_sound_smoke_test.js
+npm run build
+node scripts/validate_native_only_ios_output.js # checks every injected dist HTML
+npx cap sync ios
+npx cap open ios
+```
+
+Build/run **BibloZoo Audio Test** (confirm Xcode bundle ID ends in `.audiotest`) on the physical iPhone, **not** the original app. Do not delete/reinstall the stable BibloZoo or infer it shares profiles with the experiment.
+
+1. **Native-only output boundary:** launch title/home, tap ordinary buttons, visit a standalone practice game and a Playground activity. Web-era tap, oscillator, HTML narration, and other **unmigrated** sounds should be silent; do not use old C.2d unchecked Web sound as a comparison within this app. The app should still navigate/exit normally; record any screen trapped on a now-impossible Web audio success gate as a functional regression to address in the next owner-specific slice.
+2. **Native DEV proof:** open **DEV · Native Audio**, tap **Play star**, **Play chomp**, optionally the pet-unlock sample. Record each sound **actually heard**, along with any native error status and `Inspect native state` snapshot. The native plugin alone is permitted to produce output. Its bridge `accepted` result is not audibility proof.
+3. **Classic Feeding pilot:** open Daily To-Do Preview → Feeding Game Tester → Classic → Drag → Got It!. In `.audiotest` there is no visible Web backend checkbox; the preview should say **Native ONLY**, pegs intentionally silent. Native star/chomp are either human-audible or explicitly unavailable/silent with error. Log whether `pending=YES began=1 ended=0` still appears **before** prepare and whether the DEV panel behaves differently after the failed Feeding attempt, without switching apps. **Do not bypass an actual iOS interruption.**
+4. **Lifecycle and state:** task switch during Native Classic, return, verify frozen round and deliberate Native Resume/Back with no audio-failure-driven Zoo Escape. Visit Learn and a recording-capable screen without granting microphone accidentally; preserve navigation, stored progress and partial takes. Meter/recording playback may be unavailable temporarily; **do not claim the entire microphone/recording experience is accepted** until N7.
+5. **Non-iOS/stable:** independently verify web/PWA/Android and the existing stable BibloZoo baseline still produce their normal sounds if feasible. The native-only gate should be inert there; Linux CI checks source isolation and bundled scripts but does not simulate the real iOS session or speaker.
+
+**Node/CI evidence boundaries:** the new validator checks source sandbox behavior in VM and, after build, every packaged HTML for guard placement/relative URL. Existing regression suites and production web build remain required. GitHub Actions cannot compile Swift, sign the app, hear an iPhone, prove the audio session is healthy, or guarantee every legacy UI remains fully usable while output is suppressed. All failed audio-dependent navigation/recovery must be documented, not masked by Web fallback.
+
+---
+
+#### Historical C.2d procedure below — retained as regression history, not the current N1 device checklist
+
 ### C.2d — owner-directed **Native ONLY** Classic Feeding preview
 
 **Evidence and decision (November 7, 2026).** After merged [PR #17](https://github.com/andydoane/biblozoo/pull/17), one iPhone test showed `pending=no, began=0, ended=0` across all clock-first trace phases, but the Web-clock probe failed and the preview chose `Web (native unavailable: web-clock-unavailable)`; the owner heard **no Feeding sound**. The very same build still **audibly played the native DEV star button**. Earlier traces also showed `interruption-pending` *before* checking the Web clock. This means the Web-clock gating/fallback made the Native test ambiguous; it does not prove what initiated any iOS interruption.
