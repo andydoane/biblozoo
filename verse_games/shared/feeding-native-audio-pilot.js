@@ -1,11 +1,12 @@
-/* N4a — Native-only Classic and Melody Feeding in isolated iOS Audio Test.
+/* N4b — Native-only Classic, Labyrinth and Melody Feeding in iOS Audio Test.
  * Got It!/Resume prepares mode-specific fixed AVAudioEngine PCM buffers:
- * Classic star/chomp/peg; Melody only its prewarmed triangle-note bank.
+ * Classic/Labyrinth star/chomp/peg; Melody its native triangle-note bank.
  * No Web fallback, automatic playback, or "accepted means audible" claim. */
 (function installFeedingNativeAudioPilot(root) {
   "use strict";
 
   const IDS = Object.freeze(["feed-star", "feed-chomp", "feed-peg"]);
+  const LABYRINTH_IDS = Object.freeze(["feed-star", "feed-chomp", "feed-peg"]);
   const MELODY_IDS = Object.freeze(["feed-melody"]);
   const PEG_NOTE_COUNT = 6;
   const MELODY_MIDI_MIN = 55;
@@ -40,10 +41,12 @@
   }
 
   function create({ isCurrent, onFailure, mode = "classic" } = {}) {
-    // Only these two audited native sound profiles exist in N4a.
-    // Browser/PWA/Android never create this native controller.
-    if (!isIOS() || !["classic", "melody"].includes(mode)) return null;
-    const selectedIds = mode === "melody" ? MELODY_IDS : IDS;
+    // Three explicit native-only profiles. Labyrinth landing tones and
+    // catches intentionally reuse Classic's same fixed native resources.
+    // Browser/PWA/Android never create this controller.
+    if (!isIOS() || !["classic", "labyrinth", "melody"].includes(mode)) return null;
+    const selectedIds = mode === "melody" ? MELODY_IDS :
+      mode === "labyrinth" ? LABYRINTH_IDS : IDS;
 
     let generation = 0;
     let ready = false;
