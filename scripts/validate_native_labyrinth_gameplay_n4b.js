@@ -13,7 +13,8 @@ const catchBall=between(game,"  function catchBall(runtime, ball) {","  function
 const resume=between(game,"  function attemptFeedingResumeFromGesture(","  function attachFeedInterruptionHandlers(");
 assert.match(pilot,/const LABYRINTH_IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/);
 assert.match(pilot,/\["classic", "labyrinth", "melody"\]/);
-assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS : IDS/);
+assert.match(pilot,/mode === "labyrinth" \? LABYRINTH_IDS :/);
+assert.match(pilot,/mode === "bounce" \? BOUNCE_IDS : IDS/);
 assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" : "classic"/);
 assert.match(begin,/if \(result\?\.ready !== true \|\| !pilot\) \{[\s\S]*?return;/);
 assert.match(peg,/FEED_MODES\.LABYRINTH/);
