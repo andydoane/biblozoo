@@ -53,6 +53,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_feeding_preview_c2.js
 
+      - name: Validate N1 native-only WebKit sound output isolation
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_only_ios_output.js
+
       - name: Validate daily activity and verse flows
         shell: bash
         run: |
@@ -120,6 +124,10 @@ jobs:
 
       - name: Build production web bundle for Capacitor
         run: npm run build
+
+      - name: Validate N1 guard placement in every packaged HTML entrypoint
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_only_ios_output.js
 
       - name: Confirm bundled runtime files
         shell: bash
