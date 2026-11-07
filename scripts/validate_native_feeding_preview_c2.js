@@ -225,6 +225,8 @@ async function main() {
     const h=feedHarness();
     const preview=h.api.render({session:{feedMode:"classic",dailyTodoPreview:true,petName:"Pip"}});
     assert.match(preview,/data-daily-feed-native-opt-in/);
+    assert.match(preview,/data-daily-feed-native-pilot-opt/,
+      "explicit label marker should allow its click default");
     assert.match(preview,/data-no-ui-sound/);
     assert.match(preview,/Native star \+ chomp/);
     assert.match(preview,/data-daily-feed-native-badge/);
@@ -238,6 +240,97 @@ async function main() {
     assert.doesNotMatch(w.api.render({session:{feedMode:"classic",dailyTodoPreview:true}}),
       /data-daily-feed-native-opt-in/,"non-iOS preview stays web");
   }
+
+  {
+    // Regression for the physical-iPhone C.2 report: clicking the opt-in
+    // checkbox or its LABEL did nothing. The delegated start overlay
+    // unconditionally called preventDefault(), cancelling the checkbox's
+    // native label/input toggle. Execute that actual handler from source.
+    const from = FEED.indexOf("    runtime.startOverlayHandler = (event) => {");
+    const to = FEED.indexOf("    runtime.exitHandler = (event) => {", from);
+    assert.ok(from > 0 && to > from, "expected real overlay click handler");
+    const runtime = {
+      nativePilotAllowed: true, feedPausedAt: null, controlPhase: "choose",
+      introUnlockAt: 0
+    };
+    vm.runInNewContext(FEED.slice(from, to), {
+      runtime, activeRuntime: runtime, performance: { now: () => 10000 },
+      chooseFeedingControl: () => { throw Error("checkbox must not select controls"); }
+    }, { filename: "Feeding startOverlayHandler" });
+    const checkbox = { checked: false };
+    function tap(clickedInsidePilotLabel) {
+      const flags = { prevented: false, stopped: false };
+      const target = {
+        closest(selector) {
+          if (selector === "[data-daily-feed-native-pilot-opt]" &&
+              clickedInsidePilotLabel) return { tagName: "LABEL" };
+          return null;
+        }
+      };
+      runtime.startOverlayHandler({
+        target,
+        preventDefault() { flags.prevented = true; },
+        stopPropagation() { flags.stopped = true; }
+      });
+      // Browser default toggle, which a real preventDefault() cancels.
+      if (clickedInsidePilotLabel && !flags.prevented) {
+        checkbox.checked = !checkbox.checked;
+      }
+      return flags;
+    }
+    const labelTap = tap(true);
+    assert.equal(labelTap.prevented, false,
+      "do not cancel the iPhone's checkbox/label click default");
+    assert.equal(labelTap.stopped, true,
+      "opt-in should not bubble through outer app controls");
+    assert.equal(checkbox.checked, true, "first tap must visibly check the box");
+    assert.equal(tap(true).prevented, false);
+    assert.equal(checkbox.checked, false, "second tap must uncheck the box");
+    const ordinaryTap = tap(false);
+    assert.equal(ordinaryTap.prevented, true,
+      "regular intro click behavior must retain its intentional preventDefault");
+    assert.equal(ordinaryTap.stopped, true);
+    runtime.nativePilotAllowed = false;
+    assert.equal(tap(true).prevented, true,
+      "do not bypass handler for real Daily Feeding or non-native previews");
+
+    // The actual change listener should immediately confirm the selected
+    // backend and preserve Got It! as the activation/preflight gesture.
+    const hook = FEED.indexOf(
+      "    if (runtime.nativePilotAllowed && runtime.nativePilotCheckbox) {",
+      FEED.indexOf('startOverlay.addEventListener(\n      "click",')
+    );
+    const hookEnd = FEED.indexOf('    exitButton.addEventListener("click"', hook);
+    assert.ok(hook > 0 && hookEnd > hook);
+    let changed;
+    const nativeRuntime = {
+      nativePilotAllowed: true,
+      nativePilotCheckbox: {
+        checked: true,
+        addEventListener(type, fn) {
+          assert.equal(type, "change"); changed = fn;
+        }
+      },
+      nativePilotChoiceStatus: { textContent: "" },
+      roundStarted: false, finished: false, controlPhase: "instructions"
+    };
+    vm.runInNewContext(FEED.slice(hook, hookEnd), {
+      runtime: nativeRuntime, activeRuntime: nativeRuntime
+    }, { filename: "Feeding native opt-in change handler" });
+    assert.equal(typeof changed, "function");
+    changed();
+    assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
+      /native selected.*tap got it/i);
+    nativeRuntime.nativePilotCheckbox.checked = false;
+    changed();
+    assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
+      /web effects selected/i);
+    assert.match(FEED, /runtime\\.nativePilotCheckbox\\.removeEventListener\\(\\s*"change"/,
+      "change listener must detach on Feeding exit");
+    assert.match(FEED, /runtime\\.nativePilotCheckbox\\.disabled = true/,
+      "checkbox must not change in the middle of async preflight");
+  }
+
   {
     const h=feedHarness();
     const starts=[];
