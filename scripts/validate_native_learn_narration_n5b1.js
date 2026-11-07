@@ -126,7 +126,10 @@ async function main(){
     const m=mock(),events=[];
     await m.window.BibloZooNativeLearnNarrationPilot.startFromGesture(x=>events.push(x.kind));
     m.listeners.biblozooAppLifecycle({active:false});
-    assert.equal((await m.window.BibloZooNativeLearnNarrationPilot.resume()).accepted,true);
+    assert.equal((await m.window.BibloZooNativeLearnNarrationPilot.resume()).ready,false,
+      "return from iOS App Switcher may not replay without a fresh gesture");
+    assert.equal(m.calls.filter(x=>x[0]==="play").length,1);
+    assert.ok(events.includes("interrupted"));
   }
   {
     const m=mock({ios:false,nativeOnly:false});
