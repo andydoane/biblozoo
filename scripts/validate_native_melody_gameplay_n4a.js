@@ -19,7 +19,9 @@ assert.match(pilot,/noteIndex < MELODY_MIDI_MIN/);
 assert.match(pilot,/noteIndex > MELODY_MIDI_MAX/);
 assert.match(pilot,/soundId === "feed-melody" \? \{ midi: noteIndex \}/);
 assert.match(begin,/mode: runtime\.mode === FEED_MODES\.MELODY \? "melody" :/);
-assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" : "classic"/);
+assert.match(begin,/runtime\.mode === FEED_MODES\.LABYRINTH \? "labyrinth" :/);
+assert.match(begin,/runtime\.mode === FEED_MODES\.BOUNCE \? "bounce" : "classic"/,
+  "N4c retains Labyrinth and adds Bounce mode without replacing Classic");
 assert.match(begin,/if \(result\?\.ready !== true \|\| !pilot\) \{[\s\S]*?return;/);
 assert.match(melody,/if \(runtime\?\.nativePilotBackend === "native"\)/);
 assert.match(melody,/runtime\.nativePilot\.play\("feed-melody"/);
