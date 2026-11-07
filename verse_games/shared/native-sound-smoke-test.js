@@ -37,6 +37,10 @@
 
     const panel = doc.createElement("section");
     panel.id = PANEL_ID;
+    // app.js' capture-phase global gesture handler explicitly exempts
+    // [data-no-ui-sound]. This removes the existing Web Audio UI pop from
+    // THIS panel only, so the native MP3 can be heard in isolation.
+    panel.setAttribute("data-no-ui-sound", "");
     panel.setAttribute("role", "group");
     panel.setAttribute("aria-label", "Experimental native audio test");
     panel.style.cssText =
@@ -71,15 +75,62 @@
     status.style.cssText = "margin:6px 0 0;font-size:12px;";
     status.textContent = "Tap to request one native MP3 sound.";
 
+    const inspect = doc.createElement("button");
+    inspect.type = "button";
+    inspect.textContent = "Inspect native state (no sound)";
+    inspect.style.cssText =
+      "display:block;width:100%;min-height:36px;margin-top:7px;" +
+      "font:12px sans-serif;border-radius:7px;";
+
+    const detail = doc.createElement("p");
+    detail.setAttribute("aria-label", "Read-only native audio interruption details");
+    detail.style.cssText =
+      "margin:5px 0 0;font:11px/1.35 monospace;overflow-wrap:anywhere;";
+    detail.textContent = "Inspect after the first and second taps.";
+
     panel.appendChild(top);
     panel.appendChild(play);
     panel.appendChild(status);
+    panel.appendChild(inspect);
+    panel.appendChild(detail);
     doc.body.appendChild(panel);
 
     let epoch = 0;
     let busy = false;
     let dismissed = false;
     function plugin() { return root.Capacitor?.Plugins?.BibloZooNativeSound; }
+    function count(value) { return Number.isInteger(value) && value >= 0 ? value : "?"; }
+    async function inspectNativeState() {
+      const api = plugin();
+      if (typeof api?.getDebugState !== "function") {
+        detail.textContent = "Read-only state bridge unavailable. Rebuild Xcode app.";
+        return;
+      }
+      try {
+        const state = await bounded(api.getDebugState());
+        if (dismissed || doc.hidden) return;
+        if (state?.available !== true) {
+          detail.textContent = "Native state unavailable.";
+          return;
+        }
+        const life = ["active", "inactive", "background"].includes(state.appState)
+          ? state.appState : "unknown";
+        detail.textContent =
+          "app=" + life + " pending=" + (state.pending === true ? "YES" : "no") +
+          " last=" + safeReason(state.lastSignal) +
+          " events=" + count(state.eventCount) +
+          " began=" + count(state.beganCount) +
+          " ended=" + count(state.endedCount) +
+          " suspended=" + count(state.suspendedCount) +
+          " route=" + count(state.routeCount) +
+          " reasonCode=" + (Number.isInteger(state.lastReasonCode) ? state.lastReasonCode : "?") +
+          " ageMs=" + (Number.isInteger(state.lastAgeMs) ? state.lastAgeMs : "?");
+      } catch (_) {
+        if (!dismissed && !doc.hidden) detail.textContent = "Native state read failed or timed out.";
+      }
+    }
+    inspect.addEventListener("click", () => { void inspectNativeState(); });
+
     function stopQuietly() {
       try {
         const api = plugin();
