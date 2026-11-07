@@ -65,6 +65,32 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### C.2b — native star/chomp versus Web Audio collision beep isolation (experimental)
+
+**Owner's iPhone result after merged [PR #15](https://github.com/andydoane/biblozoo/pull/15):** The DEV checkbox now visibly checks; default unchecked **Web** Classic Feeding sounds and gameplay work normally. With the **Native** box checked, the regular synthesized **peg beeps remain audible** but the star and chomp **do not sound**. The bottom-right test label says **"Native effect failed. Exit preview to retry."** This means C.2 gameplay is **not accepted** even though both samples worked in C.1's separate DEV native buttons. The generic label did not expose whether the bridge rejected a play request with `interruption-pending`, `not-preloaded`, `play-denied`, a timeout, or another error. Web Audio / AVAudioPlayer competition is a **hypothesis**, not a proven cause.
+
+**C.2b diagnostic only:** On the separate `.audiotest` iPhone app, when **Classic Feeding Game Tester** is explicitly checked **Native** and gameplay is active, suppress *only* the synthesized non-star **peg beep oscillator**. This tests whether normal Web Audio tone emissions affect native playback. Keep the actual Feeding Web Audio **context/clock**, task-switch recovery, score, collision physics, stars, snack catches, Zoo Escape and all default **Web** audio behavior. Zoo Escape's optional sounds while paused are unchanged. Other modes and normal Daily Feeding are untouched; the isolated native mode is not a proposed permanent release mix.
+
+The experiment now labels successful native preflight as **"Native star/chomp ONLY (Web peg beeps muted for test)"**, and a rejected native play as **"Native effect failed (reason). Exit preview to retry"**. `reason` is the short allowlisted-format error code returned by the existing bridge, not proof that a sound was/wasn't heard. No new activation, `setCategory`, `setActive`, background entitlement or automatic Web fallback mid-round.
+
+**After owner merges only into `experiment/native-ios-audio`:** GitHub Desktop → `biblozoo-native-audio` on `experiment/native-ios-audio` → Fetch/Pull, then VS Code terminal:
+
+```sh
+node scripts/validate_native_feeding_preview_c2.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+Build/run **BibloZoo Audio Test** (bundle identifier `com.andydoane.biblozoo.audiotest`) on a real iPhone. Run the following controlled comparison:
+1. **Unchecked Web baseline:** Daily To-Do Preview → Feeding Game Tester → Classic → 1 or 2 question stars → Drag → Got It! Confirm synthesized peg beeps **plus** normal star and chomp sounds.
+2. **Checked Native diagnostic:** Repeat the identical Classic setup, check Native and Got It!. Badge should mention **Web peg beeps muted**. **No synthesized peg beeps is expected in this one test**. Listen for actual **native star on star-peg collision** and **native chomp when the pet catches food**. No ghost/double sounds and no score or physics changes.
+3. If either native effect fails, **report the exact badge string in parentheses**, such as `interruption-pending` or `not-preloaded`, and use the **DEV · Native Audio → Inspect native state (no sound)** button to capture `pending`, `began`, `ended`, `suspended`, and `reasonCode`. Do not infer that muted peg beeps mean the native path works; only *heard star/chomp* count as the device result.
+4. If native star/chomp now work, repeat several effects and a task switch → **explicit Resume**, and check Zoo Escape/Back remain available. We will then study how to provide peg tones without recreating the failure. If they still fail, use the captured reason for the next narrow fix rather than changing `AVAudioSessionCategorySoloAmbient` or bypassing genuine interruption.
+5. Real Daily Feeding, other tester modes, Web/PWA/Android, daily rewards, recordings and stable BibloZoo must stay unchanged.
+
+**Validation limit:** `scripts/validate_native_feeding_preview_c2.js` executes the actual `playPegTone` source in a VM to verify that Native Classic skips the Web oscillator but Web Classic still emits it, plus checks the safe error-reason UI, preflight, default-off logic, and existing task-switch/Feeding/Zoo Escape contracts. Node CI does not prove actual speaker output, Swift lifecycle callbacks, or the cause of any iPhone interruption. **Do not advance to Stage D** until native gameplay has actually passed on-device and a safe path for the missing peg beeps is decided.
+
 ### C.2a — native Feeding checkbox failed to toggle on iPhone
 
 **November 6, 2026 device result after merged [PR #14](https://github.com/andydoane/biblozoo/pull/14):** Classic Feeding Game Tester **default Web audio works normally**, but tapping the **DEV: Native star + chomp** checkbox shows **no checkmark or visible change**. This prevents selecting the native backend, so **there is no native Feeding gameplay acceptance yet**. This is not a problem with the owner's instructions.
