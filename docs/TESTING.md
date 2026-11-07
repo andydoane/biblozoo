@@ -65,6 +65,40 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### PR B: one-sound native iPhone smoke test (experiment branch only)
+
+The `experiment/native-sound-smoke-test` PR adds a branch-only `BibloZooNativeSound` Capacitor 8 plugin (`ios/App/App/BibloZooNativeSoundPlugin.swift`). It uses **AVAudioPlayer** with one allowlisted ID `pilot-unlock`, mapped to existing `ui_audio/ui_pet_unlock.mp3`. Xcode's App target **Sources** explicitly includes the Swift file, and **Copy Bundle Resources** explicitly includes the MP3 at the root of the app bundle. This is *separate* from the copied `dist/ui_audio` web asset; the plugin looks up `Bundle.main.url(forResource: "ui_pet_unlock", withExtension: "mp3")`. No new binary asset or rights assumption is needed.
+
+The developer panel `verse_games/shared/native-sound-smoke-test.js` appears at the top-right of **the experimental native iOS app only**. It is installed for this experiment, deliberately not public-release UI. There is **no auto-play or gameplay routing**; a human tap sends `preload("pilot-unlock")` followed by `play("pilot-unlock", volume:0.85)` with bounded JS wait, then offers an honest prompt asking whether the sound was **actually heard**. A native `accepted:true` is NOT a sound-health/recovery verdict.
+
+After the owner merges this PR **into `experiment/native-ios-audio` only**:
+
+```sh
+# Run from the biblozoo-native-audio worktree; Fetch/Pull Origin first.
+git branch --show-current            # experiment/native-ios-audio
+git status --short                   # clean before building
+node scripts/validate_native_audio_test_identity.js
+node scripts/validate_native_sound_smoke_test.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+In Xcode's **App** target: verify **Signing & Capabilities** still has bundle ID `com.andydoane.biblozoo.audiotest` and the owner's development Team. Inspect **Build Phases → Compile Sources** for `BibloZooNativeSoundPlugin.swift` and **Copy Bundle Resources** for `ui_pet_unlock.mp3`. If the test asset is missing at runtime, check that resource phase before modifying Web Audio or `dist`. Run on the **real iPhone**, not just simulator; leave the original BibloZoo installed.
+
+Manual gate — report observed results rather than assuming them:
+- Launch **BibloZoo Audio Test**: normal app works; **no sample sound on launch**. See small **DEV · Native Audio** panel; if absent, confirm the native project actually rebuilt and the test app is current.
+- Tap **Play native test sound** once: a brief unlock sound should be audible with sound enabled. The panel should say **"Native playback requested. Did you hear the sound?"** only when native `AVAudioPlayer.play()` reported accepted. This is **not** automated proof of hearing.
+- Repeat with silent switch enabled: audio may be silent under intentional `.soloAmbient`; do not call that a defect. Compare with sound on and stable BibloZoo at the same hardware volume.
+- Background/lock/unlock, then foreground: there must be **no automatic replay**. Tap again; confirm audible output. A task switch while a preload is pending should cancel the old JS request and native sound rather than queue a stale sound.
+- Try wired/headphone/Bluetooth output and route changes if available: sound should follow current output on a fresh tap, never self-resume or leave a repeating clip.
+- Tap **×** to dismiss the test panel: native sound stops and the panel does not interfere with normal gameplay. Feeding effects and the Web Audio/HTML recovery/Welcome Back/Zoo Escape paths are intentionally **unchanged**.
+- In the case of **Native bridge missing**, **bundled-asset-missing**, `category-not-soloambient`, Xcode Swift compiler errors or silent output despite sound enabled, report the exact label/error; **pause before Feeding PR C**.
+
+The plugin deliberately never calls `setCategory`, `setMode`, or `setActive`. It guards `.soloAmbient`, foreground and interruptions; rejects non-allowlisted IDs/invalid volumes; and forgets the player on app inactivity, route changes and media resets. These safeguards do not replace recording/microphone tests later.
+
+**Automated check:** `node scripts/validate_native_sound_smoke_test.js` validates static Xcode source/resource memberships and runs the real smoke JavaScript in a Node VM for missing-bridge, missing-asset response, bounded timeout, double-tap, background cancellation, explicit tap and no web/PWA UI. It is added to the experiment-only CI job. GitHub Actions do **not** compile Swift or verify actual iPhone audibility; the owner's reported results decide whether PR C is allowed.
+
 ## 3. Existing automated validation commands
 
 **Package scripts currently declared in `package.json`:**
@@ -112,6 +146,9 @@ node scripts/validate_tracked_lf_endings.js
 
 # Experimental iOS app identity (only on the native-audio experiment branch)
 node scripts/validate_native_audio_test_identity.js
+
+# PR B explicit native sound test (experiment branch only)
+node scripts/validate_native_sound_smoke_test.js
 ```
 
 This is a **starting selection, not every validator**. There are many historical `scripts/validate_*.js` programs. Choose the suites appropriate to the change, and run broader recovery/regression coverage for shared code. Record precise failures; don't label a failing old test “outdated” without investigating it. Check for actual missing runtime assets versus broken code.
