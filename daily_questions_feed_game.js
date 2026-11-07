@@ -5000,10 +5000,14 @@
       }
     });
     runtime.nativePilotChoicePending = true;
-    if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = true;
+    if (runtime.startConfirmButton) {
+      runtime.startConfirmButton.disabled = true;
+      runtime.startConfirmButton.textContent = "Got It!";
+    }
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
     if (runtime.nativePilotChoiceStatus)
-      runtime.nativePilotChoiceStatus.textContent = "Preparing ONLY native star/chomp…";
+      runtime.nativePilotChoiceStatus.textContent =
+        "Preparing native star, chomp, and peg sounds…";
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&
       !document.hidden && !runtime.feedPageHidden;
@@ -5029,22 +5033,36 @@
     runtime.nativePilotChoicePending = false;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
-    runtime.nativePilot = pilot || null;
-    if (result?.ready === true && pilot) {
-      if (runtime.nativePilotBadge)
-        runtime.nativePilotBadge.textContent =
-          "Native ONLY: star/chomp ready; Web audio OFF";
-    } else {
-      // A failed pilot does NOT silently start a Web backend. The owner can
-      // observe silent gameplay + the exact failure code, or exit/restart.
+    if (result?.ready !== true || !pilot) {
+      // A failed cold-start MUST NOT begin a silent round. Leave the same
+      // Instructions/Got It! gate visible so the user can deliberately retry
+      // after a brief iOS activation cooldown or choose Back. No Web fallback,
+      // automatic retry timer, score award or sound is triggered here.
       pilot?.stop?.();
+      runtime.nativePilot = null;
       const reason = typeof result?.reason === "string" &&
         /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
         ? result.reason : "bridge-error";
-      if (runtime.nativePilotBadge)
+      const message = "Native sounds unavailable (" + reason +
+        "). Tap Try Again or Back. DEV → Copy Audio Timing Report before restarting.";
+      if (runtime.nativePilotBadge) {
         runtime.nativePilotBadge.textContent =
-          "Native ONLY unavailable (" + reason + "); sounds SILENT";
+          "Native ONLY unavailable (" + reason + "); round not started";
+      }
+      if (runtime.nativePilotChoiceStatus)
+        runtime.nativePilotChoiceStatus.textContent = message;
+      if (runtime.startConfirmButton)
+        runtime.startConfirmButton.textContent = "Try Again";
+      void recordNativePreviewPhase(runtime, "preflight-failed");
+      return;
     }
+
+    runtime.nativePilot = pilot;
+    if (runtime.nativePilotBadge)
+      runtime.nativePilotBadge.textContent =
+        "Native ONLY: star/chomp ready; Web audio OFF";
+    if (runtime.nativePilotChoiceStatus)
+      runtime.nativePilotChoiceStatus.textContent = "Native effects prepared.";
     startRound(runtime);
     void recordNativePreviewPhase(runtime, "round-start");
   }

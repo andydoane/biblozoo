@@ -445,8 +445,8 @@ async function main() {
     assert.match(r.nativePilotPhases.textContent,/round-start:/);
   }
   {
-    // An interruption-pending failure MUST NOT select Web effects.
-    // Silent gameplay and an explicit code are more useful to the tester.
+    // N3c: Native preflight failure MUST NOT select Web or begin an
+    // unannounced silent round. Keep the same instructions for retry.
     const h=feedHarness();
     const starts=[];
     let stops=0;
@@ -462,12 +462,46 @@ async function main() {
     r.audioContext=null;
     h.hooks.setRuntime(r);
     await h.hooks.nativeBegin(r);
-    assert.deepEqual(starts,["native"],"Native failure must never select Web");
+    assert.deepEqual(starts,[],"Native failure must NOT start a silent round");
     assert.equal(stops,1);
     assert.equal(r.audioContext,null);
-    assert.match(r.nativePilotBadge.textContent,/Native ONLY unavailable \(interruption-pending\); sounds SILENT/);
+    assert.equal(r.nativePilot,null);
+    assert.equal(r.controlPhase,"instructions");
+    assert.match(r.nativePilotBadge.textContent,/Native ONLY unavailable \(interruption-pending\); round not started/);
+    assert.match(r.nativePilotChoiceStatus.textContent,/Tap Try Again or Back/);
+    assert.match(r.nativePilotChoiceStatus.textContent,/Copy Audio Timing Report/);
     assert.equal(r.nativePilotChoicePending,false);
     assert.equal(r.startConfirmButton.disabled,false);
+    assert.equal(r.startConfirmButton.textContent,"Try Again");
+  }
+  {
+    // N3c: after a real cold-start refusal, a second *user tap* can prepare
+    // native sound without leaving the round/reopening Web or restarting app.
+    const h=feedHarness();
+    let attempts=0, starts=0, stops=0;
+    h.window.__interceptStart=r=>{starts++;r.roundStarted=true;};
+    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
+      prepare:async()=>++attempts===1
+        ? {ready:false,reason:"activation-os-rejected"}
+        : {ready:true,reason:"prepared"},
+      isReady:()=>true,
+      stop:()=>{stops++;}
+    });
+    const r=runtime(true);
+    r.audioContext=null;
+    h.hooks.setRuntime(r);
+    await h.hooks.nativeBegin(r);
+    assert.equal(starts,0);
+    assert.equal(r.roundStarted,false);
+    assert.equal(r.startConfirmButton.textContent,"Try Again");
+    assert.match(r.nativePilotChoiceStatus.textContent,/activation-os-rejected/);
+    assert.equal(stops,1);
+    await h.hooks.nativeBegin(r); // deliberate second Got It!/Try Again tap
+    assert.equal(starts,1,"only successful native preflight may start round");
+    assert.equal(attempts,2);
+    assert.equal(r.nativePilotBackend,"native");
+    assert.equal(r.audioContext,null,"no Web fallback even on success");
+    assert.equal(r.roundStarted,true);
   }
   {
     // The explicit unchecked Web choice still works independently.
@@ -558,10 +592,12 @@ async function main() {
     const fallback=runtime(true);
     h.hooks.setRuntime(fallback);
     await h.hooks.nativeBegin(fallback);
-    assert.deepEqual(starts,["native"],"Native failure stays native-only, SILENT");
+    assert.deepEqual(starts,[],"Native failure stays at instructions for retry");
     assert.equal(stops,1);
+    assert.equal(fallback.roundStarted,false);
+    assert.equal(fallback.startConfirmButton.textContent,"Try Again");
     assert.match(fallback.nativePilotBadge.textContent,
-      /Native ONLY unavailable \(interruption-pending\); sounds SILENT/);
+      /Native ONLY unavailable \(interruption-pending\); round not started/);
   }
   {
     // Native-only Resume must ignore a suspended/missing Web context, wait

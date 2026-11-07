@@ -62,6 +62,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private var effectNodes: [String: [AVAudioPlayerNode]] = [:] // worker only
     private var nextEffectVoice: [String: Int] = [:] // worker only
     private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
+    // First cold launch now activates the session on the user's actual
+    // Got It!/Resume/DEV tap instead of assuming "no interruption" means
+    // an output session was already accepted by iOS.
+    private var hasGestureActivatedSession = false
+    private let maxPreflightEvents = 18
+    private var preflightEvents: [[String: Any]] = []
     private var lastNativeBackend = "none"
     private var lastNativePrepareMs = -1
     private var lastNativePlayQueueMs = -1
@@ -256,6 +262,31 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+
+    // Bounded, fixed-schema, main-thread-only diagnostic history. Each item
+    // comes from an actual native call resolution, with a validated sound ID
+    // and a code-defined result. No verse/profile/mic/device content, no
+    // disk/network upload and no audio operation from a debug read.
+    private func resolvePreflight(_ call: CAPPluginCall,
+                                  _ response: [String: Any],
+                                  phase: String, soundId: String) {
+        let outcome = response["reason"] as? String ?? "unknown"
+        let duration = response["prepareMs"] as? Int ?? -1
+        preflightEvents.append([
+            "phase": phase, "soundId": soundId, "result": outcome,
+            "success": (response["ready"] as? Bool == true) ||
+                       (response["prepared"] as? Bool == true),
+            "prepareMs": duration,
+            "foregroundEpoch": foregroundEpoch,
+            "pending": interrupted,
+            "active": UIApplication.shared.applicationState == .active
+        ])
+        if preflightEvents.count > maxPreflightEvents {
+            preflightEvents.removeFirst(preflightEvents.count - maxPreflightEvents)
+        }
+        call.resolve(response)
+    }
+
     private func timingReportText() -> String {
         let appState = UIApplication.shared.applicationState == .active
             ? "active" : "not-active"
@@ -295,6 +326,33 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         lines.insert("Native dispatch >=120 ms: \(slow) records (diagnostic threshold, " +
                      "not an audible-delay verdict).", at: 4)
+        lines.append("")
+        lines.append("Native first-tap preflight: \(preflightEvents.count) " +
+                     "of max \(maxPreflightEvents) (oldest first).")
+        lines.append("First gesture OS activation accepted: " +
+                     (hasGestureActivatedSession ? "yes" : "no"))
+        lines.append("phase | sound | result | accepted | prepareMs | " +
+                     "foregroundEpoch | pending | appActive")
+        for row in preflightEvents {
+            func textValue(_ key: String) -> String {
+                return row[key] as? String ?? "unknown"
+            }
+            func numberValue(_ key: String) -> Int {
+                return row[key] as? Int ?? -1
+            }
+            func boolValue(_ key: String) -> String {
+                return row[key] as? Bool == true ? "yes" : "no"
+            }
+            lines.append([
+                textValue("phase"), textValue("soundId"),
+                textValue("result"), boolValue("success"),
+                String(numberValue("prepareMs")),
+                String(numberValue("foregroundEpoch")),
+                boolValue("pending"), boolValue("active")
+            ].joined(separator: " | "))
+        }
+        lines.append("Preflight accepted does NOT prove speaker sound. " +
+                     "If silent, copy this report BEFORE restarting the app.")
         return lines.joined(separator: "\n")
     }
 
@@ -589,21 +647,27 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let self = self else {
                 call.resolve(["ready": false, "reason": "unavailable"]); return
             }
+            func finish(_ result: [String: Any]) {
+                self.resolvePreflight(call, result, phase: "gesture",
+                                      soundId: "session")
+            }
             let purpose = call.getString("purpose") ?? ""
             guard purpose == "dev" || purpose == "feeding" else {
-                call.resolve(["ready": false, "reason": "invalid-purpose"]); return
+                finish(["ready": false, "reason": "invalid-purpose"]); return
             }
             if let blocked = self.unavailableReason(), blocked != "interruption-pending",
                blocked != "media-reset-requires-gesture" {
                 self.lastActivationResult = blocked
                 self.appendTrace("activation-denied")
-                call.resolve(["ready": false, "reason": blocked]); return
+                finish(["ready": false, "reason": blocked]); return
             }
-            let needsRecovery = self.interrupted || self.needsGestureAfterReset
+            let firstTap = !self.hasGestureActivatedSession
+            let needsRecovery = firstTap || self.interrupted ||
+                self.needsGestureAfterReset
             if !needsRecovery {
                 self.lastActivationResult = "not-needed"
                 self.appendTrace("activation-not-needed")
-                call.resolve(["ready": true, "attempted": false, "reason": "not-needed"])
+                finish(["ready": true, "attempted": false, "reason": "not-needed"])
                 return
             }
             // A real pending .began remains protected until either iOS sends
@@ -611,7 +675,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             guard !self.interrupted || self.returnedToForegroundDuringInterruption else {
                 self.lastActivationResult = "interruption-pending"
                 self.appendTrace("activation-deferred")
-                call.resolve(["ready": false, "attempted": false,
+                finish(["ready": false, "attempted": false,
                               "reason": "interruption-pending"])
                 return
             }
@@ -620,7 +684,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                now.timeIntervalSince(last) < self.minimumActivationInterval {
                 self.lastActivationResult = "activation-cooldown"
                 self.appendTrace("activation-deferred")
-                call.resolve(["ready": false, "attempted": false,
+                finish(["ready": false, "attempted": false,
                               "reason": "activation-cooldown"])
                 return
             }
@@ -628,7 +692,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     self.maximumActivationAttemptsPerForeground else {
                 self.lastActivationResult = "foreground-attempt-limit"
                 self.appendTrace("activation-deferred")
-                call.resolve(["ready": false, "attempted": false,
+                finish(["ready": false, "attempted": false,
                               "reason": "foreground-attempt-limit"])
                 return
             }
@@ -641,18 +705,21 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 try AVAudioSession.sharedInstance().setActive(true)
                 self.interrupted = false
                 self.needsGestureAfterReset = false
+                self.hasGestureActivatedSession = true
                 self.leftForegroundDuringInterruption = false
                 self.returnedToForegroundDuringInterruption = false
-                self.lastInterruptionSignal = "foreground-activation-accepted"
+                self.lastInterruptionSignal = firstTap
+                    ? "initial-activation-accepted"
+                    : "foreground-activation-accepted"
                 self.lastActivationResult = "os-accepted"
                 self.appendTrace("activation-os-accepted")
-                call.resolve(["ready": true, "attempted": true,
+                finish(["ready": true, "attempted": true,
                               "reason": "os-accepted", "backend": "avfoundation"])
             } catch let error as NSError {
                 // Never clear pending state or claim sound output on failure.
                 self.lastActivationResult = "activation-os-rejected"
                 self.appendTrace("activation-os-rejected")
-                call.resolve(["ready": false, "attempted": true,
+                finish(["ready": false, "attempted": true,
                               "reason": "activation-os-rejected",
                               "errorDomain": error.domain, "errorCode": error.code])
             }
@@ -708,6 +775,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 "activationAttemptsThisForeground": self.activationAttemptsThisForeground,
                 "activationAttemptsTotal": self.activationAttemptsTotal,
                 "lastActivationResult": self.lastActivationResult,
+                "hasGestureActivatedSession": self.hasGestureActivatedSession,
+                "preflightEventCount": self.preflightEvents.count,
+                "lastPreflight": self.preflightEvents.last ?? [:],
                 "lastNativePrepareMs": self.lastNativePrepareMs,
                 "lastNativePlayQueueMs": self.lastNativePlayQueueMs,
                 "lastNativePlayCallMs": self.lastNativePlayCallMs,
@@ -728,12 +798,16 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": "unavailable"])
                 return
             }
+            func finish(_ result: [String: Any]) {
+                self.resolvePreflight(call, result, phase: "preload",
+                    soundId: self.requestedId(call) ?? "invalid")
+            }
             guard let soundId = self.requestedId(call) else {
-                call.resolve(["prepared": false, "reason": "invalid-sound-id"])
+                finish(["prepared": false, "reason": "invalid-sound-id"])
                 return
             }
             if let reason = self.unavailableReason() {
-                call.resolve(["prepared": false, "reason": reason])
+                finish(["prepared": false, "reason": reason])
                 return
             }
             let url: URL?
@@ -743,25 +817,25 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             } else if let resourceName = self.soundResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3") else {
-                    call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
                 url = bundledURL
             } else {
-                call.resolve(["prepared": false, "reason": "invalid-sound-id"])
+                finish(["prepared": false, "reason": "invalid-sound-id"])
                 return
             }
             let epoch = self.playbackEpochSnapshot()
             self.playbackQueue.async { [weak self] in
                 guard let self = self else {
                     DispatchQueue.main.async {
-                        call.resolve(["prepared": false, "reason": "unavailable"])
+                        finish(["prepared": false, "reason": "unavailable"])
                     }
                     return
                 }
                 guard self.isCurrentPlaybackEpoch(epoch) else {
                     DispatchQueue.main.async {
-                        call.resolve(["prepared": false, "reason": "stale"])
+                        finish(["prepared": false, "reason": "stale"])
                     }
                     return
                 }
@@ -809,24 +883,24 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else {
-                        call.resolve(["prepared": false, "reason": "unavailable"])
+                        finish(["prepared": false, "reason": "unavailable"])
                         return
                     }
                     guard self.isCurrentPlaybackEpoch(epoch) else {
-                        call.resolve(["prepared": false, "reason": "stale"])
+                        finish(["prepared": false, "reason": "stale"])
                         return
                     }
                     if let reason = self.unavailableReason() {
-                        call.resolve(["prepared": false, "reason": reason])
+                        finish(["prepared": false, "reason": reason])
                         return
                     }
                     self.lastNativePrepareMs = prepareMs
                     guard prepared else {
-                        call.resolve(["prepared": false, "reason": failed])
+                        finish(["prepared": false, "reason": failed])
                         return
                     }
                     // Prepared engine/player is NOT human-audible proof.
-                    call.resolve([
+                    finish([
                         "prepared": true,
                         "reason": "prepared",
                         "backend": backend,
