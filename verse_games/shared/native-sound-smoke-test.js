@@ -146,7 +146,6 @@
     panel.appendChild(top);
     panel.appendChild(play);
     panel.appendChild(samplesRow);
-    panel.appendChild(narrationRow);
     panel.appendChild(status);
     panel.appendChild(inspect);
     panel.appendChild(detail);
@@ -185,6 +184,8 @@
     timingPanel.appendChild(markLate);
     timingPanel.appendChild(reportStatus);
     panel.appendChild(timingPanel);
+    // Keep the original DEV panel child order for older test/owner controls.
+    panel.appendChild(narrationRow);
     doc.body.appendChild(panel);
 
     let epoch = 0;
