@@ -4711,6 +4711,66 @@
     showFeedingControlInstructions(runtime, "tilt");
   }
 
+  async function startPreviewRoundWithAudioChoice(runtime) {
+    if (!runtime || activeRuntime !== runtime ||
+        runtime.nativePilotChoicePending || runtime.roundStarted ||
+        runtime.finished || runtime.controlPhase !== "instructions") return;
+    // Session flags and UI are both gated: this never runs in earned Daily
+    // Feeding, or in Labyrinth/Melody/Bounce tester previews.
+    if (!runtime.nativePilotAllowed ||
+        runtime.nativePilotCheckbox?.checked !== true) {
+      runtime.nativePilotBackend = "web";
+      startRound(runtime);
+      return;
+    }
+    const factory = window.BibloZooFeedingNativeAudioPilot;
+    const pilot = factory?.create?.({
+      isCurrent: () => activeRuntime === runtime && !runtime.finished &&
+        !document.hidden && !runtime.feedPageHidden,
+      onFailure: () => {
+        if (activeRuntime !== runtime || runtime.finished) return;
+        if (runtime.nativePilotBadge) {
+          runtime.nativePilotBadge.textContent =
+            "Native effect failed; exit preview to retry";
+        }
+      }
+    });
+    runtime.nativePilotChoicePending = true;
+    if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = true;
+    if (runtime.nativePilotChoiceStatus) {
+      runtime.nativePilotChoiceStatus.textContent = "Checking both native sounds…";
+    }
+    let result;
+    try { result = await pilot?.prepare?.(); }
+    catch (_) { result = { ready: false, reason: "prepare-error" }; }
+    if (activeRuntime !== runtime || runtime.finished || runtime.roundStarted ||
+        runtime.controlPhase !== "instructions" ||
+        document.hidden || runtime.feedPageHidden) {
+      pilot?.stop?.();
+      runtime.nativePilotChoicePending = false;
+      if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+      return;
+    }
+    runtime.nativePilotChoicePending = false;
+    if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+    if (result?.ready === true && pilot) {
+      runtime.nativePilot = pilot;
+      runtime.nativePilotBackend = "native";
+      if (runtime.nativePilotBadge) {
+        runtime.nativePilotBadge.textContent = "Preview audio: Native star/chomp";
+      }
+    } else {
+      pilot?.stop?.();
+      // Fallback chosen BEFORE round start; never switch engines mid-round.
+      runtime.nativePilot = null;
+      runtime.nativePilotBackend = "web";
+      if (runtime.nativePilotBadge) {
+        runtime.nativePilotBadge.textContent = "Preview audio: Web (native unavailable)";
+      }
+    }
+    startRound(runtime);
+  }
+
   function startRound(runtime) {
     if (
       !runtime ||
@@ -5183,10 +5243,24 @@
     const scheduled =
       buildScheduledBalls();
 
+    const nativePilotAllowed =
+      session.dailyTodoPreview === true &&
+      mode === FEED_MODES.CLASSIC &&
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
     const runtime = {
       running: false,
       roundStarted: false,
       finished: false,
+      nativePilotAllowed,
+      nativePilotCheckbox: nativePilotAllowed
+        ? startOverlay.querySelector("[data-daily-feed-native-opt-in]") : null,
+      nativePilotChoiceStatus: nativePilotAllowed
+        ? startOverlay.querySelector("[data-daily-feed-native-choice-status]") : null,
+      nativePilotBadge: nativePilotAllowed
+        ? gameEl.querySelector("[data-daily-feed-native-badge]") : null,
+      nativePilot: null,
+      nativePilotBackend: "web",
+      nativePilotChoicePending: false,
       requestedMode,
       earnedStarPegCount,
       requestedMelodyId:
@@ -5506,7 +5580,11 @@
           }
           runtime.rafId = scheduleFeedFrame(runtime);
         } else {
-          startRound(runtime);
+          if (runtime.nativePilotAllowed) {
+            void startPreviewRoundWithAudioChoice(runtime);
+          } else {
+            startRound(runtime);
+          }
         }
       } else if (runtime.controlPhase === "serve" &&
                  runtime.mode === FEED_MODES.BOUNCE && runtime.roundStarted) {
