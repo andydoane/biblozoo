@@ -65,6 +65,35 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### C.2d — owner-directed **Native ONLY** Classic Feeding preview
+
+**Evidence and decision (November 7, 2026).** After merged [PR #17](https://github.com/andydoane/biblozoo/pull/17), one iPhone test showed `pending=no, began=0, ended=0` across all clock-first trace phases, but the Web-clock probe failed and the preview chose `Web (native unavailable: web-clock-unavailable)`; the owner heard **no Feeding sound**. The very same build still **audibly played the native DEV star button**. Earlier traces also showed `interruption-pending` *before* checking the Web clock. This means the Web-clock gating/fallback made the Native test ambiguous; it does not prove what initiated any iOS interruption.
+
+**Owner's clarified goal:** use this isolated iOS experiment to learn whether **native-only** sound can replace Web Audio in BibloZoo. Do not silently select Web sounds when Native was checked. A silent native effect with an accurate error is more informative than a disguised Web fallback. Zoo Escape's current connection to failed-audio retry is an older workaround; after reliable native playback is established, consider **separate, random Zoo Escape and Zoo Break surprises**, unrelated to audio health. **This PR does not implement those random features or change existing earned Daily Feeding.**
+
+**C.2d implementation is bounded to the experimental iOS Classic Feeding tester:** on entry it defers its *Feeding-owned* Web Audio/HTML sound allocation until/unless the tester explicitly starts an **unchecked Web** round. With the checkbox checked, **Got It!** prepares only the allowlisted native `feed-star` and `feed-chomp` players; there is no Feeding Web Audio context, clock probe, synthesized peg beep or HTML star/chomp fallback in that round. The iOS app's other screens may still have their own Web sound code—this is a **first isolated test slice**, not a claim that the whole app has been migrated. Peg tones are not yet implemented natively and are intentionally silent. If native `preload` or `play` fails, the backend stays **Native**, displays `Native ONLY unavailable (reason); sounds SILENT` or `Native ONLY failed (reason)`, and does not play Web. The score/game physics continue for diagnosis, with exit available. The previous read-only native interruption snapshots remain for tracking, not for a success claim.
+
+On an interruption or app switch, the **Native-only** preview still freezes on the original Welcome Back screen, but does **not** launch Zoo Escape as an audio-repair minigame, create/resume a Web Audio context, or run a Web-clock probe. A fresh, deliberate **Resume** gesture re-prepares only the native IDs before unfreezing the same round. A failure keeps the round paused with Retry/Back; no automatic restart or reward. Unchecked Web Classic and all normal Daily Feeding/other modes retain the old recovery behavior. `.soloAmbient` and microphone policy are unchanged.
+
+**After owner merges the focused C.2d PR into `experiment/native-ios-audio` ONLY**, select the Mac `biblozoo-native-audio` GitHub Desktop worktree → Fetch/Pull, and in its VS Code terminal run:
+
+```sh
+node scripts/validate_native_feeding_preview_c2.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+Build/run the separate **BibloZoo Audio Test** App target `com.andydoane.biblozoo.audiotest` on a **physical iPhone**, not original BibloZoo.
+
+1. **Web comparison:** Daily To-Do Preview → Feeding Game Tester → Classic → 1 or 2 question stars → Drag. Leave Native **unchecked**, tap Got It!, confirm peg beeps, star and chomp remain audible, catch/score/Back unchanged.
+2. **Native ONLY:** Exit, reopen the same Classic preview, check **DEV: Native ONLY (no Web fallback; star + chomp)**, Got It!. The status must say Native ONLY, never Web. **Peg beeps are intentionally silent.** Actually listen for native **star** when a star peg is hit and **chomp** when catching food, including several consecutive events. These are the **only** two tested Feeding sound effects. No web UI pop or doubled effect.
+3. **Real failure observation:** If Native `preload` fails with `interruption-pending` or missing bridge, preview remains explicitly Native but silent; copy exact badge and optional `DEV → Inspect native state` counts. **Do not count a silent effect as success**, but silence is an unambiguous failure, not a hidden Web substitute.
+4. **Native task switch/Resume:** After at least one star/chomp, switch apps, return, verify game stays frozen and no surprise audio/Zoo Escape recovery minigame runs. Tap **Resume** to re-prepare native sounds with a new user gesture, or **Back** to exit. Failed native retry stays paused; no Web fallback, no unintended reward/score change. Then repeat ordinary Web recovery separately to confirm it was not modified.
+5. Confirm real earned Daily Feeding, Labyrinth, Melody, Bounce, Web/PWA/Android, saved profiles, records and original installed BibloZoo remain unchanged. Stage D reliability measurement remains blocked until **human-heard** native gameplay and safe Native-only Resume are confirmed.
+
+**Automation limits:** Source/VM checks guard no Web preflight/fallback/oscillator in selected Native, explicit Web comparison, failure status, preparation and lifecycle ownership, plus existing Feeding/Zoo Escape regressions and web build. GitHub Node CI cannot compile Swift or confirm iPhone audio, and this is **not** yet a production design for peg tones or Zoo surprises.
+
 ### C.2c — verify Web Audio clock **before** native preflight, trace interruption phases
 
 **Owner's real iPhone result after merged [C.2b / PR #16](https://github.com/andydoane/biblozoo/pull/16):** Default unchecked/Web Feeding still sounds normal. Checked Native Classic is **silent for native star/chomp**, even though the diagnostic version also muted synthesized Web peg beeps. The bottom-right badge says **`Native effect failed (interruption-pending)`**. Owner's DEV screenshot after finishing a 7/7 catch round (score 11) reads: **`app=active pending=YES last=began events=1 began=1 ended=0 suspended=0 route=0 reasonCode=0 ageMs=15208`**. This is evidence of a recognized interruption-start notification not followed by an observed end; **it does not prove** whether WebKit Web Audio, AVAudioPlayer, another audio app or another session condition initiated it. Working game score is not evidence of audible audio.

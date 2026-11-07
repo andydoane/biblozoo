@@ -1,8 +1,7 @@
 "use strict";
 
-// Stage C.2 regression: actual isolated adapter + instrumented Feeding source.
-// GitHub Actions cannot compile Swift, infer audible output or simulate iOS
-// interruption order. This verifies our JS branch contracts and fallbacks.
+// Stage C.2d regression: native-only Classic iOS tester and explicit Web comparison.
+// GitHub Actions verifies JS contracts; native Swift and speaker need the iPhone.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -24,10 +23,10 @@ assert.match(CI, /node scripts\/validate_native_feeding_preview_c2\.js/);
 assert.match(CSS, /\.daily-feed-native-pilot-opt/);
 assert.match(CSS, /\.daily-feed-native-pilot-badge/);
 assert.match(CSS, /\.daily-feed-native-pilot-phases/);
-assert.match(FEED, /const FEED_NATIVE_CLOCK_READY_TIMEOUT_MS = 900;/);
-assert.match(FEED, /feedAudioClockAdvances\(context\)/);
-assert.match(FEED, /"after-web"/);
+assert.doesNotMatch(FEED, /FEED_NATIVE_CLOCK_READY_TIMEOUT_MS/);
+assert.match(FEED, /"before-native"/);
 assert.match(FEED, /"after-native"/);
+assert.match(FEED, /Native ONLY/);
 assert.match(APP, /dailyTodoPreview: true/, "preview is a test-only session");
 
 function later() {
@@ -88,6 +87,7 @@ function feedHarness(nativeIOS=true) {
     star: playStarSound,
     chomp: playChompSound,
     peg: playPegTone,
+    resume: attemptFeedingResumeFromGesture,
     stopEffects: stopFeedingEffects
   };
 ${marker}`;
@@ -97,6 +97,9 @@ ${marker}`;
   const compiled=FEED.replace(
     '  function startRound(runtime) {',
     '  function startRound(runtime) { if (window.__interceptStart) { window.__interceptStart(runtime); return; }'
+  ).replace(
+    '  function continueFeedingAfterGesture(runtime, now = performance.now(), keepOverlay = false) {',
+    '  function continueFeedingAfterGesture(runtime, now = performance.now(), keepOverlay = false) { if (window.__testContinue) return window.__testContinue(runtime, now, keepOverlay);'
   ).replace(
     '  function resumeFeedAudioContext(context) {',
     '  function resumeFeedAudioContext(context) { if (window.__testResume) return window.__testResume(context);'
@@ -245,7 +248,7 @@ async function main() {
     assert.match(preview,/data-daily-feed-native-pilot-opt/,
       "explicit label marker should allow its click default");
     assert.match(preview,/data-no-ui-sound/);
-    assert.match(preview,/Native star \+ chomp/);
+    assert.match(preview,/Native ONLY \(no Web fallback/);
     assert.match(preview,/data-daily-feed-native-badge/);
     assert.match(preview,/data-daily-feed-native-phases/);
     assert.doesNotMatch(h.api.render({session:{feedMode:"classic",petName:"Pip"}}),
@@ -340,9 +343,9 @@ async function main() {
     assert.equal(typeof changed, "function");
     changed();
     assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
-      /native selected.*tap got it/i);
-    assert.deepEqual(snapshots, ["before-web"],
-      "checkbox selection must capture a read-only before-Web baseline");
+      /Native ONLY selected.*Got It! tests native/i);
+    assert.deepEqual(snapshots, ["selected-native"],
+      "checkbox selection must capture a read-only native baseline");
     nativeRuntime.nativePilotCheckbox.checked = false;
     changed();
     assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
@@ -366,107 +369,76 @@ async function main() {
     assert.equal(off.nativePilotChoicePending,false);
   }
   {
-    // C.2c: test the ACTUAL Got It! sequencing, not a description of it.
-    // A verified Web Audio clock MUST precede either native sample preload,
-    // and only the existing native-player request may emit star/chomp.
+    // Native mode can prepare successfully even while the Web clock is stalled.
+    // Neither Web resume nor the Web clock probe may be invoked.
     const h=feedHarness();
     const order=[];
-    let snapshots=0;
-    h.window.__testResume=context=>{
-      order.push("web-resume-on-Got-It");
-      assert.equal(context.state,"running");
-      return Promise.resolve(true);
-    };
-    h.window.__testClock=context=>{
-      order.push("web-clock-advancing");
-      return Promise.resolve(true);
-    };
+    h.window.__testResume=()=>{throw Error("Native called Web resume");};
+    h.window.__testClock=()=>{throw Error("Native called Web clock");};
     h.window.Capacitor={Plugins:{BibloZooNativeSound:{
-      async getDebugState(){
-        snapshots++;
-        order.push("snapshot-"+snapshots);
-        return {
-          available:true,pending:snapshots===2, beganCount:snapshots===2?1:0,
-          endedCount:0,eventCount:snapshots===2?1:0,
-          lastSignal:snapshots===2?"began":"none",lastReasonCode:0
-        };
-      }
+      async getDebugState(){order.push("snapshot");return {
+        available:true,pending:false,beganCount:0,endedCount:0,
+        eventCount:0,lastSignal:"none",lastReasonCode:-1
+      };}
     }}};
     h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
       async prepare(){order.push("native-preload");return {ready:true};},
       play:()=>true,stop:()=>{},isReady:()=>true
     });
-    h.window.__interceptStart=r=>{
-      order.push("start-round");
-      r.roundStarted=true;
-    };
-    const pilot=runtime(true);
-    h.hooks.setRuntime(pilot);
-    await h.hooks.nativeBegin(pilot);
-    // async post-start snapshot is allowed to continue after game start
-    await new Promise(resolve=>setImmediate(resolve));
-    const resume=order.indexOf("web-resume-on-Got-It");
-    const clock=order.indexOf("web-clock-advancing");
-    const preload=order.indexOf("native-preload");
-    const start=order.indexOf("start-round");
-    assert.ok(resume>=0 && clock>resume && preload>clock && start>preload,
-      "web resume AND advancing clock must precede native preload and game start: "+order);
-    assert.equal(pilot.nativePilotBackend,"native");
-    assert.ok(snapshots>=3,"read-only snapshots must bracket Web, native and startup");
-    assert.match(pilot.nativePilotPhases.textContent,/after-web:/);
-    assert.match(pilot.nativePilotPhases.textContent,/after-native:/);
-    assert.match(pilot.nativePilotPhases.textContent,/round-start:/);
-    assert.match(pilot.nativePilotPhases.textContent,/pending=YES/);
-    assert.match(pilot.nativePilotPhases.textContent,/began=1/);
-    assert.equal(pilot.nativePilotChoicePending,false);
-  }
-  {
-    // A WebAudio context that is not demonstrably advancing cannot launch
-    // a native preview; it must choose WEB before the round starts and must
-    // NEVER preload native sounds, even if the bridge would accept them.
-    const h=feedHarness();
-    let preps=0;
-    let starts=[];
-    let resumes=0;
-    h.window.__testResume=()=>{resumes++;return Promise.resolve(true);};
-    h.window.__testClock=()=>Promise.resolve(false);
-    h.window.__interceptStart=r=>{starts.push(r.nativePilotBackend);r.roundStarted=true;};
-    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
-      prepare:()=>{preps++;return Promise.resolve({ready:true});},
-      stop:()=>{}
-    });
+    h.window.__interceptStart=r=>{order.push("start-round");r.roundStarted=true;};
     const r=runtime(true);
+    r.audioContext=null;
     h.hooks.setRuntime(r);
     await h.hooks.nativeBegin(r);
-    assert.equal(resumes,1);
-    assert.equal(preps,0,"a stalled Web clock must not prepare native sounds");
-    assert.deepEqual(starts,["web"]);
-    assert.match(r.nativePilotBadge.textContent,/web-clock-unavailable/);
-    assert.equal(r.nativePilotChoicePending,false);
-    assert.equal(r.startConfirmButton.disabled,false);
-    assert.equal(r.nativePilotCheckbox.disabled,false);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.deepEqual(order.filter(x=>x==="native-preload"||x==="start-round"),
+      ["native-preload","start-round"]);
+    assert.equal(r.nativePilotBackend,"native");
+    assert.equal(r.audioContext,null);
+    assert.match(r.nativePilotBadge.textContent,/Native ONLY: star\/chomp ready/);
+    assert.match(r.nativePilotPhases.textContent,/before-native:/);
+    assert.match(r.nativePilotPhases.textContent,/after-native:/);
+    assert.match(r.nativePilotPhases.textContent,/round-start:/);
   }
   {
-    // A Web context that becomes suspended DURING native preparation is
-    // evidence of a changing session. The experiment must fall back to Web
-    // BEFORE beginning the round, not attempt a late Web resume after native.
+    // An interruption-pending failure MUST NOT select Web effects.
+    // Silent gameplay and an explicit code are more useful to the tester.
     const h=feedHarness();
     const starts=[];
-    let stopped=0;
-    const r=runtime(true);
-    h.window.__interceptStart=value=>{starts.push(value.nativePilotBackend);value.roundStarted=true;};
+    let stops=0;
+    h.window.__testResume=()=>{throw Error("Web resume called on Native failure");};
+    h.window.__testClock=()=>{throw Error("Web clock probed on Native failure");};
+    h.window.__interceptStart=r=>{starts.push(r.nativePilotBackend);r.roundStarted=true;};
     h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
-      async prepare(){r.audioContext.state="suspended";return {ready:true};},
-      stop(){stopped++;}
+      prepare:async()=>({ready:false,reason:"interruption-pending"}),
+      play:()=>{throw Error("unprepared Native played");},
+      stop:()=>{stops++;}
     });
+    const r=runtime(true);
+    r.audioContext=null;
+    h.hooks.setRuntime(r);
+    await h.hooks.nativeBegin(r);
+    assert.deepEqual(starts,["native"],"Native failure must never select Web");
+    assert.equal(stops,1);
+    assert.equal(r.audioContext,null);
+    assert.match(r.nativePilotBadge.textContent,/Native ONLY unavailable \(interruption-pending\); sounds SILENT/);
+    assert.equal(r.nativePilotChoicePending,false);
+    assert.equal(r.startConfirmButton.disabled,false);
+  }
+  {
+    // The explicit unchecked Web choice still works independently.
+    const h=feedHarness();
+    const starts=[];
+    h.window.__interceptStart=r=>{starts.push(r.nativePilotBackend);r.roundStarted=true;};
+    const r=runtime(false);
     h.hooks.setRuntime(r);
     await h.hooks.nativeBegin(r);
     assert.deepEqual(starts,["web"]);
-    assert.equal(stopped,1);
-    assert.match(r.nativePilotBadge.textContent,/web-clock-changed/);
+    assert.match(r.nativePilotBadge.textContent,/Web \(explicit choice\)/);
+    assert.equal(r.nativePilot,null);
   }
   {
-    // A late read-only debug response must never start an exited game.
+    // A delayed read-only state response cannot launch an exited native game.
     const h=feedHarness();
     const pending=later();
     let starts=0,preps=0,stops=0;
@@ -479,16 +451,16 @@ async function main() {
       stop:()=>{stops++;}
     });
     const r=runtime(true);
+    r.audioContext=null;
     h.hooks.setRuntime(r);
     const waiting=h.hooks.nativeBegin(r);
-    // Let verified Web clock finish while debug snapshot remains unresolved.
     await new Promise(resolve=>setImmediate(resolve));
     h.hooks.setRuntime(null);
-    pending.resolve({available:true,pending:false,beginCount:0});
+    pending.resolve({available:true,pending:false});
     await waiting;
-    assert.equal(starts,0,"stale debug must not launch gameplay");
-    assert.equal(preps,0,"stale debug must not prepare native clips");
-    assert.ok(stops>=1,"stale startup must stop the isolated pilot");
+    assert.equal(starts,0);
+    assert.equal(preps,0);
+    assert.ok(stops>=1);
   }
   {
     const h=feedHarness();
@@ -513,15 +485,15 @@ async function main() {
     assert.equal(preps,1);
     assert.equal(on.nativePilotBackend,"native");
     assert.equal(on.startConfirmButton.disabled,false);
-    assert.match(on.nativePilotBadge.textContent,/Native star\/chomp ONLY/);
-    assert.match(on.nativePilotBadge.textContent,/Web peg beeps muted/);
+    assert.match(on.nativePilotBadge.textContent,/Native ONLY: star\/chomp ready/);
+    assert.match(on.nativePilotBadge.textContent,/Web audio OFF/);
     // Show a real safe bridge reason rather than a generic "failed" label.
     reportFailure("interruption-pending");
     assert.match(on.nativePilotBadge.textContent,
-      /Native effect failed \(interruption-pending\)/);
+      /Native ONLY failed \(interruption-pending\)/);
     reportFailure("<unsafe-reason>");
     assert.match(on.nativePilotBadge.textContent,
-      /Native effect failed \(bridge-error\)/);
+      /Native ONLY failed \(bridge-error\)/);
     // Real star/chomp functions must return BEFORE any Web/HTML playback.
     on.audioContext={state:"running",createBufferSource(){throw Error("web double sound");}};
     h.hooks.star(on);
@@ -542,10 +514,76 @@ async function main() {
     const fallback=runtime(true);
     h.hooks.setRuntime(fallback);
     await h.hooks.nativeBegin(fallback);
-    assert.deepEqual(starts,["web"],"native failure falls back before round only");
+    assert.deepEqual(starts,["native"],"Native failure stays native-only, SILENT");
     assert.equal(stops,1);
-    assert.equal(fallback.nativePilot,null);
-    assert.match(fallback.nativePilotBadge.textContent,/Web \(native unavailable: interruption-pending\)/);
+    assert.match(fallback.nativePilotBadge.textContent,
+      /Native ONLY unavailable \(interruption-pending\); sounds SILENT/);
+  }
+  {
+    // Native-only Resume must ignore a suspended/missing Web context, wait
+    // for the new native preflight and unfreeze only on a fresh human tap.
+    const h=feedHarness();
+    let resumes=0, clockChecks=0, rePrepares=0, continued=0;
+    h.window.__testResume=()=>{resumes++;throw Error("native used Web resume");};
+    h.window.__testClock=()=>{clockChecks++;throw Error("native used Web clock");};
+    h.window.__testContinue=(_r, _now, keepOverlay)=>{
+      continued++;
+      assert.equal(keepOverlay,false,"Native-only Resume must dismiss Welcome Back");
+      return true;
+    };
+    const r=runtime(true);
+    r.audioContext=null;
+    r.nativePilotBackend="native";
+    r.roundStarted=true;
+    r.running=true;
+    r.feedPausedAt=1234;
+    r.feedResumeGeneration=0;
+    r.feedResumePending=false;
+    r.resumeButton={disabled:false};
+    r.resumeStatus={textContent:"",hidden:true};
+    r.resumeOverlay={hidden:false};
+    r.nativePilot={prepare:async()=>{
+      rePrepares++;
+      return {ready:true};
+    }};
+    h.hooks.setRuntime(r);
+    const result=[];
+    assert.equal(h.hooks.resume(r,ok=>result.push(ok)),true);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(rePrepares,1);
+    assert.equal(continued,1);
+    assert.deepEqual(result,[true]);
+    assert.equal(r.feedResumePending,false);
+    assert.equal(r.resumeButton.disabled,false);
+    assert.equal(resumes,0);
+    assert.equal(clockChecks,0);
+  }
+  {
+    // Failed native-only Resume stays frozen with retry/Back; never tries Web.
+    const h=feedHarness();
+    let continued=0;
+    h.window.__testResume=()=>{throw Error("Web fallback from Native Resume");};
+    h.window.__testContinue=()=>{continued++;return true;};
+    const r=runtime(true);
+    r.audioContext=null;
+    r.nativePilotBackend="native";
+    r.roundStarted=true;
+    r.running=true;
+    r.feedPausedAt=1234;
+    r.feedResumeGeneration=0;
+    r.resumeButton={disabled:false};
+    r.resumeStatus={textContent:"",hidden:true};
+    r.resumeOverlay={hidden:false};
+    r.nativePilot={prepare:async()=>({ready:false,reason:"interruption-pending"})};
+    h.hooks.setRuntime(r);
+    const result=[];
+    assert.equal(h.hooks.resume(r,ok=>result.push(ok)),true);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.deepEqual(result,[false]);
+    assert.equal(continued,0);
+    assert.equal(r.feedPausedAt,1234);
+    assert.equal(r.resumeButton.disabled,false);
+    assert.match(r.resumeStatus.textContent,/Native sounds unavailable \(interruption-pending\)/);
   }
   {
     // Exit/route switch during a deferred prepare must not start another round.
@@ -591,18 +629,32 @@ async function main() {
     r.nativePilotBackend = "native";
     r.feedPausedAt = 1500;
     h.hooks.peg(r, 2000);
-    assert.equal(webBeepAttempts, 2,
-      "the shared Zoo Escape paused sound path remains unchanged");
+    assert.equal(webBeepAttempts, 1,
+      "Native-only tester must not make Web sounds even while paused");
   }
+  // Source contract for the experiment: nothing in the Native branch can
+  // reopen the very Web audio context whose clock failures blocked C.2c.
+  assert.match(FEED,/const audioContext = nativePilotAllowed\s*\?\s*null :/);
+  assert.match(FEED,/const starAudio =\s*audioContext \|\| nativePilotAllowed/);
+  assert.match(FEED,/const chompAudio = audioContext \|\| nativePilotAllowed/);
+  const nativeStartup=FEED.slice(
+    FEED.indexOf('    runtime.nativePilotBackend = "native";',
+      FEED.indexOf("async function startPreviewRoundWithAudioChoice")),
+    FEED.indexOf("  function startRound(runtime) {")
+  );
+  assert.ok(nativeStartup.length>500);
+  assert.doesNotMatch(nativeStartup,/resumeFeedAudioContext|feedAudioClockAdvances|new Audio\(|runtime\.nativePilotBackend\s*=\s*"web"/);
+  assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-star"/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-chomp"/);
-  assert.match(FEED,/const nativeRetry = runtime\.nativePilotBackend === "native"/);
-  assert.match(FEED,/if \(nativeRetry\) \{[\s\S]*?finishResume\(result\?\.ready === true\)/);
+  assert.match(FEED,/if \(runtime\.nativePilotBackend === "native"\) \{[\s\S]*?Native-only preview/);
+  assert.match(FEED,/native-resume-timeout/);
+  assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
   assert.match(FEED,/runtime\.nativePilot\?\.isReady\?\.\(\) !== true/);
   assert.match(FEED,/runtime\.nativePilot\?\.stop\?\.\(\)/);
   assert.match(FEED,/session\.dailyTodoPreview === true[\s\S]*?mode === FEED_MODES\.CLASSIC/);
   assert.doesNotMatch(PILOT,/\.setCategory\s*\(|\.setActive\s*\(|\.setMode\s*\(/,
     "the JS pilot must not change native AVAudioSession policy");
-  console.log("Stage C.2 native Feeding Classic tester preview gate passed (adapter, fallback, isolation, stale calls, lifecycle source contracts).");
+  console.log("Stage C.2d Native-only Feeding preview contract passed (no Web fallback/clock, stable web baseline, native errors/lifecycle).");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

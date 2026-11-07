@@ -36,9 +36,7 @@
   // Web Audio clock is necessary (but not sufficient) evidence of usable sound.
   const FEED_AUDIO_CLOCK_PROBE_MS = 180;
   const FEED_AUDIO_CLOCK_MIN_ADVANCE = 0.012;
-  // C.2c experiment: Got It! verifies the existing Web clock before native
-  // samples are prepared. Both deadlines are bounded and test-only.
-  const FEED_NATIVE_CLOCK_READY_TIMEOUT_MS = 900;
+  // C.2d: Native-only does not depend on the Web Audio clock.
   const FEED_NATIVE_STATE_READ_TIMEOUT_MS = 500;
   const FEED_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
   const FEED_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
@@ -1329,7 +1327,7 @@
           ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">Preview audio: Web (default)</div>'
           : ""}
         ${nativePilotPreview
-          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native startup trace: select the DEV checkbox</div>'
+          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native-only diagnostic: select the DEV checkbox</div>'
           : ""}
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
@@ -1417,7 +1415,7 @@
                 <label class="daily-feed-native-pilot-opt"
                   data-daily-feed-native-pilot-opt data-no-ui-sound>
                   <input type="checkbox" data-daily-feed-native-opt-in>
-                  <span>DEV: Native star + chomp (off by default)</span>
+                  <span>DEV: Native ONLY (no Web fallback; star + chomp)</span>
                 </label>
                 <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
                   role="status" aria-live="polite">Web effects are the default.</p>
@@ -1610,6 +1608,7 @@
   function zooEscapeSoundReady(runtime) {
     const context = runtime?.audioContext;
     if (!runtime || activeRuntime !== runtime || !context ||
+        runtime.nativePilotBackend === "native" ||
         context.state !== "running" || document.hidden || runtime.feedPageHidden ||
         runtime.feedPausedAt == null) return false;
     const wall = performance.now();
@@ -1626,6 +1625,7 @@
   }
 
   function playZooEscapeSound(runtime, kind) {
+    if (runtime?.nativePilotBackend === "native") return;
     // Bouncing ten pets could otherwise create dozens of simultaneous notes.
     const now = performance.now();
     const minGap = kind === "bounce" ? 180 : 85;
@@ -1636,16 +1636,10 @@
   }
 
   function playPegTone(runtime, now) {
-    // C.2b device isolation ONLY: when Classic tester has explicitly chosen
-    // native star/chomp, omit the synthesized Web Audio collision beeps.
-    // Native samples worked in isolation but failed when mixed with game
-    // Web Audio; whether these beeps cause iOS interruptions is unproven.
-    // Keep the Web Audio context/clock alive for existing Resume/Zoo Escape
-    // recovery, and leave normal Daily Feeding and all Web preview unchanged.
-    // Zoo Escape's paused sound effects retain their original readiness gate.
+    // Native-only Classic does not emit a Web oscillator, even while paused.
+    // Peg tones have not yet been migrated and are intentionally silent.
     if (runtime.nativePilotBackend === "native" &&
-        runtime.mode === FEED_MODES.CLASSIC &&
-        runtime.feedPausedAt == null) return;
+        runtime.mode === FEED_MODES.CLASSIC) return;
     const context = runtime.audioContext;
     if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
 
@@ -3462,9 +3456,9 @@
     }
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
     setFeedingResumeStatus(runtime);
-    // Only start the minigame for a genuinely active, interrupted round.
-    // New interruptions reset its stage and cancel every previous animation.
-    runtime.zooEscape?.start?.();
+    // Native-only tests pause with explicit Resume/Back, not Zoo Escape
+    // as an audio-repair minigame. All non-native paths retain that feature.
+    if (runtime.nativePilotBackend !== "native") runtime.zooEscape?.start?.();
     return true;
   }
 
@@ -3474,7 +3468,8 @@
         runtime.feedPageHidden || document.hidden ||
         (runtime.nativePilotBackend === "native" &&
           runtime.nativePilot?.isReady?.() !== true) ||
-        (runtime.audioContext && runtime.audioContext.state !== "running")) return false;
+        (runtime.nativePilotBackend !== "native" &&
+          runtime.audioContext && runtime.audioContext.state !== "running")) return false;
     const elapsed = Math.max(0, now - runtime.feedPausedAt);
     // Shift time-dependent effects, including Classic's 22s expiry and
     // Labyrinth's stuck-ball timer. Never touch positions or rewards.
@@ -3519,6 +3514,55 @@
         document.hidden || runtime.feedResumePending) {
       report(false);
       return false;
+    }
+    if (runtime.nativePilotBackend === "native") {
+      // No Web clock, no Web AudioRecoveryCoordinator and no audio-driven
+      // Zoo Escape in the opt-in Native-only preview. A fresh Resume gesture
+      // must re-prepare the two native samples before unfreezing this round.
+      runtime.feedResumePending = true;
+      setFeedingResumeStatus(runtime,
+        "Preparing native sounds… This preview has no Web fallback.");
+      if (runtime.resumeButton) runtime.resumeButton.disabled = true;
+      const generation = ++runtime.feedResumeGeneration;
+      let settled = false;
+      const finish = (ready, reason) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(runtime.feedResumeWatchdog);
+        runtime.feedResumeWatchdog = null;
+        if (activeRuntime !== runtime ||
+            runtime.feedResumeGeneration !== generation ||
+            runtime.feedPausedAt == null || runtime.finished ||
+            document.hidden || runtime.feedPageHidden) {
+          report(false);
+          return;
+        }
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        if (!ready) {
+          // No silent backend change. Keep the same frozen round with
+          // explicit retry/Back; never award progress for an audio failure.
+          const detail = typeof reason === "string" &&
+            /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
+          setFeedingResumeStatus(runtime,
+            "Native sounds unavailable (" + detail + "). Tap Resume again or Back.");
+          report(false);
+          return;
+        }
+        runtime.feedAudioRecoveryVerified = true;
+        const resumed = continueFeedingAfterGesture(runtime, performance.now(), false);
+        report(resumed);
+      };
+      runtime.feedResumeWatchdog = setTimeout(
+        () => finish(false, "native-resume-timeout"), 4200);
+      try {
+        void Promise.resolve(runtime.nativePilot?.prepare?.() ||
+          { ready: false, reason: "missing-bridge" }).then(
+          value => finish(value?.ready === true, value?.reason),
+          () => finish(false, "native-prepare-error")
+        );
+      } catch (_) { finish(false, "native-prepare-error"); }
+      return true;
     }
     const Ctor = window.AudioContext || window.webkitAudioContext;
     const needsReplacement = runtime.feedAudioNeedsFreshContext ||
@@ -4856,16 +4900,47 @@
     paint();
   }
 
+  // The unchecked Web baseline prepares its original sounds only when
+  // explicitly chosen. The native-only path never calls this helper.
+  function prepareWebClassicPreviewOnTap(runtime) {
+    if (runtime.audioContext || runtime.starAudio || runtime.chompAudio) return;
+    runtime.audioContext = prepareAudio();
+    if (runtime.audioContext) return;
+    // Preserve the existing HTML fallback on devices without Web Audio.
+    try {
+      runtime.starAudio = new Audio(`${ASSET_BASE}dq_feed_star.mp3`);
+      runtime.starAudio.preload = "auto";
+      runtime.starAudio.volume = feedingSoundVolume(0.82);
+      runtime.starAudio.load();
+      runtime.chompAudio = new Audio(`${ASSET_BASE}dq_feed_chomp.mp3`);
+      runtime.chompAudio.preload = "auto";
+      runtime.chompAudio.volume = feedingSoundVolume(0.85);
+      runtime.chompAudio.load();
+    } catch (_) { /* Web baseline keeps its original best-effort behavior. */ }
+  }
+
   async function startPreviewRoundWithAudioChoice(runtime) {
     if (!runtime || activeRuntime !== runtime ||
         runtime.nativePilotChoicePending || runtime.roundStarted ||
         runtime.finished || runtime.controlPhase !== "instructions") return;
-    // Only explicit iOS Classic *tester previews* may select native effects.
     if (!runtime.nativePilotAllowed ||
         runtime.nativePilotCheckbox?.checked !== true) {
+      // Explicit Web comparison, not an audio-error fallback from Native.
       runtime.nativePilotBackend = "web";
+      prepareWebClassicPreviewOnTap(runtime);
+      if (runtime.nativePilotBadge)
+        runtime.nativePilotBadge.textContent = "Preview audio: Web (explicit choice)";
       startRound(runtime);
       return;
+    }
+
+    // C.2d experiment: once the owner chooses Native, do not create, resume,
+    // clock-probe or silently select Web Audio. A failed native sound remains
+    // intentionally SILENT and carries an accurate diagnostic reason.
+    runtime.nativePilotBackend = "native";
+    if (preparedAudioContext) {
+      stopAudioContext(preparedAudioContext);
+      preparedAudioContext = null;
     }
     const factory = window.BibloZooFeedingNativeAudioPilot;
     const pilot = factory?.create?.({
@@ -4877,7 +4952,7 @@
           const detail = typeof reason === "string" &&
             /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
           runtime.nativePilotBadge.textContent =
-            "Native effect failed (" + detail + "). Exit preview to retry";
+            "Native ONLY failed (" + detail + "); silent effects. Exit/retry";
         }
         void recordNativePreviewPhase(runtime, "play-fail");
       }
@@ -4885,9 +4960,8 @@
     runtime.nativePilotChoicePending = true;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = true;
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
-    if (runtime.nativePilotChoiceStatus) {
-      runtime.nativePilotChoiceStatus.textContent = "Verifying Web Audio clock first…";
-    }
+    if (runtime.nativePilotChoiceStatus)
+      runtime.nativePilotChoiceStatus.textContent = "Preparing ONLY native star/chomp…";
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&
       !document.hidden && !runtime.feedPageHidden;
@@ -4899,84 +4973,35 @@
         if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
       }
     };
-    const context = runtime.audioContext;
-    // IMPORTANT: call resume synchronously within the real Got It! gesture,
-    // before ANY await. WebKit may require transient user activation.
-    // Native preload must not run until the Web clock has actually advanced.
-    let webResume;
-    try { webResume = resumeFeedAudioContext(context); }
-    catch (_) { webResume = Promise.resolve(false); }
-
-    let webClockReady = false;
+    // Read-only state is not a readiness gate; it cannot veto native audio.
+    await recordNativePreviewPhase(runtime, "before-native");
+    if (!live()) { cancelStale(); return; }
+    let result;
     try {
-      const resumed = await boundedNativeFeedStage(
-        webResume, FEED_NATIVE_CLOCK_READY_TIMEOUT_MS);
-      if (resumed && live()) {
-        webClockReady = await boundedNativeFeedStage(
-          feedAudioClockAdvances(context), FEED_NATIVE_CLOCK_READY_TIMEOUT_MS);
-      }
-    } catch (_) {
-      webClockReady = false;
-    }
-    if (!live()) {
-      cancelStale();
-      return;
-    }
-    // Observes state *after* verified clock activity, before any native
-    // preload. A moving clock is not proof the device speaker was audible.
-    await recordNativePreviewPhase(runtime, "after-web");
-    if (!live()) {
-      cancelStale();
-      return;
-    }
-    if (runtime.nativePilotChoiceStatus) {
-      runtime.nativePilotChoiceStatus.textContent = webClockReady
-        ? "Web clock verified. Preparing native star and chomp…"
-        : "Web clock unavailable; using Web preview sounds.";
-    }
-    let result = { ready: false, reason: "web-clock-unavailable" };
-    if (webClockReady) {
-      try { result = await pilot?.prepare?.() || { ready: false, reason: "missing-bridge" }; }
-      catch (_) { result = { ready: false, reason: "prepare-error" }; }
-    }
-    if (!live()) {
-      cancelStale();
-      return;
-    }
-    // Compare native notification counts with the after-Web snapshot BEFORE
-    // starting gameplay; a rejected preload is a Web fallback, not a voice.
+      result = await pilot?.prepare?.() || { ready: false, reason: "missing-bridge" };
+    } catch (_) { result = { ready: false, reason: "prepare-error" }; }
+    if (!live()) { cancelStale(); return; }
     await recordNativePreviewPhase(runtime, "after-native");
-    if (!live()) {
-      cancelStale();
-      return;
-    }
+    if (!live()) { cancelStale(); return; }
+
     runtime.nativePilotChoicePending = false;
     if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
-    if (result?.ready === true && pilot &&
-        context?.state === "running" && runtime.audioContext === context) {
-      runtime.nativePilot = pilot;
-      runtime.nativePilotBackend = "native";
-      if (runtime.nativePilotBadge) {
+    runtime.nativePilot = pilot || null;
+    if (result?.ready === true && pilot) {
+      if (runtime.nativePilotBadge)
         runtime.nativePilotBadge.textContent =
-          "Native star/chomp ONLY (Web peg beeps muted for test)";
-      }
+          "Native ONLY: star/chomp ready; Web audio OFF";
     } else {
+      // A failed pilot does NOT silently start a Web backend. The owner can
+      // observe silent gameplay + the exact failure code, or exit/restart.
       pilot?.stop?.();
-      runtime.nativePilot = null;
-      // Any failure selects the old backend BEFORE starting gameplay. Never
-      // silently change engines after the first collision/audio event.
-      runtime.nativePilotBackend = "web";
-      if (runtime.nativePilotBadge) {
-        const clockChanged = result?.ready === true &&
-          (context?.state !== "running" || runtime.audioContext !== context);
-        const reason = clockChanged ? "web-clock-changed" :
-          typeof result?.reason === "string" &&
-            /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
-              ? result.reason : "bridge-error";
+      const reason = typeof result?.reason === "string" &&
+        /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
+        ? result.reason : "bridge-error";
+      if (runtime.nativePilotBadge)
         runtime.nativePilotBadge.textContent =
-          "Preview audio: Web (native unavailable: " + reason + ")";
-      }
+          "Native ONLY unavailable (" + reason + "); sounds SILENT";
     }
     startRound(runtime);
     void recordNativePreviewPhase(runtime, "round-start");
@@ -5044,7 +5069,8 @@
     // Starting is itself a gesture. Give its Web Audio resume promise a
     // chance to settle BEFORE advancing game time, rather than flashing a
     // needless second Resume prompt during an ordinary new round.
-    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+    if (runtime.nativePilotBackend !== "native" &&
+        runtime.audioContext && runtime.audioContext.state !== "running") {
       const beganAt = performance.now();
       runtime.feedStartAudioWatchdog = setTimeout(() => {
         runtime.feedStartAudioWatchdog = null;
@@ -5093,7 +5119,8 @@
       pauseFeedingGame(runtime, runtime.lastFrameAt);
       return;
     }
-    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+    if (runtime.nativePilotBackend !== "native" &&
+        runtime.audioContext && runtime.audioContext.state !== "running") {
       pauseFeedingGame(runtime, now);
       return;
     }
@@ -5418,14 +5445,24 @@
     const petRect =
       petCircle.getBoundingClientRect();
 
-    const audioContext =
-      preparedAudioContext ||
-      prepareAudio();
-
+    // The Native-only Classic tester cannot create/resume a Feeding
+    // AudioContext before the user has even checked the Native box.
+    // Defer Web-only resource allocation until Got It! in the unchecked
+    // comparison run. All other game modes retain their original setup.
+    const nativePilotAllowed =
+      session.dailyTodoPreview === true &&
+      mode === FEED_MODES.CLASSIC &&
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
+    if (nativePilotAllowed && preparedAudioContext) {
+      stopAudioContext(preparedAudioContext);
+      preparedAudioContext = null;
+    }
+    const audioContext = nativePilotAllowed
+      ? null : (preparedAudioContext || prepareAudio());
     preparedAudioContext = null;
 
     const starAudio =
-      audioContext
+      audioContext || nativePilotAllowed
         ? null
         : new Audio(
           `${ASSET_BASE}dq_feed_star.mp3`
@@ -5440,7 +5477,7 @@
       } catch (err) { }
     }
 
-    const chompAudio = audioContext
+    const chompAudio = audioContext || nativePilotAllowed
       ? null
       : new Audio(`${ASSET_BASE}dq_feed_chomp.mp3`);
 
@@ -5454,10 +5491,6 @@
     const scheduled =
       buildScheduledBalls();
 
-    const nativePilotAllowed =
-      session.dailyTodoPreview === true &&
-      mode === FEED_MODES.CLASSIC &&
-      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
     const runtime = {
       running: false,
       roundStarted: false,
@@ -5893,7 +5926,8 @@
       // The visible Back pill is available throughout all three stages.
       // A Daily Questions reward may decline the normal Back action, so its
       // owner supplies an explicit abort without awarding completion credit.
-      const exit = runtime.zooEscape?.isPaused?.()
+      const exit = runtime.nativePilotBackend === "native" ||
+        runtime.zooEscape?.isPaused?.()
         ? (runtime.onRecoveryExitToZoo || runtime.onBackToZoo)
         : runtime.onBackToZoo;
       const shouldClose = exit?.();
@@ -5937,17 +5971,17 @@
         if (runtime.nativePilotChoiceStatus) {
           runtime.nativePilotChoiceStatus.textContent =
             runtime.nativePilotCheckbox.checked
-              ? "Native selected. Tap Got It! to verify Web clock, then both sounds."
+              ? "Native ONLY selected. Got It! tests native star/chomp, no Web fallback."
               : "Web effects selected (default).";
         }
         runtime.nativePilotTrace = [];
         if (runtime.nativePilotPhases && !runtime.nativePilotCheckbox.checked) {
-          runtime.nativePilotPhases.textContent = "Native startup trace: Web default";
+          runtime.nativePilotPhases.textContent = "Native-only diagnostic: Web comparison selected";
         }
         if (runtime.nativePilotCheckbox.checked) {
           // Separate checkbox gesture precedes Got It!, so this is our
           // best read-only baseline without consuming Got It's activation.
-          void recordNativePreviewPhase(runtime, "before-web");
+          void recordNativePreviewPhase(runtime, "selected-native");
         }
       };
       runtime.nativePilotCheckbox.addEventListener(
