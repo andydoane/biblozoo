@@ -57,7 +57,8 @@ function runtime(){return {nativePilotAllowed:true,nativePilotCheckbox:null,nati
 async function main(){
   const h=harness(),r=runtime();let starts=0;
   const html=h.hooks.render({session:{feedMode:"melody",petName:"BibloPet"}});
-  assert.match(html,/Native Melody: prepare notes on Got It!/);
+  assert.doesNotMatch(html,/Native Melody: prepare/);
+  assert.match(html,/data-daily-feed-native-choice-status/);
   assert.doesNotMatch(html,/data-daily-feed-native-opt-in/);
   h.window.__interceptStart=x=>{starts++;x.roundStarted=true;};
   h.hooks.setRuntime(r);
@@ -83,7 +84,8 @@ async function main(){
   assert.equal(failStarts,0);assert.equal(fr.nativePilot,null);
   assert.equal(fr.controlPhase,"instructions");
   assert.equal(fr.startConfirmButton.textContent,"Try Again");
-  assert.match(fr.nativePilotChoiceStatus.textContent,/interruption-pending/);
+  assert.match(fr.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
+  assert.match(fr.nativePilotBadge.textContent,/interruption-pending/);
   fail.api.preload=async({soundId})=>{fail.calls.push(["preload",soundId]);return {prepared:true};};
   await fail.hooks.start(fr);assert.equal(failStarts,1);
   assert.equal(fr.nativePilotBackend,"native");
