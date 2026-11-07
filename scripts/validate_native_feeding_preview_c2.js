@@ -23,6 +23,11 @@ assert.ok(HTML.indexOf(startup) < HTML.indexOf('<script src="daily_questions_fee
 assert.match(CI, /node scripts\/validate_native_feeding_preview_c2\.js/);
 assert.match(CSS, /\.daily-feed-native-pilot-opt/);
 assert.match(CSS, /\.daily-feed-native-pilot-badge/);
+assert.match(CSS, /\.daily-feed-native-pilot-phases/);
+assert.match(FEED, /const FEED_NATIVE_CLOCK_READY_TIMEOUT_MS = 900;/);
+assert.match(FEED, /feedAudioClockAdvances\(context\)/);
+assert.match(FEED, /"after-web"/);
+assert.match(FEED, /"after-native"/);
 assert.match(APP, /dailyTodoPreview: true/, "preview is a test-only session");
 
 function later() {
@@ -65,7 +70,9 @@ function feedHarness(nativeIOS=true) {
     location:{protocol:"https:"},
     devicePixelRatio:1,
     DeviceOrientationEvent:function(){},
-    BibloZooFeedingNativeAudioPilot:{ isIOS:()=>nativeIOS }
+    BibloZooFeedingNativeAudioPilot:{ isIOS:()=>nativeIOS },
+    __testResume: context => Promise.resolve(context?.state === "running"),
+    __testClock: context => Promise.resolve(context?.state === "running")
   };
   const sandbox={
     window, document:{hidden:false}, Image:class{}, Audio:class{},
@@ -90,6 +97,12 @@ ${marker}`;
   const compiled=FEED.replace(
     '  function startRound(runtime) {',
     '  function startRound(runtime) { if (window.__interceptStart) { window.__interceptStart(runtime); return; }'
+  ).replace(
+    '  function resumeFeedAudioContext(context) {',
+    '  function resumeFeedAudioContext(context) { if (window.__testResume) return window.__testResume(context);'
+  ).replace(
+    '  function feedAudioClockAdvances(context) {',
+    '  function feedAudioClockAdvances(context) { if (window.__testClock) return window.__testClock(context);'
   ).replace(marker,injection);
   vm.runInNewContext(compiled,sandbox,{filename:"daily_questions_feed_game.js"});
   return {window,sandbox,api:window.BibloZooDailyFeedGame,hooks:window.__stageC2};
@@ -103,6 +116,8 @@ function runtime(checked) {
     nativePilotBackend:"web",
     nativePilot:null,
     nativePilotBadge:{textContent:""},
+    nativePilotPhases:{textContent:""},
+    nativePilotTrace:[],
     nativePilotChoiceStatus:{textContent:""},
     startConfirmButton:{disabled:false},
     roundStarted:false,
@@ -110,6 +125,7 @@ function runtime(checked) {
     finished:false,
     feedPageHidden:false,
     mode:"classic",
+    audioContext:{state:"running",currentTime:12},
     feedSoundNodes:new Set(),
     starAudio:null,chompAudio:null
   };
@@ -231,6 +247,7 @@ async function main() {
     assert.match(preview,/data-no-ui-sound/);
     assert.match(preview,/Native star \+ chomp/);
     assert.match(preview,/data-daily-feed-native-badge/);
+    assert.match(preview,/data-daily-feed-native-phases/);
     assert.doesNotMatch(h.api.render({session:{feedMode:"classic",petName:"Pip"}}),
       /data-daily-feed-native-opt-in/,"normal Daily Feeding may never opt in");
     for(const mode of ["bounce","labyrinth","melody"]){
@@ -315,13 +332,17 @@ async function main() {
       nativePilotChoiceStatus: { textContent: "" },
       roundStarted: false, finished: false, controlPhase: "instructions"
     };
+    const snapshots=[];
     vm.runInNewContext(FEED.slice(hook, hookEnd), {
-      runtime: nativeRuntime, activeRuntime: nativeRuntime
+      runtime: nativeRuntime, activeRuntime: nativeRuntime,
+      recordNativePreviewPhase: (_, phase) => { snapshots.push(phase); }
     }, { filename: "Feeding native opt-in change handler" });
     assert.equal(typeof changed, "function");
     changed();
     assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
       /native selected.*tap got it/i);
+    assert.deepEqual(snapshots, ["before-web"],
+      "checkbox selection must capture a read-only before-Web baseline");
     nativeRuntime.nativePilotCheckbox.checked = false;
     changed();
     assert.match(nativeRuntime.nativePilotChoiceStatus.textContent,
