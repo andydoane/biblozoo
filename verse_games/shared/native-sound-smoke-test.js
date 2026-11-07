@@ -124,14 +124,23 @@
         const prepared = await bounded(api.preload({ soundId: SOUND_ID }));
         if (!current(token)) return;
         if (prepared?.prepared !== true) {
-          status.textContent = "Could not prepare: " + safeReason(prepared?.reason);
+          // A blocked prepare NEVER invokes this button's play call.
+          status.textContent = prepared?.reason === "interruption-pending"
+            ? "No new native sound requested: iOS interruption pending. Return to app and tap again."
+            : "Could not prepare: " + safeReason(prepared?.reason);
           return;
         }
+        const signal = safeReason(prepared?.lastInterruptionSignal);
+        const note = signal === "foreground-tap-retry"
+          ? " Fresh tap after foreground return."
+          : signal === "suspended-began"
+            ? " iOS reported a past suspension."
+            : "";
         status.textContent = "Requesting native playback…";
         const started = await bounded(api.play({ soundId: SOUND_ID, volume: 0.85 }));
         if (!current(token)) { stopQuietly(); return; }
         status.textContent = started?.accepted === true
-          ? "Native playback requested. Did you hear the sound?"
+          ? "Native playback requested. Did you hear the sound?" + note
           : "Native play failed: " + safeReason(started?.reason);
       } catch (_) {
         if (current(token)) {
