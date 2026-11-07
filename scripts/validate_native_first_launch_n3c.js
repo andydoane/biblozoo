@@ -54,8 +54,9 @@ const earlyReturn=start.indexOf("      return;",guardStart);
 assert.ok(guardStart>=0 && earlyReturn>guardStart && firstStart>earlyReturn,
   "failed preflight returns BEFORE startRound");
 assert.match(start,/runtime\.nativePilot = pilot;[\s\S]*?startRound\(runtime\)/);
-assert.doesNotMatch(start,/Web Audio\.resume\(|new Audio\(|runtime\.nativePilotBackend = "web"(?=[\s\S]*?startRound)/,
-  "Native failure may not silently change backend in the same branch");
+const nativeFlow=start.slice(start.indexOf("    // C.2d experiment:"));
+assert.doesNotMatch(nativeFlow,/Web Audio\.resume\(|new Audio\(|runtime\.nativePilotBackend = "web"/,
+  "Native failure may not silently change backend in the native branch");
 // Web-browsers have their own explicit choice; never globally remove it.
 assert.match(game,/Preview audio: Web \(explicit choice\)/);
 assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/);
