@@ -45,6 +45,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_audio_test_identity.js
 
+      - name: Validate native sound smoke test source and bridge
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_sound_smoke_test.js
+
       - name: Validate daily activity and verse flows
         shell: bash
         run: |
