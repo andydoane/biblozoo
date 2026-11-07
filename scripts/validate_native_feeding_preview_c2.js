@@ -481,15 +481,15 @@ async function main() {
     assert.equal(preps,1);
     assert.equal(on.nativePilotBackend,"native");
     assert.equal(on.startConfirmButton.disabled,false);
-    assert.match(on.nativePilotBadge.textContent,/Native star\/chomp ONLY/);
-    assert.match(on.nativePilotBadge.textContent,/Web peg beeps muted/);
+    assert.match(on.nativePilotBadge.textContent,/Native ONLY: star\/chomp ready/);
+    assert.match(on.nativePilotBadge.textContent,/Web audio OFF/);
     // Show a real safe bridge reason rather than a generic "failed" label.
     reportFailure("interruption-pending");
     assert.match(on.nativePilotBadge.textContent,
-      /Native effect failed \(interruption-pending\)/);
+      /Native ONLY failed \(interruption-pending\)/);
     reportFailure("<unsafe-reason>");
     assert.match(on.nativePilotBadge.textContent,
-      /Native effect failed \(bridge-error\)/);
+      /Native ONLY failed \(bridge-error\)/);
     // Real star/chomp functions must return BEFORE any Web/HTML playback.
     on.audioContext={state:"running",createBufferSource(){throw Error("web double sound");}};
     h.hooks.star(on);
@@ -510,10 +510,10 @@ async function main() {
     const fallback=runtime(true);
     h.hooks.setRuntime(fallback);
     await h.hooks.nativeBegin(fallback);
-    assert.deepEqual(starts,["web"],"native failure falls back before round only");
+    assert.deepEqual(starts,["native"],"Native failure stays native-only, SILENT");
     assert.equal(stops,1);
-    assert.equal(fallback.nativePilot,null);
-    assert.match(fallback.nativePilotBadge.textContent,/Web \(native unavailable: interruption-pending\)/);
+    assert.match(fallback.nativePilotBadge.textContent,
+      /Native ONLY unavailable \(interruption-pending\); sounds SILENT/);
   }
   {
     // Exit/route switch during a deferred prepare must not start another round.
@@ -559,18 +559,19 @@ async function main() {
     r.nativePilotBackend = "native";
     r.feedPausedAt = 1500;
     h.hooks.peg(r, 2000);
-    assert.equal(webBeepAttempts, 2,
-      "the shared Zoo Escape paused sound path remains unchanged");
+    assert.equal(webBeepAttempts, 1,
+      "Native-only tester must not make Web sounds even while paused");
   }
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-star"/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-chomp"/);
-  assert.match(FEED,/const nativeRetry = runtime\.nativePilotBackend === "native"/);
-  assert.match(FEED,/if \(nativeRetry\) \{[\s\S]*?finishResume\(result\?\.ready === true\)/);
+  assert.match(FEED,/if \(runtime\.nativePilotBackend === "native"\) \{[\s\S]*?Native-only preview/);
+  assert.match(FEED,/native-resume-timeout/);
+  assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
   assert.match(FEED,/runtime\.nativePilot\?\.isReady\?\.\(\) !== true/);
   assert.match(FEED,/runtime\.nativePilot\?\.stop\?\.\(\)/);
   assert.match(FEED,/session\.dailyTodoPreview === true[\s\S]*?mode === FEED_MODES\.CLASSIC/);
   assert.doesNotMatch(PILOT,/\.setCategory\s*\(|\.setActive\s*\(|\.setMode\s*\(/,
     "the JS pilot must not change native AVAudioSession policy");
-  console.log("Stage C.2 native Feeding Classic tester preview gate passed (adapter, fallback, isolation, stale calls, lifecycle source contracts).");
+  console.log("Stage C.2d Native-only Feeding preview contract passed (no Web fallback/clock, stable web baseline, native errors/lifecycle).");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
