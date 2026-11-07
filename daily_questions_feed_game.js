@@ -1629,6 +1629,16 @@
   }
 
   function playPegTone(runtime, now) {
+    // C.2b device isolation ONLY: when Classic tester has explicitly chosen
+    // native star/chomp, omit the synthesized Web Audio collision beeps.
+    // Native samples worked in isolation but failed when mixed with game
+    // Web Audio; whether these beeps cause iOS interruptions is unproven.
+    // Keep the Web Audio context/clock alive for existing Resume/Zoo Escape
+    // recovery, and leave normal Daily Feeding and all Web preview unchanged.
+    // Zoo Escape's paused sound effects retain their original readiness gate.
+    if (runtime.nativePilotBackend === "native" &&
+        runtime.mode === FEED_MODES.CLASSIC &&
+        runtime.feedPausedAt == null) return;
     const context = runtime.audioContext;
     if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
 
@@ -4792,11 +4802,15 @@
     const pilot = factory?.create?.({
       isCurrent: () => activeRuntime === runtime && !runtime.finished &&
         !document.hidden && !runtime.feedPageHidden,
-      onFailure: () => {
+      onFailure: (reason) => {
         if (activeRuntime !== runtime || runtime.finished) return;
         if (runtime.nativePilotBadge) {
+          // Adapter restricts reasons to safe, short ASCII codes. Showing the
+          // actual rejection is diagnostic, NOT an audibility measurement.
+          const detail = typeof reason === "string" &&
+            /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
           runtime.nativePilotBadge.textContent =
-            "Native effect failed; exit preview to retry";
+            "Native effect failed (" + detail + "). Exit preview to retry";
         }
       }
     });
@@ -4825,7 +4839,8 @@
       runtime.nativePilot = pilot;
       runtime.nativePilotBackend = "native";
       if (runtime.nativePilotBadge) {
-        runtime.nativePilotBadge.textContent = "Preview audio: Native star/chomp";
+        runtime.nativePilotBadge.textContent =
+          "Native star/chomp ONLY (Web peg beeps muted for test)";
       }
     } else {
       pilot?.stop?.();
