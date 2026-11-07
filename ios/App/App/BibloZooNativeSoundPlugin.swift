@@ -3,13 +3,13 @@ import UIKit
 import Capacitor
 import AVFAudio
 
-// N3a native-only iOS session owner: predecoded PCM-buffer effects on
-// AVAudioEngine/AVAudioPlayerNode for star/chomp; unchanged AVAudioPlayer
-// control sample for pilot-unlock. No Web Audio or
+// N3b native-only iOS session owner: fixed predecoded PCM star/chomp plus
+// six locally synthesized native peg tones with bounded overlapping voices.
+// DEV pilot-unlock remains a native AVAudioPlayer control. No Web Audio or
 // HTML fallback. Only an explicit Start/Resume/DEV tap may request a bounded
 // setActive(true) retry AFTER a completed foreground return. This plugin never
 // calls setCategory/setMode, deactivates, or automatically resumes sound.
-// Three allowlisted MP3 resources are packaged in the app target.
+// Three allowlisted MP3 resources are packaged; peg notes are Swift-generated PCM.
 @objc(BibloZooNativeSoundPlugin)
 final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "BibloZooNativeSoundPlugin"
@@ -48,9 +48,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     // Only these two fixed IDs use predecoded buffers. Unchanged native
     // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
     private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp"]
+    private let nativePegSoundID = "feed-peg"
+    // Matches Classic's existing six-note Web oscillator scale. Never pass
+    // raw frequencies/oscillator parameters through the Capacitor bridge.
+    private let pegFrequencies: [Double] = [
+        523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
+    ]
+    private let sampleVoiceLimit = 2
+    private let pegVoiceLimit = 4
     private var effectsEngine: AVAudioEngine? // playbackQueue only
     private var effectBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
-    private var effectNodes: [String: AVAudioPlayerNode] = [:] // worker only
+    private var pegToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
+    private var effectNodes: [String: [AVAudioPlayerNode]] = [:] // worker only
+    private var nextEffectVoice: [String: Int] = [:] // worker only
     private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
     private var lastNativeBackend = "none"
     private var lastNativePrepareMs = -1
@@ -334,21 +344,26 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     // clip alive after background/interruption/route or media-services reset.
     // A new explicit gesture must preload and warm the engine again.
     private func discardEffectsOnWorker() {
-        for node in effectNodes.values { node.stop() }
+        for nodes in effectNodes.values {
+            for node in nodes { node.stop() }
+        }
         effectsEngine?.stop()
         effectNodes.removeAll()
+        nextEffectVoice.removeAll()
         effectBuffers.removeAll()
+        pegToneBuffers.removeAll()
         effectsEngine = nil
     }
 
-    // Already on playbackQueue. At first prepare, decode the fixed bundled
-    // MP3 to an AVAudioPCMBuffer, attach its own node to the native mixer,
-    // start the engine and pre-start the player into silence (no clip queued).
-    // Actual clip scheduling on collision must do NO decoding/engine startup.
+
+    // N3b: bounded voice pools are constructed and warmed during explicit
+    // Got It!/Resume/DEV preflight. All graph/node mutations stay serialized.
+    // Collision callbacks only choose a prestarted voice and schedule memory.
     private func preparePCMEffectOnWorker(soundId: String, url: URL)
         -> (prepared: Bool, durationMs: Int, reason: String) {
         if let buffer = effectBuffers[soundId], effectsEngine?.isRunning == true,
-           let node = effectNodes[soundId], node.isPlaying {
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
             return (true, Int(Double(buffer.frameLength) /
                               buffer.format.sampleRate * 1000), "prepared")
         }
@@ -363,30 +378,104 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 return (false, 0, "pcm-allocation-failed")
             }
             try file.read(into: buffer)
-            guard buffer.frameLength > 0 else {
-                return (false, 0, "pcm-empty")
-            }
+            guard buffer.frameLength > 0 else { return (false, 0, "pcm-empty") }
             let engine = effectsEngine ?? AVAudioEngine()
-            let node = AVAudioPlayerNode()
-            engine.attach(node)
-            engine.connect(node, to: engine.mainMixerNode,
-                           format: buffer.format)
-            // Start and warm on the user-initiated preflight, not when the
-            // next star/food collision asks for an immediate sound effect.
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<sampleVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: buffer.format)
+                nodes.append(node)
+            }
             if !engine.isRunning { try engine.start() }
-            node.prepare(withFrameCount: buffer.frameLength)
-            node.play() // no scheduled samples; never an audible autoplay
+            for node in nodes {
+                node.prepare(withFrameCount: buffer.frameLength)
+                node.play() // warm, with NO audible buffer scheduled
+            }
             effectsEngine = engine
-            effectNodes[soundId] = node
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
             effectBuffers[soundId] = buffer
             return (true, Int(Double(buffer.frameLength) /
                               buffer.format.sampleRate * 1000), "prepared")
         } catch {
-            // Do not silently fall back to AVAudioPlayer/Web audio for effects.
-            // Next user gesture may retry after game exits/reprepares.
             discardEffectsOnWorker()
             return (false, 0, "pcm-decode-or-engine-start-failed")
         }
+    }
+
+    // Same sine-note pitches as the original Classic peg oscillator.
+    // Generate all SIX envelopes exactly once, before the round begins.
+    // 8ms attack, fade by 95ms, silent at 105ms; no Web Audio is ever used.
+    private func preparePegTonesOnWorker()
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        if pegToneBuffers.count == pegFrequencies.count,
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[nativePegSoundID],
+           nodes.count == pegVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, 105, "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "tone-format-failed")
+        }
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * 0.105))
+        var buffers: [Int: AVAudioPCMBuffer] = [:]
+        for (note, frequency) in pegFrequencies.enumerated() {
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format, frameCapacity: frames),
+                  let samples = buffer.floatChannelData?[0] else {
+                return (false, 0, "tone-allocation-failed")
+            }
+            buffer.frameLength = frames
+            for frame in 0..<Int(frames) {
+                let t = Double(frame) / format.sampleRate
+                // Bounded smooth attack/decay so repeated collisions click
+                // less than hard-starting and abruptly cutting a sine.
+                let envelope: Double
+                if t < 0.008 {
+                    envelope = t / 0.008
+                } else if t < 0.095 {
+                    envelope = (0.095 - t) / (0.095 - 0.008)
+                } else {
+                    envelope = 0
+                }
+                samples[frame] = Float(
+                    sin(2 * Double.pi * frequency * t) * envelope)
+            }
+            buffers[note] = buffer
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<pegVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // silent until a real Classic peg collision
+            }
+            effectsEngine = engine
+            effectNodes[nativePegSoundID] = nodes
+            nextEffectVoice[nativePegSoundID] = 0
+            pegToneBuffers = buffers
+            return (true, 105, "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "tone-engine-start-failed")
+        }
+    }
+
+    private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
+        guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
+        let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
+        nextEffectVoice[soundId] = (index + 1) % nodes.count
+        return nodes[index]
     }
 
     private func forgetPlayback() {
@@ -572,7 +661,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func requestedId(_ call: CAPPluginCall) -> String? {
         guard let soundId = call.getString("soundId"),
-              soundResources[soundId] != nil else { return nil }
+              soundResources[soundId] != nil ||
+              soundId == nativePegSoundID else { return nil }
         return soundId
     }
 
@@ -638,8 +728,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": "unavailable"])
                 return
             }
-            guard let soundId = self.requestedId(call),
-                  let resourceName = self.soundResources[soundId] else {
+            guard let soundId = self.requestedId(call) else {
                 call.resolve(["prepared": false, "reason": "invalid-sound-id"])
                 return
             }
@@ -647,8 +736,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": reason])
                 return
             }
-            guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp3") else {
-                call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
+            let url: URL?
+            if soundId == self.nativePegSoundID {
+                // Generated six-note PCM scale, never a downloaded asset.
+                url = nil
+            } else if let resourceName = self.soundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3") else {
+                    call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else {
+                call.resolve(["prepared": false, "reason": "invalid-sound-id"])
                 return
             }
             let epoch = self.playbackEpochSnapshot()
@@ -670,15 +770,21 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.pcmEffectIDs.contains(soundId) {
-                    // No MP3 decoding is permitted in the later play() path.
+                if soundId == self.nativePegSoundID {
+                    let result = self.preparePegTonesOnWorker()
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-tone"
+                } else if self.pcmEffectIDs.contains(soundId), let url = url {
+                    // MP3 decoding ONLY happens during explicit preflight.
                     let result = self.preparePCMEffectOnWorker(
                         soundId: soundId, url: url)
                     prepared = result.prepared
                     durationMs = result.durationMs
                     failed = result.reason
                     backend = "avengine-pcm"
-                } else {
+                } else if let url = url {
                     // DEV pet-unlock comparison stays native AVAudioPlayer.
                     self.players.removeValue(forKey: soundId)?.stop()
                     do {
@@ -696,6 +802,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                         }
                     } catch { failed = "decode-error" }
                     backend = "avfoundation-player"
+                } else {
+                    backend = "unavailable"
                 }
                 let prepareMs = max(0, Int(
                     (ProcessInfo.processInfo.systemUptime - startedAt) * 1000))
@@ -747,6 +855,17 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["accepted": false, "reason": "invalid-volume"])
                 return
             }
+            let requestedNoteIndex: Int?
+            if soundId == self.nativePegSoundID {
+                guard let noteIndex = call.getInt("noteIndex"),
+                      (0..<self.pegFrequencies.count).contains(noteIndex) else {
+                    call.resolve(["accepted": false, "reason": "invalid-peg-note"])
+                    return
+                }
+                requestedNoteIndex = noteIndex
+            } else {
+                requestedNoteIndex = nil
+            }
             if let reason = self.unavailableReason() {
                 self.forgetPlayback()
                 call.resolve(["accepted": false, "reason": reason])
@@ -780,13 +899,28 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                 let durationMs: Int
                 let backend: String
                 let resultReason: String
-                if self.pcmEffectIDs.contains(soundId) {
-                    // Hot path: ONLY set volume and schedule the already-
-                    // decoded memory buffer. No AVAudioPlayer.play(), decoding,
-                    // engine.start(), node.play() or audio-session changes.
+                if self.pcmEffectIDs.contains(soundId) ||
+                   soundId == self.nativePegSoundID {
+                    // One hot path for sample and note voice pools: choose a
+                    // prestarted node and schedule only an in-memory buffer.
+                    // No decode, allocation, engine start or Web fallback.
                     guard let engine = self.effectsEngine, engine.isRunning,
-                          let node = self.effectNodes[soundId], node.isPlaying,
-                          let buffer = self.effectBuffers[soundId] else {
+                          let nodes = self.effectNodes[soundId], !nodes.isEmpty,
+                          nodes.allSatisfy({ $0.isPlaying }) else {
+                        DispatchQueue.main.async {
+                            call.resolve(["accepted": false,
+                                          "reason": "pcm-not-preloaded"])
+                        }
+                        return
+                    }
+                    let buffer: AVAudioPCMBuffer?
+                    if soundId == self.nativePegSoundID {
+                        buffer = self.pegToneBuffers[requestedNoteIndex ?? -1]
+                    } else {
+                        buffer = self.effectBuffers[soundId]
+                    }
+                    guard let readyBuffer = buffer,
+                          let node = self.nextWarmVoiceOnWorker(soundId: soundId) else {
                         DispatchQueue.main.async {
                             call.resolve(["accepted": false,
                                           "reason": "pcm-not-preloaded"])
@@ -794,13 +928,16 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                         return
                     }
                     node.volume = Float(volume)
-                    node.scheduleBuffer(buffer, at: nil,
+                    // A reused voice interrupts its old buffer; distinct
+                    // voices keep a small bounded number of overlaps.
+                    node.scheduleBuffer(readyBuffer, at: nil,
                                         options: [.interrupts],
                                         completionHandler: nil)
-                    started = true  // scheduled for native rendering, NOT heard
-                    durationMs = Int(Double(buffer.frameLength) /
-                                     buffer.format.sampleRate * 1000)
-                    backend = "avengine-pcm"
+                    started = true // scheduled only, not speaker confirmation
+                    durationMs = Int(Double(readyBuffer.frameLength) /
+                                     readyBuffer.format.sampleRate * 1000)
+                    backend = soundId == self.nativePegSoundID
+                        ? "avengine-tone" : "avengine-pcm"
                     resultReason = "scheduled"
                 } else {
                     guard let sound = self.players[soundId] else {
@@ -876,9 +1013,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     return
                 }
-                if self.pcmEffectIDs.contains(soundId) {
-                    // A paused/exited round tears down its warm engine. The
-                    // next Got It!/Resume must explicitly prepare it again.
+                if self.pcmEffectIDs.contains(soundId) ||
+                   soundId == self.nativePegSoundID {
+                    // A paused/exited round tears down all prepared effect
+                    // voices; the next Got It!/Resume must explicitly warm.
                     self.discardEffectsOnWorker()
                 } else {
                     self.players.removeValue(forKey: soundId)?.stop()
