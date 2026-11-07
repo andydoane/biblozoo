@@ -65,7 +65,36 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N4a — native Melody catches & same-song Resume (PR #28; awaiting iPhone)
+### N4a.1 — stop Feeding in the iPhone App Switcher (PR #29; owner device test pending)
+
+**Owner's newest physical iPhone finding after owner-merged [N4a #28](https://github.com/andydoane/biblozoo/pull/28), merge `436c3c26`:** Actual Melody gameplay sound **worked as intended**, and a **full task switch into another app and back** recovered sound with the existing **Let's go!** button. Classic also worked after that full app switch. However, **swiping up and holding** to view the iOS **App Switcher cards**, **without opening another app**, seems to allow **both Classic and Melody** to continue running while native sound is stopped. Immediately tapping the *same BibloZoo card* does **not** display Welcome Back, and the continuing round is silent with no obvious recovery. This is a different gesture from the previously passing full background-switch path. Owner did **not** perform this exact gesture on stable `ios-prep`, whose JavaScript source also listens for `visibilitychange/pagehide` only; **stable physical behavior is unknown**. Do not infer a Melody-only regression or definite stable bug.
+
+**[PR #29](https://github.com/andydoane/biblozoo/pull/29) N4a.1** is an experiment-only **inactive-vs-background lifecycle fix**. Existing Swift `UIApplication.willResignActiveNotification` already invalidates native voices when the switcher opens; now Swift also emits a fixed `biblozooAppLifecycle` state-only plugin event on inactive and resumed-active (the latter catches delayed WebKit delivery). **Native-only Classic and Melody** Feeding runtimes subscribe, call their *existing* `pauseFeedingGame` for either event, cancel current rAF, preserve original score/song/balls and show Welcome Back; no automatic reactivation. `window.blur/focus` supplement the native signal for the card case where `document.hidden=false`. A second inactivity while a Resume preflight is pending invalidates its gesture generation, so only a **new real tap** may re-prepare. The plugin callback and focus/blur handlers are removed on game exit, including delayed listener registrations. No Web/HTML fallback or audio-session policy change.
+
+**After owner reviews/merges PR #29**, Fetch/Pull `experiment/native-ios-audio` in the **`biblozoo-native-audio`** worktree, then:
+
+```sh
+node scripts/validate_native_app_switcher_pause_n4a1.js
+node scripts/validate_native_melody_gameplay_n4a.js
+node scripts/validate_native_feeding_resume_n21.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Run **BibloZoo Audio Test** on the actual iPhone (Node CI does not compile Swift):
+
+1. **Classic exact reproduction:** Start active gameplay. Swipe up **and HOLD** to see the App Switcher thumbnails, but do not open another app; tap **BibloZoo's own app card**. **Welcome Back / Let's go! must appear**, with balls/score frozen and native audio not automatically playing. Tap Let's go! and confirm the original round, peg beeps, star/chomp and scores continue. The app-card thumbnail may be an OS snapshot, so report if its live visuals appear to advance.
+2. **Melody exact reproduction:** Catch a few notes and note tune/Caught %. Open the same cards, tap BibloZoo's own card. After **Let's go!**, the **same tune and percent**, remaining notes and audio must continue, without new reward or restart. No output by itself in the switcher or on return.
+3. **Regression:** Fully switch to YouTube/Facebook and back in both modes; test quick switcher open/close and Back. A real failed native re-preparation stays paused with Try again!/Back; a successful pending preparation continues to show **Let's go!** (disabled) instead of flickering Try again!.
+4. **Diagnostics:** If returning to a silent running game, if Welcome Back doesn't appear or if native retry fails, **Copy DEV Audio Timing Report before restarting**; paste timing rows, native first-tap preflight and what was actually audible. A `scheduled` row is **not** an audible-speaker verdict.
+
+**Gates:** Dedicated `scripts/validate_native_app_switcher_pause_n4a1.js` VM/source test covers inactive with `document.hidden=false`, return without inactive delivery, duplicate idempotence, pending Resume invalidation, async listener removal and Web isolation. Final GitHub Node regressions plus production web build are separate from **Swift Xcode compile** and **owner's live app-switcher/same-round audio acceptance**. Owner test is required before broadening N4 to Labyrinth/Bounce. See [N4a.1 iPhone protocol](N4A1-IOS-APP-SWITCHER-PAUSE.md), [AUDIO-RECOVERY](AUDIO-RECOVERY.md), [living handoff](PROJECT-HANDOFF.md).
+
+---
+
+### N4a — native Melody catches & same-song Resume (PR #28 merged; owner live Melody and full-switch audio recovered, App Switcher edge found)
 
 **Verified owner gate:** N3d [PR #27](https://github.com/andydoane/biblozoo/pull/27) was **merged** as `58698938` into `experiment/native-ios-audio`. The owner physically heard DEV **Melody E4** and said the note played fine; **Classic Feeding worked as expected**. This confirms one native Melody tone and a Classic regression pass, **not** real Melody-game catch-note audio. Earlier N3c first-launch/task-switch sound and two fresh competing-YouTube-PiP starts were positive overall (one initial `feed-peg stale` preflight recovered on the next explicit prep; one clean), but the cause of that stale request remains unknown.
 
