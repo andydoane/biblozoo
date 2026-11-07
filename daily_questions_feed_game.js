@@ -4891,6 +4891,14 @@
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&
       !document.hidden && !runtime.feedPageHidden;
+    const cancelStale = () => {
+      pilot?.stop?.();
+      if (activeRuntime === runtime) {
+        runtime.nativePilotChoicePending = false;
+        if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+        if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
+      }
+    };
     const context = runtime.audioContext;
     // IMPORTANT: call resume synchronously within the real Got It! gesture,
     // before ANY await. WebKit may require transient user activation.
@@ -4911,19 +4919,14 @@
       webClockReady = false;
     }
     if (!live()) {
-      pilot?.stop?.();
-      if (activeRuntime === runtime) {
-        runtime.nativePilotChoicePending = false;
-        if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
-        if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
-      }
+      cancelStale();
       return;
     }
     // Observes state *after* verified clock activity, before any native
     // preload. A moving clock is not proof the device speaker was audible.
     await recordNativePreviewPhase(runtime, "after-web");
     if (!live()) {
-      pilot?.stop?.();
+      cancelStale();
       return;
     }
     if (runtime.nativePilotChoiceStatus) {
@@ -4937,19 +4940,14 @@
       catch (_) { result = { ready: false, reason: "prepare-error" }; }
     }
     if (!live()) {
-      pilot?.stop?.();
-      if (activeRuntime === runtime) {
-        runtime.nativePilotChoicePending = false;
-        if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
-        if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
-      }
+      cancelStale();
       return;
     }
     // Compare native notification counts with the after-Web snapshot BEFORE
     // starting gameplay; a rejected preload is a Web fallback, not a voice.
     await recordNativePreviewPhase(runtime, "after-native");
     if (!live()) {
-      pilot?.stop?.();
+      cancelStale();
       return;
     }
     runtime.nativePilotChoicePending = false;
@@ -4970,9 +4968,12 @@
       // silently change engines after the first collision/audio event.
       runtime.nativePilotBackend = "web";
       if (runtime.nativePilotBadge) {
-        const reason = typeof result?.reason === "string" &&
-          /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
-          ? result.reason : "web-clock-changed";
+        const clockChanged = result?.ready === true &&
+          (context?.state !== "running" || runtime.audioContext !== context);
+        const reason = clockChanged ? "web-clock-changed" :
+          typeof result?.reason === "string" &&
+            /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
+              ? result.reason : "bridge-error";
         runtime.nativePilotBadge.textContent =
           "Preview audio: Web (native unavailable: " + reason + ")";
       }
