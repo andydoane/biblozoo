@@ -1,12 +1,15 @@
-/* N3b — Native-only Classic Feeding in isolated iOS Audio Test.
- * Got It!/Resume prepares fixed PCM star/chomp and six native peg tones
- * in a warmed native AVAudioEngine (DEV unlock stays AVAudioPlayer).
+/* N4a — Native-only Classic and Melody Feeding in isolated iOS Audio Test.
+ * Got It!/Resume prepares mode-specific fixed AVAudioEngine PCM buffers:
+ * Classic star/chomp/peg; Melody only its prewarmed triangle-note bank.
  * No Web fallback, automatic playback, or "accepted means audible" claim. */
 (function installFeedingNativeAudioPilot(root) {
   "use strict";
 
   const IDS = Object.freeze(["feed-star", "feed-chomp", "feed-peg"]);
+  const MELODY_IDS = Object.freeze(["feed-melody"]);
   const PEG_NOTE_COUNT = 6;
+  const MELODY_MIDI_MIN = 55;
+  const MELODY_MIDI_MAX = 83;
   const PREFLIGHT_TIMEOUT_MS = 1500;
   const PLAY_TIMEOUT_MS = 1800;
 
@@ -36,9 +39,11 @@
       ? value : "bridge-error";
   }
 
-  function create({ isCurrent, onFailure } = {}) {
-    // No creation, preloading, plugin call or background work on non-iOS.
-    if (!isIOS()) return null;
+  function create({ isCurrent, onFailure, mode = "classic" } = {}) {
+    // Only these two audited native sound profiles exist in N4a.
+    // Browser/PWA/Android never create this native controller.
+    if (!isIOS() || !["classic", "melody"].includes(mode)) return null;
+    const selectedIds = mode === "melody" ? MELODY_IDS : IDS;
 
     let generation = 0;
     let ready = false;
@@ -54,7 +59,7 @@
     function stopNative() {
       const api = bridge();
       if (typeof api?.stop !== "function") return;
-      for (const soundId of IDS) {
+      for (const soundId of selectedIds) {
         try {
           Promise.resolve(api.stop({ soundId })).catch(() => {});
         } catch (_) { /* stop is always best effort; never block navigation */ }
@@ -115,7 +120,7 @@
         stop();
         return { ready: false, reason };
       }
-      for (const soundId of IDS) {
+      for (const soundId of selectedIds) {
         let result;
         try {
           // The bridge is fixed-ID only; no caller-controlled file names.
@@ -144,11 +149,14 @@
     }
 
     function play(soundId, volume, collisionEpochMs, noteIndex) {
-      if (!IDS.includes(soundId) || !Number.isFinite(volume) ||
+      if (!selectedIds.includes(soundId) || !Number.isFinite(volume) ||
           volume < 0 || volume > 1 || !ready || failed) return false;
       if (soundId === "feed-peg" &&
           (!Number.isInteger(noteIndex) ||
            noteIndex < 0 || noteIndex >= PEG_NOTE_COUNT)) return false;
+      if (soundId === "feed-melody" &&
+          (!Number.isInteger(noteIndex) || noteIndex < MELODY_MIDI_MIN ||
+           noteIndex > MELODY_MIDI_MAX)) return false;
       const token = generation;
       if (!current(token)) return false;
       const api = bridge();
@@ -167,7 +175,8 @@
         const timing = validCollision ? { collisionEpochMs } : {};
         // The note number is a closed 0–5 mapping to Swift's fixed six
         // frequencies. No user-supplied oscillator/asset is ever accepted.
-        const note = soundId === "feed-peg" ? { noteIndex } : {};
+        const note = soundId === "feed-peg" ? { noteIndex } :
+          soundId === "feed-melody" ? { midi: noteIndex } : {};
         // Fire exactly once. Never queue a Web/HTML fallback.
         void bounded(api.play({
           soundId, volume, eventId, requestEpochMs, ...timing, ...note
