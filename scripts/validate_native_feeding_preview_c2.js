@@ -80,6 +80,7 @@ function feedHarness(nativeIOS=true) {
     nativeBegin: startPreviewRoundWithAudioChoice,
     star: playStarSound,
     chomp: playChompSound,
+    peg: playPegTone,
     stopEffects: stopFeedingEffects
   };
 ${marker}`;
@@ -347,14 +348,18 @@ async function main() {
     const h=feedHarness();
     const starts=[];
     let preps=0;
+    let reportFailure;
     const calls=[];
     h.window.__interceptStart = r=>{starts.push(r.nativePilotBackend);r.roundStarted=true;};
-    h.window.BibloZooFeedingNativeAudioPilot.create=()=>({
+    h.window.BibloZooFeedingNativeAudioPilot.create=({onFailure})=>{
+      reportFailure = onFailure;
+      return {
       prepare:async()=>{preps++;return {ready:true};},
       play:(id,vol)=>{calls.push([id,vol]);return true;},
       stop:()=>calls.push(["stop"]),
       isReady:()=>true
-    });
+    };
+    };
     const on=runtime(true);
     h.hooks.setRuntime(on);
     await h.hooks.nativeBegin(on);
@@ -362,7 +367,15 @@ async function main() {
     assert.equal(preps,1);
     assert.equal(on.nativePilotBackend,"native");
     assert.equal(on.startConfirmButton.disabled,false);
-    assert.match(on.nativePilotBadge.textContent,/Native star\/chomp/);
+    assert.match(on.nativePilotBadge.textContent,/Native star\/chomp ONLY/);
+    assert.match(on.nativePilotBadge.textContent,/Web peg beeps muted/);
+    // Show a real safe bridge reason rather than a generic "failed" label.
+    reportFailure("interruption-pending");
+    assert.match(on.nativePilotBadge.textContent,
+      /Native effect failed \(interruption-pending\)/);
+    reportFailure("<unsafe-reason>");
+    assert.match(on.nativePilotBadge.textContent,
+      /Native effect failed \(bridge-error\)/);
     // Real star/chomp functions must return BEFORE any Web/HTML playback.
     on.audioContext={state:"running",createBufferSource(){throw Error("web double sound");}};
     h.hooks.star(on);
@@ -408,6 +421,32 @@ async function main() {
     await waiting;
     assert.equal(starts,0);
     assert.equal(stops,1);
+  }
+  {
+    // Real Classic non-star pegs generate Web Audio beeps. Isolate only the
+    // opted-in native preview; preserve default Web and paused Zoo Escape.
+    const h = feedHarness();
+    let webBeepAttempts = 0;
+    const r = {
+      mode: "classic", nativePilotBackend: "native",
+      feedPausedAt: null, lastPegSoundAt: 0, lastPegNoteIndex: -1,
+      audioContext: {
+        state: "running", currentTime: 12,
+        createOscillator() { webBeepAttempts++; throw Error("instrumented"); }
+      }
+    };
+    h.hooks.peg(r, 1000);
+    assert.equal(webBeepAttempts, 0,
+      "opted-in native Classic must make no Web oscillator collision beeps");
+    r.nativePilotBackend = "web";
+    h.hooks.peg(r, 1000);
+    assert.equal(webBeepAttempts, 1,
+      "unchecked Web Classic must retain its original synthesized pegs");
+    r.nativePilotBackend = "native";
+    r.feedPausedAt = 1500;
+    h.hooks.peg(r, 2000);
+    assert.equal(webBeepAttempts, 2,
+      "the shared Zoo Escape paused sound path remains unchanged");
   }
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-star"/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-chomp"/);
