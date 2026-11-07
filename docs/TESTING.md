@@ -65,6 +65,32 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### Stage B.1 — intermittent `interruption-pending` after audible native output
+
+Owner's November 6, 2026 iPhone acceptance of merged [PR #10](https://github.com/andydoane/biblozoo/pull/10): **the native test button produced audible sound across the tested scenarios**, but the small panel also sometimes reported `Could not prepare: interruption-pending`. Do not treat either observation as proving that the same **blocked** tap made sound. In the PR #10 JS flow, a failed `preload` *returns early* and cannot invoke that tap's native `play`.
+
+Apple notes that iOS may deliver a **delayed `.began` notification after a process is suspended**, indicated by `AVAudioSessionInterruptionWasSuspendedKey`. The first plugin also set its pending flag for any **unknown/malformed** notification (`kind != .ended`) and could retain a real `.began` forever after returning if no matching ended signal arrived. [Apple documentation](https://developer.apple.com/documentation/avfaudio/avaudiosession/interruptionnotification).
+
+**B.1 follow-up on `fix/native-sound-interruption-state`**, targeting **`experiment/native-ios-audio` only**:
+- Switch on a recognized interruption type. A genuine `.began` blocks a new tap while the app remains active; `.ended` clears it. An unknown type **does not** fabricate a begin or override an existing genuine pending state.
+- A `.began` carrying `wasSuspended=true` is a delayed historical event and does not set a new pending latch. It still stops/forgets any old sound. If an independent genuine interruption is already pending, retain that state.
+- If a genuine `.began` was followed by an **inactive → active** lifecycle transition without `.ended`, mark the state eligible for a **fresh explicit-tap retry**. Do not clear or resume automatically upon foreground activation; only when a user invokes a new `preload`/`play`, and let AVAudioPlayer itself accept/deny. No `setActive`, `setCategory`, `setMode`, automatic audio or gameplay routing.
+- The developer UI says **“No new native sound requested”** on a blocked preload; a successful fresh retry reports whether the signal was a delayed suspension or a foreground-tap retry. The panel never asserts audible output.
+
+In the Mac experimental worktree, after owner merges the focused B.1 PR, Fetch/Pull `experiment/native-ios-audio`, then:
+
+```sh
+git branch --show-current            # experiment/native-ios-audio
+node scripts/validate_native_sound_smoke_test.js
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+**Required device retest before Stage C:** rebuild **BibloZoo Audio Test** (bundle ID must still end in `.audiotest`) on the physical iPhone. Tap with sound on, then repeat background → foreground, lock/unlock, quick app switches, silence switch and route changes as available. Listen for a new single sound **per tap**. The panel should not remain stuck on `interruption-pending` after a full return, and should never play by itself. If `interruption-pending` appears **during a genuine active interruption**, the blocked tap must not request a sound; try again after the interruption ends/return. Report exact sequence, panel text and whether the sound was actually heard. If the blocker persists, keep Stage C on hold and create another small follow-up.
+
+This follow-up is a **hypothesis-driven correction**, not proof of hardware sound or that every interruption can be distinguished by notifications. The Node validator tests JavaScript behavior and Swift source contracts; **Xcode compilation, the actual iOS notification sequence and audible recovery remain physical-device checks**.
+
 ### PR B: one-sound native iPhone smoke test (experiment branch only)
 
 The `experiment/native-sound-smoke-test` PR adds a branch-only `BibloZooNativeSound` Capacitor 8 plugin (`ios/App/App/BibloZooNativeSoundPlugin.swift`). It uses **AVAudioPlayer** with one allowlisted ID `pilot-unlock`, mapped to existing `ui_audio/ui_pet_unlock.mp3`. Xcode's App target **Sources** explicitly includes the Swift file, and **Copy Bundle Resources** explicitly includes the MP3 at the root of the app bundle. This is *separate* from the copied `dist/ui_audio` web asset; the plugin looks up `Bundle.main.url(forResource: "ui_pet_unlock", withExtension: "mp3")`. No new binary asset or rights assumption is needed.
