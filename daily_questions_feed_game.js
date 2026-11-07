@@ -3449,6 +3449,8 @@
     if (!runtime || activeRuntime !== runtime || !runtime.running ||
         runtime.finished || runtime.feedPausedAt == null ||
         runtime.feedPageHidden || document.hidden ||
+        (runtime.nativePilotBackend === "native" &&
+          runtime.nativePilot?.isReady?.() !== true) ||
         (runtime.audioContext && runtime.audioContext.state !== "running")) return false;
     const elapsed = Math.max(0, now - runtime.feedPausedAt);
     // Shift time-dependent effects, including Classic's 22s expiry and
@@ -3548,31 +3550,39 @@
     if (runtime.resumeButton) runtime.resumeButton.disabled = true;
     const generation = ++runtime.feedResumeGeneration;
     const context = runtime.audioContext;
+    // A native preview's players are forgotten on interruption. Re-preload
+    // BOTH IDs from this real Resume tap; never resume those sounds on
+    // foreground by itself or change audio engines during the round.
+    const nativeRetry = runtime.nativePilotBackend === "native"
+      ? Promise.resolve(runtime.nativePilot?.prepare?.()).catch(
+        () => ({ ready: false, reason: "native-prepare-error" }))
+      : null;
     let settled = false;
-    const settle = (ready, reason) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(runtime.feedResumeWatchdog);
-      runtime.feedResumeWatchdog = null;
-      if (activeRuntime !== runtime || runtime.feedResumeGeneration !== generation ||
-          runtime.feedPausedAt == null || runtime.audioContext !== context) {
+    const valid = () => activeRuntime === runtime &&
+      runtime.feedResumeGeneration === generation &&
+      runtime.feedPausedAt != null && runtime.audioContext === context &&
+      !document.hidden && !runtime.feedPageHidden;
+    const finishResume = (nativeReady) => {
+      if (!valid()) {
+        if (activeRuntime === runtime && runtime.feedResumeGeneration === generation) {
+          runtime.feedResumePending = false;
+          if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        }
         report(false);
         return;
       }
       runtime.feedResumePending = false;
       if (runtime.resumeButton) runtime.resumeButton.disabled = false;
-      if (!ready || document.hidden || runtime.feedPageHidden) {
-        if (!document.hidden && !runtime.feedPageHidden) {
-          runtime.feedAudioNeedsFreshContext = !!Ctor;
-          recordFeedAudioRecovery("feed-audio-resume-failed", runtime,
-            { reason: reason || "unavailable" });
-          setFeedingResumeStatus(runtime,
-            "Sound isn't ready yet. Wait a moment, then try again or go back.");
-        }
+      if (!nativeReady) {
+        // Native stays the chosen backend. Never silently play Web Audio
+        // after an interrupted or failed native preflight mid-round.
+        recordFeedAudioRecovery("feed-native-preview-resume-blocked", runtime);
+        setFeedingResumeStatus(runtime,
+          "Native sounds aren't ready. Tap Resume again or go back.");
         report(false);
         return;
       }
-      // Only the verified gesture path can dismiss the interruption overlay.
+      // Only a verified user gesture can dismiss the activity's overlay.
       runtime.feedAudioRecoveryVerified = true;
       const continued = continueFeedingAfterGesture(runtime,
         performance.now(), !!runtime.zooEscape);
@@ -3582,6 +3592,39 @@
         recordFeedAudioRecovery("feed-audio-resume-verified", runtime);
       }
       report(continued);
+    };
+    const settle = (ready, reason) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(runtime.feedResumeWatchdog);
+      runtime.feedResumeWatchdog = null;
+      if (!valid()) {
+        if (activeRuntime === runtime && runtime.feedResumeGeneration === generation) {
+          runtime.feedResumePending = false;
+          if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        }
+        report(false);
+        return;
+      }
+      if (!ready) {
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        runtime.feedAudioNeedsFreshContext = !!Ctor;
+        recordFeedAudioRecovery("feed-audio-resume-failed", runtime,
+          { reason: reason || "unavailable" });
+        setFeedingResumeStatus(runtime,
+          "Sound isn't ready yet. Wait a moment, then try again or go back.");
+        report(false);
+        return;
+      }
+      if (nativeRetry) {
+        // Web clock verification still owns recovery; the additional native
+        // preflight must also finish before the SAME frozen round continues.
+        void nativeRetry.then(result => finishResume(result?.ready === true),
+          () => finishResume(false));
+      } else {
+        finishResume(true);
+      }
     };
     // Older browsers with no Web Audio continue to use the existing HTML
     // audio fallback. Do not trap them behind an impossible clock probe.
@@ -3660,12 +3703,28 @@
 
   function attachFeedInterruptionHandlers(runtime) {
     runtime.feedVisibilityHandler = () => {
-      if (document.hidden) pauseFeedingGame(runtime);
+      if (document.hidden) {
+        pauseFeedingGame(runtime);
+        if (runtime.nativePilotBackend === "native" && runtime.feedPausedAt != null) {
+          // A second hide while Resume is pending invalidates all async
+          // native attempts and leaves Zoo Escape's overlay available.
+          runtime.nativePilot?.stop?.();
+          runtime.feedResumeGeneration += 1;
+          runtime.feedResumePending = false;
+          if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        }
+      }
       // Returning never automatically unfreezes the round.
     };
     runtime.feedPageHideHandler = () => {
       runtime.feedPageHidden = true;
       pauseFeedingGame(runtime);
+      if (runtime.nativePilotBackend === "native" && runtime.feedPausedAt != null) {
+        runtime.nativePilot?.stop?.();
+        runtime.feedResumeGeneration += 1;
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      }
     };
     runtime.feedPageShowHandler = () => {
       runtime.feedPageHidden = false;
