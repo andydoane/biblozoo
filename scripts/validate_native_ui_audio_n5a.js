@@ -32,7 +32,7 @@ assert.match(swift, /self\.discardEffectsOnWorker\(\)/);
 assert.doesNotMatch(swift, /setCategory\(/);
 assert.match(html, /shared\/native-ui-audio\.js/);
 assert.ok(html.indexOf("shared/native-ui-audio.js") < html.indexOf('src="app.js"'));
-assert.match(feedingPilot, /root\\.BibloZooNativeUiAudio\\?\\.invalidate\\?\\.\\(\\)/);
+assert.ok(feedingPilot.includes("root.BibloZooNativeUiAudio?.invalidate?.()"));
 assert.match(app, /function isNativeUiAudioMode\(/);
 assert.match(app, /BibloZooNativeUiAudio\.tapFromGesture\(/);
 assert.match(app, /if \(!isNativeUiAudioMode\(\)\) void preloadUiTapSoundBuffers\(\)/);
