@@ -39,7 +39,32 @@ assert.match(swift, /Bundle\.main\.url\(forResource: self\.resourceName, withExt
 assert.match(swift, /\.soloAmbient/);
 assert.match(swift, /UIApplication\.willResignActiveNotification/);
 assert.match(swift, /AVAudioSession\.interruptionNotification/);
+assert.match(swift, /UIApplication\.didBecomeActiveNotification/);
+assert.match(swift, /AVAudioSessionInterruptionWasSuspendedKey/);
 assert.match(swift, /AVAudioSession\.routeChangeNotification/);
+
+// Regression for the physical-iPhone 'interruption-pending despite audible
+// output' report: unknown notifications must not create a pending state;
+// suspended notifications are historical; genuine pending interruptions
+// remain blocked unless the app left and returned and a human taps again.
+// Static Swift checks are NOT a Swift compilation or native runtime test.
+const handle = swift.slice(
+  swift.indexOf("    private func handleInterruption("),
+  swift.indexOf("    private func onMain(")
+);
+assert.ok(handle.startsWith("    private func handleInterruption("),
+  "missing native interruption state reducer");
+assert.match(handle, /guard let raw[\s\S]*?lastInterruptionSignal = "unrecognized"[\s\S]*?return/);
+assert.match(handle, /case \.began:[\s\S]*?if wasSuspended \{[\s\S]*?lastInterruptionSignal = "suspended-began"[\s\S]*?return[\s\S]*?\}[\s\S]*?interrupted = true/,
+  "suspended notifications must be ignored before the genuine-began latch");
+assert.match(handle, /case \.ended:[\s\S]*?interrupted = false/);
+assert.doesNotMatch(handle, /interrupted\s*=\s*kind\s*!=/,
+  "unknown notification type previously left the interruption stuck");
+assert.match(swift, /private func returnedToForeground\(\)[\s\S]*?returnedToForegroundDuringInterruption = true/);
+assert.match(swift, /if interrupted \{[\s\S]*?guard returnedToForegroundDuringInterruption else \{[\s\S]*?return "interruption-pending"[\s\S]*?\}[\s\S]*?lastInterruptionSignal = "foreground-tap-retry"/,
+  "never ignore a true interruption without an inactive->active fresh tap");
+assert.match(swift, /"lastInterruptionSignal": self\.lastInterruptionSignal/,
+  "return bounded developer diagnostic for the previous session signal");
 assert.match(swift, /volume\.isFinite/);
 assert.match(swift, /invalid-sound-id/);
 const withoutComments = swift.replace(/\/\/[^\n]*/g, "");
@@ -205,6 +230,41 @@ async function run() {
     assert.equal(e.button.disabled, false);
   }
   {
+    // A pending message is a BLOCKED prepare. This tap cannot have
+    // produced the sound, even if a prior web/native sound is still audible.
+    let plays = 0;
+    let preloads = 0;
+    const e = environment({ api: {
+      preload: async () => ++preloads === 1
+        ? { prepared: false, reason: "interruption-pending" }
+        : { prepared: true, lastInterruptionSignal: "foreground-tap-retry" },
+      play: async () => { plays++; return { accepted: true }; },
+      stop: async () => ({ stopped: true })
+    } });
+    await e.button.click();
+    assert.equal(plays, 0);
+    assert.match(e.status.textContent, /no new native sound requested/i);
+    assert.match(e.status.textContent, /return to app and tap again/i);
+    await e.button.click();
+    assert.equal(plays, 1, "fresh tap must prepare again, not replay stale audio");
+    assert.match(e.status.textContent, /playback requested/i);
+    assert.match(e.status.textContent, /fresh tap after foreground return/i);
+    assert.doesNotMatch(e.status.textContent, /interruption pending/i,
+      "do not preserve a stale interruption error after a successful new request");
+  }
+  {
+    // A delayed suspended notification was already handled in Swift; it
+    // doesn't prove audible output and should be identified as historical.
+    const e = environment({ api: {
+      preload: async () => ({ prepared: true, lastInterruptionSignal: "suspended-began" }),
+      play: async () => ({ accepted: true }),
+      stop: async () => ({ stopped: true })
+    } });
+    await e.button.click();
+    assert.match(e.status.textContent, /past suspension/i);
+    assert.match(e.status.textContent, /did you hear/i);
+  }
+  {
     let stops = 0;
     const e = environment({ api: {
       preload: async () => ({ prepared: true }),
@@ -215,7 +275,7 @@ async function run() {
     assert.equal(e.doc.getElementById("biblozoo-native-sound-smoke"), null);
     assert.equal(stops, 1);
   }
-  console.log("Native sound smoke contract passed (Xcode source/resources, bridge and UI failure/timeout/lifecycle cases).");
+  console.log("Native sound smoke contract passed (Xcode source/resources, interruption states, bridge and UI failure/timeout/lifecycle cases).");
 }
 
 run().catch((err) => { console.error(err); process.exitCode = 1; });
