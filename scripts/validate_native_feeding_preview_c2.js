@@ -664,7 +664,7 @@ async function main() {
     assert.equal(continued,0);
     assert.equal(r.feedPausedAt,1234);
     assert.equal(r.resumeButton.disabled,false);
-    assert.match(r.resumeStatus.textContent,/Native sounds unavailable \(interruption-pending\)/);
+    assert.match(r.resumeStatus.textContent,/Sound isn\'t ready yet/);
   }
   {
     // Exit/route switch during a deferred prepare must not start another round.
