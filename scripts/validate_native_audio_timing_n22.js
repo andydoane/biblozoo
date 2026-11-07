@@ -42,7 +42,9 @@ async function run() {
   assert.match(SWIFT, /UIPasteboard\.general\.string = self\.timingReportText\(\)/);
   assert.match(SWIFT, /lastIndex\(where: \{/);
   assert.match(SWIFT, /now - stamped <= 60/);
-  assert.match(SWIFT, /Native dispatch = AVAudioPlayer\.play\(\) returned; NOT proof of speaker audibility/);
+  assert.match(SWIFT, /Native dispatch = predecoded PCM scheduleBuffer\(\) for star\/chomp/);
+  assert.match(SWIFT, /AVAudioPlayer\.play\(\) for pilot\. NOT proof of speaker audibility/);
+  assert.match(SWIFT, /"backend": backend/, "report must label each sound engine");
   assert.doesNotMatch(SWIFT, /URLSession\.|UserDefaults\.|FileManager\.default\.createFile/,
     "report must not be transmitted or persisted on disk by Swift");
   assert.doesNotMatch(SWIFT, /\.setCategory\(|\.setMode\(|\.setActive\(false\)/,
