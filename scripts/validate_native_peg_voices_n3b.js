@@ -44,7 +44,7 @@ function assertSourceContract() {
   assert.match(play, /buffer = self\.pegToneBuffers\[requestedNoteIndex \?\? -1\]/);
   assert.match(play, /let node = self\.nextWarmVoiceOnWorker\(soundId: soundId\)/);
   assert.match(play, /node\.scheduleBuffer\(readyBuffer, at: nil,[\s\S]*?options: \[\.interrupts\]/);
-  assert.match(play, /\? "avengine-tone" : "avengine-pcm"/);
+  assert.match(play, /\? "avengine-tone"[\s\S]*?"avengine-melody" : "avengine-pcm"/);
   assert.doesNotMatch(play.replace(/\/\/[^\n]*/g, ""),
     /AVAudioFile\(|AVAudioPCMBuffer\(|AVAudioEngine\(|engine\.start\(|node\.play\(|setCategory\(|setMode\(/,
     "no sound graph creation/decoding on the hot collision path");
