@@ -260,11 +260,12 @@ function environment(options = {}) {
   const sampleRow = panel?.children?.[2];
   const playStar = sampleRow?.children?.[0];
   const playChomp = sampleRow?.children?.[1];
+  const playMelody = sampleRow?.children?.[2];
   const status = panel?.children?.[3];
   const inspect = panel?.children?.[4];
   const detail = panel?.children?.[5];
   return {
-    panel, button, playStar, playChomp, status, inspect, detail, close, doc, calls, api,
+    panel, button, playStar, playChomp, playMelody, status, inspect, detail, close, doc, calls, api,
     copyTiming: panel?.children?.[6]?.children?.[2],
     markLate: panel?.children?.[6]?.children?.[3],
     reportStatus: panel?.children?.[6]?.children?.[4],
@@ -285,6 +286,7 @@ async function run() {
   {
     const e = environment();
     assert.ok(e.panel && e.button && e.playStar && e.playChomp &&
+      e.playMelody &&
       e.status && e.close && e.inspect && e.detail,
       "iOS test panel, star/chomp buttons and read-only inspector must exist");
     assert.equal(e.panel.attributes["data-no-ui-sound"], "",
@@ -322,6 +324,14 @@ async function run() {
     assert.equal(e.calls[5][1].soundId, "feed-star");
     assert.equal(e.calls[8][1].soundId, "feed-chomp");
     assert.match(e.status.textContent, /native chomp playback requested/i);
+    // N3d is one explicitly tapped MIDI E4 note, not a Melody song/gameplay.
+    await e.playMelody.click();
+    assert.equal(e.calls[10][0], "activateFromGesture");
+    assert.equal(e.calls[11][0], "preload");
+    assert.equal(e.calls[11][1].soundId, "feed-melody");
+    assert.deepEqual(e.calls[12][1],
+      { soundId: "feed-melody", volume: 0.25, midi: 64 });
+    assert.match(e.status.textContent, /native Melody E4 playback requested/i);
     assert.equal(e.panel.attributes["data-no-ui-sound"], "");
     assert.equal(e.copyTiming.textContent, "Copy Audio Timing Report");
     await e.copyTiming.click();
@@ -366,6 +376,7 @@ async function run() {
     assert.equal(e.button.disabled, true, "prevent overlapping taps");
     assert.equal(e.playStar.disabled, true);
     assert.equal(e.playChomp.disabled, true);
+    assert.equal(e.playMelody.disabled, true);
     pre.resolve({ prepared: true });
     await first;
     assert.equal(playCount, 1);
@@ -386,7 +397,7 @@ async function run() {
     pre.resolve({ prepared: true });
     await first;
     assert.equal(playCount, 0, "backgrounded preload must never play later");
-    assert.equal(stops, 3, "background must stop every allowlisted sample");
+    assert.equal(stops, 4, "background must stop every allowlisted sample");
     assert.match(e.status.textContent, /stopped on background/i);
   }
   {
@@ -447,7 +458,7 @@ async function run() {
     } });
     await e.close.click();
     assert.equal(e.doc.getElementById("biblozoo-native-sound-smoke"), null);
-    assert.equal(stops, 3);
+    assert.equal(stops, 4);
   }
   console.log("Native sound smoke contract passed (three Xcode samples, independent native players, tap-only UI, interruption/timeout/lifecycle cases).");
 }
