@@ -65,7 +65,37 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N4b — native Labyrinth landings/catches and same-round Resume (PR #30; iPhone pending)
+### N4c — native Bounce wall/paddle/brick cues, star bonus and catches (PR #31; iPhone pending)
+
+**New owner hardware evidence:** N4b [PR #30](https://github.com/andydoane/biblozoo/pull/30) is **owner-merged** into `experiment/native-ios-audio` as `18332f90`; owner tested the N4b iPhone build and reported **“everything is working as intended.”** This is positive physical acceptance for N4b Labyrinth under the test they performed, not a detailed numerical acoustic-latency report. N4a.1 #29 was also physically accepted: swipe-up-and-hold freezes immediately with Welcome Back visible in the thumbnail and sound recovered twice. **N4c Bounce has not yet been physically tested.**
+
+N4c [PR #31](https://github.com/andydoane/biblozoo/pull/31) is the **final planned N4 Feeding mode audio slice**. In native-only iOS `BibloZoo Audio Test`, Bounce now preloads the same fixed `feed-star`, `feed-chomp`, `feed-peg` assets already used for Classic/Labyrinth **after a real Got It! tap**, before starting the original ball/brick game. Wall, ceiling, paddle and ordinary-brick hit events already call `playPegTone`; they now use Swift's six-note prewarmed sine bank, still observing the original **55ms** sound cooldown and no immediate repeated pitch. Breaking a star brick plays native `feed-star` while spawning normal bonus white balls; catching colored snacks plays native `feed-chomp` and updates existing score. No modifications to 5×4 bricks, three serves, `Launch!`, seven-snack goal, paddle physics/tilt/drag, score, rewards, original Web/PWA/Android or stable `ios-prep`. No Web/HTML fallback on `.audiotest` even if native output refuses.
+
+**Owner after reviewing/merging #31** in the dedicated `biblozoo-native-audio` worktree: Fetch/Pull `experiment/native-ios-audio`, then:
+
+```sh
+node scripts/validate_native_bounce_gameplay_n4c.js
+node scripts/validate_native_labyrinth_gameplay_n4b.js
+node scripts/validate_native_app_switcher_pause_n4a1.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build **BibloZoo Audio Test** in Xcode on the actual iPhone. Node/production web CI cannot compile Swift or hear sound.
+
+1. **Bounce rally:** Choose Bounce Tilt/Drag, tap Got It!, then let the white ball rebound from walls, paddle and bricks. Hear short distinct native **peg notes**, not constant beeping; gray and colored bricks break and release snacks normally. Caught colored snacks should make **chomp** and increment score; a miss should not.
+2. **Star bonus and serves:** Hit a star brick; hear the native `feed-star` sound and verify original **extra white balls** appear. Score and seven colored snacks objective unchanged. If the white ball escapes, use original **Launch!** next serve; lives/brick state not reset.
+3. **Exact App Switcher gesture:** During an active Bounce rally swipe up **and HOLD**, *without choosing another app*. Expect immediate freeze with **Welcome Back visible in the thumbnail**. Tap the BibloZoo card, then **Let's go!**; the **same white ball, remaining bricks/snacks, lives and score** must continue, with native audio on next collision. No automatic sound on foreground.
+4. **Full task switch and cross-mode regression:** Switch fully to YouTube/Facebook and back, explicit Resume, then play Classic, Melody and Labyrinth to confirm their native sound and existing progress/controls remain normal. No Web fallback/HTML audio, mic prompt or Zoo Escape audio-error repair.
+5. **If initial/returned audio fails:** Do **not** restart first. Tap DEV **Copy Audio Timing Report**, paste 80 event rows plus last 18 native gesture/preload entries and what was actually heard. Preflight `prepared` or sound `scheduled` are only software measurements.
+
+**Verification gates:** New `scripts/validate_native_bounce_gameplay_n4c.js` tests actual JS Got It! native preflight, strict three-ID Bounce allowlist, 55ms impact/anti-repeat, star/chomp, paused silence, failed-first-tap Try Again and cross-platform isolation. All older N3a–N4b and N4a.1 regression checks and production web build must stay green. **Xcode compile, real audible Bounce rally, star/multiball, next serve and both return gestures need owner iPhone acceptance**. Detailed [N4c owner guide](N4C-NATIVE-BOUNCE-FEEDING.md); see [Audio recovery](AUDIO-RECOVERY.md) and [living handoff](PROJECT-HANDOFF.md).
+
+---
+
+### N4b — native Labyrinth landings/catches and same-round Resume (PR #30 merged; owner physical iPhone accepted)
 
 **Actual owner acceptance of preceding [PR #29](https://github.com/andydoane/biblozoo/pull/29), merged `ee7cbae6`:** The iOS App Switcher **swipe-up-and-hold** issue is fixed on physical iPhone: the moment the user swipes up, the game **pauses** and **Welcome Back is already visible in its thumbnail**. The owner reports native audio **recovered as expected on both test returns**. Previous Melody live catches and Classic ordinary/full-task-switch audio were also owner accepted. This is **not** a N4b Labyrinth hearing pass. The exact gesture was never confirmed on older stable `ios-prep` and this PR leaves that branch untouched.
 
