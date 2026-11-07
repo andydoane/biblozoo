@@ -3822,6 +3822,26 @@
     return true;
   }
 
+  // UIKit can make WKWebView inactive in the App Switcher while document.hidden
+  // stays false and rAF keeps running. Swift already stops all sound there;
+  // this activity-owned pause must freeze the SAME round's physics and melody.
+  // Even a delayed "active" event is evidence of a transition: never resume
+  // automatically. A fresh Welcome Back tap must re-preload the native bank.
+  function pauseNativeFeedingForAppSwitcher(runtime) {
+    if (!runtime || activeRuntime !== runtime ||
+        runtime.nativePilotBackend !== "native") return;
+    const pending = runtime.feedResumePending === true;
+    pauseFeedingGame(runtime);
+    if (pending && runtime.feedPausedAt != null) {
+      // A second leave during async Resume must invalidate its original tap.
+      runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+      runtime.feedResumePending = false;
+      runtime.nativePilot?.stop?.();
+      if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      setFeedingResumeStatus(runtime);
+    }
+  }
+
   function attachFeedInterruptionHandlers(runtime) {
     runtime.feedVisibilityHandler = () => {
       if (document.hidden) {
@@ -3853,10 +3873,61 @@
     document.addEventListener("visibilitychange", runtime.feedVisibilityHandler);
     window.addEventListener("pagehide", runtime.feedPageHideHandler);
     window.addEventListener("pageshow", runtime.feedPageShowHandler);
+
+    // N4a.1: only the isolated native-only iOS experiment needs an explicit
+    // UIKit inactive signal. Other platforms keep their existing Web gates.
+    if (runtime.nativePilotAllowed &&
+        window.BibloZooNativeOnlyOutput?.enabled === true &&
+        window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true) {
+      const native = window.Capacitor?.Plugins?.BibloZooNativeSound;
+      const generation = (runtime.feedNativeLifecycleGeneration || 0) + 1;
+      runtime.feedNativeLifecycleGeneration = generation;
+      if (typeof native?.addListener === "function") {
+        try {
+          // Both inactive AND returned-active force a pause. The latter
+          // repairs a missed WKWebView callback if the switcher suspended JS.
+          const handle = native.addListener("biblozooAppLifecycle", state => {
+            if (activeRuntime !== runtime ||
+                runtime.feedNativeLifecycleGeneration !== generation ||
+                (state?.active !== false && state?.active !== true)) return;
+            pauseNativeFeedingForAppSwitcher(runtime);
+          });
+          void Promise.resolve(handle).then(listener => {
+            if (activeRuntime === runtime &&
+                runtime.feedNativeLifecycleGeneration === generation) {
+              runtime.feedNativeLifecycleHandle = listener;
+            } else {
+              try { void Promise.resolve(listener?.remove?.()).catch(() => {}); }
+              catch (_) { /* no activity to retain this listener */ }
+            }
+          }, () => { /* window focus/blur remains a fallback */ });
+        } catch (_) { /* no automatic Web/audio fallback */ }
+      }
+      // WKWebView visibilitychange is unreliable for the multitasking deck.
+      // Focus/blur are supplementary local signals, never audio activators.
+      runtime.feedNativeFocusHandler = () =>
+        pauseNativeFeedingForAppSwitcher(runtime);
+      window.addEventListener("blur", runtime.feedNativeFocusHandler);
+      window.addEventListener("focus", runtime.feedNativeFocusHandler);
+    }
   }
 
   function detachFeedInterruptionHandlers(runtime) {
     if (!runtime) return;
+    runtime.feedNativeLifecycleGeneration =
+      (runtime.feedNativeLifecycleGeneration || 0) + 1;
+    if (runtime.feedNativeLifecycleHandle) {
+      try {
+        void Promise.resolve(runtime.feedNativeLifecycleHandle.remove?.())
+          .catch(() => {});
+      } catch (_) { /* cleanup must not block navigation */ }
+      runtime.feedNativeLifecycleHandle = null;
+    }
+    if (runtime.feedNativeFocusHandler) {
+      window.removeEventListener("blur", runtime.feedNativeFocusHandler);
+      window.removeEventListener("focus", runtime.feedNativeFocusHandler);
+      runtime.feedNativeFocusHandler = null;
+    }
     if (runtime.feedVisibilityHandler) {
       document.removeEventListener("visibilitychange", runtime.feedVisibilityHandler);
       runtime.feedVisibilityHandler = null;

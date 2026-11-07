@@ -626,6 +626,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         if !wasOutsideForeground {
             wasOutsideForeground = true
             appendTrace("app-left-active")
+            // N4a.1: opening the iOS app-switcher makes the app INACTIVE
+            // without necessarily hiding WKWebView or firing pagehide.
+            // JS must freeze its physics/song clock before another catch.
+            // This event is state only: never unlock/restart sound.
+            notifyListeners("biblozooAppLifecycle", data: [
+                "active": false,
+                "foregroundEpoch": foregroundEpoch
+            ])
         }
         if interrupted { leftForegroundDuringInterruption = true }
     }
@@ -642,6 +650,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         appendTrace("app-active")
+        // If an inactive event was held while WebKit was suspended, the
+        // matching return event also forces the JS game to pause. Only a
+        // later real Welcome Back tap is permitted to re-preload sounds.
+        notifyListeners("biblozooAppLifecycle", data: [
+            "active": true,
+            "foregroundEpoch": foregroundEpoch
+        ])
     }
 
     private func handleInterruption(_ note: Notification) {
