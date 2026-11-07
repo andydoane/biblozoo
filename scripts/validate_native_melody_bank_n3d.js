@@ -1,5 +1,5 @@
 "use strict";
-// N3d is fixed native Melody note-bank groundwork, NOT real Melody game routing.
+// N3d's fixed native Melody bank is unchanged; N4a now routes gameplay to it.
 // Source contracts do not compile AVFAudio or demonstrate speaker audibility.
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -63,10 +63,12 @@ assert.match(dev,/playMelody\.addEventListener\("click"/);
 assert.match(dev,/panel\.setAttribute\("data-no-ui-sound", ""\)/);
 assert.match(melodyGame,/context\.createOscillator\(\)/);
 assert.match(melodyGame,/oscillator\.type = "triangle"/);
-assert.doesNotMatch(melodyGame,/feed-melody|nativePilot|AVAudioEngine|BibloZooNativeSound/,
-  "N3d must NOT reroute actual Melody gameplay before N4 native start/pause owner");
-assert.match(game,/mode === FEED_MODES\.CLASSIC &&[\s\S]*?BibloZooFeedingNativeAudioPilot\?\.isIOS/,
-  "Classic-only native gesture pilot must not silently widen to Melody");
+assert.match(melodyGame,/runtime\.nativePilot\.play\("feed-melody"/,
+  "N4a now routes real Melody catch notes to N3d's fixed Swift bank");
+assert.match(game,/session\.dailyTodoPreview === true && mode === FEED_MODES\.CLASSIC/,
+  "Classic preview selection must remain intact in N4a");
+assert.match(game,/nativeOnlyApp && mode === FEED_MODES\.MELODY/,
+  "actual Melody native routing must remain isolated to .audiotest");
 assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/,
   "Classic pilot remains unaffected by DEV Melody bank");
 assert.match(workflow,/node scripts\/validate_native_melody_bank_n3d\.js/);
@@ -82,4 +84,4 @@ const raw=[...tunes.matchAll(/(?:midi:\s*(\d+)|\b(4\d|[5-8]\d)\s*[,}])/g)]
 assert.ok(raw.length>40);
 assert.ok(raw.every(m=>Number.isInteger(m)&&m>=55&&m<=83),
   "all existing Melody MIDI notes must fit the fixed native note bank");
-console.log("N3d fixed Melody 55..83 PCM triangle bank, six voices, DEV E4 tap, no early Melody game routing, lifecycle and Web isolation passed.");
+console.log("N3d fixed Melody bank, six voices, DEV E4 and N4a isolated gameplay routing/lifecycle passed.");
