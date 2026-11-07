@@ -36,9 +36,7 @@
   // Web Audio clock is necessary (but not sufficient) evidence of usable sound.
   const FEED_AUDIO_CLOCK_PROBE_MS = 180;
   const FEED_AUDIO_CLOCK_MIN_ADVANCE = 0.012;
-  // C.2c experiment: Got It! verifies the existing Web clock before native
-  // samples are prepared. Both deadlines are bounded and test-only.
-  const FEED_NATIVE_CLOCK_READY_TIMEOUT_MS = 900;
+  // C.2d: Native-only does not depend on the Web Audio clock.
   const FEED_NATIVE_STATE_READ_TIMEOUT_MS = 500;
   const FEED_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
   const FEED_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
@@ -1329,7 +1327,7 @@
           ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">Preview audio: Web (default)</div>'
           : ""}
         ${nativePilotPreview
-          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native startup trace: select the DEV checkbox</div>'
+          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native-only diagnostic: select the DEV checkbox</div>'
           : ""}
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
@@ -1417,7 +1415,7 @@
                 <label class="daily-feed-native-pilot-opt"
                   data-daily-feed-native-pilot-opt data-no-ui-sound>
                   <input type="checkbox" data-daily-feed-native-opt-in>
-                  <span>DEV: Native star + chomp (off by default)</span>
+                  <span>DEV: Native ONLY (no Web fallback; star + chomp)</span>
                 </label>
                 <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
                   role="status" aria-live="polite">Web effects are the default.</p>
@@ -1636,16 +1634,10 @@
   }
 
   function playPegTone(runtime, now) {
-    // C.2b device isolation ONLY: when Classic tester has explicitly chosen
-    // native star/chomp, omit the synthesized Web Audio collision beeps.
-    // Native samples worked in isolation but failed when mixed with game
-    // Web Audio; whether these beeps cause iOS interruptions is unproven.
-    // Keep the Web Audio context/clock alive for existing Resume/Zoo Escape
-    // recovery, and leave normal Daily Feeding and all Web preview unchanged.
-    // Zoo Escape's paused sound effects retain their original readiness gate.
+    // Native-only Classic does not emit a Web oscillator, even while paused.
+    // Peg tones have not yet been migrated and are intentionally silent.
     if (runtime.nativePilotBackend === "native" &&
-        runtime.mode === FEED_MODES.CLASSIC &&
-        runtime.feedPausedAt == null) return;
+        runtime.mode === FEED_MODES.CLASSIC) return;
     const context = runtime.audioContext;
     if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
 
@@ -3462,9 +3454,9 @@
     }
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
     setFeedingResumeStatus(runtime);
-    // Only start the minigame for a genuinely active, interrupted round.
-    // New interruptions reset its stage and cancel every previous animation.
-    runtime.zooEscape?.start?.();
+    // Native-only tests pause with explicit Resume/Back, not Zoo Escape
+    // as an audio-repair minigame. All non-native paths retain that feature.
+    if (runtime.nativePilotBackend !== "native") runtime.zooEscape?.start?.();
     return true;
   }
 
@@ -3474,7 +3466,8 @@
         runtime.feedPageHidden || document.hidden ||
         (runtime.nativePilotBackend === "native" &&
           runtime.nativePilot?.isReady?.() !== true) ||
-        (runtime.audioContext && runtime.audioContext.state !== "running")) return false;
+        (runtime.nativePilotBackend !== "native" &&
+          runtime.audioContext && runtime.audioContext.state !== "running")) return false;
     const elapsed = Math.max(0, now - runtime.feedPausedAt);
     // Shift time-dependent effects, including Classic's 22s expiry and
     // Labyrinth's stuck-ball timer. Never touch positions or rewards.
@@ -5044,7 +5037,8 @@
     // Starting is itself a gesture. Give its Web Audio resume promise a
     // chance to settle BEFORE advancing game time, rather than flashing a
     // needless second Resume prompt during an ordinary new round.
-    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+    if (runtime.nativePilotBackend !== "native" &&
+        runtime.audioContext && runtime.audioContext.state !== "running") {
       const beganAt = performance.now();
       runtime.feedStartAudioWatchdog = setTimeout(() => {
         runtime.feedStartAudioWatchdog = null;
@@ -5093,7 +5087,8 @@
       pauseFeedingGame(runtime, runtime.lastFrameAt);
       return;
     }
-    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+    if (runtime.nativePilotBackend !== "native" &&
+        runtime.audioContext && runtime.audioContext.state !== "running") {
       pauseFeedingGame(runtime, now);
       return;
     }
