@@ -1329,11 +1329,13 @@
           <strong class="daily-feed-score-value" data-daily-feed-score>${mode === FEED_MODES.MELODY ? "0%" : "0"}</strong>
         </div>
         ${nativePilotPreview
-          ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">' +
+          ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite"' +
+              (nativeOnlyApp ? ' hidden' : '') + '>' +
               (nativeOnlyApp ? 'Native ONLY: prepare on Got It!' : 'Preview audio: Web (default)') + '</div>'
           : ""}
         ${nativePilotPreview
-          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native-only diagnostic: select the DEV checkbox</div>'
+          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace"' +
+              (nativeOnlyApp ? ' hidden' : '') + '>Native-only diagnostic: select the DEV checkbox</div>'
           : ""}
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
@@ -1427,15 +1429,8 @@
               ` : ""}
               ${nativePilotPreview ? `
                 <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
-                  role="status" aria-live="polite">${nativeOnlyApp
-                    ? (mode === FEED_MODES.MELODY
-                        ? "Native Melody: prepare notes on Got It!; no Web fallback."
-                        : mode === FEED_MODES.LABYRINTH
-                          ? "Native Labyrinth: prepare impacts and catches on Got It!; no Web fallback."
-                          : mode === FEED_MODES.BOUNCE
-                            ? "Native Bounce: prepare rebounds, bonuses and catches on Got It!; no Web fallback."
-                            : "Native ONLY test app: Web effects are disabled.")
-                    : "Web effects are the default."}</p>
+                  role="status" aria-live="polite" ${nativeOnlyApp ? "hidden" : ""}>${nativeOnlyApp
+                    ? "" : "Web effects are the default."}</p>
               ` : ""}
               <button class="daily-feed-control-got-it no-zoom" type="button"
                 data-daily-feed-confirm-button>Got It!</button>
@@ -3582,7 +3577,7 @@
       // (Classic samples/pegs, or Melody note bank) before unfreezing time.
       runtime.feedResumePending = true;
       setFeedingResumeStatus(runtime,
-        "Preparing native sounds… This preview has no Web fallback.");
+        "Getting sounds ready…");
       if (runtime.resumeButton) runtime.resumeButton.disabled = true;
       const generation = ++runtime.feedResumeGeneration;
       let settled = false;
@@ -3606,7 +3601,7 @@
           const detail = typeof reason === "string" &&
             /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
           setFeedingResumeStatus(runtime,
-            "Native sounds unavailable (" + detail + "). Tap Resume again or Back.");
+            "Sound isn't ready yet. Tap Try again! or Back.");
           report(false);
           return;
         }
@@ -5105,15 +5100,10 @@
       runtime.startConfirmButton.textContent = "Got It!";
     }
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
-    if (runtime.nativePilotChoiceStatus)
-      runtime.nativePilotChoiceStatus.textContent =
-        runtime.mode === FEED_MODES.MELODY
-          ? "Preparing native Melody notes…"
-          : runtime.mode === FEED_MODES.LABYRINTH
-            ? "Preparing native Labyrinth impacts and catches…"
-            : runtime.mode === FEED_MODES.BOUNCE
-              ? "Preparing native Bounce rebounds, bonuses and catches…"
-              : "Preparing native star, chomp, and peg sounds…";
+    if (runtime.nativePilotChoiceStatus) {
+      runtime.nativePilotChoiceStatus.hidden = false;
+      runtime.nativePilotChoiceStatus.textContent = "Getting sounds ready…";
+    }
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&
       !document.hidden && !runtime.feedPageHidden;
@@ -5149,14 +5139,17 @@
       const reason = typeof result?.reason === "string" &&
         /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
         ? result.reason : "bridge-error";
-      const message = "Native sounds unavailable (" + reason +
-        "). Tap Try Again or Back. DEV → Copy Audio Timing Report before restarting.";
+      // Child-facing popup stays simple. Diagnostic reason remains available
+      // in the hidden pilot badge and manual DEV timing report.
+      const message = "Sound isn't ready yet. Tap Try Again or Back.";
       if (runtime.nativePilotBadge) {
         runtime.nativePilotBadge.textContent =
           "Native ONLY unavailable (" + reason + "); round not started";
       }
-      if (runtime.nativePilotChoiceStatus)
+      if (runtime.nativePilotChoiceStatus) {
+        runtime.nativePilotChoiceStatus.hidden = false;
         runtime.nativePilotChoiceStatus.textContent = message;
+      }
       if (runtime.startConfirmButton)
         runtime.startConfirmButton.textContent = "Try Again";
       void recordNativePreviewPhase(runtime, "preflight-failed");
@@ -5173,14 +5166,10 @@
             : runtime.mode === FEED_MODES.BOUNCE
               ? "Native ONLY: Bounce rebounds/bonus/catches ready; Web audio OFF"
               : "Native ONLY: star/chomp ready; Web audio OFF";
-    if (runtime.nativePilotChoiceStatus)
-      runtime.nativePilotChoiceStatus.textContent = runtime.mode === FEED_MODES.MELODY
-        ? "Native Melody notes prepared."
-        : runtime.mode === FEED_MODES.LABYRINTH
-          ? "Native Labyrinth impacts and catches prepared."
-          : runtime.mode === FEED_MODES.BOUNCE
-            ? "Native Bounce rebounds, bonuses and catches prepared."
-            : "Native effects prepared.";
+    if (runtime.nativePilotChoiceStatus) {
+      runtime.nativePilotChoiceStatus.textContent = "";
+      runtime.nativePilotChoiceStatus.hidden = true;
+    }
     startRound(runtime);
     void recordNativePreviewPhase(runtime, "round-start");
   }
