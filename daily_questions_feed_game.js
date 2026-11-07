@@ -1303,6 +1303,7 @@
       session?.dailyTodoPreview === true &&
       mode === FEED_MODES.CLASSIC &&
       window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true;
+    const nativeOnlyApp = window.BibloZooNativeOnlyOutput?.enabled === true;
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
         ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
@@ -1324,7 +1325,8 @@
           <strong class="daily-feed-score-value" data-daily-feed-score>${mode === FEED_MODES.MELODY ? "0%" : "0"}</strong>
         </div>
         ${nativePilotPreview
-          ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">Preview audio: Web (default)</div>'
+          ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite">' +
+              (nativeOnlyApp ? 'Native ONLY: prepare on Got It!' : 'Preview audio: Web (default)') + '</div>'
           : ""}
         ${nativePilotPreview
           ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace">Native-only diagnostic: select the DEV checkbox</div>'
@@ -1413,12 +1415,15 @@
               </div>
               ${nativePilotPreview ? `
                 <label class="daily-feed-native-pilot-opt"
-                  data-daily-feed-native-pilot-opt data-no-ui-sound>
+                  data-daily-feed-native-pilot-opt data-no-ui-sound
+                  ${nativeOnlyApp ? "hidden" : ""}>
                   <input type="checkbox" data-daily-feed-native-opt-in>
                   <span>DEV: Native ONLY (no Web fallback; star + chomp)</span>
                 </label>
                 <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
-                  role="status" aria-live="polite">Web effects are the default.</p>
+                  role="status" aria-live="polite">${nativeOnlyApp
+                    ? "Native ONLY test app: Web effects are disabled."
+                    : "Web effects are the default."}</p>
               ` : ""}
               <button class="daily-feed-control-got-it no-zoom" type="button"
                 data-daily-feed-confirm-button>Got It!</button>
@@ -4903,6 +4908,8 @@
   // The unchecked Web baseline prepares its original sounds only when
   // explicitly chosen. The native-only path never calls this helper.
   function prepareWebClassicPreviewOnTap(runtime) {
+    // N1: the separate native-only iOS package must never prepare Web output.
+    if (window.BibloZooNativeOnlyOutput?.enabled === true) return;
     if (runtime.audioContext || runtime.starAudio || runtime.chompAudio) return;
     runtime.audioContext = prepareAudio();
     if (runtime.audioContext) return;
@@ -4923,8 +4930,9 @@
     if (!runtime || activeRuntime !== runtime ||
         runtime.nativePilotChoicePending || runtime.roundStarted ||
         runtime.finished || runtime.controlPhase !== "instructions") return;
-    if (!runtime.nativePilotAllowed ||
-        runtime.nativePilotCheckbox?.checked !== true) {
+    const forceNativeOnly = window.BibloZooNativeOnlyOutput?.enabled === true;
+    if ((!runtime.nativePilotAllowed ||
+        runtime.nativePilotCheckbox?.checked !== true) && !forceNativeOnly) {
       // Explicit Web comparison, not an audio-error fallback from Native.
       runtime.nativePilotBackend = "web";
       prepareWebClassicPreviewOnTap(runtime);
@@ -4938,6 +4946,10 @@
     // clock-probe or silently select Web Audio. A failed native sound remains
     // intentionally SILENT and carries an accurate diagnostic reason.
     runtime.nativePilotBackend = "native";
+    // Native-only packaging has no Web comparison: the historical checkbox
+    // remains only for older source/VM tests, not for this iOS installation.
+    if (forceNativeOnly && runtime.nativePilotCheckbox)
+      runtime.nativePilotCheckbox.checked = true;
     if (preparedAudioContext) {
       stopAudioContext(preparedAudioContext);
       preparedAudioContext = null;
@@ -5491,13 +5503,18 @@
     const scheduled =
       buildScheduledBalls();
 
+    const nativePilotCheckbox = nativePilotAllowed
+      ? startOverlay.querySelector("[data-daily-feed-native-opt-in]") : null;
+    if (window.BibloZooNativeOnlyOutput?.enabled === true && nativePilotCheckbox) {
+      nativePilotCheckbox.checked = true;
+    }
+
     const runtime = {
       running: false,
       roundStarted: false,
       finished: false,
       nativePilotAllowed,
-      nativePilotCheckbox: nativePilotAllowed
-        ? startOverlay.querySelector("[data-daily-feed-native-opt-in]") : null,
+      nativePilotCheckbox,
       nativePilotChoiceStatus: nativePilotAllowed
         ? startOverlay.querySelector("[data-daily-feed-native-choice-status]") : null,
       nativePilotBadge: nativePilotAllowed
