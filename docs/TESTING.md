@@ -65,9 +65,43 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
-### N2 — native-only AVAudioSession lifecycle / explicit gesture gate (PR #21, iPhone acceptance pending)
+### N2.1 — Native-only Classic Resume and MP3 playback hitch (PR #22; awaiting iPhone)
 
-**Based on merged [PR #20](https://github.com/andydoane/biblozoo/pull/20) at `6303ce79`.** Owner says N1's isolation behaved as expected (including deliberately silent non-native sounds). This is *not* a new detailed session-interruption trace. [PR #21](https://github.com/andydoane/biblozoo/pull/21) is the next focused native-session change; no new audible gameplay success is claimed until your iPhone testing. Read [N2 native session state design](N2-NATIVE-SESSION-LIFECYCLE.md) and [living handoff §10](PROJECT-HANDOFF.md) before merging.
+**Current owner evidence after merged [N2 PR #21](https://github.com/andydoane/biblozoo/pull/21):** The DEV panel **actually played all three native samples**. Classic Feeding played **audible native star/chomp MP3 effects**; its Web oscillator **peg beeps were intentionally silent** (native beeps are N3, not a regression). But **each native sound caused about a second of visible game pause**, and after task-switching out/back the Welcome Back action did **nothing**, while Back still exited. This is a **partial N2 audio success and a FAILED smoothness/Resume gate**, not a fully working game. Owner did not supply exact Inspect values; do not invent a native decode timing or claim the hitch's cause is proven.
+
+**[PR #22](https://github.com/andydoane/biblozoo/pull/22), feature branch `experiment/n2-1-feeding-resume-playback-hitch`** corrects the observed source-level button routing: `daily_questions_feed_game.js` created a dormant Zoo Escape controller, which had already attached its own Welcome Back action listener, so Feeding's old `if (!runtime.zooEscape)` condition wrongly omitted the Native-only Resume listener. Feeding now **always registers** its handler, but if the live backend is Web and Zoo Escape owns the button, the Feeding handler exits without interference. The Native-only click calls `attemptFeedingResumeFromGesture` to perform the bounded native session gate + fresh two-sample preload; it never uses a Web clock. The frozen round should unfreeze on successful native prep or stay retryable with Back on a real native failure.
+
+The Swift plugin also moves `AVAudioPlayer(contentsOf:)`, `prepareToPlay()`, `play()` and `stop()` to a **single serial background playback queue**, keeping player access off the UI thread. It avoids calling `sound.stop()` before rewinding a rapid repeat (which could discard preparation). A lock-protected epoch invalidates stale queued player commands on background, interruption, media reset or route change; no automatic resume or false native audio success. The DEV Inspect panel now adds `lastSound`, `prepMs`, `queueMs`, `playMs`. These are local timings: **prepMs** = native MP3 setup duration; **queueMs** = wait before the worker processed a sound; **playMs** = time spent inside the native `play()` call. They are **not** a direct measurement of animation frame drops or whether sound was heard. N3 will add native peg tones and overlapping sample voices; they are **not** in this PR.
+
+**After owner review/merge**, in GitHub Desktop use the dedicated `biblozoo-native-audio` worktree, Fetch/Pull `experiment/native-ios-audio`, then:
+
+```sh
+git branch --show-current                   # experiment/native-ios-audio
+node scripts/validate_native_audio_test_identity.js
+node scripts/validate_native_feeding_preview_c2.js
+node scripts/validate_native_feeding_resume_n21.js
+node scripts/validate_native_sound_smoke_test.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Build and run **BibloZoo Audio Test** (bundle ID `com.andydoane.biblozoo.audiotest`) on a **physical iPhone**; do not overwrite the stable installed BibloZoo. The target is *normal, responsive gameplay*, not only native sound accepted.
+
+1. **DEV baseline:** Play native star and chomp; both should still be **heard**. Tap **Inspect native state** and copy, if possible, the simple `lastSound=...`, `prepMs=...`, `queueMs=...`, `playMs=...` values. `pending`/interruption trace remain read-only; no special need to interpret all fields.
+2. **Repeated Classic sounds:** Daily To-Do Preview → Feeding Game Tester → Classic → Got It!/Drag. Trigger several separate stars/chomps, including repeats close together. Confirm native MP3s are **heard**, whether motion **still pauses ~1 second** on each hit, and whether dragging/ball animation stays responsive. **Peg beeps remain silent by design.** If hitch persists, copy DEV timing values *immediately afterwards*; note whether `playMs` or `queueMs` are large, or instead both remain small (then investigate game/JS animation).
+3. **Task-switch / Resume:** With a running Classic round, switch to another app, return, then press the visible Welcome Back **Let's go!/Resume** control. It should respond, reprepare native sounds on the gesture, dismiss the overlay and continue **the same score, ball state and timers**. Back must still exit. Test a second switch if possible. No surprise Zoo Escape, no automatic replay, and no hidden Web audio.
+4. **Rejected native state:** If iOS reports `interruption-pending`, `activation-cooldown`, or a player error, the game should remain paused with an explicit retry and usable Back, not silently claim success or award points. Save the status/trace; a real interruption must not be cleared by a fake Web recovery.
+5. **Protect stable behavior:** Menus, pets/progress/rewards, exit and recording permissions remain unchanged. Check no duplicate rewards after resume, no delayed sound after hiding, no Web UI sound or unintended microphone startup.
+
+**Evidence labels:** source/static+VM and GitHub Actions passing != Xcode Swift compile != human-audible native effects != smooth animation or functional Resume. Log each separately in the [living handoff](PROJECT-HANDOFF.md) after the owner's test. Do not proceed to N3 native tones until the hitch and Resume have been characterized or corrected.
+
+---
+
+### N2 — native-only AVAudioSession lifecycle / explicit gesture gate (PR #21 merged; historical test plan)
+
+**[PR #21](https://github.com/andydoane/biblozoo/pull/21) was merged as `53377d2e`.** The owner confirmed DEV native samples and Classic star/chomp MP3s were **audible on iPhone**. The original interruption origin has not been proven by a fresh trace. The owner additionally reported a ~1-second gameplay hitch on every MP3 and an inert Welcome Back Resume (Back worked); see the N2.1 section above for the corrective PR and device checks. Read [N2 native session state design](N2-NATIVE-SESSION-LIFECYCLE.md) and [living handoff §10](PROJECT-HANDOFF.md) before merging.
 
 **What N2 changes:** `BibloZooNativeSoundPlugin.swift` is now the authoritative **native-only output-session decision point**. A new `activateFromGesture({purpose:"dev"|"feeding"})` bridge call happens on the real Play/Got It!/Resume tap *before* native sample preload. If there is no pending session event, it returns `not-needed` without activating. An unresolved genuine `.began` cannot be cleared by a foreground observation or elapsed timeout; after a **completed inactive/background → active return** a new tap can request one bounded `AVAudioSession.setActive(true)` retry (max two attempts per foreground and four seconds apart). The OS can accept or reject; accepting does **not** prove human audible sound. Suspended-history `.began` is counted but not treated as a fresh interruption. `.ended` clears pending; route/media reset disposes old players without auto-replay. `.soloAmbient` and microphone category are unchanged. The old Web-clock recovery bridge is disabled **only in `.audiotest`**, without replacing sound with HTML/Web fallback.
 

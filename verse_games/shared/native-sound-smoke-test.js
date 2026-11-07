@@ -157,6 +157,12 @@
           " reset=" + count(state.mediaResetCount) +
           " activationAttempts=" + count(state.activationAttemptsTotal) +
           " activation=" + safeReason(state.lastActivationResult) +
+          // Timing is diagnostic only: low native timings with a visible
+          // hitch imply we must investigate the game/UI or decode elsewhere.
+          " lastSound=" + safeReason(state.lastNativePlayedSoundId) +
+          " prepMs=" + count(state.lastNativePrepareMs) +
+          " queueMs=" + count(state.lastNativePlayQueueMs) +
+          " playMs=" + count(state.lastNativePlayCallMs) +
           (recent ? " trace=" + recent : "");
       } catch (_) {
         if (!dismissed && !doc.hidden) detail.textContent = "Native state read failed or timed out.";

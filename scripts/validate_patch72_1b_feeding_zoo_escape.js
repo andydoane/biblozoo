@@ -131,7 +131,9 @@ function staticContracts(){
    'attemptFeedingResumeFromGesture(runtime, resolve)','runtime.zooEscape?.start?.()',
    'runtime.zooEscape?.destroy?.()','runtime.onRecoveryExitToZoo || runtime.onBackToZoo',
    'soundIsReady: () => zooEscapeSoundReady(runtime)',
-   'if (!runtime.zooEscape) {','const continued = continueFeedingAfterGesture(runtime,',
+   'if (runtime.zooEscape && runtime.nativePilotBackend !== "native") return;',
+   'resumeButton.addEventListener("click", runtime.resumeButtonHandler);',
+   'const continued = continueFeedingAfterGesture(runtime,',
    'report(continued)','feed-bounce-bonus-clock-check'])
    ok(feed.includes(text),'Feeding Zoo Escape integration: '+text);
  ok(feed.indexOf('attemptFeedingResumeFromGesture(runtime, resolve)')>

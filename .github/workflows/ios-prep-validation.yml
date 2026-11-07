@@ -53,6 +53,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_feeding_preview_c2.js
 
+      - name: Validate N2.1 native Feeding Resume and async lifecycle
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_feeding_resume_n21.js
+
       - name: Validate N1 native-only WebKit sound output isolation
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_only_ios_output.js

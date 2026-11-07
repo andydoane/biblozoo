@@ -5932,6 +5932,11 @@
     attachFeedZooTestHarness(runtime);
 
     runtime.resumeButtonHandler = (event) => {
+      // The shared Zoo Escape controller attaches to this same button, but
+      // Native-only intentionally never starts that controller. Its click
+      // handler therefore ignores the tap. Route Native-only Resume directly
+      // to the activity owner; preserve legacy Web/Zoo Escape handling.
+      if (runtime.zooEscape && runtime.nativePilotBackend !== "native") return;
       event.preventDefault();
       event.stopPropagation();
       attemptFeedingResumeFromGesture(runtime);
@@ -6007,10 +6012,10 @@
     }
 
     exitButton.addEventListener("click", runtime.exitHandler);
-    if (!runtime.zooEscape) {
-      // Older builds without the shared controller retain a usable resume.
-      resumeButton.addEventListener("click", runtime.resumeButtonHandler);
-    }
+    // The Native-only tester never calls zooEscape.start(), so its shared
+    // Welcome Back button is inert unless Feeding installs its own listener.
+    // The handler above ignores non-native taps when Zoo Escape owns them.
+    resumeButton.addEventListener("click", runtime.resumeButtonHandler);
     resumeBackButton.addEventListener("click", runtime.resumeBackHandler);
 
     resultBackButton.addEventListener(
