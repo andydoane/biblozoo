@@ -81,6 +81,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_melody_gameplay_n4a.js
 
+      - name: Validate N4a.1 iOS App Switcher inactive pause and Resume safety
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_app_switcher_pause_n4a1.js
+
       - name: Validate N1 native-only WebKit sound output isolation
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_only_ios_output.js
