@@ -87,6 +87,7 @@ function feedHarness(nativeIOS=true) {
     star: playStarSound,
     chomp: playChompSound,
     peg: playPegTone,
+    resume: attemptFeedingResumeFromGesture,
     stopEffects: stopFeedingEffects
   };
 ${marker}`;
@@ -96,6 +97,9 @@ ${marker}`;
   const compiled=FEED.replace(
     '  function startRound(runtime) {',
     '  function startRound(runtime) { if (window.__interceptStart) { window.__interceptStart(runtime); return; }'
+  ).replace(
+    '  function continueFeedingAfterGesture(runtime, now = performance.now(), keepOverlay = false) {',
+    '  function continueFeedingAfterGesture(runtime, now = performance.now(), keepOverlay = false) { if (window.__testContinue) return window.__testContinue(runtime, now, keepOverlay);'
   ).replace(
     '  function resumeFeedAudioContext(context) {',
     '  function resumeFeedAudioContext(context) { if (window.__testResume) return window.__testResume(context);'
@@ -516,6 +520,72 @@ async function main() {
       /Native ONLY unavailable \(interruption-pending\); sounds SILENT/);
   }
   {
+    // Native-only Resume must ignore a suspended/missing Web context, wait
+    // for the new native preflight and unfreeze only on a fresh human tap.
+    const h=feedHarness();
+    let resumes=0, clockChecks=0, rePrepares=0, continued=0;
+    h.window.__testResume=()=>{resumes++;throw Error("native used Web resume");};
+    h.window.__testClock=()=>{clockChecks++;throw Error("native used Web clock");};
+    h.window.__testContinue=(_r, _now, keepOverlay)=>{
+      continued++;
+      assert.equal(keepOverlay,false,"Native-only Resume must dismiss Welcome Back");
+      return true;
+    };
+    const r=runtime(true);
+    r.audioContext=null;
+    r.nativePilotBackend="native";
+    r.roundStarted=true;
+    r.running=true;
+    r.feedPausedAt=1234;
+    r.feedResumeGeneration=0;
+    r.feedResumePending=false;
+    r.resumeButton={disabled:false};
+    r.resumeStatus={textContent:"",hidden:true};
+    r.resumeOverlay={hidden:false};
+    r.nativePilot={prepare:async()=>{
+      rePrepares++;
+      return {ready:true};
+    }};
+    h.hooks.setRuntime(r);
+    const result=[];
+    assert.equal(h.hooks.resume(r,ok=>result.push(ok)),true);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(rePrepares,1);
+    assert.equal(continued,1);
+    assert.deepEqual(result,[true]);
+    assert.equal(r.feedResumePending,false);
+    assert.equal(r.resumeButton.disabled,false);
+    assert.equal(resumes,0);
+    assert.equal(clockChecks,0);
+  }
+  {
+    // Failed native-only Resume stays frozen with retry/Back; never tries Web.
+    const h=feedHarness();
+    let continued=0;
+    h.window.__testResume=()=>{throw Error("Web fallback from Native Resume");};
+    h.window.__testContinue=()=>{continued++;return true;};
+    const r=runtime(true);
+    r.audioContext=null;
+    r.nativePilotBackend="native";
+    r.roundStarted=true;
+    r.running=true;
+    r.feedPausedAt=1234;
+    r.feedResumeGeneration=0;
+    r.resumeButton={disabled:false};
+    r.resumeStatus={textContent:"",hidden:true};
+    r.resumeOverlay={hidden:false};
+    r.nativePilot={prepare:async()=>({ready:false,reason:"interruption-pending"})};
+    h.hooks.setRuntime(r);
+    const result=[];
+    assert.equal(h.hooks.resume(r,ok=>result.push(ok)),true);
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.deepEqual(result,[false]);
+    assert.equal(continued,0);
+    assert.equal(r.feedPausedAt,1234);
+    assert.equal(r.resumeButton.disabled,false);
+    assert.match(r.resumeStatus.textContent,/Native sounds unavailable \(interruption-pending\)/);
+  }
+  {
     // Exit/route switch during a deferred prepare must not start another round.
     const h=feedHarness();
     let starts=0, stops=0;
@@ -562,6 +632,19 @@ async function main() {
     assert.equal(webBeepAttempts, 1,
       "Native-only tester must not make Web sounds even while paused");
   }
+  // Source contract for the experiment: nothing in the Native branch can
+  // reopen the very Web audio context whose clock failures blocked C.2c.
+  assert.match(FEED,/const audioContext = nativePilotAllowed\s*\?\s*null :/);
+  assert.match(FEED,/const starAudio =\s*audioContext \|\| nativePilotAllowed/);
+  assert.match(FEED,/const chompAudio = audioContext \|\| nativePilotAllowed/);
+  const nativeStartup=FEED.slice(
+    FEED.indexOf('    runtime.nativePilotBackend = "native";',
+      FEED.indexOf("async function startPreviewRoundWithAudioChoice")),
+    FEED.indexOf("  function startRound(runtime) {")
+  );
+  assert.ok(nativeStartup.length>500);
+  assert.doesNotMatch(nativeStartup,/resumeFeedAudioContext|feedAudioClockAdvances|new Audio\(|runtime\.nativePilotBackend\s*=\s*"web"/);
+  assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-star"/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-chomp"/);
   assert.match(FEED,/if \(runtime\.nativePilotBackend === "native"\) \{[\s\S]*?Native-only preview/);
