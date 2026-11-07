@@ -214,7 +214,9 @@ async function main() {
     const p=a.pilot.create({isCurrent:()=>true,onFailure:v=>failures.push(v)});
     await p.prepare();
     assert.equal(p.play("feed-star",0.8),true);
-    await Promise.resolve();await Promise.resolve();await Promise.resolve();
+    // The adapter races play() against a deadline and observes the result
+    // through .finally().then(); wait one macrotask for that chain to settle.
+    await new Promise(resolve => setImmediate(resolve));
     assert.equal(p.hasFailed(),true);
     assert.deepEqual(failures,["interruption-pending"]);
     assert.equal(p.play("feed-star",0.8),false,"never silently swap or repeat after rejection");
