@@ -31,7 +31,7 @@ assert.equal((pbx.match(/BibloZooNativeSoundPlugin\.swift in Sources \*\//g) || 
 assert.match(scene, /registerPluginInstance\(BibloZooNativeSoundPlugin\(\)\)/);
 assert.match(swift, /@objc\(BibloZooNativeSoundPlugin\)/);
 assert.match(swift, /jsName\s*=\s*"BibloZooNativeSound"/);
-for (const method of ["preload", "play", "stop"]) {
+for (const method of ["preload", "play", "stop", "getDebugState"]) {
   assert.match(swift, new RegExp('CAPPluginMethod\\(name: "' + method + '"'));
   assert.match(swift, new RegExp('@objc func ' + method + '\\('));
 }
@@ -39,6 +39,23 @@ assert.match(swift, /Bundle\.main\.url\(forResource: self\.resourceName, withExt
 assert.match(swift, /\.soloAmbient/);
 assert.match(swift, /UIApplication\.willResignActiveNotification/);
 assert.match(swift, /AVAudioSession\.interruptionNotification/);
+const debugSwift = swift.slice(swift.indexOf("    @objc func getDebugState("),
+  swift.indexOf("    @objc func preload("));
+assert.match(debugSwift, /lastInterruptionSignal/);
+assert.match(debugSwift, /beganEventCount/);
+assert.match(debugSwift, /endedEventCount/);
+assert.match(debugSwift, /suspendedEventCount/);
+assert.match(debugSwift, /lastInterruptionReasonCode/);
+assert.doesNotMatch(debugSwift, /\.play\(|\.prepareToPlay\(|\.setActive\(|\.setCategory\(|\.setMode\(/,
+  "native diagnostics must never play audio or activate/change the session");
+assert.match(swift, /AVAudioSessionInterruptionReasonKey/);
+assert.match(swift, /interruptionEventCount \+= 1/);
+assert.match(swift, /suspendedEventCount \+= 1/);
+const appCode = read("app.js");
+assert.match(appCode, /eventTarget\.closest\("\[data-no-ui-sound\]"\)/,
+  "global UI tap handler must honor experimental no-pop marker");
+assert.match(js, /panel\.setAttribute\("data-no-ui-sound", ""\)/,
+  "developer panel must suppress the global web audio pop");
 assert.match(swift, /UIApplication\.didBecomeActiveNotification/);
 assert.match(swift, /AVAudioSessionInterruptionWasSuspendedKey/);
 assert.match(swift, /AVAudioSession\.routeChangeNotification/);
@@ -117,7 +134,15 @@ function environment(options = {}) {
   const api = options.api || {
     async preload(args) { calls.push(["preload", args]); return { prepared: true }; },
     async play(args) { calls.push(["play", args]); return { accepted: true }; },
-    async stop(args) { calls.push(["stop", args]); return { stopped: true }; }
+    async stop(args) { calls.push(["stop", args]); return { stopped: true }; },
+    async getDebugState() {
+      calls.push(["getDebugState"]);
+      return {
+        available: true, appState: "active", pending: true, lastSignal: "began",
+        eventCount: 1, beganCount: 1, endedCount: 0, suspendedCount: 0,
+        routeCount: 0, lastReasonCode: 1, lastAgeMs: 213
+      };
+    }
   };
   const cap = options.platform === "web"
     ? { isNativePlatform: () => false, getPlatform: () => "web", Plugins: { BibloZooNativeSound: api } }
@@ -136,8 +161,10 @@ function environment(options = {}) {
   const close = top?.children?.[1];
   const button = panel?.children?.[1];
   const status = panel?.children?.[2];
+  const inspect = panel?.children?.[3];
+  const detail = panel?.children?.[4];
   return {
-    panel, button, status, close, doc, calls, api,
+    panel, button, status, inspect, detail, close, doc, calls, api,
     fireTimers(ms) {
       for (const [id, task] of [...timed]) {
         if (task.ms <= ms) { timed.delete(id); task.cb(); }
@@ -154,7 +181,10 @@ async function run() {
   }
   {
     const e = environment();
-    assert.ok(e.panel && e.button && e.status && e.close, "iOS test panel must exist");
+    assert.ok(e.panel && e.button && e.status && e.close && e.inspect && e.detail,
+      "iOS test panel and read-only inspector must exist");
+    assert.equal(e.panel.attributes["data-no-ui-sound"], "",
+      "Web Audio pop must be excluded for the entire test panel");
     assert.equal(e.calls.length, 0, "native test must not autoplay");
     await e.button.click();
     assert.deepEqual(e.calls.map(x => x[0]), ["preload", "play"]);
@@ -163,12 +193,23 @@ async function run() {
     assert.match(e.status.textContent, /playback requested/i);
     assert.match(e.status.textContent, /did you hear/i);
     assert.doesNotMatch(e.status.textContent, /sound confirmed|successfully heard/i);
+    await e.inspect.click();
+    // The inspector handler is intentionally detached from audio playback.
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.deepEqual(e.calls.map(x => x[0]), ["preload", "play", "getDebugState"]);
+    assert.match(e.detail.textContent, /pending=YES/);
+    assert.match(e.detail.textContent, /began=1 ended=0 suspended=0/);
+    assert.match(e.detail.textContent, /reasonCode=1/);
+    assert.match(e.detail.textContent, /ageMs=213/);
   }
   {
     const e = environment({ missing: true });
     await e.button.click();
     assert.match(e.status.textContent, /bridge missing/i);
     assert.equal(e.calls.length, 0);
+    await e.inspect.click();
+    assert.match(e.detail.textContent, /bridge unavailable/i);
   }
   {
     let played = 0;
