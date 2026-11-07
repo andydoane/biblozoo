@@ -169,6 +169,10 @@ function environment(options = {}) {
   };
   const calls = [];
   const api = options.api || {
+    async activateFromGesture(args) {
+      calls.push(["activateFromGesture", args]);
+      return { ready: true, attempted: false, reason: "not-needed" };
+    },
     async preload(args) { calls.push(["preload", args]); return { prepared: true }; },
     async play(args) { calls.push(["play", args]); return { accepted: true }; },
     async stop(args) { calls.push(["stop", args]); return { stopped: true }; },
@@ -177,10 +181,23 @@ function environment(options = {}) {
       return {
         available: true, appState: "active", pending: true, lastSignal: "began",
         eventCount: 1, beganCount: 1, endedCount: 0, suspendedCount: 0,
-        routeCount: 0, lastReasonCode: 1, lastAgeMs: 213
+        routeCount: 0, lastReasonCode: 1, lastAgeMs: 213,
+        foregroundEpoch: 2, mediaResetCount: 0, activationAttemptsTotal: 1,
+        lastActivationResult: "os-accepted",
+        recentEvents: [
+          { seq: 3, kind: "interruption-began", elapsedMs: 20 },
+          { seq: 4, kind: "activation-os-accepted", elapsedMs: 50 }
+        ]
       };
     }
   };
+  // Existing mock scenarios now follow the explicit Swift gesture protocol.
+  if (options.api && !options.missing && !("activateFromGesture" in api)) {
+    api.activateFromGesture = async (args) => {
+      calls.push(["activateFromGesture", args]);
+      return { ready: true, attempted: false, reason: "not-needed" };
+    };
+  }
   const cap = options.platform === "web"
     ? { isNativePlatform: () => false, getPlatform: () => "web", Plugins: { BibloZooNativeSound: api } }
     : { isNativePlatform: () => true, getPlatform: () => "ios", Plugins: options.missing ? {} : { BibloZooNativeSound: api } };
@@ -228,9 +245,10 @@ async function run() {
       "Web Audio pop must be excluded for the entire test panel");
     assert.equal(e.calls.length, 0, "native test must not autoplay");
     await e.button.click();
-    assert.deepEqual(e.calls.map(x => x[0]), ["preload", "play"]);
-    assert.equal(e.calls[0][1].soundId, "pilot-unlock");
-    assert.equal(e.calls[1][1].volume, 0.85);
+    assert.deepEqual(e.calls.map(x => x[0]), ["activateFromGesture", "preload", "play"]);
+    assert.equal(e.calls[0][1].purpose, "dev");
+    assert.equal(e.calls[1][1].soundId, "pilot-unlock");
+    assert.equal(e.calls[2][1].volume, 0.85);
     assert.match(e.status.textContent, /playback requested/i);
     assert.match(e.status.textContent, /did you hear/i);
     assert.doesNotMatch(e.status.textContent, /sound confirmed|successfully heard/i);
@@ -238,20 +256,25 @@ async function run() {
     // The inspector handler is intentionally detached from audio playback.
     await Promise.resolve();
     await Promise.resolve();
-    assert.deepEqual(e.calls.map(x => x[0]), ["preload", "play", "getDebugState"]);
+    assert.deepEqual(e.calls.map(x => x[0]),
+      ["activateFromGesture", "preload", "play", "getDebugState"]);
     assert.match(e.detail.textContent, /pending=YES/);
     assert.match(e.detail.textContent, /began=1 ended=0 suspended=0/);
     assert.match(e.detail.textContent, /reasonCode=1/);
     assert.match(e.detail.textContent, /ageMs=213/);
+    assert.match(e.detail.textContent, /foregroundEpoch=2/);
+    assert.match(e.detail.textContent, /activation=os-accepted/);
+    assert.match(e.detail.textContent, /trace=#3:interruption-began@20ms/);
     // Independent, explicit tap-only samples: no Feeding event or WebAudio pop.
     await e.playStar.click();
     await e.playChomp.click();
     assert.deepEqual(e.calls.map(x => x[0]),
-      ["preload", "play", "getDebugState", "preload", "play", "preload", "play"]);
-    assert.deepEqual([e.calls[3][1].soundId, e.calls[4][1].soundId],
-      ["feed-star", "feed-star"]);
-    assert.deepEqual([e.calls[5][1].soundId, e.calls[6][1].soundId],
-      ["feed-chomp", "feed-chomp"]);
+      ["activateFromGesture", "preload", "play", "getDebugState",
+       "activateFromGesture", "preload", "play",
+       "activateFromGesture", "preload", "play"]);
+    assert.equal(e.calls[4][1].purpose, "dev");
+    assert.equal(e.calls[5][1].soundId, "feed-star");
+    assert.equal(e.calls[8][1].soundId, "feed-chomp");
     assert.match(e.status.textContent, /native chomp playback requested/i);
     assert.equal(e.panel.attributes["data-no-ui-sound"], "");
   }
@@ -330,20 +353,21 @@ async function run() {
     let plays = 0;
     let preloads = 0;
     const e = environment({ api: {
-      preload: async () => ++preloads === 1
-        ? { prepared: false, reason: "interruption-pending" }
-        : { prepared: true, lastInterruptionSignal: "foreground-tap-retry" },
+      activateFromGesture: async () => ++preloads === 1
+        ? { ready: false, reason: "interruption-pending" }
+        : { ready: true, reason: "os-accepted" },
+      preload: async () => ({ prepared: true, lastInterruptionSignal: "foreground-activation-accepted" }),
       play: async () => { plays++; return { accepted: true }; },
       stop: async () => ({ stopped: true })
     } });
     await e.button.click();
     assert.equal(plays, 0);
-    assert.match(e.status.textContent, /no new native sound requested/i);
-    assert.match(e.status.textContent, /return to app and tap again/i);
+    assert.match(e.status.textContent, /native session not ready/i);
+    assert.match(e.status.textContent, /interruption-pending/i);
     await e.button.click();
     assert.equal(plays, 1, "fresh tap must prepare again, not replay stale audio");
     assert.match(e.status.textContent, /playback requested/i);
-    assert.match(e.status.textContent, /fresh tap after foreground return/i);
+    assert.match(e.status.textContent, /OS accepted native activation after foreground return/i);
     assert.doesNotMatch(e.status.textContent, /interruption pending/i,
       "do not preserve a stale interruption error after a successful new request");
   }
