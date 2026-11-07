@@ -67,7 +67,8 @@ assert.match(melodyGame,/runtime\.nativePilot\.play\("feed-melody"/,
   "N4a now routes real Melody catch notes to N3d's fixed Swift bank");
 assert.match(game,/session\.dailyTodoPreview === true && mode === FEED_MODES\.CLASSIC/,
   "Classic preview selection must remain intact in N4a");
-assert.match(game,/nativeOnlyApp && mode === FEED_MODES\.MELODY/,
+assert.match(game,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH\]\.includes\(mode\)/,
+  "N4b must preserve the native Melody route while adding Labyrinth on isolated iOS");
   "actual Melody native routing must remain isolated to .audiotest");
 assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/,
   "Classic pilot remains unaffected by DEV Melody bank");
