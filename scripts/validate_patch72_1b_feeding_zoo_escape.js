@@ -133,7 +133,7 @@ function staticContracts(){
    'soundIsReady: () => zooEscapeSoundReady(runtime)',
    'if (runtime.zooEscape && runtime.nativePilotBackend !== "native") return;',
    'resumeButton.addEventListener("click", runtime.resumeButtonHandler);',
-   'const continued = continueFeedingAfterGesture(runtime,
+   'const continued = continueFeedingAfterGesture(runtime,',
    'report(continued)','feed-bounce-bonus-clock-check'])
    ok(feed.includes(text),'Feeding Zoo Escape integration: '+text);
  ok(feed.indexOf('attemptFeedingResumeFromGesture(runtime, resolve)')>
