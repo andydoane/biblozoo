@@ -1,6 +1,6 @@
-/* Native audio PR B: explicit-tap smoke test, experiment branch only.
- * This module never plays on load, never routes Feeding/game audio, and is
- * invisible in a web/PWA or Android build. Remove before any public release. */
+/* N2 native-only diagnostic: explicit-tap AVFoundation samples plus a bounded,
+ * read-only Swift session event history. No Web Audio fallback or autoplay.
+ * Only in experimental iOS; remove/gate before public release. */
 (function installBibloZooNativeSoundSmoke(root) {
   "use strict";
 
@@ -138,6 +138,11 @@
         }
         const life = ["active", "inactive", "background"].includes(state.appState)
           ? state.appState : "unknown";
+        const recent = Array.isArray(state.recentEvents)
+          ? state.recentEvents.slice(-8).map(event =>
+              "#" + count(event.seq) + ":" + safeReason(event.kind) +
+              "@" + count(event.elapsedMs) + "ms").join(" / ")
+          : "";
         detail.textContent =
           "app=" + life + " pending=" + (state.pending === true ? "YES" : "no") +
           " last=" + safeReason(state.lastSignal) +
@@ -147,7 +152,12 @@
           " suspended=" + count(state.suspendedCount) +
           " route=" + count(state.routeCount) +
           " reasonCode=" + (Number.isInteger(state.lastReasonCode) ? state.lastReasonCode : "?") +
-          " ageMs=" + (Number.isInteger(state.lastAgeMs) ? state.lastAgeMs : "?");
+          " ageMs=" + (Number.isInteger(state.lastAgeMs) ? state.lastAgeMs : "?") +
+          " foregroundEpoch=" + count(state.foregroundEpoch) +
+          " reset=" + count(state.mediaResetCount) +
+          " activationAttempts=" + count(state.activationAttemptsTotal) +
+          " activation=" + safeReason(state.lastActivationResult) +
+          (recent ? " trace=" + recent : "");
       } catch (_) {
         if (!dismissed && !doc.hidden) detail.textContent = "Native state read failed or timed out.";
       }
@@ -189,14 +199,25 @@
     async function playSelected(soundId, label) {
       if (busy || dismissed || doc.hidden || !ALL_SOUND_IDS.includes(soundId)) return;
       const api = plugin();
-      if (typeof api?.preload !== "function" || typeof api?.play !== "function") {
-        status.textContent = "Native bridge missing. Check the Xcode build.";
+      if (typeof api?.activateFromGesture !== "function" ||
+          typeof api?.preload !== "function" || typeof api?.play !== "function") {
+        status.textContent = "Native session bridge missing. Check the Xcode build.";
         return;
       }
       const token = ++epoch;
       setBusy(true);
-      status.textContent = "Preparing native " + label + " MP3…";
+      status.textContent = "Checking native session for " + label + "…";
       try {
+        // N2: OS activation is requested ONLY on an explicit child/DEV tap;
+        // the Swift plugin does not reactivate from foreground notifications.
+        const session = await bounded(api.activateFromGesture({ purpose: "dev" }));
+        if (!current(token)) return;
+        if (session?.ready !== true) {
+          status.textContent = "Native session not ready: " +
+            safeReason(session?.reason) + ". No sound requested.";
+          return;
+        }
+        status.textContent = "Preparing native " + label + " MP3…";
         const prepared = await bounded(api.preload({ soundId }));
         if (!current(token)) return;
         if (prepared?.prepared !== true) {
@@ -207,8 +228,8 @@
           return;
         }
         const signal = safeReason(prepared?.lastInterruptionSignal);
-        const note = signal === "foreground-tap-retry"
-          ? " Fresh tap after foreground return."
+        const note = signal === "foreground-activation-accepted"
+          ? " OS accepted native activation after foreground return."
           : signal === "suspended-began"
             ? " iOS reported a past suspension."
             : "";
