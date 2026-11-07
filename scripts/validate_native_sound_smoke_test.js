@@ -46,7 +46,8 @@ assert.equal((pbx.match(/BibloZooNativeSoundPlugin\.swift in Sources \*\//g) || 
 assert.match(scene, /registerPluginInstance\(BibloZooNativeSoundPlugin\(\)\)/);
 assert.match(swift, /@objc\(BibloZooNativeSoundPlugin\)/);
 assert.match(swift, /jsName\s*=\s*"BibloZooNativeSound"/);
-for (const method of ["preload", "play", "stop", "getDebugState", "activateFromGesture"]) {
+for (const method of ["preload", "play", "stop", "getDebugState",
+  "activateFromGesture", "copyTimingReport", "markRecentChompLate"]) {
   assert.match(swift, new RegExp('CAPPluginMethod\\(name: "' + method + '"'));
   assert.match(swift, new RegExp('@objc func ' + method + '\\('));
 }
@@ -144,6 +145,11 @@ assert.match(nativePlay, /"playCallMs": playCallMs/);
 assert.match(js, /" prepMs=" \+ count\(state\.lastNativePrepareMs\)/);
 assert.match(js, /" queueMs=" \+ count\(state\.lastNativePlayQueueMs\)/);
 assert.match(js, /" playMs=" \+ count\(state\.lastNativePlayCallMs\)/);
+assert.match(swift, /private let maxSoundTimingEvents = 80/);
+assert.match(swift, /UIPasteboard\.general\.string = self\.timingReportText\(\)/);
+assert.match(swift, /recordSoundTiming\(\[/);
+assert.match(js, /Copy Audio Timing Report/);
+assert.match(js, /Mark last chomp late/);
 assert.match(swift, /"lastInterruptionSignal": self\.lastInterruptionSignal/,
   "return bounded developer diagnostic for the previous session signal");
 assert.match(swift, /volume\.isFinite/);
@@ -205,6 +211,14 @@ function environment(options = {}) {
     async preload(args) { calls.push(["preload", args]); return { prepared: true }; },
     async play(args) { calls.push(["play", args]); return { accepted: true }; },
     async stop(args) { calls.push(["stop", args]); return { stopped: true }; },
+    async copyTimingReport() {
+      calls.push(["copyTimingReport"]);
+      return { copied: true, count: 24, lateChompMarks: 1 };
+    },
+    async markRecentChompLate() {
+      calls.push(["markRecentChompLate"]);
+      return { marked: true, seq: 17 };
+    },
     async getDebugState() {
       calls.push(["getDebugState"]);
       return {
@@ -251,6 +265,9 @@ function environment(options = {}) {
   const detail = panel?.children?.[5];
   return {
     panel, button, playStar, playChomp, status, inspect, detail, close, doc, calls, api,
+    copyTiming: panel?.children?.[6]?.children?.[2],
+    markLate: panel?.children?.[6]?.children?.[3],
+    reportStatus: panel?.children?.[6]?.children?.[4],
     fireTimers(ms) {
       for (const [id, task] of [...timed]) {
         if (task.ms <= ms) { timed.delete(id); task.cb(); }
@@ -306,6 +323,15 @@ async function run() {
     assert.equal(e.calls[8][1].soundId, "feed-chomp");
     assert.match(e.status.textContent, /native chomp playback requested/i);
     assert.equal(e.panel.attributes["data-no-ui-sound"], "");
+    assert.equal(e.copyTiming.textContent, "Copy Audio Timing Report");
+    await e.copyTiming.click();
+    assert.match(e.reportStatus.textContent, /Copied 24 sounds/i);
+    await e.markLate.click();
+    assert.match(e.reportStatus.textContent, /flagged late/i);
+    assert.deepEqual(e.calls.slice(-2).map(x => x[0]),
+      ["copyTimingReport", "markRecentChompLate"]);
+    assert.equal(e.panel.attributes["data-no-ui-sound"], "",
+      "DEV diagnostic taps cannot produce Web UI click sounds");
   }
   {
     const e = environment({ missing: true });

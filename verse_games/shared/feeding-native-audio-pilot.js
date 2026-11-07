@@ -43,6 +43,7 @@
     let ready = false;
     let failed = false;
     let failureNotified = false;
+    let nextSoundEventId = 0;
 
     function current(token) {
       return generation === token && typeof isCurrent === "function" &&
@@ -141,7 +142,7 @@
       return { ready: true, reason: "prepared" };
     }
 
-    function play(soundId, volume) {
+    function play(soundId, volume, collisionEpochMs) {
       if (!IDS.includes(soundId) || !Number.isFinite(volume) ||
           volume < 0 || volume > 1 || !ready || failed) return false;
       const token = generation;
@@ -152,8 +153,18 @@
         return false;
       }
       try {
-        // Fire exactly once. Do not queue a web/HTML fallback for this event.
-        void bounded(api.play({ soundId, volume }), PLAY_TIMEOUT_MS).then(
+        // Cheap event metadata only: no await, layout read or extra bridge
+        // call on the actual physics collision frame. Native records the
+        // worker and AVAudioPlayer.play() dispatch times independently.
+        const eventId = "feed-" + (++nextSoundEventId);
+        const requestEpochMs = Date.now();
+        const validCollision = Number.isFinite(collisionEpochMs) &&
+          collisionEpochMs > 0 && collisionEpochMs <= requestEpochMs;
+        const timing = validCollision ? { collisionEpochMs } : {};
+        // Fire exactly once. Never queue a Web/HTML fallback.
+        void bounded(api.play({
+          soundId, volume, eventId, requestEpochMs, ...timing
+        }), PLAY_TIMEOUT_MS).then(
           result => {
             if (!current(token)) return;
             if (result?.accepted !== true) {
