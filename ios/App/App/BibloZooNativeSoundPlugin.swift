@@ -13,7 +13,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "preload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        // Read-only test diagnostics; no audio engine or session modification.
+        CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise)
     ]
 
     private let allowlistedId = "pilot-unlock"
@@ -27,6 +29,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private var leftForegroundDuringInterruption = false
     private var returnedToForegroundDuringInterruption = false
     private var lastInterruptionSignal = "none"
+    private var interruptionEventCount = 0
+    private var beganEventCount = 0
+    private var endedEventCount = 0
+    private var suspendedEventCount = 0
+    private var routeEventCount = 0
+    private var lastInterruptionAt: Date?
+    private var lastInterruptionReasonCode = -1
+    private var lastInterruptionRawType = -1
     private var observers: [NSObjectProtocol] = []
 
     public override func load() {
@@ -58,7 +68,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in self?.forgetPlayback() })
+        ) { [weak self] _ in
+            self?.routeEventCount += 1
+            self?.forgetPlayback()
+        })
         observers.append(center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification,
             object: nil,
@@ -92,6 +105,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func handleInterruption(_ note: Notification) {
         forgetPlayback()
+        // Counters are in-memory only, exposed on explicit developer taps.
+        // Never log verse text, profiles, recordings or device identifiers.
+        interruptionEventCount += 1
+        lastInterruptionAt = Date()
+        lastInterruptionRawType =
+            (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.intValue ?? -1
+        lastInterruptionReasonCode =
+            (note.userInfo?[AVAudioSessionInterruptionReasonKey] as? NSNumber)?.intValue ?? -1
         guard let raw = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
               let kind = AVAudioSession.InterruptionType(rawValue: raw) else {
             // An absent/unrecognized type is not evidence of a fresh .began.
@@ -100,9 +121,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         switch kind {
         case .began:
+            beganEventCount += 1
             let wasSuspended =
                 (note.userInfo?[AVAudioSessionInterruptionWasSuspendedKey] as? NSNumber)?.boolValue == true
             if wasSuspended {
+                suspendedEventCount += 1
                 // iOS 10+: delayed message saying the session was deactivated
                 // WHEN THE PROCESS WAS SUSPENDED. Ignore it as a fresh active
                 // interruption; keep an unrelated earlier pending .began intact.
@@ -115,6 +138,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
             returnedToForegroundDuringInterruption = false
             lastInterruptionSignal = "began"
         case .ended:
+            endedEventCount += 1
             interrupted = false
             leftForegroundDuringInterruption = false
             returnedToForegroundDuringInterruption = false
@@ -152,6 +176,43 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func validId(_ call: CAPPluginCall) -> Bool {
         call.getString("soundId") == allowlistedId
+    }
+
+    // No audio API is invoked here. This snapshot describes notification
+    // history, not whether the speaker was audible or AVAudioSession is active
+    // (Apple exposes no public isActive property).
+    @objc func getDebugState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["available": false])
+                return
+            }
+            let state: String
+            switch UIApplication.shared.applicationState {
+            case .active: state = "active"
+            case .inactive: state = "inactive"
+            case .background: state = "background"
+            @unknown default: state = "unknown"
+            }
+            let ageMs = self.lastInterruptionAt.map {
+                max(0, Int(Date().timeIntervalSince($0) * 1000))
+            } ?? -1
+            call.resolve([
+                "available": true,
+                "appState": state,
+                "category": AVAudioSession.sharedInstance().category.rawValue,
+                "pending": self.interrupted,
+                "lastSignal": self.lastInterruptionSignal,
+                "eventCount": self.interruptionEventCount,
+                "beganCount": self.beganEventCount,
+                "endedCount": self.endedEventCount,
+                "suspendedCount": self.suspendedEventCount,
+                "routeCount": self.routeEventCount,
+                "lastReasonCode": self.lastInterruptionReasonCode,
+                "lastRawType": self.lastInterruptionRawType,
+                "lastAgeMs": ageMs
+            ])
+        }
     }
 
     @objc func preload(_ call: CAPPluginCall) {
