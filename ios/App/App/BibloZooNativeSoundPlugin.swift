@@ -329,7 +329,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         lines.append("")
         lines.append("Native first-tap preflight: \(preflightEvents.count) " +
                      "of max \(maxPreflightEvents) (oldest first).")
-        lines.append("First gesture activation attempted: " +
+        lines.append("First gesture OS activation accepted: " +
                      (hasGestureActivatedSession ? "yes" : "no"))
         lines.append("phase | sound | result | accepted | prepareMs | " +
                      "foregroundEpoch | pending | appActive")
