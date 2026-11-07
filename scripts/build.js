@@ -98,11 +98,11 @@ function injectNativeOnlyAudioGuard() {
                 const source = relative.startsWith(".") ? relative : "./" + relative;
                 const tag = '<script src="' + source +
                     '" data-biblozoo-native-only-output></script>';
-                if (!/<head(?:\\s[^>]*)?>/i.test(before)) {
+                if (!/<head(?:\s[^>]*)?>/i.test(before)) {
                     throw new Error("N1 cannot guard HTML without a head: " + filePath);
                 }
-                const after = before.replace(/<head(?:\\s[^>]*)?>/i,
-                    (opening) => opening + "\\n  " + tag);
+                const after = before.replace(/<head(?:\s[^>]*)?>/i,
+                    (opening) => opening + "\n  " + tag);
                 fs.writeFileSync(filePath, after);
                 injected += 1;
             }
