@@ -172,6 +172,7 @@ function fixture({native=true,muted=false}={}){
   returnPriorPauseReason:null,returnAnimating:[],selectedMode:null,completed:false,completionResult:null,
   nativeDinoAudio:null,uiPopToggle:false,audioCtx:null,audioUnlocked:false,
   DIAGNOSTIC_TESTING_ENABLED:false,diagnosticOptions:{},diagnosticState:{},gameSpeedPresetId:"normal",
+  launch:{profileId:"tester"},
   GAME_TITLE:"Dino Dash",GAME_ICON:"🦖",GAME_ICON_HTML:"🦖",GAME_THEME:{},HELP_OVERLAY_ID:"dd2HelpOverlay",
   MENU_OVERLAY_ID:"dd2GameMenuOverlay",SPEED_MENU_OVERLAY_ID:"dd2SpeedMenuOverlay",
   SOUND_FILES:{uiPop1:"ui_sound_pop_1.mp3",uiPop2:"ui_sound_pop_2.mp3"},
