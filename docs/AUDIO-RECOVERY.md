@@ -4,6 +4,8 @@
 
 ## N6c — Bible Bugs fixed native game effects, plain Welcome Back, no routine success popup (PR #39)
 
+**CI source evidence:** full historical Node regressions and production web build **GREEN at `22a2ec99`** ([Actions #42442016620](https://github.com/andydoane/biblozoo/actions/runs/42442016620)); final docs-only HEAD recheck pending. Swift Xcode build and owner physical iPhone sounds/interruptions remain separate pending acceptance gates.
+
 **Last real owner iPhone report:** N6b.1 [#38](https://github.com/andydoane/biblozoo/pull/38), merged SHA `6f2ab22a`, **“Everything worked well”** after the owner-requested removal of the routine light-gray Scripture Snake native preflight overlay. Previously Snake task switched repeatedly and recovered nicely. The report does not by itself certify every exact Snake sound, audio latency or the untested Bible Bugs game.
 
 [N6c #39](https://github.com/andydoane/biblozoo/pull/39) moves **only Bible Bugs** game output from blocked native Web Audio into the existing **sole Swift `.soloAmbient` session and serial AVAudioEngine worker**. Native uses allowlisted fixed IDs for **twelve** packaged Bible Bugs MP3s (`public/verse_games/bible_bugs/bible_bugs_sounds`): tongue, pop1–5, correct/incorrect, streak, bonus start/end and stink bug; reuses UI-pop-1/2. Caller supplies only fixed ID, bounded volume and diagnostic event ID; no dynamic file, URLs, oscillator, Web Audio/HTML fallback, added session/category or acoustic-speaker claim. Original event triggers, random pop choice, frog actions, scoring and medals remain game-owned; Web/PWA/Android original source remains.
