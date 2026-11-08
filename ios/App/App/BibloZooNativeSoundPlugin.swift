@@ -44,6 +44,16 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "ui-pop-1": "ui_sound_pop_1",
         "ui-pop-2": "ui_sound_pop_2"
     ]
+    // N6b fixed sound IDs map only to bundled Scripture Snake MP3 assets.
+    private let snakeSoundResources: [String: String] = [
+        "snake-correct": "verse_snake_correct",
+        "snake-wrong": "verse_snake_wrong",
+        "snake-fruit": "verse_snake_fruit",
+        "snake-boost": "verse_snake_boost",
+        "snake-bonus-start": "verse_snake_bonus_start",
+        "snake-eat": "verse_snake_eat",
+        "snake-bonus-result": "verse_snake_bonus_result"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -84,8 +94,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private var narrationCompleted = false
     // Only these two fixed IDs use predecoded buffers. Unchanged native
     // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
-    private let pcmEffectIDs: Set<String> = ["feed-star", "feed-chomp",
-                                             "ui-pop-1", "ui-pop-2"]
+    private let pcmEffectIDs: Set<String> = [
+        "feed-star", "feed-chomp", "ui-pop-1", "ui-pop-2",
+        "snake-correct", "snake-wrong", "snake-fruit", "snake-boost",
+        "snake-bonus-start", "snake-eat", "snake-bonus-result"
+    ]
+    private let nativeSnakeOrbSoundID = "snake-orb"
+    private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
+    private let snakeOrbVoiceLimit = 4
     private let nativePegSoundID = "feed-peg"
     private let nativeMelodySoundID = "feed-melody"
     // All current Melody tune MIDI notes fall in this bounded 55...83 bank.
@@ -102,6 +118,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private var effectBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
     private var pegToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var melodyToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
+    private var snakeOrbToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var effectNodes: [String: [AVAudioPlayerNode]] = [:] // worker only
     private var nextEffectVoice: [String: Int] = [:] // worker only
     private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
@@ -454,6 +471,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         effectBuffers.removeAll()
         pegToneBuffers.removeAll()
         melodyToneBuffers.removeAll()
+        snakeOrbToneBuffers.removeAll()
         effectsEngine = nil
     }
 
@@ -640,6 +658,70 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+    // N6b: precomputed six-note C5–C6 triangle orb bank. No Web Audio
+    // oscillator or audio-engine start on a hot gameplay collision.
+    private func prepareSnakeOrbTonesOnWorker()
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        if snakeOrbToneBuffers.count == snakeOrbMidiNotes.count,
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[nativeSnakeOrbSoundID],
+           nodes.count == snakeOrbVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, 180, "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "snake-orb-format-failed")
+        }
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * 0.18))
+        var buffers: [Int: AVAudioPCMBuffer] = [:]
+        for (index, midi) in snakeOrbMidiNotes.enumerated() {
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format, frameCapacity: frames),
+                  let samples = buffer.floatChannelData?[0] else {
+                return (false, 0, "snake-orb-allocation-failed")
+            }
+            buffer.frameLength = frames
+            let frequency = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
+            for frame in 0..<Int(frames) {
+                let t = Double(frame) / format.sampleRate
+                let phase = (frequency * t).truncatingRemainder(dividingBy: 1.0)
+                let triangle = 1.0 - 4.0 * abs(phase - 0.5)
+                let envelope: Double
+                if t < 0.012 {
+                    envelope = t / 0.012
+                } else {
+                    envelope = max(0.0, (0.18 - t) / (0.18 - 0.012))
+                }
+                samples[frame] = Float(triangle * envelope)
+            }
+            buffers[index] = buffer
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<snakeOrbVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // no sample is scheduled yet
+            }
+            effectsEngine = engine
+            effectNodes[nativeSnakeOrbSoundID] = nodes
+            nextEffectVoice[nativeSnakeOrbSoundID] = 0
+            snakeOrbToneBuffers = buffers
+            return (true, 180, "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "snake-orb-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -782,7 +864,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             }
             let purpose = call.getString("purpose") ?? ""
             guard purpose == "dev" || purpose == "feeding" || purpose == "ui" ||
-                  purpose == "learn" else {
+                  purpose == "learn" || purpose == "game" else {
                 finish(["ready": false, "reason": "invalid-purpose"]); return
             }
             if let blocked = self.unavailableReason(), blocked != "interruption-pending",
@@ -859,6 +941,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private func requestedId(_ call: CAPPluginCall) -> String? {
         guard let soundId = call.getString("soundId"),
               soundResources[soundId] != nil ||
+              snakeSoundResources[soundId] != nil ||
+              soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
         return soundId
@@ -943,9 +1027,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             }
             let url: URL?
             if soundId == self.nativePegSoundID ||
-               soundId == self.nativeMelodySoundID {
+               soundId == self.nativeMelodySoundID ||
+               soundId == self.nativeSnakeOrbSoundID {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
+            } else if let resourceName = self.snakeSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/verse_snake/verse_snake_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
             } else if let resourceName = self.soundResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3") else {
@@ -976,7 +1069,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if soundId == self.nativePegSoundID {
+                if soundId == self.nativeSnakeOrbSoundID {
+                    let result = self.prepareSnakeOrbTonesOnWorker()
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-snake-orb"
+                } else if soundId == self.nativePegSoundID {
                     let result = self.preparePegTonesOnWorker()
                     prepared = result.prepared
                     durationMs = result.durationMs
