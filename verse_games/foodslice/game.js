@@ -611,8 +611,11 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeSliceAudio && muted) void nativeSliceAudio.stop();
         if (!muted) {
-          void unlockAudio();
+          if (!nativeSliceAudio) void unlockAudio();
+          // The actual menu Close gesture will prepare the complete bank.
+          // Unmute here only requests a fixed native UI clip.
           playUiTapSound();
         }
         return muted;
@@ -623,6 +626,7 @@
       },
       onModeSelect: () => {
         recordFoodSliceCompletion("menu-mode-select");
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
@@ -631,16 +635,22 @@
       onExit: () => {
         recordFoodSliceCompletion("menu-exit");
         playUiTapSound();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        playUiTapSound();
         setPaused(true, "menu");
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
+        playUiTapSound();
       },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (nativeSliceAudio && !muted)
+          primeNativeSliceFromGesture("resume", null, nextSliceUiKey());
+        else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -699,8 +709,10 @@
           if (e.cancelable) e.preventDefault();
           e.stopPropagation();
         }
-        void unlockAudio();
-        playUiTapSound();
+        if (!nativeSliceAudio) {
+          void unlockAudio();
+          playUiTapSound();
+        }
         openGameMenu();
       };
       menuPill.onclick = openFromPill;
@@ -720,6 +732,10 @@
     const menuOverlay = document.getElementById("fsGameMenuOverlay");
     if (menuOverlay) {
       setPaused(true, "menu");
+      if (nativeSliceAudio) {
+        void nativeSliceAudio.stop();
+        playUiTapSound(); // new UI-only gesture, after worker teardown
+      }
       menuOverlay.classList.add("is-open");
       menuOverlay.setAttribute("aria-hidden", "false");
     }
@@ -738,7 +754,11 @@
     }
 
     const helpOverlay = document.getElementById("fsHelpOverlay");
-    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) setPaused(false, "");
+    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) {
+      if (nativeSliceAudio && !muted)
+        primeNativeSliceFromGesture("resume", null, nextSliceUiKey());
+      else setPaused(false, "");
+    }
   }
 
   function openHelpFromMenu() {
@@ -753,9 +773,13 @@
 
 
   function closeHelpOverlay() {
-    playUiTapSound();
     window.VerseGameShell.closeHelp(HELP_OVERLAY_ID);
-    setPaused(false, "");
+    if (nativeSliceAudio && !muted)
+      primeNativeSliceFromGesture("resume", null, nextSliceUiKey());
+    else {
+      playUiTapSound();
+      setPaused(false, "");
+    }
   }
 
   function backToMenuFromHelp() {
