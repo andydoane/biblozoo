@@ -4508,7 +4508,8 @@
       ? (muted
           ? Promise.resolve(true)
           : nativeSnakeAudio.prepareFromGesture().then(result =>
-              window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result))) // actual Let's go! tap, no Web clock
+              (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true)))) // actual Let's go! tap, no Web clock
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioContext,
