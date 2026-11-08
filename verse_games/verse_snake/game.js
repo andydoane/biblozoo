@@ -477,6 +477,7 @@
   let nativeSnakeGateSerial = 0;
   let nativeSnakeGatePending = false;
   let nativeSnakeRetryMode = "round";
+  let snakeWelcomeBack = null;
 
   function hideNativeSnakeGate() {
     const gate = document.getElementById("vslNativeAudioGate");
@@ -557,9 +558,15 @@
   if (nativeSnakeAudio) {
     nativeSnakeAudio.configure({
       onAppInactive: () => {
-        // WebKit may still be visible in the held App Switcher thumbnail.
-        // Use the same existing physics/animation Welcome Back pause.
-        if (state.running && !completed) pauseForTaskSwitch();
+        // On held App Switcher thumbnails WebKit may remain visible.
+        // Notify the SAME plain Welcome Back owner, then pause the game.
+        if (!state.running || completed) return;
+        if (!snakeWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Return displays Welcome Back, never automatically prepares audio.
+        snakeWelcomeBack?.showAfterNativeActive?.();
       },
       onPlaybackFailure: () => {
         if (document.hidden || muted || completed || returnPaused ||
@@ -4447,7 +4454,7 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  snakeWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
     // Existing Web-era Zoo Escape recovery is retained on browser/PWA only.
     // A missing native Snake PCM asset is an explicit audio retry, not an
     // independent pet rescue or a fake sign of audible playback.
