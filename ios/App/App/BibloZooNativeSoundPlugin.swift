@@ -1167,9 +1167,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 return
             }
             let requestedNoteIndex: Int?
-            if soundId == self.nativePegSoundID {
+            if soundId == self.nativePegSoundID ||
+               soundId == self.nativeSnakeOrbSoundID {
+                let count = soundId == self.nativeSnakeOrbSoundID
+                    ? self.snakeOrbMidiNotes.count : self.pegFrequencies.count
                 guard let noteIndex = call.getInt("noteIndex"),
-                      (0..<self.pegFrequencies.count).contains(noteIndex) else {
+                      (0..<count).contains(noteIndex) else {
                     call.resolve(["accepted": false, "reason": "invalid-peg-note"])
                     return
                 }
@@ -1223,6 +1226,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 let backend: String
                 let resultReason: String
                 if self.pcmEffectIDs.contains(soundId) ||
+                   soundId == self.nativeSnakeOrbSoundID ||
                    soundId == self.nativePegSoundID ||
                    soundId == self.nativeMelodySoundID {
                     // One hot path for sample and note voice pools: choose a
@@ -1238,7 +1242,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         return
                     }
                     let buffer: AVAudioPCMBuffer?
-                    if soundId == self.nativePegSoundID {
+                    if soundId == self.nativeSnakeOrbSoundID {
+                        buffer = self.snakeOrbToneBuffers[requestedNoteIndex ?? -1]
+                    } else if soundId == self.nativePegSoundID {
                         buffer = self.pegToneBuffers[requestedNoteIndex ?? -1]
                     } else if soundId == self.nativeMelodySoundID {
                         buffer = self.melodyToneBuffers[requestedMidi ?? -1]
@@ -1265,7 +1271,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     backend = soundId == self.nativePegSoundID
                         ? "avengine-tone"
                         : (soundId == self.nativeMelodySoundID
-                            ? "avengine-melody" : "avengine-pcm")
+                            ? "avengine-melody" : (soundId == self.nativeSnakeOrbSoundID
+                                ? "avengine-snake-orb" : "avengine-pcm"))
                     resultReason = "scheduled"
                 } else {
                     guard let sound = self.players[soundId] else {
@@ -1343,6 +1350,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     return
                 }
                 if self.pcmEffectIDs.contains(soundId) ||
+                   soundId == self.nativeSnakeOrbSoundID ||
                    soundId == self.nativePegSoundID ||
                    soundId == self.nativeMelodySoundID {
                     // A paused/exited round tears down all prepared effect
