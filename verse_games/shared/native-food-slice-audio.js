@@ -223,8 +223,21 @@
         if (!current(token)) return {ready:false,reason:"stale"};
         const session = await bounded(activation, SESSION_TIMEOUT_MS);
         if (!current(token)) return {ready:false,reason:"stale"};
-        if (session?.ready !== true)
-          return {ready:false,reason:reason(session?.reason)};
+        if (session?.ready !== true) {
+          const why = reason(session?.reason);
+          if (TEMPORARY_AUDIO_REASONS.has(why)) {
+            // A competing PiP stream is an OS busy state, NOT corrupt PCM.
+            // Cancel the pending Start/Close callback and let the game's
+            // plain Welcome Back own the next real recovery gesture.
+            lastError = why;
+            invalidate();
+            try { onInactive?.(); } catch (_) {}
+            if (!root.document?.hidden) {
+              try { onActive?.(); } catch (_) {}
+            }
+          }
+          return {ready:false,reason:why};
+        }
         // Prepare ten Food Slice MP3 clips + two UI pops before gameplay.
         // Swift serializes AVAudioEngine mutations on its existing worker.
         // For a mode/Close gesture, schedule its native UI pop after the two
