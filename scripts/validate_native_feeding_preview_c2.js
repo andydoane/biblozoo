@@ -269,21 +269,24 @@ async function main() {
     assert.equal(p.play("feed-star",0.8),false);
   }
   {
-    const failures=[];
+    const failures=[],interruptions=[];
     const a=makeAdapter({api:{
       async preload(){return {prepared:true};},
       async play(){return {accepted:false,reason:"interruption-pending"};},
       async stop(){return {stopped:true};}
     }});
-    const p=a.pilot.create({isCurrent:()=>true,onFailure:v=>failures.push(v)});
+    const p=a.pilot.create({isCurrent:()=>true,onFailure:v=>failures.push(v),
+      onInterruption:v=>interruptions.push(v)});
     await p.prepare();
     assert.equal(p.play("feed-star",0.8),true);
-    // The adapter races play() against a deadline and observes the result
-    // through .finally().then(); wait one macrotask for that chain to settle.
+    // PiP is an OS-deferred pause (NOT a corrupted PCM asset). Preserve
+    // the owner's existing same-round Feeding Resume; no Web fallback.
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(p.hasFailed(),true);
-    assert.deepEqual(failures,["interruption-pending"]);
-    assert.equal(p.play("feed-star",0.8),false,"never silently swap or repeat after rejection");
+    assert.equal(p.hasFailed(),false);
+    assert.deepEqual(failures,[]);
+    assert.deepEqual(interruptions,["interruption-pending"]);
+    assert.equal(p.isReady(),false);
+    assert.equal(p.play("feed-star",0.8),false,"no replay or Web fallback until real Resume");
   }
   {
     const h=feedHarness();
