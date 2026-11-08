@@ -28,6 +28,8 @@
   let nextEvent = 0;
   let bound = false;
   let onFailure = null;
+  let onInactive = null;
+  let teardown = Promise.resolve();
 
   function isAvailable() {
     return root.BibloZooNativeOnlyOutput?.enabled === true &&
@@ -58,12 +60,14 @@
     } catch (_) { return Promise.resolve(); }
   }
   function stop() {
-    const wasActive = ready || !failed;
     generation++;
     ready = false;
     failed = false;
-    if (wasActive) return stopNative();
-    return Promise.resolve();
+    // Track the worker teardown so an immediate menu-close tap can activate
+    // synchronously yet MUST wait for old AVAudioEngine disposal before
+    // preloading any new bank; prevents late Stop from clearing fresh voices.
+    teardown = stopNative();
+    return teardown;
   }
   function invalidate() { void stop(); }
   function bind() {
@@ -77,6 +81,11 @@
     try {
       Promise.resolve(api()?.addListener?.("biblozooAppLifecycle", event => {
         if (event?.active === false || event?.active === true) invalidate();
+        if (event?.active === false) {
+          // UIKit App Switcher swipe-up-and-HOLD can make the app inactive
+          // while WebKit is still visible. Pause Snake's physics too.
+          try { onInactive?.(); } catch (_) { /* Never restart audio. */ }
+        }
       })).catch(() => {});
     } catch (_) { /* UIKit/visibility remain output safety fences. */ }
   }
@@ -88,12 +97,14 @@
     ready = false;
     failed = true;
     lastError = reason(why);
-    void stopNative();
+    teardown = stopNative();
     try { onFailure?.(lastError); } catch (_) { /* Never mutate game logic. */ }
   }
-  function configure({ onPlaybackFailure } = {}) {
+  function configure({ onPlaybackFailure, onAppInactive } = {}) {
     onFailure = typeof onPlaybackFailure === "function" ?
       onPlaybackFailure : null;
+    onInactive = typeof onAppInactive === "function" ?
+      onAppInactive : null;
   }
   // IMPORTANT: activateFromGesture is invoked in the SAME synchronous stack
   // as the child's actual mode selection / Retry / Resume button event.
@@ -113,7 +124,7 @@
     let activation;
     try { activation = bridge.activateFromGesture({ purpose: "game" }); }
     catch (_) { return Promise.resolve({ready:false,reason:"activation-error"}); }
-    const cleanup = prior ? stopNative() : Promise.resolve();
+    const cleanup = prior ? stopNative() : teardown;
     return (async () => {
       try {
         await bounded(cleanup, SESSION_TIMEOUT_MS);
@@ -126,7 +137,7 @@
         const prepared = await bounded(Promise.all(IDS.map(soundId =>
           bridge.preload({ soundId }))), BANK_TIMEOUT_MS);
         if (!current(token)) {
-          void stopNative();
+          teardown = stopNative();
           return {ready:false,reason:"stale"};
         }
         const rejected = prepared.find((result,index) =>
@@ -136,7 +147,7 @@
         if (rejected) {
           lastError = reason(rejected.reason);
           failed = true;
-          void stopNative();
+          teardown = stopNative();
           return {ready:false,reason:lastError};
         }
         ready = true;
@@ -145,7 +156,7 @@
         if (current(token)) {
           failed = true;
           lastError = "preflight-timeout-or-error";
-          void stopNative();
+          teardown = stopNative();
         }
         return {ready:false,reason:lastError || "stale"};
       }
