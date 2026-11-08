@@ -597,6 +597,34 @@
     resultShown: false
   };
 
+  if (nativeDinoAudio) {
+    nativeDinoAudio.configure({
+      onAppInactive: () => {
+        // UIKit can become inactive while WebKit is STILL visibly mounted
+        // in the held App Switcher (or during a mode/halfway preflight).
+        cancelNativeDinoPreflight();
+        if (!state.running || completed) return;
+        if (!dinoWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Show plain Welcome Back only. Never automatically activate PCM.
+        dinoWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completed ||
+            !state.running || ["menu","speed","welcome-back"].includes(state.pauseReason))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeDinoRetry = {kind:"resume",mode:null,checkpoint:null};
+        showNativeDinoFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) cancelNativeDinoPreflight();
+    });
+  }
+
   void warmGameplayObstacleImages();
 
   const halfwayFeedCheckpoint =
@@ -2641,6 +2669,12 @@
     mode,
     resumeCheckpoint = null
   ){
+    if (nativeDinoAudio && !muted && !nativeDinoAudio.isReady()) {
+      nativeDinoRetry = {kind:resumeCheckpoint?"checkpoint":"round",
+        mode,checkpoint:resumeCheckpoint};
+      showNativeDinoFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
     stopLoop();
     cleanupResize();
 
