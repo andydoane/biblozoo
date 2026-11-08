@@ -875,6 +875,36 @@ const FACE_MAP = {
     playGameSound(key, "chew");
   }
 
+  if (nativeMunchAudio) {
+    nativeMunchAudio.configure({
+      onAppInactive: () => {
+        // UIKit .inactive includes swipe-up-and-HOLD while WebKit still looks
+        // visible. Do not let a pending difficulty gesture start a ghost round.
+        if (nativeMunchPending) stopNativeMunchRound();
+        if (!state.running || completed) return;
+        if (!munchWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Plain Welcome Back only. Never re-activate PCM on foreground.
+        munchWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completed ||
+            !state.running ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        // Stop feeding/bonus state until the child's explicit Try Again.
+        setPaused(true, "native-audio-error");
+        nativeMunchRetry = {kind:"resume",mode:null};
+        showNativeMunchFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeMunchPending) stopNativeMunchRound();
+    });
+  }
+
   setupReferenceSegments();
   renderIntro();
   preloadFaceImages();
@@ -4704,6 +4734,7 @@ const shuffle = window.VerseGameShell.shuffle;
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeMunchAudio) stopNativeMunchRound();
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -4717,17 +4748,24 @@ const shuffle = window.VerseGameShell.shuffle;
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeMunchAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements++;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Real Let's go! click activates the sole Swift .soloAmbient session and
+    // prepares all 15 PCM IDs. No browser AudioContext on native iOS.
+    const restore = nativeMunchAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeMunchAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
@@ -4746,13 +4784,19 @@ const shuffle = window.VerseGameShell.shuffle;
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  munchWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeMunchAudio,
+    suppressUiSound: !!nativeMunchAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeMunchAudio) stopNativeMunchRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
