@@ -401,6 +401,36 @@
   });
   const verseWords = buildData.words;
 
+  if (nativeInvadersAudio) {
+    nativeInvadersAudio.configure({
+      onAppInactive: () => {
+        // UIKit's held App Switcher can be inactive while WebKit remains
+        // visibly mounted, including in the middle of mode preparation.
+        if (nativeInvadersPending) stopNativeInvadersRound();
+        if (!state.running || completionMarked) return;
+        if (!invadersWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // No automatic native activation/audio on foreground.
+        invadersWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completionMarked ||
+            !state.running ||
+            (state.paused && state.pauseReason !== "native-audio-error"))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeInvadersRetry = {kind:"resume",mode:null};
+        showNativeInvadersFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeInvadersPending)
+        stopNativeInvadersRound();
+    });
+  }
+
   await preloadAlienSvg();
   renderIntro();
 
@@ -3280,6 +3310,7 @@
   // foreground verified audio gesture can release the task-switch pause.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeInvadersAudio) stopNativeInvadersRound();
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -3302,7 +3333,7 @@
   }
 
   function replaceWelcomeAudioContext() {
-    if (returnContextReplacements >= 1) return false;
+    if (nativeInvadersAudio || returnContextReplacements >= 1) return false;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return false;
     let fresh;
@@ -3323,14 +3354,19 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    // Synchronously initiate Web Audio unlock from this child's actual tap.
-    const recovery = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    // The child's actual Let's go! gesture calls Swift directly.
+    // Do not infer loudspeaker sound from a prepared/accepted response.
+    const recovery = nativeInvadersAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeInvadersAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(recovery).then(ok => {
       if (!ok || document.hidden || session !== returnSession) return false;
       welcomeClock.resume();
@@ -3350,13 +3386,19 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  invadersWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeInvadersAudio,
+    suppressUiSound: !!nativeInvadersAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completionMarked,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeInvadersAudio) stopNativeInvadersRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
