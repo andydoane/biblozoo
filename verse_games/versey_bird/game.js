@@ -1050,6 +1050,7 @@
     target.disabled = true;
 
     let wakeReady = false;
+    let nativeBirdWakePromise = null;
     let tapCount = 0;
     let lastAcceptedTapAt = 0;
     let stopZAnimation =
@@ -1132,10 +1133,18 @@
           return;
         }
 
-        const audioReady =
-          audioUnlocked && audioCtx?.state === "running"
-            ? Promise.resolve(true)
-            : unlockAudio();
+        // Only an ACTUAL wake-up tap may reclaim the .soloAmbient session
+        // after Versey Bird's halfway checkpoint document reload.
+        const audioReady = nativeBirdAudio
+          ? (muted ? Promise.resolve(true) :
+            nativeBirdAudio.isReady() ? Promise.resolve(true) :
+            (nativeBirdWakePromise ||= Promise.resolve(
+              nativeBirdAudio.prepareFromGesture()
+            ).then(result => result?.ready === true)
+             .catch(() => false)
+             .finally(() => { nativeBirdWakePromise = null; })))
+          : (audioUnlocked && audioCtx?.state === "running"
+              ? Promise.resolve(true) : unlockAudio());
 
         const now =
           gameNow();
@@ -1215,6 +1224,22 @@
 
         window.setTimeout(
           async () => {
+            // The final wake-up tap must succeed at whole-bank preflight
+            // BEFORE the saved checkpoint resumes. No silent ghost round.
+            if (nativeBirdAudio && !muted) {
+              const ready = await audioReady;
+              if (!ready || document.hidden || !nativeBirdAudio.isReady()) {
+                wakeReady = true;
+                target.disabled = false;
+                tapCount = 0;
+                if (!document.hidden) {
+                  nativeBirdRetry = {kind:"checkpoint",mode:checkpoint.mode,checkpoint};
+                  showNativeBirdFailure(
+                    "Native sound is unavailable. Tap Try Again to wake Versey Bird.");
+                }
+                return;
+              }
+            }
             try {
               await warmGameplayObstacleImages();
             } catch (err) {
@@ -1228,6 +1253,7 @@
 
             window.setTimeout(
               () => {
+                if (document.hidden || returnPaused) return;
                 startGame(
                   checkpoint.mode,
                   checkpoint
@@ -7745,6 +7771,7 @@
   // Existing menu/help pauses stay in force after a task switch.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeBirdAudio) stopNativeBirdRound();
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -7762,7 +7789,7 @@
   }
 
   function replaceWelcomeAudioContext() {
-    if (returnContextReplacements >= 1 || !audioCtx) return false;
+    if (nativeBirdAudio || returnContextReplacements >= 1 || !audioCtx) return false;
     returnContextReplacements += 1;
     audioForegroundFreshContextOnGesture = true;
     audioUnlockAttempt += 1;
@@ -7774,15 +7801,22 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    // Unlock/prime now, inside the actual child's button gesture.
-    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    // Let's go is a real child gesture. Reactivate Swift/whole PCM bank
+    // only here, never from .began/.ended or app foreground notifications.
+    const attempt = nativeBirdAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeBirdAudio.prepareFromGesture().then(result =>
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(attempt).then(ok => {
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
       welcomeClock.resume();
@@ -7800,13 +7834,19 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  birdWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeBirdAudio,
+    suppressUiSound: !!nativeBirdAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeBirdAudio) stopNativeBirdRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: launch.profileId,
     pictureBase: "../../"
   });
