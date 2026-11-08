@@ -400,6 +400,7 @@
   renderIntro();
 
   function renderIntro(reason = "initial") {
+    cancelNativeSlicePreflight();
     recordFoodSliceCompletion("title-rendered", { reason });
     stopLoop();
 
@@ -413,19 +414,22 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onBack: () => {
-        void unlockAudio();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
+        else void unlockAudio();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeSliceHelpPops();
   }
 
   function renderModeSelect() {
+    cancelNativeSlicePreflight();
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -437,20 +441,30 @@
       theme: GAME_THEME,
       backLabel: "Back to Food Slice title",
       onBack: () => {
-        void unlockAudio();
+        cancelNativeSlicePreflight();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        void unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeSliceAudio && nativeSlicePending) return;
+        if (nativeSliceAudio) {
+          primeNativeSliceFromGesture("round", mode,
+            muted ? null : nextSliceUiKey());
+        } else {
+          void unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeSliceHelpPops();
   }
 
   function startGame(mode) {
-    void unlockAudio();
+    // A native-only round reaches this function ONLY after the fixed PCM
+    // bank is prepared (or intentional mute). No Web unlock on iOS.
+    if (!nativeSliceAudio) void unlockAudio();
 
     selectedMode = mode;
     completionMarked = false;
@@ -547,18 +561,20 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
         renderModeSelect();
       },
       onMoreGames: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
