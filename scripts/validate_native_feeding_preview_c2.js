@@ -471,9 +471,10 @@ async function main() {
     assert.equal(r.nativePilot,null);
     assert.equal(r.controlPhase,"instructions");
     assert.match(r.nativePilotBadge.textContent,/Native ONLY unavailable \(interruption-pending\); round not started/);
-    assert.match(r.nativePilotChoiceStatus.textContent,/Tap Try Again or Back/);
+    // External PiP playback is an OS-busy state, not a missing sample.
+    // The child's real Try Again remains available after video pause.
+    assert.match(r.nativePilotChoiceStatus.textContent,/Pause the other video's audio, then tap Try Again/);
     assert.doesNotMatch(r.nativePilotChoiceStatus.textContent,/Copy Audio Timing Report/);
-    assert.match(r.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
     assert.equal(r.nativePilotChoicePending,false);
     assert.equal(r.startConfirmButton.disabled,false);
     assert.equal(r.startConfirmButton.textContent,"Try Again");
