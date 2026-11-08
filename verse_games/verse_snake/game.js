@@ -933,6 +933,7 @@
       backLabel: "Back to Practice Games",
       onBack: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
@@ -954,6 +955,7 @@
       backLabel: `Back to ${GAME_TITLE} title`,
       onBack: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         renderIntroScreen();
       },
       onSelect: (mode) => {
@@ -3235,15 +3237,18 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         completed = false;
         renderModeSelect();
       },
       onMoreGames: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
