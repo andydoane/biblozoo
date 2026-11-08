@@ -1745,6 +1745,9 @@ function render(){
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        // Mute stops every native PCM effect. Unmute can request only the
+        // fixed UI clip; explicit Close re-prepares the full game bank.
+        if (nativeSplatAudio && muted) void nativeSplatAudio.stop();
         if (!muted) playSharedUiPopSound();
         return muted;
       },
@@ -1763,6 +1766,7 @@ function render(){
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeSplatAudio) stopNativeSplatRound();
         playSharedUiPopSound();
         state.menuOpen = false;
         state.helpOpen = false;
@@ -1773,22 +1777,29 @@ function render(){
       },
       onExit: () => {
         playSharedUiPopSound();
+        if (nativeSplatAudio) stopNativeSplatRound();
         stopLoops();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        if (state.busy) return false;
-
-        playSharedUiPopSound();
+        if (state.busy || nativeSplatPending) return false;
 
         state.menuOpen = true;
         state.helpOpen = false;
         state.helpBackMode = false;
         stopLoops();
+        // Prevent gameplay PCM from continuing under a paused menu; UI
+        // pop belongs to a new real gesture's UI-only bank.
+        if (nativeSplatAudio) void nativeSplatAudio.stop();
+        playSharedUiPopSound();
       },
       onClose: () => {
-        playSharedUiPopSound();
-        closeMenu();
+        if (nativeSplatAudio && !muted)
+          primeNativeSplatFromGesture("resume", null, pickNativeSplatUiKey());
+        else {
+          playSharedUiPopSound();
+          closeMenu();
+        }
       },
       onBackFromHelp: () => {
         playSharedUiPopSound();
@@ -1807,6 +1818,8 @@ function render(){
   }
 
   function closeMenu(){
+    // Called after the real native Close gesture's full bank is prepared
+    // (or intentional mute). Never resume a gameplay loop before that.
     state.menuOpen = false;
     syncGameMenuOpenState();
 
