@@ -7698,6 +7698,10 @@
   // Existing menu/help pauses stay in force after a task switch.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeDinoAudio) {
+      cancelNativeDinoPreflight();
+      void nativeDinoAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -7715,7 +7719,7 @@
   }
 
   function replaceWelcomeAudioContext() {
-    if (returnContextReplacements >= 1) return false;
+    if (nativeDinoAudio || returnContextReplacements >= 1) return false;
     const previous = audioCtx;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return false;
@@ -7732,14 +7736,20 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    // Unlock/prime now, inside the actual child's button gesture.
-    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    // Only the child's actual Let's go tap re-activates native
+    // .soloAmbient and prepares the entire fixed game PCM bank.
+    // Never run Web Audio on native iOS, and never automatically play.
+    const attempt = nativeDinoAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeDinoAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(attempt).then(ok => {
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
@@ -7759,13 +7769,19 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  dinoWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeDinoAudio,
+    suppressUiSound: !!nativeDinoAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeDinoAudio) stopNativeDinoRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: launch.profileId,
     pictureBase: "../../"
   });
