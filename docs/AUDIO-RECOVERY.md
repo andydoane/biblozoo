@@ -4,6 +4,8 @@
 
 ## N6a — native-only Verse Detail and Flashcards verse previews (PR #36)
 
+**Automated source gate:** complete experiment-branch Node regression checks (including N6a native preview + earlier Learn/Flashcards/Zoo recovery) and production web build **GREEN** for code commit `4c955ac6` ([GitHub Actions #42433403246](https://github.com/andydoane/biblozoo/actions/runs/42433403246)). Reconfirm final documentation HEAD. This is **not Xcode compilation or proof of iPhone speaker output**; owner physical tests still pending.
+
 **Owner accepted N5b.3 foundation:** [PR #35](https://github.com/andydoane/biblozoo/pull/35) merged `c9810257`; owner iPhone tested audible all instructions/chunks for John 3:16 and Psalm 23:4, completed whole John Learn and recovered Psalm interrupt. Earlier N5b.2 full Learn Listen, N5b.1 DEV long voice, native N5a UI/Feeding were tested. Cold/return first UI pop may still intentionally be lost under 350ms warmup; N9 debt, not a silent-preview success condition.
 
 **N6a [PR #36](https://github.com/andydoane/biblozoo/pull/36)** migrates the **existing shared** `playVerseDetailListen(verseId)` and `cancelVerseDetailListen()` from blocked HTML output to native on `.audiotest` iOS only. Callers: the BibloPet/Verse Detail **Listen to the Verse** user tap and Flashcards difficulty-screen **Listen** button. Both initiate native `BibloZooNativeLearnListen.startFromGesture` **synchronously inside that actual tap**; existing Swift `activateFromGesture`/published verse manifest safely limits to packaged `learn-ref-{verseId}` → `learn-verse-{verseId}`. No caller-provided URL/filename, new native session owner, `.soloAmbient` change or Web/HTML fallback.
