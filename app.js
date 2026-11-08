@@ -8790,6 +8790,7 @@ function setVerseDetailPreviewStatus(message = "") {
 function cancelVerseDetailListen() {
   verseDetailListenToken += 1;
   const hadNativePreview = verseDetailListenActive &&
+    typeof isNativeLearnListenMode === "function" &&
     isNativeLearnListenMode();
   verseDetailListenActive = false;
   // N6a: stop only a preview owned by this function; leaving Verse Detail
@@ -8852,7 +8853,8 @@ async function playVerseDetailListen(verseId) {
   if (muted || document.hidden) return false;
   verseDetailListenActive = true;
 
-  if (isNativeLearnListenMode()) {
+  if (typeof isNativeLearnListenMode === "function" &&
+      isNativeLearnListenMode()) {
     // This function is called synchronously from the real Verse Detail or
     // Flashcards Listen button. N5b.2's source-owner invokes Swift
     // activateFromGesture BEFORE any await, then independently validates
