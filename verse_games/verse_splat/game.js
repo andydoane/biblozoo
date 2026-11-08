@@ -3828,7 +3828,8 @@ function spawnWrongFaceParticleBurst(){
     const restore = nativeSplatAudio
       ? (muted ? Promise.resolve(true) :
           nativeSplatAudio.prepareFromGesture().then(result =>
-            window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result)))
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => {
             verseSplatAudioUnlocked = false;
