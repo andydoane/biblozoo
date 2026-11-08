@@ -1920,6 +1920,8 @@
   }
 
   function renderIntro(){
+    if (nativeBirdPending) stopNativeBirdRound();
+    clearNativeBirdFailure();
     stopLoop();
     cleanupResize();
     state.phase = "title";
@@ -1934,19 +1936,22 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onBack: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeBirdTitleHelpPops();
   }
 
   function renderModeSelect(){
+    if (nativeBirdPending) stopNativeBirdRound();
+    clearNativeBirdFailure();
     stopLoop();
     cleanupResize();
     state.phase = "mode";
@@ -1960,22 +1965,37 @@
       theme: GAME_THEME,
       backLabel: "Back to Versey Bird title",
       onBack: () => {
-        void unlockAudio();
+        if (nativeBirdAudio) stopNativeBirdRound();
+        else void unlockAudio();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        void unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeBirdAudio) {
+          if (nativeBirdPending) return;
+          primeNativeBirdFromGesture("round", mode,
+            muted ? null : nextNativeBirdUiKey());
+        } else {
+          void unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeBirdTitleHelpPops();
   }
 
   function startGame(
     mode,
     resumeCheckpoint = null
   ){
+    if (nativeBirdAudio && !muted && !nativeBirdAudio.isReady()) {
+      nativeBirdRetry = {kind:resumeCheckpoint ? "checkpoint" : "round",
+        mode,checkpoint:resumeCheckpoint};
+      showNativeBirdFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
+    clearNativeBirdFailure();
     stopLoop();
     cleanupResize();
 
