@@ -3359,7 +3359,8 @@
     const recovery = nativeInvadersAudio
       ? (muted ? Promise.resolve(true) :
           nativeInvadersAudio.prepareFromGesture().then(result =>
-            window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result)))
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioCtx,
