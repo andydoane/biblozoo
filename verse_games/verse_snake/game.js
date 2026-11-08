@@ -990,7 +990,11 @@
       backLabel: `Back to ${GAME_TITLE} title`,
       onBack: () => {
         unlockAndTap();
-        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
+        // Keep UI-only PCM ready on pre-game Back; abort an actual pending
+        // game bank, but do not cut the just-requested button pop.
+        if (nativeSnakeAudio && nativeSnakeGatePending)
+          abandonNativeSnakePreflight();
+        else if (nativeSnakeAudio && state.running) void nativeSnakeAudio.stop();
         renderIntroScreen();
       },
       onSelect: (mode) => {
