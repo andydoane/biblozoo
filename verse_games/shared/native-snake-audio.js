@@ -29,6 +29,7 @@
   let bound = false;
   let onFailure = null;
   let onInactive = null;
+  let onActive = null;
   let teardown = Promise.resolve();
 
   function isAvailable() {
@@ -85,6 +86,9 @@
           // UIKit App Switcher swipe-up-and-HOLD can make the app inactive
           // while WebKit is still visible. Pause Snake's physics too.
           try { onInactive?.(); } catch (_) { /* Never restart audio. */ }
+        } else if (event?.active === true) {
+          // Reveal Welcome Back only; activation still needs a new tap.
+          try { onActive?.(); } catch (_) { /* Never auto-play. */ }
         }
       })).catch(() => {});
     } catch (_) { /* UIKit/visibility remain output safety fences. */ }
@@ -100,11 +104,13 @@
     teardown = stopNative();
     try { onFailure?.(lastError); } catch (_) { /* Never mutate game logic. */ }
   }
-  function configure({ onPlaybackFailure, onAppInactive } = {}) {
+  function configure({ onPlaybackFailure, onAppInactive, onAppActive } = {}) {
     onFailure = typeof onPlaybackFailure === "function" ?
       onPlaybackFailure : null;
     onInactive = typeof onAppInactive === "function" ?
       onAppInactive : null;
+    onActive = typeof onAppActive === "function" ?
+      onAppActive : null;
   }
   // IMPORTANT: activateFromGesture is invoked in the SAME synchronous stack
   // as the child's actual mode selection / Retry / Resume button event.
