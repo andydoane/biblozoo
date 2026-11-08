@@ -483,6 +483,15 @@
     const gate = document.getElementById("vslNativeAudioGate");
     if (gate) gate.remove();
   }
+  function abandonNativeSnakePreflight() {
+    if (!nativeSnakeAudio || !nativeSnakeGatePending) return;
+    // N6b.1: Back/Mode Select remains available while preparing quietly.
+    // Late activation/preload must not launch a round after navigating away.
+    nativeSnakeGateSerial++;
+    nativeSnakeGatePending = false;
+    app.removeAttribute("aria-busy");
+    void nativeSnakeAudio.stop();
+  }
   // N6b.1: this gray dialog is for REAL native failures only. Ordinary
   // difficulty selection and successful resumes prepare the bank quietly.
   function showNativeSnakeGate(message, canRetry = false) {
@@ -939,6 +948,7 @@
   }
 
   function renderIntroScreen(){
+    abandonNativeSnakePreflight();
     stopLoop();
     window.VerseGameShell.renderTitleScreen({
       app,
@@ -962,6 +972,7 @@
   }
 
   function renderModeSelect(){
+    abandonNativeSnakePreflight();
     stopLoop();
     window.VerseGameShell.renderModeSelect({
       app,
@@ -1175,6 +1186,8 @@
         unlockAndTap();
         if (nativeSnakeAudio) {
           nativeSnakeGateSerial++;
+          nativeSnakeGatePending = false;
+          app.removeAttribute("aria-busy");
           void nativeSnakeAudio.stop();
           hideNativeSnakeGate();
         }
@@ -1185,6 +1198,8 @@
         unlockAndTap();
         if (nativeSnakeAudio) {
           nativeSnakeGateSerial++;
+          nativeSnakeGatePending = false;
+          app.removeAttribute("aria-busy");
           void nativeSnakeAudio.stop();
           hideNativeSnakeGate();
         }
