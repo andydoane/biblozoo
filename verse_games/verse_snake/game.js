@@ -535,7 +535,7 @@
     gate.querySelector("[data-snake-native-exit]").textContent =
       state.running ? "Back to Games" : "Choose Difficulty";
   }
-  function primeSnakeAudioAndContinue(mode = "round") {
+  function primeSnakeAudioAndContinue(mode = "round", uiPopKey = null) {
     // While a previous real gesture is preparing the sample bank, ignore
     // duplicate difficulty/menu taps instead of restarting Swift preflight.
     if (nativeSnakeGatePending) return;
@@ -554,7 +554,9 @@
     // Game stays on difficulty or paused menu until native bank is ready.
     // The call below immediately invokes Swift activateFromGesture() on
     // the child's mode-select / menu-close / Retry click, NOT from a timer.
-    const started = nativeSnakeAudio.prepareFromGesture();
+    const started = nativeSnakeAudio.prepareFromGesture(uiPopKey
+      ? { key: uiPopKey, volume: Math.min(1, Math.max(0,
+          (SOUND_VOLUMES[uiPopKey] ?? 0.7) * volumeScale)) } : null);
     void Promise.resolve(started).then(result => {
       if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
       nativeSnakeGatePending = false;
@@ -877,22 +879,25 @@
   }
 
 
-  function playUiTapSound() {
+  function nextUiTapKey() {
     uiTapToggle = !uiTapToggle;
-    playGameSound(uiTapToggle ? "uiTap1" : "uiTap2");
+    return uiTapToggle ? "uiTap1" : "uiTap2";
   }
-
+  function playUiTapSound(key = nextUiTapKey()) {
+    playGameSound(key);
+  }
   function unlockAndTap() {
+    const key = nextUiTapKey();
     if (nativeSnakeAudio) {
-      // UI pop uses the already-prewarmed native bank only; the first tap
-      // can remain quiet until mode selection completes its one-time preflight.
-      playUiTapSound();
+      // Game-less title/back buttons use the SAME native PCM worker, but
+      // prepare just two UI samples from the real child gesture.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeSnakeAudio.tapUiFromGesture(key, Math.min(1, Math.max(0,
+          (SOUND_VOLUMES[key] ?? 0.7) * volumeScale)));
       return;
     }
     void unlockAudio().then((unlocked) => {
-      if (unlocked) {
-        playUiTapSound();
-      }
+      if (unlocked) playUiTapSound(key);
     });
   }
 
@@ -989,12 +994,15 @@
       },
       onSelect: (mode) => {
         if (nativeSnakeAudio && nativeSnakeGatePending) return;
-        unlockAndTap();
         selectedMode = mode;
         completed = false;
         completionResult = null;
-        if (nativeSnakeAudio) primeSnakeAudioAndContinue("round");
-        else renderGameScreen();
+        if (nativeSnakeAudio) {
+          primeSnakeAudioAndContinue("round", muted ? null : nextUiTapKey());
+        } else {
+          unlockAndTap();
+          renderGameScreen();
+        }
       }
     });
   }
@@ -1211,9 +1219,12 @@
         if (nativeSnakeAudio) void nativeSnakeAudio.stop();
       },
       onClose: () => {
-        unlockAndTap();
-        if (nativeSnakeAudio && !muted) primeSnakeAudioAndContinue("resume");
-        else setPaused(false, "");
+        if (nativeSnakeAudio && !muted)
+          primeSnakeAudioAndContinue("resume", nextUiTapKey());
+        else {
+          unlockAndTap();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         unlockAndTap();
