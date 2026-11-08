@@ -47,7 +47,8 @@ assert.match(star,/runtime\.nativePilot\?\.play\("feed-star"/);
 assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(switcher,/pauseFeedingGame\(runtime\)/);
 assert.match(swift,/private let nativePegSoundID = "feed-peg"/);
-assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"\]/);
+// N4c Feeding resources remain fixed IDs; N6b adds only curated Snake samples.
+assert.match(swift,/private let pcmEffectIDs: Set<String> = \[\s*"feed-star", "feed-chomp", "ui-pop-1", "ui-pop-2"(?:,\s*"[a-z0-9-]+")*\s*\]/);
 assert.match(workflow,/node scripts\/validate_native_bounce_gameplay_n4c\.js/);
 
 function harness({nativeOnly=true,platform="ios",failSound=""}={}){

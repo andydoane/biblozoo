@@ -39,12 +39,14 @@ function assertSourceContract() {
   assert.match(preload, /self\.preparePegTonesOnWorker\(\)/);
   assert.match(preload, /backend = "avengine-tone"/);
   assert.match(play, /let noteIndex = call\.getInt\("noteIndex"\)/);
-  assert.match(play, /\(0\.\.<self\.pegFrequencies\.count\)\.contains\(noteIndex\)/);
+  // N6b shares the index-validated play path with Snake's fixed six orb tones.
+  assert.match(play, /self\.pegFrequencies\.count/);
+  assert.match(play, /\(0\.\.<count\)\.contains\(noteIndex\)/);
   assert.match(play, /"reason": "invalid-peg-note"/);
   assert.match(play, /buffer = self\.pegToneBuffers\[requestedNoteIndex \?\? -1\]/);
   assert.match(play, /let node = self\.nextWarmVoiceOnWorker\(soundId: soundId\)/);
   assert.match(play, /node\.scheduleBuffer\(readyBuffer, at: nil,[\s\S]*?options: \[\.interrupts\]/);
-  assert.match(play, /\? "avengine-tone"[\s\S]*?"avengine-melody" : "avengine-pcm"/);
+  assert.match(play, /\? "avengine-tone"[\s\S]*?"avengine-melody"[\s\S]*?"avengine-pcm"/);
   assert.doesNotMatch(play.replace(/\/\/[^\n]*/g, ""),
     /AVAudioFile\(|AVAudioPCMBuffer\(|AVAudioEngine\(|engine\.start\(|node\.play\(|setCategory\(|setMode\(/,
     "no sound graph creation/decoding on the hot collision path");

@@ -8780,11 +8780,9 @@ function setVerseDetailPreviewStatus(message = "") {
   const button = document.getElementById("btnDetailListen");
   if (button) button.textContent = verseDetailListenActive
     ? "Stop Listening" : "Listen to the Verse";
-  const status = document.getElementById("verseDetailListenStatus");
-  if (status) {
-    status.textContent = message;
-    status.hidden = !message;
-  }
+  // N6b UX cleanup: no visible playback/status paragraph under this button.
+  // Stop Listening still changes the button itself, and failures allow
+  // the normal explicit Listen retry; native audio lifecycle is unchanged.
 }
 
 function cancelVerseDetailListen() {
@@ -21438,8 +21436,6 @@ function screenVerseDetail(idx) {
         <button class="detail-listen-btn no-zoom" id="btnDetailListen" type="button">
           Listen to the Verse
         </button>
-        <p class="pet-helper-text" id="verseDetailListenStatus"
-          role="status" aria-live="polite" hidden></p>
 
         ${verseProgress.learnCompleted
       ? `

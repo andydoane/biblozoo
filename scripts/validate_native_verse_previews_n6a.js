@@ -21,8 +21,9 @@ assert.match(app, /stopVersePreview: cancelVerseDetailListen/);
 assert.match(flashcards, /await api\.playVersePreview\(selected\.id\)/);
 assert.match(flashcards, /if \(previewPlaying\) api\?\.stopVersePreview\?\.\(\)/);
 assert.match(app, /id="btnDetailListen"/);
-assert.match(app, /id="verseDetailListenStatus"/);
-assert.match(app, /role="status" aria-live="polite"/);
+// N6b owner request: N6a-added *visible* playback status below the
+// BibloPet Detail Listen button was NOT in the original app. Remove it.
+assert.doesNotMatch(app, /id="verseDetailListenStatus"/);
 assert.match(app, /function setVerseDetailPreviewStatus/);
 assert.match(app, /window\.BibloZooNativeLearnListen\.startFromGesture\(\{/);
 assert.match(app, /event\.kind === "completed" &&\s+event\.stage === "verse"/);
@@ -84,8 +85,7 @@ function fixture({ native = true, screen = "detail", isMuted = false } = {}) {
     set hidden(next) { hidden = next; },
     getElementById(name) {
       if (State.screen !== Screen.VERSE_DETAIL) return null;
-      return name === "btnDetailListen" ? statuses.button :
-        name === "verseDetailListenStatus" ? statuses.message : null;
+      return name === "btnDetailListen" ? statuses.button : null;
     },
     addEventListener(name, callback) { events["document:" + name] = callback; }
   };
@@ -128,15 +128,15 @@ async function testDetail() {
     [["native-start", "john_3_16"]], "gesture activation reached native synchronously");
   assert.equal(h.actions.some(x => x[0] === "html-play"), false);
   assert.equal(h.statuses.button.textContent, "Stop Listening");
-  assert.equal(h.statuses.message.hidden, false);
+  assert.equal(h.statuses.message.hidden, true);
   const request = h.pending.at(-1);
   request.wait.resolve({ ready: true });
   await flush();
   request.callback({kind:"stage",stage:"reference"});
-  assert.match(h.statuses.message.textContent, /reference/);
+  assert.equal(h.statuses.message.textContent, "", "no extra text below Listen");
   request.callback({kind:"stage-ended",stage:"reference"});
   request.callback({kind:"stage",stage:"verse"});
-  assert.match(h.statuses.message.textContent, /verse/);
+  assert.equal(h.statuses.message.textContent, "", "no extra progress status");
   request.callback({kind:"progress",stage:"verse",positionMs:4000});
   request.callback({kind:"completed",stage:"reference"});
   let settled = false;
@@ -188,12 +188,12 @@ async function testInterruptionFailureAndMute() {
   await flush();
   h.pending[0].callback({kind:"interrupted",stage:"verse"});
   assert.equal(await mid,false);
-  assert.match(h.statuses.message.textContent,/paused/);
+  assert.equal(h.statuses.message.textContent, "", "no paused text under button");
   assert.equal(h.statuses.button.textContent,"Listen to the Verse");
   const retry = h.play("john_3_16");
   h.pending[1].wait.resolve({ready:false,reason:"interruption-pending"});
   assert.equal(await retry,false);
-  assert.match(h.statuses.message.textContent,/try again/);
+  assert.equal(h.statuses.message.textContent, "", "retry stays on Listen button");
   const hidden = fixture();
   const stopped = hidden.play("john_3_16");
   hidden.document.hidden = true;

@@ -31,7 +31,8 @@ assert.match(catchBall,/runtime\.caughtCount \+= 1/);
 assert.match(catchBall,/playChompSound\(runtime, collisionEpochMs\)/);
 assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(swift,/private let nativePegSoundID = "feed-peg"/);
-assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"\]/);
+// The N4b prewarmed effects remain in Swift's fixed set after N6b adds Snake IDs.
+assert.match(swift,/private let pcmEffectIDs: Set<String> = \[\s*"feed-star", "feed-chomp", "ui-pop-1", "ui-pop-2"(?:,\s*"[a-z0-9-]+")*\s*\]/);
 assert.match(workflow,/node scripts\/validate_native_labyrinth_gameplay_n4b\.js/);
 
 function harness({platform="ios",nativeOnly=true,failSound=""}={}){

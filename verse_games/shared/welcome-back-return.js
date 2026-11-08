@@ -112,13 +112,16 @@
   }
 
   function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
-    getSoundContext, isSoundMuted, escapeText, preserveFocus = false, suppressUiSound = false } = {}) {
+    getSoundContext, isSoundMuted, escapeText, preserveFocus = false,
+    suppressUiSound = false, useZooEscape = true } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
         typeof onContinue !== "function") return null;
 
-    if (root.BibloZooZooEscape?.create) {
+    // N6b opt-out affects only the isolated native Snake owner. Every other
+    // Web/Feeding/Playground owner keeps the existing Zoo Escape contract.
+    if (useZooEscape && root.BibloZooZooEscape?.create) {
       const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
         onExit, profileId, pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
         escapeText, preserveFocus,
@@ -324,6 +327,24 @@
       }
     }
 
+    // N6b: native UIKit .inactive (swipe up and HOLD) can precede WebKit
+    // visibilitychange. This explicit owner-only signal uses the SAME
+    // plain Welcome Back overlay; no fake audio clock or auto-activation.
+    // The game alone elects to call these; Web/PWA/Android are unchanged.
+    let nativeInactive = false;
+    function pauseFromNativeInactive() {
+      if (disposed || !shouldPrompt()) return false;
+      nativeInactive = true;
+      leave();
+      return pending;
+    }
+    function showAfterNativeActive() {
+      if (disposed || !nativeInactive) return false;
+      nativeInactive = false;
+      visible(); // on actual return; never calls onContinue or audio
+      return pending;
+    }
+
     document.addEventListener("visibilitychange", visible);
     root.addEventListener("pagehide", pageHidden);
     root.addEventListener("pageshow", visible);
@@ -335,6 +356,8 @@
 
     return Object.freeze({
       isPaused: () => pending,
+      pauseFromNativeInactive,
+      showAfterNativeActive,
       destroy() {
         if (disposed) return;
         disposed = true;

@@ -44,7 +44,8 @@ assert.match(play,/"reason": "invalid-melody-midi"/);
 assert.match(play,/self\.melodyToneBuffers\[requestedMidi \?\? -1\]/);
 assert.match(play,/let node = self\.nextWarmVoiceOnWorker\(soundId: soundId\)/);
 assert.match(play,/node\.scheduleBuffer\(readyBuffer, at: nil,[\s\S]*?options: \[\.interrupts\]/);
-assert.match(play,/"avengine-melody" : "avengine-pcm"/);
+// Same native worker now also labels prewarmed Snake orb PCM separately.
+assert.match(play,/"avengine-melody"[\s\S]*?"avengine-pcm"/);
 assert.doesNotMatch(play.replace(/\/\/[^\n]*/g,""),
   /AVAudioFile\(|AVAudioPCMBuffer\(|AVAudioEngine\(|engine\.start\(|node\.play\(|setCategory\(|setMode\(/,
   "no allocation/engine startup/session mutation during native note dispatch");
