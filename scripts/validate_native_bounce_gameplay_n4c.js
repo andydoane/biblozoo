@@ -140,7 +140,8 @@ async function main(){
     assert.equal(starts,0);assert.equal(r.roundStarted,false);
     assert.equal(r.controlPhase,"instructions");
     assert.equal(r.startConfirmButton.textContent,"Try Again");
-    assert.match(r.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
+    assert.match(r.nativePilotChoiceStatus.textContent,/Pause the other video's audio, then tap Try Again/,
+      "Bounce PiP-busy preflight preserves instructions and explicit retry");
     assert.match(r.nativePilotBadge.textContent,/interruption-pending/);
     assert.ok(!e.calls.some(x=>x[0]==="play"));
     e.api.preload=async({soundId})=>{e.calls.push(["preload",soundId]);return {prepared:true};};
