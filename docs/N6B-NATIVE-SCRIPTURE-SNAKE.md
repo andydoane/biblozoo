@@ -30,6 +30,10 @@ A child's genuine **Choose Difficulty**, **Try Again**, menu/speed **Close**, or
 
 **App Switcher:** `biblozooAppLifecycle.active === false` on UIKit .inactive stops PCM and pauses the game clock **even if the WebKit card stays visible in a swipe-up-and-HOLD**. The existing *plain* Welcome Back overlay appears on return, requiring real **Let's go!** to prewarm and continue the **same round** without catch-up. No auto sound on foreground. Existing Web/PWA/Android Zoo Escape/recovery path remains untouched; native Snake does **not** misinterpret an unavailable clip as a reason to start Zoo Break. Mute/menu/speed/exit stop effects; closing menu or speed re-prepares on the actual tap before movement resumes. Subsequent game modes are **not** silently marked migrated.
 
+## Source CI status
+
+Complete historical Node regression suite (N1–N6b, Feeding, Learn, audio owner, recovery and Zoo) and production web build **GREEN at code SHA `90bde7cb`** ([Actions run #42436500105](https://github.com/andydoane/biblozoo/actions/runs/42436500105)). A final docs-only HEAD rerun remains. This is NOT compiled Swift or verified iPhone speaker output; the separate Xcode and owner iPhone checklist below still apply.
+
 ## Local source and build
 
 In the dedicated Mac worktree, while PR branch is checked out to test before merge, or after owner merges and Fetch/Pulls the updated `experiment/native-ios-audio`:
