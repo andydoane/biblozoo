@@ -2,6 +2,14 @@
 
 > This document describes the **current `ios-prep` workflow**, verified against source on 2026-11-05. Check [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md), `package.json`, and the current scripts before claiming any test exists or passed. Automated checks and physical iPhone acceptance are different.
 
+## N6c.1 — Native standalone title/difficulty UI pops (owner iPhone gate pending)
+
+**Verified starting point:** owner-merged [N6c Bible Bugs #39](https://github.com/andydoane/biblozoo/pull/39) at `67d2a107`, followed by owner-merged handoff correction [#40](https://github.com/andydoane/biblozoo/pull/40) at `ac4f7aa`. Owner reports Bible Bugs gameplay worked as expected **except title and difficulty buttons were silent**; its end screen popped. Scripture Snake shares title/mode silence. N6c final Node regression/web build at `7cea2d43` was green ([Actions #42442109251](https://github.com/andydoane/biblozoo/actions/runs/42442109251)); that is not iPhone acoustic proof.
+
+**Native-only gate:** N6c.1 uses the same sole `.soloAmbient` Swift session/AVAudioEngine worker and the existing fixed `ui-pop-1/2` PCM clips. An actual title/Back tap activates the existing native UI purpose and prepares only two UI clips, not gameplay; a real difficulty/menu Close tap invokes the existing game activation synchronously, prepares UI clips first and schedules the UI pop **before** decoding the other Snake/Bugs effects, then waits for the *entire* game bank to be ready before starting/resuming. No generated sound, new engine, native HTML/Web fallback or gray success popup. Bounded first cold tap beyond 350ms is deliberately not played late (N9 remains).
+
+**Regression and owner acceptance:** `node scripts/validate_native_standalone_ui_pops_n6c1.js` plus the historical Snake, Bible Bugs, N1 isolation and full Node/web build checks. Test John 3:16 title/start, mode Easy and Back in **both** games, second mode and Psalm 23:4, in-game menu/Close and Snake speed Close, active game sounds and Bugs end pop, mute/unmute, rapid Back/duplicate mode, UIKit held App Switcher and full switch/Let's go same round without auto foreground audio or score catch-up. Regress Feeding/Preview/Learn. Build `BibloZoo Audio Test` in separate Mac worktree with `npm run build && npx cap sync ios && npx cap open ios`. Final-head CI, Swift Xcode and owner-heard iPhone sounds are three distinct gates; **owner test pending**. On silence use DEV Inspect native state and Copy Audio Timing Report **before restarting**. Full test checklist: [N6c.1 guide](N6C1-NATIVE-STANDALONE-UI-POPS.md). Stable `ios-prep`, original app and browser/PWA/Android unchanged; owner alone merges.
+
 ## 1. Working with GitHub pull requests
 
 1. Before work, check current `ios-prep` HEAD, latest commits, open PRs and owner instructions. Local uncommitted changes are **not** visible to GitHub; have the owner push relevant work first when necessary.

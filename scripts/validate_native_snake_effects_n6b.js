@@ -60,8 +60,8 @@ assert.doesNotMatch(swift.replace(/\/\/[^\n]*/g, ""),
 assert.match(build, /"verse_games"/);
 assert.match(html, /shared\/native-snake-audio\.js/);
 assert.ok(html.indexOf("native-snake-audio.js") < html.indexOf('src="./game.js"'));
-assert.match(game, /if \(nativeSnakeAudio\) primeSnakeAudioAndContinue\("round"\)/);
-assert.match(game, /if \(nativeSnakeAudio && !muted\) primeSnakeAudioAndContinue\("resume"\)/);
+assert.match(game, /primeSnakeAudioAndContinue\("round", muted \? null : nextUiTapKey\(\)\)/);
+assert.match(game, /primeSnakeAudioAndContinue\("resume", nextUiTapKey\(\)\)/);
 assert.match(game, /onAppInactive: \(\) =>/);
 assert.match(game, /onAppActive: \(\) =>/);
 assert.match(game, /snakeWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
@@ -255,7 +255,7 @@ async function testGameOwnerNativeBranch() {
   const src = section("  function playGameSound(key, volumeScale = 1) {",
     "  function midiToFreq(note) {") +
     section("  function playOrbTone(sizeRatio = 0.25) {",
-      "  function playUiTapSound() {");
+      "  function nextUiTapKey() {");
   const plays=[];
   const h={
     muted:false,returnPaused:false,completed:false,

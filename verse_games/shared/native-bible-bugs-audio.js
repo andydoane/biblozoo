@@ -22,6 +22,8 @@
     stinkBug: "bugs-stink-bug"
   });
   const IDS = Object.freeze(Object.values(KEYS));
+  const UI_IDS = Object.freeze(["ui-pop-1", "ui-pop-2"]);
+  const UI_FIRST_TAP_MAX_DELAY_MS = 350; // N5a: no late cold-start pop
   const SESSION_TIMEOUT_MS = 1800;
   const BANK_TIMEOUT_MS = 12000; // bounded full 14-effect bank, not per hot cue
   const PLAY_TIMEOUT_MS = 1800;
@@ -35,6 +37,8 @@
   let onInactive = null;
   let onActive = null;
   let teardown = Promise.resolve();
+  let uiReady = false; // UI bank does not imply gameplay readiness
+  let uiPreparation = null;
 
   function isAvailable() {
     return root.BibloZooNativeOnlyOutput?.enabled === true &&
@@ -67,6 +71,7 @@
   function stop() {
     generation++;
     ready = false;
+    uiReady = false;
     failed = false;
     // Track the worker teardown so an immediate menu-close tap can activate
     // synchronously yet MUST wait for old AVAudioEngine disposal before
@@ -103,6 +108,7 @@
   function markFailed(token, why) {
     if (!current(token) || failed) return;
     ready = false;
+    uiReady = false;
     failed = true;
     lastError = reason(why);
     teardown = stopNative();
@@ -116,15 +122,76 @@
     onActive = typeof onAppActive === "function" ?
       onAppActive : null;
   }
+  // Title/back taps precede the full game bank. Prepare only the two fixed
+  // Swift PCM UI effects on a real gesture; this never means gameplay is ready.
+  function dispatchUi(key, volume) {
+    const soundId = KEYS[key];
+    if (!UI_IDS.includes(soundId) || !Number.isFinite(volume) ||
+        volume <= 0 || volume > 1 || root.document?.hidden) return Promise.resolve(false);
+    try {
+      return bounded(api().play({
+        soundId, volume, eventId: "bugs-ui-" + (++nextEvent),
+        requestEpochMs: Date.now()
+      }), PLAY_TIMEOUT_MS).then(result => result?.accepted === true)
+        .catch(() => false);
+    } catch (_) { return Promise.resolve(false); }
+  }
+  function tapUiFromGesture(key, volume) {
+    if (!isAvailable() || root.document?.hidden ||
+        !UI_IDS.includes(KEYS[key]) || !Number.isFinite(volume) ||
+        volume <= 0 || volume > 1) return false;
+    bind();
+    if (ready && !failed) return play(key, volume);
+    if (uiReady && !failed) {
+      void dispatchUi(key, volume);
+      return true;
+    }
+    // Duplicate rapid title taps must not start competing PCM banks or
+    // create delayed ghosts after the child changes screens.
+    if (uiPreparation) return false;
+    const token = ++generation;
+    failed = false;
+    let activation;
+    try { activation = api()?.activateFromGesture({purpose:"ui"}); }
+    catch (_) { return false; }
+    const startedAt = Date.now();
+    const pending = (async () => {
+      try {
+        await bounded(teardown, SESSION_TIMEOUT_MS);
+        const session = await bounded(activation, SESSION_TIMEOUT_MS);
+        if (!current(token) || session?.ready !== true) return false;
+        const clips = await bounded(Promise.all(UI_IDS.map(soundId =>
+          api().preload({soundId}))), BANK_TIMEOUT_MS);
+        if (!current(token) || clips.some(result =>
+          result?.prepared !== true ||
+          typeof result.durationMs !== "number" || result.durationMs <= 0)) return false;
+        uiReady = true;
+        if (Date.now() - startedAt <= UI_FIRST_TAP_MAX_DELAY_MS)
+          return dispatchUi(key, volume);
+        return false; // Never replay a stale cold-start tap seconds later.
+      } catch (_) { return false; }
+    })();
+    uiPreparation = pending;
+    void pending.finally(() => {
+      if (uiPreparation === pending) uiPreparation = null;
+    });
+    return true; // Request scheduled, not evidence of speaker output.
+  }
+
   // IMPORTANT: activateFromGesture is invoked in the SAME synchronous stack
   // as the child's actual mode selection / Retry / Resume button event.
-  function prepareFromGesture() {
+  function prepareFromGesture(uiTap = null) {
+    if (uiTap && (!UI_IDS.includes(KEYS[uiTap.key]) ||
+        !Number.isFinite(uiTap.volume) || uiTap.volume <= 0 || uiTap.volume > 1))
+      return Promise.resolve({ready:false,reason:"invalid-ui-pop"});
     if (!isAvailable() || root.document?.hidden)
       return Promise.resolve({ready:false,reason:"not-native-ios"});
     bind();
     const prior = ready;
+    const precedingUi = uiPreparation; // settle prior title preload before new bank
     const token = ++generation;
     ready = false;
+    uiReady = false;
     failed = false;
     lastError = "";
     const bridge = api();
@@ -137,15 +204,40 @@
     const cleanup = prior ? stopNative() : teardown;
     return (async () => {
       try {
-        await bounded(cleanup, SESSION_TIMEOUT_MS);
+        await bounded(Promise.all([cleanup, precedingUi || Promise.resolve()]), SESSION_TIMEOUT_MS);
+        if (!current(token)) return {ready:false,reason:"stale"};
         const session = await bounded(activation, SESSION_TIMEOUT_MS);
         if (!current(token)) return {ready:false,reason:"stale"};
         if (session?.ready !== true)
           return {ready:false,reason:reason(session?.reason)};
         // Prewarm ALL 12 MP3 clips + two UI pops before any gameplay starts.
         // Swift serializes AVAudioEngine mutations on its existing worker.
-        const prepared = await bounded(Promise.all(IDS.map(soundId =>
-          bridge.preload({ soundId }))), BANK_TIMEOUT_MS);
+        // For a mode/Close gesture, schedule its native UI pop after the two
+        // UI clips preload but BEFORE decoding the gameplay bank.
+        let prepared;
+        if (uiTap) {
+          const uiClips = await bounded(Promise.all(UI_IDS.map(soundId =>
+            bridge.preload({soundId}))), BANK_TIMEOUT_MS);
+          if (!current(token)) return {ready:false,reason:"stale"};
+          if (uiClips.some(result => result?.prepared !== true ||
+              typeof result.durationMs !== "number" || result.durationMs <= 0)) {
+            teardown = stopNative();
+            return {ready:false,reason:"ui-pop-preflight-failed"};
+          }
+          const uiPlayed = await bounded(dispatchUi(uiTap.key, uiTap.volume), PLAY_TIMEOUT_MS);
+          if (!current(token)) return {ready:false,reason:"stale"};
+          if (!uiPlayed) {
+            teardown = stopNative();
+            return {ready:false,reason:"ui-pop-play-failed"};
+          }
+          const effects = await bounded(Promise.all(IDS.filter(soundId =>
+            !UI_IDS.includes(soundId)).map(soundId =>
+            bridge.preload({soundId}))), BANK_TIMEOUT_MS);
+          prepared = [...uiClips, ...effects];
+        } else {
+          prepared = await bounded(Promise.all(IDS.map(soundId =>
+            bridge.preload({ soundId }))), BANK_TIMEOUT_MS);
+        }
         if (!current(token)) {
           // The stop that invalidated this generation already tore down its
           // worker queue. A stale Promise MUST NOT queue a second Stop after
@@ -163,6 +255,7 @@
           return {ready:false,reason:lastError};
         }
         ready = true;
+        uiReady = true;
         return {ready:true,reason:"prepared"};
       } catch (_) {
         if (current(token)) {
@@ -197,7 +290,7 @@
     }
   }
   root.BibloZooNativeBibleBugsAudio = Object.freeze({
-    isAvailable, configure, prepareFromGesture, play, stop,
+    isAvailable, configure, prepareFromGesture, tapUiFromGesture, play, stop,
     isReady: () => ready && !failed && !root.document?.hidden,
     lastError: () => lastError,
     soundIds: IDS
