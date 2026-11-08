@@ -3751,11 +3751,45 @@ function spawnWrongFaceParticleBurst(){
   // never warms a bank outside a real child Start/Close/Resume gesture.
   if (!nativeSplatAudio)
     Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
+  if (nativeSplatAudio) {
+    nativeSplatAudio.configure({
+      onAppInactive: () => {
+        if (!["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen))
+          return;
+        if (!splatWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Never retry or activate audio automatically after a task switch.
+        splatWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || state.completed ||
+            !["game", "bonus", "coverage_result", "bonus_intro"].includes(state.screen) ||
+            state.menuOpen || state.helpOpen) return;
+        // Stop gameplay while a genuine PCM failure awaits an explicit
+        // retry. The child must never keep scoring silently in the background.
+        state.menuOpen = true;
+        stopLoops();
+        nativeSplatRetry = {kind:"resume",mode:null};
+        showNativeSplatFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        nativeSplatSerial++;
+        nativeSplatPending = false;
+        app.removeAttribute("aria-busy");
+      }
+    });
+  }
+
   initVerseData();
   render();
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeSplatAudio) stopNativeSplatRound();
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -3769,7 +3803,8 @@ function spawnWrongFaceParticleBurst(){
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeSplatAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements++;
       const old = verseSplatAudioContext;
       verseSplatAudioContext = null;
@@ -3780,16 +3815,22 @@ function spawnWrongFaceParticleBurst(){
       verseSplatAudioBufferPromises.clear();
       try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => {
-        verseSplatAudioUnlocked = false;
-        unlockVerseSplatAudio();
-        return verseSplatAudioResumePromise;
-      },
-      getContext: () => verseSplatAudioContext,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // On native iOS the child's actual Let's go! tap reactivates Swift and
+    // decodes the full fixed PCM bank. No Web Audio context on that path.
+    const restore = nativeSplatAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeSplatAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => {
+            verseSplatAudioUnlocked = false;
+            unlockVerseSplatAudio();
+            return verseSplatAudioResumePromise;
+          },
+          getContext: () => verseSplatAudioContext,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
@@ -3808,13 +3849,19 @@ function spawnWrongFaceParticleBurst(){
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  splatWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeSplatAudio,
+    suppressUiSound: !!nativeSplatAudio,
     getSoundContext: () => verseSplatAudioContext,
     isSoundMuted: () => muted,
     shouldPrompt: () => ["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen),
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeSplatAudio) stopNativeSplatRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
