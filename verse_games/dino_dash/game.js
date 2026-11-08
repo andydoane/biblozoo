@@ -3275,7 +3275,11 @@
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        if (nativeDinoPending) return false;
+        // Shell listens to pointerdown + click on the same button.
+        // Do not stop/reprepare native PCM twice for one physical tap.
+        if (nativeDinoPending || returnPaused ||
+            (nativeDinoAudio && state.paused && state.pauseReason === "menu"))
+          return false;
         setPaused(true, "menu");
         if (nativeDinoAudio) {
           void nativeDinoAudio.stop();
@@ -3298,7 +3302,9 @@
       buttonId: "dd2SpeedPill",
 
       onOpen: () => {
-        if (nativeDinoPending) return false;
+        if (nativeDinoPending || returnPaused ||
+            (nativeDinoAudio && state.paused && state.pauseReason === "speed"))
+          return false;
         setPaused(true, "speed");
         if (nativeDinoAudio) void nativeDinoAudio.stop();
         playUiSound();
