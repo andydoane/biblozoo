@@ -48,7 +48,9 @@ assert.match(play,/guard let engine = self.effectsEngine, engine.isRunning/);
 assert.match(play,/let nodes = self.effectNodes\[soundId\], !nodes.isEmpty/);
 assert.match(play,/let node = self.nextWarmVoiceOnWorker\(soundId: soundId\)/);
 assert.match(play,/node.scheduleBuffer\(readyBuffer, at: nil,[\s\S]*?options: \[\.interrupts\]/);
-assert.match(play,/\? "avengine-tone"[\s\S]*?"avengine-melody" : "avengine-pcm"/);
+// N6b adds a third fixed native backend label for Snake orb tones.
+assert.match(play,/\? "avengine-tone"[\s\S]*?"avengine-melody"[\s\S]*?"avengine-pcm"/);
+assert.match(play,/"avengine-snake-orb"/);
 assert.match(play,/sound.currentTime = 0/);
 assert.match(play,/started = sound.play\(\)/);
 assert.doesNotMatch(play.replace(/\/\/[^\n]*/g,""),
