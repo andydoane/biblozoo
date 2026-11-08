@@ -116,6 +116,9 @@ This policy is deliberately written *inside* the handoff so a completely new con
 
 ## 8. Recent milestones (verify status on GitHub)
 
+**Retained historical owner-accepted milestones (not the current 7/12 count):** N6g Verse Invaders is MERGED and OWNER-TESTED/PASSED. N6h Verse Munch PR #47 was subsequently owner-merged and its ordinary gameplay sound owner-tested. The prior **6/12 exactly halfway** milestone followed Invaders #46; Munch #47 raised the real accepted count to 7/12. Current N6i #50 remains proposed, pending iPhone sound acceptance.
+
+
 | `ios-prep` commit | Verified commit subject / scope |
 | --- | --- |
 | [`1e1deb2`](https://github.com/andydoane/biblozoo/commit/1e1deb2f8d486e55e95511a4b098d9b3d0aec252) | Patch 73–73.1: Feeding controls, sizes, weight feel, Melody presentation and UI polish |
