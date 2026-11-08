@@ -116,7 +116,7 @@ const clickSource=[
  part("  function pauseForTaskSwitch()","  splatWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({"),
  part("  if (nativeSplatAudio) {\n    nativeSplatAudio.configure","  initVerseData();"),
  part("  splatWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({","})();")
-].join("\n")+"\nthis.test={renderIntro,renderModeScreen,wireSharedGameMenu,primeNativeSplatFromGesture,playSharedUiPopSound,playPopSound,playCorrectSound,playWrongSound,playStreakSound,playPaintScoreSound,playStartSound,playPositiveSound,pauseForTaskSwitch,continueFromWelcomeBack};";
+].join("\n")+"\nthis.test={renderIntro,renderModeScreen,wireSharedGameMenu,primeNativeSplatFromGesture,playSharedUiPopSound,playPopSound,playCorrectSound,playWrongSound,playStreakSound,playPaintScoreSound,playStartSound,playPositiveSound,pauseForTaskSwitch,continueFromWelcomeBack,isNativePending:()=>nativeSplatPending};";
 assert.doesNotMatch(clickSource,/\bvolumeScale\b/,"no out-of-scope volumeScale in button callbacks");
 function fixture({native=true,muted=false}={}){
  const actions=[],pops=[],plays=[],prepares=[],buttons={};let cfg,menu,gate=null,t=1000;
@@ -222,7 +222,7 @@ async function actualButtons(){
  heldMode.cfg.onAppInactive();
  heldMode.prepares[0].resolve({ready:true});await flush();
  assert.notEqual(heldMode.state.screen,"game");
- assert.equal(heldMode.context.nativeSplatPending,false);
+ assert.equal(heldMode.test.isNativePending(),false);
  const mute=fixture({muted:true});
  mute.test.renderIntro();mute.shell.title.onStart();mute.test.renderModeScreen();mute.shell.mode.onSelect("hard");
  assert.equal(mute.state.screen,"game");assert.equal(mute.prepares.length,0);
