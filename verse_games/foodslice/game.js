@@ -275,6 +275,128 @@
   state.buildSizeClass = state.buildData.buildSizeClass;
 
 
+  // N6d: native-only iOS Food Slice output belongs to the existing
+  // Swift .soloAmbient session and serialized PCM engine. Web/PWA/Android
+  // retain the untouched Web Audio code below.
+  const nativeSliceAudio = window.BibloZooNativeFoodSliceAudio?.isAvailable?.()
+    ? window.BibloZooNativeFoodSliceAudio : null;
+  let nativeSliceSession = 0;
+  let nativeSlicePending = false;
+  let nativeSliceRetry = { kind: "round", mode: null };
+  let sliceWelcomeBack = null;
+
+  function nextSliceUiKey() {
+    uiSoundFlip = !uiSoundFlip;
+    return uiSoundFlip ? "uiTap1" : "uiTap2";
+  }
+  function wireNativeSliceHelpPops() {
+    if (!nativeSliceAudio) return;
+    // The shell owns navigation. Add a listener; never override onclick.
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function hideNativeSliceFailure() {
+    document.getElementById("fsNativeAudioFailure")?.remove();
+  }
+  function cancelNativeSlicePreflight() {
+    if (!nativeSliceAudio || !nativeSlicePending) return;
+    nativeSliceSession++;
+    nativeSlicePending = false;
+    app.removeAttribute("aria-busy");
+    void nativeSliceAudio.stop(); // old async result cannot start a new screen
+  }
+  function showNativeSliceFailure(message) {
+    if (!nativeSliceAudio) return;
+    let gate = document.getElementById("fsNativeAudioFailure");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "fsNativeAudioFailure";
+      gate.className = "fs-native-audio-failure";
+      gate.innerHTML = `
+        <section class="fs-native-audio-card" role="dialog"
+            aria-modal="true" aria-label="Food Slice native sound problem">
+          <h2>Food Slice</h2>
+          <p role="status" data-slice-audio-status></p>
+          <button type="button" data-slice-audio-retry>Try Again</button>
+          <button type="button" data-slice-audio-exit>Back</button>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-slice-audio-retry]").onclick = () =>
+        primeNativeSliceFromGesture(nativeSliceRetry.kind, nativeSliceRetry.mode);
+      gate.querySelector("[data-slice-audio-exit]").onclick = () => {
+        cancelNativeSlicePreflight();
+        hideNativeSliceFailure();
+        void nativeSliceAudio.stop();
+        if (state.running) {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        } else renderModeSelect();
+      };
+    }
+    gate.querySelector("[data-slice-audio-status]").textContent = message;
+  }
+  function primeNativeSliceFromGesture(kind = "round", mode = null, uiPopKey = null) {
+    // A child may navigate while the previous gesture is still preparing.
+    // Ignore duplicated mode/Close clicks rather than preparing two banks.
+    if (nativeSlicePending) return;
+    if (!nativeSliceAudio || muted) {
+      hideNativeSliceFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeSliceRetry = {kind,mode};
+    const token = ++nativeSliceSession;
+    nativeSlicePending = true;
+    hideNativeSliceFailure();
+    app.setAttribute("aria-busy", "true");
+    // The only activation call happens NOW inside the real child gesture.
+    // UI PCM pop schedules before the other ten effect samples.
+    const started = nativeSliceAudio.prepareFromGesture(uiPopKey
+      ? {key:uiPopKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(started).then(result => {
+      if (token !== nativeSliceSession || document.hidden || returnPaused) return;
+      nativeSlicePending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else {
+        showNativeSliceFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeSliceSession || document.hidden || returnPaused) return;
+      nativeSlicePending = false;
+      app.removeAttribute("aria-busy");
+      showNativeSliceFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeSliceAudio) {
+    nativeSliceAudio.configure({
+      onAppInactive: () => {
+        cancelNativeSlicePreflight();
+        if (!state.running || state.done) return;
+        if (!sliceWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Never activate native output automatically on foreground.
+        sliceWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || state.done ||
+            !state.running || state.paused) return;
+        setPaused(true, "native-audio-error");
+        nativeSliceRetry = {kind:"resume",mode:null};
+        showNativeSliceFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) cancelNativeSlicePreflight();
+    });
+  }
+
   renderIntro();
 
   function renderIntro(reason = "initial") {
