@@ -139,8 +139,12 @@ async function exerciseReturn() {
 }
 
 function auditOwners() {
+  // N6b isolated native Snake opts out of accidental Zoo Break, while
+  // all pre-existing Web/PWA and other owners still default to Zoo Escape.
   ok(shared.includes('function attachZooReturn(options)') &&
-    shared.includes('if (root.BibloZooZooEscape?.create)'),"opt-in with safe legacy fallback");
+    shared.includes('useZooEscape = true') &&
+    shared.includes('if (useZooEscape && root.BibloZooZooEscape?.create)'),
+    "default Zoo Escape opt-in with safe native Snake plain-UI override");
   ok(shared.includes('onContinue();') && shared.includes('token === generation'),
     "shared owner runs within gesture and rejects stale asynchronous results");
   ok(zoo.includes('ok?.deferred === true') &&
