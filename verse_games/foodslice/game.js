@@ -385,8 +385,12 @@
         sliceWelcomeBack?.showAfterNativeActive?.();
       },
       onPlaybackFailure: () => {
+        // Wrong/bomb clips can complete after their 320ms animation pause
+        // starts. A real native play failure must still stop that round;
+        // only menu/help/Welcome Back/done deliberately ignore hot cues.
         if (muted || returnPaused || document.hidden || state.done ||
-            !state.running || state.paused) return;
+            !state.running ||
+            (state.paused && !["wrong", "bomb"].includes(state.pauseReason))) return;
         setPaused(true, "native-audio-error");
         nativeSliceRetry = {kind:"resume",mode:null};
         showNativeSliceFailure("A native sound stopped. Tap Try Again.");
@@ -793,6 +797,12 @@
   }
 
   function setPaused(paused, reason = "") {
+    // A delayed wrong/bomb timer must not silently bypass an actual native
+    // playback failure. Only fresh, complete native PCM preparation on the
+    // child's Try Again/Let's go gesture may release this paused round.
+    if (!paused && nativeSliceAudio &&
+        state.pauseReason === "native-audio-error" &&
+        !muted && !nativeSliceAudio.isReady()) return;
     if (returnPaused && !paused) {
       // A wrong-tap/bomb animation may complete while away. Do not unpause
       // gameplay until the child's verified Let's go! gesture.
