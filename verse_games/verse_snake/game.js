@@ -892,6 +892,7 @@
     const menuOverlay = document.getElementById("vslGameMenuOverlay");
     if (!menuOverlay) return;
     setPaused(true, "menu");
+    if (nativeSnakeAudio) void nativeSnakeAudio.stop();
     menuOverlay.classList.add("is-open");
     menuOverlay.setAttribute("aria-hidden", "false");
   }
@@ -1120,24 +1121,39 @@
       onMuteToggle: () => {
         unlockAudio();
         muted = !muted;
+        if (nativeSnakeAudio && muted) void nativeSnakeAudio.stop();
         if (!muted) playUiTapSound();
         return muted;
       },
       onHowToPlay: openHelpFromMenu,
       onModeSelect: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) {
+          nativeSnakeGateSerial++;
+          void nativeSnakeAudio.stop();
+          hideNativeSnakeGate();
+        }
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) {
+          nativeSnakeGateSerial++;
+          void nativeSnakeAudio.stop();
+          hideNativeSnakeGate();
+        }
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
-      onOpen: () => setPaused(true, "menu"),
+      onOpen: () => {
+        setPaused(true, "menu");
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
+      },
       onClose: () => {
         unlockAndTap();
-        setPaused(false, "");
+        if (nativeSnakeAudio && !muted) primeSnakeAudioAndContinue("resume");
+        else setPaused(false, "");
       },
       onBackFromHelp: () => {
         unlockAndTap();
@@ -1160,13 +1176,15 @@
 
         unlockAndTap();
         setPaused(true, "speed");
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
 
         return true;
       },
 
       onClose: () => {
         unlockAndTap();
-        setPaused(false, "");
+        if (nativeSnakeAudio && !muted) primeSnakeAudioAndContinue("resume");
+        else setPaused(false, "");
       }
     });
   }
@@ -4353,6 +4371,11 @@
   // Existing menu/help pauses stay in force after a task switch.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeSnakeAudio) {
+      nativeSnakeGateSerial++;
+      nativeSnakeGatePending = false;
+      void nativeSnakeAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -4388,13 +4411,19 @@
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
     // Unlock/prime now, inside the actual child's button gesture.
-    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioContext,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    const attempt = nativeSnakeAudio
+      ? (muted
+          ? Promise.resolve(true)
+          : nativeSnakeAudio.prepareFromGesture().then(result =>
+              result?.ready === true)) // actual Let's go! tap, no Web clock
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioContext,
+          isCurrent: () => returnPaused && session === returnSession &&
+            !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(attempt).then(ok => {
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
@@ -4414,12 +4443,21 @@
   }
 
   window.BibloZooWelcomeBackReturn?.attach?.({
+    // Existing Web-era Zoo Escape recovery is retained on browser/PWA only.
+    // A missing native Snake PCM asset is an explicit audio retry, not an
+    // independent pet rescue or a fake sign of audible playback.
+    useZooEscape: !nativeSnakeAudio,
+    suppressUiSound: !!nativeSnakeAudio,
     getSoundContext: () => audioContext,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeSnakeAudio) void nativeSnakeAudio.stop();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: launch.profileId,
     pictureBase: "../../"
   });
