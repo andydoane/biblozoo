@@ -28,6 +28,10 @@ All 12 Bible Bugs MP3s are prepackaged at `public/verse_games/bible_bugs/bible_b
 - A **genuine failed** activation/preload/playback is different from normal preparation. Only then an accessible **Try Again/Back** dialog appears. A child must tap Try Again for fresh native activation; a successful retry re-enters the selected difficulty or resumes the same running round. **Never** silently switch to Web Audio/HTML or pretend an accepted bridge event is speaker audibility.
 - Duplicate Choose Difficulty taps during preflight do not start parallel native banks; Back/title/mode/exit and offscreen invalidation reject late async results before a new game starts. This prevents surprise game starts and ghost sounds. Mute permits intentional quiet gameplay, with a new user gesture to prepare sounds on unmute.
 
+## Source CI status
+
+Full native Bible Bugs source/VM and asset-allowlist check (including stale preload cannot stop newer warm bank), all older Node regressions, and production web build **GREEN at `22a2ec99`** ([Actions #42442016620](https://github.com/andydoane/biblozoo/actions/runs/42442016620)). Final documentation-only HEAD rerun still required. **No Swift Xcode compilation or physically audible iPhone sign-off yet.**
+
 ## Automated validation
 
 ```bash
