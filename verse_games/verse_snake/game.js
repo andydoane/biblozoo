@@ -470,6 +470,115 @@
 
   const clamp = window.VerseGameShell.clamp;
 
+  // N6b: this is null outside the independent native-only iOS Audio Test.
+  // Browser/PWA/Android still use the original exact Web Audio sound owner.
+  const nativeSnakeAudio = window.BibloZooNativeSnakeAudio?.isAvailable?.()
+    ? window.BibloZooNativeSnakeAudio : null;
+  let nativeSnakeGateSerial = 0;
+  let nativeSnakeGatePending = false;
+  let nativeSnakeRetryMode = "round";
+
+  function hideNativeSnakeGate() {
+    const gate = document.getElementById("vslNativeAudioGate");
+    if (gate) gate.remove();
+  }
+  function showNativeSnakeGate(message, canRetry = false) {
+    if (!nativeSnakeAudio) return;
+    let gate = document.getElementById("vslNativeAudioGate");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "vslNativeAudioGate";
+      gate.className = "vsl-native-audio-gate";
+      gate.innerHTML = `
+        <section class="vsl-native-audio-card" role="dialog"
+          aria-modal="true" aria-label="Scripture Snake native sound">
+          <h2>Scripture Snake</h2>
+          <p role="status" data-snake-native-status></p>
+          <div class="vsl-native-audio-actions">
+            <button type="button" data-snake-native-retry>Try Again</button>
+            <button type="button" data-snake-native-exit>Choose Difficulty</button>
+          </div>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-snake-native-retry]").onclick = () => {
+        if (!nativeSnakeGatePending) primeSnakeAudioAndContinue(nativeSnakeRetryMode);
+      };
+      gate.querySelector("[data-snake-native-exit]").onclick = () => {
+        nativeSnakeGateSerial++;
+        nativeSnakeGatePending = false;
+        hideNativeSnakeGate();
+        void nativeSnakeAudio.stop();
+        if (state.running) {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        } else {
+          renderModeSelect();
+        }
+      };
+    }
+    gate.querySelector("[data-snake-native-status]").textContent = message;
+    const retry = gate.querySelector("[data-snake-native-retry]");
+    retry.hidden = !canRetry;
+    retry.disabled = nativeSnakeGatePending;
+    gate.querySelector("[data-snake-native-exit]").textContent =
+      state.running ? "Back to Games" : "Choose Difficulty";
+  }
+  function primeSnakeAudioAndContinue(mode = "round") {
+    if (!nativeSnakeAudio || muted) {
+      hideNativeSnakeGate();
+      if (mode === "round") renderGameScreen();
+      else setPaused(false, "");
+      return;
+    }
+    nativeSnakeRetryMode = mode;
+    const token = ++nativeSnakeGateSerial;
+    nativeSnakeGatePending = true;
+    showNativeSnakeGate("Getting native game sounds ready…");
+    // The call below immediately invokes Swift activateFromGesture() on
+    // the child's mode-select / menu-close / Retry click, NOT from a timer.
+    const started = nativeSnakeAudio.prepareFromGesture();
+    void Promise.resolve(started).then(result => {
+      if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
+      nativeSnakeGatePending = false;
+      if (result?.ready === true) {
+        hideNativeSnakeGate();
+        if (mode === "round") renderGameScreen();
+        else setPaused(false, "");
+      } else {
+        showNativeSnakeGate(
+          "Native sound isn't ready. Try Again to prepare it before playing.", true);
+      }
+    }).catch(() => {
+      if (token !== nativeSnakeGateSerial || document.hidden) return;
+      nativeSnakeGatePending = false;
+      showNativeSnakeGate("Native sound isn't ready. Tap Try Again.", true);
+    });
+  }
+  if (nativeSnakeAudio) {
+    nativeSnakeAudio.configure({
+      onPlaybackFailure: () => {
+        if (document.hidden || muted || completed || returnPaused ||
+            !state.running || state.paused) return;
+        setPaused(true, "native-sound-error");
+        nativeSnakeGatePending = false;
+        nativeSnakeRetryMode = "resume";
+        showNativeSnakeGate(
+          "A native sound stopped. Retry to resume the same round.", true);
+      }
+    });
+    // If preflight is interrupted before gameplay starts, never leave a
+    // hidden loading gate waiting for an automatic foreground reactivation.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        nativeSnakeGateSerial++;
+        nativeSnakeGatePending = false;
+      } else if (document.getElementById("vslNativeAudioGate")) {
+        showNativeSnakeGate(
+          "Sound was paused while you were away. Tap Try Again.", true);
+      }
+    });
+  }
+
   function helpHtml(){
     return `
       <p>Guide the snake by pointing where you want it to slither.</p>
