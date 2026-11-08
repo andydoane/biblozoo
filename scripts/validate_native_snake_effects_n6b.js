@@ -76,7 +76,11 @@ assert.match(game, /useZooEscape: !nativeSnakeAudio/);
 assert.match(returns, /useZooEscape = true/);
 assert.match(returns, /if \(useZooEscape && root\.BibloZooZooEscape\?\.create\)/);
 assert.match(game, /renderModeSelect\(\)/);
-assert.match(game, /"Getting native game sounds ready/);
+// N6b.1 owner UX cleanup: normal preparation must never open gray modal.
+assert.doesNotMatch(game, /"Getting native game sounds ready/);
+assert.match(game, /if \(nativeSnakeGatePending\) return/);
+assert.match(game, /app\.setAttribute\("aria-busy", "true"\)/);
+assert.match(game, /hideNativeSnakeGate\(\); \/\/ close a previous \*failure\* dialog/);
 assert.match(game, /"Sound was paused while you were away/);
 assert.match(game, /if \(nativeSnakeAudio\) return Promise\.resolve\(nativeSnakeAudio\.isReady\(\)\)/);
 assert.doesNotMatch(script, /new Audio\(|\.createOscillator\(|\.createBufferSource\(|\.src\s*=/);
