@@ -999,8 +999,12 @@ function openLearnMenu() {
 
   // Native Listen must stop before showing the menu. Never let its
   // unrelated HTML audio element auto-resume this native track on close.
-  if (isNativeLearnListenMode() && State.screen === Screen.LISTEN &&
-      State.listenPlaying) pauseLearnAudioForInterruption();
+  if (isNativeLearnListenMode() &&
+      ((State.screen === Screen.LISTEN && State.listenPlaying) ||
+       (State.screen === Screen.CHUNKS && State.chunkRunning) ||
+       (State.screen === Screen.ECHO && State.echoRunning))) {
+    pauseLearnAudioForInterruption();
+  }
   learnMenuOpen = true;
   syncLearnAudioResumeOverlay();
   learnMenuPausedAudio = !isNativeLearnListenMode() && !audioEl.paused;
@@ -10795,6 +10799,8 @@ function renderPracticeGameCard(game, verseProgress) {
 
 
 function resetLearn(goTitle = false) {
+  nativeLearnPartCheckpoint = null;
+  nativeLearnTrackError = "";
   learnAudioInterrupted = null;
   clearLearnAudioResumeTimers(learnAudioResumeAttempt);
   learnAudioResumeAttempt = null;
@@ -12766,9 +12772,14 @@ async function startChunkFlow() {
   const recovery = learnAudioInterrupted?.mode === "chunk" &&
     learnAudioInterrupted.screen === Screen.CHUNKS
     ? learnAudioInterrupted : null;
-  const startIndex = recovery?.index ?? 0;
-  const startPositionMs = recovery?.positionMs || 0;
+  const checkpoint = isNativeLearnTracksMode() &&
+    nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+    nativeLearnPartCheckpoint.mode === "chunk"
+    ? nativeLearnPartCheckpoint : null;
+  const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
+  const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
   learnAudioInterrupted = null;
+  nativeLearnTrackError = "";
 
   State.chunkAutoStarting = false;
   State.chunkAutoFallbackReady = false;
@@ -12899,9 +12910,14 @@ async function startEchoFlow() {
   const recovery = learnAudioInterrupted?.mode === "echo" &&
     learnAudioInterrupted.screen === Screen.ECHO
     ? learnAudioInterrupted : null;
-  const startIndex = recovery?.index ?? 0;
-  const startPositionMs = recovery?.positionMs || 0;
+  const checkpoint = isNativeLearnTracksMode() &&
+    nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+    nativeLearnPartCheckpoint.mode === "echo"
+    ? nativeLearnPartCheckpoint : null;
+  const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
+  const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
   learnAudioInterrupted = null;
+  nativeLearnTrackError = "";
 
   State.echoAutoStarting = false;
   State.echoAutoFallbackReady = false;
@@ -22382,6 +22398,9 @@ function screenChunks(idx) {
   const chunkBottomHtml = showChunkAction
     ? `
       <div class="learn-coach learn-bottom-zone">
+        ${isNativeLearnTracksMode() && nativeLearnTrackError
+          ? `<p class="coach-text" role="status">${escapeHtml(nativeLearnTrackError)}</p>`
+          : ""}
         <div class="coach-actions">
           <button class="carousel-main no-zoom" id="btnChunks" style="max-width:520px;">
             ${buttonLabel}
@@ -22415,6 +22434,7 @@ function screenChunks(idx) {
         return;
       }
 
+      primeNativeLearnTracks(); // explicit Start retry tap
       await startChunkFlow();
     };
   }
@@ -22446,6 +22466,9 @@ function screenEcho(idx) {
   const echoBottomHtml = showEchoAction
     ? `
       <div class="learn-coach learn-bottom-zone">
+        ${isNativeLearnTracksMode() && nativeLearnTrackError
+          ? `<p class="coach-text" role="status">${escapeHtml(nativeLearnTrackError)}</p>`
+          : ""}
         <div class="coach-actions">
           <button class="carousel-main no-zoom" id="btnEcho" style="max-width:520px;">
             ${State.echoDone ? (hideWordsPerRound() === 2 ? "Remove Words" : "Remove a Word") : "▶ Start Echo"}
@@ -22479,6 +22502,7 @@ function screenEcho(idx) {
         return;
       }
 
+      primeNativeLearnTracks();
       await startEchoFlow();
     };
   }
