@@ -218,7 +218,8 @@ function gameFixture({native=true,initialMuted=false}={}){
   welcomeClock:{pause(){actions.push("clock-pause");},resume(){actions.push("clock-resume");}},
   suspendWelcomeAnimations(){actions.push("animation-pause");},
   restoreWelcomeAnimations(){actions.push("animation-resume");},
-  getAudioContext(){throw Error("Native path accessed Web Audio!");},
+  unlockAudio(){actions.push("web-unlock");return Promise.resolve(true);},
+  getAudioContext(){if(native)throw Error("Native path accessed Web Audio!");return null;},
   // NO volumeScale global. A repeat of N6c.1 Snake's error breaks this VM.
  };
  vm.createContext(ctx);
