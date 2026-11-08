@@ -182,6 +182,7 @@ function fixture({native=true,muted=false}={}){
   stopLoop:()=>{calls.push("stop-loop");state.running=false;},cleanupResize:()=>calls.push("cleanup"),
   preloadSounds:()=>{if(native)throw Error("Native Dino called Web Audio preload");calls.push("web-preload");},
   unlockAudio:()=>{if(native)throw Error("Native Dino called Web unlock");calls.push("web-unlock");return Promise.resolve(true);},
+  getAudioContext:()=>{if(native)throw Error("Native Dino called browser AudioContext");return null;},
   renderDiagnosticSelect:(mode)=>calls.push("diagnostic:"+mode),
   startGame:(mode)=>{calls.push("start:"+mode);state.running=true;state.phase="verse";},
   stopGame:()=>calls.push("stop-game"),
