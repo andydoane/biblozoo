@@ -1282,7 +1282,11 @@ function setPaused(paused, reason = ""){
     };
 
     bindTouchEnd("vmunchGameMenuOverlayCloseBtn", () => {
-      playUiTapSound();
+      // iOS touchend fallback must obey EXACTLY the same native full-bank
+      // requirement as shared shell's Close click (no silent bypass).
+      if (nativeMunchAudio && !muted)
+        primeNativeMunchFromGesture("resume",null,nextNativeMunchUiKey());
+      else playUiTapSound();
       closeGameMenu();
     });
 
@@ -1292,6 +1296,7 @@ function setPaused(paused, reason = ""){
     });
 
     bindTouchEnd("vmunchGameMenuOverlayModeSelectBtn", () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       cancelActiveRun();
       setPaused(false, "");
@@ -1300,12 +1305,14 @@ function setPaused(paused, reason = ""){
 
     bindTouchEnd("vmunchGameMenuOverlayExitBtn", () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       cancelActiveRun();
       window.VerseGameBridge.exitGame();
     });
 
     bindTouchEnd("vmunchGameMenuOverlayMuteBtn", () => {
       muted = !muted;
+      if (nativeMunchAudio && muted) void nativeMunchAudio.stop();
       if (!muted) playUiTapSound();
 
       const muteBtn = document.getElementById("vmunchGameMenuOverlayMuteBtn");
@@ -1364,7 +1371,15 @@ function setPaused(paused, reason = ""){
 function openGameMenu(){
   const menuOverlay = document.getElementById("vmunchGameMenuOverlay");
   if (menuOverlay){
-    setPaused(true, "menu");
+    if (nativeMunchAudio && !returnPaused &&
+        !nativeMunchPending &&
+        !(state.paused && state.pauseReason === "menu")) {
+      setPaused(true, "menu");
+      void nativeMunchAudio.stop();
+      playUiTapSound();
+    } else {
+      setPaused(true, "menu");
+    }
     menuOverlay.classList.add("is-open");
     menuOverlay.setAttribute("aria-hidden", "false");
   }
