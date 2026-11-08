@@ -222,6 +222,10 @@ async function actualButtons(){
  assert.deepEqual(f.calls.filter(x=>x.startsWith("start:")),["start:easy"]);
  f.test.wireCommonNav();
  f.menu.onOpen();
+ const menuStops=f.calls.filter(x=>x==="native-stop").length;
+ assert.equal(f.menu.onOpen(),false,"pointerdown + click must not double-open native menu");
+ assert.equal(f.calls.filter(x=>x==="native-stop").length,menuStops,
+   "duplicate menu event may not stop the UI PCM again");
  assert.equal(f.state.paused,true);
  assert.equal(f.state.pauseReason,"menu");
  const n=f.prepares.length;
@@ -230,6 +234,9 @@ async function actualButtons(){
  f.prepares.at(-1).resolve({ready:true});await flush();
  assert.equal(f.state.paused,false);
  f.speed.onOpen();
+ const speedStops=f.calls.filter(x=>x==="native-stop").length;
+ assert.equal(f.speed.onOpen(),false,"duplicate speed-menu event ignored");
+ assert.equal(f.calls.filter(x=>x==="native-stop").length,speedStops);
  assert.equal(f.state.paused,true);
  assert.equal(f.state.pauseReason,"speed");
  f.speed.onClose();assert.equal(f.prepares.length,n+2);
