@@ -97,6 +97,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_ui_audio_n5a.js
 
+      - name: Validate N6h Verse Munch native PCM, actual mobile touchend menus and held App Switcher
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_verse_munch_n6h.js
+
       - name: Validate N6g Verse Invaders 15 unique PCM IDs, real menu/bonus and held App Switcher
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_verse_invaders_n6g.js
