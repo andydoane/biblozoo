@@ -147,7 +147,9 @@
         const prepared = await bounded(Promise.all(IDS.map(soundId =>
           bridge.preload({ soundId }))), BANK_TIMEOUT_MS);
         if (!current(token)) {
-          teardown = stopNative();
+          // The stop that invalidated this generation already tore down its
+          // worker queue. A stale Promise MUST NOT queue a second Stop after
+          // a newer legitimate gesture has prepared its own warm bank.
           return {ready:false,reason:"stale"};
         }
         const rejected = prepared.find((result,index) =>
