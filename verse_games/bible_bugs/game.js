@@ -409,6 +409,10 @@
   }
 
   function unlockAudio() {
+    // Native-only iOS is never allowed to prime Web Audio or silent HTML.
+    // A gameplay collision cannot activate a native session: preparation
+    // occurs exclusively during Choose Difficulty/Close/Retry/Let's go tap.
+    if (nativeBugsAudio) return Promise.resolve(nativeBugsAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -642,6 +646,15 @@
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeBugsAudio) {
+      if (muted || returnPaused || document.hidden) return;
+      const isUi = key === "uiTap1" || key === "uiTap2";
+      if (!isUi && (!state.running || state.paused)) return;
+      // The original random pop choice and relative volume remain unchanged;
+      // fixed IDs map to Swift-allowlisted local PCM resources. No fallback.
+      nativeBugsAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -723,6 +736,7 @@
 
 
   function renderIntro() {
+    cancelNativeBugsPreflight();
     stopLoop();
 
     shell.renderTitleScreen({
@@ -747,6 +761,7 @@
   }
 
   function renderModeSelect() {
+    cancelNativeBugsPreflight();
     stopLoop();
 
     shell.renderModeSelect({
@@ -762,8 +777,10 @@
         renderIntro();
       },
       onSelect: (mode) => {
+        if (nativeBugsAudio && nativeBugsPending) return;
         playUiTapAndUnlock();
-        startGame(mode);
+        if (nativeBugsAudio) primeBibleBugsFromGesture("round", mode);
+        else startGame(mode);
       }
     });
   }
