@@ -34,7 +34,7 @@ const interruption=swift.slice(swift.indexOf('private func handleInterruption'),
 assert.doesNotMatch(interruption,/setActive\(/,"interruption notification may NEVER auto-activate");
 assert.doesNotMatch(interruption,/setCategory\(|setMode\(/);
 assert.match(welcome,/NATIVE_AUDIO_DEFERRED_REASONS/);
-assert.match(welcome,/Pause the other video's audio, then tap Let's go!/);
+assert.match(welcome,/BibloZoo couldn't start sound yet\. Pause the video or tap Let's go! again\./);
 assert.match(feed,/onInterruption/);
 assert.match(daily,/pauseNativeFeedingForAppSwitcher\(runtime\)/);
 assert.match(daily,/Pause the other video's audio, then tap Try Again/);
