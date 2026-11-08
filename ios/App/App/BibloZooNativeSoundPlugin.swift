@@ -256,6 +256,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // deliver delayed "wasSuspended" .began events on resume; those are
     // historical and must not latch the pilot into a permanent error.
     private var interrupted = false
+    // An OS .ended clears "pending" but does NOT reactivate the nonmixable
+    // .soloAmbient session. A new real user gesture must call setActive(true).
+    // PiP can interrupt us while UIApplication remains .active.
+    private var needsGestureAfterInterruption = false
     private var leftForegroundDuringInterruption = false
     private var returnedToForegroundDuringInterruption = false
     private var lastInterruptionSignal = "none"
@@ -926,14 +930,39 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 appendTrace("interruption-suspended-history")
                 return
             }
+            // A new external takeover starts a fresh, bounded gesture
+            // recovery budget. Attempts made before YouTube started should
+            // not prevent recovery after the video is paused.
+            if !interrupted {
+                activationAttemptsThisForeground = 0
+                lastActivationAt = nil
+            }
             interrupted = true
+            needsGestureAfterInterruption = true
             leftForegroundDuringInterruption =
                 UIApplication.shared.applicationState != .active
             returnedToForegroundDuringInterruption = false
             lastInterruptionSignal = "began"
             appendTrace("interruption-began")
+            if UIApplication.shared.applicationState == .active {
+                // The PiP overlay can steal audio WITHOUT resigning UIKit
+                // active. Treat this as pause + show plain Welcome Back for
+                // native games, never a fatal PCM failure or auto-resume.
+                notifyListeners("biblozooAppLifecycle", data: [
+                    "active": false, "reason": "audio-interruption",
+                    "foregroundEpoch": foregroundEpoch
+                ])
+                notifyListeners("biblozooAppLifecycle", data: [
+                    "active": true, "reason": "audio-interruption",
+                    "foregroundEpoch": foregroundEpoch
+                ])
+            }
         case .ended:
             endedEventCount += 1
+            // Still requires gesture even though the interruption is over.
+            // Never tell the next child tap "not-needed" after iOS silently
+            // deactivated our session.
+            needsGestureAfterInterruption = true
             interrupted = false
             leftForegroundDuringInterruption = false
             returnedToForegroundDuringInterruption = false
@@ -952,13 +981,21 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
 
     private func unavailableReason() -> String? {
         if UIApplication.shared.applicationState != .active { return "not-foreground" }
-        if AVAudioSession.sharedInstance().category != .soloAmbient {
+        let session = AVAudioSession.sharedInstance()
+        if session.category != .soloAmbient {
             return "category-not-soloambient"
         }
+        // .soloAmbient does NOT mix with paused/playing YouTube PiP.
+        // Preserve YouTube's playback priority: never steal another active
+        // app's audio on a DEV, game, UI, Feeding or Learn gesture.
+        if session.isOtherAudioPlaying { return "other-audio-playing" }
         // Never clear a genuine .began merely because the app became active.
         // See activateFromGesture: a bounded OS decision is required after a
         // full inactive->active transition, or wait for a real .ended event.
         if interrupted { return "interruption-pending" }
+        if needsGestureAfterInterruption {
+            return "gesture-required-after-interruption"
+        }
         if needsGestureAfterReset { return "media-reset-requires-gesture" }
         return nil
     }
@@ -981,6 +1018,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 finish(["ready": false, "reason": "invalid-purpose"]); return
             }
             if let blocked = self.unavailableReason(), blocked != "interruption-pending",
+               blocked != "gesture-required-after-interruption",
                blocked != "media-reset-requires-gesture" {
                 self.lastActivationResult = blocked
                 self.appendTrace("activation-denied")
@@ -988,16 +1026,20 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             }
             let firstTap = !self.hasGestureActivatedSession
             let needsRecovery = firstTap || self.interrupted ||
-                self.needsGestureAfterReset
+                self.needsGestureAfterInterruption || self.needsGestureAfterReset
             if !needsRecovery {
                 self.lastActivationResult = "not-needed"
                 self.appendTrace("activation-not-needed")
                 finish(["ready": true, "attempted": false, "reason": "not-needed"])
                 return
             }
-            // A real pending .began remains protected until either iOS sends
-            // .ended OR the app has fully left/returned and the child taps.
-            guard !self.interrupted || self.returnedToForegroundDuringInterruption else {
+            // A real pending .began remains protected while another app
+            // is playing (caught above); when PiP is paused, its .ended
+            // notification can be delayed or absent. Allow ONLY an actual
+            // child gesture to ask iOS to reactivate in that case.
+            guard !self.interrupted ||
+                  self.returnedToForegroundDuringInterruption ||
+                  !AVAudioSession.sharedInstance().isOtherAudioPlaying else {
                 self.lastActivationResult = "interruption-pending"
                 self.appendTrace("activation-deferred")
                 finish(["ready": false, "attempted": false,
@@ -1029,6 +1071,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 // and mode are never changed, even after media-services reset.
                 try AVAudioSession.sharedInstance().setActive(true)
                 self.interrupted = false
+                self.needsGestureAfterInterruption = false
                 self.needsGestureAfterReset = false
                 self.hasGestureActivatedSession = true
                 self.leftForegroundDuringInterruption = false
@@ -1091,6 +1134,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 "appState": state,
                 "category": AVAudioSession.sharedInstance().category.rawValue,
                 "pending": self.interrupted,
+                "needsGestureAfterInterruption": self.needsGestureAfterInterruption,
+                "otherAudioPlaying": AVAudioSession.sharedInstance().isOtherAudioPlaying,
                 "lastSignal": self.lastInterruptionSignal,
                 "eventCount": self.interruptionEventCount,
                 "beganCount": self.beganEventCount,
