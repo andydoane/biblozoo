@@ -751,6 +751,10 @@
       backLabel: "Back to Practice Games",
       onBack: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) {
+          cancelNativeBugsPreflight();
+          void nativeBugsAudio.stop();
+        }
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
@@ -774,6 +778,10 @@
       backLabel: `Back to ${GAME_TITLE} title`,
       onBack: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) {
+          cancelNativeBugsPreflight();
+          void nativeBugsAudio.stop();
+        }
         renderIntro();
       },
       onSelect: (mode) => {
@@ -926,6 +934,7 @@
       onMuteToggle: () => {
         playUiTapAndUnlock();
         muted = !muted;
+        if (nativeBugsAudio && muted) void nativeBugsAudio.stop();
         return muted;
       },
       onHowToPlay: () => {
@@ -934,22 +943,30 @@
       },
       onModeSelect: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         setPaused(false, "");
         stopLoop();
         renderModeSelect();
       },
       onExit: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) {
+          cancelNativeBugsPreflight();
+          void nativeBugsAudio.stop();
+        }
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
         playUiTapAndUnlock();
         setPaused(true, "menu");
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
       },
       onClose: () => {
         playUiTapAndUnlock();
-        setPaused(false, "");
+        if (nativeBugsAudio && !muted)
+          primeBibleBugsFromGesture("resume");
+        else setPaused(false, "");
       },
       onBackFromHelp: () => {
         playUiTapAndUnlock();
@@ -969,7 +986,9 @@
     function closeMenu() {
       overlay.classList.remove("is-open");
       overlay.setAttribute("aria-hidden", "true");
-      setPaused(false, "");
+      // Touch fallback MUST honor exactly the same native readiness gate.
+      if (nativeBugsAudio && !muted) primeBibleBugsFromGesture("resume");
+      else setPaused(false, "");
     }
 
     function wireTouchButton(id, action) {
@@ -991,12 +1010,14 @@
     wireTouchButton(`${GAME_MENU_ID}ModeSelectBtn`, () => {
       overlay.classList.remove("is-open");
       overlay.setAttribute("aria-hidden", "true");
+      if (nativeBugsAudio) void nativeBugsAudio.stop();
       setPaused(false, "");
       stopLoop();
       renderModeSelect();
     });
 
     wireTouchButton(`${GAME_MENU_ID}ExitBtn`, () => {
+      if (nativeBugsAudio) void nativeBugsAudio.stop();
       stopLoop();
       window.VerseGameBridge.exitGame();
     });
@@ -1007,6 +1028,7 @@
 
     wireTouchButton(`${GAME_MENU_ID}MuteBtn`, () => {
       muted = !muted;
+      if (nativeBugsAudio && muted) void nativeBugsAudio.stop();
 
       const muteButton = document.getElementById(`${GAME_MENU_ID}MuteBtn`);
       if (muteButton) {
@@ -1036,7 +1058,8 @@
 
         setPaused(true, "menu");
       } else {
-        setPaused(false, "");
+        if (nativeBugsAudio && !muted) primeBibleBugsFromGesture("resume");
+        else setPaused(false, "");
       }
     }
 
