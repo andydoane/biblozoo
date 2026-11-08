@@ -1173,6 +1173,7 @@ function wireCommonNav(){
     isMuted: () => muted,
     onMuteToggle: () => {
       muted = !muted;
+      if (nativeMunchAudio && muted) void nativeMunchAudio.stop();
       if (!muted) playUiTapSound();
       return muted;
     },
@@ -1181,6 +1182,7 @@ function wireCommonNav(){
       openHelpFromMenu();
     },
     onModeSelect: () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       cancelActiveRun();
       setPaused(false, "");
@@ -1188,16 +1190,26 @@ function wireCommonNav(){
     },
     onExit: () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       cancelActiveRun();
       window.VerseGameBridge.exitGame();
     },
     onOpen: () => {
-      playUiTapSound();
+      // Avoid duplicate PCM teardown for pointerdown + click.
+      if (nativeMunchPending || returnPaused ||
+          (nativeMunchAudio && state.paused &&
+           state.pauseReason === "menu")) return false;
       setPaused(true, "menu");
+      if (nativeMunchAudio) void nativeMunchAudio.stop();
+      playUiTapSound();
     },
     onClose: () => {
-      playUiTapSound();
-      setPaused(false, "");
+      if (nativeMunchAudio && !muted)
+        primeNativeMunchFromGesture("resume",null,nextNativeMunchUiKey());
+      else {
+        playUiTapSound();
+        setPaused(false, "");
+      }
     },
     onBackFromHelp: () => {
       playUiTapSound();
@@ -1213,20 +1225,26 @@ function wireCommonNav(){
       if (
         bonusRunning ||
         state.bonusPhase ||
-        getCurrentPhase() === "done"
+        getCurrentPhase() === "done" ||
+        nativeMunchPending || returnPaused ||
+        (nativeMunchAudio && state.paused &&
+         state.pauseReason === "speed")
       ) {
         return false;
       }
-
-      playUiTapSound();
       setPaused(true, "speed");
-
+      if (nativeMunchAudio) void nativeMunchAudio.stop();
+      playUiTapSound();
       return true;
     },
 
     onClose: () => {
-      playUiTapSound();
-      setPaused(false, "");
+      if (nativeMunchAudio && !muted)
+        primeNativeMunchFromGesture("resume",null,nextNativeMunchUiKey());
+      else {
+        playUiTapSound();
+        setPaused(false, "");
+      }
     }
   });
 
@@ -1234,6 +1252,11 @@ function wireCommonNav(){
 }
 
 function setPaused(paused, reason = ""){
+  // Shared menu/help callbacks must not dismiss a task-switch pause.
+  if (returnPaused && !paused) return;
+  // A late animation/touch fallback must not bypass missing native PCM.
+  if (!paused && nativeMunchAudio && !muted &&
+      !nativeMunchAudio.isReady()) return;
   state.paused = paused;
   state.pauseReason = paused ? reason : "";
   if (!paused){
