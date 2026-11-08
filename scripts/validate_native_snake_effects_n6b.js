@@ -60,8 +60,8 @@ assert.doesNotMatch(swift.replace(/\/\/[^\n]*/g, ""),
 assert.match(build, /"verse_games"/);
 assert.match(html, /shared\/native-snake-audio\.js/);
 assert.ok(html.indexOf("native-snake-audio.js") < html.indexOf('src="./game.js"'));
-assert.match(game, /if \(nativeSnakeAudio\) primeSnakeAudioAndContinue\("round"\)/);
-assert.match(game, /if \(nativeSnakeAudio && !muted\) primeSnakeAudioAndContinue\("resume"\)/);
+assert.match(game, /primeSnakeAudioAndContinue\("round", muted \? null : nextUiTapKey\(\)\)/);
+assert.match(game, /primeSnakeAudioAndContinue\("resume", nextUiTapKey\(\)\)/);
 assert.match(game, /onAppInactive: \(\) =>/);
 assert.match(game, /onAppActive: \(\) =>/);
 assert.match(game, /snakeWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
