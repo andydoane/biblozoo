@@ -97,6 +97,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_ui_audio_n5a.js
 
+      - name: Validate N6c.2 Scripture Snake real title, Back, Help and mode callbacks
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_snake_title_ui_n6c2.js
+
       - name: Validate N6c.1 native-only Snake and Bible Bugs first UI pops and mode bank lifecycle
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_standalone_ui_pops_n6c1.js
