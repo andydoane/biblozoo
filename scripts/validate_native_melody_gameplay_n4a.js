@@ -84,7 +84,8 @@ async function main(){
   assert.equal(failStarts,0);assert.equal(fr.nativePilot,null);
   assert.equal(fr.controlPhase,"instructions");
   assert.equal(fr.startConfirmButton.textContent,"Try Again");
-  assert.match(fr.nativePilotChoiceStatus.textContent,/Sound isn't ready yet/);
+  assert.match(fr.nativePilotChoiceStatus.textContent,/Pause the other video's audio, then tap Try Again/,
+    "PiP-busy Melody must preserve exact instruction gate and explicit retry");
   assert.match(fr.nativePilotBadge.textContent,/interruption-pending/);
   fail.api.preload=async({soundId})=>{fail.calls.push(["preload",soundId]);return {prepared:true};};
   await fail.hooks.start(fr);assert.equal(failStarts,1);
