@@ -41,7 +41,13 @@
       ? value : "bridge-error";
   }
 
-  function create({ isCurrent, onFailure, mode = "classic" } = {}) {
+  const TEMPORARY_AUDIO_REASONS = new Set([
+    "other-audio-playing", "interruption-pending",
+    "gesture-required-after-interruption", "not-foreground", "stale",
+    "activation-cooldown", "foreground-attempt-limit"
+  ]);
+
+  function create({ isCurrent, onFailure, onInterruption, mode = "classic" } = {}) {
     // Four explicit native-only profiles. Bounce and Labyrinth collisions,
     // catches and bonuses intentionally reuse the fixed Classic resources.
     // The Web/PWA/Android platforms never create this controller.
@@ -85,6 +91,13 @@
 
     function markFailed(reason) {
       if (failed) return;
+      // Other-app audio is not a missing Feeding MP3. Use the already
+      // existing feeding interruption overlay, not a fatal effects badge.
+      if (TEMPORARY_AUDIO_REASONS.has(safeReason(reason))) {
+        stop();
+        try { onInterruption?.(safeReason(reason)); } catch (_) {}
+        return;
+      }
       ready = false;
       failed = true;
       // No silent switch to web during an active round: the preview keeps

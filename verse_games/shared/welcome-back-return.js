@@ -6,6 +6,25 @@
 (function installWelcomeBackReturn(root) {
   "use strict";
 
+  // N6h.1: .soloAmbient cannot mix with YouTube PiP. A blocked
+  // activateFromGesture is NOT a failed audio asset. Keep the same round
+  // frozen, let the child pause external audio, and retry by real tap.
+  const NATIVE_AUDIO_DEFERRED_REASONS = new Set([
+    "other-audio-playing", "interruption-pending",
+    "gesture-required-after-interruption", "activation-cooldown",
+    "foreground-attempt-limit", "not-foreground"
+  ]);
+  function isNativeAudioDeferred(result) {
+    return result?.ready !== true &&
+      NATIVE_AUDIO_DEFERRED_REASONS.has(result?.reason);
+  }
+  function nativeAudioResumeResult(result) {
+    if (result?.ready === true) return true;
+    if (isNativeAudioDeferred(result))
+      return { deferred: true, reason: result.reason };
+    return false;
+  }
+
   // Patch 72.1C: one lifecycle adapter for the 12 verse games, Playground,
   // Flashcards, and applicable quiet daily tasks. Owners still supply their
   // own pause, verified recovery/acknowledgement, and navigation callbacks.
@@ -239,7 +258,10 @@
         escape.hidden = false;
         if (status) {
           status.hidden = false;
-          status.textContent = "Those sloths are taking their time...";
+          status.textContent = ok.reason === "other-audio-playing" ||
+            ok.reason === "interruption-pending"
+            ? "Pause the other video's audio, then tap Let's go!"
+            : "Audio is busy. When it stops, tap Let's go!";
         }
         log("welcome-back-recovery-deferred", { reason: ok.reason || "native-interruption" });
         return;
@@ -481,5 +503,8 @@
     })();
   }
 
-  root.BibloZooWelcomeBackReturn = Object.freeze({ attach, resumeAudioOnGesture });
+  root.BibloZooWelcomeBackReturn = Object.freeze({
+    attach, resumeAudioOnGesture, isNativeAudioDeferred,
+    nativeAudioResumeResult
+  });
 })(window);

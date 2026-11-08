@@ -3280,7 +3280,8 @@
     // Welcome Back Let's go! tap. No AudioContext/replacement in iOS.
     const restore = nativeBugsAudio
       ? (muted ? Promise.resolve(true) :
-        nativeBugsAudio.prepareFromGesture().then(result => result?.ready === true))
+        nativeBugsAudio.prepareFromGesture().then(result => (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioCtx,
@@ -3288,6 +3289,9 @@
           muted
         });
     return Promise.resolve(restore).then(ok => {
+      // YouTube PiP owns .soloAmbient output while it plays. Defer without
+      // advancing game clocks or consuming a Welcome Back retry attempt.
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
         return false;

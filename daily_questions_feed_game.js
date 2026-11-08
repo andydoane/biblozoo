@@ -3601,7 +3601,10 @@
           const detail = typeof reason === "string" &&
             /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
           setFeedingResumeStatus(runtime,
-            "Sound isn't ready yet. Tap Try again! or Back.");
+            ["other-audio-playing", "interruption-pending",
+              "gesture-required-after-interruption"].includes(detail)
+              ? "Pause the other video's audio, then tap Let's go!"
+              : "Sound isn't ready yet. Tap Try again! or Back.");
           report(false);
           return;
         }
@@ -5083,6 +5086,11 @@
         runtime.mode === FEED_MODES.BOUNCE ? "bounce" : "classic",
       isCurrent: () => activeRuntime === runtime && !runtime.finished &&
         !document.hidden && !runtime.feedPageHidden,
+      onInterruption: () => {
+        // YouTube PiP may interrupt before UIKit resigns active. The
+        // original Feeding pause overlay owns the same saved round.
+        pauseNativeFeedingForAppSwitcher(runtime);
+      },
       onFailure: (reason) => {
         if (activeRuntime !== runtime || runtime.finished) return;
         if (runtime.nativePilotBadge) {
@@ -5141,7 +5149,10 @@
         ? result.reason : "bridge-error";
       // Child-facing popup stays simple. Diagnostic reason remains available
       // in the hidden pilot badge and manual DEV timing report.
-      const message = "Sound isn't ready yet. Tap Try Again or Back.";
+      const message = ["other-audio-playing", "interruption-pending",
+        "gesture-required-after-interruption"].includes(reason)
+        ? "Pause the other video's audio, then tap Try Again."
+        : "Sound isn't ready yet. Tap Try Again or Back.";
       if (runtime.nativePilotBadge) {
         runtime.nativePilotBadge.textContent =
           "Native ONLY unavailable (" + reason + "); round not started";

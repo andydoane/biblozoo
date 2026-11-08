@@ -7748,7 +7748,8 @@
     const attempt = nativeDinoAudio
       ? (muted ? Promise.resolve(true) :
           nativeDinoAudio.prepareFromGesture().then(result =>
-            result?.ready === true))
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioCtx,
@@ -7757,6 +7758,9 @@
           muted
         });
     return Promise.resolve(attempt).then(ok => {
+      // YouTube PiP owns .soloAmbient output while it plays. Defer without
+      // advancing game clocks or consuming a Welcome Back retry attempt.
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
       welcomeClock.resume();
