@@ -8772,7 +8772,11 @@ let verseDetailListenActive = false;
 // Flashcards. Only the Detail screen has this status element; Flashcards
 // owns its existing independent Listen/retry button.
 function setVerseDetailPreviewStatus(message = "") {
-  if (State.screen !== Screen.VERSE_DETAIL) return;
+  // The shared preview API also runs in Flashcards and in the historical
+  // source-level HTML-audio recovery harness without a rendered Detail UI.
+  if (typeof State === "undefined" || typeof Screen === "undefined" ||
+      State.screen !== Screen.VERSE_DETAIL ||
+      typeof document.getElementById !== "function") return;
   const button = document.getElementById("btnDetailListen");
   if (button) button.textContent = verseDetailListenActive
     ? "Stop Listening" : "Listen to the Verse";
