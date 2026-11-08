@@ -8768,9 +8768,30 @@ let verseDetailListenToken = 0;
 let cancelVerseDetailListenWait = null;
 let verseDetailListenActive = false;
 
+// N6a: the same reference→verse preview is shared by BibloPet Detail and
+// Flashcards. Only the Detail screen has this status element; Flashcards
+// owns its existing independent Listen/retry button.
+function setVerseDetailPreviewStatus(message = "") {
+  if (State.screen !== Screen.VERSE_DETAIL) return;
+  const button = document.getElementById("btnDetailListen");
+  if (button) button.textContent = verseDetailListenActive
+    ? "Stop Listening" : "Listen to the Verse";
+  const status = document.getElementById("verseDetailListenStatus");
+  if (status) {
+    status.textContent = message;
+    status.hidden = !message;
+  }
+}
+
 function cancelVerseDetailListen() {
   verseDetailListenToken += 1;
+  const hadNativePreview = verseDetailListenActive &&
+    isNativeLearnListenMode();
   verseDetailListenActive = false;
+  // N6a: stop only a preview owned by this function; leaving Verse Detail
+  // or Flashcards must never cut a newer unrelated Learn narration request.
+  if (hadNativePreview) window.BibloZooNativeLearnListen.stop();
+  setVerseDetailPreviewStatus();
 
   const cancelWait =
     cancelVerseDetailListenWait;
@@ -8827,6 +8848,67 @@ async function playVerseDetailListen(verseId) {
   if (muted || document.hidden) return false;
   verseDetailListenActive = true;
 
+  if (isNativeLearnListenMode()) {
+    // This function is called synchronously from the real Verse Detail or
+    // Flashcards Listen button. N5b.2's source-owner invokes Swift
+    // activateFromGesture BEFORE any await, then independently validates
+    // published ref+whole-verse files and request IDs. No HTML/Web fallback.
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (completed, message = "") => {
+        if (settled) return;
+        settled = true;
+        if (cancelVerseDetailListenWait === cancel)
+          cancelVerseDetailListenWait = null;
+        if (listenToken === verseDetailListenToken) {
+          verseDetailListenActive = false;
+          setVerseDetailPreviewStatus(message);
+        }
+        resolve(completed === true);
+      };
+      const cancel = () => finish(false);
+      cancelVerseDetailListenWait = cancel;
+      setVerseDetailPreviewStatus("Preparing the verse…");
+      try {
+        const start = window.BibloZooNativeLearnListen.startFromGesture({
+          verseId,
+          onEvent: (event) => {
+            if (settled || listenToken !== verseDetailListenToken ||
+                !verseDetailListenActive || document.hidden ||
+                ![Screen.VERSE_DETAIL, Screen.FLASHCARDS].includes(State.screen))
+              return;
+            if (event.kind === "stage" || event.kind === "playing") {
+              setVerseDetailPreviewStatus(
+                event.stage === "verse" ? "Reading the verse…" :
+                  "Reading the verse reference…"
+              );
+            } else if (event.kind === "completed" &&
+                       event.stage === "verse") {
+              // Flashcards' async Listen button awaits exactly this true
+              // completion; reference end, native accepted, position clock
+              // and stale completion must never count as success.
+              finish(true);
+            } else if (event.kind === "interrupted") {
+              finish(false, "Playback paused. Tap Listen to start again.");
+            } else if (event.kind === "failed") {
+              finish(false, "Sound isn't ready. Tap Listen to try again.");
+            }
+          }
+        });
+        Promise.resolve(start).then(result => {
+          if (result?.ready !== true && result?.reason !== "stale")
+            finish(false, "Sound isn't ready. Tap Listen to try again.");
+        }).catch(() => {
+          finish(false, "Sound isn't ready. Tap Listen to try again.");
+        });
+      } catch (_) {
+        finish(false, "Sound isn't ready. Tap Listen to try again.");
+      }
+    });
+  }
+
+  // Existing Web/PWA/Android HTML audio and Flashcards completion contract
+  // remain byte-for-byte unchanged below this native-only branch.
   const verseRefAudioFile =
     `${AUDIO_DIR}${verseId}_ref.mp3`;
 
@@ -21350,6 +21432,8 @@ function screenVerseDetail(idx) {
         <button class="detail-listen-btn no-zoom" id="btnDetailListen" type="button">
           Listen to the Verse
         </button>
+        <p class="pet-helper-text" id="verseDetailListenStatus"
+          role="status" aria-live="polite" hidden></p>
 
         ${verseProgress.learnCompleted
       ? `
@@ -21472,6 +21556,10 @@ function screenVerseDetail(idx) {
   const btnDetailListen = wrap.querySelector("#btnDetailListen");
   if (btnDetailListen) {
     btnDetailListen.onclick = () => {
+      if (isNativeLearnListenMode() && verseDetailListenActive) {
+        cancelVerseDetailListen(); // explicit Stop, no accidental restart
+        return;
+      }
       try {
         audioEl.pause();
         audioEl.currentTime = 0;
