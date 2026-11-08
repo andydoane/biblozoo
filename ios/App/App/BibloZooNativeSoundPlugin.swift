@@ -1267,11 +1267,46 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             return Bundle.main.url(
                 forResource: narrationResourceName, withExtension: "mp3")
         }
+        // Short Learn instruction prompts are static, application-owned
+        // files. The JS caller only supplies a fixed allowlisted key.
+        let instructions: [String: String] = [
+            "listen": "instructions_listen",
+            "meaning": "instructions_meaning",
+            "chunks1": "instructions_chunks1",
+            "chunks2": "instructions_chunks2",
+            "echo1": "instructions_echo1",
+            "echo_start": "instructions_echo_start",
+            "remove": "instructions_remove",
+            "final": "instructions_final",
+            "games": "instructions_games"
+        ]
+        if soundId.hasPrefix("learn-instruction-") {
+            let key = String(soundId.dropFirst("learn-instruction-".count))
+            guard let filename = instructions[key] else { return nil }
+            return Bundle.main.url(
+                forResource: filename, withExtension: "mp3",
+                subdirectory: "public/verse_audio")
+        }
+
         let reference = soundId.hasPrefix("learn-ref-")
         let verse = soundId.hasPrefix("learn-verse-")
-        guard reference || verse else { return nil }
-        let prefix = reference ? "learn-ref-" : "learn-verse-"
-        let verseId = String(soundId.dropFirst(prefix.count))
+        let chunk = soundId.hasPrefix("learn-part-")
+        guard reference || verse || chunk else { return nil }
+
+        let verseId: String
+        var chunkIndex: Int? = nil
+        if chunk {
+            let encoded = String(soundId.dropFirst("learn-part-".count))
+            guard let separator = encoded.lastIndex(of: "-"),
+                  let index = Int(encoded[encoded.index(after: separator)...]),
+                  index >= 0, index <= 26 else { return nil }
+            verseId = String(encoded[..<separator])
+            chunkIndex = index
+        } else {
+            let prefix = reference ? "learn-ref-" : "learn-verse-"
+            verseId = String(soundId.dropFirst(prefix.count))
+        }
+
         guard publishedLearnVerseIDs.contains(verseId),
               let jsonURL = Bundle.main.url(
                 forResource: verseId, withExtension: "json",
@@ -1281,7 +1316,24 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 as? [String: Any],
               json["published"] as? Bool == true,
               json["verseId"] as? String == verseId else { return nil }
-        let file = verseId + (reference ? "_ref" : "")
+
+        let file: String
+        if let index = chunkIndex {
+            let parts = json["echoParts"] as? [String] ?? []
+            let maximumPart = parts.isEmpty ? 1 : parts.count
+            guard index <= maximumPart else { return nil }
+            if index == 0 {
+                file = verseId + "_ref"
+            } else if parts.isEmpty {
+                file = verseId
+            } else {
+                let ascii = 96 + index
+                guard let suffix = UnicodeScalar(ascii) else { return nil }
+                file = verseId + String(Character(suffix))
+            }
+        } else {
+            file = verseId + (reference ? "_ref" : "")
+        }
         return Bundle.main.url(
             forResource: file, withExtension: "mp3",
             subdirectory: "public/verse_audio")
