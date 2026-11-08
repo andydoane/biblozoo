@@ -204,12 +204,40 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     positive: "verse_splat_positive.mp3"
   };
 
+  // N6e native output is owned by the same single Swift .soloAmbient
+  // session and serialized PCM worker as Snake, Bugs and Food Slice.
+  // Preserve the original browser/PWA/Android audio below.
+  const nativeSplatAudio = window.BibloZooNativeVerseSplatAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseSplatAudio : null;
+  const SPLAT_NATIVE_FILE_KEYS = Object.freeze({
+    "../../ui_audio/ui_sound_pop_1.mp3": "uiTap1",
+    "../../ui_audio/ui_sound_pop_2.mp3": "uiTap2",
+    "verse_splat_pop_1.mp3": "pop1",
+    "verse_splat_pop_2.mp3": "pop2",
+    "verse_splat_pop_3.mp3": "pop3",
+    "verse_splat_pop_4.mp3": "pop4",
+    "verse_splat_pop_5.mp3": "pop5",
+    "verse_splat_correct_1.mp3": "correct1",
+    "verse_splat_correct_2.mp3": "correct2",
+    "verse_splat_correct_3.mp3": "correct3",
+    "verse_splat_wrong.mp3": "wrong",
+    "verse_splat_streak.mp3": "streak",
+    "verse_splat_paint_score.mp3": "paintScore",
+    "verse_splat_start.mp3": "start",
+    "verse_splat_positive.mp3": "positive"
+  });
+  let nativeSplatSerial = 0;
+  let nativeSplatPending = false;
+  let nativeSplatRetry = { kind: "round", mode: null };
+  let splatWelcomeBack = null;
+
   const verseSplatSoundCache = new Map();
   const verseSplatAudioBufferCache = new Map();
   const verseSplatAudioBufferPromises = new Map();
   const verseSplatLastSoundByGroup = {};
   const verseSplatLastPlayedAt = {};
-  const VerseSplatAudioContext = window.AudioContext || window.webkitAudioContext;
+  const VerseSplatAudioContext = nativeSplatAudio ? null :
+    (window.AudioContext || window.webkitAudioContext);
   let verseSplatAudioContext = null;
   let verseSplatAudioUnlocked = false;
   let verseSplatAudioResumePromise = null;
@@ -238,7 +266,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function getVerseSplatAudioContext(){
-    if (!VerseSplatAudioContext) return null;
+    if (nativeSplatAudio || !VerseSplatAudioContext) return null;
 
     if (!verseSplatAudioContext){
       try {
@@ -307,7 +335,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function primeVerseSplatAudioBuffer(file){
-    if (!file) return null;
+    if (nativeSplatAudio || !file) return null;
 
     const src = verseSplatSoundSrc(file);
     const ctx = getVerseSplatAudioContext();
@@ -355,7 +383,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function primeVerseSplatSound(file){
-    if (!file) return null;
+    if (nativeSplatAudio || !file) return null;
 
     const src = verseSplatSoundSrc(file);
 
@@ -376,6 +404,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function unlockVerseSplatAudio(){
+    if (nativeSplatAudio) return; // no browser/HTML unlock on native iOS
     const ctx = resumeVerseSplatAudioContext();
     // Do not label an interrupted or suspended context as unlocked.
     verseSplatAudioUnlocked = !!ctx && ctx.state === "running";
@@ -388,14 +417,18 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   let verseSplatAudioPrimed = false;
-  // Keep these listeners after the first gesture so iOS interruptions recover.
-  document.addEventListener("pointerdown", unlockVerseSplatAudio, true);
-  document.addEventListener("keydown", unlockVerseSplatAudio, true);
-  document.addEventListener("click", unlockVerseSplatAudio, true);
-  if (!window.PointerEvent) document.addEventListener("touchstart", unlockVerseSplatAudio, true);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) verseSplatAudioUnlocked = false;
-  });
+  // Browser input keeps its original AudioContext path; native iOS uses
+  // only explicit game/UI click handlers and the Swift PCM session.
+  if (!nativeSplatAudio) {
+    document.addEventListener("pointerdown", unlockVerseSplatAudio, true);
+    document.addEventListener("keydown", unlockVerseSplatAudio, true);
+    document.addEventListener("click", unlockVerseSplatAudio, true);
+    if (!window.PointerEvent)
+      document.addEventListener("touchstart", unlockVerseSplatAudio, true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) verseSplatAudioUnlocked = false;
+    });
+  }
 
   function chooseVerseSplatSound(groupName){
     const group = VERSE_SPLAT_SOUNDS[groupName];
@@ -447,6 +480,18 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
 
   function playVerseSplatSoundFile(file, volume=1, options={}){
     if (muted || !file) return;
+    if (nativeSplatAudio) {
+      // Every original file is mapped to one fixed Swift bundled PCM ID.
+      // Unsupported keys never fall through to HTML or Web Audio.
+      if (returnPaused || document.hidden || state.menuOpen || state.helpOpen)
+        return;
+      const key = SPLAT_NATIVE_FILE_KEYS[file];
+      const cooldownKey = options.cooldownKey || key;
+      const cooldownMs = Math.max(0, Number(options.cooldownMs || 0));
+      if (key && claimVerseSplatSoundSlot(cooldownKey, cooldownMs))
+        nativeSplatAudio.play(key, Math.max(0, Math.min(1, volume)));
+      return;
+    }
 
     const src = verseSplatSoundSrc(file);
     const cooldownKey = options.cooldownKey || src;
@@ -508,6 +553,14 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function playSharedUiPopSound(){
+    if (nativeSplatAudio) {
+      if (muted || returnPaused || document.hidden ||
+          !claimVerseSplatSoundSlot("uiTap", VERSE_SPLAT_SOUND_COOLDOWNS.uiTap))
+        return;
+      // Only fixed native PCM UI pop IDs, requested on actual child clicks.
+      nativeSplatAudio.tapUiFromGesture(pickNativeSplatUiKey(), 0.45);
+      return;
+    }
     playVerseSplatSoundGroup("uiTap", 0.45, { cooldownKey:"uiTap" });
   }
 
@@ -767,6 +820,94 @@ const MODE_CONFIG = {
     medalMessage: "",
     medalSubmessage: ""
   };
+
+  function pickNativeSplatUiKey() {
+    const file = chooseVerseSplatSound("uiTap");
+    return SPLAT_NATIVE_FILE_KEYS[file] || "uiTap1";
+  }
+  function wireNativeSplatTitleHelpPops() {
+    if (!nativeSplatAudio) return;
+    // Shared shell owns navigation; only append a fixed native UI sound.
+    document.getElementById("helpBtn")
+      ?.addEventListener("click", playSharedUiPopSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playSharedUiPopSound);
+  }
+  function stopNativeSplatRound() {
+    if (!nativeSplatAudio) return;
+    nativeSplatSerial++;
+    nativeSplatPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeSplatAudio.stop();
+  }
+  function showNativeSplatFailure(message) {
+    if (!nativeSplatAudio) return;
+    let gate = document.getElementById("vspNativeAudioFailure");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "vspNativeAudioFailure";
+      gate.className = "vsp-native-audio-failure";
+      gate.innerHTML = `
+        <section class="vsp-native-audio-card" role="dialog"
+                 aria-modal="true" aria-label="Verse Splat native sound problem">
+          <h2>Verse Splat</h2>
+          <p data-splat-audio-status role="status"></p>
+          <button type="button" data-splat-audio-retry>Try Again</button>
+          <button type="button" data-splat-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-splat-audio-retry]").onclick = () =>
+        primeNativeSplatFromGesture(nativeSplatRetry.kind, nativeSplatRetry.mode);
+      gate.querySelector("[data-splat-audio-back]").onclick = () => {
+        stopNativeSplatRound();
+        gate.remove();
+        if (["game", "bonus", "coverage_result", "bonus_intro"].includes(state.screen)) {
+          stopLoops();
+          window.VerseGameBridge.exitGame();
+        } else {
+          setScreen("mode");
+        }
+      };
+    }
+    gate.querySelector("[data-splat-audio-status]").textContent = message;
+  }
+  function clearNativeSplatFailure() {
+    document.getElementById("vspNativeAudioFailure")?.remove();
+  }
+  function primeNativeSplatFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeSplatPending) return;
+    if (!nativeSplatAudio || muted) {
+      clearNativeSplatFailure();
+      if (kind === "round") startMode(mode);
+      else if (kind === "resume") closeMenu();
+      return;
+    }
+    nativeSplatRetry = {kind,mode};
+    const token = ++nativeSplatSerial;
+    nativeSplatPending = true;
+    clearNativeSplatFailure();
+    app.setAttribute("aria-busy", "true");
+    // The Swift activateFromGesture is requested synchronously in the
+    // CHILD'S actual difficulty/Close/Retry gesture, never a timer.
+    const request = nativeSplatAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:0.45} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeSplatSerial || document.hidden || returnPaused) return;
+      nativeSplatPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startMode(mode);
+        else if (kind === "resume") closeMenu();
+      } else {
+        showNativeSplatFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeSplatSerial || document.hidden || returnPaused) return;
+      nativeSplatPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeSplatFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
 
 const shuffle = window.VerseGameShell.shuffle;
 
@@ -1106,6 +1247,7 @@ function renderIntro(){
     backLabel: "Back to Practice Games",
     onBack: () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.exitGame();
     },
     onStart: () => {
@@ -1113,6 +1255,7 @@ function renderIntro(){
       setScreen("mode");
     }
   });
+  wireNativeSplatTitleHelpPops();
 }
 
 function renderModeScreen(){
@@ -1125,14 +1268,22 @@ function renderModeScreen(){
     theme: GAME_THEME,
     backLabel: "Back to Verse Splat title",
     onBack: () => {
+      if (nativeSplatAudio) stopNativeSplatRound();
       playSharedUiPopSound();
       setScreen("intro");
     },
     onSelect: (mode) => {
-      playSharedUiPopSound();
-      startMode(mode);
+      if (nativeSplatAudio && nativeSplatPending) return;
+      if (nativeSplatAudio) {
+        primeNativeSplatFromGesture("round", mode,
+          muted ? null : pickNativeSplatUiKey());
+      } else {
+        playSharedUiPopSound();
+        startMode(mode);
+      }
     }
   });
+  wireNativeSplatTitleHelpPops();
 }
 
 
@@ -1505,15 +1656,18 @@ function renderEndScreen(){
     theme: GAME_THEME,
     backLabel: "Back to Practice Games",
     onPlayAgain: () => {
+      if (nativeSplatAudio) stopNativeSplatRound();
       playSharedUiPopSound();
       setScreen("mode");
     },
     onMoreGames: () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.exitGame();
     },
     onChangeVerse: () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.returnToVersePicker();
     }
   });
@@ -1541,8 +1695,14 @@ function render(){
 
   function bindScreenEvents(){
     app.querySelectorAll("[data-mode]").forEach(btn => btn.onclick = () => {
-      playSharedUiPopSound();
-      startMode(btn.dataset.mode);
+      if (nativeSplatAudio && nativeSplatPending) return;
+      if (nativeSplatAudio)
+        primeNativeSplatFromGesture("round", btn.dataset.mode,
+          muted ? null : pickNativeSplatUiKey());
+      else {
+        playSharedUiPopSound();
+        startMode(btn.dataset.mode);
+      }
     });
 
     app.querySelectorAll("[data-action='show-help-intro']").forEach(btn => btn.onclick = () => {
@@ -1558,12 +1718,14 @@ function render(){
     });
 
     app.querySelectorAll("[data-action='play-again']").forEach(btn => btn.onclick = () => {
+      if (nativeSplatAudio) stopNativeSplatRound();
       playSharedUiPopSound();
       setScreen("mode");
     });
 
     app.querySelectorAll("[data-action='exit-game']").forEach(btn => btn.onclick = () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.exitGame();
     });
     app.querySelectorAll("[data-action='coverage-result-continue']").forEach(btn => btn.onclick = continueAfterCoverageResult);
@@ -1583,6 +1745,9 @@ function render(){
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        // Mute stops every native PCM effect. Unmute can request only the
+        // fixed UI clip; explicit Close re-prepares the full game bank.
+        if (nativeSplatAudio && muted) void nativeSplatAudio.stop();
         if (!muted) playSharedUiPopSound();
         return muted;
       },
@@ -1601,6 +1766,7 @@ function render(){
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeSplatAudio) stopNativeSplatRound();
         playSharedUiPopSound();
         state.menuOpen = false;
         state.helpOpen = false;
@@ -1611,22 +1777,29 @@ function render(){
       },
       onExit: () => {
         playSharedUiPopSound();
+        if (nativeSplatAudio) stopNativeSplatRound();
         stopLoops();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        if (state.busy) return false;
-
-        playSharedUiPopSound();
+        if (state.busy || nativeSplatPending) return false;
 
         state.menuOpen = true;
         state.helpOpen = false;
         state.helpBackMode = false;
         stopLoops();
+        // Prevent gameplay PCM from continuing under a paused menu; UI
+        // pop belongs to a new real gesture's UI-only bank.
+        if (nativeSplatAudio) void nativeSplatAudio.stop();
+        playSharedUiPopSound();
       },
       onClose: () => {
-        playSharedUiPopSound();
-        closeMenu();
+        if (nativeSplatAudio && !muted)
+          primeNativeSplatFromGesture("resume", null, pickNativeSplatUiKey());
+        else {
+          playSharedUiPopSound();
+          closeMenu();
+        }
       },
       onBackFromHelp: () => {
         playSharedUiPopSound();
@@ -1645,6 +1818,8 @@ function render(){
   }
 
   function closeMenu(){
+    // Called after the real native Close gesture's full bank is prepared
+    // (or intentional mute). Never resume a gameplay loop before that.
     state.menuOpen = false;
     syncGameMenuOpenState();
 
@@ -3572,13 +3747,57 @@ function spawnWrongFaceParticleBurst(){
     if (!state.bonusIntroVisible && !state.bonusEnding) startBonusLoop();
   }
 
-  // Warm up decoded Web Audio buffers before the child's first Start tap.
-  Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
+  // Web/PWA/Android only. Native never opens an AudioContext/HTML Audio,
+  // never warms a bank outside a real child Start/Close/Resume gesture.
+  if (!nativeSplatAudio)
+    Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
+  if (nativeSplatAudio) {
+    nativeSplatAudio.configure({
+      onAppInactive: () => {
+        // A held App Switcher may arrive DURING a mode preflight before
+        // WebKit becomes hidden. Invalidate that pending result too: it
+        // must never begin an abandoned round after a return.
+        if (nativeSplatPending) {
+          nativeSplatSerial++;
+          nativeSplatPending = false;
+          app.removeAttribute("aria-busy");
+        }
+        if (!["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen))
+          return;
+        if (!splatWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Never retry or activate audio automatically after a task switch.
+        splatWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || state.completed ||
+            !["game", "bonus", "coverage_result", "bonus_intro"].includes(state.screen) ||
+            state.menuOpen || state.helpOpen) return;
+        // Stop gameplay while a genuine PCM failure awaits an explicit
+        // retry. The child must never keep scoring silently in the background.
+        state.menuOpen = true;
+        stopLoops();
+        nativeSplatRetry = {kind:"resume",mode:null};
+        showNativeSplatFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        nativeSplatSerial++;
+        nativeSplatPending = false;
+        app.removeAttribute("aria-busy");
+      }
+    });
+  }
+
   initVerseData();
   render();
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeSplatAudio) stopNativeSplatRound();
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -3592,7 +3811,8 @@ function spawnWrongFaceParticleBurst(){
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeSplatAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements++;
       const old = verseSplatAudioContext;
       verseSplatAudioContext = null;
@@ -3603,16 +3823,22 @@ function spawnWrongFaceParticleBurst(){
       verseSplatAudioBufferPromises.clear();
       try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => {
-        verseSplatAudioUnlocked = false;
-        unlockVerseSplatAudio();
-        return verseSplatAudioResumePromise;
-      },
-      getContext: () => verseSplatAudioContext,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // On native iOS the child's actual Let's go! tap reactivates Swift and
+    // decodes the full fixed PCM bank. No Web Audio context on that path.
+    const restore = nativeSplatAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeSplatAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => {
+            verseSplatAudioUnlocked = false;
+            unlockVerseSplatAudio();
+            return verseSplatAudioResumePromise;
+          },
+          getContext: () => verseSplatAudioContext,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
@@ -3631,13 +3857,19 @@ function spawnWrongFaceParticleBurst(){
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  splatWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeSplatAudio,
+    suppressUiSound: !!nativeSplatAudio,
     getSoundContext: () => verseSplatAudioContext,
     isSoundMuted: () => muted,
     shouldPrompt: () => ["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen),
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeSplatAudio) stopNativeSplatRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
