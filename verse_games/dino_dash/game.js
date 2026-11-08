@@ -324,6 +324,114 @@
   let silenceAudio = null;
   let audioPreloadStarted = false;
   let uiPopToggle = false;
+  // N6f: isolated iOS Audio Test uses ONLY the original Swift
+  // .soloAmbient AVAudioSession and serialized predecoded PCM worker.
+  // Browser/PWA/Android keep their original Web Audio code below.
+  const nativeDinoAudio = window.BibloZooNativeDinoDashAudio?.isAvailable?.()
+    ? window.BibloZooNativeDinoDashAudio : null;
+  let nativeDinoSerial = 0;
+  let nativeDinoPending = false;
+  let nativeDinoRetry = { kind:"round", mode:null, checkpoint:null };
+  let dinoWelcomeBack = null;
+
+  function nextNativeDinoUiKey() {
+    uiPopToggle = !uiPopToggle;
+    return uiPopToggle ? "uiPop1" : "uiPop2";
+  }
+  function wireNativeDinoHelpPops() {
+    if (!nativeDinoAudio) return;
+    // Keep shared shell navigation exactly as wired. Only add a sound.
+    document.getElementById("helpBtn")?.addEventListener("click", playUiSound);
+    document.getElementById(HELP_OVERLAY_ID+"CloseBtn")
+      ?.addEventListener("click", playUiSound);
+  }
+  function cancelNativeDinoPreflight() {
+    if (!nativeDinoAudio || !nativeDinoPending) return;
+    nativeDinoSerial++;
+    nativeDinoPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeDinoAudio.stop();
+  }
+  function stopNativeDinoRound() {
+    if (!nativeDinoAudio) return;
+    nativeDinoSerial++;
+    nativeDinoPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeDinoAudio.stop();
+  }
+  function clearNativeDinoFailure() {
+    document.getElementById("dd2NativeAudioFailure")?.remove();
+  }
+  function showNativeDinoFailure(message) {
+    if (!nativeDinoAudio) return;
+    let overlay = document.getElementById("dd2NativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "dd2NativeAudioFailure";
+      overlay.className = "dd2-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="dd2-native-audio-card" role="dialog"
+                 aria-modal="true" aria-label="Dino Dash native sound problem">
+          <h2>Dino Dash</h2>
+          <p role="status" data-dino-audio-status></p>
+          <button type="button" data-dino-audio-retry>Try Again</button>
+          <button type="button" data-dino-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-dino-audio-retry]").onclick = () =>
+        primeNativeDinoFromGesture(nativeDinoRetry.kind,
+          nativeDinoRetry.mode, null, nativeDinoRetry.checkpoint);
+      overlay.querySelector("[data-dino-audio-back]").onclick = () => {
+        stopNativeDinoRound();
+        clearNativeDinoFailure();
+        if (nativeDinoRetry.kind === "round") renderModeSelect();
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-dino-audio-status]").textContent = message;
+  }
+  function continueNativeDinoAfterPrepared(kind, mode, checkpoint) {
+    if (kind === "round") {
+      if (DIAGNOSTIC_TESTING_ENABLED) renderDiagnosticSelect(mode);
+      else startGame(mode);
+    } else if (kind === "checkpoint") {
+      startGame(mode, checkpoint);
+    } else if (kind === "resume") {
+      setPaused(false, "");
+    }
+  }
+  function primeNativeDinoFromGesture(kind = "round", mode = null,
+      uiKey = null, checkpoint = null) {
+    if (nativeDinoPending) return;
+    if (!nativeDinoAudio || muted) {
+      clearNativeDinoFailure();
+      continueNativeDinoAfterPrepared(kind, mode, checkpoint);
+      return;
+    }
+    nativeDinoRetry = {kind,mode,checkpoint};
+    const token = ++nativeDinoSerial;
+    nativeDinoPending = true;
+    clearNativeDinoFailure();
+    app.setAttribute("aria-busy", "true");
+    // Real child's mode/Close/Try Again gesture. UI PCM pop is scheduled
+    // before preparing the eight game effects. No Web fallback on iOS.
+    const request = nativeDinoAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:0.55} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeDinoSerial || document.hidden || returnPaused) return;
+      nativeDinoPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true)
+        continueNativeDinoAfterPrepared(kind, mode, checkpoint);
+      else showNativeDinoFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(() => {
+      if (token !== nativeDinoSerial || document.hidden || returnPaused) return;
+      nativeDinoPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeDinoFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
   const halfwayFeedImagePreloads = [];
