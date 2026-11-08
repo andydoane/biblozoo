@@ -551,6 +551,7 @@ const FACE_MAP = {
   };
 
   function getAudioContext() {
+    if (nativeMunchAudio) return null; // iOS: never create Web Audio
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -561,6 +562,7 @@ const FACE_MAP = {
   }
 
   function ensureSilenceAudio() {
+    if (nativeMunchAudio) return null; // iOS: never prime HTML Audio
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -573,6 +575,7 @@ const FACE_MAP = {
   }
 
   function unlockAudio() {
+    if (nativeMunchAudio) return Promise.resolve(nativeMunchAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -663,9 +666,11 @@ const FACE_MAP = {
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeMunchAudio) {
+    document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+    document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+    document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  }
   function markAudioBackgrounded() {
     if (!audioCtx) return;
     audioForegroundRecoveryPending = true;
@@ -739,13 +744,15 @@ const FACE_MAP = {
     audioForegroundFreshContextOnGesture = !restored;
   }
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) markAudioBackgrounded();
-    else scheduleForegroundAudioRecovery();
-  });
-  window.addEventListener("blur", markAudioBackgrounded);
-  window.addEventListener("focus", scheduleForegroundAudioRecovery);
-  window.addEventListener("pageshow", scheduleForegroundAudioRecovery);
+  if (!nativeMunchAudio) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) markAudioBackgrounded();
+      else scheduleForegroundAudioRecovery();
+    });
+    window.addEventListener("blur", markAudioBackgrounded);
+    window.addEventListener("focus", scheduleForegroundAudioRecovery);
+    window.addEventListener("pageshow", scheduleForegroundAudioRecovery);
+  }
 
   function soundVolume(key) {
     const master = Number(SOUND_TUNING.masterVolume);
@@ -758,6 +765,7 @@ const FACE_MAP = {
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeMunchAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -800,12 +808,21 @@ const FACE_MAP = {
   }
 
   function preloadSoundBuffers() {
+    if (nativeMunchAudio) return; // PCM bank preloaded only on real gesture
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeMunchAudio) {
+      if (muted || returnPaused || document.hidden || !state.running ||
+          state.paused || completed) return;
+      // Every word-tap/chew/bonus hot event uses a fixed Swift PCM ID.
+      // No Web Audio, HTML silence or lazy decode fallback on native iOS.
+      nativeMunchAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -836,8 +853,12 @@ const FACE_MAP = {
   }
 
   function playUiTapSound() {
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
+    const key = nextNativeMunchUiKey();
+    if (nativeMunchAudio) {
+      if (!muted && !returnPaused && !document.hidden)
+        nativeMunchAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
     playGameSound(key, "uiTap");
   }
 
