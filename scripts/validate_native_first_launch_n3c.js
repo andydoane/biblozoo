@@ -23,7 +23,11 @@ assert.match(swift,/private var hasGestureActivatedSession = false/);
 assert.match(gesture,/let firstTap = !self\.hasGestureActivatedSession/);
 assert.match(gesture,/let needsRecovery = firstTap \|\| self\.interrupted \|\|/);
 assert.match(gesture,/self\.needsGestureAfterReset/);
-assert.match(gesture,/guard !self\.interrupted \|\| self\.returnedToForegroundDuringInterruption/);
+// N6h.2 advances the original N3c policy: a real foreground user tap
+// may reclaim .soloAmbient from PiP even when interrupted was still true.
+assert.match(gesture,/blocked != "other-audio-playing"/);
+assert.match(gesture,/AVAudioSession\.sharedInstance\(\)\.isOtherAudioPlaying/);
+assert.doesNotMatch(gesture,/guard !self\.interrupted \|\| self\.returnedToForegroundDuringInterruption/);
 assert.match(gesture,/self\.minimumActivationInterval/);
 assert.match(gesture,/self\.maximumActivationAttemptsPerForeground/);
 assert.match(gesture,/try AVAudioSession\.sharedInstance\(\)\.setActive\(true\)/);
