@@ -4759,7 +4759,8 @@ const shuffle = window.VerseGameShell.shuffle;
     const restore = nativeMunchAudio
       ? (muted ? Promise.resolve(true) :
           nativeMunchAudio.prepareFromGesture().then(result =>
-            window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result)))
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioCtx,
