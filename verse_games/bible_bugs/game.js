@@ -2482,14 +2482,17 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         renderModeSelect();
       },
       onMoreGames: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -3229,6 +3232,10 @@
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeBugsAudio) {
+      cancelNativeBugsPreflight();
+      void nativeBugsAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -3241,18 +3248,23 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeBugsAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements++;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    // Execute the gesture-owned unlock before yielding to any promise.
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Native gesture calls Swift activation NOW, inside the actual
+    // Welcome Back Let's go! tap. No AudioContext/replacement in iOS.
+    const restore = nativeBugsAudio
+      ? (muted ? Promise.resolve(true) :
+        nativeBugsAudio.prepareFromGesture().then(result => result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
@@ -3268,13 +3280,22 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  bugsWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    // Web/Android retain their original Zoo Escape flow by default.
+    // Native Bible Bugs only uses a plain manual Welcome Back recovery:
+    // missing PCM can never launch an unrelated Zoo Break.
+    useZooEscape: !nativeBugsAudio,
+    suppressUiSound: !!nativeBugsAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeBugsAudio) void nativeBugsAudio.stop();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
