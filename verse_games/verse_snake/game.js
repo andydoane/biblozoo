@@ -1040,6 +1040,18 @@
     wireGameControls();
 
     requestAnimationFrame(() => {
+      // An iPhone may go inactive after the sound-bank Promise resolves but
+      // before this first RAF. Never start a newly silent round on return.
+      // Retry is a NEW child tap, not an automatic foreground activation.
+      if (nativeSnakeAudio &&
+          (document.hidden || returnPaused ||
+           (!muted && !nativeSnakeAudio.isReady()))) {
+        nativeSnakeGatePending = false;
+        nativeSnakeRetryMode = "round";
+        showNativeSnakeGate(
+          "Sound was interrupted before the round began. Tap Try Again.", true);
+        return;
+      }
       initializeGame();
       startLoop();
     });
