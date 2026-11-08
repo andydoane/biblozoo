@@ -1512,6 +1512,36 @@
     streakSpeedBoostU: 0
   };
 
+
+  if (nativeBirdAudio) {
+    nativeBirdAudio.configure({
+      onAppInactive: () => {
+        // UIKit .inactive also occurs when the App Switcher card is held.
+        // A pending mode tap must never start a round behind Welcome Back.
+        if (nativeBirdPending) stopNativeBirdRound();
+        if (!state.running || completed) return;
+        if (!birdWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Only reveal plain Welcome Back; NEVER activate on foreground.
+        birdWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completed ||
+            !state.running ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeBirdRetry = {kind:"resume",mode:null,checkpoint:null};
+        showNativeBirdFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeBirdPending) stopNativeBirdRound();
+    });
+  }
+
   setupReferenceSegments();
   installDiagnosticErrorHandlers();
 
@@ -2341,44 +2371,52 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        void unlockAudio();
-
-        const nextMuted = !muted;
-        if (!nextMuted) {
-          playUiTapSound();
-        }
-
-        muted = nextMuted;
+        if (!nativeBirdAudio) void unlockAudio();
+        muted = !muted;
+        if (nativeBirdAudio && muted) void nativeBirdAudio.stop();
+        if (!muted) playUiTapSound();
         return muted;
       },
       onHowToPlay: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         openHelpFromMenu();
       },
       onModeSelect: () => {
-        void unlockAudio();
+        if (nativeBirdAudio) stopNativeBirdRound();
+        else void unlockAudio();
         playUiTapSound();
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
+        if (nativeBirdAudio) stopNativeBirdRound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        void unlockAudio();
-        playUiTapSound();
+        if (nativeBirdPending || returnPaused ||
+            (nativeBirdAudio && state.paused && state.pauseReason === "menu"))
+          return false;
+        if (!nativeBirdAudio) void unlockAudio();
         setPaused(true, "menu");
+        if (nativeBirdAudio) void nativeBirdAudio.stop();
+        playUiTapSound();
+        return true;
       },
       onClose: () => {
-        void unlockAudio();
-        playUiTapSound();
-        setPaused(false, "");
+        if (returnPaused) return;
+        if (nativeBirdAudio && !muted)
+          primeNativeBirdFromGesture("resume", null, nextNativeBirdUiKey());
+        else {
+          if (!nativeBirdAudio) void unlockAudio();
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         setPaused(true, "menu");
       }
@@ -2387,35 +2425,28 @@
     window.VerseGameShell.wireSpeedMenu({
       id: SPEED_MENU_OVERLAY_ID,
       buttonId: "vb2SpeedPill",
-
       onOpen: () => {
-        void unlockAudio();
+        if (nativeBirdPending || returnPaused ||
+            (nativeBirdAudio && state.paused && state.pauseReason === "speed"))
+          return false;
+        if (!nativeBirdAudio) void unlockAudio();
+        setPaused(true, "speed");
+        if (nativeBirdAudio) void nativeBirdAudio.stop();
         playUiTapSound();
-
-        setPaused(
-          true,
-          "speed"
-        );
-
         return true;
       },
-
       onChange: preset => {
-        gameSpeedPresetId =
-          String(
-            preset?.id ||
-            "normal"
-          );
+        gameSpeedPresetId = String(preset?.id || "normal");
       },
-
       onClose: () => {
-        void unlockAudio();
-        playUiTapSound();
-
-        setPaused(
-          false,
-          ""
-        );
+        if (returnPaused) return;
+        if (nativeBirdAudio && !muted)
+          primeNativeBirdFromGesture("resume", null, nextNativeBirdUiKey());
+        else {
+          if (!nativeBirdAudio) void unlockAudio();
+          playUiTapSound();
+          setPaused(false, "");
+        }
       }
     });
   }
@@ -2429,6 +2460,9 @@
 
   function setPaused(paused, reason = ""){
     if (returnPaused && !paused) return;
+    if (!paused && nativeBirdAudio && !muted &&
+        state.pauseReason === "native-audio-error" &&
+        !nativeBirdAudio.isReady()) return;
     if (!state.running && state.phase !== "bonusIntro") return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
