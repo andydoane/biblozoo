@@ -147,7 +147,8 @@ async function homeUI(){
   stop(){return Promise.resolve({stopped:true});},
   addListener(n,f){listeners[n]=f;return Promise.resolve({remove(){}});}
  };
- const win={document:{hidden:false,addEventListener(){}},performance:{now:()=>150},
+ let now=150;
+ const win={document:{hidden:false,addEventListener(){}},performance:{now:()=>now},
   Capacitor:{isNativePlatform:()=>true,getPlatform:()=>"ios",Plugins:{BibloZooNativeSound:bridge}},
   BibloZooNativeOnlyOutput:{enabled:true},setTimeout,clearTimeout,addEventListener(){}};
  vm.runInNewContext(ui,{window:win,Date,Promise,console});
@@ -160,6 +161,7 @@ async function homeUI(){
  pop.tapFromGesture({isCurrent:()=>true,volume:.15});await tick();
  assert.equal(plays,1,"Home UI stays quiet while other app owns speaker");
  competing=false;
+ now+=160; // a distinct real Home gesture after PiP pause (not same-tap debounce)
  const old=activations;
  pop.tapFromGesture({isCurrent:()=>true,volume:.15});await tick();
  assert.equal(activations,old+1,"new real Home tap requests Swift reactivation");
