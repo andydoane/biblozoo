@@ -12438,6 +12438,8 @@ function goToListenAndStart() {
 
 
 function goToChunksAndStart() {
+  nativeLearnTrackError = "";
+  nativeLearnPartCheckpoint = null; // new pass; not an interrupted resume
   State.chunkAutoStarting = true;
   State.chunkAutoFallbackReady = false;
 
@@ -12475,6 +12477,8 @@ function goToChunksAndStart() {
 
 
 function goToEchoAndStart() {
+  nativeLearnTrackError = "";
+  nativeLearnPartCheckpoint = null;
   State.echoDone = false;
   State.echoRunning = false;
   State.echoIndex = 0;
@@ -12759,9 +12763,11 @@ async function startFinalRecallFlow() {
 
 async function startChunkFlow() {
   if (State.chunkRunning || document.hidden) return;
-  const startIndex = learnAudioInterrupted?.mode === "chunk" &&
+  const recovery = learnAudioInterrupted?.mode === "chunk" &&
     learnAudioInterrupted.screen === Screen.CHUNKS
-    ? learnAudioInterrupted.index : 0;
+    ? learnAudioInterrupted : null;
+  const startIndex = recovery?.index ?? 0;
+  const startPositionMs = recovery?.positionMs || 0;
   learnAudioInterrupted = null;
 
   State.chunkAutoStarting = false;
@@ -12770,10 +12776,10 @@ async function startChunkFlow() {
   // cancel any prior learn audio sequence
   cancelLearnAudio();
 
-  await runChunkSequence(startIndex);
+  await runChunkSequence(startIndex, startPositionMs);
 }
 
-async function runChunkSequence(startIndex = 0) {
+async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
   const my = ++echoCancelToken;
   let completed = false;
 
@@ -12791,29 +12797,71 @@ async function runChunkSequence(startIndex = 0) {
 
       const part = learnParts[i];
       const file = part.file;
-
-      setAudioSrc(file);
-      audioEl.currentTime = 0;
-
       State.chunkIndex = i;
       render();
+      let d;
 
-      try {
-        await safePlay();
-      } catch (e) {
+      if (isNativeLearnTracksMode()) {
+        const positionMs = i === startIndex ? resumePositionMs : 0;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "chunk", index: i, positionMs
+        };
+        if (muted) {
+          failNativeLearnTrack("chunk", i, "muted");
+          return;
+        }
+        const result = await window.BibloZooNativeLearnTracks.play(
+          `learn-part-${VERSE_ID}-${i}`, {
+            positionMs,
+            onProgress: progress => nativeLearnTrackProgress("chunk", i, progress),
+            onInterrupted: progress => {
+              nativeLearnPartCheckpoint = {
+                verseId: VERSE_ID, mode: "chunk", index: i,
+                positionMs: progress.positionMs || 0
+              };
+              pauseLearnAudioForInterruption();
+              if (!document.hidden) render();
+            }
+          });
         if (my !== echoCancelToken || document.hidden) return;
-        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
-        return;
+        if (!result.ended) {
+          failNativeLearnTrack("chunk", i, result.reason);
+          return;
+        }
+        // A genuine current native ended event, not a JS timer, allows the
+        // *next* part. Duration is from this very same native player.
+        d = result.durationMs / 1000;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "chunk", index: i + 1, positionMs: 0
+        };
+        const attempt = learnAudioResumeAttempt;
+        if (attempt?.recovery?.mode === "chunk" &&
+            !attempt.narrationVerified) {
+          attempt.narrationVerified = true; // verified native ended
+          finishLearnAudioResumeAttempt(attempt);
+        }
+      } else {
+        setAudioSrc(file);
+        audioEl.currentTime = 0;
+        try {
+          await safePlay();
+        } catch (e) {
+          if (my !== echoCancelToken || document.hidden) return;
+          learnAudioInterrupted = {
+            screen: Screen.CHUNKS, mode: "chunk", index: i
+          };
+          return;
+        }
+        const ended = await waitForAudioEnd();
+        if (my !== echoCancelToken || document.hidden) return;
+        if (!ended) {
+          learnAudioInterrupted = {
+            screen: Screen.CHUNKS, mode: "chunk", index: i
+          };
+          return;
+        }
+        d = await waitForDuration();
       }
-
-      const ended = await waitForAudioEnd();
-      if (my !== echoCancelToken || document.hidden) return;
-      if (!ended) {
-        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
-        return;
-      }
-
-      const d = await waitForDuration();
       const pauseMs = (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
       const elapsed = await waitForPausableDelay(pauseMs, my);
 
@@ -12822,6 +12870,8 @@ async function runChunkSequence(startIndex = 0) {
 
     setAudioSrc(AUDIO_FILE);
     State.audioMode = null;
+    nativeLearnTrackError = "";
+    nativeLearnPartCheckpoint = null;
     State.chunkDone = true;
     State.chunkPassCount = Math.min(2, State.chunkPassCount + 1);
     completed = true;
