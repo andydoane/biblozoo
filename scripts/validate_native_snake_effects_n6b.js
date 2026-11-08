@@ -255,7 +255,7 @@ async function testGameOwnerNativeBranch() {
   const src = section("  function playGameSound(key, volumeScale = 1) {",
     "  function midiToFreq(note) {") +
     section("  function playOrbTone(sizeRatio = 0.25) {",
-      "  function playUiTapSound() {");
+      "  function nextUiTapKey() {");
   const plays=[];
   const h={
     muted:false,returnPaused:false,completed:false,
