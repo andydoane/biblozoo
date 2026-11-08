@@ -3828,7 +3828,7 @@ function spawnWrongFaceParticleBurst(){
     const restore = nativeSplatAudio
       ? (muted ? Promise.resolve(true) :
           nativeSplatAudio.prepareFromGesture().then(result =>
-            result?.ready === true))
+            window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result)))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => {
             verseSplatAudioUnlocked = false;
@@ -3840,6 +3840,9 @@ function spawnWrongFaceParticleBurst(){
           muted
         });
     return Promise.resolve(restore).then(ok => {
+      // YouTube PiP owns .soloAmbient output while it plays. Defer without
+      // advancing game clocks or consuming a Welcome Back retry attempt.
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
         return false;
