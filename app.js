@@ -1078,6 +1078,58 @@ let activeLearnAudioWaitCancel = null;
 // local transient playback state, never user progress or completion.
 let nativeListenCheckpoint = null;
 let nativeListenError = "";
+// N5b.3: transient native audio checkpoint, never verse/score progress.
+let nativeLearnPartCheckpoint = null;
+let nativeLearnTrackError = "";
+
+function isNativeLearnTracksMode() {
+  return window.BibloZooNativeLearnTracks?.isAvailable?.() === true;
+}
+function primeNativeLearnTracks() {
+  if (isNativeLearnTracksMode() && !muted) {
+    window.BibloZooNativeLearnTracks.primeFromGesture();
+  }
+}
+function nativeInstructionSoundId(key) {
+  const valid = ["listen", "meaning", "chunks1", "chunks2",
+    "echo1", "remove", "final", "games"];
+  if (!valid.includes(key)) return "";
+  return "learn-instruction-" +
+    (key === "echo1" && ["a_little", "pretty_well"].includes(State.learnLevel)
+      ? "echo_start" : key);
+}
+function nativeLearnTrackProgress(mode, index, progress) {
+  if (!progress || document.hidden) return;
+  nativeLearnPartCheckpoint = {
+    verseId: VERSE_ID, mode, index, positionMs: progress.positionMs
+  };
+  const attempt = learnAudioResumeAttempt;
+  if (!attempt || attempt.narrationVerified ||
+      attempt.recovery?.mode !== mode ||
+      attempt.recovery?.screen !== State.screen) return;
+  // Native position evidence from the current, matching source only.
+  if (index !== attempt.recovery.index ||
+      progress.positionMs > (attempt.recovery.positionMs || 0) + 40) {
+    attempt.narrationVerified = true;
+    finishLearnAudioResumeAttempt(attempt);
+  }
+}
+function failNativeLearnTrack(mode, index, reason) {
+  if (document.hidden || learnAudioInterrupted) return;
+  nativeLearnTrackError = "Sound isn't ready. Tap Start to try again.";
+  nativeLearnPartCheckpoint = {
+    verseId: VERSE_ID, mode, index, positionMs: 0
+  };
+  if (learnAudioResumeAttempt?.recovery?.mode === mode) {
+    failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+    return;
+  }
+  if (mode === "chunk") State.chunkAutoFallbackReady = true;
+  if (mode === "echo") State.echoAutoFallbackReady = true;
+  // A missing local clip is a retry, never an unrelated pet rescue.
+  if (State.screen === (mode === "chunk" ? Screen.CHUNKS : Screen.ECHO))
+    render();
+}
 
 let muted = false;
 
@@ -1982,6 +2034,13 @@ async function playLearnInstructionAudio() {
 
 async function continueLearnInstruction() {
   const key = State.learnInstructionKey;
+  if (key === "listen" && isNativeLearnListenMode() && !muted) {
+    // Native activation synchronously inside the existing Continue gesture;
+    // narration begins only when the Listen slide has settled.
+    window.BibloZooNativeLearnListen.primeFromGesture();
+  } else if (["chunks1", "chunks2", "echo1"].includes(key)) {
+    primeNativeLearnTracks();
+  }
 
   State.learnInstructionReady = false;
   State.learnInstructionAudioStarted = false;
@@ -11087,6 +11146,7 @@ function learnLevelNext() {
 }
 
 function learnLevelRun() {
+  primeNativeLearnTracks(); // real user tap before instruction slide
   const opt = LEARN_LEVEL_OPTIONS[State.learnLevelIndex];
 
   State.learnLevel = opt.level;
