@@ -271,6 +271,118 @@
     uiSoundFlip: false
   };
 
+  // N6c: dedicated native-only Bible Bugs output in separate iOS Audio Test.
+  // Web/PWA/Android retain the exact existing Web Audio game below.
+  const nativeBugsAudio = window.BibloZooNativeBibleBugsAudio?.isAvailable?.()
+    ? window.BibloZooNativeBibleBugsAudio : null;
+  let nativeBugsSession = 0;
+  let nativeBugsPending = false;
+  let nativeBugsRetry = { kind: "round", mode: null };
+  let bugsWelcomeBack = null;
+
+  function hideNativeBugsFailure() {
+    document.getElementById("bbNativeAudioFailure")?.remove();
+  }
+  function cancelNativeBugsPreflight() {
+    if (!nativeBugsAudio || !nativeBugsPending) return;
+    nativeBugsSession++;
+    nativeBugsPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeBugsAudio.stop(); // stale completion must never start this screen
+  }
+  function showNativeBugsFailure(message) {
+    if (!nativeBugsAudio) return;
+    let gate = document.getElementById("bbNativeAudioFailure");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "bbNativeAudioFailure";
+      gate.className = "bb-native-audio-failure";
+      gate.innerHTML = `
+        <section class="bb-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Bible Bugs native audio problem">
+          <h2>Bible Bugs</h2>
+          <p role="status" data-bugs-audio-status></p>
+          <button type="button" data-bugs-audio-retry>Try Again</button>
+          <button type="button" data-bugs-audio-exit>Back</button>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-bugs-audio-retry]").onclick = () =>
+        primeBibleBugsFromGesture(nativeBugsRetry.kind, nativeBugsRetry.mode);
+      gate.querySelector("[data-bugs-audio-exit]").onclick = () => {
+        cancelNativeBugsPreflight();
+        hideNativeBugsFailure();
+        void nativeBugsAudio.stop();
+        if (state.running) {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        } else renderModeSelect();
+      };
+    }
+    gate.querySelector("[data-bugs-audio-status]").textContent = message;
+  }
+  function primeBibleBugsFromGesture(kind = "round", mode = null) {
+    if (nativeBugsPending) return;
+    if (!nativeBugsAudio || muted) {
+      hideNativeBugsFailure();
+      if (kind === "round") startGame(mode);
+      else setPaused(false, "");
+      return;
+    }
+    nativeBugsRetry = { kind, mode };
+    const token = ++nativeBugsSession;
+    nativeBugsPending = true;
+    hideNativeBugsFailure(); // normal success remains quiet (N6b.1 pattern)
+    app.setAttribute("aria-busy", "true");
+    // This invokes Swift activateFromGesture immediately in the REAL tap.
+    // Never start a silent unprepared game or reactivate on foreground.
+    const attempt = nativeBugsAudio.prepareFromGesture();
+    void Promise.resolve(attempt).then(result => {
+      if (token !== nativeBugsSession || document.hidden || returnPaused) return;
+      nativeBugsPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else setPaused(false, "");
+      } else {
+        showNativeBugsFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeBugsSession || document.hidden || returnPaused) return;
+      nativeBugsPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeBugsFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeBugsAudio) {
+    nativeBugsAudio.configure({
+      onAppInactive: () => {
+        if (nativeBugsPending) cancelNativeBugsPreflight();
+        // UIKit inactive may be a held App Switcher WebKit thumbnail.
+        if (!state.running || state.done) return;
+        if (!bugsWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Show plain Welcome Back; NEVER activate output on foreground.
+        bugsWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || document.hidden || returnPaused || state.done ||
+            !state.running || state.paused) return;
+        setPaused(true, "native-audio-error");
+        nativeBugsRetry = { kind: "resume", mode: null };
+        showNativeBugsFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        cancelNativeBugsPreflight();
+      }
+      // A return does not create a failure popup or invoke audio. If a
+      // real failure gate was already open, the child can tap Try Again.
+    });
+  }
+
   preloadBibleBugsImages();
   renderIntro();
 
