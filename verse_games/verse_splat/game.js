@@ -204,6 +204,33 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
     positive: "verse_splat_positive.mp3"
   };
 
+  // N6e native output is owned by the same single Swift .soloAmbient
+  // session and serialized PCM worker as Snake, Bugs and Food Slice.
+  // Preserve the original browser/PWA/Android audio below.
+  const nativeSplatAudio = window.BibloZooNativeVerseSplatAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseSplatAudio : null;
+  const SPLAT_NATIVE_FILE_KEYS = Object.freeze({
+    "../../ui_audio/ui_sound_pop_1.mp3": "uiTap1",
+    "../../ui_audio/ui_sound_pop_2.mp3": "uiTap2",
+    "verse_splat_pop_1.mp3": "pop1",
+    "verse_splat_pop_2.mp3": "pop2",
+    "verse_splat_pop_3.mp3": "pop3",
+    "verse_splat_pop_4.mp3": "pop4",
+    "verse_splat_pop_5.mp3": "pop5",
+    "verse_splat_correct_1.mp3": "correct1",
+    "verse_splat_correct_2.mp3": "correct2",
+    "verse_splat_correct_3.mp3": "correct3",
+    "verse_splat_wrong.mp3": "wrong",
+    "verse_splat_streak.mp3": "streak",
+    "verse_splat_paint_score.mp3": "paintScore",
+    "verse_splat_start.mp3": "start",
+    "verse_splat_positive.mp3": "positive"
+  });
+  let nativeSplatSerial = 0;
+  let nativeSplatPending = false;
+  let nativeSplatRetry = { kind: "round", mode: null };
+  let splatWelcomeBack = null;
+
   const verseSplatSoundCache = new Map();
   const verseSplatAudioBufferCache = new Map();
   const verseSplatAudioBufferPromises = new Map();
@@ -767,6 +794,94 @@ const MODE_CONFIG = {
     medalMessage: "",
     medalSubmessage: ""
   };
+
+  function pickNativeSplatUiKey() {
+    const file = chooseVerseSplatSound("uiTap");
+    return SPLAT_NATIVE_FILE_KEYS[file] || "uiTap1";
+  }
+  function wireNativeSplatTitleHelpPops() {
+    if (!nativeSplatAudio) return;
+    // Shared shell owns navigation; only append a fixed native UI sound.
+    document.getElementById("helpBtn")
+      ?.addEventListener("click", playSharedUiPopSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playSharedUiPopSound);
+  }
+  function stopNativeSplatRound() {
+    if (!nativeSplatAudio) return;
+    nativeSplatSerial++;
+    nativeSplatPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeSplatAudio.stop();
+  }
+  function showNativeSplatFailure(message) {
+    if (!nativeSplatAudio) return;
+    let gate = document.getElementById("vspNativeAudioFailure");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "vspNativeAudioFailure";
+      gate.className = "vsp-native-audio-failure";
+      gate.innerHTML = `
+        <section class="vsp-native-audio-card" role="dialog"
+                 aria-modal="true" aria-label="Verse Splat native sound problem">
+          <h2>Verse Splat</h2>
+          <p data-splat-audio-status role="status"></p>
+          <button type="button" data-splat-audio-retry>Try Again</button>
+          <button type="button" data-splat-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-splat-audio-retry]").onclick = () =>
+        primeNativeSplatFromGesture(nativeSplatRetry.kind, nativeSplatRetry.mode);
+      gate.querySelector("[data-splat-audio-back]").onclick = () => {
+        stopNativeSplatRound();
+        gate.remove();
+        if (["game", "bonus", "coverage_result", "bonus_intro"].includes(state.screen)) {
+          stopLoops();
+          window.VerseGameBridge.exitGame();
+        } else {
+          setScreen("mode");
+        }
+      };
+    }
+    gate.querySelector("[data-splat-audio-status]").textContent = message;
+  }
+  function clearNativeSplatFailure() {
+    document.getElementById("vspNativeAudioFailure")?.remove();
+  }
+  function primeNativeSplatFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeSplatPending) return;
+    if (!nativeSplatAudio || muted) {
+      clearNativeSplatFailure();
+      if (kind === "round") startMode(mode);
+      else if (kind === "resume") closeMenu();
+      return;
+    }
+    nativeSplatRetry = {kind,mode};
+    const token = ++nativeSplatSerial;
+    nativeSplatPending = true;
+    clearNativeSplatFailure();
+    app.setAttribute("aria-busy", "true");
+    // The Swift activateFromGesture is requested synchronously in the
+    // CHILD'S actual difficulty/Close/Retry gesture, never a timer.
+    const request = nativeSplatAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:0.45} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeSplatSerial || document.hidden || returnPaused) return;
+      nativeSplatPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startMode(mode);
+        else if (kind === "resume") closeMenu();
+      } else {
+        showNativeSplatFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeSplatSerial || document.hidden || returnPaused) return;
+      nativeSplatPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeSplatFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
 
 const shuffle = window.VerseGameShell.shuffle;
 
