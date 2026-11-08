@@ -26,7 +26,9 @@ for (const method of ["prepareNarration", "playNarration", "pauseNarration",
 assert.match(swift, /CAPBridgedPlugin, AVAudioPlayerDelegate/);
 assert.match(swift, /private let narrationSoundID = "learn-john-3-16"/);
 assert.match(swift, /private let narrationResourceName = "john_3_16"/);
-assert.match(swift, /guard call\.getString\("soundId"\) == self\.narrationSoundID/);
+assert.match(swift, /if soundId == narrationSoundID/);
+assert.match(swift, /forResource: narrationResourceName, withExtension: "mp3"/);
+assert.ok(swift.includes("guard let url = self.nativeNarrationURL(for: soundId)"));
 assert.match(swift, /self\.narrationPlayer === player/);
 assert.match(swift, /UIApplication\.shared\.applicationState == \.active/);
 assert.match(swift, /requestId == self\.narrationRequestId/);

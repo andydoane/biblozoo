@@ -60,6 +60,25 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // slices will review a bundled verse manifest before wiring Learn.
     private let narrationSoundID = "learn-john-3-16"
     private let narrationResourceName = "john_3_16"
+    // N5b.2: the Capacitor public folder is already an Xcode folder resource
+    // and contains the production verse_audio and verse_data directories.
+    // The on-device published manifest is the authority, never JS paths.
+    private lazy var publishedLearnVerseIDs: Set<String> = {
+        guard let url = Bundle.main.url(
+            forResource: "verse_list", withExtension: "json",
+            subdirectory: "public/verse_data"),
+              let data = try? Data(contentsOf: url),
+              let ids = try? JSONDecoder().decode([String].self, from: data)
+        else { return [] }
+        return Set(ids.filter {
+            $0.count <= 80 &&
+            $0.range(
+                of: "^[0-9a-z]+(?:_[0-9a-z]+)*$",
+                options: .regularExpression
+            ) != nil
+        })
+    }()
+    private var narrationCurrentSoundID: String?
     private var narrationPlayer: AVAudioPlayer? // main thread only
     private var narrationRequestId: Int? // opaque local ID, never a verse/profile
     private var narrationCompleted = false
@@ -1240,6 +1259,34 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+    // N5b.2 keeps DEV John 3:16 and adds only published local Learn
+    // reference/full-verse files from the existing Capacitor public folder.
+    // Do not accept caller-controlled URLs, arbitrary paths, chunks or Echo.
+    private func nativeNarrationURL(for soundId: String) -> URL? {
+        if soundId == narrationSoundID {
+            return Bundle.main.url(
+                forResource: narrationResourceName, withExtension: "mp3")
+        }
+        let reference = soundId.hasPrefix("learn-ref-")
+        let verse = soundId.hasPrefix("learn-verse-")
+        guard reference || verse else { return nil }
+        let prefix = reference ? "learn-ref-" : "learn-verse-"
+        let verseId = String(soundId.dropFirst(prefix.count))
+        guard publishedLearnVerseIDs.contains(verseId),
+              let jsonURL = Bundle.main.url(
+                forResource: verseId, withExtension: "json",
+                subdirectory: "public/verse_data"),
+              let data = try? Data(contentsOf: jsonURL),
+              let json = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any],
+              json["published"] as? Bool == true,
+              json["verseId"] as? String == verseId else { return nil }
+        let file = verseId + (reference ? "_ref" : "")
+        return Bundle.main.url(
+            forResource: file, withExtension: "mp3",
+            subdirectory: "public/verse_audio")
+    }
+
     // N5b.1: One fixed packaged John 3:16 narrator proves the long-form
     // player contract before touching child-facing Learn progress. All
     // methods execute on main, matching AVAudioPlayerDelegate's run loop.
@@ -1250,6 +1297,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         narrationPlayer?.stop()
         narrationPlayer = nil
         narrationRequestId = nil
+        narrationCurrentSoundID = nil
         narrationCompleted = false
         if let reason = reason, let oldId = oldId {
             notifyListeners("biblozooNarration", data: [
@@ -1270,7 +1318,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         let positionMs = max(0, min(durationMs, Int(player.currentTime * 1000)))
         return [
             "prepared": true,
-            "soundId": narrationSoundID,
+            "soundId": narrationCurrentSoundID ?? narrationSoundID,
             "requestId": requestId,
             "playing": player.isPlaying,
             "ended": narrationCompleted,
@@ -1285,7 +1333,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             guard let self = self else {
                 call.resolve(["prepared": false, "reason": "unavailable"]); return
             }
-            guard call.getString("soundId") == self.narrationSoundID,
+            guard let soundId = call.getString("soundId"),
                   let requestId = call.getInt("requestId"),
                   requestId > 0 else {
                 call.resolve(["prepared": false, "reason": "invalid-request"]); return
@@ -1293,9 +1341,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             if let reason = self.unavailableReason() {
                 call.resolve(["prepared": false, "reason": reason]); return
             }
-            guard let url = Bundle.main.url(
-                forResource: self.narrationResourceName, withExtension: "mp3") else {
-                call.resolve(["prepared": false, "reason": "bundled-asset-missing"])
+            guard let url = self.nativeNarrationURL(for: soundId) else {
+                call.resolve(["prepared": false, "reason": "not-published-or-missing"])
                 return
             }
             self.stopNarrationPlayer()
@@ -1308,12 +1355,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     return
                 }
                 self.narrationPlayer = player
+                self.narrationCurrentSoundID = soundId
                 self.narrationRequestId = requestId
                 self.narrationCompleted = false
                 call.resolve([
                     "prepared": true,
                     "reason": "prepared",
-                    "soundId": self.narrationSoundID,
+                    "soundId": soundId,
                     "requestId": requestId,
                     "durationMs": Int(player.duration * 1000),
                     "backend": "avfoundation-narration"
@@ -1424,7 +1472,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             self.notifyListeners("biblozooNarration", data: [
                 "type": flag ? "ended" : "failed",
                 "requestId": requestId,
-                "soundId": self.narrationSoundID,
+                "soundId": self.narrationCurrentSoundID ?? self.narrationSoundID,
                 "positionMs": max(0, Int(player.currentTime * 1000)),
                 "durationMs": max(0, Int(player.duration * 1000))
             ])
