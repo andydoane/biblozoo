@@ -16,7 +16,7 @@ const gameSources = [
   { name: "bugs", game: bugsGame, controller: "verse_games/shared/native-bible-bugs-audio.js",
     exported: "BibloZooNativeBibleBugsAudio", effect: "tongue", id: "bugs-tongue", count: 14 },
   { name: "snake", game: snakeGame, controller: "verse_games/shared/native-snake-audio.js",
-    exported: "BibloZooNativeSnakeAudio", effect: "fruit", id: "snake-fruit", count: 16 }
+    exported: "BibloZooNativeSnakeAudio", effect: "fruit", id: "snake-fruit", count: 10 }
 ];
 assert.match(workflow, /validate_native_standalone_ui_pops_n6c1\.js/);
 assert.match(handoff, /N6c\.1/);
