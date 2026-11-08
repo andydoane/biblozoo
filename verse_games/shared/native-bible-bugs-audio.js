@@ -1,6 +1,6 @@
 /* N6c — Bible Bugs local sound clips on native-only iOS Audio Test.
  * Same sole Swift .soloAmbient session + AVAudioEngine worker as Feeding
- * and Scripture Bible Bugs; fixed MP3 IDs; NO Web Audio/HTML native fallback.
+ * and Scripture Snake; fixed MP3 IDs; NO Web Audio/HTML native fallback.
  * Genuine mode/retry/menu/Welcome Back gestures warm the entire bank.
  */
 (function installNativeBibleBugsAudio(root) {
@@ -172,7 +172,7 @@
       }
     })();
   }
-  function play(key, volume, noteIndex = null) {
+  function play(key, volume) {
     if (!isAvailable() || !ready || failed || root.document?.hidden ||
         typeof KEYS[key] !== "string" ||
         !Number.isFinite(volume) || volume < 0 || volume > 1) return false;
