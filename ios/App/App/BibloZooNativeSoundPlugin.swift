@@ -83,6 +83,22 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "slice-swoosh-2": "food_slice_swoosh_2",
         "slice-swoosh-3": "food_slice_swoosh_3"
     ]
+    // N6e fixed Verse Splat MP3 bank: ONLY shipped filenames, not JS paths.
+    private let verseSplatSoundResources: [String: String] = [
+        "splat-pop-1": "verse_splat_pop_1",
+        "splat-pop-2": "verse_splat_pop_2",
+        "splat-pop-3": "verse_splat_pop_3",
+        "splat-pop-4": "verse_splat_pop_4",
+        "splat-pop-5": "verse_splat_pop_5",
+        "splat-correct-1": "verse_splat_correct_1",
+        "splat-correct-2": "verse_splat_correct_2",
+        "splat-correct-3": "verse_splat_correct_3",
+        "splat-wrong": "verse_splat_wrong",
+        "splat-streak": "verse_splat_streak",
+        "splat-paint-score": "verse_splat_paint_score",
+        "splat-start": "verse_splat_start",
+        "splat-positive": "verse_splat_positive"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -134,7 +150,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "slice-bomb", "slice-wrong",
         "slice-cut-1", "slice-cut-2", "slice-cut-3",
         "slice-cut-4", "slice-cut-5",
-        "slice-swoosh-1", "slice-swoosh-2", "slice-swoosh-3"
+        "slice-swoosh-1", "slice-swoosh-2", "slice-swoosh-3",
+        "splat-pop-1", "splat-pop-2", "splat-pop-3",
+        "splat-pop-4", "splat-pop-5",
+        "splat-correct-1", "splat-correct-2", "splat-correct-3",
+        "splat-wrong", "splat-streak", "splat-paint-score",
+        "splat-start", "splat-positive"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -981,6 +1002,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               snakeSoundResources[soundId] != nil ||
               bibleBugsSoundResources[soundId] != nil ||
               foodSliceSoundResources[soundId] != nil ||
+              verseSplatSoundResources[soundId] != nil ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1082,6 +1104,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.verseSplatSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/verse_splat/verse_splat_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
