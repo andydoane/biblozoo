@@ -3189,7 +3189,9 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeDinoAudio && muted) void nativeDinoAudio.stop();
         if (!muted) playUiSound();
+        // An explicit unmuted menu Close re-prepares the whole PCM bank.
         return muted;
       },
       onHowToPlay: () => {
@@ -3197,12 +3199,14 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeDinoAudio) stopNativeDinoRound();
         playUiSound();
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
         playUiSound();
+        if (nativeDinoAudio) stopNativeDinoRound();
 
         markDiagnosticRunClean(
           "exited-game"
@@ -3210,9 +3214,23 @@
 
         window.VerseGameBridge.exitGame();
       },
-      onOpen: () => setPaused(true, "menu"),
-      onClose: () => setPaused(false, ""),
-      onBackFromHelp: () => setPaused(true, "menu")
+      onOpen: () => {
+        if (nativeDinoPending) return false;
+        setPaused(true, "menu");
+        if (nativeDinoAudio) {
+          void nativeDinoAudio.stop();
+          playUiSound();
+        }
+      },
+      onClose: () => {
+        if (nativeDinoAudio && !muted)
+          primeNativeDinoFromGesture("resume", null, nextNativeDinoUiKey());
+        else setPaused(false, "");
+      },
+      onBackFromHelp: () => {
+        setPaused(true, "menu");
+        if (nativeDinoAudio) playUiSound();
+      }
     });
 
     window.VerseGameShell.wireSpeedMenu({
@@ -3220,12 +3238,10 @@
       buttonId: "dd2SpeedPill",
 
       onOpen: () => {
+        if (nativeDinoPending) return false;
+        setPaused(true, "speed");
+        if (nativeDinoAudio) void nativeDinoAudio.stop();
         playUiSound();
-        setPaused(
-          true,
-          "speed"
-        );
-
         return true;
       },
 
@@ -3238,11 +3254,12 @@
       },
 
       onClose: () => {
-        playUiSound();
-        setPaused(
-          false,
-          ""
-        );
+        if (nativeDinoAudio && !muted)
+          primeNativeDinoFromGesture("resume", null, nextNativeDinoUiKey());
+        else {
+          playUiSound();
+          setPaused(false, "");
+        }
       }
     });
   }
@@ -3254,6 +3271,11 @@
 
   function setPaused(paused, reason = ""){
     if (returnPaused && !paused) return;
+    // Animation's delayed unpause must not bypass a native PCM failure.
+    // Only a fresh whole-bank Try Again gesture can release the round.
+    if (!paused && nativeDinoAudio &&
+        state.pauseReason === "native-audio-error" &&
+        !muted && !nativeDinoAudio.isReady()) return;
     if (!state.running && state.phase !== "bonusIntro") return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
