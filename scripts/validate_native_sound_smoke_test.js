@@ -76,11 +76,13 @@ assert.match(swift, /UIApplication\.didBecomeActiveNotification/);
 assert.match(swift, /AVAudioSessionInterruptionWasSuspendedKey/);
 assert.match(swift, /AVAudioSession\.routeChangeNotification/);
 
-// Regression for the physical-iPhone 'interruption-pending despite audible
-// output' report: unknown notifications must not create a pending state;
-// suspended notifications are historical; genuine pending interruptions
-// remain blocked unless the app left and returned and a human taps again.
-// Static Swift checks are NOT a Swift compilation or native runtime test.
+// Regression for physical-iPhone interruption reports: unrecognized and
+// wasSuspended events must not create a new pending state. The old N2 guard
+// waited for an inactive->active transition; N6h.2 deliberately changes
+// this: an explicit foreground human tap may ask iOS to reclaim soloAmbient
+// priority even while YouTube PiP remains playing. ONLY that gesture can
+// activate; notification/foreground/normal hot sound cannot do so.
+// Static Swift checks are NOT Swift compilation or real iPhone sound proof.
 const handle = swift.slice(
   swift.indexOf("    private func handleInterruption("),
   swift.indexOf("    private func onMain(")
@@ -103,7 +105,13 @@ assert.doesNotMatch(unavailable, /interrupted\s*=\s*false/,
 const gesture = swift.slice(swift.indexOf("    @objc func activateFromGesture("),
   swift.indexOf("    private func requestedId("));
 assert.ok(gesture.startsWith("    @objc func activateFromGesture("));
-assert.match(gesture, /guard !self\.interrupted \|\| self\.returnedToForegroundDuringInterruption/);
+assert.match(gesture, /blocked != "other-audio-playing"/,
+  "the child's true activation may request competing PiP priority");
+assert.match(gesture, /AVAudioSession\.sharedInstance\(\)\.isOtherAudioPlaying/);
+assert.doesNotMatch(gesture, /guard !self\.interrupted \|\| self\.returnedToForegroundDuringInterruption/,
+  "a genuinely tapped return must not be permanently blocked by PiP");
+assert.doesNotMatch(handle, /try AVAudioSession\.sharedInstance\(\)\.setActive\(true\)/,
+  "the OS interruption handler itself must never activate");
 assert.match(gesture, /guard self\.activationAttemptsThisForeground/);
 assert.match(gesture, /self\.minimumActivationInterval/);
 assert.match(gesture, /try AVAudioSession\.sharedInstance\(\)\.setActive\(true\)/);
