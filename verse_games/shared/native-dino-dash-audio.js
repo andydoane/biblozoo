@@ -107,7 +107,10 @@
   const TEMPORARY_AUDIO_REASONS = new Set([
     "other-audio-playing", "interruption-pending",
     "gesture-required-after-interruption", "not-foreground", "stale",
-    "activation-cooldown", "foreground-attempt-limit"
+    "activation-cooldown", "foreground-attempt-limit",
+    // iOS may reject a real foreground takeover while higher-priority audio
+    // (e.g. a call) plays. Remain paused/retriable, never fatal PCM error.
+    "activation-os-rejected"
   ]);
   function markFailed(token, why) {
     if (!current(token) || failed) return;
