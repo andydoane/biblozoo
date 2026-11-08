@@ -308,6 +308,9 @@ async function actualGameOwnerTests(){
  // animation's delayed unpause must NOT escape a native playback error.
  g.state.paused=true;
  g.state.pauseReason="bomb";
+ // Real markFailed() clears the controller's ready flag BEFORE notifying
+ // its game callback; mirror that state transition in this independent stub.
+ await g.audio.stop();
  g.callbacks.onPlaybackFailure();
  assert.equal(g.state.pauseReason,"native-audio-error");
  g.test.setPaused(false,"");
