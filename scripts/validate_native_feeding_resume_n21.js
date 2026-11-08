@@ -197,7 +197,8 @@ async function run() {
     assert.equal(h.runtime.resumeOverlay.hidden,false);
     assert.equal(h.runtime.resumeButton.disabled,false);
     assert.equal(h.continuation(),0);
-    assert.ok(h.messages.some(x=>x.includes("Sound isn\'t ready yet")));
+    assert.ok(h.messages.some(x=>x.includes("Pause the other video's audio")),
+      "PiP-busy Feeding resume remains paused until video stops");
     h.setPrepared(()=>Promise.resolve({ready:true,reason:"prepared"}));
     assert.equal(h.resume(),true);
     await flush();
