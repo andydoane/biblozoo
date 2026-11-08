@@ -219,7 +219,7 @@ async function actualButtons(){
  assert.equal(mute.state.screen,"game");assert.equal(mute.prepares.length,0);
  assert.equal(mute.pops.length,0);
  const web=fixture({native:false});
- web.test.renderIntro();assert.equal(web.buttons.helpBtn.events.click,undefined);
+ web.test.renderIntro();assert.equal(web.buttons.helpBtn?.events.click,undefined);
  web.shell.title.onStart();web.test.renderModeScreen();web.shell.mode.onSelect("easy");
  assert.equal(web.state.screen,"game");assert.equal(web.prepares.length,0);
 }
