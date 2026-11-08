@@ -100,8 +100,26 @@
   function current(token) {
     return isAvailable() && generation === token && !root.document?.hidden;
   }
+  // A competing YouTube PiP/phone audio session is an OS interruption,
+  // not a permanently corrupt MP3. Freeze this game and show its existing
+  // plain Welcome Back instead of trapping the child in gray Try Again.
+  // Genuine missing PCM/bridge failures still use onPlaybackFailure.
+  const TEMPORARY_AUDIO_REASONS = new Set([
+    "other-audio-playing", "interruption-pending",
+    "gesture-required-after-interruption", "not-foreground", "stale",
+    "activation-cooldown", "foreground-attempt-limit"
+  ]);
   function markFailed(token, why) {
     if (!current(token) || failed) return;
+    if (TEMPORARY_AUDIO_REASONS.has(reason(why))) {
+      lastError = reason(why);
+      invalidate(); // invalidate all hot voices; no automatic restart
+      try { onInactive?.(); } catch (_) {}
+      if (!root.document?.hidden) {
+        try { onActive?.(); } catch (_) {}
+      }
+      return;
+    }
     ready = false;
     uiReady = false;
     failed = true;
