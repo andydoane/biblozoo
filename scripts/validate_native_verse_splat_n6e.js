@@ -214,6 +214,15 @@ async function actualButtons(){
  const race=fixture();race.test.renderModeScreen();race.shell.mode.onSelect("medium");
  race.shell.mode.onBack();race.prepares[0].resolve({ready:true});await flush();
  assert.notEqual(race.state.screen,"game");
+ const heldMode=fixture();
+ heldMode.test.renderModeScreen();
+ heldMode.shell.mode.onSelect("hard");
+ // Native UIKit .inactive can happen during a difficulty preflight before
+ // WebKit changes document.hidden. It must cancel, not start a ghost round.
+ heldMode.cfg.onAppInactive();
+ heldMode.prepares[0].resolve({ready:true});await flush();
+ assert.notEqual(heldMode.state.screen,"game");
+ assert.equal(heldMode.context.nativeSplatPending,false);
  const mute=fixture({muted:true});
  mute.test.renderIntro();mute.shell.title.onStart();mute.test.renderModeScreen();mute.shell.mode.onSelect("hard");
  assert.equal(mute.state.screen,"game");assert.equal(mute.prepares.length,0);
