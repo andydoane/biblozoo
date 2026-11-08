@@ -1081,6 +1081,9 @@
     checkpoint,
     imagesReady = Promise.resolve()
   ) {
+    // The sun is an actual gesture after a WebView reload. Only it may
+    // reactivate the native 10-ID PCM bank for this checkpoint continuation.
+    let nativeHalfwayPreparation = null;
     stopLoop();
     cleanupResize();
     state.field = null;
@@ -1159,8 +1162,22 @@
       transitioning = true;
       sun.disabled = true;
       screen.classList.add("is-transitioning");
-      // A user gesture after document reload is important for iOS Web Audio.
-      void unlockAudio();
+      if (nativeDinoAudio && !muted) {
+        nativeDinoRetry = {kind:"checkpoint",mode:checkpoint.mode,checkpoint};
+        const token = ++nativeDinoSerial;
+        nativeDinoPending = true;
+        // Call the Swift activation NOW in the sun tap, not after the
+        // orbit animation or timeout. Preserve existing sun/moon visuals.
+        nativeHalfwayPreparation =
+          Promise.resolve(nativeDinoAudio.prepareFromGesture()).then(result =>
+            token === nativeDinoSerial && !document.hidden &&
+            !returnPaused && result?.ready === true
+          ).catch(() => false).finally(() => {
+            if (token === nativeDinoSerial) nativeDinoPending = false;
+          });
+      } else if (!nativeDinoAudio) {
+        void unlockAudio(); // browser/PWA/Android original sun gesture
+      }
       recordHalfwayFeedDiagnosticEvent("sun-tapped");
 
       const startedAt = gameNow();
@@ -1200,7 +1217,16 @@
       });
       await resumeAssetsReady;
       if (!resumeBlackout.isConnected) return;
-
+      if (nativeDinoAudio && !muted) {
+        const ready = nativeHalfwayPreparation &&
+          await nativeHalfwayPreparation;
+        if (!ready || !nativeDinoAudio.isReady()) {
+          resumeBlackout.remove();
+          showNativeDinoFailure(
+            "Native sounds aren't ready after the halfway scene. Tap Try Again.");
+          return;
+        }
+      }
       startGame(checkpoint.mode, checkpoint);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
