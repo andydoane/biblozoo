@@ -63,6 +63,12 @@ assert.ok(html.indexOf("native-snake-audio.js") < html.indexOf('src="./game.js"'
 assert.match(game, /if \(nativeSnakeAudio\) primeSnakeAudioAndContinue\("round"\)/);
 assert.match(game, /if \(nativeSnakeAudio && !muted\) primeSnakeAudioAndContinue\("resume"\)/);
 assert.match(game, /onAppInactive: \(\) =>/);
+assert.match(game, /onAppActive: \(\) =>/);
+assert.match(game, /snakeWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
+assert.match(game, /snakeWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
+assert.match(returns, /function pauseFromNativeInactive\(\)/);
+assert.match(returns, /function showAfterNativeActive\(\)/);
+assert.match(game, /!nativeSnakeAudio\.isReady\(\)/);
 assert.match(game, /nativeSnakeAudio\.prepareFromGesture\(\)/);
 assert.match(game, /nativeSnakeAudio\.play\("orb"/);
 assert.match(game, /if \(nativeSnakeAudio\) void nativeSnakeAudio\.stop\(\)/);
@@ -83,7 +89,7 @@ assert.match(handoff, /N6b/);
 
 function fixture({ nativeOnly = true, ios = true, activationOk = true,
   failPreload = "", failPlay = "", pendingPreloads = false } = {}) {
-  const calls = [], listeners = {}, failures = [], inactive = [];
+  const calls = [], listeners = {}, failures = [], inactive = [], active = [];
   const queue = [];
   let held = null;
   const doc = {
@@ -136,9 +142,10 @@ function fixture({ nativeOnly = true, ios = true, activationOk = true,
   const audio = window.BibloZooNativeSnakeAudio;
   audio.configure({
     onPlaybackFailure:r=>failures.push(r),
-    onAppInactive:()=>inactive.push(true)
+    onAppInactive:()=>inactive.push(true),
+    onAppActive:()=>active.push(true)
   });
-  return {audio,calls,listeners,doc,queue,failures,inactive,
+  return {audio,calls,listeners,doc,queue,failures,inactive,active,
     releasePreloads() {queue.splice(0).forEach(fn=>fn());}};
 }
 const tick = () => new Promise(ok=>setImmediate(ok));
@@ -182,6 +189,8 @@ async function testNativeEffects() {
   assert.equal(h.audio.isReady(),false);
   assert.equal(h.audio.play("fruit",0.7),false);
   h.listeners.biblozooAppLifecycle?.({active:true});
+  assert.equal(h.active.length,1,
+    "return may display Welcome Back but never auto-start audio");
   assert.equal(h.calls.filter(c=>c[0]==="activate").length,1,
     "foreground must not auto-reactivate");
   const retry=h.audio.prepareFromGesture(); // actual Let's go / retry gesture
