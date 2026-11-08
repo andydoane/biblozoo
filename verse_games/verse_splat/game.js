@@ -236,7 +236,8 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   const verseSplatAudioBufferPromises = new Map();
   const verseSplatLastSoundByGroup = {};
   const verseSplatLastPlayedAt = {};
-  const VerseSplatAudioContext = window.AudioContext || window.webkitAudioContext;
+  const VerseSplatAudioContext = nativeSplatAudio ? null :
+    (window.AudioContext || window.webkitAudioContext);
   let verseSplatAudioContext = null;
   let verseSplatAudioUnlocked = false;
   let verseSplatAudioResumePromise = null;
@@ -265,7 +266,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function getVerseSplatAudioContext(){
-    if (!VerseSplatAudioContext) return null;
+    if (nativeSplatAudio || !VerseSplatAudioContext) return null;
 
     if (!verseSplatAudioContext){
       try {
@@ -334,7 +335,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function primeVerseSplatAudioBuffer(file){
-    if (!file) return null;
+    if (nativeSplatAudio || !file) return null;
 
     const src = verseSplatSoundSrc(file);
     const ctx = getVerseSplatAudioContext();
@@ -382,7 +383,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function primeVerseSplatSound(file){
-    if (!file) return null;
+    if (nativeSplatAudio || !file) return null;
 
     const src = verseSplatSoundSrc(file);
 
@@ -403,6 +404,7 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function unlockVerseSplatAudio(){
+    if (nativeSplatAudio) return; // no browser/HTML unlock on native iOS
     const ctx = resumeVerseSplatAudioContext();
     // Do not label an interrupted or suspended context as unlocked.
     verseSplatAudioUnlocked = !!ctx && ctx.state === "running";
@@ -415,14 +417,18 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   let verseSplatAudioPrimed = false;
-  // Keep these listeners after the first gesture so iOS interruptions recover.
-  document.addEventListener("pointerdown", unlockVerseSplatAudio, true);
-  document.addEventListener("keydown", unlockVerseSplatAudio, true);
-  document.addEventListener("click", unlockVerseSplatAudio, true);
-  if (!window.PointerEvent) document.addEventListener("touchstart", unlockVerseSplatAudio, true);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) verseSplatAudioUnlocked = false;
-  });
+  // Browser input keeps its original AudioContext path; native iOS uses
+  // only explicit game/UI click handlers and the Swift PCM session.
+  if (!nativeSplatAudio) {
+    document.addEventListener("pointerdown", unlockVerseSplatAudio, true);
+    document.addEventListener("keydown", unlockVerseSplatAudio, true);
+    document.addEventListener("click", unlockVerseSplatAudio, true);
+    if (!window.PointerEvent)
+      document.addEventListener("touchstart", unlockVerseSplatAudio, true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) verseSplatAudioUnlocked = false;
+    });
+  }
 
   function chooseVerseSplatSound(groupName){
     const group = VERSE_SPLAT_SOUNDS[groupName];
@@ -474,6 +480,18 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
 
   function playVerseSplatSoundFile(file, volume=1, options={}){
     if (muted || !file) return;
+    if (nativeSplatAudio) {
+      // Every original file is mapped to one fixed Swift bundled PCM ID.
+      // Unsupported keys never fall through to HTML or Web Audio.
+      if (returnPaused || document.hidden || state.menuOpen || state.helpOpen)
+        return;
+      const key = SPLAT_NATIVE_FILE_KEYS[file];
+      const cooldownKey = options.cooldownKey || key;
+      const cooldownMs = Math.max(0, Number(options.cooldownMs || 0));
+      if (key && claimVerseSplatSoundSlot(cooldownKey, cooldownMs))
+        nativeSplatAudio.play(key, Math.max(0, Math.min(1, volume)));
+      return;
+    }
 
     const src = verseSplatSoundSrc(file);
     const cooldownKey = options.cooldownKey || src;
@@ -535,6 +553,14 @@ const HELP_OVERLAY_ID = "vspHelpOverlay";
   }
 
   function playSharedUiPopSound(){
+    if (nativeSplatAudio) {
+      if (muted || returnPaused || document.hidden ||
+          !claimVerseSplatSoundSlot("uiTap", VERSE_SPLAT_SOUND_COOLDOWNS.uiTap))
+        return;
+      // Only fixed native PCM UI pop IDs, requested on actual child clicks.
+      nativeSplatAudio.tapUiFromGesture(pickNativeSplatUiKey(), 0.45);
+      return;
+    }
     playVerseSplatSoundGroup("uiTap", 0.45, { cooldownKey:"uiTap" });
   }
 
@@ -3687,8 +3713,10 @@ function spawnWrongFaceParticleBurst(){
     if (!state.bonusIntroVisible && !state.bonusEnding) startBonusLoop();
   }
 
-  // Warm up decoded Web Audio buffers before the child's first Start tap.
-  Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
+  // Web/PWA/Android only. Native never opens an AudioContext/HTML Audio,
+  // never warms a bank outside a real child Start/Close/Resume gesture.
+  if (!nativeSplatAudio)
+    Object.values(VERSE_SPLAT_SOUNDS).flat().forEach(primeVerseSplatAudioBuffer);
   initVerseData();
   render();
 
