@@ -2513,6 +2513,7 @@
   }
 
   function getAudioContext() {
+    if (nativeSliceAudio) return null; // Native iOS never creates a Web Audio graph
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -2535,6 +2536,7 @@
   }
 
   function unlockAudio() {
+    if (nativeSliceAudio) return Promise.resolve(nativeSliceAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -2625,9 +2627,11 @@
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeSliceAudio) {
+    document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+    document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+    document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  }
   function markAudioBackgrounded() {
     if (!audioCtx) return;
     audioForegroundRecoveryPending = true;
@@ -2762,12 +2766,22 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeSliceAudio) return; // all native samples owned by Swift
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeSliceAudio) {
+      if (muted || returnPaused || document.hidden || !state.running ||
+          state.done || (state.paused &&
+            !(key === "bomb" && state.pauseReason === "bomb"))) return;
+      // The Swift worker plays predecoded PCM only; no fetch/decode/engine
+      // start from the slicing or fruit-spawn event.
+      nativeSliceAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -2816,8 +2830,15 @@
     if (now - lastUiTapAt < 70) return;
 
     lastUiTapAt = now;
-    uiSoundFlip = !uiSoundFlip;
-    playGameSound(uiSoundFlip ? "uiTap1" : "uiTap2", "uiTap");
+    const key = nextSliceUiKey();
+    if (nativeSliceAudio) {
+      // Title/Back/Help/UI never requires full gameplay readiness. This
+      // activation request occurs only in the child's real button gesture.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeSliceAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
+    playGameSound(key, "uiTap");
   }
 
 
