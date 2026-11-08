@@ -21,7 +21,9 @@ const preload=section("    @objc func preload(","    @objc func play(");
 const play=section("    @objc func play(","    @objc func stop(");
 const stop=section("    @objc func stop(","\n}");
 const forgotten=section("    private func forgetPlayback(","    private func leftForeground()");
-assert.match(swift,/private let pcmEffectIDs: Set<String> = \["feed-star", "feed-chomp",\s+"ui-pop-1", "ui-pop-2"\]/);
+// Native-only N6b extends this SAME fixed PCM allowlist with Snake samples.
+// Retain original Feeding/UI IDs, without requiring the set to stay size four.
+assert.match(swift,/private let pcmEffectIDs: Set<String> = \[\s*"feed-star", "feed-chomp", "ui-pop-1", "ui-pop-2"(?:,\s*"[a-z0-9-]+")*\s*\]/);
 assert.match(swift,/"pilot-unlock": "ui_pet_unlock"/);
 assert.match(swift,/private var effectsEngine: AVAudioEngine\?/);
 assert.match(swift,/private var effectBuffers: \[String: AVAudioPCMBuffer\]/);
