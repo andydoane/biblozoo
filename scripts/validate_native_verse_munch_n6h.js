@@ -179,7 +179,7 @@ function gameFixture({native=true,muted=false,mobile=true}={}){
  const state={running:false,paused:false,pauseReason:"",runToken:1,rafId:1,lastTs:0,
   bonusPhase:"",bonusCount:0,bonusMultiplier:1,
   feedbackUntil:1000,reactionFlashUntil:1000,streakSunburstUntil:1000,buildShakeUntil:1000};
- const welcome={pauseFromNativeInactive(){actions.push("held-inactive");ctx.test.pauseForTaskSwitch();return true;},
+ const welcome={pauseFromNativeInactive(){actions.push("held-inactive");context.test.pauseForTaskSwitch();return true;},
   showAfterNativeActive(){actions.push("foreground-visible");return true;}};
  const win={VerseGameShell:shell,BibloZooNativeVerseMunchAudio:player,
   VerseGameBridge:{exitGame(){actions.push("exit");},returnToVersePicker(){actions.push("picker");},
