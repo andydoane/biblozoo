@@ -26,7 +26,7 @@ assert.match(game,/invadersWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/invadersWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
 assert.match(game,/if \(nativeInvadersAudio\) return null; \/\/ native iOS/);
 assert.match(game,/if \(nativeInvadersAudio\) return null; \/\/ native iOS: no HTML silence/);
-assert.match(game,/if \(nativeInvadersAudio\) return Promise\.resolve\(nativeInvadersAudio\.isReady\(\)\)/);
+assert.match(game,/if \(nativeInvadersAudio\)\s*return Promise\.resolve\(nativeInvadersAudio\.isReady\(\)\)/);
 assert.match(game,/if \(nativeInvadersAudio\) return; \/\/ Swift owns/);
 assert.match(audio,/new Set\(Object\.values\(KEYS\)\)/);
 assert.doesNotMatch(audio,/new Audio\(|AudioContext|createBufferSource\(|createOscillator\(/);
