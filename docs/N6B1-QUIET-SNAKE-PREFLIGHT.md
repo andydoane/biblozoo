@@ -14,6 +14,10 @@ After merging N6b, the owner played Scripture Snake **multiple times, with multi
 - Because no modal covers the original difficulty buttons during preflight, rapid duplicate difficulty taps are ignored, and Back/title/mode/exit cancels/invalidate pending preflight; delayed Swift results cannot start a game from another screen. UIKit `.inactive` (even while held WebKit thumbnail is visible) and WebKit hidden also invalidate pending first-run preparation **without inventing a gray error on return**. Returning to difficulty calls for another **real button tap**. A running game still uses plain, explicit **Welcome Back** after task switch.
 - **No changes** to Swift resources, audio category `.soloAmbient`, the single native output owner, PCM mappings, game sounds, snake physics/score/medals/pet or verse progression, Web Audio on nonnative platforms, Learn, Flashcards, Playground, microphone/DSP or Zoo surprise features.
 
+## Source CI result
+
+The full native Snake source VM/asset and historical Node regressions plus production web build **passed** at commit `351a6574` ([GitHub Actions #42438471987](https://github.com/andydoane/biblozoo/actions/runs/42438471987)). Final docs-only HEAD must also pass. These checks **do not** compile Swift or establish actual speaker output; the physical iPhone test remains owner acceptance.
+
 ## Source, build and platform gates
 
 Run these in the dedicated Mac worktree after **the owner reviews and merges** the PR into `experiment/native-ios-audio` (or with the PR branch checked out for pre-merge verification):
