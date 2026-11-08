@@ -12896,9 +12896,11 @@ async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
 
 async function startEchoFlow() {
   if (State.echoRunning || document.hidden) return;
-  const startIndex = learnAudioInterrupted?.mode === "echo" &&
+  const recovery = learnAudioInterrupted?.mode === "echo" &&
     learnAudioInterrupted.screen === Screen.ECHO
-    ? learnAudioInterrupted.index : 0;
+    ? learnAudioInterrupted : null;
+  const startIndex = recovery?.index ?? 0;
+  const startPositionMs = recovery?.positionMs || 0;
   learnAudioInterrupted = null;
 
   State.echoAutoStarting = false;
@@ -12907,7 +12909,7 @@ async function startEchoFlow() {
   // cancel any prior
   cancelLearnAudio();
 
-  await runEchoSequence(startIndex);
+  await runEchoSequence(startIndex, startPositionMs);
 }
 
 let echoCancelToken = 0;
@@ -12930,7 +12932,7 @@ function cancelLearnAudio() {
   State.echoSpeaking = false;
 }
 
-async function runEchoSequence(startIndex = 0) {
+async function runEchoSequence(startIndex = 0, resumePositionMs = 0) {
   const my = ++echoCancelToken;
 
   State.echoDone = false;
@@ -12953,34 +12955,71 @@ async function runEchoSequence(startIndex = 0) {
 
       const part = learnParts[i];
       const file = part.file;
-
-      setAudioSrc(file);
-      audioEl.currentTime = 0;
-
       State.echoIndex = i;
       State.echoSpeaking = false;
       updateEchoStageState();
+      let d;
 
-      try {
-        await safePlay();
-      } catch (e) {
+      if (isNativeLearnTracksMode()) {
+        const positionMs = i === startIndex ? resumePositionMs : 0;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "echo", index: i, positionMs
+        };
+        if (muted) {
+          failNativeLearnTrack("echo", i, "muted");
+          return;
+        }
+        const result = await window.BibloZooNativeLearnTracks.play(
+          `learn-part-${VERSE_ID}-${i}`, {
+            positionMs,
+            onProgress: progress => nativeLearnTrackProgress("echo", i, progress),
+            onInterrupted: progress => {
+              nativeLearnPartCheckpoint = {
+                verseId: VERSE_ID, mode: "echo", index: i,
+                positionMs: progress.positionMs || 0
+              };
+              pauseLearnAudioForInterruption();
+              if (!document.hidden) render();
+            }
+          });
         if (my !== echoCancelToken || document.hidden) return;
-        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
-        return;
-      }
-
-      const ended = await waitForAudioEnd();
-      if (my !== echoCancelToken || document.hidden) return;
-      if (!ended) {
-        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
-        return;
+        if (!result.ended) {
+          failNativeLearnTrack("echo", i, result.reason);
+          return;
+        }
+        d = result.durationMs / 1000;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "echo", index: i + 1, positionMs: 0
+        };
+        const attempt = learnAudioResumeAttempt;
+        if (attempt?.recovery?.mode === "echo" &&
+            !attempt.narrationVerified) {
+          attempt.narrationVerified = true;
+          finishLearnAudioResumeAttempt(attempt);
+        }
+      } else {
+        setAudioSrc(file);
+        audioEl.currentTime = 0;
+        try {
+          await safePlay();
+        } catch (e) {
+          if (my !== echoCancelToken || document.hidden) return;
+          learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+          return;
+        }
+        const ended = await waitForAudioEnd();
+        if (my !== echoCancelToken || document.hidden) return;
+        if (!ended) {
+          learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+          return;
+        }
+        d = await waitForDuration();
       }
 
       State.echoSpeaking = true;
       updateEchoStageState();
 
       // Give the child time to repeat: duration × 1.25 (fallback 2s if unknown)
-      const d = await waitForDuration();
       const repeatMs = (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
       const elapsed = await waitForPausableDelay(repeatMs, my);
 
@@ -12993,6 +13032,8 @@ async function runEchoSequence(startIndex = 0) {
     // restore main verse audio for later
     setAudioSrc(AUDIO_FILE);
 
+    nativeLearnTrackError = "";
+    nativeLearnPartCheckpoint = null;
     State.echoDone = true;
     State.echoRunning = false;
     State.echoSpeaking = false;
