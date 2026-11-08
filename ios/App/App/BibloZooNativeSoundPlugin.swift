@@ -99,6 +99,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "splat-start": "verse_splat_start",
         "splat-positive": "verse_splat_positive"
     ]
+    // N6f Dino Dash: eight fixed, bundled game MP3 effects.
+    // Same .soloAmbient session and serialized AVAudioEngine PCM worker.
+    private let dinoDashSoundResources: [String: String] = [
+        "dino-collision": "dino_dash_collision",
+        "dino-correct": "dino_dash_correct",
+        "dino-fall": "dino_dash_fall",
+        "dino-finish": "dino_dash_finish",
+        "dino-jump": "dino_dash_jump",
+        "dino-jump2": "dino_dash_jump_2",
+        "dino-streak": "dino_dash_streak",
+        "dino-wrong": "dino_dash_wrong"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -155,7 +167,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "splat-pop-4", "splat-pop-5",
         "splat-correct-1", "splat-correct-2", "splat-correct-3",
         "splat-wrong", "splat-streak", "splat-paint-score",
-        "splat-start", "splat-positive"
+        "splat-start", "splat-positive",
+        "dino-collision", "dino-correct", "dino-fall", "dino-finish",
+        "dino-jump", "dino-jump2", "dino-streak", "dino-wrong"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1003,6 +1017,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               bibleBugsSoundResources[soundId] != nil ||
               foodSliceSoundResources[soundId] != nil ||
               verseSplatSoundResources[soundId] != nil ||
+              dinoDashSoundResources[soundId] != nil ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1104,6 +1119,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.dinoDashSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/dino_dash/dino_dash_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }

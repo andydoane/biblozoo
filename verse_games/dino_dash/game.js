@@ -324,6 +324,114 @@
   let silenceAudio = null;
   let audioPreloadStarted = false;
   let uiPopToggle = false;
+  // N6f: isolated iOS Audio Test uses ONLY the original Swift
+  // .soloAmbient AVAudioSession and serialized predecoded PCM worker.
+  // Browser/PWA/Android keep their original Web Audio code below.
+  const nativeDinoAudio = window.BibloZooNativeDinoDashAudio?.isAvailable?.()
+    ? window.BibloZooNativeDinoDashAudio : null;
+  let nativeDinoSerial = 0;
+  let nativeDinoPending = false;
+  let nativeDinoRetry = { kind:"round", mode:null, checkpoint:null };
+  let dinoWelcomeBack = null;
+
+  function nextNativeDinoUiKey() {
+    uiPopToggle = !uiPopToggle;
+    return uiPopToggle ? "uiPop1" : "uiPop2";
+  }
+  function wireNativeDinoHelpPops() {
+    if (!nativeDinoAudio) return;
+    // Keep shared shell navigation exactly as wired. Only add a sound.
+    document.getElementById("helpBtn")?.addEventListener("click", playUiSound);
+    document.getElementById(HELP_OVERLAY_ID+"CloseBtn")
+      ?.addEventListener("click", playUiSound);
+  }
+  function cancelNativeDinoPreflight() {
+    if (!nativeDinoAudio || !nativeDinoPending) return;
+    nativeDinoSerial++;
+    nativeDinoPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeDinoAudio.stop();
+  }
+  function stopNativeDinoRound() {
+    if (!nativeDinoAudio) return;
+    nativeDinoSerial++;
+    nativeDinoPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeDinoAudio.stop();
+  }
+  function clearNativeDinoFailure() {
+    document.getElementById("dd2NativeAudioFailure")?.remove();
+  }
+  function showNativeDinoFailure(message) {
+    if (!nativeDinoAudio) return;
+    let overlay = document.getElementById("dd2NativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "dd2NativeAudioFailure";
+      overlay.className = "dd2-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="dd2-native-audio-card" role="dialog"
+                 aria-modal="true" aria-label="Dino Dash native sound problem">
+          <h2>Dino Dash</h2>
+          <p role="status" data-dino-audio-status></p>
+          <button type="button" data-dino-audio-retry>Try Again</button>
+          <button type="button" data-dino-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-dino-audio-retry]").onclick = () =>
+        primeNativeDinoFromGesture(nativeDinoRetry.kind,
+          nativeDinoRetry.mode, null, nativeDinoRetry.checkpoint);
+      overlay.querySelector("[data-dino-audio-back]").onclick = () => {
+        stopNativeDinoRound();
+        clearNativeDinoFailure();
+        if (nativeDinoRetry.kind === "round") renderModeSelect();
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-dino-audio-status]").textContent = message;
+  }
+  function continueNativeDinoAfterPrepared(kind, mode, checkpoint) {
+    if (kind === "round") {
+      if (DIAGNOSTIC_TESTING_ENABLED) renderDiagnosticSelect(mode);
+      else startGame(mode);
+    } else if (kind === "checkpoint") {
+      startGame(mode, checkpoint);
+    } else if (kind === "resume") {
+      setPaused(false, "");
+    }
+  }
+  function primeNativeDinoFromGesture(kind = "round", mode = null,
+      uiKey = null, checkpoint = null) {
+    if (nativeDinoPending) return;
+    if (!nativeDinoAudio || muted) {
+      clearNativeDinoFailure();
+      continueNativeDinoAfterPrepared(kind, mode, checkpoint);
+      return;
+    }
+    nativeDinoRetry = {kind,mode,checkpoint};
+    const token = ++nativeDinoSerial;
+    nativeDinoPending = true;
+    clearNativeDinoFailure();
+    app.setAttribute("aria-busy", "true");
+    // Real child's mode/Close/Try Again gesture. UI PCM pop is scheduled
+    // before preparing the eight game effects. No Web fallback on iOS.
+    const request = nativeDinoAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:0.55} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeDinoSerial || document.hidden || returnPaused) return;
+      nativeDinoPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true)
+        continueNativeDinoAfterPrepared(kind, mode, checkpoint);
+      else showNativeDinoFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(() => {
+      if (token !== nativeDinoSerial || document.hidden || returnPaused) return;
+      nativeDinoPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeDinoFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
   const halfwayFeedImagePreloads = [];
@@ -488,6 +596,34 @@
     shakeUntil: 0,
     resultShown: false
   };
+
+  if (nativeDinoAudio) {
+    nativeDinoAudio.configure({
+      onAppInactive: () => {
+        // UIKit can become inactive while WebKit is STILL visibly mounted
+        // in the held App Switcher (or during a mode/halfway preflight).
+        cancelNativeDinoPreflight();
+        if (!state.running || completed) return;
+        if (!dinoWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Show plain Welcome Back only. Never automatically activate PCM.
+        dinoWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completed ||
+            !state.running || ["menu","speed","welcome-back"].includes(state.pauseReason))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeDinoRetry = {kind:"resume",mode:null,checkpoint:null};
+        showNativeDinoFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) cancelNativeDinoPreflight();
+    });
+  }
 
   void warmGameplayObstacleImages();
 
@@ -945,6 +1081,9 @@
     checkpoint,
     imagesReady = Promise.resolve()
   ) {
+    // The sun is an actual gesture after a WebView reload. Only it may
+    // reactivate the native 10-ID PCM bank for this checkpoint continuation.
+    let nativeHalfwayPreparation = null;
     stopLoop();
     cleanupResize();
     state.field = null;
@@ -1023,8 +1162,22 @@
       transitioning = true;
       sun.disabled = true;
       screen.classList.add("is-transitioning");
-      // A user gesture after document reload is important for iOS Web Audio.
-      void unlockAudio();
+      if (nativeDinoAudio && !muted) {
+        nativeDinoRetry = {kind:"checkpoint",mode:checkpoint.mode,checkpoint};
+        const token = ++nativeDinoSerial;
+        nativeDinoPending = true;
+        // Call the Swift activation NOW in the sun tap, not after the
+        // orbit animation or timeout. Preserve existing sun/moon visuals.
+        nativeHalfwayPreparation =
+          Promise.resolve(nativeDinoAudio.prepareFromGesture()).then(result =>
+            token === nativeDinoSerial && !document.hidden &&
+            !returnPaused && result?.ready === true
+          ).catch(() => false).finally(() => {
+            if (token === nativeDinoSerial) nativeDinoPending = false;
+          });
+      } else if (!nativeDinoAudio) {
+        void unlockAudio(); // browser/PWA/Android original sun gesture
+      }
       recordHalfwayFeedDiagnosticEvent("sun-tapped");
 
       const startedAt = gameNow();
@@ -1064,7 +1217,16 @@
       });
       await resumeAssetsReady;
       if (!resumeBlackout.isConnected) return;
-
+      if (nativeDinoAudio && !muted) {
+        const ready = nativeHalfwayPreparation &&
+          await nativeHalfwayPreparation;
+        if (!ready || !nativeDinoAudio.isReady()) {
+          resumeBlackout.remove();
+          showNativeDinoFailure(
+            "Native sounds aren't ready after the halfway scene. Tap Try Again.");
+          return;
+        }
+      }
       startGame(checkpoint.mode, checkpoint);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -1261,8 +1423,9 @@
 
 
   function renderIntro(){
-    // Fetch and decode short game effects before the first Start tap.
-    preloadSounds();
+    cancelNativeDinoPreflight();
+    // Web/PWA/Android only; no native game-bank preparation before gesture.
+    if (!nativeDinoAudio) preloadSounds();
     stopLoop();
     cleanupResize();
     state.phase = "title";
@@ -1276,15 +1439,20 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        playUiSound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
         playUiSound();
         renderModeSelect();
       }
     });
+    wireNativeDinoHelpPops();
   }
 
   function renderModeSelect(){
+    cancelNativeDinoPreflight();
     markDiagnosticRunClean(
       "returned-to-mode-select"
     );
@@ -1302,21 +1470,29 @@
       theme: GAME_THEME,
       backLabel: "Back to Dino Dash title",
       onBack: () => {
+        cancelNativeDinoPreflight();
         playUiSound();
         renderIntro();
       },
       onSelect: mode => {
-        playUiSound();
-        unlockAudio();
+        if (nativeDinoAudio && nativeDinoPending) return;
+        if (nativeDinoAudio) {
+          primeNativeDinoFromGesture("round", mode,
+            muted ? null : nextNativeDinoUiKey());
+        } else {
+          playUiSound();
+          unlockAudio();
 
-        if (DIAGNOSTIC_TESTING_ENABLED) {
-          renderDiagnosticSelect(mode);
-          return;
+          if (DIAGNOSTIC_TESTING_ENABLED) {
+            renderDiagnosticSelect(mode);
+            return;
+          }
+
+          startGame(mode);
         }
-
-        startGame(mode);
       }
     });
+    wireNativeDinoHelpPops();
   }
 
   function readDiagnosticReport(){
@@ -2519,6 +2695,12 @@
     mode,
     resumeCheckpoint = null
   ){
+    if (nativeDinoAudio && !muted && !nativeDinoAudio.isReady()) {
+      nativeDinoRetry = {kind:resumeCheckpoint?"checkpoint":"round",
+        mode,checkpoint:resumeCheckpoint};
+      showNativeDinoFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
     stopLoop();
     cleanupResize();
 
@@ -2839,6 +3021,7 @@
   }
 
   function getAudioContext() {
+    if (nativeDinoAudio) return null; // Native iOS never constructs AudioContext
     if (audioCtx) return audioCtx;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return null;
@@ -2847,7 +3030,7 @@
   }
 
   function preloadSounds() {
-    if (audioPreloadStarted) return;
+    if (nativeDinoAudio || audioPreloadStarted) return;
     const ctx = getAudioContext();
     if (!ctx) return;
     audioPreloadStarted = true;
@@ -2862,6 +3045,7 @@
   }
 
   async function loadSoundBuffer(key, url) {
+    if (nativeDinoAudio) return null;
     if (audioBuffers.has(key)) return audioBuffers.get(key);
 
     if (audioBufferPromises.has(key)) {
@@ -2911,6 +3095,7 @@
   }
 
   function unlockAudio() {
+    if (nativeDinoAudio) return Promise.resolve(nativeDinoAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx || ctx.state === "closed") return Promise.resolve(false);
     if (ctx.state === "running") {
@@ -2977,15 +3162,26 @@
   function recoverDinoAudioOnGesture() {
     if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
   }
-  document.addEventListener("pointerdown", recoverDinoAudioOnGesture, true);
-  document.addEventListener("keydown", recoverDinoAudioOnGesture, true);
-  document.addEventListener("click", recoverDinoAudioOnGesture, true);
-  if (!window.PointerEvent) document.addEventListener("touchstart", recoverDinoAudioOnGesture, true);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) audioUnlocked = false;
-  });
+  if (!nativeDinoAudio) {
+    document.addEventListener("pointerdown", recoverDinoAudioOnGesture, true);
+    document.addEventListener("keydown", recoverDinoAudioOnGesture, true);
+    document.addEventListener("click", recoverDinoAudioOnGesture, true);
+    if (!window.PointerEvent)
+      document.addEventListener("touchstart", recoverDinoAudioOnGesture, true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) audioUnlocked = false;
+    });
+  }
 
   async function playSound(key, options = {}) {
+    if (nativeDinoAudio) {
+      if (muted || returnPaused || document.hidden || state.paused) return;
+      // Collision/jump hot path only queues fixed predecoded Swift PCM.
+      // No Web/HTML audio fallback if the native bank is not ready.
+      nativeDinoAudio.play(key, Math.max(0, Math.min(1,
+        options.volume ?? 0.85)));
+      return;
+    }
     if (muted) return;
     const ctx = getAudioContext();
     if (!ctx || ctx.state !== "running") return;
@@ -3013,9 +3209,15 @@
   }
 
   function playUiSound() {
-    uiPopToggle = !uiPopToggle;
-    const key = uiPopToggle ? "uiPop1" : "uiPop2";
-    // Don't lose the first pop after an iOS interruption.
+    const key = nextNativeDinoUiKey();
+    if (nativeDinoAudio) {
+      // Actual title/Back/Help/menu gesture prepares two UI PCM only.
+      // Mode/Close uses primeNativeDinoFromGesture to avoid double pops.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeDinoAudio.tapUiFromGesture(key, 0.55);
+      return;
+    }
+    // Browser/PWA/Android original Web Audio behavior untouched.
     void unlockAudio().then(unlocked => {
       if (unlocked && !muted) void playSound(key, { volume: 0.55 });
     });
@@ -3047,7 +3249,9 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeDinoAudio && muted) void nativeDinoAudio.stop();
         if (!muted) playUiSound();
+        // An explicit unmuted menu Close re-prepares the whole PCM bank.
         return muted;
       },
       onHowToPlay: () => {
@@ -3055,12 +3259,14 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeDinoAudio) stopNativeDinoRound();
         playUiSound();
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
         playUiSound();
+        if (nativeDinoAudio) stopNativeDinoRound();
 
         markDiagnosticRunClean(
           "exited-game"
@@ -3068,9 +3274,27 @@
 
         window.VerseGameBridge.exitGame();
       },
-      onOpen: () => setPaused(true, "menu"),
-      onClose: () => setPaused(false, ""),
-      onBackFromHelp: () => setPaused(true, "menu")
+      onOpen: () => {
+        // Shell listens to pointerdown + click on the same button.
+        // Do not stop/reprepare native PCM twice for one physical tap.
+        if (nativeDinoPending || returnPaused ||
+            (nativeDinoAudio && state.paused && state.pauseReason === "menu"))
+          return false;
+        setPaused(true, "menu");
+        if (nativeDinoAudio) {
+          void nativeDinoAudio.stop();
+          playUiSound();
+        }
+      },
+      onClose: () => {
+        if (nativeDinoAudio && !muted)
+          primeNativeDinoFromGesture("resume", null, nextNativeDinoUiKey());
+        else setPaused(false, "");
+      },
+      onBackFromHelp: () => {
+        setPaused(true, "menu");
+        if (nativeDinoAudio) playUiSound();
+      }
     });
 
     window.VerseGameShell.wireSpeedMenu({
@@ -3078,12 +3302,12 @@
       buttonId: "dd2SpeedPill",
 
       onOpen: () => {
+        if (nativeDinoPending || returnPaused ||
+            (nativeDinoAudio && state.paused && state.pauseReason === "speed"))
+          return false;
+        setPaused(true, "speed");
+        if (nativeDinoAudio) void nativeDinoAudio.stop();
         playUiSound();
-        setPaused(
-          true,
-          "speed"
-        );
-
         return true;
       },
 
@@ -3096,11 +3320,12 @@
       },
 
       onClose: () => {
-        playUiSound();
-        setPaused(
-          false,
-          ""
-        );
+        if (nativeDinoAudio && !muted)
+          primeNativeDinoFromGesture("resume", null, nextNativeDinoUiKey());
+        else {
+          playUiSound();
+          setPaused(false, "");
+        }
       }
     });
   }
@@ -3112,6 +3337,11 @@
 
   function setPaused(paused, reason = ""){
     if (returnPaused && !paused) return;
+    // Animation's delayed unpause must not bypass a native PCM failure.
+    // Only a fresh whole-bank Try Again gesture can release the round.
+    if (!paused && nativeDinoAudio &&
+        state.pauseReason === "native-audio-error" &&
+        !muted && !nativeDinoAudio.isReady()) return;
     if (!state.running && state.phase !== "bonusIntro") return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
@@ -3138,7 +3368,7 @@
   }
 
   function handleInput(){
-    unlockAudio();
+    if (!nativeDinoAudio) unlockAudio();
     const now = gameNow();
     if (now - state.lastInputAt < 70) return;
     state.lastInputAt = now;
@@ -3163,10 +3393,15 @@
 
     const isDoubleJump = state.jumpsUsed === 1;
     const jumpSound = isDoubleJump ? "jump2" : "jump";
-    // The jump itself stays immediate; only its audio waits for resume.
-    void unlockAudio().then(unlocked => {
-      if (unlocked && !muted) void playSound(jumpSound);
-    });
+    // Jump movement remains immediate. Native PCM is already prepared
+    // before game start/resume; browser retains its old Web unlock path.
+    if (nativeDinoAudio) {
+      if (!muted) void playSound(jumpSound);
+    } else {
+      void unlockAudio().then(unlocked => {
+        if (unlocked && !muted) void playSound(jumpSound);
+      });
+    }
 
     if (!isDoubleJump) maybeStartBackflip();
 
@@ -7469,6 +7704,10 @@
   // Existing menu/help pauses stay in force after a task switch.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeDinoAudio) {
+      cancelNativeDinoPreflight();
+      void nativeDinoAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -7486,7 +7725,7 @@
   }
 
   function replaceWelcomeAudioContext() {
-    if (returnContextReplacements >= 1) return false;
+    if (nativeDinoAudio || returnContextReplacements >= 1) return false;
     const previous = audioCtx;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return false;
@@ -7503,14 +7742,20 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    // Unlock/prime now, inside the actual child's button gesture.
-    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    // Only the child's actual Let's go tap re-activates native
+    // .soloAmbient and prepares the entire fixed game PCM bank.
+    // Never run Web Audio on native iOS, and never automatically play.
+    const attempt = nativeDinoAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeDinoAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(attempt).then(ok => {
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
@@ -7530,13 +7775,19 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  dinoWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeDinoAudio,
+    suppressUiSound: !!nativeDinoAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeDinoAudio) stopNativeDinoRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: launch.profileId,
     pictureBase: "../../"
   });
