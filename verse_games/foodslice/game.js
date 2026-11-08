@@ -2881,6 +2881,10 @@
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeSliceAudio) {
+      cancelNativeSlicePreflight();
+      void nativeSliceAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -2897,17 +2901,24 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeSliceAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Only a child's actual Let's go! click can reactivate native PCM.
+    // Do not infer acoustic output from Swift's returned "ready" status.
+    const restore = nativeSliceAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeSliceAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
@@ -2925,14 +2936,20 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  sliceWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeSliceAudio,
+    suppressUiSound: !!nativeSliceAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeSliceAudio) void nativeSliceAudio.stop();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
