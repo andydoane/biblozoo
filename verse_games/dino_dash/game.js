@@ -2961,6 +2961,7 @@
   }
 
   function getAudioContext() {
+    if (nativeDinoAudio) return null; // Native iOS never constructs AudioContext
     if (audioCtx) return audioCtx;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return null;
@@ -2969,7 +2970,7 @@
   }
 
   function preloadSounds() {
-    if (audioPreloadStarted) return;
+    if (nativeDinoAudio || audioPreloadStarted) return;
     const ctx = getAudioContext();
     if (!ctx) return;
     audioPreloadStarted = true;
@@ -2984,6 +2985,7 @@
   }
 
   async function loadSoundBuffer(key, url) {
+    if (nativeDinoAudio) return null;
     if (audioBuffers.has(key)) return audioBuffers.get(key);
 
     if (audioBufferPromises.has(key)) {
@@ -3033,6 +3035,7 @@
   }
 
   function unlockAudio() {
+    if (nativeDinoAudio) return Promise.resolve(nativeDinoAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx || ctx.state === "closed") return Promise.resolve(false);
     if (ctx.state === "running") {
@@ -3099,15 +3102,26 @@
   function recoverDinoAudioOnGesture() {
     if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
   }
-  document.addEventListener("pointerdown", recoverDinoAudioOnGesture, true);
-  document.addEventListener("keydown", recoverDinoAudioOnGesture, true);
-  document.addEventListener("click", recoverDinoAudioOnGesture, true);
-  if (!window.PointerEvent) document.addEventListener("touchstart", recoverDinoAudioOnGesture, true);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) audioUnlocked = false;
-  });
+  if (!nativeDinoAudio) {
+    document.addEventListener("pointerdown", recoverDinoAudioOnGesture, true);
+    document.addEventListener("keydown", recoverDinoAudioOnGesture, true);
+    document.addEventListener("click", recoverDinoAudioOnGesture, true);
+    if (!window.PointerEvent)
+      document.addEventListener("touchstart", recoverDinoAudioOnGesture, true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) audioUnlocked = false;
+    });
+  }
 
   async function playSound(key, options = {}) {
+    if (nativeDinoAudio) {
+      if (muted || returnPaused || document.hidden || state.paused) return;
+      // Collision/jump hot path only queues fixed predecoded Swift PCM.
+      // No Web/HTML audio fallback if the native bank is not ready.
+      nativeDinoAudio.play(key, Math.max(0, Math.min(1,
+        options.volume ?? 0.85)));
+      return;
+    }
     if (muted) return;
     const ctx = getAudioContext();
     if (!ctx || ctx.state !== "running") return;
@@ -3135,9 +3149,15 @@
   }
 
   function playUiSound() {
-    uiPopToggle = !uiPopToggle;
-    const key = uiPopToggle ? "uiPop1" : "uiPop2";
-    // Don't lose the first pop after an iOS interruption.
+    const key = nextNativeDinoUiKey();
+    if (nativeDinoAudio) {
+      // Actual title/Back/Help/menu gesture prepares two UI PCM only.
+      // Mode/Close uses primeNativeDinoFromGesture to avoid double pops.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeDinoAudio.tapUiFromGesture(key, 0.55);
+      return;
+    }
+    // Browser/PWA/Android original Web Audio behavior untouched.
     void unlockAudio().then(unlocked => {
       if (unlocked && !muted) void playSound(key, { volume: 0.55 });
     });
@@ -3260,7 +3280,7 @@
   }
 
   function handleInput(){
-    unlockAudio();
+    if (!nativeDinoAudio) unlockAudio();
     const now = gameNow();
     if (now - state.lastInputAt < 70) return;
     state.lastInputAt = now;
@@ -3285,10 +3305,15 @@
 
     const isDoubleJump = state.jumpsUsed === 1;
     const jumpSound = isDoubleJump ? "jump2" : "jump";
-    // The jump itself stays immediate; only its audio waits for resume.
-    void unlockAudio().then(unlocked => {
-      if (unlocked && !muted) void playSound(jumpSound);
-    });
+    // Jump movement remains immediate. Native PCM is already prepared
+    // before game start/resume; browser retains its old Web unlock path.
+    if (nativeDinoAudio) {
+      if (!muted) void playSound(jumpSound);
+    } else {
+      void unlockAudio().then(unlocked => {
+        if (unlocked && !muted) void playSound(jumpSound);
+      });
+    }
 
     if (!isDoubleJump) maybeStartBackflip();
 
