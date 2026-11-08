@@ -65,6 +65,27 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### N5b.2 — child Learn Listen native reference then full verse (PR #34)
+
+**Latest owner pass:** After merging [N5b.1 PR #33](https://github.com/andydoane/biblozoo/pull/33) as `af38f56a`, the owner reported all prescribed on-device John 3:16 DEV narration tests positive, including the position/pause/seek/completion/interruption guide as reported. N5a UI pop + Feeding tests also passed; a silent first UI pop after launch/App Switcher remains a deliberate 350ms prewarm compromise (N9 UX debt), not a diagnosis of playback failure.
+
+[N5b.2 PR #34](https://github.com/andydoane/biblozoo/pull/34) routes **actual child-facing Learn Listen** to the native AVAudioPlayer. The app waits for the child to tap **Tap to Play Verse**, then plays **published-verse reference audio**, followed automatically by **full verse audio** only after the current native reference-ended event. Only the current native full-verse ended event enters Meaning. A stale HTML `audioEl.ended`, another native request ID, UI pop or merely accepted `play()` must never advance. Swift checks the existing bundled `public/verse_data/verse_list.json`, each published verse JSON and `public/verse_audio` filenames; no arbitrary URL/path or Web/HTML fallback. A request ID bound to the source and regularly read native `positionMs` checkpoint allow explicit **Welcome Back → Let's go!** after swipe-up-and-**HOLD** App Switcher or full task switch, without auto playback or wrong-track reset. Mute/Back/menu stop and leave a human-controlled retry. **Chunks/Echo/short instruction voice are not native yet;** Web/PWA/Android original Learn audio stays intact.
+
+```sh
+node scripts/validate_native_learn_listen_n5b2.js
+node scripts/validate_native_learn_narration_n5b1.js
+node scripts/validate_native_ui_audio_n5a.js
+node scripts/validate_native_bounce_gameplay_n4c.js
+node scripts/validate_native_only_ios_output.js
+npm run build && npx cap sync ios && npx cap open ios
+```
+
+Xcode-run the separate **BibloZoo Audio Test** `.audiotest` bundle on a physical iPhone. Choose **John 3:16**, enter regular Learn, continue to Listen, tap the native **Tap to Play Verse** button and *actually hear* the reference and full verse in order; Meaning must appear **only after** the full verse. Repeat with another published verse such as **Psalm 23:4** to catch source mixups. Test swipe-up-and-**hold** App Switcher mid-reference, resume only after **Let's go!**, then mid-full-verse and after a full app switch; resume the same track close to its last position and finish only once. Test mute/unmute, menu open/close, Back/new verse, no ghost audio or credited progress. Regress DEV John 3:16 position/seek/pause/ended, native UI pops and all four Feeding modes. Short Learn instruction audio may remain silent because it is outside this PR; its printed text/button must remain usable. If silence or wrong-track completion, DEV **Inspect native state + Copy Audio Timing Report BEFORE restart**, and tell us what actually reached the iPhone speaker. See [full N5b.2 physical guide](N5B2-NATIVE-LEARN-LISTEN.md).
+
+**Independent gates:** final-head GitHub Actions Node regression suite + production web build (not a Swift compile); owner Xcode asset/Swift compilation; owner physical iPhone voice/reference→verse and interruption checkpoint acceptance. Owner alone merges. N5b.3 subsequently migrates native Chunks/Echo/short instruction playback while protecting exactly the current child verse/progress; no stable `ios-prep`, recording/mic or Zoo surprises in N5b.2.
+
+---
+
 ### N5b.1 — native long narration DEV player: John 3:16 (PR #33; Xcode/iPhone pending)
 
 **Latest owner acceptance:** N5a [PR #32](https://github.com/andydoane/biblozoo/pull/32) owner-merged as `a4ed899e`, and the owner followed all N5a iPhone guide steps: UI taps/pops sound as expected and Feeding popup/regression checks were positive. **Most first UI pops after launch or task switch are silent.** N5a intentionally drops an unprepared pop after 350ms rather than playing it late. That tradeoff is expected but remains N9 first-tap UX/reliability debt, not a fully reliable first-tap audio pass.
