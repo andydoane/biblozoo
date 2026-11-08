@@ -884,6 +884,8 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeInvadersAudio && muted) void nativeInvadersAudio.stop();
+        if (nativeInvadersAudio && !muted) playUiTapSound();
         return muted;
       },
       onHowToPlay: () => {
@@ -891,6 +893,7 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeInvadersAudio) stopNativeInvadersRound();
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
@@ -898,13 +901,28 @@
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeInvadersAudio) stopNativeInvadersRound();
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
-      onOpen: () => setPaused(true, "menu"),
+      onOpen: () => {
+        // The shell can dispatch pointerdown plus click for one tap.
+        if (nativeInvadersPending || returnPaused ||
+            (nativeInvadersAudio && state.paused &&
+             state.pauseReason === "menu")) return false;
+        setPaused(true, "menu");
+        if (nativeInvadersAudio) {
+          void nativeInvadersAudio.stop();
+          playUiTapSound();
+        }
+      },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (nativeInvadersAudio && !muted)
+          primeNativeInvadersFromGesture("resume", null, nextInvadersUiKey());
+        else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -916,6 +934,9 @@
   function setPaused(paused, reason = "") {
     // Menu/help callbacks must not dismiss a task-switch pause.
     if (returnPaused && !paused) return;
+    if (!paused && nativeInvadersAudio &&
+        state.pauseReason === "native-audio-error" &&
+        !muted && !nativeInvadersAudio.isReady()) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
     if (!paused) {
