@@ -616,6 +616,9 @@
   }
 
   function unlockAudio() {
+    // The native game prepares its bank only during a real selection/retry.
+    // Never try Web Audio or an HTML silent element in .audiotest.
+    if (nativeSnakeAudio) return Promise.resolve(nativeSnakeAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx || ctx.state === "closed") return Promise.resolve(false);
     if (ctx.state === "running") {
@@ -686,6 +689,7 @@
   // Capture the next legitimate gesture after an iOS audio interruption,
   // including a Menu/Remix tap that does not reach the playing field.
   function recoverSnakeAudioOnGesture() {
+    if (nativeSnakeAudio) return; // no automatic/hot-pointer reactivation
     if (!audioContext || audioContext.state !== "running") void unlockAudio();
   }
   document.addEventListener("pointerdown", recoverSnakeAudioOnGesture, true);
@@ -739,6 +743,17 @@
   }
 
   function playGameSound(key, volumeScale = 1) {
+    if (nativeSnakeAudio) {
+      const isUi = key === "uiTap1" || key === "uiTap2";
+      if (muted || returnPaused ||
+          (!isUi && (!state.running || state.paused || completed))) return;
+      // Identical original key and volume semantics; native controller
+      // maps keys to Swift's fixed resource IDs, not JS file paths.
+      const volume = Math.min(1, Math.max(0,
+        (SOUND_VOLUMES[key] ?? 0.7) * volumeScale));
+      nativeSnakeAudio.play(key, volume);
+      return;
+    }
     if (muted || !audioUnlocked) return;
 
     const ctx = getAudioContext();
@@ -767,6 +782,20 @@
   }
 
   function playOrbTone(sizeRatio = 0.25) {
+    if (nativeSnakeAudio) {
+      if (muted || returnPaused || !state.running || state.paused || completed)
+        return;
+      // Original six-note C5–C6 sequence and size-to-volume mapping.
+      // Swift supplies precomputed triangle PCM rather than Web oscillators.
+      const sizeBoost = clamp(
+        (sizeRatio - ORB_TUNING.minSizeHeadRatio) /
+          Math.max(0.001, ORB_TUNING.maxSizeHeadRatio -
+            ORB_TUNING.minSizeHeadRatio), 0, 1);
+      const index = orbToneIndex++ % ORB_TONE_TUNING.notes.length;
+      nativeSnakeAudio.play("orb",
+        Math.min(1, ORB_TONE_TUNING.volume + sizeBoost * 0.035), index);
+      return;
+    }
     if (muted || !audioUnlocked) return;
 
     const ctx = getAudioContext();
@@ -815,6 +844,12 @@
   }
 
   function unlockAndTap() {
+    if (nativeSnakeAudio) {
+      // UI pop uses the already-prewarmed native bank only; the first tap
+      // can remain quiet until mode selection completes its one-time preflight.
+      playUiTapSound();
+      return;
+    }
     void unlockAudio().then((unlocked) => {
       if (unlocked) {
         playUiTapSound();
@@ -913,7 +948,8 @@
         selectedMode = mode;
         completed = false;
         completionResult = null;
-        renderGameScreen();
+        if (nativeSnakeAudio) primeSnakeAudioAndContinue("round");
+        else renderGameScreen();
       }
     });
   }
