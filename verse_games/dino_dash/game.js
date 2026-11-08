@@ -1369,8 +1369,9 @@
 
 
   function renderIntro(){
-    // Fetch and decode short game effects before the first Start tap.
-    preloadSounds();
+    cancelNativeDinoPreflight();
+    // Web/PWA/Android only; no native game-bank preparation before gesture.
+    if (!nativeDinoAudio) preloadSounds();
     stopLoop();
     cleanupResize();
     state.phase = "title";
@@ -1384,15 +1385,20 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        playUiSound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
         playUiSound();
         renderModeSelect();
       }
     });
+    wireNativeDinoHelpPops();
   }
 
   function renderModeSelect(){
+    cancelNativeDinoPreflight();
     markDiagnosticRunClean(
       "returned-to-mode-select"
     );
@@ -1410,21 +1416,29 @@
       theme: GAME_THEME,
       backLabel: "Back to Dino Dash title",
       onBack: () => {
+        cancelNativeDinoPreflight();
         playUiSound();
         renderIntro();
       },
       onSelect: mode => {
-        playUiSound();
-        unlockAudio();
+        if (nativeDinoAudio && nativeDinoPending) return;
+        if (nativeDinoAudio) {
+          primeNativeDinoFromGesture("round", mode,
+            muted ? null : nextNativeDinoUiKey());
+        } else {
+          playUiSound();
+          unlockAudio();
 
-        if (DIAGNOSTIC_TESTING_ENABLED) {
-          renderDiagnosticSelect(mode);
-          return;
+          if (DIAGNOSTIC_TESTING_ENABLED) {
+            renderDiagnosticSelect(mode);
+            return;
+          }
+
+          startGame(mode);
         }
-
-        startGame(mode);
       }
     });
+    wireNativeDinoHelpPops();
   }
 
   function readDiagnosticReport(){
