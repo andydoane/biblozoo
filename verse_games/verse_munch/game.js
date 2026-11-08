@@ -384,6 +384,102 @@ const FACE_MAP = {
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
+  // N6h: on native iOS all Munch effects are fixed Swift AVAudioEngine PCM.
+  // Web/PWA/Android keep the original browser Web Audio paths below.
+  const nativeMunchAudio = window.BibloZooNativeVerseMunchAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseMunchAudio : null;
+  let nativeMunchSerial = 0;
+  let nativeMunchPending = false;
+  let nativeMunchRetry = {kind:"round",mode:null};
+  let munchWelcomeBack = null;
+
+  function nextNativeMunchUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function wireNativeMunchTitleHelpPops() {
+    if (!nativeMunchAudio) return;
+    // Never replace shared shell's Start/Help/Back handlers, only add UI PCM.
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID+"CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeMunchRound() {
+    if (!nativeMunchAudio) return;
+    ++nativeMunchSerial;
+    nativeMunchPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeMunchAudio.stop();
+  }
+  function clearNativeMunchFailure() {
+    document.getElementById("vmunchNativeAudioFailure")?.remove();
+  }
+  function showNativeMunchFailure(message) {
+    if (!nativeMunchAudio) return;
+    let dialog = document.getElementById("vmunchNativeAudioFailure");
+    if (!dialog) {
+      dialog = document.createElement("div");
+      dialog.id = "vmunchNativeAudioFailure";
+      dialog.className = "vmunch-native-audio-failure";
+      dialog.innerHTML = `
+        <section class="vmunch-native-audio-card" role="dialog"
+          aria-modal="true" aria-label="Verse Munch native sound problem">
+          <h2>Verse Munch</h2>
+          <p role="status" data-munch-audio-status></p>
+          <button type="button" data-munch-audio-retry>Try Again</button>
+          <button type="button" data-munch-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector("[data-munch-audio-retry]").onclick = () =>
+        primeNativeMunchFromGesture(nativeMunchRetry.kind,nativeMunchRetry.mode);
+      dialog.querySelector("[data-munch-audio-back]").onclick = () => {
+        stopNativeMunchRound();
+        clearNativeMunchFailure();
+        if (nativeMunchRetry.kind === "round") renderModeSelect();
+        else {
+          cancelActiveRun();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    dialog.querySelector("[data-munch-audio-status]").textContent = message;
+  }
+  function primeNativeMunchFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeMunchPending) return;
+    if (!nativeMunchAudio || muted) {
+      clearNativeMunchFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeMunchRetry = {kind,mode};
+    const token = ++nativeMunchSerial;
+    nativeMunchPending = true;
+    clearNativeMunchFailure();
+    app.setAttribute("aria-busy", "true");
+    // Swift activation is requested synchronously on the child's *actual*
+    // difficulty, menu Close, Retry or Resume click. UI pop plays first.
+    const request = nativeMunchAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeMunchSerial || document.hidden || returnPaused) return;
+      nativeMunchPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else showNativeMunchFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(() => {
+      if (token !== nativeMunchSerial || document.hidden || returnPaused) return;
+      nativeMunchPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeMunchFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+
+
+
   const state = {
     running:false,
     rafId:0,
@@ -455,6 +551,7 @@ const FACE_MAP = {
   };
 
   function getAudioContext() {
+    if (nativeMunchAudio) return null; // iOS: never create Web Audio
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -465,6 +562,7 @@ const FACE_MAP = {
   }
 
   function ensureSilenceAudio() {
+    if (nativeMunchAudio) return null; // iOS: never prime HTML Audio
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -477,6 +575,7 @@ const FACE_MAP = {
   }
 
   function unlockAudio() {
+    if (nativeMunchAudio) return Promise.resolve(nativeMunchAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -567,9 +666,11 @@ const FACE_MAP = {
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeMunchAudio) {
+    document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+    document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+    document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  }
   function markAudioBackgrounded() {
     if (!audioCtx) return;
     audioForegroundRecoveryPending = true;
@@ -643,13 +744,15 @@ const FACE_MAP = {
     audioForegroundFreshContextOnGesture = !restored;
   }
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) markAudioBackgrounded();
-    else scheduleForegroundAudioRecovery();
-  });
-  window.addEventListener("blur", markAudioBackgrounded);
-  window.addEventListener("focus", scheduleForegroundAudioRecovery);
-  window.addEventListener("pageshow", scheduleForegroundAudioRecovery);
+  if (!nativeMunchAudio) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) markAudioBackgrounded();
+      else scheduleForegroundAudioRecovery();
+    });
+    window.addEventListener("blur", markAudioBackgrounded);
+    window.addEventListener("focus", scheduleForegroundAudioRecovery);
+    window.addEventListener("pageshow", scheduleForegroundAudioRecovery);
+  }
 
   function soundVolume(key) {
     const master = Number(SOUND_TUNING.masterVolume);
@@ -662,6 +765,7 @@ const FACE_MAP = {
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeMunchAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -704,12 +808,21 @@ const FACE_MAP = {
   }
 
   function preloadSoundBuffers() {
+    if (nativeMunchAudio) return; // PCM bank preloaded only on real gesture
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeMunchAudio) {
+      if (muted || returnPaused || document.hidden || !state.running ||
+          state.paused || completed) return;
+      // Every word-tap/chew/bonus hot event uses a fixed Swift PCM ID.
+      // No Web Audio, HTML silence or lazy decode fallback on native iOS.
+      nativeMunchAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -740,8 +853,12 @@ const FACE_MAP = {
   }
 
   function playUiTapSound() {
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
+    const key = nextNativeMunchUiKey();
+    if (nativeMunchAudio) {
+      if (!muted && !returnPaused && !document.hidden)
+        nativeMunchAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
     playGameSound(key, "uiTap");
   }
 
@@ -756,6 +873,36 @@ const FACE_MAP = {
     const key = chewKeys[chewSoundIndex % chewKeys.length];
     chewSoundIndex += 1;
     playGameSound(key, "chew");
+  }
+
+  if (nativeMunchAudio) {
+    nativeMunchAudio.configure({
+      onAppInactive: () => {
+        // UIKit .inactive includes swipe-up-and-HOLD while WebKit still looks
+        // visible. Do not let a pending difficulty gesture start a ghost round.
+        if (nativeMunchPending) stopNativeMunchRound();
+        if (!state.running || completed) return;
+        if (!munchWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Plain Welcome Back only. Never re-activate PCM on foreground.
+        munchWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completed ||
+            !state.running ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        // Stop feeding/bonus state until the child's explicit Try Again.
+        setPaused(true, "native-audio-error");
+        nativeMunchRetry = {kind:"resume",mode:null};
+        showNativeMunchFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeMunchPending) stopNativeMunchRound();
+    });
   }
 
   setupReferenceSegments();
@@ -787,6 +934,7 @@ function gameHelpHtml(){
 }
 
 function renderIntro(){
+  if (nativeMunchPending) stopNativeMunchRound();
   stopLoop();
 
   window.VerseGameShell.renderTitleScreen({
@@ -807,14 +955,16 @@ function renderIntro(){
       window.VerseGameBridge.exitGame();
     },
     onStart: () => {
-      unlockAudio();
+      if (!nativeMunchAudio) unlockAudio();
       playUiTapSound();
       renderModeSelect();
     }
   });
+  wireNativeMunchTitleHelpPops();
 }
 
 function renderModeSelect(){
+  if (nativeMunchPending) stopNativeMunchRound();
   stopLoop();
 
   window.VerseGameShell.renderModeSelect({
@@ -826,18 +976,31 @@ function renderModeSelect(){
     theme: GAME_THEME,
     backLabel: "Back to Verse Munch title",
     onBack: () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       renderIntro();
     },
     onSelect: (mode) => {
-      unlockAudio();
-      playUiTapSound();
-      startGame(mode);
+      if (nativeMunchAudio) {
+        if (nativeMunchPending) return;
+        primeNativeMunchFromGesture("round", mode,
+          muted ? null : nextNativeMunchUiKey());
+      } else {
+        unlockAudio();
+        playUiTapSound();
+        startGame(mode);
+      }
     }
   });
+  wireNativeMunchTitleHelpPops();
 }
 
   function startGame(mode){
+    if (nativeMunchAudio && !muted && !nativeMunchAudio.isReady()) {
+      nativeMunchRetry = {kind:"round",mode};
+      showNativeMunchFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
     state.runToken += 1;
     const runToken = state.runToken;
 
@@ -996,15 +1159,18 @@ function renderComplete(){
     theme: GAME_THEME,
     backLabel: "Back to Practice Games",
     onPlayAgain: () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       renderModeSelect();
     },
     onMoreGames: () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       window.VerseGameBridge.exitGame();
     },
     onChangeVerse: () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       window.VerseGameBridge.returnToVersePicker();
     }
   });
@@ -1037,6 +1203,7 @@ function wireCommonNav(){
     isMuted: () => muted,
     onMuteToggle: () => {
       muted = !muted;
+      if (nativeMunchAudio && muted) void nativeMunchAudio.stop();
       if (!muted) playUiTapSound();
       return muted;
     },
@@ -1045,6 +1212,7 @@ function wireCommonNav(){
       openHelpFromMenu();
     },
     onModeSelect: () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       cancelActiveRun();
       setPaused(false, "");
@@ -1052,16 +1220,26 @@ function wireCommonNav(){
     },
     onExit: () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       cancelActiveRun();
       window.VerseGameBridge.exitGame();
     },
     onOpen: () => {
-      playUiTapSound();
+      // Avoid duplicate PCM teardown for pointerdown + click.
+      if (nativeMunchPending || returnPaused ||
+          (nativeMunchAudio && state.paused &&
+           state.pauseReason === "menu")) return false;
       setPaused(true, "menu");
+      if (nativeMunchAudio) void nativeMunchAudio.stop();
+      playUiTapSound();
     },
     onClose: () => {
-      playUiTapSound();
-      setPaused(false, "");
+      if (nativeMunchAudio && !muted)
+        primeNativeMunchFromGesture("resume",null,nextNativeMunchUiKey());
+      else {
+        playUiTapSound();
+        setPaused(false, "");
+      }
     },
     onBackFromHelp: () => {
       playUiTapSound();
@@ -1077,20 +1255,26 @@ function wireCommonNav(){
       if (
         bonusRunning ||
         state.bonusPhase ||
-        getCurrentPhase() === "done"
+        getCurrentPhase() === "done" ||
+        nativeMunchPending || returnPaused ||
+        (nativeMunchAudio && state.paused &&
+         state.pauseReason === "speed")
       ) {
         return false;
       }
-
-      playUiTapSound();
       setPaused(true, "speed");
-
+      if (nativeMunchAudio) void nativeMunchAudio.stop();
+      playUiTapSound();
       return true;
     },
 
     onClose: () => {
-      playUiTapSound();
-      setPaused(false, "");
+      if (nativeMunchAudio && !muted)
+        primeNativeMunchFromGesture("resume",null,nextNativeMunchUiKey());
+      else {
+        playUiTapSound();
+        setPaused(false, "");
+      }
     }
   });
 
@@ -1098,6 +1282,11 @@ function wireCommonNav(){
 }
 
 function setPaused(paused, reason = ""){
+  // Shared menu/help callbacks must not dismiss a task-switch pause.
+  if (returnPaused && !paused) return;
+  // A late animation/touch fallback must not bypass missing native PCM.
+  if (!paused && nativeMunchAudio && !muted &&
+      !nativeMunchAudio.isReady()) return;
   state.paused = paused;
   state.pauseReason = paused ? reason : "";
   if (!paused){
@@ -1123,7 +1312,11 @@ function setPaused(paused, reason = ""){
     };
 
     bindTouchEnd("vmunchGameMenuOverlayCloseBtn", () => {
-      playUiTapSound();
+      // iOS touchend fallback must obey EXACTLY the same native full-bank
+      // requirement as shared shell's Close click (no silent bypass).
+      if (nativeMunchAudio && !muted)
+        primeNativeMunchFromGesture("resume",null,nextNativeMunchUiKey());
+      else playUiTapSound();
       closeGameMenu();
     });
 
@@ -1133,6 +1326,7 @@ function setPaused(paused, reason = ""){
     });
 
     bindTouchEnd("vmunchGameMenuOverlayModeSelectBtn", () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       cancelActiveRun();
       setPaused(false, "");
@@ -1141,12 +1335,14 @@ function setPaused(paused, reason = ""){
 
     bindTouchEnd("vmunchGameMenuOverlayExitBtn", () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       cancelActiveRun();
       window.VerseGameBridge.exitGame();
     });
 
     bindTouchEnd("vmunchGameMenuOverlayMuteBtn", () => {
       muted = !muted;
+      if (nativeMunchAudio && muted) void nativeMunchAudio.stop();
       if (!muted) playUiTapSound();
 
       const muteBtn = document.getElementById("vmunchGameMenuOverlayMuteBtn");
@@ -1205,7 +1401,15 @@ function setPaused(paused, reason = ""){
 function openGameMenu(){
   const menuOverlay = document.getElementById("vmunchGameMenuOverlay");
   if (menuOverlay){
-    setPaused(true, "menu");
+    if (nativeMunchAudio && !returnPaused &&
+        !nativeMunchPending &&
+        !(state.paused && state.pauseReason === "menu")) {
+      setPaused(true, "menu");
+      void nativeMunchAudio.stop();
+      playUiTapSound();
+    } else {
+      setPaused(true, "menu");
+    }
     menuOverlay.classList.add("is-open");
     menuOverlay.setAttribute("aria-hidden", "false");
   }
@@ -4530,6 +4734,7 @@ const shuffle = window.VerseGameShell.shuffle;
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeMunchAudio) stopNativeMunchRound();
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -4543,17 +4748,24 @@ const shuffle = window.VerseGameShell.shuffle;
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeMunchAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements++;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Real Let's go! click activates the sole Swift .soloAmbient session and
+    // prepares all 15 PCM IDs. No browser AudioContext on native iOS.
+    const restore = nativeMunchAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeMunchAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
@@ -4572,13 +4784,19 @@ const shuffle = window.VerseGameShell.shuffle;
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  munchWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeMunchAudio,
+    suppressUiSound: !!nativeMunchAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeMunchAudio) stopNativeMunchRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });

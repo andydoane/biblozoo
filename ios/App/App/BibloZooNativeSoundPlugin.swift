@@ -127,6 +127,22 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "inv-bonus-penalty": "verse_invaders_wrong_2",
         "inv-bonus-reveal": "verse_invaders_bonus_result"
     ]
+    // N6h Verse Munch: 13 fixed original MP3 assets + shared UI PCM.
+    private let verseMunchSoundResources: [String: String] = [
+        "munch-word-tap1": "verse_munch_tap_1",
+        "munch-word-tap2": "verse_munch_tap_2",
+        "munch-chew1": "verse_munch_chew_1",
+        "munch-chew2": "verse_munch_chew_2",
+        "munch-chew3": "verse_munch_chew_3",
+        "munch-chomp": "verse_munch_chomp",
+        "munch-correct": "verse_munch_correct",
+        "munch-spew": "verse_munch_spew",
+        "munch-dizzy": "verse_munch_dizzy",
+        "munch-streak": "verse_munch_streak",
+        "munch-bonus-start": "verse_munch_bonus_start",
+        "munch-bonus-result": "verse_munch_bonus_result",
+        "munch-wrong-fruit": "verse_munch_wrong_fruit"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -189,7 +205,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "inv-launch", "inv-correct", "inv-wrong", "inv-abduction",
         "inv-streak", "inv-bonus-start",
         "inv-pop-1", "inv-pop-2", "inv-pop-3", "inv-pop-4", "inv-pop-5",
-        "inv-bonus-penalty", "inv-bonus-reveal"
+        "inv-bonus-penalty", "inv-bonus-reveal",
+        "munch-word-tap1", "munch-word-tap2",
+        "munch-chew1", "munch-chew2", "munch-chew3",
+        "munch-chomp", "munch-correct", "munch-spew",
+        "munch-dizzy", "munch-streak", "munch-bonus-start",
+        "munch-bonus-result", "munch-wrong-fruit"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1039,6 +1060,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               verseSplatSoundResources[soundId] != nil ||
               dinoDashSoundResources[soundId] != nil ||
               verseInvadersSoundResources[soundId] != nil ||
+              verseMunchSoundResources[soundId] != nil ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1140,6 +1162,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.verseMunchSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/verse_munch/verse_munch_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
