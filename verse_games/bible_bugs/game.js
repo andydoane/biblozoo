@@ -320,7 +320,7 @@
     }
     gate.querySelector("[data-bugs-audio-status]").textContent = message;
   }
-  function primeBibleBugsFromGesture(kind = "round", mode = null) {
+  function primeBibleBugsFromGesture(kind = "round", mode = null, uiPopKey = null) {
     if (nativeBugsPending) return;
     if (!nativeBugsAudio || muted) {
       hideNativeBugsFailure();
@@ -335,7 +335,8 @@
     app.setAttribute("aria-busy", "true");
     // This invokes Swift activateFromGesture immediately in the REAL tap.
     // Never start a silent unprepared game or reactivate on foreground.
-    const attempt = nativeBugsAudio.prepareFromGesture();
+    const attempt = nativeBugsAudio.prepareFromGesture(uiPopKey
+      ? { key: uiPopKey, volume: soundVolume("uiTap") } : null);
     void Promise.resolve(attempt).then(result => {
       if (token !== nativeBugsSession || document.hidden || returnPaused) return;
       nativeBugsPending = false;
@@ -684,9 +685,20 @@
     }
   }
 
-  function playUiTapSound() {
+  function nextUiTapKey() {
     const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
     state.uiSoundFlip = !state.uiSoundFlip;
+    return key;
+  }
+  function playUiTapSound() {
+    const key = nextUiTapKey();
+    if (nativeBugsAudio) {
+      // Pre-game title/back taps need an independent *UI-only* native
+      // preflight. Neither Web Audio nor a started game bank is required.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeBugsAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
     playGameSound(key, "uiTap");
   }
 
@@ -786,9 +798,15 @@
       },
       onSelect: (mode) => {
         if (nativeBugsAudio && nativeBugsPending) return;
-        playUiTapAndUnlock();
-        if (nativeBugsAudio) primeBibleBugsFromGesture("round", mode);
-        else startGame(mode);
+        if (nativeBugsAudio) {
+          // One real tap: activate the game bank and schedule its UI pop
+          // after the two UI buffers prepare, before full game PCM decode.
+          primeBibleBugsFromGesture("round", mode,
+            muted ? null : nextUiTapKey());
+        } else {
+          playUiTapAndUnlock();
+          startGame(mode);
+        }
       }
     });
   }
@@ -963,10 +981,12 @@
         if (nativeBugsAudio) void nativeBugsAudio.stop();
       },
       onClose: () => {
-        playUiTapAndUnlock();
         if (nativeBugsAudio && !muted)
-          primeBibleBugsFromGesture("resume");
-        else setPaused(false, "");
+          primeBibleBugsFromGesture("resume", null, nextUiTapKey());
+        else {
+          playUiTapAndUnlock();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapAndUnlock();
