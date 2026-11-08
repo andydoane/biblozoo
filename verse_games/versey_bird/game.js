@@ -329,6 +329,105 @@
   let audioForegroundFreshContextOnGesture = false;
   let uiSoundFlip = false;
   let lastFlapSound = "";
+
+  // N6i: only Swift AVAudioEngine PCM emits sound on .audiotest iOS.
+  // Web/PWA/Android retain the original browser sound path below.
+  const nativeBirdAudio = window.BibloZooNativeVerseyBirdAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseyBirdAudio : null;
+  let nativeBirdSerial = 0;
+  let nativeBirdPending = false;
+  let nativeBirdRetry = {kind:"round",mode:null,checkpoint:null};
+  let birdWelcomeBack = null;
+
+  function nextNativeBirdUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function wireNativeBirdTitleHelpPops() {
+    if (!nativeBirdAudio) return;
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeBirdRound() {
+    if (!nativeBirdAudio) return;
+    nativeBirdSerial++;
+    nativeBirdPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeBirdAudio.stop();
+  }
+  function clearNativeBirdFailure() {
+    document.getElementById("vb2NativeAudioFailure")?.remove();
+  }
+  function showNativeBirdFailure(message) {
+    if (!nativeBirdAudio) return;
+    let overlay = document.getElementById("vb2NativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "vb2NativeAudioFailure";
+      overlay.className = "vb2-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="vb2-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Versey Bird native sound problem">
+          <h2>Versey Bird</h2>
+          <p role="status" data-bird-audio-status></p>
+          <button type="button" data-bird-audio-retry>Try Again</button>
+          <button type="button" data-bird-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-bird-audio-retry]").onclick = () =>
+        primeNativeBirdFromGesture(nativeBirdRetry.kind,
+          nativeBirdRetry.mode, null, nativeBirdRetry.checkpoint);
+      overlay.querySelector("[data-bird-audio-back]").onclick = () => {
+        stopNativeBirdRound();
+        clearNativeBirdFailure();
+        if (nativeBirdRetry.kind === "round") renderModeSelect();
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-bird-audio-status]").textContent = message;
+  }
+  function continueNativeBirdAfterPrepared(kind, mode, checkpoint) {
+    if (kind === "round") startGame(mode);
+    else if (kind === "checkpoint") startGame(mode, checkpoint);
+    else if (kind === "resume") setPaused(false, "");
+  }
+  function primeNativeBirdFromGesture(kind = "round", mode = null,
+      uiKey = null, checkpoint = null) {
+    if (nativeBirdPending) return;
+    if (!nativeBirdAudio || muted) {
+      clearNativeBirdFailure();
+      continueNativeBirdAfterPrepared(kind, mode, checkpoint);
+      return;
+    }
+    nativeBirdRetry = {kind,mode,checkpoint};
+    const token = ++nativeBirdSerial;
+    nativeBirdPending = true;
+    clearNativeBirdFailure();
+    app.setAttribute("aria-busy", "true");
+    // Activation MUST occur synchronously on the real Mode/Close/Retry tap.
+    const request = nativeBirdAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeBirdSerial || document.hidden || returnPaused) return;
+      nativeBirdPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        continueNativeBirdAfterPrepared(kind, mode, checkpoint);
+      } else {
+        showNativeBirdFailure(
+          ["activation-os-rejected","other-audio-playing"].includes(result?.reason)
+            ? "Audio is busy. Pause the other video, then tap Try Again."
+            : "Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeBirdSerial || document.hidden || returnPaused) return;
+      nativeBirdPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeBirdFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
   const halfwayNapImagePreloads = [];
@@ -951,6 +1050,7 @@
     target.disabled = true;
 
     let wakeReady = false;
+    let nativeBirdWakePromise = null;
     let tapCount = 0;
     let lastAcceptedTapAt = 0;
     let stopZAnimation =
@@ -1033,10 +1133,18 @@
           return;
         }
 
-        const audioReady =
-          audioUnlocked && audioCtx?.state === "running"
-            ? Promise.resolve(true)
-            : unlockAudio();
+        // Only an ACTUAL wake-up tap may reclaim the .soloAmbient session
+        // after Versey Bird's halfway checkpoint document reload.
+        const audioReady = nativeBirdAudio
+          ? (muted ? Promise.resolve(true) :
+            nativeBirdAudio.isReady() ? Promise.resolve(true) :
+            (nativeBirdWakePromise ||= Promise.resolve(
+              nativeBirdAudio.prepareFromGesture()
+            ).then(result => result?.ready === true)
+             .catch(() => false)
+             .finally(() => { nativeBirdWakePromise = null; })))
+          : (audioUnlocked && audioCtx?.state === "running"
+              ? Promise.resolve(true) : unlockAudio());
 
         const now =
           gameNow();
@@ -1116,6 +1224,22 @@
 
         window.setTimeout(
           async () => {
+            // The final wake-up tap must succeed at whole-bank preflight
+            // BEFORE the saved checkpoint resumes. No silent ghost round.
+            if (nativeBirdAudio && !muted) {
+              const ready = await audioReady;
+              if (!ready || document.hidden || !nativeBirdAudio.isReady()) {
+                wakeReady = true;
+                target.disabled = false;
+                tapCount = 0;
+                if (!document.hidden) {
+                  nativeBirdRetry = {kind:"checkpoint",mode:checkpoint.mode,checkpoint};
+                  showNativeBirdFailure(
+                    "Native sound is unavailable. Tap Try Again to wake Versey Bird.");
+                }
+                return;
+              }
+            }
             try {
               await warmGameplayObstacleImages();
             } catch (err) {
@@ -1129,6 +1253,7 @@
 
             window.setTimeout(
               () => {
+                if (document.hidden || returnPaused) return;
                 startGame(
                   checkpoint.mode,
                   checkpoint
@@ -1413,6 +1538,36 @@
     streakSpeedBoostU: 0
   };
 
+
+  if (nativeBirdAudio) {
+    nativeBirdAudio.configure({
+      onAppInactive: () => {
+        // UIKit .inactive also occurs when the App Switcher card is held.
+        // A pending mode tap must never start a round behind Welcome Back.
+        if (nativeBirdPending) stopNativeBirdRound();
+        if (!state.running || completed) return;
+        if (!birdWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Only reveal plain Welcome Back; NEVER activate on foreground.
+        birdWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completed ||
+            !state.running ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeBirdRetry = {kind:"resume",mode:null,checkpoint:null};
+        showNativeBirdFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeBirdPending) stopNativeBirdRound();
+    });
+  }
+
   setupReferenceSegments();
   installDiagnosticErrorHandlers();
 
@@ -1459,6 +1614,7 @@
   }
 
   function getAudioContext() {
+    if (nativeBirdAudio) return null;
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -1469,6 +1625,7 @@
   }
 
   function ensureSilenceAudio() {
+    if (nativeBirdAudio) return null;
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -1481,6 +1638,7 @@
   }
 
   function unlockAudio() {
+    if (nativeBirdAudio) return Promise.resolve(nativeBirdAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -1571,11 +1729,13 @@
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeBirdAudio) {
+    document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+    document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+    document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  }
   function markAudioBackgrounded() {
-    if (!audioCtx) return;
+    if (nativeBirdAudio || !audioCtx) return;
     audioForegroundRecoveryPending = true;
     audioForegroundRecoveryGeneration += 1;
     audioForegroundRecoveryInFlight = false;
@@ -1589,6 +1749,7 @@
   // A short delay gives iOS time to release another app's media session.
   // The context may say "running" even though its audio clock/output stalled.
   function scheduleForegroundAudioRecovery() {
+    if (nativeBirdAudio) return;
     if (!audioCtx || !audioForegroundRecoveryPending || document.hidden) return;
     const generation = ++audioForegroundRecoveryGeneration;
     clearTimeout(audioForegroundRecoveryTimer);
@@ -1599,6 +1760,7 @@
   }
 
   async function refreshForegroundAudio(generation) {
+    if (nativeBirdAudio) return;
     const ctx = audioCtx;
     if (!ctx || document.hidden || generation !== audioForegroundRecoveryGeneration) return;
     audioForegroundRecoveryInFlight = true;
@@ -1666,6 +1828,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeBirdAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -1708,12 +1871,19 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeBirdAudio) return;
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeBirdAudio) {
+      if (muted || returnPaused || document.hidden || state.paused ||
+          (!state.running && state.phase !== "nap")) return;
+      nativeBirdAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -1758,9 +1928,13 @@
   }
 
   function playUiTapSound() {
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
-    playGameSound(key, "uiTap");
+    const key = nextNativeBirdUiKey();
+    if (nativeBirdAudio) {
+      if (!muted && !returnPaused && !document.hidden)
+        nativeBirdAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+    } else {
+      playGameSound(key, "uiTap");
+    }
   }
 
   function playRandomFlapSound() {
@@ -1802,6 +1976,8 @@
   }
 
   function renderIntro(){
+    if (nativeBirdPending) stopNativeBirdRound();
+    clearNativeBirdFailure();
     stopLoop();
     cleanupResize();
     state.phase = "title";
@@ -1816,19 +1992,22 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onBack: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeBirdTitleHelpPops();
   }
 
   function renderModeSelect(){
+    if (nativeBirdPending) stopNativeBirdRound();
+    clearNativeBirdFailure();
     stopLoop();
     cleanupResize();
     state.phase = "mode";
@@ -1842,22 +2021,37 @@
       theme: GAME_THEME,
       backLabel: "Back to Versey Bird title",
       onBack: () => {
-        void unlockAudio();
+        if (nativeBirdAudio) stopNativeBirdRound();
+        else void unlockAudio();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        void unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeBirdAudio) {
+          if (nativeBirdPending) return;
+          primeNativeBirdFromGesture("round", mode,
+            muted ? null : nextNativeBirdUiKey());
+        } else {
+          void unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeBirdTitleHelpPops();
   }
 
   function startGame(
     mode,
     resumeCheckpoint = null
   ){
+    if (nativeBirdAudio && !muted && !nativeBirdAudio.isReady()) {
+      nativeBirdRetry = {kind:resumeCheckpoint ? "checkpoint" : "round",
+        mode,checkpoint:resumeCheckpoint};
+      showNativeBirdFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
+    clearNativeBirdFailure();
     stopLoop();
     cleanupResize();
 
@@ -2203,44 +2397,52 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        void unlockAudio();
-
-        const nextMuted = !muted;
-        if (!nextMuted) {
-          playUiTapSound();
-        }
-
-        muted = nextMuted;
+        if (!nativeBirdAudio) void unlockAudio();
+        muted = !muted;
+        if (nativeBirdAudio && muted) void nativeBirdAudio.stop();
+        if (!muted) playUiTapSound();
         return muted;
       },
       onHowToPlay: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         openHelpFromMenu();
       },
       onModeSelect: () => {
-        void unlockAudio();
+        if (nativeBirdAudio) stopNativeBirdRound();
+        else void unlockAudio();
         playUiTapSound();
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
+        if (nativeBirdAudio) stopNativeBirdRound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        void unlockAudio();
-        playUiTapSound();
+        if (nativeBirdPending || returnPaused ||
+            (nativeBirdAudio && state.paused && state.pauseReason === "menu"))
+          return false;
+        if (!nativeBirdAudio) void unlockAudio();
         setPaused(true, "menu");
+        if (nativeBirdAudio) void nativeBirdAudio.stop();
+        playUiTapSound();
+        return true;
       },
       onClose: () => {
-        void unlockAudio();
-        playUiTapSound();
-        setPaused(false, "");
+        if (returnPaused) return;
+        if (nativeBirdAudio && !muted)
+          primeNativeBirdFromGesture("resume", null, nextNativeBirdUiKey());
+        else {
+          if (!nativeBirdAudio) void unlockAudio();
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
-        void unlockAudio();
+        if (!nativeBirdAudio) void unlockAudio();
         playUiTapSound();
         setPaused(true, "menu");
       }
@@ -2249,35 +2451,28 @@
     window.VerseGameShell.wireSpeedMenu({
       id: SPEED_MENU_OVERLAY_ID,
       buttonId: "vb2SpeedPill",
-
       onOpen: () => {
-        void unlockAudio();
+        if (nativeBirdPending || returnPaused ||
+            (nativeBirdAudio && state.paused && state.pauseReason === "speed"))
+          return false;
+        if (!nativeBirdAudio) void unlockAudio();
+        setPaused(true, "speed");
+        if (nativeBirdAudio) void nativeBirdAudio.stop();
         playUiTapSound();
-
-        setPaused(
-          true,
-          "speed"
-        );
-
         return true;
       },
-
       onChange: preset => {
-        gameSpeedPresetId =
-          String(
-            preset?.id ||
-            "normal"
-          );
+        gameSpeedPresetId = String(preset?.id || "normal");
       },
-
       onClose: () => {
-        void unlockAudio();
-        playUiTapSound();
-
-        setPaused(
-          false,
-          ""
-        );
+        if (returnPaused) return;
+        if (nativeBirdAudio && !muted)
+          primeNativeBirdFromGesture("resume", null, nextNativeBirdUiKey());
+        else {
+          if (!nativeBirdAudio) void unlockAudio();
+          playUiTapSound();
+          setPaused(false, "");
+        }
       }
     });
   }
@@ -2291,6 +2486,9 @@
 
   function setPaused(paused, reason = ""){
     if (returnPaused && !paused) return;
+    if (!paused && nativeBirdAudio && !muted &&
+        state.pauseReason === "native-audio-error" &&
+        !nativeBirdAudio.isReady()) return;
     if (!state.running && state.phase !== "bonusIntro") return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
@@ -7573,6 +7771,7 @@
   // Existing menu/help pauses stay in force after a task switch.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeBirdAudio) stopNativeBirdRound();
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -7590,7 +7789,7 @@
   }
 
   function replaceWelcomeAudioContext() {
-    if (returnContextReplacements >= 1 || !audioCtx) return false;
+    if (nativeBirdAudio || returnContextReplacements >= 1 || !audioCtx) return false;
     returnContextReplacements += 1;
     audioForegroundFreshContextOnGesture = true;
     audioUnlockAttempt += 1;
@@ -7602,15 +7801,22 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    // Unlock/prime now, inside the actual child's button gesture.
-    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    // Let's go is a real child gesture. Reactivate Swift/whole PCM bank
+    // only here, never from .began/.ended or app foreground notifications.
+    const attempt = nativeBirdAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeBirdAudio.prepareFromGesture().then(result =>
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(attempt).then(ok => {
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
       welcomeClock.resume();
@@ -7628,13 +7834,19 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  birdWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeBirdAudio,
+    suppressUiSound: !!nativeBirdAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeBirdAudio) stopNativeBirdRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: launch.profileId,
     pictureBase: "../../"
   });
