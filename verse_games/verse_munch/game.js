@@ -904,6 +904,7 @@ function gameHelpHtml(){
 }
 
 function renderIntro(){
+  if (nativeMunchPending) stopNativeMunchRound();
   stopLoop();
 
   window.VerseGameShell.renderTitleScreen({
@@ -924,14 +925,16 @@ function renderIntro(){
       window.VerseGameBridge.exitGame();
     },
     onStart: () => {
-      unlockAudio();
+      if (!nativeMunchAudio) unlockAudio();
       playUiTapSound();
       renderModeSelect();
     }
   });
+  wireNativeMunchTitleHelpPops();
 }
 
 function renderModeSelect(){
+  if (nativeMunchPending) stopNativeMunchRound();
   stopLoop();
 
   window.VerseGameShell.renderModeSelect({
@@ -943,18 +946,31 @@ function renderModeSelect(){
     theme: GAME_THEME,
     backLabel: "Back to Verse Munch title",
     onBack: () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       renderIntro();
     },
     onSelect: (mode) => {
-      unlockAudio();
-      playUiTapSound();
-      startGame(mode);
+      if (nativeMunchAudio) {
+        if (nativeMunchPending) return;
+        primeNativeMunchFromGesture("round", mode,
+          muted ? null : nextNativeMunchUiKey());
+      } else {
+        unlockAudio();
+        playUiTapSound();
+        startGame(mode);
+      }
     }
   });
+  wireNativeMunchTitleHelpPops();
 }
 
   function startGame(mode){
+    if (nativeMunchAudio && !muted && !nativeMunchAudio.isReady()) {
+      nativeMunchRetry = {kind:"round",mode};
+      showNativeMunchFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
     state.runToken += 1;
     const runToken = state.runToken;
 
@@ -1113,15 +1129,18 @@ function renderComplete(){
     theme: GAME_THEME,
     backLabel: "Back to Practice Games",
     onPlayAgain: () => {
+      if (nativeMunchAudio) stopNativeMunchRound();
       playUiTapSound();
       renderModeSelect();
     },
     onMoreGames: () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       window.VerseGameBridge.exitGame();
     },
     onChangeVerse: () => {
       playUiTapSound();
+      if (nativeMunchAudio) stopNativeMunchRound();
       window.VerseGameBridge.returnToVersePicker();
     }
   });
