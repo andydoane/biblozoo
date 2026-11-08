@@ -272,7 +272,7 @@
     const token = generation;
     const timestamp = Date.now();
     try {
-      // Actual bug/tongue collision never decodes or starts an engine.
+      // A Food Slice cut, swoosh or bomb never decodes or starts an engine.
       void bounded(api().play({
         soundId, volume, eventId:"slice-" + (++nextEvent),
         requestEpochMs:timestamp
