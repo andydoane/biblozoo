@@ -887,8 +887,8 @@
     playGameSound(key);
   }
   function unlockAndTap() {
-    const key = nextUiTapKey();
     if (nativeSnakeAudio) {
+      const key = nextUiTapKey();
       // Game-less title/back buttons use the SAME native PCM worker, but
       // prepare just two UI samples from the real child gesture.
       if (!muted && !returnPaused && !document.hidden)
@@ -896,8 +896,9 @@
           (SOUND_VOLUMES[key] ?? 0.7) * volumeScale)));
       return;
     }
+    // Browser path retains its original key flip only on successful unlock.
     void unlockAudio().then((unlocked) => {
-      if (unlocked) playUiTapSound(key);
+      if (unlocked) playUiTapSound();
     });
   }
 
@@ -1253,9 +1254,12 @@
       },
 
       onClose: () => {
-        unlockAndTap();
-        if (nativeSnakeAudio && !muted) primeSnakeAudioAndContinue("resume");
-        else setPaused(false, "");
+        if (nativeSnakeAudio && !muted)
+          primeSnakeAudioAndContinue("resume", nextUiTapKey());
+        else {
+          unlockAndTap();
+          setPaused(false, "");
+        }
       }
     });
   }
