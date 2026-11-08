@@ -1037,8 +1037,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             // is playing (caught above); when PiP is paused, its .ended
             // notification can be delayed or absent. Allow ONLY an actual
             // child gesture to ask iOS to reactivate in that case.
-            guard !self.interrupted ||
-                  self.returnedToForegroundDuringInterruption ||
+            guard !self.interrupted || self.returnedToForegroundDuringInterruption ||
                   !AVAudioSession.sharedInstance().isOtherAudioPlaying else {
                 self.lastActivationResult = "interruption-pending"
                 self.appendTrace("activation-deferred")
