@@ -791,8 +791,10 @@
       onBack: () => {
         playUiTapAndUnlock();
         if (nativeBugsAudio) {
-          cancelNativeBugsPreflight();
-          void nativeBugsAudio.stop();
+          // A pre-game Back must not immediately discard the UI pop it
+          // just scheduled. Only a pending game bank needs cancellation.
+          if (nativeBugsPending) cancelNativeBugsPreflight();
+          else if (state.running) void nativeBugsAudio.stop();
         }
         renderIntro();
       },
