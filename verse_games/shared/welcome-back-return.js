@@ -12,7 +12,11 @@
   const NATIVE_AUDIO_DEFERRED_REASONS = new Set([
     "other-audio-playing", "interruption-pending",
     "gesture-required-after-interruption", "activation-cooldown",
-    "foreground-attempt-limit", "not-foreground"
+    "foreground-attempt-limit", "not-foreground",
+    // Competing sessions with higher priority (calls, system media) may
+    // reject our one explicit takeover. This remains a retriable pause,
+    // NEVER the irreversible second-error/gray game popup.
+    "activation-os-rejected"
   ]);
   function isNativeAudioDeferred(result) {
     return result?.ready !== true &&
@@ -258,10 +262,10 @@
         escape.hidden = false;
         if (status) {
           status.hidden = false;
-          status.textContent = ok.reason === "other-audio-playing" ||
-            ok.reason === "interruption-pending"
-            ? "Pause the other video's audio, then tap Let's go!"
-            : "Audio is busy. When it stops, tap Let's go!";
+          status.textContent = ["other-audio-playing",
+            "interruption-pending", "activation-os-rejected"].includes(ok.reason)
+            ? "BibloZoo couldn't start sound yet. Pause the video or tap Let's go! again."
+            : "Audio is busy. Tap Let's go! again when it's ready.";
         }
         log("welcome-back-recovery-deferred", { reason: ok.reason || "native-interruption" });
         return;
