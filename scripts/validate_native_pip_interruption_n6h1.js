@@ -90,7 +90,7 @@ async function controllerTest(i){
  const playName=a.player.soundIds && a.player.soundIds.length?a.player.soundIds[0]:null;
  // Controller exposed key maps are private: dynamically exercise one genuine
  // hot key through fixed test candidate names, never synthesize a native ID.
- const candidates=["correct","correctHit","rocketLaunch","wordTap1","sliceCut1","jump","flap","wrong","sliceCut","streak","pop1","chomp","swoosh1","cut1"];
+ const candidates=["correctWord","correct","correctHit","rocketLaunch","wordTap1","slice1","jump","wrong","streak","pop1","chomp","swoosh1"];
  let dispatched=false;for(const k of candidates){if(a.player.play(k,.4)){dispatched=true;break;}}
  assert.ok(dispatched,controllers[i]+" has a real game-key hot path");
  await tick();
