@@ -3754,6 +3754,14 @@ function spawnWrongFaceParticleBurst(){
   if (nativeSplatAudio) {
     nativeSplatAudio.configure({
       onAppInactive: () => {
+        // A held App Switcher may arrive DURING a mode preflight before
+        // WebKit becomes hidden. Invalidate that pending result too: it
+        // must never begin an abandoned round after a return.
+        if (nativeSplatPending) {
+          nativeSplatSerial++;
+          nativeSplatPending = false;
+          app.removeAttribute("aria-busy");
+        }
         if (!["game", "coverage_result", "bonus_intro", "bonus"].includes(state.screen))
           return;
         if (!splatWelcomeBack?.pauseFromNativeInactive?.())
