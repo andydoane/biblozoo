@@ -1247,6 +1247,7 @@ function renderIntro(){
     backLabel: "Back to Practice Games",
     onBack: () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.exitGame();
     },
     onStart: () => {
@@ -1254,6 +1255,7 @@ function renderIntro(){
       setScreen("mode");
     }
   });
+  wireNativeSplatTitleHelpPops();
 }
 
 function renderModeScreen(){
@@ -1266,14 +1268,22 @@ function renderModeScreen(){
     theme: GAME_THEME,
     backLabel: "Back to Verse Splat title",
     onBack: () => {
+      if (nativeSplatAudio) stopNativeSplatRound();
       playSharedUiPopSound();
       setScreen("intro");
     },
     onSelect: (mode) => {
-      playSharedUiPopSound();
-      startMode(mode);
+      if (nativeSplatAudio && nativeSplatPending) return;
+      if (nativeSplatAudio) {
+        primeNativeSplatFromGesture("round", mode,
+          muted ? null : pickNativeSplatUiKey());
+      } else {
+        playSharedUiPopSound();
+        startMode(mode);
+      }
     }
   });
+  wireNativeSplatTitleHelpPops();
 }
 
 
@@ -1646,15 +1656,18 @@ function renderEndScreen(){
     theme: GAME_THEME,
     backLabel: "Back to Practice Games",
     onPlayAgain: () => {
+      if (nativeSplatAudio) stopNativeSplatRound();
       playSharedUiPopSound();
       setScreen("mode");
     },
     onMoreGames: () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.exitGame();
     },
     onChangeVerse: () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.returnToVersePicker();
     }
   });
@@ -1682,8 +1695,14 @@ function render(){
 
   function bindScreenEvents(){
     app.querySelectorAll("[data-mode]").forEach(btn => btn.onclick = () => {
-      playSharedUiPopSound();
-      startMode(btn.dataset.mode);
+      if (nativeSplatAudio && nativeSplatPending) return;
+      if (nativeSplatAudio)
+        primeNativeSplatFromGesture("round", btn.dataset.mode,
+          muted ? null : pickNativeSplatUiKey());
+      else {
+        playSharedUiPopSound();
+        startMode(btn.dataset.mode);
+      }
     });
 
     app.querySelectorAll("[data-action='show-help-intro']").forEach(btn => btn.onclick = () => {
@@ -1699,12 +1718,14 @@ function render(){
     });
 
     app.querySelectorAll("[data-action='play-again']").forEach(btn => btn.onclick = () => {
+      if (nativeSplatAudio) stopNativeSplatRound();
       playSharedUiPopSound();
       setScreen("mode");
     });
 
     app.querySelectorAll("[data-action='exit-game']").forEach(btn => btn.onclick = () => {
       playSharedUiPopSound();
+      if (nativeSplatAudio) stopNativeSplatRound();
       window.VerseGameBridge.exitGame();
     });
     app.querySelectorAll("[data-action='coverage-result-continue']").forEach(btn => btn.onclick = continueAfterCoverageResult);
