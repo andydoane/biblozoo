@@ -112,13 +112,16 @@
   }
 
   function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
-    getSoundContext, isSoundMuted, escapeText, preserveFocus = false, suppressUiSound = false } = {}) {
+    getSoundContext, isSoundMuted, escapeText, preserveFocus = false,
+    suppressUiSound = false, useZooEscape = true } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
         typeof onContinue !== "function") return null;
 
-    if (root.BibloZooZooEscape?.create) {
+    // N6b opt-out affects only the isolated native Snake owner. Every other
+    // Web/Feeding/Playground owner keeps the existing Zoo Escape contract.
+    if (useZooEscape && root.BibloZooZooEscape?.create) {
       const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
         onExit, profileId, pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
         escapeText, preserveFocus,
