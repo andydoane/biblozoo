@@ -116,7 +116,7 @@ This policy is deliberately written *inside* the handoff so a completely new con
 
 ## 8. Recent milestones (verify status on GitHub)
 
-**Retained historical owner-accepted milestones (not the current 7/12 count):** N6g Verse Invaders is MERGED and OWNER-TESTED/PASSED. N6h Verse Munch PR #47 was subsequently owner-merged and its ordinary gameplay sound owner-tested. The prior **6/12 exactly halfway** milestone followed Invaders #46; Munch #47 raised the real accepted count to 7/12. Current N6i #50 remains proposed, pending iPhone sound acceptance.
+**Retained historical owner-accepted milestones (not the current 7/12 count):** Dino Dash #45 was OWNER-TESTED by the owner after its merge. N6g Verse Invaders PR #46 followed Dino and was owner-tested.  N6g Verse Invaders is MERGED and OWNER-TESTED/PASSED. N6h Verse Munch PR #47 was subsequently owner-merged and its ordinary gameplay sound owner-tested. The prior **6/12 exactly halfway** milestone followed Invaders #46; Munch #47 raised the real accepted count to 7/12. Current N6i #50 remains proposed, pending iPhone sound acceptance.
 
 
 | `ios-prep` commit | Verified commit subject / scope |
