@@ -384,6 +384,102 @@ const FACE_MAP = {
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
+  // N6h: on native iOS all Munch effects are fixed Swift AVAudioEngine PCM.
+  // Web/PWA/Android keep the original browser Web Audio paths below.
+  const nativeMunchAudio = window.BibloZooNativeVerseMunchAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseMunchAudio : null;
+  let nativeMunchSerial = 0;
+  let nativeMunchPending = false;
+  let nativeMunchRetry = {kind:"round",mode:null};
+  let munchWelcomeBack = null;
+
+  function nextNativeMunchUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function wireNativeMunchTitleHelpPops() {
+    if (!nativeMunchAudio) return;
+    // Never replace shared shell's Start/Help/Back handlers, only add UI PCM.
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID+"CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeMunchRound() {
+    if (!nativeMunchAudio) return;
+    ++nativeMunchSerial;
+    nativeMunchPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeMunchAudio.stop();
+  }
+  function clearNativeMunchFailure() {
+    document.getElementById("vmunchNativeAudioFailure")?.remove();
+  }
+  function showNativeMunchFailure(message) {
+    if (!nativeMunchAudio) return;
+    let dialog = document.getElementById("vmunchNativeAudioFailure");
+    if (!dialog) {
+      dialog = document.createElement("div");
+      dialog.id = "vmunchNativeAudioFailure";
+      dialog.className = "vmunch-native-audio-failure";
+      dialog.innerHTML = `
+        <section class="vmunch-native-audio-card" role="dialog"
+          aria-modal="true" aria-label="Verse Munch native sound problem">
+          <h2>Verse Munch</h2>
+          <p role="status" data-munch-audio-status></p>
+          <button type="button" data-munch-audio-retry>Try Again</button>
+          <button type="button" data-munch-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector("[data-munch-audio-retry]").onclick = () =>
+        primeNativeMunchFromGesture(nativeMunchRetry.kind,nativeMunchRetry.mode);
+      dialog.querySelector("[data-munch-audio-back]").onclick = () => {
+        stopNativeMunchRound();
+        clearNativeMunchFailure();
+        if (nativeMunchRetry.kind === "round") renderModeSelect();
+        else {
+          cancelActiveRun();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    dialog.querySelector("[data-munch-audio-status]").textContent = message;
+  }
+  function primeNativeMunchFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeMunchPending) return;
+    if (!nativeMunchAudio || muted) {
+      clearNativeMunchFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeMunchRetry = {kind,mode};
+    const token = ++nativeMunchSerial;
+    nativeMunchPending = true;
+    clearNativeMunchFailure();
+    app.setAttribute("aria-busy", "true");
+    // Swift activation is requested synchronously on the child's *actual*
+    // difficulty, menu Close, Retry or Resume click. UI pop plays first.
+    const request = nativeMunchAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeMunchSerial || document.hidden || returnPaused) return;
+      nativeMunchPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else showNativeMunchFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(() => {
+      if (token !== nativeMunchSerial || document.hidden || returnPaused) return;
+      nativeMunchPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeMunchFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+
+
+
   const state = {
     running:false,
     rafId:0,
