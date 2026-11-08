@@ -675,6 +675,7 @@
   }
 
   function renderIntro() {
+    if (nativeInvadersPending) stopNativeInvadersRound();
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -687,16 +688,24 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        if (nativeInvadersAudio) {
+          playUiTapSound();
+          stopNativeInvadersRound();
+        }
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        unlockAudio();
+        if (!nativeInvadersAudio) unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeInvadersTitleHelpPops();
   }
 
   function renderModeSelect() {
+    if (nativeInvadersPending) stopNativeInvadersRound();
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -708,18 +717,31 @@
       theme: GAME_THEME,
       backLabel: "Back to Verse Invaders title",
       onBack: () => {
+        if (nativeInvadersAudio) stopNativeInvadersRound();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeInvadersAudio) {
+          if (nativeInvadersPending) return;
+          primeNativeInvadersFromGesture("round", mode,
+            muted ? null : nextInvadersUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeInvadersTitleHelpPops();
   }
 
   function startGame(mode) {
+    if (nativeInvadersAudio && !muted && !nativeInvadersAudio.isReady()) {
+      nativeInvadersRetry = {kind:"round",mode};
+      showNativeInvadersFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
     selectedMode = mode;
     completionMarked = false;
     completionResult = null;
