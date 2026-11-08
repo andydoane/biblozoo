@@ -985,9 +985,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         if session.category != .soloAmbient {
             return "category-not-soloambient"
         }
-        // .soloAmbient does NOT mix with paused/playing YouTube PiP.
-        // Preserve YouTube's playback priority: never steal another active
-        // app's audio on a DEV, game, UI, Feeding or Learn gesture.
+        // A hot play/preload never steals YouTube's audio. Only an explicit
+        // activateFromGesture (below) can request session priority. Preserve
+        // the busy reason for calls outside a real child gesture.
         if session.isOtherAudioPlaying { return "other-audio-playing" }
         // Never clear a genuine .began merely because the app became active.
         // See activateFromGesture: a bounded OS decision is required after a
@@ -1017,34 +1017,37 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                   purpose == "learn" || purpose == "game" else {
                 finish(["ready": false, "reason": "invalid-purpose"]); return
             }
+            // N6h.2: do NOT deny the real child's tap simply because YouTube
+            // PiP is currently playing. A nonmixable .soloAmbient session is
+            // intended to pause competing audio when this foreground app
+            // explicitly calls setActive(true). N6h.1's unconditional
+            // "other-audio-playing" gate trapped Home and every game's mode
+            // screen whenever PiP was still audible.
             if let blocked = self.unavailableReason(), blocked != "interruption-pending",
                blocked != "gesture-required-after-interruption",
-               blocked != "media-reset-requires-gesture" {
+               blocked != "media-reset-requires-gesture",
+               blocked != "other-audio-playing" {
                 self.lastActivationResult = blocked
                 self.appendTrace("activation-denied")
                 finish(["ready": false, "reason": blocked]); return
             }
             let firstTap = !self.hasGestureActivatedSession
             let needsRecovery = firstTap || self.interrupted ||
-                self.needsGestureAfterInterruption || self.needsGestureAfterReset
+                self.needsGestureAfterInterruption || self.needsGestureAfterReset ||
+                AVAudioSession.sharedInstance().isOtherAudioPlaying
             if !needsRecovery {
                 self.lastActivationResult = "not-needed"
                 self.appendTrace("activation-not-needed")
                 finish(["ready": true, "attempted": false, "reason": "not-needed"])
                 return
             }
-            // A real pending .began remains protected while another app
-            // is playing (caught above); when PiP is paused, its .ended
-            // notification can be delayed or absent. Allow ONLY an actual
-            // child gesture to ask iOS to reactivate in that case.
-            guard !self.interrupted || self.returnedToForegroundDuringInterruption ||
-                  !AVAudioSession.sharedInstance().isOtherAudioPlaying else {
-                self.lastActivationResult = "interruption-pending"
-                self.appendTrace("activation-deferred")
-                finish(["ready": false, "attempted": false,
-                              "reason": "interruption-pending"])
-                return
-            }
+            // An active .began does not prohibit a new explicit foreground
+            // tap: that is exactly when the child can reclaim the soloAmbient
+            // speaker from PiP. Never do this automatically on a .began,
+            // .ended, route change or foreground notification. iOS alone
+            // decides whether the setActive(true) call is accepted; telephone
+            // calls or higher-priority audio can still reject it. Keep the
+            // existing bounded attempt/cooldown budget and real failure reason.
             let now = Date()
             if let last = self.lastActivationAt,
                now.timeIntervalSince(last) < self.minimumActivationInterval {
