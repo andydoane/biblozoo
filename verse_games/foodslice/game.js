@@ -275,9 +275,136 @@
   state.buildSizeClass = state.buildData.buildSizeClass;
 
 
+  // N6d: native-only iOS Food Slice output belongs to the existing
+  // Swift .soloAmbient session and serialized PCM engine. Web/PWA/Android
+  // retain the untouched Web Audio code below.
+  const nativeSliceAudio = window.BibloZooNativeFoodSliceAudio?.isAvailable?.()
+    ? window.BibloZooNativeFoodSliceAudio : null;
+  let nativeSliceSession = 0;
+  let nativeSlicePending = false;
+  let nativeSliceRetry = { kind: "round", mode: null };
+  let sliceWelcomeBack = null;
+
+  function nextSliceUiKey() {
+    uiSoundFlip = !uiSoundFlip;
+    return uiSoundFlip ? "uiTap1" : "uiTap2";
+  }
+  function wireNativeSliceHelpPops() {
+    if (!nativeSliceAudio) return;
+    // The shell owns navigation. Add a listener; never override onclick.
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function hideNativeSliceFailure() {
+    document.getElementById("fsNativeAudioFailure")?.remove();
+  }
+  function cancelNativeSlicePreflight() {
+    if (!nativeSliceAudio || !nativeSlicePending) return;
+    nativeSliceSession++;
+    nativeSlicePending = false;
+    app.removeAttribute("aria-busy");
+    void nativeSliceAudio.stop(); // old async result cannot start a new screen
+  }
+  function showNativeSliceFailure(message) {
+    if (!nativeSliceAudio) return;
+    let gate = document.getElementById("fsNativeAudioFailure");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "fsNativeAudioFailure";
+      gate.className = "fs-native-audio-failure";
+      gate.innerHTML = `
+        <section class="fs-native-audio-card" role="dialog"
+            aria-modal="true" aria-label="Food Slice native sound problem">
+          <h2>Food Slice</h2>
+          <p role="status" data-slice-audio-status></p>
+          <button type="button" data-slice-audio-retry>Try Again</button>
+          <button type="button" data-slice-audio-exit>Back</button>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-slice-audio-retry]").onclick = () =>
+        primeNativeSliceFromGesture(nativeSliceRetry.kind, nativeSliceRetry.mode);
+      gate.querySelector("[data-slice-audio-exit]").onclick = () => {
+        cancelNativeSlicePreflight();
+        hideNativeSliceFailure();
+        void nativeSliceAudio.stop();
+        if (state.running) {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        } else renderModeSelect();
+      };
+    }
+    gate.querySelector("[data-slice-audio-status]").textContent = message;
+  }
+  function primeNativeSliceFromGesture(kind = "round", mode = null, uiPopKey = null) {
+    // A child may navigate while the previous gesture is still preparing.
+    // Ignore duplicated mode/Close clicks rather than preparing two banks.
+    if (nativeSlicePending) return;
+    if (!nativeSliceAudio || muted) {
+      hideNativeSliceFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeSliceRetry = {kind,mode};
+    const token = ++nativeSliceSession;
+    nativeSlicePending = true;
+    hideNativeSliceFailure();
+    app.setAttribute("aria-busy", "true");
+    // The only activation call happens NOW inside the real child gesture.
+    // UI PCM pop schedules before the other ten effect samples.
+    const started = nativeSliceAudio.prepareFromGesture(uiPopKey
+      ? {key:uiPopKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(started).then(result => {
+      if (token !== nativeSliceSession || document.hidden || returnPaused) return;
+      nativeSlicePending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else {
+        showNativeSliceFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeSliceSession || document.hidden || returnPaused) return;
+      nativeSlicePending = false;
+      app.removeAttribute("aria-busy");
+      showNativeSliceFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeSliceAudio) {
+    nativeSliceAudio.configure({
+      onAppInactive: () => {
+        cancelNativeSlicePreflight();
+        if (!state.running || state.done) return;
+        if (!sliceWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Never activate native output automatically on foreground.
+        sliceWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        // Wrong/bomb clips can complete after their 320ms animation pause
+        // starts. A real native play failure must still stop that round;
+        // only menu/help/Welcome Back/done deliberately ignore hot cues.
+        if (muted || returnPaused || document.hidden || state.done ||
+            !state.running ||
+            (state.paused && !["wrong", "bomb"].includes(state.pauseReason))) return;
+        setPaused(true, "native-audio-error");
+        nativeSliceRetry = {kind:"resume",mode:null};
+        showNativeSliceFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) cancelNativeSlicePreflight();
+    });
+  }
+
   renderIntro();
 
   function renderIntro(reason = "initial") {
+    cancelNativeSlicePreflight();
     recordFoodSliceCompletion("title-rendered", { reason });
     stopLoop();
 
@@ -291,19 +418,22 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onBack: () => {
-        void unlockAudio();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
+        else void unlockAudio();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeSliceHelpPops();
   }
 
   function renderModeSelect() {
+    cancelNativeSlicePreflight();
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -315,20 +445,30 @@
       theme: GAME_THEME,
       backLabel: "Back to Food Slice title",
       onBack: () => {
-        void unlockAudio();
+        cancelNativeSlicePreflight();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        void unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeSliceAudio && nativeSlicePending) return;
+        if (nativeSliceAudio) {
+          primeNativeSliceFromGesture("round", mode,
+            muted ? null : nextSliceUiKey());
+        } else {
+          void unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeSliceHelpPops();
   }
 
   function startGame(mode) {
-    void unlockAudio();
+    // A native-only round reaches this function ONLY after the fixed PCM
+    // bank is prepared (or intentional mute). No Web unlock on iOS.
+    if (!nativeSliceAudio) void unlockAudio();
 
     selectedMode = mode;
     completionMarked = false;
@@ -425,18 +565,20 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
         renderModeSelect();
       },
       onMoreGames: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
-        void unlockAudio();
+        if (!nativeSliceAudio) void unlockAudio();
         playUiTapSound();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -473,8 +615,11 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeSliceAudio && muted) void nativeSliceAudio.stop();
         if (!muted) {
-          void unlockAudio();
+          if (!nativeSliceAudio) void unlockAudio();
+          // The actual menu Close gesture will prepare the complete bank.
+          // Unmute here only requests a fixed native UI clip.
           playUiTapSound();
         }
         return muted;
@@ -485,6 +630,7 @@
       },
       onModeSelect: () => {
         recordFoodSliceCompletion("menu-mode-select");
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
@@ -493,16 +639,22 @@
       onExit: () => {
         recordFoodSliceCompletion("menu-exit");
         playUiTapSound();
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        playUiTapSound();
         setPaused(true, "menu");
+        if (nativeSliceAudio) void nativeSliceAudio.stop();
+        playUiTapSound();
       },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (nativeSliceAudio && !muted)
+          primeNativeSliceFromGesture("resume", null, nextSliceUiKey());
+        else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -561,8 +713,10 @@
           if (e.cancelable) e.preventDefault();
           e.stopPropagation();
         }
-        void unlockAudio();
-        playUiTapSound();
+        if (!nativeSliceAudio) {
+          void unlockAudio();
+          playUiTapSound();
+        }
         openGameMenu();
       };
       menuPill.onclick = openFromPill;
@@ -582,6 +736,10 @@
     const menuOverlay = document.getElementById("fsGameMenuOverlay");
     if (menuOverlay) {
       setPaused(true, "menu");
+      if (nativeSliceAudio) {
+        void nativeSliceAudio.stop();
+        playUiTapSound(); // new UI-only gesture, after worker teardown
+      }
       menuOverlay.classList.add("is-open");
       menuOverlay.setAttribute("aria-hidden", "false");
     }
@@ -600,7 +758,11 @@
     }
 
     const helpOverlay = document.getElementById("fsHelpOverlay");
-    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) setPaused(false, "");
+    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) {
+      if (nativeSliceAudio && !muted)
+        primeNativeSliceFromGesture("resume", null, nextSliceUiKey());
+      else setPaused(false, "");
+    }
   }
 
   function openHelpFromMenu() {
@@ -615,9 +777,13 @@
 
 
   function closeHelpOverlay() {
-    playUiTapSound();
     window.VerseGameShell.closeHelp(HELP_OVERLAY_ID);
-    setPaused(false, "");
+    if (nativeSliceAudio && !muted)
+      primeNativeSliceFromGesture("resume", null, nextSliceUiKey());
+    else {
+      playUiTapSound();
+      setPaused(false, "");
+    }
   }
 
   function backToMenuFromHelp() {
@@ -631,6 +797,12 @@
   }
 
   function setPaused(paused, reason = "") {
+    // A delayed wrong/bomb timer must not silently bypass an actual native
+    // playback failure. Only fresh, complete native PCM preparation on the
+    // child's Try Again/Let's go gesture may release this paused round.
+    if (!paused && nativeSliceAudio &&
+        state.pauseReason === "native-audio-error" &&
+        !muted && !nativeSliceAudio.isReady()) return;
     if (returnPaused && !paused) {
       // A wrong-tap/bomb animation may complete while away. Do not unpause
       // gameplay until the child's verified Let's go! gesture.
@@ -2351,6 +2523,7 @@
   }
 
   function getAudioContext() {
+    if (nativeSliceAudio) return null; // Native iOS never creates a Web Audio graph
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -2373,6 +2546,7 @@
   }
 
   function unlockAudio() {
+    if (nativeSliceAudio) return Promise.resolve(nativeSliceAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -2463,9 +2637,11 @@
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeSliceAudio) {
+    document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+    document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+    document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  }
   function markAudioBackgrounded() {
     if (!audioCtx) return;
     audioForegroundRecoveryPending = true;
@@ -2600,12 +2776,22 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeSliceAudio) return; // all native samples owned by Swift
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeSliceAudio) {
+      if (muted || returnPaused || document.hidden || !state.running ||
+          state.done || (state.paused &&
+            !(key === "bomb" && state.pauseReason === "bomb"))) return;
+      // The Swift worker plays predecoded PCM only; no fetch/decode/engine
+      // start from the slicing or fruit-spawn event.
+      nativeSliceAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -2654,8 +2840,15 @@
     if (now - lastUiTapAt < 70) return;
 
     lastUiTapAt = now;
-    uiSoundFlip = !uiSoundFlip;
-    playGameSound(uiSoundFlip ? "uiTap1" : "uiTap2", "uiTap");
+    const key = nextSliceUiKey();
+    if (nativeSliceAudio) {
+      // Title/Back/Help/UI never requires full gameplay readiness. This
+      // activation request occurs only in the child's real button gesture.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeSliceAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
+    playGameSound(key, "uiTap");
   }
 
 
@@ -2698,6 +2891,10 @@
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeSliceAudio) {
+      cancelNativeSlicePreflight();
+      void nativeSliceAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -2714,17 +2911,24 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeSliceAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Only a child's actual Let's go! click can reactivate native PCM.
+    // Do not infer acoustic output from Swift's returned "ready" status.
+    const restore = nativeSliceAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeSliceAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
@@ -2742,14 +2946,20 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  sliceWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeSliceAudio,
+    suppressUiSound: !!nativeSliceAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeSliceAudio) void nativeSliceAudio.stop();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
