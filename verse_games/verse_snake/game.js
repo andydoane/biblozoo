@@ -556,7 +556,7 @@
     // the child's mode-select / menu-close / Retry click, NOT from a timer.
     const started = nativeSnakeAudio.prepareFromGesture(uiPopKey
       ? { key: uiPopKey, volume: Math.min(1, Math.max(0,
-          (SOUND_VOLUMES[uiPopKey] ?? 0.7) * volumeScale)) } : null);
+          (SOUND_VOLUMES[uiPopKey] ?? 0.7))) } : null);
     void Promise.resolve(started).then(result => {
       if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
       nativeSnakeGatePending = false;
@@ -893,7 +893,7 @@
       // prepare just two UI samples from the real child gesture.
       if (!muted && !returnPaused && !document.hidden)
         nativeSnakeAudio.tapUiFromGesture(key, Math.min(1, Math.max(0,
-          (SOUND_VOLUMES[key] ?? 0.7) * volumeScale)));
+          (SOUND_VOLUMES[key] ?? 0.7))));
       return;
     }
     // Browser path retains its original key flip only on successful unlock.
@@ -953,6 +953,15 @@
     setPaused(true, "help");
   }
 
+  // Shared game-shell owns Help navigation; wire only the native UI pop
+  // on its existing buttons, without replacing their click actions.
+  function wireNativeSnakeHelpPops() {
+    if (!nativeSnakeAudio) return;
+    document.getElementById("helpBtn")?.addEventListener("click", unlockAndTap);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", unlockAndTap);
+  }
+
   function renderIntroScreen(){
     abandonNativeSnakePreflight();
     stopLoop();
@@ -975,6 +984,7 @@
         renderModeSelect();
       }
     });
+    wireNativeSnakeHelpPops();
   }
 
   function renderModeSelect(){
@@ -1010,6 +1020,7 @@
         }
       }
     });
+    wireNativeSnakeHelpPops();
   }
 
   function renderGameScreen(){
