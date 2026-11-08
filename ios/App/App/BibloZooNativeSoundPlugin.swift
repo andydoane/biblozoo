@@ -111,6 +111,22 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "dino-streak": "dino_dash_streak",
         "dino-wrong": "dino_dash_wrong"
     ]
+    // N6g Verse Invaders: 13 exact packaged MP3s; aliases share one PCM.
+    private let verseInvadersSoundResources: [String: String] = [
+        "inv-launch": "verse_invaders_launch",
+        "inv-correct": "verse_invaders_correct",
+        "inv-wrong": "verse_invaders_wrong",
+        "inv-abduction": "verse_invaders_abduction",
+        "inv-streak": "verse_invaders_streak",
+        "inv-bonus-start": "verse_invaders_bonus_start",
+        "inv-pop-1": "verse_invaders_pop_1",
+        "inv-pop-2": "verse_invaders_pop_2",
+        "inv-pop-3": "verse_invaders_pop_3",
+        "inv-pop-4": "verse_invaders_pop_4",
+        "inv-pop-5": "verse_invaders_pop_5",
+        "inv-bonus-penalty": "verse_invaders_wrong_2",
+        "inv-bonus-reveal": "verse_invaders_bonus_result"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -169,7 +185,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "splat-wrong", "splat-streak", "splat-paint-score",
         "splat-start", "splat-positive",
         "dino-collision", "dino-correct", "dino-fall", "dino-finish",
-        "dino-jump", "dino-jump2", "dino-streak", "dino-wrong"
+        "dino-jump", "dino-jump2", "dino-streak", "dino-wrong",
+        "inv-launch", "inv-correct", "inv-wrong", "inv-abduction",
+        "inv-streak", "inv-bonus-start",
+        "inv-pop-1", "inv-pop-2", "inv-pop-3", "inv-pop-4", "inv-pop-5",
+        "inv-bonus-penalty", "inv-bonus-reveal"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1018,6 +1038,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               foodSliceSoundResources[soundId] != nil ||
               verseSplatSoundResources[soundId] != nil ||
               dinoDashSoundResources[soundId] != nil ||
+              verseInvadersSoundResources[soundId] != nil ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1119,6 +1140,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.verseInvadersSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/verse_invaders/verse_invaders_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }

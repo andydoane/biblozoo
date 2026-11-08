@@ -231,6 +231,102 @@
   let silenceAudio = null;
   let audioUnlocked = false;
   let audioUnlockPromise = null;
+  // N6g: only the native iOS Audio Test sends Invaders effects into the
+  // existing one Swift .soloAmbient session and serialized AVAudioEngine PCM.
+  // Browser/PWA/Android keep the untouched Web Audio branch below.
+  const nativeInvadersAudio = window.BibloZooNativeVerseInvadersAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseInvadersAudio : null;
+  let nativeInvadersSerial = 0;
+  let nativeInvadersPending = false;
+  let nativeInvadersRetry = {kind:"round",mode:null};
+  let invadersWelcomeBack = null;
+
+  function nextInvadersUiKey() {
+    const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
+    state.uiSoundFlip = !state.uiSoundFlip;
+    return key;
+  }
+  function wireNativeInvadersTitleHelpPops() {
+    if (!nativeInvadersAudio) return;
+    // The game shell owns navigation; append only a fixed native sound.
+    document.getElementById("helpBtn")
+      ?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID+"CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeInvadersRound() {
+    if (!nativeInvadersAudio) return;
+    ++nativeInvadersSerial;
+    nativeInvadersPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeInvadersAudio.stop();
+  }
+  function clearNativeInvadersFailure() {
+    document.getElementById("vinvNativeAudioFailure")?.remove();
+  }
+  function showNativeInvadersFailure(message) {
+    if (!nativeInvadersAudio) return;
+    let dialog = document.getElementById("vinvNativeAudioFailure");
+    if (!dialog) {
+      dialog = document.createElement("div");
+      dialog.id = "vinvNativeAudioFailure";
+      dialog.className = "vinv-native-audio-failure";
+      dialog.innerHTML = `
+        <section class="vinv-native-audio-card" role="dialog"
+          aria-modal="true" aria-label="Verse Invaders native sound problem">
+          <h2>Verse Invaders</h2>
+          <p role="status" data-inv-audio-status></p>
+          <button type="button" data-inv-audio-retry>Try Again</button>
+          <button type="button" data-inv-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector("[data-inv-audio-retry]").onclick = () =>
+        primeNativeInvadersFromGesture(nativeInvadersRetry.kind,
+          nativeInvadersRetry.mode);
+      dialog.querySelector("[data-inv-audio-back]").onclick = () => {
+        stopNativeInvadersRound();
+        clearNativeInvadersFailure();
+        if (nativeInvadersRetry.kind === "round") renderModeSelect();
+        else {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    dialog.querySelector("[data-inv-audio-status]").textContent = message;
+  }
+  function primeNativeInvadersFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeInvadersPending) return;
+    if (!nativeInvadersAudio || muted) {
+      clearNativeInvadersFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeInvadersRetry = {kind,mode};
+    const token = ++nativeInvadersSerial;
+    nativeInvadersPending = true;
+    clearNativeInvadersFailure();
+    app.setAttribute("aria-busy", "true");
+    // Initiate Swift activation NOW in child's real mode/Close/Retry tap.
+    // Two UI PCM samples play before the thirteen unique game samples.
+    const request = nativeInvadersAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeInvadersSerial || document.hidden || returnPaused) return;
+      nativeInvadersPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else showNativeInvadersFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(() => {
+      if (token !== nativeInvadersSerial || document.hidden || returnPaused) return;
+      nativeInvadersPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeInvadersFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
@@ -305,6 +401,36 @@
   });
   const verseWords = buildData.words;
 
+  if (nativeInvadersAudio) {
+    nativeInvadersAudio.configure({
+      onAppInactive: () => {
+        // UIKit's held App Switcher can be inactive while WebKit remains
+        // visibly mounted, including in the middle of mode preparation.
+        if (nativeInvadersPending) stopNativeInvadersRound();
+        if (!state.running || completionMarked) return;
+        if (!invadersWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // No automatic native activation/audio on foreground.
+        invadersWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden || completionMarked ||
+            !state.running ||
+            (state.paused && state.pauseReason !== "native-audio-error"))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeInvadersRetry = {kind:"resume",mode:null};
+        showNativeInvadersFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeInvadersPending)
+        stopNativeInvadersRound();
+    });
+  }
+
   await preloadAlienSvg();
   renderIntro();
 
@@ -329,6 +455,7 @@
   }
 
   function getAudioContext() {
+    if (nativeInvadersAudio) return null; // native iOS: no Web Audio context
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -339,6 +466,7 @@
   }
 
   function ensureSilenceAudio() {
+    if (nativeInvadersAudio) return null; // native iOS: no HTML silence
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -351,6 +479,8 @@
   }
 
   function unlockAudio() {
+    if (nativeInvadersAudio)
+      return Promise.resolve(nativeInvadersAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx || ctx.state === "closed") return Promise.resolve(false);
     if (ctx.state === "running") {
@@ -416,13 +546,15 @@
     if (returnPaused) return;
     if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
   }
-  document.addEventListener("pointerdown", recoverInvadersAudioOnGesture, true);
-  document.addEventListener("keydown", recoverInvadersAudioOnGesture, true);
-  document.addEventListener("click", recoverInvadersAudioOnGesture, true);
-  if (!window.PointerEvent) document.addEventListener("touchstart", recoverInvadersAudioOnGesture, true);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) audioUnlocked = false;
-  });
+  if (!nativeInvadersAudio) {
+    document.addEventListener("pointerdown", recoverInvadersAudioOnGesture, true);
+    document.addEventListener("keydown", recoverInvadersAudioOnGesture, true);
+    document.addEventListener("click", recoverInvadersAudioOnGesture, true);
+    if (!window.PointerEvent) document.addEventListener("touchstart", recoverInvadersAudioOnGesture, true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) audioUnlocked = false;
+    });
+  }
 
   function soundVolume(key) {
     const master = Number(SOUND_TUNING.masterVolume);
@@ -435,6 +567,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeInvadersAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -478,12 +611,21 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeInvadersAudio) return; // Swift owns the whole predecoded PCM bank
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeInvadersAudio) {
+      if (muted || returnPaused || document.hidden || !state.running ||
+          state.paused || completionMarked) return;
+      // Original key and volume choice, fixed IDs in the native controller;
+      // no fetch/decode/HTML/Web fallbacks on hot rocket/alien/bonus events.
+      nativeInvadersAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted || returnPaused) return;
 
     const ctx = getAudioContext();
@@ -511,9 +653,14 @@
   }
 
   function playUiTapSound() {
-    const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
-    state.uiSoundFlip = !state.uiSoundFlip;
-    // Preserve the sound from the tap that reactivates an interrupted context.
+    const key = nextInvadersUiKey();
+    if (nativeInvadersAudio) {
+      // Title/Back/Help/UI taps request just the two native UI clips.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeInvadersAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
+    // Browser/PWA/Android original Web Audio path.
     void unlockAudio().then(unlocked => {
       if (unlocked && !muted) void playGameSound(key, "uiTap");
     });
@@ -558,6 +705,7 @@
   }
 
   function renderIntro() {
+    if (nativeInvadersPending) stopNativeInvadersRound();
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -570,16 +718,24 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        if (nativeInvadersAudio) {
+          playUiTapSound();
+          stopNativeInvadersRound();
+        }
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        unlockAudio();
+        if (!nativeInvadersAudio) unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeInvadersTitleHelpPops();
   }
 
   function renderModeSelect() {
+    if (nativeInvadersPending) stopNativeInvadersRound();
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -591,18 +747,31 @@
       theme: GAME_THEME,
       backLabel: "Back to Verse Invaders title",
       onBack: () => {
+        if (nativeInvadersAudio) stopNativeInvadersRound();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeInvadersAudio) {
+          if (nativeInvadersPending) return;
+          primeNativeInvadersFromGesture("round", mode,
+            muted ? null : nextInvadersUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeInvadersTitleHelpPops();
   }
 
   function startGame(mode) {
+    if (nativeInvadersAudio && !muted && !nativeInvadersAudio.isReady()) {
+      nativeInvadersRetry = {kind:"round",mode};
+      showNativeInvadersFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
     selectedMode = mode;
     completionMarked = false;
     completionResult = null;
@@ -745,6 +914,8 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeInvadersAudio && muted) void nativeInvadersAudio.stop();
+        if (nativeInvadersAudio && !muted) playUiTapSound();
         return muted;
       },
       onHowToPlay: () => {
@@ -752,6 +923,7 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeInvadersAudio) stopNativeInvadersRound();
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
@@ -759,13 +931,28 @@
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeInvadersAudio) stopNativeInvadersRound();
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
-      onOpen: () => setPaused(true, "menu"),
+      onOpen: () => {
+        // The shell can dispatch pointerdown plus click for one tap.
+        if (nativeInvadersPending || returnPaused ||
+            (nativeInvadersAudio && state.paused &&
+             state.pauseReason === "menu")) return false;
+        setPaused(true, "menu");
+        if (nativeInvadersAudio) {
+          void nativeInvadersAudio.stop();
+          playUiTapSound();
+        }
+      },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (nativeInvadersAudio && !muted)
+          primeNativeInvadersFromGesture("resume", null, nextInvadersUiKey());
+        else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -777,6 +964,9 @@
   function setPaused(paused, reason = "") {
     // Menu/help callbacks must not dismiss a task-switch pause.
     if (returnPaused && !paused) return;
+    if (!paused && nativeInvadersAudio &&
+        state.pauseReason === "native-audio-error" &&
+        !muted && !nativeInvadersAudio.isReady()) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
     if (!paused) {
@@ -3120,6 +3310,7 @@
   // foreground verified audio gesture can release the task-switch pause.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeInvadersAudio) stopNativeInvadersRound();
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -3142,7 +3333,7 @@
   }
 
   function replaceWelcomeAudioContext() {
-    if (returnContextReplacements >= 1) return false;
+    if (nativeInvadersAudio || returnContextReplacements >= 1) return false;
     const AudioCtor = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtor) return false;
     let fresh;
@@ -3163,14 +3354,19 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    // Synchronously initiate Web Audio unlock from this child's actual tap.
-    const recovery = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    // The child's actual Let's go! gesture calls Swift directly.
+    // Do not infer loudspeaker sound from a prepared/accepted response.
+    const recovery = nativeInvadersAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeInvadersAudio.prepareFromGesture().then(result =>
+            result?.ready === true))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(recovery).then(ok => {
       if (!ok || document.hidden || session !== returnSession) return false;
       welcomeClock.resume();
@@ -3190,13 +3386,19 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  invadersWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeInvadersAudio,
+    suppressUiSound: !!nativeInvadersAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completionMarked,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeInvadersAudio) stopNativeInvadersRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
