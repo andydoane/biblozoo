@@ -556,6 +556,11 @@
   }
   if (nativeSnakeAudio) {
     nativeSnakeAudio.configure({
+      onAppInactive: () => {
+        // WebKit may still be visible in the held App Switcher thumbnail.
+        // Use the same existing physics/animation Welcome Back pause.
+        if (state.running && !completed) pauseForTaskSwitch();
+      },
       onPlaybackFailure: () => {
         if (document.hidden || muted || completed || returnPaused ||
             !state.running || state.paused) return;
