@@ -65,6 +65,27 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### N6b.1 — quiet Scripture Snake normal preflight, error-only Try Again (PR #38)
+
+**Owner real iPhone evidence:** N6b [#37](https://github.com/andydoane/biblozoo/pull/37) owner-merged as `c33c15a3`; owner played Scripture Snake repeatedly, including **multiple task switches with successful recovery each time**. Their one new complaint was **light-gray popup screens after difficulty selection and sometimes task return**. These were introduced by N6b as an every-preflight “Getting native game sounds ready…” gate, **not part of original Snake**. The report does not separately establish audibility of every individual effect or precise device latency.
+
+[N6b.1 PR #38](https://github.com/andydoane/biblozoo/pull/38) removes the *routine successful* gray audio-preparation dialog while preserving every important safety gate. On genuine **Choose Difficulty**, menu/speed **Close** and plain **Welcome Back → Let's go!**, Swift activation and the fixed Snake native MP3/UI-pop/orb PCM bank preparation remain mandatory **before gameplay starts/resumes**. During the preparation, the *existing* difficulty screen or paused round stays visible; accessibility `aria-busy` marks the existing app container, but no new visible modal is added. Native **actual failure** (session, packaged clip, PCM worker, in-round play or rare first-frame readiness) still opens the intentional gray **Try Again / Choose Difficulty** dialog. Do not replace it with a silent round or Web/HTML fallback. Because the difficulty buttons are not covered by the former loading modal, N6b.1 ignores rapid duplicate selects and invalidates **Back/title/mode/exit** preflight; late native promises cannot start a wrong screen. UIKit `.inactive` in held App Switcher and WebKit hidden cancel first-run pending preflight silently; normal running game continues to use plain, explicit Welcome Back with no automatic foreground sound. Scoring, physics, sound identity, native session and all earlier game/Feeding/Learn/Web logic unchanged.
+
+**Owner Mac/Xcode gates in isolated Audio Test worktree:**
+```sh
+node scripts/validate_native_snake_quiet_preflight_n6b1.js
+node scripts/validate_native_snake_effects_n6b.js
+node scripts/validate_native_verse_previews_n6a.js
+node scripts/validate_native_only_ios_output.js
+npm run build && npx cap sync ios && npx cap open ios
+```
+
+**Physical iPhone:** Launch **BibloZoo Audio Test** `com.andydoane.biblozoo.audiotest`. Open Practice Games → Scripture Snake → John 3:16 → Easy: preparation should complete with **no gray loading popup**; Snake starts only when its sounds are ready. Try another difficulty and Psalm 23:4; hear genuine correct/wrong, fruit, orb, boost, bonus effects. Open Game Menu, How to Play and speed menu; Close must quietly rewarm before same round continues, no duplicate dialogs. For App Switcher swipe up and **HOLD** with visible WebKit thumbnail, then return: one **plain Welcome Back** is expected, no automatic effects or motion; tap **Let's go!**, confirm same round/position and **no second gray popup**. Repeat complete task switch several times, mute/unmute and exit. Try rapid double difficulty taps and Back during preflight if the timing permits: no surprise late game launch or wrong-mode score. If audio **actually fails**, gray **Try Again** is intentionally retained, no Web fallback/Zoo Break. Briefly regress N6a Detail/Flashcards preview, N5 Learn instructions/Chunks/Echo/John complete and Psalm switch, DEV narrator, UI pops, Classic/Melody/Labyrinth/Bounce. For any failure capture **DEV Inspect native state + Copy Audio Timing Report before restart**; note what was heard, what dialog appeared and whether game moved. [Complete owner device checklist](N6B1-QUIET-SNAKE-PREFLIGHT.md).
+
+**Acceptance distinctions:** GitHub Linux Node VM/source and production web build ≠ Xcode Swift compile ≠ actual iPhone speaker output. N5a cold/return first UI pop can still drop under the 350ms bound (N9 debt), not a reason to accept missing Snake effects. Owner alone reviews and merges; do not touch stable `ios-prep` or original installed iOS app. Future N6c game, N7 mic/DSP, N8 separate Zoo, N9 reliability.
+
+---
+
 ### N6b — Scripture Snake native fixed effects, orb tones, UIKit held-switch and Verse Detail text cleanup (PR #37)
 
 **Verified source gate:** full Node regressions including N6b Snake game/Swift allowlist VM and all older Feeding/peg/melody/Zoo tests, plus production web build, **GREEN at code HEAD `90bde7cb`** ([Actions run #42436500105](https://github.com/andydoane/biblozoo/actions/runs/42436500105)). Recheck final documentation-only HEAD; Linux CI is NOT Xcode Swift compilation or actual iPhone acoustic proof.
