@@ -668,7 +668,8 @@ async function main() {
     assert.equal(continued,0);
     assert.equal(r.feedPausedAt,1234);
     assert.equal(r.resumeButton.disabled,false);
-    assert.match(r.resumeStatus.textContent,/Sound isn\'t ready yet/);
+    assert.match(r.resumeStatus.textContent,/Pause the other video's audio, then tap Let's go!/);
+    assert.equal(r.feedPausedAt,1234,"PiP deferral freezes original Feeding round");
   }
   {
     // Exit/route switch during a deferred prepare must not start another round.
