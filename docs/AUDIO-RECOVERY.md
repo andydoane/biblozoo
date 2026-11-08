@@ -4,6 +4,8 @@
 
 ## N6b — Scripture Snake fixed native PCM effects, plain UIKit Welcome Back and Detail visual cleanup (PR #37)
 
+**Source-only validation:** complete Node regression suite and production web build **GREEN at `90bde7cb`** ([Actions run #42436500105](https://github.com/andydoane/biblozoo/actions/runs/42436500105)); recheck final docs-only HEAD. Swift Xcode and actual owner-heard iPhone collision audio/App Switcher are separate pending acceptance gates.
+
 **Owner's latest actual iPhone evidence:** N6a [#36](https://github.com/andydoane/biblozoo/pull/36), merged `0be4612b`, BibloPet Detail and Flashcards native verse previews all passed. N5b.3 full Learn John 3:16 / Psalm 23:4 interrupted recovery, N5b.2 Listen, N5b.1 DEV long narrator, N5a UI/Feeding previously passed. Owner explicitly requested **removal** of N6a-added new visible messages underneath BibloPet Detail Listen (“Reading the verse reference…” / “Playback paused…”), absent from the original app. N6b removes this display only; N6a native request/verse gating and Stop Listening remain.
 
 N6b [#37](https://github.com/andydoane/biblozoo/pull/37) migrates **only standalone Scripture Snake** output in isolated `.audiotest` iOS to the existing **sole Swift `.soloAmbient` session and serial AVAudioEngine PCM worker**. Seven allowlisted local MP3 events under `public/verse_games/verse_snake/verse_snake_sounds` plus existing UI pops and fixed 6-note `snake-orb` 0–5 C5–C6 triangle PCM bank. In-game event handlers and sounds' relative volume remain JS-owned; audio output is native-only on iOS, no Web/HTML fallback, arbitrary path or frequency, no new session category or engine. Unused Snake placeholders `boostReady` and `verseComplete` remain silent as in original.
