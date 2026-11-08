@@ -1995,6 +1995,24 @@ async function playLearnInstructionAudio() {
   State.audioMode = "instruction";
   updateLearnInstructionReadyUi();
 
+  if (isNativeLearnTracksMode()) {
+    // Optional short prompt is also printed on the instruction card.
+    // Play only if native can prepare the allowlisted packaged clip;
+    // failure must never disable the original Continue button.
+    const id = nativeInstructionSoundId(State.learnInstructionKey);
+    const result = id && !muted
+      ? await window.BibloZooNativeLearnTracks.play(id)
+      : { ended: false, reason: muted ? "muted" : "invalid-instruction" };
+    if (my !== echoCancelToken || document.hidden ||
+        State.screen !== Screen.LEARN_INSTRUCTION) return;
+    State.instructionPlaying = false;
+    State.instructionKey = "";
+    State.audioMode = null;
+    State.learnInstructionReady = true;
+    updateLearnInstructionReadyUi();
+    return;
+  }
+
   setAudioSrc(`${AUDIO_DIR}${cfg.audio}`);
   audioEl.currentTime = 0;
 
@@ -11899,11 +11917,24 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
     }
 
     const file = instructionAudioFile(key);
-    setAudioSrc(file);
-    audioEl.currentTime = 0;
+    if (isNativeLearnTracksMode()) {
+      const id = nativeInstructionSoundId(key);
+      const result = id && !muted
+        ? await window.BibloZooNativeLearnTracks.play(id)
+        : { ended: false, reason: "muted-or-unknown-instruction" };
+      if (my !== echoCancelToken || document.hidden) return;
+      // Original short prompt is nonblocking; the text remains on screen
+      // and failure does not corrupt the lesson or trigger a Zoo Escape.
+      if (!result.ended) {
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
+    } else {
+      setAudioSrc(file);
+      audioEl.currentTime = 0;
 
-    try {
-      await safePlay();
+      try {
+        await safePlay();
     } catch (e) {
       if (my !== echoCancelToken || document.hidden) return;
       if (e?.name === "NotAllowedError" || e?.name === "AbortError") {
@@ -11920,11 +11951,12 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
       return;
     }
 
-    const ended = await waitForAudioEnd();
-    if (my !== echoCancelToken || document.hidden) return;
-    if (!ended) {
-      if (doneFlag) State[doneFlag] = true;
-      return;
+      const ended = await waitForAudioEnd();
+      if (my !== echoCancelToken || document.hidden) return;
+      if (!ended) {
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
     }
 
     if (doneFlag) {
