@@ -425,6 +425,7 @@
   }
 
   function getAudioContext() {
+    if (nativeInvadersAudio) return null; // native iOS: no Web Audio context
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -435,6 +436,7 @@
   }
 
   function ensureSilenceAudio() {
+    if (nativeInvadersAudio) return null; // native iOS: no HTML silence
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -447,6 +449,8 @@
   }
 
   function unlockAudio() {
+    if (nativeInvadersAudio)
+      return Promise.resolve(nativeInvadersAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx || ctx.state === "closed") return Promise.resolve(false);
     if (ctx.state === "running") {
@@ -512,13 +516,15 @@
     if (returnPaused) return;
     if (!audioCtx || audioCtx.state !== "running") void unlockAudio();
   }
-  document.addEventListener("pointerdown", recoverInvadersAudioOnGesture, true);
-  document.addEventListener("keydown", recoverInvadersAudioOnGesture, true);
-  document.addEventListener("click", recoverInvadersAudioOnGesture, true);
-  if (!window.PointerEvent) document.addEventListener("touchstart", recoverInvadersAudioOnGesture, true);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) audioUnlocked = false;
-  });
+  if (!nativeInvadersAudio) {
+    document.addEventListener("pointerdown", recoverInvadersAudioOnGesture, true);
+    document.addEventListener("keydown", recoverInvadersAudioOnGesture, true);
+    document.addEventListener("click", recoverInvadersAudioOnGesture, true);
+    if (!window.PointerEvent) document.addEventListener("touchstart", recoverInvadersAudioOnGesture, true);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) audioUnlocked = false;
+    });
+  }
 
   function soundVolume(key) {
     const master = Number(SOUND_TUNING.masterVolume);
@@ -531,6 +537,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeInvadersAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -574,12 +581,21 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeInvadersAudio) return; // Swift owns the whole predecoded PCM bank
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeInvadersAudio) {
+      if (muted || returnPaused || document.hidden || !state.running ||
+          state.paused || completionMarked) return;
+      // Original key and volume choice, fixed IDs in the native controller;
+      // no fetch/decode/HTML/Web fallbacks on hot rocket/alien/bonus events.
+      nativeInvadersAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted || returnPaused) return;
 
     const ctx = getAudioContext();
@@ -607,9 +623,14 @@
   }
 
   function playUiTapSound() {
-    const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
-    state.uiSoundFlip = !state.uiSoundFlip;
-    // Preserve the sound from the tap that reactivates an interrupted context.
+    const key = nextInvadersUiKey();
+    if (nativeInvadersAudio) {
+      // Title/Back/Help/UI taps request just the two native UI clips.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeInvadersAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
+    // Browser/PWA/Android original Web Audio path.
     void unlockAudio().then(unlocked => {
       if (unlocked && !muted) void playGameSound(key, "uiTap");
     });
