@@ -70,15 +70,20 @@ assert.match(workflow,/validate_native_bible_bugs_n6c\.js/);
 assert.match(handoff,/N6c/);
 
 // Isolated exact native sound owner (not a synthetic replacement).
-function fixture({ios=true,nativeOnly=true,missing="",rejectPlay=""}={}){
-  const calls=[],callbacks={},messages=[],alarms=[];
+function fixture({ios=true,nativeOnly=true,missing="",rejectPlay="",
+  holdFirstBank=false}={}){
+  const calls=[],callbacks={},messages=[],alarms=[],held=[];
+  let holding=holdFirstBank;
   const document={hidden:false,addEventListener:(k,fn)=>{callbacks["doc:"+k]=fn}};
   const bridge={
     activateFromGesture(input){calls.push(["activate",input]);return Promise.resolve({ready:true});},
-    preload(input){calls.push(["preload",input]);return Promise.resolve({
+    preload(input){calls.push(["preload",input]);const result={
       prepared:input.soundId!==missing,durationMs:input.soundId===missing?0:120,
       reason:input.soundId===missing?"bundled-asset-missing":"prepared"
-    });},
+    };
+    if (!holding) return Promise.resolve(result);
+    return new Promise(resolve=>held.push(()=>resolve(result)));
+    },
     play(input){calls.push(["play",input]);return Promise.resolve({
       accepted:input.soundId!==rejectPlay,
       reason:input.soundId===rejectPlay?"pcm-not-preloaded":"scheduled"
@@ -100,7 +105,9 @@ function fixture({ios=true,nativeOnly=true,missing="",rejectPlay=""}={}){
     onAppActive:()=>messages.push("active"),
     onPlaybackFailure:why=>alarms.push(why)
   });
-  return {api,calls,callbacks,messages,alarms,document};
+  return {api,calls,callbacks,messages,alarms,document,
+    releaseOldBank(){holding=false;held.splice(0).forEach(release=>release());}
+  };
 }
 const flush=async()=>{await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));};
 async function controllerTests(){
@@ -155,6 +162,24 @@ async function controllerTests(){
   await flush();
   assert.deepEqual(failing.alarms,["pcm-not-preloaded"]);
   assert.equal(failing.api.isReady(),false);
+  // N6c race: first bank's pending Swift preload finishes LATE, after a
+  // fresh real tap completed a second bank. The stale first generation
+  // must not call stopNative() again and discard the valid newer bank.
+  const raced=fixture({holdFirstBank:true});
+  const older=raced.api.prepareFromGesture();
+  await flush();
+  assert.equal(raced.calls.filter(x=>x[0]==="preload").length,14);
+  await raced.api.stop(); // actual UIKit inactive / Back gesture
+  const newer=raced.api.prepareFromGesture(); // fresh actual child tap
+  assert.equal((await newer).ready,true,"new bank ready before older preload response");
+  const stopsBefore=raced.calls.filter(x=>x[0]==="stop").length;
+  raced.releaseOldBank();
+  assert.equal((await older).ready,false);
+  await flush();
+  assert.equal(raced.api.isReady(),true,
+    "late stale bank cannot discard the new explicitly warmed bank");
+  assert.equal(raced.calls.filter(x=>x[0]==="stop").length,stopsBefore,
+    "late response must not send Stop after newer bank ready");
 }
 
 function deferred(){let resolve;const promise=new Promise(done=>{resolve=done});return{promise,resolve};}
