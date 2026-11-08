@@ -3280,7 +3280,8 @@
     // Welcome Back Let's go! tap. No AudioContext/replacement in iOS.
     const restore = nativeBugsAudio
       ? (muted ? Promise.resolve(true) :
-        nativeBugsAudio.prepareFromGesture().then(result => window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result)))
+        nativeBugsAudio.prepareFromGesture().then(result => (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioCtx,
