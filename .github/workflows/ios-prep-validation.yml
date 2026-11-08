@@ -97,6 +97,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_ui_audio_n5a.js
 
+      - name: Validate N6h.1 YouTube PiP interruption, seven native games and Home/Feeding recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_pip_interruption_n6h1.js
+
       - name: Validate N6h Verse Munch native PCM, actual mobile touchend menus and held App Switcher
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_verse_munch_n6h.js
