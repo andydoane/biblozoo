@@ -65,6 +65,28 @@ The setup PR changes **only identity**, not native playback. Check a normal vers
 
 The workflow file is extended **only on the experimental branch** to watch PRs/pushes to `experiment/native-ios-audio` and run the identity validator there, while keeping `ios-prep` compatible if the workflow is ever integrated. GitHub **did start a PR Actions run on the initial identity setup PR (#8)** even though the pre-merge experiment branch lacked the updated trigger; check the **final PR commit's actual Checks tab** rather than assuming checks are absent or have passed. After owner merge, also verify the experimental branch's post-merge push checks and subsequent PR checks. None of these Node/web jobs compiles or signs native iOS code.
 
+### N6c — Bible Bugs fixed native sounds (PR #39): quiet startup, actual events, held App Switcher
+
+**Verified Linux source gate:** the full Node regression suite (including 14 Bible Bugs fixed assets, real game source VM event/volume, failure-retry, stopped/stale PCM race, N6b.1 quiet Snake, Learn, Feeding and Zoo) plus production web build **GREEN at `22a2ec99`** ([Actions #42442016620](https://github.com/andydoane/biblozoo/actions/runs/42442016620)). Recheck final docs-only HEAD. This is NOT an Xcode Swift build or physically heard iPhone speaker output.
+
+**Owner-merged baseline:** [N6b.1 #38](https://github.com/andydoane/biblozoo/pull/38) `6f2ab22a` on `experiment/native-ios-audio`: owner says **everything worked well**, after earlier repeated Snake App Switcher recoveries and requested removal of the unwanted routine gray sound-preparation overlay. This validates the owner-tested Snake UI and switch recovery, not exact sound latency or each individual effect. N6a Detail/Flashcards, N5b.3 full John Learn/Psalm switch, DEV narrator and N4/Feeding were previously accepted.
+
+**N6c #39 scope:** **Bible Bugs only** (frog catches word bugs) in separate iOS **BibloZoo Audio Test** `com.andydoane.biblozoo.audiotest`. The original `game.js` sound triggers stay: tongue, five randomized bug-pop effects, correct/incorrect, streak, bonus-start, bonus-end, stink-bug penalty, existing two UI pops. Swift adds twelve allowlisted `bugs-` keys to the **existing** `pcmEffectIDs` and file mapping under `public/verse_games/bible_bugs/bible_bugs_sounds`. Same one `.soloAmbient` native audio-session owner and serial prewarmed AVAudioEngine worker as Feeding/Snake. Real Choose Difficulty, native Retry, menu Close or explicit Welcome Back Let's go **synchronously activates Swift** and awaits all 14 PCM sounds before first/same-game next step. **No routine gray success popup**. Genuine refused native session/sample/play alone shows **Try Again/Back**, without Web/HTML fallback or Zoo Break, never pretends a Swift `prepared` response proves speaker audibility. Original Web/PWA/Android sounds still use original Web Audio. Gameplay word/snake-like physics, scoring/streak/bonus/medals/rewards untouched.
+
+**App Switcher:** UIKit `.inactive` swipe-up-and-**HOLD** can happen while WebKit thumbnail is visible; native Bible Bugs owner stops effects and pauses **frog/bug physics/game clock** via existing *plain* Welcome Back. On return there is no automatic sound; child taps Let's go to warm the full bank, then resumes the SAME bug positions/timer without catch-up or duplicate credits. Full task switch and second switch the same. Mute/menu/help/touch fallback/exit stop; Close rewarm on genuine gesture. Duplicate difficulty/Back during preflight cancels generation to forbid stale delayed start, without a visible loading overlay. N7 mic/DSP, N8 independent Zoo, N9 first UI-pop reliability, other 10 standalone games, Playground/Daily/Read My Verse excluded.
+
+```sh
+node scripts/validate_native_bible_bugs_n6c.js
+node scripts/validate_native_snake_quiet_preflight_n6b1.js
+node scripts/validate_native_snake_effects_n6b.js
+node scripts/validate_native_only_ios_output.js
+npm run build && npx cap sync ios && npx cap open ios
+```
+
+**Owner physical iPhone:** Separate BibloZoo Audio Test; John 3:16 → Bible Bugs Easy; NO routine gray prewarm dialog. Hear real tongue, randomized pops, correct vs incorrect, streak, bonus-start/bonus-end and stink bug effects at real game events, with unchanged score/medal/verse progress. Test Psalm 23:4/another difficulty, menu/How to Play/iOS touch fallback, mute/unmute, Back and failed-asset Retry if it naturally happens. Swipe up and **HOLD** mid-bug fall, then return; check bug movement/sound frozen, **plain Welcome Back**, manual Let's go restores same game without extra popup/Zoo Break. Full task switch and repeat. Regress Snake quiet start/held return, N6a Detail/Flashcards, N5 Learn/DEV and Classic/Melody/Labyrinth/Bounce. On failure **DEV Inspect native state** and **Copy Audio Timing Report BEFORE restarting**; bridge metadata is NOT audible verification. [Full step-by-step owner gate](N6C-NATIVE-BIBLE-BUGS.md) — must also be included **directly in chat**. Linux source Node regressions + production web build, Apple Swift Xcode compile and human iPhone hearing are **three distinct acceptance gates**. Owner alone merges; stable `ios-prep` and original iOS app untouched.
+
+---
+
 ### N6b.1 — quiet Scripture Snake normal preflight, error-only Try Again (PR #38)
 
 **Automated source gate:** full Node regressions (N6b.1 real-source VM, N6b Snake PCM, N6a Detail, older Learn, Feeding and Zoo recovery) and production web build **GREEN** at `351a6574` ([GitHub Actions #42438471987](https://github.com/andydoane/biblozoo/actions/runs/42438471987)). Reconfirm final docs-only HEAD; this is **NOT Swift/Xcode compilation or physically audible iPhone output**.
