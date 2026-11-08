@@ -231,6 +231,102 @@
   let silenceAudio = null;
   let audioUnlocked = false;
   let audioUnlockPromise = null;
+  // N6g: only the native iOS Audio Test sends Invaders effects into the
+  // existing one Swift .soloAmbient session and serialized AVAudioEngine PCM.
+  // Browser/PWA/Android keep the untouched Web Audio branch below.
+  const nativeInvadersAudio = window.BibloZooNativeVerseInvadersAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseInvadersAudio : null;
+  let nativeInvadersSerial = 0;
+  let nativeInvadersPending = false;
+  let nativeInvadersRetry = {kind:"round",mode:null};
+  let invadersWelcomeBack = null;
+
+  function nextInvadersUiKey() {
+    const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
+    state.uiSoundFlip = !state.uiSoundFlip;
+    return key;
+  }
+  function wireNativeInvadersTitleHelpPops() {
+    if (!nativeInvadersAudio) return;
+    // The game shell owns navigation; append only a fixed native sound.
+    document.getElementById("helpBtn")
+      ?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID+"CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeInvadersRound() {
+    if (!nativeInvadersAudio) return;
+    ++nativeInvadersSerial;
+    nativeInvadersPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeInvadersAudio.stop();
+  }
+  function clearNativeInvadersFailure() {
+    document.getElementById("vinvNativeAudioFailure")?.remove();
+  }
+  function showNativeInvadersFailure(message) {
+    if (!nativeInvadersAudio) return;
+    let dialog = document.getElementById("vinvNativeAudioFailure");
+    if (!dialog) {
+      dialog = document.createElement("div");
+      dialog.id = "vinvNativeAudioFailure";
+      dialog.className = "vinv-native-audio-failure";
+      dialog.innerHTML = `
+        <section class="vinv-native-audio-card" role="dialog"
+          aria-modal="true" aria-label="Verse Invaders native sound problem">
+          <h2>Verse Invaders</h2>
+          <p role="status" data-inv-audio-status></p>
+          <button type="button" data-inv-audio-retry>Try Again</button>
+          <button type="button" data-inv-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector("[data-inv-audio-retry]").onclick = () =>
+        primeNativeInvadersFromGesture(nativeInvadersRetry.kind,
+          nativeInvadersRetry.mode);
+      dialog.querySelector("[data-inv-audio-back]").onclick = () => {
+        stopNativeInvadersRound();
+        clearNativeInvadersFailure();
+        if (nativeInvadersRetry.kind === "round") renderModeSelect();
+        else {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    dialog.querySelector("[data-inv-audio-status]").textContent = message;
+  }
+  function primeNativeInvadersFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeInvadersPending) return;
+    if (!nativeInvadersAudio || muted) {
+      clearNativeInvadersFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeInvadersRetry = {kind,mode};
+    const token = ++nativeInvadersSerial;
+    nativeInvadersPending = true;
+    clearNativeInvadersFailure();
+    app.setAttribute("aria-busy", "true");
+    // Initiate Swift activation NOW in child's real mode/Close/Retry tap.
+    // Two UI PCM samples play before the thirteen unique game samples.
+    const request = nativeInvadersAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeInvadersSerial || document.hidden || returnPaused) return;
+      nativeInvadersPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else showNativeInvadersFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(() => {
+      if (token !== nativeInvadersSerial || document.hidden || returnPaused) return;
+      nativeInvadersPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeInvadersFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
