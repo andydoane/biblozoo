@@ -999,8 +999,12 @@ function openLearnMenu() {
 
   // Native Listen must stop before showing the menu. Never let its
   // unrelated HTML audio element auto-resume this native track on close.
-  if (isNativeLearnListenMode() && State.screen === Screen.LISTEN &&
-      State.listenPlaying) pauseLearnAudioForInterruption();
+  if (isNativeLearnListenMode() &&
+      ((State.screen === Screen.LISTEN && State.listenPlaying) ||
+       (State.screen === Screen.CHUNKS && State.chunkRunning) ||
+       (State.screen === Screen.ECHO && State.echoRunning))) {
+    pauseLearnAudioForInterruption();
+  }
   learnMenuOpen = true;
   syncLearnAudioResumeOverlay();
   learnMenuPausedAudio = !isNativeLearnListenMode() && !audioEl.paused;
@@ -1078,6 +1082,58 @@ let activeLearnAudioWaitCancel = null;
 // local transient playback state, never user progress or completion.
 let nativeListenCheckpoint = null;
 let nativeListenError = "";
+// N5b.3: transient native audio checkpoint, never verse/score progress.
+let nativeLearnPartCheckpoint = null;
+let nativeLearnTrackError = "";
+
+function isNativeLearnTracksMode() {
+  return window.BibloZooNativeLearnTracks?.isAvailable?.() === true;
+}
+function primeNativeLearnTracks() {
+  if (isNativeLearnTracksMode() && !muted) {
+    window.BibloZooNativeLearnTracks.primeFromGesture();
+  }
+}
+function nativeInstructionSoundId(key) {
+  const valid = ["listen", "meaning", "chunks1", "chunks2",
+    "echo1", "remove", "final", "games"];
+  if (!valid.includes(key)) return "";
+  return "learn-instruction-" +
+    (key === "echo1" && ["a_little", "pretty_well"].includes(State.learnLevel)
+      ? "echo_start" : key);
+}
+function nativeLearnTrackProgress(mode, index, progress) {
+  if (!progress || document.hidden) return;
+  nativeLearnPartCheckpoint = {
+    verseId: VERSE_ID, mode, index, positionMs: progress.positionMs
+  };
+  const attempt = learnAudioResumeAttempt;
+  if (!attempt || attempt.narrationVerified ||
+      attempt.recovery?.mode !== mode ||
+      attempt.recovery?.screen !== State.screen) return;
+  // Native position evidence from the current, matching source only.
+  if (index !== attempt.recovery.index ||
+      progress.positionMs > (attempt.recovery.positionMs || 0) + 40) {
+    attempt.narrationVerified = true;
+    finishLearnAudioResumeAttempt(attempt);
+  }
+}
+function failNativeLearnTrack(mode, index, reason) {
+  if (document.hidden || learnAudioInterrupted) return;
+  nativeLearnTrackError = "Sound isn't ready. Tap Start to try again.";
+  nativeLearnPartCheckpoint = {
+    verseId: VERSE_ID, mode, index, positionMs: 0
+  };
+  if (learnAudioResumeAttempt?.recovery?.mode === mode) {
+    failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+    return;
+  }
+  if (mode === "chunk") State.chunkAutoFallbackReady = true;
+  if (mode === "echo") State.echoAutoFallbackReady = true;
+  // A missing local clip is a retry, never an unrelated pet rescue.
+  if (State.screen === (mode === "chunk" ? Screen.CHUNKS : Screen.ECHO))
+    render();
+}
 
 let muted = false;
 
@@ -1943,6 +1999,24 @@ async function playLearnInstructionAudio() {
   State.audioMode = "instruction";
   updateLearnInstructionReadyUi();
 
+  if (isNativeLearnTracksMode()) {
+    // Optional short prompt is also printed on the instruction card.
+    // Play only if native can prepare the allowlisted packaged clip;
+    // failure must never disable the original Continue button.
+    const id = nativeInstructionSoundId(State.learnInstructionKey);
+    const result = id && !muted
+      ? await window.BibloZooNativeLearnTracks.play(id)
+      : { ended: false, reason: muted ? "muted" : "invalid-instruction" };
+    if (my !== echoCancelToken || document.hidden ||
+        State.screen !== Screen.LEARN_INSTRUCTION) return;
+    State.instructionPlaying = false;
+    State.instructionKey = "";
+    State.audioMode = null;
+    State.learnInstructionReady = true;
+    updateLearnInstructionReadyUi();
+    return;
+  }
+
   setAudioSrc(`${AUDIO_DIR}${cfg.audio}`);
   audioEl.currentTime = 0;
 
@@ -1982,6 +2056,13 @@ async function playLearnInstructionAudio() {
 
 async function continueLearnInstruction() {
   const key = State.learnInstructionKey;
+  if (key === "listen" && isNativeLearnListenMode() && !muted) {
+    // Native activation synchronously inside the existing Continue gesture;
+    // narration begins only when the Listen slide has settled.
+    window.BibloZooNativeLearnListen.primeFromGesture();
+  } else if (["chunks1", "chunks2", "echo1"].includes(key)) {
+    primeNativeLearnTracks();
+  }
 
   State.learnInstructionReady = false;
   State.learnInstructionAudioStarted = false;
@@ -10718,6 +10799,8 @@ function renderPracticeGameCard(game, verseProgress) {
 
 
 function resetLearn(goTitle = false) {
+  nativeLearnPartCheckpoint = null;
+  nativeLearnTrackError = "";
   learnAudioInterrupted = null;
   clearLearnAudioResumeTimers(learnAudioResumeAttempt);
   learnAudioResumeAttempt = null;
@@ -11087,6 +11170,7 @@ function learnLevelNext() {
 }
 
 function learnLevelRun() {
+  primeNativeLearnTracks(); // real user tap before instruction slide
   const opt = LEARN_LEVEL_OPTIONS[State.learnLevelIndex];
 
   State.learnLevel = opt.level;
@@ -11559,7 +11643,10 @@ function ensureLearnAudioResumeOverlay() {
     </div>`;
   document.body.appendChild(overlay);
   const action = overlay.querySelector("#learnAudioResumeButton");
-  if (window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
+  if (!isNativeLearnListenMode() &&
+      window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
+    // N5b.3: native-only lesson recovery is a plain explicit retry, NOT
+    // a Zoo Escape/ZOO BREAK triggered by unconverted or missing clips.
     learnZooEscape = window.BibloZooZooEscape.create({
       overlay, verseId: () => VERSE_ID,
       petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),
@@ -11690,9 +11777,11 @@ function resumeInterruptedLearnAudio() {
   if (recovery.mode === "listen") {
     listenPlay(recovery.listenMode, recovery.positionMs || 0);
   } else if (recovery.mode === "chunk") {
+    primeNativeLearnTracks(); // actual Welcome Back tap, not after slide
     learnAudioInterrupted = recovery;
     void startChunkFlow();
   } else if (recovery.mode === "echo") {
+    primeNativeLearnTracks();
     learnAudioInterrupted = recovery;
     void startEchoFlow();
   }
@@ -11700,7 +11789,9 @@ function resumeInterruptedLearnAudio() {
   // A play() request can resolve even when the media timeline is frozen.
   // Only verified currentTime progress clears the gate; the watchdog keeps a
   // hung play() or frozen timeline retryable, without changing Learn progress.
-  attempt.watchdog = setTimeout(() => failLearnAudioResumeAttempt(attempt), 3500);
+  attempt.watchdog = setTimeout(() => failLearnAudioResumeAttempt(attempt),
+    isNativeLearnTracksMode() && ["chunk", "echo"].includes(recovery.mode)
+      ? 7500 : 3500);
   syncLearnAudioResumeOverlay();
   return true;
 }
@@ -11740,9 +11831,23 @@ function pauseLearnAudioForInterruption() {
 
   let recovery = null;
   if (screen === Screen.CHUNKS && (State.chunkRunning || State.chunkAutoStarting)) {
-    recovery = { screen, mode: "chunk", index: State.chunkRunning ? State.chunkIndex : 0 };
+    const checkpoint = isNativeLearnTracksMode() &&
+      nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnPartCheckpoint.mode === "chunk" ? nativeLearnPartCheckpoint : null;
+    recovery = {
+      screen, mode: "chunk",
+      index: checkpoint?.index ?? (State.chunkRunning ? State.chunkIndex : 0),
+      ...(checkpoint ? { positionMs: checkpoint.positionMs } : {})
+    };
   } else if (screen === Screen.ECHO && (State.echoRunning || State.echoAutoStarting)) {
-    recovery = { screen, mode: "echo", index: State.echoRunning ? State.echoIndex : 0 };
+    const checkpoint = isNativeLearnTracksMode() &&
+      nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnPartCheckpoint.mode === "echo" ? nativeLearnPartCheckpoint : null;
+    recovery = {
+      screen, mode: "echo",
+      index: checkpoint?.index ?? (State.echoRunning ? State.echoIndex : 0),
+      ...(checkpoint ? { positionMs: checkpoint.positionMs } : {})
+    };
   } else if (screen === Screen.LISTEN && (State.listenPlaying || State.listenAutoStarting)) {
     const checkpoint = isNativeLearnListenMode() &&
       nativeListenCheckpoint?.verseId === VERSE_ID
@@ -11839,11 +11944,24 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
     }
 
     const file = instructionAudioFile(key);
-    setAudioSrc(file);
-    audioEl.currentTime = 0;
+    if (isNativeLearnTracksMode()) {
+      const id = nativeInstructionSoundId(key);
+      const result = id && !muted
+        ? await window.BibloZooNativeLearnTracks.play(id)
+        : { ended: false, reason: "muted-or-unknown-instruction" };
+      if (my !== echoCancelToken || document.hidden) return;
+      // Original short prompt is nonblocking; the text remains on screen
+      // and failure does not corrupt the lesson or trigger a Zoo Escape.
+      if (!result.ended) {
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
+    } else {
+      setAudioSrc(file);
+      audioEl.currentTime = 0;
 
-    try {
-      await safePlay();
+      try {
+        await safePlay();
     } catch (e) {
       if (my !== echoCancelToken || document.hidden) return;
       if (e?.name === "NotAllowedError" || e?.name === "AbortError") {
@@ -11860,11 +11978,12 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
       return;
     }
 
-    const ended = await waitForAudioEnd();
-    if (my !== echoCancelToken || document.hidden) return;
-    if (!ended) {
-      if (doneFlag) State[doneFlag] = true;
-      return;
+      const ended = await waitForAudioEnd();
+      if (my !== echoCancelToken || document.hidden) return;
+      if (!ended) {
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
     }
 
     if (doneFlag) {
@@ -11971,7 +12090,8 @@ function handleNativeLearnListenEvent(event) {
   }
 }
 
-function listenPlay(resumeMode = "listen_ref", nativeResumeMs = 0) {
+function listenPlay(resumeMode = "listen_ref", nativeResumeMs = 0,
+    fromPrimedGesture = false) {
   if (document.hidden) return;
   if (isNativeLearnListenMode() && muted) {
     State.listenPlaying = false;
@@ -12001,6 +12121,7 @@ function listenPlay(resumeMode = "listen_ref", nativeResumeMs = 0) {
       verseId: VERSE_ID,
       stage: mode === "listen_verse" ? "verse" : "reference",
       positionMs: nativeResumeMs,
+      fromPrimedGesture,
       onEvent: handleNativeLearnListenEvent
     }).then(result => {
       if (result?.ready !== true && result?.reason !== "stale" &&
@@ -12270,14 +12391,28 @@ function runAfterSlide(fn, { timeoutMs = 2200, intervalMs = 50 } = {}) {
 function goToListenAndStart() {
   nativeListenCheckpoint = null;
   nativeListenError = "";
+  const nativePrimed = isNativeLearnListenMode() &&
+    window.BibloZooNativeLearnListen.hasPrimedGesture();
   State.listenDone = false;
   State.listenAutoStarting = !isNativeLearnListenMode();
   State.listenAutoFallbackReady = isNativeLearnListenMode();
+  if (nativePrimed) {
+    State.listenAutoStarting = true;
+    State.listenAutoFallbackReady = false;
+  }
 
   go(Screen.LISTEN);
   if (isNativeLearnListenMode()) {
-    // No implicit activation after runAfterSlide. Show the existing
-    // "Tap to Play Verse" button for a real child gesture instead.
+    // The preceding instruction Continue tap already activated the session.
+    // Start speech at slide completion without a second button/tap. If that
+    // gesture was unavailable, keep the explicit tap-to-play safety fallback.
+    if (nativePrimed) runAfterSlide(() => {
+      if (State.screen === Screen.LISTEN && State.listenAutoStarting &&
+          !State.listenPlaying && !learnAudioInterrupted &&
+          !learnAudioResumeAttempt && !document.hidden) {
+        listenPlay("listen_ref", 0, true);
+      }
+    });
     return;
   }
 
@@ -12309,6 +12444,8 @@ function goToListenAndStart() {
 
 
 function goToChunksAndStart() {
+  nativeLearnTrackError = "";
+  nativeLearnPartCheckpoint = null; // new pass; not an interrupted resume
   State.chunkAutoStarting = true;
   State.chunkAutoFallbackReady = false;
 
@@ -12346,6 +12483,8 @@ function goToChunksAndStart() {
 
 
 function goToEchoAndStart() {
+  nativeLearnTrackError = "";
+  nativeLearnPartCheckpoint = null;
   State.echoDone = false;
   State.echoRunning = false;
   State.echoIndex = 0;
@@ -12630,10 +12769,17 @@ async function startFinalRecallFlow() {
 
 async function startChunkFlow() {
   if (State.chunkRunning || document.hidden) return;
-  const startIndex = learnAudioInterrupted?.mode === "chunk" &&
+  const recovery = learnAudioInterrupted?.mode === "chunk" &&
     learnAudioInterrupted.screen === Screen.CHUNKS
-    ? learnAudioInterrupted.index : 0;
+    ? learnAudioInterrupted : null;
+  const checkpoint = isNativeLearnTracksMode() &&
+    nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+    nativeLearnPartCheckpoint.mode === "chunk"
+    ? nativeLearnPartCheckpoint : null;
+  const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
+  const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
   learnAudioInterrupted = null;
+  nativeLearnTrackError = "";
 
   State.chunkAutoStarting = false;
   State.chunkAutoFallbackReady = false;
@@ -12641,10 +12787,10 @@ async function startChunkFlow() {
   // cancel any prior learn audio sequence
   cancelLearnAudio();
 
-  await runChunkSequence(startIndex);
+  await runChunkSequence(startIndex, startPositionMs);
 }
 
-async function runChunkSequence(startIndex = 0) {
+async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
   const my = ++echoCancelToken;
   let completed = false;
 
@@ -12662,29 +12808,71 @@ async function runChunkSequence(startIndex = 0) {
 
       const part = learnParts[i];
       const file = part.file;
-
-      setAudioSrc(file);
-      audioEl.currentTime = 0;
-
       State.chunkIndex = i;
       render();
+      let d;
 
-      try {
-        await safePlay();
-      } catch (e) {
+      if (isNativeLearnTracksMode()) {
+        const positionMs = i === startIndex ? resumePositionMs : 0;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "chunk", index: i, positionMs
+        };
+        if (muted) {
+          failNativeLearnTrack("chunk", i, "muted");
+          return;
+        }
+        const result = await window.BibloZooNativeLearnTracks.play(
+          `learn-part-${VERSE_ID}-${i}`, {
+            positionMs,
+            onProgress: progress => nativeLearnTrackProgress("chunk", i, progress),
+            onInterrupted: progress => {
+              nativeLearnPartCheckpoint = {
+                verseId: VERSE_ID, mode: "chunk", index: i,
+                positionMs: progress.positionMs || 0
+              };
+              pauseLearnAudioForInterruption();
+              if (!document.hidden) render();
+            }
+          });
         if (my !== echoCancelToken || document.hidden) return;
-        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
-        return;
+        if (!result.ended) {
+          failNativeLearnTrack("chunk", i, result.reason);
+          return;
+        }
+        // A genuine current native ended event, not a JS timer, allows the
+        // *next* part. Duration is from this very same native player.
+        d = result.durationMs / 1000;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "chunk", index: i + 1, positionMs: 0
+        };
+        const attempt = learnAudioResumeAttempt;
+        if (attempt?.recovery?.mode === "chunk" &&
+            !attempt.narrationVerified) {
+          attempt.narrationVerified = true; // verified native ended
+          finishLearnAudioResumeAttempt(attempt);
+        }
+      } else {
+        setAudioSrc(file);
+        audioEl.currentTime = 0;
+        try {
+          await safePlay();
+        } catch (e) {
+          if (my !== echoCancelToken || document.hidden) return;
+          learnAudioInterrupted = {
+            screen: Screen.CHUNKS, mode: "chunk", index: i
+          };
+          return;
+        }
+        const ended = await waitForAudioEnd();
+        if (my !== echoCancelToken || document.hidden) return;
+        if (!ended) {
+          learnAudioInterrupted = {
+            screen: Screen.CHUNKS, mode: "chunk", index: i
+          };
+          return;
+        }
+        d = await waitForDuration();
       }
-
-      const ended = await waitForAudioEnd();
-      if (my !== echoCancelToken || document.hidden) return;
-      if (!ended) {
-        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
-        return;
-      }
-
-      const d = await waitForDuration();
       const pauseMs = (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
       const elapsed = await waitForPausableDelay(pauseMs, my);
 
@@ -12693,6 +12881,8 @@ async function runChunkSequence(startIndex = 0) {
 
     setAudioSrc(AUDIO_FILE);
     State.audioMode = null;
+    nativeLearnTrackError = "";
+    nativeLearnPartCheckpoint = null;
     State.chunkDone = true;
     State.chunkPassCount = Math.min(2, State.chunkPassCount + 1);
     completed = true;
@@ -12717,10 +12907,17 @@ async function runChunkSequence(startIndex = 0) {
 
 async function startEchoFlow() {
   if (State.echoRunning || document.hidden) return;
-  const startIndex = learnAudioInterrupted?.mode === "echo" &&
+  const recovery = learnAudioInterrupted?.mode === "echo" &&
     learnAudioInterrupted.screen === Screen.ECHO
-    ? learnAudioInterrupted.index : 0;
+    ? learnAudioInterrupted : null;
+  const checkpoint = isNativeLearnTracksMode() &&
+    nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+    nativeLearnPartCheckpoint.mode === "echo"
+    ? nativeLearnPartCheckpoint : null;
+  const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
+  const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
   learnAudioInterrupted = null;
+  nativeLearnTrackError = "";
 
   State.echoAutoStarting = false;
   State.echoAutoFallbackReady = false;
@@ -12728,7 +12925,7 @@ async function startEchoFlow() {
   // cancel any prior
   cancelLearnAudio();
 
-  await runEchoSequence(startIndex);
+  await runEchoSequence(startIndex, startPositionMs);
 }
 
 let echoCancelToken = 0;
@@ -12736,6 +12933,7 @@ let echoCancelToken = 0;
 function cancelLearnAudio() {
   echoCancelToken++;
   window.BibloZooNativeLearnListen?.stop?.();
+  window.BibloZooNativeLearnTracks?.stop?.();
   activeLearnInstructionRequest = null;
   if (activeLearnAudioWaitCancel) activeLearnAudioWaitCancel();
   try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) { }
@@ -12750,7 +12948,7 @@ function cancelLearnAudio() {
   State.echoSpeaking = false;
 }
 
-async function runEchoSequence(startIndex = 0) {
+async function runEchoSequence(startIndex = 0, resumePositionMs = 0) {
   const my = ++echoCancelToken;
 
   State.echoDone = false;
@@ -12773,34 +12971,71 @@ async function runEchoSequence(startIndex = 0) {
 
       const part = learnParts[i];
       const file = part.file;
-
-      setAudioSrc(file);
-      audioEl.currentTime = 0;
-
       State.echoIndex = i;
       State.echoSpeaking = false;
       updateEchoStageState();
+      let d;
 
-      try {
-        await safePlay();
-      } catch (e) {
+      if (isNativeLearnTracksMode()) {
+        const positionMs = i === startIndex ? resumePositionMs : 0;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "echo", index: i, positionMs
+        };
+        if (muted) {
+          failNativeLearnTrack("echo", i, "muted");
+          return;
+        }
+        const result = await window.BibloZooNativeLearnTracks.play(
+          `learn-part-${VERSE_ID}-${i}`, {
+            positionMs,
+            onProgress: progress => nativeLearnTrackProgress("echo", i, progress),
+            onInterrupted: progress => {
+              nativeLearnPartCheckpoint = {
+                verseId: VERSE_ID, mode: "echo", index: i,
+                positionMs: progress.positionMs || 0
+              };
+              pauseLearnAudioForInterruption();
+              if (!document.hidden) render();
+            }
+          });
         if (my !== echoCancelToken || document.hidden) return;
-        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
-        return;
-      }
-
-      const ended = await waitForAudioEnd();
-      if (my !== echoCancelToken || document.hidden) return;
-      if (!ended) {
-        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
-        return;
+        if (!result.ended) {
+          failNativeLearnTrack("echo", i, result.reason);
+          return;
+        }
+        d = result.durationMs / 1000;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "echo", index: i + 1, positionMs: 0
+        };
+        const attempt = learnAudioResumeAttempt;
+        if (attempt?.recovery?.mode === "echo" &&
+            !attempt.narrationVerified) {
+          attempt.narrationVerified = true;
+          finishLearnAudioResumeAttempt(attempt);
+        }
+      } else {
+        setAudioSrc(file);
+        audioEl.currentTime = 0;
+        try {
+          await safePlay();
+        } catch (e) {
+          if (my !== echoCancelToken || document.hidden) return;
+          learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+          return;
+        }
+        const ended = await waitForAudioEnd();
+        if (my !== echoCancelToken || document.hidden) return;
+        if (!ended) {
+          learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+          return;
+        }
+        d = await waitForDuration();
       }
 
       State.echoSpeaking = true;
       updateEchoStageState();
 
       // Give the child time to repeat: duration × 1.25 (fallback 2s if unknown)
-      const d = await waitForDuration();
       const repeatMs = (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
       const elapsed = await waitForPausableDelay(repeatMs, my);
 
@@ -12813,6 +13048,8 @@ async function runEchoSequence(startIndex = 0) {
     // restore main verse audio for later
     setAudioSrc(AUDIO_FILE);
 
+    nativeLearnTrackError = "";
+    nativeLearnPartCheckpoint = null;
     State.echoDone = true;
     State.echoRunning = false;
     State.echoSpeaking = false;
@@ -22161,6 +22398,9 @@ function screenChunks(idx) {
   const chunkBottomHtml = showChunkAction
     ? `
       <div class="learn-coach learn-bottom-zone">
+        ${isNativeLearnTracksMode() && nativeLearnTrackError
+          ? `<p class="coach-text" role="status">${escapeHtml(nativeLearnTrackError)}</p>`
+          : ""}
         <div class="coach-actions">
           <button class="carousel-main no-zoom" id="btnChunks" style="max-width:520px;">
             ${buttonLabel}
@@ -22194,6 +22434,7 @@ function screenChunks(idx) {
         return;
       }
 
+      primeNativeLearnTracks(); // explicit Start retry tap
       await startChunkFlow();
     };
   }
@@ -22225,6 +22466,9 @@ function screenEcho(idx) {
   const echoBottomHtml = showEchoAction
     ? `
       <div class="learn-coach learn-bottom-zone">
+        ${isNativeLearnTracksMode() && nativeLearnTrackError
+          ? `<p class="coach-text" role="status">${escapeHtml(nativeLearnTrackError)}</p>`
+          : ""}
         <div class="coach-actions">
           <button class="carousel-main no-zoom" id="btnEcho" style="max-width:520px;">
             ${State.echoDone ? (hideWordsPerRound() === 2 ? "Remove Words" : "Remove a Word") : "▶ Start Echo"}
@@ -22258,6 +22502,7 @@ function screenEcho(idx) {
         return;
       }
 
+      primeNativeLearnTracks();
       await startEchoFlow();
     };
   }

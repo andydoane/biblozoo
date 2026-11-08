@@ -45,6 +45,10 @@ function harness(mode="listen") {
     "function toggleMute(){muted=false;calls.push('unmute');}",
     "function unlockAppAudio(){calls.push('unlock');return unlockUI();}",
     "function applyMute(){}",
+    // Existing Web/HTML recovery VM remains the Web path. Native Learn has
+    // its own source-bound player and gesture activation in N5b.3.
+    "function isNativeLearnTracksMode(){return false;}",
+    "function primeNativeLearnTracks(){}",
     "function showDialog(){throw Error('Unexpected generic dialog');}",
     "function dlgBtn(){} function closeDialog(){}",
     "function isLearnAudioOverlayRecovery(r){return !!r && r.screen===State.screen && ['listen','chunk','echo'].includes(r.mode);}",

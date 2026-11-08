@@ -12,6 +12,7 @@
   let nextId = 1000000; // DEV N5b.1 IDs begin at 1; avoid request-ID overlap.
   let active = null;
   let bound = false;
+  let primedGesture = null;
 
   function isAvailable() {
     return root.BibloZooNativeOnlyOutput?.enabled === true &&
@@ -65,6 +66,7 @@
     if (active) release(active);
   }
   function interrupt() {
+    primedGesture = null;
     if (!active) return;
     release(active, "interrupted");
   }
@@ -194,8 +196,27 @@
       return { ready: false, reason: "native-timeout-or-error" };
     }
   }
+  // The Learn instruction "Read It To Me" tap can activate native audio
+  // *before* the screen slides to Listen. No sound plays until slide finish.
+  // Invalidation on background forbids an old priming promise from auto-play.
+  function primeFromGesture() {
+    if (!isAvailable() || root.document?.hidden ||
+        typeof api()?.activateFromGesture !== "function") return false;
+    bind();
+    try {
+      const result = api().activateFromGesture({ purpose: "learn" });
+      primedGesture = bounded(result)
+        .catch(() => ({ ready: false, reason: "activation-error" }));
+      return true;
+    } catch (_) {
+      primedGesture = null;
+      return false;
+    }
+  }
+  function hasPrimedGesture() { return !!primedGesture && isAvailable(); }
+
   async function startFromGesture({ verseId, stage = "reference",
-      positionMs = 0, onEvent } = {}) {
+      positionMs = 0, onEvent, fromPrimedGesture = false } = {}) {
     if (!isAvailable() || root.document?.hidden ||
         typeof onEvent !== "function" ||
         !/^[0-9a-z]+(?:_[0-9a-z]+)*$/.test(verseId || "") ||
@@ -223,9 +244,17 @@
     notify(a, "preparing");
     let activation;
     try {
-      // Must invoke the Swift session activation synchronously *inside*
-      // the child tapping "Read it to me"/"Let's go!", not after a slide.
-      activation = bridge.activateFromGesture({ purpose: "learn" });
+      if (fromPrimedGesture) {
+        // If return/background invalidated the saved tap, show a retry
+        // rather than silently re-activating after the slide.
+        activation = primedGesture ||
+          Promise.resolve({ ready: false, reason: "no-primed-gesture" });
+        primedGesture = null;
+      } else {
+        primedGesture = null;
+        // This invocation is synchronous inside a genuine Learn/Resume tap.
+        activation = bridge.activateFromGesture({ purpose: "learn" });
+      }
     } catch (_) {
       release(a, "failed", { reason: "activation-error" });
       return { ready: false, reason: "activation-error" };
@@ -244,6 +273,7 @@
     }
   }
   root.BibloZooNativeLearnListen = Object.freeze({
-    isAvailable, startFromGesture, stop
+    isAvailable, startFromGesture, primeFromGesture,
+    hasPrimedGesture, stop
   });
 })(window);
