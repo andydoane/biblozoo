@@ -483,6 +483,8 @@
     const gate = document.getElementById("vslNativeAudioGate");
     if (gate) gate.remove();
   }
+  // N6b.1: this gray dialog is for REAL native failures only. Ordinary
+  // difficulty selection and successful resumes prepare the bank quietly.
   function showNativeSnakeGate(message, canRetry = false) {
     if (!nativeSnakeAudio) return;
     let gate = document.getElementById("vslNativeAudioGate");
@@ -525,6 +527,9 @@
       state.running ? "Back to Games" : "Choose Difficulty";
   }
   function primeSnakeAudioAndContinue(mode = "round") {
+    // While a previous real gesture is preparing the sample bank, ignore
+    // duplicate difficulty/menu taps instead of restarting Swift preflight.
+    if (nativeSnakeGatePending) return;
     if (!nativeSnakeAudio || muted) {
       hideNativeSnakeGate();
       if (mode === "round") renderGameScreen();
@@ -534,13 +539,17 @@
     nativeSnakeRetryMode = mode;
     const token = ++nativeSnakeGateSerial;
     nativeSnakeGatePending = true;
-    showNativeSnakeGate("Getting native game sounds ready…");
+    hideNativeSnakeGate(); // close a previous *failure* dialog on genuine Retry
+    app.setAttribute("aria-busy", "true");
+    // No modal, spinner or extra text for routine successful preparation.
+    // Game stays on difficulty or paused menu until native bank is ready.
     // The call below immediately invokes Swift activateFromGesture() on
     // the child's mode-select / menu-close / Retry click, NOT from a timer.
     const started = nativeSnakeAudio.prepareFromGesture();
     void Promise.resolve(started).then(result => {
       if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
       nativeSnakeGatePending = false;
+      app.removeAttribute("aria-busy");
       if (result?.ready === true) {
         hideNativeSnakeGate();
         if (mode === "round") renderGameScreen();
@@ -550,16 +559,24 @@
           "Native sound isn't ready. Try Again to prepare it before playing.", true);
       }
     }).catch(() => {
-      if (token !== nativeSnakeGateSerial || document.hidden) return;
+      if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
       nativeSnakeGatePending = false;
+      app.removeAttribute("aria-busy");
       showNativeSnakeGate("Native sound isn't ready. Tap Try Again.", true);
     });
   }
   if (nativeSnakeAudio) {
     nativeSnakeAudio.configure({
       onAppInactive: () => {
-        // On held App Switcher thumbnails WebKit may remain visible.
-        // Notify the SAME plain Welcome Back owner, then pause the game.
+        // A held App Switcher thumbnail may stay WebKit-visible. Invalidate
+        // any *initial* pending sound preflight without creating a gray
+        // "audio failed" popup when the child returns to difficulty selection.
+        if (nativeSnakeGatePending) {
+          nativeSnakeGateSerial++;
+          nativeSnakeGatePending = false;
+          app.removeAttribute("aria-busy");
+        }
+        // An active game still uses the SAME plain Welcome Back owner.
         if (!state.running || completed) return;
         if (!snakeWelcomeBack?.pauseFromNativeInactive?.())
           pauseForTaskSwitch();
@@ -584,6 +601,7 @@
       if (document.hidden) {
         nativeSnakeGateSerial++;
         nativeSnakeGatePending = false;
+        app.removeAttribute("aria-busy");
       } else if (document.getElementById("vslNativeAudioGate")) {
         showNativeSnakeGate(
           "Sound was paused while you were away. Tap Try Again.", true);
@@ -959,6 +977,7 @@
         renderIntroScreen();
       },
       onSelect: (mode) => {
+        if (nativeSnakeAudio && nativeSnakeGatePending) return;
         unlockAndTap();
         selectedMode = mode;
         completed = false;
