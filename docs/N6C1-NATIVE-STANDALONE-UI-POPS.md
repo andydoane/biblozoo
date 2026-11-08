@@ -1,6 +1,6 @@
 # N6c.1 — Native-only UI pops on Scripture Snake and Bible Bugs title/difficulty screens
 
-> **Scope:** Isolated `experiment/native-ios-audio` / `BibloZoo Audio Test` only. This fixes an owner-observed post-N6c gap: both Scripture Snake and Bible Bugs have **silent title/start and difficulty/mode button taps** even though Bible Bugs' end-screen tap is audible and gameplay worked in the owner-tested scenarios. Owner review/merge and real iPhone hearing are required. **This is not a Web Audio fallback or a claim that final sound latency is measured.**
+> **PR:** [N6c.1 #41](https://github.com/andydoane/biblozoo/pull/41). **Scope:** Isolated `experiment/native-ios-audio` / `BibloZoo Audio Test` only. This fixes an owner-observed post-N6c gap: both Scripture Snake and Bible Bugs have **silent title/start and difficulty/mode button taps** even though Bible Bugs' end-screen tap is audible and gameplay worked in the owner-tested scenarios. Owner review/merge and real iPhone hearing are required. **This is not a Web Audio fallback or a claim that final sound latency is measured.**
 
 ## Diagnosis and deliberately narrow change
 
@@ -41,7 +41,7 @@ In GitHub Desktop, switch the separate **`biblozoo-native-audio`** Mac worktree 
 
 ## Stop/go
 
-- **Automated source CI:** pending until final PR HEAD passes.
+- **Automated source CI:** full Node regression suite and production build **GREEN at code HEAD `9d9b7de8`** ([Actions #42445808256](https://github.com/andydoane/biblozoo/actions/runs/42445808256)); verify final documentation-only HEAD rerun before owner merge.
 - **Swift Xcode compilation and physically audible iPhone acceptance:** owner pending.
 - **If passed:** N6d one additional standalone game at a time. If title cold first-pop still sometimes drops past 350ms, keep that bounded policy and track separately as N9 reliability; do not claim universal first-tap resolution.
 
