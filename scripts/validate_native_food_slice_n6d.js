@@ -158,17 +158,19 @@ function section(a,b){
 const ownerSrc=section("  const nativeSliceAudio =", "  renderIntro();");
 const screenSrc=section("  function renderIntro(reason = ", "  function startGame(mode) {");
 const menuSrc=section("  function wireCommonNav() {","  function bindFoodSliceZoomLock()");
+const pauseSrc=section("  function setPaused(paused, reason = \"\") {",
+  "  function recalcField() {");
 const gameSoundSrc=section("  async function playGameSound(key, volumeKey = key) {",
   "  function pickRandomSoundKey(group, previousKey) {");
 const uiSrc=section("  function playUiTapSound() {","  function playRandomSliceSound() {");
 const returnSrc=section("  function pauseForTaskSwitch() {","})();");
-const ownerFunctions=[ownerSrc,screenSrc,menuSrc,gameSoundSrc,uiSrc,returnSrc]
-  .join("\n")+"\nthis.test={renderIntro,renderModeSelect,primeNativeSliceFromGesture,cancelNativeSlicePreflight,playUiTapSound,playGameSound,wireCommonNav,pauseForTaskSwitch,continueFromWelcomeBack,read:()=>({nativeSlicePending,returnPaused,stateRunning:state.running})};";
+const ownerFunctions=[ownerSrc,screenSrc,menuSrc,pauseSrc,gameSoundSrc,uiSrc,returnSrc]
+  .join("\n")+"\nthis.test={renderIntro,renderModeSelect,primeNativeSliceFromGesture,cancelNativeSlicePreflight,playUiTapSound,playGameSound,wireCommonNav,setPaused,pauseForTaskSwitch,continueFromWelcomeBack,read:()=>({nativeSlicePending,returnPaused,stateRunning:state.running})};";
 assert.doesNotMatch(ownerSrc+screenSrc+menuSrc+uiSrc,/\bvolumeScale\b/,
   "new native button functions cannot use a free local from another function");
 function gameFixture({native=true,initialMuted=false}={}){
  const actions=[],uiCalls=[],prepares=[],buttons={};
- let gate=null,opts,config;
+ let gate=null,opts,config,bankReady=false;
  function button(id){
   return buttons[id]={listeners:{},addEventListener(name,fn){this.listeners[name]=fn;},
    click(){this.listeners.click?.();},onclick:null};
@@ -186,10 +188,17 @@ function gameFixture({native=true,initialMuted=false}={}){
   isAvailable:()=>native,
   configure(c){config=c;},
   tapUiFromGesture(...args){uiCalls.push(args);return true;},
-  prepareFromGesture(...args){const d=deferred();prepares.push({args, ...d});return d.promise;},
-  stop(){actions.push("native-stop");return Promise.resolve();},
+  prepareFromGesture(...args){
+    const d=deferred();
+    prepares.push({args,promise:d.promise,resolve(result){
+      bankReady=result?.ready===true;
+      d.resolve(result);
+    }});
+    return d.promise;
+  },
+  stop(){bankReady=false;actions.push("native-stop");return Promise.resolve();},
   play(...args){actions.push(["effect",...args]);return true;},
-  isReady:()=>false
+  isReady:()=>bankReady
  };
  const welcome={pauseFromNativeInactive(){actions.push("inactive-welcome");ctx.test.pauseForTaskSwitch();return true;},
   showAfterNativeActive(){actions.push("active-welcome");return true;}};
@@ -212,7 +221,6 @@ function gameFixture({native=true,initialMuted=false}={}){
   startGame:(mode)=>{actions.push("start:"+mode);state.running=true;},
   stopLoop:()=>actions.push("stop-loop"),startLoop:()=>actions.push("start-loop"),
   helpHtml:()=>"<p>Help</p>",
-  setPaused:(p,reason="")=>{state.paused=p;state.pauseReason=p?reason:"";actions.push("pause:"+p);},
   openHelpFromMenu:()=>actions.push("open-help"),
   hideNativeSliceFailure:()=>actions.push("hide-gate"),
   welcomeClock:{pause(){actions.push("clock-pause");},resume(){actions.push("clock-resume");}},
@@ -295,6 +303,21 @@ async function actualGameOwnerTests(){
  assert.equal(await returning,true);
  assert.equal(g.test.read().returnPaused,false);
  assert.equal(g.actions.includes("clock-resume"),true);
+
+ // Test actual Food Slice setPaused, not a permissive mock. The wrong/bomb
+ // animation's delayed unpause must NOT escape a native playback error.
+ g.state.paused=true;
+ g.state.pauseReason="bomb";
+ g.callbacks.onPlaybackFailure();
+ assert.equal(g.state.pauseReason,"native-audio-error");
+ g.test.setPaused(false,"");
+ assert.equal(g.state.paused,true,
+   "320ms bomb/wrong animation cannot bypass failed native audio");
+ g.test.primeNativeSliceFromGesture("resume");
+ g.prepares.at(-1).resolve({ready:true});
+ await settle();
+ assert.equal(g.state.paused,false,
+   "fresh genuine Retry full-bank preflight safely releases failed round");
 
  const muted=gameFixture({initialMuted:true});
  muted.test.renderIntro();
