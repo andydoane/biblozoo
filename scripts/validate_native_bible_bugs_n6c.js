@@ -106,7 +106,8 @@ function fixture({ios=true,nativeOnly=true,missing="",rejectPlay="",
     onPlaybackFailure:why=>alarms.push(why)
   });
   return {api,calls,callbacks,messages,alarms,document,
-    releaseOldBank(){holding=false;held.splice(0).forEach(release=>release());}
+    allowNewBank(){holding=false;},
+    releaseOldBank(){held.splice(0).forEach(release=>release());}
   };
 }
 const flush=async()=>{await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));};
@@ -170,6 +171,7 @@ async function controllerTests(){
   await flush();
   assert.equal(raced.calls.filter(x=>x[0]==="preload").length,14);
   await raced.api.stop(); // actual UIKit inactive / Back gesture
+  raced.allowNewBank(); // only the old bank's callbacks remain delayed
   const newer=raced.api.prepareFromGesture(); // fresh actual child tap
   assert.equal((await newer).ready,true,"new bank ready before older preload response");
   const stopsBefore=raced.calls.filter(x=>x[0]==="stop").length;
