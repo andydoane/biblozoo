@@ -7748,7 +7748,8 @@
     const attempt = nativeDinoAudio
       ? (muted ? Promise.resolve(true) :
           nativeDinoAudio.prepareFromGesture().then(result =>
-            window.BibloZooWelcomeBackReturn.nativeAudioResumeResult(result)))
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
       : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
           unlock: () => { audioUnlocked = false; return unlockAudio(); },
           getContext: () => audioCtx,
