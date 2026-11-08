@@ -43,7 +43,7 @@ assert.match(workflow,/validate_native_pip_takeover_n6h2\.js/);
 assert.match(handoff,/N6h\.2/);
 
 const names=["snake","bible-bugs","food-slice","verse-splat","dino-dash","verse-invaders","verse-munch"];
-const exports=[
+const controllerExports=[
  "BibloZooNativeSnakeAudio","BibloZooNativeBibleBugsAudio","BibloZooNativeFoodSliceAudio",
  "BibloZooNativeVerseSplatAudio","BibloZooNativeDinoDashAudio",
  "BibloZooNativeVerseInvadersAudio","BibloZooNativeVerseMunchAudio"
@@ -117,7 +117,7 @@ function env({competing=true,reject=false}={}){
 function runController(f,i){
  vm.runInNewContext(read("verse_games/shared/native-"+names[i]+"-audio.js"),
     {window:f.win,Date,Promise,Error,console});
- return f.win[exports[i]];
+ return f.win[controllerExports[i]];
 }
 async function homeColdStart(){
  const f=env({competing:true});let now=1000;f.win.performance.now=()=>now;
