@@ -4079,7 +4079,7 @@
           // case include one native UI pop with the preflight instead of
           // silently losing the selected-speed tap.
           const coldUiPop = nativeJamAudio.isUiReady() ? null :
-            uiTapIndex++ % 2;
+            Math.max(0, uiTapIndex - 1) % 2;
           const warm = { promise: null, settled: false, result: null };
           nativeJamHeadsUpPrewarm = warm;
           const activation = nativeJamAudio.prepareFromGesture(
