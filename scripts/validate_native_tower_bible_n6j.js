@@ -120,6 +120,33 @@ async function checkController(){
   await f.audio.stop();
   assert.equal(f.audio.play("streak",.5),false,"stop inhibits hot dispatch");
 }
+// Run the actual game's hot sound callback, not only the controller mock.
+function testHotGameSounds(){
+  const heard=[];
+  const scope={
+    nativeTowerAudio:{play:(key,volume)=>heard.push([key,volume])},
+    document:{hidden:false},muted:false,returnPaused:false,
+    state:{running:true,paused:false},
+    getSoundVolume:key=>({brickLand:.55,warning:.78,dangerWarning:.88,
+      collapse:.90,brickBreak:.82,streak:.90})[key] ?? 1,
+    console
+  };
+  vm.createContext(scope);
+  vm.runInContext(extract("  function playGameSound(eventId) {",
+    "  window.tbTestSound = function tbTestSound")+
+    "\\nthis.testPlay=playGameSound;",scope);
+  for(const key of ["correctWord","wrongWord","brickLand","warning",
+    "dangerWarning","collapse","brickBreak","streak"]) scope.testPlay(key);
+  assert.deepEqual(heard,[["correctWord",1],["wrongWord",1],["brickLand",.55],
+    ["warning",.78],["dangerWarning",.88],["collapse",.90],
+    ["brickBreak",.82],["streak",.90]],
+    "both baked synthesizers at 1.0; six recorded files keep authored volumes");
+  const count=heard.length;
+  scope.state.paused=true;scope.testPlay("streak");
+  scope.state.paused=false;scope.muted=true;scope.testPlay("warning");
+  scope.muted=false;scope.returnPaused=true;scope.testPlay("collapse");
+  assert.equal(heard.length,count,"no queued PCM from mute, pause or Welcome Back");
+}
 function realMenus(native=true){
   let title,mode,menu,speed;
   const events=[],prepares=[];
@@ -221,6 +248,7 @@ async function testWelcome(){
 }
 (async()=>{
   await checkController();
+  testHotGameSounds();
   realMenus(true);realMenus(false);
   await testWelcome();
   console.log("N6j Tower 6 MP3 + 2 native synthesized PCM + 2 UI, actual Mode/Menu/Speed and PiP deferral PASS");
