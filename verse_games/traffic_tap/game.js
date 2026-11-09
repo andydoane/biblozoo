@@ -261,6 +261,119 @@
   const uiSoundBuffers = new Map();
   const uiSoundBufferPromises = new Map();
   let audioUnlocked = false;
+
+  // N6l: Traffic Tap uses a 16-ID native PCM bank on iOS (one zoom MP3,
+  // 13 hard-coded generated cues incl. 8 streak notes, two shared UI pops).
+  // Web/PWA/Android keep the original AudioContext implementation below.
+  const nativeTrafficAudio = window.BibloZooNativeTrafficTapAudio?.isAvailable?.()
+    ? window.BibloZooNativeTrafficTapAudio : null;
+  let nativeTrafficToken = 0;
+  let nativeTrafficPending = false;
+  let nativeTrafficFailure = false;
+  let nativeTrafficRetry = {kind:"round",mode:null};
+  let trafficWelcomeBack = null;
+
+  function nextNativeTrafficUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function stopNativeTrafficRound() {
+    if (!nativeTrafficAudio) return;
+    nativeTrafficToken++;
+    nativeTrafficPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeTrafficAudio.stop();
+  }
+  function clearNativeTrafficFailure() {
+    nativeTrafficFailure = false;
+    document.getElementById("ttNativeAudioFailure")?.remove();
+  }
+  function showNativeTrafficFailure(message) {
+    if (!nativeTrafficAudio) return;
+    nativeTrafficFailure = true;
+    if (state.running) setPaused(true,"native-audio-error");
+    let overlay = document.getElementById("ttNativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "ttNativeAudioFailure";
+      overlay.className = "tt-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="tt-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Traffic Tap native sound issue">
+          <h2>Traffic Tap</h2><p role="status" data-traffic-audio-status></p>
+          <button type="button" data-traffic-audio-retry>Try Again</button>
+          <button type="button" data-traffic-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-traffic-audio-retry]").onclick = () =>
+        primeNativeTrafficFromGesture(nativeTrafficRetry.kind,nativeTrafficRetry.mode);
+      overlay.querySelector("[data-traffic-audio-back]").onclick = () => {
+        stopNativeTrafficRound();
+        clearNativeTrafficFailure();
+        if (nativeTrafficRetry.kind==="round") renderModeSelect();
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-traffic-audio-status]").textContent=message;
+  }
+  function primeNativeTrafficFromGesture(kind="round",mode=null,uiKey=null) {
+    if (!nativeTrafficAudio || nativeTrafficPending || returnPaused || document.hidden)
+      return;
+    nativeTrafficRetry={kind,mode};
+    clearNativeTrafficFailure();
+    if (muted) {
+      if (kind==="round") startGame(mode);
+      else setPaused(false,"");
+      return;
+    }
+    const token=++nativeTrafficToken;
+    nativeTrafficPending=true;
+    app.setAttribute("aria-busy","true");
+    if (state.running) setPaused(true,"native-audio-preflight");
+    // Sole Swift .soloAmbient priority claim happens in THIS human tap stack.
+    const prep=nativeTrafficAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:getSoundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if (token!==nativeTrafficToken || returnPaused || document.hidden) return;
+      nativeTrafficPending=false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready===true) {
+        if (kind==="round") startGame(mode);
+        else setPaused(false,"");
+      } else {
+        showNativeTrafficFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(()=>{
+      if (token!==nativeTrafficToken || returnPaused || document.hidden) return;
+      nativeTrafficPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeTrafficFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeTrafficAudio) {
+    nativeTrafficAudio.configure({
+      onAppInactive:()=>{
+        if (nativeTrafficPending) stopNativeTrafficRound();
+        if (!state.running) return;
+        if (!trafficWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive:()=>trafficWelcomeBack?.showAfterNativeActive?.(),
+      onPlaybackFailure:()=>{
+        if (muted || returnPaused || document.hidden || !state.running ||
+            nativeTrafficPending || nativeTrafficFailure ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        nativeTrafficRetry={kind:"resume",mode:null};
+        showNativeTrafficFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if (document.hidden && nativeTrafficPending) stopNativeTrafficRound();
+    });
+  }
+
   let completionMarked = false;
   let alreadyCompletedForMode = false;
   let completionResult = null;
