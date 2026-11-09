@@ -82,7 +82,7 @@ const has = (value, text, message) => assert(value.includes(text), message);
     "Original pad must be native for each BPM");
   sourceTest(/nativeJamAudio\.playTone\(midi, duration/,
     "Original tone parameters must route to pre-rendered PCM");
-  sourceTest(/nativeJamAudio\.playVoice\(sound\.id, volume\)/,
+  sourceTest(/nativeJamAudio\.playVoice\(sound\.id, volume, dueEpochMs\)/,
     "Use published recorded filler, not synthetic substitute");
   sourceTest(/nativeJamAudio\.stopVoices\(\)/,
     "Menu/interrupt stops beat voices without discarding prepared PCM");
