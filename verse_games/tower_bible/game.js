@@ -212,6 +212,106 @@
   let returnPriorPauseReason = null;
   let returnWasLooping = false;
 
+  // N6j: Tower of Bible's six original files and two fixed synthesized
+  // word cues (plus shared UI pops) use prewarmed native PCM on iOS.
+  // Web/PWA/Android retain the original oscillators and MP3 buffers below.
+  const nativeTowerAudio = window.BibloZooNativeTowerBibleAudio?.isAvailable?.()
+    ? window.BibloZooNativeTowerBibleAudio : null;
+  let nativeTowerSerial = 0;
+  let nativeTowerPending = false;
+  let nativeTowerRetry = {kind:"round",mode:null};
+  let towerWelcomeBack = null;
+
+  function nextNativeTowerUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function wireNativeTowerTitleHelpPops() {
+    if (!nativeTowerAudio) return;
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeTowerRound() {
+    if (!nativeTowerAudio) return;
+    nativeTowerSerial++;
+    nativeTowerPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeTowerAudio.stop();
+  }
+  function clearNativeTowerFailure() {
+    document.getElementById("tbNativeAudioFailure")?.remove();
+  }
+  function showNativeTowerFailure(message) {
+    if (!nativeTowerAudio) return;
+    let overlay = document.getElementById("tbNativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "tbNativeAudioFailure";
+      overlay.className = "tb-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="tb-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Tower of Bible native sound problem">
+          <h2>Tower of Bible</h2>
+          <p role="status" data-tower-audio-status></p>
+          <button type="button" data-tower-audio-retry>Try Again</button>
+          <button type="button" data-tower-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-tower-audio-retry]").onclick = () =>
+        primeNativeTowerFromGesture(nativeTowerRetry.kind,nativeTowerRetry.mode);
+      overlay.querySelector("[data-tower-audio-back]").onclick = () => {
+        stopNativeTowerRound();
+        clearNativeTowerFailure();
+        if (nativeTowerRetry.kind === "round") renderModeSelect();
+        else {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    overlay.querySelector("[data-tower-audio-status]").textContent = message;
+  }
+  function primeNativeTowerFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeTowerPending || returnPaused || document.hidden) return;
+    if (!nativeTowerAudio || muted) {
+      clearNativeTowerFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeTowerRetry = {kind,mode};
+    const token = ++nativeTowerSerial;
+    nativeTowerPending = true;
+    clearNativeTowerFailure();
+    app.setAttribute("aria-busy", "true");
+    // Swift session activation is invoked NOW, within the real human tap.
+    // Never invoke it from a visibility event, tick or late timer.
+    const request = nativeTowerAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:getSoundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeTowerSerial || returnPaused || document.hidden) return;
+      nativeTowerPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else {
+        showNativeTowerFailure(
+          ["activation-os-rejected","other-audio-playing"].includes(result?.reason)
+            ? "Audio is busy. Try again after the other audio stops."
+            : "Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeTowerSerial || returnPaused || document.hidden) return;
+      nativeTowerPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeTowerFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+
+
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
 
@@ -870,6 +970,7 @@
   }
 
   function getSilenceAudioElement() {
+    if (nativeTowerAudio) return null;
     if (silenceAudioEl) return silenceAudioEl;
 
     silenceAudioEl = document.createElement("audio");
@@ -884,6 +985,7 @@
   }
 
   function primeHtmlAudio() {
+    if (nativeTowerAudio) return;
     try {
       const audio = getSilenceAudioElement();
       audio.muted = false;
@@ -911,6 +1013,7 @@
   }
 
   function ensureAudioContext() {
+    if (nativeTowerAudio) return null;
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -925,6 +1028,7 @@
   }
 
   function unlockAudio() {
+    if (nativeTowerAudio) return nativeTowerAudio.isReady();
     const ctx = ensureAudioContext();
     if (!ctx || !masterGain) {
       audioUnlocked = false;
@@ -1025,6 +1129,13 @@
   }
 
   function playGeneratedSound(eventId) {
+    if (nativeTowerAudio) {
+      if (muted || returnPaused || document.hidden || state.paused ||
+          !state.running) return;
+      // Correct/wrong Web multipliers (3.4/3.6) are baked into native PCM.
+      nativeTowerAudio.play(eventId, 1);
+      return;
+    }
     if (muted) {
       if (SOUND_TUNING.debug) console.log("[TowerBibleSound] muted generated", eventId);
       return;
@@ -1054,11 +1165,13 @@
   }
 
   function preloadAudioFiles() {
+    if (nativeTowerAudio) return; // No iOS Web decoder.
     Object.values(UI_SOUND_FILES).forEach((url) => loadAudioBuffer(url));
     Object.values(TOWER_SOUND_FILES).forEach((url) => loadAudioBuffer(url));
   }
 
   function loadAudioBuffer(url) {
+    if (nativeTowerAudio) return Promise.resolve(null);
     if (!url) return Promise.resolve(null);
 
     if (audioBuffers.has(url)) {
@@ -1115,6 +1228,7 @@
   }
 
   function playBufferedSound(url, eventId, allowWhenMuted = false) {
+    if (nativeTowerAudio) return; // Game events use native playGameSound.
     if (muted && !allowWhenMuted) return;
 
     unlockAudio();
@@ -1154,12 +1268,26 @@
   }
 
   function playUiTapSound(allowWhenMuted = false) {
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
-    playBufferedSound(UI_SOUND_FILES[key], "uiTap", allowWhenMuted);
+    const key = nextNativeTowerUiKey();
+    if (nativeTowerAudio) {
+      if ((!muted || allowWhenMuted) && !returnPaused && !document.hidden)
+        nativeTowerAudio.tapUiFromGesture(key, getSoundVolume("uiTap"));
+    } else {
+      playBufferedSound(UI_SOUND_FILES[key], "uiTap", allowWhenMuted);
+    }
   }
 
   function playGameSound(eventId) {
+    if (nativeTowerAudio) {
+      if (muted || returnPaused || document.hidden || state.paused ||
+          !state.running) return;
+      // JS generated correct/wrong tones baked at original authored gains.
+      // Packaged MP3s retain their original per-event volume multipliers.
+      nativeTowerAudio.play(eventId,
+        eventId === "correctWord" || eventId === "wrongWord"
+          ? 1 : getSoundVolume(eventId));
+      return;
+    }
     if (SOUND_TUNING.debug) {
       console.log("[TowerBibleSound] request", eventId);
     }
