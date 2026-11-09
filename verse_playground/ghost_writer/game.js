@@ -58,6 +58,15 @@
     "spooky4",
     "spooky5"
   ];
+  // N6r: isolated iOS owns actual speaker output through the existing Swift
+  // soloAmbient PCM engine; Web/PWA/Android keep their original Web Audio.
+  const nativeGhostAudio = window.BibloZooNativeGhostWriterAudio?.isAvailable?.()
+    ? window.BibloZooNativeGhostWriterAudio : null;
+  const NATIVE_TEMPORARY = new Set([
+    "other-audio-playing", "interruption-pending",
+    "gesture-required-after-interruption", "not-foreground", "stale",
+    "activation-cooldown", "foreground-attempt-limit", "activation-os-rejected"
+  ]);
 
   const SOUND_TUNING = {
     masterVolume: 0.82,
@@ -725,6 +734,10 @@
   let parsedRef = null;
   let selectedMode = "beginner";
   let muted = false;
+  let nativeGhostPendingAction = null;
+  let nativeGhostPreflightGeneration = 0;
+  let nativeGhostPreflightPending = false;
+  let nativeGhostRetryLabel = "start";
   let audioContext = null;
   let audioUnlocked = false;
   let audioUnlockPromise = null;
@@ -807,6 +820,7 @@
   }
 
   function getAudioContext() {
+    if (nativeGhostAudio) return null; // native must never create Web Audio
     // A closed iOS audio context cannot be resumed. A later genuine gesture
     // may create a new one while retaining the already decoded sound buffers.
     if (audioContext?.state === "closed") {
@@ -832,6 +846,10 @@
   }
 
   async function unlockAudio() {
+    // Generic drawing/focus callbacks must never activate a native session.
+    // Only an explicit Mode, Replay, Menu Close, Retry or Welcome Back gesture
+    // may invoke the native controller's prepareFromGesture().
+    if (nativeGhostAudio) return nativeGhostAudio.isReady();
     const ac = getAudioContext();
     if (!ac) return false;
     if (audioUnlocked && ac.state === "running") return true;
@@ -900,6 +918,7 @@
   }
 
   async function loadSoundBuffers() {
+    if (nativeGhostAudio) return false; // no native iOS Web fetch/decode
     if (soundLoadPromise) return soundLoadPromise;
 
     const ac = getAudioContext();
@@ -957,6 +976,11 @@
   }
 
   function playGameSound(key, volumeKey = key) {
+    if (nativeGhostAudio) {
+      if (!muted && (key === "uiTap1" || key === "uiTap2"))
+        nativeGhostAudio.tapUiFromGesture(key, getSoundVolume(volumeKey));
+      return; // spooky clips use playSpooky(), never Web/HTML fallback
+    }
     if (muted) return;
 
     void (async () => {
@@ -988,6 +1012,12 @@
   }
 
   function playUiTapSound() {
+    if (nativeGhostAudio) {
+      const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+      uiSoundFlip = !uiSoundFlip;
+      if (!muted) nativeGhostAudio.tapUiFromGesture(key, getSoundVolume("uiTap"));
+      return;
+    }
     // Recover an interrupted spooky sequence on the child's next tap.
     recoverGhostSpookyAudio({ fromGesture: true });
     // Run the unlock path before the async sound-buffer work on this tap.
@@ -998,6 +1028,7 @@
   }
 
   function unlockAudioSoon() {
+    if (nativeGhostAudio) return; // drawing is not a native activation event
     void unlockAudio();
   }
 
@@ -1018,7 +1049,8 @@
   }
 
   function shuffleGhostSpookySoundKeys() {
-    const available = GHOST_SPOOKY_SOUND_KEYS.filter((key) => soundBuffers.has(key));
+    const available = GHOST_SPOOKY_SOUND_KEYS.filter((key) =>
+      nativeGhostAudio ? nativeGhostAudio.isReady() : soundBuffers.has(key));
     const out = [...available];
 
     for (let i = out.length - 1; i > 0; i -= 1) {
@@ -1046,6 +1078,11 @@
   }
 
   function stopCurrentSpookySource() {
+    if (nativeGhostAudio) {
+      spookySource = null;
+      void nativeGhostAudio.stopSpooky(); // scoped stop, retain warmed PCM
+      return;
+    }
     const source = spookySource;
     spookySource = null;
 
@@ -1081,6 +1118,33 @@
 
   function playNextGhostSpookySound(token) {
     if (!spookySoundActive || token !== spookySoundToken || muted) return;
+    if (nativeGhostAudio) {
+      if (document.hidden || !nativeGhostAudio.isReady()) {
+        pauseGhostPlaybackForBackground();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+        return;
+      }
+      const key = chooseGhostSpookySoundKey();
+      if (!key) return; // all five original clips were required in preflight
+      spookyLastKey = key;
+      // The Swift worker returns this exact clip's decoded duration, not an
+      // invented JS delay. A timeout only sequences decorative ambient sounds;
+      // it never advances handwriting, score or marks verse completion.
+      void nativeGhostAudio.playSpooky(key, getSoundVolume("ghostSpooky"))
+        .then(result => {
+          if (!spookySoundActive || token !== spookySoundToken ||
+              document.hidden || muted) return;
+          if (!result?.accepted || !(result.durationMs > 0)) return;
+          spookyTimer = setTimeout(() => {
+            spookyTimer = 0;
+            if (!spookySoundActive || token !== spookySoundToken ||
+                document.hidden || muted) return;
+            queueNextGhostSpookySound(token, getRandomSpookyGapMs());
+          }, result.durationMs);
+        });
+      return;
+    }
 
     const ac = getAudioContext();
 
@@ -1128,6 +1192,13 @@
     stopGhostSpookySounds();
 
     if (muted) return;
+    if (nativeGhostAudio && !nativeGhostAudio.isReady()) {
+      spookyRecoveryPending = true;
+      pauseGhostPlaybackForBackground();
+      playgroundWelcome?.pauseFromNativeInactive?.();
+      playgroundWelcome?.showAfterNativeActive?.();
+      return; // never start a silent iPhone replay
+    }
 
     spookySoundActive = true;
     spookyRecoveryPending = false;
@@ -1135,6 +1206,11 @@
     spookySoundQueue = [];
 
     const token = spookySoundToken;
+    if (nativeGhostAudio) {
+      // Preflight finished on an earlier real tap, never from rAF.
+      playNextGhostSpookySound(token);
+      return;
+    }
 
     void (async () => {
       // Playback starts in requestAnimationFrame, outside the Replay tap.
@@ -1176,6 +1252,22 @@
 
   function recoverGhostSpookyAudio({ fromGesture = false } = {}) {
     if (document.hidden || !spookyRecoveryPending) return;
+    if (nativeGhostAudio) {
+      // Full bank activation is exclusively owned by plain Welcome Back
+      // Let's go or a dedicated Retry/Replay gesture, never focus/RAF.
+      if (!nativeGhostAudio.isReady()) return;
+      const ps = playbackState;
+      if (!ps?.running || muted || ps.options.spookySounds === "off") {
+        spookyRecoveryPending = false;
+        return;
+      }
+      if (ps.backgroundPausedAt !== null ||
+          document.documentElement?.classList?.contains("bz-playground-welcome-paused"))
+        return;
+      spookyRecoveryPending = false;
+      startGhostSpookySounds();
+      return;
+    }
     const ps = playbackState;
     if (!ps?.running || ps.options.spookySounds === "off" || muted) {
       spookyRecoveryPending = false;
@@ -1203,6 +1295,7 @@
   }
 
   function onGhostAudioStateChange() {
+    if (nativeGhostAudio) return;
     if (!audioContext || audioContext.state !== "running") {
       noteGhostAudioInterruption();
       return;
