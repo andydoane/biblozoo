@@ -116,6 +116,106 @@
     "us", "was", "we", "were", "who", "with", "you", "your"
   ]);
 
+  // N6p Wheel native-only output: thirty-six source-authored exact
+  // MIDI/waveform/envelope presets, plus two shared native UI pops.
+  // Long verse and reference recordings use existing N5b AVAudioPlayer.
+  const nativeWheelAudio=window.BibloZooNativeWheelOfBibleAudio?.isAvailable?.()
+    ? window.BibloZooNativeWheelOfBibleAudio : null;
+  let nativeWheelGeneration=0,nativeWheelPending=false,nativeWheelFailure=false;
+  let nativeWheelMenuOpen=false,nativeWheelRetryKind="resume";
+  let nativeWheelPopFlip=false;
+  function nativeWheelUiKey(){
+    const key=nativeWheelPopFlip?"uiTap2":"uiTap1";
+    nativeWheelPopFlip=!nativeWheelPopFlip;
+    return key;
+  }
+  function stopNativeWheelRun(){
+    if(!nativeWheelAudio)return;
+    nativeWheelGeneration++;
+    nativeWheelPending=false;
+    app?.removeAttribute("aria-busy");
+    void nativeWheelAudio.stop();
+  }
+  function clearNativeWheelFailure(){
+    nativeWheelFailure=false;
+    document.getElementById("wheelNativeAudioFailure")?.remove();
+  }
+  function showNativeWheelFailure(message){
+    if(!nativeWheelAudio)return;
+    nativeWheelFailure=true;
+    nativeWheelAudio.stopSpoken();
+    if(!welcomePaused)pauseWheelForReturn();
+    let overlay=document.getElementById("wheelNativeAudioFailure");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.id="wheelNativeAudioFailure";
+      overlay.className="wheel-native-audio-failure";
+      overlay.innerHTML=`<section class="wheel-native-audio-card" role="dialog"
+        aria-modal="true" aria-label="Wheel of Bible native audio issue">
+        <h2>Wheel of Bible</h2><p role="status" data-wheel-status></p>
+        <button type="button" data-wheel-retry>Try Again</button>
+        <button type="button" data-wheel-back>Back to Playground</button>
+      </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-wheel-retry]").onclick=()=>
+        primeWheelNativeFromGesture(nativeWheelRetryKind);
+      overlay.querySelector("[data-wheel-back]").onclick=()=>{
+        clearNativeWheelFailure();
+        stopNativeWheelRun();
+        bridge().exitGame?.();
+      };
+    }
+    overlay.querySelector("[data-wheel-status]").textContent=message;
+  }
+  function primeWheelNativeFromGesture(kind="start",uiKey=null){
+    if(!nativeWheelAudio || nativeWheelPending || document.hidden)return;
+    if(welcomePaused && kind==="start")return;
+    nativeWheelRetryKind=kind;
+    clearNativeWheelFailure();
+    if(muted){
+      if(kind==="start")void beginRun();
+      else if(kind==="resume" && !nativeWheelMenuOpen)resumeWheelAfterReturn();
+      return;
+    }
+    const token=++nativeWheelGeneration;
+    nativeWheelPending=true;
+    if(kind==="resume" && !welcomePaused)pauseWheelForReturn();
+    app?.setAttribute("aria-busy","true");
+    // Must call Swift activateFromGesture in this ACTUAL child button tap.
+    const preparing=nativeWheelAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:.42} : null);
+    void Promise.resolve(preparing).then(result=>{
+      if(token!==nativeWheelGeneration || document.hidden)return;
+      nativeWheelPending=false;
+      app?.removeAttribute("aria-busy");
+      if(result?.ready===true){
+        clearNativeWheelFailure();
+        if(kind==="start")void beginRun();
+        else if(kind==="resume"){
+          if(nativeWheelMenuOpen)nativeWheelMenuOpen=false;
+          resumeWheelAfterReturn();
+        }
+        return;
+      }
+      const why=String(result?.reason||"");
+      if(["activation-os-rejected","other-audio-playing",
+          "interruption-pending","not-foreground",
+          "gesture-required-after-interruption","activation-cooldown",
+          "foreground-attempt-limit","stale"].includes(why)){
+        // Higher-priority YouTube PiP is a temporary OS denial, NOT a
+        // permanently damaged PCM bank. Native callback shows plain
+        // retryable Welcome Back when an activity is already in progress.
+        return;
+      }
+      showNativeWheelFailure("Native wheel sounds are not ready. Tap Try Again.");
+    }).catch(()=>{
+      if(token!==nativeWheelGeneration || document.hidden)return;
+      nativeWheelPending=false;
+      app?.removeAttribute("aria-busy");
+      showNativeWheelFailure("Native wheel sounds are not ready. Tap Try Again.");
+    });
+  }
+
   let muted = false;
   let audioCtx = null;
   let masterGain = null;
