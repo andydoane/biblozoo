@@ -473,7 +473,7 @@
     if(!nativeScrubAudio)return;
     nativeScrubFailure=true;
     // Preserve current run/round/coverage, never award a silent completion.
-    pauseScrubForReturn();
+    if(document.getElementById("scrubGame"))pauseScrubForReturn();
     let dialog=document.getElementById("scrubNativeAudioFailure");
     if(!dialog){
       dialog=document.createElement("div");
@@ -645,6 +645,7 @@
   }
 
   function getAudioContext() {
+    if(nativeScrubAudio)return null; // native iOS forbids WebAudio
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -655,6 +656,7 @@
   }
 
   function ensureSilenceAudio() {
+    if(nativeScrubAudio)return null; // no HTML silent prime
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio(SILENCE_AUDIO_PATH);
@@ -667,6 +669,7 @@
   }
 
   function unlockAudio() {
+    if(nativeScrubAudio)return Promise.resolve(nativeScrubAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx) {
       audioUnlocked = false;
@@ -739,6 +742,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if(nativeScrubAudio)return null;
     if (soundBuffers.has(key)) return soundBuffers.get(key);
     if (soundBufferPromises.has(key)) return soundBufferPromises.get(key);
 
@@ -782,12 +786,18 @@
   }
 
   function preloadSoundBuffers() {
+    if(nativeScrubAudio)return;
     Object.keys(SOUND_FILES).forEach((key) => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if(nativeScrubAudio) {
+      if(muted || scrubStoppedOrPaused() || !nativeScrubAudio.isReady())return;
+      nativeScrubAudio.play(key,soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -829,9 +839,13 @@
   }
 
   function playUiTapSound() {
-    const key = lastUiTapSound === "uiTap1" ? "uiTap2" : "uiTap1";
-    lastUiTapSound = key;
-    playGameSound(key, "uiTap");
+    const key=scrubUiKey();
+    if(nativeScrubAudio){
+      if(!muted && !document.hidden)
+        nativeScrubAudio.tapUiFromGesture(key,soundVolume("uiTap"));
+      return;
+    }
+    playGameSound(key,"uiTap");
   }
 
   function getRoundIntroSoundKey(round) {
@@ -928,11 +942,17 @@
 
     const frequency = scale[(step - 1) % scale.length];
     const volume = soundVolume("progressTone");
-
-    playToneFrequency(frequency, 0.075, volume);
+    if(nativeScrubAudio){
+      const key=NATIVE_SCRUB_PROGRESS[String(frequency)];
+      if(key && !muted && !scrubStoppedOrPaused())
+        nativeScrubAudio.play(key,volume);
+      return;
+    }
+    playToneFrequency(frequency,0.075,volume);
   }
 
   function warmUpGeneratedToneAudio() {
+    if(nativeScrubAudio)return; // pre-rendered only on Start/Let's go
     const ctx = getAudioContext();
     if (!ctx || muted) return;
 
@@ -971,6 +991,11 @@
   }
 
   function playCompletionArpeggio() {
+    if(nativeScrubAudio){
+      if(!muted && !scrubStoppedOrPaused())
+        nativeScrubAudio.play("completionArpeggio",1);
+      return;
+    }
     if (muted) return;
 
     const notes = [392.00, 523.25, 659.25, 783.99]; // G4 → C5 → E5 → G5
@@ -982,6 +1007,7 @@
   }
 
   function playToneFrequency(frequency, duration, volume) {
+    if(nativeScrubAudio)return; // no dynamic oscillator on iOS
     if (muted) return;
 
     try {
@@ -1028,6 +1054,12 @@
 
   async function startMowerSound(duration) {
     stopMowerSound();
+    if(nativeScrubAudio){
+      if(!muted && !scrubStoppedOrPaused() && nativeScrubAudio.isReady() &&
+         Number.isFinite(duration) && duration>0)
+        nativeScrubAudio.play("mower",soundVolume("mower"));
+      return;
+    }
 
     if (muted || !SOUND_FILES.mower) return;
 
@@ -1108,6 +1140,10 @@
 
   function stopMowerSound() {
     mowerSoundGeneration += 1;
+    if(nativeScrubAudio){
+      void nativeScrubAudio.stopMower();
+      return;
+    }
 
     if (mowerSoundSource) {
       try {
