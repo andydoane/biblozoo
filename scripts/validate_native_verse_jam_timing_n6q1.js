@@ -33,7 +33,7 @@ async function main() {
   matches(game,/onSelect: \(mode\) => \{[\s\S]*?nativeJamAudio\.prepareFromGesture\(\)/,
     "Real mode gesture must prewarm whole native sound bank");
   has(game,'setScreen("headphones")',"Original Heads Up screen retained");
-  has(game,'screen === "headphones" && nativeJamHeadsUpPrewarm',
+  has(game,'screen === "headphones" && !!nativeJamHeadsUpPrewarm',
     "Heads Up may not immediately tear down mode prewarm");
   has(game,"nativeJamHeadsUpPrewarm = null;",
     "Consume / discard stale prewarm before active run");
@@ -65,10 +65,13 @@ async function main() {
   has(swift,"AVAudioTime(hostTime: mach_absolute_time()",
     "Native PCM uses host-time scheduling, not at-the-beat hot dispatch");
 
-  // First "Time"/"Speed" note and following notes are all prepared before
-  // the text animation loop; the browser path remains word-by-word.
-  matches(game,/if \(nativeJamAudio\) \{\s*for \(let index = 0; index < message\.length; index \+= 1\) \{\s*playTone\(/,
-    "Pre-schedule every native interstitial word's note");
+  // The authored sting already supplies a pitched note at each native
+  // transition word; N6q.3 suppresses only the doubled word-note layer.
+  // Browser WebAudio retains its two original source layers unchanged.
+  has(game,"playRoundTransitionSting(transitionStart)",
+    "Source transition melody/chord must remain scheduled before word UI");
+  has(game,"The authored sting ALREADY supplies",
+    "Never duplicate source note on the same native transition beat");
   has(game,"if (!nativeJamAudio) {\n        playTone({",
     "Browser retains the original visual-word cue path");
   for(const text of ['["time", "to", "jam!"]','["speed", "it", "up"]'])
@@ -175,6 +178,6 @@ async function main() {
   assert.strictEqual(resumed.ready,true);
   assert.strictEqual(calls.preload.length,26,
     "After real interruption the complete safe bank is rewarmed once");
-  console.log("N6q.1 PASS: watchdog ending, early original transition cues, host-time Jam scheduling, mode prewarm/fast Got It, hot-bank reuse, one-stop interruption, nonclipped finale and Great responsiveness.");
+  console.log("N6q.1 PASS: watchdog ending, original authored transition sting without native duplicate notes, host-time Jam scheduling, mode prewarm/fast Got It, hot-bank reuse, one-stop interruption, nonclipped finale and Great responsiveness.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
