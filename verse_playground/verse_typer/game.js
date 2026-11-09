@@ -1484,7 +1484,10 @@
         playUiPopSound();
       },
       onExit: () => {
+        // Keep the original Web/PWA/Android pop. On native iOS, stop the
+        // bank before navigation instead of scheduling a ghost clip.
         if(nativeTyperAudio)stopNativeTyperRound();
+        else playUiPopSound();
         stopAllAudio();
         window.VerseGameBridge.exitGame();
       },
