@@ -22,11 +22,12 @@ const extract=(start,end)=> {
 };
 
 async function runTransition(roundIndex,isNative) {
-  const plays=[],words=[],times=[];
+  const plays=[],words=[],times=[],traces=[];
   const stack={appendChild(el){words.push(el.textContent);}};
   const area={innerHTML:""};
   const scope={
-    nativeJamAudio:isNative?{}:null,
+    nativeJamAudio:isNative?{traceTransition:(phase,round,index)=>
+      traces.push({phase,round,index})}:null,
     state:{roundIndex,screen:"game",paused:false},
     audioCtx:{currentTime:100},muted:false,MIX:{transition:1},
     secondsPerBeat:()=>0.5,
@@ -47,22 +48,30 @@ async function runTransition(roundIndex,isNative) {
   vm.runInNewContext(code,scope,{filename:"Verse Jam actual transition functions"});
   const newGroove=await scope.showRoundTransition({alreadyAligned:true});
   assert.strictEqual(words.length,3,"Exactly three authored transition words");
-  assert.strictEqual(Math.round(newGroove*100)/100,102.08,
-    "Source four-beat transition duration retained");
-  const expectedCount=roundIndex===1?6:4;
-  assert.strictEqual(plays.length,expectedCount+(isNative?0:3),
-    "Native uses source sting only; browser retains original extra word notes");
-  const firstBeat=plays.filter(p=>Math.abs(p.when-100.08)<0.0001)
+  const firstAt=isNative?100.26:100.08;
+  assert.strictEqual(Math.round(newGroove*100)/100,
+    Math.round((firstAt+2)*100)/100,
+    "Exactly the original source four-beat word cadence, on both paths");
+  const expectedCount=(roundIndex===1?6:4)+3;
+  assert.strictEqual(plays.length,expectedCount,
+    "Both native and ios-prep WebAudio must have the EXACT two layers");
+  const firstBeat=plays.filter(p=>Math.abs(p.when-firstAt)<0.0001)
     .map(p=>p.midi);
-  assert.deepStrictEqual(firstBeat,isNative?
-    (roundIndex===1?[60,67,72]:roundIndex===2?[72]:[67]):
-    (roundIndex===1?[60,67,72,76]:
-      roundIndex===2?[72,72]:[67,67]),
-    "First native word must retain authored chord/note with NO extra collision");
+  assert.deepStrictEqual(firstBeat,
+    roundIndex===1?[60,67,72,76]:roundIndex===2?[72,72]:[67,67],
+    "Time MUST retain C/G/C chord PLUS the first word note, as ios-prep");
   for(let beat=0;beat<3;beat++)
-    assert(plays.some(p=>Math.abs(p.when-(100.08+0.5*beat))<0.0001),
-      "Each transition word must still have a pitched beat cue");
-  return {plays,words,times};
+    assert(plays.some(p=>Math.abs(p.when-(firstAt+0.5*beat))<0.0001),
+      "Each original word must retain its two-layer beat cues");
+  if(isNative) {
+    assert.strictEqual(plays.filter(p=>p.jamCue==="transition-word").length,3,
+      "Native word notes must be submitted with the source sting BEFORE DOM paint");
+    assert.strictEqual(plays.filter(p=>p.jamCue==="transition-sting").length,
+      roundIndex===1?6:4,"Do not drop any source melody/chord voices");
+    assert.strictEqual(traces.filter(t=>t.phase==="word-visible").length,3,
+      "Every native DOM word gets a read-only Xcode timing trace");
+  }
+  return {plays,words,times,traces};
 }
 
 async function main() {
@@ -216,6 +225,6 @@ async function main() {
     await runTransition(round,true);
     await runTransition(round,false);
   }
-  console.log("N6q.3 PASS: real title/mode PCM UI pops survive navigation, Got It painted press, moderated native opening kick, all 3 source-sting transitions with NO duplicate native word note and unchanged original web arrangement.");
+  console.log("N6q.3 PASS: UI pops, Got It press, native kick headroom, all three ios-prep two-layer word/chord stings on native (plus host-time lead), and unchanged original WebAudio arrangement.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
