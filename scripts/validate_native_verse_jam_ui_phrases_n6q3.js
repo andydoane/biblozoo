@@ -149,6 +149,26 @@ async function main() {
   assert.strictEqual(runs[0][2],1125,"Min press time passed to beginRun");
   assert.strictEqual(runs[0][0],"fast");
 
+  // Run the ACTUAL native-first drum dispatch to verify the initial
+  // kick keeps its original fixed PCM shape while staying below the
+  // no-compressor mixer headroom (and with the same intended beat time).
+  const drums=[];
+  const drumScope={
+    nativeJamAudio:{playDrum:(sound,volume,due)=>{
+      drums.push({sound,volume,due});return true;
+    }}, musicGeneration:0, MIX:{drumMaster:2},
+    drumVolume:volume=>volume*2, NATIVE_JAM_DRUM_HEADROOM:.72,
+    scheduleNativeJam:(when,callback)=>{callback(100080);return true;}
+  };
+  vm.runInNewContext(extract("  function playDrum(", "  function scheduleDrumLoopBar("),
+    drumScope,{filename:"Verse Jam actual native drum-volume path"});
+  drumScope.playDrum("kick",100.08,1);
+  assert.strictEqual(drums.length,1);
+  assert(Math.abs(drums[0].volume-.72)<.000001,
+    "First native kick must have headroom without modifying source PCM recipe");
+  assert.strictEqual(drums[0].due,100080,
+    "Native kick still uses original beat-ahead host timestamp");
+
   // Execute ACTUAL native controller with sole mocked Capacitor plugin.
   const calls={activation:[],preload:[],play:[],stop:[]};
   const plugin={
