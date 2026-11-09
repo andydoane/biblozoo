@@ -17,10 +17,10 @@ const ci=read(".github/workflows/ios-prep-validation.yml");
 const pitches=[55,60,62,64,65,67,69,71,72];
 const effects=["wrong","wordDone","popup","cocoon","flap0","flap1","flap2","flyAway"];
 const ids=[
+ "ui-pop-1","ui-pop-2",
  ...pitches.map(n=>"typer-note-"+n),
  "typer-wrong","typer-word-done","typer-popup","typer-cocoon",
- "typer-flap0","typer-flap1","typer-flap2","typer-fly-away",
- "ui-pop-1","ui-pop-2"
+ "typer-flap0","typer-flap1","typer-flap2","typer-fly-away"
 ];
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function chunk(a,b){
@@ -109,7 +109,7 @@ async function testBridge(){
  for(const n of pitches)assert.equal(f.api.play("note"+n,1),true);
  for(const name of effects)assert.equal(f.api.play(name,1),true);
  await flush();
- assert.deepEqual(f.calls.filter(x=>x[0]==="play").map(x=>x[1]),ids.slice(0,17),
+ assert.deepEqual(f.calls.filter(x=>x[0]==="play").map(x=>x[1]),ids.slice(2),
    "all nine original notes plus eight phrase effects dispatched");
  const events=[];
  f.api.configure({onAppInactive:()=>events.push("paused"),
