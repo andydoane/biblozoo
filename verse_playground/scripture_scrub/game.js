@@ -506,7 +506,7 @@
   }
   function primeNativeScrubFromGesture(kind="start",uiKey=null){
     if(!nativeScrubAudio || nativeScrubPending || document.hidden ||
-       (welcomePaused && !["resume","retry"].includes(kind)))return;
+       (welcomePaused && !["resume","retry","next","finish"].includes(kind)))return;
     nativeScrubRetry={kind};
     clearNativeScrubFailure();
     if(muted){
