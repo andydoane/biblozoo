@@ -1507,6 +1507,7 @@
   }
 
   function replaceScrubWelcomeContext() {
+    if(nativeScrubAudio)return false; // native doesn't own a Web context
     const old = audioCtx;
     if (!old) return false;
     stopMowerSound();
@@ -1536,6 +1537,13 @@
     if (mowerAnimationFrame) { cancelAnimationFrame(mowerAnimationFrame); mowerAnimationFrame = null; }
   }
   function continueScrubAfterReturn() {
+    // On a task return while Help/Game Menu is open, keep its own pause
+    // until the child actually presses Keep Scrubbing.
+    if(nativeScrubAudio && menuOpen){
+      welcomePaused=true;
+      welcomeClock.pause();
+      return true;
+    }
     welcomeClock.resume();
     welcomePaused = false;
     const resumeMower = mowerResumeFrame;
@@ -1549,6 +1557,7 @@
     const round = deferredCoverageRound;
     deferredCoverageRound = null;
     if (round && round === roundConfig()) scheduleCoverageCheck(round, true);
+    return true;
   }
 
   function renderTitleScreen() {
@@ -1569,10 +1578,15 @@
       backLabel: "Back to Playground",
       theme: GAME_THEME,
       onBack: () => {
+        if(nativeScrubAudio)stopNativeScrubRun();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: async () => {
+        if(nativeScrubAudio){
+          primeNativeScrubFromGesture("start",scrubUiKey());
+          return;
+        }
         await unlockAudio();
         beginScrubRun();
       }
@@ -1727,9 +1741,12 @@
       backHelpText: "Back",
       isMuted: () => muted,
       onMuteToggle: () => {
-        muted = !muted;
-        if (!muted) playUiTapSound();
-        if (muted) stopMowerSound();
+        muted=!muted;
+        if(muted){
+          stopMowerSound();
+          if(nativeScrubAudio)void nativeScrubAudio.stop();
+        } else playUiTapSound();
+        return muted;
       },
       onHowToPlay: () => {
         playUiTapSound();
@@ -1744,20 +1761,37 @@
         window.VerseGameShell.openHelp?.(HELP_OVERLAY_ID, "back", "Back");
       },
       onExit: () => {
-        playUiTapSound();
+        if(nativeScrubAudio)stopNativeScrubRun();
+        else playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
+        if(nativeScrubAudio &&
+           (menuOpen || nativeScrubPending || nativeScrubFailure ||
+            playgroundWelcome?.isPaused?.()))return false;
+        menuOpen=true;
+        if(nativeScrubAudio){
+          // Retain same canvas, progress, mower transform and virtual time.
+          pauseScrubForReturn();
+          void nativeScrubAudio.stop();
+        }
         playUiTapSound();
-        menuOpen = true;
-        const root = document.getElementById("scrubGame");
-        if (root) root.classList.add("scrub-is-paused");
+        const root=document.getElementById("scrubGame");
+        if(root)root.classList.add("scrub-is-paused");
+        return true;
       },
       onClose: () => {
+        if(nativeScrubAudio){
+          if(nativeScrubPending || playgroundWelcome?.isPaused?.())return;
+          // Keep menu + time paused throughout full Swift bank preflight.
+          // No routine gray loading dialog; real failure has Retry/Back.
+          primeNativeScrubFromGesture("resume",scrubUiKey());
+          return;
+        }
         playUiTapSound();
-        menuOpen = false;
-        const root = document.getElementById("scrubGame");
-        if (root) root.classList.remove("scrub-is-paused");
+        menuOpen=false;
+        const root=document.getElementById("scrubGame");
+        if(root)root.classList.remove("scrub-is-paused");
       }
     });
 
@@ -5780,14 +5814,25 @@
     if (!btn) return;
 
     btn.onclick = async () => {
+      if(nativeScrubAudio){
+        if(nativeScrubPending || welcomePaused || nativeScrubFailure)return;
+        if(!muted && !nativeScrubAudio.isReady()){
+          primeNativeScrubFromGesture("next",scrubUiKey());
+          return;
+        }
+        playUiTapSound();
+        if(isFinalRound){
+          stopNativeScrubRun();
+          renderEndScreen();
+        } else advanceScrubRound();
+        return;
+      }
       await unlockAudio();
       playUiTapSound();
-
       if (isFinalRound) {
         renderEndScreen();
         return;
       }
-
       currentRoundIndex += 1;
       renderRound();
     };
@@ -5913,9 +5958,16 @@
       backLabel: "Back to Playground",
       theme: GAME_THEME,
       onPlayAgain: () => {
+        if(nativeScrubAudio){
+          primeNativeScrubFromGesture("start",scrubUiKey());
+          return;
+        }
         beginScrubRun();
       },
-      onMoreGames: () => window.VerseGameBridge.exitGame()
+      onMoreGames: () => {
+        if(nativeScrubAudio)stopNativeScrubRun();
+        window.VerseGameBridge.exitGame();
+      }
     });
   }
 
@@ -5990,12 +6042,25 @@
 
   playgroundWelcome = window.VerseGameShell.attachPlaygroundWelcomeBack?.({
     isActive: () => !!document.getElementById("scrubGame"),
-    onPause: pauseScrubForReturn,
+    onPause: () => {
+      if(nativeScrubAudio)void nativeScrubAudio.stop();
+      pauseScrubForReturn();
+    },
     onResume: continueScrubAfterReturn,
     getAudioContext: () => audioCtx,
     unlockAudio,
     replaceAudioContext: replaceScrubWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    nativeOnlyAudio: !!nativeScrubAudio,
+    restoreNativeOnGesture: nativeScrubAudio ? () => {
+      if(muted)return Promise.resolve(true);
+      // Called in the human Let's go event stack; no auto-foreground
+      // priority, no audio clock fake success or WebAudio fallback.
+      return nativeScrubAudio.prepareFromGesture().then(result=>
+        window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+        (result?.ready===true));
+    } : undefined,
+    onExit: () => {if(nativeScrubAudio)stopNativeScrubRun();}
   });
 
   verseJson = await loadVerseJson();
