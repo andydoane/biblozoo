@@ -101,6 +101,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_playground_ghost_writer_n6r.js
 
+      - name: Validate N6q.1 Jam watchdog, early beat cues, fast prewarm and Great finale
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_verse_jam_timing_n6q1.js
+
       - name: Validate N6q Playground Verse Jam native PCM, groove, and PiP recovery
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_playground_verse_jam_n6q.js

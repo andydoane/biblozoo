@@ -321,6 +321,11 @@
     get currentTime() { return performance.now() / 1000; }
   }) : null;
   const nativeJamTimers = new Set();
+  // Native AVAudioPlayerNodes can schedule a buffer against host time.
+  // Hand Swift a short lookahead instead of submitting every note *after*
+  // its JS timeout has already reached the visual beat.
+  const NATIVE_JAM_LOOKAHEAD_MS = 100;
+  let nativeJamHeadsUpPrewarm = null;
   let nativeJamAwaitingStart = false;
   let nativeJamFailureRetry = "start";
   const NATIVE_TEMPORARY = new Set(["other-audio-playing",
@@ -339,15 +344,23 @@
     const run = () => {
       if (generation === musicGeneration && !document.hidden &&
           !state.paused && !muted && !state.menuOpen && !state.helpOpen &&
-          nativeJamAudio.isReady()) callback();
+          nativeJamAudio.isReady()) {
+        // JS clock and native wall clock advance together while active. Swift
+        // validates this bounded absolute due time and schedules from its
+        // own host clock after Capacitor/worker queue latency.
+        const dueEpochMs = Date.now() +
+          Math.max(-140, (when - nativeJamClock.currentTime) * 1000);
+        callback(dueEpochMs);
+      }
     };
-    // Native PCM buffers are scheduled only when due, not all at bar start.
-    if (ms <= 8) { run(); return true; }
+    // Dispatch ~100ms before the beat. The old at-beat bridge call could
+    // arrive after the first transition word and be silently dropped.
+    if (ms <= NATIVE_JAM_LOOKAHEAD_MS) { run(); return true; }
     const id = setTimeout(() => {
       nativeJamTimers.delete(id);
-      // Skip badly late notes instead of bursting deferred drums on return.
+      // Never burst a batch of very stale notes after a stalled event loop.
       if (nativeJamClock.currentTime - when < 0.14) run();
-    }, ms);
+    }, ms - NATIVE_JAM_LOOKAHEAD_MS);
     nativeJamTimers.add(id);
     return true;
   }
@@ -661,7 +674,10 @@
   }
 
   function markVerseJamAudioBackgrounded() {
-    if (nativeJamAudio) void nativeJamAudio.stop();
+    if (nativeJamAudio) {
+      nativeJamHeadsUpPrewarm = null;
+      void nativeJamAudio.stop();
+    }
     // Freeze synchronized music before iOS can throttle JS or Web Audio.
     // A later foreground event shows Resume Beat; it never auto-replays.
     if (typeof pauseVerseJamForInterruption === "function") {
@@ -903,7 +919,12 @@
         state.phase === "intro" ||
         state.phase === "spawn_chunk" ||
         state.phase === "countdown" ||
-        state.phase === "round_transition"
+        state.phase === "round_transition" ||
+        state.phase === "ending_sequence" ||
+        // A completed final chunk can legitimately wait up to a full
+        // measure before the eight-beat "that's the end" finale. It is
+        // NEVER a hung game merely because no word button is visible.
+        state.progressIndex >= state.segments.length
       );
 
       const quietMs =
@@ -2011,7 +2032,10 @@
       // Verse word buttons already have musical gameplay sounds.
       if (
         button.classList.contains("versejam-word-btn") ||
-        button.id === "versejamCueButton"
+        button.id === "versejamCueButton" ||
+        // A UI-only pointerdown during a speed-select prewarm would
+        // invalidate the game bank before the same Got It click consumes it.
+        (nativeJamAudio && button.id === "verseJamHeadphonesGotIt")
       ) {
         return;
       }
@@ -2028,7 +2052,8 @@
   function playSoundBitSample(sound, when = audioCtx?.currentTime || 0, volume = VOICE_SOUND_BIT_VOLUME) {
     if (nativeJamAudio) {
       if (!sound?.id || !nativeJamAudio.isReady() || muted) return false;
-      return scheduleNativeJam(when, () => nativeJamAudio.playVoice(sound.id, volume));
+      return scheduleNativeJam(when, dueEpochMs =>
+        nativeJamAudio.playVoice(sound.id, volume, dueEpochMs));
     }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted || !sound?.filename) return false;
 
@@ -2053,8 +2078,8 @@
   function playTone({ midi = 60, when = audioCtx?.currentTime || 0, duration = 0.22, volume = 0.16, type = "triangle" } = {}) {
     if (nativeJamAudio) {
       if (!nativeJamAudio.isReady() || muted) return;
-      scheduleNativeJam(when, () => nativeJamAudio.playTone(midi, duration,
-        Math.max(0, Math.min(1, volume)), type));
+      scheduleNativeJam(when, dueEpochMs => nativeJamAudio.playTone(midi, duration,
+        Math.max(0, Math.min(1, volume)), type, dueEpochMs));
       return;
     }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
@@ -2079,9 +2104,9 @@
   function playDrum(sound, when, volume = 1, generation = musicGeneration) {
     if (generation !== musicGeneration) return;
     if (nativeJamAudio) {
-      scheduleNativeJam(when, () =>
+      scheduleNativeJam(when, dueEpochMs =>
         nativeJamAudio.playDrum(sound, Math.max(0,
-          Math.min(1, drumVolume(volume) / MIX.drumMaster))));
+          Math.min(1, drumVolume(volume) / MIX.drumMaster)), dueEpochMs));
       return;
     }
 
@@ -2251,7 +2276,7 @@
       while (remaining > 0) {
         const beats = Math.min(16, remaining);
         scheduleNativeJam(when + beatOffset * 60 / bpm,
-          () => nativeJamAudio.playPad(bpm, beats));
+          dueEpochMs => nativeJamAudio.playPad(bpm, beats, 1, dueEpochMs));
         remaining -= beats;
         beatOffset += beats;
       }
@@ -2733,8 +2758,9 @@
     await startNextPlayableGroup(flowId);
   }
 
-  function stopRun({ keepNativeReady = false } = {}) {
+  function stopRun({ keepNativeReady = false, preserveNativeFinale = false } = {}) {
     if (nativeJamAudio && !keepNativeReady) {
+      nativeJamHeadsUpPrewarm = null;
       void nativeJamAudio.stop();
       nativeJamAwaitingStart = false;
       clearNativeJamFailure();
@@ -2745,7 +2771,15 @@
     beginGameplayFlow();
     stopGameplayWatchdog();
     clearSleeps();
-    stopMusic();
+    // Preserve jam-note AVAudioPlayerNodes during the final arpeggio.
+    // A full jam-group stop re-prepared all twelve note voices, clipping
+    // the first melody notes during the "Great!" transition.
+    if (nativeJamAudio && preserveNativeFinale) {
+      stopMusic({ stopAudio: false });
+      nativeJamAudio.stopGrooveForFinale();
+    } else {
+      stopMusic();
+    }
     state.acceptingInput = false;
     state.busy = false;
     state.paused = false;
@@ -2776,11 +2810,27 @@
 
     const flowId = beginGameplayFlow();
 
-    // IMPORTANT for iPhone/Safari:
-    // Unlock audio immediately from the user's mode-button tap,
-    // before any awaited fetch or other async work.
-    const audioOk = nativeAlreadyReady && nativeJamAudio
-      ? nativeJamAudio.isReady() : await ensureAudio();
+    // The speed-selection gesture starts pre-rendering the full native bank
+    // WHILE the child reads Heads Up. Got It consumes that same preflight,
+    // instead of throwing away the PCM bank and rendering it a second time.
+    // A failed/invalidated prewarm may be retried from this real Got It click.
+    const headStart = nativeJamHeadsUpPrewarm;
+    nativeJamHeadsUpPrewarm = null;
+    let audioRequest;
+    if (nativeAlreadyReady && nativeJamAudio) {
+      audioRequest = nativeJamAudio.isReady();
+    } else if (nativeJamAudio && headStart?.settled &&
+               headStart.result?.ready === true) {
+      audioRequest = nativeJamAudio.isReady();
+    } else if (nativeJamAudio && headStart && !headStart.settled) {
+      audioRequest = headStart.promise.then(result =>
+        result?.ready === true && nativeJamAudio.isReady());
+    } else {
+      // Execute ensureAudio synchronously inside the real Got It click if
+      // speed prewarm did not succeed. No timer/foreground auto activation.
+      audioRequest = ensureAudio();
+    }
+    const audioOk = await audioRequest;
     if (nativeJamAudio && !audioOk) {
       if (document.hidden) return;
       if (NATIVE_TEMPORARY.has(nativeJamAudio.lastError())) {
@@ -3617,7 +3667,7 @@
   function playCompletionArpeggio() {
     if (!audioCtx || muted) return;
 
-    const now = audioCtx.currentTime + 0.03;
+    const now = audioCtx.currentTime + (nativeJamAudio ? 0.12 : 0.03);
 
     // Celebratory C-major arpeggio after the drum beat stops.
     [
@@ -3685,10 +3735,13 @@
       );
     }
 
-    stopRun({ keepNativeReady: !!nativeJamAudio });
+    stopRun({ keepNativeReady: !!nativeJamAudio,
+      preserveNativeFinale: !!nativeJamAudio });
     playCompletionArpeggio(); // tail remains warmed until End screen exit
 
-    await sleep(900);
+    // The native ending screen can render while the short musical tail rings
+    // on its own hot note pool; don't force a blank 900ms wait after "Great!".
+    await sleep(nativeJamAudio ? 260 : 900);
 
     // Do not call setScreen("end") here; setScreen would call stopRun()
     // again and can cut off the arpeggio. Render the end screen directly.
@@ -3823,6 +3876,22 @@
         ? [67, 72, 79]
         : [72, 76, 79];
 
+    // Pre-schedule *each* word's cue while the first "Time"/"Speed"
+    // is still 80ms in the future. Previously it crossed JS -> Capacitor
+    // -> Swift only AFTER the word was painted, often arriving too late.
+    // Browser WebAudio retains its original word-by-word playback path.
+    if (nativeJamAudio) {
+      for (let index = 0; index < message.length; index += 1) {
+        playTone({
+          midi: transitionNotes[index % transitionNotes.length],
+          when: transitionStart + beat * index,
+          duration: 0.11,
+          volume: 0.045,
+          type: "square"
+        });
+      }
+    }
+
     for (let index = 0; index < message.length; index += 1) {
       if (state.screen !== "game" || state.paused) return newGrooveStart;
 
@@ -3837,13 +3906,15 @@
       el.textContent = message[index];
       stack.appendChild(el);
 
-      playTone({
-        midi: transitionNotes[index % transitionNotes.length],
-        when: wordTime,
-        duration: 0.11,
-        volume: 0.045,
-        type: "square"
-      });
+      if (!nativeJamAudio) {
+        playTone({
+          midi: transitionNotes[index % transitionNotes.length],
+          when: wordTime,
+          duration: 0.11,
+          volume: 0.045,
+          type: "square"
+        });
+      }
     }
 
     // Return just before the new downbeat so the drum loop can be scheduled
@@ -3987,6 +4058,22 @@
         if (!nativeJamAudio) {
           primeHtmlAudio();
           unlockAudioFromGesture();
+        } else {
+          // Mode selection IS an explicit gesture, unlike a foreground
+          // event. Start the expensive native PCM render here and keep its
+          // promise alive across the immediately displayed Heads Up screen.
+          const warm = { promise: null, settled: false, result: null };
+          nativeJamHeadsUpPrewarm = warm;
+          const activation = nativeJamAudio.prepareFromGesture();
+          warm.promise = Promise.resolve(activation).then(result => {
+            warm.result = result;
+            warm.settled = true;
+            return result;
+          }).catch(() => {
+            warm.result = {ready:false,reason:"prewarm-error"};
+            warm.settled = true;
+            return warm.result;
+          });
         }
         selectedMode = mode;
         setScreen("headphones");
@@ -4081,7 +4168,12 @@
 
   function setScreen(screen) {
     state.screen = screen;
-    if (screen !== "game") stopRun();
+    if (screen !== "game") {
+      // Heads Up is instructional reading time, not a reason to destroy
+      // the active native PCM bank requested by Choose Your Speed.
+      stopRun({ keepNativeReady: !!(nativeJamAudio &&
+        screen === "headphones" && nativeJamHeadsUpPrewarm) });
+    }
     render();
   }
 

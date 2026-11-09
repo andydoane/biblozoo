@@ -15,6 +15,9 @@
   const PREPARE_TIMEOUT = 30000, SESSION_TIMEOUT = 1800, PLAY_TIMEOUT = 1800;
   let generation = 0, ready = false, failed = false, lastError = "";
   let uiReady = false, uiPromise = null, teardown = Promise.resolve();
+  // Multiple UIKit/visibility/Welcome Back callbacks may report one
+  // interruption. Teardown exactly once, not once per duplicated observer.
+  let bankOwned = false;
   let eventNumber = 0, bound = false, onFailure = null, onInactive = null, onActive = null;
   function isAvailable() {
     return root.BibloZooNativeOnlyOutput?.enabled === true &&
@@ -43,6 +46,8 @@
     } catch (_) { return Promise.resolve(); }
   }
   function stop() {
+    if (!bankOwned && !ready && !uiReady) return teardown;
+    bankOwned = false;
     generation++;
     ready = false;
     uiReady = false;
@@ -119,6 +124,7 @@
     if (ready || uiReady) return send(soundId, volume, {}, true);
     if (uiPromise) return false;
     const token = ++generation, startedAt = Date.now();
+    bankOwned = true;
     let activation;
     try { activation = api()?.activateFromGesture({purpose:"ui"}); }
     catch (_) { return false; }
@@ -153,7 +159,25 @@
     let activation;
     try { activation = bridge.activateFromGesture({purpose:"game"}); }
     catch (_) { return Promise.resolve({ready:false,reason:"activation-error"}); }
+    // Menu Close or a second tap while the PCM engine is already live does
+    // NOT need a full discard/re-render of the large chord and note bank.
+    // Still ask iOS to accept session priority on the actual gesture.
+    if (ready && !failed) {
+      const token = generation;
+      return bounded(activation,SESSION_TIMEOUT).then(session => {
+        if (!current(token)) return {ready:false,reason:"stale"};
+        if (session?.ready === true) return {ready:true,reason:"already-prepared"};
+        const why = safeReason(session?.reason);
+        if (TEMPORARY.has(why)) temporary(why);
+        else markFailed(token,why);
+        return {ready:false,reason:why};
+      }).catch(() => {
+        if (current(token)) markFailed(token,"activation-error");
+        return {ready:false,reason:"activation-error"};
+      });
+    }
     const hadBank = ready, priorUi = uiPromise, token = ++generation;
+    bankOwned = true;
     ready = false; uiReady = false; failed = false; lastError = "";
     const oldStop = hadBank ? stopNative() : teardown;
     return (async () => {
@@ -203,30 +227,47 @@
     try { void Promise.resolve(api()?.stopEffect?.({soundId:"jam-group"})).catch(() => {}); }
     catch (_) {}
   }
-  function playTone(midi, duration, volume, type = "triangle") {
+  function stopGrooveForFinale() {
+    // Only drum/pad/voice nodes are stopped. Do not stop or reprepare the
+    // jam-note voice pool right before the completion arpeggio starts.
+    if (!ready || failed || !isAvailable()) return;
+    try { void Promise.resolve(api()?.stopEffect?.({soundId:"jam-groove"})).catch(() => {}); }
+    catch (_) {}
+  }
+  function scheduled(extra, dueEpochMs) {
+    // Only trusted in-process beat clock supplies this bounded due time.
+    // Swift revalidates the same 350ms window at playback time.
+    return Number.isFinite(dueEpochMs) &&
+      dueEpochMs > Date.now() - 140 && dueEpochMs < Date.now() + 350
+      ? {...extra, scheduledEpochMs: dueEpochMs} : extra;
+  }
+  function playTone(midi, duration, volume, type = "triangle", dueEpochMs = null) {
     if (!Number.isFinite(midi) || !Number.isFinite(duration) ||
         !Number.isFinite(volume)) return false;
     const wave = type === "square" ? "q" : type === "sine" ? "s" : "t";
     const recipe = Math.round(midi) + "-" + Math.round(duration*1000) + "-" + wave;
-    return send("jam-note", Math.min(1, Math.max(0, volume)), {noteId:recipe});
+    return send("jam-note", Math.min(1, Math.max(0, volume)),
+      scheduled({noteId:recipe},dueEpochMs));
   }
-  function playDrum(sound, volume = 1) {
+  function playDrum(sound, volume = 1, dueEpochMs = null) {
     if (!DRUMS.includes(sound)) return false;
-    return send("jam-drum-" + sound, Math.max(0, Math.min(1, volume)));
+    return send("jam-drum-" + sound, Math.max(0, Math.min(1, volume)),
+      scheduled({},dueEpochMs));
   }
-  function playPad(bpm, beats, volume = 1) {
+  function playPad(bpm, beats, volume = 1, dueEpochMs = null) {
     if (!Number.isInteger(bpm) || !Number.isInteger(beats) ||
         ![4,8,12,16].includes(beats)) return false;
     return send("jam-pad", Math.max(0, Math.min(1, volume)),
-      {padId:bpm+"-"+beats});
+      scheduled({padId:bpm+"-"+beats},dueEpochMs));
   }
-  function playVoice(id, volume = 0.31) {
+  function playVoice(id, volume = 0.31, dueEpochMs = null) {
     if (!VOICES.includes(id)) return false;
-    return send("jam-voice-"+id, volume);
+    return send("jam-voice-"+id, volume, scheduled({},dueEpochMs));
   }
   root.BibloZooNativeVerseJamAudio = Object.freeze({
     isAvailable, configure, tapUiFromGesture, prepareFromGesture,
-    playTone, playDrum, playPad, playVoice, stopVoices, stop,
+    playTone, playDrum, playPad, playVoice, stopVoices,
+    stopGrooveForFinale, stop,
     isReady:()=>ready && !failed && !root.document?.hidden,
     lastError:()=>lastError, soundIds:IDS
   });

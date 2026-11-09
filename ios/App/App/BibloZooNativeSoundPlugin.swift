@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import Capacitor
 import AVFAudio
+import Darwin // mach_absolute_time for bounded native Jam beat lookahead
 
 // N3b native-only iOS session owner: fixed predecoded PCM star/chomp plus
 // six locally synthesized native peg tones with bounded overlapping voices.
@@ -2018,14 +2019,26 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             for (key, (midi, ms, wave)) in jamNoteRecipes {
                 let duration = Double(ms)/1000.0
                 let hz = 440.0*pow(2.0,Double(midi-69)/12.0)
+                // Precompute the exponential gain ratio once per note.
+                // Previously pow() ran on each of ~1M generated PCM frames.
+                let attackFrames = max(1,Int(ceil(rate*0.01)))
+                let activeFrames = max(attackFrames+1,Int(ceil(rate*duration)))
+                let rise = pow(1.0/0.0001,1.0/Double(attackFrames))
+                let decay = pow(0.0001,1.0/
+                    Double(max(1,activeFrames-attackFrames)))
+                var frameIndex = 0
+                var gain = 0.0001
                 guard let buffer = make(duration+0.03, sample: { t in
-                    if t >= duration { return 0 }
+                    defer { frameIndex += 1 }
+                    if frameIndex >= activeFrames { return 0 }
                     let cycle = hz*t-floor(hz*t)
                     let shape = wave == "q"
                         ? (cycle < 0.5 ? 1.0 : -1.0)
                         : (wave == "s" ? sin(2.0*Double.pi*hz*t) :
                             triangle(hz,t))
-                    return shape*envelope(t,duration,1.0,0.01)
+                    let value = shape*gain
+                    gain *= frameIndex < attackFrames ? rise : decay
+                    return value
                 }) else { return (false,0,"jam-note-allocation-failed") }
                 bank[key] = buffer
             }
@@ -2039,11 +2052,23 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     let freqs = [48,52,55,60].map {
                         440.0*pow(2.0,Double($0-69)/12.0)
                     }
+                    // Seven BPMs × four long pads used pow() per sample
+                    // across millions of frames. Retain the same exponential
+                    // envelope with one ratio per pre-rendered chord.
+                    let attackFrames = max(1,Int(ceil(rate*0.01)))
+                    let activeFrames = max(attackFrames+1,Int(ceil(rate*duration)))
+                    let rise = pow(0.016/0.0001,1.0/Double(attackFrames))
+                    let decay = pow(0.0001/0.016,1.0/
+                        Double(max(1,activeFrames-attackFrames)))
+                    var frameIndex = 0
+                    var gain = 0.0001
                     guard let buffer = make(duration+0.03, sample: { t in
-                        let gain = envelope(t,duration,0.016,0.01)*1.5
-                        return freqs.reduce(0.0) {
-                            $0 + triangle($1,t)*gain
-                        }
+                        defer { frameIndex += 1 }
+                        if frameIndex >= activeFrames { return 0 }
+                        let volume = gain*1.5
+                        gain *= frameIndex < attackFrames ? rise : decay
+                        return (triangle(freqs[0],t)+triangle(freqs[1],t)+
+                            triangle(freqs[2],t)+triangle(freqs[3],t))*volume
                     }) else { return (false,0,"jam-pad-allocation-failed") }
                     bank["\(bpm)-\(beats)"] = buffer
                     maxDuration = max(maxDuration,Int(duration*1000)+30)
@@ -2883,6 +2908,17 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 }
                 requestedJamPad = padId
             } else { requestedJamPad = nil }
+            // Only fixed Jam IDs may schedule a very near-future beat.
+            // Revalidate after the bridge/serial queue; other games unchanged.
+            let requestedJamDueEpochMs: Double?
+            if self.jamIDs.contains(soundId),
+               let due=call.getDouble("scheduledEpochMs"), due.isFinite {
+                let now=Date().timeIntervalSince1970*1000.0
+                requestedJamDueEpochMs = due >= now-160 && due <= now+350
+                    ? due : nil
+            } else {
+                requestedJamDueEpochMs = nil
+            }
             let requestedMidi: Int?
             if soundId == self.nativeMelodySoundID {
                 guard let midi = call.getInt("midi"),
@@ -2967,11 +3003,31 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         return
                     }
                     node.volume = Float(volume)
+                    // Use the AVAudioEngine host timeline for beat-aligned
+                    // Jam buffers; never invoke JS callbacks at the audible
+                    // deadline and hope the Capacitor bridge is instantaneous.
+                    let remaining = requestedJamDueEpochMs.map {
+                        max(0.0,min(0.30,($0-
+                            Date().timeIntervalSince1970*1000.0)/1000.0))
+                    } ?? 0.0
+                    let scheduledAt: AVAudioTime? = remaining >= 0.010
+                        ? AVAudioTime(hostTime: mach_absolute_time() +
+                            AVAudioTime.hostTime(forSeconds: remaining))
+                        : nil
                     // A reused voice interrupts its old buffer; distinct
                     // voices keep a small bounded number of overlaps.
-                    node.scheduleBuffer(readyBuffer, at: nil,
-                                        options: [.interrupts],
-                                        completionHandler: nil)
+                    if self.jamIDs.contains(soundId),
+                       let scheduledAt = scheduledAt {
+                        node.scheduleBuffer(readyBuffer, at: scheduledAt,
+                                            options: [.interrupts],
+                                            completionHandler: nil)
+                    } else {
+                        // Every non-Jam game retains its original immediate
+                        // PCM path, including the N3a hot-collision contract.
+                        node.scheduleBuffer(readyBuffer, at: nil,
+                                            options: [.interrupts],
+                                            completionHandler: nil)
+                    }
                     started = true // scheduled only, not speaker confirmation
                     durationMs = Int(Double(readyBuffer.frameLength) /
                                      readyBuffer.format.sampleRate * 1000)
@@ -3082,6 +3138,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             guard let self=self,
                   let soundId=call.getString("soundId"),
                   (soundId == "scrub-mower" || soundId == "jam-group" ||
+                   soundId == "jam-groove" ||
                    soundId == "ghost-spooky-group") else {
                 call.resolve(["stopped":false,"reason":"invalid-sound-id"])
                 return
@@ -3099,6 +3156,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     group = ["jam-note", "jam-pad", "jam-drum-kick",
                              "jam-drum-snare", "jam-drum-hat",
                              "jam-drum-extra"] +
+                        self.jamVoices.map { "jam-voice-" + $0 }
+                } else if soundId == "jam-groove" {
+                    // Don't stop/reprepare twelve note nodes while the
+                    // "Great!" completion arpeggio is starting.
+                    group = ["jam-pad", "jam-drum-kick", "jam-drum-snare",
+                             "jam-drum-hat", "jam-drum-extra"] +
                         self.jamVoices.map { "jam-voice-" + $0 }
                 } else if soundId == "ghost-spooky-group" {
                     group = ["ghost-spooky-1", "ghost-spooky-2",
