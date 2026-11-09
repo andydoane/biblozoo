@@ -261,6 +261,119 @@
   const uiSoundBuffers = new Map();
   const uiSoundBufferPromises = new Map();
   let audioUnlocked = false;
+
+  // N6l: Traffic Tap uses a 16-ID native PCM bank on iOS (one zoom MP3,
+  // 13 hard-coded generated cues incl. 8 streak notes, two shared UI pops).
+  // Web/PWA/Android keep the original AudioContext implementation below.
+  const nativeTrafficAudio = window.BibloZooNativeTrafficTapAudio?.isAvailable?.()
+    ? window.BibloZooNativeTrafficTapAudio : null;
+  let nativeTrafficToken = 0;
+  let nativeTrafficPending = false;
+  let nativeTrafficFailure = false;
+  let nativeTrafficRetry = {kind:"round",mode:null};
+  let trafficWelcomeBack = null;
+
+  function nextNativeTrafficUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function stopNativeTrafficRound() {
+    if (!nativeTrafficAudio) return;
+    nativeTrafficToken++;
+    nativeTrafficPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeTrafficAudio.stop();
+  }
+  function clearNativeTrafficFailure() {
+    nativeTrafficFailure = false;
+    document.getElementById("ttNativeAudioFailure")?.remove();
+  }
+  function showNativeTrafficFailure(message) {
+    if (!nativeTrafficAudio) return;
+    nativeTrafficFailure = true;
+    if (state.running) setPaused(true,"native-audio-error");
+    let overlay = document.getElementById("ttNativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "ttNativeAudioFailure";
+      overlay.className = "tt-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="tt-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Traffic Tap native sound issue">
+          <h2>Traffic Tap</h2><p role="status" data-traffic-audio-status></p>
+          <button type="button" data-traffic-audio-retry>Try Again</button>
+          <button type="button" data-traffic-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-traffic-audio-retry]").onclick = () =>
+        primeNativeTrafficFromGesture(nativeTrafficRetry.kind,nativeTrafficRetry.mode);
+      overlay.querySelector("[data-traffic-audio-back]").onclick = () => {
+        stopNativeTrafficRound();
+        clearNativeTrafficFailure();
+        if (nativeTrafficRetry.kind==="round") renderModeSelect();
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-traffic-audio-status]").textContent=message;
+  }
+  function primeNativeTrafficFromGesture(kind="round",mode=null,uiKey=null) {
+    if (!nativeTrafficAudio || nativeTrafficPending || returnPaused || document.hidden)
+      return;
+    nativeTrafficRetry={kind,mode};
+    clearNativeTrafficFailure();
+    if (muted) {
+      if (kind==="round") startGame(mode);
+      else setPaused(false,"");
+      return;
+    }
+    const token=++nativeTrafficToken;
+    nativeTrafficPending=true;
+    app.setAttribute("aria-busy","true");
+    if (state.running) setPaused(true,"native-audio-preflight");
+    // Sole Swift .soloAmbient priority claim happens in THIS human tap stack.
+    const prep=nativeTrafficAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:getSoundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if (token!==nativeTrafficToken || returnPaused || document.hidden) return;
+      nativeTrafficPending=false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready===true) {
+        if (kind==="round") startGame(mode);
+        else setPaused(false,"");
+      } else {
+        showNativeTrafficFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(()=>{
+      if (token!==nativeTrafficToken || returnPaused || document.hidden) return;
+      nativeTrafficPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeTrafficFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeTrafficAudio) {
+    nativeTrafficAudio.configure({
+      onAppInactive:()=>{
+        if (nativeTrafficPending) stopNativeTrafficRound();
+        if (!state.running) return;
+        if (!trafficWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive:()=>trafficWelcomeBack?.showAfterNativeActive?.(),
+      onPlaybackFailure:()=>{
+        if (muted || returnPaused || document.hidden || !state.running ||
+            nativeTrafficPending || nativeTrafficFailure ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        nativeTrafficRetry={kind:"resume",mode:null};
+        showNativeTrafficFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if (document.hidden && nativeTrafficPending) stopNativeTrafficRound();
+    });
+  }
+
   let completionMarked = false;
   let alreadyCompletedForMode = false;
   let completionResult = null;
@@ -356,6 +469,7 @@
   }
 
   function getSilenceAudioElement() {
+    if (nativeTrafficAudio) return null;
     if (silenceAudioEl) return silenceAudioEl;
 
     silenceAudioEl = document.createElement("audio");
@@ -370,6 +484,7 @@
   }
 
   function primeHtmlAudio() {
+    if (nativeTrafficAudio) return;
     try {
       const audio = getSilenceAudioElement();
       audio.muted = false;
@@ -401,6 +516,7 @@
   }
 
   function loadZoomAudioBuffer() {
+    if (nativeTrafficAudio) return Promise.resolve(null);
     if (zoomAudioBuffer) return Promise.resolve(zoomAudioBuffer);
     if (zoomAudioLoadPromise) return zoomAudioLoadPromise;
 
@@ -442,6 +558,13 @@
   }
 
   function playZoomSound() {
+    if (nativeTrafficAudio) {
+      if (!muted && !returnPaused && !nativeTrafficPending &&
+          !nativeTrafficFailure && !state.paused && state.running &&
+          !document.hidden)
+        nativeTrafficAudio.play("zoomLaunch",getZoomVolume());
+      return;
+    }
     if (muted) return;
 
     try {
@@ -474,6 +597,7 @@
   }
 
   function loadUiSoundBuffer(key) {
+    if (nativeTrafficAudio) return Promise.resolve(null);
     if (uiSoundBuffers.has(key)) return Promise.resolve(uiSoundBuffers.get(key));
     if (uiSoundBufferPromises.has(key)) return uiSoundBufferPromises.get(key);
 
@@ -514,10 +638,12 @@
   }
 
   function preloadUiSoundBuffers() {
+    if (nativeTrafficAudio) return;
     Object.keys(UI_SOUND_FILES).forEach(loadUiSoundBuffer);
   }
 
   async function playUiBufferSound(key, volumeKey = "uiTap") {
+    if (nativeTrafficAudio) return;
     if (muted) return;
 
     try {
@@ -553,10 +679,14 @@
     if (now - lastUiSoundAt < 80) return;
     lastUiSoundAt = now;
 
+    if (nativeTrafficAudio) {
+      const key=nextNativeTrafficUiKey();
+      if (!returnPaused && !document.hidden)
+        nativeTrafficAudio.tapUiFromGesture(key,getSoundVolume("uiTap"));
+      return;
+    }
     unlockAudio();
-
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
+    const key = nextNativeTrafficUiKey();
     playUiBufferSound(key, "uiTap");
   }
 
@@ -566,6 +696,7 @@
   let audioResumeFailures = 0;
 
   function ensureAudioContext() {
+    if (nativeTrafficAudio) return null;
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -591,6 +722,7 @@
   }
 
   function replaceStuckTrafficTapAudioContext() {
+    if (nativeTrafficAudio) return false;
     const previous = audioCtx;
     const previousGain = masterGain;
     audioCtx = null;
@@ -613,6 +745,7 @@
   }
 
   function unlockAudio() {
+    if (nativeTrafficAudio) return nativeTrafficAudio.isReady();
     let ctx = ensureAudioContext();
     if (!ctx || !masterGain) {
       audioUnlocked = false;
@@ -692,6 +825,7 @@
   }
 
   function onTrafficTapAudioGesture() {
+    if (nativeTrafficAudio) return;
     if (!muted && (!audioUnlocked || !audioCtx || audioCtx.state !== "running")) {
       unlockAudio();
     }
@@ -876,6 +1010,19 @@
   };
 
   function playGameSound(eventId) {
+    if (nativeTrafficAudio) {
+      if (muted || returnPaused || nativeTrafficPending ||
+          nativeTrafficFailure || !state.running || state.paused ||
+          document.hidden) return;
+      // Bonus tap climbs through eight distinct hard-coded melodic pairs,
+      // matching original (bonusStreak - 1) % 8, not a generic effect.
+      const key=eventId==="bonusTap"
+        ? "bonusTap"+((Math.max(0,state.bonusStreak-1)%8)+1)
+        : eventId;
+      // Swift precomputed each generated Web oscillator at authored gain.
+      nativeTrafficAudio.play(key,1);
+      return;
+    }
     if (muted) return;
 
     // An animation/timer may fire this without user activation. Only the
@@ -897,6 +1044,11 @@
   renderIntro();
 
   function renderIntro() {
+    if (nativeTrafficAudio) {
+      if (state.running) stopNativeTrafficRound();
+      state.running = false;
+      clearNativeTrafficFailure();
+    }
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -908,17 +1060,30 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
         preloadTrafficTapImages();
-        unlockAudio();
+        if (!nativeTrafficAudio) unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    if (nativeTrafficAudio)
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
   }
 
   function renderModeSelect() {
+    if (nativeTrafficAudio) {
+      // Do not cancel the first title pop's two-UI prewarm while
+      // navigating into mode; only tear down an already-running game.
+      if (state.running) stopNativeTrafficRound();
+      state.running = false;
+      clearNativeTrafficFailure();
+    }
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -935,14 +1100,27 @@
       },
       onSelect: (mode) => {
         preloadTrafficTapImages();
-        unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeTrafficAudio) {
+          primeNativeTrafficFromGesture("round",mode,
+            muted?null:nextNativeTrafficUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    if (nativeTrafficAudio)
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
   }
 
   function startGame(mode) {
+    if (nativeTrafficAudio && !muted && !nativeTrafficAudio.isReady()) {
+      nativeTrafficRetry={kind:"round",mode};
+      showNativeTrafficFailure("Native sound bank is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeTrafficFailure();
     selectedMode = mode;
     window.VerseGameShell.resetGameSpeed();
     itemsClickBound = false;
@@ -1132,16 +1310,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeTrafficAudio) unlockAudio();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         playUiTapSound();
         renderModeSelect();
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -1179,8 +1360,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeTrafficAudio && muted) void nativeTrafficAudio.stop();
         if (!muted) {
-          unlockAudio();
+          if (!nativeTrafficAudio) unlockAudio();
           playUiTapSound();
         }
         return muted;
@@ -1190,21 +1372,33 @@ In the bonus round, tap as many of the target vehicle as you can.`;
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         playUiTapSound();
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        playUiTapSound();
+        if (nativeTrafficPending || returnPaused ||
+            (nativeTrafficAudio && state.paused && state.pauseReason==="menu"))
+          return false;
         setPaused(true, "menu");
+        if (nativeTrafficAudio) void nativeTrafficAudio.stop();
+        playUiTapSound();
+        return true;
       },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (nativeTrafficPending || returnPaused) return;
+        if (nativeTrafficAudio && !muted) {
+          primeNativeTrafficFromGesture("resume",null,nextNativeTrafficUiKey());
+        } else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -1217,16 +1411,13 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
       onOpen: () => {
         if (
-          state.mainDone ||
-          state.bonusRound ||
-          state.bonusIntro
-        ) {
-          return false;
-        }
-
-        playUiTapSound();
+          state.mainDone || state.bonusRound || state.bonusIntro ||
+          nativeTrafficPending || returnPaused ||
+          (nativeTrafficAudio && state.paused && state.pauseReason==="speed")
+        ) return false;
         setPaused(true, "speed");
-
+        if (nativeTrafficAudio) void nativeTrafficAudio.stop();
+        playUiTapSound();
         return true;
       },
 
@@ -1239,10 +1430,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       },
 
       onClose: () => {
-        playUiTapSound();
-
-        if (!state.mainDone) {
-          setPaused(false, "");
+        if (nativeTrafficPending || returnPaused) return;
+        if (!state.mainDone && nativeTrafficAudio && !muted) {
+          primeNativeTrafficFromGesture("resume",null,nextNativeTrafficUiKey());
+        } else {
+          playUiTapSound();
+          if (!state.mainDone) setPaused(false, "");
         }
       }
     });
@@ -1251,8 +1444,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
   function toggleMute(muteBtn, menuMuteBtn) {
     muted = !muted;
+    if (nativeTrafficAudio && muted) void nativeTrafficAudio.stop();
     if (!muted) {
-      unlockAudio();
+      if (!nativeTrafficAudio) unlockAudio();
       playUiTapSound();
     }
     if (muteBtn) muteBtn.textContent = muted ? "🔇" : "🔊";
@@ -1274,8 +1468,17 @@ In the bonus round, tap as many of the target vehicle as you can.`;
           if (e.cancelable) e.preventDefault();
           e.stopPropagation();
         }
-        playUiTapSound();
-        openGameMenu();
+        // Legacy Traffic binds touchstart + pointerdown + click on top of
+        // the shared shell. Ignore duplicate native dispatches; stop stale
+        // PCM before requesting this new user-gesture UI pop.
+        if (nativeTrafficAudio) {
+          if (state.paused && state.pauseReason === "menu") return;
+          openGameMenu();
+          playUiTapSound();
+        } else {
+          playUiTapSound();
+          openGameMenu();
+        }
       };
       menuPill.onclick = open;
       menuPill.onpointerdown = open;
@@ -1290,7 +1493,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
         if (!hit) return;
         if (e.cancelable) e.preventDefault();
         e.stopPropagation();
-        unlockAudio();
+        if (!nativeTrafficAudio) unlockAudio();
         const id = Number(hit.dataset.itemId);
         if (!Number.isFinite(id)) return;
         if (state.bonusRound) chooseBonusItem(id, hit);
@@ -1319,13 +1522,18 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function openGameMenu() {
     const overlay = document.getElementById("ttGameMenuOverlay");
     if (overlay) {
+      if (nativeTrafficPending || returnPaused ||
+          (nativeTrafficAudio && state.paused && state.pauseReason==="menu"))
+        return;
       setPaused(true, "menu");
+      if (nativeTrafficAudio) void nativeTrafficAudio.stop();
       overlay.classList.add("is-open");
       overlay.setAttribute("aria-hidden", "false");
     }
   }
 
   function closeGameMenu() {
+    if (returnPaused || nativeTrafficPending) return;
     const overlay = document.getElementById("ttGameMenuOverlay");
 
     if (overlay && overlay.contains(document.activeElement)) {
@@ -1338,7 +1546,11 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     }
 
     const helpOverlay = document.getElementById("ttHelpOverlay");
-    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) setPaused(false, "");
+    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) {
+      if (nativeTrafficAudio && !muted)
+        primeNativeTrafficFromGesture("resume",null,nextNativeTrafficUiKey());
+      else setPaused(false,"");
+    }
   }
 
   function openHelpFromMenu() {
@@ -1366,8 +1578,11 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function setPaused(paused, reason = "") {
-    // A delayed game callback cannot dismiss the task-switch pause.
-    if (returnPaused && !paused) return;
+    // A delayed callback cannot dismiss a native bank or task-switch wait.
+    if (!paused && (returnPaused ||
+        (nativeTrafficAudio && !muted &&
+         (nativeTrafficPending || nativeTrafficFailure ||
+          !nativeTrafficAudio.isReady())))) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
 
@@ -3397,6 +3612,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function pauseForTaskSwitch() {
     returnSession += 1;
     if (returnPaused) return;
+    // Native lifecycle already invalidated Swift PCM; kill any stale JS
+    // mode/Close promise before the old async callback can start a run.
+    if (nativeTrafficAudio) nativeTrafficToken++;
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
@@ -3412,25 +3630,33 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeTrafficAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       // Reuse the existing bounded new-context-on-gesture path.
       replaceStuckTrafficTapAudioContext();
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: () => {
-        if (returnContextReplacements >= 1) return false;
-        returnContextReplacements += 1;
-        audioUnlocked = false;
-        return replaceStuckTrafficTapAudioContext();
-      },
-      muted
-    });
+    // Only this ACTUAL Let's go tap may reclaim priority from YouTube PiP.
+    const restore = nativeTrafficAudio
+      ? (muted ? Promise.resolve(true) :
+        nativeTrafficAudio.prepareFromGesture().then(result =>
+          window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+          (result?.ready === true)))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: () => {
+            if (returnContextReplacements >= 1) return false;
+            returnContextReplacements += 1;
+            audioUnlocked = false;
+            return replaceStuckTrafficTapAudioContext();
+          },
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
         return false;
@@ -3447,14 +3673,20 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  trafficWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeTrafficAudio,
+    suppressUiSound: !!nativeTrafficAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeTrafficAudio) stopNativeTrafficRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });

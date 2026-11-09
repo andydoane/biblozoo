@@ -187,6 +187,26 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "launch-countdown-low", "launch-countdown-high",
         "launch-projectile-tick", "launch-projectile-tock"
     ]
+    // N6l: 1 exact packaged zoom file; all thirteen fixed Web-style
+    // tones/truck tunes/8 unique bonus streak pairs are prebuilt native PCM.
+    private let trafficTapSoundResources: [String: String] = [
+        "traffic-zoom": "sound_zoom"
+    ]
+    private let trafficTapToneIDs: Set<String> = [
+        "traffic-correct",
+        "traffic-wrong",
+        "traffic-truck-intro",
+        "traffic-truck-outro",
+        "traffic-rainbow",
+        "traffic-bonus-1",
+        "traffic-bonus-2",
+        "traffic-bonus-3",
+        "traffic-bonus-4",
+        "traffic-bonus-5",
+        "traffic-bonus-6",
+        "traffic-bonus-7",
+        "traffic-bonus-8"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -265,7 +285,21 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "launch-explode", "launch-hit", "launch-land",
         "launch-launch", "launch-enter",
         "launch-countdown-low", "launch-countdown-high",
-        "launch-projectile-tick", "launch-projectile-tock"
+        "launch-projectile-tick", "launch-projectile-tock",
+        "traffic-zoom",
+        "traffic-correct",
+        "traffic-wrong",
+        "traffic-truck-intro",
+        "traffic-truck-outro",
+        "traffic-rainbow",
+        "traffic-bonus-1",
+        "traffic-bonus-2",
+        "traffic-bonus-3",
+        "traffic-bonus-4",
+        "traffic-bonus-5",
+        "traffic-bonus-6",
+        "traffic-bonus-7",
+        "traffic-bonus-8"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1087,6 +1121,145 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+    // N6l: fixed offline synthesis of original Traffic Tap WebAudio.
+    // Tempo = 0.65; only these 13 allowlisted presets may be requested.
+    // Eight bonus streak steps keep their original alternating pitches.
+    // Decoded PCM shares existing serialized AVAudioEngine/soloAmbient.
+    private func prepareTrafficTapToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard trafficTapToneIDs.contains(soundId) else {
+            return (false, 0, "invalid-traffic-tone")
+        }
+        if let buffer = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, Int(Double(buffer.frameLength) /
+                              buffer.format.sampleRate * 1000), "prepared")
+        }
+        // offset/duration seconds, source/target Hz, source gain including
+        // authored SOUND_TUNING multiplier, triangle oscillator flag.
+        var notes: [(Double, Double, Double, Double, Double, Bool)] = []
+        if soundId == "traffic-correct" {
+            notes = [(0, 0.09, 659, 784, 0.30 * 0.85, true)]
+        } else if soundId == "traffic-wrong" {
+            notes = [(0, 0.08, 220, 170, 0.10 * 3.40, true),
+                     (0.07, 0.09, 170, 170, 0.07 * 3.40, true)]
+        } else if soundId.hasPrefix("traffic-bonus-") {
+            let pairs: [(Double, Double)] = [
+                (523.25, 659.25), (587.33, 783.99),
+                (659.25, 880.00), (783.99, 1046.50),
+                (880.00, 1318.51), (783.99, 1046.50),
+                (659.25, 880.00), (587.33, 783.99)
+            ]
+            guard let suffix = Int(soundId.dropFirst("traffic-bonus-".count)),
+                  suffix >= 1, suffix <= pairs.count else {
+                return (false, 0, "invalid-traffic-bonus")
+            }
+            let (a, b) = pairs[suffix - 1]
+            notes = [(0, 0.055, a, a * 1.015, 0.075 * 1.15, false),
+                     (0.045, 0.075, b, b * 1.015, 0.06 * 1.15, true)]
+        } else {
+            // Truck intro/outro and rainbow melodies use original TT_TUNES.
+            let tune: [(Double, Double, Double, Double)]
+            let volume: Double
+            switch soundId {
+            case "traffic-truck-intro":
+                tune = [(587.33, 0, 0.05, 0.045),
+                        (659.25, 0.055, 0.05, 0.045),
+                        (783.99, 0.11, 0.10, 0.05)]
+                volume = 3.00
+            case "traffic-truck-outro":
+                tune = [(1046.50, 0, 0.07, 0.045),
+                        (783.99, 0.06, 0.07, 0.045),
+                        (1318.51, 0.13, 0.13, 0.05)]
+                volume = 3.00
+            case "traffic-rainbow":
+                tune = [(783.99, 0, 0.06, 0.04),
+                        (1046.50, 0.055, 0.07, 0.045),
+                        (1318.51, 0.12, 0.09, 0.045),
+                        (1046.50, 0.23, 0.16, 0.05)]
+                volume = 3.20
+            default:
+                return (false, 0, "invalid-traffic-tune")
+            }
+            notes = tune.enumerated().map { index, note in
+                let (hz, offset, duration, gain) = note
+                return (offset / 0.65, duration / 0.65,
+                        hz, hz * 1.015, gain * volume,
+                        index % 3 == 1)
+            }
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "traffic-tone-format-failed")
+        }
+        let length = notes.reduce(0.0) { max($0, $1.0 + $1.1 + 0.10) }
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * length))
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format, frameCapacity: frames),
+              let samples = buffer.floatChannelData?[0] else {
+            return (false, 0, "traffic-tone-allocation-failed")
+        }
+        buffer.frameLength = frames
+        for frame in 0..<Int(frames) {
+            let t = Double(frame) / format.sampleRate
+            var mixed = 0.0
+            for note in notes {
+                let (offset, duration, hz, endHz, peak, triangle) = note
+                let elapsed = t - offset
+                if elapsed < 0 || elapsed > duration + 0.10 { continue }
+                let attack = 0.005
+                let release = 0.06
+                let envelope: Double
+                if elapsed < attack {
+                    envelope = 0.0001 * pow(peak / 0.0001,
+                                            elapsed / attack)
+                } else if elapsed < duration + release {
+                    envelope = peak * pow(0.0001 / peak,
+                        (elapsed - attack) / (duration + release - attack))
+                } else {
+                    envelope = 0.0001
+                }
+                let sweep = min(elapsed, duration)
+                let ratio = log(endHz / hz)
+                let turns = abs(ratio) < 0.000001
+                    ? hz * sweep
+                    : hz * duration * (exp(ratio * sweep / duration) - 1) / ratio
+                let phase = turns + max(0.0, elapsed - duration) * endHz
+                let cycle = phase - floor(phase)
+                let wave = triangle
+                    ? 1.0 - 4.0 * abs(cycle - 0.5)
+                    : sin(2.0 * Double.pi * phase)
+                mixed += wave * envelope
+            }
+            samples[frame] = Float(max(-0.95, min(0.95, mixed)))
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<sampleVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // warm without audible samples
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            effectBuffers[soundId] = buffer
+            return (true, Int(length * 1000), "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "traffic-tone-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -1359,6 +1532,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               towerWordToneIDs.contains(soundId) ||
               verseLaunchSoundResources[soundId] != nil ||
               verseLaunchToneIDs.contains(soundId) ||
+              trafficTapSoundResources[soundId] != nil ||
+              trafficTapToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1449,7 +1624,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                soundId == self.nativeMelodySoundID ||
                soundId == self.nativeSnakeOrbSoundID ||
                self.towerWordToneIDs.contains(soundId) ||
-               self.verseLaunchToneIDs.contains(soundId) {
+               self.verseLaunchToneIDs.contains(soundId) ||
+               self.trafficTapToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.snakeSoundResources[soundId] {
@@ -1464,6 +1640,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.trafficTapSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/traffic_tap/traffic_tap_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
@@ -1562,7 +1746,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.verseLaunchToneIDs.contains(soundId) {
+                if self.trafficTapToneIDs.contains(soundId) {
+                    let result = self.prepareTrafficTapToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-traffic-tone"
+                } else if self.verseLaunchToneIDs.contains(soundId) {
                     let result = self.prepareVerseLaunchToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
