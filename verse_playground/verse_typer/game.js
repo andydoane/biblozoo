@@ -3269,17 +3269,24 @@
     return !!audioCtx && audioCtx !== old;
   }
   function pauseTyperForReturn() {
-    if (returnPaused) return;
-    returnPaused = true;
-    wasPausedBeforeReturn = state.paused;
-    state.paused = true;
+    if(returnPaused)return;
+    // End any menu/narration hold before Welcome Back owns the clock,
+    // preventing double subtraction during a held UIKit App Switcher.
+    finishNativeHold();
+    if(nativeTyperAudio)void nativeTyperAudio.stop();
+    returnPaused=true;
+    wasPausedBeforeReturn=state.paused;
+    state.paused=true;
     welcomeClock.pause();
   }
   function continueTyperAfterReturn() {
+    if(nativeTyperAudio && !muted && !nativeTyperAudio.isReady())return false;
     welcomeClock.resume();
-    returnPaused = false;
-    state.paused = wasPausedBeforeReturn;
-    if (state.screen === "game") scheduleCaterpillarPositionUpdate({ instant: true });
+    returnPaused=false;
+    state.paused=wasPausedBeforeReturn;
+    if(state.paused)beginNativeHold();
+    if(state.screen==="game")scheduleCaterpillarPositionUpdate({instant:true});
+    return true;
   }
 
   function setScreen(screen) {
@@ -3315,7 +3322,18 @@
     getAudioContext: () => audioCtx,
     unlockAudio,
     replaceAudioContext: replaceTyperWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    nativeOnlyAudio: !!nativeTyperAudio,
+    // The shared shell calls this synchronously in the real Let's go tap.
+    // Muted activities acknowledge quietly; otherwise prepare all 19 PCM
+    // clips before the original word/bonus clock can unpause.
+    restoreNativeOnGesture: nativeTyperAudio ? () => {
+      if(muted)return Promise.resolve(true);
+      return nativeTyperAudio.prepareFromGesture().then(result=>
+        window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+        (result?.ready===true));
+    } : undefined,
+    onExit: () => {if(nativeTyperAudio)stopNativeTyperRound();}
   });
 
   setScreen("intro");
