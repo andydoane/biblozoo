@@ -3285,6 +3285,12 @@
   // Only a task switch while actually playing prompts the child. Starting a
   // page, visiting an internal menu, or the game's end screen does not.
   function pauseForTaskSwitch() {
+    if (nativeScrambleAudio) {
+      // Unwind menu-preflight freeze before beginning task-switch freeze,
+      // so their elapsed spans never count twice.
+      finishNativeScrambleFreeze();
+      if (nativeScramblePending) stopNativeScrambleRound();
+    }
     // A second task switch invalidates a recovery attempt still in flight.
     if (returnPaused) {
       returnSession += 1;
@@ -3309,6 +3315,7 @@
   }
 
   function replaceStalledContextForNewGesture() {
+    if (nativeScrambleAudio) return;
     const old = audioCtx;
     audioCtx = null;
     masterGain = null;
@@ -3322,41 +3329,68 @@
 
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
-    const session = returnSession;
-    // A replacement is allowed only on a NEW actual gesture after a failure.
+    const session=returnSession;
+    if (nativeScrambleAudio) {
+      // Only the human Welcome Back Let's go tap can request OS priority.
+      // A true PiP OS denial is temporary: leave the SAME run paused and
+      // let the plain Welcome Back offer another tap.
+      const restore=muted?Promise.resolve(true):
+        nativeScrambleAudio.prepareFromGesture().then(result=>
+          window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+          (result?.ready===true));
+      return Promise.resolve(restore).then(ok=>{
+        if (ok?.deferred===true) return ok;
+        if (!ok || document.hidden || session!==returnSession) {
+          returnRecoveryFailures+=1;
+          return false;
+        }
+        const duration=performance.now()-returnPausedAt;
+        totalReturnPauseMs+=duration;
+        if (state.startTime) state.startTime+=duration;
+        returnPaused=false;
+        app?.classList.remove("is-welcome-return-paused");
+        returnRecoveryFailures=0;
+        // An open Game Menu or Help still owns its own virtual-clock pause.
+        if (state.menuOpen || state.helpOpen) beginNativeScrambleFreeze();
+        else if (state.screen==="game" && !state.bonusActive)
+          scheduleEasyHint();
+        return true;
+      });
+    }
+    // Original Web/PWA/Android AudioContext resume and clock-probe path,
+    // deliberately unchanged and never available to native iOS.
     if (returnRecoveryFailures && !returnContextReplacements) {
-      returnContextReplacements = 1;
+      returnContextReplacements=1;
       replaceStalledContextForNewGesture();
     }
-    // Gesture-owned, synchronous Web Audio resume + optional media priming.
     unlockAudio();
-    const context = audioCtx;
-    return (async () => {
+    const context=audioCtx;
+    return (async()=>{
       if (!muted) {
-        let good = await audioClockAdvances(context);
-        if (!good && !document.hidden && session === returnSession &&
+        let good=await audioClockAdvances(context);
+        if (!good && !document.hidden && session===returnSession &&
             window.BibloZooAudioRecoveryCoordinator?.isAvailable?.()) {
-          const recovery = await window.BibloZooAudioRecoveryCoordinator.recoverAfterStall({
-            source: "app",
-            probe: () => audioClockAdvances(context),
-            isCurrent: () => returnPaused && session === returnSession &&
-              audioCtx === context
+          const recovery=await window.BibloZooAudioRecoveryCoordinator.recoverAfterStall({
+            source:"app",
+            probe:()=>audioClockAdvances(context),
+            isCurrent:()=>returnPaused && session===returnSession &&
+              audioCtx===context
           });
-          good = recovery.recovered === true;
+          good=recovery.recovered===true;
         }
-        if (!good || document.hidden || session !== returnSession) {
-          returnRecoveryFailures += 1;
+        if (!good || document.hidden || session!==returnSession) {
+          returnRecoveryFailures+=1;
           return false;
         }
       }
-      if (document.hidden || session !== returnSession) return false;
-      const duration = performance.now() - returnPausedAt;
-      totalReturnPauseMs += duration;
-      if (state.startTime) state.startTime += duration;
-      returnPaused = false;
+      if (document.hidden || session!==returnSession) return false;
+      const duration=performance.now()-returnPausedAt;
+      totalReturnPauseMs+=duration;
+      if (state.startTime) state.startTime+=duration;
+      returnPaused=false;
       app?.classList.remove("is-welcome-return-paused");
-      returnRecoveryFailures = 0;
-      if (state.screen === "game" && !state.bonusActive) scheduleEasyHint();
+      returnRecoveryFailures=0;
+      if (state.screen==="game" && !state.bonusActive) scheduleEasyHint();
       return true;
     })();
   }
@@ -3388,12 +3422,18 @@
 
   setScreen("intro");
   welcomeBackController = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeScrambleAudio,
+    suppressUiSound: !!nativeScrambleAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.screen === "game",
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession+=1;
+      if (nativeScrambleAudio) stopNativeScrambleRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   }) || null;
