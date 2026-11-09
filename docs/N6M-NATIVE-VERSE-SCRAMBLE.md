@@ -1,6 +1,6 @@
 # N6m — Verse Scramble final standalone native iOS audio PR #54
 
-> **[PR #54](https://github.com/andydoane/biblozoo/pull/54)** is OPEN / NOT MERGED, branch `experiment/n6m-native-verse-scramble` → isolated `experiment/native-ios-audio`. This is the **proposed twelfth/final standalone native-audio game**. **Do not mark 12/12 complete before owner-heard iPhone PASS after merge.** Stable `ios-prep`, original installed BibloZoo, browser/PWA/Android, microphone, Zoo and all stored verse/player progress remain unchanged.
+> **CURRENT RESULT — ALL 12 STANDALONE GAMES ACCEPTED (2026-11-08 Michigan):** [N6m Verse Scramble PR #54](https://github.com/andydoane/biblozoo/pull/54) **MERGED** to `experiment/native-ios-audio` as `76148dfd281aa91d7838908497def114756c0cfd` on 2026-11-09 02:09:43 UTC. Owner now reports actual real-iPhone Verse Scramble tests worked and marks the game complete. This brings **12/12 external standalone games owner-accepted**; per-event device metrics were not provided and must not be invented. The pending tests below describe the historical pre-merge plan, not current status. The next [N6n Playground Verse Typer PR #55](https://github.com/andydoane/biblozoo/pull/55) is OPEN, proposed **first of five Verse Playground activities** and independently needs Mac Swift/iPhone hearing tests. Stable `ios-prep`, original installed app, Web/PWA/Android, microphone and Zoo remain unchanged.
 
 ## Baseline now accepted by owner
 

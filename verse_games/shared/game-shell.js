@@ -2699,6 +2699,10 @@
       pictureBase: "../../",
       getSoundContext: options.getAudioContext,
       isSoundMuted: options.isMuted,
+      // N6n optional native Playground owner. This does not change any
+      // legacy Web/PWA/Android callers or unrelated Playground activities.
+      useZooEscape: !options.nativeOnlyAudio,
+      suppressUiSound: !!options.nativeOnlyAudio,
       escapeText: "Back to Playground",
       preserveFocus: true,
       shouldPrompt: () => !!options.isActive?.(),
@@ -2713,7 +2717,11 @@
         // acknowledgement, not a newly created context or artificial delay.
         const currentContext = options.getAudioContext?.();
         const muted = options.isMuted?.() === true;
-        const recovery = !currentContext || muted
+        // Native iOS must call activateFromGesture in THIS child's actual
+        // Let's go event stack. No Web Audio clock-success bypass for native.
+        const recovery = typeof options.restoreNativeOnGesture === "function"
+          ? options.restoreNativeOnGesture()
+          : !currentContext || muted
           ? Promise.resolve(true)
           : controllerApi.resumeAudioOnGesture({
             unlock: options.unlockAudio,
@@ -2739,7 +2747,10 @@
           return true;
         });
       },
-      onExit: () => window.VerseGameBridge?.exitGame?.()
+      onExit: () => {
+        options.onExit?.();
+        window.VerseGameBridge?.exitGame?.();
+      }
     };
     controller = controllerApi.attach(controllerOptions);
     return controller;

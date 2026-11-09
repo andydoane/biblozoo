@@ -259,6 +259,132 @@
     runToken: 0
   };
 
+
+  // N6n Verse Typer: one game-scoped 19-ID PCM bank and the existing
+  // published-verse AVAudioPlayer narrator. No native iOS Web/HTML output.
+  const nativeTyperAudio=window.BibloZooNativeVerseTyperAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseTyperAudio : null;
+  let nativeTyperToken=0,nativeTyperPending=false,nativeTyperFailure=false;
+  let nativeTyperRetry={kind:"round",mode:null};
+  let nativeHoldStarted=0,nativeHoldTotal=0;
+  const nativeTyperNotes=new Set([55,60,62,64,65,67,69,71,72]);
+  function typerNow(){
+    const now=welcomeClock.now();
+    return now-nativeHoldTotal-
+      (nativeHoldStarted ? Math.max(0,now-nativeHoldStarted) : 0);
+  }
+  function beginNativeHold(){
+    if(!nativeTyperAudio || nativeHoldStarted || state.screen!=="game")return;
+    nativeHoldStarted=welcomeClock.now();
+  }
+  function finishNativeHold(){
+    if(!nativeHoldStarted)return;
+    nativeHoldTotal+=Math.max(0,welcomeClock.now()-nativeHoldStarted);
+    nativeHoldStarted=0;
+  }
+  function stopNativeTyperRound(){
+    if(!nativeTyperAudio)return;
+    nativeTyperToken++;
+    nativeTyperPending=false;
+    app.removeAttribute("aria-busy");
+    void nativeTyperAudio.stop();
+  }
+  function clearNativeTyperFailure(){
+    nativeTyperFailure=false;
+    document.getElementById("vtNativeAudioFailure")?.remove();
+  }
+  function showNativeTyperFailure(message){
+    if(!nativeTyperAudio)return;
+    nativeTyperFailure=true;
+    // A PCM or narration failure must not leave a prior voice playing
+    // behind the Retry/Back modal or advance the same review chunk.
+    nativeTyperAudio.stopChunk();
+    beginNativeHold();
+    let overlay=document.getElementById("vtNativeAudioFailure");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.id="vtNativeAudioFailure";
+      overlay.className="vt-native-audio-failure";
+      overlay.innerHTML=`<section class="vt-native-audio-card" role="dialog"
+        aria-modal="true" aria-label="Verse Typer native audio issue">
+        <h2>Verse Typer</h2><p data-typer-status role="status"></p>
+        <button type="button" data-typer-retry>Try Again</button>
+        <button type="button" data-typer-back>Back</button></section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-typer-retry]").onclick=()=>
+        primeNativeTyperFromGesture(nativeTyperRetry.kind,nativeTyperRetry.mode);
+      overlay.querySelector("[data-typer-back]").onclick=()=>{
+        clearNativeTyperFailure();
+        stopNativeTyperRound();
+        finishNativeHold();
+        if(nativeTyperRetry.kind==="round")setScreen("mode");
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-typer-status]").textContent=message;
+  }
+  function primeNativeTyperFromGesture(kind="round",mode=null,uiKey=null){
+    if(!nativeTyperAudio || nativeTyperPending || returnPaused ||
+       document.hidden)return;
+    nativeTyperRetry={kind,mode};
+    clearNativeTyperFailure();
+    if(muted){
+      if(kind==="round"){
+        selectedMode=INTERNAL_MODE_BY_SHELL_MODE[mode]||"beginner";
+        void beginRun();
+      } else {
+        finishNativeHold();
+        state.paused=false;
+      }
+      return;
+    }
+    const token=++nativeTyperToken;
+    nativeTyperPending=true;
+    beginNativeHold();
+    app.setAttribute("aria-busy","true");
+    // MUST request Swift priority synchronously in this real click.
+    const prepare=nativeTyperAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:UI_POP_SOUND_VOLUME} : null);
+    void Promise.resolve(prepare).then(result=>{
+      if(token!==nativeTyperToken || returnPaused || document.hidden)return;
+      nativeTyperPending=false;
+      app.removeAttribute("aria-busy");
+      if(result?.ready!==true){
+        showNativeTyperFailure("Native sound isn't ready. Tap Try Again.");
+        return;
+      }
+      clearNativeTyperFailure();
+      if(kind==="round"){
+        selectedMode=INTERNAL_MODE_BY_SHELL_MODE[mode]||"beginner";
+        void beginRun();
+      } else {
+        finishNativeHold();
+        state.paused=false;
+      }
+    }).catch(()=>{
+      if(token!==nativeTyperToken || returnPaused || document.hidden)return;
+      nativeTyperPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeTyperFailure("Native sound isn't ready. Tap Try Again.");
+    });
+  }
+  if(nativeTyperAudio){
+    nativeTyperAudio.configure({
+      onAppInactive:()=>{
+        if(nativeTyperPending)stopNativeTyperRound();
+        if(state.screen!=="game")return;
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive:()=>playgroundWelcome?.showAfterNativeActive?.(),
+      onPlaybackFailure:()=>{
+        if(muted||returnPaused||document.hidden||nativeTyperPending||
+           nativeTyperFailure||state.screen!=="game"||state.paused)return;
+        nativeTyperRetry={kind:"resume",mode:null};
+        showNativeTyperFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+  }
+
   function clearTrackedTimeout(id) {
     if (!id) return;
     const job = scheduledActions.get(id);
@@ -269,7 +395,7 @@
 
   function trackedTimeout(callback, ms, runToken = state.runToken) {
     const id = ++nextScheduledId;
-    const deadline = welcomeClock.now() + Math.max(0, Number(ms) || 0);
+    const deadline = typerNow() + Math.max(0, Number(ms) || 0);
     const job = { timer: 0 };
     scheduledActions.set(id, job);
     state.sleepIds.push(id);
@@ -280,16 +406,16 @@
         clearTrackedTimeout(id);
         return;
       }
-      if (!returnPaused && welcomeClock.now() >= deadline) {
+      if (!returnPaused && typerNow() >= deadline) {
         clearTrackedTimeout(id);
         callback();
         return;
       }
-      job.timer = setTimeout(check, returnPaused ? 80 : Math.max(0, deadline - welcomeClock.now()));
+      job.timer = setTimeout(check, returnPaused ? 80 : Math.max(0, deadline - typerNow()));
     };
     // Ordinary typing keeps its original precise delay; only the interrupted
     // state polls briefly while time is frozen.
-    job.timer = setTimeout(check, Math.max(0, deadline - welcomeClock.now()));
+    job.timer = setTimeout(check, Math.max(0, deadline - typerNow()));
     return id;
   }
 
@@ -329,6 +455,7 @@
   }
 
   function createChunkAudioElement() {
+    if (nativeTyperAudio) return null;
     if (chunkAudioEl) return chunkAudioEl;
 
     chunkAudioEl = document.createElement("audio");
@@ -346,6 +473,7 @@
   // Prime HTML media on the actual tap, independent of the spoken verse
   // element. Switching screens must not cancel an in-flight silent prime.
   function primeHtmlAudio() {
+    if (nativeTyperAudio) return Promise.resolve(false);
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
 
@@ -404,6 +532,7 @@
   }
 
   function createAudio() {
+    if (nativeTyperAudio) return;
     if (audioCtx) {
       if (masterGain) masterGain.gain.value = muted ? 0 : WEB_AUDIO_MASTER_VOLUME;
       return;
@@ -419,6 +548,7 @@
   }
 
   async function unlockAudio() {
+    if (nativeTyperAudio) return nativeTyperAudio.isReady();
     createAudio();
     if (!audioCtx || !masterGain) return false;
 
@@ -471,6 +601,7 @@
   }
 
   function getUiPopAudioContext() {
+    if (nativeTyperAudio) return null;
     if (IS_NATIVE_CAPACITOR) {
       createAudio();
       return audioCtx;
@@ -589,6 +720,7 @@
   }
 
   function preloadUiPopSounds() {
+    if (nativeTyperAudio) return;
     const targetCtx =
       IS_NATIVE_CAPACITOR
         ? audioCtx
@@ -613,9 +745,14 @@
 
   function playUiPopSound() {
     if (muted) return;
-
     const index = uiPopFlip ? 1 : 0;
     uiPopFlip = !uiPopFlip;
+    if (nativeTyperAudio) {
+      if (!returnPaused && !document.hidden)
+        nativeTyperAudio.tapUiFromGesture(index ? "uiTap2":"uiTap1",
+          UI_POP_SOUND_VOLUME);
+      return;
+    }
 
     const targetCtx =
       getUiPopAudioContext();
@@ -712,6 +849,9 @@
     root.querySelectorAll("button").forEach(button => {
       if (button.dataset.vtUiPopSound === "wired") return;
       if (button.closest(".vt-root")) return;
+      // Native difficulty selection already plays one UI pop as part of
+      // the same gesture that prewarms all 19 PCM clips. Do not double it.
+      if (nativeTyperAudio && button.hasAttribute("data-game-shell-mode")) return;
 
       button.dataset.vtUiPopSound = "wired";
 
@@ -734,6 +874,7 @@
   }
 
   function playTone({ midi = 60, duration = 0.16, volume = 0.16, type = "triangle" } = {}) {
+    if (nativeTyperAudio) return; // fixed native phrase or note instead
     if (muted) return;
 
     createAudio();
@@ -917,16 +1058,32 @@
       : chooseMelodyForLength(state.currentItem?.expected?.length || 1);
 
     const midi = melody[state.typedIndex % melody.length] || 60;
-    playTone({ midi, duration: 0.13, volume: CORRECT_LETTER_VOLUME, type: "triangle" });
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused &&
+          !nativeTyperPending && !nativeTyperFailure &&
+          nativeTyperNotes.has(midi))
+        nativeTyperAudio.play("note"+midi,1);
+    } else playTone({ midi, duration: 0.13,
+      volume: CORRECT_LETTER_VOLUME, type: "triangle" });
   }
 
   function playWrongSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("wrong",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 43, duration: 0.13, volume: WRONG_TONE_VOLUME_1, type: "sine" });
     trackedTimeout(() => playTone({ midi: 38, duration: 0.11, volume: WRONG_TONE_VOLUME_2, type: "sine" }), 55, runToken);
   }
 
   function playWordDoneSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("wordDone",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 72, duration: 0.14, volume: WORD_DONE_VOLUME_1, type: "triangle" });
     trackedTimeout(() => playTone({ midi: 76, duration: 0.18, volume: WORD_DONE_VOLUME_2, type: "triangle" }), 70, runToken);
@@ -1139,7 +1296,7 @@
     state.entranceDone = false;
     state.pendingCompleteAfterEntrance = false;
     state.paused = false;
-    state.startTime = welcomeClock.now();
+    state.startTime = typerNow();
     state.correctLetters = 0;
     state.typos = 0;
     state.streak = 0;
@@ -1172,11 +1329,16 @@
       helpText: "How to Play",
       theme: GAME_THEME,
       backLabel: "Back to Verse Playground",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        if(nativeTyperAudio)stopNativeTyperRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        createChunkAudioElement();
-        primeHtmlAudio();
-        unlockAudio();
+        if(!nativeTyperAudio){
+          createChunkAudioElement();
+          void primeHtmlAudio();
+          void unlockAudio();
+        }
         preloadGameAssets();
         setScreen("mode");
       }
@@ -1201,10 +1363,16 @@
       modes: MODES,
       onBack: () => setScreen("intro"),
       onSelect: async (mode) => {
+        preloadGameAssets();
+        if(nativeTyperAudio){
+          const key=uiPopFlip ? "uiTap2":"uiTap1";
+          uiPopFlip=!uiPopFlip;
+          primeNativeTyperFromGesture("round",mode,key);
+          return;
+        }
         createChunkAudioElement();
         primeHtmlAudio();
         unlockAudio();
-        preloadGameAssets();
         selectedMode = INTERNAL_MODE_BY_SHELL_MODE[mode] || "beginner";
         await beginRun();
       }
@@ -1215,6 +1383,8 @@
 
   async function beginRun() {
     const runToken = beginRunToken();
+    nativeHoldStarted=0;
+    nativeHoldTotal=0;
 
     await initRunData();
     if (state.runToken !== runToken) return;
@@ -1288,12 +1458,14 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        muted = !muted;
-        if (masterGain && audioCtx) {
-          masterGain.gain.setValueAtTime(muted ? 0 : WEB_AUDIO_MASTER_VOLUME, audioCtx.currentTime);
+        muted=!muted;
+        if(nativeTyperAudio && muted)void nativeTyperAudio.stop();
+        if(masterGain && audioCtx){
+          masterGain.gain.setValueAtTime(muted?0:WEB_AUDIO_MASTER_VOLUME,
+            audioCtx.currentTime);
         }
-        if (chunkAudio) chunkAudio.muted = muted;
-        if (!muted) playUiPopSound();
+        if(chunkAudio)chunkAudio.muted=muted;
+        if(!muted)playUiPopSound();
         return muted;
       },
       onHowToPlay: () => {
@@ -1306,37 +1478,58 @@
         }
 
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
-        state.paused = true;
+        state.paused=true;
+        beginNativeHold();
       },
       onModeSelect: () => {
-        playUiPopSound();
-        state.paused = false;
+        if(nativeTyperAudio)stopNativeTyperRound();
+        state.paused=false;
+        finishNativeHold();
         stopAllAudio();
         setScreen("mode");
+        playUiPopSound();
       },
       onExit: () => {
-        playUiPopSound();
+        // Keep the original Web/PWA/Android pop. On native iOS, stop the
+        // bank before navigation instead of scheduling a ghost clip.
+        if(nativeTyperAudio)stopNativeTyperRound();
+        else playUiPopSound();
         stopAllAudio();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
+        if(returnPaused || nativeTyperPending ||
+           (nativeTyperAudio && state.paused))return false;
+        state.paused=true;
+        beginNativeHold();
+        if(nativeTyperAudio)void nativeTyperAudio.stop();
         playUiPopSound();
-        state.paused = true;
+        return true;
       },
       onClose: () => {
-        playUiPopSound();
-        state.paused = false;
+        if(returnPaused || nativeTyperPending)return;
+        if(nativeTyperAudio && !muted){
+          const key=uiPopFlip?"uiTap2":"uiTap1";
+          uiPopFlip=!uiPopFlip;
+          primeNativeTyperFromGesture("resume",null,key);
+        } else {
+          playUiPopSound();
+          finishNativeHold();
+          state.paused=false;
+        }
       },
       onBackFromHelp: () => {
         playUiPopSound();
-        state.paused = true;
+        state.paused=true;
+        beginNativeHold();
       }
     });
   }
 
   function wirePhysicalKeyboard() {
     window.onkeydown = (event) => {
-      if (state.screen !== "game" || returnPaused) return;
+      if (state.screen !== "game" || returnPaused || state.paused ||
+          nativeTyperPending || nativeTyperFailure) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const key = String(event.key || "").toUpperCase();
@@ -1754,15 +1947,22 @@
     const prompt = document.getElementById("vtCocoonPrompt");
     if (prompt) {
       prompt.onclick = () => {
-        createChunkAudioElement();
-        primeHtmlAudio();
-        unlockAudio();
+        if(!nativeTyperAudio){
+          createChunkAudioElement();
+          void primeHtmlAudio();
+          void unlockAudio();
+        }
         openCocoon(runToken);
       };
     }
   }
 
   function playPopupSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("popup",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 67, duration: 0.10, volume: POPUP_TONE_VOLUME_1, type: "triangle" });
     trackedTimeout(() => {
@@ -1771,6 +1971,11 @@
   }
 
   function playCocoonOpenSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("cocoon",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 60, duration: 0.10, volume: 0.32, type: "triangle" });
     trackedTimeout(() => playTone({ midi: 64, duration: 0.11, volume: 0.34, type: "triangle" }), 82, runToken);
@@ -1779,6 +1984,11 @@
   }
 
   function playFlapSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("flap"+(state.butterflyFlaps%3),1);
+      return;
+    }
     const runToken = state.runToken;
     const base = 76 + (state.butterflyFlaps % 3) * 2;
     playTone({ midi: base, duration: 0.09, volume: 0.28, type: "triangle" });
@@ -1786,6 +1996,11 @@
   }
 
   function playButterflyFlyAwaySound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("flyAway",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 72, duration: 0.08, volume: 0.28, type: "triangle" });
     trackedTimeout(() => playTone({ midi: 76, duration: 0.08, volume: 0.30, type: "triangle" }), 70, runToken);
@@ -2204,7 +2419,7 @@
         : -1;
 
       return `
-        <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
+        <span class="vt-head ${state.headShakeUntil > typerNow() ? "is-no" : ""}">${faceHtml()}</span>
         <span class="vt-body vt-reference-body">
           ${item.chars.map((char, index) => {
         const isDigit = /\d/.test(char);
@@ -2226,7 +2441,7 @@
 
     if (item.kind === "mega") {
       return `
-        <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
+        <span class="vt-head ${state.headShakeUntil > typerNow() ? "is-no" : ""}">${faceHtml()}</span>
         <span class="vt-body vt-mega-body">
           ${(item.parts || []).map(part => {
         if (part.kind === "space") {
@@ -2251,7 +2466,7 @@
       : -1;
 
     return `
-      <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
+      <span class="vt-head ${state.headShakeUntil > typerNow() ? "is-no" : ""}">${faceHtml()}</span>
       <span class="vt-body">
         ${letters.map((letter, index) => {
       const typed = index < state.typedIndex;
@@ -2333,7 +2548,7 @@
   }
 
   function startRippleDelayLoop(durationMs, item) {
-    const startedAt = welcomeClock.now();
+    const startedAt = typerNow();
 
     const tick = () => {
       if (state.screen !== "game" || state.currentItem !== item) return;
@@ -2343,7 +2558,7 @@
         return;
       }
       updateRippleDelays();
-      if (welcomeClock.now() - startedAt < durationMs - 40) {
+      if (typerNow() - startedAt < durationMs - 40) {
         requestAnimationFrame(tick);
       }
     };
@@ -2620,7 +2835,7 @@
     state.streak = 0;
     state.keyFlash = key;
     state.keyFlashBad = true;
-    state.headShakeUntil = welcomeClock.now() + 420;
+    state.headShakeUntil = typerNow() + 420;
 
     playWrongSound();
     renderHud();
@@ -2749,6 +2964,7 @@
 
   function stopAllAudio() {
     clearSleeps();
+    if(nativeTyperAudio)nativeTyperAudio.stopChunk();
 
     const audio = chunkAudioEl || chunkAudio;
     if (audio) {
@@ -2763,7 +2979,45 @@
     chunkAudio = chunkAudioEl;
   }
 
+  async function playNativeTyperChunk(file,runToken){
+    if(!file || muted)return sleep(900,runToken);
+    const base="../../verse_audio/"+ctx.verseId;
+    if(!file.startsWith(base) || !/^[a-z]\.mp3$/.test(file.slice(base.length))){
+      showNativeTyperFailure("That verse chunk is unavailable. Tap Back.");
+      return;
+    }
+    const partIndex=file.charCodeAt(base.length)-96;
+    let positionMs=0;
+    while(isLiveRun(runToken)){
+      // Muted review remains a quiet visual checkpoint, not a fake
+      // native playback failure or an accidental start of speaker audio.
+      if(muted){await sleep(900,runToken);return;}
+      // Both an interrupted narration and an open Game Menu must suspend
+      // this exact review chunk; NEVER skip ahead on a failed play().
+      if(returnPaused || state.paused || nativeTyperPending ||
+         nativeTyperFailure || !nativeTyperAudio.isReady()){
+        if(!returnPaused && !state.paused && !nativeTyperPending &&
+           !nativeTyperFailure && !nativeTyperAudio.isReady()){
+          nativeTyperRetry={kind:"resume",mode:null};
+          showNativeTyperFailure("Native speech isn't ready. Tap Try Again.");
+        }
+        await new Promise(resolve=>setTimeout(resolve,85));
+        continue;
+      }
+      const result=await nativeTyperAudio.playChunk(ctx.verseId,partIndex,positionMs);
+      if(!isLiveRun(runToken))return;
+      if(result?.ended===true)return; // matching AVAudioPlayerDelegate only
+      positionMs=Math.max(0,Number(result?.positionMs)||positionMs);
+      if(!returnPaused && !state.paused && !nativeTyperPending &&
+         !nativeTyperFailure && result?.reason!=="interrupted"){
+        nativeTyperRetry={kind:"resume",mode:null};
+        showNativeTyperFailure("Verse speech stopped. Tap Try Again.");
+      }
+    }
+  }
+
   function playChunkAudio(file, runToken = state.runToken) {
+    if(nativeTyperAudio)return playNativeTyperChunk(file,runToken);
     if (!file) return sleep(900, runToken);
 
     return new Promise(resolve => {
@@ -3027,21 +3281,33 @@
     return !!audioCtx && audioCtx !== old;
   }
   function pauseTyperForReturn() {
-    if (returnPaused) return;
-    returnPaused = true;
-    wasPausedBeforeReturn = state.paused;
-    state.paused = true;
+    if(returnPaused)return;
+    // End any menu/narration hold before Welcome Back owns the clock,
+    // preventing double subtraction during a held UIKit App Switcher.
+    finishNativeHold();
+    if(nativeTyperAudio)void nativeTyperAudio.stop();
+    returnPaused=true;
+    wasPausedBeforeReturn=state.paused;
+    state.paused=true;
     welcomeClock.pause();
   }
   function continueTyperAfterReturn() {
+    if(nativeTyperAudio && !muted && !nativeTyperAudio.isReady())return false;
     welcomeClock.resume();
-    returnPaused = false;
-    state.paused = wasPausedBeforeReturn;
-    if (state.screen === "game") scheduleCaterpillarPositionUpdate({ instant: true });
+    returnPaused=false;
+    state.paused=wasPausedBeforeReturn;
+    if(state.paused)beginNativeHold();
+    if(state.screen==="game")scheduleCaterpillarPositionUpdate({instant:true});
+    return true;
   }
 
   function setScreen(screen) {
     if (screen !== "game") {
+      if(nativeTyperAudio && state.screen==="game"){
+        stopNativeTyperRound();
+        finishNativeHold();
+        clearNativeTyperFailure();
+      }
       invalidateRun();
     }
 
@@ -3054,7 +3320,7 @@
   }
 
 
-  document.addEventListener("pointerdown", () => {
+  if(!nativeTyperAudio)document.addEventListener("pointerdown", () => {
     createChunkAudioElement();
   }, { capture: true, passive: true });
   window.addEventListener("resize", () => {
@@ -3068,7 +3334,18 @@
     getAudioContext: () => audioCtx,
     unlockAudio,
     replaceAudioContext: replaceTyperWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    nativeOnlyAudio: !!nativeTyperAudio,
+    // The shared shell calls this synchronously in the real Let's go tap.
+    // Muted activities acknowledge quietly; otherwise prepare all 19 PCM
+    // clips before the original word/bonus clock can unpause.
+    restoreNativeOnGesture: nativeTyperAudio ? () => {
+      if(muted)return Promise.resolve(true);
+      return nativeTyperAudio.prepareFromGesture().then(result=>
+        window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+        (result?.ready===true));
+    } : undefined,
+    onExit: () => {if(nativeTyperAudio)stopNativeTyperRound();}
   });
 
   setScreen("intro");
