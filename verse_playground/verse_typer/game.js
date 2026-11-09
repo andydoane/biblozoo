@@ -1323,11 +1323,16 @@
       helpText: "How to Play",
       theme: GAME_THEME,
       backLabel: "Back to Verse Playground",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        if(nativeTyperAudio)stopNativeTyperRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        createChunkAudioElement();
-        primeHtmlAudio();
-        unlockAudio();
+        if(!nativeTyperAudio){
+          createChunkAudioElement();
+          void primeHtmlAudio();
+          void unlockAudio();
+        }
         preloadGameAssets();
         setScreen("mode");
       }
@@ -1352,10 +1357,16 @@
       modes: MODES,
       onBack: () => setScreen("intro"),
       onSelect: async (mode) => {
+        preloadGameAssets();
+        if(nativeTyperAudio){
+          const key=uiPopFlip ? "uiTap2":"uiTap1";
+          uiPopFlip=!uiPopFlip;
+          primeNativeTyperFromGesture("round",mode,key);
+          return;
+        }
         createChunkAudioElement();
         primeHtmlAudio();
         unlockAudio();
-        preloadGameAssets();
         selectedMode = INTERNAL_MODE_BY_SHELL_MODE[mode] || "beginner";
         await beginRun();
       }
@@ -1366,6 +1377,8 @@
 
   async function beginRun() {
     const runToken = beginRunToken();
+    nativeHoldStarted=0;
+    nativeHoldTotal=0;
 
     await initRunData();
     if (state.runToken !== runToken) return;
@@ -1439,12 +1452,14 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        muted = !muted;
-        if (masterGain && audioCtx) {
-          masterGain.gain.setValueAtTime(muted ? 0 : WEB_AUDIO_MASTER_VOLUME, audioCtx.currentTime);
+        muted=!muted;
+        if(nativeTyperAudio && muted)void nativeTyperAudio.stop();
+        if(masterGain && audioCtx){
+          masterGain.gain.setValueAtTime(muted?0:WEB_AUDIO_MASTER_VOLUME,
+            audioCtx.currentTime);
         }
-        if (chunkAudio) chunkAudio.muted = muted;
-        if (!muted) playUiPopSound();
+        if(chunkAudio)chunkAudio.muted=muted;
+        if(!muted)playUiPopSound();
         return muted;
       },
       onHowToPlay: () => {
@@ -1457,37 +1472,55 @@
         }
 
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
-        state.paused = true;
+        state.paused=true;
+        beginNativeHold();
       },
       onModeSelect: () => {
-        playUiPopSound();
-        state.paused = false;
+        if(nativeTyperAudio)stopNativeTyperRound();
+        state.paused=false;
+        finishNativeHold();
         stopAllAudio();
         setScreen("mode");
+        playUiPopSound();
       },
       onExit: () => {
-        playUiPopSound();
+        if(nativeTyperAudio)stopNativeTyperRound();
         stopAllAudio();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
+        if(returnPaused || nativeTyperPending ||
+           (nativeTyperAudio && state.paused))return false;
+        state.paused=true;
+        beginNativeHold();
+        if(nativeTyperAudio)void nativeTyperAudio.stop();
         playUiPopSound();
-        state.paused = true;
+        return true;
       },
       onClose: () => {
-        playUiPopSound();
-        state.paused = false;
+        if(returnPaused || nativeTyperPending)return;
+        if(nativeTyperAudio && !muted){
+          const key=uiPopFlip?"uiTap2":"uiTap1";
+          uiPopFlip=!uiPopFlip;
+          primeNativeTyperFromGesture("resume",null,key);
+        } else {
+          playUiPopSound();
+          finishNativeHold();
+          state.paused=false;
+        }
       },
       onBackFromHelp: () => {
         playUiPopSound();
-        state.paused = true;
+        state.paused=true;
+        beginNativeHold();
       }
     });
   }
 
   function wirePhysicalKeyboard() {
     window.onkeydown = (event) => {
-      if (state.screen !== "game" || returnPaused) return;
+      if (state.screen !== "game" || returnPaused || state.paused ||
+          nativeTyperPending || nativeTyperFailure) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       const key = String(event.key || "").toUpperCase();
@@ -1905,9 +1938,11 @@
     const prompt = document.getElementById("vtCocoonPrompt");
     if (prompt) {
       prompt.onclick = () => {
-        createChunkAudioElement();
-        primeHtmlAudio();
-        unlockAudio();
+        if(!nativeTyperAudio){
+          createChunkAudioElement();
+          void primeHtmlAudio();
+          void unlockAudio();
+        }
         openCocoon(runToken);
       };
     }
@@ -2920,6 +2955,7 @@
 
   function stopAllAudio() {
     clearSleeps();
+    if(nativeTyperAudio)nativeTyperAudio.stopChunk();
 
     const audio = chunkAudioEl || chunkAudio;
     if (audio) {
@@ -3213,6 +3249,11 @@
 
   function setScreen(screen) {
     if (screen !== "game") {
+      if(nativeTyperAudio && state.screen==="game"){
+        stopNativeTyperRound();
+        finishNativeHold();
+        clearNativeTyperFailure();
+      }
       invalidateRun();
     }
 
@@ -3225,7 +3266,7 @@
   }
 
 
-  document.addEventListener("pointerdown", () => {
+  if(!nativeTyperAudio)document.addEventListener("pointerdown", () => {
     createChunkAudioElement();
   }, { capture: true, passive: true });
   window.addEventListener("resize", () => {
