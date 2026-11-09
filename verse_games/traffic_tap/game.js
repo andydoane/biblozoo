@@ -1356,8 +1356,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeTrafficAudio && muted) void nativeTrafficAudio.stop();
         if (!muted) {
-          unlockAudio();
+          if (!nativeTrafficAudio) unlockAudio();
           playUiTapSound();
         }
         return muted;
@@ -1367,21 +1368,33 @@ In the bonus round, tap as many of the target vehicle as you can.`;
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         playUiTapSound();
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        playUiTapSound();
+        if (nativeTrafficPending || returnPaused ||
+            (nativeTrafficAudio && state.paused && state.pauseReason==="menu"))
+          return false;
         setPaused(true, "menu");
+        if (nativeTrafficAudio) void nativeTrafficAudio.stop();
+        playUiTapSound();
+        return true;
       },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (nativeTrafficPending || returnPaused) return;
+        if (nativeTrafficAudio && !muted) {
+          primeNativeTrafficFromGesture("resume",null,nextNativeTrafficUiKey());
+        } else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -1394,16 +1407,13 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
       onOpen: () => {
         if (
-          state.mainDone ||
-          state.bonusRound ||
-          state.bonusIntro
-        ) {
-          return false;
-        }
-
-        playUiTapSound();
+          state.mainDone || state.bonusRound || state.bonusIntro ||
+          nativeTrafficPending || returnPaused ||
+          (nativeTrafficAudio && state.paused && state.pauseReason==="speed")
+        ) return false;
         setPaused(true, "speed");
-
+        if (nativeTrafficAudio) void nativeTrafficAudio.stop();
+        playUiTapSound();
         return true;
       },
 
@@ -1416,10 +1426,12 @@ In the bonus round, tap as many of the target vehicle as you can.`;
       },
 
       onClose: () => {
-        playUiTapSound();
-
-        if (!state.mainDone) {
-          setPaused(false, "");
+        if (nativeTrafficPending || returnPaused) return;
+        if (!state.mainDone && nativeTrafficAudio && !muted) {
+          primeNativeTrafficFromGesture("resume",null,nextNativeTrafficUiKey());
+        } else {
+          playUiTapSound();
+          if (!state.mainDone) setPaused(false, "");
         }
       }
     });
@@ -1496,13 +1508,18 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function openGameMenu() {
     const overlay = document.getElementById("ttGameMenuOverlay");
     if (overlay) {
+      if (nativeTrafficPending || returnPaused ||
+          (nativeTrafficAudio && state.paused && state.pauseReason==="menu"))
+        return;
       setPaused(true, "menu");
+      if (nativeTrafficAudio) void nativeTrafficAudio.stop();
       overlay.classList.add("is-open");
       overlay.setAttribute("aria-hidden", "false");
     }
   }
 
   function closeGameMenu() {
+    if (returnPaused || nativeTrafficPending) return;
     const overlay = document.getElementById("ttGameMenuOverlay");
 
     if (overlay && overlay.contains(document.activeElement)) {
@@ -1515,7 +1532,11 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     }
 
     const helpOverlay = document.getElementById("ttHelpOverlay");
-    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) setPaused(false, "");
+    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) {
+      if (nativeTrafficAudio && !muted)
+        primeNativeTrafficFromGesture("resume",null,nextNativeTrafficUiKey());
+      else setPaused(false,"");
+    }
   }
 
   function openHelpFromMenu() {
@@ -1543,8 +1564,11 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   }
 
   function setPaused(paused, reason = "") {
-    // A delayed game callback cannot dismiss the task-switch pause.
-    if (returnPaused && !paused) return;
+    // A delayed callback cannot dismiss a native bank or task-switch wait.
+    if (!paused && (returnPaused ||
+        (nativeTrafficAudio && !muted &&
+         (nativeTrafficPending || nativeTrafficFailure ||
+          !nativeTrafficAudio.isReady())))) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
 
