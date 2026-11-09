@@ -2903,7 +2903,7 @@
 
   function wireChalkboardErase(round) {
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -3304,7 +3304,7 @@
 
   function wireGlowReveal(round) {
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -4160,7 +4160,7 @@
     }
 
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked || mowerActive) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked || mowerActive) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -4467,7 +4467,7 @@
 
   function wireCanvasScrub(round) {
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -4748,7 +4748,7 @@
     }
 
     stageEl.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, roundConfig())) return;
 
       tapLeafAt(event.clientX, event.clientY);
@@ -5066,7 +5066,7 @@
       cookie.appendChild(img);
 
       cookie.addEventListener("pointerdown", (event) => {
-        if (menuOpen || completionLocked || cookie.dataset.cleared === "1") return;
+        if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked || cookie.dataset.cleared === "1") return;
         if (absorbInstructionTap(event, roundConfig())) return;
 
         event.preventDefault();
@@ -5519,7 +5519,7 @@
 
       btn.onclick = null;
       btn.onpointerdown = (event) => {
-        if (menuOpen || completionLocked || btn.classList.contains("is-peeled")) return;
+        if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked || btn.classList.contains("is-peeled")) return;
         if (absorbInstructionTap(event, roundConfig())) return;
 
         event.preventDefault();
@@ -5662,6 +5662,12 @@
   }
 
   function completeRound() {
+    // Some coverage/reward callbacks run asynchronously. An inactive
+    // app/menu/native preflight must never silently grant a round complete.
+    if(welcomePaused || nativeScrubPending || nativeScrubFailure){
+      deferredCoverageRound=roundConfig();
+      return;
+    }
     if (completionLocked) return;
     completionLocked = true;
     pointerDown = false;
