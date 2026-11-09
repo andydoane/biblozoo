@@ -1044,6 +1044,10 @@
   renderIntro();
 
   function renderIntro() {
+    if (nativeTrafficAudio) {
+      stopNativeTrafficRound();
+      clearNativeTrafficFailure();
+    }
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -1055,17 +1059,27 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
         preloadTrafficTapImages();
-        unlockAudio();
+        if (!nativeTrafficAudio) unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    if (nativeTrafficAudio)
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
   }
 
   function renderModeSelect() {
+    if (nativeTrafficAudio) {
+      stopNativeTrafficRound();
+      clearNativeTrafficFailure();
+    }
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -1082,14 +1096,27 @@
       },
       onSelect: (mode) => {
         preloadTrafficTapImages();
-        unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeTrafficAudio) {
+          primeNativeTrafficFromGesture("round",mode,
+            muted?null:nextNativeTrafficUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    if (nativeTrafficAudio)
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
   }
 
   function startGame(mode) {
+    if (nativeTrafficAudio && !muted && !nativeTrafficAudio.isReady()) {
+      nativeTrafficRetry={kind:"round",mode};
+      showNativeTrafficFailure("Native sound bank is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeTrafficFailure();
     selectedMode = mode;
     window.VerseGameShell.resetGameSpeed();
     itemsClickBound = false;
@@ -1279,16 +1306,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeTrafficAudio) unlockAudio();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         playUiTapSound();
         renderModeSelect();
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeTrafficAudio) stopNativeTrafficRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
