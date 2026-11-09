@@ -1,6 +1,6 @@
 # N6k — Verse Launch native iOS audio acceptance and handoff
 
-> **[PR #52](https://github.com/andydoane/biblozoo/pull/52)**, `experiment/n6k-native-verse-launch` → `experiment/native-ios-audio`. **Proposed tenth migration; owner physical-iPhone PASS pending.** Leave stable `ios-prep`, original app, Web/PWA/Android, microphone, Zoo and persistent player data untouched.
+> **CURRENT RESULT — OWNER ACCEPTED (2026-11-08 Michigan):** [N6k Verse Launch PR #52](https://github.com/andydoane/biblozoo/pull/52) was **MERGED** to `experiment/native-ios-audio` at `21912befabff7f7e3819ed0b01349db579447319` on 2026-11-09 00:44:38 UTC. Owner now reports **normal real-iPhone tests worked great (PASS)**, so Verse Launch is the **tenth of 12 owner-accepted standalone native games (10/12)**. No specific event/device metrics were supplied; don't invent them. Any pending checklists below describe the *historical pre-merge test plan*, not current status. Next is open [N6l Traffic Tap PR #53](https://github.com/andydoane/biblozoo/pull/53), pending independent Mac Swift/iPhone acceptance. Stable `ios-prep`, original installed BibloZoo, Web/PWA/Android, mic/Zoo and user data unchanged.
 
 ## Actual owner-accepted baseline
 
