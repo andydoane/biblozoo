@@ -829,15 +829,11 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        unlockAudio();
-
+        if (!nativeTowerAudio) unlockAudio();
         const wasMuted = muted;
         muted = !muted;
-
-        if (wasMuted) {
-          playUiTapSound(true);
-        }
-
+        if (nativeTowerAudio && muted) void nativeTowerAudio.stop();
+        if (wasMuted) playUiTapSound(true);
         return muted;
       },
       onHowToPlay: () => {
@@ -845,6 +841,7 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
@@ -852,16 +849,28 @@
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        playUiTapSound();
+        // Shell pointerdown + click and the legacy onclick may overlap.
+        if (nativeTowerPending || returnPaused ||
+            (nativeTowerAudio && state.paused && state.pauseReason === "menu"))
+          return false;
         setPaused(true, "menu");
+        if (nativeTowerAudio) void nativeTowerAudio.stop();
+        playUiTapSound();
+        return true;
       },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (returnPaused || nativeTowerPending) return;
+        if (nativeTowerAudio && !muted) {
+          primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
+        } else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -871,41 +880,38 @@
     window.VerseGameShell.wireSpeedMenu({
       id: "tbSpeedMenuOverlay",
       buttonId: "tbSpeedPill",
-
       onOpen: () => {
         if (
-          state.introActive ||
-          state.collapseTriggered ||
-          state.frenzyActive ||
-          state.done
-        ) {
-          return false;
-        }
-
-        playUiTapSound();
+          state.introActive || state.collapseTriggered ||
+          state.frenzyActive || state.done || nativeTowerPending ||
+          returnPaused || (nativeTowerAudio && state.paused &&
+            state.pauseReason === "speed")
+        ) return false;
         setPaused(true, "speed");
-
+        if (nativeTowerAudio) void nativeTowerAudio.stop();
+        playUiTapSound();
         return true;
       },
-
       onChange: () => {
         updateBeltSpeedFromSettings();
       },
-
       onClose: () => {
-        playUiTapSound();
-
+        if (returnPaused || nativeTowerPending) return;
         if (
-          !state.introActive &&
-          !state.collapseTriggered &&
-          !state.frenzyActive &&
-          !state.done
+          !state.introActive && !state.collapseTriggered &&
+          !state.frenzyActive && !state.done
         ) {
-          setPaused(false, "");
+          if (nativeTowerAudio && !muted) {
+            primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
+          } else {
+            playUiTapSound();
+            setPaused(false, "");
+          }
+        } else {
+          playUiTapSound();
         }
       }
     });
-
   }
 
   function wireGameInput() {
@@ -959,6 +965,11 @@
   }
 
   function openGameMenu() {
+    if (nativeTowerPending || returnPaused ||
+        (nativeTowerAudio && state.paused && state.pauseReason === "menu"))
+      return;
+    setPaused(true, "menu");
+    if (nativeTowerAudio) void nativeTowerAudio.stop();
     playUiTapSound();
 
     const menuOverlay = document.getElementById("tbGameMenuOverlay");
@@ -969,8 +980,15 @@
     }
   }
   function closeGameMenu() {
-    playUiTapSound();
-
+    if (returnPaused || nativeTowerPending) return;
+    const helpOverlay = document.getElementById("tbHelpOverlay");
+    if (nativeTowerAudio && !muted && (!helpOverlay ||
+        !helpOverlay.classList.contains("is-open"))) {
+      // Keyboard Escape and legacy Close may bypass shell's onClose.
+      primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
+    } else {
+      playUiTapSound();
+    }
     const menuOverlay = document.getElementById("tbGameMenuOverlay");
 
     if (menuOverlay && menuOverlay.contains(document.activeElement)) {
@@ -982,8 +1000,8 @@
       menuOverlay.setAttribute("aria-hidden", "true");
     }
 
-    const helpOverlay = document.getElementById("tbHelpOverlay");
-    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) setPaused(false, "");
+    if ((!helpOverlay || !helpOverlay.classList.contains("is-open")) &&
+        (!nativeTowerAudio || muted)) setPaused(false, "");
   }
 
   function openHelpFromMenu() {
@@ -1366,6 +1384,8 @@
 
   function setPaused(paused, reason = "") {
     if (returnPaused && !paused) return;
+    if (!paused && nativeTowerAudio && !muted &&
+        !nativeTowerAudio.isReady()) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
     if (!paused) state.lastTs = gameNow();
