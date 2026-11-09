@@ -1369,20 +1369,55 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        muted = !muted;
-        if (masterGain && audioCtx) masterGain.gain.setValueAtTime(muted ? 0 : WEB_AUDIO_MASTER_VOLUME, audioCtx.currentTime);
-        if (verseAudioEl) verseAudioEl.muted = muted;
-        if (muted) {
-          nextSpinTick = remainingSpinTickIndex();
+        muted=!muted;
+        if(masterGain && audioCtx)
+          masterGain.gain.setValueAtTime(muted?0:WEB_AUDIO_MASTER_VOLUME,audioCtx.currentTime);
+        if(verseAudioEl)verseAudioEl.muted=muted;
+        if(muted){
+          nextSpinTick=remainingSpinTickIndex();
           cancelQueuedSpinTicks();
           stopLiveTones();
-        } else if (wheelSpinPending && !welcomePaused) {
+          if(nativeWheelAudio)void nativeWheelAudio.stop();
+        }else if(wheelSpinPending && !welcomePaused && !nativeWheelAudio){
           scheduleRemainingSpinTicks();
         }
         return muted;
       },
-      onHowToPlay: () => { document.getElementById(MENU_OVERLAY_ID)?.classList.remove("is-open"); shell().openHelp?.(HELP_OVERLAY_ID, "back", "Back"); },
-      onExit: () => { stopVerseAudio(); clearTimers(); bridge().exitGame?.(); }
+      onHowToPlay: () => {
+        document.getElementById(MENU_OVERLAY_ID)?.classList.remove("is-open");
+        shell().openHelp?.(HELP_OVERLAY_ID,"back","Back");
+      },
+      onOpen: () => {
+        if(nativeWheelAudio){
+          if(nativeWheelMenuOpen || nativeWheelPending ||
+             nativeWheelFailure || playgroundWelcome?.isPaused?.())return false;
+          nativeWheelMenuOpen=true;
+          pauseWheelForReturn();
+          nativeWheelAudio.tapUiFromGesture(nativeWheelUiKey(),.42);
+        }
+        return true;
+      },
+      onClose: () => {
+        if(!nativeWheelAudio)return;
+        if(nativeWheelPending || playgroundWelcome?.isPaused?.()){
+          // The shell closes DOM first. Keep the menu reachable after a
+          // blocked Close while Welcome Back or a preflight is in flight.
+          const overlay=document.getElementById(MENU_OVERLAY_ID);
+          overlay?.classList.add("is-open");
+          overlay?.setAttribute("aria-hidden","false");
+          return;
+        }
+        // The same real Menu Close tap must re-own iOS session priority
+        // and warm all 38 fixed clips BEFORE wheel/prize timers unpause.
+        primeWheelNativeFromGesture("resume",nativeWheelUiKey());
+      },
+      onBackFromHelp: () => {
+        // Help Back should restore the menu; stay paused until Close.
+      },
+      onExit: () => {
+        if(nativeWheelAudio)stopNativeWheelRun();
+        stopVerseAudio();clearTimers();bridge().exitGame?.();
+      }
     });
   }
 
@@ -1398,8 +1433,20 @@
     shell().renderTitleScreen?.({
       app, title: GAME_TITLE, icon: GAME_ICON, iconHtml: GAME_ICON_HTML, helpHtml: helpHtml(), helpOverlayId: HELP_OVERLAY_ID,
       startText: "Start", helpText: "How to Play", theme: GAME_THEME, backLabel: "Back to Verse Playground",
-      onBack: () => bridge().exitGame?.(),
-      onStart: async () => { createVerseAudioElement(); primeHtmlAudio(); unlockAudio(); await beginRun(); }
+      onBack: () => {
+        if(nativeWheelAudio)stopNativeWheelRun();
+        bridge().exitGame?.();
+      },
+      onStart: async () => {
+        if(nativeWheelAudio){
+          primeWheelNativeFromGesture("start",nativeWheelUiKey());
+          return;
+        }
+        createVerseAudioElement();
+        primeHtmlAudio();
+        unlockAudio();
+        await beginRun();
+      }
     });
   }
 
@@ -1453,7 +1500,9 @@
     `, { status: "Today's Verse", rootClass: "is-simple-screen is-meet-screen" });
     wireGameMenu();
     document.getElementById("meetVerseBtn")?.addEventListener("click", () => {
-      void unlockAudio();
+      if(nativeWheelAudio && (!nativeWheelAudio.isReady() ||
+         nativeWheelPending || nativeWheelFailure || welcomePaused))return;
+      if(!nativeWheelAudio)void unlockAudio();
       void playVerseIntro();
     });
   }
@@ -1556,7 +1605,9 @@
   }
 
   async function spinWheel() {
-    if (welcomePaused || wheelSpinPending || document.hidden) return;
+    if (welcomePaused || wheelSpinPending || document.hidden ||
+        nativeWheelPending || nativeWheelFailure || nativeWheelMenuOpen ||
+        (nativeWheelAudio && !muted && !nativeWheelAudio.isReady())) return;
     wheelSpinPending = true;
     const btn = document.getElementById("spinWheelBtn"); if (btn) btn.disabled = true;
     await unlockAudio();
@@ -3964,7 +4015,14 @@
     if (shell().renderCompleteScreen) {
       shell().renderCompleteScreen({
         app, title: "Wheel Complete!", icon: GAME_ICON, iconHtml: GAME_ICON_HTML, statsText, playAgainText: "Play Again", moreGamesText: "Back to Playground", backLabel: "Back to Playground", theme: GAME_THEME,
-        onPlayAgain: () => beginRun(), onMoreGames: () => bridge().exitGame?.()
+        onPlayAgain: () => {
+          if(nativeWheelAudio)primeWheelNativeFromGesture("start",nativeWheelUiKey());
+          else void beginRun();
+        },
+        onMoreGames: () => {
+          if(nativeWheelAudio)stopNativeWheelRun();
+          bridge().exitGame?.();
+        }
       });
     } else {
       app.innerHTML = `<div class="wob-root"><div class="wob-panel"><div class="wob-big-title">Complete!</div><button class="wob-btn" id="backBtn">Back</button></div></div>`;
