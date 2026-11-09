@@ -134,7 +134,7 @@ function testHotGameSounds(){
   vm.createContext(scope);
   vm.runInContext(extract("  function playGameSound(eventId) {",
     "  window.tbTestSound = function tbTestSound")+
-    "\\nthis.testPlay=playGameSound;",scope);
+    "\nthis.testPlay=playGameSound;",scope);
   for(const key of ["correctWord","wrongWord","brickLand","warning",
     "dangerWarning","collapse","brickBreak","streak"]) scope.testPlay(key);
   assert.deepEqual(heard,[["correctWord",1],["wrongWord",1],["brickLand",.55],
