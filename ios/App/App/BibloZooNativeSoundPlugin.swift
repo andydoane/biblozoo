@@ -207,6 +207,29 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "traffic-bonus-7",
         "traffic-bonus-8"
     ]
+    // N6m: final standalone Verse Scramble. Its source-selected correct
+    // melody uses 8 distinct MIDI pitches across 1..10-letter words.
+    // All pitch IDs and 8 other sound recipes are fixed; never accept
+    // dynamic frequencies, Web output or additional AVAudioSession owners.
+    private let scramblePitchMIDIs: Set<Int> = [60, 62, 64, 65, 67, 69, 71, 72]
+    private let scrambleToneIDs: Set<String> = [
+        "scramble-note-60",
+        "scramble-note-62",
+        "scramble-note-64",
+        "scramble-note-65",
+        "scramble-note-67",
+        "scramble-note-69",
+        "scramble-note-71",
+        "scramble-note-72",
+        "scramble-wrong-letter",
+        "scramble-word-complete",
+        "scramble-letters-fall",
+        "scramble-message-pop",
+        "scramble-bonus-start",
+        "scramble-bonus-you-win",
+        "scramble-bonus-iwin",
+        "scramble-bonus-final"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -299,7 +322,23 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "traffic-bonus-5",
         "traffic-bonus-6",
         "traffic-bonus-7",
-        "traffic-bonus-8"
+        "traffic-bonus-8",
+        "scramble-note-60",
+        "scramble-note-62",
+        "scramble-note-64",
+        "scramble-note-65",
+        "scramble-note-67",
+        "scramble-note-69",
+        "scramble-note-71",
+        "scramble-note-72",
+        "scramble-wrong-letter",
+        "scramble-word-complete",
+        "scramble-letters-fall",
+        "scramble-message-pop",
+        "scramble-bonus-start",
+        "scramble-bonus-you-win",
+        "scramble-bonus-iwin",
+        "scramble-bonus-final"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1260,6 +1299,183 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+
+    // N6m: the eight source MIDI notes plus eight exact, bounded original
+    // Web-style recipes are rendered ONCE on playbackQueue, during a child's
+    // explicit mode/Menu Close/Welcome Back preflight. No hot oscillator,
+    // caller frequency, extra audio session, Web decoder or HTML sound.
+    private func prepareScrambleToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard scrambleToneIDs.contains(soundId) else {
+            return (false, 0, "invalid-scramble-tone")
+        }
+        if let buffer = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, Int(Double(buffer.frameLength) /
+                buffer.format.sampleRate * 1000), "prepared")
+        }
+        // source offset (s), duration (s), from/to Hz, authored peak,
+        // triangle oscillator (otherwise sine)
+        var notes: [(Double, Double, Double, Double, Double, Bool)] = []
+        let fridgeSlide = soundId == "scramble-letters-fall"
+        if soundId.hasPrefix("scramble-note-") {
+            guard let midi = Int(soundId.dropFirst("scramble-note-".count)),
+                  scramblePitchMIDIs.contains(midi) else {
+                return (false, 0, "invalid-scramble-midi")
+            }
+            let hz = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
+            notes = [(0, 0.13, hz, hz, 0.48 * 0.85, true)]
+        } else if soundId == "scramble-wrong-letter" {
+            notes = [(0, 0.08, 220, 170, 0.10 * 3.60, true),
+                     (0.07, 0.09, 170, 170, 0.07 * 3.60, true)]
+        } else if soundId == "scramble-word-complete" {
+            notes = [(0, 0.08, 523, 523, 0.07 * 3.40, false),
+                     (0.07, 0.08, 659, 659, 0.07 * 3.40, false),
+                     (0.14, 0.12, 784, 784, 0.08 * 3.40, false),
+                     (0.20, 0.16, 1046, 1046, 0.06 * 3.40, false)]
+        } else if fridgeSlide {
+            // Original 650 Hz filtered-noise Fridge Slide + 240→110 sine.
+            notes = [(0.18, 0.18, 240, 110, 0.035 * 2.40, false)]
+        } else {
+            let source: [(Double, Double, Double, Double)]
+            let volume: Double
+            switch soundId {
+            case "scramble-message-pop":
+                // TitleIntro C5/E5/A5/G5 at original TUNE_TEMPO 0.65
+                source = [(523.25, 0, 0.065, 0.052),
+                          (659.25, 0.06, 0.065, 0.052),
+                          (880.00, 0.12, 0.075, 0.05),
+                          (783.99, 0.20, 0.13, 0.045)]
+                volume = 3.60
+            case "scramble-bonus-start":
+                source = [(587.33, 0, 0.05, 0.045),
+                          (659.25, 0.055, 0.05, 0.045),
+                          (783.99, 0.11, 0.10, 0.05)]
+                volume = 3.20
+            case "scramble-bonus-you-win":
+                source = [(1046.50, 0, 0.07, 0.045),
+                          (783.99, 0.06, 0.07, 0.045),
+                          (1318.51, 0.13, 0.13, 0.05)]
+                volume = 3.20
+            case "scramble-bonus-iwin":
+                source = [(659.25, 0, 0.08, 0.045),
+                          (587.33, 0.08, 0.08, 0.045),
+                          (523.25, 0.16, 0.13, 0.045)]
+                volume = 3.20
+            case "scramble-bonus-final":
+                source = [(783.99, 0, 0.06, 0.04),
+                          (1046.50, 0.055, 0.07, 0.045),
+                          (1318.51, 0.12, 0.09, 0.045),
+                          (1046.50, 0.23, 0.16, 0.05)]
+                volume = 3.20
+            default:
+                return (false, 0, "invalid-scramble-recipe")
+            }
+            notes = source.enumerated().map { index, note in
+                let (hz, offset, duration, gain) = note
+                return (offset / 0.65, duration / 0.65,
+                        hz, hz * 1.015, gain * volume,
+                        index % 3 == 1)
+            }
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "scramble-tone-format-failed")
+        }
+        let noteDuration = notes.reduce(0.0) {
+            max($0, $1.0 + $1.1 + 0.10)
+        }
+        let length = max(noteDuration, fridgeSlide ? 0.53 : 0.0)
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * length))
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format, frameCapacity: frames),
+              let samples = buffer.floatChannelData?[0] else {
+            return (false, 0, "scramble-tone-allocation-failed")
+        }
+        buffer.frameLength = frames
+        let sampleRate = format.sampleRate
+        // Fixed deterministic noise/one-pole 650 Hz lowpass is generated only
+        // during preflight. Original WebNoise used a random lowpass source.
+        var seed: UInt32 = 0x39c8a1
+        var filtered = 0.0
+        let alpha = exp(-2.0 * Double.pi * 650.0 / sampleRate)
+        for frame in 0..<Int(frames) {
+            let t = Double(frame) / sampleRate
+            var mixed = 0.0
+            for note in notes {
+                let (offset, duration, hz, endHz, peak, triangle) = note
+                let elapsed = t - offset
+                if elapsed < 0 || elapsed > duration + 0.10 { continue }
+                let attack = 0.005
+                let release = 0.06
+                let envelope: Double
+                if elapsed < attack {
+                    envelope = 0.0001 * pow(peak / 0.0001,
+                                            elapsed / attack)
+                } else if elapsed < duration + release {
+                    envelope = peak * pow(0.0001 / peak,
+                        (elapsed - attack) / (duration + release - attack))
+                } else {
+                    envelope = 0.0001
+                }
+                let sweep = min(elapsed, duration)
+                let ratio = log(endHz / hz)
+                let turns = abs(ratio) < 0.000001
+                    ? hz * sweep
+                    : hz * duration *
+                        (exp(ratio * sweep / duration) - 1) / ratio
+                let phase = turns + max(0.0, elapsed - duration) * endHz
+                let cycle = phase - floor(phase)
+                let wave = triangle
+                    ? 1.0 - 4.0 * abs(cycle - 0.5)
+                    : sin(2.0 * Double.pi * phase)
+                mixed += wave * envelope
+            }
+            if fridgeSlide && t <= 0.43 {
+                seed = seed &* 1664525 &+ 1013904223
+                let white = Double(seed) / Double(UInt32.max) * 2.0 - 1.0
+                filtered = (1.0 - alpha) * white + alpha * filtered
+                let peak = 0.09 * 2.40
+                let envelope: Double
+                if t < 0.002 {
+                    envelope = 0.0001 * pow(peak / 0.0001, t / 0.002)
+                } else if t < 0.43 {
+                    envelope = peak * pow(0.0001 / peak,
+                        (t - 0.002) / (0.43 - 0.002))
+                } else {
+                    envelope = 0.0001
+                }
+                mixed += filtered * envelope
+            }
+            samples[frame] = Float(max(-0.95, min(0.95, mixed)))
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<sampleVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // no samples until a child's actual gameplay event
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            effectBuffers[soundId] = buffer
+            return (true, Int(length * 1000), "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "scramble-tone-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -1534,6 +1750,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               verseLaunchToneIDs.contains(soundId) ||
               trafficTapSoundResources[soundId] != nil ||
               trafficTapToneIDs.contains(soundId) ||
+              scrambleToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1625,7 +1842,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                soundId == self.nativeSnakeOrbSoundID ||
                self.towerWordToneIDs.contains(soundId) ||
                self.verseLaunchToneIDs.contains(soundId) ||
-               self.trafficTapToneIDs.contains(soundId) {
+               self.trafficTapToneIDs.contains(soundId) ||
+               self.scrambleToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.snakeSoundResources[soundId] {
@@ -1746,7 +1964,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.trafficTapToneIDs.contains(soundId) {
+                if self.scrambleToneIDs.contains(soundId) {
+                    let result = self.prepareScrambleToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-scramble-tone"
+                } else if self.trafficTapToneIDs.contains(soundId) {
                     let result = self.prepareTrafficTapToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs

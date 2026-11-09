@@ -1,6 +1,6 @@
 # N6l — Traffic Tap native iOS audio owner acceptance guide
 
-> **[PR #53](https://github.com/andydoane/biblozoo/pull/53)**: `experiment/n6l-native-traffic-tap` → `experiment/native-ios-audio` (isolated experiment only). **Open for review, not merged or owner-heard yet.** Only the owner merges. If accepted after normal iPhone tests, Traffic Tap becomes **11/12** standalone games (10/12 at this baseline). Stable `ios-prep`, original installed BibloZoo, browser/PWA/Android, recording/mic, Zoo and game data remain untouched.
+> **CURRENT RESULT — OWNER ACCEPTED (2026-11-08 Michigan):** [N6l Traffic Tap PR #53](https://github.com/andydoane/biblozoo/pull/53) was **MERGED** to `experiment/native-ios-audio` as `e0defada177a723401d3968c29fde99e4ecc827d` on 2026-11-09 at 01:24:22 UTC. Owner now reports **terrific real-iPhone tests and no issues (PASS)**, making Traffic Tap the **eleventh of twelve accepted standalone games (11/12)**. No per-event device logs were supplied; do not invent them. The pending tests below describe the *historical pre-merge test plan*. New [N6m Verse Scramble PR #54](https://github.com/andydoane/biblozoo/pull/54) is OPEN and proposed last game; its Mac/Xcode/iPhone speaker validation remains pending. Stable `ios-prep`, original installed app, Web/PWA/Android, mic and Zoo remain unchanged.
 
 ## Latest verified baseline
 
