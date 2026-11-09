@@ -452,6 +452,7 @@
   }
 
   function createChunkAudioElement() {
+    if (nativeTyperAudio) return null;
     if (chunkAudioEl) return chunkAudioEl;
 
     chunkAudioEl = document.createElement("audio");
@@ -469,6 +470,7 @@
   // Prime HTML media on the actual tap, independent of the spoken verse
   // element. Switching screens must not cancel an in-flight silent prime.
   function primeHtmlAudio() {
+    if (nativeTyperAudio) return Promise.resolve(false);
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
 
@@ -527,6 +529,7 @@
   }
 
   function createAudio() {
+    if (nativeTyperAudio) return;
     if (audioCtx) {
       if (masterGain) masterGain.gain.value = muted ? 0 : WEB_AUDIO_MASTER_VOLUME;
       return;
@@ -542,6 +545,7 @@
   }
 
   async function unlockAudio() {
+    if (nativeTyperAudio) return nativeTyperAudio.isReady();
     createAudio();
     if (!audioCtx || !masterGain) return false;
 
@@ -594,6 +598,7 @@
   }
 
   function getUiPopAudioContext() {
+    if (nativeTyperAudio) return null;
     if (IS_NATIVE_CAPACITOR) {
       createAudio();
       return audioCtx;
@@ -712,6 +717,7 @@
   }
 
   function preloadUiPopSounds() {
+    if (nativeTyperAudio) return;
     const targetCtx =
       IS_NATIVE_CAPACITOR
         ? audioCtx
@@ -736,9 +742,14 @@
 
   function playUiPopSound() {
     if (muted) return;
-
     const index = uiPopFlip ? 1 : 0;
     uiPopFlip = !uiPopFlip;
+    if (nativeTyperAudio) {
+      if (!returnPaused && !document.hidden)
+        nativeTyperAudio.tapUiFromGesture(index ? "uiTap2":"uiTap1",
+          UI_POP_SOUND_VOLUME);
+      return;
+    }
 
     const targetCtx =
       getUiPopAudioContext();
@@ -857,6 +868,7 @@
   }
 
   function playTone({ midi = 60, duration = 0.16, volume = 0.16, type = "triangle" } = {}) {
+    if (nativeTyperAudio) return; // fixed native phrase or note instead
     if (muted) return;
 
     createAudio();
@@ -1040,16 +1052,32 @@
       : chooseMelodyForLength(state.currentItem?.expected?.length || 1);
 
     const midi = melody[state.typedIndex % melody.length] || 60;
-    playTone({ midi, duration: 0.13, volume: CORRECT_LETTER_VOLUME, type: "triangle" });
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused &&
+          !nativeTyperPending && !nativeTyperFailure &&
+          nativeTyperNotes.has(midi))
+        nativeTyperAudio.play("note"+midi,1);
+    } else playTone({ midi, duration: 0.13,
+      volume: CORRECT_LETTER_VOLUME, type: "triangle" });
   }
 
   function playWrongSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("wrong",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 43, duration: 0.13, volume: WRONG_TONE_VOLUME_1, type: "sine" });
     trackedTimeout(() => playTone({ midi: 38, duration: 0.11, volume: WRONG_TONE_VOLUME_2, type: "sine" }), 55, runToken);
   }
 
   function playWordDoneSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("wordDone",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 72, duration: 0.14, volume: WORD_DONE_VOLUME_1, type: "triangle" });
     trackedTimeout(() => playTone({ midi: 76, duration: 0.18, volume: WORD_DONE_VOLUME_2, type: "triangle" }), 70, runToken);
@@ -1886,6 +1914,11 @@
   }
 
   function playPopupSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("popup",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 67, duration: 0.10, volume: POPUP_TONE_VOLUME_1, type: "triangle" });
     trackedTimeout(() => {
@@ -1894,6 +1927,11 @@
   }
 
   function playCocoonOpenSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("cocoon",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 60, duration: 0.10, volume: 0.32, type: "triangle" });
     trackedTimeout(() => playTone({ midi: 64, duration: 0.11, volume: 0.34, type: "triangle" }), 82, runToken);
@@ -1902,6 +1940,11 @@
   }
 
   function playFlapSound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("flap"+(state.butterflyFlaps%3),1);
+      return;
+    }
     const runToken = state.runToken;
     const base = 76 + (state.butterflyFlaps % 3) * 2;
     playTone({ midi: base, duration: 0.09, volume: 0.28, type: "triangle" });
@@ -1909,6 +1952,11 @@
   }
 
   function playButterflyFlyAwaySound() {
+    if (nativeTyperAudio) {
+      if (!muted && !returnPaused && !state.paused && !nativeTyperPending)
+        nativeTyperAudio.play("flyAway",1);
+      return;
+    }
     const runToken = state.runToken;
     playTone({ midi: 72, duration: 0.08, volume: 0.28, type: "triangle" });
     trackedTimeout(() => playTone({ midi: 76, duration: 0.08, volume: 0.30, type: "triangle" }), 70, runToken);
