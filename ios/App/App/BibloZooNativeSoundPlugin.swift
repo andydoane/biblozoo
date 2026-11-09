@@ -18,6 +18,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         CAPPluginMethod(name: "preload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        // N6o: cut only the bounded Scripture Scrub mower clip at the
+        // end of its 1250ms visual pass; keep other PCM clips prepared.
+        CAPPluginMethod(name: "stopEffect", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "activateFromGesture", returnType: CAPPluginReturnPromise),
         // Read-only, bounded native session history; never activates audio.
         CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise),
@@ -253,6 +256,50 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "typer-flap2",
         "typer-fly-away"
     ]
+    // N6o: Scripture Scrub original packaged effects; unused peel.mp3 is
+    // intentionally excluded because the game never references it.
+    private let scrubSoundResources: [String: String] = [
+        "scrub-bite1": "scripture_scrub_bite_1",
+        "scrub-bite2": "scripture_scrub_bite_2",
+        "scrub-bite3": "scripture_scrub_bite_3",
+        "scrub-chalk": "scripture_scrub_chalk",
+        "scrub-complete": "scripture_scrub_complete",
+        "scrub-dig": "scripture_scrub_dig",
+        "scrub-glow": "scripture_scrub_glow",
+        "scrub-leaves": "scripture_scrub_leaves",
+        "scrub-mower": "scripture_scrub_mower",
+        "scrub-pop1": "scripture_scrub_pop_1",
+        "scrub-pop2": "scripture_scrub_pop_2",
+        "scrub-pop3": "scripture_scrub_pop_3",
+        "scrub-pop4": "scripture_scrub_pop_4",
+        "scrub-pop5": "scripture_scrub_pop_5",
+        "scrub-rainbow": "scripture_scrub_rainbow",
+        "scrub-splat": "scripture_scrub_splat",
+        "scrub-squeak": "scripture_scrub_squeak",
+        "scrub-popup": "scripture_scrub_popup"
+    ]
+    // The original 2%-increment melody repeats seven source frequencies.
+    // These are seven fixed (not 49 arbitrary) 75ms PCM tones plus the
+    // four-note completion fanfare.
+    private let scrubProgressFrequencies: [String: Double] = [
+        "scrub-progress-g3": 196,
+        "scrub-progress-c4": 261.63,
+        "scrub-progress-d4": 293.66,
+        "scrub-progress-e4": 329.63,
+        "scrub-progress-f4": 349.23,
+        "scrub-progress-g4": 392,
+        "scrub-progress-a4": 440
+    ]
+    private let scrubToneIDs: Set<String> = [
+        "scrub-progress-g3",
+        "scrub-progress-c4",
+        "scrub-progress-d4",
+        "scrub-progress-e4",
+        "scrub-progress-f4",
+        "scrub-progress-g4",
+        "scrub-progress-a4",
+        "scrub-completion-arpeggio"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -378,7 +425,33 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "typer-flap0",
         "typer-flap1",
         "typer-flap2",
-        "typer-fly-away"
+        "typer-fly-away",
+        "scrub-bite1",
+        "scrub-bite2",
+        "scrub-bite3",
+        "scrub-chalk",
+        "scrub-complete",
+        "scrub-dig",
+        "scrub-glow",
+        "scrub-leaves",
+        "scrub-mower",
+        "scrub-pop1",
+        "scrub-pop2",
+        "scrub-pop3",
+        "scrub-pop4",
+        "scrub-pop5",
+        "scrub-rainbow",
+        "scrub-splat",
+        "scrub-squeak",
+        "scrub-popup",
+        "scrub-progress-g3",
+        "scrub-progress-c4",
+        "scrub-progress-d4",
+        "scrub-progress-e4",
+        "scrub-progress-f4",
+        "scrub-progress-g4",
+        "scrub-progress-a4",
+        "scrub-completion-arpeggio"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1624,6 +1697,123 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+
+    // N6o: fixed original Scripture Scrub notes at 2% coverage steps.
+    // AudioContext sine tones were 75ms with ~12ms exponential attack,
+    // volume 1.00; the completion fanfare is G4/C5/E5/G5 at 95ms gaps.
+    // No new AVAudioSession, JS-supplied frequency, hot oscillator or Web
+    // fallback. All work happens on existing playbackQueue during preflight.
+    private func prepareScrubToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard scrubToneIDs.contains(soundId) else {
+            return (false,0,"invalid-scrub-tone")
+        }
+        if let buffer = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true,Int(Double(buffer.frameLength) /
+                buffer.format.sampleRate * 1000),"prepared")
+        }
+        let notes: [(Double, Double, Double, Double)]
+        if let hz = scrubProgressFrequencies[soundId] {
+            notes = [(0, 0.075, hz, 1.0)]
+        } else if soundId == "scrub-completion-arpeggio" {
+            notes = [(0,0.13,392.00,0.98),
+                     (0.095,0.13,523.25,0.98),
+                     (0.190,0.13,659.25,0.98),
+                     (0.285,0.13,783.99,0.98)]
+        } else { return (false,0,"invalid-scrub-fanfare") }
+        guard let format=AVAudioFormat(
+            standardFormatWithSampleRate:44_100,channels:1) else {
+            return (false,0,"scrub-tone-format-failed")
+        }
+        let duration=notes.reduce(0.0) {max($0,$1.0+$1.1+0.025)}
+        let frames=AVAudioFrameCount(ceil(format.sampleRate*duration))
+        guard let buffer=AVAudioPCMBuffer(
+            pcmFormat:format,frameCapacity:frames),
+            let channel=buffer.floatChannelData?[0] else {
+            return (false,0,"scrub-tone-allocation-failed")
+        }
+        buffer.frameLength=frames
+        for i in 0..<Int(frames) {
+            let time=Double(i)/format.sampleRate
+            var sum=0.0
+            for note in notes {
+                let (delay,length,hz,volume)=note
+                let t=time-delay
+                if t<0 || t>=length {continue}
+                let peak=max(0.0001,volume)
+                let env=t<0.012
+                    ? 0.0001*pow(peak/0.0001,t/0.012)
+                    : peak*pow(0.0001/peak,
+                        (t-0.012)/max(0.001,length-0.012))
+                sum+=sin(2.0*Double.pi*hz*t)*env
+            }
+            channel[i]=Float(max(-0.95,min(0.95,sum)))
+        }
+        do {
+            let engine=effectsEngine ?? AVAudioEngine()
+            var nodes:[AVAudioPlayerNode]=[]
+            for _ in 0..<sampleVoiceLimit {
+                let node=AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node,to:engine.mainMixerNode,format:format)
+                nodes.append(node)
+            }
+            if !engine.isRunning {try engine.start()}
+            for node in nodes {
+                node.prepare(withFrameCount:frames)
+                node.play()
+            }
+            effectsEngine=engine
+            effectNodes[soundId]=nodes
+            nextEffectVoice[soundId]=0
+            effectBuffers[soundId]=buffer
+            return (true,Int(duration*1000),"prepared")
+        }catch{
+            discardEffectsOnWorker()
+            return (false,0,"scrub-tone-engine-failed")
+        }
+    }
+
+    // Source mower uses looped MP3 for an animation lasting 1250ms, with
+    // 120ms fade-in and 35%-duration fade-out. Prebuild that exact bounded
+    // loop/fade from the original packaged MP3; no loop decoder on hot tap.
+    // The optional stopEffect cuts any remainder when animation ends.
+    private func prepareScrubMowerOnWorker(soundId:String,url:URL)
+        -> (prepared:Bool,durationMs:Int,reason:String) {
+        let original=preparePCMEffectOnWorker(soundId:soundId,url:url)
+        guard original.prepared,let source=effectBuffers[soundId],
+              source.frameLength>0,
+              let input=source.floatChannelData else {return original}
+        let format=source.format
+        let duration=1.25
+        let frameCount=AVAudioFrameCount(ceil(format.sampleRate*duration))
+        guard let loop=AVAudioPCMBuffer(
+            pcmFormat:format,frameCapacity:frameCount),
+              let output=loop.floatChannelData else {
+            return (false,0,"scrub-mower-loop-allocation-failed")
+        }
+        loop.frameLength=frameCount
+        let channelCount=Int(format.channelCount)
+        let sourceFrames=Int(source.frameLength)
+        for frame in 0..<Int(frameCount) {
+            let t=Double(frame)/format.sampleRate
+            let volumeEnvelope:Double
+            if t<0.12 {volumeEnvelope=max(0.0001,t/0.12)}
+            else if t<duration*0.65 {volumeEnvelope=1.0}
+            else {volumeEnvelope=max(0.0001,
+                (duration-t)/(duration*0.35))}
+            for channel in 0..<channelCount {
+                output[channel][frame]=input[channel][frame % sourceFrames] *
+                    Float(volumeEnvelope)
+            }
+        }
+        effectBuffers[soundId]=loop
+        return (true,1250,"prepared")
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -1900,6 +2090,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               trafficTapToneIDs.contains(soundId) ||
               scrambleToneIDs.contains(soundId) ||
               typerToneIDs.contains(soundId) ||
+              scrubSoundResources[soundId] != nil ||
+              scrubToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1993,9 +2185,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                self.verseLaunchToneIDs.contains(soundId) ||
                self.trafficTapToneIDs.contains(soundId) ||
                self.scrambleToneIDs.contains(soundId) ||
-               self.typerToneIDs.contains(soundId) {
+               self.typerToneIDs.contains(soundId) ||
+               self.scrubToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
+            } else if let resourceName = self.scrubSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_playground/scripture_scrub/scripture_scrub_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
             } else if let resourceName = self.snakeSoundResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
@@ -2114,7 +2315,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.typerToneIDs.contains(soundId) {
+                if self.scrubToneIDs.contains(soundId) {
+                    let result = self.prepareScrubToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-scrub-tone"
+                } else if self.typerToneIDs.contains(soundId) {
                     let result = self.prepareTyperToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
@@ -2164,8 +2371,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     backend = "avengine-melody"
                 } else if self.pcmEffectIDs.contains(soundId), let url = url {
                     // MP3 decoding ONLY happens during explicit preflight.
-                    let result = self.preparePCMEffectOnWorker(
-                        soundId: soundId, url: url)
+                    // N6o mower: loop predecoded original clip to one 1.25s
+                    // bounded pre-ramped PCM pass (no hot decoder/loop).
+                    let result = soundId == "scrub-mower"
+                        ? self.prepareScrubMowerOnWorker(soundId:soundId,url:url)
+                        : self.preparePCMEffectOnWorker(soundId:soundId,url:url)
                     prepared = result.prepared
                     durationMs = result.durationMs
                     failed = result.reason
@@ -2406,6 +2616,42 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+
+
+    // N6o only: cancel the mower's 1250ms sound when a visual sweep ends
+    // without discarding the entire 28-ID warm PCM bank (other sounds stay
+    // playable). This never activates/deactivates AVAudioSession.
+    @objc func stopEffect(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self=self,
+                  let soundId=call.getString("soundId"),
+                  soundId == "scrub-mower" else {
+                call.resolve(["stopped":false,"reason":"invalid-sound-id"])
+                return
+            }
+            let epoch=self.playbackEpochSnapshot()
+            self.playbackQueue.async { [weak self] in
+                guard let self=self,self.isCurrentPlaybackEpoch(epoch) else {
+                    DispatchQueue.main.async {
+                        call.resolve(["stopped":false,"reason":"stale"])
+                    }
+                    return
+                }
+                if let nodes=self.effectNodes[soundId],
+                    let buffer=self.effectBuffers[soundId],
+                    let engine=self.effectsEngine,engine.isRunning {
+                    for node in nodes {
+                        node.stop()
+                        node.prepare(withFrameCount:buffer.frameLength)
+                        node.play()
+                    }
+                }
+                DispatchQueue.main.async {
+                    call.resolve(["stopped":true,"reason":"stopped"])
+                }
+            }
+        }
+    }
 
     @objc func stop(_ call: CAPPluginCall) {
         onMain { [weak self] in
