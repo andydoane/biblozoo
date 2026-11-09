@@ -560,9 +560,40 @@
 
   prepareNextStreakPet();
 
+  if (nativeTowerAudio) {
+    nativeTowerAudio.configure({
+      onAppInactive: () => {
+        // A held iOS App Switcher can leave the WebView visibly mounted.
+        // Cancel any async start and freeze the SAME run and virtual clock.
+        if (nativeTowerPending) stopNativeTowerRound();
+        if (!state.running || state.done) return;
+        if (!towerWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Never request AVAudioSession activation during foreground.
+        towerWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden ||
+            !state.running || state.done ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeTowerRetry = {kind:"resume",mode:null};
+        showNativeTowerFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeTowerPending) stopNativeTowerRound();
+    });
+  }
+
   renderIntro();
 
   function renderIntro() {
+    if (nativeTowerPending) stopNativeTowerRound();
+    clearNativeTowerFailure();
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -576,17 +607,21 @@
       backLabel: "Back to Practice Games",
       onBack: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        unlockAudio();
+        if (!nativeTowerAudio) unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeTowerTitleHelpPops();
   }
 
   function renderModeSelect() {
+    if (nativeTowerPending) stopNativeTowerRound();
+    clearNativeTowerFailure();
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -598,18 +633,32 @@
       theme: GAME_THEME,
       backLabel: "Back to Tower of Bible title",
       onBack: () => {
+        if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeTowerAudio) {
+          if (nativeTowerPending) return;
+          primeNativeTowerFromGesture("round",mode,
+            muted ? null : nextNativeTowerUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeTowerTitleHelpPops();
   }
 
   function startGame(mode) {
+    if (nativeTowerAudio && !muted && !nativeTowerAudio.isReady()) {
+      nativeTowerRetry = {kind:"round",mode};
+      showNativeTowerFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
+    clearNativeTowerFailure();
     selectedMode = mode;
     window.VerseGameShell.resetGameSpeed();
     completionMarked = false;
@@ -730,16 +779,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeTowerAudio) unlockAudio();
+        if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         renderModeSelect();
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
