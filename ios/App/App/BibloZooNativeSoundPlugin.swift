@@ -230,6 +230,29 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "scramble-bonus-iwin",
         "scramble-bonus-final"
     ]
+    // N6n: Verse Typer, first Playground migration. Nine source-selected
+    // correct MIDI notes (including the Mega pillar's MIDI 55), and eight
+    // fixed generated effect recipes. No dynamic caller pitches or paths.
+    private let typerNoteMIDIs: Set<Int> = [55, 60, 62, 64, 65, 67, 69, 71, 72]
+    private let typerToneIDs: Set<String> = [
+        "typer-note-55",
+        "typer-note-60",
+        "typer-note-62",
+        "typer-note-64",
+        "typer-note-65",
+        "typer-note-67",
+        "typer-note-69",
+        "typer-note-71",
+        "typer-note-72",
+        "typer-wrong",
+        "typer-word-done",
+        "typer-popup",
+        "typer-cocoon",
+        "typer-flap0",
+        "typer-flap1",
+        "typer-flap2",
+        "typer-fly-away"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -338,7 +361,24 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "scramble-bonus-start",
         "scramble-bonus-you-win",
         "scramble-bonus-iwin",
-        "scramble-bonus-final"
+        "scramble-bonus-final",
+        "typer-note-55",
+        "typer-note-60",
+        "typer-note-62",
+        "typer-note-64",
+        "typer-note-65",
+        "typer-note-67",
+        "typer-note-69",
+        "typer-note-71",
+        "typer-note-72",
+        "typer-wrong",
+        "typer-word-done",
+        "typer-popup",
+        "typer-cocoon",
+        "typer-flap0",
+        "typer-flap1",
+        "typer-flap2",
+        "typer-fly-away"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1476,6 +1516,114 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+    // N6n: original Typer Web Audio oscillator shapes/gains rendered
+    // only during real gesture preflight, not in hot typing callbacks.
+    // Tuple: delay, duration, MIDI pitch, source volume, sine vs triangle.
+    private func prepareTyperToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard typerToneIDs.contains(soundId) else {
+            return (false, 0, "invalid-typer-tone")
+        }
+        if let b = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, Int(Double(b.frameLength) / b.format.sampleRate * 1000), "prepared")
+        }
+        var notes: [(Double, Double, Int, Double, Bool)] = []
+        if soundId.hasPrefix("typer-note-") {
+            guard let midi = Int(soundId.dropFirst("typer-note-".count)),
+                  typerNoteMIDIs.contains(midi) else {
+                return (false, 0, "invalid-typer-midi")
+            }
+            notes = [(0, 0.13, midi, 0.48, false)]
+        } else {
+            switch soundId {
+            case "typer-wrong":
+                notes = [(0, 0.13, 43, 0.40, true),
+                         (0.055, 0.11, 38, 0.30, true)]
+            case "typer-word-done":
+                notes = [(0, 0.14, 72, 0.38, false),
+                         (0.07, 0.18, 76, 0.34, false)]
+            case "typer-popup":
+                notes = [(0, 0.10, 67, 0.26, false),
+                         (0.058, 0.13, 72, 0.22, false)]
+            case "typer-cocoon":
+                notes = [(0, 0.10, 60, 0.32, false),
+                         (0.082, 0.11, 64, 0.34, false),
+                         (0.164, 0.12, 67, 0.36, false),
+                         (0.248, 0.18, 72, 0.40, false)]
+            case "typer-flap0", "typer-flap1", "typer-flap2":
+                let suffix = Int(String(soundId.suffix(1))) ?? 0
+                let base = 76 + (suffix % 3) * 2
+                notes = [(0, 0.09, base, 0.28, false),
+                         (0.052, 0.11, base + 7, 0.24, false)]
+            case "typer-fly-away":
+                notes = [(0, 0.08, 72, 0.28, false),
+                         (0.07, 0.08, 76, 0.30, false),
+                         (0.14, 0.10, 79, 0.32, false),
+                         (0.22, 0.18, 84, 0.34, false)]
+            default:
+                return (false, 0, "invalid-typer-recipe")
+            }
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "typer-tone-format-failed")
+        }
+        let duration = notes.reduce(0.0) { max($0, $1.0 + $1.1 + 0.04) }
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * duration))
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames),
+              let samples = buffer.floatChannelData?[0] else {
+            return (false, 0, "typer-tone-allocation-failed")
+        }
+        buffer.frameLength = frames
+        for i in 0..<Int(frames) {
+            let t = Double(i) / format.sampleRate
+            var mixed = 0.0
+            for note in notes {
+                let (offset, length, midi, gain, sine) = note
+                let elapsed = t - offset
+                if elapsed < 0 || elapsed >= length { continue }
+                let hz = 440.0 * pow(2.0, Double(midi - 69) / 12.0)
+                let phase = hz * elapsed
+                let cycle = phase - floor(phase)
+                let wave = sine ? sin(2.0 * Double.pi * phase) :
+                    (1.0 - 4.0 * abs(cycle - 0.5))
+                let peak = max(0.001, gain * 0.85) // original Web master
+                let envelope = elapsed < 0.012 ?
+                    0.0001 * pow(peak / 0.0001, elapsed / 0.012) :
+                    peak * pow(0.0001 / peak,
+                        (elapsed - 0.012) / max(0.001, length - 0.012))
+                mixed += wave * envelope
+            }
+            samples[i] = Float(max(-0.95, min(0.95, mixed)))
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<sampleVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // no samples until a real game event
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            effectBuffers[soundId] = buffer
+            return (true, Int(duration * 1000), "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "typer-tone-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -1751,6 +1899,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               trafficTapSoundResources[soundId] != nil ||
               trafficTapToneIDs.contains(soundId) ||
               scrambleToneIDs.contains(soundId) ||
+              typerToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1843,7 +1992,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                self.towerWordToneIDs.contains(soundId) ||
                self.verseLaunchToneIDs.contains(soundId) ||
                self.trafficTapToneIDs.contains(soundId) ||
-               self.scrambleToneIDs.contains(soundId) {
+               self.scrambleToneIDs.contains(soundId) ||
+               self.typerToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.snakeSoundResources[soundId] {
@@ -1964,7 +2114,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.scrambleToneIDs.contains(soundId) {
+                if self.typerToneIDs.contains(soundId) {
+                    let result = self.prepareTyperToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-typer-tone"
+                } else if self.scrambleToneIDs.contains(soundId) {
                     let result = self.prepareScrambleToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
