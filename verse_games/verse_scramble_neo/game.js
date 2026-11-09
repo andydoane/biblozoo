@@ -1719,7 +1719,9 @@
   }
 
   function setScreen(screen){
-    if (nativeScrambleAudio && screen!=="game") {
+    if (nativeScrambleAudio && screen!=="game" &&
+        (state.screen==="game" || nativeScramblePending ||
+         nativeScrambleFailure || nativeScrambleAudio.isReady())) {
       stopNativeScrambleRound();
       clearNativeScrambleFailure();
       finishNativeScrambleFreeze();
@@ -2191,8 +2193,9 @@
   }
 
   function handleBonusTileTap(btn) {
-    if (returnPaused) return;
-    unlockAudio();
+    if (returnPaused || nativeScramblePending ||
+        nativeScrambleFrozen || nativeScrambleFailure) return;
+    if (!nativeScrambleAudio) unlockAudio();
 
     if (returnPaused || state.busy || state.menuOpen || state.helpOpen || state.bonusStage !== "round") return;
 
@@ -2582,15 +2585,11 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        unlockAudio();
-
-        const wasMuted = muted;
-        muted = !muted;
-
-        if (wasMuted) {
-          playUiTapSound(true);
-        }
-
+        if (!nativeScrambleAudio) unlockAudio();
+        const wasMuted=muted;
+        muted=!muted;
+        if (nativeScrambleAudio && muted) void nativeScrambleAudio.stop();
+        if (wasMuted) playUiTapSound(true);
         return muted;
       },
       onHowToPlay: () => {
@@ -2608,26 +2607,44 @@
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeScrambleAudio) stopNativeScrambleRound();
+        state.menuOpen=false;
+        state.helpOpen=false;
+        state.helpBackMode=false;
+        finishNativeScrambleFreeze();
         playUiTapSound();
-        state.menuOpen = false;
-        state.helpOpen = false;
-        state.helpBackMode = false;
         setScreen("mode");
       },
       onExit: () => {
+        if (nativeScrambleAudio) stopNativeScrambleRound();
+        finishNativeScrambleFreeze();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        if (state.busy) return;
+        if (state.busy || returnPaused || nativeScramblePending ||
+            nativeScrambleFailure || (nativeScrambleAudio && state.menuOpen))
+          return false;
+        state.menuOpen=true;
+        state.helpOpen=false;
+        state.helpBackMode=false;
+        if (nativeScrambleAudio) {
+          beginNativeScrambleFreeze();
+          void nativeScrambleAudio.stop();
+        }
         playUiTapSound();
-        state.menuOpen = true;
-        state.helpOpen = false;
-        state.helpBackMode = false;
+        return true;
       },
       onClose: () => {
-        playUiTapSound();
-        state.menuOpen = false;
+        if (returnPaused || nativeScramblePending) return;
+        state.menuOpen=false;
+        if (nativeScrambleAudio && !muted) {
+          primeNativeScrambleFromGesture("resume",null,
+            nextNativeScrambleUiKey());
+        } else {
+          playUiTapSound();
+          finishNativeScrambleFreeze();
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -3035,8 +3052,9 @@
   }
 
   async function handleTileTap(btn){
-    if (returnPaused) return;
-    unlockAudio();
+    if (returnPaused || nativeScramblePending ||
+        nativeScrambleFrozen || nativeScrambleFailure) return;
+    if (!nativeScrambleAudio) unlockAudio();
 
     if (state.bonusActive){
       handleBonusTileTap(btn);
