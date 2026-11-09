@@ -2086,6 +2086,7 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeLaunchAudio && muted) void nativeLaunchAudio.stop();
         if (!muted) playUiTapSound();
         return muted;
       },
@@ -2105,6 +2106,7 @@
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         state.menuOpen = false;
         state.helpOpen = false;
@@ -2114,22 +2116,26 @@
         setScreen("mode");
       },
       onExit: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
         if (!canOpenGameMenu()) return false;
 
-        playUiTapSound();
         state.menuOpen = true;
+        if (nativeLaunchAudio) void nativeLaunchAudio.stop();
+        playUiTapSound();
         state.helpOpen = false;
         state.helpBackMode = false;
         stopConveyorLoop();
         syncGameClockPause();
       },
       onClose: () => {
-        playUiTapSound();
         state.menuOpen = false;
+        if (nativeLaunchAudio && !muted) {
+          primeNativeLaunchFromGesture("resume",null,nextNativeLaunchUiKey());
+        } else playUiTapSound();
         syncGameClockPause();
         startConveyorLoop();
       },
@@ -2154,8 +2160,9 @@
           return false;
         }
 
-        playUiTapSound();
         state.speedMenuOpen = true;
+        if (nativeLaunchAudio) void nativeLaunchAudio.stop();
+        playUiTapSound();
         stopConveyorLoop();
         syncGameClockPause();
 
@@ -2163,8 +2170,10 @@
       },
 
       onClose: () => {
-        playUiTapSound();
         state.speedMenuOpen = false;
+        if (nativeLaunchAudio && !muted) {
+          primeNativeLaunchFromGesture("resume",null,nextNativeLaunchUiKey());
+        } else playUiTapSound();
         syncGameClockPause();
         startConveyorLoop();
       }
@@ -2181,6 +2190,7 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeLaunchAudio && muted) void nativeLaunchAudio.stop();
         if (!muted) playUiTapSound();
         return muted;
       },
@@ -2201,6 +2211,7 @@
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         state.menuOpen = false;
         state.helpOpen = false;
@@ -2212,6 +2223,7 @@
         setScreen("mode");
       },
       onExit: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         stopAstroLoop();
         window.VerseGameBridge.exitGame();
@@ -2219,16 +2231,19 @@
       onOpen: () => {
         if (!canOpenGameMenu()) return false;
 
-        playUiTapSound();
         state.menuOpen = true;
+        if (nativeLaunchAudio) void nativeLaunchAudio.stop();
+        playUiTapSound();
         state.helpOpen = false;
         state.helpBackMode = false;
         state.astroMoveDir = 0;
         syncGameClockPause();
       },
       onClose: () => {
-        playUiTapSound();
         state.menuOpen = false;
+        if (nativeLaunchAudio && !muted) {
+          primeNativeLaunchFromGesture("resume",null,nextNativeLaunchUiKey());
+        } else playUiTapSound();
         state.astroMoveDir = 0;
         syncGameClockPause();
       },
