@@ -3941,6 +3941,7 @@
   function pauseForTaskSwitch() {
     returnSession += 1;
     if (returnPaused) return;
+    if (nativeTowerAudio) stopNativeTowerRound();
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
@@ -3956,7 +3957,8 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeTowerAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       const old = audioCtx;
       audioCtx = null;
@@ -3966,13 +3968,21 @@
       audioBufferPromises.clear();
       try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Only this REAL Let's go tap may reclaim native priority from PiP.
+    // UIKit foreground and interruption notifications only pause/show UI.
+    const restore = nativeTowerAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeTowerAudio.prepareFromGesture().then(result =>
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      if (ok?.deferred === true) return ok; // Higher-priority OS audio: retriable.
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
         return false;
@@ -3989,14 +3999,20 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  towerWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeTowerAudio,
+    suppressUiSound: !!nativeTowerAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeTowerAudio) stopNativeTowerRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
