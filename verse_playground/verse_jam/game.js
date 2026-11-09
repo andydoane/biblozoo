@@ -2032,7 +2032,10 @@
       // Verse word buttons already have musical gameplay sounds.
       if (
         button.classList.contains("versejam-word-btn") ||
-        button.id === "versejamCueButton"
+        button.id === "versejamCueButton" ||
+        // A UI-only pointerdown during a speed-select prewarm would
+        // invalidate the game bank before the same Got It click consumes it.
+        (nativeJamAudio && button.id === "verseJamHeadphonesGotIt")
       ) {
         return;
       }
@@ -2755,8 +2758,9 @@
     await startNextPlayableGroup(flowId);
   }
 
-  function stopRun({ keepNativeReady = false } = {}) {
+  function stopRun({ keepNativeReady = false, preserveNativeFinale = false } = {}) {
     if (nativeJamAudio && !keepNativeReady) {
+      nativeJamHeadsUpPrewarm = null;
       void nativeJamAudio.stop();
       nativeJamAwaitingStart = false;
       clearNativeJamFailure();
@@ -2767,7 +2771,15 @@
     beginGameplayFlow();
     stopGameplayWatchdog();
     clearSleeps();
-    stopMusic();
+    // Preserve jam-note AVAudioPlayerNodes during the final arpeggio.
+    // A full jam-group stop re-prepared all twelve note voices, clipping
+    // the first melody notes during the "Great!" transition.
+    if (nativeJamAudio && preserveNativeFinale) {
+      stopMusic({ stopAudio: false });
+      nativeJamAudio.stopGrooveForFinale();
+    } else {
+      stopMusic();
+    }
     state.acceptingInput = false;
     state.busy = false;
     state.paused = false;
@@ -2798,11 +2810,27 @@
 
     const flowId = beginGameplayFlow();
 
-    // IMPORTANT for iPhone/Safari:
-    // Unlock audio immediately from the user's mode-button tap,
-    // before any awaited fetch or other async work.
-    const audioOk = nativeAlreadyReady && nativeJamAudio
-      ? nativeJamAudio.isReady() : await ensureAudio();
+    // The speed-selection gesture starts pre-rendering the full native bank
+    // WHILE the child reads Heads Up. Got It consumes that same preflight,
+    // instead of throwing away the PCM bank and rendering it a second time.
+    // A failed/invalidated prewarm may be retried from this real Got It click.
+    const headStart = nativeJamHeadsUpPrewarm;
+    nativeJamHeadsUpPrewarm = null;
+    let audioRequest;
+    if (nativeAlreadyReady && nativeJamAudio) {
+      audioRequest = nativeJamAudio.isReady();
+    } else if (nativeJamAudio && headStart?.settled &&
+               headStart.result?.ready === true) {
+      audioRequest = nativeJamAudio.isReady();
+    } else if (nativeJamAudio && headStart && !headStart.settled) {
+      audioRequest = headStart.promise.then(result =>
+        result?.ready === true && nativeJamAudio.isReady());
+    } else {
+      // Execute ensureAudio synchronously inside the real Got It click if
+      // speed prewarm did not succeed. No timer/foreground auto activation.
+      audioRequest = ensureAudio();
+    }
+    const audioOk = await audioRequest;
     if (nativeJamAudio && !audioOk) {
       if (document.hidden) return;
       if (NATIVE_TEMPORARY.has(nativeJamAudio.lastError())) {
@@ -3639,7 +3667,7 @@
   function playCompletionArpeggio() {
     if (!audioCtx || muted) return;
 
-    const now = audioCtx.currentTime + 0.03;
+    const now = audioCtx.currentTime + (nativeJamAudio ? 0.12 : 0.03);
 
     // Celebratory C-major arpeggio after the drum beat stops.
     [
@@ -3707,10 +3735,13 @@
       );
     }
 
-    stopRun({ keepNativeReady: !!nativeJamAudio });
+    stopRun({ keepNativeReady: !!nativeJamAudio,
+      preserveNativeFinale: !!nativeJamAudio });
     playCompletionArpeggio(); // tail remains warmed until End screen exit
 
-    await sleep(900);
+    // The native ending screen can render while the short musical tail rings
+    // on its own hot note pool; don't force a blank 900ms wait after "Great!".
+    await sleep(nativeJamAudio ? 260 : 900);
 
     // Do not call setScreen("end") here; setScreen would call stopRun()
     // again and can cut off the arpeggio. Render the end screen directly.
@@ -4027,6 +4058,22 @@
         if (!nativeJamAudio) {
           primeHtmlAudio();
           unlockAudioFromGesture();
+        } else {
+          // Mode selection IS an explicit gesture, unlike a foreground
+          // event. Start the expensive native PCM render here and keep its
+          // promise alive across the immediately displayed Heads Up screen.
+          const warm = { promise: null, settled: false, result: null };
+          nativeJamHeadsUpPrewarm = warm;
+          const activation = nativeJamAudio.prepareFromGesture();
+          warm.promise = Promise.resolve(activation).then(result => {
+            warm.result = result;
+            warm.settled = true;
+            return result;
+          }).catch(() => {
+            warm.result = {ready:false,reason:"prewarm-error"};
+            warm.settled = true;
+            return warm.result;
+          });
         }
         selectedMode = mode;
         setScreen("headphones");
@@ -4121,7 +4168,12 @@
 
   function setScreen(screen) {
     state.screen = screen;
-    if (screen !== "game") stopRun();
+    if (screen !== "game") {
+      // Heads Up is instructional reading time, not a reason to destroy
+      // the active native PCM bank requested by Choose Your Speed.
+      stopRun({ keepNativeReady: !!(nativeJamAudio &&
+        screen === "headphones" && nativeJamHeadsUpPrewarm) });
+    }
     render();
   }
 
