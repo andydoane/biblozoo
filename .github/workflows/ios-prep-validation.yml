@@ -97,6 +97,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_ui_audio_n5a.js
 
+      - name: Validate N6o Playground Scripture Scrub 28 native PCM, 2-percent melody, mower and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_playground_scripture_scrub_n6o.js
+
       - name: Validate N6n Playground Verse Typer native PCM, chunk narrator and PiP
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_playground_verse_typer_n6n.js

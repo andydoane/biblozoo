@@ -433,6 +433,157 @@
   let mowerSoundGain = null;
   let mowerSoundGeneration = 0;
 
+  // N6o: Scripture Scrub native-only iOS bank. All 18 source MP3 effects,
+  // seven exact progress pitches, four-note fanfare and two shared UI pops
+  // are prewarmed on the sole serial Swift .soloAmbient PCM engine.
+  // Web/PWA/Android continue the old Web Audio implementation below.
+  const nativeScrubAudio=window.BibloZooNativeScriptureScrubAudio?.isAvailable?.()
+    ? window.BibloZooNativeScriptureScrubAudio : null;
+  const NATIVE_SCRUB_PROGRESS=Object.freeze({
+    "196":"progressG3", "261.63":"progressC4",
+    "293.66":"progressD4", "329.63":"progressE4",
+    "349.23":"progressF4", "392":"progressG4",
+    "440":"progressA4"
+  });
+  let nativeScrubGeneration=0;
+  let nativeScrubPending=false,nativeScrubFailure=false;
+  let nativeScrubRetry={kind:"start"};
+  function scrubUiKey(){
+    const next=lastUiTapSound==="uiTap1"?"uiTap2":"uiTap1";
+    lastUiTapSound=next;
+    return next;
+  }
+  function scrubStoppedOrPaused(){
+    return welcomePaused || nativeScrubPending || nativeScrubFailure ||
+      menuOpen || document.hidden;
+  }
+  function clearNativeScrubFailure(){
+    nativeScrubFailure=false;
+    document.getElementById("scrubNativeAudioFailure")?.remove();
+  }
+  function stopNativeScrubRun(){
+    if(!nativeScrubAudio)return;
+    nativeScrubGeneration++;
+    nativeScrubPending=false;
+    app.removeAttribute("aria-busy");
+    stopMowerSound();
+    void nativeScrubAudio.stop();
+  }
+  function showNativeScrubFailure(message){
+    if(!nativeScrubAudio)return;
+    nativeScrubFailure=true;
+    // Preserve current run/round/coverage, never award a silent completion.
+    if(document.getElementById("scrubGame"))pauseScrubForReturn();
+    let dialog=document.getElementById("scrubNativeAudioFailure");
+    if(!dialog){
+      dialog=document.createElement("div");
+      dialog.id="scrubNativeAudioFailure";
+      dialog.className="scrub-native-audio-failure";
+      dialog.innerHTML=`<section class="scrub-native-audio-card"
+        role="dialog" aria-modal="true" aria-label="Scripture Scrub sound problem">
+        <h2>Scripture Scrub</h2><p role="status" data-scrub-audio-status></p>
+        <button type="button" data-scrub-audio-retry>Try Again</button>
+        <button type="button" data-scrub-audio-back>Back</button>
+      </section>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector("[data-scrub-audio-retry]").onclick=()=>
+        primeNativeScrubFromGesture(nativeScrubRetry.kind);
+      dialog.querySelector("[data-scrub-audio-back]").onclick=()=>{
+        clearNativeScrubFailure();
+        stopNativeScrubRun();
+        window.VerseGameBridge.exitGame();
+      };
+    }
+    dialog.querySelector("[data-scrub-audio-status]").textContent=message;
+  }
+  function resumeScrubNative(){
+    // This resumes the ORIGINAL round, mowing frame, coverage and virtual
+    // clock only after the fresh real-gesture full bank is confirmed ready.
+    clearNativeScrubFailure();
+    menuOpen=false;
+    document.getElementById("scrubGame")?.classList.remove("scrub-is-paused");
+    continueScrubAfterReturn();
+  }
+  function primeNativeScrubFromGesture(kind="start",uiKey=null){
+    if(!nativeScrubAudio || nativeScrubPending || document.hidden ||
+       (welcomePaused && !["resume","retry","next","finish"].includes(kind)))return;
+    nativeScrubRetry={kind};
+    clearNativeScrubFailure();
+    if(muted){
+      if(kind==="start")beginScrubRun();
+      else if(kind==="next")advanceScrubRound();
+      else if(kind==="finish"){stopNativeScrubRun();renderEndScreen();}
+      else resumeScrubNative();
+      return;
+    }
+    const token=++nativeScrubGeneration;
+    nativeScrubPending=true;
+    if(kind!=="start")pauseScrubForReturn();
+    app.setAttribute("aria-busy","true");
+    // REAL gesture ownership: Swift activateFromGesture is called
+    // synchronously before any promise, timer or await.
+    const prep=nativeScrubAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if(token!==nativeScrubGeneration || document.hidden)return;
+      nativeScrubPending=false;
+      app.removeAttribute("aria-busy");
+      if(result?.ready===true){
+        clearNativeScrubFailure();
+        if(kind==="start")beginScrubRun();
+        else if(kind==="next")advanceScrubRound();
+        else if(kind==="finish"){stopNativeScrubRun();renderEndScreen();}
+        else resumeScrubNative();
+        return;
+      }
+      if(["activation-os-rejected","other-audio-playing",
+          "interruption-pending","not-foreground",
+          "gesture-required-after-interruption","activation-cooldown",
+          "foreground-attempt-limit","stale"].includes(result?.reason)){
+        if(document.getElementById("scrubGame")){
+          playgroundWelcome?.pauseFromNativeInactive?.();
+          playgroundWelcome?.showAfterNativeActive?.();
+        }
+        // On title, leave Start enabled for a second real tap; don't show
+        // a fake permanent asset-corruption dialog for YouTube PiP.
+        return;
+      }
+      showNativeScrubFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(()=>{
+      if(token!==nativeScrubGeneration || document.hidden)return;
+      nativeScrubPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeScrubFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  function advanceScrubRound(){
+    currentRoundIndex+=1;
+    void renderRound();
+  }
+  if(nativeScrubAudio){
+    nativeScrubAudio.configure({
+      onAppInactive:()=>{
+        if(nativeScrubPending)stopNativeScrubRun();
+        if(!document.getElementById("scrubGame"))return;
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive:()=>{
+        if(document.getElementById("scrubGame"))
+          playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure:()=>{
+        if(muted || welcomePaused || nativeScrubPending ||
+           nativeScrubFailure || document.hidden ||
+           !document.getElementById("scrubGame"))return;
+        nativeScrubRetry={kind:"resume"};
+        showNativeScrubFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden && nativeScrubPending)stopNativeScrubRun();
+    });
+  }
+
   const parsedRef = window.VerseGameShell.parseReferenceParts(
     ctx.verseRef,
     ctx.translation,
@@ -496,6 +647,7 @@
   }
 
   function getAudioContext() {
+    if(nativeScrubAudio)return null; // native iOS forbids WebAudio
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -506,6 +658,7 @@
   }
 
   function ensureSilenceAudio() {
+    if(nativeScrubAudio)return null; // no HTML silent prime
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio(SILENCE_AUDIO_PATH);
@@ -518,6 +671,7 @@
   }
 
   function unlockAudio() {
+    if(nativeScrubAudio)return Promise.resolve(nativeScrubAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx) {
       audioUnlocked = false;
@@ -590,6 +744,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if(nativeScrubAudio)return null;
     if (soundBuffers.has(key)) return soundBuffers.get(key);
     if (soundBufferPromises.has(key)) return soundBufferPromises.get(key);
 
@@ -633,12 +788,18 @@
   }
 
   function preloadSoundBuffers() {
+    if(nativeScrubAudio)return;
     Object.keys(SOUND_FILES).forEach((key) => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if(nativeScrubAudio) {
+      if(muted || scrubStoppedOrPaused() || !nativeScrubAudio.isReady())return;
+      nativeScrubAudio.play(key,soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -680,9 +841,13 @@
   }
 
   function playUiTapSound() {
-    const key = lastUiTapSound === "uiTap1" ? "uiTap2" : "uiTap1";
-    lastUiTapSound = key;
-    playGameSound(key, "uiTap");
+    const key=scrubUiKey();
+    if(nativeScrubAudio){
+      if(!muted && !document.hidden)
+        nativeScrubAudio.tapUiFromGesture(key,soundVolume("uiTap"));
+      return;
+    }
+    playGameSound(key,"uiTap");
   }
 
   function getRoundIntroSoundKey(round) {
@@ -779,11 +944,17 @@
 
     const frequency = scale[(step - 1) % scale.length];
     const volume = soundVolume("progressTone");
-
-    playToneFrequency(frequency, 0.075, volume);
+    if(nativeScrubAudio){
+      const key=NATIVE_SCRUB_PROGRESS[String(frequency)];
+      if(key && !muted && !scrubStoppedOrPaused())
+        nativeScrubAudio.play(key,volume);
+      return;
+    }
+    playToneFrequency(frequency,0.075,volume);
   }
 
   function warmUpGeneratedToneAudio() {
+    if(nativeScrubAudio)return; // pre-rendered only on Start/Let's go
     const ctx = getAudioContext();
     if (!ctx || muted) return;
 
@@ -822,6 +993,11 @@
   }
 
   function playCompletionArpeggio() {
+    if(nativeScrubAudio){
+      if(!muted && !scrubStoppedOrPaused())
+        nativeScrubAudio.play("completionArpeggio",1);
+      return;
+    }
     if (muted) return;
 
     const notes = [392.00, 523.25, 659.25, 783.99]; // G4 → C5 → E5 → G5
@@ -833,6 +1009,7 @@
   }
 
   function playToneFrequency(frequency, duration, volume) {
+    if(nativeScrubAudio)return; // no dynamic oscillator on iOS
     if (muted) return;
 
     try {
@@ -879,6 +1056,12 @@
 
   async function startMowerSound(duration) {
     stopMowerSound();
+    if(nativeScrubAudio){
+      if(!muted && !scrubStoppedOrPaused() && nativeScrubAudio.isReady() &&
+         Number.isFinite(duration) && duration>0)
+        nativeScrubAudio.play("mower",soundVolume("mower"));
+      return;
+    }
 
     if (muted || !SOUND_FILES.mower) return;
 
@@ -959,6 +1142,10 @@
 
   function stopMowerSound() {
     mowerSoundGeneration += 1;
+    if(nativeScrubAudio){
+      void nativeScrubAudio.stopMower();
+      return;
+    }
 
     if (mowerSoundSource) {
       try {
@@ -1322,6 +1509,7 @@
   }
 
   function replaceScrubWelcomeContext() {
+    if(nativeScrubAudio)return false; // native doesn't own a Web context
     const old = audioCtx;
     if (!old) return false;
     stopMowerSound();
@@ -1351,6 +1539,13 @@
     if (mowerAnimationFrame) { cancelAnimationFrame(mowerAnimationFrame); mowerAnimationFrame = null; }
   }
   function continueScrubAfterReturn() {
+    // On a task return while Help/Game Menu is open, keep its own pause
+    // until the child actually presses Keep Scrubbing.
+    if(nativeScrubAudio && menuOpen){
+      welcomePaused=true;
+      welcomeClock.pause();
+      return true;
+    }
     welcomeClock.resume();
     welcomePaused = false;
     const resumeMower = mowerResumeFrame;
@@ -1364,6 +1559,7 @@
     const round = deferredCoverageRound;
     deferredCoverageRound = null;
     if (round && round === roundConfig()) scheduleCoverageCheck(round, true);
+    return true;
   }
 
   function renderTitleScreen() {
@@ -1384,10 +1580,16 @@
       backLabel: "Back to Playground",
       theme: GAME_THEME,
       onBack: () => {
-        playUiTapSound();
+        // Avoid a late cold-start native UI clip after Playground exit.
+        if(nativeScrubAudio)stopNativeScrubRun();
+        else playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: async () => {
+        if(nativeScrubAudio){
+          primeNativeScrubFromGesture("start",scrubUiKey());
+          return;
+        }
         await unlockAudio();
         beginScrubRun();
       }
@@ -1542,9 +1744,12 @@
       backHelpText: "Back",
       isMuted: () => muted,
       onMuteToggle: () => {
-        muted = !muted;
-        if (!muted) playUiTapSound();
-        if (muted) stopMowerSound();
+        muted=!muted;
+        if(muted){
+          stopMowerSound();
+          if(nativeScrubAudio)void nativeScrubAudio.stop();
+        } else playUiTapSound();
+        return muted;
       },
       onHowToPlay: () => {
         playUiTapSound();
@@ -1559,20 +1764,45 @@
         window.VerseGameShell.openHelp?.(HELP_OVERLAY_ID, "back", "Back");
       },
       onExit: () => {
-        playUiTapSound();
+        if(nativeScrubAudio)stopNativeScrubRun();
+        else playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
+        if(nativeScrubAudio &&
+           (menuOpen || nativeScrubPending || nativeScrubFailure ||
+            playgroundWelcome?.isPaused?.()))return false;
+        menuOpen=true;
+        if(nativeScrubAudio){
+          // Retain same canvas, progress, mower transform and virtual time.
+          pauseScrubForReturn();
+          void nativeScrubAudio.stop();
+        }
         playUiTapSound();
-        menuOpen = true;
-        const root = document.getElementById("scrubGame");
-        if (root) root.classList.add("scrub-is-paused");
+        const root=document.getElementById("scrubGame");
+        if(root)root.classList.add("scrub-is-paused");
+        return true;
       },
       onClose: () => {
+        if(nativeScrubAudio){
+          if(nativeScrubPending || playgroundWelcome?.isPaused?.()){
+            // The shared shell removes the DOM menu before onClose. If the
+            // app is still behind Welcome Back/preflight, restore it so the
+            // next genuine Close tap remains reachable after recovery.
+            const overlay=document.getElementById(MENU_OVERLAY_ID);
+            overlay?.classList.add("is-open");
+            overlay?.setAttribute("aria-hidden","false");
+            return;
+          }
+          // Keep menu + time paused throughout full Swift bank preflight.
+          // No routine gray loading dialog; real failure has Retry/Back.
+          primeNativeScrubFromGesture("resume",scrubUiKey());
+          return;
+        }
         playUiTapSound();
-        menuOpen = false;
-        const root = document.getElementById("scrubGame");
-        if (root) root.classList.remove("scrub-is-paused");
+        menuOpen=false;
+        const root=document.getElementById("scrubGame");
+        if(root)root.classList.remove("scrub-is-paused");
       }
     });
 
@@ -2684,7 +2914,7 @@
 
   function wireChalkboardErase(round) {
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -3085,7 +3315,7 @@
 
   function wireGlowReveal(round) {
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -3941,7 +4171,7 @@
     }
 
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked || mowerActive) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked || mowerActive) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -4248,7 +4478,7 @@
 
   function wireCanvasScrub(round) {
     coverCanvas.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, round)) return;
 
       event.preventDefault();
@@ -4529,7 +4759,7 @@
     }
 
     stageEl.onpointerdown = (event) => {
-      if (menuOpen || completionLocked) return;
+      if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked) return;
       if (absorbInstructionTap(event, roundConfig())) return;
 
       tapLeafAt(event.clientX, event.clientY);
@@ -4847,7 +5077,7 @@
       cookie.appendChild(img);
 
       cookie.addEventListener("pointerdown", (event) => {
-        if (menuOpen || completionLocked || cookie.dataset.cleared === "1") return;
+        if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked || cookie.dataset.cleared === "1") return;
         if (absorbInstructionTap(event, roundConfig())) return;
 
         event.preventDefault();
@@ -5300,7 +5530,7 @@
 
       btn.onclick = null;
       btn.onpointerdown = (event) => {
-        if (menuOpen || completionLocked || btn.classList.contains("is-peeled")) return;
+        if (menuOpen || welcomePaused || nativeScrubPending || nativeScrubFailure || completionLocked || btn.classList.contains("is-peeled")) return;
         if (absorbInstructionTap(event, roundConfig())) return;
 
         event.preventDefault();
@@ -5443,6 +5673,12 @@
   }
 
   function completeRound() {
+    // Some coverage/reward callbacks run asynchronously. An inactive
+    // app/menu/native preflight must never silently grant a round complete.
+    if(welcomePaused || nativeScrubPending || nativeScrubFailure){
+      deferredCoverageRound=roundConfig();
+      return;
+    }
     if (completionLocked) return;
     completionLocked = true;
     pointerDown = false;
@@ -5595,14 +5831,26 @@
     if (!btn) return;
 
     btn.onclick = async () => {
+      if(nativeScrubAudio){
+        if(nativeScrubPending || welcomePaused || nativeScrubFailure)return;
+        if(!muted && !nativeScrubAudio.isReady()){
+          primeNativeScrubFromGesture(isFinalRound?"finish":"next",
+            scrubUiKey());
+          return;
+        }
+        playUiTapSound();
+        if(isFinalRound){
+          stopNativeScrubRun();
+          renderEndScreen();
+        } else advanceScrubRound();
+        return;
+      }
       await unlockAudio();
       playUiTapSound();
-
       if (isFinalRound) {
         renderEndScreen();
         return;
       }
-
       currentRoundIndex += 1;
       renderRound();
     };
@@ -5728,9 +5976,16 @@
       backLabel: "Back to Playground",
       theme: GAME_THEME,
       onPlayAgain: () => {
+        if(nativeScrubAudio){
+          primeNativeScrubFromGesture("start",scrubUiKey());
+          return;
+        }
         beginScrubRun();
       },
-      onMoreGames: () => window.VerseGameBridge.exitGame()
+      onMoreGames: () => {
+        if(nativeScrubAudio)stopNativeScrubRun();
+        window.VerseGameBridge.exitGame();
+      }
     });
   }
 
@@ -5805,12 +6060,25 @@
 
   playgroundWelcome = window.VerseGameShell.attachPlaygroundWelcomeBack?.({
     isActive: () => !!document.getElementById("scrubGame"),
-    onPause: pauseScrubForReturn,
+    onPause: () => {
+      if(nativeScrubAudio)void nativeScrubAudio.stop();
+      pauseScrubForReturn();
+    },
     onResume: continueScrubAfterReturn,
     getAudioContext: () => audioCtx,
     unlockAudio,
     replaceAudioContext: replaceScrubWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    nativeOnlyAudio: !!nativeScrubAudio,
+    restoreNativeOnGesture: nativeScrubAudio ? () => {
+      if(muted)return Promise.resolve(true);
+      // Called in the human Let's go event stack; no auto-foreground
+      // priority, no audio clock fake success or WebAudio fallback.
+      return nativeScrubAudio.prepareFromGesture().then(result=>
+        window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+        (result?.ready===true));
+    } : undefined,
+    onExit: () => {if(nativeScrubAudio)stopNativeScrubRun();}
   });
 
   verseJson = await loadVerseJson();

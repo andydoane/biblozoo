@@ -1,6 +1,6 @@
 # N6n — First Verse Playground Native Audio: Verse Typer
 
-> **[PR #55](https://github.com/andydoane/biblozoo/pull/55)** on `experiment/n6n-native-verse-typer` → `experiment/native-ios-audio`. **OPEN / not owner-tested yet.** First of **five** Playground apps. All **12/12 external games already owner-accepted** after Verse Scramble #54 merged and owner-reported real iPhone PASS. Do NOT confuse completion of the standalone games with Playground or the entire app. Stable `ios-prep`, original installed BibloZoo, Web/PWA/Android, mic, Zoo, profiles and rewards remain untouched.
+> **CURRENT ACCEPTANCE (2026-11-09):** [N6n Verse Typer PR #55](https://github.com/andydoane/biblozoo/pull/55) **MERGED** to isolated `experiment/native-ios-audio` as `c7035e240e2e3f6af62ca23d639ea3d550065b3c` on 2026-11-09 13:20:03 UTC. The owner has now tested all usual iPhone scenarios and reports **PASS**, making this **Playground 1/5 accepted**; no individual audio-device logs were given. Older "pending" checklists below describe the **historic pre-merge owner test plan**, not current status. All **12/12 separate external games** remain accepted. [N6o Scripture Scrub PR #56](https://github.com/andydoane/biblozoo/pull/56) is OPEN, proposed second Playground, not yet owner-heard. Stable `ios-prep`, original installed app, Web/PWA/Android, mic, Zoo and user data remain unchanged.
 
 ## Accepted baseline
 

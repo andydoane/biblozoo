@@ -1904,3 +1904,34 @@ body{
     max-width: 88vw;
   }
 }
+
+/* N6o: shown ONLY for genuine native sound/bridge failure, never during
+   routine Start, Game Menu Close or Welcome Back preflight. */
+.scrub-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0,0,0,.65);
+}
+.scrub-native-audio-card {
+  width: min(100%,360px);
+  border-radius: 16px;
+  padding: 22px;
+  background: white;
+  color: #202020;
+  text-align: center;
+  font: 600 17px/1.4 system-ui,sans-serif;
+}
+.scrub-native-audio-card button {
+  min-height: 44px;
+  margin: 6px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  background: #333;
+  color: white;
+  font: inherit;
+}
