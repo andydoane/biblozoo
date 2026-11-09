@@ -237,7 +237,8 @@ function mainGameContracts(){
  assert.match(game,/if \(round && round === roundConfig\(\)\) scheduleCoverageCheck/);
  assert.match(game,/deferredCoverageRound=roundConfig\(\)/);
  assert.match(game,/const isFinalRound = round\.kind === "archaeology"/);
- assert.match(game,/for \(const \w+ of ROUNDS\)/i);
+ assert.match(game,/const SCRUB_ROUND_GROUPS = \[/);
+ assert.match(game,/chosen\.push\(byId\.get\("archaeology"\)\)/);
  assert.match(shell,/typeof options\.restoreNativeOnGesture === "function"/);
  assert.match(shell,/useZooEscape: !options\.nativeOnlyAudio/);
  assert.match(shell,/suppressUiSound: !!options\.nativeOnlyAudio/);
