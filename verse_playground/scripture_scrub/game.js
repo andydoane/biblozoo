@@ -512,6 +512,7 @@
     if(muted){
       if(kind==="start")beginScrubRun();
       else if(kind==="next")advanceScrubRound();
+      else if(kind==="finish"){stopNativeScrubRun();renderEndScreen();}
       else resumeScrubNative();
       return;
     }
@@ -531,6 +532,7 @@
         clearNativeScrubFailure();
         if(kind==="start")beginScrubRun();
         else if(kind==="next")advanceScrubRound();
+        else if(kind==="finish"){stopNativeScrubRun();renderEndScreen();}
         else resumeScrubNative();
         return;
       }
@@ -5823,7 +5825,8 @@
       if(nativeScrubAudio){
         if(nativeScrubPending || welcomePaused || nativeScrubFailure)return;
         if(!muted && !nativeScrubAudio.isReady()){
-          primeNativeScrubFromGesture("next",scrubUiKey());
+          primeNativeScrubFromGesture(isFinalRound?"finish":"next",
+            scrubUiKey());
           return;
         }
         playUiTapSound();
