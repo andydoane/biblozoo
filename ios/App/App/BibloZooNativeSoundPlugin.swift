@@ -344,6 +344,55 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     ]
     private lazy var wheelToneIDs: Set<String> =
         Set(wheelToneRecipes.keys)
+
+    // N6q finite original Verse Jam note/bpm inventory. Prepared once on
+    // the serial AVAudioEngine worker; the hot path selects a fixed buffer.
+    private lazy var jamNoteRecipes: [String: (Int, Int, String)] = {
+        var recipes: [String: (Int, Int, String)] = [:]
+        func add(_ midi: Int, _ ms: Int, _ wave: String) {
+            recipes["\(midi)-\(ms)-\(wave)"] = (midi, ms, wave)
+        }
+        for midi in [60,62,64,67,69,72,74,76,79,81,84] {
+            for wave in ["t", "q"] { add(midi,220,wave) }
+            add(midi,120,"t")
+            add(midi,110,"q")
+            add(midi,160,"t")
+        }
+        let extras: [(Int,Int,String)] = [
+            (72,55,"q"),(84,45,"q"),(79,75,"q"),(84,85,"q"),
+            (43,160,"s"),(38,130,"s"),(60,80,"t"),
+            (60,120,"q"),(64,120,"q"),(67,120,"q"),
+            (72,110,"q"),(76,120,"q"),(79,140,"q"),
+            (84,120,"q"),(88,130,"q"),(91,150,"q"),
+            (67,150,"q"),(69,150,"q"),(67,220,"q"),
+            (64,150,"q"),(62,150,"q"),(60,360,"t"),
+            (48,1300,"t"),(52,1220,"t"),(55,1160,"t"),(60,1100,"t"),
+            (60,420,"t"),(67,420,"t"),(72,460,"t"),
+            (76,160,"q"),(79,180,"q"),(84,160,"t"),
+            (72,140,"q"),(76,140,"q"),(79,200,"q"),
+            (67,160,"t"),(72,160,"q"),(79,220,"q"),
+            (84,140,"t"),(60,160,"q"),(64,160,"q"),
+            (67,180,"q"),(72,220,"q"),(76,240,"t"),
+            (79,280,"t"),(84,420,"t"),(91,180,"t"),
+            (72,120,"q"),(76,130,"q"),(79,180,"t")
+        ]
+        for (midi, ms, wave) in extras { add(midi,ms,wave) }
+        return recipes
+    }()
+    private let jamBPMs: [Int] = [92,100,104,108,112,120,128]
+    private let jamPadBeats: [Int] = [4,8,12,16]
+    private let jamVoices = ["boom","hey","woo","yeah","yo"]
+    private let jamDrums = ["kick","snare","hat","extra"]
+    private lazy var jamIDs: Set<String> = {
+        Set(["jam-note","jam-pad"] +
+            jamDrums.map { "jam-drum-" + $0 } +
+            jamVoices.map { "jam-voice-" + $0 })
+    }()
+    private lazy var jamVoiceResources: [String:String] = {
+        Dictionary(uniqueKeysWithValues: jamVoices.map {
+            ("jam-voice-" + $0,"verse_jam_voice_" + $0)
+        })
+    }()
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -531,7 +580,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "wheel-note-75-35-70-t",
         "wheel-note-76-35-70-t",
         "wheel-note-77-35-70-t",
-        "wheel-note-78-35-70-t"
+        "wheel-note-78-35-70-t",
+        "jam-note", "jam-pad", "jam-drum-kick", "jam-drum-snare",
+        "jam-drum-hat", "jam-drum-extra", "jam-voice-boom",
+        "jam-voice-hey", "jam-voice-woo", "jam-voice-yeah", "jam-voice-yo"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -553,6 +605,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private var pegToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var melodyToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var snakeOrbToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
+    private var jamNoteBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
+    private var jamPadBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
     private var effectNodes: [String: [AVAudioPlayerNode]] = [:] // worker only
     private var nextEffectVoice: [String: Int] = [:] // worker only
     private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
