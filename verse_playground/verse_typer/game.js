@@ -2974,7 +2974,7 @@
   }
 
   async function playNativeTyperChunk(file,runToken){
-    if(!file)return sleep(900,runToken);
+    if(!file || muted)return sleep(900,runToken);
     const base="../../verse_audio/"+ctx.verseId;
     if(!file.startsWith(base) || !/^[a-z]\.mp3$/.test(file.slice(base.length))){
       showNativeTyperFailure("That verse chunk is unavailable. Tap Back.");
@@ -2983,6 +2983,9 @@
     const partIndex=file.charCodeAt(base.length)-96;
     let positionMs=0;
     while(isLiveRun(runToken)){
+      // Muted review remains a quiet visual checkpoint, not a fake
+      // native playback failure or an accidental start of speaker audio.
+      if(muted){await sleep(900,runToken);return;}
       // Both an interrupted narration and an open Game Menu must suspend
       // this exact review chunk; NEVER skip ahead on a failed play().
       if(returnPaused || state.paused || nativeTyperPending ||
