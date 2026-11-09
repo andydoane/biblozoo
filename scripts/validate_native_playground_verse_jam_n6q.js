@@ -72,7 +72,7 @@ const has = (value, text, message) => assert(value.includes(text), message);
     "Global pointer/foreground callbacks cannot activate session on iOS");
   sourceTest(/function scheduleVerseJamForegroundRecovery\(\) \{\s*if \(nativeJamAudio\) return/,
     "Passive foreground audio activation prohibited");
-  sourceTest(/scheduleNativeJam\(when, \(\) =>\s*nativeJamAudio\.playDrum/,
+  sourceTest(/scheduleNativeJam\(when, dueEpochMs =>\s*nativeJamAudio\.playDrum/,
     "Native bars must defer drums until their actual event time");
   sourceTest(/nativeJamTimers\.forEach\(id => clearTimeout\(id\)\)/,
     "Cancel in-flight JS note timers");
@@ -94,7 +94,7 @@ const has = (value, text, message) => assert(value.includes(text), message);
     "No native Zoo Break for audio session failure");
   sourceTest(/phase === "score"/,
     "Score needs paused-return handling with no duplicate reward");
-  sourceTest(/stopRun\(\{ keepNativeReady: !!nativeJamAudio \}\)/,
+  sourceTest(/stopRun\(\{ keepNativeReady: !!nativeJamAudio,[\s\S]*?preserveNativeFinale: !!nativeJamAudio \}\)/,
     "Final arpeggio must not be cut off by early stop");
   sourceTest(/nativeJamAudio\.stop\(\)/, "Native app exit/interruption tears bank down");
   has(workflow,"validate_native_playground_verse_jam_n6q.js",
