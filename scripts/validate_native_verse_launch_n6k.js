@@ -184,7 +184,10 @@ function entryAndMenus(){
     helpHtml:()=>"",playUiTapSound:()=>calls.push("pop"),
     nextNativeLaunchUiKey:()=>"uiTap2",stopNativeLaunchRound:()=>calls.push("stopRound"),
     primeNativeLaunchFromGesture:(...args)=>calls.push(["prepare",...args]),
-    setScreen:screen=>{scope.state.screen=screen;},
+    setScreen:screen=>{
+      scope.state.screen=screen;
+      if(screen==="mode")scope.test.renderMode();
+    },
     unlockAudio:()=>Promise.resolve(true),$:(name)=>null,
     canOpenGameMenu:()=>true,stopConveyorLoop:()=>calls.push("stopConveyor"),
     startConveyorLoop:()=>calls.push("startConveyor"),
