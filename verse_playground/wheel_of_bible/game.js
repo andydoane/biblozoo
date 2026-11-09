@@ -268,6 +268,7 @@
   // Stop actual Web Audio nodes, rather than merely muting masterGain or
   // stopping future JS timers. Every oscillator is disconnected on ended/stop.
   function stopLiveTones() {
+    if(nativeWheelAudio)return 0; // native owner stops bank on pause
     toneGeneration += 1; // Invalidates any earlier async unlock/play promise.
     const stopped = activeToneSources.size;
     for (const source of Array.from(activeToneSources)) {
@@ -368,6 +369,7 @@
   }
   function pauseWheelForReturn() {
     if (welcomePaused) return;
+    if(nativeWheelAudio)void nativeWheelAudio.stop();
     welcomePaused = true;
     welcomeClock.pause();
     const remaining = remainingSpinTickIndex();
@@ -389,6 +391,9 @@
   }
   function resumeWheelAfterReturn() {
     if (!welcomePaused) return true;
+    if(nativeWheelAudio && nativeWheelMenuOpen)return true;
+    if(nativeWheelAudio && !muted && !nativeWheelAudio.isReady())
+      return false; // never release game clock without hot PCM bank
     welcomeClock.resume();
     welcomePaused = false;
     pausedVisualAnimations.forEach(anim => { try { anim.play(); } catch (_) {} });
@@ -903,6 +908,7 @@
   }
 
   function createVerseAudioElement() {
+    if(nativeWheelAudio)return null;
     if (verseAudioEl) return verseAudioEl;
     verseAudioEl = document.createElement("audio");
     verseAudioEl.preload = "auto";
@@ -915,6 +921,7 @@
 
   function audioContextConstructor() { return window.AudioContext || window.webkitAudioContext; }
   function createAudio() {
+    if(nativeWheelAudio)return; // no browser oscillator on iOS
     if (audioCtx) { if (masterGain) masterGain.gain.value = muted ? 0 : WEB_AUDIO_MASTER_VOLUME; return; }
     const AudioCtor = audioContextConstructor();
     if (!AudioCtor) return;
@@ -925,6 +932,7 @@
   }
 
   function primeHtmlAudio() {
+    if(nativeWheelAudio)return Promise.resolve(false);
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
     if (!silenceAudioEl) {
@@ -966,6 +974,7 @@
   }
 
   function preloadSpokenVerse() {
+    if(nativeWheelAudio)return; // native N5b published AVAudioPlayer
     const verse = getVerseAudioCandidates()[0];
     if (verse) {
       const audio = createVerseAudioElement();
@@ -984,6 +993,7 @@
   }
 
   async function unlockAudio() {
+    if(nativeWheelAudio)return nativeWheelAudio.isReady();
     createAudio(); createVerseAudioElement();
     if (!audioCtx || !masterGain) return false;
     if (audioUnlocked && audioCtx.state === "running") return true;
@@ -1005,6 +1015,7 @@
   }
 
   function replaceWheelWelcomeContext() {
+    if(nativeWheelAudio)return false;
     const old = audioCtx;
     if (!old || !(window.AudioContext || window.webkitAudioContext)) return false;
     // Web Audio nodes and pending unlock promises from the old context must
@@ -1024,7 +1035,18 @@
   function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
   function playTone({ midi = 60, duration = 0.12, volume = 0.18, type = "triangle",
     tag = "effect", allowDeferred = true } = {}) {
-    if (muted || welcomePaused || document.hidden) return;
+    if (muted || welcomePaused || document.hidden ||
+        nativeWheelPending || nativeWheelFailure || nativeWheelMenuOpen) return;
+    if(nativeWheelAudio){
+      // Exact finite source tuple only; pre-rendered on Swift serial worker.
+      // No Web oscillator, deferred unlock or hot buffer decode on iOS.
+      if(!nativeWheelAudio.playToneRecipe(midi,duration,volume,type) &&
+         nativeWheelAudio.isReady()){
+        nativeWheelRetryKind="resume";
+        showNativeWheelFailure("A Wheel sound is unavailable. Tap Try Again.");
+      }
+      return;
+    }
     createAudio();
     if (!audioCtx || !masterGain) return;
     if (audioCtx.state !== "running") {
