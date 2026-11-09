@@ -105,6 +105,167 @@
   let returnSession = 0;
   let welcomeBackController = null;
   let currentCorrectMelody = [];
+
+  // N6m: source-selected correct note melodies and all generated effects
+  // use the single native Swift PCM bank ONLY on iOS. Web/PWA/Android retain
+  // their exact AudioContext oscillator/noise implementation below.
+  const nativeScrambleAudio = window.BibloZooNativeVerseScrambleAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseScrambleAudio : null;
+  const NATIVE_SCRAMBLE_NOTES = new Set([60,62,64,65,67,69,71,72]);
+  let nativeScrambleToken = 0;
+  let nativeScramblePending = false;
+  let nativeScrambleFailure = false;
+  let nativeScrambleRetry = {kind:"round",mode:null};
+  let nativeScramblePausedAt = 0;
+  let nativeScramblePausedMs = 0;
+  let nativeScrambleFrozen = false;
+
+  function nextNativeScrambleUiKey() {
+    const key=uiSoundFlip?"uiTap2":"uiTap1";
+    uiSoundFlip=!uiSoundFlip;
+    return key;
+  }
+  function beginNativeScrambleFreeze() {
+    if (!nativeScrambleAudio || nativeScrambleFrozen ||
+        state.screen!=="game" || returnPaused) return;
+    nativeScrambleFrozen=true;
+    nativeScramblePausedAt=performance.now();
+    clearEasyHint();
+  }
+  function finishNativeScrambleFreeze() {
+    if (!nativeScrambleFrozen) return;
+    const elapsed=Math.max(0,performance.now()-nativeScramblePausedAt);
+    nativeScramblePausedMs+=elapsed;
+    if (state.startTime) state.startTime+=elapsed;
+    nativeScrambleFrozen=false;
+  }
+  function stopNativeScrambleRound() {
+    if (!nativeScrambleAudio) return;
+    nativeScrambleToken++;
+    nativeScramblePending=false;
+    app?.removeAttribute("aria-busy");
+    void nativeScrambleAudio.stop();
+  }
+  function clearNativeScrambleFailure() {
+    nativeScrambleFailure=false;
+    document.getElementById("vsnNativeAudioFailure")?.remove();
+  }
+  function showNativeScrambleFailure(message) {
+    if (!nativeScrambleAudio) return;
+    nativeScrambleFailure=true;
+    beginNativeScrambleFreeze();
+    let overlay=document.getElementById("vsnNativeAudioFailure");
+    if (!overlay) {
+      overlay=document.createElement("div");
+      overlay.id="vsnNativeAudioFailure";
+      overlay.className="vsn-native-audio-failure";
+      overlay.innerHTML=`
+        <section class="vsn-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Verse Scramble native sound problem">
+          <h2>Verse Scramble</h2>
+          <p role="status" data-scramble-status></p>
+          <button type="button" data-scramble-retry>Try Again</button>
+          <button type="button" data-scramble-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-scramble-retry]").onclick=()=>
+        primeNativeScrambleFromGesture(nativeScrambleRetry.kind,nativeScrambleRetry.mode);
+      overlay.querySelector("[data-scramble-back]").onclick=()=>{
+        stopNativeScrambleRound();
+        clearNativeScrambleFailure();
+        finishNativeScrambleFreeze();
+        if (nativeScrambleRetry.kind==="round") setScreen("mode");
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-scramble-status]").textContent=message;
+  }
+  async function startNativeScrambleRound(mode,token) {
+    // Existing font/profile reward async sequence remains, but no gameplay
+    // starts until the whole iOS PCM bank has been warmed on the FIRST tap.
+    await waitForMagnetFont();
+    if (token!==nativeScrambleToken || returnPaused || document.hidden) return;
+    selectedMode=mode;
+    initVerseData();
+    await preloadNextProfileReward();
+    if (token!==nativeScrambleToken || returnPaused || document.hidden) return;
+    clearNativeScrambleFailure();
+    state.startTime=performance.now();
+    state.showingInstruction=true;
+    state.instructionToken+=1;
+    state.busy=true;
+    state.currentTarget=null;
+    state.tiles=[];
+    setScreen("game");
+  }
+  function finishNativeScrambleResume() {
+    if (!muted && !nativeScrambleAudio.isReady()) {
+      showNativeScrambleFailure("Native sound is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeScrambleFailure();
+    finishNativeScrambleFreeze();
+    if (state.screen==="game" && !state.bonusActive) scheduleEasyHint();
+  }
+  function primeNativeScrambleFromGesture(kind="round",mode=null,uiKey=null) {
+    if (!nativeScrambleAudio || nativeScramblePending ||
+        returnPaused || document.hidden) return;
+    nativeScrambleRetry={kind,mode};
+    clearNativeScrambleFailure();
+    if (muted) {
+      if (kind==="round") {
+        const token=++nativeScrambleToken;
+        void startNativeScrambleRound(mode,token);
+      } else finishNativeScrambleResume();
+      return;
+    }
+    const token=++nativeScrambleToken;
+    nativeScramblePending=true;
+    beginNativeScrambleFreeze();
+    app?.setAttribute("aria-busy","true");
+    // Call Swift activateFromGesture synchronously in this ACTUAL tap.
+    const prep=nativeScrambleAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:getSoundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if (token!==nativeScrambleToken || returnPaused || document.hidden) return;
+      nativeScramblePending=false;
+      app?.removeAttribute("aria-busy");
+      if (result?.ready===true) {
+        if (kind==="round") void startNativeScrambleRound(mode,token);
+        else finishNativeScrambleResume();
+      } else showNativeScrambleFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(()=>{
+      if (token!==nativeScrambleToken || returnPaused || document.hidden) return;
+      nativeScramblePending=false;
+      app?.removeAttribute("aria-busy");
+      showNativeScrambleFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeScrambleAudio) {
+    nativeScrambleAudio.configure({
+      onAppInactive:()=>{
+        if (nativeScramblePending) stopNativeScrambleRound();
+        if (state.screen!=="game") return;
+        if (!welcomeBackController?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive:()=>{
+        // Show Welcome Back; NEVER activate Swift on passive foreground.
+        welcomeBackController?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure:()=>{
+        if (muted || returnPaused || document.hidden ||
+            nativeScramblePending || nativeScrambleFailure ||
+            state.screen!=="game" || state.menuOpen || state.helpOpen) return;
+        nativeScrambleRetry={kind:"resume",mode:null};
+        showNativeScrambleFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if (document.hidden && nativeScramblePending) stopNativeScrambleRound();
+    });
+  }
+
   let uiSoundFlip = false;
   let profilePictureVerseIds = [];
   let profilePictureCatalogPromise = null;
