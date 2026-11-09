@@ -156,6 +156,10 @@
       typeof bridge?.[k] === "function"))
       return Promise.resolve({ready:false,reason:"missing-bridge"});
     // Activation must start synchronously with a real Got It!/Menu Close/Resume tap.
+    // If a speed selection has to replace a cold title UI preflight, a
+    // single speed-pop may accompany its already-permitted game preflight.
+    // Never play a pop seconds later on the unrelated Heads Up screen.
+    const uiGestureAt = Date.now();
     let activation;
     try { activation = bridge.activateFromGesture({purpose:"game"}); }
     catch (_) { return Promise.resolve({ready:false,reason:"activation-error"}); }
@@ -198,7 +202,8 @@
         if (ui.some(x => x?.prepared !== true || !(x.durationMs > 0)))
           return {ready:false,reason:"ui-preflight-failed"};
         uiReady = true;
-        if (uiIndex !== null && !root.document.hidden) {
+        if (uiIndex !== null && !root.document.hidden &&
+            Date.now() - uiGestureAt <= 350) {
           send(UI[uiIndex % UI.length], volume, {}, true);
         }
         const others = await bounded(Promise.all(IDS.filter(x => !UI.includes(x)).map(
@@ -269,6 +274,7 @@
     playTone, playDrum, playPad, playVoice, stopVoices,
     stopGrooveForFinale, stop,
     isReady:()=>ready && !failed && !root.document?.hidden,
+    isUiReady:()=>uiReady && !failed && !root.document?.hidden,
     lastError:()=>lastError, soundIds:IDS
   });
 })(window);
