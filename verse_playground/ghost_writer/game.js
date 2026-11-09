@@ -1589,9 +1589,10 @@
         renderIntro();
       },
       onSelect: (mode) => {
-        if (nativeGhostAudio) {
+        if (nativeGhostAudio && !muted) {
           primeNativeGhostFromGesture(() => startRun(mode), "start");
         } else {
+          // Muted training has no musical dependency or audio priority need.
           playUiTapSound();
           startRun(mode);
         }
@@ -1693,12 +1694,15 @@
         return true;
       },
       onClose: () => {
-        if (nativeGhostAudio) {
+        if (nativeGhostAudio && !muted) {
           primeNativeGhostFromGesture(() => {
             restoreGhostPlaybackFromBackground({ nativeGesture: true });
           }, "menu");
         } else {
+          // Muted menu close never takes over another audio session.
           playUiTapSound();
+          if (nativeGhostAudio)
+            restoreGhostPlaybackFromBackground({ nativeGesture: true });
         }
       },
       onBackFromHelp: () => { }
@@ -2776,12 +2780,14 @@
 
     wireMenu();
     document.getElementById("ghostWriteBtn")?.addEventListener("click", () => {
+      const options = makeDefaultRemixOptions();
       const begin = () => renderPlayback({
-        options: makeDefaultRemixOptions(),
+        options,
         markPractice: true,
         returnTo: "remix"
       });
-      if (nativeGhostAudio) primeNativeGhostFromGesture(begin, "playback");
+      if (nativeGhostAudio && !muted && options.spookySounds !== "off")
+        primeNativeGhostFromGesture(begin, "playback");
       else { playUiTapSound(); begin(); }
     });
   }
@@ -3293,7 +3299,7 @@
     });
 
     startOverConfirmBtn?.addEventListener("click", () => {
-      if (nativeGhostAudio) primeNativeGhostFromGesture(
+      if (nativeGhostAudio && !muted) primeNativeGhostFromGesture(
         () => startRun(selectedMode), "start-over");
       else { playUiTapSound(); startRun(selectedMode); }
     });
