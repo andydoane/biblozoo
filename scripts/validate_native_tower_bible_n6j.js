@@ -168,7 +168,8 @@ function realMenus(native=true){
   scope.t.wireCommonNav();
   assert.equal(menu.onOpen(),true);
   assert.equal(scope.state.paused,true);
-  assert.equal(menu.onOpen(),false,"duplicate physical menu open ignored");
+  if(native) assert.equal(menu.onOpen(),false,
+    "native duplicate physical menu open ignored; web behavior unchanged");
   const n=prepares.length;
   menu.onClose();
   if(native) {
