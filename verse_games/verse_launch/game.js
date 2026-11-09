@@ -473,6 +473,7 @@
   }
 
   function getAudioContext() {
+    if (nativeLaunchAudio) return null;
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -483,6 +484,7 @@
   }
 
   function ensureSilenceAudio() {
+    if (nativeLaunchAudio) return null;
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -495,6 +497,7 @@
   }
 
   function unlockAudio() {
+    if (nativeLaunchAudio) return Promise.resolve(nativeLaunchAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -585,10 +588,11 @@
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeLaunchAudio) document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeLaunchAudio) document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+  if (!nativeLaunchAudio) document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
   function markAudioBackgrounded() {
+    if (nativeLaunchAudio) return;
     if (!audioCtx) return;
     audioForegroundRecoveryPending = true;
     audioForegroundRecoveryGeneration += 1;
@@ -603,6 +607,7 @@
   // A short delay gives iOS time to release another app's media session.
   // The context may say "running" even though its audio clock/output stalled.
   function scheduleForegroundAudioRecovery() {
+    if (nativeLaunchAudio) return;
     if (!audioCtx || !audioForegroundRecoveryPending || document.hidden) return;
     const generation = ++audioForegroundRecoveryGeneration;
     clearTimeout(audioForegroundRecoveryTimer);
@@ -680,6 +685,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeLaunchAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -722,12 +728,21 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeLaunchAudio) return;
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeLaunchAudio) {
+      if (muted || returnPaused || nativeLaunchPending || nativeLaunchFailure ||
+          state.menuOpen || state.helpOpen || state.speedMenuOpen ||
+          document.hidden) return;
+      // MP3 original master+gain; fixed oscillator PCM already baked gains.
+      nativeLaunchAudio.play(key,soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -758,12 +773,20 @@
   }
 
   function playUiTapSound() {
-    const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
-    state.uiSoundFlip = !state.uiSoundFlip;
-    playGameSound(key, "uiTap");
+    const key=nextNativeLaunchUiKey();
+    if (nativeLaunchAudio) {
+      if (!muted && !returnPaused && !document.hidden)
+        nativeLaunchAudio.tapUiFromGesture(key,soundVolume("uiTap"));
+    } else playGameSound(key, "uiTap");
   }
 
   async function playCountdownBeep(finalBeep = false) {
+    if (nativeLaunchAudio) {
+      if (!muted && !returnPaused && !nativeLaunchPending &&
+          !nativeLaunchFailure && !document.hidden)
+        nativeLaunchAudio.play(finalBeep?"countdownFinalBeep":"countdownBeep",1);
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -795,6 +818,15 @@
   }
 
   async function playProjectileFireSound() {
+    if (nativeLaunchAudio) {
+      if (muted || returnPaused || nativeLaunchPending ||
+          nativeLaunchFailure || state.menuOpen || state.helpOpen ||
+          document.hidden) return;
+      const isTock=state.astroProjectileSoundFlip;
+      state.astroProjectileSoundFlip=!state.astroProjectileSoundFlip;
+      nativeLaunchAudio.play(isTock?"projectileTock":"projectileTick",1);
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
