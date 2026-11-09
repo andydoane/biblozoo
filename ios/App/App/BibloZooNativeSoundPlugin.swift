@@ -393,6 +393,15 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             ("jam-voice-" + $0,"verse_jam_voice_" + $0)
         })
     }()
+    // N6r: Ghost Writer's five source-used spooky recordings only.
+    // Six dormant ghost_writer_scribble_*.mp3 files are deliberately excluded.
+    private let ghostWriterSoundResources: [String: String] = [
+        "ghost-spooky-1": "ghost_writer_spooky_1",
+        "ghost-spooky-2": "ghost_writer_spooky_2",
+        "ghost-spooky-3": "ghost_writer_spooky_3",
+        "ghost-spooky-4": "ghost_writer_spooky_4",
+        "ghost-spooky-5": "ghost_writer_spooky_5"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -583,7 +592,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "wheel-note-78-35-70-t",
         "jam-note", "jam-pad", "jam-drum-kick", "jam-drum-snare",
         "jam-drum-hat", "jam-drum-extra", "jam-voice-boom",
-        "jam-voice-hey", "jam-voice-woo", "jam-voice-yeah", "jam-voice-yo"
+        "jam-voice-hey", "jam-voice-woo", "jam-voice-yeah", "jam-voice-yo",
+        "ghost-spooky-1", "ghost-spooky-2", "ghost-spooky-3",
+        "ghost-spooky-4", "ghost-spooky-5"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -2445,6 +2456,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               scrubToneIDs.contains(soundId) ||
               wheelToneIDs.contains(soundId) ||
               jamIDs.contains(soundId) ||
+              ghostWriterSoundResources[soundId] != nil ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -2545,6 +2557,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                  self.jamVoiceResources[soundId] == nil) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
+            } else if let resourceName = self.ghostWriterSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_playground/ghost_writer/ghost_writer_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
             } else if let resourceName = self.jamVoiceResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
@@ -3061,7 +3081,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         onMain { [weak self] in
             guard let self=self,
                   let soundId=call.getString("soundId"),
-                  (soundId == "scrub-mower" || soundId == "jam-group") else {
+                  (soundId == "scrub-mower" || soundId == "jam-group" ||
+                   soundId == "ghost-spooky-group") else {
                 call.resolve(["stopped":false,"reason":"invalid-sound-id"])
                 return
             }
@@ -3073,11 +3094,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     }
                     return
                 }
-                let group: [String] = soundId == "jam-group"
-                    ? ["jam-note", "jam-pad", "jam-drum-kick", "jam-drum-snare",
-                       "jam-drum-hat", "jam-drum-extra"] +
+                let group: [String]
+                if soundId == "jam-group" {
+                    group = ["jam-note", "jam-pad", "jam-drum-kick",
+                             "jam-drum-snare", "jam-drum-hat",
+                             "jam-drum-extra"] +
                         self.jamVoices.map { "jam-voice-" + $0 }
-                    : [soundId]
+                } else if soundId == "ghost-spooky-group" {
+                    group = ["ghost-spooky-1", "ghost-spooky-2",
+                             "ghost-spooky-3", "ghost-spooky-4",
+                             "ghost-spooky-5"]
+                } else {
+                    group = [soundId]
+                }
                 if let engine=self.effectsEngine,engine.isRunning {
                     for item in group {
                         guard let nodes=self.effectNodes[item] else { continue }
