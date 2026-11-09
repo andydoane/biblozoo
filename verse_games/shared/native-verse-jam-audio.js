@@ -232,12 +232,40 @@
     try { void Promise.resolve(api()?.stopEffect?.({soundId:"jam-group"})).catch(() => {}); }
     catch (_) {}
   }
+  function stopGrooveForTransition() {
+    // Keep every prewarmed jam-note voice ready for a four-note "Time"
+    // downbeat. The original web version stops the beat, NOT its ability
+    // to play the word melody/chord. Resolve only after Swift completes
+    // the targeted drum/pad/voice stop on its serial playback worker.
+    if (!ready || failed || !isAvailable())
+      return Promise.resolve({stopped:false,reason:"not-ready"});
+    try {
+      return Promise.resolve(api()?.stopEffect?.({soundId:"jam-groove"}))
+        .catch(() => ({stopped:false,reason:"stop-error"}));
+    } catch (_) {
+      return Promise.resolve({stopped:false,reason:"stop-error"});
+    }
+  }
   function stopGrooveForFinale() {
-    // Only drum/pad/voice nodes are stopped. Do not stop or reprepare the
-    // jam-note voice pool right before the completion arpeggio starts.
-    if (!ready || failed || !isAvailable()) return;
-    try { void Promise.resolve(api()?.stopEffect?.({soundId:"jam-groove"})).catch(() => {}); }
-    catch (_) {}
+    // The finale likewise leaves prepared note voices intact.
+    void stopGrooveForTransition();
+  }
+  function traceTransition(phase, round, wordIndex = -1) {
+    // Diagnostic ONLY: fixed phases/rounds, no verse text, audio data,
+    // automatic session activation, disk writes or network calls.
+    const allowed = ["stop-request", "stop-complete", "phrase-scheduled",
+      "word-visible", "next-groove"];
+    if (!isAvailable() || root.document?.hidden ||
+        !allowed.includes(phase) || !Number.isInteger(round) ||
+        round < 1 || round > 4 || !Number.isInteger(wordIndex) ||
+        wordIndex < -1 || wordIndex > 2 ||
+        typeof api()?.traceJamTransition !== "function") return false;
+    try {
+      void Promise.resolve(api().traceJamTransition({
+        phase, round, wordIndex, clientEpochMs: Date.now()
+      })).catch(() => {});
+      return true;
+    } catch (_) { return false; }
   }
   function scheduled(extra, dueEpochMs) {
     // Only trusted in-process beat clock supplies this bounded due time.
@@ -246,13 +274,16 @@
       dueEpochMs > Date.now() - 140 && dueEpochMs < Date.now() + 350
       ? {...extra, scheduledEpochMs: dueEpochMs} : extra;
   }
-  function playTone(midi, duration, volume, type = "triangle", dueEpochMs = null) {
+  function playTone(midi, duration, volume, type = "triangle",
+                    dueEpochMs = null, jamCue = null) {
     if (!Number.isFinite(midi) || !Number.isFinite(duration) ||
         !Number.isFinite(volume)) return false;
     const wave = type === "square" ? "q" : type === "sine" ? "s" : "t";
     const recipe = Math.round(midi) + "-" + Math.round(duration*1000) + "-" + wave;
+    const trace = jamCue === "transition-sting" || jamCue === "transition-word"
+      ? {jamCue} : {};
     return send("jam-note", Math.min(1, Math.max(0, volume)),
-      scheduled({noteId:recipe},dueEpochMs));
+      scheduled({noteId:recipe,...trace},dueEpochMs));
   }
   function playDrum(sound, volume = 1, dueEpochMs = null) {
     if (!DRUMS.includes(sound)) return false;
@@ -272,7 +303,7 @@
   root.BibloZooNativeVerseJamAudio = Object.freeze({
     isAvailable, configure, tapUiFromGesture, prepareFromGesture,
     playTone, playDrum, playPad, playVoice, stopVoices,
-    stopGrooveForFinale, stop,
+    stopGrooveForFinale, stopGrooveForTransition, traceTransition, stop,
     isReady:()=>ready && !failed && !root.document?.hidden,
     isUiReady:()=>uiReady && !failed && !root.document?.hidden,
     lastError:()=>lastError, soundIds:IDS
