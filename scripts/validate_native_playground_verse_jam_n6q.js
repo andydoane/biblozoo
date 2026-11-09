@@ -47,8 +47,9 @@ const has = (value, text, message) => assert(value.includes(text), message);
     "jam-drum-snare","jam-drum-hat","jam-drum-extra",
     "jam-voice-boom","jam-voice-hey","jam-voice-woo",
     "jam-voice-yeah","jam-voice-yo","ui-pop-1","ui-pop-2"]) {
-    has(controller, id === "jam-voice-boom" ? '"jam-voice-"': id.startsWith("jam-voice-")
-      ? "jam-voice-" : id, "Controller missing " + id);
+    has(controller, id.startsWith("jam-voice-") ? '"jam-voice-"' :
+      id.startsWith("jam-drum-") ? '"jam-drum-"' : id,
+      "Controller missing " + id);
     has(swift, id.startsWith("jam-voice-") ? "jam-voice-" : id,
       "Swift missing " + id);
   }
