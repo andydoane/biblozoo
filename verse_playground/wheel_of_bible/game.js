@@ -144,7 +144,7 @@
     if(!nativeWheelAudio)return;
     nativeWheelFailure=true;
     nativeWheelAudio.stopSpoken();
-    if(!welcomePaused)pauseWheelForReturn();
+    if(state.screen!=="intro" && !welcomePaused)pauseWheelForReturn();
     let overlay=document.getElementById("wheelNativeAudioFailure");
     if(!overlay){
       overlay=document.createElement("div");
@@ -1226,8 +1226,49 @@
     gameTimeout(() => playTone({ midi: 76, duration: .12, volume: .16, type: "triangle" }), 145);
   }
 
-  function stopVerseAudio() { if (!verseAudioEl) return; try { verseAudioEl.pause(); verseAudioEl.currentTime = 0; } catch (err) { } }
-  async function tryPlayAudioCandidatesAndWait(candidates, fallbackMs = 1200) {
+  function stopVerseAudio() {
+    if(nativeWheelAudio){nativeWheelAudio.stopSpoken();return;}
+    if (!verseAudioEl) return;
+    try { verseAudioEl.pause(); verseAudioEl.currentTime = 0; } catch (err) {}
+  }
+  // The original Wheel opens with the entire verse and then its reference.
+  // Native iOS cannot use the old HTML <audio> branch: re-use the already
+  // published, bundled Learn narration allowlist instead. A spoken phase
+  // advances ONLY on a matching AVAudioPlayerDelegate "ended" notification.
+  async function playNativeWheelSpoken(kind){
+    if(muted)return true; // intentional user mute, never fake audible
+    let positionMs=0;
+    while(state.screen==="verseIntro"){
+      if(nativeWheelPending || nativeWheelFailure || welcomePaused ||
+         nativeWheelMenuOpen || document.hidden ||
+         !nativeWheelAudio.isReady()){
+        // Await an explicit real Menu Close / Welcome Back / Retry tap.
+        // This is an unpaused polling timeout, NOT a successful speech timer.
+        await new Promise(resolve=>setTimeout(resolve,85));
+        continue;
+      }
+      const result=await nativeWheelAudio.playSpoken(ctx.verseId,kind,positionMs);
+      if(state.screen!=="verseIntro")return false;
+      if(result?.ended===true)return true;
+      positionMs=Math.max(0,Number(result?.positionMs)||positionMs);
+      if(result?.reason==="interrupted")continue;
+      const temporary=["activation-os-rejected","other-audio-playing",
+        "interruption-pending","gesture-required-after-interruption",
+        "not-foreground"].includes(String(result?.reason||""));
+      if(temporary){
+        pauseWheelForReturn();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+        continue;
+      }
+      nativeWheelRetryKind="resume";
+      showNativeWheelFailure("The published verse recording couldn't finish. Tap Try Again.");
+    }
+    return false;
+  }
+  async function tryPlayAudioCandidatesAndWait(candidates, fallbackMs = 1200,
+    nativeKind = "ref") {
+    if(nativeWheelAudio)return playNativeWheelSpoken(nativeKind);
     const audio = createVerseAudioElement();
     audio.muted = muted;
     audio.volume = muted ? 0 : 1;
@@ -1277,7 +1318,8 @@
   }
 
   async function tryPlayVerseAudio() {
-    return tryPlayAudioCandidatesAndWait(getVerseAudioCandidates(), estimateListenMs());
+    return tryPlayAudioCandidatesAndWait(getVerseAudioCandidates(),
+      estimateListenMs(),"verse");
   }
   function estimateListenMs() {
     const wordCount = state.words.length || String(state.verseText || "").split(/\s+/).filter(Boolean).length;
@@ -1466,7 +1508,8 @@
     }
 
     if (state.screen !== "verseIntro") return;
-    const refPlayed = await tryPlayAudioCandidatesAndWait(getReferenceAudioCandidates(), 1600);
+    const refPlayed = await tryPlayAudioCandidatesAndWait(
+      getReferenceAudioCandidates(),1600,"ref");
     if (refPlayed === "blocked") {
       offerSpokenAudioRetry("Tap to hear the reference", () => playVerseIntroRecordings("reference"));
       return;
