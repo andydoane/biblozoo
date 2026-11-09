@@ -1,6 +1,6 @@
 # N6i — Versey Bird native iOS audio: owner test and handoff
 
-> **PR [#50](https://github.com/andydoane/biblozoo/pull/50)** targets only `experiment/native-ios-audio`, not stable `ios-prep`. Branch `experiment/n6i-native-versey-bird`. Current status: **implementation proposed; Mac Xcode compilation and owner-heard iPhone audio pending**. No automatic merge. The native migration count becomes **8 of 12 only after owner review, merge and iPhone acceptance**.
+> **CURRENT RESULT — OWNER ACCEPTED (2026-11-08):** [N6i PR #50](https://github.com/andydoane/biblozoo/pull/50) was **MERGED** into `experiment/native-ios-audio` on 2026-11-08 at `5d6378fbd3ee441bd2def561975a5c8ed2f340a0`. The owner subsequently reports successful real-iPhone Versey Bird testing, so N6i is now the **eighth of 12 accepted standalone native-audio games (8/12)**. Exact individual test steps, iOS version and speaker logs were not supplied; don't fabricate them. This guide's steps and pending checkboxes below describe the **historical pre-merge acceptance plan**. Current next feature is open [N6j Tower of Bible PR #51](https://github.com/andydoane/biblozoo/pull/51) with independent iPhone/Swift testing still pending. Stable `ios-prep`, original installed app, Web/PWA/Android and mic/Zoo unchanged.
 
 ## Baseline and purpose
 
