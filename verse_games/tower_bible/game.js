@@ -212,6 +212,110 @@
   let returnPriorPauseReason = null;
   let returnWasLooping = false;
 
+  // N6j: Tower of Bible's six original files and two fixed synthesized
+  // word cues (plus shared UI pops) use prewarmed native PCM on iOS.
+  // Web/PWA/Android retain the original oscillators and MP3 buffers below.
+  const nativeTowerAudio = window.BibloZooNativeTowerBibleAudio?.isAvailable?.()
+    ? window.BibloZooNativeTowerBibleAudio : null;
+  let nativeTowerSerial = 0;
+  let nativeTowerPending = false;
+  // The shared shell and Tower's legacy button/keyboard handlers can both
+  // receive one physical gesture; only one PCM teardown/prewarm is allowed.
+  let nativeTowerMenuOpen = false;
+  let nativeTowerSpeedMenuOpen = false;
+  let nativeTowerRetry = {kind:"round",mode:null};
+  let towerWelcomeBack = null;
+
+  function nextNativeTowerUiKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function wireNativeTowerTitleHelpPops() {
+    if (!nativeTowerAudio) return;
+    document.getElementById("helpBtn")?.addEventListener("click", playUiTapSound);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", playUiTapSound);
+  }
+  function stopNativeTowerRound() {
+    if (!nativeTowerAudio) return;
+    nativeTowerSerial++;
+    nativeTowerPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeTowerAudio.stop();
+  }
+  function clearNativeTowerFailure() {
+    document.getElementById("tbNativeAudioFailure")?.remove();
+  }
+  function showNativeTowerFailure(message) {
+    if (!nativeTowerAudio) return;
+    let overlay = document.getElementById("tbNativeAudioFailure");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "tbNativeAudioFailure";
+      overlay.className = "tb-native-audio-failure";
+      overlay.innerHTML = `
+        <section class="tb-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Tower of Bible native sound problem">
+          <h2>Tower of Bible</h2>
+          <p role="status" data-tower-audio-status></p>
+          <button type="button" data-tower-audio-retry>Try Again</button>
+          <button type="button" data-tower-audio-back>Back</button>
+        </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-tower-audio-retry]").onclick = () =>
+        primeNativeTowerFromGesture(nativeTowerRetry.kind,nativeTowerRetry.mode);
+      overlay.querySelector("[data-tower-audio-back]").onclick = () => {
+        stopNativeTowerRound();
+        clearNativeTowerFailure();
+        if (nativeTowerRetry.kind === "round") renderModeSelect();
+        else {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    overlay.querySelector("[data-tower-audio-status]").textContent = message;
+  }
+  function primeNativeTowerFromGesture(kind = "round", mode = null, uiKey = null) {
+    if (nativeTowerPending || returnPaused || document.hidden) return;
+    if (!nativeTowerAudio || muted) {
+      clearNativeTowerFailure();
+      if (kind === "round") startGame(mode);
+      else if (kind === "resume") setPaused(false, "");
+      return;
+    }
+    nativeTowerRetry = {kind,mode};
+    const token = ++nativeTowerSerial;
+    nativeTowerPending = true;
+    clearNativeTowerFailure();
+    app.setAttribute("aria-busy", "true");
+    // Swift session activation is invoked NOW, within the real human tap.
+    // Never invoke it from a visibility event, tick or late timer.
+    const request = nativeTowerAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:getSoundVolume("uiTap")} : null);
+    void Promise.resolve(request).then(result => {
+      if (token !== nativeTowerSerial || returnPaused || document.hidden) return;
+      nativeTowerPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else if (kind === "resume") setPaused(false, "");
+      } else {
+        showNativeTowerFailure(
+          ["activation-os-rejected","other-audio-playing"].includes(result?.reason)
+            ? "Audio is busy. Try again after the other audio stops."
+            : "Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeTowerSerial || returnPaused || document.hidden) return;
+      nativeTowerPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeTowerFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+
+
   const audioBuffers = new Map();
   const audioBufferPromises = new Map();
 
@@ -460,9 +564,42 @@
 
   prepareNextStreakPet();
 
+  if (nativeTowerAudio) {
+    nativeTowerAudio.configure({
+      onAppInactive: () => {
+        // A held iOS App Switcher can leave the WebView visibly mounted.
+        // Cancel any async start and freeze the SAME run and virtual clock.
+        if (nativeTowerPending) stopNativeTowerRound();
+        if (!state.running || state.done) return;
+        if (!towerWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Never request AVAudioSession activation during foreground.
+        towerWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || returnPaused || document.hidden ||
+            !state.running || state.done ||
+            ["menu","speed","help","welcome-back"].includes(state.pauseReason))
+          return;
+        setPaused(true, "native-audio-error");
+        nativeTowerRetry = {kind:"resume",mode:null};
+        showNativeTowerFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden && nativeTowerPending) stopNativeTowerRound();
+    });
+  }
+
   renderIntro();
 
   function renderIntro() {
+    nativeTowerMenuOpen = false;
+    nativeTowerSpeedMenuOpen = false;
+    if (nativeTowerPending) stopNativeTowerRound();
+    clearNativeTowerFailure();
     stopLoop();
 
     window.VerseGameShell.renderTitleScreen({
@@ -476,17 +613,23 @@
       backLabel: "Back to Practice Games",
       onBack: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
-        unlockAudio();
+        if (!nativeTowerAudio) unlockAudio();
         playUiTapSound();
         renderModeSelect();
       }
     });
+    wireNativeTowerTitleHelpPops();
   }
 
   function renderModeSelect() {
+    nativeTowerMenuOpen = false;
+    nativeTowerSpeedMenuOpen = false;
+    if (nativeTowerPending) stopNativeTowerRound();
+    clearNativeTowerFailure();
     stopLoop();
 
     window.VerseGameShell.renderModeSelect({
@@ -498,18 +641,34 @@
       theme: GAME_THEME,
       backLabel: "Back to Tower of Bible title",
       onBack: () => {
+        if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        unlockAudio();
-        playUiTapSound();
-        startGame(mode);
+        if (nativeTowerAudio) {
+          if (nativeTowerPending) return;
+          primeNativeTowerFromGesture("round",mode,
+            muted ? null : nextNativeTowerUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          startGame(mode);
+        }
       }
     });
+    wireNativeTowerTitleHelpPops();
   }
 
   function startGame(mode) {
+    if (nativeTowerAudio && !muted && !nativeTowerAudio.isReady()) {
+      nativeTowerRetry = {kind:"round",mode};
+      showNativeTowerFailure("Native sounds aren't ready. Tap Try Again.");
+      return;
+    }
+    clearNativeTowerFailure();
+    nativeTowerMenuOpen = false;
+    nativeTowerSpeedMenuOpen = false;
     selectedMode = mode;
     window.VerseGameShell.resetGameSpeed();
     completionMarked = false;
@@ -630,16 +789,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeTowerAudio) unlockAudio();
+        if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         renderModeSelect();
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -677,15 +839,11 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        unlockAudio();
-
+        if (!nativeTowerAudio) unlockAudio();
         const wasMuted = muted;
         muted = !muted;
-
-        if (wasMuted) {
-          playUiTapSound(true);
-        }
-
+        if (nativeTowerAudio && muted) void nativeTowerAudio.stop();
+        if (wasMuted) playUiTapSound(true);
         return muted;
       },
       onHowToPlay: () => {
@@ -693,23 +851,43 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        nativeTowerMenuOpen = false;
+        nativeTowerSpeedMenuOpen = false;
+        if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         setPaused(false, "");
         stopLoop();
         renderModeSelect();
       },
       onExit: () => {
+        nativeTowerMenuOpen = false;
+        nativeTowerSpeedMenuOpen = false;
         playUiTapSound();
+        if (nativeTowerAudio) stopNativeTowerRound();
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
-        playUiTapSound();
+        // Shell pointerdown + click and the legacy onclick may overlap.
+        if (nativeTowerPending || returnPaused ||
+            (nativeTowerAudio && (nativeTowerMenuOpen ||
+              (state.paused && state.pauseReason === "menu"))))
+          return false;
+        nativeTowerMenuOpen = true;
         setPaused(true, "menu");
+        if (nativeTowerAudio) void nativeTowerAudio.stop();
+        playUiTapSound();
+        return true;
       },
       onClose: () => {
-        playUiTapSound();
-        setPaused(false, "");
+        if (returnPaused || nativeTowerPending) return;
+        nativeTowerMenuOpen = false;
+        if (nativeTowerAudio && !muted) {
+          primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
+        } else {
+          playUiTapSound();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapSound();
@@ -719,41 +897,41 @@
     window.VerseGameShell.wireSpeedMenu({
       id: "tbSpeedMenuOverlay",
       buttonId: "tbSpeedPill",
-
       onOpen: () => {
         if (
-          state.introActive ||
-          state.collapseTriggered ||
-          state.frenzyActive ||
-          state.done
-        ) {
-          return false;
-        }
-
-        playUiTapSound();
+          state.introActive || state.collapseTriggered ||
+          state.frenzyActive || state.done || nativeTowerPending ||
+          returnPaused || (nativeTowerAudio &&
+            (nativeTowerSpeedMenuOpen ||
+              (state.paused && state.pauseReason === "speed")))
+        ) return false;
+        nativeTowerSpeedMenuOpen = true;
         setPaused(true, "speed");
-
+        if (nativeTowerAudio) void nativeTowerAudio.stop();
+        playUiTapSound();
         return true;
       },
-
       onChange: () => {
         updateBeltSpeedFromSettings();
       },
-
       onClose: () => {
-        playUiTapSound();
-
+        if (returnPaused || nativeTowerPending) return;
+        nativeTowerSpeedMenuOpen = false;
         if (
-          !state.introActive &&
-          !state.collapseTriggered &&
-          !state.frenzyActive &&
-          !state.done
+          !state.introActive && !state.collapseTriggered &&
+          !state.frenzyActive && !state.done
         ) {
-          setPaused(false, "");
+          if (nativeTowerAudio && !muted) {
+            primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
+          } else {
+            playUiTapSound();
+            setPaused(false, "");
+          }
+        } else {
+          playUiTapSound();
         }
       }
     });
-
   }
 
   function wireGameInput() {
@@ -807,6 +985,13 @@
   }
 
   function openGameMenu() {
+    if (nativeTowerPending || returnPaused ||
+        (nativeTowerAudio && (nativeTowerMenuOpen ||
+          (state.paused && state.pauseReason === "menu"))))
+      return;
+    nativeTowerMenuOpen = true;
+    setPaused(true, "menu");
+    if (nativeTowerAudio) void nativeTowerAudio.stop();
     playUiTapSound();
 
     const menuOverlay = document.getElementById("tbGameMenuOverlay");
@@ -817,8 +1002,16 @@
     }
   }
   function closeGameMenu() {
-    playUiTapSound();
-
+    if (returnPaused || nativeTowerPending) return;
+    nativeTowerMenuOpen = false;
+    const helpOverlay = document.getElementById("tbHelpOverlay");
+    if (nativeTowerAudio && !muted && (!helpOverlay ||
+        !helpOverlay.classList.contains("is-open"))) {
+      // Keyboard Escape and legacy Close may bypass shell's onClose.
+      primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
+    } else {
+      playUiTapSound();
+    }
     const menuOverlay = document.getElementById("tbGameMenuOverlay");
 
     if (menuOverlay && menuOverlay.contains(document.activeElement)) {
@@ -830,8 +1023,8 @@
       menuOverlay.setAttribute("aria-hidden", "true");
     }
 
-    const helpOverlay = document.getElementById("tbHelpOverlay");
-    if (!helpOverlay || !helpOverlay.classList.contains("is-open")) setPaused(false, "");
+    if ((!helpOverlay || !helpOverlay.classList.contains("is-open")) &&
+        (!nativeTowerAudio || muted)) setPaused(false, "");
   }
 
   function openHelpFromMenu() {
@@ -870,6 +1063,7 @@
   }
 
   function getSilenceAudioElement() {
+    if (nativeTowerAudio) return null;
     if (silenceAudioEl) return silenceAudioEl;
 
     silenceAudioEl = document.createElement("audio");
@@ -884,6 +1078,7 @@
   }
 
   function primeHtmlAudio() {
+    if (nativeTowerAudio) return;
     try {
       const audio = getSilenceAudioElement();
       audio.muted = false;
@@ -911,6 +1106,7 @@
   }
 
   function ensureAudioContext() {
+    if (nativeTowerAudio) return null;
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -925,6 +1121,7 @@
   }
 
   function unlockAudio() {
+    if (nativeTowerAudio) return nativeTowerAudio.isReady();
     const ctx = ensureAudioContext();
     if (!ctx || !masterGain) {
       audioUnlocked = false;
@@ -1025,6 +1222,13 @@
   }
 
   function playGeneratedSound(eventId) {
+    if (nativeTowerAudio) {
+      if (muted || returnPaused || document.hidden || state.paused ||
+          !state.running) return;
+      // Correct/wrong Web multipliers (3.4/3.6) are baked into native PCM.
+      nativeTowerAudio.play(eventId, 1);
+      return;
+    }
     if (muted) {
       if (SOUND_TUNING.debug) console.log("[TowerBibleSound] muted generated", eventId);
       return;
@@ -1054,11 +1258,13 @@
   }
 
   function preloadAudioFiles() {
+    if (nativeTowerAudio) return; // No iOS Web decoder.
     Object.values(UI_SOUND_FILES).forEach((url) => loadAudioBuffer(url));
     Object.values(TOWER_SOUND_FILES).forEach((url) => loadAudioBuffer(url));
   }
 
   function loadAudioBuffer(url) {
+    if (nativeTowerAudio) return Promise.resolve(null);
     if (!url) return Promise.resolve(null);
 
     if (audioBuffers.has(url)) {
@@ -1115,6 +1321,7 @@
   }
 
   function playBufferedSound(url, eventId, allowWhenMuted = false) {
+    if (nativeTowerAudio) return; // Game events use native playGameSound.
     if (muted && !allowWhenMuted) return;
 
     unlockAudio();
@@ -1154,12 +1361,26 @@
   }
 
   function playUiTapSound(allowWhenMuted = false) {
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
-    playBufferedSound(UI_SOUND_FILES[key], "uiTap", allowWhenMuted);
+    const key = nextNativeTowerUiKey();
+    if (nativeTowerAudio) {
+      if ((!muted || allowWhenMuted) && !returnPaused && !document.hidden)
+        nativeTowerAudio.tapUiFromGesture(key, getSoundVolume("uiTap"));
+    } else {
+      playBufferedSound(UI_SOUND_FILES[key], "uiTap", allowWhenMuted);
+    }
   }
 
   function playGameSound(eventId) {
+    if (nativeTowerAudio) {
+      if (muted || returnPaused || document.hidden || state.paused ||
+          !state.running) return;
+      // JS generated correct/wrong tones baked at original authored gains.
+      // Packaged MP3s retain their original per-event volume multipliers.
+      nativeTowerAudio.play(eventId,
+        eventId === "correctWord" || eventId === "wrongWord"
+          ? 1 : getSoundVolume(eventId));
+      return;
+    }
     if (SOUND_TUNING.debug) {
       console.log("[TowerBibleSound] request", eventId);
     }
@@ -1186,6 +1407,8 @@
 
   function setPaused(paused, reason = "") {
     if (returnPaused && !paused) return;
+    if (!paused && nativeTowerAudio && !muted &&
+        !nativeTowerAudio.isReady()) return;
     state.paused = paused;
     state.pauseReason = paused ? reason : "";
     if (!paused) state.lastTs = gameNow();
@@ -3741,6 +3964,7 @@
   function pauseForTaskSwitch() {
     returnSession += 1;
     if (returnPaused) return;
+    if (nativeTowerAudio) stopNativeTowerRound();
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
@@ -3756,7 +3980,8 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeTowerAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       const old = audioCtx;
       audioCtx = null;
@@ -3766,13 +3991,21 @@
       audioBufferPromises.clear();
       try { Promise.resolve(old?.close?.()).catch(() => {}); } catch (_) {}
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Only this REAL Let's go tap may reclaim native priority from PiP.
+    // UIKit foreground and interruption notifications only pause/show UI.
+    const restore = nativeTowerAudio
+      ? (muted ? Promise.resolve(true) :
+          nativeTowerAudio.prepareFromGesture().then(result =>
+            (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      if (ok?.deferred === true) return ok; // Higher-priority OS audio: retriable.
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
         return false;
@@ -3789,14 +4022,20 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  towerWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeTowerAudio,
+    suppressUiSound: !!nativeTowerAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeTowerAudio) stopNativeTowerRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });

@@ -97,6 +97,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_ui_audio_n5a.js
 
+      - name: Validate N6j Tower of Bible 6 MP3 + 2 native synthesized cues and PiP recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_tower_bible_n6j.js
+
       - name: Validate N6i Versey Bird native PCM, checkpoint wake and PiP recovery
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_versey_bird_n6i.js

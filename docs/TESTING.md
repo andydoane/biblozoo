@@ -2,7 +2,15 @@
 
 > This document describes the **current `ios-prep` workflow**, verified against source on 2026-11-05. Check [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md), `package.json`, and the current scripts before claiming any test exists or passed. Automated checks and physical iPhone acceptance are different.
 
-## N6i — Versey Bird native-only PCM + halfway checkpoint (OPEN PR #50)
+## N6j — Tower of Bible native PCM, generated word cues and physical iPhone gate (PR #51)
+
+**Current progress (2026-11-08):** [N6i Versey Bird #50](https://github.com/andydoane/biblozoo/pull/50) is **MERGED** as `5d6378f`, and the owner now reports real-iPhone **testing successful**. This raises standalone native games to **8/12 owner-accepted**. [N6h.2 PiP #49](https://github.com/andydoane/biblozoo/pull/49) was likewise merged and owner reports multi-scenario PiP recovery PASS. The prior N6i/#50 OPEN notices below are **historical pre-merge checklists**, not current status.
+
+**New [N6j Tower PR #51](https://github.com/andydoane/biblozoo/pull/51) is OPEN/NOT MERGED.** It adds **6 shipped Tower MP3s + 2 fixed Swift-generated word cues + 2 shared native UI pops** (10 fixed IDs) to the sole `.soloAmbient`/prewarmed `AVAudioEngine` PCM worker, preserving Web/PWA/Android original audio and Tower gameplay. Verify original ascending 4-note correct and 2-note wrong sounds (frequencies and authored volume baked into native PCM) plus brick land, warning 1/2, collapse, break, streak; title/mode/Help/Back, full mode preflight, Game/Speed Close, mute, Frenzy bomb, warning/collapse, physics/score, no early unpause, held App Switcher and PiP STILL PLAYING/paused/OS denial, Home after exit and old eight native games/Feeding/Learn.
+
+**From VS Code in the separate `biblozoo-native-audio` folder:** `git fetch origin`, `git switch --track origin/experiment/n6j-native-tower-of-bible` (or `git switch experiment/n6j-native-tower-of-bible && git pull --ff-only origin experiment/n6j-native-tower-of-bible` when already present), `npm ci`, `node scripts/validate_native_tower_bible_n6j.js`, `node scripts/validate_native_versey_bird_n6i.js`, `node scripts/validate_native_pip_takeover_n6h2.js`, `npm run build`, `node scripts/validate_native_only_ios_output.js`, `npx cap sync ios`, `npx cap open ios`. Use **App** scheme for separate BibloZoo Audio Test `com.andydoane.biblozoo.audiotest` on a physical iPhone. **Final PR HEAD Node/regression and production web CI GREEN**, independent **Mac Xcode Swift compile**, and **owner actually hears iPhone effects** are three distinct gates. Only owner merges, then count becomes 9/12 after reported successful test. Full [N6j owner guide](N6J-NATIVE-TOWER-OF-BIBLE.md). Any silence: before restarting DEV Inspect native state + Copy Audio Timing Report and note PiP playing/paused.
+
+## N6i — historical owner-merged Versey Bird (#50, device PASS reported)
 
 **Current corrected status (2026-11-08):** [PiP #49](https://github.com/andydoane/biblozoo/pull/49) is **MERGED** as `d19a314`; the experiment branch's [post-merge Node + web CI](https://github.com/andydoane/biblozoo/actions/runs/42530212683) passed. The owner subsequently reports successful audio recovery across multiple real-iPhone PiP tests, superseding #48's historical paused-vs-still-playing failures and #49's pre-merge pending marker. Exact scenarios/devices were not provided. Seven game migrations are currently accepted; [N6i Versey Bird open PR #50](https://github.com/andydoane/biblozoo/pull/50) is the proposed eighth and **not yet owner-tested/merged**.
 
@@ -10,7 +18,7 @@
 
 **Physical iPhone tests:** after building **BibloZoo Audio Test** (`com.andydoane.biblozoo.audiotest`) in Xcode, hear four randomized flap MP3 variants plus bee/boulder/correct/wrong/streak/pipe sounds and fixed UI pops; start/mode/Help/Back, Game Menu/Speed Close full prewarm, pause/mute/retry/Back and no routine gray popup; repeat the halfway nap *document reload* and tap-to-wake while preserving the saved checkpoint; held App Switcher/full return, PiP with YouTube PAUSED then STILL PLAYING, cold launch under existing PiP and Home after game; regress existing seven games, Feeding four modes, Learn and previews. Verify sound **by ear**, no automatic foreground session takeover and same score/verse/bonus/timers. On failure BEFORE app restart DEV Inspect native state + Copy Audio Timing Report. [Full N6i steps and copyable commands](N6I-NATIVE-VERSEY-BIRD.md).
 
-**Status:** code/CI proposed in #50, **Mac Xcode compile and owner-heard iPhone pending**. Do not count Versey Bird as game 8/12 until actual merge and owner acceptance. Same PR updates the living handoff and this testing guide. Owner alone merges.
+**Historical status when #50 was open:** the owner has since merged #50 and reported successful real-iPhone testing; Versey Bird now counts as the eighth accepted game. Same PR updates the living handoff and this testing guide. Owner alone merges.
 
 ## N6h.2 — historical #48 failures and #49 corrective design: from STILL-PLAYING YouTube PiP (PR #49)
 
