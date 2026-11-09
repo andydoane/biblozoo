@@ -1045,7 +1045,8 @@
 
   function renderIntro() {
     if (nativeTrafficAudio) {
-      stopNativeTrafficRound();
+      if (state.running) stopNativeTrafficRound();
+      state.running = false;
       clearNativeTrafficFailure();
     }
     stopLoop();
@@ -1077,7 +1078,10 @@
 
   function renderModeSelect() {
     if (nativeTrafficAudio) {
-      stopNativeTrafficRound();
+      // Do not cancel the first title pop's two-UI prewarm while
+      // navigating into mode; only tear down an already-running game.
+      if (state.running) stopNativeTrafficRound();
+      state.running = false;
       clearNativeTrafficFailure();
     }
     stopLoop();
@@ -1440,8 +1444,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
   function toggleMute(muteBtn, menuMuteBtn) {
     muted = !muted;
+    if (nativeTrafficAudio && muted) void nativeTrafficAudio.stop();
     if (!muted) {
-      unlockAudio();
+      if (!nativeTrafficAudio) unlockAudio();
       playUiTapSound();
     }
     if (muteBtn) muteBtn.textContent = muted ? "🔇" : "🔊";
@@ -1479,7 +1484,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
         if (!hit) return;
         if (e.cancelable) e.preventDefault();
         e.stopPropagation();
-        unlockAudio();
+        if (!nativeTrafficAudio) unlockAudio();
         const id = Number(hit.dataset.itemId);
         if (!Number.isFinite(id)) return;
         if (state.bonusRound) chooseBonusItem(id, hit);
@@ -3598,6 +3603,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function pauseForTaskSwitch() {
     returnSession += 1;
     if (returnPaused) return;
+    // Native lifecycle already invalidated Swift PCM; kill any stale JS
+    // mode/Close promise before the old async callback can start a run.
+    if (nativeTrafficAudio) nativeTrafficToken++;
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
@@ -3613,25 +3621,33 @@ In the bonus round, tap as many of the target vehicle as you can.`;
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeTrafficAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       // Reuse the existing bounded new-context-on-gesture path.
       replaceStuckTrafficTapAudioContext();
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: () => {
-        if (returnContextReplacements >= 1) return false;
-        returnContextReplacements += 1;
-        audioUnlocked = false;
-        return replaceStuckTrafficTapAudioContext();
-      },
-      muted
-    });
+    // Only this ACTUAL Let's go tap may reclaim priority from YouTube PiP.
+    const restore = nativeTrafficAudio
+      ? (muted ? Promise.resolve(true) :
+        nativeTrafficAudio.prepareFromGesture().then(result =>
+          window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+          (result?.ready === true)))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          replaceContext: () => {
+            if (returnContextReplacements >= 1) return false;
+            returnContextReplacements += 1;
+            audioUnlocked = false;
+            return replaceStuckTrafficTapAudioContext();
+          },
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
         return false;
@@ -3648,14 +3664,20 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  trafficWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeTrafficAudio,
+    suppressUiSound: !!nativeTrafficAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeTrafficAudio) stopNativeTrafficRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
