@@ -1719,6 +1719,11 @@
   }
 
   function setScreen(screen){
+    if (nativeScrambleAudio && screen!=="game") {
+      stopNativeScrambleRound();
+      clearNativeScrambleFailure();
+      finishNativeScrambleFreeze();
+    }
     state.screen = screen;
     render();
   }
@@ -1850,13 +1855,19 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        if (nativeScrambleAudio) stopNativeScrambleRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        unlockAudio();
+        if (!nativeScrambleAudio) unlockAudio();
         playUiTapSound();
         setScreen("mode");
       }
     });
+    if (nativeScrambleAudio) {
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
+    }
   }
 
   function renderMode(){
@@ -1873,6 +1884,11 @@
         setScreen("intro");
       },
       onSelect: async (mode) => {
+        if (nativeScrambleAudio) {
+          primeNativeScrambleFromGesture("round",mode,
+            muted?null:nextNativeScrambleUiKey());
+          return;
+        }
         unlockAudio();
         playUiTapSound();
         await waitForMagnetFont();
@@ -1890,6 +1906,9 @@
         setScreen("game");
       }
     });
+    if (nativeScrambleAudio) {
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
+    }
   }
 
 
@@ -2468,16 +2487,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeScrambleAudio) unlockAudio();
+        if (nativeScrambleAudio) stopNativeScrambleRound();
         playUiTapSound();
         setScreen("mode");
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeScrambleAudio) stopNativeScrambleRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeScrambleAudio) stopNativeScrambleRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
