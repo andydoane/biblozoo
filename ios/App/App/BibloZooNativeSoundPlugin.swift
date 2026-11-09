@@ -2442,6 +2442,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               scrubSoundResources[soundId] != nil ||
               scrubToneIDs.contains(soundId) ||
               wheelToneIDs.contains(soundId) ||
+              jamIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -2537,9 +2538,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                self.scrambleToneIDs.contains(soundId) ||
                self.typerToneIDs.contains(soundId) ||
                self.scrubToneIDs.contains(soundId) ||
-               self.wheelToneIDs.contains(soundId) {
+               self.wheelToneIDs.contains(soundId) ||
+                (self.jamIDs.contains(soundId) &&
+                 self.jamVoiceResources[soundId] == nil) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
+            } else if let resourceName = self.jamVoiceResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_playground/verse_jam/verse_jam_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
             } else if let resourceName = self.scrubSoundResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
@@ -2666,7 +2677,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.wheelToneIDs.contains(soundId) {
+                if self.jamIDs.contains(soundId) &&
+                    self.jamVoiceResources[soundId] == nil {
+                    let result = self.prepareJamOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-jam"
+                } else if self.wheelToneIDs.contains(soundId) {
                     let result = self.prepareWheelToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
@@ -2822,6 +2840,27 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             } else {
                 requestedNoteIndex = nil
             }
+            // Jam's source-backed finite recipes are verified on main before worker.
+            let requestedJamNote: String?
+            if soundId == "jam-note" {
+                guard let noteId = call.getString("noteId"),
+                      self.jamNoteRecipes[noteId] != nil else {
+                    call.resolve(["accepted": false, "reason": "invalid-jam-note"])
+                    return
+                }
+                requestedJamNote = noteId
+            } else { requestedJamNote = nil }
+            let requestedJamPad: String?
+            if soundId == "jam-pad" {
+                guard let padId = call.getString("padId"),
+                      padId.split(separator: "-").count == 2,
+                      self.jamBPMs.contains(Int(padId.split(separator: "-")[0]) ?? -1),
+                      self.jamPadBeats.contains(Int(padId.split(separator: "-")[1]) ?? -1) else {
+                    call.resolve(["accepted": false, "reason": "invalid-jam-pad"])
+                    return
+                }
+                requestedJamPad = padId
+            } else { requestedJamPad = nil }
             let requestedMidi: Int?
             if soundId == self.nativeMelodySoundID {
                 guard let midi = call.getInt("midi"),
@@ -2884,7 +2923,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         return
                     }
                     let buffer: AVAudioPCMBuffer?
-                    if soundId == self.nativeSnakeOrbSoundID {
+                    if soundId == "jam-note" {
+                        buffer = self.jamNoteBuffers[requestedJamNote ?? ""]
+                    } else if soundId == "jam-pad" {
+                        buffer = self.jamPadBuffers[requestedJamPad ?? ""]
+                    } else if soundId == self.nativeSnakeOrbSoundID {
                         buffer = self.snakeOrbToneBuffers[requestedNoteIndex ?? -1]
                     } else if soundId == self.nativePegSoundID {
                         buffer = self.pegToneBuffers[requestedNoteIndex ?? -1]
@@ -3016,7 +3059,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         onMain { [weak self] in
             guard let self=self,
                   let soundId=call.getString("soundId"),
-                  soundId == "scrub-mower" else {
+                  (soundId == "scrub-mower" || soundId == "jam-group") else {
                 call.resolve(["stopped":false,"reason":"invalid-sound-id"])
                 return
             }
@@ -3028,13 +3071,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     }
                     return
                 }
-                if let nodes=self.effectNodes[soundId],
-                    let buffer=self.effectBuffers[soundId],
-                    let engine=self.effectsEngine,engine.isRunning {
-                    for node in nodes {
-                        node.stop()
-                        node.prepare(withFrameCount:buffer.frameLength)
-                        node.play()
+                let group: [String] = soundId == "jam-group"
+                    ? ["jam-note", "jam-pad", "jam-drum-kick", "jam-drum-snare",
+                       "jam-drum-hat", "jam-drum-extra"] +
+                        self.jamVoices.map { "jam-voice-" + $0 }
+                    : [soundId]
+                if let engine=self.effectsEngine,engine.isRunning {
+                    for item in group {
+                        guard let nodes=self.effectNodes[item] else { continue }
+                        for node in nodes {
+                            node.stop()
+                            node.play() // preserve warmed bank, cancel ghost notes
+                        }
                     }
                 }
                 DispatchQueue.main.async {
