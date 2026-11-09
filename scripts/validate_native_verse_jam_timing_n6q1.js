@@ -83,8 +83,12 @@ async function main() {
     "Repeated OS/visibility pause must not enqueue duplicate stops");
   has(swift,"let rise = pow(0.016/0.0001",
     "Chord exponential gain ratio is computed once per buffer");
-  has(swift,"let decay = pow(0.0001/0.016",
-    "Pad decay is an inexpensive per-sample multiplier");
+  has(swift,"let fadeFrames = Double(max(1, activeFrames - attackFrames))",
+    "Attack and decay math must reuse an explicit finite frame count");
+  has(swift,"let decay = pow(0.0001 / 0.016, 1.0 / fadeFrames)",
+    "Pad decay must remain a per-buffer exponential multiplier");
+  has(swift,"let decay = pow(0.0001, 1.0 / fadeFrames)",
+    "Note decay must remain a per-buffer exponential multiplier");
   has(swift,"let rise = pow(1.0/0.0001",
     "Tone gain ratio is computed once per note buffer");
 
