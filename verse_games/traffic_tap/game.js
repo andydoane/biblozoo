@@ -469,6 +469,7 @@
   }
 
   function getSilenceAudioElement() {
+    if (nativeTrafficAudio) return null;
     if (silenceAudioEl) return silenceAudioEl;
 
     silenceAudioEl = document.createElement("audio");
@@ -483,6 +484,7 @@
   }
 
   function primeHtmlAudio() {
+    if (nativeTrafficAudio) return;
     try {
       const audio = getSilenceAudioElement();
       audio.muted = false;
@@ -514,6 +516,7 @@
   }
 
   function loadZoomAudioBuffer() {
+    if (nativeTrafficAudio) return Promise.resolve(null);
     if (zoomAudioBuffer) return Promise.resolve(zoomAudioBuffer);
     if (zoomAudioLoadPromise) return zoomAudioLoadPromise;
 
@@ -555,6 +558,13 @@
   }
 
   function playZoomSound() {
+    if (nativeTrafficAudio) {
+      if (!muted && !returnPaused && !nativeTrafficPending &&
+          !nativeTrafficFailure && !state.paused && state.running &&
+          !document.hidden)
+        nativeTrafficAudio.play("zoomLaunch",getZoomVolume());
+      return;
+    }
     if (muted) return;
 
     try {
@@ -587,6 +597,7 @@
   }
 
   function loadUiSoundBuffer(key) {
+    if (nativeTrafficAudio) return Promise.resolve(null);
     if (uiSoundBuffers.has(key)) return Promise.resolve(uiSoundBuffers.get(key));
     if (uiSoundBufferPromises.has(key)) return uiSoundBufferPromises.get(key);
 
@@ -627,10 +638,12 @@
   }
 
   function preloadUiSoundBuffers() {
+    if (nativeTrafficAudio) return;
     Object.keys(UI_SOUND_FILES).forEach(loadUiSoundBuffer);
   }
 
   async function playUiBufferSound(key, volumeKey = "uiTap") {
+    if (nativeTrafficAudio) return;
     if (muted) return;
 
     try {
@@ -666,10 +679,14 @@
     if (now - lastUiSoundAt < 80) return;
     lastUiSoundAt = now;
 
+    if (nativeTrafficAudio) {
+      const key=nextNativeTrafficUiKey();
+      if (!returnPaused && !document.hidden)
+        nativeTrafficAudio.tapUiFromGesture(key,getSoundVolume("uiTap"));
+      return;
+    }
     unlockAudio();
-
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
+    const key = nextNativeTrafficUiKey();
     playUiBufferSound(key, "uiTap");
   }
 
@@ -679,6 +696,7 @@
   let audioResumeFailures = 0;
 
   function ensureAudioContext() {
+    if (nativeTrafficAudio) return null;
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -704,6 +722,7 @@
   }
 
   function replaceStuckTrafficTapAudioContext() {
+    if (nativeTrafficAudio) return false;
     const previous = audioCtx;
     const previousGain = masterGain;
     audioCtx = null;
@@ -726,6 +745,7 @@
   }
 
   function unlockAudio() {
+    if (nativeTrafficAudio) return nativeTrafficAudio.isReady();
     let ctx = ensureAudioContext();
     if (!ctx || !masterGain) {
       audioUnlocked = false;
@@ -805,6 +825,7 @@
   }
 
   function onTrafficTapAudioGesture() {
+    if (nativeTrafficAudio) return;
     if (!muted && (!audioUnlocked || !audioCtx || audioCtx.state !== "running")) {
       unlockAudio();
     }
@@ -989,6 +1010,19 @@
   };
 
   function playGameSound(eventId) {
+    if (nativeTrafficAudio) {
+      if (muted || returnPaused || nativeTrafficPending ||
+          nativeTrafficFailure || !state.running || state.paused ||
+          document.hidden) return;
+      // Bonus tap climbs through eight distinct hard-coded melodic pairs,
+      // matching original (bonusStreak - 1) % 8, not a generic effect.
+      const key=eventId==="bonusTap"
+        ? "bonusTap"+((Math.max(0,state.bonusStreak-1)%8)+1)
+        : eventId;
+      // Swift precomputed each generated Web oscillator at authored gain.
+      nativeTrafficAudio.play(key,1);
+      return;
+    }
     if (muted) return;
 
     // An animation/timer may fire this without user activation. Only the
