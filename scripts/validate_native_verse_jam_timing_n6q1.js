@@ -65,13 +65,15 @@ async function main() {
   has(swift,"AVAudioTime(hostTime: mach_absolute_time()",
     "Native PCM uses host-time scheduling, not at-the-beat hot dispatch");
 
-  // The authored sting already supplies a pitched note at each native
-  // transition word; N6q.3 suppresses only the doubled word-note layer.
-  // Browser WebAudio retains its two original source layers unchanged.
+  // N6q.4 restores the TWO original source layers heard in ios-prep:
+  // "Time" opens with C/G/C plus the E word-note; Speed and Feel likewise
+  // keep their original intentionally overlapping word notes.
   has(game,"playRoundTransitionSting(transitionStart)",
-    "Source transition melody/chord must remain scheduled before word UI");
-  has(game,"The authored sting ALREADY supplies",
-    "Never duplicate source note on the same native transition beat");
+    "Original chord and transition melody must stay before word animation");
+  has(game,"Exact original ios-prep arrangement has TWO deliberate sound layers",
+    "Native must preserve all ios-prep source notes, not delete word cues");
+  has(game,'jamCue: "transition-word"',
+    "Original native per-word notes are scheduled in advance of DOM painting");
   has(game,"if (!nativeJamAudio) {\n        playTone({",
     "Browser retains the original visual-word cue path");
   for(const text of ['["time", "to", "jam!"]','["speed", "it", "up"]'])
@@ -178,6 +180,6 @@ async function main() {
   assert.strictEqual(resumed.ready,true);
   assert.strictEqual(calls.preload.length,26,
     "After real interruption the complete safe bank is rewarmed once");
-  console.log("N6q.1 PASS: watchdog ending, original authored transition sting without native duplicate notes, host-time Jam scheduling, mode prewarm/fast Got It, hot-bank reuse, one-stop interruption, nonclipped finale and Great responsiveness.");
+  console.log("N6q.1 PASS: watchdog ending, ios-prep two-layer native transition, host-time Jam scheduling, mode prewarm/Got It, hot-bank reuse, genuine one-stop interruption and Great finale.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

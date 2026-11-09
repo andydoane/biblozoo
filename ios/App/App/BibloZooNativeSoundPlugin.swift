@@ -22,6 +22,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         // N6o: cut only the bounded Scripture Scrub mower clip at the
         // end of its 1250ms visual pass; keep other PCM clips prepared.
         CAPPluginMethod(name: "stopEffect", returnType: CAPPluginReturnPromise),
+        // Debug-only data tracing: fixed Verse Jam phase/word timing, no audio.
+        CAPPluginMethod(name: "traceJamTransition", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "activateFromGesture", returnType: CAPPluginReturnPromise),
         // Read-only, bounded native session history; never activates audio.
         CAPPluginMethod(name: "getDebugState", returnType: CAPPluginReturnPromise),
@@ -2889,6 +2891,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 requestedNoteIndex = nil
             }
             // Jam's source-backed finite recipes are verified on main before worker.
+            let jamTraceCue: String?
+            if soundId == "jam-note",
+               let cue = call.getString("jamCue"),
+               ["transition-sting","transition-word"].contains(cue) {
+                jamTraceCue = cue
+            } else {
+                jamTraceCue = nil
+            }
             let requestedJamNote: String?
             if soundId == "jam-note" {
                 guard let noteId = call.getString("noteId"),
@@ -3030,6 +3040,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                                             options: [.interrupts],
                                             completionHandler: nil)
                     }
+                    #if DEBUG
+                    if let cue = jamTraceCue {
+                        let actualEpochMs = Date().timeIntervalSince1970*1000.0
+                        let leadMs = requestedJamDueEpochMs.map {
+                            Int(($0-actualEpochMs).rounded())
+                        } ?? -999
+                        NSLog("[VerseJamTiming] pcm cue=\(cue) " +
+                              "recipe=\(requestedJamNote ?? "?") " +
+                              "leadMs=\(leadMs) queueMs=\(queueMs) " +
+                              "hostScheduled=\(scheduledAt != nil) " +
+                              "workerEpochMs=\(Int(actualEpochMs))")
+                    }
+                    #endif
                     started = true // scheduled only, not speaker confirmation
                     durationMs = Int(Double(readyBuffer.frameLength) /
                                      readyBuffer.format.sampleRate * 1000)
@@ -3098,6 +3121,38 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
 
 
 
+    // N6q.4: correlate each original Verse Jam interstitial word's JS DOM
+    // insertion epoch with Swift queue/PCM scheduling in Xcode Debug Console.
+    // Never touches AVAudioSession/AVAudioEngine, media, child or verse data.
+    // Release builds acknowledge fixed markers but produce no NSLog.
+    @objc func traceJamTransition(_ call: CAPPluginCall) {
+        onMain {
+            guard let phase = call.getString("phase"),
+                  ["stop-request","stop-complete","phrase-scheduled",
+                   "word-visible","next-groove"].contains(phase),
+                  let round = call.getInt("round"),
+                  (1...4).contains(round),
+                  let wordIndex = call.getInt("wordIndex"),
+                  (-1...2).contains(wordIndex),
+                  let jsEpochMs = call.getDouble("clientEpochMs"),
+                  jsEpochMs.isFinite else {
+                call.resolve(["ok":false,"reason":"invalid-jam-marker"])
+                return
+            }
+            let nowEpochMs = Date().timeIntervalSince1970*1000.0
+            guard abs(nowEpochMs-jsEpochMs) < 10_000 else {
+                call.resolve(["ok":false,"reason":"stale-jam-marker"])
+                return
+            }
+            #if DEBUG
+            NSLog("[VerseJamTiming] word phase=\(phase) round=\(round) " +
+                  "index=\(wordIndex) jsMs=\(Int(jsEpochMs)) " +
+                  "nativeReceiveMs=\(Int(nowEpochMs))")
+            #endif
+            call.resolve(["ok":true])
+        }
+    }
+
     @objc func stop(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self else {
@@ -3146,6 +3201,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 return
             }
             let epoch=self.playbackEpochSnapshot()
+            #if DEBUG
+            if soundId == "jam-groove" {
+                NSLog("[VerseJamTiming] groove-stop queued " +
+                      "nativeEpochMs=\(Int(Date().timeIntervalSince1970*1000.0))")
+            }
+            #endif
             self.playbackQueue.async { [weak self] in
                 guard let self=self,self.isCurrentPlaybackEpoch(epoch) else {
                     DispatchQueue.main.async {
@@ -3190,6 +3251,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         }
                     }
                 }
+                #if DEBUG
+                if soundId == "jam-groove" {
+                    NSLog("[VerseJamTiming] groove-stop finished " +
+                          "workerEpochMs=\(Int(Date().timeIntervalSince1970*1000.0))")
+                }
+                #endif
                 DispatchQueue.main.async {
                     call.resolve(["stopped":true,"reason":"stopped"])
                 }
