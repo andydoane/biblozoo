@@ -1580,8 +1580,9 @@
       backLabel: "Back to Playground",
       theme: GAME_THEME,
       onBack: () => {
+        // Avoid a late cold-start native UI clip after Playground exit.
         if(nativeScrubAudio)stopNativeScrubRun();
-        playUiTapSound();
+        else playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onStart: async () => {
@@ -1784,7 +1785,15 @@
       },
       onClose: () => {
         if(nativeScrubAudio){
-          if(nativeScrubPending || playgroundWelcome?.isPaused?.())return;
+          if(nativeScrubPending || playgroundWelcome?.isPaused?.()){
+            // The shared shell removes the DOM menu before onClose. If the
+            // app is still behind Welcome Back/preflight, restore it so the
+            // next genuine Close tap remains reachable after recovery.
+            const overlay=document.getElementById(MENU_OVERLAY_ID);
+            overlay?.classList.add("is-open");
+            overlay?.setAttribute("aria-hidden","false");
+            return;
+          }
           // Keep menu + time paused throughout full Swift bank preflight.
           // No routine gray loading dialog; real failure has Retry/Back.
           primeNativeScrubFromGesture("resume",scrubUiKey());
