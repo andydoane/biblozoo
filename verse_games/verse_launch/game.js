@@ -4601,6 +4601,7 @@
   function pauseForTaskSwitch() {
     returnSession += 1;
     if (returnPaused) return;
+    if (nativeLaunchAudio) stopNativeLaunchRound();
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
@@ -4619,18 +4620,27 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeLaunchAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // A real Let's go gesture can request priority over paused/still-playing
+    // PiP. Foreground and OS events must NEVER activate or auto-replay.
+    const restore = nativeLaunchAudio
+      ? (muted ? Promise.resolve(true) :
+        nativeLaunchAudio.prepareFromGesture().then(result =>
+          window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+          (result?.ready === true)))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
         return false;
@@ -4653,14 +4663,20 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  launchWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeLaunchAudio,
+    suppressUiSound: !!nativeLaunchAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => ["game", "travel", "asteroids"].includes(state.screen) && !state.completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeLaunchAudio) stopNativeLaunchRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
