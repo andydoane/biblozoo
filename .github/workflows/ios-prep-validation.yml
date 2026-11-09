@@ -1,6 +1,7 @@
 # Run automated checks for BibloZoo's iOS integration and native-audio experiment branches.
-# This checks JavaScript and web assets on Linux. It does NOT build the
-# native Xcode app, publish GitHub Pages, or replace physical iPhone testing.
+# This checks JavaScript, web assets, and Swift source syntax on Linux for
+# the native-audio experiment. It does NOT build/link the iOS Xcode app,
+# type-check against iOS SDKs, or replace physical iPhone testing.
 name: BibloZoo branch validation
 
 on:
@@ -40,6 +41,16 @@ jobs:
 
       - name: Verify tracked LF line endings
         run: node scripts/validate_tracked_lf_endings.js
+
+      # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
+      # plugin for grammar errors without needing UIKit/Capacitor modules.
+      # Unlike regex assertions, this catches Swift's newline/infix failures
+      # from N6q.1. It is NOT an iOS SDK type-check or Xcode build.
+      - name: Parse experimental native sound plugin with Swift compiler
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: |
+          command -v swiftc
+          swiftc -frontend -parse ios/App/App/BibloZooNativeSoundPlugin.swift
 
       - name: Validate experimental iOS app identity
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
