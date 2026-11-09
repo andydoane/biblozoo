@@ -1262,7 +1262,7 @@
         return;
       }
       if (ps.backgroundPausedAt !== null ||
-          document.documentElement?.classList?.contains("bz-playground-welcome-paused"))
+          (!fromGesture && document.documentElement?.classList?.contains("bz-playground-welcome-paused")))
         return;
       spookyRecoveryPending = false;
       startGhostSpookySounds();
@@ -1315,10 +1315,11 @@
     }
   }
 
-  function restoreGhostPlaybackFromBackground() {
+  function restoreGhostPlaybackFromBackground({ nativeGesture = false } = {}) {
     // Focus/pageshow is not permission to continue handwriting playback.
     // Wait for the shared acknowledgement and any required audio check.
-    if (document.hidden || document.documentElement?.classList?.contains("bz-playground-welcome-paused")) return;
+    if (document.hidden ||
+        (!nativeGesture && document.documentElement?.classList?.contains("bz-playground-welcome-paused"))) return;
     const ps = playbackState;
     if (ps?.running && ps.backgroundPausedAt !== null) {
       const elapsed = Math.max(0, performance.now() - ps.backgroundPausedAt);
@@ -1327,7 +1328,7 @@
       if (ps.pauseUntil) ps.pauseUntil += elapsed;
       if (!playbackRaf) playbackRaf = requestAnimationFrame(playbackFrame);
     }
-    recoverGhostSpookyAudio();
+    recoverGhostSpookyAudio({ fromGesture: nativeGesture });
   }
 
   function escapeHtml(value) {
@@ -1403,6 +1404,140 @@
     `;
   }
 
+
+  function nativeUiTapKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function clearNativeGhostDialogs() {
+    document.getElementById("ghostNativePreparing")?.remove();
+    document.getElementById("ghostNativeAudioFailure")?.remove();
+  }
+  function showNativeGhostPreparing() {
+    if (!nativeGhostAudio || document.hidden) return;
+    clearNativeGhostDialogs();
+    const overlay = document.createElement("div");
+    overlay.id = "ghostNativePreparing";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;" +
+      "display:flex;align-items:center;justify-content:center;padding:22px;" +
+      "background:rgba(5,5,16,.94);color:#fff;";
+    overlay.innerHTML = `<section role="status" aria-live="polite"
+      aria-label="Preparing Ghost Writer native sound" style="text-align:center;
+      max-width:350px;background:#252733;border:2px solid #d8d3ff;
+      border-radius:20px;padding:24px">
+      <h2>Getting spooky sounds ready…</h2>
+      <p>Your handwriting will stay here while the sounds prepare.</p>
+      <button id="ghostNativePreparingBack" type="button">Back to Playground</button>
+    </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#ghostNativePreparingBack")?.addEventListener("click", () => {
+      nativeGhostPreflightGeneration++;
+      nativeGhostPreflightPending = false;
+      nativeGhostPendingAction = null;
+      void nativeGhostAudio.stop();
+      bridge().exitGame?.();
+    });
+  }
+  function showNativeGhostFailure(label = "start") {
+    if (!nativeGhostAudio || document.hidden) return;
+    nativeGhostRetryLabel = label;
+    clearNativeGhostDialogs();
+    const overlay = document.createElement("div");
+    overlay.id = "ghostNativeAudioFailure";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;" +
+      "display:flex;align-items:center;justify-content:center;padding:22px;" +
+      "background:rgba(5,5,16,.94);color:#fff;";
+    overlay.innerHTML = `<section role="dialog" aria-modal="true"
+      aria-label="Ghost Writer native sound unavailable" style="text-align:center;
+      max-width:350px;background:#252733;border:2px solid #d8d3ff;
+      border-radius:20px;padding:24px">
+      <h2>Sound isn't ready</h2>
+      <p role="status">Ghost Writer is paused. Try again to prepare native sounds.</p>
+      <button id="ghostNativeTryAgain" type="button">Try Again</button>
+      <button id="ghostNativeBack" type="button">Back to Playground</button>
+    </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#ghostNativeTryAgain")?.addEventListener("click", () => {
+      // A real Try Again click owns native session activation.
+      primeNativeGhostFromGesture(nativeGhostPendingAction ||
+        (() => restoreGhostPlaybackFromBackground({ nativeGesture: true })),
+        nativeGhostRetryLabel);
+    });
+    overlay.querySelector("#ghostNativeBack")?.addEventListener("click", () => {
+      nativeGhostPreflightGeneration++;
+      nativeGhostPendingAction = null;
+      void nativeGhostAudio.stop();
+      bridge().exitGame?.();
+    });
+    overlay.querySelector("#ghostNativeTryAgain")?.focus?.();
+  }
+  // This function MUST be called in the original button-click stack.
+  // No session request is made by page visibility, rAF or a passive timer.
+  function primeNativeGhostFromGesture(action, label = "start") {
+    if (!nativeGhostAudio) { action?.(); return; }
+    if (nativeGhostPreflightPending) return;
+    nativeGhostPendingAction = action;
+    nativeGhostRetryLabel = label;
+    if (nativeGhostAudio.isReady()) {
+      clearNativeGhostDialogs();
+      nativeGhostPendingAction = null;
+      if (!muted) nativeGhostAudio.tapUiFromGesture(
+        nativeUiTapKey(), getSoundVolume("uiTap"));
+      action?.();
+      return;
+    }
+    const token = ++nativeGhostPreflightGeneration;
+    nativeGhostPreflightPending = true;
+    const uiTap = muted ? null : {
+      key: nativeUiTapKey(), volume: getSoundVolume("uiTap")
+    };
+    // Synchronous gesture activation occurs inside prepareFromGesture.
+    const preparation = nativeGhostAudio.prepareFromGesture(uiTap);
+    showNativeGhostPreparing();
+    void Promise.resolve(preparation).then(result => {
+      if (token !== nativeGhostPreflightGeneration || document.hidden) return;
+      nativeGhostPreflightPending = false;
+      document.getElementById("ghostNativePreparing")?.remove();
+      if (result?.ready === true && nativeGhostAudio.isReady()) {
+        clearNativeGhostDialogs();
+        nativeGhostPendingAction = null;
+        action?.();
+      } else if (NATIVE_TEMPORARY.has(result?.reason)) {
+        // Competing PiP/phone audio is an OS interruption, NOT PCM corruption.
+        // Keep the exact action/handwriting until ordinary Welcome Back Let's go.
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+      } else {
+        showNativeGhostFailure(label);
+      }
+    }).catch(() => {
+      if (token !== nativeGhostPreflightGeneration || document.hidden) return;
+      nativeGhostPreflightPending = false;
+      showNativeGhostFailure(label);
+    });
+  }
+  if (nativeGhostAudio) {
+    nativeGhostAudio.configure({
+      onAppInactive: () => {
+        pauseGhostPlaybackForBackground();
+        document.getElementById("ghostNativePreparing")?.remove();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive: () => {
+        playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        pauseGhostPlaybackForBackground();
+        if (!document.hidden) {
+          nativeGhostPendingAction = () =>
+            restoreGhostPlaybackFromBackground({ nativeGesture: true });
+          showNativeGhostFailure("return");
+        }
+      }
+    });
+  }
+
   function renderIntro() {
     stopPlayback();
     clearGuideTimer();
@@ -1454,8 +1589,12 @@
         renderIntro();
       },
       onSelect: (mode) => {
-        playUiTapSound();
-        startRun(mode);
+        if (nativeGhostAudio) {
+          primeNativeGhostFromGesture(() => startRun(mode), "start");
+        } else {
+          playUiTapSound();
+          startRun(mode);
+        }
       }
     });
   }
@@ -1515,12 +1654,26 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
+        if (nativeGhostAudio) {
+          muted = !muted;
+          if (muted) {
+            stopGhostSpookySounds();
+          } else {
+            // Mute can acknowledge silently; unmute requires a real gesture.
+            if (playbackState?.running && playbackState.options.spookySounds !== "off")
+              spookyRecoveryPending = true;
+            primeNativeGhostFromGesture(() => {
+              if (playbackState?.running)
+                recoverGhostSpookyAudio({ fromGesture: true });
+            }, "unmute");
+          }
+          return muted;
+        }
         if (muted) {
           muted = false;
           playUiTapSound();
           return muted;
         }
-
         playUiTapSound();
         muted = true;
         stopGhostSpookySounds();
@@ -1532,6 +1685,7 @@
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeGhostAudio) void nativeGhostAudio.stop();
         bridge().exitGame?.();
       },
       onOpen: () => {
@@ -1539,7 +1693,13 @@
         return true;
       },
       onClose: () => {
-        playUiTapSound();
+        if (nativeGhostAudio) {
+          primeNativeGhostFromGesture(() => {
+            restoreGhostPlaybackFromBackground({ nativeGesture: true });
+          }, "menu");
+        } else {
+          playUiTapSound();
+        }
       },
       onBackFromHelp: () => { }
     });
@@ -2616,12 +2776,13 @@
 
     wireMenu();
     document.getElementById("ghostWriteBtn")?.addEventListener("click", () => {
-      playUiTapSound();
-      renderPlayback({
+      const begin = () => renderPlayback({
         options: makeDefaultRemixOptions(),
         markPractice: true,
         returnTo: "remix"
       });
+      if (nativeGhostAudio) primeNativeGhostFromGesture(begin, "playback");
+      else { playUiTapSound(); begin(); }
     });
   }
 
@@ -3052,9 +3213,14 @@
     });
 
     document.getElementById("ghostReplayBtn")?.addEventListener("click", () => {
-      playUiTapSound();
       sanitizeRemixOptions(state.remix);
-      renderPlayback({ options: { ...state.remix }, markPractice: false, returnTo: "remix" });
+      const options = { ...state.remix };
+      const replay = () => renderPlayback({
+        options, markPractice: false, returnTo: "remix"
+      });
+      if (nativeGhostAudio && options.spookySounds !== "off" && !muted)
+        primeNativeGhostFromGesture(replay, "replay");
+      else { playUiTapSound(); replay(); }
     });
 
     document.getElementById("ghostSaveImageBtn")?.addEventListener("click", () => {
@@ -3127,8 +3293,9 @@
     });
 
     startOverConfirmBtn?.addEventListener("click", () => {
-      playUiTapSound();
-      startRun(selectedMode);
+      if (nativeGhostAudio) primeNativeGhostFromGesture(
+        () => startRun(selectedMode), "start-over");
+      else { playUiTapSound(); startRun(selectedMode); }
     });
 
     startOverConfirm?.addEventListener("click", (event) => {
