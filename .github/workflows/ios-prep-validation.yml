@@ -112,6 +112,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_playground_ghost_writer_n6r.js
 
+      - name: Validate N6q.3 Jam title and speed UI pops, Got It press and transition chords
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_verse_jam_ui_phrases_n6q3.js
+
       - name: Validate N6q.1 Jam watchdog, early beat cues, fast prewarm and Great finale
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_verse_jam_timing_n6q1.js
