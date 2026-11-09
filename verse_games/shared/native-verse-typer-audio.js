@@ -45,12 +45,13 @@
   let uiPreparation = null;
   // Use the existing N5b published-verse native narrator. A chunk is never
   // accepted as "heard" until its matching AVAudioPlayerDelegate ended.
-  let chunkSequence=0,activeChunk=null;
+  let chunkSequence=120000+Math.floor(Math.random()*500000),activeChunk=null;
   function stopChunk(){
     const old=activeChunk;
     if(!old)return;
     activeChunk=null;
     root.clearTimeout(old.poll);
+    root.clearTimeout(old.watchdog);
     old.resolve({ended:false,reason:"interrupted",positionMs:old.positionMs});
     try{void Promise.resolve(api()?.stopNarration?.({requestId:old.id})).catch(()=>{});}
     catch(_){}
@@ -60,6 +61,7 @@
     if(!old || old.id!==id)return;
     activeChunk=null;
     root.clearTimeout(old.poll);
+    root.clearTimeout(old.watchdog);
     old.resolve({ended,reason:why,positionMs:old.positionMs});
   }
   function pollChunk(id){
@@ -103,6 +105,12 @@
             settleChunk(id,false,reason(played?.reason));return;
           }
           pollChunk(id);
+          // If AVAudioPlayerDelegate never arrives, expose genuine failure
+          // rather than hanging forever or falsely claiming the verse heard.
+          const watchdog=Math.max(8000,Math.min(90000,
+            (Number(prep.durationMs)||10000)+7000));
+          current.watchdog=root.setTimeout(()=>
+            settleChunk(id,false,"narration-ended-timeout"),watchdog);
           // NO timeout completion. Only matching native 'ended' releases the
           // same word-review progression; OS interruption stops/preserves it.
         }catch(_){settleChunk(id,false,"narration-bridge-error");}
