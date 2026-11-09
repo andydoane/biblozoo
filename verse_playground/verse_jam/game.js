@@ -325,6 +325,10 @@
   // Hand Swift a short lookahead instead of submitting every note *after*
   // its JS timeout has already reached the visual beat.
   const NATIVE_JAM_LOOKAHEAD_MS = 100;
+  // Native has no WebAudio output compressor. Leave the original chiptune
+  // source/bpm intact while giving the kick/snare a little mixer headroom.
+  const NATIVE_JAM_DRUM_HEADROOM = 0.72;
+  const NATIVE_JAM_GOT_IT_PRESS_MS = 130;
   let nativeJamHeadsUpPrewarm = null;
   let nativeJamAwaitingStart = false;
   let nativeJamFailureRetry = "start";
@@ -2106,7 +2110,8 @@
     if (nativeJamAudio) {
       scheduleNativeJam(when, dueEpochMs =>
         nativeJamAudio.playDrum(sound, Math.max(0,
-          Math.min(1, drumVolume(volume) / MIX.drumMaster)), dueEpochMs));
+          Math.min(1, drumVolume(volume) / MIX.drumMaster)) *
+          NATIVE_JAM_DRUM_HEADROOM, dueEpochMs));
       return;
     }
 
@@ -2791,7 +2796,8 @@
   }
 
 
-  async function beginRun(mode, nativeAlreadyReady = false) {
+  async function beginRun(mode, nativeAlreadyReady = false,
+    headphonesPressedAt = 0) {
     if (nativeJamAudio) nativeJamAwaitingStart = false;
     selectedMode = mode;
 
@@ -2856,9 +2862,24 @@
 
     if (!isGameplayFlowActive(flowId)) return;
 
+    // Keep a real 130ms painted button press when native preflight was
+    // already complete. The activation call above still ran synchronously
+    // from Got It whenever a retry was needed.
+    if (nativeJamAudio && headphonesPressedAt > 0) {
+      const remainingPressMs = NATIVE_JAM_GOT_IT_PRESS_MS -
+        (performance.now() - headphonesPressedAt);
+      if (remainingPressMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingPressMs));
+      }
+    }
+    if (!isGameplayFlowActive(flowId)) return;
+
     state.phase = "intro";
     renderShellGame();
-    startBeatLoop();
+    // No stale music exists on first entrance from the pregame warning.
+    // A full jam-group stop here would reprepare all hot note voices
+    // immediately before the first kick/intro phrase.
+    startBeatLoop({cleanRestart: !nativeJamAudio});
     startGameplayWatchdog();
     await runIntroSequence(flowId);
 
@@ -3876,21 +3897,12 @@
         ? [67, 72, 79]
         : [72, 76, 79];
 
-    // Pre-schedule *each* word's cue while the first "Time"/"Speed"
-    // is still 80ms in the future. Previously it crossed JS -> Capacitor
-    // -> Swift only AFTER the word was painted, often arriving too late.
-    // Browser WebAudio retains its original word-by-word playback path.
-    if (nativeJamAudio) {
-      for (let index = 0; index < message.length; index += 1) {
-        playTone({
-          midi: transitionNotes[index % transitionNotes.length],
-          when: transitionStart + beat * index,
-          duration: 0.11,
-          volume: 0.045,
-          type: "square"
-        });
-      }
-    }
+    // The authored sting ALREADY supplies a beat-zero C/G/C chord for
+    // "Time", and a note on beats 0/1/2 for each other phrase. On native
+    // the former extra word-note layer doubled those pitches (and added
+    // a fourth simultaneous tone to "Time"). Keep the source sting,
+    // including its chord; do not submit redundant native word notes.
+    // Browser WebAudio intentionally retains both original layers.
 
     for (let index = 0; index < message.length; index += 1) {
       if (state.screen !== "game" || state.paused) return newGrooveStart;
@@ -4062,9 +4074,16 @@
           // Mode selection IS an explicit gesture, unlike a foreground
           // event. Start the expensive native PCM render here and keep its
           // promise alive across the immediately displayed Heads Up screen.
+          // If the title's cold UI tap has not finished yet, its own
+          // generation can be superseded by this game preflight. In that
+          // case include one native UI pop with the preflight instead of
+          // silently losing the selected-speed tap.
+          const coldUiPop = nativeJamAudio.isUiReady() ? null :
+            uiTapIndex++ % 2;
           const warm = { promise: null, settled: false, result: null };
           nativeJamHeadsUpPrewarm = warm;
-          const activation = nativeJamAudio.prepareFromGesture();
+          const activation = nativeJamAudio.prepareFromGesture(
+            coldUiPop, MIX.uiTap);
           warm.promise = Promise.resolve(activation).then(result => {
             warm.result = result;
             warm.settled = true;
@@ -4122,9 +4141,19 @@
         if (!nativeJamAudio) {
           primeHtmlAudio();
           unlockAudioFromGesture();
+          state.screen = "game";
+          void beginRun(selectedMode);
+          return;
         }
+        // The original CSS :active press disappears before WebKit can
+        // paint if a warm native bank advances immediately. Keep a short
+        // visible pressed state; do not add another UI sound preflight that
+        // invalidates the bank assembled at Choose Your Speed.
+        const pressedAt = performance.now();
+        button.classList.add("is-pressed");
+        button.disabled = true;
         state.screen = "game";
-        void beginRun(selectedMode);
+        void beginRun(selectedMode, false, pressedAt);
       }, { once: true });
     }
   }
@@ -4169,10 +4198,15 @@
   function setScreen(screen) {
     state.screen = screen;
     if (screen !== "game") {
-      // Heads Up is instructional reading time, not a reason to destroy
-      // the active native PCM bank requested by Choose Your Speed.
-      stopRun({ keepNativeReady: !!(nativeJamAudio &&
-        screen === "headphones" && nativeJamHeadsUpPrewarm) });
+      // Title -> Choose Speed -> Heads Up is UI navigation, NOT a game
+      // shutdown. The old stopRun() discarded the just-preloaded UI pops
+      // on every title/mode transition (and raced with mode's prewarm).
+      // Continue canceling beats/animations, but keep the serial native
+      // PCM owner warm across these in-game setup screens.
+      const keepPregameAudio = !!nativeJamAudio &&
+        (screen === "intro" || screen === "mode" ||
+         (screen === "headphones" && !!nativeJamHeadsUpPrewarm));
+      stopRun({keepNativeReady: keepPregameAudio});
     }
     render();
   }
