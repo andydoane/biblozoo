@@ -285,6 +285,7 @@
     state.startTime=gameNow();
     buildChoices();
     setScreen("game");
+    syncGameClockPause();
   }
   function finishNativeLaunchResume() {
     if (!muted && !nativeLaunchAudio.isReady()) {
@@ -1205,7 +1206,8 @@
   // and bonus sleep() delays. Foreground recovery is a separate pause owner:
   // closing a menu must never resume time while Welcome Back remains open.
   function syncGameClockPause() {
-    if (returnPaused || state.menuOpen || state.helpOpen || state.speedMenuOpen) {
+    if (returnPaused || nativeLaunchPending || nativeLaunchFailure ||
+        state.menuOpen || state.helpOpen || state.speedMenuOpen) {
       welcomeClock.pause();
     } else {
       welcomeClock.resume();
@@ -1213,7 +1215,7 @@
   }
 
   function canOpenGameMenu() {
-    if (returnPaused || state.busy) return false;
+    if (returnPaused || nativeLaunchPending || nativeLaunchFailure || state.busy) return false;
     if (state.screen === "travel") return false;
     return true;
   }
@@ -1790,7 +1792,8 @@
   function startConveyorLoop() {
     // Rendering or a speed-menu callback must not restart gameplay behind
     // the Game Menu, How to Play, or a pending iOS Welcome Back dialog.
-    if (state.conveyorRaf || returnPaused || state.menuOpen || state.helpOpen ||
+    if (state.conveyorRaf || returnPaused || nativeLaunchPending ||
+        nativeLaunchFailure || state.menuOpen || state.helpOpen ||
         state.speedMenuOpen || state.screen !== "game" || state.bonusReady) return;
 
     state.conveyorLastTs = 0;
@@ -1838,13 +1841,20 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        playUiTapSound();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        unlockAudio();
+        if (!nativeLaunchAudio) unlockAudio();
         playUiTapSound();
         setScreen("mode");
       }
     });
+    if (nativeLaunchAudio) {
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
+    }
   }
 
   function renderMode() {
@@ -1856,18 +1866,30 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Verse Launch title",
-      onBack: () => setScreen("intro"),
-      onSelect: (mode) => {
-        unlockAudio();
+      onBack: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
-        state.mode = mode;
-        window.VerseGameShell.resetGameSpeed();
-        initVerseData();
-        state.startTime = gameNow();
-        buildChoices();
-        setScreen("game");
+        setScreen("intro");
+      },
+      onSelect: (mode) => {
+        if (nativeLaunchAudio) {
+          primeNativeLaunchFromGesture("round",mode,
+            muted?null:nextNativeLaunchUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          state.mode = mode;
+          window.VerseGameShell.resetGameSpeed();
+          initVerseData();
+          state.startTime = gameNow();
+          buildChoices();
+          setScreen("game");
+        }
       }
     });
+    if (nativeLaunchAudio) {
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
+    }
   }
 
   function renderGame() {
@@ -2029,16 +2051,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeLaunchAudio) unlockAudio();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         setScreen("mode");
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -4190,7 +4215,9 @@
 
   function astroTick(ts) {
     ts = gameNow();
-    if (returnPaused) { state.astroRaf = 0; return; }
+    if (returnPaused || nativeLaunchPending || nativeLaunchFailure) {
+      state.astroRaf = 0; return;
+    }
     if (!state.astroRunning) return;
     if (!state.astroLastTs) state.astroLastTs = ts;
     const dtMs = Math.min(
