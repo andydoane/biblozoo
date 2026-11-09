@@ -433,6 +433,155 @@
   let mowerSoundGain = null;
   let mowerSoundGeneration = 0;
 
+  // N6o: Scripture Scrub native-only iOS bank. All 18 source MP3 effects,
+  // seven exact progress pitches, four-note fanfare and two shared UI pops
+  // are prewarmed on the sole serial Swift .soloAmbient PCM engine.
+  // Web/PWA/Android continue the old Web Audio implementation below.
+  const nativeScrubAudio=window.BibloZooNativeScriptureScrubAudio?.isAvailable?.()
+    ? window.BibloZooNativeScriptureScrubAudio : null;
+  const NATIVE_SCRUB_PROGRESS=Object.freeze({
+    "196":"progressG3", "261.63":"progressC4",
+    "293.66":"progressD4", "329.63":"progressE4",
+    "349.23":"progressF4", "392":"progressG4",
+    "440":"progressA4"
+  });
+  let nativeScrubGeneration=0;
+  let nativeScrubPending=false,nativeScrubFailure=false;
+  let nativeScrubRetry={kind:"start"};
+  function scrubUiKey(){
+    const next=lastUiTapSound==="uiTap1"?"uiTap2":"uiTap1";
+    lastUiTapSound=next;
+    return next;
+  }
+  function scrubStoppedOrPaused(){
+    return welcomePaused || nativeScrubPending || nativeScrubFailure ||
+      menuOpen || document.hidden;
+  }
+  function clearNativeScrubFailure(){
+    nativeScrubFailure=false;
+    document.getElementById("scrubNativeAudioFailure")?.remove();
+  }
+  function stopNativeScrubRun(){
+    if(!nativeScrubAudio)return;
+    nativeScrubGeneration++;
+    nativeScrubPending=false;
+    app.removeAttribute("aria-busy");
+    stopMowerSound();
+    void nativeScrubAudio.stop();
+  }
+  function showNativeScrubFailure(message){
+    if(!nativeScrubAudio)return;
+    nativeScrubFailure=true;
+    // Preserve current run/round/coverage, never award a silent completion.
+    pauseScrubForReturn();
+    let dialog=document.getElementById("scrubNativeAudioFailure");
+    if(!dialog){
+      dialog=document.createElement("div");
+      dialog.id="scrubNativeAudioFailure";
+      dialog.className="scrub-native-audio-failure";
+      dialog.innerHTML=`<section class="scrub-native-audio-card"
+        role="dialog" aria-modal="true" aria-label="Scripture Scrub sound problem">
+        <h2>Scripture Scrub</h2><p role="status" data-scrub-audio-status></p>
+        <button type="button" data-scrub-audio-retry>Try Again</button>
+        <button type="button" data-scrub-audio-back>Back</button>
+      </section>`;
+      document.body.appendChild(dialog);
+      dialog.querySelector("[data-scrub-audio-retry]").onclick=()=>
+        primeNativeScrubFromGesture(nativeScrubRetry.kind);
+      dialog.querySelector("[data-scrub-audio-back]").onclick=()=>{
+        clearNativeScrubFailure();
+        stopNativeScrubRun();
+        window.VerseGameBridge.exitGame();
+      };
+    }
+    dialog.querySelector("[data-scrub-audio-status]").textContent=message;
+  }
+  function resumeScrubNative(){
+    // This resumes the ORIGINAL round, mowing frame, coverage and virtual
+    // clock only after the fresh real-gesture full bank is confirmed ready.
+    clearNativeScrubFailure();
+    menuOpen=false;
+    document.getElementById("scrubGame")?.classList.remove("scrub-is-paused");
+    continueScrubAfterReturn();
+  }
+  function primeNativeScrubFromGesture(kind="start",uiKey=null){
+    if(!nativeScrubAudio || nativeScrubPending || document.hidden ||
+       (welcomePaused && !["resume","retry"].includes(kind)))return;
+    nativeScrubRetry={kind};
+    clearNativeScrubFailure();
+    if(muted){
+      if(kind==="start")beginScrubRun();
+      else if(kind==="next")advanceScrubRound();
+      else resumeScrubNative();
+      return;
+    }
+    const token=++nativeScrubGeneration;
+    nativeScrubPending=true;
+    if(kind!=="start")pauseScrubForReturn();
+    app.setAttribute("aria-busy","true");
+    // REAL gesture ownership: Swift activateFromGesture is called
+    // synchronously before any promise, timer or await.
+    const prep=nativeScrubAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if(token!==nativeScrubGeneration || document.hidden)return;
+      nativeScrubPending=false;
+      app.removeAttribute("aria-busy");
+      if(result?.ready===true){
+        clearNativeScrubFailure();
+        if(kind==="start")beginScrubRun();
+        else if(kind==="next")advanceScrubRound();
+        else resumeScrubNative();
+        return;
+      }
+      if(["activation-os-rejected","other-audio-playing",
+          "interruption-pending","not-foreground",
+          "gesture-required-after-interruption","activation-cooldown",
+          "foreground-attempt-limit","stale"].includes(result?.reason)){
+        if(document.getElementById("scrubGame")){
+          playgroundWelcome?.pauseFromNativeInactive?.();
+          playgroundWelcome?.showAfterNativeActive?.();
+        }
+        // On title, leave Start enabled for a second real tap; don't show
+        // a fake permanent asset-corruption dialog for YouTube PiP.
+        return;
+      }
+      showNativeScrubFailure("Native sounds aren't ready. Tap Try Again.");
+    }).catch(()=>{
+      if(token!==nativeScrubGeneration || document.hidden)return;
+      nativeScrubPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeScrubFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  function advanceScrubRound(){
+    currentRoundIndex+=1;
+    void renderRound();
+  }
+  if(nativeScrubAudio){
+    nativeScrubAudio.configure({
+      onAppInactive:()=>{
+        if(nativeScrubPending)stopNativeScrubRun();
+        if(!document.getElementById("scrubGame"))return;
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive:()=>{
+        if(document.getElementById("scrubGame"))
+          playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure:()=>{
+        if(muted || welcomePaused || nativeScrubPending ||
+           nativeScrubFailure || document.hidden ||
+           !document.getElementById("scrubGame"))return;
+        nativeScrubRetry={kind:"resume"};
+        showNativeScrubFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden && nativeScrubPending)stopNativeScrubRun();
+    });
+  }
+
   const parsedRef = window.VerseGameShell.parseReferenceParts(
     ctx.verseRef,
     ctx.translation,
