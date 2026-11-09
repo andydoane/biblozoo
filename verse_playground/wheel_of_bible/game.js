@@ -4030,16 +4030,55 @@
     }
   }
 
-  // Patch 68: shared Playground return, with a frozen spin/bonus clock.
-  // Progress and selected wheel segment remain in memory throughout recovery.
+  // N6p: the opt-in shared Playground return owns the same wheel/prize
+  // game clock AND active spoken verse/reference intro. Never reactivate on
+  // passive foreground. Only the child's actual Let's go gesture can call
+  // Swift activateFromGesture and rewarm all 38 fixed tone/UI buffers.
+  if(nativeWheelAudio){
+    nativeWheelAudio.configure({
+      onAppInactive: () => {
+        if(nativeWheelPending)stopNativeWheelRun();
+        if(state.screen==="intro" || state.completed)return;
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive: () => {
+        if(state.screen!=="intro" && !state.completed)
+          playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if(muted || welcomePaused || nativeWheelPending ||
+           nativeWheelFailure || nativeWheelMenuOpen ||
+           document.hidden || state.completed || state.screen==="intro")return;
+        nativeWheelRetryKind="resume";
+        showNativeWheelFailure("A native Wheel sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden && nativeWheelPending)stopNativeWheelRun();
+    });
+  }
   playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
-    isActive: () => !state.completed && !["intro", "meetVerse", "verseIntro"].includes(state.screen),
+    // Speech in the Meet Verse / verseIntro stages also needs Welcome Back;
+    // the original Web/PWA/Android prompt policy is kept unchanged.
+    isActive: () => nativeWheelAudio
+      ? !state.completed && state.screen!=="intro"
+      : !state.completed && !["intro","meetVerse","verseIntro"].includes(state.screen),
     onPause: pauseWheelForReturn,
     onResume: resumeWheelAfterReturn,
     getAudioContext: () => audioCtx,
     unlockAudio,
     replaceAudioContext: replaceWheelWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    nativeOnlyAudio: !!nativeWheelAudio,
+    restoreNativeOnGesture: nativeWheelAudio ? () => {
+      if(muted)return Promise.resolve(true);
+      // This function is called synchronously from Welcome Back's click,
+      // never from page load, timers or an app-foreground notification.
+      return nativeWheelAudio.prepareFromGesture().then(result=>
+        window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+        (result?.ready===true));
+    } : undefined,
+    onExit: () => {if(nativeWheelAudio)stopNativeWheelRun();}
   });
 
   renderIntro();
