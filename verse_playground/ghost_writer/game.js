@@ -6732,26 +6732,79 @@
     return !!fresh && fresh !== old;
   }
   playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
-    isActive: () => ["training", "punctuationRecorder", "ready", "playback", "remix"].includes(state.screen),
+    isActive: () => ["training", "punctuationRecorder", "ready",
+      "playback", "remix"].includes(state.screen) ||
+      (nativeGhostAudio && nativeGhostPendingAction !== null),
     onPause: pauseGhostPlaybackForBackground,
-    onResume: restoreGhostPlaybackFromBackground,
-    getAudioContext: () => audioContext,
+    onResume: () => {
+      if (nativeGhostAudio) {
+        // Native welcome is an actual Let's go gesture; the whole PCM bank
+        // must have been prepared before handwriting/ambience can continue.
+        if (!muted && !nativeGhostAudio.isReady()) return false;
+        if (nativeGhostPendingAction) {
+          const action = nativeGhostPendingAction;
+          nativeGhostPendingAction = null;
+          nativeGhostPreflightGeneration++;
+          nativeGhostPreflightPending = false;
+          clearNativeGhostDialogs();
+          action();
+          return true;
+        }
+        restoreGhostPlaybackFromBackground({ nativeGesture: true });
+        return true;
+      }
+      restoreGhostPlaybackFromBackground();
+      return true;
+    },
+    nativeOnlyAudio: !!nativeGhostAudio,
+    getAudioContext: () => nativeGhostAudio ? null : audioContext,
+    restoreNativeOnGesture: nativeGhostAudio ? () => {
+      if (muted) return Promise.resolve(true);
+      // This function is invoked synchronously in the real Let's go click
+      // by shared Welcome Back. Never request activation on focus/pageshow.
+      return nativeGhostAudio.prepareFromGesture().then(result => {
+        if (result?.ready === true && nativeGhostAudio.isReady()) return true;
+        if (NATIVE_TEMPORARY.has(result?.reason))
+          return { deferred: true, reason: "native-interruption" };
+        nativeGhostPendingAction = () =>
+          restoreGhostPlaybackFromBackground({ nativeGesture: true });
+        showNativeGhostFailure("return");
+        return false;
+      });
+    } : undefined,
     unlockAudio,
     replaceAudioContext: replaceGhostWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    onExit: nativeGhostAudio ? () => { void nativeGhostAudio.stop(); } : undefined
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pauseGhostPlaybackForBackground();
+    if (document.hidden) {
+      pauseGhostPlaybackForBackground();
+      playgroundWelcome?.pauseFromNativeInactive?.();
+    } else if (nativeGhostAudio) {
+      playgroundWelcome?.showAfterNativeActive?.();
+    } else {
+      restoreGhostPlaybackFromBackground();
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    pauseGhostPlaybackForBackground();
+    if (nativeGhostAudio) void nativeGhostAudio.stop();
+  });
+  window.addEventListener("pageshow", () => {
+    if (nativeGhostAudio) playgroundWelcome?.showAfterNativeActive?.();
     else restoreGhostPlaybackFromBackground();
   });
-  window.addEventListener("pagehide", pauseGhostPlaybackForBackground);
-  window.addEventListener("pageshow", restoreGhostPlaybackFromBackground);
-  window.addEventListener("focus", restoreGhostPlaybackFromBackground);
+  window.addEventListener("focus", () => {
+    if (nativeGhostAudio) playgroundWelcome?.showAfterNativeActive?.();
+    else restoreGhostPlaybackFromBackground();
+  });
 
-  // Capture the next genuine interaction before any async click/render work.
-  // Keyboard activation is covered by the regular playUiTapSound() handler.
-  app.addEventListener("pointerdown", () => {
+  // The Web fallback retains the original pointer-gesture recovery.
+  // On isolated native iOS, only the explicit modal/menu/replay handler
+  // may activate the audio session. Canvas strokes cannot do so.
+  if (!nativeGhostAudio) app.addEventListener("pointerdown", () => {
     recoverGhostSpookyAudio({ fromGesture: true });
   }, { capture: true });
 
