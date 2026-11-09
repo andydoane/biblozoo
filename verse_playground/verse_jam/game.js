@@ -661,6 +661,7 @@
   }
 
   function markVerseJamAudioBackgrounded() {
+    if (nativeJamAudio) void nativeJamAudio.stop();
     // Freeze synchronized music before iOS can throttle JS or Web Audio.
     // A later foreground event shows Resume Beat; it never auto-replays.
     if (typeof pauseVerseJamForInterruption === "function") {
@@ -943,6 +944,13 @@
         area.innerHTML = "";
       }
 
+      if (nativeJamAudio) {
+        // Watchdog is NOT a gesture. Never reactivate AVAudioSession here.
+        markVerseJamAudioBackgrounded();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+        return;
+      }
       await ensureAudio();
       if (!isGameplayFlowActive(flowId)) return;
 
@@ -2606,7 +2614,7 @@
         state.menuOpen || state.helpOpen) return;
     const activePhrase = [
       "intro", "round_transition", "ending_sequence",
-      "spawn_chunk", "countdown", "play_chunk"
+      "spawn_chunk", "countdown", "play_chunk", "score"
     ].includes(state.phase);
     if (!activePhrase) return;
 
@@ -2643,7 +2651,10 @@
     const flowId = beginGameplayFlow();
     startGameplayWatchdog();
 
-    if (phase === "intro") {
+    if (phase === "score") {
+      startBeatLoop();
+      await showGroovyScoreScreen(flowId); // no duplicate score/reward
+    } else if (phase === "intro") {
       state.phase = "intro";
       startBeatLoop();
       await runIntroSequence(flowId);
@@ -2687,6 +2698,18 @@
 
   async function resumeGameFromMenu() {
     if (!state.paused || !state.resumeAfterMenu) return;
+    if (nativeJamAudio) {
+      // Called synchronously from the real Menu Close tap. Remain paused
+      // until the whole native bank is genuinely prewarmed.
+      const ok = await ensureAudio();
+      if (!ok) {
+        if (!document.hidden &&
+            !NATIVE_TEMPORARY.has(nativeJamAudio.lastError()))
+          showNativeJamFailure("menu");
+        return;
+      }
+      clearNativeJamFailure();
+    }
 
     const flowId = beginGameplayFlow();
 
@@ -2697,7 +2720,7 @@
 
     if (!isGameplayFlowActive(flowId)) return;
 
-    await ensureAudio();
+    if (!nativeJamAudio) await ensureAudio();
     if (!isGameplayFlowActive(flowId)) return;
 
     // Restart the groove cleanly.
@@ -2710,7 +2733,12 @@
     await startNextPlayableGroup(flowId);
   }
 
-  function stopRun() {
+  function stopRun({ keepNativeReady = false } = {}) {
+    if (nativeJamAudio && !keepNativeReady) {
+      void nativeJamAudio.stop();
+      nativeJamAwaitingStart = false;
+      clearNativeJamFailure();
+    }
     resumeBeatGestureGeneration += 1;
     resumeBeatInFlight = false;
     hideResumeBeatOverlay();
@@ -2729,7 +2757,8 @@
   }
 
 
-  async function beginRun(mode) {
+  async function beginRun(mode, nativeAlreadyReady = false) {
+    if (nativeJamAudio) nativeJamAwaitingStart = false;
     selectedMode = mode;
 
     // Clear any stale end/menu state before the first active-run check.
@@ -2750,7 +2779,24 @@
     // IMPORTANT for iPhone/Safari:
     // Unlock audio immediately from the user's mode-button tap,
     // before any awaited fetch or other async work.
-    await ensureAudio();
+    const audioOk = nativeAlreadyReady && nativeJamAudio
+      ? nativeJamAudio.isReady() : await ensureAudio();
+    if (nativeJamAudio && !audioOk) {
+      if (document.hidden) return;
+      if (NATIVE_TEMPORARY.has(nativeJamAudio.lastError())) {
+        nativeJamAwaitingStart = true;
+        state.paused = true;
+        state.resumeAfterInterruption = true;
+        state.interruptedPhase = "native-start";
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+      } else {
+        state.paused = true;
+        showNativeJamFailure("start");
+      }
+      return; // NEVER advance a silent native rhythm.
+    }
+    if (nativeJamAudio) clearNativeJamFailure();
 
     if (!isGameplayFlowActive(flowId)) return;
 
@@ -3639,8 +3685,8 @@
       );
     }
 
-    stopRun();
-    playCompletionArpeggio();
+    stopRun({ keepNativeReady: !!nativeJamAudio });
+    playCompletionArpeggio(); // tail remains warmed until End screen exit
 
     await sleep(900);
 
@@ -3914,8 +3960,10 @@
       backLabel: "Back to Verse Playground",
       onBack: () => window.VerseGameBridge.exitGame(),
       onStart: () => {
-        primeHtmlAudio();
-        unlockAudioFromGesture();
+        if (!nativeJamAudio) {
+          primeHtmlAudio();
+          unlockAudioFromGesture();
+        }
         setScreen("mode");
       }
     });
@@ -3936,8 +3984,10 @@
       modes: MODES,
       onBack: () => setScreen("intro"),
       onSelect: (mode) => {
-        primeHtmlAudio();
-        unlockAudioFromGesture();
+        if (!nativeJamAudio) {
+          primeHtmlAudio();
+          unlockAudioFromGesture();
+        }
         selectedMode = mode;
         setScreen("headphones");
       }
@@ -3982,10 +4032,12 @@
 
     if (button) {
       button.addEventListener("click", () => {
-        primeHtmlAudio();
-        unlockAudioFromGesture();
+        if (!nativeJamAudio) {
+          primeHtmlAudio();
+          unlockAudioFromGesture();
+        }
         state.screen = "game";
-        beginRun(selectedMode);
+        void beginRun(selectedMode);
       }, { once: true });
     }
   }
@@ -4040,6 +4092,76 @@
     if (state.screen === "end") return renderEnd();
   }
 
+
+  // Fatal missing bank/bridge errors are explicit, accessible and retriable.
+  // Temporary OS priority denials stay in plain Welcome Back, never gray UI.
+  function clearNativeJamFailure() {
+    document.getElementById("verseJamNativeFailure")?.remove();
+  }
+  function showNativeJamFailure(kind = "start") {
+    if (!nativeJamAudio || document.hidden) return;
+    nativeJamFailureRetry = kind;
+    clearNativeJamFailure();
+    const overlay = document.createElement("div");
+    overlay.id = "verseJamNativeFailure";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483400;" +
+      "display:flex;align-items:center;justify-content:center;padding:20px;" +
+      "background:rgba(5,3,20,.94);color:#fff;";
+    overlay.innerHTML = `<section role="dialog" aria-modal="true"
+      aria-label="Verse Jam native audio unavailable"
+      style="max-width:360px;padding:26px;text-align:center;border-radius:18px;
+      border:2px solid #8df7ff;background:#221447">
+      <h2 style="color:#8df7ff">Sound isn't ready</h2>
+      <p role="status">Verse Jam is paused. Try again to prepare native sound.</p>
+      <button id="jamNativeRetry" type="button">Try Again</button>
+      <button id="jamNativeBack" type="button">Back to Playground</button>
+    </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#jamNativeRetry")?.addEventListener("click", async () => {
+      const button = overlay.querySelector("#jamNativeRetry");
+      if (button) button.disabled = true;
+      try {
+        if (nativeJamFailureRetry === "menu") {
+          await resumeGameFromMenu();
+        } else if (nativeJamFailureRetry === "return") {
+          const ok = await unlockAudioFromGesture();
+          if (ok && state.resumeAfterInterruption) {
+            state.resumeBeatApproved = true;
+            await resumeVerseJamAfterInterruption();
+            clearNativeJamFailure();
+          }
+        } else {
+          await beginRun(selectedMode);
+        }
+      } finally {
+        if (button && button.isConnected) button.disabled = false;
+      }
+    });
+    overlay.querySelector("#jamNativeBack")?.addEventListener("click", () => {
+      stopRun();
+      window.VerseGameBridge.exitGame();
+    });
+    overlay.querySelector("#jamNativeRetry")?.focus?.();
+  }
+  if (nativeJamAudio) {
+    nativeJamAudio.configure({
+      onAppInactive: () => {
+        markVerseJamAudioBackgrounded();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive: () => {
+        playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        markVerseJamAudioBackgrounded();
+        if (!document.hidden && state.screen === "game") {
+          nativeJamFailureRetry = "return";
+          showNativeJamFailure("return");
+        }
+      }
+    });
+  }
+
   // The shared Welcome Back gesture verifies audio before a clean downbeat.
   // Keep the existing Resume Beat modal only as a fallback for web clients
   // where the shared files are not available.
@@ -4050,6 +4172,19 @@
       hideResumeBeatOverlay();
     },
     onResume: () => {
+      if (nativeJamAudio) {
+        audioUnlocked = nativeJamAudio.isReady();
+        audioForegroundRecoveryPending = !audioUnlocked;
+        if (!audioUnlocked) return false;
+        if (nativeJamAwaitingStart) {
+          // Recovery already activated on this genuine Let's go gesture.
+          nativeJamAwaitingStart = false;
+          state.resumeAfterInterruption = false;
+          state.paused = false;
+          void beginRun(selectedMode, true);
+          return true;
+        }
+      }
       if (!state.resumeAfterInterruption) return true;
       if (muted) {
         audioUnlocked = true;
@@ -4063,7 +4198,16 @@
       void resumeVerseJamAfterInterruption();
       return true;
     },
-    getAudioContext: () => audioCtx,
+    getAudioContext: () => nativeJamAudio ? null : audioCtx,
+    nativeOnlyAudio: !!nativeJamAudio,
+    restoreNativeOnGesture: nativeJamAudio ? () =>
+      nativeJamAudio.prepareFromGesture().then(result => {
+        audioUnlocked = result?.ready === true;
+        audioForegroundRecoveryPending = !audioUnlocked;
+        if (audioUnlocked) return true;
+        return NATIVE_TEMPORARY.has(result?.reason)
+          ? {deferred:true,reason:"native-interruption"} : false;
+      }) : undefined,
     unlockAudio: unlockAudioFromGesture,
     replaceAudioContext: replaceJamWelcomeContext,
     isMuted: () => muted
