@@ -116,7 +116,7 @@ This policy is deliberately written *inside* the handoff so a completely new con
 
 ## 8. Recent milestones (verify status on GitHub)
 
-**Retained historical owner-accepted milestones (preserve legacy testing regex):** Dino Dash #45 owner-accepted. N6g Verse Invaders is MERGED and OWNER-TESTED/PASSED (PR #46), historic **6/12 exactly halfway**. Verse Munch #47 raised 7/12. Versey Bird #50 = 8/12; Tower #51 = 9/12; Verse Launch #52 = 10/12; Traffic Tap #53 = 11/12; Verse Scramble #54 = **12/12 external standalone games MERGED/OWNER-TESTED/PASSED**. N6n Verse Typer Playground #55 MERGED and OWNER-TESTED/PASSED at `c7035e2` = Playground 1/5. **N6o Scripture Scrub #56 MERGED and OWNER-TESTED/PASSED at `1aa5c7d` = Playground 2/5.** [N6p Wheel of Bible #57](https://github.com/andydoane/biblozoo/pull/57) OPEN, proposed third, not merged/tested.
+**Retained historical owner-accepted milestones (preserve legacy testing regex):** Dino Dash #45 owner-accepted. N6g Verse Invaders is MERGED and OWNER-TESTED/PASSED (PR #46), historic **6/12 exactly halfway**. N6h Verse Munch PR #47 owner-merged and tested, raising 7/12. Versey Bird #50 = 8/12; Tower #51 = 9/12; Verse Launch #52 = 10/12; Traffic Tap #53 = 11/12; Verse Scramble #54 = **12/12 external standalone games MERGED/OWNER-TESTED/PASSED**. N6n Verse Typer Playground #55 MERGED and OWNER-TESTED/PASSED at `c7035e2` = Playground 1/5. **N6o Scripture Scrub #56 MERGED and OWNER-TESTED/PASSED at `1aa5c7d` = Playground 2/5.** [N6p Wheel of Bible #57](https://github.com/andydoane/biblozoo/pull/57) OPEN, proposed third, not merged/tested.
 
 
 | `ios-prep` commit | Verified commit subject / scope |
