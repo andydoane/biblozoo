@@ -43,6 +43,72 @@
   let teardown = Promise.resolve();
   let uiReady = false; // UI bank does not imply gameplay readiness
   let uiPreparation = null;
+  // Use the existing N5b published-verse native narrator. A chunk is never
+  // accepted as "heard" until its matching AVAudioPlayerDelegate ended.
+  let chunkSequence=0,activeChunk=null;
+  function stopChunk(){
+    const old=activeChunk;
+    if(!old)return;
+    activeChunk=null;
+    root.clearTimeout(old.poll);
+    old.resolve({ended:false,reason:"interrupted",positionMs:old.positionMs});
+    try{void Promise.resolve(api()?.stopNarration?.({requestId:old.id})).catch(()=>{});}
+    catch(_){}
+  }
+  function settleChunk(id,ended,why="ended"){
+    const old=activeChunk;
+    if(!old || old.id!==id)return;
+    activeChunk=null;
+    root.clearTimeout(old.poll);
+    old.resolve({ended,reason:why,positionMs:old.positionMs});
+  }
+  function pollChunk(id){
+    const old=activeChunk;
+    if(!old || old.id!==id)return;
+    try{void Promise.resolve(api()?.getNarrationState?.()).then(st=>{
+      if(activeChunk?.id!==id)return;
+      if(st?.requestId===id && Number.isFinite(st.positionMs))
+        activeChunk.positionMs=Math.max(activeChunk.positionMs,st.positionMs);
+    }).catch(()=>{});}catch(_){}
+    if(activeChunk?.id===id)
+      old.poll=root.setTimeout(()=>pollChunk(id),220);
+  }
+  function playChunk(verseId,partIndex,positionMs=0){
+    if(!isAvailable() || !ready || failed || root.document?.hidden ||
+       !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(verseId) ||
+       !Number.isInteger(partIndex) || partIndex<1 || partIndex>26)
+      return Promise.resolve({ended:false,reason:"invalid-native-chunk",positionMs});
+    stopChunk();
+    const id=++chunkSequence;
+    return new Promise(resolve=>{
+      const current={id,resolve,positionMs:Math.max(0,positionMs),poll:0};
+      activeChunk=current;
+      void (async()=>{
+        try {
+          const bridge=api(),soundId="learn-part-"+verseId+"-"+partIndex;
+          const prep=await bounded(bridge.prepareNarration({soundId,requestId:id}),5000);
+          if(activeChunk?.id!==id)return;
+          if(prep?.prepared!==true){
+            settleChunk(id,false,reason(prep?.reason));return;
+          }
+          if(current.positionMs>0 && current.positionMs<prep.durationMs-100){
+            const seek=await bounded(bridge.seekNarration({
+              requestId:id,positionMs:Math.floor(current.positionMs)}),3500);
+            if(activeChunk?.id!==id)return;
+            if(seek?.seeked!==true){settleChunk(id,false,"seek-failed");return;}
+          }
+          const played=await bounded(bridge.playNarration({requestId:id}),5000);
+          if(activeChunk?.id!==id)return;
+          if(played?.accepted!==true){
+            settleChunk(id,false,reason(played?.reason));return;
+          }
+          pollChunk(id);
+          // NO timeout completion. Only matching native 'ended' releases the
+          // same word-review progression; OS interruption stops/preserves it.
+        }catch(_){settleChunk(id,false,"narration-bridge-error");}
+      })();
+    });
+  }
 
   function isAvailable() {
     return root.BibloZooNativeOnlyOutput?.enabled === true &&
@@ -73,6 +139,7 @@
     } catch (_) { return Promise.resolve(); }
   }
   function stop() {
+    stopChunk();
     generation++;
     ready = false;
     uiReady = false;
@@ -92,6 +159,14 @@
     });
     root.addEventListener?.("pagehide", invalidate);
     root.addEventListener?.("blur", invalidate);
+    try {
+      Promise.resolve(api()?.addListener?.("biblozooNarration",event=>{
+        if(!activeChunk || event?.requestId!==activeChunk.id)return;
+        if(event.type==="ended")settleChunk(event.requestId,true,"ended");
+        else if(event.type==="invalidated" || event.type==="failed")
+          settleChunk(event.requestId,false,reason(event.reason||event.type));
+      })).catch(()=>{});
+    }catch(_){}
     try {
       Promise.resolve(api()?.addListener?.("biblozooAppLifecycle", event => {
         if (event?.active === false || event?.active === true) invalidate();
@@ -329,6 +404,7 @@
   }
   root.BibloZooNativeVerseTyperAudio = Object.freeze({
     isAvailable, configure, prepareFromGesture, tapUiFromGesture, play, stop,
+    playChunk, stopChunk,
     isReady: () => ready && !failed && !root.document?.hidden,
     lastError: () => lastError,
     soundIds: IDS
