@@ -219,6 +219,10 @@
     ? window.BibloZooNativeTowerBibleAudio : null;
   let nativeTowerSerial = 0;
   let nativeTowerPending = false;
+  // The shared shell and Tower's legacy button/keyboard handlers can both
+  // receive one physical gesture; only one PCM teardown/prewarm is allowed.
+  let nativeTowerMenuOpen = false;
+  let nativeTowerSpeedMenuOpen = false;
   let nativeTowerRetry = {kind:"round",mode:null};
   let towerWelcomeBack = null;
 
@@ -592,6 +596,8 @@
   renderIntro();
 
   function renderIntro() {
+    nativeTowerMenuOpen = false;
+    nativeTowerSpeedMenuOpen = false;
     if (nativeTowerPending) stopNativeTowerRound();
     clearNativeTowerFailure();
     stopLoop();
@@ -620,6 +626,8 @@
   }
 
   function renderModeSelect() {
+    nativeTowerMenuOpen = false;
+    nativeTowerSpeedMenuOpen = false;
     if (nativeTowerPending) stopNativeTowerRound();
     clearNativeTowerFailure();
     stopLoop();
@@ -659,6 +667,8 @@
       return;
     }
     clearNativeTowerFailure();
+    nativeTowerMenuOpen = false;
+    nativeTowerSpeedMenuOpen = false;
     selectedMode = mode;
     window.VerseGameShell.resetGameSpeed();
     completionMarked = false;
@@ -841,6 +851,8 @@
         openHelpFromMenu();
       },
       onModeSelect: () => {
+        nativeTowerMenuOpen = false;
+        nativeTowerSpeedMenuOpen = false;
         if (nativeTowerAudio) stopNativeTowerRound();
         playUiTapSound();
         setPaused(false, "");
@@ -848,6 +860,8 @@
         renderModeSelect();
       },
       onExit: () => {
+        nativeTowerMenuOpen = false;
+        nativeTowerSpeedMenuOpen = false;
         playUiTapSound();
         if (nativeTowerAudio) stopNativeTowerRound();
         stopLoop();
@@ -856,8 +870,10 @@
       onOpen: () => {
         // Shell pointerdown + click and the legacy onclick may overlap.
         if (nativeTowerPending || returnPaused ||
-            (nativeTowerAudio && state.paused && state.pauseReason === "menu"))
+            (nativeTowerAudio && (nativeTowerMenuOpen ||
+              (state.paused && state.pauseReason === "menu"))))
           return false;
+        nativeTowerMenuOpen = true;
         setPaused(true, "menu");
         if (nativeTowerAudio) void nativeTowerAudio.stop();
         playUiTapSound();
@@ -865,6 +881,7 @@
       },
       onClose: () => {
         if (returnPaused || nativeTowerPending) return;
+        nativeTowerMenuOpen = false;
         if (nativeTowerAudio && !muted) {
           primeNativeTowerFromGesture("resume",null,nextNativeTowerUiKey());
         } else {
@@ -884,9 +901,11 @@
         if (
           state.introActive || state.collapseTriggered ||
           state.frenzyActive || state.done || nativeTowerPending ||
-          returnPaused || (nativeTowerAudio && state.paused &&
-            state.pauseReason === "speed")
+          returnPaused || (nativeTowerAudio &&
+            (nativeTowerSpeedMenuOpen ||
+              (state.paused && state.pauseReason === "speed")))
         ) return false;
+        nativeTowerSpeedMenuOpen = true;
         setPaused(true, "speed");
         if (nativeTowerAudio) void nativeTowerAudio.stop();
         playUiTapSound();
@@ -897,6 +916,7 @@
       },
       onClose: () => {
         if (returnPaused || nativeTowerPending) return;
+        nativeTowerSpeedMenuOpen = false;
         if (
           !state.introActive && !state.collapseTriggered &&
           !state.frenzyActive && !state.done
@@ -966,8 +986,10 @@
 
   function openGameMenu() {
     if (nativeTowerPending || returnPaused ||
-        (nativeTowerAudio && state.paused && state.pauseReason === "menu"))
+        (nativeTowerAudio && (nativeTowerMenuOpen ||
+          (state.paused && state.pauseReason === "menu"))))
       return;
+    nativeTowerMenuOpen = true;
     setPaused(true, "menu");
     if (nativeTowerAudio) void nativeTowerAudio.stop();
     playUiTapSound();
@@ -981,6 +1003,7 @@
   }
   function closeGameMenu() {
     if (returnPaused || nativeTowerPending) return;
+    nativeTowerMenuOpen = false;
     const helpOverlay = document.getElementById("tbHelpOverlay");
     if (nativeTowerAudio && !muted && (!helpOverlay ||
         !helpOverlay.classList.contains("is-open"))) {
