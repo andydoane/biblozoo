@@ -13,6 +13,9 @@ const swift=read("ios/App/App/BibloZooNativeSoundPlugin.swift");
 const html=read("verse_games/verse_scramble_neo/index.html");
 const workflow=read(".github/workflows/ios-prep-validation.yml");
 const handoff=read("docs/PROJECT-HANDOFF.md");
+// The production build copies standalone source as an asset. Parse the ENTIRE
+// real game now so accidental edits outside extracted VM segments cannot pass.
+new vm.Script(game,{filename:"verse_games/verse_scramble_neo/game.js"});
 const midi=[60,62,64,65,67,69,71,72];
 const fixed=[
   ["wrongLetter","scramble-wrong-letter"],
