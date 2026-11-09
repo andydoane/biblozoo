@@ -216,6 +216,145 @@
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
+  // N6k: use the sole Swift AVAudioEngine prewarmed bank on native iOS,
+  // never WebAudio/HTML audio. Preserve all Web/PWA/Android original code.
+  const nativeLaunchAudio = window.BibloZooNativeVerseLaunchAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseLaunchAudio : null;
+  let nativeLaunchToken = 0;
+  let nativeLaunchPending = false;
+  let nativeLaunchFailure = false;
+  let nativeLaunchRetry = {kind:"round",mode:null};
+  let launchWelcomeBack = null;
+  function nextNativeLaunchUiKey() {
+    const key=state.uiSoundFlip?"uiTap2":"uiTap1";
+    state.uiSoundFlip=!state.uiSoundFlip;
+    return key;
+  }
+  function stopNativeLaunchRound() {
+    if (!nativeLaunchAudio) return;
+    nativeLaunchToken++;
+    nativeLaunchPending=false;
+    app.removeAttribute("aria-busy");
+    void nativeLaunchAudio.stop();
+  }
+  function clearNativeLaunchFailure() {
+    nativeLaunchFailure=false;
+    document.getElementById("vlNativeAudioFailure")?.remove();
+  }
+  function showNativeLaunchFailure(message) {
+    if (!nativeLaunchAudio) return;
+    nativeLaunchFailure=true;
+    stopConveyorLoop();
+    syncGameClockPause();
+    let overlay=document.getElementById("vlNativeAudioFailure");
+    if (!overlay) {
+      overlay=document.createElement("div");
+      overlay.id="vlNativeAudioFailure";
+      overlay.className="vl-native-audio-failure";
+      overlay.innerHTML=`<section class="vl-native-audio-card" role="dialog"
+        aria-modal="true" aria-label="Verse Launch native sound issue">
+        <h2>Verse Launch</h2><p role="status" data-launch-status></p>
+        <button type="button" data-launch-retry>Try Again</button>
+        <button type="button" data-launch-back>Back</button></section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-launch-retry]").onclick=()=>
+        primeNativeLaunchFromGesture(nativeLaunchRetry.kind,nativeLaunchRetry.mode);
+      overlay.querySelector("[data-launch-back]").onclick=()=>{
+        stopNativeLaunchRound();
+        clearNativeLaunchFailure();
+        if (nativeLaunchRetry.kind==="round") setScreen("mode");
+        else {
+          stopConveyorLoop();
+          stopAstroLoop();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    overlay.querySelector("[data-launch-status]").textContent=message;
+  }
+  function completeNativeLaunchMode(mode) {
+    if (nativeLaunchAudio && !muted && !nativeLaunchAudio.isReady()) {
+      nativeLaunchRetry={kind:"round",mode};
+      showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeLaunchFailure();
+    state.mode=mode;
+    window.VerseGameShell.resetGameSpeed();
+    initVerseData();
+    state.startTime=gameNow();
+    buildChoices();
+    setScreen("game");
+  }
+  function finishNativeLaunchResume() {
+    if (!muted && !nativeLaunchAudio.isReady()) {
+      showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeLaunchFailure();
+    syncGameClockPause();
+    if (state.screen==="game") startConveyorLoop();
+    if (state.screen==="asteroids" && state.astroRunning && !state.astroRaf) {
+      state.astroLastTs=0;
+      state.astroRaf=requestAnimationFrame(astroTick);
+    }
+  }
+  function primeNativeLaunchFromGesture(kind="round",mode=null,uiKey=null) {
+    if (!nativeLaunchAudio || nativeLaunchPending || returnPaused ||
+        document.hidden) return;
+    nativeLaunchRetry={kind,mode};
+    clearNativeLaunchFailure();
+    if (muted) {
+      if (kind==="round") completeNativeLaunchMode(mode);
+      else finishNativeLaunchResume();
+      return;
+    }
+    const token=++nativeLaunchToken;
+    nativeLaunchPending=true;
+    app.setAttribute("aria-busy","true");
+    syncGameClockPause();
+    // Must call Swift activateFromGesture NOW on actual child's tap.
+    const prep=nativeLaunchAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if (token!==nativeLaunchToken || returnPaused || document.hidden) return;
+      nativeLaunchPending=false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready===true) {
+        if (kind==="round") completeNativeLaunchMode(mode);
+        else finishNativeLaunchResume();
+      } else showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+    }).catch(()=>{
+      if (token!==nativeLaunchToken || returnPaused || document.hidden) return;
+      nativeLaunchPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+    });
+  }
+  if (nativeLaunchAudio) {
+    nativeLaunchAudio.configure({
+      onAppInactive:()=>{
+        if (nativeLaunchPending) stopNativeLaunchRound();
+        if (!["game","travel","asteroids"].includes(state.screen) ||
+            state.completed) return;
+        if (!launchWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive:()=>launchWelcomeBack?.showAfterNativeActive?.(),
+      onPlaybackFailure:()=>{
+        if (muted || returnPaused || document.hidden || nativeLaunchPending ||
+            !["game","travel","asteroids"].includes(state.screen) ||
+            state.menuOpen || state.speedMenuOpen || state.helpOpen) return;
+        nativeLaunchRetry={kind:"resume",mode:null};
+        showNativeLaunchFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if (document.hidden && nativeLaunchPending) stopNativeLaunchRound();
+    });
+  }
+
+
   const astroDom = {
     stage: null,
     layer: null,
