@@ -427,9 +427,20 @@
       return false;
     }
   }
+  // Resolve only the exact original finite MIDI/length/gain/wave recipes
+  // enumerated in KEYS. A caller cannot send arbitrary oscillators to Swift.
+  function playToneRecipe(midi,duration,volume,type="triangle"){
+    const wave=type==="square"?"q":type==="sine"?"s":"t";
+    if(!Number.isFinite(midi) || !Number.isFinite(duration) ||
+       !Number.isFinite(volume))return false;
+    const key="t"+Math.round(midi)+"_"+Math.round(duration*1000)+"_"+
+      Math.round(volume*1000)+"_"+wave;
+    if(!Object.prototype.hasOwnProperty.call(KEYS,key))return false;
+    return play(key,1);
+  }
   root.BibloZooNativeWheelOfBibleAudio = Object.freeze({
     isAvailable, configure, prepareFromGesture, tapUiFromGesture, play, stop,
-    playSpoken, stopSpoken,
+    playToneRecipe, playSpoken, stopSpoken,
     isReady: () => ready && !failed && !root.document?.hidden,
     lastError: () => lastError,
     soundIds: IDS
