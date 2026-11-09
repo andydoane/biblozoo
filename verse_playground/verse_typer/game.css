@@ -2120,3 +2120,7 @@ html.vt-native-capacitor .vt-root::before {
 .vt-streak-pill.is-streak-rainbow {
   box-shadow: none !important;
 }
+/* N6n: genuinely failed native PCM/chunk, never routine prewarm. */
+.vt-native-audio-failure{position:fixed;inset:0;z-index:10020;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.66)}
+.vt-native-audio-card{width:min(100%,360px);padding:22px;border-radius:16px;background:white;color:#202020;text-align:center;font:600 17px/1.4 system-ui,sans-serif}
+.vt-native-audio-card button{min-height:44px;margin:6px;padding:10px 16px;border:0;border-radius:9px;color:white;background:#333;font:inherit}
