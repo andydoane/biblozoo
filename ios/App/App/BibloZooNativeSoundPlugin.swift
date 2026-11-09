@@ -3016,9 +3016,18 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         : nil
                     // A reused voice interrupts its old buffer; distinct
                     // voices keep a small bounded number of overlaps.
-                    node.scheduleBuffer(readyBuffer, at: scheduledAt,
-                                        options: [.interrupts],
-                                        completionHandler: nil)
+                    if self.jamIDs.contains(soundId),
+                       let scheduledAt = scheduledAt {
+                        node.scheduleBuffer(readyBuffer, at: scheduledAt,
+                                            options: [.interrupts],
+                                            completionHandler: nil)
+                    } else {
+                        // Every non-Jam game retains its original immediate
+                        // PCM path, including the N3a hot-collision contract.
+                        node.scheduleBuffer(readyBuffer, at: nil,
+                                            options: [.interrupts],
+                                            completionHandler: nil)
+                    }
                     started = true // scheduled only, not speaker confirmation
                     durationMs = Int(Double(readyBuffer.frameLength) /
                                      readyBuffer.format.sampleRate * 1000)
