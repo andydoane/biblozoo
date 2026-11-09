@@ -157,6 +157,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "bird-wrong": "versey_bird_wrong",
         "bird-bee-hit": "versey_bird_bee_hit"
     ]
+    // N6j: fixed Tower of Bible effects (the unused place.mp3 stays unused).
+    // Correct/wrong cues are synthesized once on the existing PCM worker.
+    private let towerBibleSoundResources: [String: String] = [
+        "tower-brick-land": "tower_bible_land",
+        "tower-warning": "tower_bible_warning_1",
+        "tower-danger-warning": "tower_bible_warning_2",
+        "tower-collapse": "tower_bible_collapse",
+        "tower-brick-break": "tower_bible_break",
+        "tower-streak": "tower_bible_success"
+    ]
+    private let towerWordToneIDs: Set<String> = [
+        "tower-correct-word", "tower-wrong-word"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -227,7 +240,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "munch-bonus-result", "munch-wrong-fruit",
         "bird-flap-1", "bird-flap-2", "bird-flap-3", "bird-flap-4",
         "bird-boulder", "bird-correct", "bird-pipe-cleared",
-        "bird-pipe-crash", "bird-streak", "bird-wrong", "bird-bee-hit"
+        "bird-pipe-crash", "bird-streak", "bird-wrong", "bird-bee-hit",
+        "tower-brick-land", "tower-warning", "tower-danger-warning",
+        "tower-collapse", "tower-brick-break", "tower-streak",
+        "tower-correct-word", "tower-wrong-word"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -856,6 +872,108 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+    // N6j: immutable Tower of Bible correct/wrong word cues.
+    // Browser originals mix four sine notes (C5/E5/G5/C6) for correct and
+    // two triangle downward tones for wrong. All waves/envelopes are rendered
+    // into bounded native PCM at preflight; no oscillator or engine setup on a
+    // brick tap, and the JS bridge cannot send arbitrary frequencies.
+    // Original Web sound multipliers 3.40 / 3.60 are baked into samples
+    // because native play volume is restricted to 0...1.
+    private func prepareTowerWordToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard towerWordToneIDs.contains(soundId) else {
+            return (false, 0, "invalid-tower-tone")
+        }
+        if let buffer = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, Int(Double(buffer.frameLength) /
+                              buffer.format.sampleRate * 1000), "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "tower-tone-format-failed")
+        }
+        let correct = soundId == "tower-correct-word"
+        // offset (s), duration (s), initial Hz, final Hz, base peak, triangle
+        let notes: [(Double, Double, Double, Double, Double, Bool)] = correct
+            ? [(0.00, 0.08, 523, 523, 0.07, false),
+               (0.07, 0.08, 659, 659, 0.07, false),
+               (0.14, 0.12, 784, 784, 0.08, false),
+               (0.20, 0.16, 1046, 1046, 0.06, false)]
+            : [(0.00, 0.08, 220, 170, 0.10, true),
+               (0.07, 0.09, 170, 170, 0.07, true)]
+        let length = correct ? 0.46 : 0.27
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * length))
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format, frameCapacity: frames),
+              let samples = buffer.floatChannelData?[0] else {
+            return (false, 0, "tower-tone-allocation-failed")
+        }
+        buffer.frameLength = frames
+        let volumeMultiplier = correct ? 3.40 : 3.60
+        for frame in 0..<Int(frames) {
+            let time = Double(frame) / format.sampleRate
+            var mixed = 0.0
+            for note in notes {
+                let (offset, duration, hz, endingHz, peak, triangle) = note
+                let elapsed = time - offset
+                if elapsed < 0 || elapsed > duration + 0.10 { continue }
+                let attack = 0.005
+                let release = 0.06
+                let high = peak * volumeMultiplier
+                // WebAudio setValueAtTime(.0001) -> exponential attack ->
+                // exponential release; phase continues beyond frequency ramp.
+                let envelope: Double
+                if elapsed < attack {
+                    envelope = 0.0001 * pow(high / 0.0001,
+                                            elapsed / attack)
+                } else if elapsed < duration + release {
+                    envelope = high * pow(0.0001 / high,
+                        (elapsed - attack) / (duration + release - attack))
+                } else {
+                    envelope = 0.0001
+                }
+                let sweep = min(elapsed, duration)
+                let ratio = log(endingHz / hz)
+                let turns = abs(ratio) < 0.000001
+                    ? hz * sweep
+                    : hz * duration * (exp(ratio * sweep / duration) - 1) / ratio
+                let phase = turns + max(0, elapsed - duration) * endingHz
+                let cycle = phase - floor(phase)
+                let wave = triangle
+                    ? 1.0 - 4.0 * abs(cycle - 0.5)
+                    : sin(2.0 * Double.pi * phase)
+                mixed += wave * envelope
+            }
+            samples[frame] = Float(max(-0.95, min(0.95, mixed)))
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<sampleVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // no sound until a child's gameplay effect
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            effectBuffers[soundId] = buffer
+            return (true, Int(length * 1000), "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "tower-tone-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -1124,6 +1242,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               verseInvadersSoundResources[soundId] != nil ||
               verseMunchSoundResources[soundId] != nil ||
               verseyBirdSoundResources[soundId] != nil ||
+              towerBibleSoundResources[soundId] != nil ||
+              towerWordToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1212,7 +1332,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             let url: URL?
             if soundId == self.nativePegSoundID ||
                soundId == self.nativeMelodySoundID ||
-               soundId == self.nativeSnakeOrbSoundID {
+               soundId == self.nativeSnakeOrbSoundID ||
+               self.towerWordToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.snakeSoundResources[soundId] {
@@ -1227,6 +1348,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.towerBibleSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/tower_bible/tower_bible_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
@@ -1309,7 +1438,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if soundId == self.nativeSnakeOrbSoundID {
+                if self.towerWordToneIDs.contains(soundId) {
+                    let result = self.prepareTowerWordToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-tower-tone"
+                } else if soundId == self.nativeSnakeOrbSoundID {
                     let result = self.prepareSnakeOrbTonesOnWorker()
                     prepared = result.prepared
                     durationMs = result.durationMs
