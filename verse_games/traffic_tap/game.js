@@ -1468,8 +1468,17 @@ In the bonus round, tap as many of the target vehicle as you can.`;
           if (e.cancelable) e.preventDefault();
           e.stopPropagation();
         }
-        playUiTapSound();
-        openGameMenu();
+        // Legacy Traffic binds touchstart + pointerdown + click on top of
+        // the shared shell. Ignore duplicate native dispatches; stop stale
+        // PCM before requesting this new user-gesture UI pop.
+        if (nativeTrafficAudio) {
+          if (state.paused && state.pauseReason === "menu") return;
+          openGameMenu();
+          playUiTapSound();
+        } else {
+          playUiTapSound();
+          openGameMenu();
+        }
       };
       menuPill.onclick = open;
       menuPill.onpointerdown = open;
