@@ -311,9 +311,49 @@
     drumMaster: DRUM_MASTER_VOLUME
   };
 
+  // N6q: native iOS keeps the existing beat/score logic but replaces the Web
+  // audio output and AudioContext clock with a JS monotonic clock. It never
+  // creates Web Audio/HTML audio or resumes output from a passive callback.
+  const nativeJamAudio = window.BibloZooNativeVerseJamAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseJamAudio : null;
+  const nativeJamClock = nativeJamAudio ? Object.freeze({
+    state: "running",
+    get currentTime() { return performance.now() / 1000; }
+  }) : null;
+  const nativeJamTimers = new Set();
+  let nativeJamAwaitingStart = false;
+  let nativeJamFailureRetry = "start";
+  const NATIVE_TEMPORARY = new Set(["other-audio-playing",
+    "interruption-pending", "gesture-required-after-interruption",
+    "not-foreground", "stale", "activation-cooldown",
+    "foreground-attempt-limit", "activation-os-rejected"]);
+  function cancelNativeJamTimers() {
+    nativeJamTimers.forEach(id => clearTimeout(id));
+    nativeJamTimers.clear();
+  }
+  function scheduleNativeJam(when, callback) {
+    if (!nativeJamAudio || !nativeJamAudio.isReady() || muted ||
+        document.hidden || state.paused) return false;
+    const generation = musicGeneration;
+    const ms = Math.max(0, (when - nativeJamClock.currentTime) * 1000);
+    const run = () => {
+      if (generation === musicGeneration && !document.hidden &&
+          !state.paused && !muted && !state.menuOpen && !state.helpOpen &&
+          nativeJamAudio.isReady()) callback();
+    };
+    // Native PCM buffers are scheduled only when due, not all at bar start.
+    if (ms <= 8) { run(); return true; }
+    const id = setTimeout(() => {
+      nativeJamTimers.delete(id);
+      // Skip badly late notes instead of bursting deferred drums on return.
+      if (nativeJamClock.currentTime - when < 0.14) run();
+    }, ms);
+    nativeJamTimers.add(id);
+    return true;
+  }
   let selectedMode = null;
   let muted = false;
-  let audioCtx = null;
+  let audioCtx = nativeJamClock;
   let masterGain = null;
   let compressor = null;
   let outputGain = null;
@@ -353,7 +393,7 @@
   let soundBitBag = [];
 
   function audioContextConstructor() {
-    return window.AudioContext || window.webkitAudioContext;
+    return nativeJamAudio ? null : (window.AudioContext || window.webkitAudioContext);
   }
 
   function createHtmlAudioElement() {
@@ -371,6 +411,7 @@
   }
 
   function primeHtmlAudio() {
+    if (nativeJamAudio) return Promise.resolve(false);
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
 
@@ -445,6 +486,7 @@
   }
 
   function createAudioGraph() {
+    if (nativeJamAudio) return; // no Web Audio graph on experimental iOS
     if (audioCtx) {
       if (masterGain) masterGain.gain.value = muted ? 0 : MIX.gameMaster;
       if (outputGain) outputGain.gain.value = MIX.outputBoost;
@@ -535,6 +577,18 @@
   }
 
   function unlockAudioFromGesture() {
+    if (nativeJamAudio) {
+      const request = nativeJamAudio.prepareFromGesture();
+      return Promise.resolve(request).then(result => {
+        audioUnlocked = result?.ready === true;
+        audioForegroundRecoveryPending = !audioUnlocked;
+        return audioUnlocked;
+      }).catch(() => {
+        audioUnlocked = false;
+        audioForegroundRecoveryPending = true;
+        return false;
+      });
+    }
     primeHtmlAudio();
     createAudioGraph();
     if (!audioCtx || !masterGain) return Promise.resolve(false);
@@ -607,6 +661,7 @@
   }
 
   function markVerseJamAudioBackgrounded() {
+    if (nativeJamAudio) void nativeJamAudio.stop();
     // Freeze synchronized music before iOS can throttle JS or Web Audio.
     // A later foreground event shows Resume Beat; it never auto-replays.
     if (typeof pauseVerseJamForInterruption === "function") {
@@ -629,6 +684,7 @@
   }
 
   function scheduleVerseJamForegroundRecovery() {
+    if (nativeJamAudio) return; // do not activate from foreground
     if (document.hidden) return;
     if (state.resumeAfterInterruption && !sharedWelcomeEnabled) showResumeBeatOverlay();
     if (!audioCtx || audioCtx.state === "closed") return;
@@ -678,6 +734,16 @@
   }
 
   function installAudioUnlockHandlers() {
+    if (nativeJamAudio) {
+      // UIKit .inactive is handled by the native controller even when
+      // WebKit remains visible. Visibility is only an additional pause gate.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) markVerseJamAudioBackgrounded();
+        else playgroundWelcome?.showAfterNativeActive?.();
+      });
+      window.addEventListener("pagehide", markVerseJamAudioBackgrounded);
+      return;
+    }
     const unlock = event => {
       // Resume Beat's own button owns this gesture. Avoid two competing
       // unlock requests from document capture and the button handler.
@@ -878,6 +944,13 @@
         area.innerHTML = "";
       }
 
+      if (nativeJamAudio) {
+        // Watchdog is NOT a gesture. Never reactivate AVAudioSession here.
+        markVerseJamAudioBackgrounded();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+        return;
+      }
       await ensureAudio();
       if (!isGameplayFlowActive(flowId)) return;
 
@@ -1126,6 +1199,11 @@
   }
 
   function playSoundBitSound(button) {
+    if (nativeJamAudio) {
+      const sound = SOUND_BITS.find(item => item.id === button?.soundBitId);
+      if (sound) playSoundBitSample(sound, audioCtx.currentTime);
+      return; // Never use generated Web/HTML fallback for native voice bits.
+    }
     if (!audioCtx) return;
 
     const now = audioCtx.currentTime;
@@ -1747,6 +1825,7 @@
   }
 
   async function ensureAudio() {
+    if (nativeJamAudio) return unlockAudioFromGesture();
     // Runs from real Start/Mode/Menu gestures; a failed or stalled unlock
     // must not hang the gameplay flow or falsely report readiness.
     return unlockAudioFromGesture();
@@ -1774,6 +1853,15 @@
   }
 
   function setMuted(value) {
+    if (nativeJamAudio) {
+      muted = !!value;
+      if (muted) {
+        cancelNativeJamTimers();
+        nativeJamAudio.stopVoices();
+      }
+      // Menu Close, not passive unmute, is the next legitimate preflight.
+      return;
+    }
     muted = !!value;
     if (masterGain && audioCtx && audioCtx.state !== "closed") {
       masterGain.gain.setValueAtTime(muted ? 0 : 0.72, audioCtx.currentTime);
@@ -1793,6 +1881,7 @@
   }
 
   async function loadSoundBitBuffers() {
+    if (nativeJamAudio) return;
     if (!audioCtx) return;
     const decodingContext = audioCtx;
     if (soundBitLoadPromise) return soundBitLoadPromise;
@@ -1827,6 +1916,7 @@
   }
 
   async function loadUiTapBuffers() {
+    if (nativeJamAudio) return;
     if (!audioCtx) return;
     const decodingContext = audioCtx;
     if (uiTapLoadPromise) return uiTapLoadPromise;
@@ -1861,6 +1951,7 @@
   }
 
   function playUiTapFallback() {
+    if (nativeJamAudio) return;
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
 
     const now = audioCtx.currentTime;
@@ -1876,6 +1967,11 @@
   }
 
   function playUiTapSound() {
+    if (nativeJamAudio) {
+      if (muted) return false;
+      const index = uiTapIndex++;
+      return nativeJamAudio.tapUiFromGesture(index % 2, MIX.uiTap);
+    }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return false;
 
     const availableBuffers = uiTapBuffers.filter(Boolean);
@@ -1930,6 +2026,10 @@
 
 
   function playSoundBitSample(sound, when = audioCtx?.currentTime || 0, volume = VOICE_SOUND_BIT_VOLUME) {
+    if (nativeJamAudio) {
+      if (!sound?.id || !nativeJamAudio.isReady() || muted) return false;
+      return scheduleNativeJam(when, () => nativeJamAudio.playVoice(sound.id, volume));
+    }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted || !sound?.filename) return false;
 
     const buffer = soundBitBuffers[sound.filename];
@@ -1951,6 +2051,12 @@
   }
 
   function playTone({ midi = 60, when = audioCtx?.currentTime || 0, duration = 0.22, volume = 0.16, type = "triangle" } = {}) {
+    if (nativeJamAudio) {
+      if (!nativeJamAudio.isReady() || muted) return;
+      scheduleNativeJam(when, () => nativeJamAudio.playTone(midi, duration,
+        Math.max(0, Math.min(1, volume)), type));
+      return;
+    }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
 
     const osc = audioCtx.createOscillator();
@@ -1972,6 +2078,12 @@
 
   function playDrum(sound, when, volume = 1, generation = musicGeneration) {
     if (generation !== musicGeneration) return;
+    if (nativeJamAudio) {
+      scheduleNativeJam(when, () =>
+        nativeJamAudio.playDrum(sound, Math.max(0,
+          Math.min(1, drumVolume(volume) / MIX.drumMaster))));
+      return;
+    }
 
     // Generated chiptune drums.
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
@@ -2047,6 +2159,10 @@
 
   function stopMusic({ stopAudio = true } = {}) {
     musicGeneration += 1;
+    if (nativeJamAudio) {
+      cancelNativeJamTimers();
+      if (stopAudio) nativeJamAudio.stopVoices(); // preserve prepared PCM
+    }
 
     if (beatTimer) {
       clearInterval(beatTimer);
@@ -2124,6 +2240,23 @@
   function schedulePhrasePad(startAt, generation = musicGeneration) {
     if (generation !== musicGeneration) return;
     if (!audioCtx || muted || !currentRound().pad) return;
+    if (nativeJamAudio) {
+      const bpm = currentRound().bpm;
+      let remaining = Math.max(4,
+        Math.ceil((currentPhrasePadBeats() + PAD_GAP_BEATS) / 4) * 4);
+      let beatOffset = 0;
+      const when = Number.isFinite(startAt) ? startAt : nativeJamClock.currentTime + 0.06;
+      // Split an exceptionally long phrase into source-aligned measures;
+      // ordinary 4/8/12/16-beat pads remain one uninterrupted native chord.
+      while (remaining > 0) {
+        const beats = Math.min(16, remaining);
+        scheduleNativeJam(when + beatOffset * 60 / bpm,
+          () => nativeJamAudio.playPad(bpm, beats));
+        remaining -= beats;
+        beatOffset += beats;
+      }
+      return;
+    }
 
     const when = Number.isFinite(startAt)
       ? startAt
@@ -2481,7 +2614,7 @@
         state.menuOpen || state.helpOpen) return;
     const activePhrase = [
       "intro", "round_transition", "ending_sequence",
-      "spawn_chunk", "countdown", "play_chunk"
+      "spawn_chunk", "countdown", "play_chunk", "score"
     ].includes(state.phase);
     if (!activePhrase) return;
 
@@ -2518,7 +2651,10 @@
     const flowId = beginGameplayFlow();
     startGameplayWatchdog();
 
-    if (phase === "intro") {
+    if (phase === "score") {
+      startBeatLoop();
+      await showGroovyScoreScreen(flowId); // no duplicate score/reward
+    } else if (phase === "intro") {
       state.phase = "intro";
       startBeatLoop();
       await runIntroSequence(flowId);
@@ -2562,6 +2698,18 @@
 
   async function resumeGameFromMenu() {
     if (!state.paused || !state.resumeAfterMenu) return;
+    if (nativeJamAudio) {
+      // Called synchronously from the real Menu Close tap. Remain paused
+      // until the whole native bank is genuinely prewarmed.
+      const ok = await ensureAudio();
+      if (!ok) {
+        if (!document.hidden &&
+            !NATIVE_TEMPORARY.has(nativeJamAudio.lastError()))
+          showNativeJamFailure("menu");
+        return;
+      }
+      clearNativeJamFailure();
+    }
 
     const flowId = beginGameplayFlow();
 
@@ -2572,7 +2720,7 @@
 
     if (!isGameplayFlowActive(flowId)) return;
 
-    await ensureAudio();
+    if (!nativeJamAudio) await ensureAudio();
     if (!isGameplayFlowActive(flowId)) return;
 
     // Restart the groove cleanly.
@@ -2585,7 +2733,12 @@
     await startNextPlayableGroup(flowId);
   }
 
-  function stopRun() {
+  function stopRun({ keepNativeReady = false } = {}) {
+    if (nativeJamAudio && !keepNativeReady) {
+      void nativeJamAudio.stop();
+      nativeJamAwaitingStart = false;
+      clearNativeJamFailure();
+    }
     resumeBeatGestureGeneration += 1;
     resumeBeatInFlight = false;
     hideResumeBeatOverlay();
@@ -2604,7 +2757,8 @@
   }
 
 
-  async function beginRun(mode) {
+  async function beginRun(mode, nativeAlreadyReady = false) {
+    if (nativeJamAudio) nativeJamAwaitingStart = false;
     selectedMode = mode;
 
     // Clear any stale end/menu state before the first active-run check.
@@ -2625,7 +2779,24 @@
     // IMPORTANT for iPhone/Safari:
     // Unlock audio immediately from the user's mode-button tap,
     // before any awaited fetch or other async work.
-    await ensureAudio();
+    const audioOk = nativeAlreadyReady && nativeJamAudio
+      ? nativeJamAudio.isReady() : await ensureAudio();
+    if (nativeJamAudio && !audioOk) {
+      if (document.hidden) return;
+      if (NATIVE_TEMPORARY.has(nativeJamAudio.lastError())) {
+        nativeJamAwaitingStart = true;
+        state.paused = true;
+        state.resumeAfterInterruption = true;
+        state.interruptedPhase = "native-start";
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+      } else {
+        state.paused = true;
+        showNativeJamFailure("start");
+      }
+      return; // NEVER advance a silent native rhythm.
+    }
+    if (nativeJamAudio) clearNativeJamFailure();
 
     if (!isGameplayFlowActive(flowId)) return;
 
@@ -3514,8 +3685,8 @@
       );
     }
 
-    stopRun();
-    playCompletionArpeggio();
+    stopRun({ keepNativeReady: !!nativeJamAudio });
+    playCompletionArpeggio(); // tail remains warmed until End screen exit
 
     await sleep(900);
 
@@ -3789,8 +3960,10 @@
       backLabel: "Back to Verse Playground",
       onBack: () => window.VerseGameBridge.exitGame(),
       onStart: () => {
-        primeHtmlAudio();
-        unlockAudioFromGesture();
+        if (!nativeJamAudio) {
+          primeHtmlAudio();
+          unlockAudioFromGesture();
+        }
         setScreen("mode");
       }
     });
@@ -3811,8 +3984,10 @@
       modes: MODES,
       onBack: () => setScreen("intro"),
       onSelect: (mode) => {
-        primeHtmlAudio();
-        unlockAudioFromGesture();
+        if (!nativeJamAudio) {
+          primeHtmlAudio();
+          unlockAudioFromGesture();
+        }
         selectedMode = mode;
         setScreen("headphones");
       }
@@ -3857,10 +4032,12 @@
 
     if (button) {
       button.addEventListener("click", () => {
-        primeHtmlAudio();
-        unlockAudioFromGesture();
+        if (!nativeJamAudio) {
+          primeHtmlAudio();
+          unlockAudioFromGesture();
+        }
         state.screen = "game";
-        beginRun(selectedMode);
+        void beginRun(selectedMode);
       }, { once: true });
     }
   }
@@ -3915,6 +4092,76 @@
     if (state.screen === "end") return renderEnd();
   }
 
+
+  // Fatal missing bank/bridge errors are explicit, accessible and retriable.
+  // Temporary OS priority denials stay in plain Welcome Back, never gray UI.
+  function clearNativeJamFailure() {
+    document.getElementById("verseJamNativeFailure")?.remove();
+  }
+  function showNativeJamFailure(kind = "start") {
+    if (!nativeJamAudio || document.hidden) return;
+    nativeJamFailureRetry = kind;
+    clearNativeJamFailure();
+    const overlay = document.createElement("div");
+    overlay.id = "verseJamNativeFailure";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483400;" +
+      "display:flex;align-items:center;justify-content:center;padding:20px;" +
+      "background:rgba(5,3,20,.94);color:#fff;";
+    overlay.innerHTML = `<section role="dialog" aria-modal="true"
+      aria-label="Verse Jam native audio unavailable"
+      style="max-width:360px;padding:26px;text-align:center;border-radius:18px;
+      border:2px solid #8df7ff;background:#221447">
+      <h2 style="color:#8df7ff">Sound isn't ready</h2>
+      <p role="status">Verse Jam is paused. Try again to prepare native sound.</p>
+      <button id="jamNativeRetry" type="button">Try Again</button>
+      <button id="jamNativeBack" type="button">Back to Playground</button>
+    </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#jamNativeRetry")?.addEventListener("click", async () => {
+      const button = overlay.querySelector("#jamNativeRetry");
+      if (button) button.disabled = true;
+      try {
+        if (nativeJamFailureRetry === "menu") {
+          await resumeGameFromMenu();
+        } else if (nativeJamFailureRetry === "return") {
+          const ok = await unlockAudioFromGesture();
+          if (ok && state.resumeAfterInterruption) {
+            state.resumeBeatApproved = true;
+            await resumeVerseJamAfterInterruption();
+            clearNativeJamFailure();
+          }
+        } else {
+          await beginRun(selectedMode);
+        }
+      } finally {
+        if (button && button.isConnected) button.disabled = false;
+      }
+    });
+    overlay.querySelector("#jamNativeBack")?.addEventListener("click", () => {
+      stopRun();
+      window.VerseGameBridge.exitGame();
+    });
+    overlay.querySelector("#jamNativeRetry")?.focus?.();
+  }
+  if (nativeJamAudio) {
+    nativeJamAudio.configure({
+      onAppInactive: () => {
+        markVerseJamAudioBackgrounded();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive: () => {
+        playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        markVerseJamAudioBackgrounded();
+        if (!document.hidden && state.screen === "game") {
+          nativeJamFailureRetry = "return";
+          showNativeJamFailure("return");
+        }
+      }
+    });
+  }
+
   // The shared Welcome Back gesture verifies audio before a clean downbeat.
   // Keep the existing Resume Beat modal only as a fallback for web clients
   // where the shared files are not available.
@@ -3925,6 +4172,19 @@
       hideResumeBeatOverlay();
     },
     onResume: () => {
+      if (nativeJamAudio) {
+        audioUnlocked = nativeJamAudio.isReady();
+        audioForegroundRecoveryPending = !audioUnlocked;
+        if (!audioUnlocked) return false;
+        if (nativeJamAwaitingStart) {
+          // Recovery already activated on this genuine Let's go gesture.
+          nativeJamAwaitingStart = false;
+          state.resumeAfterInterruption = false;
+          state.paused = false;
+          void beginRun(selectedMode, true);
+          return true;
+        }
+      }
       if (!state.resumeAfterInterruption) return true;
       if (muted) {
         audioUnlocked = true;
@@ -3938,7 +4198,16 @@
       void resumeVerseJamAfterInterruption();
       return true;
     },
-    getAudioContext: () => audioCtx,
+    getAudioContext: () => nativeJamAudio ? null : audioCtx,
+    nativeOnlyAudio: !!nativeJamAudio,
+    restoreNativeOnGesture: nativeJamAudio ? () =>
+      nativeJamAudio.prepareFromGesture().then(result => {
+        audioUnlocked = result?.ready === true;
+        audioForegroundRecoveryPending = !audioUnlocked;
+        if (audioUnlocked) return true;
+        return NATIVE_TEMPORARY.has(result?.reason)
+          ? {deferred:true,reason:"native-interruption"} : false;
+      }) : undefined,
     unlockAudio: unlockAudioFromGesture,
     replaceAudioContext: replaceJamWelcomeContext,
     isMuted: () => muted

@@ -344,6 +344,55 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     ]
     private lazy var wheelToneIDs: Set<String> =
         Set(wheelToneRecipes.keys)
+
+    // N6q finite original Verse Jam note/bpm inventory. Prepared once on
+    // the serial AVAudioEngine worker; the hot path selects a fixed buffer.
+    private lazy var jamNoteRecipes: [String: (Int, Int, String)] = {
+        var recipes: [String: (Int, Int, String)] = [:]
+        func add(_ midi: Int, _ ms: Int, _ wave: String) {
+            recipes["\(midi)-\(ms)-\(wave)"] = (midi, ms, wave)
+        }
+        for midi in [60,62,64,67,69,72,74,76,79,81,84] {
+            for wave in ["t", "q"] { add(midi,220,wave) }
+            add(midi,120,"t")
+            add(midi,110,"q")
+            add(midi,160,"t")
+        }
+        let extras: [(Int,Int,String)] = [
+            (72,55,"q"),(84,45,"q"),(79,75,"q"),(84,85,"q"),
+            (43,160,"s"),(38,130,"s"),(60,80,"t"),
+            (60,120,"q"),(64,120,"q"),(67,120,"q"),
+            (72,110,"q"),(76,120,"q"),(79,140,"q"),
+            (84,120,"q"),(88,130,"q"),(91,150,"q"),
+            (67,150,"q"),(69,150,"q"),(67,220,"q"),
+            (64,150,"q"),(62,150,"q"),(60,360,"t"),
+            (48,1300,"t"),(52,1220,"t"),(55,1160,"t"),(60,1100,"t"),
+            (60,420,"t"),(67,420,"t"),(72,460,"t"),
+            (76,160,"q"),(79,180,"q"),(84,160,"t"),
+            (72,140,"q"),(76,140,"q"),(79,200,"q"),
+            (67,160,"t"),(72,160,"q"),(79,220,"q"),
+            (84,140,"t"),(60,160,"q"),(64,160,"q"),
+            (67,180,"q"),(72,220,"q"),(76,240,"t"),
+            (79,280,"t"),(84,420,"t"),(91,180,"t"),
+            (72,120,"q"),(76,130,"q"),(79,180,"t")
+        ]
+        for (midi, ms, wave) in extras { add(midi,ms,wave) }
+        return recipes
+    }()
+    private let jamBPMs: [Int] = [92,100,104,108,112,120,128]
+    private let jamPadBeats: [Int] = [4,8,12,16]
+    private let jamVoices = ["boom","hey","woo","yeah","yo"]
+    private let jamDrums = ["kick","snare","hat","extra"]
+    private lazy var jamIDs: Set<String> = {
+        Set(["jam-note","jam-pad"] +
+            jamDrums.map { "jam-drum-" + $0 } +
+            jamVoices.map { "jam-voice-" + $0 })
+    }()
+    private lazy var jamVoiceResources: [String:String] = {
+        Dictionary(uniqueKeysWithValues: jamVoices.map {
+            ("jam-voice-" + $0,"verse_jam_voice_" + $0)
+        })
+    }()
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -531,7 +580,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "wheel-note-75-35-70-t",
         "wheel-note-76-35-70-t",
         "wheel-note-77-35-70-t",
-        "wheel-note-78-35-70-t"
+        "wheel-note-78-35-70-t",
+        "jam-note", "jam-pad", "jam-drum-kick", "jam-drum-snare",
+        "jam-drum-hat", "jam-drum-extra", "jam-voice-boom",
+        "jam-voice-hey", "jam-voice-woo", "jam-voice-yeah", "jam-voice-yo"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -553,6 +605,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private var pegToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var melodyToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
     private var snakeOrbToneBuffers: [Int: AVAudioPCMBuffer] = [:] // worker only
+    private var jamNoteBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
+    private var jamPadBuffers: [String: AVAudioPCMBuffer] = [:] // worker only
     private var effectNodes: [String: [AVAudioPlayerNode]] = [:] // worker only
     private var nextEffectVoice: [String: Int] = [:] // worker only
     private let maximumEffectFrames: AVAudioFramePosition = 1_500_000
@@ -910,6 +964,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         pegToneBuffers.removeAll()
         melodyToneBuffers.removeAll()
         snakeOrbToneBuffers.removeAll()
+        jamNoteBuffers.removeAll()
+        jamPadBuffers.removeAll()
         effectsEngine = nil
     }
 
@@ -1897,6 +1953,144 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
 
     // N6p: offline PCM rendering of exact Wheel-of-Bible source triangle,
     // square and sine oscillator notes, no new session and no hot synth.
+
+    // N6q: one worker-only AVAudioEngine; no hot oscillator, decode or
+    // per-note dynamic buffer allocation. Voice bits use the existing
+    // packaged-MP3 PCM preloader. Pads are original four-note triangle
+    // chords, pre-rendered at every source BPM / measure length.
+    private func prepareJamOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard jamIDs.contains(soundId),
+              soundId == "jam-note" || soundId == "jam-pad" ||
+                  soundId.hasPrefix("jam-drum-") else {
+            return (false, 0, "invalid-jam-id")
+        }
+        if effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], !nodes.isEmpty,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, soundId == "jam-pad" ? 1800 : 220, "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "jam-format-failed")
+        }
+        let rate = format.sampleRate
+        func make(_ seconds: Double,
+                  sample: (Double) -> Double) -> AVAudioPCMBuffer? {
+            let frames = AVAudioFrameCount(ceil(rate * seconds))
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format, frameCapacity: frames),
+                  let values = buffer.floatChannelData?[0] else { return nil }
+            buffer.frameLength = frames
+            for i in 0..<Int(frames) {
+                values[i] = Float(max(-0.96, min(0.96,
+                    sample(Double(i) / rate))))
+            }
+            return buffer
+        }
+        func triangle(_ hz: Double, _ t: Double) -> Double {
+            let cycle = hz*t - floor(hz*t)
+            return 1.0 - 4.0*abs(cycle-0.5)
+        }
+        func envelope(_ t: Double, _ duration: Double,
+                      _ peak: Double, _ attack: Double) -> Double {
+            if t >= duration { return 0 }
+            if t < attack {
+                return 0.0001*pow(peak/0.0001,t/attack)
+            }
+            return peak*pow(0.0001/peak,
+                (t-attack)/max(0.001,duration-attack))
+        }
+        var maxDuration = 220
+        if soundId == "jam-note" {
+            var bank: [String: AVAudioPCMBuffer] = [:]
+            for (key, (midi, ms, wave)) in jamNoteRecipes {
+                let duration = Double(ms)/1000.0
+                let hz = 440.0*pow(2.0,Double(midi-69)/12.0)
+                guard let buffer = make(duration+0.03, sample: { t in
+                    if t >= duration { return 0 }
+                    let cycle = hz*t-floor(hz*t)
+                    let shape = wave == "q"
+                        ? (cycle < 0.5 ? 1.0 : -1.0)
+                        : (wave == "s" ? sin(2.0*Double.pi*hz*t) :
+                            triangle(hz,t))
+                    return shape*envelope(t,duration,1.0,0.01)
+                }) else { return (false,0,"jam-note-allocation-failed") }
+                bank[key] = buffer
+            }
+            jamNoteBuffers = bank
+            maxDuration = 1350
+        } else if soundId == "jam-pad" {
+            var bank: [String: AVAudioPCMBuffer] = [:]
+            for bpm in jamBPMs {
+                for beats in jamPadBeats {
+                    let duration = (Double(beats)-0.25)*60.0/Double(bpm)
+                    let freqs = [48,52,55,60].map {
+                        440.0*pow(2.0,Double($0-69)/12.0)
+                    }
+                    guard let buffer = make(duration+0.03, sample: { t in
+                        let gain = envelope(t,duration,0.016,0.01)*1.5
+                        return freqs.reduce(0.0) {
+                            $0 + triangle($1,t)*gain
+                        }
+                    }) else { return (false,0,"jam-pad-allocation-failed") }
+                    bank["\(bpm)-\(beats)"] = buffer
+                    maxDuration = max(maxDuration,Int(duration*1000)+30)
+                }
+            }
+            jamPadBuffers = bank
+        } else {
+            let sound = String(soundId.dropFirst("jam-drum-".count))
+            let duration: Double = sound == "kick" ? 0.20 : 0.13
+            guard let buffer = make(duration, sample: { t in
+                let peak = (sound == "kick" ? 0.22 :
+                    (sound == "snare" ? 0.09 : 0.045))*2.0*1.5
+                let end = sound == "kick" ? 0.18 :
+                    (sound == "snare" ? 0.11 : 0.045)
+                let attack = sound == "kick" ? 0.006 : 0.004
+                let gain = envelope(t,end,peak,attack)
+                let hz: Double = sound == "snare" ? 185.0 :
+                    (sound == "extra" ? 320.0 : 520.0)
+                let cycle: Double
+                if sound == "kick" {
+                    let logRatio = log(48.0/120.0)
+                    let before = min(t,0.14)
+                    let first = 120.0*0.14/logRatio *
+                        (pow(48.0/120.0,before/0.14)-1.0)
+                    cycle = first + 48.0*max(0,t-0.14)
+                } else { cycle = hz*t }
+                return (sound == "kick" ? sin(2.0*Double.pi*cycle) :
+                    (cycle-floor(cycle) < 0.5 ? 1.0 : -1.0))*gain
+            }) else { return (false,0,"jam-drum-allocation-failed") }
+            effectBuffers[soundId] = buffer
+            maxDuration = Int(duration*1000)
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            let count = soundId == "jam-note" ? 12 : 4
+            for _ in 0..<count {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node,to:engine.mainMixerNode,format:format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: AVAudioFrameCount(
+                    ceil(rate*Double(maxDuration+40)/1000.0)))
+                node.play()
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            return (true,maxDuration,"prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false,0,"jam-engine-start-failed")
+        }
+    }
+
     private func prepareWheelToneOnWorker(soundId: String)
         -> (prepared: Bool, durationMs: Int, reason: String) {
         guard let (midi, milliseconds, volumeMilli, wave) =
@@ -2250,6 +2444,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               scrubSoundResources[soundId] != nil ||
               scrubToneIDs.contains(soundId) ||
               wheelToneIDs.contains(soundId) ||
+              jamIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -2345,9 +2540,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                self.scrambleToneIDs.contains(soundId) ||
                self.typerToneIDs.contains(soundId) ||
                self.scrubToneIDs.contains(soundId) ||
-               self.wheelToneIDs.contains(soundId) {
+               self.wheelToneIDs.contains(soundId) ||
+                (self.jamIDs.contains(soundId) &&
+                 self.jamVoiceResources[soundId] == nil) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
+            } else if let resourceName = self.jamVoiceResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_playground/verse_jam/verse_jam_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
             } else if let resourceName = self.scrubSoundResources[soundId] {
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
@@ -2474,7 +2679,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.wheelToneIDs.contains(soundId) {
+                if self.jamIDs.contains(soundId) &&
+                    self.jamVoiceResources[soundId] == nil {
+                    let result = self.prepareJamOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-jam"
+                } else if self.wheelToneIDs.contains(soundId) {
                     let result = self.prepareWheelToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
@@ -2630,6 +2842,27 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             } else {
                 requestedNoteIndex = nil
             }
+            // Jam's source-backed finite recipes are verified on main before worker.
+            let requestedJamNote: String?
+            if soundId == "jam-note" {
+                guard let noteId = call.getString("noteId"),
+                      self.jamNoteRecipes[noteId] != nil else {
+                    call.resolve(["accepted": false, "reason": "invalid-jam-note"])
+                    return
+                }
+                requestedJamNote = noteId
+            } else { requestedJamNote = nil }
+            let requestedJamPad: String?
+            if soundId == "jam-pad" {
+                guard let padId = call.getString("padId"),
+                      padId.split(separator: "-").count == 2,
+                      self.jamBPMs.contains(Int(padId.split(separator: "-")[0]) ?? -1),
+                      self.jamPadBeats.contains(Int(padId.split(separator: "-")[1]) ?? -1) else {
+                    call.resolve(["accepted": false, "reason": "invalid-jam-pad"])
+                    return
+                }
+                requestedJamPad = padId
+            } else { requestedJamPad = nil }
             let requestedMidi: Int?
             if soundId == self.nativeMelodySoundID {
                 guard let midi = call.getInt("midi"),
@@ -2692,7 +2925,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         return
                     }
                     let buffer: AVAudioPCMBuffer?
-                    if soundId == self.nativeSnakeOrbSoundID {
+                    if soundId == "jam-note" {
+                        buffer = self.jamNoteBuffers[requestedJamNote ?? ""]
+                    } else if soundId == "jam-pad" {
+                        buffer = self.jamPadBuffers[requestedJamPad ?? ""]
+                    } else if soundId == self.nativeSnakeOrbSoundID {
                         buffer = self.snakeOrbToneBuffers[requestedNoteIndex ?? -1]
                     } else if soundId == self.nativePegSoundID {
                         buffer = self.pegToneBuffers[requestedNoteIndex ?? -1]
@@ -2824,7 +3061,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         onMain { [weak self] in
             guard let self=self,
                   let soundId=call.getString("soundId"),
-                  soundId == "scrub-mower" else {
+                  (soundId == "scrub-mower" || soundId == "jam-group") else {
                 call.resolve(["stopped":false,"reason":"invalid-sound-id"])
                 return
             }
@@ -2836,13 +3073,27 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     }
                     return
                 }
-                if let nodes=self.effectNodes[soundId],
-                    let buffer=self.effectBuffers[soundId],
-                    let engine=self.effectsEngine,engine.isRunning {
-                    for node in nodes {
-                        node.stop()
-                        node.prepare(withFrameCount:buffer.frameLength)
-                        node.play()
+                let group: [String] = soundId == "jam-group"
+                    ? ["jam-note", "jam-pad", "jam-drum-kick", "jam-drum-snare",
+                       "jam-drum-hat", "jam-drum-extra"] +
+                        self.jamVoices.map { "jam-voice-" + $0 }
+                    : [soundId]
+                if let engine=self.effectsEngine,engine.isRunning {
+                    for item in group {
+                        guard let nodes=self.effectNodes[item] else { continue }
+                        for node in nodes {
+                            node.stop()
+                            // Preserve the original N6o mower preparation and
+                            // also rewarm Jam's shared note/chord pools.
+                            if let buffer=self.effectBuffers[item] {
+                                node.prepare(withFrameCount:buffer.frameLength)
+                            } else if item == "jam-note" {
+                                node.prepare(withFrameCount:60_000)
+                            } else if item == "jam-pad" {
+                                node.prepare(withFrameCount:500_000)
+                            }
+                            node.play()
+                        }
                     }
                 }
                 DispatchQueue.main.async {
