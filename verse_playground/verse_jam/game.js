@@ -2079,11 +2079,11 @@
     return true;
   }
 
-  function playTone({ midi = 60, when = audioCtx?.currentTime || 0, duration = 0.22, volume = 0.16, type = "triangle" } = {}) {
+  function playTone({ midi = 60, when = audioCtx?.currentTime || 0, duration = 0.22, volume = 0.16, type = "triangle", jamCue = null } = {}) {
     if (nativeJamAudio) {
       if (!nativeJamAudio.isReady() || muted) return;
       scheduleNativeJam(when, dueEpochMs => nativeJamAudio.playTone(midi, duration,
-        Math.max(0, Math.min(1, volume)), type, dueEpochMs));
+        Math.max(0, Math.min(1, volume)), type, dueEpochMs, jamCue));
       return;
     }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
@@ -2187,11 +2187,22 @@
     playTone({ midi: 38, when: now + 0.07, duration: 0.13, volume: 0.08, type: "sine" });
   }
 
-  function stopMusic({ stopAudio = true } = {}) {
+  function stopMusic({ stopAudio = true, preserveNativeNotes = false } = {}) {
     musicGeneration += 1;
+    let nativeStop = null;
     if (nativeJamAudio) {
       cancelNativeJamTimers();
-      if (stopAudio) nativeJamAudio.stopVoices(); // preserve prepared PCM
+      if (stopAudio) {
+        // The ios-prep original stops the background beat before each
+        // interstitial but immediately plays four simultaneous first-word
+        // notes. A jam-group stop would STOP/REPREPARE the note voices
+        // on Swift's serial worker before those four requests arrive.
+        if (preserveNativeNotes) {
+          nativeStop = nativeJamAudio.stopGrooveForTransition();
+        } else {
+          nativeJamAudio.stopVoices();
+        }
+      }
     }
 
     if (beatTimer) {
@@ -2206,6 +2217,9 @@
     if (stopAudio) {
       stopActiveAudioSources();
     }
+    // Only the between-round transition awaits the native worker's scoped
+    // stop. Ordinary stopMusic callers keep their original immediate flow.
+    return nativeStop;
   }
 
   function startBeatLoop({ cleanRestart = true, startAt = null } = {}) {
@@ -3512,7 +3526,21 @@
         if (!isGameplayFlowActive(flowId)) return;
 
         clearSleeps();
-        stopMusic();
+        const comingRoundIndex = state.roundIndex + 1;
+        if (nativeJamAudio) {
+          nativeJamAudio.traceTransition("stop-request", comingRoundIndex);
+        }
+        const stoppedBackground = stopMusic({
+          preserveNativeNotes: !!nativeJamAudio
+        });
+        if (nativeJamAudio) {
+          // Audio beat still stops exactly as in ios-prep; only the drum,
+          // pad and filler voices stop. Wait for the serialized Swift
+          // stop acknowledgement BEFORE placing the short Time chord.
+          await stoppedBackground;
+          if (!isGameplayFlowActive(flowId)) return;
+          nativeJamAudio.traceTransition("stop-complete", comingRoundIndex);
+        }
 
         state.roundIndex += 1;
         state.progressIndex = 0;
@@ -3641,7 +3669,8 @@
           when: startAt + beat * note.beat,
           duration: note.duration,
           volume: note.volume * MIX.transition,
-          type: note.type
+          type: note.type,
+          jamCue: nativeJamAudio ? "transition-sting" : null
         });
       });
 
@@ -3661,7 +3690,8 @@
           when: startAt + beat * note.beat,
           duration: note.duration,
           volume: note.volume * MIX.transition,
-          type: note.type
+          type: note.type,
+          jamCue: nativeJamAudio ? "transition-sting" : null
         });
       });
 
@@ -3680,7 +3710,8 @@
         when: startAt + beat * note.beat,
         duration: note.duration,
           volume: note.volume * MIX.transition,
-        type: note.type
+        type: note.type,
+          jamCue: nativeJamAudio ? "transition-sting" : null
       });
     });
   }
@@ -3885,10 +3916,13 @@
 
     const beat = secondsPerBeat();
     const transitionStart = audioCtx
-      ? audioCtx.currentTime + 0.08
+      ? audioCtx.currentTime + (nativeJamAudio ? 0.26 : 0.08)
       : performance.now() / 1000;
     const newGrooveStart = transitionStart + beat * 4;
 
+    if (nativeJamAudio) {
+      nativeJamAudio.traceTransition("phrase-scheduled", state.roundIndex);
+    }
     playRoundTransitionSting(transitionStart);
 
     const transitionNotes = state.roundIndex === 1
@@ -3897,12 +3931,24 @@
         ? [67, 72, 79]
         : [72, 76, 79];
 
-    // The authored sting ALREADY supplies a beat-zero C/G/C chord for
-    // "Time", and a note on beats 0/1/2 for each other phrase. On native
-    // the former extra word-note layer doubled those pitches (and added
-    // a fourth simultaneous tone to "Time"). Keep the source sting,
-    // including its chord; do not submit redundant native word notes.
-    // Browser WebAudio intentionally retains both original layers.
+    // Exact original ios-prep arrangement has TWO deliberate sound layers:
+    // source sting (C/G/C at "Time") plus a distinct word-note on every
+    // word. Keep BOTH. Native pre-schedules the word notes before drawing
+    // any text, while original Web Audio still submits each on its word.
+    // Starting after the scoped stop gives the four first-beat PCM requests
+    // a real bridge/worker lead rather than sending the chord too late.
+    if (nativeJamAudio) {
+      for (let index = 0; index < message.length; index += 1) {
+        playTone({
+          midi: transitionNotes[index % transitionNotes.length],
+          when: transitionStart + beat * index,
+          duration: 0.11,
+          volume: 0.045,
+          type: "square",
+          jamCue: "transition-word"
+        });
+      }
+    }
 
     for (let index = 0; index < message.length; index += 1) {
       if (state.screen !== "game" || state.paused) return newGrooveStart;
@@ -3917,6 +3963,10 @@
       el.className = "versejam-intro-word is-in";
       el.textContent = message[index];
       stack.appendChild(el);
+      if (nativeJamAudio) {
+        // Xcode Debug Console marker for the actual DOM word insertion.
+        nativeJamAudio.traceTransition("word-visible", state.roundIndex, index);
+      }
 
       if (!nativeJamAudio) {
         playTone({
@@ -3932,6 +3982,9 @@
     // Return just before the new downbeat so the drum loop can be scheduled
     // exactly on the beat instead of starting after the animation finishes.
     await waitUntilAudioTime(newGrooveStart - 0.12);
+    if (nativeJamAudio) {
+      nativeJamAudio.traceTransition("next-groove", state.roundIndex);
+    }
 
     return newGrooveStart;
   }
