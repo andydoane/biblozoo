@@ -162,6 +162,7 @@ function realMenus(){
     nativeTrafficPending:false,nativeTrafficFailure:false,
     muted:false,returnPaused:false,
     playUiTapSound:()=>calls.push("pop"),
+    nextNativeTrafficUiKey:()=>"uiTap2",
     primeNativeTrafficFromGesture:(...args)=>calls.push(["prime",...args]),
     stopNativeTrafficRound:()=>calls.push("stopRound"),
     setPaused:(v,reason="")=>{scope.state.paused=v;scope.state.pauseReason=v?reason:"";},
