@@ -259,6 +259,129 @@
     runToken: 0
   };
 
+
+  // N6n Verse Typer: one game-scoped 19-ID PCM bank and the existing
+  // published-verse AVAudioPlayer narrator. No native iOS Web/HTML output.
+  const nativeTyperAudio=window.BibloZooNativeVerseTyperAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseTyperAudio : null;
+  let nativeTyperToken=0,nativeTyperPending=false,nativeTyperFailure=false;
+  let nativeTyperRetry={kind:"round",mode:null};
+  let nativeHoldStarted=0,nativeHoldTotal=0;
+  const nativeTyperNotes=new Set([55,60,62,64,65,67,69,71,72]);
+  function typerNow(){
+    const now=welcomeClock.now();
+    return now-nativeHoldTotal-
+      (nativeHoldStarted ? Math.max(0,now-nativeHoldStarted) : 0);
+  }
+  function beginNativeHold(){
+    if(!nativeTyperAudio || nativeHoldStarted || state.screen!=="game")return;
+    nativeHoldStarted=welcomeClock.now();
+  }
+  function finishNativeHold(){
+    if(!nativeHoldStarted)return;
+    nativeHoldTotal+=Math.max(0,welcomeClock.now()-nativeHoldStarted);
+    nativeHoldStarted=0;
+  }
+  function stopNativeTyperRound(){
+    if(!nativeTyperAudio)return;
+    nativeTyperToken++;
+    nativeTyperPending=false;
+    app.removeAttribute("aria-busy");
+    void nativeTyperAudio.stop();
+  }
+  function clearNativeTyperFailure(){
+    nativeTyperFailure=false;
+    document.getElementById("vtNativeAudioFailure")?.remove();
+  }
+  function showNativeTyperFailure(message){
+    if(!nativeTyperAudio)return;
+    nativeTyperFailure=true;
+    beginNativeHold();
+    let overlay=document.getElementById("vtNativeAudioFailure");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.id="vtNativeAudioFailure";
+      overlay.className="vt-native-audio-failure";
+      overlay.innerHTML=`<section class="vt-native-audio-card" role="dialog"
+        aria-modal="true" aria-label="Verse Typer native audio issue">
+        <h2>Verse Typer</h2><p data-typer-status role="status"></p>
+        <button type="button" data-typer-retry>Try Again</button>
+        <button type="button" data-typer-back>Back</button></section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-typer-retry]").onclick=()=>
+        primeNativeTyperFromGesture(nativeTyperRetry.kind,nativeTyperRetry.mode);
+      overlay.querySelector("[data-typer-back]").onclick=()=>{
+        clearNativeTyperFailure();
+        stopNativeTyperRound();
+        finishNativeHold();
+        if(nativeTyperRetry.kind==="round")setScreen("mode");
+        else window.VerseGameBridge.exitGame();
+      };
+    }
+    overlay.querySelector("[data-typer-status]").textContent=message;
+  }
+  function primeNativeTyperFromGesture(kind="round",mode=null,uiKey=null){
+    if(!nativeTyperAudio || nativeTyperPending || returnPaused ||
+       document.hidden)return;
+    nativeTyperRetry={kind,mode};
+    clearNativeTyperFailure();
+    if(muted){
+      if(kind==="round"){
+        selectedMode=INTERNAL_MODE_BY_SHELL_MODE[mode]||"beginner";
+        void beginRun();
+      } else {
+        finishNativeHold();
+        state.paused=false;
+      }
+      return;
+    }
+    const token=++nativeTyperToken;
+    nativeTyperPending=true;
+    beginNativeHold();
+    app.setAttribute("aria-busy","true");
+    // MUST request Swift priority synchronously in this real click.
+    const prepare=nativeTyperAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:UI_POP_SOUND_VOLUME} : null);
+    void Promise.resolve(prepare).then(result=>{
+      if(token!==nativeTyperToken || returnPaused || document.hidden)return;
+      nativeTyperPending=false;
+      app.removeAttribute("aria-busy");
+      if(result?.ready!==true){
+        showNativeTyperFailure("Native sound isn't ready. Tap Try Again.");
+        return;
+      }
+      clearNativeTyperFailure();
+      if(kind==="round"){
+        selectedMode=INTERNAL_MODE_BY_SHELL_MODE[mode]||"beginner";
+        void beginRun();
+      } else {
+        finishNativeHold();
+        state.paused=false;
+      }
+    }).catch(()=>{
+      if(token!==nativeTyperToken || returnPaused || document.hidden)return;
+      nativeTyperPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeTyperFailure("Native sound isn't ready. Tap Try Again.");
+    });
+  }
+  if(nativeTyperAudio){
+    nativeTyperAudio.configure({
+      onAppInactive:()=>{
+        if(nativeTyperPending)stopNativeTyperRound();
+        if(state.screen!=="game")return;
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive:()=>playgroundWelcome?.showAfterNativeActive?.(),
+      onPlaybackFailure:()=>{
+        if(muted||returnPaused||document.hidden||nativeTyperPending||
+           nativeTyperFailure||state.screen!=="game"||state.paused)return;
+        nativeTyperRetry={kind:"resume",mode:null};
+        showNativeTyperFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+  }
+
   function clearTrackedTimeout(id) {
     if (!id) return;
     const job = scheduledActions.get(id);
@@ -269,7 +392,7 @@
 
   function trackedTimeout(callback, ms, runToken = state.runToken) {
     const id = ++nextScheduledId;
-    const deadline = welcomeClock.now() + Math.max(0, Number(ms) || 0);
+    const deadline = typerNow() + Math.max(0, Number(ms) || 0);
     const job = { timer: 0 };
     scheduledActions.set(id, job);
     state.sleepIds.push(id);
@@ -280,16 +403,16 @@
         clearTrackedTimeout(id);
         return;
       }
-      if (!returnPaused && welcomeClock.now() >= deadline) {
+      if (!returnPaused && typerNow() >= deadline) {
         clearTrackedTimeout(id);
         callback();
         return;
       }
-      job.timer = setTimeout(check, returnPaused ? 80 : Math.max(0, deadline - welcomeClock.now()));
+      job.timer = setTimeout(check, returnPaused ? 80 : Math.max(0, deadline - typerNow()));
     };
     // Ordinary typing keeps its original precise delay; only the interrupted
     // state polls briefly while time is frozen.
-    job.timer = setTimeout(check, Math.max(0, deadline - welcomeClock.now()));
+    job.timer = setTimeout(check, Math.max(0, deadline - typerNow()));
     return id;
   }
 
@@ -1139,7 +1262,7 @@
     state.entranceDone = false;
     state.pendingCompleteAfterEntrance = false;
     state.paused = false;
-    state.startTime = welcomeClock.now();
+    state.startTime = typerNow();
     state.correctLetters = 0;
     state.typos = 0;
     state.streak = 0;
@@ -2204,7 +2327,7 @@
         : -1;
 
       return `
-        <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
+        <span class="vt-head ${state.headShakeUntil > typerNow() ? "is-no" : ""}">${faceHtml()}</span>
         <span class="vt-body vt-reference-body">
           ${item.chars.map((char, index) => {
         const isDigit = /\d/.test(char);
@@ -2226,7 +2349,7 @@
 
     if (item.kind === "mega") {
       return `
-        <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
+        <span class="vt-head ${state.headShakeUntil > typerNow() ? "is-no" : ""}">${faceHtml()}</span>
         <span class="vt-body vt-mega-body">
           ${(item.parts || []).map(part => {
         if (part.kind === "space") {
@@ -2251,7 +2374,7 @@
       : -1;
 
     return `
-      <span class="vt-head ${state.headShakeUntil > welcomeClock.now() ? "is-no" : ""}">${faceHtml()}</span>
+      <span class="vt-head ${state.headShakeUntil > typerNow() ? "is-no" : ""}">${faceHtml()}</span>
       <span class="vt-body">
         ${letters.map((letter, index) => {
       const typed = index < state.typedIndex;
@@ -2333,7 +2456,7 @@
   }
 
   function startRippleDelayLoop(durationMs, item) {
-    const startedAt = welcomeClock.now();
+    const startedAt = typerNow();
 
     const tick = () => {
       if (state.screen !== "game" || state.currentItem !== item) return;
@@ -2343,7 +2466,7 @@
         return;
       }
       updateRippleDelays();
-      if (welcomeClock.now() - startedAt < durationMs - 40) {
+      if (typerNow() - startedAt < durationMs - 40) {
         requestAnimationFrame(tick);
       }
     };
@@ -2620,7 +2743,7 @@
     state.streak = 0;
     state.keyFlash = key;
     state.keyFlashBad = true;
-    state.headShakeUntil = welcomeClock.now() + 420;
+    state.headShakeUntil = typerNow() + 420;
 
     playWrongSound();
     renderHud();
