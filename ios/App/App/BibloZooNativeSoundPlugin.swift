@@ -170,6 +170,23 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private let towerWordToneIDs: Set<String> = [
         "tower-correct-word", "tower-wrong-word"
     ]
+    // N6k Verse Launch: eight actual gameplay MP3 clips. WordAdded and
+    // starCollected share the same shipped collect clip/one fixed PCM ID.
+    private let verseLaunchSoundResources: [String: String] = [
+        "launch-correct": "verse_launch_zoom",
+        "launch-wrong": "verse_launch_wrong",
+        "launch-collect": "verse_launch_collect",
+        "launch-explode": "verse_launch_explode",
+        "launch-hit": "verse_launch_explode_2",
+        "launch-land": "verse_launch_land",
+        "launch-launch": "verse_launch_launch",
+        "launch-enter": "verse_launch_launch_2"
+    ]
+    // Four exact, non-parametric sine/triangle recipes for native preflight.
+    private let verseLaunchToneIDs: Set<String> = [
+        "launch-countdown-low", "launch-countdown-high",
+        "launch-projectile-tick", "launch-projectile-tock"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -243,7 +260,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "bird-pipe-crash", "bird-streak", "bird-wrong", "bird-bee-hit",
         "tower-brick-land", "tower-warning", "tower-danger-warning",
         "tower-collapse", "tower-brick-break", "tower-streak",
-        "tower-correct-word", "tower-wrong-word"
+        "tower-correct-word", "tower-wrong-word",
+        "launch-correct", "launch-wrong", "launch-collect",
+        "launch-explode", "launch-hit", "launch-land",
+        "launch-launch", "launch-enter",
+        "launch-countdown-low", "launch-countdown-high",
+        "launch-projectile-tick", "launch-projectile-tock"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -974,6 +996,97 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+    // N6k: pre-render a bounded PCM clip per original Verse Launch Web
+    // oscillator: C4/C5 160ms beeps, and fast 58ms rising triangle shots.
+    // No hot oscillator, extra session, variable frequency or caller path.
+    // Original SOUND_TUNING master 0.90 is baked with each authored gain
+    // so native play uses volume 1 for these four exact recipes.
+    private func prepareVerseLaunchToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard verseLaunchToneIDs.contains(soundId) else {
+            return (false, 0, "invalid-launch-tone")
+        }
+        if let buffer = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, Int(Double(buffer.frameLength) /
+                              buffer.format.sampleRate * 1000), "prepared")
+        }
+        let isProjectile = soundId.hasPrefix("launch-projectile-")
+        let isHigh = soundId == "launch-countdown-high"
+        let isTock = soundId == "launch-projectile-tock"
+        let freqStart: Double = isProjectile
+            ? (isTock ? 620.0 : 880.0)
+            : (isHigh ? 523.25 : 261.63)
+        let freqEnd: Double = isProjectile
+            ? (isTock ? 820.0 : 1180.0) : freqStart
+        let toneDuration: Double = isProjectile ? 0.058 : 0.18
+        let rampDuration: Double = isProjectile ? 0.058 : 0.16
+        let attack: Double = isProjectile ? 0.008 : 0.015
+        let peak = 0.90 * (isProjectile
+            ? (isTock ? 0.085 : 0.12)
+            : (isHigh ? 0.52 : 0.92))
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "launch-tone-format-failed")
+        }
+        let frames = AVAudioFrameCount(ceil(format.sampleRate * toneDuration))
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format, frameCapacity: frames),
+              let samples = buffer.floatChannelData?[0] else {
+            return (false, 0, "launch-tone-allocation-failed")
+        }
+        buffer.frameLength = frames
+        for frame in 0..<Int(frames) {
+            let t = Double(frame) / format.sampleRate
+            let sustainTime = min(t, rampDuration)
+            let ratio = log(freqEnd / freqStart)
+            let turns = abs(ratio) < 0.000001
+                ? freqStart * sustainTime
+                : freqStart * rampDuration *
+                    (exp(ratio * sustainTime / rampDuration) - 1) / ratio
+            let phase = turns + max(0.0, t - rampDuration) * freqEnd
+            let cycle = phase - floor(phase)
+            let wave = isProjectile
+                ? 1.0 - 4.0 * abs(cycle - 0.5)
+                : sin(2.0 * Double.pi * phase)
+            let envelope: Double
+            if t < attack {
+                envelope = 0.0001 * pow(peak / 0.0001, t / attack)
+            } else if t < rampDuration {
+                envelope = peak * pow(0.0001 / peak,
+                    (t - attack) / (rampDuration - attack))
+            } else {
+                envelope = 0.0001
+            }
+            samples[frame] = Float(max(-0.95, min(0.95, wave * envelope)))
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            for _ in 0..<sampleVoiceLimit {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node, to: engine.mainMixerNode, format: format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: frames)
+                node.play() // no samples scheduled until a game event
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            effectBuffers[soundId] = buffer
+            return (true, Int(toneDuration * 1000), "prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false, 0, "launch-tone-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -1244,6 +1357,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               verseyBirdSoundResources[soundId] != nil ||
               towerBibleSoundResources[soundId] != nil ||
               towerWordToneIDs.contains(soundId) ||
+              verseLaunchSoundResources[soundId] != nil ||
+              verseLaunchToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1333,7 +1448,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             if soundId == self.nativePegSoundID ||
                soundId == self.nativeMelodySoundID ||
                soundId == self.nativeSnakeOrbSoundID ||
-               self.towerWordToneIDs.contains(soundId) {
+               self.towerWordToneIDs.contains(soundId) ||
+               self.verseLaunchToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.snakeSoundResources[soundId] {
@@ -1348,6 +1464,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_games/bible_bugs/bible_bugs_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.verseLaunchSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_games/verse_launch/verse_launch_sounds") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
@@ -1438,7 +1562,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.towerWordToneIDs.contains(soundId) {
+                if self.verseLaunchToneIDs.contains(soundId) {
+                    let result = self.prepareVerseLaunchToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-launch-tone"
+                } else if self.towerWordToneIDs.contains(soundId) {
                     let result = self.prepareTowerWordToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
