@@ -57,6 +57,9 @@ function makeHarness() {
     "let returnPaused=false,returnSession=0,returnRecoveryFailures=0,returnContextReplacements=0;",
     "let returnConveyorWasRunning=false,returnAstroWasRunning=false;",
     "let audioForegroundFreshContextOnGesture=false,audioUnlocked=false,audioCtx=null,muted=false;",
+    // N6k: this legacy fixture runs the real browser callbacks without a
+    // Capacitor bridge, so all new native-only pause owners are inactive.
+    "const nativeLaunchAudio=null;let nativeLaunchPending=false,nativeLaunchFailure=false;",
     "const HELP_OVERLAY_ID='vlHelpOverlay';",
     "const ASTRO_MAX_FRAME_DT_MS=50;",
     "const gameNow=()=>welcomeClock.now();",

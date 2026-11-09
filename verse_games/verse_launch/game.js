@@ -216,6 +216,146 @@
   const soundBuffers = new Map();
   const soundBufferPromises = new Map();
 
+  // N6k: use the sole Swift AVAudioEngine prewarmed bank on native iOS,
+  // never WebAudio/HTML audio. Preserve all Web/PWA/Android original code.
+  const nativeLaunchAudio = window.BibloZooNativeVerseLaunchAudio?.isAvailable?.()
+    ? window.BibloZooNativeVerseLaunchAudio : null;
+  let nativeLaunchToken = 0;
+  let nativeLaunchPending = false;
+  let nativeLaunchFailure = false;
+  let nativeLaunchRetry = {kind:"round",mode:null};
+  let launchWelcomeBack = null;
+  function nextNativeLaunchUiKey() {
+    const key=state.uiSoundFlip?"uiTap2":"uiTap1";
+    state.uiSoundFlip=!state.uiSoundFlip;
+    return key;
+  }
+  function stopNativeLaunchRound() {
+    if (!nativeLaunchAudio) return;
+    nativeLaunchToken++;
+    nativeLaunchPending=false;
+    app.removeAttribute("aria-busy");
+    void nativeLaunchAudio.stop();
+  }
+  function clearNativeLaunchFailure() {
+    nativeLaunchFailure=false;
+    document.getElementById("vlNativeAudioFailure")?.remove();
+  }
+  function showNativeLaunchFailure(message) {
+    if (!nativeLaunchAudio) return;
+    nativeLaunchFailure=true;
+    stopConveyorLoop();
+    syncGameClockPause();
+    let overlay=document.getElementById("vlNativeAudioFailure");
+    if (!overlay) {
+      overlay=document.createElement("div");
+      overlay.id="vlNativeAudioFailure";
+      overlay.className="vl-native-audio-failure";
+      overlay.innerHTML=`<section class="vl-native-audio-card" role="dialog"
+        aria-modal="true" aria-label="Verse Launch native sound issue">
+        <h2>Verse Launch</h2><p role="status" data-launch-status></p>
+        <button type="button" data-launch-retry>Try Again</button>
+        <button type="button" data-launch-back>Back</button></section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-launch-retry]").onclick=()=>
+        primeNativeLaunchFromGesture(nativeLaunchRetry.kind,nativeLaunchRetry.mode);
+      overlay.querySelector("[data-launch-back]").onclick=()=>{
+        stopNativeLaunchRound();
+        clearNativeLaunchFailure();
+        if (nativeLaunchRetry.kind==="round") setScreen("mode");
+        else {
+          stopConveyorLoop();
+          stopAstroLoop();
+          window.VerseGameBridge.exitGame();
+        }
+      };
+    }
+    overlay.querySelector("[data-launch-status]").textContent=message;
+  }
+  function completeNativeLaunchMode(mode) {
+    if (nativeLaunchAudio && !muted && !nativeLaunchAudio.isReady()) {
+      nativeLaunchRetry={kind:"round",mode};
+      showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeLaunchFailure();
+    state.mode=mode;
+    window.VerseGameShell.resetGameSpeed();
+    initVerseData();
+    state.startTime=gameNow();
+    buildChoices();
+    setScreen("game");
+    syncGameClockPause();
+  }
+  function finishNativeLaunchResume() {
+    if (!muted && !nativeLaunchAudio.isReady()) {
+      showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+      return;
+    }
+    clearNativeLaunchFailure();
+    syncGameClockPause();
+    if (state.screen==="game") startConveyorLoop();
+    if (state.screen==="asteroids" && state.astroRunning && !state.astroRaf) {
+      state.astroLastTs=0;
+      state.astroRaf=requestAnimationFrame(astroTick);
+    }
+  }
+  function primeNativeLaunchFromGesture(kind="round",mode=null,uiKey=null) {
+    if (!nativeLaunchAudio || nativeLaunchPending || returnPaused ||
+        document.hidden) return;
+    nativeLaunchRetry={kind,mode};
+    clearNativeLaunchFailure();
+    if (muted) {
+      if (kind==="round") completeNativeLaunchMode(mode);
+      else finishNativeLaunchResume();
+      return;
+    }
+    const token=++nativeLaunchToken;
+    nativeLaunchPending=true;
+    app.setAttribute("aria-busy","true");
+    syncGameClockPause();
+    // Must call Swift activateFromGesture NOW on actual child's tap.
+    const prep=nativeLaunchAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:soundVolume("uiTap")} : null);
+    void Promise.resolve(prep).then(result=>{
+      if (token!==nativeLaunchToken || returnPaused || document.hidden) return;
+      nativeLaunchPending=false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready===true) {
+        if (kind==="round") completeNativeLaunchMode(mode);
+        else finishNativeLaunchResume();
+      } else showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+    }).catch(()=>{
+      if (token!==nativeLaunchToken || returnPaused || document.hidden) return;
+      nativeLaunchPending=false;
+      app.removeAttribute("aria-busy");
+      showNativeLaunchFailure("Native sound is not ready. Tap Try Again.");
+    });
+  }
+  if (nativeLaunchAudio) {
+    nativeLaunchAudio.configure({
+      onAppInactive:()=>{
+        if (nativeLaunchPending) stopNativeLaunchRound();
+        if (!["game","travel","asteroids"].includes(state.screen) ||
+            state.completed) return;
+        if (!launchWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive:()=>launchWelcomeBack?.showAfterNativeActive?.(),
+      onPlaybackFailure:()=>{
+        if (muted || returnPaused || document.hidden || nativeLaunchPending ||
+            !["game","travel","asteroids"].includes(state.screen) ||
+            state.menuOpen || state.speedMenuOpen || state.helpOpen) return;
+        nativeLaunchRetry={kind:"resume",mode:null};
+        showNativeLaunchFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if (document.hidden && nativeLaunchPending) stopNativeLaunchRound();
+    });
+  }
+
+
   const astroDom = {
     stage: null,
     layer: null,
@@ -334,6 +474,7 @@
   }
 
   function getAudioContext() {
+    if (nativeLaunchAudio) return null;
     if (!audioCtx) {
       const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextCtor) return null;
@@ -344,6 +485,7 @@
   }
 
   function ensureSilenceAudio() {
+    if (nativeLaunchAudio) return null;
     if (silenceAudio) return silenceAudio;
 
     silenceAudio = new Audio("../../verse_audio/silence.mp3");
@@ -356,6 +498,7 @@
   }
 
   function unlockAudio() {
+    if (nativeLaunchAudio) return Promise.resolve(nativeLaunchAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -446,10 +589,11 @@
 
   // Retry from genuine touches/keys; never rely on automatic game-timer sounds
   // to reauthorize playback after iOS interrupts the audio context.
-  document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
-  document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
-  document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeLaunchAudio) document.addEventListener("pointerdown", () => { void unlockAudio(); }, { capture: true });
+  if (!nativeLaunchAudio) document.addEventListener("touchstart", () => { void unlockAudio(); }, { capture: true, passive: true });
+  if (!nativeLaunchAudio) document.addEventListener("keydown", () => { void unlockAudio(); }, { capture: true });
   function markAudioBackgrounded() {
+    if (nativeLaunchAudio) return;
     if (!audioCtx) return;
     audioForegroundRecoveryPending = true;
     audioForegroundRecoveryGeneration += 1;
@@ -464,6 +608,7 @@
   // A short delay gives iOS time to release another app's media session.
   // The context may say "running" even though its audio clock/output stalled.
   function scheduleForegroundAudioRecovery() {
+    if (nativeLaunchAudio) return;
     if (!audioCtx || !audioForegroundRecoveryPending || document.hidden) return;
     const generation = ++audioForegroundRecoveryGeneration;
     clearTimeout(audioForegroundRecoveryTimer);
@@ -541,6 +686,7 @@
   }
 
   async function loadSoundBuffer(key) {
+    if (nativeLaunchAudio) return null;
     const ctx = getAudioContext();
     const src = SOUND_FILES[key];
 
@@ -583,12 +729,21 @@
   }
 
   function preloadSoundBuffers() {
+    if (nativeLaunchAudio) return;
     Object.keys(SOUND_FILES).forEach(key => {
       loadSoundBuffer(key);
     });
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeLaunchAudio) {
+      if (muted || returnPaused || nativeLaunchPending || nativeLaunchFailure ||
+          state.menuOpen || state.helpOpen || state.speedMenuOpen ||
+          document.hidden) return;
+      // MP3 original master+gain; fixed oscillator PCM already baked gains.
+      nativeLaunchAudio.play(key,soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -619,12 +774,20 @@
   }
 
   function playUiTapSound() {
-    const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
-    state.uiSoundFlip = !state.uiSoundFlip;
-    playGameSound(key, "uiTap");
+    const key=nextNativeLaunchUiKey();
+    if (nativeLaunchAudio) {
+      if (!muted && !returnPaused && !document.hidden)
+        nativeLaunchAudio.tapUiFromGesture(key,soundVolume("uiTap"));
+    } else playGameSound(key, "uiTap");
   }
 
   async function playCountdownBeep(finalBeep = false) {
+    if (nativeLaunchAudio) {
+      if (!muted && !returnPaused && !nativeLaunchPending &&
+          !nativeLaunchFailure && !document.hidden)
+        nativeLaunchAudio.play(finalBeep?"countdownFinalBeep":"countdownBeep",1);
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -656,6 +819,15 @@
   }
 
   async function playProjectileFireSound() {
+    if (nativeLaunchAudio) {
+      if (muted || returnPaused || nativeLaunchPending ||
+          nativeLaunchFailure || state.menuOpen || state.helpOpen ||
+          document.hidden) return;
+      const isTock=state.astroProjectileSoundFlip;
+      state.astroProjectileSoundFlip=!state.astroProjectileSoundFlip;
+      nativeLaunchAudio.play(isTock?"projectileTock":"projectileTick",1);
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -1034,7 +1206,8 @@
   // and bonus sleep() delays. Foreground recovery is a separate pause owner:
   // closing a menu must never resume time while Welcome Back remains open.
   function syncGameClockPause() {
-    if (returnPaused || state.menuOpen || state.helpOpen || state.speedMenuOpen) {
+    if (returnPaused || nativeLaunchPending || nativeLaunchFailure ||
+        state.menuOpen || state.helpOpen || state.speedMenuOpen) {
       welcomeClock.pause();
     } else {
       welcomeClock.resume();
@@ -1042,7 +1215,7 @@
   }
 
   function canOpenGameMenu() {
-    if (returnPaused || state.busy) return false;
+    if (returnPaused || nativeLaunchPending || nativeLaunchFailure || state.busy) return false;
     if (state.screen === "travel") return false;
     return true;
   }
@@ -1619,7 +1792,8 @@
   function startConveyorLoop() {
     // Rendering or a speed-menu callback must not restart gameplay behind
     // the Game Menu, How to Play, or a pending iOS Welcome Back dialog.
-    if (state.conveyorRaf || returnPaused || state.menuOpen || state.helpOpen ||
+    if (state.conveyorRaf || returnPaused || nativeLaunchPending ||
+        nativeLaunchFailure || state.menuOpen || state.helpOpen ||
         state.speedMenuOpen || state.screen !== "game" || state.bonusReady) return;
 
     state.conveyorLastTs = 0;
@@ -1667,13 +1841,20 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
-      onBack: () => window.VerseGameBridge.exitGame(),
+      onBack: () => {
+        playUiTapSound();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
+        window.VerseGameBridge.exitGame();
+      },
       onStart: () => {
-        unlockAudio();
+        if (!nativeLaunchAudio) unlockAudio();
         playUiTapSound();
         setScreen("mode");
       }
     });
+    if (nativeLaunchAudio) {
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
+    }
   }
 
   function renderMode() {
@@ -1685,18 +1866,30 @@
       helpOverlayId: HELP_OVERLAY_ID,
       theme: GAME_THEME,
       backLabel: "Back to Verse Launch title",
-      onBack: () => setScreen("intro"),
-      onSelect: (mode) => {
-        unlockAudio();
+      onBack: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
-        state.mode = mode;
-        window.VerseGameShell.resetGameSpeed();
-        initVerseData();
-        state.startTime = gameNow();
-        buildChoices();
-        setScreen("game");
+        setScreen("intro");
+      },
+      onSelect: (mode) => {
+        if (nativeLaunchAudio) {
+          primeNativeLaunchFromGesture("round",mode,
+            muted?null:nextNativeLaunchUiKey());
+        } else {
+          unlockAudio();
+          playUiTapSound();
+          state.mode = mode;
+          window.VerseGameShell.resetGameSpeed();
+          initVerseData();
+          state.startTime = gameNow();
+          buildChoices();
+          setScreen("game");
+        }
       }
     });
+    if (nativeLaunchAudio) {
+      document.getElementById("helpBtn")?.addEventListener("click",playUiTapSound);
+    }
   }
 
   function renderGame() {
@@ -1858,16 +2051,19 @@
       theme: GAME_THEME,
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
-        unlockAudio();
+        if (!nativeLaunchAudio) unlockAudio();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         setScreen("mode");
       },
       onMoreGames: () => {
         playUiTapSound();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapSound();
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -1890,6 +2086,7 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeLaunchAudio && muted) void nativeLaunchAudio.stop();
         if (!muted) playUiTapSound();
         return muted;
       },
@@ -1909,6 +2106,7 @@
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         state.menuOpen = false;
         state.helpOpen = false;
@@ -1918,22 +2116,26 @@
         setScreen("mode");
       },
       onExit: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
         if (!canOpenGameMenu()) return false;
 
-        playUiTapSound();
         state.menuOpen = true;
+        if (nativeLaunchAudio) void nativeLaunchAudio.stop();
+        playUiTapSound();
         state.helpOpen = false;
         state.helpBackMode = false;
         stopConveyorLoop();
         syncGameClockPause();
       },
       onClose: () => {
-        playUiTapSound();
         state.menuOpen = false;
+        if (nativeLaunchAudio && !muted) {
+          primeNativeLaunchFromGesture("resume",null,nextNativeLaunchUiKey());
+        } else playUiTapSound();
         syncGameClockPause();
         startConveyorLoop();
       },
@@ -1958,8 +2160,9 @@
           return false;
         }
 
-        playUiTapSound();
         state.speedMenuOpen = true;
+        if (nativeLaunchAudio) void nativeLaunchAudio.stop();
+        playUiTapSound();
         stopConveyorLoop();
         syncGameClockPause();
 
@@ -1967,8 +2170,10 @@
       },
 
       onClose: () => {
-        playUiTapSound();
         state.speedMenuOpen = false;
+        if (nativeLaunchAudio && !muted) {
+          primeNativeLaunchFromGesture("resume",null,nextNativeLaunchUiKey());
+        } else playUiTapSound();
         syncGameClockPause();
         startConveyorLoop();
       }
@@ -1985,6 +2190,7 @@
       isMuted: () => muted,
       onMuteToggle: () => {
         muted = !muted;
+        if (nativeLaunchAudio && muted) void nativeLaunchAudio.stop();
         if (!muted) playUiTapSound();
         return muted;
       },
@@ -2005,6 +2211,7 @@
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         state.menuOpen = false;
         state.helpOpen = false;
@@ -2016,6 +2223,7 @@
         setScreen("mode");
       },
       onExit: () => {
+        if (nativeLaunchAudio) stopNativeLaunchRound();
         playUiTapSound();
         stopAstroLoop();
         window.VerseGameBridge.exitGame();
@@ -2023,16 +2231,19 @@
       onOpen: () => {
         if (!canOpenGameMenu()) return false;
 
-        playUiTapSound();
         state.menuOpen = true;
+        if (nativeLaunchAudio) void nativeLaunchAudio.stop();
+        playUiTapSound();
         state.helpOpen = false;
         state.helpBackMode = false;
         state.astroMoveDir = 0;
         syncGameClockPause();
       },
       onClose: () => {
-        playUiTapSound();
         state.menuOpen = false;
+        if (nativeLaunchAudio && !muted) {
+          primeNativeLaunchFromGesture("resume",null,nextNativeLaunchUiKey());
+        } else playUiTapSound();
         state.astroMoveDir = 0;
         syncGameClockPause();
       },
@@ -4019,7 +4230,9 @@
 
   function astroTick(ts) {
     ts = gameNow();
-    if (returnPaused) { state.astroRaf = 0; return; }
+    if (returnPaused || nativeLaunchPending || nativeLaunchFailure) {
+      state.astroRaf = 0; return;
+    }
     if (!state.astroRunning) return;
     if (!state.astroLastTs) state.astroLastTs = ts;
     const dtMs = Math.min(
@@ -4388,6 +4601,7 @@
   function pauseForTaskSwitch() {
     returnSession += 1;
     if (returnPaused) return;
+    if (nativeLaunchAudio) stopNativeLaunchRound();
     returnPaused = true;
     returnRecoveryFailures = 0;
     returnContextReplacements = 0;
@@ -4406,18 +4620,27 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeLaunchAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements += 1;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // A real Let's go gesture can request priority over paused/still-playing
+    // PiP. Foreground and OS events must NEVER activate or auto-replay.
+    const restore = nativeLaunchAudio
+      ? (muted ? Promise.resolve(true) :
+        nativeLaunchAudio.prepareFromGesture().then(result =>
+          window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+          (result?.ready === true)))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures += 1;
         return false;
@@ -4440,14 +4663,20 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  launchWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    useZooEscape: !nativeLaunchAudio,
+    suppressUiSound: !!nativeLaunchAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => ["game", "travel", "asteroids"].includes(state.screen) && !state.completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
     // Invalidate any pending audio attempt before navigating away.
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeLaunchAudio) stopNativeLaunchRound();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });
