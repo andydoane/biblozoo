@@ -226,7 +226,6 @@ async function welcome(){
     nativeLaunchAudio:{prepareFromGesture:()=>{events.push("gesture");return Promise.resolve(acceptance);}},
     window:{BibloZooWelcomeBackReturn:{nativeAudioResumeResult:r=>r.ready?true:{
       deferred:true,reason:r.reason}}},
-    },
     document:{hidden:false,body:{classList:{remove:()=>{}}}},
     returnPaused:true,returnSession:3,returnRecoveryFailures:0,
     returnContextReplacements:0,returnConveyorWasRunning:true,
