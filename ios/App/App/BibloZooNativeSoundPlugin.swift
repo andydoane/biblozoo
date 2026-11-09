@@ -300,6 +300,50 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "scrub-progress-a4",
         "scrub-completion-arpeggio"
     ]
+    // N6p Wheel of Bible: ALL 36 exact source tone recipes for spin,
+    // keyword challenge, cash, prizes, bad, hint and fireworks. The JS
+    // caller selects a fixed preset ID (midi,duration,gain,waveform)
+    // instead of constructing any oscillator or passing arbitrary Hz.
+    private let wheelToneRecipes: [String: (Int, Int, Int, String)] = [
+        "wheel-note-50-45-120-q": (50, 45, 120, "q"),
+        "wheel-note-53-45-120-q": (53, 45, 120, "q"),
+        "wheel-note-56-45-120-q": (56, 45, 120, "q"),
+        "wheel-note-67-100-240-t": (67, 100, 240, "t"),
+        "wheel-note-71-100-240-t": (71, 100, 240, "t"),
+        "wheel-note-75-100-240-t": (75, 100, 240, "t"),
+        "wheel-note-72-100-280-t": (72, 100, 280, "t"),
+        "wheel-note-79-140-220-t": (79, 140, 220, "t"),
+        "wheel-note-60-130-480-t": (60, 130, 480, "t"),
+        "wheel-note-62-130-480-t": (62, 130, 480, "t"),
+        "wheel-note-64-130-480-t": (64, 130, 480, "t"),
+        "wheel-note-65-130-480-t": (65, 130, 480, "t"),
+        "wheel-note-67-130-480-t": (67, 130, 480, "t"),
+        "wheel-note-69-130-480-t": (69, 130, 480, "t"),
+        "wheel-note-71-130-480-t": (71, 130, 480, "t"),
+        "wheel-note-72-130-480-t": (72, 130, 480, "t"),
+        "wheel-note-43-130-320-s": (43, 130, 320, "s"),
+        "wheel-note-38-120-240-s": (38, 120, 240, "s"),
+        "wheel-note-64-80-180-t": (64, 80, 180, "t"),
+        "wheel-note-66-80-180-t": (66, 80, 180, "t"),
+        "wheel-note-68-80-180-t": (68, 80, 180, "t"),
+        "wheel-note-70-80-180-t": (70, 80, 180, "t"),
+        "wheel-note-72-80-180-t": (72, 80, 180, "t"),
+        "wheel-note-72-100-250-t": (72, 100, 250, "t"),
+        "wheel-note-76-100-240-t": (76, 100, 240, "t"),
+        "wheel-note-84-180-280-t": (84, 180, 280, "t"),
+        "wheel-note-67-80-180-t": (67, 80, 180, "t"),
+        "wheel-note-72-90-180-t": (72, 90, 180, "t"),
+        "wheel-note-76-120-160-t": (76, 120, 160, "t"),
+        "wheel-note-72-35-70-t": (72, 35, 70, "t"),
+        "wheel-note-73-35-70-t": (73, 35, 70, "t"),
+        "wheel-note-74-35-70-t": (74, 35, 70, "t"),
+        "wheel-note-75-35-70-t": (75, 35, 70, "t"),
+        "wheel-note-76-35-70-t": (76, 35, 70, "t"),
+        "wheel-note-77-35-70-t": (77, 35, 70, "t"),
+        "wheel-note-78-35-70-t": (78, 35, 70, "t")
+    ]
+    private lazy var wheelToneIDs: Set<String> =
+        Set(wheelToneRecipes.keys)
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -451,7 +495,43 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "scrub-progress-f4",
         "scrub-progress-g4",
         "scrub-progress-a4",
-        "scrub-completion-arpeggio"
+        "scrub-completion-arpeggio",
+        "wheel-note-50-45-120-q",
+        "wheel-note-53-45-120-q",
+        "wheel-note-56-45-120-q",
+        "wheel-note-67-100-240-t",
+        "wheel-note-71-100-240-t",
+        "wheel-note-75-100-240-t",
+        "wheel-note-72-100-280-t",
+        "wheel-note-79-140-220-t",
+        "wheel-note-60-130-480-t",
+        "wheel-note-62-130-480-t",
+        "wheel-note-64-130-480-t",
+        "wheel-note-65-130-480-t",
+        "wheel-note-67-130-480-t",
+        "wheel-note-69-130-480-t",
+        "wheel-note-71-130-480-t",
+        "wheel-note-72-130-480-t",
+        "wheel-note-43-130-320-s",
+        "wheel-note-38-120-240-s",
+        "wheel-note-64-80-180-t",
+        "wheel-note-66-80-180-t",
+        "wheel-note-68-80-180-t",
+        "wheel-note-70-80-180-t",
+        "wheel-note-72-80-180-t",
+        "wheel-note-72-100-250-t",
+        "wheel-note-76-100-240-t",
+        "wheel-note-84-180-280-t",
+        "wheel-note-67-80-180-t",
+        "wheel-note-72-90-180-t",
+        "wheel-note-76-120-160-t",
+        "wheel-note-72-35-70-t",
+        "wheel-note-73-35-70-t",
+        "wheel-note-74-35-70-t",
+        "wheel-note-75-35-70-t",
+        "wheel-note-76-35-70-t",
+        "wheel-note-77-35-70-t",
+        "wheel-note-78-35-70-t"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1814,6 +1894,83 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         return (true,1250,"prepared")
     }
 
+
+    // N6p: offline PCM rendering of exact Wheel-of-Bible source triangle,
+    // square and sine oscillator notes, no new session and no hot synth.
+    private func prepareWheelToneOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard let (midi, milliseconds, volumeMilli, wave) =
+            wheelToneRecipes[soundId] else {
+            return (false, 0, "invalid-wheel-tone")
+        }
+        if let buffer = effectBuffers[soundId],
+           effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], nodes.count == sampleVoiceLimit,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, Int(Double(buffer.frameLength) /
+                buffer.format.sampleRate * 1000), "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "wheel-tone-format-failed")
+        }
+        let originalDuration=Double(milliseconds)/1000.0
+        let totalDuration=originalDuration+0.04
+        let frames=AVAudioFrameCount(ceil(format.sampleRate*totalDuration))
+        guard let buffer=AVAudioPCMBuffer(
+            pcmFormat:format,frameCapacity:frames),
+              let samples=buffer.floatChannelData?[0] else {
+            return (false, 0, "wheel-tone-allocation-failed")
+        }
+        buffer.frameLength=frames
+        let hz=440.0*pow(2.0,Double(midi-69)/12.0)
+        let peak=Double(volumeMilli)/1000.0*0.82
+        for i in 0..<Int(frames) {
+            let t=Double(i)/format.sampleRate
+            if t>=originalDuration { samples[i]=0; continue }
+            let cycle=hz*t-floor(hz*t)
+            let waveform:Double
+            if wave=="q" {
+                waveform=cycle<0.5 ? 1.0 : -1.0
+            } else if wave=="s" {
+                waveform=sin(2.0*Double.pi*hz*t)
+            } else {
+                waveform=1.0-4.0*abs(cycle-0.5)
+            }
+            let gain:Double
+            if t<0.012 {
+                gain=0.0001*pow(peak/0.0001,t/0.012)
+            } else {
+                gain=peak*pow(0.0001/peak,
+                    (t-0.012)/max(0.001,originalDuration-0.012))
+            }
+            samples[i]=Float(max(-0.95,min(0.95,waveform*gain)))
+        }
+        do {
+            let engine=effectsEngine ?? AVAudioEngine()
+            var nodes:[AVAudioPlayerNode]=[]
+            for _ in 0..<sampleVoiceLimit {
+                let node=AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node,to:engine.mainMixerNode,format:format)
+                nodes.append(node)
+            }
+            if !engine.isRunning {try engine.start()}
+            for node in nodes {
+                node.prepare(withFrameCount:frames)
+                node.play() // silent until the existing hot scheduleBuffer
+            }
+            effectsEngine=engine
+            effectNodes[soundId]=nodes
+            nextEffectVoice[soundId]=0
+            effectBuffers[soundId]=buffer
+            return (true,Int(totalDuration*1000),"prepared")
+        }catch {
+            discardEffectsOnWorker()
+            return (false,0,"wheel-tone-engine-failed")
+        }
+    }
+
     private func nextWarmVoiceOnWorker(soundId: String) -> AVAudioPlayerNode? {
         guard let nodes = effectNodes[soundId], !nodes.isEmpty else { return nil }
         let index = (nextEffectVoice[soundId] ?? 0) % nodes.count
@@ -2092,6 +2249,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               typerToneIDs.contains(soundId) ||
               scrubSoundResources[soundId] != nil ||
               scrubToneIDs.contains(soundId) ||
+              wheelToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -2186,7 +2344,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                self.trafficTapToneIDs.contains(soundId) ||
                self.scrambleToneIDs.contains(soundId) ||
                self.typerToneIDs.contains(soundId) ||
-               self.scrubToneIDs.contains(soundId) {
+               self.scrubToneIDs.contains(soundId) ||
+               self.wheelToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.scrubSoundResources[soundId] {
@@ -2315,7 +2474,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.scrubToneIDs.contains(soundId) {
+                if self.wheelToneIDs.contains(soundId) {
+                    let result = self.prepareWheelToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-wheel-tone"
+                } else if self.scrubToneIDs.contains(soundId) {
                     let result = self.prepareScrubToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
