@@ -964,6 +964,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         pegToneBuffers.removeAll()
         melodyToneBuffers.removeAll()
         snakeOrbToneBuffers.removeAll()
+        jamNoteBuffers.removeAll()
+        jamPadBuffers.removeAll()
         effectsEngine = nil
     }
 
@@ -3081,7 +3083,16 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         guard let nodes=self.effectNodes[item] else { continue }
                         for node in nodes {
                             node.stop()
-                            node.play() // preserve warmed bank, cancel ghost notes
+                            // Preserve the original N6o mower preparation and
+                            // also rewarm Jam's shared note/chord pools.
+                            if let buffer=self.effectBuffers[item] {
+                                node.prepare(withFrameCount:buffer.frameLength)
+                            } else if item == "jam-note" {
+                                node.prepare(withFrameCount:60_000)
+                            } else if item == "jam-pad" {
+                                node.prepare(withFrameCount:500_000)
+                            }
+                            node.play()
                         }
                     }
                 }
