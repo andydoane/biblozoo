@@ -846,6 +846,9 @@
     root.querySelectorAll("button").forEach(button => {
       if (button.dataset.vtUiPopSound === "wired") return;
       if (button.closest(".vt-root")) return;
+      // Native difficulty selection already plays one UI pop as part of
+      // the same gesture that prewarms all 19 PCM clips. Do not double it.
+      if (nativeTyperAudio && button.hasAttribute("data-game-shell-mode")) return;
 
       button.dataset.vtUiPopSound = "wired";
 
