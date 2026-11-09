@@ -2970,7 +2970,42 @@
     chunkAudio = chunkAudioEl;
   }
 
+  async function playNativeTyperChunk(file,runToken){
+    if(!file)return sleep(900,runToken);
+    const base="../../verse_audio/"+ctx.verseId;
+    if(!file.startsWith(base) || !/^[a-z]\.mp3$/.test(file.slice(base.length))){
+      showNativeTyperFailure("That verse chunk is unavailable. Tap Back.");
+      return;
+    }
+    const partIndex=file.charCodeAt(base.length)-96;
+    let positionMs=0;
+    while(isLiveRun(runToken)){
+      // Both an interrupted narration and an open Game Menu must suspend
+      // this exact review chunk; NEVER skip ahead on a failed play().
+      if(returnPaused || state.paused || nativeTyperPending ||
+         nativeTyperFailure || !nativeTyperAudio.isReady()){
+        if(!returnPaused && !state.paused && !nativeTyperPending &&
+           !nativeTyperFailure && !nativeTyperAudio.isReady()){
+          nativeTyperRetry={kind:"resume",mode:null};
+          showNativeTyperFailure("Native speech isn't ready. Tap Try Again.");
+        }
+        await new Promise(resolve=>setTimeout(resolve,85));
+        continue;
+      }
+      const result=await nativeTyperAudio.playChunk(ctx.verseId,partIndex,positionMs);
+      if(!isLiveRun(runToken))return;
+      if(result?.ended===true)return; // matching AVAudioPlayerDelegate only
+      positionMs=Math.max(0,Number(result?.positionMs)||positionMs);
+      if(!returnPaused && !state.paused && !nativeTyperPending &&
+         !nativeTyperFailure && result?.reason!=="interrupted"){
+        nativeTyperRetry={kind:"resume",mode:null};
+        showNativeTyperFailure("Verse speech stopped. Tap Try Again.");
+      }
+    }
+  }
+
   function playChunkAudio(file, runToken = state.runToken) {
+    if(nativeTyperAudio)return playNativeTyperChunk(file,runToken);
     if (!file) return sleep(900, runToken);
 
     return new Promise(resolve => {
