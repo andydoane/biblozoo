@@ -2618,6 +2618,40 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
 
 
 
+    @objc func stop(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else {
+                call.resolve(["stopped": false, "reason": "unavailable"])
+                return
+            }
+            guard let soundId = self.requestedId(call) else {
+                call.resolve(["stopped": false, "reason": "invalid-sound-id"])
+                return
+            }
+            self.playbackQueue.async { [weak self] in
+                guard let self = self else {
+                    DispatchQueue.main.async {
+                        call.resolve(["stopped": false, "reason": "unavailable"])
+                    }
+                    return
+                }
+                if self.pcmEffectIDs.contains(soundId) ||
+                   soundId == self.nativeSnakeOrbSoundID ||
+                   soundId == self.nativePegSoundID ||
+                   soundId == self.nativeMelodySoundID {
+                    // A paused/exited round tears down all prepared effect
+                    // voices; the next Got It!/Resume must explicitly warm.
+                    self.discardEffectsOnWorker()
+                } else {
+                    self.players.removeValue(forKey: soundId)?.stop()
+                }
+                DispatchQueue.main.async {
+                    call.resolve(["stopped": true, "reason": "stopped"])
+                }
+            }
+        }
+    }
+
     // N6o only: cancel the mower's 1250ms sound when a visual sweep ends
     // without discarding the entire 28-ID warm PCM bank (other sounds stay
     // playable). This never activates/deactivates AVAudioSession.
@@ -2648,40 +2682,6 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 }
                 DispatchQueue.main.async {
                     call.resolve(["stopped":true,"reason":"stopped"])
-                }
-            }
-        }
-    }
-
-    @objc func stop(_ call: CAPPluginCall) {
-        onMain { [weak self] in
-            guard let self = self else {
-                call.resolve(["stopped": false, "reason": "unavailable"])
-                return
-            }
-            guard let soundId = self.requestedId(call) else {
-                call.resolve(["stopped": false, "reason": "invalid-sound-id"])
-                return
-            }
-            self.playbackQueue.async { [weak self] in
-                guard let self = self else {
-                    DispatchQueue.main.async {
-                        call.resolve(["stopped": false, "reason": "unavailable"])
-                    }
-                    return
-                }
-                if self.pcmEffectIDs.contains(soundId) ||
-                   soundId == self.nativeSnakeOrbSoundID ||
-                   soundId == self.nativePegSoundID ||
-                   soundId == self.nativeMelodySoundID {
-                    // A paused/exited round tears down all prepared effect
-                    // voices; the next Got It!/Resume must explicitly warm.
-                    self.discardEffectsOnWorker()
-                } else {
-                    self.players.removeValue(forKey: soundId)?.stop()
-                }
-                DispatchQueue.main.async {
-                    call.resolve(["stopped": true, "reason": "stopped"])
                 }
             }
         }
