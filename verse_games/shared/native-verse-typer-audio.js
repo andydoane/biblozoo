@@ -1,4 +1,4 @@
-/* N6n: Verse Typer eight correct-note pitches and eight fixed generated tones/noise + two shared native UI pops.
+/* N6n: Verse Typer nine source-selected correct-note pitches, eight fixed musical phrases and two shared native UI pops. Published verse-chunk narration reuses N5b AVAudioPlayer.
  * Reuse sole Swift .soloAmbient and serialized predecoded AVAudioEngine PCM;
  * never fall back to Web or HTML Audio on native iOS.
  */
