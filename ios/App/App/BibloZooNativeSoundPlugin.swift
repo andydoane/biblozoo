@@ -1951,6 +1951,144 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
 
     // N6p: offline PCM rendering of exact Wheel-of-Bible source triangle,
     // square and sine oscillator notes, no new session and no hot synth.
+
+    // N6q: one worker-only AVAudioEngine; no hot oscillator, decode or
+    // per-note dynamic buffer allocation. Voice bits use the existing
+    // packaged-MP3 PCM preloader. Pads are original four-note triangle
+    // chords, pre-rendered at every source BPM / measure length.
+    private func prepareJamOnWorker(soundId: String)
+        -> (prepared: Bool, durationMs: Int, reason: String) {
+        guard jamIDs.contains(soundId),
+              soundId == "jam-note" || soundId == "jam-pad" ||
+                  soundId.hasPrefix("jam-drum-") else {
+            return (false, 0, "invalid-jam-id")
+        }
+        if effectsEngine?.isRunning == true,
+           let nodes = effectNodes[soundId], !nodes.isEmpty,
+           nodes.allSatisfy({ $0.isPlaying }) {
+            return (true, soundId == "jam-pad" ? 1800 : 220, "prepared")
+        }
+        guard let format = AVAudioFormat(
+            standardFormatWithSampleRate: 44_100, channels: 1) else {
+            return (false, 0, "jam-format-failed")
+        }
+        let rate = format.sampleRate
+        func make(_ seconds: Double,
+                  sample: (Double) -> Double) -> AVAudioPCMBuffer? {
+            let frames = AVAudioFrameCount(ceil(rate * seconds))
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format, frameCapacity: frames),
+                  let values = buffer.floatChannelData?[0] else { return nil }
+            buffer.frameLength = frames
+            for i in 0..<Int(frames) {
+                values[i] = Float(max(-0.96, min(0.96,
+                    sample(Double(i) / rate))))
+            }
+            return buffer
+        }
+        func triangle(_ hz: Double, _ t: Double) -> Double {
+            let cycle = hz*t - floor(hz*t)
+            return 1.0 - 4.0*abs(cycle-0.5)
+        }
+        func envelope(_ t: Double, _ duration: Double,
+                      _ peak: Double, _ attack: Double) -> Double {
+            if t >= duration { return 0 }
+            if t < attack {
+                return 0.0001*pow(peak/0.0001,t/attack)
+            }
+            return peak*pow(0.0001/peak,
+                (t-attack)/max(0.001,duration-attack))
+        }
+        var maxDuration = 220
+        if soundId == "jam-note" {
+            var bank: [String: AVAudioPCMBuffer] = [:]
+            for (key, (midi, ms, wave)) in jamNoteRecipes {
+                let duration = Double(ms)/1000.0
+                let hz = 440.0*pow(2.0,Double(midi-69)/12.0)
+                guard let buffer = make(duration+0.03, sample: { t in
+                    if t >= duration { return 0 }
+                    let cycle = hz*t-floor(hz*t)
+                    let shape = wave == "q"
+                        ? (cycle < 0.5 ? 1.0 : -1.0)
+                        : (wave == "s" ? sin(2.0*Double.pi*hz*t) :
+                            triangle(hz,t))
+                    return shape*envelope(t,duration,1.0,0.01)
+                }) else { return (false,0,"jam-note-allocation-failed") }
+                bank[key] = buffer
+            }
+            jamNoteBuffers = bank
+            maxDuration = 1350
+        } else if soundId == "jam-pad" {
+            var bank: [String: AVAudioPCMBuffer] = [:]
+            for bpm in jamBPMs {
+                for beats in jamPadBeats {
+                    let duration = (Double(beats)-0.25)*60.0/Double(bpm)
+                    let freqs = [48,52,55,60].map {
+                        440.0*pow(2.0,Double($0-69)/12.0)
+                    }
+                    guard let buffer = make(duration+0.03, sample: { t in
+                        let gain = envelope(t,duration,0.016,0.01)*1.5
+                        return freqs.reduce(0.0) {
+                            $0 + triangle($1,t)*gain
+                        }
+                    }) else { return (false,0,"jam-pad-allocation-failed") }
+                    bank["\(bpm)-\(beats)"] = buffer
+                    maxDuration = max(maxDuration,Int(duration*1000)+30)
+                }
+            }
+            jamPadBuffers = bank
+        } else {
+            let sound = String(soundId.dropFirst("jam-drum-".count))
+            let duration: Double = sound == "kick" ? 0.20 : 0.13
+            guard let buffer = make(duration, sample: { t in
+                let peak = (sound == "kick" ? 0.22 :
+                    (sound == "snare" ? 0.09 : 0.045))*2.0*1.5
+                let end = sound == "kick" ? 0.18 :
+                    (sound == "snare" ? 0.11 : 0.045)
+                let attack = sound == "kick" ? 0.006 : 0.004
+                let gain = envelope(t,end,peak,attack)
+                let hz: Double = sound == "snare" ? 185.0 :
+                    (sound == "extra" ? 320.0 : 520.0)
+                let cycle: Double
+                if sound == "kick" {
+                    let logRatio = log(48.0/120.0)
+                    let before = min(t,0.14)
+                    let first = 120.0*0.14/logRatio *
+                        (pow(48.0/120.0,before/0.14)-1.0)
+                    cycle = first + 48.0*max(0,t-0.14)
+                } else { cycle = hz*t }
+                return (sound == "kick" ? sin(2.0*Double.pi*cycle) :
+                    (cycle-floor(cycle) < 0.5 ? 1.0 : -1.0))*gain
+            }) else { return (false,0,"jam-drum-allocation-failed") }
+            effectBuffers[soundId] = buffer
+            maxDuration = Int(duration*1000)
+        }
+        do {
+            let engine = effectsEngine ?? AVAudioEngine()
+            var nodes: [AVAudioPlayerNode] = []
+            let count = soundId == "jam-note" ? 12 : 4
+            for _ in 0..<count {
+                let node = AVAudioPlayerNode()
+                engine.attach(node)
+                engine.connect(node,to:engine.mainMixerNode,format:format)
+                nodes.append(node)
+            }
+            if !engine.isRunning { try engine.start() }
+            for node in nodes {
+                node.prepare(withFrameCount: AVAudioFrameCount(
+                    ceil(rate*Double(maxDuration+40)/1000.0)))
+                node.play()
+            }
+            effectsEngine = engine
+            effectNodes[soundId] = nodes
+            nextEffectVoice[soundId] = 0
+            return (true,maxDuration,"prepared")
+        } catch {
+            discardEffectsOnWorker()
+            return (false,0,"jam-engine-start-failed")
+        }
+    }
+
     private func prepareWheelToneOnWorker(soundId: String)
         -> (prepared: Bool, durationMs: Int, reason: String) {
         guard let (midi, milliseconds, volumeMilli, wave) =
