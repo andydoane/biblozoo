@@ -321,6 +321,11 @@
     get currentTime() { return performance.now() / 1000; }
   }) : null;
   const nativeJamTimers = new Set();
+  // Native AVAudioPlayerNodes can schedule a buffer against host time.
+  // Hand Swift a short lookahead instead of submitting every note *after*
+  // its JS timeout has already reached the visual beat.
+  const NATIVE_JAM_LOOKAHEAD_MS = 100;
+  let nativeJamHeadsUpPrewarm = null;
   let nativeJamAwaitingStart = false;
   let nativeJamFailureRetry = "start";
   const NATIVE_TEMPORARY = new Set(["other-audio-playing",
@@ -339,15 +344,23 @@
     const run = () => {
       if (generation === musicGeneration && !document.hidden &&
           !state.paused && !muted && !state.menuOpen && !state.helpOpen &&
-          nativeJamAudio.isReady()) callback();
+          nativeJamAudio.isReady()) {
+        // JS clock and native wall clock advance together while active. Swift
+        // validates this bounded absolute due time and schedules from its
+        // own host clock after Capacitor/worker queue latency.
+        const dueEpochMs = Date.now() +
+          Math.max(-140, (when - nativeJamClock.currentTime) * 1000);
+        callback(dueEpochMs);
+      }
     };
-    // Native PCM buffers are scheduled only when due, not all at bar start.
-    if (ms <= 8) { run(); return true; }
+    // Dispatch ~100ms before the beat. The old at-beat bridge call could
+    // arrive after the first transition word and be silently dropped.
+    if (ms <= NATIVE_JAM_LOOKAHEAD_MS) { run(); return true; }
     const id = setTimeout(() => {
       nativeJamTimers.delete(id);
-      // Skip badly late notes instead of bursting deferred drums on return.
+      // Never burst a batch of very stale notes after a stalled event loop.
       if (nativeJamClock.currentTime - when < 0.14) run();
-    }, ms);
+    }, ms - NATIVE_JAM_LOOKAHEAD_MS);
     nativeJamTimers.add(id);
     return true;
   }
@@ -661,7 +674,10 @@
   }
 
   function markVerseJamAudioBackgrounded() {
-    if (nativeJamAudio) void nativeJamAudio.stop();
+    if (nativeJamAudio) {
+      nativeJamHeadsUpPrewarm = null;
+      void nativeJamAudio.stop();
+    }
     // Freeze synchronized music before iOS can throttle JS or Web Audio.
     // A later foreground event shows Resume Beat; it never auto-replays.
     if (typeof pauseVerseJamForInterruption === "function") {
@@ -903,7 +919,12 @@
         state.phase === "intro" ||
         state.phase === "spawn_chunk" ||
         state.phase === "countdown" ||
-        state.phase === "round_transition"
+        state.phase === "round_transition" ||
+        state.phase === "ending_sequence" ||
+        // A completed final chunk can legitimately wait up to a full
+        // measure before the eight-beat "that's the end" finale. It is
+        // NEVER a hung game merely because no word button is visible.
+        state.progressIndex >= state.segments.length
       );
 
       const quietMs =
@@ -2028,7 +2049,8 @@
   function playSoundBitSample(sound, when = audioCtx?.currentTime || 0, volume = VOICE_SOUND_BIT_VOLUME) {
     if (nativeJamAudio) {
       if (!sound?.id || !nativeJamAudio.isReady() || muted) return false;
-      return scheduleNativeJam(when, () => nativeJamAudio.playVoice(sound.id, volume));
+      return scheduleNativeJam(when, dueEpochMs =>
+        nativeJamAudio.playVoice(sound.id, volume, dueEpochMs));
     }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted || !sound?.filename) return false;
 
@@ -2053,8 +2075,8 @@
   function playTone({ midi = 60, when = audioCtx?.currentTime || 0, duration = 0.22, volume = 0.16, type = "triangle" } = {}) {
     if (nativeJamAudio) {
       if (!nativeJamAudio.isReady() || muted) return;
-      scheduleNativeJam(when, () => nativeJamAudio.playTone(midi, duration,
-        Math.max(0, Math.min(1, volume)), type));
+      scheduleNativeJam(when, dueEpochMs => nativeJamAudio.playTone(midi, duration,
+        Math.max(0, Math.min(1, volume)), type, dueEpochMs));
       return;
     }
     if (!audioCtx || audioCtx.state !== "running" || !masterGain || muted) return;
@@ -2079,9 +2101,9 @@
   function playDrum(sound, when, volume = 1, generation = musicGeneration) {
     if (generation !== musicGeneration) return;
     if (nativeJamAudio) {
-      scheduleNativeJam(when, () =>
+      scheduleNativeJam(when, dueEpochMs =>
         nativeJamAudio.playDrum(sound, Math.max(0,
-          Math.min(1, drumVolume(volume) / MIX.drumMaster))));
+          Math.min(1, drumVolume(volume) / MIX.drumMaster)), dueEpochMs));
       return;
     }
 
@@ -2251,7 +2273,7 @@
       while (remaining > 0) {
         const beats = Math.min(16, remaining);
         scheduleNativeJam(when + beatOffset * 60 / bpm,
-          () => nativeJamAudio.playPad(bpm, beats));
+          dueEpochMs => nativeJamAudio.playPad(bpm, beats, 1, dueEpochMs));
         remaining -= beats;
         beatOffset += beats;
       }
@@ -3823,6 +3845,22 @@
         ? [67, 72, 79]
         : [72, 76, 79];
 
+    // Pre-schedule *each* word's cue while the first "Time"/"Speed"
+    // is still 80ms in the future. Previously it crossed JS -> Capacitor
+    // -> Swift only AFTER the word was painted, often arriving too late.
+    // Browser WebAudio retains its original word-by-word playback path.
+    if (nativeJamAudio) {
+      for (let index = 0; index < message.length; index += 1) {
+        playTone({
+          midi: transitionNotes[index % transitionNotes.length],
+          when: transitionStart + beat * index,
+          duration: 0.11,
+          volume: 0.045,
+          type: "square"
+        });
+      }
+    }
+
     for (let index = 0; index < message.length; index += 1) {
       if (state.screen !== "game" || state.paused) return newGrooveStart;
 
@@ -3837,13 +3875,15 @@
       el.textContent = message[index];
       stack.appendChild(el);
 
-      playTone({
-        midi: transitionNotes[index % transitionNotes.length],
-        when: wordTime,
-        duration: 0.11,
-        volume: 0.045,
-        type: "square"
-      });
+      if (!nativeJamAudio) {
+        playTone({
+          midi: transitionNotes[index % transitionNotes.length],
+          when: wordTime,
+          duration: 0.11,
+          volume: 0.045,
+          type: "square"
+        });
+      }
     }
 
     // Return just before the new downbeat so the drum loop can be scheduled
