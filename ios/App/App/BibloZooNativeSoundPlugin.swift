@@ -2024,8 +2024,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 let attackFrames = max(1,Int(ceil(rate*0.01)))
                 let activeFrames = max(attackFrames+1,Int(ceil(rate*duration)))
                 let rise = pow(1.0/0.0001,1.0/Double(attackFrames))
-                let decay = pow(0.0001,1.0/
-                    Double(max(1,activeFrames-attackFrames)))
+                let fadeFrames = Double(max(1, activeFrames - attackFrames))
+                let decay = pow(0.0001, 1.0 / fadeFrames)
                 var frameIndex = 0
                 var gain = 0.0001
                 guard let buffer = make(duration+0.03, sample: { t in
@@ -2058,8 +2058,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     let attackFrames = max(1,Int(ceil(rate*0.01)))
                     let activeFrames = max(attackFrames+1,Int(ceil(rate*duration)))
                     let rise = pow(0.016/0.0001,1.0/Double(attackFrames))
-                    let decay = pow(0.0001/0.016,1.0/
-                        Double(max(1,activeFrames-attackFrames)))
+                    let fadeFrames = Double(max(1, activeFrames - attackFrames))
+                    let decay = pow(0.0001 / 0.016, 1.0 / fadeFrames)
                     var frameIndex = 0
                     var gain = 0.0001
                     guard let buffer = make(duration+0.03, sample: { t in
@@ -2067,8 +2067,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                         if frameIndex >= activeFrames { return 0 }
                         let volume = gain*1.5
                         gain *= frameIndex < attackFrames ? rise : decay
-                        return (triangle(freqs[0],t)+triangle(freqs[1],t)+
-                            triangle(freqs[2],t)+triangle(freqs[3],t))*volume
+                        let chord = triangle(freqs[0], t) + triangle(freqs[1], t)
+                            + triangle(freqs[2], t) + triangle(freqs[3], t)
+                        return chord * volume
                     }) else { return (false,0,"jam-pad-allocation-failed") }
                     bank["\(bpm)-\(beats)"] = buffer
                     maxDuration = max(maxDuration,Int(duration*1000)+30)
@@ -3006,9 +3007,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     // Use the AVAudioEngine host timeline for beat-aligned
                     // Jam buffers; never invoke JS callbacks at the audible
                     // deadline and hope the Capacitor bridge is instantaneous.
-                    let remaining = requestedJamDueEpochMs.map {
-                        max(0.0,min(0.30,($0-
-                            Date().timeIntervalSince1970*1000.0)/1000.0))
+                    let remaining = requestedJamDueEpochMs.map { dueEpochMs in
+                        let nowEpochMs = Date().timeIntervalSince1970 * 1000.0
+                        return max(0.0, min(0.30,
+                            (dueEpochMs - nowEpochMs) / 1000.0))
                     } ?? 0.0
                     let scheduledAt: AVAudioTime? = remaining >= 0.010
                         ? AVAudioTime(hostTime: mach_absolute_time() +
