@@ -207,6 +207,29 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "traffic-bonus-7",
         "traffic-bonus-8"
     ]
+    // N6m: final standalone Verse Scramble. Its source-selected correct
+    // melody uses 8 distinct MIDI pitches across 1..10-letter words.
+    // All pitch IDs and 8 other sound recipes are fixed; never accept
+    // dynamic frequencies, Web output or additional AVAudioSession owners.
+    private let scramblePitchMIDIs: Set<Int> = [60, 62, 64, 65, 67, 69, 71, 72]
+    private let scrambleToneIDs: Set<String> = [
+        "scramble-note-60",
+        "scramble-note-62",
+        "scramble-note-64",
+        "scramble-note-65",
+        "scramble-note-67",
+        "scramble-note-69",
+        "scramble-note-71",
+        "scramble-note-72",
+        "scramble-wrong-letter",
+        "scramble-word-complete",
+        "scramble-letters-fall",
+        "scramble-message-pop",
+        "scramble-bonus-start",
+        "scramble-bonus-you-win",
+        "scramble-bonus-iwin",
+        "scramble-bonus-final"
+    ]
     // Worker owns all players, PCM effect buffers, AVAudioPlayerNodes and
     // AVAudioEngine. Swift main queue owns AVAudioSession/session history only.
     // PCM decode + engine startup occur on an explicit Got It!/Resume/DEV
@@ -299,7 +322,23 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "traffic-bonus-5",
         "traffic-bonus-6",
         "traffic-bonus-7",
-        "traffic-bonus-8"
+        "traffic-bonus-8",
+        "scramble-note-60",
+        "scramble-note-62",
+        "scramble-note-64",
+        "scramble-note-65",
+        "scramble-note-67",
+        "scramble-note-69",
+        "scramble-note-71",
+        "scramble-note-72",
+        "scramble-wrong-letter",
+        "scramble-word-complete",
+        "scramble-letters-fall",
+        "scramble-message-pop",
+        "scramble-bonus-start",
+        "scramble-bonus-you-win",
+        "scramble-bonus-iwin",
+        "scramble-bonus-final"
     ]
     private let nativeSnakeOrbSoundID = "snake-orb"
     private let snakeOrbMidiNotes: [Int] = [72, 74, 76, 79, 81, 84]
@@ -1534,6 +1573,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
               verseLaunchToneIDs.contains(soundId) ||
               trafficTapSoundResources[soundId] != nil ||
               trafficTapToneIDs.contains(soundId) ||
+              scrambleToneIDs.contains(soundId) ||
               soundId == nativeSnakeOrbSoundID ||
               soundId == nativePegSoundID ||
               soundId == nativeMelodySoundID else { return nil }
@@ -1625,7 +1665,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                soundId == self.nativeSnakeOrbSoundID ||
                self.towerWordToneIDs.contains(soundId) ||
                self.verseLaunchToneIDs.contains(soundId) ||
-               self.trafficTapToneIDs.contains(soundId) {
+               self.trafficTapToneIDs.contains(soundId) ||
+               self.scrambleToneIDs.contains(soundId) {
                 // Fixed Swift-generated PCM banks, never downloaded assets.
                 url = nil
             } else if let resourceName = self.snakeSoundResources[soundId] {
@@ -1746,7 +1787,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 var durationMs = 0
                 var failed = "prepare-failed"
                 let backend: String
-                if self.trafficTapToneIDs.contains(soundId) {
+                if self.scrambleToneIDs.contains(soundId) {
+                    let result = self.prepareScrambleToneOnWorker(soundId: soundId)
+                    prepared = result.prepared
+                    durationMs = result.durationMs
+                    failed = result.reason
+                    backend = "avengine-scramble-tone"
+                } else if self.trafficTapToneIDs.contains(soundId) {
                     let result = self.prepareTrafficTapToneOnWorker(soundId: soundId)
                     prepared = result.prepared
                     durationMs = result.durationMs
