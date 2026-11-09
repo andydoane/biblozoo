@@ -1,6 +1,6 @@
 # N6j — Tower of Bible native iOS audio: owner test guide
 
-> **[PR #51](https://github.com/andydoane/biblozoo/pull/51)**, branch `experiment/n6j-native-tower-of-bible` → `experiment/native-ios-audio`. **OPEN / OWNER iPHONE TEST PENDING.** Leave `ios-prep`, original BibloZoo installation, Web/PWA/Android and mic/Zoo unchanged. After owner test and merge this would be **9 of 12** standalone games, not before.
+> **CURRENT RESULT — OWNER ACCEPTED (2026-11-08):** [N6j PR #51](https://github.com/andydoane/biblozoo/pull/51) was **MERGED** to `experiment/native-ios-audio` at `1593a98bb60709582e8fa6b1a5fd4ac9a7e9d07d` (Nov 9 00:17:54 UTC). The owner now reports **successful usual real-iPhone tests without issues**. Tower of Bible is the **ninth of 12 owner-accepted standalone native games (9/12)**; specific device logs or each individual test scenario were not supplied, so don't invent them. Older pending sections below are the historical test plan, not current status. Next is open [N6k Verse Launch PR #52](https://github.com/andydoane/biblozoo/pull/52) awaiting separate Mac Swift/iPhone validation. Stable `ios-prep`, installed BibloZoo, Web/PWA/Android and mic/Zoo unchanged.
 
 ## Starting point and scope
 
