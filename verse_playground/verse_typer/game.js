@@ -296,6 +296,9 @@
   function showNativeTyperFailure(message){
     if(!nativeTyperAudio)return;
     nativeTyperFailure=true;
+    // A PCM or narration failure must not leave a prior voice playing
+    // behind the Retry/Back modal or advance the same review chunk.
+    nativeTyperAudio.stopChunk();
     beginNativeHold();
     let overlay=document.getElementById("vtNativeAudioFailure");
     if(!overlay){
