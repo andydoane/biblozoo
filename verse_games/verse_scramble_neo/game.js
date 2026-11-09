@@ -2607,13 +2607,19 @@
         window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
       },
       onModeSelect: () => {
-        if (nativeScrambleAudio) stopNativeScrambleRound();
         state.menuOpen=false;
         state.helpOpen=false;
         state.helpBackMode=false;
         finishNativeScrambleFreeze();
-        playUiTapSound();
-        setScreen("mode");
+        if (nativeScrambleAudio) {
+          // setScreen first retires old PCM; then this *same* real click
+          // plays the new mode UI pop rather than being silenced by Stop.
+          setScreen("mode");
+          playUiTapSound();
+        } else {
+          playUiTapSound();
+          setScreen("mode");
+        }
       },
       onExit: () => {
         if (nativeScrambleAudio) stopNativeScrambleRound();
