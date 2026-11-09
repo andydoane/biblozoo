@@ -368,21 +368,27 @@
   function gameNow() {
     const now = performance.now();
     return now - totalReturnPauseMs -
-      (returnPaused ? now - returnPausedAt : 0);
+      (returnPaused ? now - returnPausedAt : 0) -
+      nativeScramblePausedMs -
+      (nativeScrambleFrozen ? now - nativeScramblePausedAt : 0);
   }
 
   // Instructions, animated letter falls and the bonus pointer must not use
   // elapsed wall time while BibloZoo is in the background or waiting on tap.
   async function sleep(ms) {
     const deadline = gameNow() + ms;
-    while (returnPaused || gameNow() < deadline) {
+    while (returnPaused || nativeScrambleFrozen ||
+           nativeScramblePending || nativeScrambleFailure ||
+           gameNow() < deadline) {
       await new Promise(resolve => setTimeout(resolve,
         Math.min(100, Math.max(16, deadline - gameNow()))));
     }
   }
 
   async function waitUntilGameActive() {
-    while (returnPaused) await new Promise(resolve => setTimeout(resolve, 80));
+    while (returnPaused || nativeScrambleFrozen ||
+           nativeScramblePending || nativeScrambleFailure)
+      await new Promise(resolve => setTimeout(resolve, 80));
   }
 
   async function waitForMagnetFont() {
@@ -860,6 +866,7 @@
   }
 
   function getSilenceAudioElement() {
+    if (nativeScrambleAudio) return null;
     if (silenceAudioEl) return silenceAudioEl;
 
     silenceAudioEl = document.createElement("audio");
@@ -874,6 +881,7 @@
   }
 
   function primeHtmlAudio() {
+    if (nativeScrambleAudio) return;
     try {
       const audio = getSilenceAudioElement();
       audio.muted = false;
@@ -901,6 +909,7 @@
   }
 
   function ensureAudioContext() {
+    if (nativeScrambleAudio) return null;
     if (audioCtx) return audioCtx;
 
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -915,6 +924,7 @@
   }
 
   function unlockAudio() {
+    if (nativeScrambleAudio) return nativeScrambleAudio.isReady();
     const ctx = ensureAudioContext();
     if (!ctx || !masterGain) {
       audioUnlocked = false;
@@ -1036,12 +1046,14 @@
 
 
   function preloadUiSounds() {
+    if (nativeScrambleAudio) return;
     Object.keys(UI_SOUND_FILES).forEach(key => {
       loadUiSoundBuffer(key);
     });
   }
 
   function loadUiSoundBuffer(key) {
+    if (nativeScrambleAudio) return Promise.resolve(null);
     if (uiSoundBuffers.has(key)) {
       return Promise.resolve(uiSoundBuffers.get(key));
     }
@@ -1085,6 +1097,7 @@
   }
 
   function playBufferedUiSound(key, eventId = "uiTap", allowWhenMuted = false) {
+    if (nativeScrambleAudio) return; // no HTML/Web Audio on iOS
     if (muted && !allowWhenMuted) return;
 
     unlockAudio();
@@ -1124,9 +1137,14 @@
   }
 
   function playUiTapSound(allowWhenMuted = false) {
-    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
-    uiSoundFlip = !uiSoundFlip;
-    playBufferedUiSound(key, "uiTap", allowWhenMuted);
+    const key=nextNativeScrambleUiKey();
+    if (nativeScrambleAudio) {
+      if ((!muted || allowWhenMuted) && !returnPaused &&
+          !document.hidden)
+        nativeScrambleAudio.tapUiFromGesture(key,getSoundVolume("uiTap"));
+    } else {
+      playBufferedUiSound(key,"uiTap",allowWhenMuted);
+    }
   }
 
   const TUNE_TEMPO = 0.65;
@@ -1359,6 +1377,26 @@
   };
 
   function playGameSound(eventId) {
+    if (nativeScrambleAudio) {
+      if (muted || returnPaused || nativeScrambleFrozen ||
+          nativeScramblePending || nativeScrambleFailure ||
+          document.hidden || state.screen!=="game" ||
+          state.menuOpen || state.helpOpen) return;
+      let key=eventId;
+      if (eventId==="correctLetter") {
+        // Preserve the EXACT source-selected melody from
+        // melodyPoolsForLength (1..10), with the pre-increment index.
+        const length=state.currentTarget?.playableText?.length || 1;
+        if (!currentCorrectMelody.length)
+          currentCorrectMelody=chooseCorrectMelodyForLength(length);
+        const midi=currentCorrectMelody[
+          state.letterIndex % currentCorrectMelody.length] || 60;
+        key=NATIVE_SCRAMBLE_NOTES.has(midi)?"correct"+midi:"correct60";
+      }
+      // Swift has already baked the source gain (some multipliers >1).
+      nativeScrambleAudio.play(key,1);
+      return;
+    }
     if (muted) return;
 
     unlockAudio();
