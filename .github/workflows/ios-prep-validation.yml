@@ -58,6 +58,10 @@ jobs:
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7f.1 Flashcards coral top toast and stable Next/Continue controls
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_flashcards_top_toast_n7f1.js
+
       - name: Validate N7f Read My Verse native output and owner-selected Wacky character voices
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7f_read_my_verse_output.js
