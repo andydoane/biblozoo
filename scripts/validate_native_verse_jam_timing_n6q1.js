@@ -104,8 +104,14 @@ async function main() {
     "Controller uses narrow native groove stop");
   matches(game,/stopRun\(\{ keepNativeReady: !!nativeJamAudio,[\s\S]*?preserveNativeFinale: !!nativeJamAudio \}\)/,
     "Finish must retain hot notes for final arpeggio");
-  has(game,"await sleep(nativeJamAudio ? 260 : 900)",
-    "Great tap must not wait 900ms on native iOS; browser unchanged");
+  has(game,"NATIVE_JAM_FINALE_LEAD_SECONDS = 0.22",
+    "Finale notes must have worker-safe host-time lead after native stop");
+  has(game,"NATIVE_JAM_FINALE_SCREEN_HOLD_MS = 440",
+    "Show end only after first notes should be audible; don't change web 900ms");
+  has(game,"await finaleGrooveStop",
+    "Do not fire-and-forget the native groove stop before final arpeggio");
+  has(game,"await sleep(nativeJamAudio ? NATIVE_JAM_FINALE_SCREEN_HOLD_MS : 900)",
+    "Native Great remains responsive; browser retains exact 900ms");
   has(game,'state.screen = "end";\n    render();',
     "End renders without a second stop that clips the arpeggio");
   has(game,"markPlaygroundCompleted?.({",
