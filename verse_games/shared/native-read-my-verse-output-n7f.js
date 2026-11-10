@@ -116,7 +116,7 @@
   }
   class NativeAudio {
     constructor(src) {
-      this.src=String(src||"");
+      this._src=String(src||"");
       this.preload="none";
       this.loop=false;
       this.muted=false;
@@ -129,10 +129,24 @@
       this._generation=0;
       this._playingRequest=null;
       this._requestId="";
-      this._clipId=clipIdFor(this.src);
+      this._clipId=clipIdFor(this._src);
       listen();
       // N7g: a newly allocated Audio object is not itself an active player.
       // Register only when play() actually starts a native attempt.
+    }
+    get src() { return this._src; }
+    set src(value) {
+      const next=String(value||"");
+      if(next===this._src) return;
+      // Media src may be replaced on a reused Audio object. Retire the
+      // previous native player and validate the NEW fixed asset key; do not
+      // accidentally play the previous verse under an updated src string.
+      if(this._requestId) this.pause();
+      this._src=next;
+      this._clipId=clipIdFor(next);
+      this._position=0;
+      this.duration=NaN;
+      this.ended=false;
     }
     get currentTime() {return this._position;}
     set currentTime(value) {
@@ -150,7 +164,7 @@
       if(name==="src") this.src=String(value||"");
     }
     removeAttribute(name) {
-      if(name==="src") {this.pause();this.src="";this._clipId="";}
+      if(name==="src") this.src="";
     }
     load() { /* Bundled native audio is loaded exclusively on a real Play. */ }
     addEventListener(name,fn,options) {
@@ -211,7 +225,6 @@
       catch(_){}
     }
     async play() {
-      if (this._playingRequest !== null) return true;
       if(root.document?.hidden || !this._clipId ||
          typeof api()?.playClip!=="function") {
         this._emit("error");
@@ -221,6 +234,7 @@
         this._emit("error");
         throw mkError("needs-real-gesture");
       }
+      if (this._playingRequest !== null) return true;
       const epoch=++this._generation;
       // Fresh request ID per playback, not per Audio object. If an old
       // ended/interrupt event arrives after Pause→Play/Welcome Back, it
