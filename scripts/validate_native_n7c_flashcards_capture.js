@@ -40,14 +40,14 @@ contains(native,"Promise.resolve(mic()?.finishCapture?.())",
   "Stop waits for actual Swift take flush");
 contains(native,"mic()?.discardCapture?.()",
   "Re-record/exit must release original voice data in Swift memory");
-contains(native,'root.addEventListener("pagehide", interrupt)',
-  "Task switching interrupts an active recording");
+contains(native,'root.addEventListener("pagehide", () => {',
+  "Task switching still interrupts active capture while pausing finished replay");
 contains(native,'api.addListener("biblozooCaptureLifecycle"',
   "UIKit native interruptions signal JS even with no pagehide");
-contains(native,"playbackComplete: false",
-  "Capture is NOT false playback PASS; N7d is separate");
-contains(native,"playbackAvailable: false",
-  "Play must not be shown before native playback really exists");
+contains(native,"playbackComplete,",
+  "Native completion starts false and only changes on actual played-back event");
+contains(native,"playbackAvailable: !!takeMetadata?.takeId",
+  "Native Play must be offered ONLY for the actual opaque RAM take");
 assert(!/getUserMedia\s*\(|MediaRecorder\s*\(|AudioContext\s*\(|new Audio\s*\(/.test(native),
   "No browser fallback for native mic/playback");
 contains(ui,"nativeCaptureOnly","Comparison screen must clearly label N7c");
@@ -97,18 +97,26 @@ function simulated({ios=true,denied=false,missing=false}={}){
     addEventListener:(type,fn)=>{docEvents[type]=fn},
   };
   const bridge={
-    addListener(event,fn){if(event==="biblozooCaptureLifecycle")on.native=fn;
+    addListener(event,fn){
+      if(event==="biblozooCaptureLifecycle")on.native=fn;
+      if(event==="biblozooCaptureLevel")on.level=fn;
+      if(event==="biblozooCapturePlayback")on.playback=fn;
       return Promise.resolve({remove(){}})},
     requestPermission(){events.push("permission");
       return Promise.resolve({granted:!denied,
         reason:denied?"permission-denied":"permission-granted"});},
     prepareCapture(){events.push("prepare");return Promise.resolve({prepared:true})},
     beginCapture({limitMs}){events.push("begin:"+limitMs);
-      return Promise.resolve({started:true})},
+      return Promise.resolve({started:true,captureKey:41})},
     finishCapture(){events.push("finish");return Promise.resolve({
-      ready:true,restored:true,frameCount:48000,durationMs:1000});},
+      ready:true,restored:true,frameCount:48000,durationMs:1000,
+      takeId:"n7c-test-take"});},
     discardCapture(){events.push("discard");
       return Promise.resolve({discarded:true})},
+    playCapture({takeId}){events.push("play:"+takeId);
+      return Promise.resolve({started:true,playToken:1})},
+    stopCapturePlayback(){events.push("stop-play");
+      return Promise.resolve({stopped:true})},
   };
   const output={devPrepareForMicrophone(){events.push("output-stop");
     return Promise.resolve({prepared:true,reason:"output-worker-idle"})}};
@@ -157,14 +165,19 @@ async function main(){
   assert.equal(rec.snapshot().hasRecording,true,
     "At least 256 actual PCM frames flushed, native only");
   assert.equal(rec.snapshot().capturedFrames,48000);
-  assert.equal(rec.snapshot().playbackComplete,false);
-  assert.equal(rec.snapshot().playbackAvailable,false);
-  assert.equal(rec.snapshot().playbackFailed,true,
-    "Continue Without Listening is available, not fake playback completion");
-  assert.match(rec.snapshot().message,/Native playback arrives in N7d/);
-  assert.equal(await rec.play(),false,"Never silently play a recording in N7c");
+  assert.equal(rec.snapshot().playbackComplete,false,
+    "N7c still cannot pretend Stop means audible completion");
+  assert.equal(rec.snapshot().playbackAvailable,true,
+    "Only N7d explicit native Play exposes a ready opaque take");
+  assert.equal(rec.snapshot().playbackFailed,false);
+  assert.equal(await rec.play(),true,"Real child Play now invokes native output");
+  assert.equal(rec.snapshot().playbackComplete,false,
+    "Even a successful play bridge response is NOT completed playback");
+  e.on.playback({kind:"ended",takeId:"n7c-test-take",playToken:1});
+  assert.equal(rec.snapshot().playbackComplete,true,
+    "Only real AVAudioPlayerNode .dataPlayedBack may set completion");
   assert.equal(await rec.playFun("squirrel",()=>{}),false,
-    "Wacky DSP cannot start/consume entitlement before N7e");
+    "Wacky DSP remains blocked until N7e");
   rec.dispose();
   await tick();
   assert(e.events.includes("discard"),"Dispose MUST drop native RAM take");
@@ -212,7 +225,7 @@ async function main(){
   const timed=simulated();const t=timed.create();
   await t.start(()=>{},async()=>true);
   timed.on.native({kind:"completed",ready:true,restored:true,
-    frameCount:38400,durationMs:800});
+    takeId:"n7c-time-limited-take",frameCount:38400,durationMs:800});
   assert.equal(t.snapshot().hasRecording,true,
     "Native 120s watchdog completion waits for actual RAM buffer flush");
   assert.equal(t.snapshot().playbackComplete,false);
@@ -223,6 +236,6 @@ async function main(){
   assert.equal(h.snapshot().status,"idle");
   assert(hidden.events.includes("discard"));
   assert(!hidden.events.includes("finish"));
-  console.log("N7c PASS: unchanged original web recorder, real native Flashcards Record → 3-2-1 → bounded capture/Stop, opaque RAM ready, no silent Play/Wacky, denial/unavailable fail-closed, native app-switch/route/hidden interruption, re-record/exit release.");
+  console.log("N7c regression PASS with N7d: original Web unchanged, Record→3-2-1→Stop RAM take, no premature playback completion, native Play and actual ended event, Wacky blocked, denial/cancellation/interrupt/timeout/discard intact.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1});
