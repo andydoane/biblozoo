@@ -36,6 +36,8 @@ final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
         // N7b DEV-only explicit microphone permission and 4-second RAM-only
         // input-level probe; never wired into Flashcards or auto-started.
         bridge?.registerPluginInstance(BibloZooMicSessionProbePlugin())
+        // N7f output-only Read My Verse playback, exact .audiotest bundle.
+        bridge?.registerPluginInstance(BibloZooNativeReadOutputPlugin())
     }
 }
 
@@ -1598,6 +1600,383 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             call.resolve(self.state())
+        }
+    }
+}
+
+
+// N7f: Read My Verse OUTPUT only. All source MP3 clips must be from the
+// published, installed app bundle; no caller URLs/paths, mic, user files,
+// network access, WebAudio/HTML fallback, or silent fake completion.
+// Independent AVAudioPlayers allow Verse Crawl soundtrack + real narration
+// + ending overlap. OS .soloAmbient session is shared, never mixed/ducked.
+@objc(BibloZooNativeReadOutputPlugin)
+final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
+    AVAudioPlayerDelegate {
+    public let identifier = "BibloZooNativeReadOutputPlugin"
+    public let jsName = "BibloZooNativeReadOutput"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "activateFromGesture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "seekClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopAll", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playCue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopCues", returnType: CAPPluginReturnPromise)
+    ]
+    private var clips: [String: AVAudioPlayer] = [:]
+    private var cues: [AVAudioPlayer] = []
+    private var watches: [NSObjectProtocol] = []
+    private var progressTimer: Timer?
+    private var ownedByReadGesture = false
+    private var generation = 0
+
+    private var isDevBundle: Bool {
+        Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest"
+    }
+    private func onMain(_ action: @escaping () -> Void) {
+        if Thread.isMainThread { action() }
+        else { DispatchQueue.main.async(execute: action) }
+    }
+    public override func load() {
+        super.load()
+        let center = NotificationCenter.default
+        watches.append(center.addObserver(forName:
+            AVAudioSession.interruptionNotification, object: nil,
+            queue: .main) { [weak self] note in
+                guard let raw = (note.userInfo?[
+                    AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
+                    raw == AVAudioSession.InterruptionType.began.rawValue else {
+                    return
+                }
+                self?.cancelAll(reason: "interrupted")
+            })
+        for name in [UIApplication.willResignActiveNotification,
+                     UIApplication.didEnterBackgroundNotification,
+                     AVAudioSession.mediaServicesWereLostNotification,
+                     AVAudioSession.mediaServicesWereResetNotification] {
+            watches.append(center.addObserver(forName: name, object: nil,
+                queue: .main) { [weak self] _ in
+                    self?.cancelAll(reason: "interrupted")
+                })
+        }
+    }
+    deinit {
+        watches.forEach { NotificationCenter.default.removeObserver($0) }
+        progressTimer?.invalidate()
+        clips.values.forEach { $0.stop() }
+        cues.forEach { $0.stop() }
+    }
+    // Validated published JSON, never a user-provided filename.
+    private func publishedVerse(_ id: String) -> Bool {
+        guard id.count > 0 && id.count <= 65 &&
+              id.range(of: "^[a-z0-9_-]+$",
+                       options: .regularExpression) != nil,
+              let url = Bundle.main.url(forResource: id,
+                withExtension: "json", subdirectory: "public/verse_data"),
+              let data = try? Data(contentsOf: url),
+              let verse = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any] else { return false }
+        return verse["published"] as? Bool == true &&
+               verse["verseId"] as? String == id
+    }
+    // Do not accept paths, URLs, arbitrary clip keys or external IDs.
+    private func bundledClip(_ key: String) -> URL? {
+        let fixed: [String: (String, String)] = [
+            "crawl-theme": ("verse_images/read_my_verse",
+                            "verse_crawl_theme_ducked"),
+            "crawl-ending": ("verse_images/read_my_verse",
+                             "verse_crawl_theme_ending"),
+            "typewriter-alert": ("verse_images/read_my_verse",
+                                 "typewriter_alert"),
+            "keyboard-alert": ("verse_images/read_my_verse",
+                               "keyboard_alert"),
+            "incorrect": ("verse_images/daily_questions", "dq_incorrect")
+        ]
+        if let entry = fixed[key] {
+            return Bundle.main.url(forResource: entry.1, withExtension: "mp3",
+                subdirectory: "public/" + entry.0)
+        }
+        if key.hasPrefix("typewriter-"), let index =
+            Int(key.dropFirst("typewriter-".count)),
+            (1...3).contains(index) {
+            return Bundle.main.url(forResource: "typewriter_\(index)",
+                withExtension: "mp3",
+                subdirectory: "public/verse_images/read_my_verse")
+        }
+        if key.hasPrefix("keyboard-"), let index =
+            Int(key.dropFirst("keyboard-".count)),
+            (1...7).contains(index) {
+            return Bundle.main.url(forResource: "keyboard_\(index)",
+                withExtension: "mp3",
+                subdirectory: "public/verse_images/read_my_verse")
+        }
+        guard key.hasPrefix("verse:") else { return nil }
+        let stem = String(key.dropFirst("verse:".count))
+        guard stem.count <= 80 &&
+              stem.range(of: "^[a-z0-9_-]+$",
+                         options: .regularExpression) != nil else { return nil }
+        var valid = publishedVerse(stem)
+        if stem.hasSuffix("_ref") {
+            valid = publishedVerse(String(stem.dropLast(4)))
+        } else if !valid, let letter = stem.last,
+                  letter >= "a" && letter <= "z" {
+            valid = publishedVerse(String(stem.dropLast()))
+        }
+        guard valid else { return nil }
+        return Bundle.main.url(forResource: stem, withExtension: "mp3",
+            subdirectory: "public/verse_audio")
+    }
+    private func emit(_ kind: String, id: String,
+                      player: AVAudioPlayer, reason: String = "") {
+        notifyListeners("biblozooReadOutput", data: [
+            "kind": kind, "requestId": id,
+            "positionMs": Int(player.currentTime * 1000),
+            "durationMs": Int(player.duration * 1000),
+            "reason": reason
+        ])
+    }
+    private func armProgress() {
+        guard progressTimer == nil else { return }
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.14,
+            repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                for (id, player) in self.clips where player.isPlaying {
+                    self.emit("progress", id: id, player: player)
+                }
+                if self.clips.isEmpty {
+                    self.progressTimer?.invalidate()
+                    self.progressTimer = nil
+                }
+            }
+    }
+    private func cancelAll(reason: String) {
+        generation += 1
+        ownedByReadGesture = false
+        for (id, player) in clips {
+            player.stop()
+            if reason == "interrupted" {
+                emit("interrupted", id: id, player: player, reason: reason)
+            }
+        }
+        clips.removeAll()
+        cues.forEach { $0.stop() }
+        cues.removeAll()
+        progressTimer?.invalidate()
+        progressTimer = nil
+        // Never reactivate on OS interruption/foreground return. Do not
+        // send .notifyOthersOnDeactivation, which auto-resumes Apple Music.
+    }
+    @objc func activateFromGesture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active,
+                  AVAudioSession.sharedInstance().category == .soloAmbient else {
+                call.resolve(["activated": false, "reason": "not-ready"])
+                return
+            }
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+                self.ownedByReadGesture = true
+                call.resolve(["activated": true])
+            } catch {
+                self.ownedByReadGesture = false
+                call.resolve(["activated": false, "reason": "os-denied"])
+            }
+        }
+    }
+    @objc func playClip(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active,
+                  self.ownedByReadGesture,
+                  let id = call.getString("requestId"), id.count > 0,
+                  id.count <= 64, self.clips.count < 8 ||
+                  self.clips[id] != nil else {
+                call.resolve(["started": false, "reason": "not-ready"])
+                return
+            }
+            guard let key = call.getString("clipId"),
+                  let url = self.bundledClip(key) else {
+                call.resolve(["started": false, "reason": "unpublished-clip"])
+                return
+            }
+            self.clips[id]?.stop()
+            self.clips[id] = nil
+            do {
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.delegate = self
+                player.numberOfLoops = 0
+                let volume = call.getDouble("volume") ?? 1
+                player.volume = Float(min(1, max(0, volume)))
+                player.prepareToPlay()
+                let seekMs = call.getDouble("positionMs") ?? 0
+                if seekMs > 0 {
+                    player.currentTime = min(player.duration,
+                                             max(0, seekMs / 1000))
+                }
+                guard player.play() else {
+                    call.resolve(["started": false, "reason": "player-refused"])
+                    return
+                }
+                self.clips[id] = player
+                self.armProgress()
+                self.emit("started", id: id, player: player)
+                call.resolve(["started": true,
+                              "positionMs": Int(player.currentTime * 1000),
+                              "durationMs": Int(player.duration * 1000)])
+            } catch {
+                call.resolve(["started": false, "reason": "decode-failed"])
+            }
+        }
+    }
+    @objc func stopClip(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else { call.resolve(["stopped":false]); return }
+            if let id = call.getString("requestId"),
+               let player = self.clips.removeValue(forKey: id) {
+                player.stop()
+            }
+            call.resolve(["stopped": true])
+        }
+    }
+    @objc func seekClip(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  let id = call.getString("requestId"),
+                  let player = self.clips[id],
+                  let ms = call.getDouble("positionMs"),
+                  ms.isFinite else {
+                call.resolve(["seeked": false]); return
+            }
+            player.currentTime = min(player.duration, max(0, ms / 1000))
+            self.emit("progress", id: id, player: player)
+            call.resolve(["seeked": true])
+        }
+    }
+    @objc func stopAll(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            self?.cancelAll(reason: "stopped")
+            call.resolve(["stopped": true])
+        }
+    }
+    public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer,
+                                            successfully flag: Bool) {
+        onMain { [weak self] in
+            guard let self = self else { return }
+            if let id = self.clips.first(where: { $0.value === player })?.key {
+                self.emit(flag ? "ended" : "interrupted", id: id,
+                          player: player, reason: flag ? "" : "player-failed")
+                self.clips.removeValue(forKey: id)
+            } else {
+                self.cues.removeAll(where: { $0 === player })
+            }
+        }
+    }
+    // Source-authored fixed note patterns, synthesized entirely in
+    // native RAM. No user-supplied frequency, waveform, path or PCM.
+    private func wavData(midi: Int, seconds: Double, gain: Double,
+                         square: Bool = false) -> Data {
+        let rate = 44_100
+        let count = min(22_050, max(512, Int(Double(rate) * seconds)))
+        var data = Data()
+        func bytes(_ value: String) {
+            data.append(contentsOf: value.utf8)
+        }
+        func word(_ value: UInt16) {
+            var le = value.littleEndian
+            withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+        }
+        func dword(_ value: UInt32) {
+            var le = value.littleEndian
+            withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+        }
+        bytes("RIFF"); dword(UInt32(36 + count * 2))
+        bytes("WAVEfmt "); dword(16); word(1); word(1)
+        dword(UInt32(rate)); dword(UInt32(rate * 2))
+        word(2); word(16)
+        bytes("data"); dword(UInt32(count * 2))
+        let hz = 440 * pow(2, Double(midi - 69) / 12)
+        for index in 0..<count {
+            let t = Double(index) / Double(rate)
+            let phase = (t * hz).truncatingRemainder(dividingBy: 1)
+            let wave: Double = square ? (phase < 0.5 ? 1 : -1) :
+                (4 * abs(phase - 0.5) - 1)
+            let attack = min(1, Double(index) / (0.018 * Double(rate)))
+            let release = min(1, Double(count - index) /
+                              (0.04 * Double(rate)))
+            let sample = max(-1, min(1,
+                wave * gain * max(0, min(attack, release))))
+            word(UInt16(bitPattern: Int16(sample * 32767)))
+        }
+        return data
+    }
+    @objc func playCue(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  self.ownedByReadGesture,
+                  UIApplication.shared.applicationState == .active,
+                  let kind = call.getString("kind"),
+                  ["order", "scramble", "negative"].contains(kind) else {
+                call.resolve(["played": false, "reason": "not-ready"])
+                return
+            }
+            let index = min(64, max(1, call.getInt("index") ?? 1))
+            let complete = call.getBool("complete") == true
+            let wrong = call.getBool("wrong") == true
+            let scale = [60, 62, 64, 67, 69, 72]
+            let base = scale[(index - 1) % scale.count]
+            let notes: [(Int, Double)]
+            let gain: Double
+            let duration: Double
+            let square: Bool
+            if kind == "negative" {
+                notes = [(48, 0)]; gain = 0.08
+                duration = 0.15; square = true
+            } else if kind == "order" {
+                let midi = wrong ? 48 : base
+                notes = wrong ? [(midi, 0)] : complete ?
+                    [(midi, 0), (midi + 4, 0.09),
+                     (midi + 7, 0.18), (midi + 12, 0.27)] :
+                    [(midi, 0)]
+                gain = wrong ? 0.11 : 0.22
+                duration = wrong ? 0.14 : 0.17
+                square = wrong
+            } else {
+                notes = complete ?
+                    [(base, 0), (base + 4, 0.09),
+                     (base + 7, 0.19), (base + 12, 0.3)] :
+                    [(base, 0), (base + 4, 0.1)]
+                gain = 0.22; duration = complete ? 0.2 : 0.17
+                square = false
+            }
+            self.cues.removeAll(where: { !$0.isPlaying })
+            while self.cues.count + notes.count > 12 && !self.cues.isEmpty {
+                self.cues.removeFirst().stop()
+            }
+            var scheduled = 0
+            for (midi, delay) in notes {
+                guard let player = try? AVAudioPlayer(
+                    data: self.wavData(midi: midi, seconds: duration,
+                                       gain: gain, square: square)) else {
+                    continue
+                }
+                player.delegate = self
+                player.prepareToPlay()
+                if player.play(atTime: player.deviceCurrentTime + delay) {
+                    self.cues.append(player)
+                    scheduled += 1
+                }
+            }
+            call.resolve(["played": scheduled == notes.count,
+                          "noteCount": scheduled])
+        }
+    }
+    @objc func stopCues(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            self?.cues.forEach { $0.stop() }
+            self?.cues.removeAll()
+            call.resolve(["stopped": true])
         }
     }
 }
