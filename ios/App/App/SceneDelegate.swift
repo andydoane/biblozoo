@@ -303,6 +303,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // N7e: effect nodes and bounded pitch automation for the CURRENT
     // playback generation only. None of these store or export voice samples.
     private var playbackEffects: [AVAudioNode] = []
+    // N7e.1: additional output-only voices for DEV chorus comparison.
+    private var playbackChorusPlayers: [AVAudioPlayerNode] = []
     private var playbackPitchWorkItems: [DispatchWorkItem] = []
     private var playbackWackyTapInstalled = false
     private var playbackWackyStartNotified = false
@@ -1041,7 +1043,113 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         "ascending", "descending", "demon", "chorus_alien", "cave"
     ]
 
+    // N7e.1 experiment only: five clean-first Demon alternatives and
+    // five real multi-voice Chorus choices. Original two IDs stay unchanged.
+    // Variants require a separate native DEV flag, not child random Wacky.
+    private struct N7e1Variant {
+        let cents: Float
+        let rate: Float
+        let lowPassHz: Float
+        let roomWet: Float
+        let distortionWet: Float
+        let echoSeconds: Double
+        let echoWet: Float
+        let tailSeconds: Double
+        let layerDetunes: [Float]
+        let layerDelays: [Double]
+        let layerVolumes: [Float]
+        let dryVolume: Float
+    }
+
+    private static let n7e1Variants: [String: N7e1Variant] = [
+        "demon_clean": N7e1Variant(cents: -600, rate: 0.94,
+            lowPassHz: 2150, roomWet: 18, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 1,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_shadow": N7e1Variant(cents: -800, rate: 0.92,
+            lowPassHz: 1620, roomWet: 34, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 2,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_abyss": N7e1Variant(cents: -1000, rate: 0.9,
+            lowPassHz: 1180, roomWet: 25, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 1.7,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_whisper": N7e1Variant(cents: -400, rate: 0.97,
+            lowPassHz: 2600, roomWet: 27, distortionWet: 0,
+            echoSeconds: 0.12, echoWet: 16, tailSeconds: 1.6,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_thunder": N7e1Variant(cents: -700, rate: 0.91,
+            lowPassHz: 1850, roomWet: 24, distortionWet: 3,
+            echoSeconds: 0.17, echoWet: 19, tailSeconds: 1.8,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "chorus_air": N7e1Variant(cents: 200, rate: 0.98,
+            lowPassHz: 0, roomWet: 0, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.22,
+            layerDetunes: [-10,10], layerDelays: [0.015,0.029],
+            layerVolumes: [0.18,0.18], dryVolume: 0.64),
+        "chorus_swarm": N7e1Variant(cents: 300, rate: 0.98,
+            lowPassHz: 0, roomWet: 0, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.22,
+            layerDetunes: [-23,23], layerDelays: [0.012,0.035],
+            layerVolumes: [0.22,0.22], dryVolume: 0.56),
+        "chorus_cosmic": N7e1Variant(cents: 500, rate: 0.93,
+            lowPassHz: 0, roomWet: 13, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 1.1,
+            layerDetunes: [-42,42], layerDelays: [0.023,0.047],
+            layerVolumes: [0.21,0.21], dryVolume: 0.58),
+        "chorus_choir": N7e1Variant(cents: 0, rate: 0.96,
+            lowPassHz: 0, roomWet: 9, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.75,
+            layerDetunes: [-14,14], layerDelays: [0.026,0.052],
+            layerVolumes: [0.25,0.25], dryVolume: 0.5),
+        "chorus_wobble": N7e1Variant(cents: 300, rate: 0.98,
+            lowPassHz: 0, roomWet: 9, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.7,
+            layerDetunes: [-27,27], layerDelays: [0.017,0.043],
+            layerVolumes: [0.23,0.23], dryVolume: 0.54)
+    ]
+
+    private func n7e1WireChorusLayers(_ variant: N7e1Variant,
+                                     engine: AVAudioEngine,
+                                     format: AVAudioFormat) -> [AVAudioPlayerNode] {
+        guard variant.layerDetunes.count == 2 &&
+              variant.layerDelays.count == 2 &&
+              variant.layerVolumes.count == 2 else { return [] }
+        var players: [AVAudioPlayerNode] = []
+        // The two additional independent time-pitch chains use the SAME
+        // opaque RAM take; distinct detune+12–52ms offsets create genuine
+        // chorus voices instead of the original static single delay.
+        for index in 0..<2 {
+            let voice = AVAudioPlayerNode()
+            voice.volume = variant.layerVolumes[index]
+            let tune = AVAudioUnitTimePitch()
+            tune.pitch = variant.cents + variant.layerDetunes[index]
+            tune.rate = variant.rate
+            tune.overlap = 8
+            let delay = AVAudioUnitDelay()
+            delay.delayTime = variant.layerDelays[index]
+            delay.feedback = 0
+            delay.wetDryMix = 100
+            engine.attach(voice)
+            engine.attach(tune)
+            engine.attach(delay)
+            engine.connect(voice, to: tune, format: format)
+            engine.connect(tune, to: delay, format: format)
+            engine.connect(delay, to: engine.mainMixerNode, format: format)
+            playbackEffects.append(tune)
+            playbackEffects.append(delay)
+            players.append(voice)
+        }
+        return players
+    }
+
     private func n7eRate(_ preset: String) -> Float {
+        if let variant = Self.n7e1Variants[preset] { return variant.rate }
         switch preset {
         case "squirrel": return 1.15
         case "giant": return 0.9
@@ -1055,6 +1163,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func n7eCents(_ preset: String, at time: Double,
                           duration: Double) -> Float {
+        if let variant = Self.n7e1Variants[preset] {
+            if preset == "chorus_wobble" {
+                return variant.cents + Float(75 * sin(time * 2 * .pi * 1.8))
+            }
+            return variant.cents
+        }
         switch preset {
         case "squirrel": return 900
         case "giant": return -700
@@ -1091,7 +1205,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private func n7eSchedulePitch(_ preset: String, unit: AVAudioUnitTimePitch,
                                   token: Int, duration: Double) {
         guard preset == "roller_coaster" || preset == "ascending" ||
-              preset == "descending" else { return }
+              preset == "descending" || preset == "chorus_wobble" else {
+            return
+        }
         // 80ms nominal, never more than 160 queued callbacks for long takes.
         let count = min(160, max(1, Int(duration / 0.08)))
         for step in 1...count {
@@ -1121,7 +1237,41 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         pitch.overlap = 8
         engine.attach(pitch)
         var effects: [AVAudioNode] = [pitch]
-        if preset == "demon" {
+        if let variant = Self.n7e1Variants[preset] {
+            // Clean-first Demon presets avoid the owner-reported corrupted
+            // MP3 distortion. Chorus variant volume sums are near 1.0.
+            if variant.lowPassHz > 0 {
+                let eq = AVAudioUnitEQ(numberOfBands: 1)
+                eq.bands[0].filterType = .lowPass
+                eq.bands[0].frequency = variant.lowPassHz
+                eq.bands[0].bypass = false
+                engine.attach(eq)
+                effects.append(eq)
+            }
+            if variant.distortionWet > 0 {
+                let drive = AVAudioUnitDistortion()
+                drive.loadFactoryPreset(.multiBrokenSpeaker)
+                drive.wetDryMix = variant.distortionWet
+                engine.attach(drive)
+                effects.append(drive)
+            }
+            if variant.echoSeconds > 0 {
+                let echo = AVAudioUnitDelay()
+                echo.delayTime = variant.echoSeconds
+                echo.feedback = 7
+                echo.wetDryMix = variant.echoWet
+                engine.attach(echo)
+                effects.append(echo)
+            }
+            if variant.roomWet > 0 {
+                let reverb = AVAudioUnitReverb()
+                reverb.loadFactoryPreset(.largeRoom)
+                reverb.wetDryMix = variant.roomWet
+                engine.attach(reverb)
+                effects.append(reverb)
+            }
+            player.volume = variant.dryVolume
+        } else if preset == "demon" {
             let eq = AVAudioUnitEQ(numberOfBands: 1)
             let band = eq.bands[0]
             band.filterType = .lowPass
@@ -1188,7 +1338,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             let requestedId = call.getString("takeId") ?? ""
             // Empty preset means the unchanged dry recorded-voice path.
             let effectId = call.getString("presetId") ?? ""
-            guard effectId.isEmpty || Self.wackyPresetIds.contains(effectId) else {
+            let devVariant = call.getBool("devVariant") == true
+            guard effectId.isEmpty || Self.wackyPresetIds.contains(effectId) ||
+                  (devVariant && Self.n7e1Variants[effectId] != nil) else {
                 call.resolve(["started": false, "reason": "unknown-preset"])
                 return
             }
@@ -1216,9 +1368,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 // Reverb/delay tails need actual silent source frames after
                 // speech; the normal dry take is byte-for-byte unchanged.
-                let tail: Double = effectId == "cave" ? 3.2 :
-                    effectId == "demon" ? 2.4 :
-                    effectId == "chorus_alien" ? 0.2 : 0
+                let tail: Double = Self.n7e1Variants[effectId]?.tailSeconds ??
+                    (effectId == "cave" ? 3.2 :
+                     effectId == "demon" ? 2.4 :
+                     effectId == "chorus_alien" ? 0.2 : 0)
                 let totalFrames = self.savedSamples.count +
                     Int(self.savedSampleRate * tail)
                 guard totalFrames <= 12_500_000,
@@ -1265,6 +1418,16 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     // nodes, not WebAudio. Keep nodes alive until stop/ended.
                     let pitch = self.n7eWireEffects(effectId, engine: engine,
                         player: player, format: format)
+                    // DEV-only chorus processing: two independent voices,
+                    // same real RAM take and shared output-only session.
+                    let chorusVoices: [AVAudioPlayerNode]
+                    if let variant = Self.n7e1Variants[effectId],
+                       !variant.layerDetunes.isEmpty {
+                        chorusVoices = self.n7e1WireChorusLayers(
+                            variant, engine: engine, format: format)
+                    } else {
+                        chorusVoices = []
+                    }
                     do {
                         // A deliberate Play tap, not a foreground callback.
                         // Leave the normal .soloAmbient category unchanged.
@@ -1272,6 +1435,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         self.ownsFlashcardsForegroundAudio = true
                         self.playbackEngine = engine
                         self.playbackNode = player
+                        self.playbackChorusPlayers = chorusVoices
                         self.playbackTakeId = requestedId
                         self.playbackStartedAt = Date()
                         self.playbackWackyStartNotified = false
@@ -1318,6 +1482,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                             self.n7eSchedulePitch(effectId, unit: pitch,
                                 token: playToken, duration: voiceSeconds)
                         }
+                        // Each chorus layer consumes the exact same buffer,
+                        // not an uploaded, serialized or fabricated sample.
+                        for voice in chorusVoices {
+                            voice.scheduleBuffer(buffer, at: nil,
+                                options: [], completionHandler: nil)
+                        }
                         player.scheduleBuffer(buffer,
                             completionCallbackType: .dataPlayedBack) {
                             [weak self] _ in
@@ -1330,6 +1500,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                             }
                         }
                         try engine.start()
+                        for voice in chorusVoices { voice.play() }
                         player.play()
                         call.resolve(["started": true,
                                       "reason": "native-playing",
@@ -1360,6 +1531,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         playbackWackyStartNotified = false
         for item in playbackPitchWorkItems { item.cancel() }
         playbackPitchWorkItems.removeAll()
+        for voice in playbackChorusPlayers { voice.stop() }
+        playbackChorusPlayers.removeAll()
         playbackNode?.stop()
         playbackEngine?.stop()
         playbackNode = nil

@@ -118,8 +118,12 @@ has(dock,'panel.style.display = "none"',"Old panels do not occupy main screen");
 has(dock,'action("DEV Tools",',"Compact way to reopen tools");
 has(dock,"root.BibloZooWackyLab?.open?.()",
   "Developer can open test lab with explicit click");
-has(lab,"root.BibloZooWackyLab=Object.freeze({open,close})",
-  "Lab is opened manually from DEV dock");
+has(lab,"root.BibloZooWackyLab=Object.freeze({",
+  "Both DEV Lab modes are gated behind explicit DEV dock taps");
+has(lab,'open:()=>open("official")',
+  "Original ten-preset Lab remains unchanged by comparison mode");
+has(lab,'openVariants:()=>open("variants")',
+  "Owner comparison Lab is a separate explicitly opened mode");
 has(lab,"recorder.start(","Lab records directly from Home, no Flashcards flow");
 has(lab,"recorder.playFun(id,","Every lab button invokes selected preset directly");
 has(lab,"recorder?.dispose?.()","Lab close discards recorded voice");
