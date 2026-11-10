@@ -715,11 +715,6 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                           self.captureRunning else { return }
                     self.stopCaptureInternal(retain: true,
                         reason: "time-limit", call: nil)
-                    // Web UI can query the take's *metadata*, never bytes.
-                    self.notifyListeners("biblozooCaptureLifecycle", data: [
-                        "kind": "time-limit",
-                        "generation": token
-                    ])
                 }
                 call.resolve(["started": true, "reason": "capturing",
                               "limitMs": self.captureLimitMs])
@@ -810,7 +805,18 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         "frameCount": count,
                         "restored": restoreOK
                     ])
-                } else if !retain {
+                } else if retain && reason == "time-limit" {
+                    // Deliver the completed take only AFTER the captureWorker
+                    // has flushed its in-flight tap buffers into RAM.
+                    self.notifyListeners("biblozooCaptureLifecycle", data: [
+                        "kind": "completed",
+                        "ready": keep,
+                        "durationMs": durationMs,
+                        "frameCount": count,
+                        "restored": restoreOK
+                    ])
+                } else if !retain &&
+                    (reason == "interrupted" || reason == "route-changed") {
                     self.notifyListeners("biblozooCaptureLifecycle", data: [
                         "kind": "interrupted",
                         "reason": reason
