@@ -33,6 +33,9 @@ final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(BibloZooAudioSessionRecoveryPlugin())
         // Branch-only explicit-tap AVAudioPlayer pilot. Never invoked automatically.
         bridge?.registerPluginInstance(BibloZooNativeSoundPlugin())
+        // N7b DEV-only explicit microphone permission and 4-second RAM-only
+        // input-level probe; never wired into Flashcards or auto-started.
+        bridge?.registerPluginInstance(BibloZooMicSessionProbePlugin())
     }
 }
 
@@ -233,6 +236,320 @@ final class BibloZooAudioSessionRecoveryPlugin: CAPPlugin, CAPBridgedPlugin {
                     "otherAudioPlayingAfter": audioSession.isOtherAudioPlaying
                 ])
             }
+        }
+    }
+}
+
+
+// N7b only: separate experimental microphone INPUT/route proof. The existing
+// NativeSound plugin remains sole PLAYBACK owner; its DEV handoff drains the
+// serial output worker before this plugin temporarily changes AVAudioSession.
+// Nothing here saves voice samples, sends audio to speakers, logs content,
+// restarts the microphone on foreground, or replaces Flashcards recording.
+// Remove DEV probe before any stable integration; session policy for N7c
+// remains subject to owner approval and real-device testing.
+@objc(BibloZooMicSessionProbePlugin)
+final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "BibloZooMicSessionProbePlugin"
+    public let jsName = "BibloZooMicSessionProbe"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "requestPermission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginProbe", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endProbe", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getProbeState", returnType: CAPPluginReturnPromise)
+    ]
+
+    private let maximumSeconds: TimeInterval = 4.0
+    private var microphoneEngine: AVAudioEngine?
+    private var savedCategory: AVAudioSession.Category?
+    private var savedMode: AVAudioSession.Mode?
+    private var savedOptions: AVAudioSession.CategoryOptions?
+    private var requestInFlight = false
+    private var generation = 0
+    private var isProbing = false
+    private var startedAt: Date?
+    private var lastPeakPercent = 0
+    private var buffersObserved = 0
+    private var lastReason = "not-started"
+    private var restorationSucceeded = true
+    private var observers: [NSObjectProtocol] = []
+
+    private func onMain(_ work: @escaping () -> Void) {
+        if Thread.isMainThread { work() }
+        else { DispatchQueue.main.async(execute: work) }
+    }
+
+    private var isDevBundle: Bool {
+        return Bundle.main.bundleIdentifier ==
+            "com.andydoane.biblozoo.audiotest"
+    }
+
+    private func permissionLabel() -> String {
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted: return "granted"
+        case .denied: return "denied"
+        case .undetermined: return "undetermined"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private func state() -> [String: Any] {
+        let session = AVAudioSession.sharedInstance()
+        return [
+            "available": isDevBundle,
+            "permission": permissionLabel(),
+            "foreground": UIApplication.shared.applicationState == .active,
+            "running": isProbing,
+            "category": session.category.rawValue,
+            "mode": session.mode.rawValue,
+            "otherAudioPlaying": session.isOtherAudioPlaying,
+            "inputPorts": session.currentRoute.inputs.map { $0.portType.rawValue },
+            "outputPorts": session.currentRoute.outputs.map { $0.portType.rawValue },
+            "peakPercent": lastPeakPercent,
+            "buffersObserved": buffersObserved,
+            "reason": lastReason,
+            "restored": restorationSucceeded
+        ]
+    }
+
+    public override func load() {
+        super.load()
+        // Real UIKit/OS interruptions MUST stop capture. Never restart in
+        // didBecomeActive, route replug, or a generic Welcome Back.
+        let center = NotificationCenter.default
+        for name in [UIApplication.willResignActiveNotification,
+                     UIApplication.didEnterBackgroundNotification,
+                     AVAudioSession.interruptionNotification,
+                     AVAudioSession.mediaServicesWereLostNotification,
+                     AVAudioSession.mediaServicesWereResetNotification] {
+            observers.append(center.addObserver(forName: name, object: nil,
+                queue: .main) { [weak self] _ in
+                    self?.stopProbe(reason: "interrupted")
+                })
+        }
+        observers.append(center.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: nil,
+            queue: .main) { [weak self] _ in
+                guard let self = self, self.isProbing else { return }
+                // Changing category at probe start can itself notify a route
+                // change; ignore only that bounded setup settling window.
+                if let started = self.startedAt,
+                   Date().timeIntervalSince(started) >= 0.5 {
+                    self.stopProbe(reason: "route-changed")
+                }
+            })
+    }
+
+    deinit {
+        for token in observers { NotificationCenter.default.removeObserver(token) }
+        if microphoneEngine != nil || savedCategory != nil {
+            stopProbe(reason: "disposed")
+        }
+    }
+
+    // The ONLY microphone-permission prompt. Called on explicit DEV button
+    // tap; reading state or opening the app NEVER requests a permission.
+    @objc func requestPermission(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["granted":false,"reason":"not-foreground-dev"])
+                return
+            }
+            guard !self.requestInFlight && !self.isProbing else {
+                call.resolve(["granted":false,"reason":"busy"])
+                return
+            }
+            self.requestInFlight = true
+            AVAudioSession.sharedInstance().requestRecordPermission {
+                [weak self] granted in
+                DispatchQueue.main.async {
+                    guard let self = self else {
+                        call.resolve(["granted":false,"reason":"unavailable"])
+                        return
+                    }
+                    self.requestInFlight = false
+                    self.lastReason = granted ? "permission-granted" :
+                                                "permission-denied"
+                    call.resolve(["granted":granted,
+                                  "reason":self.lastReason,
+                                  "permission":self.permissionLabel()])
+                }
+            }
+        }
+    }
+
+    // Native session/probe starts ONLY on the second explicit DEV tap,
+    // after permission already granted AND the output worker's stop barrier
+    // has acknowledged. Never run at app launch or from visibility return.
+    // Dev candidate: playAndRecord + measurement + speaker default. A future
+    // production session/route configuration is NOT approved by this pilot.
+    @objc func beginProbe(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["started":false,"reason":"not-foreground-dev"])
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            guard self.permissionLabel() == "granted" else {
+                call.resolve(["started":false,"reason":"permission-required"])
+                return
+            }
+            guard !self.isProbing && self.savedCategory == nil &&
+                  !self.requestInFlight else {
+                call.resolve(["started":false,"reason":"busy"])
+                return
+            }
+            guard session.category == .soloAmbient else {
+                call.resolve(["started":false,"reason":"category-not-soloambient"])
+                return
+            }
+            // In particular, DON'T take priority from YouTube PiP still
+            // playing. The owner can test paused PiP / an idle foreground.
+            guard !session.isOtherAudioPlaying else {
+                call.resolve(["started":false,"reason":"other-audio-playing"])
+                return
+            }
+            self.savedCategory = session.category
+            self.savedMode = session.mode
+            self.savedOptions = session.categoryOptions
+            self.restorationSucceeded = false
+            self.generation += 1
+            let token = self.generation
+            self.lastPeakPercent = 0
+            self.buffersObserved = 0
+            self.startedAt = Date()
+            do {
+                try session.setCategory(.playAndRecord, mode: .measurement,
+                                        options: [.defaultToSpeaker])
+                try session.setActive(true)
+
+                let engine = AVAudioEngine()
+                let input = engine.inputNode
+                let format = input.outputFormat(forBus: 0)
+                guard format.sampleRate >= 8000,
+                      format.channelCount > 0,
+                      format.commonFormat == .pcmFormatFloat32 else {
+                    self.stopProbe(reason: "unsupported-input-format")
+                    call.resolve(["started":false,
+                                  "reason":"unsupported-input-format"])
+                    return
+                }
+                // Input tap ONLY. No audio is connected to output; no
+                // recording file, Blob, persistent buffer, upload or replay.
+                input.installTap(onBus: 0, bufferSize: 1024,
+                                 format: format) { [weak self] buffer, _ in
+                    guard let channels = buffer.floatChannelData else { return }
+                    let length = Int(buffer.frameLength)
+                    if length == 0 { return }
+                    let channelCount = min(2, Int(buffer.format.channelCount))
+                    var total: Double = 0
+                    var count = 0
+                    for channel in 0..<channelCount {
+                        var frame = 0
+                        while frame < length {
+                            let sample = Double(channels[channel][frame])
+                            total += sample * sample
+                            count += 1
+                            frame += 16
+                        }
+                    }
+                    let rms = sqrt(total / Double(max(1,count)))
+                    let db = 20 * log10(max(rms, 0.00001))
+                    let percent = max(0, min(100, Int((db + 55) * 100 / 55)))
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self, self.generation == token,
+                              self.isProbing else { return }
+                        self.buffersObserved += 1
+                        self.lastPeakPercent = max(self.lastPeakPercent, percent)
+                    }
+                }
+                self.microphoneEngine = engine
+                try engine.start()
+                self.isProbing = true
+                self.lastReason = "sampling-level-only"
+                self.startedAt = Date()
+                DispatchQueue.main.asyncAfter(deadline: .now() +
+                    self.maximumSeconds) { [weak self] in
+                        guard let self = self, self.generation == token,
+                              self.isProbing else { return }
+                        self.stopProbe(reason: "time-limit")
+                    }
+                call.resolve(["started":true,"reason":"sampling-level-only",
+                              "maximumSeconds":Int(self.maximumSeconds),
+                              "category":session.category.rawValue])
+            } catch {
+                self.stopProbe(reason: "setup-failed")
+                call.resolve(["started":false,"reason":"setup-failed"])
+            }
+        }
+    }
+
+    // Stop and restore earlier category/mode/options without re-activating
+    // the output session. Games regain it ONLY through a later real tap.
+    // The shared output-plugin DEV handoff already invalidated its bank.
+    private func stopProbe(reason: String) {
+        guard microphoneEngine != nil || savedCategory != nil else { return }
+        generation += 1
+        isProbing = false
+        if let engine = microphoneEngine {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
+        microphoneEngine = nil
+        let category = savedCategory
+        let mode = savedMode
+        let options = savedOptions
+        savedCategory = nil
+        savedMode = nil
+        savedOptions = nil
+        startedAt = nil
+        let session = AVAudioSession.sharedInstance()
+        var deactivated = true
+        do {
+            try session.setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch {
+            deactivated = false
+        }
+        var categoryRestored = false
+        if let category = category, let mode = mode, let options = options {
+            do {
+                try session.setCategory(category, mode: mode, options: options)
+                categoryRestored = session.category == category &&
+                                   session.mode == mode
+            } catch {
+                categoryRestored = false
+            }
+        }
+        restorationSucceeded = deactivated && categoryRestored
+        lastReason = restorationSucceeded ? reason : "restore-failed"
+    }
+
+    @objc func endProbe(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["stopped":false,"reason":"unavailable"])
+                return
+            }
+            let wasRunning = self.microphoneEngine != nil ||
+                             self.savedCategory != nil
+            self.stopProbe(reason: "stopped-by-user")
+            call.resolve(["stopped":wasRunning,
+                          "reason":self.lastReason,
+                          "restored":self.restorationSucceeded])
+        }
+    }
+
+    // Purely read-only status; never grants permission, requests capture,
+    // sets the category, resumes the mic or activates audio.
+    @objc func getProbeState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["available":false])
+                return
+            }
+            call.resolve(self.state())
         }
     }
 }
