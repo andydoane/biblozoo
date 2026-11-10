@@ -21,6 +21,8 @@ Original Web source `flashcards/audio-effects.js` defines these ten official Wac
 | Chorus Alien | +3 semitones, 0.98×, ~14ms chorus delay | Multiple bright almost-simultaneous swirling voices |
 | Cave | original pitch/speed, long hall reverb | Natural speaking voice with roomy reflections and trailing echo |
 
+**One-use heard-start gate:** N7e also installs a bounded, output-only native mixer observation **only while Wacky plays**. When actual **nonzero processed PCM** reaches the mixer, Swift emits a single `biblozooCapturePlayback(kind:started,takeId,playToken)` boolean/token event; only then can the child-facing Wacky button be consumed. `playCapture.started:true` is merely an accepted engine request, never proof of DSP output, and a mixer event is still not proof a physical speaker was audible. Source completion remains the distinct `.dataPlayedBack` event. The output tap is removed on stop/exit/interruption; **no raw sample is sent over Capacitor**.
+
 **Sound parity caveat:** The original browser renders through SoundTouch plus browser-specific DSP; native processing uses Apple's own DSP units. Numerical rates/target contour and broad character are matched, but effect algorithms (especially choir/chorus and reverb) will not be byte- or sound-identical. Physical owner listening is the acceptance gate; if one is unconvincing, please name that effect rather than approving all ten at once. Both source/browser and current audio effect references must remain unchanged.
 
 ## Fastest physical iPhone test: Wacky Lab (no normal Flashcards flow)
