@@ -58,6 +58,10 @@ jobs:
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7g integrated Read media lifecycle, stale events and RAM-only Flashcards contracts
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_n7g_integrated_audio_lifecycle.js
+
       - name: Validate N7f.2 immediate Read task-switch freeze and 6-waveform DEV tone auditions
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7f2_read_pause_waveform_lab.js

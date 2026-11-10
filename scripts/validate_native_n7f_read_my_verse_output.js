@@ -104,8 +104,12 @@ has(js,"root.Capacitor?.isNativePlatform?.() === true",
 has(js,'root.Capacitor?.getPlatform?.() === "ios"',
     "Only iOS Audio Test");
 has(js,"class NativeAudio {","Activity-local audio compatibility proxy");
-has(js,"this._requestId=\"rmv-\"+(++counter)",
-    "Each native clip has a unique generation-scoped request id");
+has(js,'const requestId="rmv-"+(++counter);',
+    "Each native PLAY attempt has a new token, not only each Audio object");
+has(js,'clips.set(requestId,this);',
+    "Only an actual active play is registered for native output events");
+has(js,'clips.delete(this._requestId);',
+    "Ended/stopped playback drops its JS owner to avoid long-session leaks");
 has(js,"playClip({","Actual playback uses Capacitor native bridge");
 has(js,"this._emit(\"ended\"); // native AVAudioPlayerDelegate only",
     "Only REAL native ended event can advance chunk/verse");

@@ -10,9 +10,17 @@
     root.Capacitor?.getPlatform?.() === "ios";
   if (!enabled) return;
   const api = () => root.Capacitor?.Plugins?.BibloZooNativeReadOutput;
+  // N7g: ONLY in-flight clips belong in this map. The original constructor
+  // retained every short Typewriter/Keyboard Audio forever, and stopAll()
+  // cleared the map without re-registering reusable clips on Resume.
   const clips = new Map();
   let counter = 0;
   let activation = null;
+  let lifecycleEpoch = 0;
+  function invalidateActivation() {
+    lifecycleEpoch++;
+    activation = null;
+  }
   let listenersReady = false;
   const inactiveCallbacks = new Set();
   const mkError = reason => Object.assign(
@@ -47,9 +55,9 @@
     // Registration has no mic request, audio activation or playback.
     Promise.resolve(api().addListener("biblozooReadLifecycle", event => {
       if (event?.phase !== "willResignActive") return;
-      activation = null;
-      for (const audio of clips.values()) {
-        if (!audio.paused) {
+      invalidateActivation();
+      for (const audio of [...clips.values()]) {
+        if (!audio.paused || audio._playingRequest !== null) {
           audio._stopLocal();
           audio._emit("error");
         }
@@ -72,8 +80,10 @@
     listen();
     // Only the owner calling this in a real Start/Resume interaction can
     // request .soloAmbient takeover. Animated verse timers never reactivate.
+    const epoch = ++lifecycleEpoch;
     activation = Promise.resolve(api().activateFromGesture())
-      .then(r => r?.activated === true,()=>false);
+      .then(r => epoch === lifecycleEpoch && r?.activated === true,
+        () => false);
     return activation;
   }
   function stopCues() {
@@ -81,7 +91,7 @@
     catch (_) { return Promise.resolve(); }
   }
   function stopAll() {
-    activation = null;
+    invalidateActivation();
     for (const audio of [...clips.values()]) audio._stopLocal();
     clips.clear();
     try { return Promise.resolve(api()?.stopAll?.()).catch(()=>{}); }
@@ -92,16 +102,21 @@
     if (!["order","scramble","negative"].includes(kind)) return false;
     const args={kind,index:Math.max(1,Math.min(64,Math.floor(index)||1)),
       complete:complete===true,wrong:wrong===true};
-    // No browser oscillator fallback. No microphone/user PCM crosses bridge.
-    void Promise.resolve(activation).then(ready=>{
-      if (!ready || root.document?.hidden) return;
+    const epoch = lifecycleEpoch;
+    const claimedActivation = activation;
+    // N7g: a queued cue may resolve AFTER Exit/lock/external AirPods Play.
+    // A stale gesture must never launch a new native note after revocation.
+    // No browser oscillator fallback or raw child PCM crosses this bridge.
+    void Promise.resolve(claimedActivation).then(ready=>{
+      if (!ready || epoch !== lifecycleEpoch ||
+          activation !== claimedActivation || root.document?.hidden) return;
       return Promise.resolve(api()?.playCue?.(args)).catch(()=>{});
     }).catch(()=>{});
     return true;
   }
   class NativeAudio {
     constructor(src) {
-      this.src=String(src||"");
+      this._src=String(src||"");
       this.preload="none";
       this.loop=false;
       this.muted=false;
@@ -113,10 +128,25 @@
       this._handlers=new Map();
       this._generation=0;
       this._playingRequest=null;
-      this._requestId="rmv-"+(++counter);
-      this._clipId=clipIdFor(this.src);
+      this._requestId="";
+      this._clipId=clipIdFor(this._src);
       listen();
-      clips.set(this._requestId,this);
+      // N7g: a newly allocated Audio object is not itself an active player.
+      // Register only when play() actually starts a native attempt.
+    }
+    get src() { return this._src; }
+    set src(value) {
+      const next=String(value||"");
+      if(next===this._src) return;
+      // Media src may be replaced on a reused Audio object. Retire the
+      // previous native player and validate the NEW fixed asset key; do not
+      // accidentally play the previous verse under an updated src string.
+      if(this._requestId) this.pause();
+      this._src=next;
+      this._clipId=clipIdFor(next);
+      this._position=0;
+      this.duration=NaN;
+      this.ended=false;
     }
     get currentTime() {return this._position;}
     set currentTime(value) {
@@ -124,7 +154,7 @@
       if(!Number.isFinite(target))return;
       this._position=Math.max(0,target);
       this.ended=false;
-      if(this._playingRequest) {
+      if(this._playingRequest && this._requestId) {
         try{void Promise.resolve(api()?.seekClip?.({
           requestId:this._requestId,positionMs:this._position*1000
         })).catch(()=>{});}catch(_){}
@@ -134,7 +164,7 @@
       if(name==="src") this.src=String(value||"");
     }
     removeAttribute(name) {
-      if(name==="src") {this.pause();this.src="";this._clipId="";}
+      if(name==="src") this.src="";
     }
     load() { /* Bundled native audio is loaded exclusively on a real Play. */ }
     addEventListener(name,fn,options) {
@@ -167,15 +197,22 @@
       if(event.kind==="ended") {
         this.ended=true;
         this.paused=true;
+        this._releaseCurrent();
         this._playingRequest=null;
         this._emit("ended"); // native AVAudioPlayerDelegate only
       } else if(event.kind==="interrupted") {
         this.paused=true;
+        this._releaseCurrent();
         this._playingRequest=null;
         this._emit("error"); // never a fake 'ended'
       }
     }
+    _releaseCurrent() {
+      if (this._requestId && clips.get(this._requestId) === this)
+        clips.delete(this._requestId);
+    }
     _stopLocal() {
+      this._releaseCurrent();
       this._generation++;
       this._playingRequest=null;
       this.paused=true;
@@ -197,20 +234,34 @@
         this._emit("error");
         throw mkError("needs-real-gesture");
       }
+      if (this._playingRequest !== null) return true;
+      // A replay of a naturally ENDED audio element starts from the
+      // beginning (HTMLMediaElement semantics). Keep the saved position
+      // only for Pause/Welcome Back, never seek the next play to EOF.
+      if (this.ended) this._position=0;
       const epoch=++this._generation;
+      // Fresh request ID per playback, not per Audio object. If an old
+      // ended/interrupt event arrives after Pause→Play/Welcome Back, it
+      // cannot complete the replacement clip with the same owner.
+      const requestId="rmv-"+(++counter);
+      this._requestId=requestId;
       this._playingRequest=epoch;
       this.ended=false;
+      clips.set(requestId,this);
+      const claim=activation;
       try {
-        if(await activation!==true)throw mkError("audio-session-denied");
+        if(await claim!==true || activation!==claim)
+          throw mkError("audio-session-denied");
         if(epoch!==this._generation || root.document?.hidden)
           throw mkError("stale-or-inactive");
         const started=await api().playClip({
-          requestId:this._requestId,clipId:this._clipId,
+          requestId,clipId:this._clipId,
           positionMs:Math.max(0,this._position*1000),
           volume:this.muted?0:Math.max(0,Math.min(1,this.volume))
         });
-        if(epoch!==this._generation || root.document?.hidden){
-          try{void api()?.stopClip?.({requestId:this._requestId});}catch(_){}
+        if(epoch!==this._generation || root.document?.hidden ||
+           activation!==claim){
+          try{void api()?.stopClip?.({requestId});}catch(_){}
           throw mkError("stale-or-hidden");
         }
         if(started?.started!==true)throw mkError(started?.reason);
@@ -228,6 +279,7 @@
         return true; // ACK is NOT an ended event
       } catch(err) {
         if(epoch===this._generation) {
+          this._releaseCurrent();
           this._playingRequest=null;this.paused=true;
           this._emit("error");
         }
@@ -237,9 +289,9 @@
   }
   root.document?.addEventListener?.("visibilitychange",()=>{
     if(root.document?.hidden) {
-      activation=null;
-      for(const audio of clips.values()){
-        if(!audio.paused) {
+      invalidateActivation();
+      for(const audio of [...clips.values()]){
+        if(!audio.paused || audio._playingRequest!==null) {
           audio._stopLocal();
           audio._emit("error");
         }
