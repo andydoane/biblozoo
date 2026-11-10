@@ -100,7 +100,7 @@ has(micUi,"root.BibloZooDevTools?.register?.(panel)",
   "Bottom left DEV mic overlay hidden on launch");
 has(dock,"panel.hidden = true","Both large overlays start hidden");
 has(dock,'panel.style.display = "none"',"Old panels do not occupy main screen");
-has(dock,'button.textContent = "DEV Tools"',"Compact way to reopen tools");
+has(dock,'action("DEV Tools",',"Compact way to reopen tools");
 has(dock,"root.BibloZooWackyLab?.open?.()",
   "Developer can open test lab with explicit click");
 has(lab,"root.BibloZooWackyLab=Object.freeze({open,close})",
