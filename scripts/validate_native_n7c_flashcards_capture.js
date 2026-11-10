@@ -179,7 +179,10 @@ async function main(){
   let wackyStarted=0;
   const wacky=rec.playFun("squirrel",()=>{wackyStarted++});
   await tick();
-  assert.equal(wackyStarted,1,"N7e voice effect really requests native playback");
+  assert.equal(wackyStarted,0,
+    "Bridge accepted Wacky cannot spend one-use before real mixer output");
+  e.on.playback({kind:"started",takeId:"n7c-test-take",playToken:1});
+  assert.equal(wackyStarted,1,"Post-DSP output signal unlocks once");
   e.on.playback({kind:"ended",takeId:"n7c-test-take",playToken:1});
   assert.equal(await wacky,true,
     "Native Wacky resolves on real ended-event, not bridge started");
