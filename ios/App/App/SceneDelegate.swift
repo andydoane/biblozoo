@@ -302,6 +302,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var captureLimitMs = 120000
     private var captureSampleRate = 0.0
     private var captureStartedAt: Date?
+    private var capturePreparedAt: Date?
     private var captureRestoreOK = true
 
     private func onMain(_ work: @escaping () -> Void) {
@@ -371,8 +372,14 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 // Input route loss is a real capture cancellation.
                 if self.capturePrepared || self.captureRunning {
-                    self.stopCaptureInternal(retain: false,
-                                              reason: "route-changed", call: nil)
+                    // setCategory(.playAndRecord) itself can emit an
+                    // expected route change. Do not cancel the 3-2-1
+                    // countdown merely due to our own initial handoff.
+                    if let prepared = self.capturePreparedAt,
+                       Date().timeIntervalSince(prepared) >= 0.5 {
+                        self.stopCaptureInternal(retain: false,
+                            reason: "route-changed", call: nil)
+                    }
                 }
             })
     }
@@ -634,6 +641,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                                         options: [.defaultToSpeaker])
                 try session.setActive(true)
                 self.capturePrepared = true
+                self.capturePreparedAt = Date()
                 self.captureRunning = false
                 self.lastReason = "capture-prepared"
                 call.resolve(["prepared": true, "reason": "capture-prepared"])
@@ -749,6 +757,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         captureRunning = false
         capturePrepared = false
         captureStartedAt = nil
+        capturePreparedAt = nil
         if let engine = captureEngine {
             if wasRecording { engine.inputNode.removeTap(onBus: 0) }
             engine.stop()
