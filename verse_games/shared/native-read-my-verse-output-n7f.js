@@ -14,6 +14,7 @@
   let counter = 0;
   let activation = null;
   let listenersReady = false;
+  const inactiveCallbacks = new Set();
   const mkError = reason => Object.assign(
     new Error(String(reason || "native-read-audio-failed")),
     {name:"NotAllowedError"});
@@ -41,6 +42,28 @@
       const audio = clips.get(event?.requestId);
       if (audio) audio._onNativeEvent(event);
     })).catch(()=>{ listenersReady = false; });
+    // UIApplication.willResignActive arrives at the FIRST App Switcher
+    // gesture; document.visibilitychange can arrive much later in WebKit.
+    // Registration has no mic request, audio activation or playback.
+    Promise.resolve(api().addListener("biblozooReadLifecycle", event => {
+      if (event?.phase !== "willResignActive") return;
+      activation = null;
+      for (const audio of clips.values()) {
+        if (!audio.paused) {
+          audio._stopLocal();
+          audio._emit("error");
+        }
+      }
+      for (const callback of inactiveCallbacks) {
+        try { callback(); } catch (_) { /* Don't strand another handler. */ }
+      }
+    })).catch(()=>{ listenersReady = false; });
+  }
+  function onAppInactive(callback) {
+    if (typeof callback !== "function") return () => {};
+    inactiveCallbacks.add(callback);
+    listen();
+    return () => inactiveCallbacks.delete(callback);
   }
   function activateFromGesture() {
     if (!enabled || root.document?.hidden ||
@@ -224,8 +247,11 @@
     }
   });
   root.addEventListener?.("pagehide",stopAll);
+  // Always listen for app-state changes, even during a purely visual
+  // Balloon/Fish/Typewriter/Keyboard sequence without active narration.
+  listen();
   root.BibloZooNativeReadOutputController=Object.freeze({
     enabled:true,NativeAudio,clipIdFor,activateFromGesture,
-    playCue,stopCues,stopAll
+    onAppInactive,playCue,stopCues,stopAll
   });
 })(window);
