@@ -23,6 +23,8 @@
     let playbackFailed = false;
     let playbackComplete = false;
     let playbackRequest = 0;
+    let activePlayToken = null;
+    let earlyPlaybackEvent = null;
     let captureKey = -1;
     let level = null;
     let recordingDeadline = 0;
@@ -42,6 +44,8 @@
       playbackFailed = false;
       playbackComplete = false;
       playbackRequest += 1;
+      activePlayToken = null;
+      earlyPlaybackEvent = null;
       captureKey = -1;
       level = null;
       takeMetadata = null;
@@ -185,6 +189,8 @@
     }
     function pause() {
       playbackRequest += 1;
+      activePlayToken = null;
+      earlyPlaybackEvent = null;
       if (status !== "playing" && status !== "loading") return;
       status = "ready";
       notify();
@@ -201,6 +207,8 @@
       const api = mic();
       if (typeof api?.playCapture !== "function") return false;
       const token = ++playbackRequest;
+      activePlayToken = null;
+      earlyPlaybackEvent = null;
       status = "loading";
       playbackFailed = false;
       message = "";
@@ -213,18 +221,26 @@
           catch (_) {}
           return false;
         }
-        if (reply?.started !== true) {
+        if (reply?.started !== true ||
+            !Number.isInteger(reply.playToken)) {
           status = "ready";
           playbackFailed = true;
           message = "Playback couldn't start. Tap Play to try again.";
           notify();
           return false;
         }
-        // A very short PCM take may finish before the Capacitor promise
-        // settles. Never turn already-complete playback back to playing.
+        activePlayToken = reply.playToken;
         if (status === "loading") {
           status = "playing";
           notify();
+        }
+        // A tiny take can finish before the bridge result arrives. Hold
+        // that event until we know the new playToken, and reject an old
+        // take's delayed completion from the previous Play/Stop attempt.
+        const early = earlyPlaybackEvent;
+        earlyPlaybackEvent = null;
+        if (early && early.playToken === activePlayToken) {
+          finishPlaybackEvent(early);
         }
         return true;
       } catch (_) {
@@ -241,6 +257,26 @@
     async function playFun() { return false; }
     function readLevel() {
       return status === "recording" ? level : null;
+    }
+
+    function finishPlaybackEvent(event) {
+      if (!takeMetadata?.takeId ||
+          event?.takeId !== takeMetadata.takeId ||
+          !["playing", "loading"].includes(status) ||
+          event?.playToken !== activePlayToken) return;
+      activePlayToken = null;
+      earlyPlaybackEvent = null;
+      if (event.kind === "ended") {
+        status = "ready";
+        playbackComplete = true; // real .dataPlayedBack only
+        playbackFailed = false;
+        message = "";
+      } else {
+        status = "ready";
+        playbackFailed = true;
+        message = "Playback was interrupted. Tap Play to retry.";
+      }
+      notify();
     }
 
     // Native 120-second limit and UIKit-interruption events also work when
@@ -266,18 +302,13 @@
         Promise.resolve(api.addListener("biblozooCapturePlayback", event => {
           if (!takeMetadata?.takeId ||
               event?.takeId !== takeMetadata.takeId ||
-              !["playing", "loading"].includes(status)) return;
-          if (event.kind === "ended") {
-            status = "ready";
-            playbackComplete = true; // actual .dataPlayedBack, NEVER bridge accepted
-            playbackFailed = false;
-            message = "";
-          } else {
-            status = "ready";
-            playbackFailed = true;
-            message = "Playback was interrupted. Tap Play to retry.";
+              !["playing", "loading"].includes(status) ||
+              !Number.isInteger(event.playToken)) return;
+          if (status === "loading" && activePlayToken === null) {
+            earlyPlaybackEvent = event;
+            return;
           }
-          notify();
+          finishPlaybackEvent(event);
         })).catch(()=>{});
       } catch (_) {}
     }
