@@ -31,7 +31,9 @@
     let funRequest = 0;
     let funPlayToken = null;
     let funEarlyEvent = null;
+    let funEarlyStarted = null;
     let funResolve = null;
+    let funOnStarted = null;
     let funStarted = false;
     let captureKey = -1;
     let level = null;
@@ -57,7 +59,9 @@
       funRequest += 1;
       funPlayToken = null;
       funEarlyEvent = null;
+      funEarlyStarted = null;
       funStarted = false;
+      funOnStarted = null;
       const pendingFun = funResolve;
       funResolve = null;
       pendingFun?.(false);
@@ -284,7 +288,9 @@
       funRequest += 1;
       funPlayToken = null;
       funEarlyEvent = null;
+      funEarlyStarted = null;
       funStarted = false;
+      funOnStarted = null;
       const done = funResolve;
       funResolve = null;
       status = "ready";
@@ -300,14 +306,28 @@
       if (!takeMetadata?.takeId || event?.takeId !== takeMetadata.takeId ||
           event?.playToken !== funPlayToken ||
           !["fun-loading", "fun-playing"].includes(status)) return;
-      if (event.kind === "started") return; // distinct real event, no completion
+      if (event.kind === "started") {
+        if (funStarted) return;
+        // N7e: real nonzero processed PCM reached Swift's mixer tap.
+        // A native playCapture started:true bridge ACK alone must NOT
+        // spend the original child's one-time Wacky opportunity.
+        funStarted = true;
+        const started = funOnStarted;
+        funOnStarted = null;
+        try { started?.(); } catch (_) {}
+        notify();
+        return;
+      }
+      const heard = event.kind === "ended" && funStarted;
       const done = funResolve;
       funResolve = null;
       funPlayToken = null;
       funEarlyEvent = null;
+      funEarlyStarted = null;
+      funOnStarted = null;
       status = "ready";
       notify();
-      done?.(event.kind === "ended");
+      done?.(heard);
     }
 
     function playFun(presetId, onStarted) {
@@ -319,6 +339,8 @@
       const token = ++funRequest;
       funPlayToken = null;
       funEarlyEvent = null;
+      funEarlyStarted = null;
+      funOnStarted = onStarted;
       funStarted = false;
       status = "fun-loading";
       notify();
@@ -336,25 +358,30 @@
           if (reply?.started !== true || !Number.isInteger(reply.playToken)) {
             status = "ready";
             funResolve = null;
+            funOnStarted = null;
             notify();
             resolve(false);
             return;
           }
           funPlayToken = reply.playToken;
           status = "fun-playing";
-          // "started" is the native AVAudioEngine/player ACK; actual
-          // completion still requires the exact .dataPlayedBack event.
-          // onStarted is only the original Wacky one-time entitlement gate.
-          funStarted = true;
-          try { onStarted?.(); } catch (_) {}
+          // Bridge ACK is just engine acceptance. Wait for a native
+          // mixer "started" event containing nonzero post-DSP output before
+          // invoking onStarted / consuming the child's one-time Wacky.
           notify();
-          const early = funEarlyEvent;
+          const earlyStart = funEarlyStarted;
+          funEarlyStarted = null;
+          if (earlyStart && earlyStart.playToken === funPlayToken)
+            finishFunEvent(earlyStart);
+          const earlyEnd = funEarlyEvent;
           funEarlyEvent = null;
-          if (early && early.playToken === funPlayToken) finishFunEvent(early);
+          if (earlyEnd && earlyEnd.playToken === funPlayToken)
+            finishFunEvent(earlyEnd);
         }).catch(() => {
           if (token !== funRequest) return;
           status = "ready";
           funResolve = null;
+          funOnStarted = null;
           notify();
           resolve(false);
         });
@@ -410,7 +437,8 @@
               !Number.isInteger(event.playToken)) return;
           if (status === "fun-loading" || status === "fun-playing") {
             if (status === "fun-loading" && funPlayToken === null) {
-              funEarlyEvent = event;
+              if (event.kind === "started") funEarlyStarted = event;
+              else funEarlyEvent = event;
               return;
             }
             finishFunEvent(event);
