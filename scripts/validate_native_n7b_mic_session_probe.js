@@ -61,7 +61,7 @@ expect(scene,"AVAudioSession.routeChangeNotification",
   "Actual route change eventually cancels microphone session");
 expect(scene,"self.stopProbe(reason: \"interrupted\")",
   "No mic should survive genuine interruption");
-expect(scene,"no recorded take",
+expect(scene,"recording file, Blob",
   "Swift source documents input-only ephemeral level sampling");
 assert(!/AVAudioRecorder\s*\(/.test(scene),
   "Never create an AVAudioRecorder file in N7b");
