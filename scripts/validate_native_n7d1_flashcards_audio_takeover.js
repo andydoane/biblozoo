@@ -55,7 +55,8 @@ assert(play.includes("try AVAudioSession.sharedInstance().setActive(true)") &&
 assert(route.includes("guard let self = self else { return }") &&
   route.includes("if self.isProbing,") &&
   route.includes("if self.playbackEngine != nil") &&
-  route.includes("if self.capturePrepared || self.captureRunning") &&
+  route.includes("if self.captureRunning ||") &&
+  route.includes("AVAudioSessionRouteChangeReasonKey") &&
   !route.includes("guard let self = self, self.isProbing else"),
   "AirPods route changes must reach actual Flashcards input/replay owners");
 assert(devProbe.includes("!session.isOtherAudioPlaying"),
