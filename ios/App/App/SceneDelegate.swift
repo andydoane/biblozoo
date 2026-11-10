@@ -1148,8 +1148,21 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         return players
     }
 
+    // N7f owner decision: promote Haunted Whisper and Wobbling Chorus to
+    // the existing child IDs while retaining the separately selectable DEV
+    // alternatives. No changes to the child's ten-preset random catalog.
+    private func n7fApprovedPreset(_ id: String) -> String {
+        switch id {
+        case "demon": return "demon_whisper" // owner D4
+        case "chorus_alien": return "chorus_wobble" // owner C5
+        default: return id
+        }
+    }
+
     private func n7eRate(_ preset: String) -> Float {
-        if let variant = Self.n7e1Variants[preset] { return variant.rate }
+        if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)] {
+            return variant.rate
+        }
         switch preset {
         case "squirrel": return 1.15
         case "giant": return 0.9
@@ -1163,8 +1176,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func n7eCents(_ preset: String, at time: Double,
                           duration: Double) -> Float {
-        if let variant = Self.n7e1Variants[preset] {
-            if preset == "chorus_wobble" {
+        if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)] {
+            if n7fApprovedPreset(preset) == "chorus_wobble" {
                 return variant.cents + Float(75 * sin(time * 2 * .pi * 1.8))
             }
             return variant.cents
@@ -1205,7 +1218,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private func n7eSchedulePitch(_ preset: String, unit: AVAudioUnitTimePitch,
                                   token: Int, duration: Double) {
         guard preset == "roller_coaster" || preset == "ascending" ||
-              preset == "descending" || preset == "chorus_wobble" else {
+              preset == "descending" || preset == "chorus_wobble" ||
+              preset == "chorus_alien" else {
             return
         }
         // 80ms nominal, never more than 160 queued callbacks for long takes.
@@ -1237,7 +1251,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         pitch.overlap = 8
         engine.attach(pitch)
         var effects: [AVAudioNode] = [pitch]
-        if let variant = Self.n7e1Variants[preset] {
+        if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)] {
             // Clean-first Demon presets avoid the owner-reported corrupted
             // MP3 distortion. Chorus variant volume sums are near 1.0.
             if variant.lowPassHz > 0 {
@@ -1368,7 +1382,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 // Reverb/delay tails need actual silent source frames after
                 // speech; the normal dry take is byte-for-byte unchanged.
-                let tail: Double = Self.n7e1Variants[effectId]?.tailSeconds ??
+                let tail: Double = Self.n7e1Variants[
+                    self.n7fApprovedPreset(effectId)]?.tailSeconds ??
                     (effectId == "cave" ? 3.2 :
                      effectId == "demon" ? 2.4 :
                      effectId == "chorus_alien" ? 0.2 : 0)
@@ -1421,7 +1436,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     // DEV-only chorus processing: two independent voices,
                     // same real RAM take and shared output-only session.
                     let chorusVoices: [AVAudioPlayerNode]
-                    if let variant = Self.n7e1Variants[effectId],
+                    if let variant = Self.n7e1Variants[
+                        self.n7fApprovedPreset(effectId)],
                        !variant.layerDetunes.isEmpty {
                         chorusVoices = self.n7e1WireChorusLayers(
                             variant, engine: engine, format: format)
