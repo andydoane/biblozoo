@@ -34,7 +34,7 @@ has(readPlugin,'AVAudioSession.InterruptionType.began.rawValue',
     "External audio interruption cancels native Read players");
 has(readPlugin,"case .oldDeviceUnavailable, .newDeviceAvailable,",
     "Read handles actual Bluetooth device route changes");
-has(readPlugin,"case .noSuitableRouteForCategory:",
+has(readPlugin,".noSuitableRouteForCategory:",
     "No usable route cancels native Read playback");
 has(readPlugin,"self?.cancelAll(reason: \"interrupted\")",
     "OS route/background/media reset invalidates native Read output");
