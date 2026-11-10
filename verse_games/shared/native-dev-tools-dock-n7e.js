@@ -57,6 +57,12 @@
       drawer.hidden = true;
       root.BibloZooWackyLab?.open?.();
     }));
+    // N7e.1: entirely separate owner-audition surface; original ten
+    // child effects and existing Wacky Lab stay untouched.
+    drawer.appendChild(action("Demon / Chorus Lab · 5 + 5", () => {
+      drawer.hidden = true;
+      root.BibloZooWackyLab?.openVariants?.();
+    }));
   }
   function mount() {
     if (!allowed() || !doc.body || dock) return;
