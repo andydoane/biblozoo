@@ -176,8 +176,14 @@ async function main(){
   e.on.playback({kind:"ended",takeId:"n7c-test-take",playToken:1});
   assert.equal(rec.snapshot().playbackComplete,true,
     "Only real AVAudioPlayerNode .dataPlayedBack may set completion");
-  assert.equal(await rec.playFun("squirrel",()=>{}),false,
-    "Wacky DSP remains blocked until N7e");
+  let wackyStarted=0;
+  const wacky=rec.playFun("squirrel",()=>{wackyStarted++});
+  await tick();
+  assert.equal(wackyStarted,1,"N7e voice effect really requests native playback");
+  e.on.playback({kind:"ended",takeId:"n7c-test-take",playToken:1});
+  assert.equal(await wacky,true,
+    "Native Wacky resolves on real ended-event, not bridge started");
+  assert.equal(rec.snapshot().playbackComplete,true);
   rec.dispose();
   await tick();
   assert(e.events.includes("discard"),"Dispose MUST drop native RAM take");
