@@ -1145,7 +1145,7 @@
           ${showWackyReplay
             ? wackyReplayButtonHtml()
             : nativeCaptureOnly
-              ? '<p class="flashcards-recording-note" role="status">Voice captured in memory. Playback is coming in N7d.</p>'
+              ? `<p class="flashcards-recording-note" role="status">Voice captured in memory (${Number.isInteger(audio.capturedFrames) ? audio.capturedFrames : 0} PCM frames). Playback is coming in N7d.</p>`
               : audio.hasRecording || waiting
                 ? controlButton("flashcardsPlayBtn",
                   waiting ? "record" : audio.status === "playing" ? "stop" : "play",
