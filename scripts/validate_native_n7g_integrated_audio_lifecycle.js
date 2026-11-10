@@ -67,8 +67,8 @@ has(flashPlugin,'self.playbackGeneration += 1',
     "Flashcards cancels late native playback worker");
 has(flashPlugin,'completionCallbackType: .dataPlayedBack',
     "Only native actually played-back Wacky/voice completion counts");
-has(flash,'captureKey: token',
-    "Flashcards only accepts live capture generation");
+has(flash,'event?.captureKey !== captureKey',
+    "Flashcards meter accepts only current capture generation");
 has(flash,'event?.playToken !== activePlayToken',
     "Flashcards dry replay ignores stale take completion");
 has(flash,'event?.playToken !== funPlayToken',
