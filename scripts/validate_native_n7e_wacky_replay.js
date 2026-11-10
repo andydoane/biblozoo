@@ -68,6 +68,15 @@ has(swift,"memset(samplesOut[0], 0,","Bounded downstream effect tail");
 has(swift,"totalFrames <= 12_500_000","Source PCM plus tail hard capped");
 has(swift,"completionCallbackType: .dataPlayedBack",
   "Only actual native played-back callback completes Wacky");
+has(swift,'engine.mainMixerNode.installTap(',
+  "Wacky one-use entitlement requires a real post-DSP mixer signal");
+has(swift,'"kind": "started"',"Native output render sends started token only");
+has(swift,"playbackWackyStartNotified","Render signal must be once per take");
+has(swift,"playbackEngine?.mainMixerNode.removeTap(onBus: 0)",
+  "Mixer observation must be uninstalled on Stop/end");
+has(facade,"funEarlyStarted","Early output-before-bridge handshake buffered");
+has(facade,'if (event.kind === "started") {',
+  "One-use output signal tracked");
 has(swift,"self.playbackGeneration == playToken",
   "Late dynamic pitch and end callbacks cannot resurrect output");
 has(swift,"self.ownsFlashcardsForegroundAudio = true",
@@ -172,8 +181,15 @@ async function main(){
     const call=t.calls.filter(x=>typeof x==="object").at(-1);
     assert.equal(call.presetId,id,"Each DEV button passes its EXPLICIT ID");
     assert.equal(call.takeId,"one-temporary-voice","Same one RAM take");
-    assert.equal(started,1,"One playback engine started callback per tap");
+    assert.equal(started,0,
+      "A bridge ACK is not a render signal or one-use Wacky entitlement");
     assert.equal(c.snapshot().status,"fun-playing");
+    t.listeners.biblozooCapturePlayback({
+      kind:"started",takeId:call.takeId,playToken:call.token});
+    assert.equal(started,1,"Exactly one post-DSP native mixer start signal");
+    t.listeners.biblozooCapturePlayback({
+      kind:"started",takeId:call.takeId,playToken:call.token});
+    assert.equal(started,1,"Repeated mixer frames cannot double-consume Wacky");
     assert.equal(c.snapshot().playbackComplete,false,
       "Testing Wacky cannot fake listened-to dry playback/grade");
     t.listeners.biblozooCapturePlayback({
