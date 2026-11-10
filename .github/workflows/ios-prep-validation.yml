@@ -58,6 +58,10 @@ jobs:
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7f Read My Verse native output and owner-selected Wacky character voices
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_n7f_read_my_verse_output.js
+
       - name: Validate N7e.1 five Demon and five independent Chorus DEV variants
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7e1_demon_chorus_variant_lab.js
