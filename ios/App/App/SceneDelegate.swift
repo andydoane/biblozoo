@@ -1065,14 +1065,23 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         case "descending":
             return Float(1000 - 2000 * min(1, max(0, time / max(0.01, duration))))
         case "roller_coaster":
-            // Original browser: 0 -> +12 -> -12 -> +10 -> -10
-            // semitones in successive 0.75-second smooth ramps, returning 0.
-            let targets: [Float] = [0, 1200, -1200, 1000, -1000, 0]
+            // Original browser repeats +12, -12, +10, -10 semitones
+            // in smooth 0.75s intervals through LONG recordings too.
+            // Cycle instead of flattening after the fourth pitch swing.
+            let targets: [Float] = [1200, -1200, 1000, -1000]
             let step = 0.75
-            let position = min(Double(targets.count - 1), max(0, time / step))
-            let index = min(targets.count - 2, Int(position))
+            let position = max(0, time / step)
+            let index = Int(position)
             let fraction = Float(position - Double(index))
-            return targets[index] + (targets[index + 1] - targets[index]) * fraction
+            let previous: Float = index == 0 ? 0 :
+                targets[(index - 1) % targets.count]
+            let next = targets[index % targets.count]
+            let result = previous + (next - previous) * fraction
+            // A complete take returns toward natural pitch at its tail.
+            if duration - time < 0.10 {
+                return result * Float(max(0, (duration - time) / 0.10))
+            }
+            return result
         default: return 0
         }
     }
@@ -1223,8 +1232,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 // PCM copy and bounded silence tail run only on the serial
                 // worker, never the WebView/main/render/audio callback.
-                memset(samplesOut[0], 0,
-                       totalFrames * MemoryLayout<Float>.size)
+                if tail > 0 {
+                    // Only atmosphere effects need extra zeroed tail frames.
+                    // Dry playback keeps N7d's original direct PCM copy.
+                    memset(samplesOut[0], 0,
+                           totalFrames * MemoryLayout<Float>.size)
+                }
                 self.savedSamples.withUnsafeBufferPointer { source in
                     guard let base = source.baseAddress else { return }
                     samplesOut[0].update(from: base, count: source.count)
