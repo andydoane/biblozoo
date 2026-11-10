@@ -1104,17 +1104,18 @@
   function renderComparison(wrap) {
     const selected = getSelectedVerse();
     const audio = recording.snapshot();
-    // N7c is native CAPTURE-only. The PCM take is real, but native replay
-    // and Wacky DSP are deliberately separate N7d/N7e acceptance gates.
-    // Never offer a Play button that cannot produce audible output.
+    // N7e: original Web Wacky remains unchanged; isolated iOS now supports
+    // ten native DSP presets after a full dry playback of the saved RAM take.
     const nativeCaptureOnly = audio.captureOnly === true &&
       audio.hasRecording && audio.playbackAvailable === false;
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
     const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
-    // N7d restores real normal Replay but Wacky DSP is deliberately N7e.
-    // Never show a WebAudio Wacky option on experimental native output.
-    const showWackyReplay = audio.nativeReplay !== true &&
+    // Browser runs its unchanged SoundTouch presets. Experimental iOS
+    // only unlocks Wacky when native AVFoundation reports support;
+    // no WebAudio fallback and no early Next/grade entitlement.
+    const showWackyReplay =
+      (audio.nativeReplay !== true || audio.nativeWacky === true) &&
       (wackyReplayPlaying ||
         (wackyReplayUnlocked && !wackyReplayConsumed));
     const comparisonInstruction = nativeCaptureOnly
@@ -1486,14 +1487,16 @@
           audio.playbackComplete &&
           !wackyReplayConsumed &&
           !wackyReplayPlaying &&
-          audio.nativeReplay !== true &&
-          window.BibloZooAudioEffects
-            ?.isSupported?.() === true
+          (audio.nativeWacky === true ||
+            (audio.nativeReplay !== true &&
+              window.BibloZooAudioEffects?.isSupported?.() === true))
         ) {
           wackyReplayUnlocked = true;
-          // Processor code loads quietly, without allocating a playback
-          // context or touching microphone permission and capture.
-          try { window.BibloZooAudioEffects.preloadSoundTouch?.(); } catch (_) {}
+          // Only the original browser path may preload SoundTouch.
+          // Native iOS output remains AVFoundation exclusively.
+          if (audio.nativeWacky !== true) {
+            try { window.BibloZooAudioEffects.preloadSoundTouch?.(); } catch (_) {}
+          }
         }
         requestRender();
       },
