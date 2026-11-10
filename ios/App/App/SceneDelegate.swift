@@ -304,6 +304,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // playback generation only. None of these store or export voice samples.
     private var playbackEffects: [AVAudioNode] = []
     private var playbackPitchWorkItems: [DispatchWorkItem] = []
+    private var playbackWackyTapInstalled = false
+    private var playbackWackyStartNotified = false
     private var captureEngine: AVAudioEngine?
     // Separate session snapshot from the N7b DEV probe. Sharing the DEV
     // savedCategory slot would let its interruption observer restore a
@@ -1272,6 +1274,46 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         self.playbackNode = player
                         self.playbackTakeId = requestedId
                         self.playbackStartedAt = Date()
+                        self.playbackWackyStartNotified = false
+                        // N7e Wacky: bridge started:true confirms engine
+                        // acceptance, NOT audible effect. One-time child
+                        // Wacky eligibility needs a render-buffer signal
+                        // from the REAL post-DSP native mixer. Only a
+                        // boolean event crosses JS, never microphone PCM.
+                        if !effectId.isEmpty {
+                            engine.mainMixerNode.installTap(
+                                onBus: 0, bufferSize: 1024,
+                                format: nil) { [weak self] audio, _ in
+                                guard audio.frameLength > 0,
+                                      let channels = audio.floatChannelData else {
+                                    return
+                                }
+                                let frames = min(512, Int(audio.frameLength))
+                                var audible = false
+                                for sample in stride(from: 0, to: frames, by: 16) {
+                                    if abs(channels[0][sample]) > 0.0001 {
+                                        audible = true
+                                        break
+                                    }
+                                }
+                                if !audible { return }
+                                DispatchQueue.main.async { [weak self] in
+                                    guard let self = self,
+                                          self.playbackGeneration == playToken,
+                                          self.playbackEngine != nil,
+                                          !self.playbackWackyStartNotified else {
+                                        return
+                                    }
+                                    self.playbackWackyStartNotified = true
+                                    self.notifyListeners("biblozooCapturePlayback", data: [
+                                        "kind": "started",
+                                        "takeId": requestedId,
+                                        "playToken": playToken
+                                    ])
+                                }
+                            }
+                            self.playbackWackyTapInstalled = true
+                        }
                         if let pitch = pitch {
                             self.n7eSchedulePitch(effectId, unit: pitch,
                                 token: playToken, duration: voiceSeconds)
@@ -1311,6 +1353,11 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         let token = playbackGeneration
         let take = playbackTakeId
         playbackGeneration += 1 // invalidate in-flight AVAudio callbacks
+        if playbackWackyTapInstalled {
+            playbackEngine?.mainMixerNode.removeTap(onBus: 0)
+            playbackWackyTapInstalled = false
+        }
+        playbackWackyStartNotified = false
         for item in playbackPitchWorkItems { item.cancel() }
         playbackPitchWorkItems.removeAll()
         playbackNode?.stop()
