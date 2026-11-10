@@ -75,8 +75,10 @@
   let resizeObserver = null;
   let recording = null;
   let recordRequest = 0;
-  let recordingNotice = "";
   let nativeMicrophonePermissionDenied = false;
+  let playbackFailureAnnounced = false;
+  let flashcardsToast = null;
+  let flashcardsToastTimer = null;
   let countdownRemaining = 0;
   let countdownTimer = null;
   let countdownFrame = null;
@@ -91,7 +93,45 @@
   let finishCountdown = null;
   let welcomeBack = null;
 
+  // Match Zoo-To-Do's top, body-level medal toast. Rendering/replacing the
+  // Flashcards slide never inserts a message into its action/grid flow.
+  function dismissFlashcardsToast() {
+    if (flashcardsToastTimer !== null) {
+      clearTimeout(flashcardsToastTimer);
+      flashcardsToastTimer = null;
+    }
+    flashcardsToast?.remove?.();
+    flashcardsToast = null;
+  }
+
+  function showFlashcardsToast(message) {
+    if (!message || document.hidden ||
+        !document.body?.appendChild || !document.createElement ||
+        api?.isActive?.() === false) return;
+    dismissFlashcardsToast();
+    const toast = document.createElement("div");
+    toast.className = "flashcards-feedback-toast";
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+    toast.setAttribute("aria-atomic", "true");
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    flashcardsToast = toast;
+    // The medal-style toast also disappears automatically without a tap.
+    flashcardsToastTimer = setTimeout(dismissFlashcardsToast, 4600);
+  }
+
+  // Capture the tap BEFORE the underlying button handler, but never
+  // preventDefault or stopPropagation. Taps still activate their buttons.
+  document.addEventListener("pointerdown", dismissFlashcardsToast, true);
+  document.addEventListener("click", dismissFlashcardsToast, true);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) dismissFlashcardsToast();
+  });
+  window.addEventListener("pagehide", dismissFlashcardsToast);
+
   function stopFlashcardAudioForReturn() {
+    dismissFlashcardsToast();
     // Only the current activity is affected. Preserve card/difficulty/grade.
     // Capturing the microphone is never resumed without a fresh Record tap.
     interruptCountdown();
@@ -186,9 +226,7 @@
     if (!finishCountdown) return;
     discardRecording();
     state.view = "recording_intro";
-    recordingNotice = IS_NATIVE_CAPACITOR
-      ? "Countdown was interrupted. Please try again."
-      : "Countdown was interrupted. Please try again or skip recording.";
+    // A visible Record button makes the interrupted countdown obvious.
     requestRender();
   }
 
@@ -271,7 +309,7 @@
     meterFrame = null;
     comparisonPlaybackStarted = false;
     recording?.dispose();
-    recordingNotice = "";
+    playbackFailureAnnounced = false;
   }
 
   async function beginWithoutRecording() {
@@ -289,7 +327,8 @@
     stopWackyPlayback();
     wackyReplayUnlocked = false;
     wackyReplayMessage = "";
-    recordingNotice = "";
+    dismissFlashcardsToast();
+    playbackFailureAnnounced = false;
     comparisonPlaybackStarted = false;
     state.grade = "";
     const request = ++recordRequest;
@@ -433,6 +472,8 @@
   }
 
   function resetSession() {
+    dismissFlashcardsToast();
+    playbackFailureAnnounced = false;
     limitRequest += 1;
     recordingLimitMs = 120000;
     discardRecording();
@@ -728,6 +769,7 @@
     if (request !== previewRequest) return;
     previewPlaying = false;
     previewMessage = completed ? "" : "Audio couldn't play. Tap Listen to try again.";
+    if (previewMessage) showFlashcardsToast(previewMessage);
     requestRender();
   }
 
@@ -763,7 +805,7 @@
               type="button" data-no-ui-sound aria-pressed="${previewPlaying}">
               ${previewPlaying ? "Stop Listening" : "Listen to the Verse"}
             </button>
-            ${previewMessage ? `<span class="flashcards-listen-message" role="status">${escapeHtml(previewMessage)}</span>` : ""}
+            <!-- Listen errors use the fixed top toast, never inline text. -->
           <h1 class="flashcards-difficulty-title">
             ${isDailyTodoSession()
               ? "How well do you know this verse?"
@@ -844,9 +886,7 @@
         <div class="flashcards-recall-actions">
           ${controlButton("flashcardsRecordStartBtn", "record",
       requesting ? "Waiting for microphone…" : "Record", requesting)}
-          ${recordingNotice ? `<p class="flashcards-recording-note" role="status">
-            ${escapeHtml(recordingNotice)}
-          </p>` : ""}
+          <!-- Interrupted capture: Record already provides the recovery action. -->
           <div class="flashcards-comparison-buttons">
             ${explaining ? `<button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
               type="button">Go Back</button>` : ""}
@@ -1028,7 +1068,8 @@
     }
 
     wackyReplayPlaying = true;
-    wackyReplayMessage = "Getting your wacky voice ready…";
+    // The existing "Wacky Replay…" button is enough preparation feedback.
+    wackyReplayMessage = "";
 
     const preset = pickWackyPreset();
     const request =
@@ -1060,6 +1101,7 @@
       // Invalidates outstanding async audio setup before it can start later.
       stopWackyPlayback();
       wackyReplayMessage = "Wacky Replay couldn't start. Tap Wacky Replay to try again.";
+      showFlashcardsToast(wackyReplayMessage);
       requestRender();
       return;
     }
@@ -1069,10 +1111,12 @@
     wackyReplayPlaying = false;
 
     const completed = outcome === "completed";
-    if (!completed) {
-      wackyReplayMessage = wackyReplayConsumed
-        ? "Wacky Replay stopped. You can still continue."
-        : "Wacky Replay couldn't start. Tap Wacky Replay to try again.";
+    if (!completed && !wackyReplayConsumed) {
+      wackyReplayMessage = "Wacky Replay couldn't start. Tap Wacky Replay to try again.";
+      showFlashcardsToast(wackyReplayMessage);
+    } else {
+      // Stopped Wacky with Next visible requires no redundant banner.
+      wackyReplayMessage = "";
     }
 
     requestRender();
@@ -1110,7 +1154,11 @@
       audio.hasRecording && audio.playbackAvailable === false;
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
-    const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
+    // Keep the two-button layout even on native/browser playback failure.
+    const canContinueUnheard = audio.hasRecording &&
+      audio.playbackFailed && !audio.playbackComplete && !waiting;
+    const nextDisabled = waiting ||
+      (audio.hasRecording && !audio.playbackComplete && !canContinueUnheard);
     // Browser runs its unchanged SoundTouch presets. Experimental iOS
     // only unlocks Wacky when native AVFoundation reports support;
     // no WebAudio fallback and no early Next/grade entitlement.
@@ -1123,7 +1171,6 @@
       : audio.hasRecording || waiting
         ? "Listen to your recording, then compare it with the verse."
         : "Check the verse and see how you did.";
-    const message = audio.message;
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell flashcards-comparison-shell">
@@ -1145,24 +1192,19 @@
           ${showWackyReplay
             ? wackyReplayButtonHtml()
             : nativeCaptureOnly
-              ? `<p class="flashcards-recording-note" role="status">Voice captured in memory (${Number.isInteger(audio.capturedFrames) ? audio.capturedFrames : 0} PCM frames). Playback is coming in N7d.</p>`
+              ? controlButton("flashcardsPlayBtn", "play", "Playback Unavailable", true)
               : audio.hasRecording || waiting
                 ? controlButton("flashcardsPlayBtn",
                   waiting ? "record" : audio.status === "playing" ? "stop" : "play",
                   waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
                   waiting || audio.status === "loading")
               : ""}
-          ${message ? `<p class="flashcards-recording-note" role="status">${escapeHtml(message)}</p>` : ""}
-          ${wackyReplayMessage ? `<p class="flashcards-recording-note" role="status">${escapeHtml(wackyReplayMessage)}</p>` : ""}
           <div class="flashcards-comparison-buttons">
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
             <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
-              type="button" ${nextDisabled ? "disabled" : ""}>${needsVerseCheck ? "Check Verse" : "Next"}</button>
+              type="button" ${nextDisabled ? "disabled" : ""}>${canContinueUnheard ? "Continue Anyway" : needsVerseCheck ? "Check Verse" : "Next"}</button>
           </div>
-          ${audio.playbackFailed && !audio.playbackComplete && !waiting ? `<button
-            class="flashcards-secondary-btn" id="flashcardsContinueUnheardBtn"
-            type="button">Continue Without Listening</button>` : ""}
         </div>
       </div>
     `;
@@ -1184,17 +1226,21 @@
     }
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
-    const continueUnheard = wrap.querySelector("#flashcardsContinueUnheardBtn");
-    if (continueUnheard) continueUnheard.onclick = () => {
-      if (!recording.snapshot().playbackFailed) return;
-      recording.pause();
-      state.view = "challenge_complete";
-      requestRender();
-    };
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
       const currentAudio = recording.snapshot();
+      const continuedWithoutListening = currentAudio.hasRecording &&
+        currentAudio.playbackFailed && !currentAudio.playbackComplete;
       if (["requesting", "preparing"].includes(currentAudio.status) ||
-        (currentAudio.hasRecording && !currentAudio.playbackComplete)) return;
+        (currentAudio.hasRecording && !currentAudio.playbackComplete &&
+          !continuedWithoutListening)) return;
+      if (continuedWithoutListening) {
+        // Historical escape remains available only after a REAL failure:
+        // do not fake heard playback, Wacky eligibility or extra rewards.
+        recording.pause();
+        state.view = "challenge_complete";
+        requestRender();
+        return;
+      }
       if (needsVerseCheck) {
         comparisonPlaybackStarted = true;
         requestRender();
@@ -1475,6 +1521,17 @@
         const audio =
           recording?.snapshot();
 
+        // Show actionable errors once per attempt. If Play is visible
+        // after interruption, an extra "interrupted" notice is redundant.
+        if (!audio?.playbackFailed) {
+          playbackFailureAnnounced = false;
+        } else if (!playbackFailureAnnounced) {
+          playbackFailureAnnounced = true;
+          if (audio.message &&
+              !/playback was interrupted/i.test(audio.message))
+            showFlashcardsToast(audio.message);
+        }
+
         if (state.view === "comparison" &&
           ["requesting", "preparing"].includes(audio?.status) &&
           showRerecordWaiting()) return;
@@ -1504,9 +1561,7 @@
         recordRequest += 1;
         cancelCountdown();
         if (!getSelectedVerse()) return;
-        recordingNotice = IS_NATIVE_CAPACITOR
-          ? "Recording was interrupted. Please try again."
-          : "Recording was interrupted. Please try again or skip recording.";
+        // Return to Record; the recovery action is self-explanatory.
         state.view = "recording_intro";
         requestRender();
       }
