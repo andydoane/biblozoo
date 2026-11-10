@@ -301,6 +301,7 @@
   let animationTimer = 0;
   let wordFeedbackTimer = 0;
   let typewriterIntroTimer = 0;
+  let typewriterIntroTask = null;
   let typewriterIntroWrap = null;
   let chunkGlowFadeTimer = 0;
   let lastKeySoundIndex = -1;
@@ -1819,6 +1820,12 @@
   function pauseReadForInterruption() {
     if (!state.verseId || state.phase === "idle" || completionReported) return false;
     if (readAudioRecovery) {
+      // Repeated native/background events must NEVER unfreeze a typing intro
+      // or a CSS scene that is already awaiting a real Resume Audio tap.
+      if (root?.BibloZooNativeReadOutputController?.enabled &&
+          isTypingActivity(state.activityId)) freezeReadTypingIntro();
+      if (readAudioRecovery.kind === "animated")
+        freezeReadScene(readAudioRecovery.scene);
       // Another background event invalidates a pending Resume Audio attempt.
       if (root?.document?.hidden) {
         readAudioRecoveryGeneration += 1;
@@ -1853,16 +1860,20 @@
       recovery = { kind: "chunk" };
     }
     if (!recovery) {
-      // Typing and word activities need acknowledgement, not an invented
-      // audio replay or a new game pause state. Keep the existing intro policy.
-      if (isTypingActivity(state.activityId) && state.typewriterIntroPhase !== "done") {
-        finishTypewriterIntro();
-      }
+      // Web/PWA/Android retains its original typing-intro return behavior.
+      // Only the native Audio Test gets exact intro timeline freeze/resume.
+      if (!root?.BibloZooNativeReadOutputController?.enabled &&
+          isTypingActivity(state.activityId) &&
+          state.typewriterIntroPhase !== "done") finishTypewriterIntro();
       recovery = { kind: "ack" };
     }
     recovery.startedAt = Date.now();
     recovery.error = "";
     readAudioRecovery = recovery;
+    // Freeze BOTH short Typewriter/Keyboard intro timers AND cursor CSS.
+    // These must not finish while the held App Switcher is on screen.
+    if (root?.BibloZooNativeReadOutputController?.enabled &&
+        isTypingActivity(state.activityId)) freezeReadTypingIntro();
     readAudioRecoveryGeneration += 1;
     readAudioRecoveryAttempt = null;
     if (recovery.kind === "animated") {
@@ -2020,6 +2031,7 @@
         readAudioRecoveryAttempt = null;
         readAudioRecovery = null;
         thawReadPauseTimer();
+        thawReadTypingIntro();
         syncReadAudioOverlay();
         return true;
       }
@@ -2035,6 +2047,7 @@
         }
         readAudioRecovery = null;
         thawReadPauseTimer();
+        thawReadTypingIntro();
         syncReadAudioOverlay();
       });
       return true;
@@ -2108,6 +2121,7 @@
       readAudioRecovery = null;
       thawReadPauseTimer();
       if (kind === "animated") thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
+      thawReadTypingIntro();
       syncReadAudioOverlay();
       const delayedFinish = readDeferredNarrationFinish;
       readDeferredNarrationFinish = null;
@@ -2127,6 +2141,15 @@
   });
   root?.addEventListener?.("pagehide", pauseReadForInterruption);
   root?.addEventListener?.("pageshow", restorePausedReadSceneOnReturn);
+  // N7f.2: UIApplication.willResignActive precedes WebKit visibilitychange
+  // while the owner HOLDS the multitask/app switcher. Native freezes the
+  // presented layer instantly; this callback freezes the READ scene,
+  // intro timers and pending score clocks until a real Welcome Back tap.
+  root?.BibloZooNativeReadOutputController?.onAppInactive?.(
+    () => {
+      if (appApi?.isActive?.() === false) return;
+      pauseReadForInterruption();
+    });
 
   function stopAudio() {
     if (root?.BibloZooNativeReadOutputController?.enabled) void root.BibloZooNativeReadOutputController.stopAll();
@@ -2180,6 +2203,7 @@
     clearTimeout(wordFeedbackTimer);
     clearTimeout(typewriterIntroTimer);
     typewriterIntroTimer = 0;
+    typewriterIntroTask = null;
     typewriterIntroWrap = null;
     pauseTimer = 0;
     animationTimer = 0;
@@ -5496,11 +5520,60 @@
       `<span class="read-typewriter-intro-untyped">${escapeHtml(tail.slice(tailCount))}</span></span>`;
   }
 
+  // Short typewriter/keyboard cutscene steps used to run on bare timeouts.
+  // Keep the SAME callback and remaining milliseconds across a held switch.
+  // Only the already-existing Resume Audio action can re-arm them.
+  function scheduleTypewriterIntroStep(callback, milliseconds) {
+    clearTimeout(typewriterIntroTimer);
+    const task = { callback, remaining: Math.max(0, milliseconds),
+      startedAt: 0, id: 0 };
+    task.arm = () => {
+      if (readAudioRecovery || root?.document?.hidden) return;
+      task.startedAt = Date.now();
+      task.id = setTimeout(() => {
+        task.id = 0;
+        typewriterIntroTimer = 0;
+        if (typewriterIntroTask !== task) return;
+        if (readAudioRecovery || root?.document?.hidden) {
+          task.remaining = 0;
+          return;
+        }
+        typewriterIntroTask = null;
+        callback();
+      }, task.remaining);
+      typewriterIntroTimer = task.id;
+    };
+    typewriterIntroTask = task;
+    task.arm();
+  }
+
+  function freezeReadTypingIntro() {
+    const wrap = typewriterIntroWrap || root?.document?.querySelector?.(
+      ".read-typewriter-screen, .read-keyboard-screen");
+    wrap?.classList?.add?.("read-audio-paused");
+    const task = typewriterIntroTask;
+    if (!task?.id) return;
+    clearTimeout(task.id);
+    task.id = 0;
+    typewriterIntroTimer = 0;
+    task.remaining = Math.max(0,
+      task.remaining - (Date.now() - task.startedAt));
+  }
+
+  function thawReadTypingIntro() {
+    const wrap = typewriterIntroWrap || root?.document?.querySelector?.(
+      ".read-typewriter-screen, .read-keyboard-screen");
+    wrap?.classList?.remove?.("read-audio-paused");
+    if (typewriterIntroTask && !typewriterIntroTask.id)
+      typewriterIntroTask.arm();
+  }
+
   // Both typing activities share the cutscene timing, but retain their own
   // fitted verse, fonts, audio effects, and original tap-to-reveal gameplay.
   function finishTypewriterIntro() {
     clearTimeout(typewriterIntroTimer);
     typewriterIntroTimer = 0;
+    typewriterIntroTask = null;
     if (state.typewriterIntroPhase === "done") return;
     state.typewriterIntroPhase = "done";
     typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")?.remove();
@@ -5515,7 +5588,7 @@
     state.typewriterIntroPhase = "fading";
     typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")
       ?.classList.add("is-fading");
-    typewriterIntroTimer = setTimeout(
+    scheduleTypewriterIntroStep(
       finishTypewriterIntro,
       state.reducedMotion ? 0 : TYPEWRITER_INTRO_FADE_MS
     );
@@ -5528,7 +5601,7 @@
     state.typewriterIntroStarted = true;
 
     if (state.typewriterIntroPhase === "hold") {
-      typewriterIntroTimer = setTimeout(
+      scheduleTypewriterIntroStep(
         fadeTypewriterIntro, TYPEWRITER_INTRO_HOLD_MS);
       return;
     }
@@ -5545,13 +5618,13 @@
 
       if (state.typewriterIntroCount >= TYPEWRITER_INTRO_TEXT.length) {
         state.typewriterIntroPhase = "hold";
-        typewriterIntroTimer = setTimeout(
+        scheduleTypewriterIntroStep(
           fadeTypewriterIntro, TYPEWRITER_INTRO_HOLD_MS);
       } else {
-        typewriterIntroTimer = setTimeout(typeNext, TYPEWRITER_INTRO_KEY_MS);
+        scheduleTypewriterIntroStep(typeNext, TYPEWRITER_INTRO_KEY_MS);
       }
     };
-    typewriterIntroTimer = setTimeout(typeNext, TYPEWRITER_INTRO_KEY_MS);
+    scheduleTypewriterIntroStep(typeNext, TYPEWRITER_INTRO_KEY_MS);
   }
 
   function scheduleTypewriterIntro(wrap) {

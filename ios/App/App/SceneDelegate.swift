@@ -1,9 +1,36 @@
 import UIKit
 import Capacitor
 import AVFAudio
+import QuartzCore
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    // N7f.2: freeze the presented iOS view the INSTANT the scene loses
+    // foreground activity, even if WKWebView delays document.visibilitychange
+    // while the user holds the App Switcher. This is a visual pause only.
+    private var switcherPausedLayerTime: CFTimeInterval?
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        guard Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest",
+              switcherPausedLayerTime == nil,
+              let layer = window?.rootViewController?.view.layer else { return }
+        let clock = layer.convertTime(CACurrentMediaTime(), from: nil)
+        switcherPausedLayerTime = clock
+        layer.speed = 0
+        layer.timeOffset = clock
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        guard let paused = switcherPausedLayerTime,
+              let layer = window?.rootViewController?.view.layer else { return }
+        layer.speed = 1
+        layer.timeOffset = 0
+        layer.beginTime = 0
+        layer.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil) - paused
+        switcherPausedLayerTime = nil
+        // Read My Verse remains frozen by its own read-audio-paused class
+        // until an explicit owner Resume Audio tap verifies actual playback.
+    }
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -1622,6 +1649,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         CAPPluginMethod(name: "seekClip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopAll", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "playCue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "auditionCue", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopCues", returnType: CAPPluginReturnPromise)
     ]
     private var clips: [String: AVAudioPlayer] = [:]
@@ -1657,6 +1685,12 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                      AVAudioSession.mediaServicesWereResetNotification] {
             watches.append(center.addObserver(forName: name, object: nil,
                 queue: .main) { [weak self] _ in
+                    if name == UIApplication.willResignActiveNotification {
+                        // Native event precedes WebKit's sometimes-late
+                        // visibilitychange during the held multitask gesture.
+                        self?.notifyListeners("biblozooReadLifecycle",
+                            data: ["phase": "willResignActive"])
+                    }
                     self?.cancelAll(reason: "interrupted")
                 })
         }
@@ -1893,7 +1927,8 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     // Source-authored fixed note patterns, synthesized entirely in
     // native RAM. No user-supplied frequency, waveform, path or PCM.
     private func wavData(midi: Int, seconds: Double, gain: Double,
-                         square: Bool = false) -> Data {
+                         square: Bool = false,
+                         waveform: String = "current") -> Data {
         let rate = 44_100
         let count = min(22_050, max(512, Int(Double(rate) * seconds)))
         var data = Data()
@@ -1917,13 +1952,41 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         for index in 0..<count {
             let t = Double(index) / Double(rate)
             let phase = (t * hz).truncatingRemainder(dividingBy: 1)
-            let wave: Double = square ? (phase < 0.5 ? 1 : -1) :
-                (4 * abs(phase - 0.5) - 1)
+            let triangle = 4 * abs(phase - 0.5) - 1
+            let sine = sin(2 * Double.pi * phase)
+            let wave: Double
+            switch waveform {
+            case "sine":
+                wave = sine
+            case "soft-square":
+                // Rounded harmonics avoid the hard edges of a full square.
+                wave = 0.78 * sine + 0.22 * sin(3 * 2 * Double.pi * phase)
+            case "sawtooth":
+                wave = 2 * phase - 1
+            case "warm":
+                wave = 0.55 * triangle + 0.45 * sine
+            default:
+                // "current" is byte-for-byte the same triangle or square
+                // chosen by the existing child playCue() call.
+                wave = square ? (phase < 0.5 ? 1 : -1) : triangle
+            }
             let attack = min(1, Double(index) / (0.018 * Double(rate)))
             let release = min(1, Double(count - index) /
                               (0.04 * Double(rate)))
+            let envelope: Double
+            if waveform == "web-triangle" {
+                // The original WEB oscillator has an exponential decay
+                // after a 20ms attack. Compare WITHOUT promoting it yet.
+                let rise = min(1, t / 0.02)
+                let decayed = pow(0.0001,
+                    max(0, t - 0.02) / max(0.01, seconds - 0.02))
+                envelope = rise * decayed
+            } else {
+                envelope = max(0, min(attack, release))
+            }
             let sample = max(-1, min(1,
-                wave * gain * max(0, min(attack, release))))
+                (waveform == "web-triangle" ? triangle : wave)
+                * gain * envelope))
             word(UInt16(bitPattern: Int16(sample * 32767)))
         }
         return data
@@ -1987,6 +2050,68 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             }
             call.resolve(["played": scheduled == notes.count,
                           "noteCount": scheduled])
+        }
+    }
+    // N7f.2: audition ONLY. An explicit DEV Tools sample tap activates
+    // the same nonmixing output session; it NEVER replaces child playCue()
+    // and never captures, writes or bridges a voice recording.
+    @objc func auditionCue(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active,
+                  AVAudioSession.sharedInstance().category == .soloAmbient,
+                  let sample = call.getString("sample"),
+                  ["scramble-word", "scramble-finish", "order-finish"]
+                    .contains(sample),
+                  let waveform = call.getString("waveform"),
+                  ["current", "web-triangle", "sine", "soft-square",
+                   "sawtooth", "warm"].contains(waveform) else {
+                call.resolve(["played": false, "reason": "dev-only-or-invalid"])
+                return
+            }
+            do {
+                // The lab only starts audio on a fresh button tap.
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                call.resolve(["played": false, "reason": "os-denied"])
+                return
+            }
+            // Fixed deterministic notes let the owner compare TIMBRE using
+            // the same exact pitches, volumes and delays for every choice.
+            let base = 67 // fourth note of the existing six-note scale
+            let notes: [(Int, Double)]
+            let duration: Double
+            if sample == "scramble-word" {
+                notes = [(base, 0), (base + 4, 0.1)]
+                duration = 0.17
+            } else if sample == "scramble-finish" {
+                notes = [(base, 0), (base + 4, 0.09),
+                         (base + 7, 0.19), (base + 12, 0.3)]
+                duration = 0.2
+            } else {
+                notes = [(base, 0), (base + 4, 0.09),
+                         (base + 7, 0.18), (base + 12, 0.27)]
+                duration = 0.17
+            }
+            // Another sample tap replaces (not layers with) the old
+            // audition. The child-facing playCue() behavior is untouched.
+            self.cues.forEach { $0.stop() }
+            self.cues.removeAll()
+            var count = 0
+            for (midi, delay) in notes {
+                guard let player = try? AVAudioPlayer(
+                    data: self.wavData(midi: midi, seconds: duration,
+                                       gain: 0.22, square: false,
+                                       waveform: waveform)) else { continue }
+                player.delegate = self
+                player.prepareToPlay()
+                if player.play(atTime: player.deviceCurrentTime + delay) {
+                    self.cues.append(player)
+                    count += 1
+                }
+            }
+            call.resolve(["played": count == notes.count,
+                          "noteCount": count])
         }
     }
     @objc func stopCues(_ call: CAPPluginCall) {

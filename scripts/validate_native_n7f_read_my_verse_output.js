@@ -37,8 +37,14 @@ has(plug,'AVAudioSession.sharedInstance().category == .soloAmbient',
     "Preserve single nonmixing output session category");
 has(plug,'try AVAudioSession.sharedInstance().setActive(true)',
     "Only explicit Resume/Start can claim audio session");
-assert.equal((plug.match(/setActive\(true\)/g)||[]).length,1,
-    "No passive/timer sound priority takeover");
+assert.equal((plug.match(/setActive\(true\)/g)||[]).length,2,
+    "Only explicit child Read Start/Resume and DEV audition taps activate audio");
+const childGesture=plug.slice(plug.indexOf("    @objc func activateFromGesture("),
+  plug.indexOf("    @objc func playClip("));
+const devGesture=plug.slice(plug.indexOf("    @objc func auditionCue("),
+  plug.indexOf("    @objc func stopCues("));
+assert(childGesture.includes("setActive(true)") && devGesture.includes("setActive(true)"),
+    "Both activations are behind real explicit user gestures");
 has(plug,'AVAudioSession.InterruptionType.began.rawValue',
     "Real external OS interruption stops active tracks");
 has(plug,'UIApplication.willResignActiveNotification',
@@ -172,7 +178,9 @@ async function exerciseNative(){
   const calls=[],on={},listeners={},eventLoop={};
   let accept=true,gestureCount=0;
   const plugin={
-    addListener(name,fn){assert.equal(name,"biblozooReadOutput");
+    addListener(name,fn){
+      assert(["biblozooReadOutput","biblozooReadLifecycle"].includes(name),
+        "Only native Read media and early scene lifecycle are observed");
       listeners[name]=fn;return Promise.resolve({remove(){}});},
     activateFromGesture(){gestureCount++;calls.push({kind:"activate"});
       return Promise.resolve({activated:accept});},
@@ -200,6 +208,8 @@ async function exerciseNative(){
     Object,Math,Map,Array,RegExp,String});
   const a=win.BibloZooNativeReadOutputController;
   assert(a?.enabled,"Only native iOS installs output adapter");
+  assert(typeof listeners.biblozooReadLifecycle==="function",
+    "N7f.2 listens for UIApplication.willResignActive even while idle");
   assert.equal(calls.length,0,"Passive load cannot activate sound");
   for(const [src,id] of [
     ["./verse_audio/john_3_16a.mp3","verse:john_3_16a"],
@@ -272,6 +282,13 @@ async function exerciseNative(){
     "Background may never activate the session");
   await a.stopAll();
   assert(calls.some(c=>c.kind==="stop-all"));
+  // Held switcher doesn't depend on document.hidden changing in WebKit.
+  let inactive=0;
+  a.onAppInactive(()=>inactive++);
+  listeners.biblozooReadLifecycle({phase:"willResignActive"});
+  assert.equal(inactive,1,"Native early pause reaches an idle Read scene");
+  assert.equal(await a.activateFromGesture(),false,
+    "App switcher may never claim a fresh audio session");
   // A second nonnative browser/PWA context never installs the facade.
   const plain={document:doc,
     BibloZooNativeOnlyOutput:{enabled:false},

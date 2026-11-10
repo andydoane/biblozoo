@@ -63,6 +63,12 @@
       drawer.hidden = true;
       root.BibloZooWackyLab?.openVariants?.();
     }));
+    // N7f.2: no microphone; six alternate native timbres for two short
+    // Read My Verse cues. Choices are DEV-only and never saved.
+    drawer.appendChild(action("Read Beep Lab · 6 Waveforms", () => {
+      drawer.hidden = true;
+      root.BibloZooNativeReadCueLab?.open?.();
+    }));
   }
   function mount() {
     if (!allowed() || !doc.body || dock) return;
