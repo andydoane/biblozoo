@@ -38,7 +38,7 @@ h(swift,'effectId.isEmpty || Self.wackyPresetIds.contains(effectId) ||',
 h(swift,'(devVariant && Self.n7e1Variants[effectId] != nil)',
  "DEV alternative cannot be reached without intentional test flag");
 h(swift,'self.isDevBundle',"Only exact Audio Test bundle uses native mic plugin");
-h(swift,'if let variant = Self.n7e1Variants[preset]',
+h(swift,'if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)]',
  "Each effect is decoded into native DSP, not passed back to WebAudio");
 h(swift,"AVAudioUnitTimePitch()",
  "Pitch/time controls remain native AVFoundation");
@@ -68,7 +68,7 @@ h(swift,"for voice in playbackChorusPlayers { voice.stop() }",
  "Explicit Stop/interrupt cancels every extra voice");
 h(swift,"playbackChorusPlayers.removeAll()",
  "All voice owners released on playback end");
-h(swift,'Self.n7e1Variants[effectId]?.tailSeconds',
+h(swift,'self.n7fApprovedPreset(effectId)]?.tailSeconds',
  "Short/long effects have explicit bounded native PCM tail");
 h(swift,"totalFrames <= 12_500_000",
  "RAM source+tail remains hard capped");
