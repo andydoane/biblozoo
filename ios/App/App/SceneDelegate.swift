@@ -1660,6 +1660,23 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                     self?.cancelAll(reason: "interrupted")
                 })
         }
+        // N7d.2 parity: only genuine route loss/arrival invalidates current
+        // Read audio. Category/override/AirPods setup notices are not the
+        // same as actual device disconnect and can arrive late.
+        watches.append(center.addObserver(forName:
+            AVAudioSession.routeChangeNotification, object: nil,
+            queue: .main) { [weak self] note in
+                guard let raw = (note.userInfo?[
+                    AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue,
+                    let reason = AVAudioSession.RouteChangeReason(
+                        rawValue: raw) else { return }
+                switch reason {
+                case .oldDeviceUnavailable, .newDeviceAvailable,
+                     .noSuitableRouteForCategory:
+                    self?.cancelAll(reason: "interrupted")
+                default: break
+                }
+            })
     }
     deinit {
         watches.forEach { NotificationCenter.default.removeObserver($0) }
