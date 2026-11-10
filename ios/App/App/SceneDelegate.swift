@@ -290,6 +290,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var workerCaptureKey = -1 // captureWorker only
     private var savedCaptureKey = -1 // captureWorker only
     private var captureEngine: AVAudioEngine?
+    // Separate session snapshot from the N7b DEV probe. Sharing the DEV
+    // savedCategory slot would let its interruption observer restore a
+    // Flashcards-owned microphone session prematurely.
+    private var captureSavedCategory: AVAudioSession.Category?
+    private var captureSavedMode: AVAudioSession.Mode?
+    private var captureSavedOptions: AVAudioSession.CategoryOptions?
     private var capturePrepared = false
     private var captureRunning = false
     private var captureGeneration = 0 // main thread
@@ -598,7 +604,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             guard !self.isProbing && !self.capturePrepared &&
-                  !self.captureRunning && self.savedCategory == nil &&
+                  !self.captureRunning && self.captureSavedCategory == nil &&
                   !self.requestInFlight else {
                 call.resolve(["prepared": false, "reason": "busy"])
                 return
@@ -608,9 +614,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": "unsafe-session-state"])
                 return
             }
-            self.savedCategory = session.category
-            self.savedMode = session.mode
-            self.savedOptions = session.categoryOptions
+            self.captureSavedCategory = session.category
+            self.captureSavedMode = session.mode
+            self.captureSavedOptions = session.categoryOptions
             self.captureRestoreOK = false
             self.captureGeneration += 1
             let captureKey = self.captureGeneration
@@ -749,12 +755,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         captureEngine = nil
         let session = AVAudioSession.sharedInstance()
-        let category = savedCategory
-        let mode = savedMode
-        let options = savedOptions
-        savedCategory = nil
-        savedMode = nil
-        savedOptions = nil
+        let category = captureSavedCategory
+        let mode = captureSavedMode
+        let options = captureSavedOptions
+        captureSavedCategory = nil
+        captureSavedMode = nil
+        captureSavedOptions = nil
         var deactivated = true
         do {
             try session.setActive(false, options: [.notifyOthersOnDeactivation])
