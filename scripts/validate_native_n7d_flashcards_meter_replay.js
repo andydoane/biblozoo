@@ -40,7 +40,11 @@ has(js,"playbackAvailable: !!takeMetadata?.takeId",
 has(js,"nativeReplay: true","Comparison knows native dry playback is available");
 has(ui,'audio.nativeReplay !== true',"Original Wacky effects stay blocked until N7e");
 has(ui,"recording.readLevel()","Original Flashcards 16-bar meter reads real level");
-has(ui,"Continue Without Listening","Actual failed playback retains fair exit");
+has(ui,'"Continue Anyway"',"N7f.1 keeps a fair failure escape in the SAME Next slot");
+has(ui,'currentAudio.playbackFailed && !currentAudio.playbackComplete',
+  "Failure escape is gated to truly unplayed failed voice");
+assert(!ui.includes('flashcardsContinueUnheardBtn'),
+  "A third playback-failure button must never shift Flashcards controls");
 has(ui,"Play My Recording","Original Play UI returns in native N7d");
 for(const fn of ["playCapture","stopCapturePlayback"]) {
   has(swift,'CAPPluginMethod(name: "'+fn+'"',
