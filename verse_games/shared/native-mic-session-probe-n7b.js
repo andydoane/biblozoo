@@ -82,6 +82,9 @@
     snapshot.textContent = "Inspect to see permission and current audio route.";
     panel.appendChild(status);panel.appendChild(snapshot);
     doc.body.appendChild(panel);
+    // N7e: keep the full diagnostic controls but hide both large panels
+    // behind the compact DEV Tools drawer until explicitly reopened.
+    root.BibloZooDevTools?.register?.(panel);
 
     let busy = false;
     let listening = false;

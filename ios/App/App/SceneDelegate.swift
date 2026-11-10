@@ -300,6 +300,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var playbackGeneration = 0 // main thread
     private var playbackTakeId = ""
     private var playbackStartedAt: Date?
+    // N7e: effect nodes and bounded pitch automation for the CURRENT
+    // playback generation only. None of these store or export voice samples.
+    private var playbackEffects: [AVAudioNode] = []
+    private var playbackPitchWorkItems: [DispatchWorkItem] = []
+    private var playbackWackyTapInstalled = false
+    private var playbackWackyStartNotified = false
     private var captureEngine: AVAudioEngine?
     // Separate session snapshot from the N7b DEV probe. Sharing the DEV
     // savedCategory slot would let its interruption observer restore a
@@ -1027,6 +1033,136 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
 
+    // N7e: native-only effects use AVAudioUnitTimePitch so speed and pitch
+    // remain independent like the original SoundTouch-based browser presets.
+    // The dynamic presets get a bounded number of UI-queue pitch changes.
+    private static let wackyPresetIds: Set<String> = [
+        "squirrel", "giant", "sleepy", "rocket", "roller_coaster",
+        "ascending", "descending", "demon", "chorus_alien", "cave"
+    ]
+
+    private func n7eRate(_ preset: String) -> Float {
+        switch preset {
+        case "squirrel": return 1.15
+        case "giant": return 0.9
+        case "sleepy": return 0.55
+        case "rocket": return 1.65
+        case "demon": return 0.92
+        case "chorus_alien": return 0.98
+        default: return 1
+        }
+    }
+
+    private func n7eCents(_ preset: String, at time: Double,
+                          duration: Double) -> Float {
+        switch preset {
+        case "squirrel": return 900
+        case "giant": return -700
+        case "sleepy": return -300
+        case "rocket": return 400
+        case "demon": return -800
+        case "chorus_alien": return 300
+        case "ascending":
+            return Float(-1000 + 2000 * min(1, max(0, time / max(0.01, duration))))
+        case "descending":
+            return Float(1000 - 2000 * min(1, max(0, time / max(0.01, duration))))
+        case "roller_coaster":
+            // Original browser repeats +12, -12, +10, -10 semitones
+            // in smooth 0.75s intervals through LONG recordings too.
+            // Cycle instead of flattening after the fourth pitch swing.
+            let targets: [Float] = [1200, -1200, 1000, -1000]
+            let step = 0.75
+            let position = max(0, time / step)
+            let index = Int(position)
+            let fraction = Float(position - Double(index))
+            let previous: Float = index == 0 ? 0 :
+                targets[(index - 1) % targets.count]
+            let next = targets[index % targets.count]
+            let result = previous + (next - previous) * fraction
+            // A complete take returns toward natural pitch at its tail.
+            if duration - time < 0.10 {
+                return result * Float(max(0, (duration - time) / 0.10))
+            }
+            return result
+        default: return 0
+        }
+    }
+
+    private func n7eSchedulePitch(_ preset: String, unit: AVAudioUnitTimePitch,
+                                  token: Int, duration: Double) {
+        guard preset == "roller_coaster" || preset == "ascending" ||
+              preset == "descending" else { return }
+        // 80ms nominal, never more than 160 queued callbacks for long takes.
+        let count = min(160, max(1, Int(duration / 0.08)))
+        for step in 1...count {
+            let offset = duration * Double(step) / Double(count)
+            let cents = n7eCents(preset, at: offset, duration: duration)
+            let work = DispatchWorkItem { [weak self, weak unit] in
+                guard let self = self,
+                      self.playbackGeneration == token,
+                      self.playbackEngine != nil else { return }
+                unit?.pitch = cents
+            }
+            playbackPitchWorkItems.append(work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + offset, execute: work)
+        }
+    }
+
+    private func n7eWireEffects(_ preset: String, engine: AVAudioEngine,
+                                player: AVAudioPlayerNode,
+                                format: AVAudioFormat) -> AVAudioUnitTimePitch? {
+        guard !preset.isEmpty else {
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+            return nil
+        }
+        let pitch = AVAudioUnitTimePitch()
+        pitch.rate = n7eRate(preset)
+        pitch.pitch = n7eCents(preset, at: 0, duration: 1)
+        pitch.overlap = 8
+        engine.attach(pitch)
+        var effects: [AVAudioNode] = [pitch]
+        if preset == "demon" {
+            let eq = AVAudioUnitEQ(numberOfBands: 1)
+            let band = eq.bands[0]
+            band.filterType = .lowPass
+            band.frequency = 1500
+            band.bypass = false
+            engine.attach(eq)
+            effects.append(eq)
+            let drive = AVAudioUnitDistortion()
+            drive.loadFactoryPreset(.multiBrokenSpeaker)
+            drive.wetDryMix = 14
+            engine.attach(drive)
+            effects.append(drive)
+            let reverb = AVAudioUnitReverb()
+            reverb.loadFactoryPreset(.largeRoom)
+            reverb.wetDryMix = 52
+            engine.attach(reverb)
+            effects.append(reverb)
+        } else if preset == "chorus_alien" {
+            let chorus = AVAudioUnitDelay()
+            chorus.delayTime = 0.014
+            chorus.feedback = 0
+            chorus.wetDryMix = 34
+            engine.attach(chorus)
+            effects.append(chorus)
+        } else if preset == "cave" {
+            let reverb = AVAudioUnitReverb()
+            reverb.loadFactoryPreset(.largeHall)
+            reverb.wetDryMix = 58
+            engine.attach(reverb)
+            effects.append(reverb)
+        }
+        var previous: AVAudioNode = player
+        for effect in effects {
+            engine.connect(previous, to: effect, format: format)
+            previous = effect
+        }
+        engine.connect(previous, to: engine.mainMixerNode, format: format)
+        playbackEffects = effects
+        return pitch
+    }
+
     // N7d: only the explicit "Play My Recording" gesture may start
     // playback. ONE fresh AVAudioEngine+AVAudioPlayerNode is owned here
     // while the previously captured mono PCM stays opaque in RAM on the
@@ -1050,6 +1186,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             let requestedId = call.getString("takeId") ?? ""
+            // Empty preset means the unchanged dry recorded-voice path.
+            let effectId = call.getString("presetId") ?? ""
+            guard effectId.isEmpty || Self.wackyPresetIds.contains(effectId) else {
+                call.resolve(["started": false, "reason": "unknown-preset"])
+                return
+            }
             guard !requestedId.isEmpty else {
                 call.resolve(["started": false, "reason": "missing-take"])
                 return
@@ -1066,11 +1208,23 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                       self.savedSampleRate <= 96000,
                       let format = AVAudioFormat(
                         standardFormatWithSampleRate: self.savedSampleRate,
-                        channels: 1),
+                        channels: 1) else {
+                    DispatchQueue.main.async {
+                        call.resolve(["started": false, "reason": "take-unavailable"])
+                    }
+                    return
+                }
+                // Reverb/delay tails need actual silent source frames after
+                // speech; the normal dry take is byte-for-byte unchanged.
+                let tail: Double = effectId == "cave" ? 3.2 :
+                    effectId == "demon" ? 2.4 :
+                    effectId == "chorus_alien" ? 0.2 : 0
+                let totalFrames = self.savedSamples.count +
+                    Int(self.savedSampleRate * tail)
+                guard totalFrames <= 12_500_000,
                       let buffer = AVAudioPCMBuffer(
                         pcmFormat: format,
-                        frameCapacity: AVAudioFrameCount(
-                            self.savedSamples.count)),
+                        frameCapacity: AVAudioFrameCount(totalFrames)),
                       let samplesOut = buffer.floatChannelData else {
                     DispatchQueue.main.async {
                         call.resolve(["started": false,
@@ -1078,12 +1232,21 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     return
                 }
-                // This copy runs off the main/UI/audio-render threads.
+                // PCM copy and bounded silence tail run only on the serial
+                // worker, never the WebView/main/render/audio callback.
+                if tail > 0 {
+                    // Only atmosphere effects need extra zeroed tail frames.
+                    // Dry playback keeps N7d's original direct PCM copy.
+                    memset(samplesOut[0], 0,
+                           totalFrames * MemoryLayout<Float>.size)
+                }
                 self.savedSamples.withUnsafeBufferPointer { source in
                     guard let base = source.baseAddress else { return }
                     samplesOut[0].update(from: base, count: source.count)
                 }
-                buffer.frameLength = AVAudioFrameCount(self.savedSamples.count)
+                buffer.frameLength = AVAudioFrameCount(totalFrames)
+                let voiceSeconds = Double(self.savedSamples.count) /
+                    self.savedSampleRate / Double(self.n7eRate(effectId))
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self,
                           self.playbackGeneration == playToken,
@@ -1098,8 +1261,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     let engine = AVAudioEngine()
                     let player = AVAudioPlayerNode()
                     engine.attach(player)
-                    engine.connect(player, to: engine.mainMixerNode,
-                                   format: format)
+                    // N7e: all ten effects are generated by AVFoundation
+                    // nodes, not WebAudio. Keep nodes alive until stop/ended.
+                    let pitch = self.n7eWireEffects(effectId, engine: engine,
+                        player: player, format: format)
                     do {
                         // A deliberate Play tap, not a foreground callback.
                         // Leave the normal .soloAmbient category unchanged.
@@ -1109,6 +1274,50 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         self.playbackNode = player
                         self.playbackTakeId = requestedId
                         self.playbackStartedAt = Date()
+                        self.playbackWackyStartNotified = false
+                        // N7e Wacky: bridge started:true confirms engine
+                        // acceptance, NOT audible effect. One-time child
+                        // Wacky eligibility needs a render-buffer signal
+                        // from the REAL post-DSP native mixer. Only a
+                        // boolean event crosses JS, never microphone PCM.
+                        if !effectId.isEmpty {
+                            engine.mainMixerNode.installTap(
+                                onBus: 0, bufferSize: 1024,
+                                format: nil) { [weak self] audio, _ in
+                                guard audio.frameLength > 0,
+                                      let channels = audio.floatChannelData else {
+                                    return
+                                }
+                                let frames = min(512, Int(audio.frameLength))
+                                var audible = false
+                                for sample in stride(from: 0, to: frames, by: 16) {
+                                    if abs(channels[0][sample]) > 0.0001 {
+                                        audible = true
+                                        break
+                                    }
+                                }
+                                if !audible { return }
+                                DispatchQueue.main.async { [weak self] in
+                                    guard let self = self,
+                                          self.playbackGeneration == playToken,
+                                          self.playbackEngine != nil,
+                                          !self.playbackWackyStartNotified else {
+                                        return
+                                    }
+                                    self.playbackWackyStartNotified = true
+                                    self.notifyListeners("biblozooCapturePlayback", data: [
+                                        "kind": "started",
+                                        "takeId": requestedId,
+                                        "playToken": playToken
+                                    ])
+                                }
+                            }
+                            self.playbackWackyTapInstalled = true
+                        }
+                        if let pitch = pitch {
+                            self.n7eSchedulePitch(effectId, unit: pitch,
+                                token: playToken, duration: voiceSeconds)
+                        }
                         player.scheduleBuffer(buffer,
                             completionCallbackType: .dataPlayedBack) {
                             [weak self] _ in
@@ -1124,7 +1333,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         player.play()
                         call.resolve(["started": true,
                                       "reason": "native-playing",
-                                      "playToken": playToken])
+                                      "playToken": playToken,
+                                      "presetId": effectId])
                     } catch {
                         self.stopPlaybackInternal(reason: "start-failed",
                                                   notify: false)
@@ -1143,10 +1353,18 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         let token = playbackGeneration
         let take = playbackTakeId
         playbackGeneration += 1 // invalidate in-flight AVAudio callbacks
+        if playbackWackyTapInstalled {
+            playbackEngine?.mainMixerNode.removeTap(onBus: 0)
+            playbackWackyTapInstalled = false
+        }
+        playbackWackyStartNotified = false
+        for item in playbackPitchWorkItems { item.cancel() }
+        playbackPitchWorkItems.removeAll()
         playbackNode?.stop()
         playbackEngine?.stop()
         playbackNode = nil
         playbackEngine = nil
+        playbackEffects.removeAll()
         playbackTakeId = ""
         playbackStartedAt = nil
         // Ending a normal take or manually stopping it only stops the PCM
