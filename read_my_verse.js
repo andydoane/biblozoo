@@ -2460,7 +2460,8 @@
     if (!keySoundAudio.length && root?.Audio) {
       keySoundAudio = sources.flatMap((src) =>
         Array.from({ length: KEY_SOUND_FALLBACK_VOICES }, () => {
-          const audio = new Audio(src);
+          const audio = root?.BibloZooNativeReadOutputController?.enabled
+            ? new Audio(src) : new root.Audio(src);
           audio.preload = "auto";
           audio.setAttribute("playsinline", "");
           audio.setAttribute("webkit-playsinline", "");
@@ -2894,9 +2895,9 @@
 
     if (!negativeFeedbackAudio) {
       negativeFeedbackAudio =
-        new Audio(
-          READ_FEEDBACK_ASSETS.negative
-        );
+        root?.BibloZooNativeReadOutputController?.enabled
+          ? new Audio(READ_FEEDBACK_ASSETS.negative)
+          : new root.Audio(READ_FEEDBACK_ASSETS.negative);
       negativeFeedbackAudio.preload =
         "auto";
       negativeFeedbackAudio.setAttribute(
@@ -3629,7 +3630,8 @@
 
     try {
       activeAudio?.pause?.();
-      activeAudio = new Audio(src);
+      activeAudio = root?.BibloZooNativeReadOutputController?.enabled
+        ? new Audio(src) : new root.Audio(src);
       activeAudio.preload = "auto";
       activeAudio.setAttribute(
         "playsinline",
@@ -4066,7 +4068,9 @@
   function startCrawlMusic(reason = "unspecified", resumeAt = 0) {
     if (appApi?.isMuted?.() || !root?.Audio) return;
     try {
-      const audio = new Audio(CRAWL_MUSIC_SRC);
+      const audio = root?.BibloZooNativeReadOutputController?.enabled
+        ? new Audio(CRAWL_MUSIC_SRC)
+        : new root.Audio(CRAWL_MUSIC_SRC);
       audio.preload = "auto";
       audio.loop = false;
       audio.setAttribute?.("playsinline", "");
@@ -4131,7 +4135,9 @@
     }
     let ending;
     try {
-      ending = new Audio(CRAWL_ENDING_SRC);
+      ending = root?.BibloZooNativeReadOutputController?.enabled
+        ? new Audio(CRAWL_ENDING_SRC)
+        : new root.Audio(CRAWL_ENDING_SRC);
       ending.preload = "auto";
       ending.setAttribute?.("playsinline", "");
       ending.setAttribute?.("webkit-playsinline", "");
