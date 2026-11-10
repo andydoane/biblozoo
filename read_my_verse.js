@@ -4081,6 +4081,11 @@
       crawlMusic = music;
       audio.addEventListener?.("error", () => {
         music.failed = true;
+        // A real AirPods Play/route loss can interrupt only the theme while
+        // its animation is running. Freeze Read's own scene and require
+        // Resume Audio; an automatic next chunk must never steal priority.
+        if (root?.BibloZooNativeReadOutputController?.enabled)
+          pauseReadForInterruption();
       });
       if (resumeAt > 0) {
         const seek = () => {
