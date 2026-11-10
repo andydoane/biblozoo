@@ -235,6 +235,10 @@
         throw mkError("needs-real-gesture");
       }
       if (this._playingRequest !== null) return true;
+      // A replay of a naturally ENDED audio element starts from the
+      // beginning (HTMLMediaElement semantics). Keep the saved position
+      // only for Pause/Welcome Back, never seek the next play to EOF.
+      if (this.ended) this._position=0;
       const epoch=++this._generation;
       // Fresh request ID per playback, not per Audio object. If an old
       // ended/interrupt event arrives after Pause→Play/Welcome Back, it
