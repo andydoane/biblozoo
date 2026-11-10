@@ -194,14 +194,16 @@ async function run(){
  const two=f.lastPlay();
  assert.notEqual(two.requestId,one.requestId,
    "Replaying SAME Audio cannot reuse a completed token");
+ assert.equal(two.positionMs,0,
+   "An actually ENDED verse restarts from 0, not its previous EOF");
  f.listeners.biblozooReadOutput({
    kind:"ended",requestId:one.requestId,positionMs:1800,durationMs:1800});
  assert.equal(completed,1,
    "An old native ended event cannot complete the new playback");
  f.listeners.biblozooReadOutput({
    kind:"progress",requestId:one.requestId,positionMs:1800,durationMs:1800});
- assert.equal(audio.currentTime,1.8,
-   "Stale previous progress must not replace new native play position");
+ assert.equal(audio.currentTime,0,
+   "Stale prior progress may not seek the new playback to old EOF");
  f.listeners.biblozooReadOutput({
    kind:"ended",requestId:two.requestId,positionMs:1800,durationMs:1800});
  assert.equal(completed,2);
