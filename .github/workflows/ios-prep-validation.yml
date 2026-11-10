@@ -58,6 +58,10 @@ jobs:
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7d Flashcards real native mic levels and listened-to-take completion
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_n7d_flashcards_meter_replay.js
+
       - name: Validate N7c Flashcards native 3-2-1 capture and interrupted RAM take lifecycle
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7c_flashcards_capture.js
