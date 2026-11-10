@@ -18,6 +18,11 @@
   const ASSET_BASE =
     "./verse_images/read_my_verse/";
   const AUDIO_BASE = "./verse_audio/";
+  // N7f: shadow Audio ONLY inside this activity, never window.Audio.
+  // Browser/PWA/Android remains its original Audio constructor.
+  const NativeReadOutput = root?.BibloZooNativeReadOutputController;
+  const Audio = NativeReadOutput?.enabled
+    ? NativeReadOutput.NativeAudio : root?.Audio;
   const TYPEWRITER_ACTIVITY_ID =
     "typewriter";
   const VERSE_CRAWL_ACTIVITY_ID =
@@ -1505,7 +1510,8 @@
     readAudioStartPromise = promise;
     promise.catch((error) => {
       if (activeAudio !== audio || completionReported) return;
-      if (readNarrationBlocked(error)) pauseReadForInterruption();
+      if (NativeReadOutput?.enabled || readNarrationBlocked(error))
+        pauseReadForInterruption();
       else fallback?.();
     });
     return promise;
@@ -1987,6 +1993,9 @@
   }
 
   function resumeReadAudioFromGesture() {
+    // A user-tapped Welcome Back is the only post-interruption takeover.
+    if (NativeReadOutput?.enabled)
+      void NativeReadOutput.activateFromGesture();
     const recovery = readAudioRecovery;
     if (!recovery || readAudioRecoveryAttempt || root?.document?.hidden) return false;
     const generation = readAudioRecoveryGeneration;
@@ -2118,6 +2127,7 @@
   root?.addEventListener?.("pageshow", restorePausedReadSceneOnReturn);
 
   function stopAudio() {
+    if (NativeReadOutput?.enabled) void NativeReadOutput.stopAll();
     readAudioRecoveryGeneration += 1;
     readZooRecovery = null;
     readAudioRecovery = null;
@@ -2282,6 +2292,10 @@
     state.decorations =
       createDecorations(safeActivityId);
 
+    // Claim audio priority only on this actual Start interaction.
+    // Subsequent animated chunk timers may NEVER seize it anew.
+    if (NativeReadOutput?.enabled)
+      void NativeReadOutput.activateFromGesture();
     // Start in the launch gesture so iOS permits music playback.
     if (safeActivityId === VERSE_CRAWL_ACTIVITY_ID) {
       startCrawlMusic("activity-launch");
@@ -2444,7 +2458,7 @@
     if (!keySoundAudio.length && root?.Audio) {
       keySoundAudio = sources.flatMap((src) =>
         Array.from({ length: KEY_SOUND_FALLBACK_VOICES }, () => {
-          const audio = new root.Audio(src);
+          const audio = new Audio(src);
           audio.preload = "auto";
           audio.setAttribute("playsinline", "");
           audio.setAttribute("webkit-playsinline", "");
@@ -2615,6 +2629,7 @@
   }
 
   function stopScrambleRewards() {
+    if (NativeReadOutput?.enabled) void NativeReadOutput.stopCues();
     scrambleSoundVoices.forEach(({ oscillator, gain }) => {
       try { oscillator.onended = null; oscillator.stop(); } catch (err) { }
       try { oscillator.disconnect(); gain.disconnect(); } catch (err) { }
@@ -2631,6 +2646,10 @@
   // Notes are scheduled together, so no delayed callback can outlive a game.
   function playScrambleReward(solvedCount, complete) {
     if (appApi?.isMuted?.()) return;
+    if (NativeReadOutput?.enabled) {
+      NativeReadOutput.playCue("scramble", solvedCount, complete, false);
+      return;
+    }
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
     if (!AudioContextClass) return;
     try {
@@ -2674,6 +2693,10 @@
   // completion flourish. These voices use the same lifecycle as Scramble's.
   function playOrderTone(nextIndex, complete = false, wrong = false) {
     if (appApi?.isMuted?.()) return;
+    if (NativeReadOutput?.enabled) {
+      NativeReadOutput.playCue("order", nextIndex, complete, wrong);
+      return;
+    }
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
     if (!AudioContextClass) return;
     try {
@@ -2805,6 +2828,10 @@
   }
 
   function playGeneratedNegativeTone() {
+    if (NativeReadOutput?.enabled) {
+      NativeReadOutput.playCue("negative", 1, false, true);
+      return;
+    }
     const AudioContextClass =
       root?.AudioContext ||
       root?.webkitAudioContext;
@@ -2865,7 +2892,7 @@
 
     if (!negativeFeedbackAudio) {
       negativeFeedbackAudio =
-        new root.Audio(
+        new Audio(
           READ_FEEDBACK_ASSETS.negative
         );
       negativeFeedbackAudio.preload =
@@ -3204,7 +3231,8 @@
       activeAudio.addEventListener(
         "error",
         () => {
-          if (root?.document?.hidden) pauseReadForInterruption();
+          if (root?.document?.hidden || NativeReadOutput?.enabled)
+            pauseReadForInterruption();
           else finish();
         },
         { once: true }
@@ -3599,7 +3627,7 @@
 
     try {
       activeAudio?.pause?.();
-      activeAudio = new root.Audio(src);
+      activeAudio = new Audio(src);
       activeAudio.preload = "auto";
       activeAudio.setAttribute(
         "playsinline",
@@ -3613,7 +3641,8 @@
       activeAudio.addEventListener(
         "error",
         () => {
-          if (root?.document?.hidden) pauseReadForInterruption();
+          if (root?.document?.hidden || NativeReadOutput?.enabled)
+            pauseReadForInterruption();
           else finish();
         },
         { once: true }
@@ -4035,13 +4064,14 @@
   function startCrawlMusic(reason = "unspecified", resumeAt = 0) {
     if (appApi?.isMuted?.() || !root?.Audio) return;
     try {
-      const audio = new root.Audio(CRAWL_MUSIC_SRC);
+      const audio = new Audio(CRAWL_MUSIC_SRC);
       audio.preload = "auto";
       audio.loop = false;
       audio.setAttribute?.("playsinline", "");
       audio.setAttribute?.("webkit-playsinline", "");
       const music = { audio, context: null, gain: null,
-        engine: "html-media-direct-20j", failed: false };
+        engine: NativeReadOutput?.enabled ? "native-read-n7f" :
+          "html-media-direct-20j", failed: false };
       crawlMusic = music;
       audio.addEventListener?.("error", () => {
         music.failed = true;
@@ -4059,7 +4089,11 @@
       // play() is invoked synchronously during the launch/resume gesture.
       music.startPromise = Promise.resolve(audio.play()).then(
         () => true,
-        () => { music.failed = true; return false; });
+        () => {
+          music.failed = true;
+          if (NativeReadOutput?.enabled) pauseReadForInterruption();
+          return false;
+        });
     } catch (error) {
       stopCrawlMusic();
     }
@@ -4095,7 +4129,7 @@
     }
     let ending;
     try {
-      ending = new root.Audio(CRAWL_ENDING_SRC);
+      ending = new Audio(CRAWL_ENDING_SRC);
       ending.preload = "auto";
       ending.setAttribute?.("playsinline", "");
       ending.setAttribute?.("webkit-playsinline", "");
@@ -4108,7 +4142,10 @@
         completeCrawlIfReady(session);
       };
       ending.addEventListener?.("ended", finish, { once: true });
-      ending.addEventListener?.("error", finish, { once: true });
+      ending.addEventListener?.("error", () => {
+        if (NativeReadOutput?.enabled) pauseReadForInterruption();
+        else finish();
+      }, { once: true });
       Promise.resolve(ending.play()).then(
         () => {
           if (crawlEnding !== ending) return;
@@ -4120,9 +4157,16 @@
             }
           }, CRAWL_ENDING_OVERLAP_MS);
         },
-        () => finish());
-      // Never strand completion if WebKit omits ended/error.
-      crawlTimer(session, finish, 6500);
+        () => {
+          if (NativeReadOutput?.enabled) pauseReadForInterruption();
+          else finish();
+        });
+      // Native never gives verse completion for an elapsed watchdog alone.
+      crawlTimer(session, () => {
+        if (NativeReadOutput?.enabled && !session.endingDone)
+          pauseReadForInterruption();
+        else finish();
+      }, 6500);
     } catch (error) {
       session.endingDone = true;
       stopCrawlEnding();
