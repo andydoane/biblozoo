@@ -185,7 +185,7 @@ async function exerciseNative(){
     seekClip(args){calls.push({kind:"seek",...args});
       return Promise.resolve({seeked:true});},
     stopAll(){calls.push({kind:"stop-all"});return Promise.resolve({stopped:true});},
-    playCue(args){calls.push({kind:"cue",...args});
+    playCue(args){calls.push({operation:"cue",...args});
       return Promise.resolve({played:true});},
     stopCues(){calls.push({kind:"stop-cues"});
       return Promise.resolve({stopped:true});}
@@ -263,8 +263,10 @@ async function exerciseNative(){
   // Cue calls await the real-gesture activation promise and then cross
   // a separate Capacitor microtask queue. Yield one full event-loop turn.
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(calls.filter(c=>c.kind==="cue").length,3,
-    "All fixed authored feedback paths call native, never WebAudio");
+  assert.deepEqual(
+    calls.filter(c=>c.operation==="cue").map(c=>c.kind),
+    ["order","scramble","negative"],
+    "All three fixed authored feedback paths call native, never WebAudio");
   doc.hidden=true;on.visibilitychange();
   assert.equal(await a.activateFromGesture(),false,
     "Background may never activate the session");
