@@ -1202,7 +1202,7 @@
           <div class="flashcards-comparison-buttons">
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
               id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
-            <button class="flashcards-secondary-btn" id="flashcardsNextBtn"
+            <button class="flashcards-secondary-btn${canContinueUnheard ? " flashcards-continue-anyway" : ""}" id="flashcardsNextBtn"
               type="button" ${nextDisabled ? "disabled" : ""}>${canContinueUnheard ? "Continue Anyway" : needsVerseCheck ? "Check Verse" : "Next"}</button>
           </div>
         </div>
