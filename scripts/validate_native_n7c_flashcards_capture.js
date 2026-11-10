@@ -51,10 +51,14 @@ contains(native,"playbackAvailable: !!takeMetadata?.takeId",
 assert(!/getUserMedia\s*\(|MediaRecorder\s*\(|AudioContext\s*\(|new Audio\s*\(/.test(native),
   "No browser fallback for native mic/playback");
 contains(ui,"nativeCaptureOnly","Comparison screen must clearly label N7c");
-contains(ui,"Continue Without Listening",
-  "Child has a legitimate route through comparison without fake audio");
-contains(ui,"Playback is coming in N7d",
-  "Do not silently promise finished replay or Wacky DSP");
+contains(ui,'"Continue Anyway"',
+  "N7f.1 retains legitimate failure-only recorded-voice opt-out in Next position");
+contains(ui,"canContinueUnheard",
+  "Failed playback alone enables fair escape without fake completion");
+assert(!ui.includes("flashcardsContinueUnheardBtn"),
+  "Separate third failure button would shift original two-button layout");
+contains(ui,'controlButton("flashcardsPlayBtn", "play", "Playback Unavailable", true)',
+  "Historic N7c capture-only path must never render a fake playable button");
 contains(original,"new MediaRecorder(stream","Original WebAudio recording unchanged");
 contains(original,"new Audio(url)","Existing browser raw replay preserved");
 contains(scene,'CAPPluginMethod(name: "prepareCapture"',

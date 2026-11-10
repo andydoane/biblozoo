@@ -342,12 +342,6 @@ Patch 2: themed visual system + difficulty flow
   cursor: pointer;
 }
 
-.flashcards-listen-message {
-  display: block;
-  margin-top: 8px;
-  font-size: 1rem;
-}
-
 .flashcards-difficulty-title {
   max-width: 22ch;
   margin: var(--stage-gap) auto;
@@ -653,18 +647,6 @@ Patch 2: themed visual system + difficulty flow
   display: none;
 }
 
-.flashcards-recording-note {
-  margin: 0;
-  max-width: 42ch;
-  border-radius: 12px;
-  padding: 8px 12px;
-  background: #ffffff;
-  color: #333333;
-  font-size: 16px;
-  line-height: 1.2;
-  text-align: center;
-}
-
 .flashcards-secondary-btn {
   width: min(100%, 500px);
   min-height: 48px;
@@ -678,6 +660,14 @@ Patch 2: themed visual system + difficulty flow
   font-size: clamp(21px, 4vw, 30px);
   font-weight: 900;
   cursor: pointer;
+}
+
+/* N7f.1: a longer failure-only label must never wrap and grow the
+   Re-record/Next row on the narrowest iPhone. Same two button slots. */
+.flashcards-secondary-btn.flashcards-continue-anyway {
+  font-size: clamp(13px, 3.4vw, 21px);
+  padding-inline: 8px;
+  white-space: nowrap;
 }
 
 .flashcards-secondary-btn:active,
@@ -778,10 +768,6 @@ Patch 2: themed visual system + difficulty flow
   margin-top: 0.1em;
   font-size: clamp(5rem, min(24vw, 20vh), 10rem);
   line-height: 1;
-}
-
-.flashcards-recording-note {
-  font-weight: 800;
 }
 
 .flashcards-comparison-shell .flashcards-record-preview {
@@ -910,5 +896,59 @@ Patch 2: themed visual system + difficulty flow
   .flashcards-comparison-instruction,
   .flashcards-comparison-stage .smart-learn-text {
     transition: none;
+  }
+}
+
+
+/* N7f.1: matches Zoo-To-Do's medal toast geometry/slide/fade, but coral.
+   Body-level fixed positioning means neither the verse nor Play/Next buttons
+   ever take up/lose space when an actionable audio message appears. */
+.flashcards-feedback-toast {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 60000;
+  top: calc(16px + var(--safeT, env(safe-area-inset-top, 0px)));
+  left: 50%;
+  width: min(calc(100vw - 28px), 430px);
+  min-height: 82px;
+  padding: 16px 20px;
+  border-radius: 22px;
+  background: #ff5a51;
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+  font-family: "Baloo 2", system-ui, sans-serif;
+  font-size: clamp(17px, 4vw, 21px);
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -18px);
+  animation: flashcardsToastLife 4600ms ease forwards;
+}
+
+@keyframes flashcardsToastLife {
+  0% { opacity: 0; transform: translate(-50%, -18px); }
+  8%, 84% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+@media (max-width: 380px) {
+  .flashcards-feedback-toast {
+    width: calc(100vw - 20px);
+    padding: 12px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flashcards-feedback-toast {
+    animation: none;
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 }
