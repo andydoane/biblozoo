@@ -39,6 +39,10 @@ has(swift,"let effectId = call.getString(\"presetId\") ?? \"\"",
 has(swift,"effectId.isEmpty || Self.wackyPresetIds.contains(effectId)",
   "Unknown preset must fail closed, not silently play dry");
 has(swift,"AVAudioUnitTimePitch()","Independent native pitch/tempo");
+has(swift,"targets[(index - 1) % targets.count]",
+  "Roller Coaster must repeat moving-pitch pattern across long voices");
+has(swift,"if tail > 0 {",
+  "Previously owner-accepted dry replay cannot incur unnecessary tail processing");
 has(swift,"pitch.rate = n7eRate(preset)","Tempo maps to original source");
 has(swift,"pitch.pitch = n7eCents(preset, at: 0, duration: 1)",
   "Pitch maps to original source");
