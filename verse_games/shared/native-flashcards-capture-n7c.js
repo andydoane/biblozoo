@@ -1,7 +1,8 @@
 /* N7d: native-only Flashcards record, 16-bar level and original dry replay.
  * Original ios-prep MediaRecorder/WebAudio remain unchanged on Web/Android.
  * Voice PCM stays bounded and opaque in Swift RAM; no Web/HTML fallback.
- * Wacky DSP is a separate N7e milestone, never unlocked by a fake start.
+ * N7e routes the official ten Wacky effects through native AVFoundation,
+ * with event-scoped heard-end completion and NO WebAudio fallback.
  */
 (function installN7cFlashcardsCapture(root) {
   "use strict";
@@ -25,6 +26,13 @@
     let playbackRequest = 0;
     let activePlayToken = null;
     let earlyPlaybackEvent = null;
+    // Independent Wacky replay handshake. A stopped / stale Wacky event
+    // cannot complete normal raw playback or spend a new user-selected test.
+    let funRequest = 0;
+    let funPlayToken = null;
+    let funEarlyEvent = null;
+    let funResolve = null;
+    let funStarted = false;
     let captureKey = -1;
     let level = null;
     let recordingDeadline = 0;
@@ -46,6 +54,13 @@
       playbackRequest += 1;
       activePlayToken = null;
       earlyPlaybackEvent = null;
+      funRequest += 1;
+      funPlayToken = null;
+      funEarlyEvent = null;
+      funStarted = false;
+      const pendingFun = funResolve;
+      funResolve = null;
+      pendingFun?.(false);
       captureKey = -1;
       level = null;
       takeMetadata = null;
@@ -57,6 +72,7 @@
       // Explicitly stop any replay before deleting the RAM take; a delayed
       // playCapture callback is also invalidated by the native stop method.
       pause();
+      stopFun();
       nativeOwned = false;
       resetLocal();
       if (hadNative) {
@@ -188,6 +204,10 @@
       });
     }
     function pause() {
+      if (status === "fun-loading" || status === "fun-playing") {
+        stopFun();
+        return;
+      }
       playbackRequest += 1;
       activePlayToken = null;
       earlyPlaybackEvent = null;
@@ -201,7 +221,8 @@
     }
 
     async function play() {
-      if (!hasRecording || !takeMetadata?.takeId || doc.hidden) return false;
+      if (!hasRecording || !takeMetadata?.takeId || doc.hidden ||
+          status === "fun-loading" || status === "fun-playing") return false;
       if (status === "loading") return false;
       if (status === "playing") { pause(); return false; }
       const api = mic();
@@ -253,8 +274,92 @@
       }
     }
 
-    function stopFun() { return false; } // N7e will supply native Wacky DSP
-    async function playFun() { return false; }
+    const OFFICIAL_WACKY_IDS = new Set([
+      "squirrel","giant","sleepy","rocket","roller_coaster",
+      "ascending","descending","demon","chorus_alien","cave"
+    ]);
+
+    function stopFun() {
+      if (status !== "fun-loading" && status !== "fun-playing") return false;
+      funRequest += 1;
+      funPlayToken = null;
+      funEarlyEvent = null;
+      funStarted = false;
+      const done = funResolve;
+      funResolve = null;
+      status = "ready";
+      done?.(false);
+      notify();
+      // Stop native output also invalidates an in-flight PCM preparation.
+      try { void Promise.resolve(mic()?.stopCapturePlayback?.()).catch(()=>{}); }
+      catch (_) {}
+      return true;
+    }
+
+    function finishFunEvent(event) {
+      if (!takeMetadata?.takeId || event?.takeId !== takeMetadata.takeId ||
+          event?.playToken !== funPlayToken ||
+          !["fun-loading", "fun-playing"].includes(status)) return;
+      if (event.kind === "started") return; // distinct real event, no completion
+      const done = funResolve;
+      funResolve = null;
+      funPlayToken = null;
+      funEarlyEvent = null;
+      status = "ready";
+      notify();
+      done?.(event.kind === "ended");
+    }
+
+    function playFun(presetId, onStarted) {
+      if (!OFFICIAL_WACKY_IDS.has(presetId) ||
+          !hasRecording || !takeMetadata?.takeId || doc.hidden ||
+          status !== "ready" || typeof mic()?.playCapture !== "function") {
+        return Promise.resolve(false);
+      }
+      const token = ++funRequest;
+      funPlayToken = null;
+      funEarlyEvent = null;
+      funStarted = false;
+      status = "fun-loading";
+      notify();
+      return new Promise(resolve => {
+        funResolve = resolve;
+        Promise.resolve(mic().playCapture({
+          takeId: takeMetadata.takeId, presetId
+        })).then(reply => {
+          if (token !== funRequest || doc.hidden || status !== "fun-loading") {
+            // A stale response may otherwise sound after a new Record/Exit.
+            try { void Promise.resolve(mic()?.stopCapturePlayback?.()).catch(()=>{}); }
+            catch (_) {}
+            return;
+          }
+          if (reply?.started !== true || !Number.isInteger(reply.playToken)) {
+            status = "ready";
+            funResolve = null;
+            notify();
+            resolve(false);
+            return;
+          }
+          funPlayToken = reply.playToken;
+          status = "fun-playing";
+          // "started" is the native AVAudioEngine/player ACK; actual
+          // completion still requires the exact .dataPlayedBack event.
+          // onStarted is only the original Wacky one-time entitlement gate.
+          funStarted = true;
+          try { onStarted?.(); } catch (_) {}
+          notify();
+          const early = funEarlyEvent;
+          funEarlyEvent = null;
+          if (early && early.playToken === funPlayToken) finishFunEvent(early);
+        }).catch(() => {
+          if (token !== funRequest) return;
+          status = "ready";
+          funResolve = null;
+          notify();
+          resolve(false);
+        });
+      });
+    }
     function readLevel() {
       return status === "recording" ? level : null;
     }
@@ -302,8 +407,16 @@
         Promise.resolve(api.addListener("biblozooCapturePlayback", event => {
           if (!takeMetadata?.takeId ||
               event?.takeId !== takeMetadata.takeId ||
-              !["playing", "loading"].includes(status) ||
               !Number.isInteger(event.playToken)) return;
+          if (status === "fun-loading" || status === "fun-playing") {
+            if (status === "fun-loading" && funPlayToken === null) {
+              funEarlyEvent = event;
+              return;
+            }
+            finishFunEvent(event);
+            return;
+          }
+          if (!["playing", "loading"].includes(status)) return;
           if (status === "loading" && activePlayToken === null) {
             earlyPlaybackEvent = event;
             return;
@@ -341,6 +454,7 @@
           playbackAvailable: !!takeMetadata?.takeId,
           captureOnly: false,
           nativeReplay: true,
+          nativeWacky: true,
           capturedFrames: takeMetadata?.frameCount || 0,
           remainingSeconds: status === "recording"
             ? Math.max(0, Math.ceil((recordingDeadline - performance.now()) / 1000))
