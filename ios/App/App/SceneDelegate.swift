@@ -256,7 +256,13 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beginProbe", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endProbe", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getProbeState", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getProbeState", returnType: CAPPluginReturnPromise),
+        // N7c Flashcards capture. Opaque RAM take, never a file or JS bytes.
+        CAPPluginMethod(name: "prepareCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "finishCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "discardCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCaptureState", returnType: CAPPluginReturnPromise)
     ]
 
     private let maximumSeconds: TimeInterval = 4.0
@@ -273,6 +279,31 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var lastReason = "not-started"
     private var restorationSucceeded = true
     private var observers: [NSObjectProtocol] = []
+
+    // N7c: one bounded, temporary voice take; NEVER files, JS payloads,
+    // profile data, network or microphone monitoring. Samples and their
+    // opaque ID are owned ONLY by captureWorker, not the main/callback thread.
+    private let captureWorker = DispatchQueue(
+        label: "com.biblozoo.n7c.capture", qos: .userInitiated)
+    private var captureSamples: [Float] = [] // captureWorker only
+    private var savedSamples: [Float] = [] // captureWorker only
+    private var workerCaptureKey = -1 // captureWorker only
+    private var savedCaptureKey = -1 // captureWorker only
+    private var captureEngine: AVAudioEngine?
+    // Separate session snapshot from the N7b DEV probe. Sharing the DEV
+    // savedCategory slot would let its interruption observer restore a
+    // Flashcards-owned microphone session prematurely.
+    private var captureSavedCategory: AVAudioSession.Category?
+    private var captureSavedMode: AVAudioSession.Mode?
+    private var captureSavedOptions: AVAudioSession.CategoryOptions?
+    private var capturePrepared = false
+    private var captureRunning = false
+    private var captureGeneration = 0 // main thread
+    private var captureLimitMs = 120000
+    private var captureSampleRate = 0.0
+    private var captureStartedAt: Date?
+    private var capturePreparedAt: Date?
+    private var captureRestoreOK = true
 
     private func onMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() }
@@ -325,6 +356,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             observers.append(center.addObserver(forName: name, object: nil,
                 queue: .main) { [weak self] _ in
                     self?.stopProbe(reason: "interrupted")
+                    self?.stopCaptureInternal(retain: false,
+                                              reason: "interrupted", call: nil)
                 })
         }
         observers.append(center.addObserver(
@@ -337,6 +370,17 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                    Date().timeIntervalSince(started) >= 0.5 {
                     self.stopProbe(reason: "route-changed")
                 }
+                // Input route loss is a real capture cancellation.
+                if self.capturePrepared || self.captureRunning {
+                    // setCategory(.playAndRecord) itself can emit an
+                    // expected route change. Do not cancel the 3-2-1
+                    // countdown merely due to our own initial handoff.
+                    if let prepared = self.capturePreparedAt,
+                       Date().timeIntervalSince(prepared) >= 0.5 {
+                        self.stopCaptureInternal(retain: false,
+                            reason: "route-changed", call: nil)
+                    }
+                }
             })
     }
 
@@ -344,6 +388,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         for token in observers { NotificationCenter.default.removeObserver(token) }
         if microphoneEngine != nil || savedCategory != nil {
             stopProbe(reason: "disposed")
+        }
+        if capturePrepared || captureRunning {
+            stopCaptureInternal(retain: false, reason: "disposed", call: nil)
         }
     }
 
@@ -356,7 +403,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["granted":false,"reason":"not-foreground-dev"])
                 return
             }
-            guard !self.requestInFlight && !self.isProbing else {
+            guard !self.requestInFlight && !self.isProbing &&
+                  !self.capturePrepared && !self.captureRunning else {
                 call.resolve(["granted":false,"reason":"busy"])
                 return
             }
@@ -397,6 +445,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             guard !self.isProbing && self.savedCategory == nil &&
+                  !self.capturePrepared && !self.captureRunning &&
                   !self.requestInFlight else {
                 call.resolve(["started":false,"reason":"busy"])
                 return
@@ -541,6 +590,313 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["stopped":wasRunning,
                           "reason":self.lastReason,
                           "restored":self.restorationSucceeded])
+        }
+    }
+
+
+    // N7c captures *only* on the child's Flashcards Record gesture.
+    // Permission was requested by that gesture through requestPermission,
+    // and the output owner's devPrepareForMicrophone barrier already
+    // acknowledged stopping AVAudioEngine nodes. No input engine yet.
+    @objc func prepareCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["prepared": false, "reason": "not-foreground-dev"])
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            guard self.permissionLabel() == "granted" else {
+                call.resolve(["prepared": false, "reason": "permission-required"])
+                return
+            }
+            guard !self.isProbing && !self.capturePrepared &&
+                  !self.captureRunning && self.captureSavedCategory == nil &&
+                  !self.requestInFlight else {
+                call.resolve(["prepared": false, "reason": "busy"])
+                return
+            }
+            guard session.category == .soloAmbient,
+                  !session.isOtherAudioPlaying else {
+                call.resolve(["prepared": false, "reason": "unsafe-session-state"])
+                return
+            }
+            self.captureSavedCategory = session.category
+            self.captureSavedMode = session.mode
+            self.captureSavedOptions = session.categoryOptions
+            self.captureRestoreOK = false
+            self.captureGeneration += 1
+            let captureKey = self.captureGeneration
+            self.captureWorker.async {
+                self.workerCaptureKey = captureKey
+                self.captureSamples.removeAll(keepingCapacity: false)
+                self.savedSamples.removeAll(keepingCapacity: false)
+                self.savedCaptureKey = -1
+            }
+            do {
+                // N7b owner-tested candidate, used only for explicitly
+                // initiated Flashcards capture in the isolated Audio Test.
+                // A final production audio-session policy remains N7g-gated.
+                try session.setCategory(.playAndRecord, mode: .measurement,
+                                        options: [.defaultToSpeaker])
+                try session.setActive(true)
+                self.capturePrepared = true
+                self.capturePreparedAt = Date()
+                self.captureRunning = false
+                self.lastReason = "capture-prepared"
+                call.resolve(["prepared": true, "reason": "capture-prepared"])
+            } catch {
+                self.stopCaptureInternal(retain: false,
+                    reason: "prepare-failed", call: nil)
+                call.resolve(["prepared": false, "reason": "prepare-failed"])
+            }
+        }
+    }
+
+    // Called after Flashcards' ORIGINAL painted 3,2,1 countdown has fully
+    // completed. No microphone stream samples are collected before this call.
+    @objc func beginCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle, self.capturePrepared,
+                  !self.captureRunning,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["started": false, "reason": "not-prepared"])
+                return
+            }
+            let requestMs = call.getInt("limitMs") ?? 120000
+            self.captureLimitMs = max(1000, min(120000, requestMs))
+            let token = self.captureGeneration
+            do {
+                let engine = AVAudioEngine()
+                let input = engine.inputNode
+                let format = input.outputFormat(forBus: 0)
+                guard format.sampleRate >= 8000,
+                      format.sampleRate <= 96000,
+                      format.channelCount > 0,
+                      format.commonFormat == .pcmFormatFloat32 else {
+                    self.stopCaptureInternal(retain: false,
+                        reason: "unsupported-format", call: nil)
+                    call.resolve(["started": false,
+                                  "reason": "unsupported-format"])
+                    return
+                }
+                let sampleRate = format.sampleRate
+                let maxFrames = Int((Double(self.captureLimitMs) / 1000.0) *
+                                     sampleRate) + 1024
+                // Hard RAM cap: <= ~46 MiB of mono Float32 for 120s at 96k.
+                let frameCap = min(12_000_000, maxFrames)
+                input.installTap(onBus: 0, bufferSize: 1024,
+                                 format: format) { [weak self] buffer, _ in
+                    guard let self = self,
+                          let data = buffer.floatChannelData else { return }
+                    let frames = Int(buffer.frameLength)
+                    if frames <= 0 { return }
+                    let channels = min(2, Int(buffer.format.channelCount))
+                    var mono: [Float] = []
+                    mono.reserveCapacity(frames)
+                    for frame in 0..<frames {
+                        var total: Float = 0
+                        for channel in 0..<channels {
+                            let sample = data[channel][frame]
+                            total += sample.isFinite ? sample : 0
+                        }
+                        mono.append(total / Float(max(1, channels)))
+                    }
+                    // Input callback NEVER writes disk, blocks on a lock,
+                    // updates UIKit, or calls AVAudioSession/Capacitor.
+                    self.captureWorker.async { [weak self] in
+                        guard let self = self,
+                              self.workerCaptureKey == token else { return }
+                        let space = max(0, frameCap - self.captureSamples.count)
+                        if space > 0 {
+                            self.captureSamples.append(
+                                contentsOf: mono.prefix(space))
+                        }
+                    }
+                }
+                self.captureEngine = engine
+                try engine.start()
+                self.captureSampleRate = sampleRate
+                self.captureStartedAt = Date()
+                self.captureRunning = true
+                self.lastReason = "capturing"
+                // Protect even if Web JS timers/background callbacks stall.
+                DispatchQueue.main.asyncAfter(
+                    deadline: .now() + .milliseconds(self.captureLimitMs)
+                ) { [weak self] in
+                    guard let self = self,
+                          self.captureGeneration == token,
+                          self.captureRunning else { return }
+                    self.stopCaptureInternal(retain: true,
+                        reason: "time-limit", call: nil)
+                }
+                call.resolve(["started": true, "reason": "capturing",
+                              "limitMs": self.captureLimitMs])
+            } catch {
+                self.stopCaptureInternal(retain: false,
+                    reason: "engine-start-failed", call: nil)
+                call.resolve(["started": false, "reason": "engine-start-failed"])
+            }
+        }
+    }
+
+    // Flush queued input buffers after stopping the microphone, keeping only
+    // ONE opaque take in RAM. The original recorded bytes never cross JS
+    // bridge; N7d will supply guarded native replay in a separate PR.
+    private func stopCaptureInternal(retain: Bool, reason: String,
+                                     call: CAPPluginCall?) {
+        guard capturePrepared || captureRunning else {
+            if let call = call {
+                call.resolve(["ready": false, "reason": "not-capturing"])
+            }
+            return
+        }
+        let wasRecording = captureRunning
+        let token = captureGeneration
+        let rate = captureSampleRate
+        captureRunning = false
+        capturePrepared = false
+        captureStartedAt = nil
+        capturePreparedAt = nil
+        if let engine = captureEngine {
+            if wasRecording { engine.inputNode.removeTap(onBus: 0) }
+            engine.stop()
+        }
+        captureEngine = nil
+        let session = AVAudioSession.sharedInstance()
+        let category = captureSavedCategory
+        let mode = captureSavedMode
+        let options = captureSavedOptions
+        captureSavedCategory = nil
+        captureSavedMode = nil
+        captureSavedOptions = nil
+        var deactivated = true
+        do {
+            try session.setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch { deactivated = false }
+        var categoryRestored = false
+        if let category = category, let mode = mode, let options = options {
+            do {
+                try session.setCategory(category, mode: mode, options: options)
+                categoryRestored = session.category == category &&
+                                   session.mode == mode
+            } catch { categoryRestored = false }
+        }
+        captureRestoreOK = deactivated && categoryRestored
+        lastReason = captureRestoreOK ? reason : "restore-failed"
+        let restoreOK = captureRestoreOK
+        let savedId = UUID().uuidString
+        captureWorker.async { [weak self] in
+            guard let self = self else { return }
+            let count = self.workerCaptureKey == token
+                ? self.captureSamples.count : 0
+            let keep = retain && wasRecording && count >= 256 &&
+                       rate >= 8000 && restoreOK
+            if keep {
+                self.savedSamples = self.captureSamples
+                self.savedCaptureKey = token
+            } else {
+                self.savedSamples.removeAll(keepingCapacity: false)
+                self.savedCaptureKey = -1
+            }
+            self.captureSamples.removeAll(keepingCapacity: false)
+            self.workerCaptureKey = -1
+            let durationMs = count > 0 && rate > 0
+                ? Int(Double(count) / rate * 1000) : 0
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if self.captureGeneration != token {
+                    call?.resolve(["ready": false, "reason": "stale"])
+                    return
+                }
+                self.lastReason = restoreOK
+                    ? (keep ? "captured" : reason) : "restore-failed"
+                if let call = call {
+                    call.resolve([
+                        "ready": keep,
+                        "reason": self.lastReason,
+                        "takeId": keep ? savedId : "",
+                        "durationMs": durationMs,
+                        "frameCount": count,
+                        "restored": restoreOK
+                    ])
+                } else if retain && reason == "time-limit" {
+                    // Deliver the completed take only AFTER the captureWorker
+                    // has flushed its in-flight tap buffers into RAM.
+                    self.notifyListeners("biblozooCaptureLifecycle", data: [
+                        "kind": "completed",
+                        "ready": keep,
+                        "durationMs": durationMs,
+                        "frameCount": count,
+                        "restored": restoreOK
+                    ])
+                } else if !retain &&
+                    (reason == "interrupted" || reason == "route-changed") {
+                    self.notifyListeners("biblozooCaptureLifecycle", data: [
+                        "kind": "interrupted",
+                        "reason": reason
+                    ])
+                }
+            }
+        }
+    }
+
+    @objc func finishCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["ready": false, "reason": "unavailable"])
+                return
+            }
+            self.stopCaptureInternal(retain: true,
+                reason: "stopped-by-user", call: call)
+        }
+    }
+
+    // Always release sample memory on Exit/Re-record/Skip. No take ever
+    // goes into user profiles, a temp file or cloud backup.
+    @objc func discardCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["discarded": false, "reason": "unavailable"])
+                return
+            }
+            self.stopCaptureInternal(retain: false,
+                reason: "discarded", call: nil)
+            self.captureGeneration += 1
+            self.captureWorker.async { [weak self] in
+                guard let self = self else { return }
+                self.workerCaptureKey = -1
+                self.captureSamples.removeAll(keepingCapacity: false)
+                self.savedSamples.removeAll(keepingCapacity: false)
+                self.savedCaptureKey = -1
+                DispatchQueue.main.async {
+                    call.resolve(["discarded": true])
+                }
+            }
+        }
+    }
+
+    @objc func getCaptureState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["available": false])
+                return
+            }
+            self.captureWorker.async { [weak self] in
+                guard let self = self else { return }
+                let frames = self.savedSamples.count
+                DispatchQueue.main.async {
+                    call.resolve([
+                        "available": true,
+                        "prepared": self.capturePrepared,
+                        "recording": self.captureRunning,
+                        "hasTake": frames >= 256,
+                        "frameCount": frames,
+                        "restored": self.captureRestoreOK,
+                        "reason": self.lastReason
+                    ])
+                }
+            }
         }
     }
 

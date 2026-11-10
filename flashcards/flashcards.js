@@ -1104,6 +1104,11 @@
   function renderComparison(wrap) {
     const selected = getSelectedVerse();
     const audio = recording.snapshot();
+    // N7c is native CAPTURE-only. The PCM take is real, but native replay
+    // and Wacky DSP are deliberately separate N7d/N7e acceptance gates.
+    // Never offer a Play button that cannot produce audible output.
+    const nativeCaptureOnly = audio.captureOnly === true &&
+      audio.hasRecording && audio.playbackAvailable === false;
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
     const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
@@ -1113,9 +1118,11 @@
         wackyReplayUnlocked &&
         !wackyReplayConsumed
       );
-    const comparisonInstruction = audio.hasRecording || waiting
-      ? "Listen to your recording, then compare it with the verse."
-      : "Check the verse and see how you did.";
+    const comparisonInstruction = nativeCaptureOnly
+      ? "Your recording was captured. Native playback arrives in the next update."
+      : audio.hasRecording || waiting
+        ? "Listen to your recording, then compare it with the verse."
+        : "Check the verse and see how you did.";
     const message = audio.message;
     wrap.innerHTML = `
       ${renderMenuButton()}
@@ -1137,8 +1144,10 @@
         <div class="flashcards-recall-actions">
           ${showWackyReplay
             ? wackyReplayButtonHtml()
-            : audio.hasRecording || waiting
-              ? controlButton("flashcardsPlayBtn",
+            : nativeCaptureOnly
+              ? `<p class="flashcards-recording-note" role="status">Voice captured in memory (${Number.isInteger(audio.capturedFrames) ? audio.capturedFrames : 0} PCM frames). Playback is coming in N7d.</p>`
+              : audio.hasRecording || waiting
+                ? controlButton("flashcardsPlayBtn",
                   waiting ? "record" : audio.status === "playing" ? "stop" : "play",
                   waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
                   waiting || audio.status === "loading")

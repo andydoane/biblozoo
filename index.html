@@ -113,6 +113,10 @@
 <script src="daily_questions.js"></script>
 <script src="flashcards/audio-effects.js"></script>
 <script src="flashcards/recording.js"></script>
+<!-- N7c: experimental iOS ONLY overrides the recorder factory AFTER the
+     untouched web original, BEFORE Flashcards initializes. Never fall back
+     to HTML/WebAudio recording playback on native. -->
+<script src="verse_games/shared/native-flashcards-capture-n7c.js"></script>
 <script src="flashcards/flashcards.js"></script>
 <script src="read_my_verse.js"></script>
 <script src="daily_zoo_todo.js"></script>
