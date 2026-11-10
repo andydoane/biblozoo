@@ -190,7 +190,14 @@
     doc.body.appendChild(overlay);
     backdrop=overlay;statusNode=status;message="";run+=1;
     recorder=root.BibloZooRecording.create({
-      onChange:()=>render(),
+      onChange:()=> {
+        const state=recorder?.snapshot?.();
+        if(message==="Saving temporary native RAM take…" &&
+            state?.status==="ready" && state?.hasRecording) {
+          message="";
+        }
+        render();
+      },
       onInterrupted:()=> {
         cancelAutoStop();
         setMessage("Recording was interrupted. Retry from Record.");
