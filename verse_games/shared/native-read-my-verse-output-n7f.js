@@ -193,9 +193,14 @@
         if(started?.started!==true)throw mkError(started?.reason);
         if(Number.isFinite(started.durationMs) && started.durationMs>0)
           this.duration=started.durationMs/1000;
-        if(Number.isFinite(started.positionMs))
+        if(Number.isFinite(started.positionMs) && !this.ended)
           this._position=started.positionMs/1000;
-        this.paused=false;
+        // Native can actually finish a very short clip BEFORE this
+        // asynchronous bridge start response reaches JS. Never resurrect
+        // an already ended/stopped/interrupted media owner on late ACK.
+        if(!this.ended && this._playingRequest!==epoch)
+          throw mkError("interrupted-before-ack");
+        if(!this.ended) this.paused=false;
         this._emit("loadedmetadata");
         return true; // ACK is NOT an ended event
       } catch(err) {
