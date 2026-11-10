@@ -1112,12 +1112,11 @@
     const waiting = ["requesting", "preparing"].includes(audio.status);
     const needsVerseCheck = !audio.hasRecording && !waiting && !comparisonPlaybackStarted;
     const nextDisabled = waiting || (audio.hasRecording && !audio.playbackComplete);
-    const showWackyReplay =
-      wackyReplayPlaying ||
-      (
-        wackyReplayUnlocked &&
-        !wackyReplayConsumed
-      );
+    // N7d restores real normal Replay but Wacky DSP is deliberately N7e.
+    // Never show a WebAudio Wacky option on experimental native output.
+    const showWackyReplay = audio.nativeReplay !== true &&
+      (wackyReplayPlaying ||
+        (wackyReplayUnlocked && !wackyReplayConsumed));
     const comparisonInstruction = nativeCaptureOnly
       ? "Your recording was captured. Native playback arrives in the next update."
       : audio.hasRecording || waiting
@@ -1487,6 +1486,7 @@
           audio.playbackComplete &&
           !wackyReplayConsumed &&
           !wackyReplayPlaying &&
+          audio.nativeReplay !== true &&
           window.BibloZooAudioEffects
             ?.isSupported?.() === true
         ) {
