@@ -232,6 +232,7 @@ async function run(){
  assert.equal(f.size(),1);
  f.listeners.biblozooReadOutput({kind:"ended",requestId:four.requestId,
    positionMs:1800,durationMs:1800});
+ assert.equal(completed,3,"Only the current fourth attempt finished");
  assert.equal(f.size(),0);
 
  // A cached Crawl-like track reused after stopAll must re-register and
@@ -247,7 +248,8 @@ async function run(){
  assert.equal(f.size(),1);
  f.listeners.biblozooReadOutput({kind:"ended",requestId:five.requestId,
    positionMs:1800,durationMs:1800});
- assert.equal(completed,3);
+ assert.equal(completed,4,
+   "Fresh post-StopAll replay receives its fourth genuine ended event");
  assert.equal(f.size(),0);
 
  // User-provided or changed src MUST be checked before any native call.
