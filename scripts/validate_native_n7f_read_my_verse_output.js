@@ -37,8 +37,14 @@ has(plug,'AVAudioSession.sharedInstance().category == .soloAmbient',
     "Preserve single nonmixing output session category");
 has(plug,'try AVAudioSession.sharedInstance().setActive(true)',
     "Only explicit Resume/Start can claim audio session");
-assert.equal((plug.match(/setActive\(true\)/g)||[]).length,1,
-    "No passive/timer sound priority takeover");
+assert.equal((plug.match(/setActive\(true\)/g)||[]).length,2,
+    "Only explicit child Read Start/Resume and DEV audition taps activate audio");
+const childGesture=plug.slice(plug.indexOf("    @objc func activateFromGesture("),
+  plug.indexOf("    @objc func playClip("));
+const devGesture=plug.slice(plug.indexOf("    @objc func auditionCue("),
+  plug.indexOf("    @objc func stopCues("));
+assert(childGesture.includes("setActive(true)") && devGesture.includes("setActive(true)"),
+    "Both activations are behind real explicit user gestures");
 has(plug,'AVAudioSession.InterruptionType.began.rawValue',
     "Real external OS interruption stops active tracks");
 has(plug,'UIApplication.willResignActiveNotification',
