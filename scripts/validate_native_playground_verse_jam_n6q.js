@@ -94,7 +94,7 @@ const has = (value, text, message) => assert(value.includes(text), message);
     "No native Zoo Break for audio session failure");
   sourceTest(/phase === "score"/,
     "Score needs paused-return handling with no duplicate reward");
-  sourceTest(/stopRun\(\{ keepNativeReady: !!nativeJamAudio,[\s\S]*?preserveNativeFinale: !!nativeJamAudio \}\)/,
+  sourceTest(/stopRun\(\{\s*keepNativeReady:\s*!!nativeJamAudio,\s*preserveNativeFinale:\s*!!nativeJamAudio\s*\}\)/,
     "Final arpeggio must not be cut off by early stop");
   sourceTest(/nativeJamAudio\.stop\(\)/, "Native app exit/interruption tears bank down");
   has(workflow,"validate_native_playground_verse_jam_n6q.js",

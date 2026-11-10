@@ -329,6 +329,10 @@
   // source/bpm intact while giving the kick/snare a little mixer headroom.
   const NATIVE_JAM_DRUM_HEADROOM = 0.72;
   const NATIVE_JAM_GOT_IT_PRESS_MS = 130;
+  // Great! has its own native-only timing gate. Audio must be audible
+  // BEFORE the final menu arrives; the web remains exactly ios-prep.
+  const NATIVE_JAM_FINALE_LEAD_SECONDS = 0.22;
+  const NATIVE_JAM_FINALE_SCREEN_HOLD_MS = 440;
   let nativeJamHeadsUpPrewarm = null;
   let nativeJamAwaitingStart = false;
   let nativeJamFailureRetry = "start";
@@ -2793,9 +2797,13 @@
     // Preserve jam-note AVAudioPlayerNodes during the final arpeggio.
     // A full jam-group stop re-prepared all twelve note voices, clipping
     // the first melody notes during the "Great!" transition.
+    let finaleGrooveStop = null;
     if (nativeJamAudio && preserveNativeFinale) {
       stopMusic({ stopAudio: false });
-      nativeJamAudio.stopGrooveForFinale();
+      // Do not discard the note pool. Unlike the old fire-and-forget stop,
+      // this acknowledges the actual serialized native groove shutdown
+      // before the score button can schedule the C-major finale.
+      finaleGrooveStop = nativeJamAudio.stopGrooveForFinale();
     } else {
       stopMusic();
     }
@@ -2807,6 +2815,7 @@
     state.resumeBeatApproved = false;
     state.interruptedPhase = "";
     state.currentButtons = [];
+    return finaleGrooveStop;
   }
 
 
@@ -3719,7 +3728,8 @@
   function playCompletionArpeggio() {
     if (!audioCtx || muted) return;
 
-    const now = audioCtx.currentTime + (nativeJamAudio ? 0.12 : 0.03);
+    const now = audioCtx.currentTime +
+      (nativeJamAudio ? NATIVE_JAM_FINALE_LEAD_SECONDS : 0.03);
 
     // Celebratory C-major arpeggio after the drum beat stops.
     [
@@ -3787,13 +3797,26 @@
       );
     }
 
-    stopRun({ keepNativeReady: !!nativeJamAudio,
-      preserveNativeFinale: !!nativeJamAudio });
-    playCompletionArpeggio(); // tail remains warmed until End screen exit
+    const finaleGrooveStop = stopRun({
+      keepNativeReady: !!nativeJamAudio,
+      preserveNativeFinale: !!nativeJamAudio
+    });
+    if (nativeJamAudio) {
+      // N6q.4 fixed the same stop/reprepare race for "Time / to / Jam!".
+      // The previous Great! path still sent this scoped stop without
+      // waiting, then attempted the first note only 120ms later. Notes
+      // waited behind the Swift worker and could finally sound AFTER the
+      // ending menu appeared. Acknowledgment gives the hot note voices a
+      // clear scheduling lane before the completion melody begins.
+      await finaleGrooveStop;
+    }
+    playCompletionArpeggio(); // same authored C-major score; hot note pool
 
-    // The native ending screen can render while the short musical tail rings
-    // on its own hot note pool; don't force a blank 900ms wait after "Great!".
-    await sleep(nativeJamAudio ? 260 : 900);
+    // Render once the FIRST native notes have had time to start sounding,
+    // not at 260ms while Swift may still be stopping the drum groove.
+    // The melody continues to ring as the end menu becomes visible.
+    // Browser keeps ios-prep's original 900ms animation cadence.
+    await sleep(nativeJamAudio ? NATIVE_JAM_FINALE_SCREEN_HOLD_MS : 900);
 
     // Do not call setScreen("end") here; setScreen would call stopRun()
     // again and can cut off the arpeggio. Render the end screen directly.
