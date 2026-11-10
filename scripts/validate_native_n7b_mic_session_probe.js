@@ -59,7 +59,7 @@ expect(scene,"AVAudioSession.interruptionNotification",
   "Audio takeover must stop the probe");
 expect(scene,"AVAudioSession.routeChangeNotification",
   "Actual route change eventually cancels microphone session");
-expect(scene,"self.stopProbe(reason: \"interrupted\")",
+expect(scene,'self?.stopProbe(reason: "interrupted")',
   "No mic should survive genuine interruption");
 expect(scene,"recording file, Blob",
   "Swift source documents input-only ephemeral level sampling");
