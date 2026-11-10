@@ -52,6 +52,13 @@ jobs:
           command -v swiftc
           swiftc -frontend -parse ios/App/App/BibloZooNativeSoundPlugin.swift
 
+      # N7a is a docs/source-contract audit, not native capture. Restrict
+      # it to the isolated native-audio experiment and keep current iOS
+      # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7a Flashcards recording and Wacky DSP source audit
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_n7_recording_audit_n7a.js
+
       - name: Validate experimental iOS app identity
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_audio_test_identity.js
