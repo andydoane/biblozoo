@@ -38,6 +38,10 @@ assert(!src.includes('id="flashcardsContinueUnheardBtn"') &&
 assert(!css.includes(".flashcards-recording-note") &&
        !css.includes(".flashcards-listen-message"),
  "No obsolete in-flow message styling remains");
+has(css,'.flashcards-secondary-btn.flashcards-continue-anyway {',
+ "Long failure-only label has its own non-jumping compact style");
+has(css,"white-space: nowrap;",
+ "Continue Anyway never wraps and grows the action row");
 has(src,'const continuedWithoutListening = currentAudio.hasRecording &&',
  "Skip exists only for failed real recording playback");
 has(src,'currentAudio.playbackFailed && !currentAudio.playbackComplete',
@@ -204,6 +208,8 @@ function main(){
  let failed=f.render();
  assert(failed.html.includes("Continue Anyway"),
    "Next changes label rather than introducing a third button");
+ assert(failed.html.includes('class="flashcards-secondary-btn flashcards-continue-anyway" id="flashcardsNextBtn"'),
+   "The same Next id receives one-line compact label styling on failure");
  assert(failed.html.includes('id="flashcardsPlayBtn"'),
    "Play My Recording remains available for another deliberate tap");
  assert(!failed.html.includes("Continue Without Listening"));
