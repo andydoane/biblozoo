@@ -185,9 +185,12 @@ async function main(){
   let wackyStarted=0;
   const wacky=c.playFun("squirrel",()=>{wackyStarted+=1});
   await tick();
-  assert.equal(wackyStarted,1,
-    "N7e native Wacky must start after explicit button/engine ACK");
+  assert.equal(wackyStarted,0,
+    "N7e native Wacky requires real rendered PCM, not just bridge ACK");
   assert.equal(c.snapshot().status,"fun-playing");
+  t.listeners.biblozooCapturePlayback({kind:"started",
+    takeId:"take-n7d-one",playToken:12});
+  assert.equal(wackyStarted,1,"Post-DSP mixer signal unlocks Wacky once");
   assert(t.events.slice(wackyBegin).includes("play:take-n7d-one"),
     "Native Wacky replays the SAME completed RAM take");
   t.listeners.biblozooCapturePlayback({kind:"ended",
