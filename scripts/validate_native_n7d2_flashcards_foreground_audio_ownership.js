@@ -21,7 +21,7 @@ const prepare=slice(plugin,"    @objc func prepareCapture(","    @objc func begi
 const stop=slice(plugin,"    private func stopCaptureInternal(","    @objc func finishCapture(");
 const play=slice(plugin,"    @objc func playCapture(","    // Called by actual Stop Playback");
 const stopPlay=slice(plugin,"    private func stopPlaybackInternal(","    @objc func stopCapturePlayback(");
-const route=slice(load,"forName: AVAudioSession.routeChangeNotification, object: nil,","    deinit {");
+const route=slice(plugin,"forName: AVAudioSession.routeChangeNotification, object: nil,","    deinit {");
 const onInterrupt=slice(load,"forName: AVAudioSession.interruptionNotification, object: nil,",
   "// UIKit inactive/background or real media-services loss/reset");
 assert(plugin.includes("private var ownsFlashcardsForegroundAudio = false") &&
