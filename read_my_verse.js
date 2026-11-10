@@ -1822,7 +1822,8 @@
     if (readAudioRecovery) {
       // Repeated native/background events must NEVER unfreeze a typing intro
       // or a CSS scene that is already awaiting a real Resume Audio tap.
-      if (isTypingActivity(state.activityId)) freezeReadTypingIntro();
+      if (root?.BibloZooNativeReadOutputController?.enabled &&
+          isTypingActivity(state.activityId)) freezeReadTypingIntro();
       if (readAudioRecovery.kind === "animated")
         freezeReadScene(readAudioRecovery.scene);
       // Another background event invalidates a pending Resume Audio attempt.
@@ -1859,8 +1860,11 @@
       recovery = { kind: "chunk" };
     }
     if (!recovery) {
-      // Typing/word activities need an explicit acknowledgement, not a
-      // fabricated narration or a premature finished typing intro.
+      // Web/PWA/Android retains its original typing-intro return behavior.
+      // Only the native Audio Test gets exact intro timeline freeze/resume.
+      if (!root?.BibloZooNativeReadOutputController?.enabled &&
+          isTypingActivity(state.activityId) &&
+          state.typewriterIntroPhase !== "done") finishTypewriterIntro();
       recovery = { kind: "ack" };
     }
     recovery.startedAt = Date.now();
@@ -1868,7 +1872,8 @@
     readAudioRecovery = recovery;
     // Freeze BOTH short Typewriter/Keyboard intro timers AND cursor CSS.
     // These must not finish while the held App Switcher is on screen.
-    if (isTypingActivity(state.activityId)) freezeReadTypingIntro();
+    if (root?.BibloZooNativeReadOutputController?.enabled &&
+        isTypingActivity(state.activityId)) freezeReadTypingIntro();
     readAudioRecoveryGeneration += 1;
     readAudioRecoveryAttempt = null;
     if (recovery.kind === "animated") {
