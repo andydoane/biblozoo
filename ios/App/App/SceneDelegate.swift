@@ -262,7 +262,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "beginCapture", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "finishCapture", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "discardCapture", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getCaptureState", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getCaptureState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopCapturePlayback", returnType: CAPPluginReturnPromise)
     ]
 
     private let maximumSeconds: TimeInterval = 4.0
@@ -289,6 +291,15 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var savedSamples: [Float] = [] // captureWorker only
     private var workerCaptureKey = -1 // captureWorker only
     private var savedCaptureKey = -1 // captureWorker only
+    private var savedTakeId = "" // captureWorker only, opaque RAM take token
+    private var savedSampleRate = 0.0 // captureWorker only
+    private var workerLastLevelAt: TimeInterval = 0 // captureWorker only
+    private var captureLevel: Double? // main thread, 0...1 only
+    private var playbackEngine: AVAudioEngine? // main thread
+    private var playbackNode: AVAudioPlayerNode? // main thread
+    private var playbackGeneration = 0 // main thread
+    private var playbackTakeId = ""
+    private var playbackStartedAt: Date?
     private var captureEngine: AVAudioEngine?
     // Separate session snapshot from the N7b DEV probe. Sharing the DEV
     // savedCategory slot would let its interruption observer restore a
@@ -358,6 +369,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     self?.stopProbe(reason: "interrupted")
                     self?.stopCaptureInternal(retain: false,
                                               reason: "interrupted", call: nil)
+                    self?.stopPlaybackInternal(reason: "interrupted",
+                                                notify: true)
                 })
         }
         observers.append(center.addObserver(
@@ -369,6 +382,14 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 if let started = self.startedAt,
                    Date().timeIntervalSince(started) >= 0.5 {
                     self.stopProbe(reason: "route-changed")
+                }
+                // Playback route changes terminate replay, not the take.
+                if self.playbackEngine != nil {
+                    if let started = self.playbackStartedAt,
+                       Date().timeIntervalSince(started) >= 0.5 {
+                        self.stopPlaybackInternal(reason: "route-changed",
+                                                  notify: true)
+                    }
                 }
                 // Input route loss is a real capture cancellation.
                 if self.capturePrepared || self.captureRunning {
@@ -392,6 +413,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         if capturePrepared || captureRunning {
             stopCaptureInternal(retain: false, reason: "disposed", call: nil)
         }
+        stopPlaybackInternal(reason: "disposed", notify: false)
     }
 
     // The ONLY microphone-permission prompt. Called on explicit DEV button
@@ -611,7 +633,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             guard !self.isProbing && !self.capturePrepared &&
-                  !self.captureRunning && self.captureSavedCategory == nil &&
+                  !self.captureRunning && self.playbackEngine == nil &&
+                  self.captureSavedCategory == nil &&
                   !self.requestInFlight else {
                 call.resolve(["prepared": false, "reason": "busy"])
                 return
@@ -625,6 +648,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             self.captureSavedMode = session.mode
             self.captureSavedOptions = session.categoryOptions
             self.captureRestoreOK = false
+            self.captureLevel = nil
             self.captureGeneration += 1
             let captureKey = self.captureGeneration
             self.captureWorker.async {
@@ -632,6 +656,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.captureSamples.removeAll(keepingCapacity: false)
                 self.savedSamples.removeAll(keepingCapacity: false)
                 self.savedCaptureKey = -1
+                self.savedTakeId = ""
+                self.savedSampleRate = 0
+                self.workerLastLevelAt = 0
             }
             do {
                 // N7b owner-tested candidate, used only for explicitly
@@ -712,6 +739,31 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                             self.captureSamples.append(
                                 contentsOf: mono.prefix(space))
                         }
+                        // Meter only: one bounded 0...1 RMS level, at most
+                        // about 12 updates/sec; PCM stays on captureWorker.
+                        let uptime = ProcessInfo.processInfo.systemUptime
+                        if uptime - self.workerLastLevelAt >= 0.08 {
+                            self.workerLastLevelAt = uptime
+                            var sum: Double = 0
+                            var count = 0
+                            for i in stride(from: 0, to: mono.count, by: 16) {
+                                let value = Double(mono[i])
+                                sum += value * value
+                                count += 1
+                            }
+                            let rms = sqrt(sum / Double(max(count, 1)))
+                            let db = 20.0 * log10(max(0.00001, rms))
+                            let level = max(0.0, min(1.0, (db + 55) / 55))
+                            DispatchQueue.main.async { [weak self] in
+                                guard let self = self,
+                                      self.captureGeneration == token,
+                                      self.captureRunning else { return }
+                                self.captureLevel = level
+                                self.notifyListeners("biblozooCaptureLevel",
+                                    data: ["captureKey": token,
+                                           "level": level])
+                            }
+                        }
                     }
                 }
                 self.captureEngine = engine
@@ -719,6 +771,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.captureSampleRate = sampleRate
                 self.captureStartedAt = Date()
                 self.captureRunning = true
+                self.captureLevel = nil
                 self.lastReason = "capturing"
                 // Protect even if Web JS timers/background callbacks stall.
                 DispatchQueue.main.asyncAfter(
@@ -731,7 +784,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         reason: "time-limit", call: nil)
                 }
                 call.resolve(["started": true, "reason": "capturing",
-                              "limitMs": self.captureLimitMs])
+                              "limitMs": self.captureLimitMs,
+                              "captureKey": token])
             } catch {
                 self.stopCaptureInternal(retain: false,
                     reason: "engine-start-failed", call: nil)
@@ -740,9 +794,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    // Flush queued input buffers after stopping the microphone, keeping only
-    // ONE opaque take in RAM. The original recorded bytes never cross JS
-    // bridge; N7d will supply guarded native replay in a separate PR.
+    // Flush queued input buffers before returning one opaque RAM take.
+    // N7d replay uses the same saved samples; no audio data enters JavaScript.
     private func stopCaptureInternal(retain: Bool, reason: String,
                                      call: CAPPluginCall?) {
         guard capturePrepared || captureRunning else {
@@ -756,6 +809,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         let rate = captureSampleRate
         captureRunning = false
         capturePrepared = false
+        captureLevel = nil
         captureStartedAt = nil
         capturePreparedAt = nil
         if let engine = captureEngine {
@@ -795,9 +849,13 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             if keep {
                 self.savedSamples = self.captureSamples
                 self.savedCaptureKey = token
+                self.savedTakeId = savedId
+                self.savedSampleRate = rate
             } else {
                 self.savedSamples.removeAll(keepingCapacity: false)
                 self.savedCaptureKey = -1
+                self.savedTakeId = ""
+                self.savedSampleRate = 0
             }
             self.captureSamples.removeAll(keepingCapacity: false)
             self.workerCaptureKey = -1
@@ -826,6 +884,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     self.notifyListeners("biblozooCaptureLifecycle", data: [
                         "kind": "completed",
                         "ready": keep,
+                        "takeId": keep ? savedId : "",
                         "durationMs": durationMs,
                         "frameCount": count,
                         "restored": restoreOK
@@ -862,6 +921,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             }
             self.stopCaptureInternal(retain: false,
                 reason: "discarded", call: nil)
+            // Cancel delayed playCapture worker preparation even if no
+            // player node exists yet; then stop any currently audible take.
+            self.playbackGeneration += 1
+            self.stopPlaybackInternal(reason: "discarded", notify: false)
             self.captureGeneration += 1
             self.captureWorker.async { [weak self] in
                 guard let self = self else { return }
@@ -869,6 +932,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.captureSamples.removeAll(keepingCapacity: false)
                 self.savedSamples.removeAll(keepingCapacity: false)
                 self.savedCaptureKey = -1
+                self.savedTakeId = ""
+                self.savedSampleRate = 0
                 DispatchQueue.main.async {
                     call.resolve(["discarded": true])
                 }
@@ -892,11 +957,165 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         "recording": self.captureRunning,
                         "hasTake": frames >= 256,
                         "frameCount": frames,
+                        "level": self.captureLevel ?? 0,
+                        "playing": self.playbackEngine != nil,
                         "restored": self.captureRestoreOK,
                         "reason": self.lastReason
                     ])
                 }
             }
+        }
+    }
+
+
+    // N7d: only the explicit "Play My Recording" gesture may start
+    // playback. ONE fresh AVAudioEngine+AVAudioPlayerNode is owned here
+    // while the previously captured mono PCM stays opaque in RAM on the
+    // capture worker. This never connects microphone input to output and
+    // does not use WebAudio, HTMLMediaElement or an AVAudioRecorder file.
+    @objc func playCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active,
+                  !self.capturePrepared, !self.captureRunning,
+                  !self.isProbing, self.playbackEngine == nil else {
+                call.resolve(["started": false, "reason": "not-ready"])
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            guard session.category == .soloAmbient,
+                  !session.isOtherAudioPlaying else {
+                call.resolve(["started": false,
+                              "reason": "other-audio-or-session"])
+                return
+            }
+            let requestedId = call.getString("takeId") ?? ""
+            guard !requestedId.isEmpty else {
+                call.resolve(["started": false, "reason": "missing-take"])
+                return
+            }
+            self.playbackGeneration += 1
+            let playToken = self.playbackGeneration
+            self.captureWorker.async { [weak self] in
+                guard let self = self else { return }
+                guard self.savedCaptureKey >= 0,
+                      self.savedTakeId == requestedId,
+                      self.savedSamples.count >= 256,
+                      self.savedSamples.count <= 12_000_000,
+                      self.savedSampleRate >= 8000,
+                      self.savedSampleRate <= 96000,
+                      let format = AVAudioFormat(
+                        standardFormatWithSampleRate: self.savedSampleRate,
+                        channels: 1),
+                      let buffer = AVAudioPCMBuffer(
+                        pcmFormat: format,
+                        frameCapacity: AVAudioFrameCount(
+                            self.savedSamples.count)),
+                      let samplesOut = buffer.floatChannelData else {
+                    DispatchQueue.main.async {
+                        call.resolve(["started": false,
+                                      "reason": "take-unavailable"])
+                    }
+                    return
+                }
+                // This copy runs off the main/UI/audio-render threads.
+                self.savedSamples.withUnsafeBufferPointer { source in
+                    guard let base = source.baseAddress else { return }
+                    samplesOut[0].update(from: base, count: source.count)
+                }
+                buffer.frameLength = AVAudioFrameCount(self.savedSamples.count)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self,
+                          self.playbackGeneration == playToken,
+                          UIApplication.shared.applicationState == .active,
+                          !AVAudioSession.sharedInstance().isOtherAudioPlaying,
+                          !self.captureRunning, !self.capturePrepared,
+                          self.playbackEngine == nil else {
+                        call.resolve(["started": false,
+                                      "reason": "stale-or-inactive"])
+                        return
+                    }
+                    let engine = AVAudioEngine()
+                    let player = AVAudioPlayerNode()
+                    engine.attach(player)
+                    engine.connect(player, to: engine.mainMixerNode,
+                                   format: format)
+                    do {
+                        // A deliberate Play tap, not a foreground callback.
+                        // Leave the normal .soloAmbient category unchanged.
+                        try AVAudioSession.sharedInstance().setActive(true)
+                        self.playbackEngine = engine
+                        self.playbackNode = player
+                        self.playbackTakeId = requestedId
+                        self.playbackStartedAt = Date()
+                        player.scheduleBuffer(buffer,
+                            completionCallbackType: .dataPlayedBack) {
+                            [weak self] _ in
+                            DispatchQueue.main.async {
+                                guard let self = self,
+                                      self.playbackGeneration == playToken,
+                                      self.playbackEngine != nil else { return }
+                                self.stopPlaybackInternal(reason: "ended",
+                                                          notify: true)
+                            }
+                        }
+                        try engine.start()
+                        player.play()
+                        call.resolve(["started": true,
+                                      "reason": "native-playing",
+                                      "playToken": playToken])
+                    } catch {
+                        self.stopPlaybackInternal(reason: "start-failed",
+                                                  notify: false)
+                        call.resolve(["started": false,
+                                      "reason": "start-failed"])
+                    }
+                }
+            }
+        }
+    }
+
+    // Called by actual Stop Playback, pagehide or other native lifecycle.
+    // Never clears savedSamples: re-play is possible until Exit/Re-record.
+    private func stopPlaybackInternal(reason: String, notify: Bool) {
+        guard playbackEngine != nil || playbackNode != nil else { return }
+        let token = playbackGeneration
+        let take = playbackTakeId
+        playbackGeneration += 1 // invalidate in-flight AVAudio callbacks
+        playbackNode?.stop()
+        playbackEngine?.stop()
+        playbackNode = nil
+        playbackEngine = nil
+        playbackTakeId = ""
+        playbackStartedAt = nil
+        do {
+            try AVAudioSession.sharedInstance().setActive(false,
+                options: [.notifyOthersOnDeactivation])
+        } catch {
+            // No automatic activation/retry on a later foreground change.
+        }
+        if notify {
+            notifyListeners("biblozooCapturePlayback", data: [
+                "kind": reason == "ended" ? "ended" : "interrupted",
+                "reason": reason,
+                "takeId": take,
+                "playToken": token
+            ])
+        }
+    }
+
+    @objc func stopCapturePlayback(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["stopped": false, "reason": "unavailable"])
+                return
+            }
+            // Explicit Pause also invalidates an in-flight PCM copy: a
+            // late worker callback must NEVER start playing on its own.
+            self.playbackGeneration += 1
+            self.stopPlaybackInternal(reason: "stopped-by-user",
+                                      notify: false)
+            call.resolve(["stopped": true])
         }
     }
 
