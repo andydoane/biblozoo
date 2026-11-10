@@ -921,6 +921,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             }
             self.stopCaptureInternal(retain: false,
                 reason: "discarded", call: nil)
+            // Cancel delayed playCapture worker preparation even if no
+            // player node exists yet; then stop any currently audible take.
+            self.playbackGeneration += 1
             self.stopPlaybackInternal(reason: "discarded", notify: false)
             self.captureGeneration += 1
             self.captureWorker.async { [weak self] in
@@ -1107,6 +1110,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["stopped": false, "reason": "unavailable"])
                 return
             }
+            // Explicit Pause also invalidates an in-flight PCM copy: a
+            // late worker callback must NEVER start playing on its own.
+            self.playbackGeneration += 1
             self.stopPlaybackInternal(reason: "stopped-by-user",
                                       notify: false)
             call.resolve(["stopped": true])
