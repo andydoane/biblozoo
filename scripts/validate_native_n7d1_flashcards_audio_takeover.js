@@ -52,13 +52,14 @@ assert(play.includes("try AVAudioSession.sharedInstance().setActive(true)") &&
   play.includes("completionCallbackType: .dataPlayedBack") &&
   play.includes('reason: "start-failed"'),
   "Real OS activation, real completion event and honest OS failure remain");
-assert(route.includes("guard let self = self else { return }") &&
-  route.includes("if self.isProbing,") &&
+assert(route.includes("guard let self = self,") &&
+  route.includes("if self.isProbing {") &&
   route.includes("if self.playbackEngine != nil") &&
   route.includes("if self.captureRunning ||") &&
   route.includes("AVAudioSessionRouteChangeReasonKey") &&
+  route.includes("case .oldDeviceUnavailable, .newDeviceAvailable,") &&
   !route.includes("guard let self = self, self.isProbing else"),
-  "AirPods route changes must reach actual Flashcards input/replay owners");
+  "AirPods route changes must reach Flashcards and ignore internal category changes");
 assert(devProbe.includes("!session.isOtherAudioPlaying"),
   "Independent four-second DEV probe remains conservatively gated");
 assert(n6.includes('blocked != "other-audio-playing"'),
