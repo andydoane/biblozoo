@@ -315,6 +315,18 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var captureStartedAt: Date?
     private var capturePreparedAt: Date?
     private var captureRestoreOK = true
+    // N7d.2: Foreground-only audio priority starts ONLY on a true
+    // Flashcards Record/Play tap. Normal completion keeps Apple Music paused.
+    // External interruption or leaving the app relinquishes this claim.
+    private var ownsFlashcardsForegroundAudio = false
+
+    private func releaseFlashcardsAudioPriority() {
+        guard ownsFlashcardsForegroundAudio else { return }
+        ownsFlashcardsForegroundAudio = false
+        // Never ask iOS to auto-resume the interrupted app's music.
+        do { try AVAudioSession.sharedInstance().setActive(false) }
+        catch { /* A real OS interruption may already have deactivated us. */ }
+    }
 
     private func onMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() }
@@ -356,12 +368,29 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 
     public override func load() {
         super.load()
-        // Real UIKit/OS interruptions MUST stop capture. Never restart in
-        // didBecomeActive, route replug, or a generic Welcome Back.
+        // Only .began is an actual *new* OS interruption. The old
+        // observer cancelled live recording on .ended as well, including a
+        // just-ended Apple Music handoff. Never auto-resume on .ended.
         let center = NotificationCenter.default
+        observers.append(center.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil,
+            queue: .main) { [weak self] notification in
+                guard let self = self,
+                      let raw = (notification.userInfo?[
+                        AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
+                      raw == AVAudioSession.InterruptionType.began.rawValue else {
+                    return
+                }
+                self.stopProbe(reason: "interrupted")
+                self.stopCaptureInternal(retain: false,
+                                         reason: "interrupted", call: nil)
+                self.stopPlaybackInternal(reason: "interrupted", notify: true)
+                self.releaseFlashcardsAudioPriority()
+            })
+        // UIKit inactive/background or real media-services loss/reset always
+        // cancels live work, even if a WebView callback never runs.
         for name in [UIApplication.willResignActiveNotification,
                      UIApplication.didEnterBackgroundNotification,
-                     AVAudioSession.interruptionNotification,
                      AVAudioSession.mediaServicesWereLostNotification,
                      AVAudioSession.mediaServicesWereResetNotification] {
             observers.append(center.addObserver(forName: name, object: nil,
@@ -371,20 +400,36 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                                               reason: "interrupted", call: nil)
                     self?.stopPlaybackInternal(reason: "interrupted",
                                                 notify: true)
+                    self?.releaseFlashcardsAudioPriority()
                 })
         }
         observers.append(center.addObserver(
             forName: AVAudioSession.routeChangeNotification, object: nil,
-            queue: .main) { [weak self] _ in
-                guard let self = self else { return }
-                // N7d.1: A DEV probe cannot hide route changes during an
-                // actual child's Flashcards mic capture or voice replay.
-                if self.isProbing,
-                   let started = self.startedAt,
-                   Date().timeIntervalSince(started) >= 0.5 {
-                    self.stopProbe(reason: "route-changed")
+            queue: .main) { [weak self] notification in
+                guard let self = self,
+                      let raw = (notification.userInfo?[
+                        AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue,
+                      let routeReason = AVAudioSession.RouteChangeReason(
+                        rawValue: raw) else { return }
+                // An app-owned .soloAmbient ↔ .playAndRecord category change,
+                // output override or Bluetooth A2DP/HFP reconfiguration is
+                // not the same as unplugging AirPods. Those notifications can
+                // arrive late, even after the old 0.5s safety window.
+                switch routeReason {
+                case .oldDeviceUnavailable, .newDeviceAvailable,
+                     .noSuitableRouteForCategory:
+                    break
+                default:
+                    return
                 }
-                // Playback route changes terminate replay, not the take.
+                if self.isProbing {
+                    if let started = self.startedAt,
+                       Date().timeIntervalSince(started) >= 0.5 {
+                        self.stopProbe(reason: "route-changed")
+                    }
+                }
+                // Genuine external route loss/connection during playback
+                // still cancels this take rather than continuing on speaker.
                 if self.playbackEngine != nil {
                     if let started = self.playbackStartedAt,
                        Date().timeIntervalSince(started) >= 0.5 {
@@ -392,16 +437,15 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                                                   notify: true)
                     }
                 }
-                // Input route loss is a real capture cancellation.
-                if self.capturePrepared || self.captureRunning {
-                    // setCategory(.playAndRecord) itself can emit an
-                    // expected route change. Do not cancel the 3-2-1
-                    // countdown merely due to our own initial handoff.
-                    if let prepared = self.capturePreparedAt,
-                       Date().timeIntervalSince(prepared) >= 0.5 {
-                        self.stopCaptureInternal(retain: false,
-                            reason: "route-changed", call: nil)
-                    }
+                // During the 3→2→1 countdown, AirPods may still be
+                // negotiating their microphone route. Don't interpret that
+                // as a recording interruption; beginCapture checks format.
+                // Once *recording*, an actual route change cancels safely.
+                if self.captureRunning ||
+                   (self.capturePrepared &&
+                    routeReason == .noSuitableRouteForCategory) {
+                    self.stopCaptureInternal(retain: false,
+                        reason: "route-changed", call: nil)
                 }
             })
     }
@@ -673,6 +717,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 try session.setCategory(.playAndRecord, mode: .measurement,
                                         options: [.defaultToSpeaker])
                 try session.setActive(true)
+                self.ownsFlashcardsForegroundAudio = true
                 self.captureRunning = false
                 self.lastReason = "capture-prepared"
                 call.resolve(["prepared": true, "reason": "capture-prepared"])
@@ -830,10 +875,13 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         captureSavedCategory = nil
         captureSavedMode = nil
         captureSavedOptions = nil
-        var deactivated = true
-        do {
-            try session.setActive(false, options: [.notifyOthersOnDeactivation])
-        } catch { deactivated = false }
+        // Normal Stop/timeout keeps the user-claimed nonmixing audio
+        // session ACTIVE, but restores .soloAmbient after mic input ends.
+        // Deactivation with .notifyOthersOnDeactivation used to restart the
+        // interrupted MP3 and relinquish priority on every completed take.
+        let keepPriority = UIApplication.shared.applicationState == .active &&
+            (reason == "stopped-by-user" || reason == "time-limit" ||
+             reason == "discarded")
         var categoryRestored = false
         if let category = category, let mode = mode, let options = options {
             do {
@@ -842,7 +890,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                                    session.mode == mode
             } catch { categoryRestored = false }
         }
-        captureRestoreOK = deactivated && categoryRestored
+        captureRestoreOK = categoryRestored
+        if !keepPriority || !categoryRestored {
+            // Genuine interruption, background, failed setup, or route
+            // loss must NEVER reclaim the other app's session on its own.
+            self.releaseFlashcardsAudioPriority()
+        }
         lastReason = captureRestoreOK ? reason : "restore-failed"
         let restoreOK = captureRestoreOK
         let savedId = UUID().uuidString
@@ -1051,6 +1104,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         // A deliberate Play tap, not a foreground callback.
                         // Leave the normal .soloAmbient category unchanged.
                         try AVAudioSession.sharedInstance().setActive(true)
+                        self.ownsFlashcardsForegroundAudio = true
                         self.playbackEngine = engine
                         self.playbackNode = player
                         self.playbackTakeId = requestedId
@@ -1095,11 +1149,13 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         playbackEngine = nil
         playbackTakeId = ""
         playbackStartedAt = nil
-        do {
-            try AVAudioSession.sharedInstance().setActive(false,
-                options: [.notifyOthersOnDeactivation])
-        } catch {
-            // No automatic activation/retry on a later foreground change.
+        // Ending a normal take or manually stopping it only stops the PCM
+        // player. Keep the foreground nonmixing AVAudioSession active so
+        // Apple Music/PiP stays paused until its OWN next Play gesture.
+        // A true interruption, route loss or setup failure relinquishes it.
+        if reason != "ended" && reason != "stopped-by-user" &&
+           reason != "discarded" {
+            self.releaseFlashcardsAudioPriority()
         }
         if notify {
             notifyListeners("biblozooCapturePlayback", data: [
