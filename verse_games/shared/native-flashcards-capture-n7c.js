@@ -282,6 +282,14 @@
       "squirrel","giant","sleepy","rocket","roller_coaster",
       "ascending","descending","demon","chorus_alien","cave"
     ]);
+    // N7e.1: only the opt-in DEV comparison Lab may request these.
+    // Child Flashcards pickWackyPreset() remains the original ten.
+    const DEV_VARIANT_IDS = new Set([
+      "demon_clean","demon_shadow","demon_abyss",
+      "demon_whisper","demon_thunder",
+      "chorus_air","chorus_swarm","chorus_cosmic",
+      "chorus_choir","chorus_wobble"
+    ]);
 
     function stopFun() {
       if (status !== "fun-loading" && status !== "fun-playing") return false;
@@ -331,7 +339,16 @@
     }
 
     function playFun(presetId, onStarted) {
-      if (!OFFICIAL_WACKY_IDS.has(presetId) ||
+      return playWackyPreset(presetId, onStarted, false);
+    }
+    function playDevVariant(presetId, onStarted) {
+      return playWackyPreset(presetId, onStarted, true);
+    }
+    function playWackyPreset(presetId, onStarted, devVariant) {
+      const isAllowed = devVariant
+        ? DEV_VARIANT_IDS.has(presetId)
+        : OFFICIAL_WACKY_IDS.has(presetId);
+      if (!isAllowed ||
           !hasRecording || !takeMetadata?.takeId || doc.hidden ||
           status !== "ready" || typeof mic()?.playCapture !== "function") {
         return Promise.resolve(false);
@@ -347,7 +364,8 @@
       return new Promise(resolve => {
         funResolve = resolve;
         Promise.resolve(mic().playCapture({
-          takeId: takeMetadata.takeId, presetId
+          takeId: takeMetadata.takeId, presetId,
+          ...(devVariant ? {devVariant: true} : {})
         })).then(reply => {
           if (token !== funRequest || doc.hidden || status !== "fun-loading") {
             // A stale response may otherwise sound after a new Record/Exit.
@@ -470,7 +488,7 @@
     });
 
     return Object.freeze({
-      start, stop, play, pause, playFun, stopFun, dispose, readLevel,
+      start, stop, play, pause, playFun, playDevVariant, stopFun, dispose, readLevel,
       interruptCapture: interrupt,
       snapshot() {
         return {
