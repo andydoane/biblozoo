@@ -112,6 +112,10 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_playground_ghost_writer_n6r.js
 
+      - name: Validate N6q.5 Great score button, native final stop ACK and source C-major finale
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_verse_jam_score_finale_n6q5.js
+
       - name: Validate N6q.4 original ios-prep two-layer interstitials and timed scoped native stop
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_verse_jam_original_transition_n6q4.js
