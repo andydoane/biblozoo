@@ -376,10 +376,11 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         observers.append(center.addObserver(
             forName: AVAudioSession.routeChangeNotification, object: nil,
             queue: .main) { [weak self] _ in
-                guard let self = self, self.isProbing else { return }
-                // Changing category at probe start can itself notify a route
-                // change; ignore only that bounded setup settling window.
-                if let started = self.startedAt,
+                guard let self = self else { return }
+                // N7d.1: A DEV probe cannot hide route changes during an
+                // actual child's Flashcards mic capture or voice replay.
+                if self.isProbing,
+                   let started = self.startedAt,
                    Date().timeIntervalSince(started) >= 0.5 {
                     self.stopProbe(reason: "route-changed")
                 }
@@ -639,8 +640,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["prepared": false, "reason": "busy"])
                 return
             }
-            guard session.category == .soloAmbient,
-                  !session.isOtherAudioPlaying else {
+            // N7d.1: An explicit Record tap may interrupt Apple Music/PiP.
+            // isOtherAudioPlaying is not an OS rejection; setActive decides.
+            guard session.category == .soloAmbient else {
                 call.resolve(["prepared": false, "reason": "unsafe-session-state"])
                 return
             }
@@ -660,6 +662,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.savedSampleRate = 0
                 self.workerLastLevelAt = 0
             }
+            // If activation fails (e.g. phone call), the capture teardown
+            // MUST run even though a mic engine was never started.
+            self.capturePrepared = true
+            self.capturePreparedAt = Date()
             do {
                 // N7b owner-tested candidate, used only for explicitly
                 // initiated Flashcards capture in the isolated Audio Test.
@@ -667,15 +673,15 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 try session.setCategory(.playAndRecord, mode: .measurement,
                                         options: [.defaultToSpeaker])
                 try session.setActive(true)
-                self.capturePrepared = true
-                self.capturePreparedAt = Date()
                 self.captureRunning = false
                 self.lastReason = "capture-prepared"
                 call.resolve(["prepared": true, "reason": "capture-prepared"])
-            } catch {
+            } catch let error as NSError {
                 self.stopCaptureInternal(retain: false,
                     reason: "prepare-failed", call: nil)
-                call.resolve(["prepared": false, "reason": "prepare-failed"])
+                call.resolve(["prepared": false, "reason": "prepare-failed",
+                              "errorDomain": error.domain,
+                              "errorCode": error.code])
             }
         }
     }
@@ -983,10 +989,11 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             let session = AVAudioSession.sharedInstance()
-            guard session.category == .soloAmbient,
-                  !session.isOtherAudioPlaying else {
+            // N7d.1: An explicit Play tap may reclaim nonmixing .soloAmbient
+            // from Apple Music, subject to iOS activation priority.
+            guard session.category == .soloAmbient else {
                 call.resolve(["started": false,
-                              "reason": "other-audio-or-session"])
+                              "reason": "category-not-soloambient"])
                 return
             }
             let requestedId = call.getString("takeId") ?? ""
@@ -1028,7 +1035,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     guard let self = self,
                           self.playbackGeneration == playToken,
                           UIApplication.shared.applicationState == .active,
-                          !AVAudioSession.sharedInstance().isOtherAudioPlaying,
+                          AVAudioSession.sharedInstance().category == .soloAmbient,
                           !self.captureRunning, !self.capturePrepared,
                           self.playbackEngine == nil else {
                         call.resolve(["started": false,

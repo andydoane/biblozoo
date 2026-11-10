@@ -60,8 +60,16 @@ has(swift,"self.savedSamples.withUnsafeBufferPointer",
   "Playback copies the ACTUAL previously captured RAM data");
 has(swift,"self.savedTakeId == requestedId",
   "No stale/other capture can be played with fabricated takeId");
-has(swift,"!session.isOtherAudioPlaying",
-  "Don't seize YouTube still-playing priority at Play");
+// N7d.1: the explicit Play tap may now reclaim Apple Music priority.
+const captureMethod = swift.slice(swift.indexOf("    @objc func prepareCapture("),
+  swift.indexOf("    @objc func beginCapture("));
+const playMethod = swift.slice(swift.indexOf("    @objc func playCapture("),
+  swift.indexOf("    // Called by actual Stop Playback"));
+assert(!captureMethod.includes("!session.isOtherAudioPlaying"),
+  "Only iOS activation, not a competing-audio veto, decides Record priority");
+assert(!playMethod.includes("!session.isOtherAudioPlaying") &&
+  !playMethod.includes("!AVAudioSession.sharedInstance().isOtherAudioPlaying"),
+  "Explicit native Play may ask iOS to interrupt another media app");
 has(swift,"session.category == .soloAmbient",
   "Don't override temporary recording category");
 has(swift,"try AVAudioSession.sharedInstance().setActive(true)",
