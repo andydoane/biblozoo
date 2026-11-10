@@ -662,6 +662,14 @@ Patch 2: themed visual system + difficulty flow
   cursor: pointer;
 }
 
+/* N7f.1: a longer failure-only label must never wrap and grow the
+   Re-record/Next row on the narrowest iPhone. Same two button slots. */
+.flashcards-secondary-btn.flashcards-continue-anyway {
+  font-size: clamp(13px, 3.4vw, 21px);
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+
 .flashcards-secondary-btn:active,
 .flashcards-record-preview:active {
   transform: translateY(4px);
