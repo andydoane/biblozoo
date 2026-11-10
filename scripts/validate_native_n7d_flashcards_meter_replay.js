@@ -165,6 +165,10 @@ async function main(){
     takeId:"old-take",playToken:12});
   assert.equal(c.snapshot().playbackComplete,false,"Old take event cannot unlock UI");
   t.listeners.biblozooCapturePlayback({kind:"ended",
+    takeId:"take-n7d-one",playToken:11});
+  assert.equal(c.snapshot().playbackComplete,false,
+    "Stale playToken on SAME RAM take must never complete new replay");
+  t.listeners.biblozooCapturePlayback({kind:"ended",
     takeId:"take-n7d-one",playToken:12});
   assert.equal(c.snapshot().status,"ready");
   assert.equal(c.snapshot().playbackComplete,true,
@@ -205,6 +209,20 @@ async function main(){
   assert.equal(d.snapshot().playbackComplete,false);
   assert(delayed.events.includes("stop-play"),
     "Pause invalidates in-flight Play before later native worker can sound");
+  const early=sim();const tiny=await ready(early);
+  early.delayPlay();
+  const first=tiny.play();await tick();
+  early.listeners.biblozooCapturePlayback({kind:"ended",
+    takeId:"take-n7d-one",playToken:11});
+  early.listeners.biblozooCapturePlayback({kind:"ended",
+    takeId:"take-n7d-one",playToken:12});
+  assert.equal(tiny.snapshot().playbackComplete,false,
+    "Completion event arriving before started result must await token validation");
+  early.releasePlay({started:true,playToken:12});
+  await first;await tick();
+  assert.equal(tiny.snapshot().playbackComplete,true,
+    "Valid very-short take end event can complete after playback ID handshake");
+
   const discard=sim();const z=await ready(discard);
   await z.play();z.dispose();await tick();
   assert(discard.events.includes("stop-play"));
