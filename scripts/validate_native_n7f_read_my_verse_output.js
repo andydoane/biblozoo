@@ -86,7 +86,8 @@ has(plug,"player.play(atTime: player.deviceCurrentTime + delay)",
     "Short fixed note delays are driven by native player clock");
 assert(!/getUserMedia\(|MediaRecorder\(|requestPermission\(/.test(plug),
     "N7f is output ONLY, never microphone input");
-assert(!/notifyOthersOnDeactivation|.mixWithOthers|.duckOthers/.test(plug),
+const activeSwift = plug.replace(/\/\/[^\n]*/g, "");
+assert(!/notifyOthersOnDeactivation|\.mixWithOthers|\.duckOthers/.test(activeSwift),
     "N7d.2 priority policy remains nonmixing with no auto-resume hint");
 assert(!/URL\(string:|http[s]?:|FileManager\.default|write\(to:/.test(plug),
     "No remote fetch, writable recording files, or arbitrary audio URLs");
