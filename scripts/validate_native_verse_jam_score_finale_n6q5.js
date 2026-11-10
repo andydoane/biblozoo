@@ -106,7 +106,10 @@ async function playRealFinale({isNative}) {
       "Do not show End screen before native note scheduling even begins");
     releaseStop({stopped:true});
   }
-  await Promise.resolve();await Promise.resolve();
+  // The real score click, finish function and Swift-stop Promise each cross
+  // an async boundary. Give the VM a full event-loop turn for that native
+  // acknowledgment to propagate; never assert before its microtasks settle.
+  await new Promise(resolve=>setImmediate(resolve));
 
   assert.strictEqual(notes.length,8,
     "Original seven-note C-major arpeggio AND sparkle retained");
