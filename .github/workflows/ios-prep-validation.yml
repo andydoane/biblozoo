@@ -58,6 +58,10 @@ jobs:
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7e all ten native Wacky Replay presets and compact DEV Lab
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_n7e_wacky_replay.js
+
       - name: Validate N7d.2 Flashcards foreground audio ownership and genuine AirPods interruptions
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7d2_flashcards_foreground_audio_ownership.js
