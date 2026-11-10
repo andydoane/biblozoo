@@ -112,35 +112,35 @@ has(js,"NativeAudio,clipIdFor,activateFromGesture,",
     "Controller exposes only native owner capabilities");
 assert(!/root\.Audio\s*=|AudioContext\s*=|webkitAudioContext\s*=/.test(js),
     "No global Audio/WebAudio hijack or fallback");
-has(activity,"const Audio = NativeReadOutput?.enabled",
-    "Read My Verse shadows only its own constructor");
-has(activity,"? NativeReadOutput.NativeAudio : root?.Audio;",
-    "Original browser constructor preserved outside native app");
-assert(!activity.includes("new root.Audio("),
-    "All Read My Verse media paths use a local native-aware constructor");
+has(activity,"const Audio = root?.BibloZooNativeReadOutputController?.enabled",
+    "Only local Read My Verse Audio constructor is shadowed");
+has(activity,"? root.BibloZooNativeReadOutputController.NativeAudio : root?.Audio;",
+    "Browser/PWA/Android keep their actual root.Audio constructor");
+has(activity,"new root.Audio(",
+    "Original browser reference path remains intact in source/legacy VM");
 for(const part of ["new Audio(src)","new Audio(CRAWL_MUSIC_SRC)",
  "new Audio(CRAWL_ENDING_SRC)","new Audio("])
-  has(activity,part,"Source Read audio routed consistently");
-has(activity,"void NativeReadOutput.activateFromGesture();",
-    "Real Start/Resume gesture requests session activation");
-has(activity,"void NativeReadOutput.stopAll();",
-    "Session cleanup cancels native narration and Crawl overlap");
-has(activity,'NativeReadOutput.playCue("order", nextIndex, complete, wrong)',
-    "Tap Words correct/wrong generated feedback native");
-has(activity,'NativeReadOutput.playCue("scramble", solvedCount, complete, false)',
-    "Unscramble fixed melody native");
-has(activity,'NativeReadOutput.playCue("negative", 1, false, true)',
-    "Native generated negative optional fallback");
-has(activity,'void NativeReadOutput.stopCues();',
-    "Activity exit cuts pending synthetic feedback");
-has(activity,"if (NativeReadOutput?.enabled || readNarrationBlocked(error))",
-    "Native denial pauses/recovery rather than fabricated chunk completion");
-has(activity,'engine: NativeReadOutput?.enabled ? "native-read-n7f" :',
-    "Crawl soundtrack distinctly native in Audio Test");
-has(activity,"NativeReadOutput?.enabled && !session.endingDone",
-    "Native Crawl watchdog never claims unheard ending completed");
-has(activity,"NativeReadOutput?.enabled) pauseReadForInterruption()",
-    "Native denied ending does not grant false score/credit");
+  has(activity,part,"Native Read media paths select the local native ctor");
+has(activity,"void root.BibloZooNativeReadOutputController.activateFromGesture();",
+    "Actual user Start/Resume is the only activation site");
+has(activity,"void root.BibloZooNativeReadOutputController.stopAll();",
+    "Exit cancels native narration and overlapping Crawl output");
+has(activity,'root.BibloZooNativeReadOutputController.playCue("order", nextIndex, complete, wrong)',
+    "Tap Words in Order correct/wrong notes are native");
+has(activity,'root.BibloZooNativeReadOutputController.playCue("scramble", solvedCount, complete, false)',
+    "Unscramble correct/complete rewards are native");
+has(activity,'root.BibloZooNativeReadOutputController.playCue("negative", 1, false, true)',
+    "Native generated negative optional feedback");
+has(activity,'void root.BibloZooNativeReadOutputController.stopCues();',
+    "Activity exit cuts fixed native note feedback");
+has(activity,"if (root?.BibloZooNativeReadOutputController?.enabled || readNarrationBlocked(error))",
+    "Native denied output goes to recovery, never fake chunk completion");
+has(activity,'engine: root?.BibloZooNativeReadOutputController?.enabled ? "native-read-n7f" :',
+    "Crawl uses native/HTML path based on isolated Audio Test");
+has(activity,"root?.BibloZooNativeReadOutputController?.enabled && !session.endingDone",
+    "Native Crawl watchdog is a failure, never fabricated ended");
+has(activity,"root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption()",
+    "Native ending denial goes to recovery");
 has(old,"const OFFICIAL_PRESET_IDS =",
     "Original browser ten Wacky names unchanged");
 has(original,"new MediaRecorder(stream",
