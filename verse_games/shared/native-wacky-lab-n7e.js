@@ -12,11 +12,29 @@
     ["ascending", "Ascending"], ["descending", "Descending"],
     ["demon", "Demon"], ["chorus_alien", "Chorus Alien"], ["cave", "Cave"]
   ]);
+  // N7e.1: independently selectable, intentionally NOT in child's random
+  // original 10. The variant lab can A/B against the two CURRENT effects.
+  const DEV_VARIANTS = Object.freeze([
+    ["demon_clean", "D1 · Clean Depth"],
+    ["demon_shadow", "D2 · Dark Shadow"],
+    ["demon_abyss", "D3 · Deep Abyss"],
+    ["demon_whisper", "D4 · Haunted Whisper"],
+    ["demon_thunder", "D5 · Soft Thunder"],
+    ["chorus_air", "C1 · Airy Trio"],
+    ["chorus_swarm", "C2 · Alien Swarm"],
+    ["chorus_cosmic", "C3 · Cosmic Voices"],
+    ["chorus_choir", "C4 · Wide Choir"],
+    ["chorus_wobble", "C5 · Wobbling Chorus"]
+  ]);
+  const REFERENCE_PRESETS = Object.freeze([
+    ["demon", "Current Demon"],
+    ["chorus_alien", "Current Chorus Alien"]
+  ]);
   const allowed = () => root.BibloZooNativeOnlyOutput?.enabled === true &&
     root.Capacitor?.isNativePlatform?.() === true &&
     root.Capacitor?.getPlatform?.() === "ios";
   let backdrop=null, recorder=null, statusNode=null, buttons=[];
-  let autoStop=null, run=0, message="";
+  let autoStop=null, run=0, message="", currentMode="official";
 
   function button(text, action, extraStyle="") {
     const b=doc.createElement("button");
@@ -107,13 +125,16 @@
       setMessage("Recording cancelled. Tap Record again.");
     }
   }
-  async function playPreset(id,label) {
+  async function playPreset(id,label,isDevVariant=false) {
     if(!recorder || !snapshot().hasRecording || doc.hidden) return;
     const token=++run;
     setMessage("Starting "+label+" with your saved voice…");
-    const result=await recorder.playFun(id,()=>{
+    const started=()=> {
       if(token===run) setMessage("Playing "+label+"…");
-    });
+    };
+    const result=isDevVariant
+      ? await recorder.playDevVariant(id,started)
+      : await recorder.playFun(id,started);
     if(token!==run || !backdrop?.isConnected)return;
     setMessage(result
       ? label+" finished. Tap another effect or replay "+label+"."
@@ -132,15 +153,17 @@
     recorder?.pause?.();
     setMessage("Playback stopped. Your temporary take remains ready.");
   }
-  function open() {
+  function open(mode="official") {
     if(!allowed() || !doc.body || !root.BibloZooRecording?.create) return;
     if(backdrop?.isConnected) return;
+    currentMode=mode==="variants"?"variants":"official";
     const overlay=doc.createElement("div");
     overlay.id="biblozoo-n7e-wacky-lab";
     overlay.setAttribute("data-no-ui-sound","");
     overlay.setAttribute("role","dialog");
     overlay.setAttribute("aria-modal","true");
-    overlay.setAttribute("aria-label","Native Wacky Replay Lab");
+    overlay.setAttribute("aria-label",currentMode==="variants"
+      ? "Native Demon and Chorus Variant Lab" : "Native Wacky Replay Lab");
     overlay.style.cssText="position:fixed;inset:0;z-index:15000;" +
       "display:flex;align-items:center;justify-content:center;" +
       "padding:calc(env(safe-area-inset-top,0px) + 10px) 10px " +
@@ -153,14 +176,17 @@
     const heading=doc.createElement("div");
     heading.style.cssText="display:flex;justify-content:space-between;gap:10px;align-items:center;";
     const title=doc.createElement("strong");
-    title.textContent="DEV · Wacky Lab (10)";
+    title.textContent=currentMode==="variants"
+      ? "DEV · Demon / Chorus Lab" : "DEV · Wacky Lab (10)";
     title.style.cssText="font:700 20px/1.3 sans-serif;";
     const dismiss=button("×",close,"min-width:38px;background:#f4e6e6;");
     dismiss.setAttribute("aria-label","Close Wacky Lab and discard sample");
     heading.append(title,dismiss);
     const info=doc.createElement("p");
     info.style.cssText="font:12px/1.5 sans-serif;margin:8px 0;";
-    info.textContent="Record one short verse or phrase from Home. Stop, then replay any of the 10 official effects. Repeat freely; no Flashcards grades or random picks. Voice stays only in temporary iPhone memory.";
+    info.textContent=currentMode==="variants"
+      ? "Record ONE phrase, then audition 5 Demon and 5 Chorus Alien alternatives. The two current versions are also here for instant A/B comparison. No Flashcards grade, random choice, file or upload; voice stays in temporary RAM."
+      : "Record one short verse or phrase from Home. Stop, then replay any of the 10 official effects. Repeat freely; no Flashcards grades or random picks. Voice stays only in temporary iPhone memory.";
     const controls=doc.createElement("div");
     controls.style.cssText="display:grid;grid-template-columns:1fr 1fr;gap:6px;";
     const add=(label,kind,fn)=>{
@@ -172,15 +198,40 @@
     add("▶ Original Voice","play",()=>{void playNormal()});
     add("■ Stop Playback","stop-play",stopPlayback);
     const subtitle=doc.createElement("p");
-    subtitle.textContent="Tap any preset (repeatable):";
+    subtitle.textContent=currentMode==="variants"
+      ? "Choose any variation repeatedly (one recording):"
+      : "Tap any preset (repeatable):";
     subtitle.style.cssText="font:700 13px sans-serif;margin:10px 0 5px;";
     const grid=doc.createElement("div");
     grid.style.cssText="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;";
-    PRESETS.forEach(([id,label])=>{
-      const b=button(label,()=>{void playPreset(id,label)});
-      b.setAttribute("data-wacky-preset",id);
-      grid.appendChild(b);buttons.push({node:b,kind:"preset"});
-    });
+    if(currentMode==="variants") {
+      // The new entry is a SEPARATE DEV comparison screen; it does not
+      // replace original Wacky Lab or silently alter child-facing presets.
+      const sections=[
+        ["Demon · 5 variations",DEV_VARIANTS.slice(0,5)],
+        ["Chorus Alien · 5 variations",DEV_VARIANTS.slice(5,10)],
+        ["Current sounds · A/B references",REFERENCE_PRESETS]
+      ];
+      for(const [heading,presets] of sections) {
+        const groupTitle=doc.createElement("p");
+        groupTitle.textContent=heading;
+        groupTitle.style.cssText="grid-column:1 / -1;font:700 13px sans-serif;" +
+          "margin:8px 0 0;";
+        grid.appendChild(groupTitle);
+        for(const [id,label] of presets) {
+          const isDevVariant=DEV_VARIANTS.some(([key])=>key===id);
+          const b=button(label,()=>{void playPreset(id,label,isDevVariant)});
+          b.setAttribute("data-wacky-variant",id);
+          grid.appendChild(b);buttons.push({node:b,kind:"preset"});
+        }
+      }
+    } else {
+      PRESETS.forEach(([id,label])=>{
+        const b=button(label,()=>{void playPreset(id,label)});
+        b.setAttribute("data-wacky-preset",id);
+        grid.appendChild(b);buttons.push({node:b,kind:"preset"});
+      });
+    }
     const status=doc.createElement("p");
     status.setAttribute("role","status");
     status.setAttribute("aria-live","polite");
@@ -216,5 +267,9 @@
   root.addEventListener("pagehide",()=>{
     if(backdrop?.isConnected)close();
   });
-  root.BibloZooWackyLab=Object.freeze({open,close});
+  root.BibloZooWackyLab=Object.freeze({
+    open:()=>open("official"),
+    openVariants:()=>open("variants"),
+    close
+  });
 })(window);
