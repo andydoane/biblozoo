@@ -181,8 +181,21 @@ async function main(){
   assert.equal(c.snapshot().status,"ready");
   assert.equal(c.snapshot().playbackComplete,true,
     "Only real .dataPlayedBack event unlocks original Next/grade");
-  assert.equal(await c.playFun("squirrel",()=>{}),false,
-    "Wacky DSP must stay disabled N7e");
+  const wackyBegin = t.events.length;
+  let wackyStarted=0;
+  const wacky=c.playFun("squirrel",()=>{wackyStarted+=1});
+  await tick();
+  assert.equal(wackyStarted,1,
+    "N7e native Wacky must start after explicit button/engine ACK");
+  assert.equal(c.snapshot().status,"fun-playing");
+  assert(t.events.slice(wackyBegin).includes("play:take-n7d-one"),
+    "Native Wacky replays the SAME completed RAM take");
+  t.listeners.biblozooCapturePlayback({kind:"ended",
+    takeId:"take-n7d-one",playToken:12});
+  assert.equal(await wacky,true,
+    "N7e Wacky Promise resolves only on matching native playback completion");
+  assert.equal(c.snapshot().playbackComplete,true,
+    "Wacky cannot erase or fake normal voice's previously heard completion");
 
   const pause=sim();const p=await ready(pause);
   await p.play();p.pause();
