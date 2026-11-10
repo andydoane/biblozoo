@@ -102,7 +102,7 @@ async function main() {
     "Targeted end-of-game stop must exclude jam-note voices");
   has(native,'stopEffect?.({soundId:"jam-groove"})',
     "Controller uses narrow native groove stop");
-  matches(game,/stopRun\(\{ keepNativeReady: !!nativeJamAudio,[\s\S]*?preserveNativeFinale: !!nativeJamAudio \}\)/,
+  matches(game,/stopRun\(\{\s*keepNativeReady:\s*!!nativeJamAudio,\s*preserveNativeFinale:\s*!!nativeJamAudio\s*\}\)/,
     "Finish must retain hot notes for final arpeggio");
   has(game,"NATIVE_JAM_FINALE_LEAD_SECONDS = 0.22",
     "Finale notes must have worker-safe host-time lead after native stop");
