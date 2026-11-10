@@ -20,9 +20,11 @@
   const AUDIO_BASE = "./verse_audio/";
   // N7f: shadow Audio ONLY inside this activity, never window.Audio.
   // Browser/PWA/Android remains its original Audio constructor.
-  const NativeReadOutput = root?.BibloZooNativeReadOutputController;
-  const Audio = NativeReadOutput?.enabled
-    ? NativeReadOutput.NativeAudio : root?.Audio;
+  // Refer to the native controller through root in activity functions,
+  // not a closure-only binding. The older Read recovery regression harness
+  // also extracts and executes those individual functions in isolation.
+  const Audio = root?.BibloZooNativeReadOutputController?.enabled
+    ? root.BibloZooNativeReadOutputController.NativeAudio : root?.Audio;
   const TYPEWRITER_ACTIVITY_ID =
     "typewriter";
   const VERSE_CRAWL_ACTIVITY_ID =
@@ -1510,7 +1512,7 @@
     readAudioStartPromise = promise;
     promise.catch((error) => {
       if (activeAudio !== audio || completionReported) return;
-      if (NativeReadOutput?.enabled || readNarrationBlocked(error))
+      if (root?.BibloZooNativeReadOutputController?.enabled || readNarrationBlocked(error))
         pauseReadForInterruption();
       else fallback?.();
     });
@@ -1994,8 +1996,8 @@
 
   function resumeReadAudioFromGesture() {
     // A user-tapped Welcome Back is the only post-interruption takeover.
-    if (NativeReadOutput?.enabled)
-      void NativeReadOutput.activateFromGesture();
+    if (root?.BibloZooNativeReadOutputController?.enabled)
+      void root.BibloZooNativeReadOutputController.activateFromGesture();
     const recovery = readAudioRecovery;
     if (!recovery || readAudioRecoveryAttempt || root?.document?.hidden) return false;
     const generation = readAudioRecoveryGeneration;
@@ -2127,7 +2129,7 @@
   root?.addEventListener?.("pageshow", restorePausedReadSceneOnReturn);
 
   function stopAudio() {
-    if (NativeReadOutput?.enabled) void NativeReadOutput.stopAll();
+    if (root?.BibloZooNativeReadOutputController?.enabled) void root.BibloZooNativeReadOutputController.stopAll();
     readAudioRecoveryGeneration += 1;
     readZooRecovery = null;
     readAudioRecovery = null;
@@ -2294,8 +2296,8 @@
 
     // Claim audio priority only on this actual Start interaction.
     // Subsequent animated chunk timers may NEVER seize it anew.
-    if (NativeReadOutput?.enabled)
-      void NativeReadOutput.activateFromGesture();
+    if (root?.BibloZooNativeReadOutputController?.enabled)
+      void root.BibloZooNativeReadOutputController.activateFromGesture();
     // Start in the launch gesture so iOS permits music playback.
     if (safeActivityId === VERSE_CRAWL_ACTIVITY_ID) {
       startCrawlMusic("activity-launch");
@@ -2629,7 +2631,7 @@
   }
 
   function stopScrambleRewards() {
-    if (NativeReadOutput?.enabled) void NativeReadOutput.stopCues();
+    if (root?.BibloZooNativeReadOutputController?.enabled) void root.BibloZooNativeReadOutputController.stopCues();
     scrambleSoundVoices.forEach(({ oscillator, gain }) => {
       try { oscillator.onended = null; oscillator.stop(); } catch (err) { }
       try { oscillator.disconnect(); gain.disconnect(); } catch (err) { }
@@ -2646,8 +2648,8 @@
   // Notes are scheduled together, so no delayed callback can outlive a game.
   function playScrambleReward(solvedCount, complete) {
     if (appApi?.isMuted?.()) return;
-    if (NativeReadOutput?.enabled) {
-      NativeReadOutput.playCue("scramble", solvedCount, complete, false);
+    if (root?.BibloZooNativeReadOutputController?.enabled) {
+      root.BibloZooNativeReadOutputController.playCue("scramble", solvedCount, complete, false);
       return;
     }
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
@@ -2693,8 +2695,8 @@
   // completion flourish. These voices use the same lifecycle as Scramble's.
   function playOrderTone(nextIndex, complete = false, wrong = false) {
     if (appApi?.isMuted?.()) return;
-    if (NativeReadOutput?.enabled) {
-      NativeReadOutput.playCue("order", nextIndex, complete, wrong);
+    if (root?.BibloZooNativeReadOutputController?.enabled) {
+      root.BibloZooNativeReadOutputController.playCue("order", nextIndex, complete, wrong);
       return;
     }
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
@@ -2828,8 +2830,8 @@
   }
 
   function playGeneratedNegativeTone() {
-    if (NativeReadOutput?.enabled) {
-      NativeReadOutput.playCue("negative", 1, false, true);
+    if (root?.BibloZooNativeReadOutputController?.enabled) {
+      root.BibloZooNativeReadOutputController.playCue("negative", 1, false, true);
       return;
     }
     const AudioContextClass =
@@ -3231,7 +3233,7 @@
       activeAudio.addEventListener(
         "error",
         () => {
-          if (root?.document?.hidden || NativeReadOutput?.enabled)
+          if (root?.document?.hidden || root?.BibloZooNativeReadOutputController?.enabled)
             pauseReadForInterruption();
           else finish();
         },
@@ -3641,7 +3643,7 @@
       activeAudio.addEventListener(
         "error",
         () => {
-          if (root?.document?.hidden || NativeReadOutput?.enabled)
+          if (root?.document?.hidden || root?.BibloZooNativeReadOutputController?.enabled)
             pauseReadForInterruption();
           else finish();
         },
@@ -4070,7 +4072,7 @@
       audio.setAttribute?.("playsinline", "");
       audio.setAttribute?.("webkit-playsinline", "");
       const music = { audio, context: null, gain: null,
-        engine: NativeReadOutput?.enabled ? "native-read-n7f" :
+        engine: root?.BibloZooNativeReadOutputController?.enabled ? "native-read-n7f" :
           "html-media-direct-20j", failed: false };
       crawlMusic = music;
       audio.addEventListener?.("error", () => {
@@ -4091,7 +4093,7 @@
         () => true,
         () => {
           music.failed = true;
-          if (NativeReadOutput?.enabled) pauseReadForInterruption();
+          if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
           return false;
         });
     } catch (error) {
@@ -4143,7 +4145,7 @@
       };
       ending.addEventListener?.("ended", finish, { once: true });
       ending.addEventListener?.("error", () => {
-        if (NativeReadOutput?.enabled) pauseReadForInterruption();
+        if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
         else finish();
       }, { once: true });
       Promise.resolve(ending.play()).then(
@@ -4158,12 +4160,12 @@
           }, CRAWL_ENDING_OVERLAP_MS);
         },
         () => {
-          if (NativeReadOutput?.enabled) pauseReadForInterruption();
+          if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
           else finish();
         });
       // Native never gives verse completion for an elapsed watchdog alone.
       crawlTimer(session, () => {
-        if (NativeReadOutput?.enabled && !session.endingDone)
+        if (root?.BibloZooNativeReadOutputController?.enabled && !session.endingDone)
           pauseReadForInterruption();
         else finish();
       }, 6500);
