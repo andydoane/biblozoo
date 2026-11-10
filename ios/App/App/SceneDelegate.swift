@@ -456,7 +456,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         }
                     }
                     let rms = sqrt(total / Double(max(1,count)))
-                    let db = 20 * log10(max(rms, 0.00001))
+                    // An unexpected nonfinite input sample must NEVER
+                    // become Int(NaN) and crash the physical DEV test app.
+                    let safeRms = rms.isFinite ? max(rms, 0.00001) : 0.00001
+                    let db = 20 * log10(safeRms)
                     let percent = max(0, min(100, Int((db + 55) * 100 / 55)))
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self, self.generation == token,
