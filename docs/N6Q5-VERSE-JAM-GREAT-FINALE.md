@@ -7,7 +7,7 @@
 Reviewed `ios-prep/verse_playground/verse_jam/game.js` `playCompletionArpeggio()` and `finishToEndScreen()`. Original user-facing sequence:
 
 - On “Tap to Continue,” the button disables immediately and changes to **“Great!”**, single completion/verse reward is marked, existing background beat stops, and a cheerful **C-major arpeggio** starts before the End menu.
-- Its **seven ascending melody notes** are exact original fixed MIDI, timing, duration, volume, and waveforms: C60 at 0.00s, E64 at .08s, G67 at .16s, C72 at .25s, E76 at .36s, G79 at .48s, C84 at .62s; a tiny sparkle C#91 at .80s (square on earlier melody, triangle on later notes).
+- Its **seven ascending melody notes** are exact original fixed MIDI, timing, duration, volume, and waveforms: C60 at 0.00s, E64 at .08s, G67 at .16s, C72 at .25s, E76 at .36s, G79 at .48s, C84 at .62s; a tiny MIDI91 sparkle at .80s (square on earlier melody, triangle on later notes).
 - The original source note arrays and volume `MIX.finalArpeggio` are retained; the original web path uses `audioCtx.currentTime + 0.03` and shows its ending screen after **900ms**, allowing most of the celebratory cue to play while “Great!” is still visible. These original Web/PWA/Android behaviors are untouched by this PR.
 
 ## Why native was late and sounded uneven
