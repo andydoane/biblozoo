@@ -19,6 +19,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         CAPPluginMethod(name: "preload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+        // N7b DEV-only barrier: stop output worker before mic session proof.
+        CAPPluginMethod(name: "devPrepareForMicrophone", returnType: CAPPluginReturnPromise),
         // N6o: cut only the bounded Scripture Scrub mower clip at the
         // end of its 1250ms visual pass; keep other PCM clips prepared.
         CAPPluginMethod(name: "stopEffect", returnType: CAPPluginReturnPromise),
@@ -3182,6 +3184,37 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 }
                 DispatchQueue.main.async {
                     call.resolve(["stopped": true, "reason": "stopped"])
+                }
+            }
+        }
+    }
+
+    // N7b DEV only. A separate microphone meter temporarily owns the SAME
+    // OS AVAudioSession, but may not race the existing serial AVAudioEngine
+    // output worker. It must request this barrier from the real DEV tap.
+    // This method never setsCategory/mode or deactivates the audio session;
+    // the DEV probe must restore it, and the next sound requires a NEW tap.
+    @objc func devPrepareForMicrophone(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self,
+                  Bundle.main.bundleIdentifier ==
+                    "com.andydoane.biblozoo.audiotest",
+                  UIApplication.shared.applicationState == .active,
+                  AVAudioSession.sharedInstance().category == .soloAmbient else {
+                call.resolve(["prepared":false,"reason":"unsafe-session-state"])
+                return
+            }
+            self.needsGestureAfterInterruption = true
+            self.hasGestureActivatedSession = false
+            self.activationAttemptsThisForeground = 0
+            self.lastActivationAt = nil
+            self.appendTrace("mic-dev-handoff")
+            self.forgetPlayback()
+            // forgetPlayback enqueues disposal. This subsequent barrier
+            // acknowledges that all earlier output work has actually stopped.
+            self.playbackQueue.async {
+                DispatchQueue.main.async {
+                    call.resolve(["prepared":true,"reason":"output-worker-idle"])
                 }
             }
         }

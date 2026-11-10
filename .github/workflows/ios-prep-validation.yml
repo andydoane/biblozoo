@@ -51,10 +51,17 @@ jobs:
         run: |
           command -v swiftc
           swiftc -frontend -parse ios/App/App/BibloZooNativeSoundPlugin.swift
+          # N7b adds a DEV-only mic plugin in the existing Xcode SceneDelegate
+          # source, so parse the actual modified Swift file too.
+          swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7b explicit DEV mic permission and session restore proof
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_n7b_mic_session_probe.js
+
       - name: Validate N7a Flashcards recording and Wacky DSP source audit
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7_recording_audit_n7a.js
