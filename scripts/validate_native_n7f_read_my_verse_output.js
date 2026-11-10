@@ -260,7 +260,9 @@ async function exerciseNative(){
   a.playCue("order",3,false,false);
   a.playCue("scramble",2,true,false);
   a.playCue("negative",1,false,true);
-  await Promise.resolve();await Promise.resolve();
+  // Cue calls await the real-gesture activation promise and then cross
+  // a separate Capacitor microtask queue. Yield one full event-loop turn.
+  await new Promise(resolve=>setImmediate(resolve));
   assert.equal(calls.filter(c=>c.kind==="cue").length,3,
     "All fixed authored feedback paths call native, never WebAudio");
   doc.hidden=true;on.visibilitychange();
