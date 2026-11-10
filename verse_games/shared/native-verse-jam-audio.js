@@ -247,8 +247,13 @@
     }
   }
   function stopGrooveForFinale() {
-    // The finale likewise leaves prepared note voices intact.
-    void stopGrooveForTransition();
+    // The original ios-prep final C-major arpeggio plays *after* the
+    // background beat stops. Return the worker acknowledgment so the
+    // Great! button can schedule its first notes onto a genuinely idle
+    // serial PCM worker instead of racing stop/prepare and playing late.
+    // This uses the same narrow drum/pad/voice scope as between rounds:
+    // all twelve prewarmed melody-note voices remain available.
+    return stopGrooveForTransition();
   }
   function traceTransition(phase, round, wordIndex = -1) {
     // Diagnostic ONLY: fixed phases/rounds, no verse text, audio data,
