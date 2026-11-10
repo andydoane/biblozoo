@@ -45,8 +45,12 @@ has(readActivity,"onAppInactive?.(",
   "Read My Verse hooks native signal to its actual recovery owner");
 has(readActivity,"pauseReadForInterruption();",
   "Actual recovery freezes scene, audio and timers");
-has(readActivity,"if (isTypingActivity(state.activityId)) freezeReadTypingIntro();",
+has(readActivity,"root?.BibloZooNativeReadOutputController?.enabled &&",
+  "New typing freeze is gated to native Audio Test, preserving browser");
+has(readActivity,"isTypingActivity(state.activityId)) freezeReadTypingIntro();",
   "Both typing activities freeze their short cutscene and blinking cursor");
+has(readActivity,'state.typewriterIntroPhase !== "done") finishTypewriterIntro();',
+  "Original Web/PWA/Android still finishes interrupted typing intro as before");
 has(readActivity,"thawReadTypingIntro();",
   "Typing intro unfreezes on explicit verified Resume Audio only");
 has(css,".read-my-verse-screen.read-audio-paused *",
