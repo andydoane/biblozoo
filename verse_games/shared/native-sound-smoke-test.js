@@ -187,6 +187,9 @@
     // Keep the original DEV panel child order for older test/owner controls.
     panel.appendChild(narrationRow);
     doc.body.appendChild(panel);
+    // N7e: keep the full diagnostic controls but hide both large panels
+    // behind the compact DEV Tools drawer until explicitly reopened.
+    root.BibloZooDevTools?.register?.(panel);
 
     let epoch = 0;
     let busy = false;
