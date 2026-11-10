@@ -85,8 +85,10 @@ has(facade,"const OFFICIAL_WACKY_IDS = new Set([","Native whitelist");
 has(facade,"mic().playCapture({","Native bridge only, no HTML DSP fallback");
 has(facade,"takeId: takeMetadata.takeId, presetId","Exact opaque take selector");
 has(facade,"nativeWacky: true","Native child UI visibility capability");
-has(facade,"done?.(event.kind === \"ended\")",
-  "Wacky Promise completes ONLY with real matching native end event");
+has(facade,'const heard = event.kind === "ended" && funStarted;',
+  "Wacky success needs both rendered DSP audio and real full end");
+has(facade,"done?.(heard)",
+  "A bridge ACK or raw silence cannot falsely finish Wacky");
 has(facade,"function stopFun()","Early cancel interrupts native output");
 assert(!/getUserMedia\s*\(|MediaRecorder\s*\(|new Audio\s*\(|AudioContext\s*\(/.test(facade),
   "Native iOS never uses Web/HTML effects fallback");
