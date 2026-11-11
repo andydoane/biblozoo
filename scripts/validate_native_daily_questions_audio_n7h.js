@@ -181,6 +181,60 @@ async function run() {
   }), false);
   assert.equal(played(web).length, 0);
 
+  // Also execute the actual Daily Questions module's generated Sounds Like?
+  // handler (not just a text assertion). Native Play Sound must prime the
+  // existing Read AVAudioPlayer bridge synchronously, and no browser Audio
+  // constructor may be touched in the Audio Test environment.
+  const nativeCalls = [];
+  class FakeReadClip {
+    constructor(src) { this.src = src; this.currentTime = 0.2;
+      this.paused = true; this.ended = false; this.handlers = new Map(); }
+    addEventListener(type, fn) { this.handlers.set(type, fn); }
+    pause() { nativeCalls.push(["stop-chunk", this.src]); this.paused = true; }
+    play() { nativeCalls.push(["play-chunk", this.src]); this.paused = false;
+      return Promise.resolve(true); }
+  }
+  const currentDoc = { hidden: false, addEventListener() {} };
+  const nativeWindow = {
+    BibloZooNativeOnlyOutput: { enabled: true },
+    BibloZooNativeReadOutputController: {
+      enabled: true,
+      clipIdFor: src => /^\.\/verse_audio\/[a-z0-9_]+\.mp3$/.test(src) ?
+        "verse:published" : "",
+      activateFromGesture: () => {
+        nativeCalls.push(["gesture"]);
+        return Promise.resolve(true);
+      },
+      NativeAudio: FakeReadClip
+    },
+    addEventListener() {}
+  };
+  const instrumented = daily.replace(/\n\}\)\(\);\s*$/, '\n  window.__n7hProbe = {setSession: (value) => { dailySession=value; appApi={isMuted:()=>false,renderApp:()=>{}}; }, playGeneratedQuestionAudio, stopGeneratedQuestionAudio};\n})();\n');
+  assert.notEqual(instrumented, daily, "Daily Questions VM hook must be inserted");
+  vm.runInNewContext(instrumented, {
+    window: nativeWindow, document: currentDoc, Promise, Date,
+    Audio: class { constructor() { throw Error("Web Audio forbidden on iOS"); } },
+    setTimeout: () => 1, clearTimeout: () => {},
+    setInterval: () => 2, clearInterval: () => {}
+  });
+  const session = { answered: false, questionAudioPlaying: false, phase: "question" };
+  nativeWindow.__n7hProbe.setSession(session);
+  nativeWindow.__n7hProbe.playGeneratedQuestionAudio(
+    "./verse_audio/john_3_16a.mp3", session);
+  assert.equal(nativeCalls[0][0], "gesture",
+    "native activation must occur in actual Play Sound handler");
+  assert.equal(nativeCalls[1][0], "play-chunk");
+  assert.equal(session.questionAudioPlaying, true);
+  nativeWindow.__n7hProbe.stopGeneratedQuestionAudio();
+  assert.equal(session.questionAudioPlaying, false);
+  assert(nativeCalls.some(x => x[0] === "stop-chunk"),
+    "Next/Exit must stop native chunk");
+  nativeWindow.BibloZooNativeReadOutputController = undefined;
+  nativeWindow.__n7hProbe.playGeneratedQuestionAudio(
+    "./verse_audio/john_3_16a.mp3", session);
+  assert.equal(session.questionAudioPlaying, false,
+    "missing native Read bridge must fail closed, not construct HTML Audio");
+
   console.log("N7h PASS: exact bundled MP3 native PCM IDs, correct/incorrect " +
     "real-adapter taps, no Web fallback, mute/Exit/hidden/held-switcher " +
     "stale activation blocked, timed feedback, Sounds Like native facade, " +
