@@ -137,7 +137,7 @@
   async function play(soundId, { onProgress, onInterrupted,
     positionMs = 0 } = {}) {
     if (!isAvailable() || root.document?.hidden || typeof soundId !== "string" ||
-        !/^(learn-instruction-[a-z0-9_]+|learn-part-[a-z0-9_]+-[0-9]+)$/.test(soundId))
+        !/^(learn-instruction-[a-z0-9_]+|learn-part-[a-z0-9_]+-[0-9]+|tutorial-page-[1-4])$/.test(soundId))
       return { ended: false, reason: "invalid-source" };
     const bridge = api();
     if (typeof bridge?.prepareNarration !== "function" ||

@@ -1263,9 +1263,20 @@ let lastUiTapFallbackAt = 0;
 let petUnlockAudioEl = null;
 let lastPetUnlockSoundAt = 0;
 let petUnlockSoundGeneration = 0;
+let petUnlockNativeLifecycleBound = false;
 
 function stopPetUnlockPackageSound() {
   petUnlockSoundGeneration += 1;
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    // N7l: the original boxed BibloPet clip is already bundled and allowlisted
+    // as the native DEV pilot-unlock AVAudioPlayer. Scoped Stop leaves other
+    // audio banks/session ownership untouched; do not call browser Audio.
+    try {
+      void Promise.resolve(window.Capacitor?.Plugins?.BibloZooNativeSound
+        ?.stop?.({ soundId: "pilot-unlock" })).catch(() => {});
+    } catch (_) { /* Leaving the page cannot be blocked by audio cleanup. */ }
+    return;
+  }
   try {
     petUnlockAudioEl?.pause();
     if (petUnlockAudioEl) petUnlockAudioEl.currentTime = 0;
@@ -1443,6 +1454,10 @@ function ensurePetUnlockAudio() {
 }
 
 function preloadPetUnlockSoundBuffer() {
+  // No HTMLAudioElement may be constructed on the native-only iOS build.
+  // Native preflight is deliberately reserved for the box-opening gesture.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true)
+    return Promise.resolve(null);
   const audio = ensurePetUnlockAudio();
 
   try {
@@ -1462,6 +1477,45 @@ function playPetUnlockPackageSound({ allowFallback = true } = {}) {
   lastPetUnlockSoundAt = nowMs;
 
   const generation = ++petUnlockSoundGeneration;
+  // N7l: play the ORIGINAL ui_pet_unlock.mp3 from Swift's existing bundled
+  // pilot-unlock AVAudioPlayer on the real Open Box button click. No WebKit
+  // playback, oscillator, tap-pop fallback or hidden auto-reactivation.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    const api = window.Capacitor?.Plugins?.BibloZooNativeSound;
+    if (typeof api?.activateFromGesture !== "function" ||
+        typeof api?.preload !== "function" ||
+        typeof api?.play !== "function" ||
+        typeof api?.stop !== "function") return;
+    if (!petUnlockNativeLifecycleBound &&
+        typeof api.addListener === "function") {
+      petUnlockNativeLifecycleBound = true;
+      try {
+        void Promise.resolve(api.addListener("biblozooAppLifecycle", event => {
+          if (event?.active === false || event?.active === true)
+            stopPetUnlockPackageSound();
+        })).catch(() => { petUnlockNativeLifecycleBound = false; });
+      } catch (_) { petUnlockNativeLifecycleBound = false; }
+    }
+    const stillCurrent = () =>
+      generation === petUnlockSoundGeneration &&
+      State.screen === Screen.PET_UNLOCK && !muted && !document.hidden &&
+      performance.now() - nowMs <= 1600;
+    let activation;
+    try {
+      // This call, unlike the async prepare/play, must occur inside the tap.
+      activation = api.activateFromGesture({ purpose: "ui" });
+    } catch (_) { return; }
+    void Promise.resolve(activation).then(async ready => {
+      if (ready?.ready !== true || !stillCurrent()) return;
+      const prepared = await api.preload({ soundId: "pilot-unlock" });
+      if (prepared?.prepared !== true || !stillCurrent()) return;
+      // Scheduling is not proof the child heard the sound; box rewards and
+      // animation never depend on a native ACK.
+      await api.play({ soundId: "pilot-unlock", volume: UI_PET_UNLOCK_VOLUME,
+        eventId: "pet-unlock-" + generation, requestEpochMs: Date.now() });
+    }).catch(() => { /* Fail closed; box can always be opened. */ });
+    return;
+  }
   const audio = ensurePetUnlockAudio();
   const fallbackIfCurrent = (err) => {
     console.warn("Could not play BibloPet unlock sound", err);
@@ -2203,6 +2257,7 @@ async function continueLearnInstruction() {
     }
 
     if (isTutorialActive()) {
+      primeZooTodoTutorialNativeAudioFromGesture();
       State.todoTutorialJustFinishedLearn = true;
       markTutorialLearnDone(VERSE_ID);
       go(Screen.TODO_DEV);
@@ -14453,6 +14508,8 @@ function activateProfileFromPicker(profileId) {
 
   try {
     profileApi?.setActiveProfile?.(profileId);
+    // Existing Zookeeper selection tap can lead straight to tutorial page 1.
+    if (isTutorialActive()) primeZooTodoTutorialNativeAudioFromGesture();
 
     void continueAfterProfileActivation()
       .catch((err) => {
@@ -14565,6 +14622,10 @@ function updateProfileEditorValidationUi(rootEl) {
 
 async function submitProfileEditor() {
   if (State.profileEditorBusy) return;
+  // N7l: the Create Zookeeper gesture is the first opportunity to preflight
+  // tutorial page 1; validation/storage awaits must not initiate audio later.
+  if (State.profileEditorMode !== PROFILE_EDITOR_MODES.EDIT)
+    primeZooTodoTutorialNativeAudioFromGesture();
 
   const profileApi = getProfileApi();
 
@@ -18958,7 +19019,20 @@ let zooTodoTutorialAudioAttempt = null;
 const zooTodoTutorialAutoAttempted = new Set();
 const zooTodoTutorialNeedsRetry = new Set();
 
+function primeZooTodoTutorialNativeAudioFromGesture() {
+  // Only explicit existing Create/Choose Zookeeper/Next/Practice-time taps
+  // may reclaim AVAudioSession. Preparing the next tutorial page in the same
+  // gesture preserves ios-prep's AUTOMATIC page narration; no new button.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true &&
+      isNativeLearnTracksMode() && !muted && !document.hidden) {
+    window.BibloZooNativeLearnTracks.primeFromGesture();
+  }
+}
+
 function renderZooTodoTutorialAudioRetry(pageNumber) {
+  // N7l native iOS: the broken visible retry control has no part in the
+  // original four-page flow; retain the Web/PWA version and markup there.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) return "";
   if (!zooTodoTutorialNeedsRetry.has(pageNumber) ||
       hasPlayedZooTodoTutorialPageAudio(pageNumber)) return "";
   return `<div class="todo-tutorial-actions" style="margin-top:10px">
@@ -18974,6 +19048,14 @@ function stopZooTodoTutorialPageAudio({ offerRetry = false } = {}) {
   zooTodoTutorialAudioAttempt = null;
   zooTodoTutorialAudioGeneration += 1;
   clearTimeout(attempt.startupTimer);
+  if (attempt.native === true) {
+    // The tutorial owns exactly one native narrator; don't release Learn,
+    // Read or another screen when no tutorial narration is active.
+    window.BibloZooNativeLearnTracks?.stop?.();
+    if (offerRetry && !hasPlayedZooTodoTutorialPageAudio(attempt.pageNumber))
+      zooTodoTutorialNeedsRetry.add(attempt.pageNumber);
+    return;
+  }
   audioEl.removeEventListener("ended", attempt.onEnd);
   audioEl.removeEventListener("error", attempt.onError);
   audioEl.removeEventListener("pause", attempt.onPause);
@@ -19223,6 +19305,34 @@ function playZooTodoTutorialPageAudio(pageNumber, { explicit = false } = {}) {
   zooTodoTutorialAudioAttempt = attempt;
   const isCurrent = () => zooTodoTutorialAudioAttempt === attempt &&
     zooTodoTutorialAudioGeneration === generation;
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    // Same four original tutorial_page_*.mp3 files as ios-prep, decoded by
+    // Swift AVAudioPlayer under fixed tutorial-page-1..4 IDs. No WebKit
+    // Audio construction, HTML play(), synthesized tones or auto-resume.
+    attempt.native = true;
+    if (!isNativeLearnTracksMode()) {
+      stopZooTodoTutorialPageAudio({ offerRetry: true });
+      return;
+    }
+    try {
+      void Promise.resolve(window.BibloZooNativeLearnTracks.play(
+        "tutorial-page-" + pageNumber
+      )).then(result => {
+        if (!isCurrent()) return;
+        const ended = result?.ended === true;
+        stopZooTodoTutorialPageAudio({ offerRetry: !ended });
+        if (!ended || document.hidden || muted ||
+            State.screen !== Screen.TODO_DEV ||
+            getZooTodoTutorialPageNumber() !== pageNumber) return;
+        // Only an actual native AVAudioPlayer 'ended' event marks heard.
+        markZooTodoTutorialPageAudioPlayed(pageNumber);
+        zooTodoTutorialNeedsRetry.delete(pageNumber);
+      }).catch(() => {
+        if (isCurrent()) stopZooTodoTutorialPageAudio({ offerRetry: true });
+      });
+    } catch (_) { stopZooTodoTutorialPageAudio({ offerRetry: true }); }
+    return;
+  }
   const fail = (err) => {
     if (!isCurrent()) return;
     if (err) console.warn("Could not play Zoo To-Do tutorial audio", err);
@@ -19339,6 +19449,7 @@ function bindZooTodoTutorial(rootEl) {
       e.stopPropagation();
 
       const nextPage = Number(btn.getAttribute("data-tutorial-next") || 1);
+      primeZooTodoTutorialNativeAudioFromGesture();
       stopZooTodoTutorialPageAudio();
 
       if (nextPage === 2) {
@@ -23070,6 +23181,9 @@ function screenFinalRecall(idx) {
           markLearnCompleted(VERSE_ID);
         }
 
+        // Practice time is a real button gesture; activate the next original
+        // tutorial-page-4 narrator before the async slide/page transition.
+        primeZooTodoTutorialNativeAudioFromGesture();
         State.todoTutorialJustFinishedLearn = true;
         markTutorialLearnDone(VERSE_ID);
         go(Screen.TODO_DEV);
