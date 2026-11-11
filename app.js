@@ -13150,6 +13150,8 @@ async function startEchoFlow() {
     ? nativeLearnPartCheckpoint : null;
   const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
   const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
+  const resumeQuiet = recovery?.quietPhase === "echo-repeat"
+    ? { phase: "echo-repeat", remainingMs: recovery.quietRemainingMs } : null;
   learnAudioInterrupted = null;
   nativeLearnTrackError = "";
 
@@ -13159,7 +13161,7 @@ async function startEchoFlow() {
   // cancel any prior
   cancelLearnAudio();
 
-  await runEchoSequence(startIndex, startPositionMs);
+  await runEchoSequence(startIndex, startPositionMs, resumeQuiet);
 }
 
 let echoCancelToken = 0;
@@ -13183,7 +13185,8 @@ function cancelLearnAudio() {
   nativeLearnQuietCheckpoint = null;
 }
 
-async function runEchoSequence(startIndex = 0, resumePositionMs = 0) {
+async function runEchoSequence(startIndex = 0, resumePositionMs = 0,
+    resumeQuiet = null) {
   const my = ++echoCancelToken;
 
   State.echoDone = false;
@@ -13210,8 +13213,13 @@ async function runEchoSequence(startIndex = 0, resumePositionMs = 0) {
       State.echoSpeaking = false;
       updateEchoStageState();
       let d;
+      const resumingRepeat = i === startIndex &&
+        resumeQuiet?.phase === "echo-repeat" && isNativeLearnTracksMode();
 
-      if (isNativeLearnTracksMode()) {
+      if (resumingRepeat) {
+        // Yellow text = the child speaking; there is no AVAudioPlayer to
+        // resume. Restore the SAME remaining turn, without re-playing audio.
+      } else if (isNativeLearnTracksMode()) {
         const positionMs = i === startIndex ? resumePositionMs : 0;
         nativeLearnPartCheckpoint = {
           verseId: VERSE_ID, mode: "echo", index: i, positionMs
@@ -13271,8 +13279,22 @@ async function runEchoSequence(startIndex = 0, resumePositionMs = 0) {
       updateEchoStageState();
 
       // Give the child time to repeat: duration × 1.25 (fallback 2s if unknown)
-      const repeatMs = (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
-      const elapsed = await waitForPausableDelay(repeatMs, my);
+      const repeatMs = resumingRepeat
+        ? Math.max(75, Number(resumeQuiet.remainingMs) || 0)
+        : (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
+      if (isNativeLearnTracksMode()) nativeLearnQuietCheckpoint = {
+        verseId: VERSE_ID, mode: "echo", phase: "echo-repeat",
+        index: i, remainingMs: repeatMs
+      };
+      const elapsed = await waitForPausableDelay(repeatMs, my, remaining => {
+        if (!isNativeLearnTracksMode()) return;
+        if (nativeLearnQuietCheckpoint?.mode === "echo" &&
+            nativeLearnQuietCheckpoint.index === i)
+          nativeLearnQuietCheckpoint.remainingMs = remaining;
+        if (resumingRepeat) nativeLearnQuietResumeProgress("echo", i,
+          "echo-repeat", remaining);
+      });
+      if (my === echoCancelToken) nativeLearnQuietCheckpoint = null;
 
       if (!elapsed || my !== echoCancelToken || document.hidden) return;
 
