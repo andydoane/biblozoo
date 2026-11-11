@@ -101,7 +101,9 @@ function makeHarness({ native = true, ready = true, mute = false } = {}) {
     encodeURIComponent,
     showDialog(x) { dialogs.push(x); },
     dlgBtn() { return {}; },
-    closeDialog() {}
+    closeDialog() {},
+    stopDailyQuestionPreviewAudio() {},
+    stopPetUnlockPackageSound() {}
   };
   vm.runInNewContext(picker +
     "\nwindow.__test = {toggleNewVersePickerPreviewAudio, " +
