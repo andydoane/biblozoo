@@ -1,5 +1,18 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## N7j — Learn menu Close resumes native narration, not false Welcome Back (2026-11-10)
+
+**Reported and source-confirmed:** On Audio Test iOS, playing Learn verse narration → open Learn/BibloZoo menu → tap Close previously surfaced **Welcome Back… / Let's go!**. The owner confirms Let's go recovers audio successfully. The code cause is `openLearnMenu` using `pauseLearnAudioForInterruption` to snapshot and stop the native Listen/Chunks/Echo stream, while `closeLearnMenu` simply exposed `learnAudioInterrupted` via the overlay.
+
+**Experimental fix:** Preserve exact native checkpoint and immediate pause on menu Open. Distinguish **menu-local** recovery from genuine iOS inactivity. A real **Close** tap can invoke existing native `resumeInterruptedLearnAudio` (`BibloZooNativeLearnListen.startFromGesture` or native Chunks/Echo preflight) with saved reference/full-verse stage, chunk index and position, while suppressing *only* the menu-close pending Welcome Back UI. Native progression/event remains the real proof before finishing, never an accepted bridge ACK; on refusal/watchdog, original Welcome Back retry returns. Exit Learn, mute, app hidden/pagehide/blur and early UIKit `biblozooAppLifecycle(active:false)` forbid that shortcut; real OS interruption retains manual Let's go. Stable/Web/PWA/Android keep original HTML `safePlay` behavior. Native-only resume no longer runs optional browser AudioContext unlock. No Swift/session/DSP, recording, Zoo, rewards or accessibility UI rewrite.
+
+**Regression command:** `node scripts/validate_native_learn_menu_close_n7j.js` executes **actual production Learn menu, pause, recovery and overlay functions** inside a mocked DOM/native VM, covering Listen, Chunks, Echo, checkpoint restoration, no false overlay, native failure retry, OS early inactive, hidden, Exit, mute, and original browser resume. Included in experimental GitHub Actions with N1–N7i regressions, Swift full-file grammar parser and production web build. **CI/mock ACK is not a device audible PASS or Apple SDK typecheck.** [N7j device checklist](N7J-LEARN-MENU-NATIVE-RESUME.md).
+
+**Owner physical after review/merge:** Pull `experiment/native-ios-audio` in separate Mac Audio Test worktree, `npm run build && npx cap sync ios && npx cap open ios` and build real iPhone `com.andydoane.biblozoo.audiotest`. Test menu Open→Close during both Listen **reference and full verse** (John 3:16 and Psalm 23:4), during spoken **Chunks** and **Echo**, no popup/rewind/skip, and genuine OS App Switcher hold/lock/external AirPods Play **still does require Let's go!**. Check menu Exit, mute, repeated Open/Close, no ghost audio, no duplicate Learn/Daily Zoo credit. **N7j owner PASS PENDING.** N7i #78 merged at `60646e97` and owner reports its New Verse picker speaker fix **worked** (only that observed path); N7h Daily Questions and N7g integrated broader device PASS still unreported.
+
+---
+
+
 ## N7i — Choose a New Verse speaker: original full verse via native AVAudioPlayer (owner iPhone PENDING)
 
 **Reported Problem #1 (2026-11-10), source-confirmed:** On each pet/verse card in **Choose a New Verse**, the small top-right speaker shows "Verse audio unavailable". The owner sound audit (Session 1) already flags the picker as an HTML-audio gap. Previously `app.js toggleNewVersePickerPreviewAudio` called `new Audio("./verse_audio/<verseId>.mp3")` even in isolated Audio Test iOS where N1 blocks WebKit audio. Unlike Verse Detail/Flashcards N6a, picker speaker was not migrated.
