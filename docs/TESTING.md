@@ -1,5 +1,18 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## N7i — Choose a New Verse speaker: original full verse via native AVAudioPlayer (owner iPhone PENDING)
+
+**Reported Problem #1 (2026-11-10), source-confirmed:** On each pet/verse card in **Choose a New Verse**, the small top-right speaker shows "Verse audio unavailable". The owner sound audit (Session 1) already flags the picker as an HTML-audio gap. Previously `app.js toggleNewVersePickerPreviewAudio` called `new Audio("./verse_audio/<verseId>.mp3")` even in isolated Audio Test iOS where N1 blocks WebKit audio. Unlike Verse Detail/Flashcards N6a, picker speaker was not migrated.
+
+**New experiment PR N7i:** `app.js` conditionally invokes the existing `BibloZooNativeLearnListen.startFromGesture({verseId,stage:"verse"})` synchronously on a real picker speaker tap for Audio Test iOS only. This is the already packaged/allowlisted original **FULL VERSE** `learn-verse-<id>` through native `AVAudioPlayer`, deliberately *no reference intro* or synthetic beep. Picker toggle, aria-pressed/labels, Stop/replay, switching verse cards, old promise/event suppression, mute, navigation, visibility/pagehide and quiet interruption are retained. Missing/refused native bridge never falls back to HTML or WebAudio and leaves the verse selectable; genuine failure reports the original child-friendly Unavailable prompt. The original Web/PWA/Android `new Audio` path is unchanged. No new Swift session/category, recording/mic, rewards/profile or selected verse change.
+
+**Automated gate:** `node scripts/validate_native_new_verse_picker_n7i.js` executes the real picker controller in a Node VM with simulated native and browser players, checking exact `stage:"verse"`, press/stop/end/switch/stale/exit/mute/failure/browsers, shipped native bridge/Swift bundled verse contract. Included in experimental branch GitHub Actions, alongside prior regressions, Swift grammar parsing and Web build. **No test here establishes actual speaker audibility or Xcode SDK compilation.** Confirm final PR HEAD CI separately.
+
+**Real iPhone after owner merge:** Audio Test bundle `com.andydoane.biblozoo.audiotest`; GitHub Desktop Pull origin on experimental worktree; `npm run build && npx cap sync ios && npx cap open ios`, Xcode App real iPhone. Hear full John 3:16 and Psalm 23:4 on picker speakers; Stop/replay, select/change cards, mute, held App Switcher, lock, AirPods/PiP and external Play; no ghost narration/popup/auto-restart, no accidental selected verse/rewards. Smoke-test existing native Verse Detail, Flashcards, Daily Questions, Learn. [N7i detailed checklist](N7I-NATIVE-NEW-VERSE-PICKER-PREVIEWS.md). **Owner N7i physical PASS PENDING.** N7h #77 is merged at `5d043b95` with GREEN merge-head CI; its Daily Questions physical PASS is not reported. N7g integrated physical gate also remains open.
+
+---
+
+
 ## N7h — Native Daily Questions answer and Sounds Like? output (owner iPhone PENDING)
 
 **Status (2026-11-10):** Feature PR targeting only `experiment/native-ios-audio` at N7g merge base `758d182232a80cf49de21f7885c1ca9360f78927`. N7g #76 code merged and two CI jobs passed at merge; full N7g iPhone integration PASS remains pending. Earlier September 28 answer sounds and October 17 browser reliability fixes remained `new Audio` in `daily_questions.js`. N1 native-only guard deliberately rejected this HTML playback; sound silence is a real unmigrated gap, not success. **No owner N7h Xcode/iPhone PASS yet.**
