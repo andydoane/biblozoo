@@ -1,5 +1,18 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## N7h — Native Daily Questions answer and Sounds Like? output (owner iPhone PENDING)
+
+**Status (2026-11-10):** Feature PR targeting only `experiment/native-ios-audio` at N7g merge base `758d182232a80cf49de21f7885c1ca9360f78927`. N7g #76 code merged and two CI jobs passed at merge; full N7g iPhone integration PASS remains pending. Earlier September 28 answer sounds and October 17 browser reliability fixes remained `new Audio` in `daily_questions.js`. N1 native-only guard deliberately rejected this HTML playback; sound silence is a real unmigrated gap, not success. **No owner N7h Xcode/iPhone PASS yet.**
+
+**Native routing:** New inert-on-Web/PWA/Android `verse_games/shared/native-daily-questions-audio.js` activates existing `BibloZooNativeSound` only on a genuine answer tap, requests exact fixed original `daily-question-correct`/`daily-question-incorrect` MP3 effects packaged under `public/verse_images/daily_questions`, and decodes through the existing AVAudioEngine PCM voice worker. Scoped native `stopEffect` cancels these two voices on Exit/mute/background/held iOS App Switcher without globally discarding Feeding/Learn/UI game banks. Pending activation/preload is invalid after lifecycle or changed question; no Web/HTML fallback or new AVAudioSession category. The generated **Sounds Like? Play Sound** uses the preexisting N7f published-verse allowlisted `NativeAudio` and true native AVAudioPlayer progress/end. Daily **Check the Verse → Listen** already invokes the N5 native Learn Listen route and remains unchanged.
+
+**Automated check:** `node scripts/validate_native_daily_questions_audio_n7h.js` runs source/Swift/asset contracts and the real answer adapter against a fake Capacitor bridge (correct/wrong, refusal, stale activation, hidden, inactive, delay, browser isolation). GitHub Actions runs it with Daily Questions existing suite, other N1–N7g regressions, two whole-file Swift *grammar* parses, and Production Web build. **Code validation cannot prove speaker audibility, Xcode SDK linking or AirPods/PiP priority.** Keep original Web/PWA/Android audio and all Daily reward/star/Zoo/progress rules unchanged.
+
+**Owner physical gate:** Mac experiment worktree Pull Origin → `npm run build && npx cap sync ios && npx cap open ios` → Xcode App on physical iPhone `com.andydoane.biblozoo.audiotest`. Hear correct and incorrect original answer MP3 on FIRST tap, test global mute, answer-lock/Next, no duplicate pegs; try **Sounds Like? Play Sound** actual published chunk + honest retry/real completion; check Verse Help native Listen/Close, rapid answer/Exit, held switcher/lock, AirPods reconnect, external media Play and still-playing YouTube PiP, fresh deliberate return. Smoke-test Learn/Feeding/N6 and N7 Read/Flashcards, no mic prompt, no ghosts or Zoo/grade change. Record heard results, Mac errors and any failure explicitly. [Full N7h gate](N7H-NATIVE-DAILY-QUESTIONS-AUDIO.md). **Owner PASS PENDING.**
+
+---
+
+
 > This document describes the **current `ios-prep` workflow**, verified against source on 2026-11-05. Check [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md), `package.json`, and the current scripts before claiming any test exists or passed. Automated checks and physical iPhone acceptance are different.
 
 ## N7g — Integrated audio reliability, bounded Read media ownership, Bluetooth/PiP/privacy (owner iPhone PENDING)
