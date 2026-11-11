@@ -1190,6 +1190,21 @@ function nativeLearnTrackProgress(mode, index, progress) {
     finishLearnAudioResumeAttempt(attempt);
   }
 }
+// Resuming a child's silent Echo turn cannot produce an AVAudioPlayer event.
+// Only real foreground delay-clock movement may dismiss the recovery overlay
+// for the SAME quiet phase. This does NOT mean a sound was heard or award credit.
+function nativeLearnQuietResumeProgress(mode, index, phase, remainingMs) {
+  const attempt = learnAudioResumeAttempt;
+  if (!attempt || attempt.narrationVerified || attempt.quietPhaseVerified ||
+      attempt.recovery?.mode !== mode || attempt.recovery.index !== index ||
+      attempt.recovery.quietPhase !== phase ||
+      attempt.recovery.screen !== State.screen ||
+      document.hidden || learnMenuOpen || muted) return;
+  const initial = Number(attempt.recovery.quietRemainingMs);
+  if (!Number.isFinite(initial) || remainingMs > initial - 30) return;
+  attempt.quietPhaseVerified = true; // UI clock, NOT native audio ended.
+  finishLearnAudioResumeAttempt(attempt);
+}
 function failNativeLearnTrack(mode, index, reason) {
   if (document.hidden || learnAudioInterrupted) return;
   // A stopped native source during a real OS audio interruption is NOT a
@@ -11904,7 +11919,8 @@ function verifyLearnNarrationProgress(attempt, narrationSrc, startingTime) {
 }
 
 function finishLearnAudioResumeAttempt(attempt) {
-  if (learnAudioResumeAttempt !== attempt || !attempt.narrationVerified ||
+  if (learnAudioResumeAttempt !== attempt ||
+      (!attempt.narrationVerified && !attempt.quietPhaseVerified) ||
       document.hidden || State.screen !== attempt.recovery.screen) {
     return;
   }
@@ -12009,19 +12025,35 @@ function pauseLearnAudioForInterruption() {
     const checkpoint = isNativeLearnTracksMode() &&
       nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
       nativeLearnPartCheckpoint.mode === "chunk" ? nativeLearnPartCheckpoint : null;
+    const quiet = isNativeLearnTracksMode() &&
+      nativeLearnQuietCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnQuietCheckpoint.mode === "chunk" &&
+      nativeLearnQuietCheckpoint.phase === "chunk-gap"
+      ? nativeLearnQuietCheckpoint : null;
     recovery = {
       screen, mode: "chunk",
-      index: checkpoint?.index ?? (State.chunkRunning ? State.chunkIndex : 0),
-      ...(checkpoint ? { positionMs: checkpoint.positionMs } : {})
+      index: quiet?.index ?? checkpoint?.index ??
+        (State.chunkRunning ? State.chunkIndex : 0),
+      ...(quiet ? { positionMs: 0, quietPhase: quiet.phase,
+          quietRemainingMs: quiet.remainingMs } :
+        checkpoint ? { positionMs: checkpoint.positionMs } : {})
     };
   } else if (screen === Screen.ECHO && (State.echoRunning || State.echoAutoStarting)) {
     const checkpoint = isNativeLearnTracksMode() &&
       nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
       nativeLearnPartCheckpoint.mode === "echo" ? nativeLearnPartCheckpoint : null;
+    const quiet = isNativeLearnTracksMode() &&
+      nativeLearnQuietCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnQuietCheckpoint.mode === "echo" &&
+      nativeLearnQuietCheckpoint.phase === "echo-repeat"
+      ? nativeLearnQuietCheckpoint : null;
     recovery = {
       screen, mode: "echo",
-      index: checkpoint?.index ?? (State.echoRunning ? State.echoIndex : 0),
-      ...(checkpoint ? { positionMs: checkpoint.positionMs } : {})
+      index: quiet?.index ?? checkpoint?.index ??
+        (State.echoRunning ? State.echoIndex : 0),
+      ...(quiet ? { positionMs: 0, quietPhase: quiet.phase,
+          quietRemainingMs: quiet.remainingMs } :
+        checkpoint ? { positionMs: checkpoint.positionMs } : {})
     };
   } else if (screen === Screen.LISTEN && (State.listenPlaying || State.listenAutoStarting)) {
     const checkpoint = isNativeLearnListenMode() &&
