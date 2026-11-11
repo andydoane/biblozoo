@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # N7j: a temporary Learn in-app menu should resume native audio on its
+      # actual Close tap, without treating it as an OS Welcome Back event.
+      - name: Validate N7j Learn menu native Close resume versus real interruption
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_learn_menu_close_n7j.js
+
       # N7i: actual New Verse picker full-verse speaker uses N5b.2 native
       # AVAudioPlayer; test Stop/switch/Exit/mute and unchanged browser preview.
       - name: Validate N7i New Verse picker native-only verse previews
