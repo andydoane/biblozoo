@@ -1677,6 +1677,14 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                     raw == AVAudioSession.InterruptionType.began.rawValue else {
                     return
                 }
+                // N7m: PiP Play and AirPods/Apple Music Play can take over
+                // audio while UIApplication stays ACTIVE, including a quiet
+                // Keyboard/Typewriter interval with zero owned AVAudioPlayers.
+                // Report the OS event to Read's activity owner independently
+                // of player events; NEVER activate or restart on a callback.
+                self?.notifyListeners("biblozooReadLifecycle", data: [
+                    "phase": "audioInterruptionBegan"
+                ])
                 self?.cancelAll(reason: "interrupted")
             })
         for name in [UIApplication.willResignActiveNotification,
@@ -1690,6 +1698,12 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                         // visibilitychange during the held multitask gesture.
                         self?.notifyListeners("biblozooReadLifecycle",
                             data: ["phase": "willResignActive"])
+                    } else if name == AVAudioSession.mediaServicesWereLostNotification ||
+                              name == AVAudioSession.mediaServicesWereResetNotification {
+                        // A silent Read animation has no player callback;
+                        // freeze its screen/timers even on a media-server reset.
+                        self?.notifyListeners("biblozooReadLifecycle",
+                            data: ["phase": "mediaServicesInterrupted"])
                     }
                     self?.cancelAll(reason: "interrupted")
                 })
@@ -1707,6 +1721,11 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 switch reason {
                 case .oldDeviceUnavailable, .newDeviceAvailable,
                      .noSuitableRouteForCategory:
+                    // Only genuine device/route changes, never late setup,
+                    // override or category notices, pause quiet Read phases.
+                    self?.notifyListeners("biblozooReadLifecycle", data: [
+                        "phase": "routeInterrupted"
+                    ])
                     self?.cancelAll(reason: "interrupted")
                 default: break
                 }

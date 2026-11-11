@@ -2007,10 +2007,15 @@
 
   function resumeReadAudioFromGesture() {
     // A user-tapped Welcome Back is the only post-interruption takeover.
-    if (root?.BibloZooNativeReadOutputController?.enabled)
-      void root.BibloZooNativeReadOutputController.activateFromGesture();
     const recovery = readAudioRecovery;
     if (!recovery || readAudioRecoveryAttempt || root?.document?.hidden) return false;
+    const nativeMode = root?.BibloZooNativeReadOutputController?.enabled === true;
+    // N7m: Invoke the session claim synchronously on the REAL Let's go tap,
+    // but don't mistake an unverified Promise/gesture for recovered audio.
+    // Keyboard/Typewriter quiet states have no AVAudioPlayer to verify.
+    const nativeActivation = nativeMode
+      ? root.BibloZooNativeReadOutputController.activateFromGesture()
+      : Promise.resolve(true);
     const generation = readAudioRecoveryGeneration;
     readAudioRecoveryAttempt = { generation };
     recovery.error = "";
@@ -2025,7 +2030,8 @@
         (state.activityId === TAP_WORDS_ORDER_ACTIVITY_ID ||
           state.activityId === UNSCRAMBLE_ACTIVITY_ID) &&
         !!(root?.AudioContext || root?.webkitAudioContext);
-      if (!needsToneRecovery) {
+      if (!needsToneRecovery && !nativeMode) {
+        // Preserve the original Web/PWA/Android immediate quiet ACK.
         if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery ||
             root?.document?.hidden) return false;
         readAudioRecoveryAttempt = null;
@@ -2035,21 +2041,32 @@
         syncReadAudioOverlay();
         return true;
       }
-      // Starting context.resume() here retains the original user gesture.
-      const toneCheck = prepareReadTonesFromGesture();
-      void Promise.resolve(toneCheck).then(ready => {
-        if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
-        readAudioRecoveryAttempt = null;
-        if (!ready || root?.document?.hidden) {
+      // Start any Web tone resume INSIDE the original tap, before awaiting.
+      // Native-only quiet pages need a confirmed native session claim before
+      // the fixed overlay may disappear. This is NOT speaker output proof.
+      const toneCheck = needsToneRecovery
+        ? prepareReadTonesFromGesture() : Promise.resolve(true);
+      void Promise.all([Promise.resolve(nativeActivation), Promise.resolve(toneCheck)])
+        .then(([nativeReady, tonesReady]) => {
+          if (generation !== readAudioRecoveryGeneration ||
+              readAudioRecovery !== recovery) return;
+          readAudioRecoveryAttempt = null;
+          if (!nativeReady || !tonesReady || root?.document?.hidden) {
+            recovery.error = "Audio isn't ready yet. Try again!";
+            syncReadAudioOverlay();
+            return;
+          }
+          readAudioRecovery = null;
+          thawReadPauseTimer();
+          thawReadTypingIntro();
+          syncReadAudioOverlay();
+        }).catch(() => {
+          if (generation !== readAudioRecoveryGeneration ||
+              readAudioRecovery !== recovery) return;
+          readAudioRecoveryAttempt = null;
           recovery.error = "Audio isn't ready yet. Try again!";
           syncReadAudioOverlay();
-          return;
-        }
-        readAudioRecovery = null;
-        thawReadPauseTimer();
-        thawReadTypingIntro();
-        syncReadAudioOverlay();
-      });
+        });
       return true;
     }
     if (recovery.kind === "animated" &&
@@ -2102,9 +2119,13 @@
       const heard = started && (appApi?.isMuted?.() || !narrationAudio ||
         await waitReadMediaProgress(narrationAudio, current));
       const tonesReady = await toneReady;
+      // An animated Balloons/Fish quiet interval may have no narration
+      // promise at all. Never unfreeze its timers merely because there was
+      // no clip to fail: require the real native session decision as well.
+      const nativeReady = await Promise.resolve(nativeActivation).catch(() => false);
       if (!current()) return;
       readAudioRecoveryAttempt = null;
-      if (!heard || !tonesReady || root?.document?.hidden) {
+      if (!heard || !tonesReady || !nativeReady || root?.document?.hidden) {
         stopReadNarration();
         if (kind === "sequence") {
           recovery.data.activeButtonIndex = -1;
