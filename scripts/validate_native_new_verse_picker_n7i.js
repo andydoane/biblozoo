@@ -115,6 +115,7 @@ function makeHarness({ native = true, ready = true, mute = false } = {}) {
     toggle: id => win.__test.toggleNewVersePickerPreviewAudio(id),
     stop: () => win.__test.stopNewVersePickerPreviewAudio(),
     nativeEvent: event => callback?.(event),
+    currentCallback: () => callback,
     resolveNative: result => resolveStart?.(result),
     emit, webAudio: () => audioSources,
     selected: id => buttons.find(x => x.dataset.newVersePreviewId === id)
@@ -148,14 +149,8 @@ async function run() {
 
   const switched = makeHarness();
   switched.toggle("john_3_16");
-  const oldCallback = (() => {
-    let cb;
-    const api = switched.win.BibloZooNativeLearnListen;
-    const orig = api.startFromGesture;
-    api.startFromGesture = args => { cb = args.onEvent; return orig(args); };
-    switched.toggle("psalm_23_4");
-    return cb;
-  })();
+  const oldCallback = switched.currentCallback();
+  switched.toggle("psalm_23_4");
   oldCallback({ kind: "completed", stage: "verse" });
   assert.equal(switched.selected("psalm_23_4").attrs.get("aria-pressed"), "true",
     "stale completed event cannot clear newer selected verse");
