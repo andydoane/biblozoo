@@ -985,9 +985,26 @@ function ensureLearnMenuOverlay() {
   if (exitBtn) {
     exitBtn.onclick = () => {
       learnMenuPausedAudio = false;
+      // Exit Learn is not a request to restart a menu-paused narration.
+      learnMenuNativeRecovery = null;
       closeLearnMenu();
       resetLearn(true);
     };
+  }
+
+  // A held iOS App Switcher can make UIKit inactive before WebKit hides.
+  // Once that happens, the pending menu-close shortcut is NOT authorized:
+  // keep the real interruption's explicit Welcome Back / Let's go! gate.
+  if (isNativeLearnListenMode()) {
+    try {
+      Promise.resolve(window.Capacitor?.Plugins?.BibloZooNativeSound
+        ?.addListener?.("biblozooAppLifecycle", event => {
+          if (learnMenuOpen && (event?.active === false ||
+                                event?.active === true)) {
+            learnMenuNativeRecovery = null;
+          }
+        })).catch(() => {});
+    } catch (_) { /* visibility/pagehide/blur are also safety guards. */ }
   }
 }
 
@@ -997,13 +1014,19 @@ function openLearnMenu() {
   const menu = document.getElementById("learnMenuOverlay");
   if (!menu) return;
 
-  // Native Listen must stop before showing the menu. Never let its
-  // unrelated HTML audio element auto-resume this native track on close.
+  // A deliberately opened menu is different from a system interruption.
+  // Stop the native player and retain its exact Listen/Chunk/Echo checkpoint,
+  // but only the matching menu Close gesture may restore it silently.
+  learnMenuNativeRecovery = null;
   if (isNativeLearnListenMode() &&
       ((State.screen === Screen.LISTEN && State.listenPlaying) ||
        (State.screen === Screen.CHUNKS && State.chunkRunning) ||
        (State.screen === Screen.ECHO && State.echoRunning))) {
+    const before = learnAudioInterrupted;
     pauseLearnAudioForInterruption();
+    if (!before && isLearnAudioOverlayRecovery(learnAudioInterrupted)) {
+      learnMenuNativeRecovery = learnAudioInterrupted;
+    }
   }
   learnMenuOpen = true;
   syncLearnAudioResumeOverlay();
@@ -1025,6 +1048,19 @@ function closeLearnMenu() {
   menu.setAttribute("aria-hidden", "true");
 
   learnMenuOpen = false;
+  const menuRecovery = learnMenuNativeRecovery;
+  learnMenuNativeRecovery = null;
+  // Close is an actual user tap: it may invoke the *existing* native
+  // startFromGesture / primeFromGesture immediately, at the saved checkpoint.
+  // Do not show Welcome Back for a simple in-app menu round trip. If iOS
+  // actually became inactive, hidden, muted, or another owner took over,
+  // the shortcut is revoked and the normal manual recovery gate remains.
+  if (menuRecovery && menuRecovery === learnAudioInterrupted &&
+      isNativeLearnListenMode() && !muted && !document.hidden &&
+      isLearnAudioOverlayRecovery(menuRecovery) &&
+      resumeInterruptedLearnAudio(true)) {
+    return;
+  }
   syncLearnAudioResumeOverlay();
 
   if (learnMenuPausedAudio) {
@@ -1070,6 +1106,15 @@ const UI_PET_UNLOCK_VOLUME = 0.55;
 
 let learnMenuOpen = false;
 let learnMenuPausedAudio = false;
+let learnMenuNativeRecovery = null;
+// The menu itself must never authorize playback after a genuine OS departure.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) learnMenuNativeRecovery = null;
+});
+window.addEventListener("pagehide", () => { learnMenuNativeRecovery = null; });
+window.addEventListener("blur", () => {
+  if (learnMenuOpen) learnMenuNativeRecovery = null;
+});
 // A backgrounded spoken lesson waits for a deliberate tap in a fixed overlay.
 // Short instruction narration is optional and never needs its own retry UI.
 let learnAudioInterrupted = null;
@@ -11750,7 +11795,11 @@ function ensureLearnAudioResumeOverlay() {
 
 function syncLearnAudioResumeOverlay() {
   const recovery = learnAudioResumeAttempt?.recovery || learnAudioInterrupted;
+  // The menu's genuine Close gesture can resume native playback without
+  // treating an intentional in-app pause as an OS interruption. Preserve the
+  // existing Welcome Back gate for real inactivity or a failed menu resume.
   const show = !document.hidden && !learnMenuOpen &&
+    !learnAudioResumeAttempt?.menuClose &&
     isLearnAudioOverlayRecovery(recovery);
   const existing = document.getElementById("learnAudioResumeOverlay");
   if (!show) {
@@ -11844,7 +11893,7 @@ function failLearnAudioResumeAttempt(attempt) {
   if (!document.hidden) render();
 }
 
-function resumeInterruptedLearnAudio() {
+function resumeInterruptedLearnAudio(fromMenuClose = false) {
   const recovery = learnAudioInterrupted;
   if (document.hidden || learnMenuOpen || learnAudioResumeAttempt ||
       !isLearnAudioOverlayRecovery(recovery)) return false;
@@ -11853,9 +11902,14 @@ function resumeInterruptedLearnAudio() {
   // An unrelated UI AudioContext must never veto successfully advancing
   // narration. Keep unlockAppAudio() best-effort and non-blocking.
   if (muted) toggleMute();
-  try { void Promise.resolve(unlockAppAudio()).catch(() => {}); }
-  catch (_) { /* Optional UI effects may remain silent. */ }
-  const attempt = { recovery, narrationVerified: false, progressTimer: null, watchdog: null };
+  // An iOS native-only Listen resume must not create or unlock Web sound.
+  // Existing Web/PWA/Android HTML recovery keeps its previous UI primer.
+  if (!isNativeLearnListenMode()) {
+    try { void Promise.resolve(unlockAppAudio()).catch(() => {}); }
+    catch (_) { /* Optional UI effects may remain silent. */ }
+  }
+  const attempt = { recovery, narrationVerified: false, progressTimer: null,
+    watchdog: null, menuClose: fromMenuClose === true };
   learnAudioResumeAttempt = attempt;
   learnAudioInterrupted = null;
   learnAudioResumeError = "";
