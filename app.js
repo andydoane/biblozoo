@@ -2257,6 +2257,7 @@ async function continueLearnInstruction() {
     }
 
     if (isTutorialActive()) {
+      primeZooTodoTutorialNativeAudioFromGesture();
       State.todoTutorialJustFinishedLearn = true;
       markTutorialLearnDone(VERSE_ID);
       go(Screen.TODO_DEV);
@@ -19012,7 +19013,20 @@ let zooTodoTutorialAudioAttempt = null;
 const zooTodoTutorialAutoAttempted = new Set();
 const zooTodoTutorialNeedsRetry = new Set();
 
+function primeZooTodoTutorialNativeAudioFromGesture() {
+  // Only explicit existing Create/Choose Zookeeper/Next/Practice-time taps
+  // may reclaim AVAudioSession. Preparing the next tutorial page in the same
+  // gesture preserves ios-prep's AUTOMATIC page narration; no new button.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true &&
+      isNativeLearnTracksMode() && !muted && !document.hidden) {
+    window.BibloZooNativeLearnTracks.primeFromGesture();
+  }
+}
+
 function renderZooTodoTutorialAudioRetry(pageNumber) {
+  // N7l native iOS: the broken visible retry control has no part in the
+  // original four-page flow; retain the Web/PWA version and markup there.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) return "";
   if (!zooTodoTutorialNeedsRetry.has(pageNumber) ||
       hasPlayedZooTodoTutorialPageAudio(pageNumber)) return "";
   return `<div class="todo-tutorial-actions" style="margin-top:10px">
@@ -19028,6 +19042,14 @@ function stopZooTodoTutorialPageAudio({ offerRetry = false } = {}) {
   zooTodoTutorialAudioAttempt = null;
   zooTodoTutorialAudioGeneration += 1;
   clearTimeout(attempt.startupTimer);
+  if (attempt.native === true) {
+    // The tutorial owns exactly one native narrator; don't release Learn,
+    // Read or another screen when no tutorial narration is active.
+    window.BibloZooNativeLearnTracks?.stop?.();
+    if (offerRetry && !hasPlayedZooTodoTutorialPageAudio(attempt.pageNumber))
+      zooTodoTutorialNeedsRetry.add(attempt.pageNumber);
+    return;
+  }
   audioEl.removeEventListener("ended", attempt.onEnd);
   audioEl.removeEventListener("error", attempt.onError);
   audioEl.removeEventListener("pause", attempt.onPause);
@@ -19277,6 +19299,34 @@ function playZooTodoTutorialPageAudio(pageNumber, { explicit = false } = {}) {
   zooTodoTutorialAudioAttempt = attempt;
   const isCurrent = () => zooTodoTutorialAudioAttempt === attempt &&
     zooTodoTutorialAudioGeneration === generation;
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    // Same four original tutorial_page_*.mp3 files as ios-prep, decoded by
+    // Swift AVAudioPlayer under fixed tutorial-page-1..4 IDs. No WebKit
+    // Audio construction, HTML play(), synthesized tones or auto-resume.
+    attempt.native = true;
+    if (!isNativeLearnTracksMode()) {
+      stopZooTodoTutorialPageAudio({ offerRetry: true });
+      return;
+    }
+    try {
+      void Promise.resolve(window.BibloZooNativeLearnTracks.play(
+        "tutorial-page-" + pageNumber
+      )).then(result => {
+        if (!isCurrent()) return;
+        const ended = result?.ended === true;
+        stopZooTodoTutorialPageAudio({ offerRetry: !ended });
+        if (!ended || document.hidden || muted ||
+            State.screen !== Screen.TODO_DEV ||
+            getZooTodoTutorialPageNumber() !== pageNumber) return;
+        // Only an actual native AVAudioPlayer 'ended' event marks heard.
+        markZooTodoTutorialPageAudioPlayed(pageNumber);
+        zooTodoTutorialNeedsRetry.delete(pageNumber);
+      }).catch(() => {
+        if (isCurrent()) stopZooTodoTutorialPageAudio({ offerRetry: true });
+      });
+    } catch (_) { stopZooTodoTutorialPageAudio({ offerRetry: true }); }
+    return;
+  }
   const fail = (err) => {
     if (!isCurrent()) return;
     if (err) console.warn("Could not play Zoo To-Do tutorial audio", err);
@@ -19393,6 +19443,7 @@ function bindZooTodoTutorial(rootEl) {
       e.stopPropagation();
 
       const nextPage = Number(btn.getAttribute("data-tutorial-next") || 1);
+      primeZooTodoTutorialNativeAudioFromGesture();
       stopZooTodoTutorialPageAudio();
 
       if (nextPage === 2) {
