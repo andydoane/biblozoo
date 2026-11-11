@@ -148,6 +148,9 @@
   }
 
   function prepareDailyQuestionAnswerSounds() {
+    // N7h: the isolated iOS experiment must NEVER instantiate HTMLAudio
+    // for these effects. The native worker owns the original fixed MP3s.
+    if (window.BibloZooNativeOnlyOutput?.enabled === true) return;
     if (typeof Audio === "undefined") {
       return;
     }
@@ -174,6 +177,7 @@
   }
 
   function stopDailyQuestionAnswerSounds() {
+    window.BibloZooNativeDailyQuestionAudio?.stop?.();
     for (const audio of [correctAnswerAudio, incorrectAnswerAudio]) {
       if (!audio) continue;
       try { audio.pause(); } catch (err) { }
@@ -183,6 +187,21 @@
 
   function playDailyQuestionAnswerSound(isCorrect) {
     if (isDailyQuestionAudioMuted()) return;
+
+    // Only the native bridge may produce answer sound in Audio Test iOS.
+    // No HTML/WebAudio fallback when the bridge is absent or refuses audio.
+    if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+      const session = dailySession;
+      window.BibloZooNativeDailyQuestionAudio?.tapAnswer?.({
+        correct: isCorrect,
+        isCurrent: () => dailySession === session &&
+          session?.phase === SESSION_PHASES.QUESTION &&
+          session.answered === true &&
+          session.answerCorrect === isCorrect &&
+          !isDailyQuestionAudioMuted() && !dailyQuestionsReturnPaused()
+      });
+      return;
+    }
 
     prepareDailyQuestionAnswerSounds();
     const audio = isCorrect ? correctAnswerAudio : incorrectAnswerAudio;
@@ -224,12 +243,28 @@
       session.answered ||
       session.questionAudioPlaying ||
       isDailyQuestionAudioMuted() ||
-      typeof Audio === "undefined"
+      (typeof Audio === "undefined" &&
+       window.BibloZooNativeOnlyOutput?.enabled !== true)
     ) return;
 
+    // The generated Sounds Like? prompt is also a fixed, published verse
+    // chunk. Use the already allowlisted N7f AVAudioPlayer facade on iOS;
+    // only Web/PWA/Android may instantiate the original HTML Audio.
+    const nativeOnly = window.BibloZooNativeOnlyOutput?.enabled === true;
+    const readOutput = window.BibloZooNativeReadOutputController;
+    if (nativeOnly && (!readOutput?.enabled || !readOutput.clipIdFor(source)))
+      return;
     stopGeneratedQuestionAudio();
     let audio;
-    try { audio = new Audio(source); } catch (err) { return; }
+    try {
+      if (nativeOnly) {
+        // This must happen synchronously in the child's Play Sound tap.
+        void readOutput.activateFromGesture();
+        audio = new readOutput.NativeAudio(source);
+      } else {
+        audio = new Audio(source);
+      }
+    } catch (err) { return; }
 
     generatedQuestionAudio = audio;
     session.questionAudioPlaying = true;
