@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # N7i: actual New Verse picker full-verse speaker uses N5b.2 native
+      # AVAudioPlayer; test Stop/switch/Exit/mute and unchanged browser preview.
+      - name: Validate N7i New Verse picker native-only verse previews
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_new_verse_picker_n7i.js
+
       # N7h: Daily Questions answer MP3 and generated Sounds Like prompt must
       # use the native bridge in Audio Test iOS, never HTML/WebAudio fallback.
       - name: Validate N7h Daily Questions native audio and interruption safety
