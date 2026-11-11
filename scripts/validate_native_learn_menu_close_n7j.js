@@ -47,9 +47,12 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
     querySelector(q){return q==="#learnMenuClose"?buttons.close:q==="#learnMenuExit"?buttons.exit:null;},
     addEventListener(){}
   };
+  let menuCreated=false;
   const document={
-    hidden:false,body:{appendChild(){}},createElement:()=>menu,
-    getElementById:id=>id==="learnMenuOverlay"?menu:id==="learnAudioResumeOverlay"?overlay:null
+    hidden:false,body:{appendChild(el){if(el===menu)menuCreated=true;}},
+    createElement:()=>menu,
+    getElementById:id=>id==="learnMenuOverlay"?(menuCreated?menu:null):
+      id==="learnAudioResumeOverlay"?overlay:null
   };
   const lifecycle=[];
   const win={
@@ -96,11 +99,11 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
       context.learnAudioInterrupted=null;State.listenPlaying=true;
     },
     primeNativeLearnTracks(){calls.push(["native-prime"]);},
-    startChunkFlow(){calls.push(["native-chunk"]);return Promise.resolve();},
-    startEchoFlow(){calls.push(["native-echo"]);return Promise.resolve();},
+    startChunkFlow(){calls.push(["native-chunk"]);context.learnAudioInterrupted=null;return Promise.resolve();},
+    startEchoFlow(){calls.push(["native-echo"]);context.learnAudioInterrupted=null;return Promise.resolve();},
     unlockAppAudio(){calls.push(["web-unlock"]);return Promise.resolve();},
     toggleMute(){calls.push(["toggle-mute"]);context.muted=false;},
-    render(){calls.push(["render"]);},
+    render(){calls.push(["render"]);win.__test?.syncLearnAudioResumeOverlay?.();},
     resetLearn(x){calls.push(["exit",x]);},
     safePlay(){calls.push(["web-resume"]);return Promise.resolve();},
     setTimeout(fn,delay){calls.push(["watchdog",delay]);return 1;},
@@ -109,6 +112,7 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
   vm.runInNewContext(code+
     "\nwindow.__test={openLearnMenu,closeLearnMenu,"+
     "finishLearnAudioResumeAttempt,failLearnAudioResumeAttempt,"+
+    "syncLearnAudioResumeOverlay,"+
     "current:()=>({menu:learnMenuNativeRecovery,interrupted:learnAudioInterrupted,"+
     "attempt:learnAudioResumeAttempt,open:learnMenuOpen})};",
     context,{filename:"app.js:N7j production functions"});
