@@ -1,5 +1,16 @@
 # BibloZoo — Audio Recovery and Zoo Escape Contract
 
+## N7j — Native Learn menu is a voluntary pause, not an iOS task-switch (2026-11-10)
+
+**Observed:** Owner hears native Learn recover correctly after Welcome Back → Let's go, but merely opening and closing the *in-app* BibloZoo Learn menu wrongly triggered that modal. `app.js openLearnMenu` previously invoked the same `pauseLearnAudioForInterruption` used for real UIKit/visibility loss; Close exposed `learnAudioInterrupted` without resuming. **No claim that AVFoundation/Swift audio failed**; this is recovery-owner classification and user gesture routing.
+
+**New menu ownership:** When native Listen/Chunks/Echo is actively playing, opening the menu snapshots its native checkpoint and stops current audio using existing owner cleanup. Mark recovery as **menu-local** only when the menu started it. Its **Close** gesture is an explicit foreground tap that calls existing `resumeInterruptedLearnAudio(true)`: native AVAudioPlayer Listen `learn-ref`/`learn-verse` resumes at the correct `positionMs`, and native `learn-part` Chunks/Echo maintain index/position. A menu-local attempt suppresses the Welcome Back overlay during legitimate native playback verification; **real position/progress or actual native ended** (never a bridge ready/accepted status) clears it. If activation/prepare/play/progress fails, the original manual Welcome Back retry becomes visible. Web/PWA/Android still have their old HTML pause/`safePlay` route; isolated `.audiotest` native resume does not unlock Web audio.
+
+**Hard OS boundary:** `document.hidden`, pagehide, blur and early UIKit `biblozooAppLifecycle(active:false)` revoke a menu-local shortcut. Genuine iOS App Switcher/lock/AirPods/route interruption must still require a real explicit recovery tap, never silent automatic activation on foreground. Menu **Exit Learn** never resumes; mute is respected. No new AVAudioSession category, `.notifyOthersOnDeactivation`, synthetic audio clock, UI pop proving sound, microphone, saved child voice, extra scores or Zoo repairs. See [N7j owner device and stress checklist](N7J-LEARN-MENU-NATIVE-RESUME.md). New real-controller VM regression in GitHub experimental CI; a green Linux check cannot prove iPhone physical audio. **N7j owner hardware PASS PENDING.** N7i #78 merged and owner says picker speaker fixed for tested scope; N7h/N7g wider physical gates stay independently open.
+
+---
+
+
 ## N7i — New Verse picker native full-verse audio owner (experiment; owner iPhone PENDING)
 
 **2026-11-10 source gap / Problem #1:** `app.js toggleNewVersePickerPreviewAudio` still used HTML `new Audio(verse_audio/<verseId>.mp3)` and threw "Verse audio unavailable" in the test iOS app because N1 blocks WebKit output. No Web/HTML retry, Web Audio clock or generic UI pop may masquerade as restored narration.
