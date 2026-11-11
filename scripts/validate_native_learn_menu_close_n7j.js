@@ -29,7 +29,7 @@ assert(app.includes('window.addEventListener("pagehide", () => { learnMenuNative
 assert(app.includes('"biblozooAppLifecycle", event => {'));
 assert(app.includes("menuClose: fromMenuClose === true"));
 assert(app.includes("!learnAudioResumeAttempt?.menuClose"));
-assert(app.includes("if (!isNativeLearnListenMode()) {\n    try { void Promise.resolve(unlockAppAudio())"));
+assert(app.includes("if (window.BibloZooNativeLearnListen?.isAvailable?.() !== true) {\n    try { void Promise.resolve(unlockAppAudio())"));
 assert(nativeListen.includes('activateFromGesture({ purpose: "learn" })'));
 assert(nativeTracks.includes("primeFromGesture"));
 assert(swift.includes('subdirectory: "public/verse_audio"'));
@@ -60,7 +60,8 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
       assert.equal(name,"biblozooAppLifecycle");
       lifecycle.push(fn); return Promise.resolve({});
     }}}},
-    BibloZooWelcomeBack:null
+    BibloZooWelcomeBack:null,
+    BibloZooNativeLearnListen:{isAvailable:()=>native}
   };
   const Screen={LISTEN:"listen",CHUNKS:"chunks",ECHO:"echo",
     LEARN_INSTRUCTION:"instruction",MEANING:"meaning"};
