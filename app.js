@@ -12989,6 +12989,8 @@ async function startChunkFlow() {
     ? nativeLearnPartCheckpoint : null;
   const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
   const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
+  const resumeQuiet = recovery?.quietPhase === "chunk-gap"
+    ? { phase: "chunk-gap", remainingMs: recovery.quietRemainingMs } : null;
   learnAudioInterrupted = null;
   nativeLearnTrackError = "";
 
@@ -12998,10 +13000,11 @@ async function startChunkFlow() {
   // cancel any prior learn audio sequence
   cancelLearnAudio();
 
-  await runChunkSequence(startIndex, startPositionMs);
+  await runChunkSequence(startIndex, startPositionMs, resumeQuiet);
 }
 
-async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
+async function runChunkSequence(startIndex = 0, resumePositionMs = 0,
+    resumeQuiet = null) {
   const my = ++echoCancelToken;
   let completed = false;
 
@@ -13022,8 +13025,13 @@ async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
       State.chunkIndex = i;
       render();
       let d;
+      const resumingGap = i === startIndex &&
+        resumeQuiet?.phase === "chunk-gap" && isNativeLearnTracksMode();
 
-      if (isNativeLearnTracksMode()) {
+      if (resumingGap) {
+        // The preceding chunk actually ended. Continue its quiet pause;
+        // do not replay or skip a chunk merely because of an app switch.
+      } else if (isNativeLearnTracksMode()) {
         const positionMs = i === startIndex ? resumePositionMs : 0;
         nativeLearnPartCheckpoint = {
           verseId: VERSE_ID, mode: "chunk", index: i, positionMs
@@ -13084,8 +13092,22 @@ async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
         }
         d = await waitForDuration();
       }
-      const pauseMs = (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
-      const elapsed = await waitForPausableDelay(pauseMs, my);
+      const pauseMs = resumingGap
+        ? Math.max(75, Number(resumeQuiet.remainingMs) || 0)
+        : (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
+      if (isNativeLearnTracksMode()) nativeLearnQuietCheckpoint = {
+        verseId: VERSE_ID, mode: "chunk", phase: "chunk-gap",
+        index: i, remainingMs: pauseMs
+      };
+      const elapsed = await waitForPausableDelay(pauseMs, my, remaining => {
+        if (!isNativeLearnTracksMode()) return;
+        if (nativeLearnQuietCheckpoint?.mode === "chunk" &&
+            nativeLearnQuietCheckpoint.index === i)
+          nativeLearnQuietCheckpoint.remainingMs = remaining;
+        if (resumingGap) nativeLearnQuietResumeProgress("chunk", i,
+          "chunk-gap", remaining);
+      });
+      if (my === echoCancelToken) nativeLearnQuietCheckpoint = null;
 
       if (!elapsed || my !== echoCancelToken || document.hidden) return;
     }
