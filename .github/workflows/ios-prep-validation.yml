@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # N7l: original BibloPet box MP3 and four Zoo To-Do onboarding voices
+      # must be native-only on Audio Test iOS, with no dead retry button.
+      - name: Validate N7l native pet unlock and onboarding narration
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_pet_unlock_onboarding_n7l.js
+
       # N7k: early iOS lifecycle and quiet interval checkpoints for Chunks
       # and Echo; held App Switcher during yellow speaking must Welcome Back.
       - name: Validate N7k Learn Chunks and Echo silent-phase native interruptions
