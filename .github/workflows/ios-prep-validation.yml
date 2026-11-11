@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # N7k: early iOS lifecycle and quiet interval checkpoints for Chunks
+      # and Echo; held App Switcher during yellow speaking must Welcome Back.
+      - name: Validate N7k Learn Chunks and Echo silent-phase native interruptions
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_learn_quiet_interruption_n7k.js
+
       # N7j: a temporary Learn in-app menu should resume native audio on its
       # actual Close tap, without treating it as an OS Welcome Back event.
       - name: Validate N7j Learn menu native Close resume versus real interruption
