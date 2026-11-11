@@ -83,6 +83,7 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
     learnShortInstructionNeedsRender:false,activeLearnInstructionRequest:null,
     nativeListenCheckpoint:{verseId:"john_3_16",mode:"listen_verse",positionMs:1630},
     nativeLearnPartCheckpoint:{verseId:"john_3_16",mode,index:mode==="chunk"?2:3,positionMs:880},
+    nativeLearnQuietCheckpoint:null, // N7k: no quiet interval in these N7j menu scenarios
     learnZooEscape:null,learnZooRecovery:null,
     isNativeLearnListenMode:()=>native,isNativeLearnTracksMode:()=>native,
     showDialog(){throw Error("unexpected modal");},closeDialog(){},dlgBtn(){return {};},
