@@ -3325,6 +3325,17 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             return Bundle.main.url(
                 forResource: narrationResourceName, withExtension: "mp3")
         }
+        // N7l: original four Zoo To-Do onboarding narration MP3s.
+        // Exact numeric IDs only, from the shipped Capacitor public folder;
+        // never accept a caller-controlled URL, filename or path.
+        if soundId.hasPrefix("tutorial-page-") {
+            let suffix = String(soundId.dropFirst("tutorial-page-".count))
+            guard let page = Int(suffix), (1...4).contains(page),
+                  suffix == String(page) else { return nil }
+            return Bundle.main.url(
+                forResource: "tutorial_page_\(page)", withExtension: "mp3",
+                subdirectory: "public/verse_audio")
+        }
         // Short Learn instruction prompts are static, application-owned
         // files. The JS caller only supplies a fixed allowlisted key.
         let instructions: [String: String] = [
