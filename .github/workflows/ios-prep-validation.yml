@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # N7h: Daily Questions answer MP3 and generated Sounds Like prompt must
+      # use the native bridge in Audio Test iOS, never HTML/WebAudio fallback.
+      - name: Validate N7h Daily Questions native audio and interruption safety
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_daily_questions_audio_n7h.js
+
       # N7a is a docs/source-contract audit, not native capture. Restrict
       # it to the isolated native-audio experiment and keep current iOS
       # behavior untouched until each sensitive input/DSP PR is approved.
