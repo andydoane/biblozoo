@@ -1130,6 +1130,33 @@ let nativeListenError = "";
 // N5b.3: transient native audio checkpoint, never verse/score progress.
 let nativeLearnPartCheckpoint = null;
 let nativeLearnTrackError = "";
+// N7k: Chunks has an audible-clip gap; Echo has the yellow-text speaking turn.
+// Both are ACTIVE Learn activity even with no native AVAudioPlayer running.
+// This is transient timing state, never an earned part or user recording.
+let nativeLearnQuietCheckpoint = null;
+let nativeLearnActivityLifecycleBound = false;
+function bindNativeLearnActivityLifecycle() {
+  if (nativeLearnActivityLifecycleBound || !isNativeLearnTracksMode()) return;
+  const bridge = window.Capacitor?.Plugins?.BibloZooNativeSound;
+  if (typeof bridge?.addListener !== "function") return;
+  nativeLearnActivityLifecycleBound = true;
+  try {
+    Promise.resolve(bridge.addListener("biblozooAppLifecycle", event => {
+      // UIKit reports INACTIVE even when a held App Switcher leaves WebKit
+      // document.hidden=false. The native track owner has no current player
+      // during a speaking/gap timer, so only the ACTIVITY can catch this.
+      if (event?.active !== false && event?.active !== true) return;
+      const activeLearn =
+        (State.screen === Screen.CHUNKS &&
+          (State.chunkRunning || State.chunkAutoStarting)) ||
+        (State.screen === Screen.ECHO &&
+          (State.echoRunning || State.echoAutoStarting));
+      if (!activeLearn || learnMenuOpen) return;
+      pauseLearnAudioForInterruption();
+      if (!document.hidden && learnAudioInterrupted) render();
+    })).catch(() => { nativeLearnActivityLifecycleBound = false; });
+  } catch (_) { nativeLearnActivityLifecycleBound = false; }
+}
 
 function isNativeLearnTracksMode() {
   return window.BibloZooNativeLearnTracks?.isAvailable?.() === true;
@@ -1165,6 +1192,14 @@ function nativeLearnTrackProgress(mode, index, progress) {
 }
 function failNativeLearnTrack(mode, index, reason) {
   if (document.hidden || learnAudioInterrupted) return;
+  // A stopped native source during a real OS audio interruption is NOT a
+  // missing asset. Preserve the Welcome Back route instead of inserting the
+  // inline Start/error row and shifting the Learn page layout.
+  if (reason === "interrupted") {
+    pauseLearnAudioForInterruption();
+    if (!document.hidden && learnAudioInterrupted) render();
+    return;
+  }
   nativeLearnTrackError = "Sound isn't ready. Tap Start to try again.";
   nativeLearnPartCheckpoint = {
     verseId: VERSE_ID, mode, index, positionMs: 0
@@ -12050,7 +12085,7 @@ function waitForAudioEnd() {
   });
 }
 
-function waitForPausableDelay(ms, generation = echoCancelToken) {
+function waitForPausableDelay(ms, generation = echoCancelToken, onRemaining = null) {
   return new Promise((resolve) => {
     let remaining = ms;
     let last = performance.now();
@@ -12060,6 +12095,7 @@ function waitForPausableDelay(ms, generation = echoCancelToken) {
       const now = performance.now();
       if (!learnMenuOpen && !document.hidden) remaining -= now - last;
       last = now;
+      if (typeof onRemaining === "function") onRemaining(Math.max(0, remaining));
       if (remaining <= 0) return resolve(true);
       setTimeout(tick, 50);
     }
@@ -12584,6 +12620,7 @@ function goToListenAndStart() {
 
 
 function goToChunksAndStart() {
+  bindNativeLearnActivityLifecycle();
   nativeLearnTrackError = "";
   nativeLearnPartCheckpoint = null; // new pass; not an interrupted resume
   State.chunkAutoStarting = true;
@@ -12623,6 +12660,7 @@ function goToChunksAndStart() {
 
 
 function goToEchoAndStart() {
+  bindNativeLearnActivityLifecycle();
   nativeLearnTrackError = "";
   nativeLearnPartCheckpoint = null;
   State.echoDone = false;
@@ -12909,6 +12947,7 @@ async function startFinalRecallFlow() {
 
 async function startChunkFlow() {
   if (State.chunkRunning || document.hidden) return;
+  bindNativeLearnActivityLifecycle();
   const recovery = learnAudioInterrupted?.mode === "chunk" &&
     learnAudioInterrupted.screen === Screen.CHUNKS
     ? learnAudioInterrupted : null;
@@ -13047,6 +13086,7 @@ async function runChunkSequence(startIndex = 0, resumePositionMs = 0) {
 
 async function startEchoFlow() {
   if (State.echoRunning || document.hidden) return;
+  bindNativeLearnActivityLifecycle();
   const recovery = learnAudioInterrupted?.mode === "echo" &&
     learnAudioInterrupted.screen === Screen.ECHO
     ? learnAudioInterrupted : null;
@@ -13086,6 +13126,7 @@ function cancelLearnAudio() {
   State.chunkRunning = false;
   State.echoRunning = false;
   State.echoSpeaking = false;
+  nativeLearnQuietCheckpoint = null;
 }
 
 async function runEchoSequence(startIndex = 0, resumePositionMs = 0) {
