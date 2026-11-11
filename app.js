@@ -1263,9 +1263,20 @@ let lastUiTapFallbackAt = 0;
 let petUnlockAudioEl = null;
 let lastPetUnlockSoundAt = 0;
 let petUnlockSoundGeneration = 0;
+let petUnlockNativeLifecycleBound = false;
 
 function stopPetUnlockPackageSound() {
   petUnlockSoundGeneration += 1;
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    // N7l: the original boxed BibloPet clip is already bundled and allowlisted
+    // as the native DEV pilot-unlock AVAudioPlayer. Scoped Stop leaves other
+    // audio banks/session ownership untouched; do not call browser Audio.
+    try {
+      void Promise.resolve(window.Capacitor?.Plugins?.BibloZooNativeSound
+        ?.stop?.({ soundId: "pilot-unlock" })).catch(() => {});
+    } catch (_) { /* Leaving the page cannot be blocked by audio cleanup. */ }
+    return;
+  }
   try {
     petUnlockAudioEl?.pause();
     if (petUnlockAudioEl) petUnlockAudioEl.currentTime = 0;
@@ -1443,6 +1454,10 @@ function ensurePetUnlockAudio() {
 }
 
 function preloadPetUnlockSoundBuffer() {
+  // No HTMLAudioElement may be constructed on the native-only iOS build.
+  // Native preflight is deliberately reserved for the box-opening gesture.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true)
+    return Promise.resolve(null);
   const audio = ensurePetUnlockAudio();
 
   try {
@@ -1462,6 +1477,45 @@ function playPetUnlockPackageSound({ allowFallback = true } = {}) {
   lastPetUnlockSoundAt = nowMs;
 
   const generation = ++petUnlockSoundGeneration;
+  // N7l: play the ORIGINAL ui_pet_unlock.mp3 from Swift's existing bundled
+  // pilot-unlock AVAudioPlayer on the real Open Box button click. No WebKit
+  // playback, oscillator, tap-pop fallback or hidden auto-reactivation.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    const api = window.Capacitor?.Plugins?.BibloZooNativeSound;
+    if (typeof api?.activateFromGesture !== "function" ||
+        typeof api?.preload !== "function" ||
+        typeof api?.play !== "function" ||
+        typeof api?.stop !== "function") return;
+    if (!petUnlockNativeLifecycleBound &&
+        typeof api.addListener === "function") {
+      petUnlockNativeLifecycleBound = true;
+      try {
+        void Promise.resolve(api.addListener("biblozooAppLifecycle", event => {
+          if (event?.active === false || event?.active === true)
+            stopPetUnlockPackageSound();
+        })).catch(() => { petUnlockNativeLifecycleBound = false; });
+      } catch (_) { petUnlockNativeLifecycleBound = false; }
+    }
+    const stillCurrent = () =>
+      generation === petUnlockSoundGeneration &&
+      State.screen === Screen.PET_UNLOCK && !muted && !document.hidden &&
+      performance.now() - nowMs <= 1600;
+    let activation;
+    try {
+      // This call, unlike the async prepare/play, must occur inside the tap.
+      activation = api.activateFromGesture({ purpose: "ui" });
+    } catch (_) { return; }
+    void Promise.resolve(activation).then(async ready => {
+      if (ready?.ready !== true || !stillCurrent()) return;
+      const prepared = await api.preload({ soundId: "pilot-unlock" });
+      if (prepared?.prepared !== true || !stillCurrent()) return;
+      // Scheduling is not proof the child heard the sound; box rewards and
+      // animation never depend on a native ACK.
+      await api.play({ soundId: "pilot-unlock", volume: UI_PET_UNLOCK_VOLUME,
+        eventId: "pet-unlock-" + generation, requestEpochMs: Date.now() });
+    }).catch(() => { /* Fail closed; box can always be opened. */ });
+    return;
+  }
   const audio = ensurePetUnlockAudio();
   const fallbackIfCurrent = (err) => {
     console.warn("Could not play BibloPet unlock sound", err);
