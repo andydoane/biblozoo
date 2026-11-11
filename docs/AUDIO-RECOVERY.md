@@ -1,5 +1,18 @@
 # BibloZoo — Audio Recovery and Zoo Escape Contract
 
+## N7i — New Verse picker native full-verse audio owner (experiment; owner iPhone PENDING)
+
+**2026-11-10 source gap / Problem #1:** `app.js toggleNewVersePickerPreviewAudio` still used HTML `new Audio(verse_audio/<verseId>.mp3)` and threw "Verse audio unavailable" in the test iOS app because N1 blocks WebKit output. No Web/HTML retry, Web Audio clock or generic UI pop may masquerade as restored narration.
+
+**N7i output-only routing:** On `com.andydoane.biblozoo.audiotest` only, the *actual speaker tap* starts `BibloZooNativeLearnListen.startFromGesture({stage:"verse",verseId})`. That existing N5b.2 owner validates `learn-verse-<published id>`, loads the shipped `public/verse_audio/<verseId>.mp3` in Swift `AVAudioPlayer`, and activates the preexisting `.soloAmbient` policy **only on that tap**. This picker originally played full verse **without** separate reference; maintain that distinction from Verse Detail/Flashcards N6a reference→verse. No new AVAudioSession owner, category/mix/duck change, microphone or Web fallback. Web/PWA/Android remains on the original browser `Audio` path.
+
+**Cancellation rules:** The existing picker token+audio handle now supports the native owner. Same-card Stop, switching verse, selecting a card/going Home, global mute, visibility/pagehide and native UIKit inactive invalidate the old playback and pending activation. Native `completed(stage:"verse")` clears the control; `interrupted` clears quietly; actual `failed` offers retry, but stale/hidden errors never resurrect the popup or audio. No automatic activation on foreground, no credit/verse change on preview. Because `BibloZooNativeLearnListen` is shared with Learn/Detail/Flashcards, call its scoped stop only for an **active picker-owned preview**.
+
+**Proof gate:** `node scripts/validate_native_new_verse_picker_n7i.js` runs the actual controller in a mock VM; GitHub Actions Swift parse/Web build are not iPhone SDK/type-check or evidence that children actually heard sound. Owner should test two verses, Stop/restart/switch, mute, held switcher, lock, AirPods, Apple Music/PiP, leaving to Learn, and unchanged N6a native previews. [Detailed owner N7i checklist](N7I-NATIVE-NEW-VERSE-PICKER-PREVIEWS.md). **N7i iPhone PASS PENDING.** N7h #77 merged at `5d043b95` with CI GREEN but hardware Daily Questions acceptance not reported; N7g full integrated owner gate remains open.
+
+---
+
+
 ## N7h — Daily Questions native-only answer and generated Play Sound (experiment; iPhone PENDING)
 
 **2026-11-10 source audit and new PR:** In the isolated `experiment/native-ios-audio` test app only, Daily Questions answer taps were silent because original correct/incorrect `new Audio` MP3s (September 28) and Sounds Like? generated question `new Audio` chunk remained in browser code; N1 intentionally rejects HTMLAudioElement output. A browser retry/clock recovery is **not** a valid fix for this experiment. N7h routes fixed answer IDs through the *existing* AVAudioEngine PCM worker, and generated published verse chunks through the N7f native Read `AVAudioPlayer` with actual ended/progress, never Web sound. Original Web/PWA/Android and stable `ios-prep` retain their former audio and existing clock/Welcome Back semantics.
