@@ -52,6 +52,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         "ui-pop-1": "ui_sound_pop_1",
         "ui-pop-2": "ui_sound_pop_2"
     ]
+    // N7h: original Daily Questions answer effects, native PCM only.
+    // Both live in the Capacitor public folder; no web playback or URLs.
+    private let dailyQuestionSoundResources: [String: String] = [
+        "daily-question-correct": "dq_correct",
+        "daily-question-incorrect": "dq_incorrect"
+    ]
     // N6b fixed sound IDs map only to bundled Scripture Snake MP3 assets.
     private let snakeSoundResources: [String: String] = [
         "snake-correct": "verse_snake_correct",
@@ -449,6 +455,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // AVAudioPlayer pet-unlock is a useful DEV A/B reference for latency.
     private let pcmEffectIDs: Set<String> = [
         "feed-star", "feed-chomp", "ui-pop-1", "ui-pop-2",
+        "daily-question-correct", "daily-question-incorrect",
         "snake-correct", "snake-wrong", "snake-fruit", "snake-boost",
         "snake-bonus-start", "snake-eat", "snake-bonus-result",
         "bugs-tongue", "bugs-pop-1", "bugs-pop-2", "bugs-pop-3",
@@ -2466,6 +2473,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private func requestedId(_ call: CAPPluginCall) -> String? {
         guard let soundId = call.getString("soundId"),
               soundResources[soundId] != nil ||
+              dailyQuestionSoundResources[soundId] != nil ||
               snakeSoundResources[soundId] != nil ||
               bibleBugsSoundResources[soundId] != nil ||
               foodSliceSoundResources[soundId] != nil ||
@@ -2607,6 +2615,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 guard let bundledURL = Bundle.main.url(
                     forResource: resourceName, withExtension: "mp3",
                     subdirectory: "public/verse_playground/scripture_scrub/scripture_scrub_sounds") else {
+                    finish(["prepared": false, "reason": "bundled-asset-missing"])
+                    return
+                }
+                url = bundledURL
+            } else if let resourceName = self.dailyQuestionSoundResources[soundId] {
+                guard let bundledURL = Bundle.main.url(
+                    forResource: resourceName, withExtension: "mp3",
+                    subdirectory: "public/verse_images/daily_questions") else {
                     finish(["prepared": false, "reason": "bundled-asset-missing"])
                     return
                 }
@@ -3227,7 +3243,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         onMain { [weak self] in
             guard let self=self,
                   let soundId=call.getString("soundId"),
-                  (soundId == "scrub-mower" || soundId == "jam-group" ||
+                  (soundId == "scrub-mower" ||
+                   soundId == "daily-question-correct" ||
+                   soundId == "daily-question-incorrect" ||
+                   soundId == "jam-group" ||
                    soundId == "jam-groove" ||
                    soundId == "ghost-spooky-group") else {
                 call.resolve(["stopped":false,"reason":"invalid-sound-id"])
