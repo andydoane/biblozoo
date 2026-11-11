@@ -65,7 +65,8 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
   const Screen={LISTEN:"listen",CHUNKS:"chunks",ECHO:"echo",
     LEARN_INSTRUCTION:"instruction",MEANING:"meaning"};
   const State={
-    screen:Screen[mode.toUpperCase()],listenPlaying:mode==="listen",
+    screen:mode==="chunk"?Screen.CHUNKS:Screen[mode.toUpperCase()],
+    listenPlaying:mode==="listen",
     listenAutoStarting:false,listenAutoFallbackReady:false,audioMode:"listen_verse",
     chunkRunning:mode==="chunk",chunkAutoStarting:false,
     chunkAutoFallbackReady:false,chunkIndex:2,
