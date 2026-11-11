@@ -2388,7 +2388,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             }
             let purpose = call.getString("purpose") ?? ""
             guard purpose == "dev" || purpose == "feeding" || purpose == "ui" ||
-                  purpose == "learn" || purpose == "game" else {
+                  purpose == "learn" || purpose == "game" ||
+                  purpose == "daily-questions" else {
                 finish(["ready": false, "reason": "invalid-purpose"]); return
             }
             // N6h.2: do NOT deny the real child's tap simply because YouTube
