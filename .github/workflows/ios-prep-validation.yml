@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # N7m: external PiP Play/AirPods remote Play can interrupt an ACTIVE
+      # Read game while no native clip is owned; it still needs Welcome Back.
+      - name: Validate N7m Read native external-audio takeover recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_read_external_audio_n7m.js
+
       # N7l: original BibloPet box MP3 and four Zoo To-Do onboarding voices
       # must be native-only on Audio Test iOS, with no dead retry button.
       - name: Validate N7l native pet unlock and onboarding narration
