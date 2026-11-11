@@ -26,6 +26,8 @@ assert(swift.includes('"daily-question-correct": "dq_correct"'));
 assert(swift.includes('"daily-question-incorrect": "dq_incorrect"'));
 assert(swift.includes('subdirectory: "public/verse_images/daily_questions"'));
 assert(swift.includes('"daily-question-correct", "daily-question-incorrect"'));
+assert(swift.includes('purpose == "daily-questions"'),
+  "new child tap purpose must be accepted by Swift activation");
 assert.match(swift, /soundId == "daily-question-correct"[\s\S]*soundId == "daily-question-incorrect"/);
 assert(build.includes('"verse_images"'));
 assert(build.includes("injectNativeOnlyAudioGuard"));
