@@ -19755,7 +19755,11 @@ function stopNewVersePickerPreviewAudio() {
   const audio = newVersePreviewAudio;
   newVersePreviewAudio = null;
   newVersePreviewVerseId = "";
-  if (audio) {
+  if (audio?.native === true) {
+    // The picker owns this one native narration only. Never cancel another
+    // Learn/Detail/Flashcards request when no picker preview is active.
+    window.BibloZooNativeLearnListen?.stop?.();
+  } else if (audio) {
     try {
       audio.pause();
       audio.currentTime = 0;
@@ -19794,6 +19798,66 @@ function toggleNewVersePickerPreviewAudio(verseId) {
     return;
   }
 
+  // N7i: "Choose a New Verse" is a FULL-VERSE preview (no reference
+  // prelude). The Audio Test iOS bundle forbids HTML/Web Audio, so reuse
+  // the already accepted N5b.2 AVAudioPlayer/Swift narration bridge.
+  // Start must be invoked synchronously inside this actual speaker tap.
+  // A missing/denied native bridge FAILS CLOSED, never via new Audio().
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    const listen = window.BibloZooNativeLearnListen;
+    if (!listen?.isAvailable?.()) {
+      showDialog({
+        title: "Verse audio unavailable",
+        body: "This verse couldn't play right now. You can still choose it.",
+        actions: [dlgBtn("OK", { onClick: closeDialog })]
+      });
+      return;
+    }
+    const preview = { native: true };
+    const token = ++newVersePreviewToken;
+    newVersePreviewAudio = preview;
+    newVersePreviewVerseId = verseId;
+    const isCurrent = () =>
+      token === newVersePreviewToken &&
+      newVersePreviewAudio === preview &&
+      newVersePreviewVerseId === verseId &&
+      State.screen === Screen.NEW_VERSE_PICKER &&
+      !muted && !document.hidden;
+    const finish = () => {
+      if (isCurrent()) stopNewVersePickerPreviewAudio();
+    };
+    const failed = () => {
+      if (!isCurrent()) return;
+      stopNewVersePickerPreviewAudio();
+      showDialog({
+        title: "Verse audio unavailable",
+        body: "This verse couldn't play right now. You can still choose it.",
+        actions: [dlgBtn("OK", { onClick: closeDialog })]
+      });
+    };
+    updateNewVersePickerAudioButtons();
+    try {
+      const request = listen.startFromGesture({
+        verseId,
+        stage: "verse",
+        onEvent: (event) => {
+          if (!isCurrent()) return;
+          if (event.kind === "completed" && event.stage === "verse") finish();
+          else if (event.kind === "interrupted") finish();
+          else if (event.kind === "failed") failed();
+        }
+      });
+      Promise.resolve(request).then(result => {
+        if (isCurrent() && result?.ready !== true && result?.reason !== "stale")
+          failed();
+      }).catch(failed);
+    } catch (_) {
+      failed();
+    }
+    return;
+  }
+
+  // Original browser/PWA/Android picker preview, unchanged below.
   const audio = new Audio(`${AUDIO_DIR}${encodeURIComponent(verseId)}.mp3`);
   const token = ++newVersePreviewToken;
   audio.preload = "auto";
