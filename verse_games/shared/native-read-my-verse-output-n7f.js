@@ -54,7 +54,15 @@
     // gesture; document.visibilitychange can arrive much later in WebKit.
     // Registration has no mic request, audio activation or playback.
     Promise.resolve(api().addListener("biblozooReadLifecycle", event => {
-      if (event?.phase !== "willResignActive") return;
+      // N7m: AVAudioSession interruption .began is delivered even when
+      // UIApplication remains active (PiP Play / AirPods remote Play), and
+      // Read currently owns zero sound clips during typing/quiet intervals.
+      // An OS event must freeze the WHOLE activity, not just an AVPlayer.
+      // Only real OS interruption/route/media events qualify; in particular,
+      // a normal PiP pause, playback ended or category notice cannot do so.
+      if (!["willResignActive", "audioInterruptionBegan",
+            "routeInterrupted", "mediaServicesInterrupted"]
+            .includes(event?.phase)) return;
       invalidateActivation();
       for (const audio of [...clips.values()]) {
         if (!audio.paused || audio._playingRequest !== null) {
