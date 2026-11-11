@@ -34,8 +34,13 @@ has(scene,'name == UIApplication.willResignActiveNotification',
   "Swift event sent at willResign, not delayed didEnterBackground");
 has(adapter,'api().addListener("biblozooReadLifecycle"',
   "JS subscribes to native notification");
-has(adapter,'if (event?.phase !== "willResignActive") return;',
-  "Only real native inactive transition freezes Read");
+// N7m expands the real OS interruption signals: an active UIKit scene can
+// lose audio to PiP/AirPods with NO AVAudioPlayer, without willResignActive.
+for (const phase of ['"willResignActive"','"audioInterruptionBegan"',
+                     '"routeInterrupted"','"mediaServicesInterrupted"'])
+  has(adapter,phase,"Only fixed authentic native OS lifecycle phases pause Read");
+has(adapter,".includes(event?.phase)) return;",
+  "Unrelated native notifications must NOT freeze Read");
 has(adapter,"activation = null;","Never reclaim audio priority from inactive timer");
 has(adapter,"onAppInactive,playCue,stopCues,stopAll",
   "Read controller can subscribe to native early scene event");
