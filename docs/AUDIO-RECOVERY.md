@@ -1,5 +1,16 @@
 # BibloZoo — Audio Recovery and Zoo Escape Contract
 
+## N7h — Daily Questions native-only answer and generated Play Sound (experiment; iPhone PENDING)
+
+**2026-11-10 source audit and new PR:** In the isolated `experiment/native-ios-audio` test app only, Daily Questions answer taps were silent because original correct/incorrect `new Audio` MP3s (September 28) and Sounds Like? generated question `new Audio` chunk remained in browser code; N1 intentionally rejects HTMLAudioElement output. A browser retry/clock recovery is **not** a valid fix for this experiment. N7h routes fixed answer IDs through the *existing* AVAudioEngine PCM worker, and generated published verse chunks through the N7f native Read `AVAudioPlayer` with actual ended/progress, never Web sound. Original Web/PWA/Android and stable `ios-prep` retain their former audio and existing clock/Welcome Back semantics.
+
+**Foreground/ownership:** Only the child's fresh answer tap may call `BibloZooNativeSound.activateFromGesture`; only a fresh Sounds Like? **Play Sound** tap may call `BibloZooNativeReadOutput.activateFromGesture`. Two allowlisted native answer MP3s are preloaded after gesture, not at app startup. Muting, Exit, visibility/pagehide/blur and early UIKit inactive invalidate pending callbacks and scoped-stop only these two native sound effects. No unseen delayed note may reclaim Apple Music/AirPods priority. The native bridge's `prepared`/`accepted` means only predecoded/scheduled, **never** physically heard. Question correctness, star pegs, profile progress and Zoo credit cannot depend on audio ACK. No new microphone, saved file, Web monitor, mix/duck or session category.
+
+**Owner gate pending:** See [N7h physical iPhone checklist](N7H-NATIVE-DAILY-QUESTIONS-AUDIO.md): genuinely hear both answer sounds, Sounds Like? chunk and Verse Help Listen, then test mute, leave/re-enter, held App Switcher, lock, Bluetooth and still-playing external audio; verify fresh explicit retry and no duplicate rewards. GitHub Linux Swift syntax/Node/Web checks are not Xcode SDK build/hardware proof. N7g #76 merged with green CI but independent integrated device signoff remains open.
+
+---
+
+
 > **Read with** [the living handoff](PROJECT-HANDOFF.md). This describes the safety boundaries of the current `ios-prep` implementation as checked on 2026-11-05 (base `1e1deb2`). **Source and current tests are authoritative.** On the focused Learn recovery PR (`fix/learn-narration-recovery-gate`), narration itself—not app UI effects—is the required playback source for Learn's recovery success. Do not replace the activity-owned recovery path with a global approximation.
 
 ## N7g — Read native playback ownership, token isolation and queued-cue cancellation
