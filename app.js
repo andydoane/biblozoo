@@ -11904,7 +11904,7 @@ function resumeInterruptedLearnAudio(fromMenuClose = false) {
   if (muted) toggleMute();
   // An iOS native-only Listen resume must not create or unlock Web sound.
   // Existing Web/PWA/Android HTML recovery keeps its previous UI primer.
-  if (!isNativeLearnListenMode()) {
+  if (window.BibloZooNativeLearnListen?.isAvailable?.() !== true) {
     try { void Promise.resolve(unlockAppAudio()).catch(() => {}); }
     catch (_) { /* Optional UI effects may remain silent. */ }
   }
