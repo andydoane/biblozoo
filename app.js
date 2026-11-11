@@ -14508,6 +14508,8 @@ function activateProfileFromPicker(profileId) {
 
   try {
     profileApi?.setActiveProfile?.(profileId);
+    // Existing Zookeeper selection tap can lead straight to tutorial page 1.
+    if (isTutorialActive()) primeZooTodoTutorialNativeAudioFromGesture();
 
     void continueAfterProfileActivation()
       .catch((err) => {
@@ -14620,6 +14622,10 @@ function updateProfileEditorValidationUi(rootEl) {
 
 async function submitProfileEditor() {
   if (State.profileEditorBusy) return;
+  // N7l: the Create Zookeeper gesture is the first opportunity to preflight
+  // tutorial page 1; validation/storage awaits must not initiate audio later.
+  if (State.profileEditorMode !== PROFILE_EDITOR_MODES.EDIT)
+    primeZooTodoTutorialNativeAudioFromGesture();
 
   const profileApi = getProfileApi();
 
@@ -23175,6 +23181,9 @@ function screenFinalRecall(idx) {
           markLearnCompleted(VERSE_ID);
         }
 
+        // Practice time is a real button gesture; activate the next original
+        // tutorial-page-4 narrator before the async slide/page transition.
+        primeZooTodoTutorialNativeAudioFromGesture();
         State.todoTutorialJustFinishedLearn = true;
         markTutorialLearnDone(VERSE_ID);
         go(Screen.TODO_DEV);
