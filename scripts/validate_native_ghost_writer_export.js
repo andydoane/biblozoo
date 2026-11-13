@@ -148,7 +148,7 @@ async function run() {
 
   const missing=env();
   missing.ctx.nativeGhostExport=null;
-  await assert.rejects(missing.fn.saveGhostWriterImage({exportSize:"square"}),/Native picture sharing is unavailable/);
+  await assert.rejects(missing.fn.saveGhostWriterImage({exportSize:"square"}),/Native picture saving is unavailable/);
   assert.equal(missing.calls.filter(x=>x[0]==="saveImage").length,0,
     "no silent fallback to a browser download on native");
 
