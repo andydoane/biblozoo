@@ -2815,7 +2815,7 @@
           >
 
           <button class="ghost-playback-remix-btn" id="ghostPlaybackRemixBtn" type="button" aria-label="Open remix screen">
-            🔄 Remix
+            <img class="ghost-playback-remix-icon" src="../../verse_images/icon_remix.png" alt="" aria-hidden="true" draggable="false"> Remix
           </button>
         </div>
       </div>
