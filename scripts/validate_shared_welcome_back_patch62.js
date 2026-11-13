@@ -104,8 +104,8 @@ async function tests() {
   eq(h.name.textContent, "Alexandria", "Uses launched zookeeper, not an unrelated active profile");
   eq(h.picture.src, "../../profile_pictures/profile_picture_john_3_16.png",
     "Standalone avatar resolves from site root");
-  eq(h.nameLine.style.values["--bz-welcome-name-size"], "clamp(13px, 4.2vw, 26px)",
-    "Longer names receive a smaller line-size ceiling");
+  eq(h.nameLine.style.values["--bz-welcome-name-size"], "inherit",
+    "Names start at the full Welcome back size; layout fitting waits for a measurable width");
   ok(h.overlay.hidden, "Prompt not displayed at app launch");
   h.blur();h.focus();
   ok(h.overlay.hidden, "No prompt when a non-game screen was backgrounded");

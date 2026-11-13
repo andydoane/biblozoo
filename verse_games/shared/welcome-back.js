@@ -25,7 +25,74 @@
   ]);
   const MESSAGE_INTERVAL_MS = 2500;
   const messageSessions = new WeakMap();
+  const nameObservers = new WeakMap();
+  const MIN_READABLE_NAME_PX = 16;
   let messageStartIndex = 0;
+
+  // Fit the actual rendered name plus ! to the full button width. A
+  // character-count cutoff penalized names such as "Ultimate Tester" even
+  // when their glyphs could fit at the heading's normal font size.
+  function fitName(root) {
+    const line = root?.querySelector?.("[data-welcome-back-name-line]");
+    const title = root?.querySelector?.(".bz-welcome-title");
+    const slot = root?.querySelector?.("[data-welcome-back-action-slot]") ||
+      root?.querySelector?.("[data-welcome-back-action]");
+    if (!line?.style || !title) return;
+    line.classList?.remove?.("bz-welcome-name-wrap");
+    line.style.setProperty("--bz-welcome-name-size", "inherit");
+    const width = slot?.getBoundingClientRect?.().width;
+    const fullSize = Number.parseFloat(window.getComputedStyle?.(title)?.fontSize);
+    // Initial populate() often precedes showing the overlay. The observer
+    // below runs again as soon as its action slot gains a real layout width.
+    if (!(width > 0) || !(fullSize > 0) || !(line.scrollWidth > 0)) return;
+    const limit = width - 1; // reserve a pixel for glyph/layout rounding
+    if (line.scrollWidth <= limit) return;
+
+    const minimum = Math.min(MIN_READABLE_NAME_PX, fullSize);
+    line.style.setProperty("--bz-welcome-name-size", minimum + "px");
+    if (line.scrollWidth > limit) {
+      // Extremely long names remain readable instead of becoming tiny.
+      line.classList?.add?.("bz-welcome-name-wrap");
+      return;
+    }
+    let low = minimum, high = fullSize;
+    for (let i = 0; i < 9; i++) {
+      const mid = (low + high) / 2;
+      line.style.setProperty("--bz-welcome-name-size", mid + "px");
+      if (line.scrollWidth <= limit) low = mid;
+      else high = mid;
+    }
+    line.style.setProperty("--bz-welcome-name-size",
+      (Math.floor(low * 10) / 10) + "px");
+  }
+
+  function scheduleNameFit(root) {
+    const line = root?.querySelector?.("[data-welcome-back-name-line]");
+    const slot = root?.querySelector?.("[data-welcome-back-action-slot]") ||
+      root?.querySelector?.("[data-welcome-back-action]");
+    fitName(root);
+    if (!line || !slot) return;
+    // Width transitions 0 -> visible when the hidden popup opens; rotation
+    // and small-window changes also refit without a stale guessed size.
+    if (!nameObservers.has(line) && typeof window.ResizeObserver === "function") {
+      const observer = new window.ResizeObserver(() => {
+        if (root.isConnected === false) {
+          observer.disconnect();
+          nameObservers.delete(line);
+        } else fitName(root);
+      });
+      observer.observe(slot);
+      nameObservers.set(line, observer);
+    }
+    window.requestAnimationFrame?.(() => {
+      if (root.isConnected !== false) fitName(root);
+    });
+    // Re-measure once the actual Baloo font loads rather than measuring only
+    // a temporary system fallback face.
+    window.document?.fonts?.ready?.then?.(() => {
+      if (root.isConnected !== false) fitName(root);
+    });
+  }
 
   function getMessage(root) {
     const card = root?.querySelector?.("[data-welcome-back-card]");
@@ -34,14 +101,16 @@
 
   function setMessagesRunning(root, busy) {
     const card = root?.querySelector?.("[data-welcome-back-card]");
-    const status = root?.querySelector?.("[data-welcome-back-status]");
-    if (!card || !status) return;
+    const progress = root?.querySelector?.("[data-welcome-back-progress]");
+    if (!card || !progress) return;
     const previous = messageSessions.get(card);
     if (!busy) {
       if (previous) {
         window.clearInterval(previous.timer);
         messageSessions.delete(card);
       }
+      progress.hidden = true;
+      progress.textContent = "";
       return;
     }
     // Idempotent: Learn and Feeding may call setAction repeatedly while busy.
@@ -58,12 +127,12 @@
       }
       index = (index + 1) % ZOO_MESSAGES.length;
       session.message = ZOO_MESSAGES[index];
-      status.textContent = session.message;
-      status.hidden = false;
+      progress.textContent = session.message;
+      progress.hidden = false;
     };
     messageSessions.set(card, session);
-    status.textContent = session.message;
-    status.hidden = false;
+    progress.textContent = session.message;
+    progress.hidden = false;
     session.timer = window.setInterval(advance, MESSAGE_INTERVAL_MS);
   }
 
@@ -86,15 +155,9 @@
   function populate(root, options = {}) {
     if (!root || typeof root.querySelector !== "function") return;
     const identity = getIdentity(options.name, options.profileId);
-    const nameLine = root.querySelector("[data-welcome-back-name-line]");
-    if (nameLine?.style) {
-      const length = Array.from(identity.name).length;
-      nameLine.style.setProperty("--bz-welcome-name-size", length > 13
-        ? "clamp(11px, 3.8vw, 21px)"
-        : length > 9 ? "clamp(13px, 4.2vw, 26px)" : "inherit");
-    }
     const name = root.querySelector("[data-welcome-back-name]");
     if (name) name.textContent = identity.name;
+    scheduleNameFit(root);
     const picture = root.querySelector("[data-welcome-back-picture]");
     const paw = root.querySelector("[data-welcome-back-picture-fallback]");
     if (!picture) return;
@@ -128,6 +191,15 @@
     if (!button) return;
     button.textContent = retry ? RETRY_TEXT : BUTTON_TEXT;
     button.disabled = !!busy;
+    const progress = root.querySelector?.("[data-welcome-back-progress]");
+    // The message replaces the button in its reserved slot. A legacy
+    // controller without new markup safely retains its disabled button.
+    button.hidden = !!busy && !!progress;
+    if (progress) progress.hidden = !busy;
+    if (busy) {
+      const errorStatus = root.querySelector?.("[data-welcome-back-status]");
+      if (errorStatus) errorStatus.hidden = true;
+    }
     // Preserve the busy/accessibility state but keep the portrait stationary.
     // Patch 72.1A replaces spinning with a silent-capable rescue flow.
     const card = root.querySelector?.("[data-welcome-back-card]") ||
@@ -162,8 +234,12 @@
           Welcome back,<span class="bz-welcome-name-line" data-welcome-back-name-line><span class="bz-welcome-name"
           data-welcome-back-name>Zookeeper</span><span class="bz-welcome-punctuation">!</span></span>
         </h2>
-        <button type="button" class="${actionClass}bz-welcome-action no-zoom"
-          data-welcome-back-action ${actionAttrs}>${BUTTON_TEXT}</button>
+        <div class="bz-welcome-action-slot" data-welcome-back-action-slot>
+          <button type="button" class="${actionClass}bz-welcome-action no-zoom"
+            data-welcome-back-action ${actionAttrs}>${BUTTON_TEXT}</button>
+          <p class="bz-welcome-progress" data-welcome-back-progress
+            role="status" aria-live="polite" aria-atomic="true" hidden></p>
+        </div>
         <p class="${statusClass}bz-welcome-status" data-welcome-back-status
           ${statusAttrs} role="status" aria-live="polite" hidden></p>
       </div>`;
