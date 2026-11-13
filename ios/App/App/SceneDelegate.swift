@@ -2284,22 +2284,45 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func shareImage(_ call: CAPPluginCall) {
+    private func imageExportURL(_ call: CAPPluginCall) -> URL? {
         guard let encoded = call.getString("png"),
-              encoded.hasPrefix("data:image/png;base64,") else {
-            call.reject("Expected a PNG image."); return
+              encoded.hasPrefix("data:image/png;base64,") else { return nil }
+        let base64 = String(encoded.dropFirst("data:image/png;base64,".count))
+        guard base64.count <= 28_000_000,
+              let bytes = Data(base64Encoded: base64), bytes.count <= 20_000_000,
+              UIImage(data: bytes) != nil,
+              let url = temporaryURL(extension: "png",
+                                     name: call.getString("name") ?? "Ghost Writer Picture") else {
+            return nil
         }
+        do {
+            try bytes.write(to: url, options: .atomic)
+            return url
+        } catch {
+            cleanupExport(at: url)
+            return nil
+        }
+    }
+
+    @objc func shareImage(_ call: CAPPluginCall) {
         exportQueue.async {
-            let base64 = String(encoded.dropFirst("data:image/png;base64,".count))
-            guard base64.count <= 28_000_000,
-                  let bytes = Data(base64Encoded: base64),
-                  bytes.count <= 20_000_000,
-                  let image = UIImage(data: bytes) else {
-                call.reject("Could not decode the picture."); return
+            guard let url = self.imageExportURL(call) else {
+                call.reject("Could not prepare the Ghost Writer PNG.")
+                return
             }
-            // UIImage gives the standard iOS 'Save Image' option in Photos;
-            // the system sheet also offers compatible sharing destinations.
-            self.presentShare([image], call: call)
+            // Unlike UIImage, sharing the PNG URL preserves the readable
+            // filename in Files, AirDrop and compatible destination apps.
+            self.presentShare([url], call: call, cleanupURL: url)
+        }
+    }
+
+    @objc func saveImage(_ call: CAPPluginCall) {
+        exportQueue.async {
+            guard let url = self.imageExportURL(call) else {
+                call.reject("Could not prepare the Ghost Writer PNG.")
+                return
+            }
+            self.saveToPhotos(url, video: false, call: call)
         }
     }
 
@@ -2308,8 +2331,11 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             guard self.videoJob == nil else {
                 call.reject("A Ghost Writer video is already exporting."); return
             }
-            let url = self.temporaryURL(extension: "mp4",
-                                        name: call.getString("name") ?? "ghost-writer-verse-portrait")
+            guard let url = self.temporaryURL(
+                extension: "mp4", name: call.getString("name") ?? "Ghost Writer Video") else {
+                call.reject("Could not create a temporary MP4 file.")
+                return
+            }
             do {
                 let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
                 writer.shouldOptimizeForNetworkUse = true
@@ -2341,7 +2367,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
                     assetWriterInput: input, sourcePixelBufferAttributes: attributes)
                 guard writer.startWriting() else {
                     call.reject(writer.error?.localizedDescription ?? "Unable to start video encoding.")
-                    try? FileManager.default.removeItem(at: url)
+                    self.cleanupExport(at: url)
                     return
                 }
                 writer.startSession(atSourceTime: .zero)
@@ -2351,7 +2377,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["token": token, "width": self.videoWidth,
                               "height": self.videoHeight, "fps": self.videoFPS])
             } catch {
-                try? FileManager.default.removeItem(at: url)
+                self.cleanupExport(at: url)
                 call.reject("Could not start MP4 export: \(error.localizedDescription)")
             }
         }
@@ -2359,7 +2385,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func fail(_ job: VideoJob, _ call: CAPPluginCall, _ message: String) {
         job.writer.cancelWriting()
-        try? FileManager.default.removeItem(at: job.url)
+        self.cleanupExport(at: job.url)
         videoJob = nil
         call.reject(message)
     }
@@ -2380,9 +2406,8 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
                                       bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
                                       space: CGColorSpaceCreateDeviceRGB(),
                                       bitmapInfo: info) else { return nil }
-        // The canvas frame is top-down: flip Quartz's default bottom-up axis.
-        context.translateBy(x: 0, y: CGFloat(videoHeight))
-        context.scaleBy(x: 1, y: -1)
+        // The JPEG frame is already upright; the extra Quartz flip in #86
+        // inverted the handwriting within an otherwise portrait MP4.
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(videoWidth),
                                          height: CGFloat(videoHeight)))
         return pixelBuffer
@@ -2443,14 +2468,18 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             job.input.markAsFinished()
             job.writer.finishWriting {
                 guard job.writer.status == .completed else {
-                    try? FileManager.default.removeItem(at: job.url)
+                    self.cleanupExport(at: job.url)
                     call.reject(job.writer.error?.localizedDescription ??
                                 "The video could not be finished.")
                     return
                 }
-                // The system share sheet can Save Video to Photos or Files
-                // and hand MP4 to X/Facebook/Instagram; never auto-upload.
-                self.presentShare([job.url], call: call, cleanupURL: job.url)
+                if call.getString("destination") == "share" {
+                    self.presentShare([job.url], call: call, cleanupURL: job.url)
+                } else {
+                    // Save Video defaults to Photos: success only on a
+                    // confirmed PhotoKit transaction, never a share-sheet open.
+                    self.saveToPhotos(job.url, video: true, call: call)
+                }
             }
         }
     }
@@ -2463,7 +2492,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             self.videoJob = nil
             job.writer.cancelWriting()
-            try? FileManager.default.removeItem(at: job.url)
+            self.cleanupExport(at: job.url)
             call.resolve(["cancelled": true])
         }
     }
