@@ -2939,7 +2939,7 @@
                     data-ghost-export-cancel hidden>Cancel</button>
             <button class="ghost-export-action" type="button"
                     data-ghost-export-done hidden>Done!</button>
-            <div class="ghost-export-error-actions">
+            <div class="ghost-export-error-actions" data-ghost-export-error-actions hidden>
               <button class="ghost-export-action" type="button"
                       data-ghost-export-retry hidden>Try Again</button>
               <button class="ghost-export-action ghost-export-back" type="button"
