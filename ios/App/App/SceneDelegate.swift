@@ -2191,9 +2191,15 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
     // Accessed ONLY from exportQueue. No concurrent writers.
     private var videoJob: VideoJob?
 
-    private func temporaryURL(extension ext: String) -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("biblozoo-ghost-\(UUID().uuidString)")
+    private func temporaryURL(extension ext: String, name: String) -> URL {
+        // Keep a useful verse-based filename when the child chooses Files.
+        // Never trust caller-supplied directories or path separators.
+        let clean = name.lowercased()
+            .replacingOccurrences(of: "[^a-z0-9-]", with: "-", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        let stem = String(clean.prefix(52))
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("biblozoo-ghost-\(stem.isEmpty ? "verse" : stem)-\(UUID().uuidString.prefix(8))")
             .appendingPathExtension(ext)
     }
 
@@ -2249,7 +2255,8 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             guard self.videoJob == nil else {
                 call.reject("A Ghost Writer video is already exporting."); return
             }
-            let url = self.temporaryURL(extension: "mp4")
+            let url = self.temporaryURL(extension: "mp4",
+                                        name: call.getString("name") ?? "ghost-writer-verse-portrait")
             do {
                 let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
                 writer.shouldOptimizeForNetworkUse = true
