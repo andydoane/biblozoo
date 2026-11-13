@@ -2271,7 +2271,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 writer.add(input)
                 let attributes: [String: Any] = [
-                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
                     kCVPixelBufferWidthKey as String: self.videoWidth,
                     kCVPixelBufferHeightKey as String: self.videoHeight,
                     kCVPixelBufferCGImageCompatibilityKey as String: true,
@@ -2313,7 +2313,8 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         CVPixelBufferLockBaseAddress(pixelBuffer, [])
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
         guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
-        let info = CGImageAlphaInfo.noneSkipFirst.rawValue
+        let info = CGBitmapInfo.byteOrder32Little.rawValue |
+            CGImageAlphaInfo.premultipliedFirst.rawValue
         guard let context = CGContext(data: base, width: videoWidth, height: videoHeight,
                                       bitsPerComponent: 8,
                                       bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
@@ -2322,8 +2323,8 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         // The canvas frame is top-down: flip Quartz's default bottom-up axis.
         context.translateBy(x: 0, y: CGFloat(videoHeight))
         context.scaleBy(x: 1, y: -1)
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: videoWidth,
-                                         height: videoHeight))
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(videoWidth),
+                                         height: CGFloat(videoHeight)))
         return pixelBuffer
     }
 
