@@ -5937,7 +5937,8 @@
     return username + "'s " + kind + " - " + reference + "." + extension;
   }
 
-  async function saveGhostWriterImage(options = state.remix, destination = "photos") {
+  async function saveGhostWriterImage(options = state.remix, destination = "photos",
+                                      onReadyToSave = null) {
     const cleanOptions = sanitizeRemixOptions({ ...options });
     const size = EXPORT_SIZES[cleanOptions.exportSize || "square"] || EXPORT_SIZES.square;
     await waitForExportAssets(cleanOptions);
@@ -5961,6 +5962,7 @@
       }
       // Save goes straight to PhotoKit; Share preserves the original file
       // name in iOS Files/AirDrop. Never fall back to WKWebView downloads.
+      onReadyToSave?.(); // Canvas is rendered; PhotoKit is about to begin.
       const result = await nativeGhostExport[method]({
         png: canvas.toDataURL("image/png"),
         name: makeFriendlyExportFilename("Picture", "png")
@@ -6012,7 +6014,7 @@
     let token = null;
     let shared = false;
     try {
-      showProgress("Preparing Video...");
+      showProgress("Preparing Video...", { phase: "making", progress: 0 });
       await waitForExportAssets(cleanOptions);
       if (job.cancelled || state.screen !== "remix" || document.hidden)
         return { cancelled: true };
@@ -6062,8 +6064,10 @@
           token, index: frameCount, jpeg
         });
         if (frameCount % 15 === 0) {
-          showProgress("Making Video... " +
-            Math.min(99, Math.floor(100 * frameCount / Math.max(expected, 1))) + "%");
+          const percent = Math.min(99,
+            Math.floor(100 * (frameCount + 1) / Math.max(expected, 1)));
+          showProgress("Making Video... " + percent + "%",
+            { phase: "making", progress: percent });
           // Yield to touch, accessibility and cancellation between batches.
           await new Promise(resolve => setTimeout(resolve, 0));
         }
@@ -6074,7 +6078,8 @@
         throw new Error("The verse animation exceeded the safe video duration.");
       }
       showProgress(destination === "share"
-        ? "Opening Video Share..." : "Saving to Photos...");
+        ? "Opening Video Share..." : "Saving to Photos...",
+        { phase: "saving" });
       const result = await nativeGhostExport.finishVideo({ token, destination });
       if (destination === "share" ? result?.presented !== true : result?.saved !== true)
         throw new Error("The video export was not confirmed.");
