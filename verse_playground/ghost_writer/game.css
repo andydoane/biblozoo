@@ -487,6 +487,17 @@ body {
 }
 /* A hidden Cancel Video control must not occupy a row until encoding starts. */
 .ghost-remix-actions .vm-btn[hidden] { display: none !important; }
+/* One reserved status line avoids an unexpected jump when Photos completes. */
+.ghost-export-status {
+  margin: 0;
+  min-height: 1.45em;
+  padding: 2px 4px;
+  color: #e7ffdc;
+  font: 700 16px/1.35 "Baloo 2", system-ui, sans-serif;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.ghost-export-status.is-error { color: #ffe1df; }
 
 .ghost-training-card .ghost-train-actions {
   width: min(calc(100% - 24px), 440px);
