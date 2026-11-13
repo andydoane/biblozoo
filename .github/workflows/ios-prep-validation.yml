@@ -60,6 +60,12 @@ jobs:
       - name: Validate shared Welcome Back name sizing and stable recovery progress
         run: node scripts/validate_welcome_back_fit_progress_ui.js
 
+      # Native Photos saving uses a purple Welcome Back-style modal.
+      # Exercise its real focus lock, progress, cancel, retry, and cleanup.
+      - name: Validate Ghost Writer purple export popup and accessibility
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_ghost_writer_export_modal.js
+
       # Native Audio Test only: Ghost Writer PNG Save Picture share sheet,
       # 1080x1920 30fps H.264 MP4 silent export and cancel/cleanup.
       - name: Validate native Ghost Writer picture share and silent social MP4
