@@ -29,8 +29,9 @@
     const done = overlay.querySelector("[data-ghost-export-done]");
     const retry = overlay.querySelector("[data-ghost-export-retry]");
     const back = overlay.querySelector("[data-ghost-export-back]");
+    const errorActions = overlay.querySelector("[data-ghost-export-error-actions]");
     if (![dialog, title, message, progress, bar, percentage, activity,
-          successMark, actionHint, cancel, done, retry, back].every(Boolean)) return null;
+          successMark, actionHint, cancel, done, retry, back, errorActions].every(Boolean)) return null;
 
     let active = false, phase = "idle", kind = "video";
     let handlers = {}, lastFocus = null, locked = [], timer = null;
@@ -149,6 +150,7 @@
       done.hidden = next !== "success";
       retry.hidden = next !== "error";
       back.hidden = next !== "error";
+      errorActions.hidden = next !== "error";
       if (next === "making") {
         title.textContent = isVideo ? "Making your video!" : "Saving your picture!";
         if (isVideo) {
