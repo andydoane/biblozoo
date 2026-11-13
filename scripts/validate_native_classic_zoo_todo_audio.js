@@ -81,12 +81,12 @@ assert.equal(feed.split(marker).length, 2, "one export anchor for test-only hook
 const instrumented = feed.replace(
   "  function startRound(runtime) {",
   '  function startRound(runtime) { if (window.__interceptRound) { window.__interceptRound(runtime); return; }'
-).replace(marker, \`  window.__classicAudioTest = {
+).replace(marker, `  window.__classicAudioTest = {
     render,
     setRuntime(value) { activeRuntime = value; },
     nativeBegin: startPreviewRoundWithAudioChoice
   };
-\${marker}\`);
+${marker}`);
 assert.notEqual(instrumented, feed);
 
 function appHarness({nativeOnly = true} = {}) {
