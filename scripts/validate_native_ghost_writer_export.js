@@ -58,7 +58,7 @@ function env({onAppend} = {}) {
   const job = { cancelled:false };
   const plugin = {
     async shareImage(args) {calls.push(["shareImage",args]);return {presented:true};},
-    async beginVideo() {calls.push(["beginVideo"]);return {token:"native-job",width:1080,height:1920,fps:30};},
+    async beginVideo(args) {calls.push(["beginVideo",args]);return {token:"native-job",width:1080,height:1920,fps:30};},
     async appendVideoFrame(args) {
       calls.push(["frame",args]);
       if (onAppend) onAppend(args,job);
