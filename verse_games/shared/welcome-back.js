@@ -29,9 +29,21 @@
   const MIN_READABLE_NAME_PX = 16;
   let messageStartIndex = 0;
 
-  // Fit the actual rendered name plus ! to the full button width. A
-  // character-count cutoff penalized names such as "Ultimate Tester" even
-  // when their glyphs could fit at the heading's normal font size.
+  // A block's scrollWidth usually includes the whole block (roughly the
+  // button width), even when it contains a short name. Measure the rendered
+  // inline glyphs + exclamation instead, not the full-width name-line box.
+  function renderedNameWidth(line) {
+    const doc = line?.ownerDocument || window.document;
+    if (typeof doc?.createRange !== "function") return 0;
+    const range = doc.createRange();
+    range.selectNodeContents(line);
+    const width = range.getBoundingClientRect().width;
+    range.detach?.();
+    return Number.isFinite(width) && width > 0 ? width : 0;
+  }
+
+  // Start at precisely the heading size, and only shrink to fit real glyphs
+  // across the full button width (with a readable floor for very long names).
   function fitName(root) {
     const line = root?.querySelector?.("[data-welcome-back-name-line]");
     const title = root?.querySelector?.(".bz-welcome-title");
@@ -44,13 +56,21 @@
     const fullSize = Number.parseFloat(window.getComputedStyle?.(title)?.fontSize);
     // Initial populate() often precedes showing the overlay. The observer
     // below runs again as soon as its action slot gains a real layout width.
-    if (!(width > 0) || !(fullSize > 0) || !(line.scrollWidth > 0)) return;
+    if (!(width > 0) || !(fullSize > 0)) return;
     const limit = width - 1; // reserve a pixel for glyph/layout rounding
-    if (line.scrollWidth <= limit) return;
+    const naturalWidth = renderedNameWidth(line);
+    // When hidden or the DOM Range API is unavailable, don't guess a tiny
+    // font. The observer remeasures after the popup becomes visible.
+    if (!(naturalWidth > 0) || naturalWidth <= limit) return;
 
     const minimum = Math.min(MIN_READABLE_NAME_PX, fullSize);
     line.style.setProperty("--bz-welcome-name-size", minimum + "px");
-    if (line.scrollWidth > limit) {
+    const minimumWidth = renderedNameWidth(line);
+    if (!(minimumWidth > 0)) {
+      line.style.setProperty("--bz-welcome-name-size", "inherit");
+      return;
+    }
+    if (minimumWidth > limit) {
       // Extremely long names remain readable instead of becoming tiny.
       line.classList?.add?.("bz-welcome-name-wrap");
       return;
@@ -59,7 +79,7 @@
     for (let i = 0; i < 9; i++) {
       const mid = (low + high) / 2;
       line.style.setProperty("--bz-welcome-name-size", mid + "px");
-      if (line.scrollWidth <= limit) low = mid;
+      if (renderedNameWidth(line) <= limit) low = mid;
       else high = mid;
     }
     line.style.setProperty("--bz-welcome-name-size",

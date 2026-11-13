@@ -23,6 +23,12 @@ assert.match(FEED, /data-daily-feed-resume>Let's go!<\/button>/);
 assert.match(FEED, /data-welcome-back-status data-daily-feed-resume-status/);
 assert.doesNotMatch(JS, /length > 13|length > 9/,
   "old character-count sizing must not return");
+assert.match(JS, /range\.selectNodeContents\(line\)/,
+  "measure name and punctuation with a DOM Range, not a block box");
+assert.doesNotMatch(JS, /line\.scrollWidth/,
+  "a block's scrollWidth is not its inline text width");
+assert.match(CSS, /\.bz-welcome-name-line\s*\{[^}]*display:\s*block/,
+  "test deliberately models the production full-width block container");
 
 function cls() {
   const values = new Set();
@@ -46,11 +52,9 @@ function harness() {
       setProperty(k,v) {this.values[k] = String(v);}
     },
     classList:cls(),
-    get scrollWidth() {
-      const raw = this.style.values["--bz-welcome-name-size"];
-      const px = raw === "inherit" || raw == null ? 39 : Number.parseFloat(raw);
-      return Math.ceil((name.textContent.length + 1) * px * 0.60);
-    }
+    // Real WebKit's block box fills the parent width even for "DanTDM".
+    // PR #84's old test incorrectly made scrollWidth equal glyph width.
+    get scrollWidth() { return width; }
   };
   const slot = {getBoundingClientRect:() => ({width})};
   const title = {};
@@ -79,7 +83,22 @@ function harness() {
       }[sel] || null;
     }
   };
-  const document = {hidden:false, fonts:{ready:Promise.resolve()}};
+  const document = {
+    hidden:false, fonts:{ready:Promise.resolve()},
+    createRange() {
+      let measured;
+      return {
+        selectNodeContents(node) { measured=node; },
+        getBoundingClientRect() {
+          assert.equal(measured,nameLine,"Range includes name + exclamation");
+          const raw=nameLine.style.values["--bz-welcome-name-size"];
+          const px=raw === "inherit" || raw == null ? 39 : Number.parseFloat(raw);
+          return {width:Math.ceil((name.textContent.length + 1)*px*0.60)};
+        },
+        detach() {}
+      };
+    }
+  };
   class ResizeObserver {
     constructor(fn) {this.fn=fn;this.disconnected=false;observers.push(this);}
     observe(target) {this.target=target;}
@@ -99,6 +118,11 @@ function harness() {
     slot,button,progress,status,timers,frames,observers,
     nameAs(value) {username=value;},
     widthAs(value) {width=value;},
+    glyphWidth() {
+      const range=document.createRange();
+      range.selectNodeContents(nameLine);
+      return range.getBoundingClientRect().width;
+    },
     fireResize() {for(const observer of observers) if(!observer.disconnected) observer.fire();},
     tick() {for(const [id,timer] of [...timers]) if(timers.has(id)) timer.fn();}
   };
@@ -127,7 +151,7 @@ async function main() {
   let fitted = Number.parseFloat(nameLine.style.values["--bz-welcome-name-size"]);
   assert(fitted >= 16 && fitted < 39,
     "Ultimate Tester scales only enough to fit the action width");
-  assert(nameLine.scrollWidth <= 279, "fitted name and ! fit button width");
+  assert(h.glyphWidth() <= 279, "fitted name and ! fit button width");
   assert(!nameLine.classList.contains("bz-welcome-name-wrap"));
 
   h.widthAs(420); // rotate phone / larger popup
@@ -139,6 +163,15 @@ async function main() {
   fitted=Number.parseFloat(nameLine.style.values["--bz-welcome-name-size"]);
   assert(fitted < 39 && fitted >= 16, "narrow screen refits");
 
+  // Exact owner screenshot regression: full-width block scrollWidth equals
+  // the button width, but DanTDM! glyphs fit at the full heading size.
+  h.nameAs("DanTDM");
+  api.populate(root);
+  assert.equal(nameLine.scrollWidth,220,
+    "block scrollWidth intentionally hides the true glyph width");
+  assert(h.glyphWidth() < 219);
+  assert.equal(nameLine.style.values["--bz-welcome-name-size"],"inherit",
+    "DanTDM must remain the SAME size as Welcome back");
   h.nameAs("Sam");
   api.populate(root);
   assert.equal(nameLine.style.values["--bz-welcome-name-size"],"inherit",
@@ -154,7 +187,7 @@ async function main() {
     "reusing the popup clears the long-name wrapping state");
   for(const frame of h.frames.splice(0)) frame(); // next frame before paint
   await Promise.resolve(); // real font face becoming ready
-  assert(nameLine.scrollWidth <= 219);
+  assert(h.glyphWidth() <= 219);
 
   // During recovery the button disappears from its existing fixed slot;
   // playful text lives THERE, not in the error paragraph below the button.
@@ -194,6 +227,6 @@ async function main() {
   root.isConnected=false;
   h.fireResize();
   assert(h.observers[0].disconnected,"detached popup releases resize observer");
-  console.log("Welcome Back fit/progress PASS: actual shared JS, hidden-open/resize/font refit, readable long names, one fixed progress slot, retry/error, background timer cleanup.");
+  console.log("Welcome Back Range fit/progress PASS: DanTDM at full size despite full-width block scrollWidth; long-name resize/font fit, stable progress, retry/error, background cleanup.");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
