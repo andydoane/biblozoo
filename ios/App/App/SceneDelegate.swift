@@ -65,6 +65,9 @@ final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(BibloZooMicSessionProbePlugin())
         // N7f output-only Read My Verse playback, exact .audiotest bundle.
         bridge?.registerPluginInstance(BibloZooNativeReadOutputPlugin())
+        // Ghost Writer: user-initiated PNG share and silent H.264 MP4 export.
+        // No microphone, audio output, Photos-library read, or server upload.
+        bridge?.registerPluginInstance(BibloZooGhostWriterExportPlugin())
     }
 }
 
@@ -2138,6 +2141,269 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             self?.cues.forEach { $0.stop() }
             self?.cues.removeAll()
             call.resolve(["stopped": true])
+        }
+    }
+}
+
+
+// Ghost Writer only: explicit local image/share and silent social-video export.
+// Each JPEG frame is submitted and ACKed separately from JavaScript; no audio
+// tracks, microphone, network transfer, or unbounded frame arrays are created.
+// Registered only in the Audio Test native app (not Web/PWA/Android).
+import AVFoundation
+import CoreVideo
+
+@objc(BibloZooGhostWriterExportPlugin)
+final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "BibloZooGhostWriterExportPlugin"
+    public let jsName = "BibloZooGhostWriterExport"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "appendVideoFrame", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "finishVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelVideo", returnType: CAPPluginReturnPromise)
+    ]
+
+    private let exportQueue = DispatchQueue(label: "com.andydoane.biblozoo.ghostexport")
+    private let videoWidth = 1080
+    private let videoHeight = 1920
+    private let videoFPS: Int32 = 30
+    private let maximumFrames = 5400 // 3 minutes, bounded even for long verses.
+
+    private final class VideoJob {
+        let token: String
+        let url: URL
+        let writer: AVAssetWriter
+        let input: AVAssetWriterInput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        var nextFrame = 0
+
+        init(token: String, url: URL, writer: AVAssetWriter,
+             input: AVAssetWriterInput, adaptor: AVAssetWriterInputPixelBufferAdaptor) {
+            self.token = token
+            self.url = url
+            self.writer = writer
+            self.input = input
+            self.adaptor = adaptor
+        }
+    }
+    // Accessed ONLY from exportQueue. No concurrent writers.
+    private var videoJob: VideoJob?
+
+    private func temporaryURL(extension ext: String) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("biblozoo-ghost-\(UUID().uuidString)")
+            .appendingPathExtension(ext)
+    }
+
+    private func presentShare(_ items: [Any], call: CAPPluginCall,
+                              cleanupURL: URL? = nil) {
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState == .active,
+                  let presenter = self.bridge?.viewController,
+                  presenter.presentedViewController == nil else {
+                if let url = cleanupURL { try? FileManager.default.removeItem(at: url) }
+                call.reject("Please return to BibloZoo and try sharing again.")
+                return
+            }
+            let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX,
+                                            y: presenter.view.bounds.midY,
+                                            width: 1, height: 1)
+                popover.permittedArrowDirections = []
+            }
+            sheet.completionWithItemsHandler = { _, _, _, _ in
+                if let url = cleanupURL { try? FileManager.default.removeItem(at: url) }
+            }
+            presenter.present(sheet, animated: true) {
+                // A share sheet opened; this does NOT claim the user saved.
+                call.resolve(["presented": true])
+            }
+        }
+    }
+
+    @objc func shareImage(_ call: CAPPluginCall) {
+        guard let encoded = call.getString("png"),
+              encoded.hasPrefix("data:image/png;base64,") else {
+            call.reject("Expected a PNG image."); return
+        }
+        exportQueue.async {
+            let base64 = String(encoded.dropFirst("data:image/png;base64,".count))
+            guard base64.count <= 28_000_000,
+                  let bytes = Data(base64Encoded: base64),
+                  bytes.count <= 20_000_000,
+                  let image = UIImage(data: bytes) else {
+                call.reject("Could not decode the picture."); return
+            }
+            // UIImage gives the standard iOS 'Save Image' option in Photos;
+            // the system sheet also offers compatible sharing destinations.
+            self.presentShare([image], call: call)
+        }
+    }
+
+    @objc func beginVideo(_ call: CAPPluginCall) {
+        exportQueue.async {
+            guard self.videoJob == nil else {
+                call.reject("A Ghost Writer video is already exporting."); return
+            }
+            let url = self.temporaryURL(extension: "mp4")
+            do {
+                let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+                writer.shouldOptimizeForNetworkUse = true
+                let settings: [String: Any] = [
+                    AVVideoCodecKey: AVVideoCodecType.h264,
+                    AVVideoWidthKey: self.videoWidth,
+                    AVVideoHeightKey: self.videoHeight,
+                    AVVideoCompressionPropertiesKey: [
+                        AVVideoAverageBitRateKey: 4_500_000,
+                        AVVideoExpectedSourceFrameRateKey: self.videoFPS,
+                        AVVideoMaxKeyFrameIntervalKey: self.videoFPS * 2,
+                        AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+                    ]
+                ]
+                let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+                input.expectsMediaDataInRealTime = false
+                guard writer.canAdd(input) else {
+                    call.reject("H.264 video export isn't supported on this device."); return
+                }
+                writer.add(input)
+                let attributes: [String: Any] = [
+                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
+                    kCVPixelBufferWidthKey as String: self.videoWidth,
+                    kCVPixelBufferHeightKey as String: self.videoHeight,
+                    kCVPixelBufferCGImageCompatibilityKey as String: true,
+                    kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
+                ]
+                let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                    assetWriterInput: input, sourcePixelBufferAttributes: attributes)
+                guard writer.startWriting() else {
+                    call.reject(writer.error?.localizedDescription ?? "Unable to start video encoding.")
+                    try? FileManager.default.removeItem(at: url)
+                    return
+                }
+                writer.startSession(atSourceTime: .zero)
+                let token = UUID().uuidString
+                self.videoJob = VideoJob(token: token, url: url, writer: writer,
+                                         input: input, adaptor: adaptor)
+                call.resolve(["token": token, "width": self.videoWidth,
+                              "height": self.videoHeight, "fps": self.videoFPS])
+            } catch {
+                try? FileManager.default.removeItem(at: url)
+                call.reject("Could not start MP4 export: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func fail(_ job: VideoJob, _ call: CAPPluginCall, _ message: String) {
+        job.writer.cancelWriting()
+        try? FileManager.default.removeItem(at: job.url)
+        videoJob = nil
+        call.reject(message)
+    }
+
+    private func makeBuffer(from jpeg: Data, job: VideoJob) -> CVPixelBuffer? {
+        guard let image = UIImage(data: jpeg), let cgImage = image.cgImage,
+              let pool = job.adaptor.pixelBufferPool else { return nil }
+        var buffer: CVPixelBuffer?
+        guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer)
+                == kCVReturnSuccess, let pixelBuffer = buffer else { return nil }
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        let info = CGImageAlphaInfo.noneSkipFirst.rawValue
+        guard let context = CGContext(data: base, width: videoWidth, height: videoHeight,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: info) else { return nil }
+        // The canvas frame is top-down: flip Quartz's default bottom-up axis.
+        context.translateBy(x: 0, y: CGFloat(videoHeight))
+        context.scaleBy(x: 1, y: -1)
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: videoWidth,
+                                         height: videoHeight))
+        return pixelBuffer
+    }
+
+    @objc func appendVideoFrame(_ call: CAPPluginCall) {
+        let token = call.getString("token") ?? ""
+        let index = call.getInt("index") ?? -1
+        let encoded = call.getString("jpeg") ?? ""
+        exportQueue.async {
+            guard let job = self.videoJob, job.token == token else {
+                call.reject("Video export is no longer active."); return
+            }
+            guard index == job.nextFrame, index >= 0, index < self.maximumFrames else {
+                self.fail(job, call, "Video frames must arrive in order (maximum 3 minutes).")
+                return
+            }
+            guard encoded.hasPrefix("data:image/jpeg;base64,"),
+                  encoded.count <= 12_000_000,
+                  let jpeg = Data(base64Encoded:
+                    String(encoded.dropFirst("data:image/jpeg;base64,".count))),
+                  jpeg.count <= 9_000_000,
+                  let buffer = self.makeBuffer(from: jpeg, job: job) else {
+                self.fail(job, call, "Could not read an export frame."); return
+            }
+            // Backpressure on a private queue: never freeze UIKit or hold
+            // hundreds of megabytes of frame data in JavaScript/Swift.
+            let deadline = Date().addingTimeInterval(8)
+            while !job.input.isReadyForMoreMediaData && Date() < deadline &&
+                  job.writer.status == .writing {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            guard job.input.isReadyForMoreMediaData,
+                  job.writer.status == .writing else {
+                self.fail(job, call, "The video encoder stopped responding."); return
+            }
+            let time = CMTime(value: Int64(index), timescale: self.videoFPS)
+            guard job.adaptor.append(buffer, withPresentationTime: time) else {
+                self.fail(job, call,
+                          job.writer.error?.localizedDescription ?? "Could not encode a video frame.")
+                return
+            }
+            job.nextFrame += 1
+            call.resolve(["accepted": true, "frames": job.nextFrame])
+        }
+    }
+
+    @objc func finishVideo(_ call: CAPPluginCall) {
+        let token = call.getString("token") ?? ""
+        exportQueue.async {
+            guard let job = self.videoJob, job.token == token else {
+                call.reject("Video export is no longer active."); return
+            }
+            guard job.nextFrame >= self.videoFPS else {
+                self.fail(job, call, "Video must include at least one second."); return
+            }
+            self.videoJob = nil
+            job.input.markAsFinished()
+            job.writer.finishWriting {
+                guard job.writer.status == .completed else {
+                    try? FileManager.default.removeItem(at: job.url)
+                    call.reject(job.writer.error?.localizedDescription ??
+                                "The video could not be finished.")
+                    return
+                }
+                // The system share sheet can Save Video to Photos or Files
+                // and hand MP4 to X/Facebook/Instagram; never auto-upload.
+                self.presentShare([job.url], call: call, cleanupURL: job.url)
+            }
+        }
+    }
+
+    @objc func cancelVideo(_ call: CAPPluginCall) {
+        let token = call.getString("token") ?? ""
+        exportQueue.async {
+            guard let job = self.videoJob, job.token == token else {
+                call.resolve(["cancelled": false]); return
+            }
+            self.videoJob = nil
+            job.writer.cancelWriting()
+            try? FileManager.default.removeItem(at: job.url)
+            call.resolve(["cancelled": true])
         }
     }
 }
