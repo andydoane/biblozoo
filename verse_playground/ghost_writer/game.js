@@ -3325,6 +3325,11 @@
     const shareVideoBtn = document.getElementById("ghostShareVideoBtn");
     const cancelVideoBtn = document.getElementById("ghostCancelVideoBtn");
     const exportStatus = document.getElementById("ghostExportStatus");
+    const exportDialog = nativeGhostExport
+      ? window.BibloZooGhostExportDialog?.create?.(
+          document.getElementById("ghostExportOverlay"))
+      : null;
+
     const announceExport = (message, failed = false) => {
       if (!exportStatus?.isConnected) return;
       exportStatus.textContent = message;
@@ -3337,6 +3342,7 @@
         ? { ...state.remix, exportSize: "phone" }
         : { ...state.remix };
     }
+
     function setExportActionsDisabled(disabled) {
       for (const button of [saveImageBtn, shareImageBtn, saveVideoBtn, shareVideoBtn]) {
         if (button?.isConnected) button.disabled = disabled;
@@ -3344,25 +3350,37 @@
     }
 
     async function onPictureAction(destination, button) {
-      if (!button || button.disabled || activeGhostImageExport || activeGhostVideoExport)
-        return;
+      if (!button || button.disabled || activeGhostImageExport ||
+          activeGhostVideoExport) return;
+      const modal = destination === "photos" ? exportDialog : null;
+      if (modal && !modal.open("picture", {
+        onRetry: () => { void onPictureAction("photos", saveImageBtn); }
+      })) return;
       playUiTapSound();
       activeGhostImageExport = true;
       setExportActionsDisabled(true);
-      button.textContent = destination === "photos" ? "Saving Picture..." : "Sharing Picture...";
-      announceExport(destination === "photos" ? "Saving picture to Photos..." : "Preparing picture...");
+      if (!modal) {
+        button.textContent = destination === "photos" ? "Saving Picture..." : "Sharing Picture...";
+        announceExport(destination === "photos" ? "Saving picture to Photos..." : "Preparing picture...");
+      }
       try {
-        const result = await saveGhostWriterImage(pictureOptions(), destination);
-        if (IS_NATIVE_CAPACITOR) {
-          if (destination === "photos" && result?.saved === true)
-            announceExport("Picture saved to Photos! 🎉");
-          else if (destination === "share" && result?.presented === true)
-            announceExport("Choose where to share your picture.");
+        const result = await saveGhostWriterImage(
+          pictureOptions(), destination,
+          () => { if (modal) modal.saving(); }
+        );
+        if (modal && result?.saved === true) {
+          modal.success(); // PhotoKit confirmed, never just sheet presentation
+        } else if (destination === "photos" && result?.saved === true) {
+          announceExport("Picture saved to Photos! 🎉");
+        } else if (destination === "share" && result?.presented === true) {
+          announceExport("Choose where to share your picture.");
         }
       } catch (error) {
         console.warn("Ghost Writer picture export failed", error);
-        announceExport(destination === "photos"
-          ? "Couldn't save to Photos. Check permission in Settings or try Share Picture."
+        const detail = "Couldn't save your picture. " +
+          "Check Photos permission in Settings, or try Share Picture.";
+        if (modal) modal.error(detail);
+        else announceExport(destination === "photos" ? detail
           : "Couldn't open picture sharing. Please try again.", true);
       } finally {
         activeGhostImageExport = false;
@@ -3374,9 +3392,10 @@
     saveImageBtn?.addEventListener("click", () => void onPictureAction("photos", saveImageBtn));
     shareImageBtn?.addEventListener("click", () => void onPictureAction("share", shareImageBtn));
 
+    // Share Video keeps its original inline cancellation and share-sheet
+    // behavior. Save Video uses the modal's Cancel in the same reserved slot.
     cancelVideoBtn?.addEventListener("click", () => {
       if (!activeGhostVideoExport) return;
-      // Wait for at most one in-flight frame ACK; cancel the temp writer.
       activeGhostVideoExport.cancelled = true;
       cancelVideoBtn.disabled = true;
       cancelVideoBtn.textContent = "Stopping...";
@@ -3386,35 +3405,50 @@
     async function onVideoAction(destination, button) {
       if (!nativeGhostExport || !button || button.disabled ||
           activeGhostImageExport || activeGhostVideoExport) return;
+      const job = { cancelled: false };
+      const modal = destination === "photos" ? exportDialog : null;
+      if (modal && !modal.open("video", {
+        onCancel: () => { job.cancelled = true; },
+        onRetry: () => { void onVideoAction("photos", saveVideoBtn); }
+      })) return;
       playUiTapSound();
       sanitizeRemixOptions(state.remix);
-      const job = { cancelled: false };
       activeGhostVideoExport = job;
       setExportActionsDisabled(true);
-      if (cancelVideoBtn?.isConnected) {
+      if (!modal && cancelVideoBtn?.isConnected) {
         cancelVideoBtn.hidden = false;
         cancelVideoBtn.disabled = false;
       }
-      announceExport("Preparing silent portrait video...");
+      if (!modal) announceExport("Preparing silent portrait video...");
       try {
         const result = await saveGhostWriterNativeVideo({ ...state.remix }, job,
-          label => {
-            if (button.isConnected) button.textContent = label;
+          (label, stage) => {
+            if (modal) {
+              if (stage?.phase === "saving") modal.saving();
+              else if (stage?.phase === "making")
+                modal.setProgress(stage.progress);
+            } else if (button.isConnected) {
+              button.textContent = label;
+            }
           }, destination);
         if (job.cancelled || result?.cancelled) {
-          announceExport("Video export cancelled.");
+          if (modal) modal.close();
+          else announceExport("Video export cancelled.");
         } else if (destination === "photos" && result?.saved === true) {
-          announceExport("Video saved to Photos! 🎉");
+          if (modal) modal.success();
+          else announceExport("Video saved to Photos! 🎉");
         } else if (destination === "share" && result?.presented === true) {
           announceExport("Choose where to share your video.");
         }
       } catch (error) {
         if (!job.cancelled) {
           console.warn("Ghost Writer native MP4 export failed", error);
-          announceExport(destination === "photos"
-            ? "Couldn't save video to Photos. Check permission in Settings or try Share Video."
+          const detail = "Couldn't save your video. " +
+            "Check Photos permission in Settings, or try Share Video.";
+          if (modal) modal.error(detail);
+          else announceExport(destination === "photos" ? detail
             : "Couldn't share video. Please try again.", true);
-        }
+        } else if (modal) modal.close();
       } finally {
         if (activeGhostVideoExport === job) activeGhostVideoExport = null;
         setExportActionsDisabled(false);
