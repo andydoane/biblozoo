@@ -913,7 +913,9 @@
 }
 
 /* N5a: pilot trace/badges never leak into normal native-only Feeding UI.
-   A real preflight failure may reveal the short retry status explicitly. */
+   A real preflight failure may reveal the short retry status explicitly.
+   Honor [hidden] even on a flex-based DEV label if it is ever rendered. */
+.daily-feed-native-pilot-opt[hidden],
 .daily-feed-native-pilot-badge[hidden],
 .daily-feed-native-pilot-phases[hidden],
 .daily-feed-native-pilot-status[hidden] {

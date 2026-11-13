@@ -1298,15 +1298,17 @@
       resolveFeedMode(session?.feedMode);
     const modeConfig =
       getFeedModeConfig(mode);
-    // Preserve opt-in Classic; all four Feeding modes in the separate
-    // native-only iOS test app now use an explicit native sound profile.
-    // Web/PWA/Android and the original iOS app remain unchanged.
+    // In Audio Test iOS, every Feeding mode (including real Zoo To-Do
+    // Classic) must prepare native sound on Got It!. Retain the optional
+    // Classic developer preview on other builds; leave Web/PWA unchanged.
     const nativeOnlyApp = window.BibloZooNativeOnlyOutput?.enabled === true;
     const nativePilotPreview =
       window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
       ((session?.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
-        (nativeOnlyApp && [FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
-    const nativeClassicChoice = nativePilotPreview &&
+        (nativeOnlyApp && [FEED_MODES.CLASSIC, FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
+    // Only the legacy comparison preview offers a DEV checkbox. Real
+    // Audio Test gameplay is always native and must not render that control.
+    const nativeClassicChoice = nativePilotPreview && !nativeOnlyApp &&
       mode === FEED_MODES.CLASSIC;
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
@@ -5623,14 +5625,14 @@
     const petRect =
       petCircle.getBoundingClientRect();
 
-    // Retain legacy opt-in Classic preview. Native-only Melody,
-    // Labyrinth and Bounce prepare on a real Got It! user tap;
+    // Retain legacy opt-in Classic preview. Every native-only Feeding
+    // mode, including real Zoo To-Do Classic, prepares on the Got It! tap;
     // never allocate Web/HTML output in the isolated iOS app.
     const nativePilotAllowed =
       window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
       ((session.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
         (window.BibloZooNativeOnlyOutput?.enabled === true &&
-         [FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
+         [FEED_MODES.CLASSIC, FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
     if (nativePilotAllowed && preparedAudioContext) {
       stopAudioContext(preparedAudioContext);
       preparedAudioContext = null;

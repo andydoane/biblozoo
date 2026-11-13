@@ -68,8 +68,8 @@ assert.match(melodyGame,/runtime\.nativePilot\.play\("feed-melody"/,
   "N4a now routes real Melody catch notes to N3d's fixed Swift bank");
 assert.match(game,/session\.dailyTodoPreview === true && mode === FEED_MODES\.CLASSIC/,
   "Classic preview selection must remain intact in N4a");
-assert.match(game,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
-  "N4c preserves N3d fixed Melody bank on isolated native-only iOS");
+assert.match(game,/nativeOnlyApp && \[FEED_MODES\.CLASSIC, FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
+  "Native-only Classic/Melody/Labyrinth/Bounce remain enabled in Audio Test iOS");
 assert.match(pilot,/const IDS = Object\.freeze\(\["feed-star", "feed-chomp", "feed-peg"\]\)/,
   "Classic pilot remains unaffected by DEV Melody bank");
 assert.match(workflow,/node scripts\/validate_native_melody_bank_n3d\.js/);
