@@ -86,6 +86,7 @@ function env({onAppend} = {}) {
     EXPORT_SIZES:{square:{width:1080,height:1080,filenameLabel:"square"}},
     drawCompleteText(){calls.push(["renderPNG"]);},
     makeExportFilename:()=> "ghost-writer-test.png",
+    makeExportVideoFilename:()=> "ghost-writer-john-11-35-portrait.webm",
     downloadBlob(){throw Error("WKWebView browser-download fallback forbidden");},
     downloadCanvasDataUrl(){throw Error("WKWebView data URL fallback forbidden");},
     NATIVE_SOCIAL_VIDEO:{width:1080,height:1920,fps:30,maxFrames:5400,endHoldFrames:21},
@@ -123,6 +124,9 @@ async function run() {
   await h.fn.saveGhostWriterNativeVideo({speed:"normal"},h.job,h.report);
   assert.deepEqual(h.calls.filter(x=>x[0]==="beginVideo"||x[0]==="finish").map(x=>x[0]),
     ["beginVideo","finish"]);
+  assert.equal(h.calls.find(x=>x[0]==="beginVideo")[1].name,
+    "ghost-writer-john-11-35-portrait",
+    "the native MP4 has a readable verse reference, not a random opaque name");
   assert.equal(h.calls.filter(x=>x[0]==="cancel").length,0);
   const frames=h.calls.filter(x=>x[0]==="frame").map(x=>x[1]);
   assert(frames.length>=23,"complete short replay and 21 finish-hold frames");
