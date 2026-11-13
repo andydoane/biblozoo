@@ -2152,6 +2152,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
 // Registered only in the Audio Test native app (not Web/PWA/Android).
 import AVFoundation
 import CoreVideo
+import Photos
 
 @objc(BibloZooGhostWriterExportPlugin)
 final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -2159,6 +2160,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "BibloZooGhostWriterExport"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveImage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beginVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "appendVideoFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "finishVideo", returnType: CAPPluginReturnPromise),
@@ -2191,16 +2193,67 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
     // Accessed ONLY from exportQueue. No concurrent writers.
     private var videoJob: VideoJob?
 
-    private func temporaryURL(extension ext: String, name: String) -> URL {
-        // Keep a useful verse-based filename when the child chooses Files.
-        // Never trust caller-supplied directories or path separators.
-        let clean = name.lowercased()
-            .replacingOccurrences(of: "[^a-z0-9-]", with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        let stem = String(clean.prefix(52))
-        return FileManager.default.temporaryDirectory
-            .appendingPathComponent("biblozoo-ghost-\(stem.isEmpty ? "verse" : stem)-\(UUID().uuidString.prefix(8))")
-            .appendingPathExtension(ext)
+    private func temporaryURL(extension ext: String, name: String) -> URL? {
+        // Preserve the friendly filename for Files/AirDrop in a unique temp
+        // folder. Ignore paths and illegal characters from JavaScript.
+        let stem = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_'"))
+        let cleaned = stem.unicodeScalars.map {
+            safe.contains($0) ? String($0) : "_"
+        }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("biblozoo-ghost-\(UUID().uuidString)")
+        do {
+            try FileManager.default.createDirectory(at: folder,
+                                                    withIntermediateDirectories: true)
+            return folder.appendingPathComponent(
+                String(cleaned.prefix(76)).isEmpty ? "Ghost Writer" : String(cleaned.prefix(76)))
+                .appendingPathExtension(ext)
+        } catch {
+            return nil
+        }
+    }
+
+    private func cleanupExport(at url: URL) {
+        let folder = url.deletingLastPathComponent()
+        guard folder.lastPathComponent.hasPrefix("biblozoo-ghost-"),
+              folder.deletingLastPathComponent().standardizedFileURL ==
+                FileManager.default.temporaryDirectory.standardizedFileURL else { return }
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    private func saveToPhotos(_ url: URL, video: Bool, call: CAPPluginCall) {
+        // PhotoKit add-only: no access to the child's existing library.
+        // Complete the Promise only after the OS confirms the asset was saved.
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState == .active else {
+                self.cleanupExport(at: url)
+                call.reject("Return to BibloZoo to save to Photos.")
+                return
+            }
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                guard status == .authorized || status == .limited else {
+                    self.cleanupExport(at: url)
+                    call.reject("Allow BibloZoo to Add Photos in Settings, or use Share.")
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    if video {
+                        _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+                    } else {
+                        _ = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url)
+                    }
+                }, completionHandler: { saved, error in
+                    self.cleanupExport(at: url)
+                    if saved {
+                        call.resolve(["saved": true, "destination": "photos"])
+                    } else {
+                        call.reject(error?.localizedDescription ??
+                                    "Photos could not save the Ghost Writer export.")
+                    }
+                })
+            }
+        }
     }
 
     private func presentShare(_ items: [Any], call: CAPPluginCall,
@@ -2209,7 +2262,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             guard UIApplication.shared.applicationState == .active,
                   let presenter = self.bridge?.viewController,
                   presenter.presentedViewController == nil else {
-                if let url = cleanupURL { try? FileManager.default.removeItem(at: url) }
+                if let url = cleanupURL { self.cleanupExport(at: url) }
                 call.reject("Please return to BibloZoo and try sharing again.")
                 return
             }
@@ -2222,7 +2275,7 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
                 popover.permittedArrowDirections = []
             }
             sheet.completionWithItemsHandler = { _, _, _, _ in
-                if let url = cleanupURL { try? FileManager.default.removeItem(at: url) }
+                if let url = cleanupURL { self.cleanupExport(at: url) }
             }
             presenter.present(sheet, animated: true) {
                 // A share sheet opened; this does NOT claim the user saved.
