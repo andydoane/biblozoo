@@ -60,6 +60,11 @@ jobs:
       - name: Validate shared Welcome Back name sizing and stable recovery progress
         run: node scripts/validate_welcome_back_fit_progress_ui.js
 
+      # Ghost Writer finished-playback Remix button swaps its OS emoji for
+      # the existing 1em PNG; verify path, sizing, and click semantics.
+      - name: Validate Ghost Writer Remix button PNG and sizing
+        run: node scripts/validate_ghost_writer_remix_icon.js
+
       # Real Daily Zoo To-Do Classic Feeding must use the same native Got It!
       # preparation as its DEV preview and other three native Feeding modes.
       - name: Validate native Classic Feeding from Daily Zoo To-Do
