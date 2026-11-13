@@ -2238,11 +2238,13 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
                 PHPhotoLibrary.shared().performChanges({
-                    if video {
-                        _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-                    } else {
-                        _ = PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url)
-                    }
+                    // Non-optional creation request: a no-op change block
+                    // must never return a false-positive "Saved!".
+                    let request = PHAssetCreationRequest.forAsset()
+                    let options = PHAssetResourceCreationOptions()
+                    options.originalFilename = url.lastPathComponent
+                    request.addResource(with: video ? .video : .photo,
+                                        fileURL: url, options: options)
                 }, completionHandler: { saved, error in
                     self.cleanupExport(at: url)
                     if saved {
