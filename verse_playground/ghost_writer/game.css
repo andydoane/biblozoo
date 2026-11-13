@@ -745,6 +745,16 @@ body {
   transition: opacity .2s ease, transform .2s ease;
 }
 
+/* 1em matches the old emoji's font-relative footprint at every viewport size. */
+.ghost-playback-remix-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  vertical-align: -0.13em;
+  pointer-events: none;
+}
+
 .ghost-playback-remix-btn.is-visible {
   opacity: 1;
   transform: translateY(0);
