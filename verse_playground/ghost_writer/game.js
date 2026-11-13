@@ -62,6 +62,11 @@
   // soloAmbient PCM engine; Web/PWA/Android keep their original Web Audio.
   const nativeGhostAudio = window.BibloZooNativeGhostWriterAudio?.isAvailable?.()
     ? window.BibloZooNativeGhostWriterAudio : null;
+  // Native Audio Test export is independent of AVAudioSession and microphones.
+  // Non-native Web/PWA keep their existing download behavior unchanged.
+  const nativeGhostExport = IS_NATIVE_CAPACITOR
+    ? window.Capacitor?.Plugins?.BibloZooGhostWriterExport || null : null;
+  let activeGhostVideoExport = null;
   const NATIVE_TEMPORARY = new Set([
     "other-audio-playing", "interruption-pending",
     "gesture-required-after-interruption", "not-foreground", "stale",
@@ -535,6 +540,16 @@
       "video/webm"
     ]
   };
+
+  // Standard full-screen social portrait, independent of device dimensions.
+  // No audio track is ever submitted to the native MP4 encoder.
+  const NATIVE_SOCIAL_VIDEO = Object.freeze({
+    width: 1080,
+    height: 1920,
+    fps: 30,
+    maxFrames: 5400,
+    endHoldFrames: 21
+  });
 
   const EXPORT_SIZES = {
     square: {
@@ -2899,6 +2914,10 @@
 
     const background = getBackgroundConfig(state.remix);
     const isSimple = state.remixMode !== "more";
+    const videoSaveControls = nativeGhostExport
+      ? `<button class="vm-btn vm-btn-secondary" id="ghostSaveVideoBtn" type="button">Save Video</button>
+         <button class="vm-btn vm-btn-secondary" id="ghostCancelVideoBtn" type="button" hidden>Cancel Video</button>`
+      : "";
 
     const settingsHtml = isSimple ? `
           <div class="ghost-remix-section">
@@ -2946,6 +2965,7 @@
             <div class="ghost-remix-actions">
               <button class="vm-btn" id="ghostReplayBtn" type="button">Replay</button>
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
+              ${videoSaveControls}
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
@@ -3006,6 +3026,7 @@
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               ${selectOptionHtml("ghostExportSizeSelect", "Picture Shape", state.remix.exportSize || "square", EXPORT_SIZES)}
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
+              ${videoSaveControls}
 
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
@@ -3229,45 +3250,72 @@
       else { playUiTapSound(); replay(); }
     });
 
-    document.getElementById("ghostSaveImageBtn")?.addEventListener("click", () => {
+    const saveImageBtn = document.getElementById("ghostSaveImageBtn");
+    saveImageBtn?.addEventListener("click", async () => {
+      if (saveImageBtn.disabled || activeGhostVideoExport) return;
       playUiTapSound();
       sanitizeRemixOptions(state.remix);
-
       const imageOptions = state.remixMode === "simple"
         ? { ...state.remix, exportSize: "phone" }
         : { ...state.remix };
-
-      saveGhostWriterImage(imageOptions);
+      saveImageBtn.disabled = true;
+      saveImageBtn.textContent = "Preparing Picture...";
+      try {
+        await saveGhostWriterImage(imageOptions);
+      } catch (error) {
+        console.warn("Ghost Writer picture share failed", error);
+        alert("Couldn't open picture saving. Please try again.");
+      } finally {
+        if (saveImageBtn.isConnected) {
+          saveImageBtn.disabled = false;
+          saveImageBtn.textContent = "Save Picture";
+        }
+      }
     });
 
     const saveVideoBtn = document.getElementById("ghostSaveVideoBtn");
+    const cancelVideoBtn = document.getElementById("ghostCancelVideoBtn");
 
-    if (saveVideoBtn && !isReplayVideoSupported()) {
-      saveVideoBtn.hidden = true;
-    }
+    cancelVideoBtn?.addEventListener("click", () => {
+      // The native export ACKs one frame at a time. Stop after its current
+      // ACK, then cancel the temporary MP4 and release the writer.
+      if (activeGhostVideoExport) activeGhostVideoExport.cancelled = true;
+      cancelVideoBtn.disabled = true;
+      cancelVideoBtn.textContent = "Stopping...";
+    });
 
     saveVideoBtn?.addEventListener("click", async () => {
+      if (!nativeGhostExport || saveVideoBtn.disabled || activeGhostVideoExport) return;
       playUiTapSound();
-
-      if (!isReplayVideoSupported()) {
-        saveVideoBtn.hidden = true;
-        return;
-      }
-
       sanitizeRemixOptions(state.remix);
-
-      const originalText = saveVideoBtn.textContent;
+      const job = { cancelled: false };
+      activeGhostVideoExport = job;
       saveVideoBtn.disabled = true;
-      saveVideoBtn.textContent = "Making Video...";
-
+      saveImageBtn.disabled = true;
+      cancelVideoBtn.hidden = false;
+      cancelVideoBtn.disabled = false;
       try {
-        await saveGhostWriterReplayVideo({ ...state.remix });
-      } catch (err) {
-        console.warn("Ghost Writer video export failed", err);
-        alert("Sorry, this browser could not save the replay video.");
+        // No WebM conversion: native AVAssetWriter returns actual silent
+        // H.264 MP4 at 1080x1920 / 30fps, shared through iOS.
+        await saveGhostWriterNativeVideo({ ...state.remix }, job,
+          label => { if (saveVideoBtn.isConnected) saveVideoBtn.textContent = label; });
+      } catch (error) {
+        if (!job.cancelled) {
+          console.warn("Ghost Writer native MP4 export failed", error);
+          alert("Couldn't make the video. Please try again.");
+        }
       } finally {
-        saveVideoBtn.disabled = false;
-        saveVideoBtn.textContent = originalText || "Save Replay Video";
+        if (activeGhostVideoExport === job) activeGhostVideoExport = null;
+        if (saveVideoBtn.isConnected) {
+          saveVideoBtn.disabled = false;
+          saveVideoBtn.textContent = "Save Video";
+        }
+        if (saveImageBtn.isConnected) saveImageBtn.disabled = false;
+        if (cancelVideoBtn.isConnected) {
+          cancelVideoBtn.hidden = true;
+          cancelVideoBtn.disabled = false;
+          cancelVideoBtn.textContent = "Cancel Video";
+        }
       }
     });
 
@@ -5747,6 +5795,16 @@
 
     const filename = makeExportFilename(size);
 
+    if (IS_NATIVE_CAPACITOR) {
+      if (!nativeGhostExport?.shareImage) {
+        throw new Error("Native picture sharing is unavailable.");
+      }
+      // UIKit share sheet supplies Save Image/Photos and supported share apps.
+      // Never silently fall back to a WKWebView blob-anchor download.
+      await nativeGhostExport.shareImage({ png: canvas.toDataURL("image/png") });
+      return;
+    }
+
     if (canvas.toBlob) {
       canvas.toBlob((blob) => {
         if (!blob) {
@@ -5761,6 +5819,103 @@
     }
 
     downloadCanvasDataUrl(canvas, filename);
+  }
+
+  function estimateReplayVideoFrames(placements, speed) {
+    let milliseconds = 700;
+    for (const entry of placements) {
+      const decoration = entry?.type === "referenceDecoration";
+      const glyph = decoration ? null : getGlyph(entry.char, entry.colorIndex || 0);
+      const pieces = decoration
+        ? getReferenceDecorationPieceCount(entry.decoration)
+        : (glyph ? countStrokePieces(glyph.strokes) : 1);
+      milliseconds += decoration
+        ? clamp((160 + pieces * 18) * (speed?.multiplier || 1), 180, 900)
+        : clamp((92 + pieces * 15) * (speed?.multiplier || 1), 65, 480);
+      milliseconds += (entry.pauseAfter || 0) * (speed?.pauseMultiplier || 1);
+    }
+    return Math.ceil(milliseconds * NATIVE_SOCIAL_VIDEO.fps / 1000);
+  }
+
+  async function saveGhostWriterNativeVideo(options, job, showProgress) {
+    if (!nativeGhostExport?.beginVideo || !nativeGhostExport?.appendVideoFrame ||
+        !nativeGhostExport?.finishVideo || !nativeGhostExport?.cancelVideo) {
+      throw new Error("Native MP4 export bridge is unavailable.");
+    }
+    const cleanOptions = sanitizeRemixOptions({ ...options });
+    const size = NATIVE_SOCIAL_VIDEO;
+    let token = null;
+    let shared = false;
+    try {
+      showProgress("Preparing Video...");
+      await waitForExportAssets(cleanOptions);
+      if (job.cancelled || state.screen !== "remix" || document.hidden) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const c = canvas.getContext("2d", { alpha: false });
+      if (!c) throw new Error("Could not render the video.");
+      const placements = buildPlaybackPlacements(makeLayout(size.width, size.height, cleanOptions));
+      const speed = SPEEDS[cleanOptions.speed] || SPEEDS.normal;
+      const expected = estimateReplayVideoFrames(placements, speed);
+      if (expected > size.maxFrames - size.endHoldFrames) {
+        throw new Error("This verse's video is longer than the 3-minute safety limit.");
+      }
+      const start = performance.now();
+      const ps = {
+        running: true, c, width: size.width, height: size.height,
+        options: cleanOptions, placements, index: 0,
+        charStart: start, pauseUntil: 0, speed,
+        lastTip: null, lastDirectionDeg: null,
+        directionWiggle: 0, vaporTrail: []
+      };
+      clearPlaybackCanvas(c, size.width, size.height, cleanOptions);
+      const begun = await nativeGhostExport.beginVideo({
+        name: makeExportVideoFilename({ filenameLabel: "portrait" })
+          .replace(/\.webm$/, "")
+      });
+      token = begun?.token;
+      if (!token || begun.width !== size.width || begun.height !== size.height ||
+          begun.fps !== size.fps) {
+        throw new Error("Native video settings do not match the social export.");
+      }
+
+      let completeFrames = 0, frameCount = 0;
+      for (; frameCount < size.maxFrames; frameCount++) {
+        if (job.cancelled || state.screen !== "remix" || document.hidden) {
+          job.cancelled = true;
+          break;
+        }
+        const virtualTime = start + frameCount * 1000 / size.fps;
+        const finished = drawReplayVideoFrame(ps, virtualTime);
+        if (finished) completeFrames++;
+        // Transfer and ACK only ONE compressed JPEG frame at a time:
+        // no unbounded JS arrays and no microphone/audio stream.
+        const jpeg = canvas.toDataURL("image/jpeg", 0.83);
+        await nativeGhostExport.appendVideoFrame({
+          token, index: frameCount, jpeg
+        });
+        if (frameCount % 15 === 0) {
+          showProgress("Making Video... " +
+            Math.min(99, Math.floor(100 * frameCount / Math.max(expected, 1))) + "%");
+          // Yield to touch, accessibility and cancellation between batches.
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        if (completeFrames >= size.endHoldFrames) { frameCount++; break; }
+      }
+      if (job.cancelled) return;
+      if (completeFrames < size.endHoldFrames) {
+        throw new Error("The verse animation exceeded the safe video duration.");
+      }
+      showProgress("Opening Video Share...");
+      await nativeGhostExport.finishVideo({ token });
+      shared = true; // sheet displayed, NOT proof that the child saved it.
+    } finally {
+      if (token && !shared) {
+        try { await nativeGhostExport.cancelVideo({ token }); } catch (_) {}
+      }
+    }
   }
 
   function isReplayVideoSupported() {

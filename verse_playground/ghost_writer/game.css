@@ -485,6 +485,8 @@ body {
   min-height: 56px;
   font-size: clamp(18px, 4.8vw, 24px);
 }
+/* A hidden Cancel Video control must not occupy a row until encoding starts. */
+.ghost-remix-actions .vm-btn[hidden] { display: none !important; }
 
 .ghost-training-card .ghost-train-actions {
   width: min(calc(100% - 24px), 440px);

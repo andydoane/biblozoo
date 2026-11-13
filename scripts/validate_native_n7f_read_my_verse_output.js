@@ -30,7 +30,14 @@ has(swift,'public let jsName = "BibloZooNativeReadOutput"',
 for(const api of ["activateFromGesture","playClip","stopClip",
  "seekClip","stopAll","playCue","stopCues"])
  has(swift,'CAPPluginMethod(name: "'+api+'"',"Native contract method");
-const plug=swift.slice(swift.indexOf("@objc(BibloZooNativeReadOutputPlugin)"));
+// Scope Read-only privacy/audio constraints to the Read plugin itself.
+ // The later Ghost Writer EXPORT plugin legitimately writes a temporary
+ // user-requested MP4 but may never alter Read playback policy.
+const readStart=swift.indexOf("@objc(BibloZooNativeReadOutputPlugin)");
+const exportStart=swift.indexOf("@objc(BibloZooGhostWriterExportPlugin)",readStart);
+assert(readStart >= 0 && exportStart > readStart,
+  "Read playback and user-initiated export are separate native owners");
+const plug=swift.slice(readStart,exportStart);
 has(plug,'Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest"',
     "Never native-activate normal/stable installed app");
 has(plug,'AVAudioSession.sharedInstance().category == .soloAmbient',
