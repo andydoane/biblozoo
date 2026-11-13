@@ -25,8 +25,8 @@ function expression(before, after) {
 // Run both ACTUAL production predicates rather than reimplementing them in
 // the test. The first controls rendered preview UI; the second controls
 // audio allocation and whether Got It! invokes native prepare().
-const rendered = expression("    const nativePilotPreview =\n", ";\n    const nativeClassicChoice");
-const runtime = expression("    const nativePilotAllowed =\n", ";\n    if (nativePilotAllowed && preparedAudioContext)");
+const rendered = expression("    const nativePilotPreview =\n", ";\n");
+const runtime = expression("    const nativePilotAllowed =\n", ";\n");
 
 function selected(expr, mode, {nativeOnly, ios, preview} = {}) {
   const session = { dailyTodoPreview: preview === true, dailyTodoSnack: preview !== true };
