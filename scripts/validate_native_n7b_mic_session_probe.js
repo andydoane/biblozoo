@@ -65,8 +65,15 @@ expect(scene,"recording file, Blob",
   "Swift source documents input-only ephemeral level sampling");
 assert(!/AVAudioRecorder\s*\(/.test(scene),
   "Never create an AVAudioRecorder file in N7b");
+// Scope microphone privacy checks to the actual N7b plugin. The later,
+ // separate Ghost Writer export plugin legitimately writes a user-requested
+ // PNG/MP4 to a bounded temporary directory for Photos or Files.
+const micStart = scene.indexOf("// N7b only: separate experimental microphone");
+const micEnd = scene.indexOf("@objc(BibloZooNativeReadOutputPlugin)", micStart);
+assert(micStart >= 0 && micEnd > micStart,
+  "N7b and native Read plugins must retain independent boundaries");
 assert(!/\.write\s*\(|URLSession|FileManager\.default\.createFile/.test(
-  scene.slice(scene.indexOf("// N7b only: separate experimental microphone"))),
+  scene.slice(micStart, micEnd)),
   "Probe must not persist or upload microphone samples");
 expect(sound,'CAPPluginMethod(name: "devPrepareForMicrophone"',
   "Single existing native owner coordinates pre-mic output stop");
