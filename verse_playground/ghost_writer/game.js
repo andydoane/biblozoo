@@ -5778,7 +5778,21 @@
     );
   }
 
-  async function saveGhostWriterImage(options = state.remix) {
+  // These names appear when a family shares an original file to Files or
+  // AirDrop. Photos may independently choose a library-managed filename.
+  function makeFriendlyExportFilename(kind, extension) {
+    const clean = value => String(value || "")
+      .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+      .replace(/\s+/g, " ").trim();
+    const username = clean(
+      window.BibloZooProfiles?.getActiveProfile?.()?.name || "Zookeeper"
+    ).slice(0, 40) || "Zookeeper";
+    const reference = clean(String(parsedRef?.display || ctx.verseRef || "Verse")
+      .replace(/:/g, "_")).slice(0, 48) || "Verse";
+    return username + "'s " + kind + " - " + reference + "." + extension;
+  }
+
+  async function saveGhostWriterImage(options = state.remix, destination = "photos") {
     const cleanOptions = sanitizeRemixOptions({ ...options });
     const size = EXPORT_SIZES[cleanOptions.exportSize || "square"] || EXPORT_SIZES.square;
     await waitForExportAssets(cleanOptions);
@@ -5796,13 +5810,19 @@
     const filename = makeExportFilename(size);
 
     if (IS_NATIVE_CAPACITOR) {
-      if (!nativeGhostExport?.shareImage) {
-        throw new Error("Native picture sharing is unavailable.");
+      const method = destination === "share" ? "shareImage" : "saveImage";
+      if (typeof nativeGhostExport?.[method] !== "function") {
+        throw new Error("Native picture saving is unavailable.");
       }
-      // UIKit share sheet supplies Save Image/Photos and supported share apps.
-      // Never silently fall back to a WKWebView blob-anchor download.
-      await nativeGhostExport.shareImage({ png: canvas.toDataURL("image/png") });
-      return;
+      // Save goes straight to PhotoKit; Share preserves the original file
+      // name in iOS Files/AirDrop. Never fall back to WKWebView downloads.
+      const result = await nativeGhostExport[method]({
+        png: canvas.toDataURL("image/png"),
+        name: makeFriendlyExportFilename("Picture", "png")
+      });
+      if (destination === "share" ? result?.presented !== true : result?.saved !== true)
+        throw new Error("The picture export was not confirmed.");
+      return result;
     }
 
     if (canvas.toBlob) {
@@ -5837,7 +5857,7 @@
     return Math.ceil(milliseconds * NATIVE_SOCIAL_VIDEO.fps / 1000);
   }
 
-  async function saveGhostWriterNativeVideo(options, job, showProgress) {
+  async function saveGhostWriterNativeVideo(options, job, showProgress, destination = "photos") {
     if (!nativeGhostExport?.beginVideo || !nativeGhostExport?.appendVideoFrame ||
         !nativeGhostExport?.finishVideo || !nativeGhostExport?.cancelVideo) {
       throw new Error("Native MP4 export bridge is unavailable.");
@@ -5849,7 +5869,8 @@
     try {
       showProgress("Preparing Video...");
       await waitForExportAssets(cleanOptions);
-      if (job.cancelled || state.screen !== "remix" || document.hidden) return;
+      if (job.cancelled || state.screen !== "remix" || document.hidden)
+        return { cancelled: true };
 
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
@@ -5872,8 +5893,7 @@
       };
       clearPlaybackCanvas(c, size.width, size.height, cleanOptions);
       const begun = await nativeGhostExport.beginVideo({
-        name: makeExportVideoFilename({ filenameLabel: "portrait" })
-          .replace(/\.webm$/, "")
+        name: makeFriendlyExportFilename("Video", "mp4")
       });
       token = begun?.token;
       if (!token || begun.width !== size.width || begun.height !== size.height ||
@@ -5904,13 +5924,17 @@
         }
         if (completeFrames >= size.endHoldFrames) { frameCount++; break; }
       }
-      if (job.cancelled) return;
+      if (job.cancelled) return { cancelled: true };
       if (completeFrames < size.endHoldFrames) {
         throw new Error("The verse animation exceeded the safe video duration.");
       }
-      showProgress("Opening Video Share...");
-      await nativeGhostExport.finishVideo({ token });
-      shared = true; // sheet displayed, NOT proof that the child saved it.
+      showProgress(destination === "share"
+        ? "Opening Video Share..." : "Saving to Photos...");
+      const result = await nativeGhostExport.finishVideo({ token, destination });
+      if (destination === "share" ? result?.presented !== true : result?.saved !== true)
+        throw new Error("The video export was not confirmed.");
+      shared = true;
+      return result; // Photos confirmation or sheet presentation, NOT both.
     } finally {
       if (token && !shared) {
         try { await nativeGhostExport.cancelVideo({ token }); } catch (_) {}
