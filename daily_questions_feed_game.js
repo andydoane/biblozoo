@@ -1306,7 +1306,9 @@
       window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
       ((session?.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
         (nativeOnlyApp && [FEED_MODES.CLASSIC, FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
-    const nativeClassicChoice = nativePilotPreview &&
+    // Only the legacy comparison preview offers a DEV checkbox. Real
+    // Audio Test gameplay is always native and must not render that control.
+    const nativeClassicChoice = nativePilotPreview && !nativeOnlyApp &&
       mode === FEED_MODES.CLASSIC;
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
