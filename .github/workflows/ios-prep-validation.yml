@@ -55,6 +55,12 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # Real Daily Zoo To-Do Classic Feeding must use the same native Got It!
+      # preparation as its DEV preview and other three native Feeding modes.
+      - name: Validate native Classic Feeding from Daily Zoo To-Do
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_native_classic_zoo_todo_audio.js
+
       # N7m: external PiP Play/AirPods remote Play can interrupt an ACTIVE
       # Read game while no native clip is owned; it still needs Welcome Back.
       - name: Validate N7m Read native external-audio takeover recovery
