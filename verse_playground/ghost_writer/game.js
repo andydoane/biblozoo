@@ -2916,7 +2916,15 @@
     const isSimple = state.remixMode !== "more";
     const videoSaveControls = nativeGhostExport
       ? `<button class="vm-btn vm-btn-secondary" id="ghostSaveVideoBtn" type="button">Save Video</button>
+         <button class="vm-btn vm-btn-secondary" id="ghostShareVideoBtn" type="button">Share Video</button>
          <button class="vm-btn vm-btn-secondary" id="ghostCancelVideoBtn" type="button" hidden>Cancel Video</button>`
+      : "";
+    const pictureShareControls = nativeGhostExport
+      ? `<button class="vm-btn vm-btn-secondary" id="ghostShareImageBtn" type="button">Share Picture</button>`
+      : "";
+    const exportStatus = nativeGhostExport
+      ? `<p class="ghost-export-status ghost-full" id="ghostExportStatus"
+             role="status" aria-live="polite" aria-atomic="true"></p>`
       : "";
 
     const settingsHtml = isSimple ? `
@@ -2965,7 +2973,9 @@
             <div class="ghost-remix-actions">
               <button class="vm-btn" id="ghostReplayBtn" type="button">Replay</button>
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
+              ${pictureShareControls}
               ${videoSaveControls}
+              ${exportStatus}
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
@@ -3026,7 +3036,9 @@
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               ${selectOptionHtml("ghostExportSizeSelect", "Picture Shape", state.remix.exportSize || "square", EXPORT_SIZES)}
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
+              ${pictureShareControls}
               ${videoSaveControls}
+              ${exportStatus}
 
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
