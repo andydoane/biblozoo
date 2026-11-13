@@ -1235,7 +1235,7 @@ html.gw-native-capacitor .ghost-playback-root::before {
   background: rgba(22, 14, 32, .83);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
-  touch-action: none;
+  touch-action: manipulation;
 }
 .ghost-export-dialog {
   box-sizing: border-box;
@@ -1276,8 +1276,12 @@ html.gw-native-capacitor .ghost-playback-root::before {
 }
 .ghost-export-title {
   margin: 0;
-  min-height: 1.08em;
+  min-height: 2.16em;
   width: 100%;
+  flex: 0 0 2.16em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #ffffff;
   font: 900 clamp(27px, 7.2vw, 38px)/1.08 "Baloo 2", system-ui, sans-serif;
 }
