@@ -2899,6 +2899,57 @@
     remixBtn?.classList.add("is-visible");
   }
 
+  // Appended as a sibling of the Remix stage: the modal can inert all
+  // background elements without trapping its own Cancel/Done buttons.
+  function ghostExportOverlayHtml() {
+    if (!nativeGhostExport) return "";
+    return `
+      <div class="ghost-export-overlay" id="ghostExportOverlay" hidden>
+        <section class="ghost-export-dialog" role="dialog" aria-modal="true"
+                 aria-labelledby="ghostExportTitle"
+                 aria-describedby="ghostExportMessage"
+                 data-ghost-export-dialog tabindex="-1">
+          <div class="ghost-export-avatar" aria-hidden="true">
+            <img src="../../verse_images/game_icons/app_icon_ghost_writer.png" alt="">
+          </div>
+          <h2 class="ghost-export-title" id="ghostExportTitle"
+              data-ghost-export-title aria-live="polite">Making your video!</h2>
+          <p class="ghost-export-message" id="ghostExportMessage"
+             data-ghost-export-message>Our ghost is hard at work...</p>
+          <div class="ghost-export-phase-slot">
+            <div class="ghost-export-progress" data-ghost-export-progress
+                 role="progressbar" aria-label="Video frames prepared"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+              <div class="ghost-export-progress-track">
+                <div class="ghost-export-progress-bar" data-ghost-export-bar></div>
+              </div>
+              <div class="ghost-export-percentage"
+                   data-ghost-export-percentage aria-hidden="true">0%</div>
+            </div>
+            <div class="ghost-export-activity" data-ghost-export-activity
+                 aria-hidden="true" hidden><span class="ghost-export-spinner"></span></div>
+            <div class="ghost-export-success-mark" data-ghost-export-success
+                 aria-hidden="true" hidden>✓</div>
+          </div>
+          <div class="ghost-export-action-slot">
+            <p class="ghost-export-action-hint" data-ghost-export-action-hint hidden>
+              Saving...
+            </p>
+            <button class="ghost-export-action" type="button"
+                    data-ghost-export-cancel hidden>Cancel</button>
+            <button class="ghost-export-action" type="button"
+                    data-ghost-export-done hidden>Done!</button>
+            <div class="ghost-export-error-actions">
+              <button class="ghost-export-action" type="button"
+                      data-ghost-export-retry hidden>Try Again</button>
+              <button class="ghost-export-action ghost-export-back" type="button"
+                      data-ghost-export-back hidden>Back</button>
+            </div>
+          </div>
+        </section>
+      </div>`;
+  }
+
   function renderRemix() {
     stopPlayback();
     clearGuideTimer();
@@ -3096,6 +3147,11 @@
       </div>
     `, { menu: true, wide: true, rootClass: "is-remix-screen" });
 
+    if (nativeGhostExport) {
+      app.querySelector(".ghost-writer-root")?.insertAdjacentHTML(
+        "beforeend", ghostExportOverlayHtml()
+      );
+    }
     wireMenu();
     wireRemixControls();
     drawRemixPreview();
