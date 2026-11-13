@@ -1463,8 +1463,12 @@
             <h2 class="bz-welcome-title">Welcome back,<span class="bz-welcome-name-line"
                 data-welcome-back-name-line><span class="bz-welcome-name"
                 data-welcome-back-name>Zookeeper</span><span class="bz-welcome-punctuation">!</span></span></h2>
-            <button class="daily-feed-resume-button bz-welcome-action no-zoom"
-              type="button" data-welcome-back-action data-daily-feed-resume>Let's go!</button>
+            <div class="bz-welcome-action-slot" data-welcome-back-action-slot>
+              <button class="daily-feed-resume-button bz-welcome-action no-zoom"
+                type="button" data-welcome-back-action data-daily-feed-resume>Let's go!</button>
+              <p class="bz-welcome-progress" data-welcome-back-progress
+                role="status" aria-live="polite" aria-atomic="true" hidden></p>
+            </div>
             <p class="daily-feed-resume-status bz-welcome-status"
                data-welcome-back-status data-daily-feed-resume-status
                role="status" aria-live="polite" hidden></p>
