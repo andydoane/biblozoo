@@ -55,6 +55,11 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # Welcome Back presentation only: measure full-size name against button
+      # width and swap playful busy copy into fixed slot without layout jumps.
+      - name: Validate shared Welcome Back name sizing and stable recovery progress
+        run: node scripts/validate_welcome_back_fit_progress_ui.js
+
       # Real Daily Zoo To-Do Classic Feeding must use the same native Got It!
       # preparation as its DEV preview and other three native Feeding modes.
       - name: Validate native Classic Feeding from Daily Zoo To-Do
