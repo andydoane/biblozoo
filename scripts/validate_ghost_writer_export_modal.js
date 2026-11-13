@@ -76,7 +76,7 @@ function harness() {
   }
   const keys=[
     "dialog","title","message","progress","bar","percentage",
-    "activity","success","actionHint","cancel","done","retry","back"
+    "activity","success","actionHint","cancel","done","retry","back","errorActions"
   ];
   const nodes={};
   for(const k of keys) nodes[k]=node(k);
@@ -95,7 +95,8 @@ function harness() {
     "[data-ghost-export-cancel]":"cancel",
     "[data-ghost-export-done]":"done",
     "[data-ghost-export-retry]":"retry",
-    "[data-ghost-export-back]":"back"
+    "[data-ghost-export-back]":"back",
+    "[data-ghost-export-error-actions]":"errorActions"
   };
   overlay.querySelector=q=>nodes[selector[q]] || null;
   overlay.contains=x=>Object.values(nodes).includes(x);
@@ -132,6 +133,7 @@ assert.equal(h.dialog.phase(),"making");
 assert.equal(h.nodes.title.textContent,"Making your video!");
 assert(!h.nodes.progress.hidden && h.nodes.activity.hidden);
 assert(h.nodes.done.hidden && h.nodes.retry.hidden && h.nodes.back.hidden);
+assert(h.nodes.errorActions.hidden,"hidden retry wrapper cannot intercept Cancel");
 assert.equal(h.timers.size,1,"one playful-caption interval");
 h.dialog.setProgress(47);
 assert.equal(h.nodes.bar.style.width,"47%");
@@ -178,6 +180,7 @@ h.dialog.success();
 assert.equal(h.nodes.title.textContent,"You did it! 🎉");
 assert.equal(h.nodes.message.textContent,"Your video is saved to Photos!");
 assert(!h.nodes.done.hidden && h.nodes.activity.hidden);
+assert(h.nodes.errorActions.hidden,"success has only the Done button");
 assert.equal(h.doc.activeElement,h.nodes.done);
 h.nodes.done.click();
 assert(h.overlay.hidden && !h.stage.inert && h.timers.size===0);
@@ -190,7 +193,7 @@ h.dialog.saving();
 h.dialog.error("Allow Photos permission in Settings, then Try Again.");
 assert.equal(h.nodes.title.textContent,"Oops!");
 assert.match(h.nodes.message.textContent,/Photos permission/);
-assert(!h.nodes.retry.hidden && !h.nodes.back.hidden);
+assert(!h.nodes.retry.hidden && !h.nodes.back.hidden && !h.nodes.errorActions.hidden);
 assert(h.nodes.actionHint.hidden && h.nodes.activity.hidden);
 assert.equal(h.doc.activeElement,h.nodes.retry);
 const tab=h.doc.key("Tab");
