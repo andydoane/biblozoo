@@ -5871,7 +5871,10 @@
         directionWiggle: 0, vaporTrail: []
       };
       clearPlaybackCanvas(c, size.width, size.height, cleanOptions);
-      const begun = await nativeGhostExport.beginVideo();
+      const begun = await nativeGhostExport.beginVideo({
+        name: makeExportVideoFilename({ filenameLabel: "portrait" })
+          .replace(/\.webm$/, "")
+      });
       token = begun?.token;
       if (!token || begun.width !== size.width || begun.height !== size.height ||
           begun.fps !== size.fps) {
