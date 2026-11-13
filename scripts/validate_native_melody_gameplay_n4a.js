@@ -32,8 +32,8 @@ assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
 assert.match(resume,/continueFeedingAfterGesture\(runtime, performance\.now\(\), false\)/);
 assert.match(continued,/shiftFeedingDeadlines\(runtime, elapsed\)/);
 assert.match(continued,/resumeMelodyAfterInterruption\(runtime, now\)/);
-assert.match(js,/nativeOnlyApp && \[FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
-  "N4c preserves N4a native Melody alongside Labyrinth and Bounce");
+assert.match(js,/nativeOnlyApp && \[FEED_MODES\.CLASSIC, FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
+  "N4a Melody stays native alongside Classic, Labyrinth and Bounce");
 assert.match(js,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start/);
 assert.match(ci,/node scripts\/validate_native_melody_gameplay_n4a\.js/);
 
