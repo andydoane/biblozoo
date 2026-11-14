@@ -146,6 +146,13 @@ jobs:
       - name: Validate Flashcards instruction autoplay and comparison text fitting
         run: node scripts/validate_flashcards_instruction_audio.js
 
+      # A retained native Flashcards take restores the original foreground
+      # audio session. Narration may start without a second tap, but never
+      # after real interruptions or incomplete category restoration.
+      - name: Validate post-recording native Flashcards instruction handoff
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_flashcards_native_instruction_handoff.js
+
       - name: Validate N7f.1 Flashcards coral top toast and stable Next/Continue controls
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_flashcards_top_toast_n7f1.js
