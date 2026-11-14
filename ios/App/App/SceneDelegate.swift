@@ -971,6 +971,20 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.lastReason = restoreOK
                     ? (keep ? "captured" : reason) : "restore-failed"
+                // Complete the *same* Record-gesture audio handoff before
+                // resolving ready to JS. This is NOT a new audio activation.
+                // Never announce on interrupted/failed/discarded capture,
+                // lost foreground audio ownership, or external audio takeover.
+                if keep && restoreOK &&
+                   (reason == "stopped-by-user" || reason == "time-limit") &&
+                   self.ownsFlashcardsForegroundAudio &&
+                   UIApplication.shared.applicationState == .active &&
+                   AVAudioSession.sharedInstance().category == .soloAmbient &&
+                   !AVAudioSession.sharedInstance().isOtherAudioPlaying {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("biblozoo.flashcards.capture-restored"),
+                        object: nil)
+                }
                 if let call = call {
                     call.resolve([
                         "ready": keep,

@@ -658,6 +658,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // .soloAmbient session. A new real user gesture must call setActive(true).
     // PiP can interrupt us while UIApplication remains .active.
     private var needsGestureAfterInterruption = false
+    // A genuine Flashcards Record gesture temporarily hands our existing
+    // output session to the native microphone. Only a verified completed
+    // RAM take may restore that *internal* handoff without a second tap.
+    // Genuine OS interruptions, backgrounding and media resets revoke it.
+    private var pendingFlashcardsMicHandoff:
+        (began: Int, foreground: Int, reset: Int)?
     private var leftForegroundDuringInterruption = false
     private var returnedToForegroundDuringInterruption = false
     private var lastInterruptionSignal = "none"
@@ -720,6 +726,19 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             object: nil,
             queue: .main
         ) { [weak self] note in self?.handleInterruption(note) })
+        // Native-to-native, no JS request to claim a new session. The mic
+        // plugin posts this ONLY after a retained take and successful return
+        // to our already-active .soloAmbient foreground output session.
+        observers.append(center.addObserver(
+            forName: Notification.Name("biblozoo.flashcards.capture-restored"),
+            object: nil,
+            // Synchronous delivery on the posting (already-main) thread:
+            // the gate MUST clear before finishCapture resolves ready to JS.
+            queue: nil
+        ) { [weak self] _ in
+            guard Thread.isMainThread else { return }
+            self?.acceptFlashcardsCaptureHandoff()
+        })
         observers.append(center.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
@@ -737,6 +756,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            self?.pendingFlashcardsMicHandoff = nil
             self?.forgetPlayback()
             self?.appendTrace("media-services-lost")
         })
@@ -746,6 +766,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             queue: .main
         ) { [weak self] _ in
             guard let self = self else { return }
+            self.pendingFlashcardsMicHandoff = nil
             self.forgetPlayback()
             self.mediaResetCount += 1
             self.needsGestureAfterReset = true
@@ -2236,6 +2257,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     }
 
     private func leftForeground() {
+        pendingFlashcardsMicHandoff = nil
         forgetPlayback()
         if !wasOutsideForeground {
             wasOutsideForeground = true
@@ -2304,6 +2326,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 appendTrace("interruption-suspended-history")
                 return
             }
+            pendingFlashcardsMicHandoff = nil
             // A new external takeover starts a fresh, bounded gesture
             // recovery budget. Attempts made before YouTube started should
             // not prevent recovery after the video is paused.
@@ -2351,6 +2374,32 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private func onMain(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() }
         else { DispatchQueue.main.async(execute: work) }
+    }
+
+    // Unlike an external interruption, a normal child-initiated recording
+    // already activated/retained this same foreground AVAudioSession.
+    // A native mic-success signal clears ONLY the synthetic handoff gate:
+    // never setActive(true), change category, resume another app, or clear an
+    // OS interruption/reset. One completed take can consume one handoff.
+    private func acceptFlashcardsCaptureHandoff() {
+        guard let pending = pendingFlashcardsMicHandoff else { return }
+        pendingFlashcardsMicHandoff = nil
+        let session = AVAudioSession.sharedInstance()
+        guard Bundle.main.bundleIdentifier ==
+                  "com.andydoane.biblozoo.audiotest",
+              UIApplication.shared.applicationState == .active,
+              !wasOutsideForeground, !interrupted, !needsGestureAfterReset,
+              beganEventCount - suspendedEventCount == pending.began,
+              foregroundEpoch == pending.foreground,
+              mediaResetCount == pending.reset,
+              session.category == .soloAmbient,
+              !session.isOtherAudioPlaying else {
+            appendTrace("flashcards-capture-handoff-denied")
+            return
+        }
+        needsGestureAfterInterruption = false
+        hasGestureActivatedSession = true
+        appendTrace("flashcards-capture-handoff-restored")
     }
 
     private func unavailableReason() -> String? {
@@ -3210,7 +3259,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // OS AVAudioSession, but may not race the existing serial AVAudioEngine
     // output worker. It must request this barrier from the real DEV tap.
     // This method never setsCategory/mode or deactivates the audio session;
-    // the DEV probe must restore it, and the next sound requires a NEW tap.
+    // the DEV probe must restore it. Only a verified normal Flashcards take
+    // restores this held session without another tap; DEV probe/real OS
+    // interruptions still require a fresh gesture.
     @objc func devPrepareForMicrophone(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self,
@@ -3221,6 +3272,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 call.resolve(["prepared":false,"reason":"unsafe-session-state"])
                 return
             }
+            self.pendingFlashcardsMicHandoff = (
+                began: self.beganEventCount - self.suspendedEventCount,
+                foreground: self.foregroundEpoch,
+                reset: self.mediaResetCount
+            )
             self.needsGestureAfterInterruption = true
             self.hasGestureActivatedSession = false
             self.activationAttemptsThisForeground = 0
