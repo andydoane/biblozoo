@@ -60,6 +60,12 @@ jobs:
       - name: Validate shared Welcome Back name sizing and stable recovery progress
         run: node scripts/validate_welcome_back_fit_progress_ui.js
 
+      # Native Audio Test only: no WKWebView Take Photo path, no camera
+      # permission, separate PhotosUI/Files pickers and WebKit draw-pad hold.
+      - name: Validate Ghost Writer camera-free picker and guide long press
+        if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
+        run: node scripts/validate_ghost_writer_camera_free_picker.js
+
       # Imported Ghost Writer photos stay in bounded JS RAM, never profile
       # storage. Exercise actual loader, replacement, aspect-cover and cleanup.
       - name: Validate Ghost Writer session photo backgrounds

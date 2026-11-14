@@ -66,6 +66,10 @@
   // Non-native Web/PWA keep their existing download behavior unchanged.
   const nativeGhostExport = IS_NATIVE_CAPACITOR
     ? window.Capacitor?.Plugins?.BibloZooGhostWriterExport || null : null;
+  // Camera-free: native Ghost Writer offers only PHPicker Photos and Files.
+  // Never fall back to <input type=file> in the native Audio Test app.
+  const nativePhotoPicker = IS_NATIVE_CAPACITOR
+    ? window.Capacitor?.Plugins?.BibloZooGhostBackgroundPicker || null : null;
   let activeGhostVideoExport = null;
   let activeGhostImageExport = false;
   const NATIVE_TEMPORARY = new Set([
@@ -2331,6 +2335,12 @@
     const wrap = document.getElementById("ghostDrawWrap");
     if (!canvas || !wrap) return;
 
+    // Long-press selection and the iOS context menu are blocked only on
+    // the drawing surface, not in the menus or text fields elsewhere.
+    const suppressCallout = event => event.preventDefault();
+    wrap.addEventListener("selectstart", suppressCallout, { capture: true });
+    wrap.addEventListener("contextmenu", suppressCallout, { capture: true });
+
     const rect = wrap.getBoundingClientRect();
     const c = setupCanvasForDpr(canvas, rect.width, rect.height);
     c.clearRect(0, 0, rect.width, rect.height);
@@ -2906,6 +2916,32 @@
 
   // Appended as a sibling of the Remix stage: the modal can inert all
   // background elements without trapping its own Cancel/Done buttons.
+  function ghostPhotoChoiceOverlayHtml() {
+    if (!IS_NATIVE_CAPACITOR) return "";
+    return `
+      <div class="ghost-photo-choice-overlay" id="ghostPhotoChoiceOverlay" hidden>
+        <section class="ghost-photo-choice-dialog" data-ghost-photo-choice-dialog
+                 role="dialog" aria-modal="true" tabindex="-1"
+                 aria-labelledby="ghostPhotoChoiceTitle"
+                 aria-describedby="ghostPhotoChoiceDescription">
+          <h2 id="ghostPhotoChoiceTitle">Import Background</h2>
+          <p id="ghostPhotoChoiceDescription">Where's your picture?</p>
+          <button type="button" class="ghost-photo-choice-action"
+                  data-ghost-photo-choice-photos>
+            Choose from Photos
+          </button>
+          <button type="button" class="ghost-photo-choice-action"
+                  data-ghost-photo-choice-files>
+            Choose from Files
+          </button>
+          <button type="button" class="ghost-photo-choice-cancel"
+                  data-ghost-photo-choice-cancel>Cancel</button>
+          <p class="ghost-photo-choice-status" data-ghost-photo-choice-status
+             role="status" aria-live="polite"></p>
+        </section>
+      </div>`;
+  }
+
   function ghostExportOverlayHtml() {
     if (!nativeGhostExport) return "";
     return `
@@ -3157,6 +3193,11 @@
         "beforeend", ghostExportOverlayHtml()
       );
     }
+    if (IS_NATIVE_CAPACITOR) {
+      app.querySelector(".ghost-writer-root")?.insertAdjacentHTML(
+        "beforeend", ghostPhotoChoiceOverlayHtml()
+      );
+    }
     wireMenu();
     wireRemixControls();
     drawRemixPreview();
@@ -3217,9 +3258,9 @@
                 id="ghostImportBackgroundBtn" aria-label="Import a photo background">
           Import
         </button>
-        <input type="file" id="ghostImportBackgroundInput" hidden
+        ${IS_NATIVE_CAPACITOR ? "" : `<input type="file" id="ghostImportBackgroundInput" hidden
                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif"
-               aria-label="Choose a photo background">
+               aria-label="Choose a photo background">`}
       </div>
       <label class="ghost-background-darken" id="ghostBackgroundDarkenRow"
              ${current ? "" : "hidden"}>
@@ -3253,6 +3294,9 @@
     const background = document.getElementById("ghostBackgroundSelect");
     const importButton = document.getElementById("ghostImportBackgroundBtn");
     const importInput = document.getElementById("ghostImportBackgroundInput");
+    const nativeChoice = IS_NATIVE_CAPACITOR
+      ? window.BibloZooGhostPhotoChoice?.create?.(
+          document.getElementById("ghostPhotoChoiceOverlay")) : null;
     const importStatus = document.getElementById("ghostBackgroundImportStatus");
     const darkenRow = document.getElementById("ghostBackgroundDarkenRow");
     const darkenToggle = document.getElementById("ghostBackgroundDarkenToggle");
@@ -3343,9 +3387,34 @@
     // opens from a *real* user tap. It offers Photos/Files without library
     // browsing permission and the chosen pixels stay in JS memory only.
     importButton?.addEventListener("click", () => {
-      if (!customBackground || !importInput) return;
+      if (!customBackground) return;
       playUiTapSound();
-      importInput.click();
+      if (IS_NATIVE_CAPACITOR) {
+        if (!nativeChoice || !nativePhotoPicker?.choosePhoto ||
+            !nativePhotoPicker?.chooseFile) {
+          if (importStatus) importStatus.textContent =
+            "Photo importing isn't ready. Please rebuild the Audio Test app.";
+          return; // fail closed: NEVER reopen WKWebView's Take Photo menu
+        }
+        nativeChoice.open({
+          onChoose: source => source === "photos"
+            ? nativePhotoPicker.choosePhoto() : nativePhotoPicker.chooseFile(),
+          onImported: picked => customBackground.importDataUrl(
+            picked.dataUrl, picked.name),
+          onReady: () => {
+            if (state.screen !== "remix") {
+              customBackground.clear();
+              return;
+            }
+            state.remix.background = "custom";
+            state.remix.style = "custom";
+            state.remix.customDarken = true;
+            renderRemix();
+          }
+        });
+      } else {
+        importInput?.click(); // Web/PWA keeps its existing browser file picker
+      }
     });
     importInput?.addEventListener("change", async () => {
       const file = importInput.files?.[0];
