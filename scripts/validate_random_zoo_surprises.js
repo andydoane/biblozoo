@@ -23,6 +23,9 @@ assert.match(engine, /Math\.random\(\) < 0\.80 \? "escape" : "break"/);
 assert.match(engine, /SURPRISE_PREFIX = "biblozooZooSurprise:v1:"/);
 assert.match(engine, /!kind \|\| !startSurprise\(kind\)\) successful\(\)/);
 assert.match(engine, /if \(surpriseMode\) \{[\s\S]*?successful\(\);[\s\S]*?return;[\s\S]*?if \(attemptCount >= MAX_ATTEMPTS\)/);
+assert.match(engine, /if \(surpriseEnabled && !isDeveloperRun\(\)\)[\s\S]*?recoveryFailureWithoutSurprise\(\)/);
+assert.match(engine, /handleRecoveryFailure\(from\)/);
+assert.match(engine, /button\.disabled = attemptCount >= MAX_ATTEMPTS/);
 assert.match(engine, /let recovery;[\s\S]*?recoveryForAttempt\([\s\S]*?ok === true && running\(\)[\s\S]*?choose\?\.\(profileId, "welcome"\)/);
 assert.match(welcomeReturn, /try \{ outcome = onContinue\(\); \} catch/);
 assert.match(welcomeReturn, /surpriseEnabled: true/);
@@ -166,11 +169,20 @@ async function main() {
       randomMath:seededMath(0,0.1)});
     h.ctl.start();h.button.trigger("click");await Promise.resolve();
     assert.equal(h.recovery.length,1);
-    assert.equal(h.ctl.getStage(),"escape",
-      "real audio failure still goes to legacy recovery Pet Escape stage");
+    assert.equal(h.ctl.getStage(),"welcome",
+      "real audio failure must NOT cause a production Pet Escape");
+    assert.equal(h.button.disabled,false,
+      "safe retry on original Let's go! remains available");
     assert.equal(h.ctl.getState().attemptCount,1);
     assert.equal(h.win.localStorage.getItem("biblozooZooSurprise:v1:p1"),null,
       "audio failure cannot consume a random entertainment roll");
+    h.button.trigger("click");await Promise.resolve();
+    h.button.trigger("click");await Promise.resolve();
+    assert.equal(h.ctl.getStage(),"welcome");
+    assert.equal(h.ctl.getState().attemptCount,3);
+    assert.equal(h.button.disabled,true,
+      "bounded recovery failures offer Back rather than another fake rescue");
+    assert.equal(h.recovery.length,3);
     h.ctl.destroy();
   }
   {
@@ -196,6 +208,6 @@ async function main() {
       "completion calls original pending Zoo To-Do navigation");
     h.ctl.destroy();
   }
-  console.log("Random Zoo surprise PASS: 25% shared Daily, 10% successful Welcome, 80/20 kind, once per Zookeeper/day; real onClick audio before event, OS failures untouched, rescue/LOCK GATE/stat/return without fake sound.");
+  console.log("Random Zoo surprise PASS: 25% shared Daily, 10% verified Welcome, 80/20 kind, once per profile/day; real click audio recovery first, failed/deferred audio never spawns pets, bounded retry, real rescue/LOCK GATE/stats/return without fake sound.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
