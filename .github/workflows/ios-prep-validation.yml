@@ -60,6 +60,11 @@ jobs:
       - name: Validate shared Welcome Back name sizing and stable recovery progress
         run: node scripts/validate_welcome_back_fit_progress_ui.js
 
+      # Imported Ghost Writer photos stay in bounded JS RAM, never profile
+      # storage. Exercise actual loader, replacement, aspect-cover and cleanup.
+      - name: Validate Ghost Writer session photo backgrounds
+        run: node scripts/validate_ghost_writer_custom_background.js
+
       # Native Photos saving uses a purple Welcome Back-style modal.
       # Exercise its real focus lock, progress, cancel, retry, and cleanup.
       - name: Validate Ghost Writer purple export popup and accessibility

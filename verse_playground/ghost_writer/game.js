@@ -775,6 +775,9 @@
   let builtInPunctuationGlyphs = {};
   const openingQuoteGlyphCache = new WeakMap();
   const backgroundImageCache = new Map();
+  // A user-selected photo exists ONLY in this Ghost Writer JS session.
+  // No image bytes or filenames are written to localStorage or any server.
+  const customBackground = window.BibloZooGhostCustomBackground?.create?.() || null;
   const borderDoodleImageCache = new Map();
   const tintedBorderDoodleCache = new Map();
   const soundBuffers = new Map();
@@ -809,6 +812,7 @@
   function makeDefaultRemixOptions() {
     return {
       background: "ghost",
+      customDarken: true,
       textColor: "lightGray",
       referenceTextColor: "lightGray",
       referenceDecorationColor: "lightGray",
@@ -1619,6 +1623,7 @@
   function startRun(mode) {
     stopPlayback();
     clearGuideTimer();
+    customBackground?.clear(); // new run discards the previous session's photo
 
     selectedMode = mode === "advanced" ? "advanced" : "beginner";
     state.requiredChars = getRequiredCharsForMode(state.fullText, selectedMode);
@@ -2983,7 +2988,7 @@
           <div class="ghost-remix-section">
             <div class="ghost-section-title">🖼️ Background</div>
             <div class="ghost-options">
-              ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+              ${selectImportBackgroundHtml()}
             </div>
           </div>
 
@@ -3036,7 +3041,7 @@
           <div class="ghost-remix-section">
             <div class="ghost-section-title">🖼️ Background</div>
             <div class="ghost-options">
-              ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+              ${selectImportBackgroundHtml()}
             </div>
           </div>
 
@@ -3191,12 +3196,39 @@
       const selected = key === value ? " selected" : "";
       return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(obj.label || key)}</option>`;
     }).join("");
+    const custom = customBackground?.hasImage()
+      ? `<option value="custom"${value === "custom" ? " selected" : ""}>My Photo</option>`
+      : "";
 
     return `
       <div class="ghost-option">
         <label for="${escapeHtml(id)}">${escapeHtml(label)}</label>
-        <select id="${escapeHtml(id)}">${options}</select>
+        <select id="${escapeHtml(id)}">${options}${custom}</select>
       </div>
+    `;
+  }
+
+  function selectImportBackgroundHtml() {
+    const current = state.remix.background === "custom" && customBackground?.hasImage();
+    return `
+      <div class="ghost-background-picker">
+        ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+        <button type="button" class="ghost-background-import-btn"
+                id="ghostImportBackgroundBtn" aria-label="Import a photo background">
+          Import
+        </button>
+        <input type="file" id="ghostImportBackgroundInput" hidden
+               accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif"
+               aria-label="Choose a photo background">
+      </div>
+      <label class="ghost-background-darken" id="ghostBackgroundDarkenRow"
+             ${current ? "" : "hidden"}>
+        <input type="checkbox" id="ghostBackgroundDarkenToggle"
+               ${state.remix.customDarken !== false ? "checked" : ""}>
+        Darken Background
+      </label>
+      <p class="ghost-background-import-status" id="ghostBackgroundImportStatus"
+         role="status" aria-live="polite"></p>
     `;
   }
 
@@ -3219,6 +3251,11 @@
 
   function wireRemixControls() {
     const background = document.getElementById("ghostBackgroundSelect");
+    const importButton = document.getElementById("ghostImportBackgroundBtn");
+    const importInput = document.getElementById("ghostImportBackgroundInput");
+    const importStatus = document.getElementById("ghostBackgroundImportStatus");
+    const darkenRow = document.getElementById("ghostBackgroundDarkenRow");
+    const darkenToggle = document.getElementById("ghostBackgroundDarkenToggle");
     const textColor = document.getElementById("ghostTextColorSelect");
     const speed = document.getElementById("ghostSpeedSelect");
     const thickness = document.getElementById("ghostThicknessSelect");
@@ -3239,6 +3276,11 @@
     const update = () => {
       state.remix.background = background?.value || state.remix.background;
       state.remix.style = state.remix.background;
+      if (darkenToggle) state.remix.customDarken = darkenToggle.checked;
+      if (darkenRow) {
+        darkenRow.hidden = !(state.remix.background === "custom" &&
+          customBackground?.hasImage());
+      }
       state.remix.textColor = textColor?.value || state.remix.textColor;
       state.remix.speed = speed?.value || state.remix.speed;
       state.remix.thickness = thickness?.value || state.remix.thickness;
@@ -3296,6 +3338,43 @@
     [background, textColor, speed, thickness, jitter, wobble, tool, vapor, spookySounds, referenceDesign, referenceTextColor, referenceDecorationColor, exportSize, borderStyle, borderThickness, borderColor].forEach((el) => {
       if (el) el.onchange = update;
     });
+
+    // The native iOS WKWebView file chooser (and regular browser picker)
+    // opens from a *real* user tap. It offers Photos/Files without library
+    // browsing permission and the chosen pixels stay in JS memory only.
+    importButton?.addEventListener("click", () => {
+      if (!customBackground || !importInput) return;
+      playUiTapSound();
+      importInput.click();
+    });
+    importInput?.addEventListener("change", async () => {
+      const file = importInput.files?.[0];
+      importInput.value = ""; // selecting the same photo again must work
+      if (!file || !customBackground) return; // picker cancel is a no-op
+      importButton.disabled = true;
+      if (importStatus) importStatus.textContent = "Preparing your photo...";
+      try {
+        const result = await customBackground.importFile(file);
+        if (!result) return; // superseded by newer import/reset
+        if (state.screen !== "remix") {
+          customBackground.clear();
+          return;
+        }
+        state.remix.background = "custom";
+        state.remix.style = "custom";
+        state.remix.customDarken = true; // subtle default, optional to disable
+        renderRemix(); // rebuild both Simple/More selectors + redraw preview
+      } catch (error) {
+        console.warn("Ghost Writer photo import failed", error);
+        if (importStatus?.isConnected) {
+          importStatus.textContent = error?.message ||
+            "That photo couldn't be opened. Try a JPG or PNG.";
+        }
+      } finally {
+        if (importButton?.isConnected) importButton.disabled = false;
+      }
+    });
+    darkenToggle?.addEventListener("change", update);
 
     remixModeButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -5036,6 +5115,13 @@
 
   function getBackgroundConfig(options = {}) {
     const key = getBackgroundKey(options);
+    if (key === "custom" && customBackground?.hasImage()) {
+      return {
+        label: "My Photo", kind: "special", value: "#101114",
+        cardClass: "", texture: "sessionPhoto",
+        image: customBackground.getCanvas()
+      };
+    }
     return BACKGROUNDS[key] || BACKGROUNDS.ghost;
   }
 
@@ -5062,24 +5148,28 @@
   }
 
   function drawCoverImage(c, img, width, height) {
-    if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) {
+    // Existing static backgrounds are HTMLImageElements. Session-only
+    // imported photos are bounded canvas images without .complete/.natural*.
+    const sourceWidth = img?.naturalWidth || img?.width || 0;
+    const sourceHeight = img?.naturalHeight || img?.height || 0;
+    if (!img || img.complete === false || !(sourceWidth > 0) || !(sourceHeight > 0)) {
       return false;
     }
 
-    const imageRatio = img.naturalWidth / img.naturalHeight;
+    const imageRatio = sourceWidth / sourceHeight;
     const canvasRatio = width / height;
 
     let sourceX = 0;
     let sourceY = 0;
-    let sourceW = img.naturalWidth;
-    let sourceH = img.naturalHeight;
+    let sourceW = sourceWidth;
+    let sourceH = sourceHeight;
 
     if (imageRatio > canvasRatio) {
-      sourceW = img.naturalHeight * canvasRatio;
-      sourceX = (img.naturalWidth - sourceW) / 2;
+      sourceW = sourceHeight * canvasRatio;
+      sourceX = (sourceWidth - sourceW) / 2;
     } else {
-      sourceH = img.naturalWidth / canvasRatio;
-      sourceY = (img.naturalHeight - sourceH) / 2;
+      sourceH = sourceWidth / canvasRatio;
+      sourceY = (sourceHeight - sourceH) / 2;
     }
 
     c.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
@@ -5557,11 +5647,18 @@
     c.fillStyle = background.value;
     c.fillRect(0, 0, width, height);
 
-    if (background.texture === "image") {
-      const img = getBackgroundImage(background.imageSrc);
+    if (background.texture === "image" || background.texture === "sessionPhoto") {
+      const img = background.texture === "sessionPhoto"
+        ? background.image : getBackgroundImage(background.imageSrc);
 
       if (!drawCoverImage(c, img, width, height)) {
         c.fillStyle = background.value;
+        c.fillRect(0, 0, width, height);
+      }
+      // A subtle default darkening improves white-ink contrast on busy photos.
+      // It can be turned off in Remix, and applies to playback + PNG + MP4.
+      if (background.texture === "sessionPhoto" && options.customDarken !== false) {
+        c.fillStyle = "rgba(0, 0, 0, 0.22)";
         c.fillRect(0, 0, width, height);
       }
 
