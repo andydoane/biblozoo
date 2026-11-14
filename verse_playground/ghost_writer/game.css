@@ -962,6 +962,60 @@ body {
   background: #fff;
 }
 
+/* Session-only photo picker lives next to Background in both Remix modes. */
+.ghost-background-picker {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.ghost-background-picker .ghost-option {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ghost-background-import-btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: #7f66c6;
+  color: #ffffff;
+  font: 900 16px/1.1 "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ghost-background-import-btn:disabled { opacity: .55; }
+.ghost-background-import-btn:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+.ghost-background-picker input[hidden],
+.ghost-background-darken[hidden] { display: none !important; }
+.ghost-background-darken {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  width: fit-content;
+  min-height: 30px;
+  align-items: center;
+  gap: 9px;
+  color: #ffffff;
+  font: 800 15px/1.2 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-background-darken input {
+  width: 20px;
+  height: 20px;
+  accent-color: #7f66c6;
+}
+.ghost-background-import-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ffffff;
+  font: 700 14px/1.25 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-background-import-status:empty { display: none; }
+
 .ghost-remix-actions {
   grid-template-columns: 1fr 1fr;
 }
