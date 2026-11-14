@@ -258,6 +258,22 @@
     0 5px 0 rgba(0, 0, 0, 0.16);
 }
 
+/* Melody's existing edible music-note image replaces the textual score
+   label; its numerical score remains the original notes-caught percent. */
+.daily-feed-result-score:has(.daily-feed-result-note-image) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.daily-feed-result-note-image {
+  display: block;
+  width: clamp(25px, 6vw, 34px);
+  height: clamp(25px, 6vw, 34px);
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
 .daily-feed-result-catches {
   font-size: clamp(17px, 4.3vw, 23px);
   font-weight: 800;
@@ -266,17 +282,6 @@
 }
 
 .daily-feed-result-catches[hidden] { display: none; }
-
-.daily-feed-result-complete {
-  color: var(--purple);
-
-  font-size:
-    clamp(24px, 6vw, 34px);
-  font-weight: 900;
-  line-height: 1.05;
-
-  text-wrap: balance;
-}
 
 .daily-feed-game.is-daily-todo-snack
 .daily-feed-result-card {
@@ -292,7 +297,8 @@
 
   padding: 10px 22px;
 
-  background: var(--purple);
+  /* Match the Zookeeper Stats green and white lettering exactly. */
+  background: #24783c;
   color: #ffffff;
 
   font: inherit;

@@ -141,7 +141,9 @@
   const LABYRINTH_BALL_SIZE_MULTIPLIER = 2;
   const LABYRINTH_GRAVITY_SCALE = 0.60;
   const LABYRINTH_MAX_VERTICAL_SPEED_SCALE = 0.55;
-  const LABYRINTH_STUCK_MS = 3500;
+  // A last-resort rescue for a snack genuinely resting on a solid platform.
+  // Give the child ten seconds to steer before nudging it toward a gap.
+  const LABYRINTH_STUCK_MS = 10000;
   const LABYRINTH_STEER_ACCELERATION_SCALE = 3.2;
   const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
   const LABYRINTH_HORIZONTAL_DAMPING = 0.982;
@@ -1515,31 +1517,27 @@
               class="daily-feed-result-title"
               data-daily-feed-result-title
             >
-              ${isDailyTodoSnack ? "Thanks for the snack!" : "Great Catching!"}
+              Thanks for the snack!
             </div>
 
             <div
               class="daily-feed-result-score"
               data-daily-feed-result-score
             >
-              ${mode === FEED_MODES.MELODY ? "Music Notes Caught: 0%" : "Score: 0"}
+              ${mode === FEED_MODES.MELODY
+                ? `<img class="daily-feed-result-note-image" src="${MUSIC_NOTE_BALL.asset}" alt="Music note"><span>× 0%</span>`
+                : "Score: 0"}
             </div>
             <div class="daily-feed-result-catches" data-daily-feed-result-catches>
-              Caught 0 of 7 snacks
+              Caught 0 Snacks
             </div>
-
-            ${isDailyTodoSnack ? `
-              <div class="daily-feed-result-complete">
-                Zoo To-Do Complete!
-              </div>
-            ` : ""}
 
             <button
               class="daily-feed-result-back no-zoom"
               type="button"
               data-daily-feed-result-back
             >
-              ${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}
+              ✔ To-Do Complete!
             </button>
           </div>
         </div>
@@ -2607,6 +2605,17 @@
     return ball.id % 2 === 0 ? -1 : 1;
   }
 
+  function isLabyrinthBallRestingOnPlatform(runtime, ball) {
+    const tolerance = Math.max(2, (ball?.radius || 0) * 0.12);
+    return (runtime.labyrinth?.platformRows || []).some(row =>
+      (row.segments || []).some(segment =>
+        ball.x + ball.radius > segment.x &&
+        ball.x - ball.radius < segment.x + segment.width &&
+        Math.abs(ball.y + ball.radius - segment.y) <= tolerance
+      )
+    );
+  }
+
   function recoverStuckLabyrinthBall(
     runtime,
     ball,
@@ -2653,7 +2662,10 @@
 
     if (
       now - ball.labyrinthProgressAt <
-      LABYRINTH_STUCK_MS
+      LABYRINTH_STUCK_MS ||
+      // Never steer a free-falling snack, even when frame throttling has
+      // kept it inside the movement threshold for a long time.
+      !isLabyrinthBallRestingOnPlatform(runtime, ball)
     ) {
       return false;
     }
@@ -3330,6 +3342,9 @@
       for (const point of ball.trail || []) shift(point, "bornAt");
     }
     for (const burst of runtime.bursts || []) shift(burst, "startedAt");
+    // A locked/paused iPhone must not release all staggered Bounce bonus
+    // snacks at once on foreground return. Shift only unspawned deadlines.
+    for (const item of runtime.bounce?.bonusPending || []) shift(item, "at");
   }
 
   function armTiltObservationFallback(runtime) {
@@ -4379,6 +4394,10 @@
       livesLeft: BOUNCE_SERVES,
       waitingServe: true,
       snacksReleased: false,
+      // Full-clear food is a one-shot reward; its queued snacks use the same
+      // catch physics and score path as food released from colored bricks.
+      bonusTriggered: false,
+      bonusPending: [],
       ended: false
     };
   }
@@ -4421,6 +4440,40 @@
     });
   }
 
+  function startBounceFullClearBonus(runtime, now, random = Math.random) {
+    const state = runtime.bounce;
+    if (!state || state.bonusTriggered) return false;
+    // Count ONLY white balls physically on-screen at the final brick hit.
+    // Unused launches and star balls pending creation do not qualify.
+    const activeCount = Math.min(3, state.whiteBalls.filter(ball =>
+      ball.y + ball.radius >= 0 && ball.y - ball.radius <= runtime.height
+    ).length);
+    if (!activeCount) return false;
+
+    const bonusCount = activeCount * 2 +
+      Math.floor(clamp(random(), 0, 0.999999) * 2);
+    const solids = SOLID_BALLS.slice();
+    for (let i = solids.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(clamp(random(), 0, 0.999999) * (i + 1));
+      [solids[i], solids[j]] = [solids[j], solids[i]];
+    }
+    const colors = solids.slice(0, Math.min(bonusCount, solids.length));
+    if (bonusCount === 7) colors.push(RAINBOW_BALL);
+
+    // Alternate left and right, with randomized lanes and a gentle stagger,
+    // so the player can steer for each falling piece instead of facing a wall.
+    state.bonusPending = colors.map((config, index) => ({
+      config,
+      x: runtime.width * (
+        (index % 2 === 0 ? 0.12 : 0.56) + clamp(random(), 0, 0.999999) * 0.30
+      ),
+      at: now + 120 + index * 450
+    }));
+    state.bonusTriggered = true;
+    state.snacksReleased = true;
+    return true;
+  }
+
   function breakBounceBrick(runtime, brick, ball, now) {
     if (!brick.active) return;
     brick.active = false;
@@ -4436,6 +4489,15 @@
       playStarSound(runtime);
     } else {
       playPegTone(runtime, now);
+    }
+    const state = runtime.bounce;
+    if (!state.bricks.some(item => item.active && item.config)) {
+      // This is the LAST permitted rally: no more launches once all seven
+      // colored bricks have opened, even if the player has serves left.
+      state.snacksReleased = true;
+    }
+    if (!state.bricks.some(item => item.active)) {
+      startBounceFullClearBonus(runtime, now);
     }
   }
 
@@ -4644,40 +4706,71 @@
   function updateBounceMode(runtime, dt, now) {
     const state = runtime.bounce;
     if (!state) return;
-    if (!state.ended && !state.snacksReleased && !state.waitingServe) {
+    if (state.bonusTriggered) {
+      // The count was frozen at the last brick impact. No more bouncing
+      // once the full-clear food shower has begun.
+      state.whiteBalls = [];
+      state.pendingWhiteBalls = [];
+    }
+    if (!state.ended && !state.bonusTriggered && !state.waitingServe) {
       const steps = Math.max(1, Math.ceil(dt / BOUNCE_STEP));
       const step = dt / steps;
       for (let i = 0; i < steps; i += 1) {
         state.whiteBalls = state.whiteBalls.filter(
           (ball) => updateBounceWhiteBall(runtime, ball, step, now)
         );
-        if (state.pendingWhiteBalls.length) {
-          state.whiteBalls.push(...state.pendingWhiteBalls);
-          state.pendingWhiteBalls.length = 0;
-        }
-        // Feeding, not clearing gray bricks, is the objective.
-        // Stop the rally after the seventh snack brick is broken;
-        // let released snacks finish falling before showing results.
-        if (!state.bricks.some((brick) => brick.active && brick.config)) {
-          state.snacksReleased = true;
+        if (state.bonusTriggered) {
+          // All bricks cleared. The final active-ball count was snapshotted
+          // at impact; stop bouncing and let the snack shower take over.
           state.whiteBalls = [];
           state.pendingWhiteBalls = [];
           break;
         }
+        if (state.pendingWhiteBalls.length) {
+          state.whiteBalls.push(...state.pendingWhiteBalls);
+          state.pendingWhiteBalls.length = 0;
+        }
+        if (!state.bricks.some((brick) => brick.active && brick.config)) {
+          state.snacksReleased = true;
+        }
         if (!state.whiteBalls.length) break;
       }
-      if (!state.snacksReleased && !state.whiteBalls.length) {
+      if (!state.bonusTriggered && !state.whiteBalls.length) {
         state.livesLeft -= 1;
-        if (state.livesLeft > 0) {
+        if (!state.snacksReleased && state.livesLeft > 0) {
           showBounceNextServe(runtime, now);
         } else {
+          // After the seventh food brick the current on-screen balls are
+          // the final chance at clearing the board, regardless of launches.
+          // Any falling food still gets a chance to reach the BibloPet.
           state.ended = true;
-          runtime.balls = [];
         }
       }
     }
-    if (!state.waitingServe && !state.ended) {
+
+    if (state.bonusTriggered && state.bonusPending.length) {
+      while (state.bonusPending.length &&
+             state.bonusPending[0].at <= now) {
+        const entry = state.bonusPending.shift();
+        const radius = getFeedStarPegDiameter(runtime) / 2;
+        spawnBounceSnack(runtime, {
+          config: entry.config,
+          x: entry.x,
+          width: 0,
+          y: -radius * 2,
+          height: 0
+        });
+      }
+    }
+    // Continue collecting drops after a last-ball miss or a full clear.
+    // No early result while an original or bonus snack is still falling.
+    if (!state.waitingServe && runtime.balls.length) {
       updateBounceSnacks(runtime, dt);
+    }
+    if (state.bonusTriggered &&
+        state.bonusPending.length === 0 &&
+        runtime.balls.length === 0) {
+      state.ended = true;
     }
     updateBouncePetLean(runtime, dt);
   }
@@ -4749,7 +4842,8 @@
 
   function isBounceModeComplete(runtime, now) {
     const state = runtime.bounce;
-    if (!state?.ended && !(state?.snacksReleased && runtime.balls.length === 0)) {
+    if (!state?.ended || runtime.balls.length > 0 ||
+        state.bonusPending.length > 0) {
       runtime.finishAt = 0;
       return false;
     }
@@ -4764,6 +4858,7 @@
     if (!runtime?.bounce) return;
     runtime.bounce.whiteBalls = [];
     runtime.bounce.pendingWhiteBalls = [];
+    runtime.bounce.bonusPending = [];
     runtime.bounce.waitingServe = false;
   }
 
@@ -4916,32 +5011,27 @@
     stopAudioContext(runtime.audioContext);
     runtime.audioContext = null;
 
-    const copy =
-      getResultCopy(
-        result.score,
-        result.caughtCount,
-        runtime.petName
-      );
-
     runtime.gameEl.classList.add(
       "is-finished"
     );
 
     runtime.startOverlay.hidden = true;
+    // Debug Feeding previews must show the identical result screen to a
+    // real Daily To-Do run, while their onComplete path stays non-awarding.
     runtime.resultTitleEl.textContent =
-      runtime.dailyTodoSnack && !runtime.dailyTodoPreview
-        ? `Thanks for the snack, ${runtime.zookeeperName}!`
-        : copy.title;
-    runtime.resultScoreEl.textContent =
-      result.mode === FEED_MODES.MELODY
-        ? `Music Notes Caught: ${Number(result.catchPercent) || 0}%`
-        : `Score: ${result.score}`;
+      `Thanks for the snack, ${runtime.zookeeperName}!`;
+    if (result.mode === FEED_MODES.MELODY) {
+      const percent = Math.max(0, Number(result.catchPercent) || 0);
+      runtime.resultScoreEl.innerHTML =
+        `<img class="daily-feed-result-note-image" src="${MUSIC_NOTE_BALL.asset}" alt="Music note"><span>× ${percent}%</span>`;
+    } else {
+      runtime.resultScoreEl.textContent = `Score: ${result.score}`;
+    }
     if (runtime.resultCatchesEl) {
-      const caught = Math.max(0, Number(result.caughtCount) || 0);
-      const total = Math.max(0, Number(result.totalCount) || 0);
-      runtime.resultCatchesEl.textContent = result.mode === FEED_MODES.MELODY
-        ? `Caught ${Math.max(0, Number(result.snacksCaught) || 0)} of ${Math.max(0, Number(result.snacksTotal) || MELODY_SNACK_COUNT)} snacks`
-        : `Caught ${caught} of ${total} snacks`;
+      const caught = result.mode === FEED_MODES.MELODY
+        ? Math.max(0, Number(result.snacksCaught) || 0)
+        : Math.max(0, Number(result.caughtCount) || 0);
+      runtime.resultCatchesEl.textContent = `Caught ${caught} Snacks`;
       runtime.resultCatchesEl.hidden = false;
     }
     runtime.resultOverlay.hidden = false;
