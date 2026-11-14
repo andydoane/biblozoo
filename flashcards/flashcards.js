@@ -1510,8 +1510,18 @@
     if (["difficulty_intro", "recording_intro", "challenge", "comparison", "challenge_complete", "result"].includes(state.view) &&
       !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
-    // One narrator per screen visit, even when the UI rerenders while waiting.
-    const gate = instructions()?.sync(state.view, state.difficulty, state.selectedVerseId);
+    // The optional Skip Recording route says "Check the verse", not
+    // "Listen to your recording". Do not narrate a nonexistent take or
+    // compete with an in-flight microphone capture on a waiting screen.
+    const comparedAudio = state.view === "comparison"
+      ? recording?.snapshot?.() : null;
+    const canNarrateComparison = !comparedAudio ||
+      (comparedAudio.hasRecording && comparedAudio.captureOnly !== true &&
+        !["requesting", "preparing", "recording", "stopping"].includes(comparedAudio.status));
+    // One narrator per instruction screen visit; rerenders cannot restart it.
+    const instructionView = state.view === "comparison" && !canNarrateComparison
+      ? "" : state.view;
+    const gate = instructions()?.sync(instructionView, state.difficulty, state.selectedVerseId);
     const isLanding =
       state.view === "landing";
 
@@ -1561,16 +1571,16 @@
       }
     }
     updateMeter(wrap);
-    const instructionView = ["difficulty_intro", "recording_intro"].includes(state.view);
+    const fittingIntroView = ["difficulty_intro", "recording_intro"].includes(state.view);
     const comparisonView = state.view === "comparison";
     const fit = () => {
-      if (instructionView) fitRecordingInstructions(wrap);
+      if (fittingIntroView) fitRecordingInstructions(wrap);
       else {
         api.scheduleSmartLearnTextFit(wrap);
         if (comparisonView) fitComparisonInstruction(wrap);
       }
     };
-    if (instructionView || comparisonView) {
+    if (fittingIntroView || comparisonView) {
       requestAnimationFrame(fit);
       document.fonts?.ready.then(fit).catch(() => { });
     }
