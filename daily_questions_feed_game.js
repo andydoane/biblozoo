@@ -4391,6 +4391,10 @@ const LABYRINTH_STUCK_MS = 10000;
       livesLeft: BOUNCE_SERVES,
       waitingServe: true,
       snacksReleased: false,
+      // Full-clear food is a one-shot reward; its queued snacks use the same
+      // catch physics and score path as food released from colored bricks.
+      bonusTriggered: false,
+      bonusPending: [],
       ended: false
     };
   }
@@ -4433,6 +4437,39 @@ const LABYRINTH_STUCK_MS = 10000;
     });
   }
 
+  function startBounceFullClearBonus(runtime, now) {
+    const state = runtime.bounce;
+    if (!state || state.bonusTriggered) return false;
+    // Count ONLY white balls physically on-screen at the final brick hit.
+    // Unused launches and star balls pending creation do not qualify.
+    const activeCount = Math.min(3, state.whiteBalls.filter(ball =>
+      ball.y + ball.radius >= 0 && ball.y - ball.radius <= runtime.height
+    ).length);
+    if (!activeCount) return false;
+
+    const bonusCount = activeCount * 2 + Math.floor(Math.random() * 2);
+    const solids = SOLID_BALLS.slice();
+    for (let i = solids.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [solids[i], solids[j]] = [solids[j], solids[i]];
+    }
+    const colors = solids.slice(0, Math.min(bonusCount, solids.length));
+    if (bonusCount === 7) colors.push(RAINBOW_BALL);
+
+    // Alternate left and right, with randomized lanes and a gentle stagger,
+    // so the player can steer for each falling piece instead of facing a wall.
+    state.bonusPending = colors.map((config, index) => ({
+      config,
+      x: runtime.width * (
+        (index % 2 === 0 ? 0.12 : 0.56) + Math.random() * 0.30
+      ),
+      at: now + 120 + index * 450
+    }));
+    state.bonusTriggered = true;
+    state.snacksReleased = true;
+    return true;
+  }
+
   function breakBounceBrick(runtime, brick, ball, now) {
     if (!brick.active) return;
     brick.active = false;
@@ -4448,6 +4485,15 @@ const LABYRINTH_STUCK_MS = 10000;
       playStarSound(runtime);
     } else {
       playPegTone(runtime, now);
+    }
+    const state = runtime.bounce;
+    if (!state.bricks.some(item => item.active && item.config)) {
+      // This is the LAST permitted rally: no more launches once all seven
+      // colored bricks have opened, even if the player has serves left.
+      state.snacksReleased = true;
+    }
+    if (!state.bricks.some(item => item.active)) {
+      startBounceFullClearBonus(runtime, now);
     }
   }
 
@@ -4656,40 +4702,65 @@ const LABYRINTH_STUCK_MS = 10000;
   function updateBounceMode(runtime, dt, now) {
     const state = runtime.bounce;
     if (!state) return;
-    if (!state.ended && !state.snacksReleased && !state.waitingServe) {
+    if (!state.ended && !state.bonusTriggered && !state.waitingServe) {
       const steps = Math.max(1, Math.ceil(dt / BOUNCE_STEP));
       const step = dt / steps;
       for (let i = 0; i < steps; i += 1) {
         state.whiteBalls = state.whiteBalls.filter(
           (ball) => updateBounceWhiteBall(runtime, ball, step, now)
         );
-        if (state.pendingWhiteBalls.length) {
-          state.whiteBalls.push(...state.pendingWhiteBalls);
-          state.pendingWhiteBalls.length = 0;
-        }
-        // Feeding, not clearing gray bricks, is the objective.
-        // Stop the rally after the seventh snack brick is broken;
-        // let released snacks finish falling before showing results.
-        if (!state.bricks.some((brick) => brick.active && brick.config)) {
-          state.snacksReleased = true;
+        if (state.bonusTriggered) {
+          // All bricks cleared. The final active-ball count was snapshotted
+          // at impact; stop bouncing and let the snack shower take over.
           state.whiteBalls = [];
           state.pendingWhiteBalls = [];
           break;
         }
+        if (state.pendingWhiteBalls.length) {
+          state.whiteBalls.push(...state.pendingWhiteBalls);
+          state.pendingWhiteBalls.length = 0;
+        }
+        if (!state.bricks.some((brick) => brick.active && brick.config)) {
+          state.snacksReleased = true;
+        }
         if (!state.whiteBalls.length) break;
       }
-      if (!state.snacksReleased && !state.whiteBalls.length) {
+      if (!state.bonusTriggered && !state.whiteBalls.length) {
         state.livesLeft -= 1;
-        if (state.livesLeft > 0) {
+        if (!state.snacksReleased && state.livesLeft > 0) {
           showBounceNextServe(runtime, now);
         } else {
+          // After the seventh food brick the current on-screen balls are
+          // the final chance at clearing the board, regardless of launches.
+          // Any falling food still gets a chance to reach the BibloPet.
           state.ended = true;
-          runtime.balls = [];
         }
       }
     }
-    if (!state.waitingServe && !state.ended) {
+
+    if (state.bonusTriggered && state.bonusPending.length) {
+      while (state.bonusPending.length &&
+             state.bonusPending[0].at <= now) {
+        const entry = state.bonusPending.shift();
+        const radius = getFeedStarPegDiameter(runtime) / 2;
+        spawnBounceSnack(runtime, {
+          config: entry.config,
+          x: entry.x,
+          width: 0,
+          y: -radius * 2,
+          height: 0
+        });
+      }
+    }
+    // Continue collecting drops after a last-ball miss or a full clear.
+    // No early result while an original or bonus snack is still falling.
+    if (!state.waitingServe && runtime.balls.length) {
       updateBounceSnacks(runtime, dt);
+    }
+    if (state.bonusTriggered &&
+        state.bonusPending.length === 0 &&
+        runtime.balls.length === 0) {
+      state.ended = true;
     }
     updateBouncePetLean(runtime, dt);
   }
@@ -4761,7 +4832,8 @@ const LABYRINTH_STUCK_MS = 10000;
 
   function isBounceModeComplete(runtime, now) {
     const state = runtime.bounce;
-    if (!state?.ended && !(state?.snacksReleased && runtime.balls.length === 0)) {
+    if (!state?.ended || runtime.balls.length > 0 ||
+        state.bonusPending.length > 0) {
       runtime.finishAt = 0;
       return false;
     }
@@ -4776,6 +4848,7 @@ const LABYRINTH_STUCK_MS = 10000;
     if (!runtime?.bounce) return;
     runtime.bounce.whiteBalls = [];
     runtime.bounce.pendingWhiteBalls = [];
+    runtime.bounce.bonusPending = [];
     runtime.bounce.waitingServe = false;
   }
 
