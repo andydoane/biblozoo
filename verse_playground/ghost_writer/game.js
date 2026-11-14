@@ -3251,6 +3251,11 @@
 
   function wireRemixControls() {
     const background = document.getElementById("ghostBackgroundSelect");
+    const importButton = document.getElementById("ghostImportBackgroundBtn");
+    const importInput = document.getElementById("ghostImportBackgroundInput");
+    const importStatus = document.getElementById("ghostBackgroundImportStatus");
+    const darkenRow = document.getElementById("ghostBackgroundDarkenRow");
+    const darkenToggle = document.getElementById("ghostBackgroundDarkenToggle");
     const textColor = document.getElementById("ghostTextColorSelect");
     const speed = document.getElementById("ghostSpeedSelect");
     const thickness = document.getElementById("ghostThicknessSelect");
@@ -3271,6 +3276,11 @@
     const update = () => {
       state.remix.background = background?.value || state.remix.background;
       state.remix.style = state.remix.background;
+      if (darkenToggle) state.remix.customDarken = darkenToggle.checked;
+      if (darkenRow) {
+        darkenRow.hidden = !(state.remix.background === "custom" &&
+          customBackground?.hasImage());
+      }
       state.remix.textColor = textColor?.value || state.remix.textColor;
       state.remix.speed = speed?.value || state.remix.speed;
       state.remix.thickness = thickness?.value || state.remix.thickness;
@@ -3328,6 +3338,43 @@
     [background, textColor, speed, thickness, jitter, wobble, tool, vapor, spookySounds, referenceDesign, referenceTextColor, referenceDecorationColor, exportSize, borderStyle, borderThickness, borderColor].forEach((el) => {
       if (el) el.onchange = update;
     });
+
+    // The native iOS WKWebView file chooser (and regular browser picker)
+    // opens from a *real* user tap. It offers Photos/Files without library
+    // browsing permission and the chosen pixels stay in JS memory only.
+    importButton?.addEventListener("click", () => {
+      if (!customBackground || !importInput) return;
+      playUiTapSound();
+      importInput.click();
+    });
+    importInput?.addEventListener("change", async () => {
+      const file = importInput.files?.[0];
+      importInput.value = ""; // selecting the same photo again must work
+      if (!file || !customBackground) return; // picker cancel is a no-op
+      importButton.disabled = true;
+      if (importStatus) importStatus.textContent = "Preparing your photo...";
+      try {
+        const result = await customBackground.importFile(file);
+        if (!result) return; // superseded by newer import/reset
+        if (state.screen !== "remix") {
+          customBackground.clear();
+          return;
+        }
+        state.remix.background = "custom";
+        state.remix.style = "custom";
+        state.remix.customDarken = true; // subtle default, optional to disable
+        renderRemix(); // rebuild both Simple/More selectors + redraw preview
+      } catch (error) {
+        console.warn("Ghost Writer photo import failed", error);
+        if (importStatus?.isConnected) {
+          importStatus.textContent = error?.message ||
+            "That photo couldn't be opened. Try a JPG or PNG.";
+        }
+      } finally {
+        if (importButton?.isConnected) importButton.disabled = false;
+      }
+    });
+    darkenToggle?.addEventListener("change", update);
 
     remixModeButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
