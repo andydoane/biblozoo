@@ -4437,7 +4437,7 @@ const LABYRINTH_STUCK_MS = 10000;
     });
   }
 
-  function startBounceFullClearBonus(runtime, now) {
+  function startBounceFullClearBonus(runtime, now, random = Math.random) {
     const state = runtime.bounce;
     if (!state || state.bonusTriggered) return false;
     // Count ONLY white balls physically on-screen at the final brick hit.
@@ -4447,10 +4447,10 @@ const LABYRINTH_STUCK_MS = 10000;
     ).length);
     if (!activeCount) return false;
 
-    const bonusCount = activeCount * 2 + Math.floor(Math.random() * 2);
+    const bonusCount = activeCount * 2 + Math.floor(clamp(random(), 0, 0.999999) * 2);
     const solids = SOLID_BALLS.slice();
     for (let i = solids.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(clamp(random(), 0, 0.999999) * (i + 1));
       [solids[i], solids[j]] = [solids[j], solids[i]];
     }
     const colors = solids.slice(0, Math.min(bonusCount, solids.length));
@@ -4461,7 +4461,7 @@ const LABYRINTH_STUCK_MS = 10000;
     state.bonusPending = colors.map((config, index) => ({
       config,
       x: runtime.width * (
-        (index % 2 === 0 ? 0.12 : 0.56) + Math.random() * 0.30
+        (index % 2 === 0 ? 0.12 : 0.56) + clamp(random(), 0, 0.999999) * 0.30
       ),
       at: now + 120 + index * 450
     }));
