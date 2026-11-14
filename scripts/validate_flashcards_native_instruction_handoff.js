@@ -67,7 +67,7 @@ assert(micStop.includes("if keep && restoreOK &&") &&
        micStop.includes("UIApplication.shared.applicationState == .active") &&
        micStop.includes("AVAudioSession.sharedInstance().category == .soloAmbient") &&
        micStop.includes("!AVAudioSession.sharedInstance().isOtherAudioPlaying") &&
-       micStop.indexOf(normalSignal) < micStop.indexOf("if let call = call {"),
+       micStop.indexOf(normalSignal) < micStop.lastIndexOf("if let call = call {"),
   "Only successful retained user/timeout take after restoration can signal BEFORE ready reaches JS");
 assert(micStop.indexOf("self.savedSamples = self.captureSamples") <
        micStop.indexOf(normalSignal) &&
