@@ -67,9 +67,9 @@
       if (a.nativeStarted) tracks()?.stop?.();
     }
     function change(a, status) {
-      if (!still(a)) return;
-      cleanup(a);
+      if (!still(a) || a.status !== "playing") return;
       a.status = status;
+      cleanup(a);
       if (status === "failed") {
         onError?.("Instructions couldn't play. Tap Try Instructions Again.");
       }
@@ -154,10 +154,10 @@
     function interrupt() {
       if (!current || current.status !== "playing") return;
       const a = current;
+      a.status = "failed";
       cleanup(a);
       if (a.nativeStarted) tracks()?.stop?.();
       a.nativeStarted = false;
-      a.status = "failed";
       onChange?.();
     }
     root.document?.addEventListener?.("visibilitychange", () => {
