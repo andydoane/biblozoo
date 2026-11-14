@@ -721,6 +721,19 @@ Patch 2: themed visual system + difficulty flow
 
 }
 
+/* Instruction narration holds the actual action buttons until a real end.
+   Failure leaves Try Instructions Again visible rather than silently skipping. */
+.flashcards-recall-actions button:disabled {
+  pointer-events: none;
+  opacity: 0.45;
+  cursor: default;
+}
+
+.flashcards-instruction-retry {
+  width: min(100%, 500px);
+  font-size: clamp(18px, 3.6vw, 26px);
+}
+
 /* Recording and comparison controls keep the verse card's fitting area bounded. */
 .flashcards-comparison-buttons {
   display: flex;
@@ -864,11 +877,14 @@ Patch 2: themed visual system + difficulty flow
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(100%, 24ch);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   margin: auto;
   padding: 20px;
   color: #333333;
-  font-size: clamp(1.5rem, min(7vw, 8vh), 3rem);
+  font-size: 1.375rem;
+  overflow-y: auto;
   font-weight: 800;
   line-height: 1.12;
   text-align: center;
@@ -876,6 +892,13 @@ Patch 2: themed visual system + difficulty flow
   overflow-wrap: break-word;
   opacity: 1;
   transition: opacity 260ms ease;
+}
+
+/* Measure the actual wrapped text, not a fixed 24-character-wide box. */
+.flashcards-comparison-message {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .flashcards-comparison-stage .smart-learn-text {
