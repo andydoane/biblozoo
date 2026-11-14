@@ -2335,6 +2335,12 @@
     const wrap = document.getElementById("ghostDrawWrap");
     if (!canvas || !wrap) return;
 
+    // Long-press selection and the iOS context menu are blocked only on
+    // the drawing surface, not in the menus or text fields elsewhere.
+    const suppressCallout = event => event.preventDefault();
+    wrap.addEventListener("selectstart", suppressCallout, { capture: true });
+    wrap.addEventListener("contextmenu", suppressCallout, { capture: true });
+
     const rect = wrap.getBoundingClientRect();
     const c = setupCanvasForDpr(canvas, rect.width, rect.height);
     c.clearRect(0, 0, rect.width, rect.height);
