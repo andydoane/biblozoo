@@ -7046,6 +7046,17 @@ function exitDailyTodoQuestions(
   return true;
 }
 
+function showNewDailyTodoDayMessage() {
+  showDialog({
+    title: "A New Day at the Zoo!",
+    body:
+      "Yesterday's Daily Tasks have ended. Complete today's fresh three tasks to earn today's snack.",
+    actions: [
+      dlgBtn("OK", { onClick: closeDialog })
+    ]
+  });
+}
+
 function getReadyDailySnackRuntime(
   requestedPlan = null,
   now = new Date()
@@ -20947,6 +20958,10 @@ function screenDailySnack(idx) {
   });
 }
 
+function dailyTodoApiDayKey() {
+  return window.BibloZooDailyTodo?.localDayKey?.() || "";
+}
+
 function screenTodoDev(idx) {
   const wrap = document.createElement("div");
   wrap.className = "todo-dev-screen";
@@ -21104,6 +21119,29 @@ function screenTodoDev(idx) {
   dailyTodoUi?.promoteMedalToasts?.(
     wrap
   );
+
+  // A page left open over midnight must not accept yesterday's
+  // checklist taps, even if iOS delayed its background timer.
+  if (dailyPreviewMode === "actual" && dailyPreviewPlan) {
+    wrap.addEventListener("click", (event) => {
+      if (
+        !event.target?.closest?.(
+          "[data-daily-todo-preview-task], [data-daily-complete-task]"
+        )
+      ) {
+        return;
+      }
+
+      const today = dailyTodoApiDayKey();
+      if (!today || dailyPreviewPlan.day === today) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      getOrCreateDailyTodoPreviewPlan();
+      render();
+      showNewDailyTodoDayMessage();
+    }, true);
+  }
 
   bindHomePill(wrap);
 
@@ -21411,6 +21449,16 @@ function screenTodoDev(idx) {
         if (launched) return;
 
         snackRow.disabled = false;
+        if (
+          dailyPreviewMode === "actual" &&
+          dailyPreviewPlan.day !== dailyTodoApiDayKey()
+        ) {
+          getOrCreateDailyTodoPreviewPlan();
+          render();
+          showNewDailyTodoDayMessage();
+          return;
+        }
+
         showDialog({
           title: "Snack Unavailable",
           body:
@@ -24583,15 +24631,53 @@ function refreshDailySurfacesForNewDay() {
   render();
 }
 
+// Schedule the exact next local midnight (including DST boundaries).
+// iOS may suspend this timer, so foreground/pageshow/focus recheck too.
+let dailyDayBoundaryRefreshTimer = null;
+
+function scheduleDailyDayBoundaryRefresh() {
+  if (dailyDayBoundaryRefreshTimer !== null) {
+    clearTimeout(dailyDayBoundaryRefreshTimer);
+  }
+  const now = new Date();
+  const tomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1
+  );
+  const delay = Math.max(
+    50,
+    tomorrow.getTime() - now.getTime() + 50
+  );
+
+  dailyDayBoundaryRefreshTimer = setTimeout(() => {
+    dailyDayBoundaryRefreshTimer = null;
+    refreshDailySurfacesForNewDay();
+    scheduleDailyDayBoundaryRefresh();
+  }, delay);
+}
+
+function checkDailyDayBoundaryOnReturn() {
+  refreshDailySurfacesForNewDay();
+  scheduleDailyDayBoundaryRefresh();
+}
+
 document.addEventListener(
   "visibilitychange",
-  refreshDailySurfacesForNewDay
+  checkDailyDayBoundaryOnReturn
 );
 
 window.addEventListener(
   "pageshow",
-  refreshDailySurfacesForNewDay
+  checkDailyDayBoundaryOnReturn
 );
+
+window.addEventListener(
+  "focus",
+  checkDailyDayBoundaryOnReturn
+);
+
+scheduleDailyDayBoundaryRefresh();
 
 (async function init() {
   if (
