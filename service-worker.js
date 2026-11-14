@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Oct_28_patch73_1_feeding_intro_polish";
+const CACHE_VERSION = "2026_Nov_14_melody_seven_snacks_badges";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -226,6 +226,12 @@ const FEED_ASSET_PATHS = [
   ),
   ...["red", "yellow", "orange", "green", "blue", "purple", "rainbow"]
     .map((color) => `./verse_images/daily_questions/dq_feed_ball_${color}.png`),
+  "./verse_images/daily_questions/dq_feed_music_note.png",
+  // Optional art: badge assets are not part of the required shell, and the
+  // user-supplied animated 1000 milestone has a real double .gif suffix.
+  ...[10, 25, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+    .map((n) => `./verse_images/daily_zoo_todo/snacks_${n}.png`),
+  "./verse_images/daily_zoo_todo/snacks_1000.gif.gif",
   "./verse_images/daily_questions/dq_feed_star_peg.png",
   "./verse_images/daily_questions/dq_feed_shadow.png",
   "./verse_images/daily_questions/dq_feed_control_tilt.png",
