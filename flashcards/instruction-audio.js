@@ -153,7 +153,11 @@
       a.attempt += 1; // revoke an earlier failed attempt's late promise
       a.status = "playing";
       onChange?.();
-      root.requestAnimationFrame(() => start(a));
+      // Browser autoplay restrictions require the retry's media.play() to
+      // execute in this real click task, not a later animation frame.
+      // Native activation was already claimed on this same user gesture.
+      if (nativeOnly()) root.requestAnimationFrame(() => start(a));
+      else start(a);
     }
     // Never replay narration automatically on a task switch/return.
     function interrupt() {
