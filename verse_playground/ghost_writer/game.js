@@ -2988,7 +2988,7 @@
           <div class="ghost-remix-section">
             <div class="ghost-section-title">🖼️ Background</div>
             <div class="ghost-options">
-              ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+              ${selectImportBackgroundHtml()}
             </div>
           </div>
 
@@ -3041,7 +3041,7 @@
           <div class="ghost-remix-section">
             <div class="ghost-section-title">🖼️ Background</div>
             <div class="ghost-options">
-              ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+              ${selectImportBackgroundHtml()}
             </div>
           </div>
 
@@ -3196,12 +3196,39 @@
       const selected = key === value ? " selected" : "";
       return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(obj.label || key)}</option>`;
     }).join("");
+    const custom = customBackground?.hasImage()
+      ? `<option value="custom"${value === "custom" ? " selected" : ""}>My Photo</option>`
+      : "";
 
     return `
       <div class="ghost-option">
         <label for="${escapeHtml(id)}">${escapeHtml(label)}</label>
-        <select id="${escapeHtml(id)}">${options}</select>
+        <select id="${escapeHtml(id)}">${options}${custom}</select>
       </div>
+    `;
+  }
+
+  function selectImportBackgroundHtml() {
+    const current = state.remix.background === "custom" && customBackground?.hasImage();
+    return `
+      <div class="ghost-background-picker">
+        ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+        <button type="button" class="ghost-background-import-btn"
+                id="ghostImportBackgroundBtn" aria-label="Import a photo background">
+          Import
+        </button>
+        <input type="file" id="ghostImportBackgroundInput" hidden
+               accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif"
+               aria-label="Choose a photo background">
+      </div>
+      <label class="ghost-background-darken" id="ghostBackgroundDarkenRow"
+             ${current ? "" : "hidden"}>
+        <input type="checkbox" id="ghostBackgroundDarkenToggle"
+               ${state.remix.customDarken !== false ? "checked" : ""}>
+        Darken Background
+      </label>
+      <p class="ghost-background-import-status" id="ghostBackgroundImportStatus"
+         role="status" aria-live="polite"></p>
     `;
   }
 
