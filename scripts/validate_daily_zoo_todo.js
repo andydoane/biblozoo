@@ -781,13 +781,14 @@ function testRolloverCreatesFreshPlan() {
 function testOldDayActiveFlowPreservation() {
   let state = DailyTodo.createDefaultState();
   state.activePlan = {
+    kind: DailyTodo.PLAN_KINDS.CARE,
     id: "old-plan",
     profileId: "profile-a",
     day: "2026-10-04",
     verseId: "verse_a",
     activity: { kind: "game", id: "game_a", mode: "easy" },
     tasks: {
-      flashcard: { status: "open" },
+      review: { status: "open" },
       questions: { status: "open" },
       activity: { status: "open" }
     },
@@ -803,28 +804,124 @@ function testOldDayActiveFlowPreservation() {
     now: new Date(2026, 9, 4, 23, 58, 0),
     random: () => 0
   });
+  assert.strictEqual(started.changed, true);
   state = started.state;
 
-  const held = DailyTodo.expireOldPlanIfNeeded(
+  // Ordinary Daily To-Do work cannot preserve yesterday's checklist
+  // just because the child was playing at midnight.
+  const expired = DailyTodo.expireOldPlanIfNeeded(
     state,
     "2026-10-05"
   );
-
-  assert.strictEqual(held.preserved, true);
-  assert.strictEqual(held.state.activePlan.id, "old-plan");
-
-  const released = DailyTodo.releaseRolloverHold(held.state, {
-    planId: "old-plan",
-    launchToken: started.launchToken
-  });
-
-  const expired = DailyTodo.expireOldPlanIfNeeded(
-    released.state,
-    "2026-10-05"
-  );
-
+  assert.strictEqual(expired.preserved, false);
   assert.strictEqual(expired.expired, true);
   assert.strictEqual(expired.state.activePlan, null);
+
+  // A stale game callback does not finish yesterday's task after midnight.
+  const late = DailyTodo.setPendingCompletion(state, {
+    planId: "old-plan",
+    taskId: "activity",
+    launchToken: started.launchToken,
+    now: new Date(2026, 9, 5, 0, 2, 0)
+  });
+  assert.strictEqual(late.changed, false);
+  assert.strictEqual(late.state.activePlan.tasks.activity.status, "running");
+}
+
+function testCrossDayChecklistCannotUnlockOrClaimSnack() {
+  const midnight = new Date(2026, 9, 6, 0, 1, 0);
+  const oldState = makePlanState({
+    day: "2026-10-05",
+    totalTasks: 2
+  });
+
+  // On Monday the first two tasks were confirmed. On Tuesday a still-open
+  // screen has its third task pending. The UI must not mint a Tuesday
+  // completion or unlock Monday's now-expired snack.
+  const confirmed = DailyTodo.confirmPendingCompletion(oldState, {
+    planId: "plan-2026-10-05",
+    taskId: "activity",
+    now: midnight
+  });
+  assert.strictEqual(confirmed.changed, false);
+  assert.strictEqual(confirmed.taskCompleted, false);
+  assert.strictEqual(confirmed.educationalCompleted, false);
+  assert.strictEqual(confirmed.state.activePlan.educationalCompletedAt, 0);
+  assert.strictEqual(confirmed.state.activePlan.snack.unlocked, false);
+  assert.strictEqual(confirmed.state.stats.totalTasks, 2);
+
+  const pending = DailyTodo.setPendingCompletion(oldState, {
+    planId: "plan-2026-10-05",
+    taskId: "activity",
+    now: midnight
+  });
+  assert.strictEqual(pending.changed, false);
+
+  const openOldState = DailyTodo.normalizeState(oldState);
+  openOldState.activePlan.tasks.activity.status = "open";
+  const launched = DailyTodo.beginTask(openOldState, {
+    planId: "plan-2026-10-05",
+    taskId: "activity",
+    now: midnight
+  });
+  assert.strictEqual(launched.changed, false);
+
+  // Even legacy/in-memory saves that already show three checkmarks and
+  // 'snack unlocked' must never receive an expired feeding reward.
+  const oldReady = DailyTodo.normalizeState(oldState);
+  oldReady.activePlan.tasks.activity.status = "complete";
+  oldReady.activePlan.educationalCompletedAt = midnight.getTime() - 3600000;
+  oldReady.activePlan.snack.unlocked = true;
+  const deniedSnack = DailyTodo.markSnackClaimed(oldReady, {
+    planId: "plan-2026-10-05",
+    now: midnight,
+    snacksCaught: 16
+  });
+  assert.strictEqual(deniedSnack.changed, false);
+  assert.strictEqual(deniedSnack.state.stats.totalSnacksEaten, 0);
+
+  // An old completed/unfinished care plan is replaced, but lifetime task
+  // credit and other saved verse progress survive without backfilling.
+  const registries = makeSimpleRegistries();
+  const progress = {
+    verses: {
+      verse_a: makeVerseProgress({ status: "happy", lastPracticedAt: 1 })
+    },
+    dailyZooTodo: oldReady
+  };
+  const fresh = DailyTodo.getOrCreatePlan({
+    progress,
+    profileId: "profile-a",
+    verseList: [{ id: "verse_a" }],
+    gameRegistry: registries.games,
+    playgroundRegistry: registries.playground,
+    isPetUnlocked,
+    getPetStatus,
+    now: midnight,
+    random: () => 0,
+    idFactory: () => "fresh-tuesday-plan"
+  });
+  assert.strictEqual(fresh.created, true);
+  assert.strictEqual(fresh.plan.id, "fresh-tuesday-plan");
+  assert.strictEqual(fresh.plan.day, "2026-10-06");
+  assert.strictEqual(fresh.plan.educationalCompletedAt, 0);
+  assert.strictEqual(fresh.plan.snack.unlocked, false);
+  assert.strictEqual(fresh.state.stats.totalTasks, 2);
+  assert.strictEqual(fresh.progress.verses.verse_a.learnCompleted, true);
+}
+
+function testAppRefreshesAtLocalMidnightAndRejectsStaleTap() {
+  const appSource = fs.readFileSync(
+    path.join(rootDir, "app.js"),
+    "utf8"
+  );
+  assert.match(appSource, /function scheduleDailyDayBoundaryRefresh\(/);
+  assert.match(appSource, /tomorrow\.getTime\(\) - now\.getTime\(\)/);
+  assert.match(appSource, /"pageshow",\s*checkDailyDayBoundaryOnReturn/);
+  assert.match(appSource, /"visibilitychange",\s*checkDailyDayBoundaryOnReturn/);
+  assert.match(appSource, /dailyPreviewPlan\.day === today/);
+  assert.match(appSource, /showNewDailyTodoDayMessage\(/);
+  assert.match(appSource, /plan\.day !==\s*engine\.localDayKey\?\.\(now\)/);
 }
 
 function testConfirmationReleasesRolloverHold() {
@@ -3119,6 +3216,8 @@ async function main() {
     testNoUnlockedPetCreatesNoPlan,
     testRolloverCreatesFreshPlan,
     testOldDayActiveFlowPreservation,
+    testCrossDayChecklistCannotUnlockOrClaimSnack,
+    testAppRefreshesAtLocalMidnightAndRejectsStaleTap,
     testConfirmationReleasesRolloverHold,
     testCompletedRolloverHoldSelfHeals,
     testIdempotentTaskConfirmationAndStreak,

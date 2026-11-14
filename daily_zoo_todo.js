@@ -2325,9 +2325,20 @@
     return true;
   }
 
+  // A regular Daily To-Do belongs to exactly one local calendar day.
+  // A running/returning activity must not keep yesterday's checklist alive.
+  // New BibloPet missions intentionally retain their separate carryover rule.
+  function isExpiredCarePlan(plan, now = new Date()) {
+    return plan?.kind === PLAN_KINDS.CARE &&
+      plan.day !== localDayKey(now);
+  }
+
   function shouldPreserveOldPlan(plan) {
+    if (plan?.kind !== PLAN_KINDS.NEW_PET) {
+      return false;
+    }
+
     if (
-      plan?.kind === PLAN_KINDS.NEW_PET &&
       cleanString(plan.verseId) &&
       plan.educationalCompletedAt <= 0
     ) {
@@ -2641,7 +2652,11 @@
       taskId
     );
 
-    if (!plan || plan.id !== cleanString(planId)) {
+    if (
+      !plan ||
+      plan.id !== cleanString(planId) ||
+      isExpiredCarePlan(plan, now)
+    ) {
       return { state, changed: false, launchToken: "" };
     }
 
@@ -2715,8 +2730,12 @@
       taskId
     );
 
-    if (!plan || plan.id !== cleanString(planId) ||
-      resolvedTaskId === TASK_IDS.PACKAGE) {
+    if (
+      !plan ||
+      plan.id !== cleanString(planId) ||
+      isExpiredCarePlan(plan, now) ||
+      resolvedTaskId === TASK_IDS.PACKAGE
+    ) {
       return { state, changed: false };
     }
 
@@ -2778,7 +2797,11 @@
       taskId
     );
 
-    if (!plan || plan.id !== cleanString(planId)) {
+    if (
+      !plan ||
+      plan.id !== cleanString(planId) ||
+      isExpiredCarePlan(plan, now)
+    ) {
       return {
         state,
         changed: false,
