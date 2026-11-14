@@ -1266,7 +1266,7 @@ html.gw-native-capacitor .ghost-playback-root::before {
   place-items: center;
   padding: 9px;
   border-radius: 25px;
-  background: #ffffff;
+  background: #333333;
 }
 .ghost-export-avatar img {
   display: block;
