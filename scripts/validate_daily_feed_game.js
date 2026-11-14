@@ -1470,30 +1470,35 @@ function testBounceGrayBricksCannotFinishWhileSnacksRemain() {
   assert.strictEqual(runtime.finishAt, 0);
 }
 
-function testBounceLastSnackFinishesWithGrayBricksStanding() {
+function testBounceFinalRallyAfterAllSnackBricks() {
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const state = runtime.bounce;
-  const lastSnack = state.bricks.find((brick) => brick.config?.id === "rainbow");
-  // All other snack bricks have already released and resolved their food.
-  state.bricks.forEach((brick) => {
+  const lastSnack = state.bricks.find(brick => brick.config?.id === "rainbow");
+  state.bricks.forEach(brick => {
     if (brick.config && brick !== lastSnack) brick.active = false;
   });
-  assert.ok(state.bricks.some((brick) => brick.active && !brick.config));
+  assert.ok(state.bricks.some(brick => brick.active && !brick.config));
   assert.strictEqual(hooks.launchBounceServe(runtime), true);
-  hooks.updateBounceMode(runtime, 1 / 120, 1000);
-  assert.strictEqual(state.snacksReleased, false);
-
-  // The last colored brick releases the final snack. Gray bricks remain.
   hooks.breakBounceBrick(runtime, lastSnack, {}, 1000);
-  assert.strictEqual(runtime.balls.length, 1);
-  hooks.updateBounceMode(runtime, 1 / 120, 1008);
   assert.strictEqual(state.snacksReleased, true);
-  assert.strictEqual(state.whiteBalls.length, 0,
-    "No more white-ball rebounds are needed after the last food brick");
-  assert.ok(state.bricks.some((brick) => brick.active && !brick.config));
-  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1008), false,
-    "The final snack must finish falling before the results screen");
+  assert.strictEqual(state.bonusTriggered, false);
+  hooks.updateBounceMode(runtime, 1 / 120, 1008);
+  assert.strictEqual(state.whiteBalls.length, 1,
+    "Last snack brick must no longer delete the white ball");
+  assert.strictEqual(state.waitingServe, false);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1008), false);
+
+  state.whiteBalls[0].y = runtime.height + 50;
+  hooks.updateBounceMode(runtime, 1 / 120, 1010);
+  assert.strictEqual(state.ended, true,
+    "Missing all live balls after all snacks ends the final rally");
+  assert.strictEqual(state.livesLeft, 2,
+    "Unused launches do not restart the final rally");
+  assert.strictEqual(hooks.launchBounceServe(runtime), false);
+  assert.strictEqual(runtime.balls.length, 1,
+    "Previously released food still gets a chance to fall");
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1010), false);
 
   runtime.balls[0].x = state.paddleX;
   runtime.balls[0].y = runtime.petCenterY - 5;
@@ -1504,43 +1509,119 @@ function testBounceLastSnackFinishesWithGrayBricksStanding() {
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1016), false);
   assert.strictEqual(runtime.finishAt, 1916);
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1916), true);
-
-  const result = hooks.getModeController("bounce").buildResult({
-    mode: "bounce", score: 7, caughtCount: 3, totalCount: 7
-  });
-  assert.deepStrictEqual(toPlain(result), {
-    mode: "bounce", score: 7, caughtCount: 3,
-    totalCount: 7, completed: true
-  });
 }
 
-function testBounceLastSnackMissStillAllowsCompletion() {
+function testBounceBonusBallCountsAndUniqueColors() {
+  for (const balls of [1,2,3]) {
+    for (const choice of [0,0.999]) {
+      const runtime = makeBounceRuntime(2);
+      hooks.initializeBounceMode(runtime);
+      const state = runtime.bounce;
+      assert.strictEqual(hooks.launchBounceServe(runtime), true);
+      state.whiteBalls = Array.from({length:balls}, (_,i) =>
+        hooks.makeBounceWhiteBall(runtime, 125 + 35*i, 430)
+      );
+      state.livesLeft = 3;
+      assert.strictEqual(hooks.startBounceFullClearBonus(runtime, 1000, () => choice), true);
+      const queued = state.bonusPending;
+      const expectedCount = balls*2 + (choice===0 ? 0 : 1);
+      assert.strictEqual(queued.length, expectedCount,
+        `${balls} active on-screen balls: exact 2x or 2x+1 bonus`);
+      assert.strictEqual(new Set(queued.map(item => item.config.id)).size,
+        expectedCount, "Bonus colors must never repeat");
+      assert.strictEqual(queued.some(item => item.config.id==="rainbow"),
+        expectedCount===7, "Only seventh bonus snack may be Rainbow");
+      assert.ok(queued.every((item,i) =>
+        item.x >= 0 && item.x <= runtime.width &&
+        item.at === 1120 + i*450
+      ), "Alternate randomized left/right spawn lanes and stagger their release");
+      assert.strictEqual(hooks.startBounceFullClearBonus(runtime, 1001, () => choice), false,
+        "Bonus can only be queued once");
+      assert.strictEqual(state.livesLeft, 3,
+        "Unused launches must not affect bonus quantity");
+    }
+  }
+}
+
+function testBounceFullClearTriggersBonusAndDrainsWithoutExtraBall() {
+  const runtime = makeBounceRuntime(2);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  assert.strictEqual(hooks.launchBounceServe(runtime), true);
+  // Two on-screen star balls plus the launch ball, regardless of lives left.
+  state.whiteBalls = Array.from({length:3}, (_,i) =>
+    hooks.makeBounceWhiteBall(runtime, 140 + i*30, 350)
+  );
+  state.livesLeft = 1;
+  const lastBrick = state.bricks.find(brick => !brick.config && !brick.isStar);
+  state.bricks.forEach(brick => {
+    if (brick !== lastBrick) brick.active = false;
+  });
+  state.snacksReleased = true;
+  hooks.breakBounceBrick(runtime, lastBrick, state.whiteBalls[0], 1000);
+  assert.strictEqual(state.bonusTriggered, true);
+  assert.strictEqual(state.snacksReleased, true);
+  const quantity = state.bonusPending.length;
+  assert.ok([6,7].includes(quantity),
+    "Three live balls earn 6 or 7 bonus snacks");
+  const plannedColors = state.bonusPending.map(item => item.config.id);
+  assert.strictEqual(new Set(plannedColors).size, quantity);
+  hooks.updateBounceMode(runtime, 1 / 120, 1008);
+  assert.strictEqual(state.whiteBalls.length, 0,
+    "After a full clear the white balls leave and the snack shower begins");
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1008), false);
+  hooks.updateBounceMode(runtime, 1 / 120, 1100);
+  assert.strictEqual(runtime.balls.length, 0, "First bonus snack respects stagger");
+  hooks.updateBounceMode(runtime, 1 / 120, 1120);
+  assert.strictEqual(runtime.balls.length, 1);
+  const lastDue = 1120+(quantity-1)*450;
+  hooks.updateBounceMode(runtime, 1 / 120, lastDue);
+  assert.strictEqual(runtime.balls.length, quantity);
+  assert.deepStrictEqual(toPlain(runtime.balls.map(b=>b.config.id)),plannedColors);
+  assert.strictEqual(state.bonusPending.length, 0);
+  assert.strictEqual(state.ended, false, "No result before all bonus snacks fall");
+
+  // Catch all bonus food via original hitbox, scoring, and sound path.
+  runtime.balls.forEach(ball => {
+    ball.x = state.paddleX;
+    ball.y = runtime.petCenterY - 5;
+  });
+  hooks.updateBounceMode(runtime, 1 / 120, lastDue+8);
+  assert.strictEqual(runtime.balls.length, 0);
+  assert.strictEqual(runtime.caughtCount, quantity);
+  assert.strictEqual(runtime.score, quantity===7 ? 11 : quantity,
+    "Rainbow is five points but just one eaten snack");
+  assert.strictEqual(state.ended, true);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, lastDue+8), false);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, lastDue+908), true);
+  hooks.updateBounceMode(runtime, 1 / 120, lastDue+916);
+  assert.strictEqual(runtime.caughtCount, quantity, "No duplicate bonus credit");
+  assert.strictEqual(hooks.launchBounceServe(runtime), false);
+}
+
+function testBounceNoFoodLeftStillNeedsFinalBallToExit() {
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const state = runtime.bounce;
-  state.bricks.forEach((brick) => {
+  state.bricks.forEach(brick => {
     if (brick.config) brick.active = false;
   });
   assert.strictEqual(hooks.launchBounceServe(runtime), true);
   hooks.updateBounceMode(runtime, 1 / 120, 1000);
   assert.strictEqual(state.snacksReleased, true);
-  assert.ok(state.bricks.some((brick) => brick.active),
-    "The game must not require breaking remaining gray bricks");
-  assert.strictEqual(state.livesLeft, 3);
-
-  runtime.balls = [{
-    x: 10, y: runtime.height + 30, vy: 120,
-    radius: 10, rotation: 0
-  }];
+  assert.ok(state.bricks.some(brick => brick.active),
+    "Gray bricks need not be cleared for normal end");
+  assert.strictEqual(state.ended, false);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1000), false);
+  state.whiteBalls[0].y = runtime.height + 50;
   hooks.updateBounceMode(runtime, 1 / 120, 1010);
-  assert.strictEqual(runtime.balls.length, 0);
-  assert.strictEqual(runtime.caughtCount, 0);
-  assert.strictEqual(runtime.score, 0);
+  assert.strictEqual(state.ended, true);
+  assert.strictEqual(hooks.launchBounceServe(runtime), false,
+    "Spare launches cannot be used after last food brick");
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1010), false);
-  assert.strictEqual(runtime.finishAt, 1910,
-    "Missing the final released snack must not stall the round");
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1910), true);
 }
+
 
 function testMelodyExactOdeToJoySequence() {
   const reference = extractVerseTyperOdeToJoy();
@@ -4188,8 +4269,10 @@ async function main() {
     testBounceWhiteBallsAccelerateIndependently,
     testBounceThreeLivesAndPopup,
     testBounceGrayBricksCannotFinishWhileSnacksRemain,
-    testBounceLastSnackFinishesWithGrayBricksStanding,
-    testBounceLastSnackMissStillAllowsCompletion,
+    testBounceFinalRallyAfterAllSnackBricks,
+    testBounceBonusBallCountsAndUniqueColors,
+    testBounceFullClearTriggersBonusAndDrainsWithoutExtraBall,
+    testBounceNoFoodLeftStillNeedsFinalBallToExit,
     testBounceOverlayLifecycleAndRealDailyIsolation,
     testMelodyExactOdeToJoySequence,
     testMelodyTuneRegistryAndSelection,
