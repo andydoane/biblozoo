@@ -333,10 +333,21 @@ function testMilestoneDefinitionsAndAssets() {
     ]
   );
 
+  assert.deepStrictEqual(
+    DailyTodo.SNACK_BADGE_THRESHOLDS,
+    [10,25,50,100,200,300,400,500,600,700,800,900,1000],
+    "Snack milestones match the supplied real image filenames"
+  );
   const definitions = [
     ...DailyTodo.BADGE_DEFINITIONS.streak,
-    ...DailyTodo.BADGE_DEFINITIONS.tasks
+    ...DailyTodo.BADGE_DEFINITIONS.tasks,
+    ...DailyTodo.BADGE_DEFINITIONS.snacks
   ];
+  assert.strictEqual(
+    DailyTodo.BADGE_DEFINITIONS.snacks.at(-1).asset,
+    "snacks_1000.gif.gif",
+    "The actual supplied 1000-Snack badge is an animated GIF"
+  );
 
   for (const badge of definitions) {
     assert.ok(badge.id);
@@ -963,6 +974,53 @@ function testStreakResetAfterGapAndBestStreakPersistence() {
   assert.strictEqual(completed.state.stats.currentStreak, 1);
   assert.strictEqual(completed.state.stats.bestStreak, 10);
   assert.strictEqual(completed.state.stats.totalTasks, 21);
+}
+
+function testSnackLifetimeBadgesCreditOnlyRealClaim() {
+  const ready = DailyTodo.confirmPendingCompletion(
+    makePlanState({
+      day:"2026-10-05",currentStreak:2,bestStreak:4,
+      lastCompletedDay:"2026-10-04",totalTasks:8
+    }),
+    {planId:"plan-2026-10-05",taskId:"activity",
+     now:new Date(2026,9,5,18,0,0)}
+  );
+  const claimed = DailyTodo.markSnackClaimed(ready.state,{
+    planId:"plan-2026-10-05",now:new Date(2026,9,5,18,5,0),
+    snacksCaught:10,feedMode:"classic"
+  });
+  assert.strictEqual(claimed.changed,true);
+  assert.strictEqual(claimed.state.stats.totalSnacksEaten,10);
+  assert(claimed.state.stats.earnedSnackBadges.includes(10));
+  assert.deepStrictEqual(claimed.state.stats.earnedTaskBadges, ready.state.stats.earnedTaskBadges);
+  const restored=DailyTodo.normalizeState(JSON.parse(JSON.stringify(claimed.state)));
+  assert.strictEqual(restored.stats.totalSnacksEaten,10,
+    "An existing Zookeeper's food total survives reload");
+  assert.deepStrictEqual(restored.stats.earnedSnackBadges,[10],
+    "Snack awards survive save/normalize/reload");
+  const replay=DailyTodo.markSnackClaimed(restored,{
+    planId:"plan-2026-10-05",now:new Date(2026,9,5,18,6,0),snacksCaught:16
+  });
+  assert.strictEqual(replay.changed,false,"Cannot claim the same Daily reward twice");
+  assert.strictEqual(replay.state.stats.totalSnacksEaten,10,
+    "A result replay can't double count snacks");
+  const preview=DailyTodo.normalizeState({stats:{totalSnacksEaten:1000}});
+  assert.strictEqual(preview.stats.totalSnacksEaten,1000);
+  assert(preview.stats.earnedSnackBadges.includes(1000));
+  assert(DailyTodo.getEarnedBadgeDefinitions(preview.stats).snacks.some(b=>b.asset==="snacks_1000.gif.gif"));
+  assert.strictEqual(DailyTodo.normalizeState({}).stats.totalSnacksEaten,0,
+    "Legacy saved profiles default to zero, not invented historical catches");
+  const blocked=DailyTodo.markSnackClaimed(makePlanState({day:"2026-10-05"}),{
+    planId:"plan-2026-10-05",now:new Date(2026,9,5,18,0,0),snacksCaught:500
+  });
+  assert.strictEqual(blocked.changed,false);
+  assert.strictEqual(blocked.state.stats.totalSnacksEaten,0,
+    "Incomplete/preview-like game may not award food");
+  const capped=DailyTodo.markSnackClaimed(ready.state,{
+    planId:"plan-2026-10-05",now:new Date(2026,9,5,18,5,0),snacksCaught:999
+  });
+  assert.strictEqual(capped.state.stats.totalSnacksEaten,16,
+    "A single feeding round cannot contribute an unbounded count");
 }
 
 function testSnackClaimIsOptionalIdempotentAndStatNeutral() {
@@ -3065,6 +3123,7 @@ async function main() {
     testCompletedRolloverHoldSelfHeals,
     testIdempotentTaskConfirmationAndStreak,
     testSnackClaimIsOptionalIdempotentAndStatNeutral,
+    testSnackLifetimeBadgesCreditOnlyRealClaim,
     testStreakResetAfterGapAndBestStreakPersistence,
     testCurrentStreakDisplaysZeroAfterMissedDay,
     testPendingStateIsDistinctFromComplete,

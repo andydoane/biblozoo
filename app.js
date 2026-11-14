@@ -7192,6 +7192,7 @@ async function startDailyTodoSnack(
     rewardTiltEnabled,
     rewardScore: 0,
     rewardCaught: 0,
+    rewardSnacksCaught: 0,
     rewardComplete: false,
     rewardClaimed: false
   };
@@ -7222,6 +7223,10 @@ function claimDailyTodoSnack(
         Number(session.rewardCaught) ||
         0
       );
+    // Preview results may display snacks, but cannot persist achievements.
+    session.rewardSnacksCaught = session.feedMode === "melody"
+      ? Math.max(0, Number(result.snacksCaught) || 0)
+      : Math.max(0, Number(result.caughtCount) || 0);
     session.rewardComplete = true;
     session.rewardClaimed = true;
     return true;
@@ -7259,6 +7264,11 @@ function claimDailyTodoSnack(
       {
         planId: session.planId,
         now: new Date(),
+        // Melody's many playable music notes are NOT all food; only its
+        // seven colored BibloSnacks count. Other modes catch food directly.
+        snacksCaught: session.feedMode === "melody"
+          ? Math.max(0, Number(result.snacksCaught) || 0)
+          : Math.max(0, Number(result.caughtCount) || 0),
         // The emergency Classic-only switch must not consume
         // a rotation turn, even when Classic was already assigned.
         feedMode: ENABLE_DAILY_FEEDING_VARIETY
@@ -7287,6 +7297,9 @@ function claimDailyTodoSnack(
       0,
       Number(result.caughtCount) || 0
     );
+  session.rewardSnacksCaught = session.feedMode === "melody"
+    ? Math.max(0, Number(result.snacksCaught) || 0)
+    : session.rewardCaught;
   session.rewardComplete = true;
   session.rewardClaimed = true;
   return true;
@@ -22426,11 +22439,13 @@ function screenZookeeperStats(idx) {
       stats
     ) || {
       streak: [],
-      tasks: []
+      tasks: [],
+      snacks: []
     };
   const hasBadges =
     earnedBadges.streak.length > 0 ||
-    earnedBadges.tasks.length > 0;
+    earnedBadges.tasks.length > 0 ||
+    (earnedBadges.snacks?.length || 0) > 0;
   const profileName =
     String(profile?.name || "Zookeeper")
       .trim() || "Zookeeper";
@@ -22503,6 +22518,12 @@ function screenZookeeperStats(idx) {
             </div>
           </div>
           <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">Snacks Eaten</div>
+            <div class="zookeeper-stat-value">
+              ${stats.totalSnacksEaten || 0}
+            </div>
+          </div>
+          <div class="detail-row zookeeper-stat-row">
             <div class="detail-label">BibloPets Rescued</div>
             <div class="zookeeper-stat-value">
               ${zooEscapeStats.petsRescued}
@@ -22528,6 +22549,10 @@ function screenZookeeperStats(idx) {
               ${zookeeperBadgeGroupHtml(
                 "Task Badges",
                 earnedBadges.tasks
+              )}
+              ${zookeeperBadgeGroupHtml(
+                "Snack Badges",
+                earnedBadges.snacks || []
               )}
             `
             : `

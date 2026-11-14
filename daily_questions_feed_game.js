@@ -21,6 +21,15 @@
     points: 5,
     trailColors: ["#ff5a51", "#ff963f", "#ffc751", "#78ad4f", "#46aef0", "#7f66c6"]
   });
+  // Melody keeps ALL playable note gestures and original pitches/percentage,
+  // but only these seven colorful art pieces are edible BibloSnacks.
+  const MELODY_SNACK_COUNT = 7;
+  const MUSIC_NOTE_BALL = Object.freeze({
+    id: "music-note",
+    color: "#ffffff",
+    asset: `${ASSET_BASE}dq_feed_music_note.png`,
+    points: 0
+  });
   const PEG_NOTE_FREQUENCIES = Object.freeze([
     523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
   ]);
@@ -920,6 +929,7 @@
     const balls = {};
     for (const config of SOLID_BALLS) balls[config.id] = createImage(config.asset);
     balls.rainbow = createImage(RAINBOW_BALL.asset);
+    balls[MUSIC_NOTE_BALL.id] = createImage(MUSIC_NOTE_BALL.asset);
     return {
       balls,
       star: createImage(`${ASSET_BASE}dq_feed_star_peg.png`)
@@ -1502,10 +1512,9 @@
               class="daily-feed-result-score"
               data-daily-feed-result-score
             >
-              ${mode === FEED_MODES.MELODY ? "Snacks Caught: 0%" : "Score: 0"}
+              ${mode === FEED_MODES.MELODY ? "Music Notes Caught: 0%" : "Score: 0"}
             </div>
-            <div class="daily-feed-result-catches" data-daily-feed-result-catches
-              ${mode === FEED_MODES.MELODY ? "hidden" : ""}>
+            <div class="daily-feed-result-catches" data-daily-feed-result-catches>
               Caught 0 of 7 snacks
             </div>
 
@@ -3012,6 +3021,31 @@
     return configs[index % configs.length];
   }
 
+  function assignMelodySnacks(timeline) {
+    // Place one of each six solid colors and the rainbow at spaced musical
+    // TIMES, not every Nth array entry: songs include rests and half-beats.
+    // This never changes pitches, note/beat offsets, lanes or arrival times.
+    const notes = timeline.filter(entry => Number.isFinite(entry.midi));
+    const count = Math.min(MELODY_SNACK_COUNT, notes.length);
+    if (!count) return 0;
+    const first = notes[0].arrivalOffsetMs;
+    const span = notes[notes.length - 1].arrivalOffsetMs - first;
+    let previous = -1;
+    for (let index = 0; index < count; index += 1) {
+      const target = first + span * (index + 1) / (count + 1);
+      const lastAllowed = notes.length - (count - index);
+      let selected = previous + 1;
+      for (let candidate = selected + 1; candidate <= lastAllowed; candidate += 1) {
+        if (Math.abs(notes[candidate].arrivalOffsetMs - target) <
+            Math.abs(notes[selected].arrivalOffsetMs - target))
+          selected = candidate;
+      }
+      notes[selected].snackConfig = getMelodySnackConfig(index);
+      previous = selected;
+    }
+    return count;
+  }
+
   function updateMelodyScore(runtime) {
     const state = runtime?.melody;
     if (!state) return;
@@ -3136,6 +3170,7 @@
       timeline.filter(
         (entry) => Number.isFinite(entry.midi)
       ).length;
+    const snacksTotal = assignMelodySnacks(timeline);
 
     runtime.pegs = [];
     runtime.bursts = [];
@@ -3145,8 +3180,10 @@
     runtime.nextScheduledAt = Infinity;
     runtime.score = 0;
     runtime.caughtCount = 0;
+    runtime.snacksCaught = 0;
     runtime.totalCount = totalCount;
     runtime.melody = {
+      snacksTotal,
       tuneId: tune?.id || "odeToJoy",
       tuneLabel:
         String(tune?.label || "").trim(),
@@ -3955,7 +3992,7 @@
 
   function spawnMelodyNote(runtime, entry) {
     const radius = getFeedStarPegDiameter(runtime) / 2;
-    const config = getMelodySnackConfig(entry.index);
+    const config = entry.snackConfig || MUSIC_NOTE_BALL;
     const x = clamp(
       Number(entry.x) || runtime.width / 2,
       radius * 1.25,
@@ -3994,13 +4031,18 @@
     if (!entry || entry.status !== "active") return;
 
     entry.status = "caught";
-    runtime.caughtCount += 1;
+    runtime.caughtCount += 1; // Every played note still counts toward Caught %.
+    if (entry.snackConfig) {
+      // ONLY the seven visible colored BibloSnacks count toward food badges.
+      runtime.snacksCaught = (Number(runtime.snacksCaught) || 0) + 1;
+    }
     runtime.melody.classifiedCount += 1;
     updateMelodyScore(runtime);
     playMelodyTone(runtime, entry.midi);
 
-    // The melody note takes the place of a chomp sound, but pet feedback is shared.
-    showCatchScore(runtime, { config: ball.config, points: 1 });
+    // Notes stay musical; only actual food shows a +1 snack popup.
+    if (entry.snackConfig)
+      showCatchScore(runtime, { config: ball.config, points: 1 });
     pulseFeedPet(runtime);
   }
 
@@ -4173,7 +4215,9 @@
       ...buildStandardResult(runtime),
       score: catchPercent,
       totalCount: runtime.totalCount,
-      catchPercent
+      catchPercent,
+      snacksCaught: Math.max(0, Number(runtime.snacksCaught) || 0),
+      snacksTotal: Math.max(0, Number(runtime.melody?.snacksTotal) || MELODY_SNACK_COUNT)
     };
   }
 
@@ -4877,13 +4921,15 @@
         : copy.title;
     runtime.resultScoreEl.textContent =
       result.mode === FEED_MODES.MELODY
-        ? `Snacks Caught: ${Number(result.catchPercent) || 0}%`
+        ? `Music Notes Caught: ${Number(result.catchPercent) || 0}%`
         : `Score: ${result.score}`;
     if (runtime.resultCatchesEl) {
       const caught = Math.max(0, Number(result.caughtCount) || 0);
       const total = Math.max(0, Number(result.totalCount) || 0);
-      runtime.resultCatchesEl.textContent = `Caught ${caught} of ${total} snacks`;
-      runtime.resultCatchesEl.hidden = result.mode === FEED_MODES.MELODY;
+      runtime.resultCatchesEl.textContent = result.mode === FEED_MODES.MELODY
+        ? `Caught ${Math.max(0, Number(result.snacksCaught) || 0)} of ${Math.max(0, Number(result.snacksTotal) || MELODY_SNACK_COUNT)} snacks`
+        : `Caught ${caught} of ${total} snacks`;
+      runtime.resultCatchesEl.hidden = false;
     }
     runtime.resultOverlay.hidden = false;
   }
@@ -6215,6 +6261,9 @@
             session.rewardCaught
           ) || 0
         );
+      // Preserve the independent seven-snack score when returning to a
+      // completed Melody result; never infer food from music-note catches.
+      runtime.snacksCaught = Math.max(0, Number(session.rewardSnacksCaught) || 0);
 
       showResult(
         runtime,

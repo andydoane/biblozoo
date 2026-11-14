@@ -39,6 +39,12 @@
     10, 25, 50, 100, 200, 300, 400,
     500, 600, 700, 800, 900, 1000
   ]);
+  // Match the owner's supplied Snack Badge artwork exactly. The 1,000
+  // milestone is an animated GIF stored with its actual uploaded filename.
+  const SNACK_BADGE_THRESHOLDS = Object.freeze([
+    10, 25, 50, 100, 200, 300, 400,
+    500, 600, 700, 800, 900, 1000
+  ]);
   const BADGE_DEFINITIONS = Object.freeze({
     streak: Object.freeze(
       STREAK_BADGE_THRESHOLDS.map(
@@ -59,6 +65,19 @@
           threshold,
           label: `${threshold} Tasks`,
           asset: `tasks_${threshold}.png`
+        })
+      )
+    ),
+    snacks: Object.freeze(
+      SNACK_BADGE_THRESHOLDS.map(
+        (threshold) => Object.freeze({
+          id: `snacks-${threshold}`,
+          type: "snacks",
+          threshold,
+          label: `${threshold.toLocaleString("en-US")} Snacks`,
+          asset: threshold === 1000
+            ? "snacks_1000.gif.gif"
+            : `snacks_${threshold}.png`
         })
       )
     )
@@ -250,6 +269,12 @@
         stats.earnedTaskBadges,
         TASK_BADGE_THRESHOLDS,
         stats.totalTasks
+      );
+    stats.earnedSnackBadges =
+      normalizeEarnedThresholds(
+        stats.earnedSnackBadges,
+        SNACK_BADGE_THRESHOLDS,
+        stats.totalSnacksEaten
       );
   }
 
@@ -624,9 +649,11 @@
       bestStreak: 0,
       lastCompletedDay: "",
       totalTasks: 0,
+      totalSnacksEaten: 0,
       zooTodoExtraCreditKeys: [],
       earnedStreakBadges: [],
       earnedTaskBadges: [],
+      earnedSnackBadges: [],
       recentAssignments: [],
       feedRotation: { order: [], index: 0 }
     };
@@ -672,6 +699,8 @@
         ? raw.lastCompletedDay
         : "",
       totalTasks: toNonNegativeInteger(raw.totalTasks),
+      // New lifetime metric; legacy profiles safely start at zero.
+      totalSnacksEaten: toNonNegativeInteger(raw.totalSnacksEaten),
       // Keep verified extra-task awards alongside the profile's task total.
       zooTodoExtraCreditKeys: Array.isArray(raw.zooTodoExtraCreditKeys)
         ? [...new Set(raw.zooTodoExtraCreditKeys.filter(
@@ -682,6 +711,8 @@
         raw.earnedStreakBadges,
       earnedTaskBadges:
         raw.earnedTaskBadges,
+      earnedSnackBadges:
+        raw.earnedSnackBadges,
       recentAssignments,
       feedRotation: normalizeFeedRotation(raw.feedRotation)
     };
@@ -1915,6 +1946,11 @@
             badge.threshold
           )
         )
+        .map(cloneJson),
+      snacks: BADGE_DEFINITIONS.snacks
+        .filter((badge) =>
+          stats.earnedSnackBadges.includes(badge.threshold)
+        )
         .map(cloneJson)
     };
   }
@@ -2902,6 +2938,7 @@
       planId = "",
       now = new Date(),
       feedMode = "",
+      snacksCaught = 0,
       random = Math.random
     } = {}
   ) {
@@ -2925,6 +2962,15 @@
 
     plan.snack.claimed = true;
     plan.snack.claimedAt = now.getTime();
+    // Only the ONE canonical, completed, actually claimed Daily Feeding
+    // reward may credit lifetime food. Replay/preview/expired claim paths
+    // return above without incrementing. Classic star bonuses allow up to 16.
+    const earnedSnacks = Math.min(16, toNonNegativeInteger(snacksCaught));
+    state.stats.totalSnacksEaten = Math.min(
+      Number.MAX_SAFE_INTEGER,
+      state.stats.totalSnacksEaten + earnedSnacks
+    );
+    refreshEarnedBadges(state.stats);
 
     // Progress only a *real*, successfully claimed feeding game.
     // Preview sessions cannot call this path, and a Classic-only
@@ -2947,6 +2993,7 @@
     NEW_PET_MISSION_RULES,
     STREAK_BADGE_THRESHOLDS,
     TASK_BADGE_THRESHOLDS,
+    SNACK_BADGE_THRESHOLDS,
     BADGE_DEFINITIONS,
     PLAN_KINDS,
     TASK_IDS,
