@@ -37,6 +37,8 @@ assert.match(game, /showProgress\("Making Video\.\.\. " \+ percent \+ "%",\s*\{\
 assert.match(game, /\{ phase: "saving" \}/);
 assert.match(game, /result\?\.saved === true[\s\S]*?modal\.success\(\)/);
 assert.match(css, /\.ghost-export-dialog\s*\{[^}]*background:\s*#7f66c6/i);
+assert.match(css, /\.ghost-export-avatar\s*\{[^}]*background:\s*#333333/i);
+assert.doesNotMatch(source, /You did it!|🎉/, "No emoji in export success heading");
 assert.match(css, /\.ghost-export-overlay\s*\{[^}]*background:\s*rgba\(22,\s*14,\s*32,\s*\.83\)/);
 assert.match(css, /\.ghost-export-overlay\[hidden\],\s*\.ghost-export-overlay \[hidden\]\s*\{\s*display:\s*none\s*!important/);
 assert.match(css, /\.ghost-export-title\s*\{[^}]*flex:\s*0 0 2\.16em/);
@@ -177,7 +179,7 @@ assert(h.nodes.progress.hidden && !h.nodes.activity.hidden);
 assert(h.nodes.cancel.hidden,"no cancel during PhotoKit transaction");
 assert.equal(h.doc.activeElement,h.nodes.dialog,"non-interactive phase focuses dialog");
 h.dialog.success();
-assert.equal(h.nodes.title.textContent,"You did it! 🎉");
+assert.equal(h.nodes.title.textContent,"Complete!");
 assert.equal(h.nodes.message.textContent,"Your video is saved to Photos!");
 assert(!h.nodes.done.hidden && h.nodes.activity.hidden);
 assert(h.nodes.errorActions.hidden,"success has only the Done button");
