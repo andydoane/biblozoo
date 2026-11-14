@@ -1515,7 +1515,7 @@
     // compete with an in-flight microphone capture on a waiting screen.
     const comparedAudio = state.view === "comparison"
       ? recording?.snapshot?.() : null;
-    const canNarrateComparison = !comparedAudio ||
+    const canNarrateComparison = !!comparedAudio &&
       (comparedAudio.hasRecording && comparedAudio.captureOnly !== true &&
         !["requesting", "preparing", "recording", "stopping"].includes(comparedAudio.status));
     // One narrator per instruction screen visit; rerenders cannot restart it.
