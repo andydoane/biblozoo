@@ -28,7 +28,9 @@ for (const [, , id, file] of sounds) {
 }
 assert.match(swift, /subdirectory:\s*"public\/flashcards"/);
 assert.match(tracks, /flashcard-instruction-\(no-help\|first-letter\|pictures\|record\|listen\)/);
-assert.match(game, /instructions\(\)\?\.sync\(state\.view, state\.difficulty, state\.selectedVerseId\)/);
+assert.match(game, /instructions\(\)\?\.sync\(instructionView, state\.difficulty, state\.selectedVerseId\)/);
+assert.match(game, /comparedAudio\.hasRecording && comparedAudio\.captureOnly !== true/);
+assert.match(game, /state\.view === "comparison" && !canNarrateComparison/);
 assert.match(game, /requesting \|\| locked/);
 assert.match(game, /const nextDisabled = instructionLocked\(\) \|\| waiting/);
 assert.match(game, /audio\.status === "loading" \|\| instructionLocked\(\)/);
