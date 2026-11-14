@@ -14,6 +14,7 @@ const app = read("app.js");
 const readGame = read("read_my_verse.js");
 const feeding = read("daily_questions_feed_game.js");
 const shell = read("verse_games/shared/game-shell.js");
+const profiles = read("profiles.js");
 const testing = read("scripts/validate_patch72_1a_zoo_escape.js");
 const workflow = read(".github/workflows/ios-prep-validation.yml");
 
@@ -21,6 +22,8 @@ assert.match(workflow, /node scripts\/validate_random_zoo_surprises\.js/);
 assert.match(engine, /daily: 0\.25, welcome: 0\.10/);
 assert.match(engine, /Math\.random\(\) < 0\.80 \? "escape" : "break"/);
 assert.match(engine, /SURPRISE_PREFIX = "biblozooZooSurprise:v1:"/);
+assert.match(profiles, /localStorage\.removeItem\(`biblozooZooSurprise:v1:\$\{id\}`\)/,
+  "Deleting a profile with its progress must clear its separate surprise eligibility");
 assert.match(engine, /!kind \|\| !startSurprise\(kind\)\) successful\(\)/);
 assert.match(engine, /if \(surpriseMode\) \{[\s\S]*?successful\(\);[\s\S]*?return;[\s\S]*?if \(attemptCount >= MAX_ATTEMPTS\)/);
 assert.match(engine, /if \(surpriseEnabled && !isDeveloperRun\(\)\)[\s\S]*?recoveryFailureWithoutSurprise\(\)/);
