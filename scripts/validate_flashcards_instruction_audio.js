@@ -32,7 +32,7 @@ assert.match(game, /instructions\(\)\?\.sync\(state\.view, state\.difficulty, st
 assert.match(game, /requesting \|\| locked/);
 assert.match(game, /const nextDisabled = instructionLocked\(\) \|\| waiting/);
 assert.match(game, /audio\.status === "loading" \|\| instructionLocked\(\)/);
-assert.match(game, /id="flashcardsInstructionRetryBtn"/);
+assert.match(game, /retry\.id\s*=\s*"flashcardsInstructionRetryBtn"/);
 assert.match(game, /function fitComparisonInstruction\(wrap\)/);
 assert.match(game, /message\.scrollHeight <= availableHeight/);
 assert.doesNotMatch(css, /width:\s*min\(100%,\s*24ch\)/);
