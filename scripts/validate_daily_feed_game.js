@@ -2802,7 +2802,7 @@ async function testDailyFeedPrecacheSurvivesIndividualFailures() {
     await installing;
     assert.strictEqual(
       [...cached.values()].filter((value) => value === "feed").length,
-      failOne ? 34 : 35
+      failOne ? 48 : 49
     );
     assert.ok(cached.has("https://example.org/biblozoo/daily_questions_feed_game.js"));
     assert.strictEqual(warnings.length, failOne ? 1 : 0);
