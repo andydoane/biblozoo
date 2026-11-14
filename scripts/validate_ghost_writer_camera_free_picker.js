@@ -37,6 +37,7 @@ assert.match(game,/id="ghostPhotoChoiceOverlay" hidden/);
 assert.match(game,/Choose from Photos/);
 assert.match(game,/Choose from Files/);
 assert.match(game,/data-ghost-photo-choice-cancel>Cancel/);
+assert.doesNotMatch(game,/>Take Photo<|["\u0027]Take Photo["\u0027]/, "no camera action is rendered");
 assert.match(game,/IS_NATIVE_CAPACITOR \? "" :/);
 assert.match(game,/nativePhotoPicker\.choosePhoto\(\) : nativePhotoPicker\.chooseFile\(\)/);
 assert.match(game,/customBackground\.importDataUrl\(/);
