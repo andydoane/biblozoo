@@ -112,6 +112,11 @@ function loadFeedGameForValidation() {
     normalizeFeedMelodyNotes,
     createMelodyLanePath,
     createMelodyTimeline,
+    MUSIC_NOTE_BALL,
+    MELODY_SNACK_COUNT,
+    assignMelodySnacks,
+    catchMelodyNote,
+    spawnMelodyNote,
     midiToFrequency,
     calculateMelodyCatchPercent,
     initializeMelodyMode,
@@ -2046,6 +2051,54 @@ function testMelodyMidiFrequencyMatchesVerseTyper() {
   );
 }
 
+function testSevenRealMelodySnacksAndUnchangedNotes() {
+  const expected = ["red","yellow","orange","green","blue","purple","rainbow"];
+  for (const tune of hooks.FEED_MELODIES) {
+    const timeline = hooks.createMelodyTimeline(tune.notes, 390, {bpm:tune.bpm});
+    const preserved = timeline.map(entry =>
+      [entry.midi,entry.x,entry.spawnOffsetMs,entry.arrivalOffsetMs,entry.beats]);
+    assert.strictEqual(hooks.assignMelodySnacks(timeline), 7,
+      "Every shipped tune, including the shortest, has seven spaced food notes");
+    assert.deepStrictEqual(timeline.map(entry =>
+      [entry.midi,entry.x,entry.spawnOffsetMs,entry.arrivalOffsetMs,entry.beats]),preserved,
+      "Changing food graphics must NEVER change note timing, pitch, lane or rests");
+    const food = timeline.filter(entry => entry.snackConfig);
+    assert.deepStrictEqual(food.map(entry => entry.snackConfig.id), expected);
+    assert.strictEqual(food.length, 7);
+    assert.strictEqual(new Set(food).size, 7);
+    assert(food.every(entry => Number.isFinite(entry.midi)));
+    assert(timeline.filter(entry => Number.isFinite(entry.midi)).length > 7,
+      "Ordinary musical notes stay present and are not food");
+    const intervals=food.slice(1).map((entry,i)=>
+      entry.arrivalOffsetMs-food[i].arrivalOffsetMs);
+    assert(intervals.every(n=>n>0),
+      "Food must be separated across increasing musical arrival times");
+  }
+  assert.strictEqual(hooks.MELODY_SNACK_COUNT,7);
+  assert.strictEqual(hooks.MUSIC_NOTE_BALL.asset,
+    "./verse_images/daily_questions/dq_feed_music_note.png");
+
+  const tune=hooks.getFeedMelodyById("odeToJoy");
+  const timeline=hooks.createMelodyTimeline(tune.notes,390,{bpm:tune.bpm});
+  hooks.assignMelodySnacks(timeline);
+  const food=timeline.find(entry=>entry.snackConfig);
+  const plain=timeline.find(entry=>Number.isFinite(entry.midi)&&!entry.snackConfig);
+  const runtime={mode:"melody",caughtCount:0,snacksCaught:0,totalCount:60,
+    score:0,scoreEl:null,scorePopupsEl:null,catcher:null,
+    audioContext:null,melody:{classifiedCount:0}};
+  hooks.catchMelodyNote(runtime,{melodyEntry:plain,config:hooks.MUSIC_NOTE_BALL});
+  assert.strictEqual(runtime.caughtCount,1);
+  assert.strictEqual(runtime.snacksCaught,0,
+    "An ordinary played note may affect percent but never food");
+  hooks.catchMelodyNote(runtime,{melodyEntry:food,config:food.snackConfig});
+  assert.strictEqual(runtime.caughtCount,2);
+  assert.strictEqual(runtime.snacksCaught,1,
+    "Only the seven colored food visuals credit Snacks Eaten");
+  hooks.catchMelodyNote(runtime,{melodyEntry:food,config:food.snackConfig});
+  assert.strictEqual(runtime.snacksCaught,1,"A duplicate collision cannot count food twice");
+  assert.strictEqual(runtime.score,3,"Two of 60 notes still count toward the original percentage");
+}
+
 function testMelodyPercentageScoring() {
   assert.strictEqual(hooks.calculateMelodyCatchPercent(60, 60), 100);
   assert.strictEqual(hooks.calculateMelodyCatchPercent(0, 60), 0);
@@ -2067,11 +2120,13 @@ function testMelodyPercentageScoring() {
       caughtCount: 46,
       totalCount: 60,
       completed: true,
-      catchPercent: 77
+      catchPercent: 77,
+      snacksCaught: 0,
+      snacksTotal: 7
     }
   );
   assert.ok(
-    source.includes("`Snacks Caught: ${Number(result.catchPercent) || 0}%`")
+    source.includes("`Music Notes Caught: ${Number(result.catchPercent) || 0}%`")
   );
 }
 
@@ -3874,7 +3929,8 @@ function testPreviewNeverClaimsDailyCompletion() {
     };
     hooks.setActiveRuntimeForValidation(runtime);
     hooks.showResult(runtime, {
-      mode, score: 5, caughtCount: 3, totalCount: 7, catchPercent: 71
+      mode, score: 5, caughtCount: 3, totalCount: 7, catchPercent: 71,
+      snacksCaught: 2, snacksTotal: 7
     });
     return runtime;
   };
@@ -3883,8 +3939,9 @@ function testPreviewNeverClaimsDailyCompletion() {
   assert.strictEqual(previewRuntime.resultScoreEl.textContent, "Score: 5");
   assert.strictEqual(previewRuntime.resultCatchesEl.textContent, "Caught 3 of 7 snacks");
   const melodyRuntime = target("melody", true);
-  assert.strictEqual(melodyRuntime.resultScoreEl.textContent, "Snacks Caught: 71%");
-  assert.strictEqual(melodyRuntime.resultCatchesEl.hidden, true);
+  assert.strictEqual(melodyRuntime.resultScoreEl.textContent, "Music Notes Caught: 71%");
+  assert.strictEqual(melodyRuntime.resultCatchesEl.textContent, "Caught 2 of 7 snacks");
+  assert.strictEqual(melodyRuntime.resultCatchesEl.hidden, false);
   const dailyRuntime = target("classic", false);
   assert.ok(dailyRuntime.resultTitleEl.textContent.includes("Thanks for the snack, Someone!"));
   hooks.setActiveRuntimeForValidation(null);
@@ -4135,6 +4192,7 @@ async function main() {
     testMelodyLaneTargetsStayWithinTwoLanes,
     testMelodyMidiFrequencyMatchesVerseTyper,
     testMelodyPercentageScoring,
+    testSevenRealMelodySnacksAndUnchangedNotes,
     testMelodyIgnoresQuestionStars,
     testMelodyCompletionWaitsForFinalArrival,
     testMelodyAudioAndBackgroundSafety,
