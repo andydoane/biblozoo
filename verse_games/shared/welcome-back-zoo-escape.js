@@ -896,7 +896,7 @@
     }
     function showTestMenu() {
       cancelTestHold();
-      if (!allowTestMenu || !running() || busy || testMenu) return;
+      if (!allowTestMenu || surpriseMode || !running() || busy || testMenu) return;
       const menu = doc.createElement("div");
       menu.className = "bz-zoo-dev-menu";
       menu.setAttribute("role", "dialog");
@@ -935,7 +935,7 @@
       content.querySelector?.("button")?.focus?.({ preventScroll: true });
     }
     function testPointerDown(event) {
-      if (!allowTestMenu || !running() || busy || testMenu ||
+      if (!allowTestMenu || surpriseMode || !running() || busy || testMenu ||
           (event.button != null && event.button !== 0)) return;
       cancelTestHold();
       testPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
