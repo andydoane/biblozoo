@@ -1,6 +1,6 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## Feeding four results, Bounce full clear, and Labyrinth ten-second rescue (owner iPhone PENDING)
+## PR #99 — Feeding four results, Bounce full clear, and Labyrinth ten-second rescue (owner iPhone PENDING)
 
 **Owner-approved 2026-11-14 UI scope:** Real Daily To-Do **AND hidden DEV Feeding Game Tester** must show the *same* end-screen design for Classic, Labyrinth, Bounce, Melody. Every end card shows a solid **Zookeeper Stats green `#24783c` and white** **✔ To-Do Complete!** button (same actual back navigation; debug still exits to Zoo); remove the separate purple `Zoo To-Do Complete!` line everywhere. Food summary reads exactly `Caught X Snacks` with NO `of X` denominator; only actually caught food pieces count. Melody's yellow score pill displays **`dq_feed_music_note.png` × X%** (real musical-note catch percentage, no fake emoji and no food/note conflation), preserving original percentages and underlying game score, pitches and timing. Result header is shared between actual and DEV endings. The preview *looks* complete, but never earns a Daily claim, Snacks Eaten, badges, streak, rotation turn or unrelated persistent progress. No rework of secret debug menu/launcher.
 
@@ -20,7 +20,7 @@
 6. **Persistent stats:** Repeat previews and replay results; verify the tester **never adds lifetime Snacks Eaten, badges, Daily completion or rotation**, while a real current-day completed To-Do claim credits only the actually caught colored food once, including caught Bounce bonus. Verify no unclaimed old-day carryover per merged PR #97.
 7. **Native boundaries:** Do not infer physical Apple SDK compile/audio PASS from Node/Linux Swift grammar or Web build. No intentional Swift/AVFoundation/`.soloAmbient` changes, no recording/mic/Photos permission change, no WebAudio fallback, and no unrelated Read/Flashcards/Welcome Back changes.
 
-**Status:** first isolated runtime/source probes passed (real feed JavaScript parses; 1/2/3 white-ball quantity and color cases; full-clear catch/drain, Labyrinth 10s support, identical debug/actual render markup); complete GitHub Actions and physical iPhone **PENDING until exact final PR head and owner verification**.
+**[PR #99](https://github.com/andydoane/biblozoo/pull/99) status:** first isolated runtime/source probes passed (real feed JavaScript parses; 1/2/3 white-ball quantity/color cases, full-clear catch/drain, Labyrinth 10s support, identical debug/actual render markup). First Actions [#43644910365](https://github.com/andydoane/biblozoo/actions/runs/43644910365) **Web build PASS, Node regressions FAIL only on cross-VM realm array strict comparison** in new test; normalized both sides and rerun requested by subsequent commits. **Exact final PR-head Node/Swift grammar/Web CI and physical iPhone PENDING until verified.**
 
 
 ## Bounce next-ball Zookeeper profile picture (owner iPhone PENDING)
