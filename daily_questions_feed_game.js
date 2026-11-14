@@ -1515,31 +1515,27 @@
               class="daily-feed-result-title"
               data-daily-feed-result-title
             >
-              ${isDailyTodoSnack ? "Thanks for the snack!" : "Great Catching!"}
+              Thanks for the snack!
             </div>
 
             <div
               class="daily-feed-result-score"
               data-daily-feed-result-score
             >
-              ${mode === FEED_MODES.MELODY ? "Music Notes Caught: 0%" : "Score: 0"}
+              ${mode === FEED_MODES.MELODY
+                ? `<img class="daily-feed-result-note-image" src="${MUSIC_NOTE_BALL.asset}" alt="Music note"><span>× 0%</span>`
+                : "Score: 0"}
             </div>
             <div class="daily-feed-result-catches" data-daily-feed-result-catches>
-              Caught 0 of 7 snacks
+              Caught 0 Snacks
             </div>
-
-            ${isDailyTodoSnack ? `
-              <div class="daily-feed-result-complete">
-                Zoo To-Do Complete!
-              </div>
-            ` : ""}
 
             <button
               class="daily-feed-result-back no-zoom"
               type="button"
               data-daily-feed-result-back
             >
-              ${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}
+              ✔ To-Do Complete!
             </button>
           </div>
         </div>
@@ -4928,20 +4924,22 @@
     );
 
     runtime.startOverlay.hidden = true;
+    // Debug Feeding previews must show the identical result screen to a
+    // real Daily To-Do run, while their onComplete path stays non-awarding.
     runtime.resultTitleEl.textContent =
-      runtime.dailyTodoSnack && !runtime.dailyTodoPreview
-        ? `Thanks for the snack, ${runtime.zookeeperName}!`
-        : copy.title;
-    runtime.resultScoreEl.textContent =
-      result.mode === FEED_MODES.MELODY
-        ? `Music Notes Caught: ${Number(result.catchPercent) || 0}%`
-        : `Score: ${result.score}`;
+      `Thanks for the snack, ${runtime.zookeeperName}!`;
+    if (result.mode === FEED_MODES.MELODY) {
+      const percent = Math.max(0, Number(result.catchPercent) || 0);
+      runtime.resultScoreEl.innerHTML =
+        `<img class="daily-feed-result-note-image" src="${MUSIC_NOTE_BALL.asset}" alt="Music note"><span>× ${percent}%</span>`;
+    } else {
+      runtime.resultScoreEl.textContent = `Score: ${result.score}`;
+    }
     if (runtime.resultCatchesEl) {
-      const caught = Math.max(0, Number(result.caughtCount) || 0);
-      const total = Math.max(0, Number(result.totalCount) || 0);
-      runtime.resultCatchesEl.textContent = result.mode === FEED_MODES.MELODY
-        ? `Caught ${Math.max(0, Number(result.snacksCaught) || 0)} of ${Math.max(0, Number(result.snacksTotal) || MELODY_SNACK_COUNT)} snacks`
-        : `Caught ${caught} of ${total} snacks`;
+      const caught = result.mode === FEED_MODES.MELODY
+        ? Math.max(0, Number(result.snacksCaught) || 0)
+        : Math.max(0, Number(result.caughtCount) || 0);
+      runtime.resultCatchesEl.textContent = `Caught ${caught} Snacks`;
       runtime.resultCatchesEl.hidden = false;
     }
     runtime.resultOverlay.hidden = false;
