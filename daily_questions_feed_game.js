@@ -142,8 +142,8 @@
   const LABYRINTH_GRAVITY_SCALE = 0.60;
   const LABYRINTH_MAX_VERTICAL_SPEED_SCALE = 0.55;
   // A last-resort rescue for a snack genuinely resting on a solid platform.
-// Give the child ten seconds to steer before nudging it toward a gap.
-const LABYRINTH_STUCK_MS = 10000;
+  // Give the child ten seconds to steer before nudging it toward a gap.
+  const LABYRINTH_STUCK_MS = 10000;
   const LABYRINTH_STEER_ACCELERATION_SCALE = 3.2;
   const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
   const LABYRINTH_HORIZONTAL_DAMPING = 0.982;
@@ -4450,7 +4450,8 @@ const LABYRINTH_STUCK_MS = 10000;
     ).length);
     if (!activeCount) return false;
 
-    const bonusCount = activeCount * 2 + Math.floor(clamp(random(), 0, 0.999999) * 2);
+    const bonusCount = activeCount * 2 +
+      Math.floor(clamp(random(), 0, 0.999999) * 2);
     const solids = SOLID_BALLS.slice();
     for (let i = solids.length - 1; i > 0; i -= 1) {
       const j = Math.floor(clamp(random(), 0, 0.999999) * (i + 1));
