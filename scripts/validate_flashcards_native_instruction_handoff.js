@@ -36,6 +36,9 @@ assert(outputLoad.includes(normalSignal) && micStop.includes(normalSignal),
   "Both native plugins must use the same private completion notification");
 assert(outputLoad.includes("self?.acceptFlashcardsCaptureHandoff()"),
   "Narration owner must observe native capture completion on main");
+assert.match(outputLoad,
+  /forName: Notification\.Name\("biblozoo\.flashcards\.capture-restored"\),[\s\S]*?queue: nil[\s\S]*?guard Thread\.isMainThread else \{ return \}[\s\S]*?self\?\.acceptFlashcardsCaptureHandoff\(\)/,
+  "Capture-restored notification MUST be synchronous on main before native ready reaches JS");
 assert(handoffStart.includes("self.pendingFlashcardsMicHandoff = (") &&
        handoffStart.includes("self.needsGestureAfterInterruption = true") &&
        handoffStart.includes("self.forgetPlayback()") &&
