@@ -2083,6 +2083,9 @@ function testSevenRealMelodySnacksAndUnchangedNotes() {
   hooks.assignMelodySnacks(timeline);
   const food=timeline.find(entry=>entry.snackConfig);
   const plain=timeline.find(entry=>Number.isFinite(entry.midi)&&!entry.snackConfig);
+  // The real scheduler first transitions a note from pending to active.
+  plain.status = "active";
+  food.status = "active";
   const runtime={mode:"melody",caughtCount:0,snacksCaught:0,totalCount:60,
     score:0,scoreEl:null,scorePopupsEl:null,catcher:null,
     audioContext:null,melody:{classifiedCount:0}};
