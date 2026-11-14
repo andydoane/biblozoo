@@ -68,6 +68,9 @@ final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
         // Ghost Writer: user-initiated PNG share and silent H.264 MP4 export.
         // No microphone, audio output, Photos-library read, or server upload.
         bridge?.registerPluginInstance(BibloZooGhostWriterExportPlugin())
+        // Select an EXISTING photo or image file; no camera permission or
+        // UIImagePickerController "Take Photo" path is ever offered.
+        bridge?.registerPluginInstance(BibloZooGhostBackgroundPickerPlugin())
     }
 }
 
@@ -2497,5 +2500,212 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             self.cleanupExport(at: job.url)
             call.resolve(["cancelled": true])
         }
+    }
+}
+
+
+// NATIVE AUDIO TEST ONLY: Ghost Writer session-photo chooser.
+// PHPicker (Photos) and UIDocumentPicker (Files) are deliberately distinct:
+// neither opens UIImagePickerController's camera/capture option.
+// Images are downsampled to a bounded opaque JPEG in RAM and returned once
+// to the existing session-only JS canvas. No persistent files, raw EXIF,
+// library enumeration, background upload or Photo read permission.
+import PhotosUI
+import UniformTypeIdentifiers
+import ImageIO
+
+@objc(BibloZooGhostBackgroundPickerPlugin)
+final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
+                                                   PHPickerViewControllerDelegate,
+                                                   UIDocumentPickerDelegate {
+    public let identifier = "BibloZooGhostBackgroundPickerPlugin"
+    public let jsName = "BibloZooGhostBackgroundPicker"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "choosePhoto", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "chooseFile", returnType: CAPPluginReturnPromise)
+    ]
+
+    private var pendingCall: CAPPluginCall?
+    private let maxFileBytes: Int64 = 18 * 1024 * 1024
+    private let maxPixels: Int64 = 80_000_000
+    private let maxEdge = 2560
+    private let maxJPEGBytes = 8 * 1024 * 1024
+
+    private func begin(_ call: CAPPluginCall, makePicker: () -> UIViewController) {
+        DispatchQueue.main.async {
+            guard Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest",
+                  UIApplication.shared.applicationState == .active,
+                  self.pendingCall == nil,
+                  let presenter = self.bridge?.viewController,
+                  presenter.presentedViewController == nil else {
+                call.reject("Photo picker is busy. Please try again.")
+                return
+            }
+            self.pendingCall = call
+            let picker = makePicker()
+            if let popover = picker.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX,
+                                            y: presenter.view.bounds.midY,
+                                            width: 1, height: 1)
+                popover.permittedArrowDirections = []
+            }
+            presenter.present(picker, animated: true)
+        }
+    }
+
+    @objc func choosePhoto(_ call: CAPPluginCall) {
+        begin(call) {
+            var config = PHPickerConfiguration()
+            config.filter = .images
+            config.selectionLimit = 1
+            config.preferredAssetRepresentationMode = .compatible
+            let picker = PHPickerViewController(configuration: config)
+            picker.delegate = self
+            return picker
+        }
+    }
+
+    @objc func chooseFile(_ call: CAPPluginCall) {
+        begin(call) {
+            let picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [.image], asCopy: true)
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            return picker
+        }
+    }
+
+    private func finish(cancelled: Bool = false, image: Data? = nil,
+                        name: String = "My Photo", error: String? = nil) {
+        DispatchQueue.main.async {
+            guard let call = self.pendingCall else { return }
+            self.pendingCall = nil
+            if let error = error {
+                call.reject(error)
+            } else if cancelled {
+                call.resolve(["cancelled": true])
+            } else if let image = image {
+                call.resolve([
+                    "name": String(name.prefix(100)),
+                    "dataUrl": "data:image/jpeg;base64," + image.base64EncodedString()
+                ])
+            } else {
+                call.reject("Could not import that photo.")
+            }
+        }
+    }
+
+    private func readBoundedPhoto(at url: URL) throws -> Data {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let bytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        guard bytes > 0 && bytes <= maxFileBytes else {
+            throw NSError(domain: "GhostPhoto", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "Choose a photo smaller than 18 MB."])
+        }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [
+                    kCGImageSourceShouldCache: false
+                ] as CFDictionary),
+              CGImageSourceGetCount(source) > 0 else {
+            throw NSError(domain: "GhostPhoto", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "That image could not be opened. Try a JPG or PNG."])
+        }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?
+        let width = (props?[kCGImagePropertyPixelWidth] as? NSNumber)?.int64Value ?? 0
+        let height = (props?[kCGImagePropertyPixelHeight] as? NSNumber)?.int64Value ?? 0
+        guard width > 0 && height > 0 && width <= maxPixels / height else {
+            throw NSError(domain: "GhostPhoto", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "This photo is too large. Choose a smaller one."])
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxEdge
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+                  source, 0, options as CFDictionary) else {
+            throw NSError(domain: "GhostPhoto", code: 4,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "The photo could not be prepared."])
+        }
+        let image = UIImage(cgImage: thumbnail)
+        guard let jpeg = image.jpegData(compressionQuality: 0.82),
+              jpeg.count <= maxJPEGBytes ||
+                (image.jpegData(compressionQuality: 0.60)?.count ?? Int.max) <= maxJPEGBytes
+        else {
+            throw NSError(domain: "GhostPhoto", code: 5,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "The photo is too complex. Try a smaller image."])
+        }
+        if jpeg.count <= maxJPEGBytes { return jpeg }
+        guard let compact = image.jpegData(compressionQuality: 0.60) else {
+            throw NSError(domain: "GhostPhoto", code: 6,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not encode the photo."])
+        }
+        return compact
+    }
+
+    private func importURL(_ url: URL, name: String) {
+        // Files may originate in iCloud or a document provider; don't block
+        // UIKit during file access, image decode or JPEG compression.
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let jpeg = try self.readBoundedPhoto(at: url)
+                self.finish(image: jpeg, name: name)
+            } catch {
+                self.finish(error: error.localizedDescription)
+            }
+        }
+    }
+
+    // PHPicker shows ONLY existing photo-library images. No app-wide Photos
+    // read permission and no camera action are requested.
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let result = results.first else {
+            finish(cancelled: true)
+            return
+        }
+        let provider = result.itemProvider
+        let format = provider.registeredTypeIdentifiers.first {
+            UTType($0)?.conforms(to: .image) == true
+        }
+        guard let type = format else {
+            finish(error: "Choose a photo image, not a video.")
+            return
+        }
+        provider.loadFileRepresentation(forTypeIdentifier: type) { [weak self] url, error in
+            guard let self = self else { return }
+            guard let url = url else {
+                self.finish(error: error?.localizedDescription ??
+                            "That photo could not be opened.")
+                return
+            }
+            // File representations may be removed as soon as this handler
+            // returns; synchronously decode it here, not on a later queue.
+            do {
+                let jpeg = try self.readBoundedPhoto(at: url)
+                self.finish(image: jpeg, name: provider.suggestedName ?? "My Photo")
+            } catch {
+                self.finish(error: error.localizedDescription)
+            }
+        }
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController,
+                        didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { finish(cancelled: true); return }
+        importURL(url, name: url.lastPathComponent)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        finish(cancelled: true)
     }
 }
