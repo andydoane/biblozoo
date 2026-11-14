@@ -793,6 +793,28 @@
         transitionTimer = root.setTimeout(() => { transitionTimer = 0; exitToZoo(); }, reduced ? 60 : 420);
       }
     }
+    // Real audio failure is handled separately from RANDOM entertainment.
+    // Developer-only scripted legacy recovery stages remain available for
+    // deterministic regression, but production never invents a zoo rescue
+    // because an audio session was unavailable.
+    function recoveryFailureWithoutSurprise() {
+      if (!running()) return;
+      button.disabled = attemptCount >= MAX_ATTEMPTS;
+      exitButton.hidden = false;
+      if (status) {
+        status.hidden = false;
+        status.textContent = attemptCount >= MAX_ATTEMPTS
+          ? "Sound isn't ready. Use Back to Zoo to leave safely."
+          : "Sound isn't ready yet. Tap Let's go! again, or Back to Zoo.";
+      }
+      log("welcome-back-recovery-retry", { attemptCount });
+    }
+    function handleRecoveryFailure(from) {
+      if (surpriseEnabled && !isDeveloperRun())
+        recoveryFailureWithoutSurprise();
+      else finishFailure(from);
+    }
+
     // This never synthesizes success. A scripted failure/deferred result skips
     // the owner's audio handler. A scripted "real" result invokes the owner's
     // original recovery SYNCHRONOUSLY inside the real LOCK GATE click.
@@ -836,7 +858,7 @@
         if (disposed || !busy || token !== serial) return;
         busy = false;
         button.disabled = false;
-        finishFailure(from);
+        handleRecoveryFailure(from);
       }, RECOVERY_WATCHDOG_MS);
       Promise.resolve(recovery).then(ok => {
         if (disposed || token !== serial || !busy) return;
@@ -864,12 +886,12 @@
             catch (_) { /* No surprise may block recovered gameplay. */ }
           }
           if (!kind || !startSurprise(kind)) successful();
-        } else if (running()) finishFailure(from);
+        } else if (running()) handleRecoveryFailure(from);
       }, () => {
         if (disposed || token !== serial || !busy) return;
         busy = false;
         if (watchdog) { root.clearTimeout(watchdog); watchdog = 0; }
-        finishFailure(from);
+        handleRecoveryFailure(from);
       });
     }
     function exitToZoo() {
