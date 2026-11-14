@@ -92,6 +92,21 @@
   let lastWackyPreset = "";
   let finishCountdown = null;
   let welcomeBack = null;
+  let instructionNarration = null;
+
+  function instructions() {
+    if (!instructionNarration && window.BibloZooFlashcardsInstructions?.create) {
+      instructionNarration = window.BibloZooFlashcardsInstructions.create({
+        onChange: requestRender,
+        onError: showFlashcardsToast,
+        isMuted: () => api?.isMuted?.() === true
+      });
+    }
+    return instructionNarration;
+  }
+  function instructionLocked() {
+    return instructions()?.snapshot()?.locked === true;
+  }
 
   // Match Zoo-To-Do's top, body-level medal toast. Rendering/replacing the
   // Flashcards slide never inserts a message into its action/grid flow.
@@ -138,6 +153,7 @@
     recording?.interruptCapture?.();
     recording?.pause?.();
     stopWackyPlayback();
+    instructions()?.interrupt();
     try { api?.stopVersePreview?.(); } catch (_) {}
   }
 
@@ -303,6 +319,7 @@
     stopWackyPlayback();
     wackyReplayUnlocked = false;
     stopVersePreview();
+    instructions()?.stop();
     recordRequest += 1;
     cancelCountdown();
     cancelAnimationFrame(meterFrame);
@@ -313,6 +330,7 @@
   }
 
   async function beginWithoutRecording() {
+    if (instructionLocked()) return;
     discardRecording();
     state.grade = "";
     const request = recordRequest;
@@ -323,6 +341,7 @@
   }
 
   async function beginRecording() {
+    if (instructionLocked()) return;
     if (!recording || ["requesting", "preparing", "recording"].includes(recording.snapshot().status)) return;
     stopWackyPlayback();
     wackyReplayUnlocked = false;
@@ -563,6 +582,7 @@
     if (!option) return;
 
     stopVersePreview();
+    instructions()?.primeFromGesture();
     recordingLimitMs = 120000;
     const request = ++limitRequest;
     const verseId = state.selectedVerseId;
@@ -600,6 +620,9 @@
       result: "challenge_complete"
     }[state.view];
     if (!previousView) return;
+    if (previousView === "difficulty_intro" || previousView === "recording_intro") {
+      instructions()?.primeFromGesture();
+    }
     // Grading and results still belong to this attempt; retain review audio.
     if (!["challenge_complete", "result"].includes(state.view)) discardRecording();
     state.view = previousView;
@@ -872,6 +895,7 @@
       still_learning: "Say the verse, using the words and pictures to help you remember."
     };
     const requesting = recording?.snapshot().status === "requesting";
+    const locked = instructionLocked();
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell flashcards-instruction-shell">
@@ -885,7 +909,7 @@
         </section>
         <div class="flashcards-recall-actions">
           ${controlButton("flashcardsRecordStartBtn", "record",
-      requesting ? "Waiting for microphone…" : "Record", requesting)}
+      requesting ? "Waiting for microphone…" : "Record", requesting || locked)}
           <!-- Interrupted capture: Record already provides the recovery action. -->
           <div class="flashcards-comparison-buttons">
             ${explaining ? `<button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
@@ -908,8 +932,11 @@
     const introBack = wrap.querySelector("#flashcardsIntroBackBtn");
     if (introBack) introBack.onclick = goBack;
     const next = wrap.querySelector("#flashcardsSkipRecordingBtn");
-    if (next) next.onclick = explaining ? async () => {
-      if (next.disabled) return;
+    if (next) {
+      next.disabled = next.disabled || locked;
+      next.onclick = explaining ? async () => {
+      if (next.disabled || instructionLocked()) return;
+      instructions()?.primeFromGesture();
       next.disabled = true;
       const copy = wrap.querySelector(".flashcards-recording-copy");
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -923,6 +950,7 @@
       const incoming = document.querySelector(".flashcards-recording-copy");
       if (!reduceMotion) incoming?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
     } : beginWithoutRecording;
+    }
   }
 
   function renderChallenge(wrap) {
