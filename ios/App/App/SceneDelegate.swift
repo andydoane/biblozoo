@@ -2531,7 +2531,7 @@ final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
     private let maxEdge = 2560
     private let maxJPEGBytes = 8 * 1024 * 1024
 
-    private func begin(_ call: CAPPluginCall, makePicker: () -> UIViewController) {
+    private func begin(_ call: CAPPluginCall, makePicker: @escaping () -> UIViewController) {
         DispatchQueue.main.async {
             guard Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest",
                   UIApplication.shared.applicationState == .active,
