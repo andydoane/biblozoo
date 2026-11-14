@@ -732,8 +732,13 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         observers.append(center.addObserver(
             forName: Notification.Name("biblozoo.flashcards.capture-restored"),
             object: nil,
-            queue: .main
-        ) { [weak self] _ in self?.acceptFlashcardsCaptureHandoff() })
+            // Synchronous delivery on the posting (already-main) thread:
+            // the gate MUST clear before finishCapture resolves ready to JS.
+            queue: nil
+        ) { [weak self] _ in
+            guard Thread.isMainThread else { return }
+            self?.acceptFlashcardsCaptureHandoff()
+        })
         observers.append(center.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: nil,
