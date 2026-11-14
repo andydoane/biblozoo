@@ -174,7 +174,7 @@
         message.textContent = "Tidying up the magic...";
         actionHint.textContent = "Stopping...";
       } else if (next === "success") {
-        title.textContent = "You did it! 🎉";
+        title.textContent = "Complete!";
         message.textContent = isVideo
           ? "Your video is saved to Photos!"
           : "Your picture is saved to Photos!";
