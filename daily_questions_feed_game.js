@@ -3342,6 +3342,9 @@ const LABYRINTH_STUCK_MS = 10000;
       for (const point of ball.trail || []) shift(point, "bornAt");
     }
     for (const burst of runtime.bursts || []) shift(burst, "startedAt");
+    // A locked/paused iPhone must not release all staggered Bounce bonus
+    // snacks at once on foreground return. Shift only unspawned deadlines.
+    for (const item of runtime.bounce?.bonusPending || []) shift(item, "at");
   }
 
   function armTiltObservationFallback(runtime) {
@@ -4702,6 +4705,12 @@ const LABYRINTH_STUCK_MS = 10000;
   function updateBounceMode(runtime, dt, now) {
     const state = runtime.bounce;
     if (!state) return;
+    if (state.bonusTriggered) {
+      // The count was frozen at the last brick impact. No more bouncing
+      // once the full-clear food shower has begun.
+      state.whiteBalls = [];
+      state.pendingWhiteBalls = [];
+    }
     if (!state.ended && !state.bonusTriggered && !state.waitingServe) {
       const steps = Math.max(1, Math.ceil(dt / BOUNCE_STEP));
       const step = dt / steps;
