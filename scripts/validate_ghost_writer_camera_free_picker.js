@@ -15,6 +15,9 @@ const ci=read(".github/workflows/ios-prep-validation.yml");
 const native=swift.slice(swift.indexOf("@objc(BibloZooGhostBackgroundPickerPlugin)"));
 assert.match(ci,/node scripts\/validate_ghost_writer_camera_free_picker\.js/);
 assert.match(swift,/registerPluginInstance\(BibloZooGhostBackgroundPickerPlugin\(\)\)/);
+// The picker factory is captured by the escaping DispatchQueue.main.async block.
+// Check the actual source contract here; Linux Swift -parse alone will not type-check it.
+assert.match(native,/private func begin\(_ call: CAPPluginCall,\s*makePicker:\s*@escaping\s*\(\)\s*->\s*UIViewController\)\s*\{/);
 assert.match(native,/CAPPluginMethod\(name: "choosePhoto"/);
 assert.match(native,/CAPPluginMethod\(name: "chooseFile"/);
 assert.match(native,/PHPickerViewController\(configuration: config\)/);
