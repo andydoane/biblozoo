@@ -18,7 +18,7 @@ const marker='  window.BibloZooDailyFeedGame = Object.freeze({';
 eq(feed.split(marker).length-1,1,"single Feeding export");
 const patched=feed.replace(marker,`  window.__patch731 = {
  LABYRINTH_ACCELERATION_FACTORS, showFeedingControlChoice, showFeedingControlInstructions,
- spawnMelodyNote, updateMelodyMode, getFeedStarPegDiameter,
+ showBounceNextServe, spawnMelodyNote, updateMelodyMode, getFeedStarPegDiameter,
  setRuntime:r=>{activeRuntime=r;}
  };\n${marker}`);
 const window={location:{protocol:"https:"},addEventListener(){},removeEventListener(){}};
@@ -37,7 +37,8 @@ for(const mode of ["classic","labyrinth","melody","bounce"]){
 for(const method of ["tilt","drag"]){
  const rt={mode:"bounce",startOverlay:{hidden:false},startTitleEl:{hidden:false},
   startBallsEl:{hidden:false},startChoiceEl:{hidden:false},startConfirmEl:{hidden:true},
-  startSelectedIconEl:{hidden:true},startInstructionEl:{textContent:""},
+  startSelectedIconEl:{hidden:true},startServeAvatarEl:{hidden:true},
+  startInstructionEl:{textContent:""},
   startConfirmButton:{textContent:""},startControlMessageEl:{hidden:true},
   controlPhase:"choose",introUnlockAt:0};
  h.showFeedingControlInstructions(rt,method);
@@ -47,10 +48,52 @@ for(const method of ["tilt","drag"]){
  eq(rt.startConfirmEl.hidden,false,`${method}: show selected instructions`);
  ok(rt.startInstructionEl.textContent.startsWith(method==="tilt"?"Tilt":"Drag"),`${method}: instructions use selected control`);
  ok(rt.startSelectedIconEl.src.endsWith(`dq_feed_control_${method}.png`),`${method}: selected icon`);
+ eq(rt.startServeAvatarEl.hidden,true,`${method}: Zookeeper photo hidden on control instructions`);
  h.showFeedingControlChoice(rt);
  eq(rt.startTitleEl.hidden,false,`${method}: restore title on chooser return`);
  eq(rt.startBallsEl.hidden,false,`${method}: restore snack art on chooser return`);
 }
+// Bounce's next-ball popup reuses the existing white tile, but swaps its
+// contents to the current Zookeeper profile picture (not today's BibloPet).
+const zookeeperMarkup='<div class="profile-picture-visual daily-feed-next-serve-profile"><img class="profile-picture-img" src="zookeeper-photo.png" alt=""></div>';
+const bounceHtml=window.BibloZooDailyFeedGame.render({
+  session:{feedMode:"bounce",petName:"Pip"},
+  profilePictureHtml:'<img data-biblopet src="pet.png">',
+  zookeeperPictureHtml:zookeeperMarkup
+});
+ok(bounceHtml.includes('data-daily-feed-next-serve-avatar hidden'),"Bounce has initially hidden next-ball avatar");
+ok(bounceHtml.includes(zookeeperMarkup),"Bounce next-ball tile receives the selected Zookeeper avatar");
+ok(bounceHtml.includes('data-daily-feed-selected-icon alt="" hidden'),"existing Tilt/Drag slot is unchanged");
+ok(bounceHtml.includes('data-biblopet'),"gameplay still shows the original BibloPet");
+for(const mode of ["classic","labyrinth","melody"]){
+ const html=window.BibloZooDailyFeedGame.render({session:{feedMode:mode},zookeeperPictureHtml:zookeeperMarkup});
+ ok(!html.includes('data-daily-feed-next-serve-avatar'),`${mode}: no Bounce-only avatar tile`);
+}
+const serve={
+ mode:"bounce",bounce:{livesLeft:2},controlPhase:"playing",introUnlockAt:0,
+ startOverlay:{hidden:true},startTitleEl:{textContent:""},
+ startInstructionEl:{textContent:""},startChoiceEl:{hidden:false},
+ startConfirmEl:{hidden:true},startSelectedIconEl:{hidden:false,src:"tilt.png"},
+ startServeAvatarEl:{hidden:true},startConfirmButton:{textContent:""}
+};
+h.showBounceNextServe(serve,1000);
+eq(serve.controlPhase,"serve","next ball enters serve mode");
+eq(serve.startTitleEl.textContent,"2 Balls Left!","next-ball heading retained");
+eq(serve.startInstructionEl.textContent,"Tap to launch","next-ball instruction retained");
+eq(serve.startConfirmButton.textContent,"Launch!","next-ball action retained");
+eq(serve.startSelectedIconEl.hidden,true,"Tilt/Drag icon hidden only on next ball");
+eq(serve.startServeAvatarEl.hidden,false,"Zookeeper avatar shown in white tile between balls");
+h.showFeedingControlInstructions(serve,"drag");
+eq(serve.startServeAvatarEl.hidden,true,"Zookeeper avatar hidden when returning to Drag controls");
+ok(serve.startSelectedIconEl.src.endsWith("dq_feed_control_drag.png"),"original Drag image returns on instruction step");
+eq(serve.startSelectedIconEl.hidden,false,"control image visible on instruction step");
+h.showFeedingControlChoice(serve);
+eq(serve.startServeAvatarEl.hidden,true,"Zookeeper avatar hidden on chooser");
+ok(/\.daily-feed-next-serve-avatar\[hidden\][\s\S]*?display: none !important/.test(css),"avatar hidden attribute prevents empty tile occupancy");
+ok(css.includes(".daily-feed-next-serve-avatar .daily-feed-next-serve-profile"),"Zookeeper avatar sized within existing white tile");
+const app=read("app.js");
+ok(app.includes('zookeeper?.avatarVerseId || ""'),"feeding reads active Zookeeper avatar ID, not the verse pet");
+ok(app.includes('"daily-feed-next-serve-profile"'),"app passes selected Zookeeper photo to Bounce slot");
 ok(/\.daily-feed-start-balls\[hidden\][\s\S]*?display: none !important/.test(css),"hidden snack artwork occupies no space");
 ok(/\.daily-feed-start-title\[hidden\]/.test(css),"hidden heading occupies no space");
 ok(/\.daily-feed-selected-control-tile[\s\S]*?background: #fff/.test(css),"selected icon has white background");
