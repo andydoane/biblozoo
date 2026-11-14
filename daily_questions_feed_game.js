@@ -141,7 +141,9 @@
   const LABYRINTH_BALL_SIZE_MULTIPLIER = 2;
   const LABYRINTH_GRAVITY_SCALE = 0.60;
   const LABYRINTH_MAX_VERTICAL_SPEED_SCALE = 0.55;
-  const LABYRINTH_STUCK_MS = 3500;
+  // A last-resort rescue for a snack genuinely resting on a solid platform.
+// Give the child ten seconds to steer before nudging it toward a gap.
+const LABYRINTH_STUCK_MS = 10000;
   const LABYRINTH_STEER_ACCELERATION_SCALE = 3.2;
   const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
   const LABYRINTH_HORIZONTAL_DAMPING = 0.982;
@@ -2603,6 +2605,17 @@
     return ball.id % 2 === 0 ? -1 : 1;
   }
 
+  function isLabyrinthBallRestingOnPlatform(runtime, ball) {
+    const tolerance = Math.max(2, (ball?.radius || 0) * 0.12);
+    return (runtime.labyrinth?.platformRows || []).some(row =>
+      (row.segments || []).some(segment =>
+        ball.x + ball.radius > segment.x &&
+        ball.x - ball.radius < segment.x + segment.width &&
+        Math.abs(ball.y + ball.radius - segment.y) <= tolerance
+      )
+    );
+  }
+
   function recoverStuckLabyrinthBall(
     runtime,
     ball,
@@ -2649,7 +2662,10 @@
 
     if (
       now - ball.labyrinthProgressAt <
-      LABYRINTH_STUCK_MS
+      LABYRINTH_STUCK_MS ||
+      // Never steer a free-falling snack, even when frame throttling has
+      // kept it inside the movement threshold for a long time.
+      !isLabyrinthBallRestingOnPlatform(runtime, ball)
     ) {
       return false;
     }
@@ -4911,13 +4927,6 @@
 
     stopAudioContext(runtime.audioContext);
     runtime.audioContext = null;
-
-    const copy =
-      getResultCopy(
-        result.score,
-        result.caughtCount,
-        runtime.petName
-      );
 
     runtime.gameEl.classList.add(
       "is-finished"
