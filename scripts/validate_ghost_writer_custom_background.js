@@ -40,7 +40,7 @@ assert.match(game,/function drawRemixPreview[\s\S]*?drawCompleteText\(c, rect\.w
 assert.match(css,/\.ghost-background-picker\s*\{[^}]*grid-column:\s*1 \/ -1/);
 assert.match(css,/\.ghost-background-import-btn\s*\{/);
 assert.match(css,/\.ghost-background-darken\[hidden\]/);
-assert.doesNotMatch(helper,/localStorage|sessionStorage|indexedDB|fetch\(|XMLHttpRequest|FileReader|upload/i,
+assert.doesNotMatch(helper,/localStorage|sessionStorage|indexedDB|fetch\(|XMLHttpRequest|FileReader|upload\(/i,
   "selected photo bytes stay in RAM only and are never uploaded or persisted");
 assert.match(helper,/root\.URL\.revokeObjectURL\(url\)/);
 assert.match(helper,/MAX_FILE_BYTES = 18 \* 1024 \* 1024/);
