@@ -3336,6 +3336,23 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 forResource: "tutorial_page_\(page)", withExtension: "mp3",
                 subdirectory: "public/verse_audio")
         }
+        // Flashcards: five fixed new instructions; never accept a JS path.
+        // AVAudioPlayer's real ended event gates the child's next action.
+        // The native folder is already bundled as public/flashcards by Capacitor.
+        let flashcardInstructions: [String: String] = [
+            "no-help": "flashcard_instruction_no_help",
+            "first-letter": "flashcard_instruction_first_letter",
+            "pictures": "flashcard_instruction_pictures",
+            "record": "flashcard_instruction_record",
+            "listen": "flashcard_instruction_listen"
+        ]
+        if soundId.hasPrefix("flashcard-instruction-") {
+            let key = String(soundId.dropFirst("flashcard-instruction-".count))
+            guard let file = flashcardInstructions[key] else { return nil }
+            return Bundle.main.url(
+                forResource: file, withExtension: "mp3",
+                subdirectory: "public/flashcards")
+        }
         // Short Learn instruction prompts are static, application-owned
         // files. The JS caller only supplies a fixed allowlisted key.
         let instructions: [String: String] = [

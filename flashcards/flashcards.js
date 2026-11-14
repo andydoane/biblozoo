@@ -92,6 +92,21 @@
   let lastWackyPreset = "";
   let finishCountdown = null;
   let welcomeBack = null;
+  let instructionNarration = null;
+
+  function instructions() {
+    if (!instructionNarration && window.BibloZooFlashcardsInstructions?.create) {
+      instructionNarration = window.BibloZooFlashcardsInstructions.create({
+        onChange: requestRender,
+        onError: showFlashcardsToast,
+        isMuted: () => api?.isMuted?.() === true
+      });
+    }
+    return instructionNarration;
+  }
+  function instructionLocked() {
+    return instructions()?.snapshot()?.locked === true;
+  }
 
   // Match Zoo-To-Do's top, body-level medal toast. Rendering/replacing the
   // Flashcards slide never inserts a message into its action/grid flow.
@@ -138,6 +153,7 @@
     recording?.interruptCapture?.();
     recording?.pause?.();
     stopWackyPlayback();
+    instructions()?.interrupt();
     try { api?.stopVersePreview?.(); } catch (_) {}
   }
 
@@ -303,6 +319,7 @@
     stopWackyPlayback();
     wackyReplayUnlocked = false;
     stopVersePreview();
+    instructions()?.stop();
     recordRequest += 1;
     cancelCountdown();
     cancelAnimationFrame(meterFrame);
@@ -313,6 +330,7 @@
   }
 
   async function beginWithoutRecording() {
+    if (instructionLocked()) return;
     discardRecording();
     state.grade = "";
     const request = recordRequest;
@@ -323,6 +341,7 @@
   }
 
   async function beginRecording() {
+    if (instructionLocked()) return;
     if (!recording || ["requesting", "preparing", "recording"].includes(recording.snapshot().status)) return;
     stopWackyPlayback();
     wackyReplayUnlocked = false;
@@ -563,6 +582,7 @@
     if (!option) return;
 
     stopVersePreview();
+    instructions()?.primeFromGesture();
     recordingLimitMs = 120000;
     const request = ++limitRequest;
     const verseId = state.selectedVerseId;
@@ -600,6 +620,9 @@
       result: "challenge_complete"
     }[state.view];
     if (!previousView) return;
+    if (previousView === "difficulty_intro" || previousView === "recording_intro") {
+      instructions()?.primeFromGesture();
+    }
     // Grading and results still belong to this attempt; retain review audio.
     if (!["challenge_complete", "result"].includes(state.view)) discardRecording();
     state.view = previousView;
@@ -872,6 +895,7 @@
       still_learning: "Say the verse, using the words and pictures to help you remember."
     };
     const requesting = recording?.snapshot().status === "requesting";
+    const locked = instructionLocked();
     wrap.innerHTML = `
       ${renderMenuButton()}
       <div class="flashcards-recall-shell flashcards-instruction-shell">
@@ -885,7 +909,7 @@
         </section>
         <div class="flashcards-recall-actions">
           ${controlButton("flashcardsRecordStartBtn", "record",
-      requesting ? "Waiting for microphone…" : "Record", requesting)}
+      requesting ? "Waiting for microphone…" : "Record", requesting || locked)}
           <!-- Interrupted capture: Record already provides the recovery action. -->
           <div class="flashcards-comparison-buttons">
             ${explaining ? `<button class="flashcards-secondary-btn" id="flashcardsIntroBackBtn"
@@ -908,8 +932,11 @@
     const introBack = wrap.querySelector("#flashcardsIntroBackBtn");
     if (introBack) introBack.onclick = goBack;
     const next = wrap.querySelector("#flashcardsSkipRecordingBtn");
-    if (next) next.onclick = explaining ? async () => {
-      if (next.disabled) return;
+    if (next) {
+      next.disabled = next.disabled || locked;
+      next.onclick = explaining ? async () => {
+      if (next.disabled || instructionLocked()) return;
+      instructions()?.primeFromGesture();
       next.disabled = true;
       const copy = wrap.querySelector(".flashcards-recording-copy");
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -923,6 +950,7 @@
       const incoming = document.querySelector(".flashcards-recording-copy");
       if (!reduceMotion) incoming?.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
     } : beginWithoutRecording;
+    }
   }
 
   function renderChallenge(wrap) {
@@ -1027,7 +1055,7 @@
         type="button"
         data-no-ui-sound
         aria-label="Wacky Replay"
-        ${wackyReplayPlaying ? "disabled" : ""}
+        ${wackyReplayPlaying || instructionLocked() ? "disabled" : ""}
       >
         <span
           class="flashcards-wacky-replay-icon"
@@ -1157,7 +1185,7 @@
     // Keep the two-button layout even on native/browser playback failure.
     const canContinueUnheard = audio.hasRecording &&
       audio.playbackFailed && !audio.playbackComplete && !waiting;
-    const nextDisabled = waiting ||
+    const nextDisabled = instructionLocked() || waiting ||
       (audio.hasRecording && !audio.playbackComplete && !canContinueUnheard);
     // Browser runs its unchanged SoundTouch presets. Experimental iOS
     // only unlocks Wacky when native AVFoundation reports support;
@@ -1180,7 +1208,7 @@
             ${renderReferencePill(selected.ref || selected.id)}
 <div class="learn-stage flashcards-recall-stage flashcards-comparison-stage${comparisonPlaybackStarted ? " flashcards-comparison-active" : ""}">
   <p class="flashcards-comparison-instruction">
-    ${comparisonInstruction}
+    <span class="flashcards-comparison-message">${comparisonInstruction}</span>
   </p>
   <div class="smart-learn-text" data-smart-learn-text>
     <div class="smart-learn-body">${escapeHtml(selected.verseText)}</div>
@@ -1197,11 +1225,11 @@
                 ? controlButton("flashcardsPlayBtn",
                   waiting ? "record" : audio.status === "playing" ? "stop" : "play",
                   waiting ? "Waiting for microphone…" : audio.status === "playing" ? "Stop Playback" : "Play My Recording",
-                  waiting || audio.status === "loading")
+                  waiting || audio.status === "loading" || instructionLocked())
               : ""}
           <div class="flashcards-comparison-buttons">
             ${audio.hasRecording || waiting ? `<button class="flashcards-secondary-btn"
-              id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting ? "disabled" : ""}>Re-record</button>` : ""}
+              id="flashcardsRerecordBtn" type="button" data-no-ui-sound ${waiting || instructionLocked() ? "disabled" : ""}>Re-record</button>` : ""}
             <button class="flashcards-secondary-btn${canContinueUnheard ? " flashcards-continue-anyway" : ""}" id="flashcardsNextBtn"
               type="button" ${nextDisabled ? "disabled" : ""}>${canContinueUnheard ? "Continue Anyway" : needsVerseCheck ? "Check Verse" : "Next"}</button>
           </div>
@@ -1211,6 +1239,7 @@
     api.scheduleSmartLearnTextFit(wrap);
     const play = wrap.querySelector("#flashcardsPlayBtn");
     if (play) play.onclick = () => {
+  if (instructionLocked()) return;
   comparisonPlaybackStarted = true;
   requestRender();
   void recording.play();
@@ -1227,6 +1256,7 @@
     const retry = wrap.querySelector("#flashcardsRerecordBtn");
     if (retry) retry.onclick = beginRecording;
     wrap.querySelector("#flashcardsNextBtn").onclick = () => {
+      if (instructionLocked()) return;
       const currentAudio = recording.snapshot();
       const continuedWithoutListening = currentAudio.hasRecording &&
         currentAudio.playbackFailed && !currentAudio.playbackComplete;
@@ -1442,6 +1472,37 @@
     panel.style.minHeight = `${Math.ceil(copy.scrollHeight + padding)}px`;
   }
 
+
+  // Use the same measured 1.375–2.75rem range as the Record instructions.
+  // The earlier 24ch clamp reduced legibility regardless of available room.
+  function fitComparisonInstruction(wrap) {
+    if (!wrap.isConnected) return;
+    const stage = wrap.querySelector(".flashcards-comparison-stage");
+    const copy = wrap.querySelector(".flashcards-comparison-instruction");
+    const message = wrap.querySelector(".flashcards-comparison-message");
+    if (!stage || !copy || !message || stage.clientHeight < 1) return;
+    const style = getComputedStyle(copy);
+    const top = (parseFloat(style.paddingTop) || 0) +
+      (parseFloat(style.paddingBottom) || 0);
+    const sides = (parseFloat(style.paddingLeft) || 0) +
+      (parseFloat(style.paddingRight) || 0);
+    const availableHeight = Math.max(1, stage.clientHeight - top);
+    const availableWidth = Math.max(1, stage.clientWidth - sides);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    message.style.width = `${availableWidth}px`;
+    let low = 1.375 * rem, high = 2.75 * rem;
+    let best = low;
+    for (let i = 0; i < 9; i++) {
+      const size = (low + high) / 2;
+      copy.style.fontSize = `${size}px`;
+      if (message.scrollHeight <= availableHeight &&
+          message.scrollWidth <= availableWidth) {
+        best = low = size;
+      } else high = size;
+    }
+    copy.style.fontSize = `${Math.floor(best)}px`;
+  }
+
   function renderScreen(idx) {
     if (!api?.makeSlide) return null;
 
@@ -1449,6 +1510,18 @@
     if (["difficulty_intro", "recording_intro", "challenge", "comparison", "challenge_complete", "result"].includes(state.view) &&
       !getDifficultyOption(state.difficulty)) state.view = "difficulty";
 
+    // The optional Skip Recording route says "Check the verse", not
+    // "Listen to your recording". Do not narrate a nonexistent take or
+    // compete with an in-flight microphone capture on a waiting screen.
+    const comparedAudio = state.view === "comparison"
+      ? recording?.snapshot?.() : null;
+    const canNarrateComparison = !!comparedAudio &&
+      (comparedAudio.hasRecording && comparedAudio.captureOnly !== true &&
+        !["requesting", "preparing", "recording", "stopping"].includes(comparedAudio.status));
+    // One narrator per instruction screen visit; rerenders cannot restart it.
+    const instructionView = state.view === "comparison" && !canNarrateComparison
+      ? "" : state.view;
+    const gate = instructions()?.sync(instructionView, state.difficulty, state.selectedVerseId);
     const isLanding =
       state.view === "landing";
 
@@ -1485,12 +1558,29 @@
     }
 
     bindCommonActions(wrap);
+    if (gate?.failed) {
+      const actions = wrap.querySelector(".flashcards-recall-actions");
+      if (actions) {
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.id = "flashcardsInstructionRetryBtn";
+        retry.className = "flashcards-secondary-btn flashcards-instruction-retry";
+        retry.textContent = "Try Instructions Again";
+        retry.onclick = () => instructions()?.retryFromGesture();
+        actions.appendChild(retry);
+      }
+    }
     updateMeter(wrap);
-    const instructionView = ["difficulty_intro", "recording_intro"].includes(state.view);
-    const fit = () => instructionView
-      ? fitRecordingInstructions(wrap)
-      : api.scheduleSmartLearnTextFit(wrap);
-    if (instructionView) {
+    const fittingIntroView = ["difficulty_intro", "recording_intro"].includes(state.view);
+    const comparisonView = state.view === "comparison";
+    const fit = () => {
+      if (fittingIntroView) fitRecordingInstructions(wrap);
+      else {
+        api.scheduleSmartLearnTextFit(wrap);
+        if (comparisonView) fitComparisonInstruction(wrap);
+      }
+    };
+    if (fittingIntroView || comparisonView) {
       requestAnimationFrame(fit);
       document.fonts?.ready.then(fit).catch(() => { });
     }

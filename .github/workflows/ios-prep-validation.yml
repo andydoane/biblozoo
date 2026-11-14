@@ -141,6 +141,11 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_native_n7f2_read_pause_waveform_lab.js
 
+      # Newly uploaded five Flashcards instruction MP3s: native real-ended
+      # playback gating, browser mirror, retry and comparison text fitting.
+      - name: Validate Flashcards instruction autoplay and comparison text fitting
+        run: node scripts/validate_flashcards_instruction_audio.js
+
       - name: Validate N7f.1 Flashcards coral top toast and stable Next/Continue controls
         if: github.base_ref == 'experiment/native-ios-audio' || github.ref == 'refs/heads/experiment/native-ios-audio'
         run: node scripts/validate_flashcards_top_toast_n7f1.js
