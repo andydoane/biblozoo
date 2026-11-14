@@ -2728,6 +2728,10 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
       `${prefix}dq_feed_ball_${ball.id}.png`
     ),
     `${prefix}dq_feed_ball_rainbow.png`,
+    `${prefix}dq_feed_music_note.png`,
+    ...[10,25,50,100,200,300,400,500,600,700,800,900]
+      .map(n => `./verse_images/daily_zoo_todo/snacks_${n}.png`),
+    "./verse_images/daily_zoo_todo/snacks_1000.gif.gif",
     `${prefix}dq_feed_star_peg.png`,
     `${prefix}dq_feed_shadow.png`,
     `${prefix}dq_feed_control_tilt.png`,
@@ -2735,7 +2739,7 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
     `${prefix}dq_feed_star.mp3`,
     `${prefix}dq_feed_chomp.mp3`
   ];
-  assert.strictEqual(expected.length, 35);
+  assert.strictEqual(expected.length, 49);
   assert.deepStrictEqual(paths, expected);
   assert.strictEqual(new Set(paths).size, paths.length);
   assert.ok(sw.includes("await precacheDailyFeedAssets(cache);"));
