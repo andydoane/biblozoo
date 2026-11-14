@@ -66,8 +66,9 @@
       cleanup(a);
       if (a.nativeStarted) tracks()?.stop?.();
     }
-    function change(a, status) {
-      if (!still(a) || a.status !== "playing") return;
+    function change(a, status, attempt) {
+      if (!still(a) || a.status !== "playing" ||
+          a.attempt !== attempt) return;
       a.status = status;
       cleanup(a);
       if (status === "failed") {
@@ -76,40 +77,42 @@
       onChange?.();
     }
     function start(a) {
+      const attempt = ++a.attempt;
       if (!still(a) || root.document?.hidden) {
-        change(a, "failed");
+        change(a, "failed", attempt);
         return;
       }
       if (isMuted?.()) {
         // A deliberately muted session does not make the child wait for silence.
-        change(a, "done");
+        change(a, "done", attempt);
         return;
       }
       a.timer = root.setTimeout(() => {
-        if (!still(a) || a.status !== "playing") return;
+        if (!still(a) || a.status !== "playing" ||
+            a.attempt !== attempt) return;
         if (a.nativeStarted) tracks()?.stop?.();
-        change(a, "failed");
+        change(a, "failed", attempt);
       }, MAX_WAIT_MS);
 
       if (nativeOnly()) {
         const player = tracks();
         if (!player?.isAvailable?.()) {
-          change(a, "failed");
+          change(a, "failed", attempt);
           return;
         }
         a.nativeStarted = true;
         Promise.resolve(player.play(a.source.id))
-          .then(result => change(a, result?.ended === true ? "done" : "failed"))
-          .catch(() => change(a, "failed"));
+          .then(result => change(a, result?.ended === true ? "done" : "failed", attempt))
+          .catch(() => change(a, "failed", attempt));
       } else {
         const audio = new root.Audio("flashcards/" + a.source.file);
         a.audio = audio;
         audio.preload = "auto";
-        audio.addEventListener("ended", () => change(a, "done"), { once: true });
-        audio.addEventListener("error", () => change(a, "failed"), { once: true });
+        audio.addEventListener("ended", () => change(a, "done", attempt), { once: true });
+        audio.addEventListener("error", () => change(a, "failed", attempt), { once: true });
         try {
-          Promise.resolve(audio.play()).catch(() => change(a, "failed"));
-        } catch (_) { change(a, "failed"); }
+          Promise.resolve(audio.play()).catch(() => change(a, "failed", attempt));
+        } catch (_) { change(a, "failed", attempt); }
       }
     }
     function sync(view, difficulty, verseId) {
@@ -123,7 +126,8 @@
         stop();
         const a = {
           key, source, status: "playing", cancelled: false,
-          token: serial, timer: null, audio: null, nativeStarted: false
+          token: serial, timer: null, audio: null, nativeStarted: false,
+          attempt: 0
         };
         current = a;
         root.requestAnimationFrame(() => start(a));
@@ -146,6 +150,7 @@
       if (!current || current.status !== "failed") return;
       primeFromGesture();
       const a = current;
+      a.attempt += 1; // revoke an earlier failed attempt's late promise
       a.status = "playing";
       onChange?.();
       root.requestAnimationFrame(() => start(a));
@@ -154,6 +159,7 @@
     function interrupt() {
       if (!current || current.status !== "playing") return;
       const a = current;
+      a.attempt += 1;
       a.status = "failed";
       cleanup(a);
       if (a.nativeStarted) tracks()?.stop?.();
