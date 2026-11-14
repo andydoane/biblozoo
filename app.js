@@ -11884,6 +11884,7 @@ function ensureLearnAudioResumeOverlay() {
     // N5b.3: native-only lesson recovery is a plain explicit retry, NOT
     // a Zoo Escape/ZOO BREAK triggered by unconverted or missing clips.
     learnZooEscape = window.BibloZooZooEscape.create({
+      surpriseEnabled: true,
       overlay, verseId: () => VERSE_ID,
       petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),
       getSoundContext: () => appAudioUnlocked && !appAudioRecoveryPending
