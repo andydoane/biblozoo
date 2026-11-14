@@ -65,6 +65,8 @@ ok(bounceHtml.includes('data-daily-feed-next-serve-avatar hidden'),"Bounce has i
 ok(bounceHtml.includes(zookeeperMarkup),"Bounce next-ball tile receives the selected Zookeeper avatar");
 ok(bounceHtml.includes('data-daily-feed-selected-icon alt="" hidden'),"existing Tilt/Drag slot is unchanged");
 ok(bounceHtml.includes('data-biblopet'),"gameplay still shows the original BibloPet");
+const bounceFallback=window.BibloZooDailyFeedGame.render({session:{feedMode:"bounce",petName:"Pip"}});
+ok(bounceFallback.includes('daily-feed-next-serve-fallback'),"Bounce shows paw fallback without a saved Zookeeper photo");
 for(const mode of ["classic","labyrinth","melody"]){
  const html=window.BibloZooDailyFeedGame.render({session:{feedMode:mode},zookeeperPictureHtml:zookeeperMarkup});
  ok(!html.includes('data-daily-feed-next-serve-avatar'),`${mode}: no Bounce-only avatar tile`);
