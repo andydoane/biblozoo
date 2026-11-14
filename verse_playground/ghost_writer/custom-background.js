@@ -31,6 +31,50 @@
       release();
     }
 
+    // Both the original Web/PWA file input and the new camera-free native
+    // Photos/Files pickers use this same bounded RAM-only rasterization.
+    async function rasterize(image, id, filename) {
+      if (id !== revision) return null;
+      const sourceWidth = image.naturalWidth;
+      const sourceHeight = image.naturalHeight;
+      if (!(sourceWidth > 0 && sourceHeight > 0) ||
+          sourceWidth > MAX_SOURCE_PIXELS / sourceHeight) {
+        throw new Error("That photo is too large. Try a smaller image.");
+      }
+      const scale = Math.min(1, MAX_EDGE / Math.max(sourceWidth, sourceHeight));
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+      const canvas = doc.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("The photo couldn't be prepared.");
+      context.fillStyle = "#101114";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+      if (id !== revision) {
+        canvas.width = canvas.height = 0;
+        return null;
+      }
+      release(); // keep the previous background if decoding fails
+      current = {
+        canvas, name: String(filename || "My Photo"),
+        width, height
+      };
+      return { name: current.name, width, height };
+    }
+
+    function decode(src) {
+      return new Promise((resolve, reject) => {
+        const img = new root.Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(
+          "This photo couldn't be opened. Try a JPG or PNG."
+        ));
+        img.src = src;
+      });
+    }
+
     async function importFile(file) {
       if (!file || !Number.isFinite(file.size) || file.size <= 0 ||
           file.size > MAX_FILE_BYTES) {
@@ -45,47 +89,29 @@
       let url;
       try {
         url = root.URL.createObjectURL(file);
-        const image = await new Promise((resolve, reject) => {
-          const img = new root.Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error(
-            "This photo couldn't be opened. Try a JPG or PNG."
-          ));
-          img.src = url;
-        });
-        if (id !== revision) return null;
-        const sourceWidth = image.naturalWidth;
-        const sourceHeight = image.naturalHeight;
-        if (!(sourceWidth > 0 && sourceHeight > 0) ||
-            sourceWidth * sourceHeight > MAX_SOURCE_PIXELS) {
-          throw new Error("That photo is too large. Try a smaller image.");
-        }
-        const scale = Math.min(1, MAX_EDGE / Math.max(sourceWidth, sourceHeight));
-        const width = Math.max(1, Math.round(sourceWidth * scale));
-        const height = Math.max(1, Math.round(sourceHeight * scale));
-        const canvas = doc.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("The photo couldn't be prepared.");
-        // Flatten transparency so the image remains an opaque background.
-        context.fillStyle = "#101114";
-        context.fillRect(0, 0, width, height);
-        context.drawImage(image, 0, 0, width, height);
-        if (id !== revision) {
-          canvas.width = canvas.height = 0;
-          return null;
-        }
-        release(); // release the previous photo only after the new one works
-        current = { canvas, name: String(file.name || "My Photo"), width, height };
-        return { name: current.name, width, height };
+        const image = await decode(url);
+        return await rasterize(image, id, file.name);
       } finally {
         if (url) root.URL.revokeObjectURL(url);
       }
     }
 
+    // The native iOS picker downscales and strips original EXIF, then returns
+    // one bounded JPEG data URL. Never persist or forward it anywhere.
+    async function importDataUrl(dataUrl, name = "My Photo") {
+      if (typeof dataUrl !== "string" ||
+          !dataUrl.startsWith("data:image/jpeg;base64,") ||
+          dataUrl.length > 12_000_000) {
+        throw new Error("Could not import that photo. Try a smaller image.");
+      }
+      const id = ++revision;
+      const image = await decode(dataUrl);
+      return rasterize(image, id, name);
+    }
+
     return Object.freeze({
       importFile,
+      importDataUrl,
       clear,
       getCanvas: () => current?.canvas || null,
       hasImage: () => !!current?.canvas,
