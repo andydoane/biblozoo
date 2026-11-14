@@ -161,6 +161,17 @@ async function main() {
   assert.equal(web.owner.snapshot().locked, false);
   assert.equal(web.starts.length, 0, "web mode must not invoke native output");
 
+  const denied = harness(false);
+  denied.owner.sync("recording_intro", "really_well", "john_3_16");
+  denied.pump();
+  denied.browser[0].emit("error");
+  assert.equal(denied.owner.snapshot().failed, true);
+  denied.owner.retryFromGesture();
+  assert.equal(denied.browser.length, 2,
+    "browser retry must invoke play in the original click task, not later RAF");
+  denied.browser[1].emit("ended");
+  assert.equal(denied.owner.snapshot().locked, false);
+
   const quiet = harness(true, true);
   quiet.owner.sync("difficulty_intro", "really_well", "john_3_16");
   quiet.pump();
