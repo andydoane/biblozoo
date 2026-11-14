@@ -2899,6 +2899,57 @@
     remixBtn?.classList.add("is-visible");
   }
 
+  // Appended as a sibling of the Remix stage: the modal can inert all
+  // background elements without trapping its own Cancel/Done buttons.
+  function ghostExportOverlayHtml() {
+    if (!nativeGhostExport) return "";
+    return `
+      <div class="ghost-export-overlay" id="ghostExportOverlay" hidden>
+        <section class="ghost-export-dialog" role="dialog" aria-modal="true"
+                 aria-labelledby="ghostExportTitle"
+                 aria-describedby="ghostExportMessage"
+                 data-ghost-export-dialog tabindex="-1">
+          <div class="ghost-export-avatar" aria-hidden="true">
+            <img src="../../verse_images/game_icons/app_icon_ghost_writer.png" alt="">
+          </div>
+          <h2 class="ghost-export-title" id="ghostExportTitle"
+              data-ghost-export-title aria-live="polite">Making your video!</h2>
+          <p class="ghost-export-message" id="ghostExportMessage"
+             data-ghost-export-message>Our ghost is hard at work...</p>
+          <div class="ghost-export-phase-slot">
+            <div class="ghost-export-progress" data-ghost-export-progress
+                 role="progressbar" aria-label="Video frames prepared"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+              <div class="ghost-export-progress-track">
+                <div class="ghost-export-progress-bar" data-ghost-export-bar></div>
+              </div>
+              <div class="ghost-export-percentage"
+                   data-ghost-export-percentage aria-hidden="true">0%</div>
+            </div>
+            <div class="ghost-export-activity" data-ghost-export-activity
+                 aria-hidden="true" hidden><span class="ghost-export-spinner"></span></div>
+            <div class="ghost-export-success-mark" data-ghost-export-success
+                 aria-hidden="true" hidden>✓</div>
+          </div>
+          <div class="ghost-export-action-slot">
+            <p class="ghost-export-action-hint" data-ghost-export-action-hint hidden>
+              Saving...
+            </p>
+            <button class="ghost-export-action" type="button"
+                    data-ghost-export-cancel hidden>Cancel</button>
+            <button class="ghost-export-action" type="button"
+                    data-ghost-export-done hidden>Done!</button>
+            <div class="ghost-export-error-actions" data-ghost-export-error-actions hidden>
+              <button class="ghost-export-action" type="button"
+                      data-ghost-export-retry hidden>Try Again</button>
+              <button class="ghost-export-action ghost-export-back" type="button"
+                      data-ghost-export-back hidden>Back</button>
+            </div>
+          </div>
+        </section>
+      </div>`;
+  }
+
   function renderRemix() {
     stopPlayback();
     clearGuideTimer();
@@ -3096,6 +3147,11 @@
       </div>
     `, { menu: true, wide: true, rootClass: "is-remix-screen" });
 
+    if (nativeGhostExport) {
+      app.querySelector(".ghost-writer-root")?.insertAdjacentHTML(
+        "beforeend", ghostExportOverlayHtml()
+      );
+    }
     wireMenu();
     wireRemixControls();
     drawRemixPreview();
@@ -3269,6 +3325,11 @@
     const shareVideoBtn = document.getElementById("ghostShareVideoBtn");
     const cancelVideoBtn = document.getElementById("ghostCancelVideoBtn");
     const exportStatus = document.getElementById("ghostExportStatus");
+    const exportDialog = nativeGhostExport
+      ? window.BibloZooGhostExportDialog?.create?.(
+          document.getElementById("ghostExportOverlay"))
+      : null;
+
     const announceExport = (message, failed = false) => {
       if (!exportStatus?.isConnected) return;
       exportStatus.textContent = message;
@@ -3281,6 +3342,7 @@
         ? { ...state.remix, exportSize: "phone" }
         : { ...state.remix };
     }
+
     function setExportActionsDisabled(disabled) {
       for (const button of [saveImageBtn, shareImageBtn, saveVideoBtn, shareVideoBtn]) {
         if (button?.isConnected) button.disabled = disabled;
@@ -3288,25 +3350,37 @@
     }
 
     async function onPictureAction(destination, button) {
-      if (!button || button.disabled || activeGhostImageExport || activeGhostVideoExport)
-        return;
+      if (!button || button.disabled || activeGhostImageExport ||
+          activeGhostVideoExport) return;
+      const modal = destination === "photos" ? exportDialog : null;
+      if (modal && !modal.open("picture", {
+        onRetry: () => { void onPictureAction("photos", saveImageBtn); }
+      })) return;
       playUiTapSound();
       activeGhostImageExport = true;
       setExportActionsDisabled(true);
-      button.textContent = destination === "photos" ? "Saving Picture..." : "Sharing Picture...";
-      announceExport(destination === "photos" ? "Saving picture to Photos..." : "Preparing picture...");
+      if (!modal) {
+        button.textContent = destination === "photos" ? "Saving Picture..." : "Sharing Picture...";
+        announceExport(destination === "photos" ? "Saving picture to Photos..." : "Preparing picture...");
+      }
       try {
-        const result = await saveGhostWriterImage(pictureOptions(), destination);
-        if (IS_NATIVE_CAPACITOR) {
-          if (destination === "photos" && result?.saved === true)
-            announceExport("Picture saved to Photos! 🎉");
-          else if (destination === "share" && result?.presented === true)
-            announceExport("Choose where to share your picture.");
+        const result = await saveGhostWriterImage(
+          pictureOptions(), destination,
+          () => { if (modal) modal.saving(); }
+        );
+        if (modal && result?.saved === true) {
+          modal.success(); // PhotoKit confirmed, never just sheet presentation
+        } else if (destination === "photos" && result?.saved === true) {
+          announceExport("Picture saved to Photos! 🎉");
+        } else if (destination === "share" && result?.presented === true) {
+          announceExport("Choose where to share your picture.");
         }
       } catch (error) {
         console.warn("Ghost Writer picture export failed", error);
-        announceExport(destination === "photos"
-          ? "Couldn't save to Photos. Check permission in Settings or try Share Picture."
+        const detail = "Couldn't save your picture. " +
+          "Check Photos permission in Settings, or try Share Picture.";
+        if (modal) modal.error(detail);
+        else announceExport(destination === "photos" ? detail
           : "Couldn't open picture sharing. Please try again.", true);
       } finally {
         activeGhostImageExport = false;
@@ -3318,9 +3392,10 @@
     saveImageBtn?.addEventListener("click", () => void onPictureAction("photos", saveImageBtn));
     shareImageBtn?.addEventListener("click", () => void onPictureAction("share", shareImageBtn));
 
+    // Share Video keeps its original inline cancellation and share-sheet
+    // behavior. Save Video uses the modal's Cancel in the same reserved slot.
     cancelVideoBtn?.addEventListener("click", () => {
       if (!activeGhostVideoExport) return;
-      // Wait for at most one in-flight frame ACK; cancel the temp writer.
       activeGhostVideoExport.cancelled = true;
       cancelVideoBtn.disabled = true;
       cancelVideoBtn.textContent = "Stopping...";
@@ -3330,35 +3405,50 @@
     async function onVideoAction(destination, button) {
       if (!nativeGhostExport || !button || button.disabled ||
           activeGhostImageExport || activeGhostVideoExport) return;
+      const job = { cancelled: false };
+      const modal = destination === "photos" ? exportDialog : null;
+      if (modal && !modal.open("video", {
+        onCancel: () => { job.cancelled = true; },
+        onRetry: () => { void onVideoAction("photos", saveVideoBtn); }
+      })) return;
       playUiTapSound();
       sanitizeRemixOptions(state.remix);
-      const job = { cancelled: false };
       activeGhostVideoExport = job;
       setExportActionsDisabled(true);
-      if (cancelVideoBtn?.isConnected) {
+      if (!modal && cancelVideoBtn?.isConnected) {
         cancelVideoBtn.hidden = false;
         cancelVideoBtn.disabled = false;
       }
-      announceExport("Preparing silent portrait video...");
+      if (!modal) announceExport("Preparing silent portrait video...");
       try {
         const result = await saveGhostWriterNativeVideo({ ...state.remix }, job,
-          label => {
-            if (button.isConnected) button.textContent = label;
+          (label, stage) => {
+            if (modal) {
+              if (stage?.phase === "saving") modal.saving();
+              else if (stage?.phase === "making")
+                modal.setProgress(stage.progress);
+            } else if (button.isConnected) {
+              button.textContent = label;
+            }
           }, destination);
         if (job.cancelled || result?.cancelled) {
-          announceExport("Video export cancelled.");
+          if (modal) modal.close();
+          else announceExport("Video export cancelled.");
         } else if (destination === "photos" && result?.saved === true) {
-          announceExport("Video saved to Photos! 🎉");
+          if (modal) modal.success();
+          else announceExport("Video saved to Photos! 🎉");
         } else if (destination === "share" && result?.presented === true) {
           announceExport("Choose where to share your video.");
         }
       } catch (error) {
         if (!job.cancelled) {
           console.warn("Ghost Writer native MP4 export failed", error);
-          announceExport(destination === "photos"
-            ? "Couldn't save video to Photos. Check permission in Settings or try Share Video."
+          const detail = "Couldn't save your video. " +
+            "Check Photos permission in Settings, or try Share Video.";
+          if (modal) modal.error(detail);
+          else announceExport(destination === "photos" ? detail
             : "Couldn't share video. Please try again.", true);
-        }
+        } else if (modal) modal.close();
       } finally {
         if (activeGhostVideoExport === job) activeGhostVideoExport = null;
         setExportActionsDisabled(false);
@@ -5847,7 +5937,8 @@
     return username + "'s " + kind + " - " + reference + "." + extension;
   }
 
-  async function saveGhostWriterImage(options = state.remix, destination = "photos") {
+  async function saveGhostWriterImage(options = state.remix, destination = "photos",
+                                      onReadyToSave = null) {
     const cleanOptions = sanitizeRemixOptions({ ...options });
     const size = EXPORT_SIZES[cleanOptions.exportSize || "square"] || EXPORT_SIZES.square;
     await waitForExportAssets(cleanOptions);
@@ -5871,6 +5962,7 @@
       }
       // Save goes straight to PhotoKit; Share preserves the original file
       // name in iOS Files/AirDrop. Never fall back to WKWebView downloads.
+      onReadyToSave?.(); // Canvas is rendered; PhotoKit is about to begin.
       const result = await nativeGhostExport[method]({
         png: canvas.toDataURL("image/png"),
         name: makeFriendlyExportFilename("Picture", "png")
@@ -5922,7 +6014,7 @@
     let token = null;
     let shared = false;
     try {
-      showProgress("Preparing Video...");
+      showProgress("Preparing Video...", { phase: "making", progress: 0 });
       await waitForExportAssets(cleanOptions);
       if (job.cancelled || state.screen !== "remix" || document.hidden)
         return { cancelled: true };
@@ -5972,8 +6064,10 @@
           token, index: frameCount, jpeg
         });
         if (frameCount % 15 === 0) {
-          showProgress("Making Video... " +
-            Math.min(99, Math.floor(100 * frameCount / Math.max(expected, 1))) + "%");
+          const percent = Math.min(99,
+            Math.floor(100 * (frameCount + 1) / Math.max(expected, 1)));
+          showProgress("Making Video... " + percent + "%",
+            { phase: "making", progress: percent });
           // Yield to touch, accessibility and cancellation between batches.
           await new Promise(resolve => setTimeout(resolve, 0));
         }
@@ -5984,7 +6078,8 @@
         throw new Error("The verse animation exceeded the safe video duration.");
       }
       showProgress(destination === "share"
-        ? "Opening Video Share..." : "Saving to Photos...");
+        ? "Opening Video Share..." : "Saving to Photos...",
+        { phase: "saving" });
       const result = await nativeGhostExport.finishVideo({ token, destination });
       if (destination === "share" ? result?.presented !== true : result?.saved !== true)
         throw new Error("The video export was not confirmed.");
