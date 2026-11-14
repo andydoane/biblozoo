@@ -19,11 +19,19 @@ const testing = read("scripts/validate_patch72_1a_zoo_escape.js");
 const workflow = read(".github/workflows/ios-prep-validation.yml");
 
 assert.match(workflow, /node scripts\/validate_random_zoo_surprises\.js/);
-assert.match(engine, /daily: 0\.25, welcome: 0\.10/);
-assert.match(engine, /Math\.random\(\) < 0\.80 \? "escape" : "break"/);
-assert.match(engine, /SURPRISE_PREFIX = "biblozooZooSurprise:v1:"/);
-assert.match(profiles, /localStorage\.removeItem\(`biblozooZooSurprise:v1:\$\{id\}`\)/,
-  "Deleting a profile with its progress must clear its separate surprise eligibility");
+assert.match(engine, /firstBreak: 0\.55/);
+assert.match(engine, /extraDailyBreak: 0\.05/);
+assert.match(engine, /extraWelcomeBreak: 0\.02/);
+assert.match(engine, /petAfterNoBreak: 0\.15/);
+assert.match(engine, /SURPRISE_PREFIX = "biblozooZooSurprise:v2:"/);
+assert.match(engine, /priorBreaks === 0[\s\S]*?SURPRISE_CHANCES\.firstBreak/);
+assert.match(engine, /root\.localStorage\.setItem\(key, JSON\.stringify\(\{[\s\S]*?breaksTriggered: priorBreaks \+ \(isBreak \? 1 : 0\)/);
+assert.doesNotMatch(engine.slice(engine.indexOf("function chooseSurprise("), engine.indexOf("root.BibloZooZooSurprise =")),
+  /dailyTried|welcomeTried|shown === true|state\[tried\]/,
+  "Every eligible button press must receive a new random roll");
+for (const version of ["v1","v2"])
+  assert(profiles.includes("localStorage.removeItem(`biblozooZooSurprise:" + version + ":${id}`)"),
+    "Deleting a Zookeeper's progress clears old/new daily chance records");
 assert.match(engine, /!kind \|\| !startSurprise\(kind\)\) successful\(\)/);
 assert.match(engine, /if \(surpriseMode\) \{[\s\S]*?successful\(\);[\s\S]*?return;[\s\S]*?if \(attemptCount >= MAX_ATTEMPTS\)/);
 assert.match(engine, /if \(surpriseEnabled && !isDeveloperRun\(\)\)[\s\S]*?recoveryFailureWithoutSurprise\(\)/);
@@ -73,38 +81,68 @@ function policy(store, random, initialDay = "2026-11-13") {
     setDay:d=>{day=d;}, stats:id=>win.BibloZooZooStats.get(id)};
 }
 
+// Each *press* is independent; only a selected Break lowers subsequent
+// Break odds for the rest of that Zookeeper's local day.
 {
-  const store=storage(), p=policy(store,seededMath(0.1,0.3));
-  assert.equal(p.choose("kid-a","daily"),"escape","25% daily opportunity");
-  assert.equal(p.choose("kid-a","daily"),null,"no repeat from other Zoo To-Do button");
-  assert.equal(p.choose("kid-a","welcome"),null,"one surprise total per Zookeeper/day");
-  assert.equal(p.choose("kid-b","daily"),null,"profile isolation, random 0.5 outside 25%");
+  const store=storage(), p=policy(store,seededMath(0.99,0.99,0.54));
+  assert.equal(p.choose("kid-a","daily"),null,"a miss is not a one-time daily ticket");
+  assert.equal(p.choose("kid-a","daily"),"break",
+    "second tap still gets generous 55% until first Zoo Break");
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:kid-a")).breaksTriggered,1);
+  assert.equal(p.choose("kid-a","not-a-trigger"),null,"unknown triggers cannot roll");
+  assert.equal(p.choose("","daily"),null,"unknown Zookeeper cannot earn odds state");
+}
+{
+  const store=storage();
+  const p=policy(store,seededMath(
+    0.54,             // first day's Break, exactly under 55%
+    0.051,0.99,       // further Daily 5% miss, Pet 15% miss
+    0.049,            // later Daily 5% hit: a second Break is possible
+    0.019,            // Welcome later 2% hit: a THIRD Break is possible
+    0.021,0.12        // Welcome 2% miss, Pet 15% hit
+  ));
+  assert.equal(p.choose("kid-a","daily"),"break");
+  assert.equal(p.choose("kid-a","daily"),null);
+  assert.equal(p.choose("kid-a","daily"),"break");
+  assert.equal(p.choose("kid-a","welcome"),"break");
+  assert.equal(p.choose("kid-a","welcome"),"escape",
+    "Pet Escapes still roll separately after no Zoo Break");
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:kid-a")).breaksTriggered,3,
+    "Pet Escapes don't increase the Zoo Break count");
   p.setDay("2026-11-14");
-  assert.equal(p.choose("kid-a","daily"),null,"new calendar date reopens eligibility");
+  assert.equal(p.choose("kid-a","welcome"),"break",
+    "the next local day resets to 55% first-Break odds");
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:kid-a")).breaksTriggered,1);
 }
 {
-  const p=policy(storage(),seededMath(0.24,0.95));
-  assert.equal(p.choose("kid-a","daily"),"break","20% of surprises are full Zoo Breaks");
+  const store=storage();
+  const p=policy(store,seededMath(0.9,0.1,0.5,0.9,0.1,0.4));
+  assert.equal(p.choose("kid-a","daily"),"escape",
+    "Pet Escape can happen before the first Zoo Break");
+  assert.equal(p.choose("kid-a","welcome"),"break",
+    "Pet Escape does NOT lower 55% first-break odds");
+  assert.equal(p.choose("kid-b","daily"),"escape",
+    "a different Zookeeper keeps independent first-Break odds");
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:kid-a")).breaksTriggered,1);
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:kid-b")).breaksTriggered,0);
 }
 {
-  const p=policy(storage(),seededMath(0.8,0.04,0.2));
-  assert.equal(p.choose("kid-a","daily"),null,"daily 25% miss");
-  assert.equal(p.choose("kid-a","daily"),null,"no farming daily misses");
-  assert.equal(p.choose("kid-a","welcome"),"escape","independent verified Welcome 10% opportunity");
-  assert.equal(p.choose("kid-a","welcome"),null,"no repeated recovery-roll attempts");
-}
-{
-  const p=policy(storage(),seededMath(0.099,0.95));
-  assert.equal(p.choose("kid-a","welcome"),"break","Welcome 10% and Zoo Break share 80/20 split");
-  assert.equal(p.choose("","welcome"),null,"unknown profile cannot store surprise");
-  assert.equal(p.choose("kid-a","not-a-trigger"),null,"unknown events rejected");
+  // The old one-roll-per-day record must not suppress any new v2 roll.
+  const store=storage();
+  store.setItem("biblozooZooSurprise:v1:kid-a",
+    JSON.stringify({day:"2026-11-13",dailyTried:true,welcomeTried:true,shown:true}));
+  const p=policy(store,seededMath(0.5));
+  assert.equal(p.choose("kid-a","daily"),"break",
+    "v1 suppression flags are retired; a v2 roll is allowed immediately");
 }
 {
   const bad={getItem(){throw Error("storage blocked")},setItem(){throw Error("storage blocked")}};
   assert.equal(policy(bad,seededMath(0)).choose("kid-a","daily"),null,
-    "Unavailable storage fails closed; don't lose task navigation");
+    "Unavailable storage fails closed; don't strand normal task navigation");
 }
 
+// These original audio owners must continue their verified resume before
+// checking entertainment odds: no fake Let's go! tap, no random recovery.
 // Reuse the previously tested real controller fixture, including its fake DOM,
 // pointer-rescue motion, LOCK GATE, field, sound and per-Zookeeper stats.
 const start=testing.indexOf("function harness(");
@@ -129,7 +167,7 @@ async function main() {
     // Child taps the real Welcome Back action. A verified audio result is
     // mandatory BEFORE the random Pet Escape becomes visible.
     const h=harness([true],{localStorage:storage(),surpriseEnabled:true,
-      randomMath:seededMath(0.01,0.10),reduced:true});
+      randomMath:seededMath(0.99,0.10),reduced:true});
     h.ctl.start();
     assert.equal(h.ctl.getStage(),"welcome");
     h.button.trigger("click");
@@ -177,7 +215,7 @@ async function main() {
     assert.equal(h.button.disabled,false,
       "safe retry on original Let's go! remains available");
     assert.equal(h.ctl.getState().attemptCount,1);
-    assert.equal(h.win.localStorage.getItem("biblozooZooSurprise:v1:p1"),null,
+    assert.equal(h.win.localStorage.getItem("biblozooZooSurprise:v2:p1"),null,
       "audio failure cannot consume a random entertainment roll");
     h.button.trigger("click");await Promise.resolve();
     h.button.trigger("click");await Promise.resolve();
@@ -195,7 +233,7 @@ async function main() {
     assert.equal(h.ctl.getStage(),"welcome",
       "OS/audio priority deferral still requires the child's next real tap");
     assert.equal(h.ctl.getState().attemptCount,0);
-    assert.equal(h.win.localStorage.getItem("biblozooZooSurprise:v1:p1"),null);
+    assert.equal(h.win.localStorage.getItem("biblozooZooSurprise:v2:p1"),null);
     h.ctl.destroy();
   }
   {
@@ -211,6 +249,6 @@ async function main() {
       "completion calls original pending Zoo To-Do navigation");
     h.ctl.destroy();
   }
-  console.log("Random Zoo surprise PASS: 25% shared Daily, 10% verified Welcome, 80/20 kind, once per profile/day; real click audio recovery first, failed/deferred audio never spawns pets, bounded retry, real rescue/LOCK GATE/stats/return without fake sound.");
+  console.log("Random Zoo surprise PASS: repeatable 55% first Break per press, then 5% Daily / 2% verified Welcome Breaks; 15% Pet on non-break, per-profile/day reset, original owner audio gesture and failed/deferred recovery untouched, actual rescue/LOCK GATE/stats and return.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
