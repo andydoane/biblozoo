@@ -2310,7 +2310,6 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         switch kind {
         case .began:
             beganEventCount += 1
-            pendingFlashcardsMicHandoff = nil
             let wasSuspended =
                 (note.userInfo?[AVAudioSessionInterruptionWasSuspendedKey] as? NSNumber)?.boolValue == true
             if wasSuspended {
@@ -2322,6 +2321,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 appendTrace("interruption-suspended-history")
                 return
             }
+            pendingFlashcardsMicHandoff = nil
             // A new external takeover starts a fresh, bounded gesture
             // recovery budget. Attempts made before YouTube started should
             // not prevent recovery after the video is paused.
@@ -2384,7 +2384,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                   "com.andydoane.biblozoo.audiotest",
               UIApplication.shared.applicationState == .active,
               !wasOutsideForeground, !interrupted, !needsGestureAfterReset,
-              beganEventCount == pending.began,
+              beganEventCount - suspendedEventCount == pending.began,
               foregroundEpoch == pending.foreground,
               mediaResetCount == pending.reset,
               session.category == .soloAmbient,
@@ -3254,7 +3254,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // OS AVAudioSession, but may not race the existing serial AVAudioEngine
     // output worker. It must request this barrier from the real DEV tap.
     // This method never setsCategory/mode or deactivates the audio session;
-    // the DEV probe must restore it, and the next sound requires a NEW tap.
+    // the DEV probe must restore it. Only a verified normal Flashcards take
+    // restores this held session without another tap; DEV probe/real OS
+    // interruptions still require a fresh gesture.
     @objc func devPrepareForMicrophone(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self,
@@ -3266,7 +3268,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 return
             }
             self.pendingFlashcardsMicHandoff = (
-                began: self.beganEventCount,
+                began: self.beganEventCount - self.suspendedEventCount,
                 foreground: self.foregroundEpoch,
                 reset: self.mediaResetCount
             )
