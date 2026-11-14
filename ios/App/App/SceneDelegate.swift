@@ -2569,7 +2569,7 @@ final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
     @objc func chooseFile(_ call: CAPPluginCall) {
         begin(call) {
             let picker = UIDocumentPickerViewController(
-                forOpeningContentTypes: [.image], asCopy: true)
+                forOpeningContentTypes: [.image], asCopy: false)
             picker.delegate = self
             picker.allowsMultipleSelection = false
             return picker
@@ -2597,9 +2597,8 @@ final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
     }
 
     private func readBoundedPhoto(at url: URL) throws -> Data {
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-
+        // Photos item-provider representations are scoped to the callback.
+        // Files caller separately manages security scope + coordinated read.
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let bytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         guard bytes > 0 && bytes <= maxFileBytes else {
@@ -2653,14 +2652,30 @@ final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
     }
 
     private func importURL(_ url: URL, name: String) {
-        // Files may originate in iCloud or a document provider; don't block
-        // UIKit during file access, image decode or JPEG compression.
+        // Open in place: no persistent Files copy inside BibloZoo. Access
+        // is security-scoped only for this single import, with coordinated
+        // reads so iCloud/File Provider changes cannot race decoding.
         DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let jpeg = try self.readBoundedPhoto(at: url)
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let coordinator = NSFileCoordinator(filePresenter: nil)
+            var coordinateError: NSError?
+            var decodeError: Error?
+            var result: Data?
+            coordinator.coordinate(readingItemAt: url, options: [], error: &coordinateError) {
+                readableURL in
+                do {
+                    result = try self.readBoundedPhoto(at: readableURL)
+                } catch {
+                    decodeError = error
+                }
+            }
+            if let jpeg = result {
                 self.finish(image: jpeg, name: name)
-            } catch {
-                self.finish(error: error.localizedDescription)
+            } else {
+                self.finish(error: decodeError?.localizedDescription ??
+                    coordinateError?.localizedDescription ??
+                    "That file couldn't be opened. Try an image from Photos.")
             }
         }
     }
