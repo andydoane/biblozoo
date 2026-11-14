@@ -513,8 +513,10 @@
           localStorage.removeItem(progressKey);
           // Zoo Escape achievements belong to the same Zookeeper profile.
           localStorage.removeItem(`biblozooZooEscapeStats:v1:${id}`);
-          // Recreational daily-odds state also belongs to this Zookeeper.
+          // Remove both the retired one-roll v1 state and current per-day
+          // first-Break v2 state when this Zookeeper's progress is deleted.
           localStorage.removeItem(`biblozooZooSurprise:v1:${id}`);
+          localStorage.removeItem(`biblozooZooSurprise:v2:${id}`);
         } catch (err) {
           console.warn("Could not remove Zookeeper progress", err);
         }

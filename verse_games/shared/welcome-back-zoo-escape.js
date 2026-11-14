@@ -107,12 +107,19 @@
     acknowledgeCelebration, storageKey: id => statsKey(profileForStats(id)) });
   root.BibloZooZooStats = statsApi;
 
-  // Purely recreational daily surprise policy, separate from real audio
-  // recovery. Both Zoo To-Do entry points share ONE daily opportunity.
-  // Welcome Back gets a separate 10% opportunity after audio is VERIFIED.
-  // A surprise is limited to once per Zookeeper's local calendar day.
-  const SURPRISE_PREFIX = "biblozooZooSurprise:v1:";
-  const SURPRISE_CHANCES = Object.freeze({ daily: 0.25, welcome: 0.10 });
+  // Purely recreational surprise rolls, NEVER an audio recovery mechanism.
+  // Every eligible tap rolls again: the two Zoo To-Do buttons share "daily",
+  // and Welcome Back rolls ONLY after the existing verified recovery gesture.
+  // The first Zoo Break shown today has 55% odds; further breaks that day
+  // are rare but remain possible. Pet Escapes roll separately on a non-break.
+  // This v2 key intentionally ignores the obsolete one-roll-per-day v1 flags.
+  const SURPRISE_PREFIX = "biblozooZooSurprise:v2:";
+  const SURPRISE_CHANCES = Object.freeze({
+    firstBreak: 0.55,
+    extraDailyBreak: 0.05,
+    extraWelcomeBreak: 0.02,
+    petAfterNoBreak: 0.15
+  });
   const localDay = () => {
     const date = new Date();
     return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"),
@@ -120,25 +127,32 @@
   };
   function chooseSurprise(explicitId, source) {
     const id = profileForStats(explicitId);
-    if (!id || !Object.hasOwn(SURPRISE_CHANCES, source)) return null;
+    if (!id || (source !== "daily" && source !== "welcome")) return null;
     const key = SURPRISE_PREFIX + id;
-    const tried = source + "Tried";
-    let state;
     try {
-      // When persistence is unavailable, fail closed to avoid surprise
-      // loops or extra re-rolls from a child rapidly reopening the popup.
+      // If storage is unavailable, fail closed instead of offering a Zoo
+      // Break whose first-of-day state cannot be durably remembered.
       const raw = root.localStorage?.getItem?.(key);
       if (raw === undefined) return null;
       const parsed = raw ? JSON.parse(raw) : null;
       const day = localDay();
-      state = parsed?.day === day ? parsed : { day,
-        dailyTried: false, welcomeTried: false, shown: false };
-      if (state.shown === true || state[tried] === true) return null;
-      state[tried] = true;
-      const selected = Math.random() < SURPRISE_CHANCES[source];
-      const kind = selected ? (Math.random() < 0.80 ? "escape" : "break") : null;
-      if (kind) state.shown = true;
-      root.localStorage.setItem(key, JSON.stringify(state));
+      const priorBreaks = parsed?.day === day &&
+        Number.isSafeInteger(parsed.breaksTriggered) &&
+        parsed.breaksTriggered >= 0 ? parsed.breaksTriggered : 0;
+      const breakChance = priorBreaks === 0
+        ? SURPRISE_CHANCES.firstBreak
+        : source === "daily"
+          ? SURPRISE_CHANCES.extraDailyBreak
+          : SURPRISE_CHANCES.extraWelcomeBreak;
+      const isBreak = Math.random() < breakChance;
+      const kind = isBreak ? "break" :
+        Math.random() < SURPRISE_CHANCES.petAfterNoBreak ? "escape" : null;
+      // A shown/selected Zoo Break reduces today's future odds even if the
+      // child later exits the rescue. Actual caught-pet and stopped-break
+      // statistics still depend on real rescues and a completed LOCK GATE.
+      root.localStorage.setItem(key, JSON.stringify({
+        day, breaksTriggered: priorBreaks + (isBreak ? 1 : 0)
+      }));
       return kind;
     } catch (_) { return null; }
   }
