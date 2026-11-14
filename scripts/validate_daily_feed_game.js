@@ -77,6 +77,7 @@ function loadFeedGameForValidation() {
     makeBounceWhiteBall,
     launchBounceServe,
     spawnBounceSnack,
+    startBounceFullClearBonus,
     breakBounceBrick,
     collideBounceBallWithBricks,
     normalizeBounceBallVelocity,
@@ -145,6 +146,7 @@ function loadFeedGameForValidation() {
     detachMelodyInterruptionHandlers,
     advanceLabyrinthPet,
     recoverStuckLabyrinthBall,
+    isLabyrinthBallRestingOnPlatform,
     buildScheduledBalls,
     chooseBackground,
     createPegField,
@@ -1014,7 +1016,9 @@ function testLabyrinthStuckRecoveryNudgesTowardGap() {
       y: 300,
       gapCenter: 320,
       gapWidth: 100,
-      segments: []
+      segments: [{
+        x: 0, y: 300, width: 240, height: 14
+      }]
     }
   ];
 
@@ -1031,16 +1035,15 @@ function testLabyrinthStuckRecoveryNudgesTowardGap() {
     labyrinthReleaseCount: 0
   };
 
-  assert.strictEqual(
-    hooks.recoverStuckLabyrinthBall(
-      runtime,
-      ball,
-      1000 +
-        hooks.LABYRINTH_STUCK_MS +
-        1
-    ),
-    true
-  );
+  assert.strictEqual(hooks.LABYRINTH_STUCK_MS, 10000,
+    "Stuck recovery must allow a full ten seconds of steering");
+  assert.strictEqual(hooks.isLabyrinthBallRestingOnPlatform(runtime, ball), true);
+  assert.strictEqual(hooks.recoverStuckLabyrinthBall(runtime, ball, 9999), false,
+    "No autopilot before the ten-second stuck timer");
+  const airborne = { ...ball, y: 200, labyrinthProgressY: 200 };
+  assert.strictEqual(hooks.recoverStuckLabyrinthBall(runtime, airborne, 11001), false,
+    "Even a stalled timer must not steer an airborne snack");
+  assert.strictEqual(hooks.recoverStuckLabyrinthBall(runtime, ball, 11001), true);
   assert.ok(
     ball.vx > 0,
     "Stuck recovery should nudge a snack toward the nearby gap"
@@ -2129,7 +2132,8 @@ function testMelodyPercentageScoring() {
     }
   );
   assert.ok(
-    source.includes("`Music Notes Caught: ${Number(result.catchPercent) || 0}%`")
+    source.includes('class="daily-feed-result-note-image"'),
+    "Melody score uses actual note art with unchanged catch percentage"
   );
 }
 
@@ -3532,8 +3536,8 @@ function testClassicRenderContract() {
   assert.ok(!normal.includes("data-daily-feed-paddle"));
   assert.ok(normal.includes("Catch the BibloSnacks!"));
   assert.ok(normal.includes("Drag to steer and catch the snacks!"));
-  assert.ok(normal.includes("Great Catching!"));
-  assert.ok(normal.includes("Back to Zoo"));
+  assert.ok(normal.includes("Thanks for the snack!"));
+  assert.ok(normal.includes("✔ To-Do Complete!"));
   assert.ok(normal.includes("Tilt or drag Pip left and right"));
   assert.ok(normal.includes("<span>pet</span>"));
 
@@ -3546,8 +3550,8 @@ function testClassicRenderContract() {
 
   assert.ok(daily.includes("is-daily-todo-snack"));
   assert.ok(daily.includes("Thanks for the snack!"));
-  assert.ok(daily.includes("Zoo To-Do Complete!"));
-  assert.ok(daily.includes("Back Home"));
+  assert.ok(!daily.includes("Zoo To-Do Complete!"));
+  assert.ok(daily.includes("✔ To-Do Complete!"));
 }
 
 function testClassicScheduledBalls() {
