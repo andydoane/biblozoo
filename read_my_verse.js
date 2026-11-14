@@ -1721,6 +1721,7 @@
     if (root?.BibloZooZooEscape?.create && root?.BibloZooWelcomeBack?.markup) {
       readZooEscape = root.BibloZooZooEscape.create({
         overlay, profileId: state.context?.profileId,
+        surpriseEnabled: true,
         verseId: () => state.verseId,
         getSoundContext: () => scrambleAudioContext?.state === "running"
           ? scrambleAudioContext : keySoundContext?.state === "running"

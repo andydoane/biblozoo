@@ -57,6 +57,11 @@ jobs:
 
       # Welcome Back presentation only: measure full-size name against button
       # width and swap playful busy copy into fixed slot without layout jumps.
+      # Recreation only: real Let's go! recovery must run FIRST and succeed,
+      # while both Zoo To-Do buttons share the same one-per-day chance.
+      - name: Validate random Zoo surprises and preserved audio recovery
+        run: node scripts/validate_random_zoo_surprises.js
+
       - name: Validate shared Welcome Back name sizing and stable recovery progress
         run: node scripts/validate_welcome_back_fit_progress_ui.js
 

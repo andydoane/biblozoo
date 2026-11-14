@@ -55,6 +55,7 @@
     let generation = 0;
     const zoo = root.BibloZooZooEscape.create({
       overlay, profileId, pictureBase, name, petName, verseId,
+      surpriseEnabled: true,
       getSoundContext, isSoundMuted,
       recover: () => {
         const token = generation;
