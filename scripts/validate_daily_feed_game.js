@@ -2063,7 +2063,7 @@ function testSevenRealMelodySnacksAndUnchangedNotes() {
       [entry.midi,entry.x,entry.spawnOffsetMs,entry.arrivalOffsetMs,entry.beats]),preserved,
       "Changing food graphics must NEVER change note timing, pitch, lane or rests");
     const food = timeline.filter(entry => entry.snackConfig);
-    assert.deepStrictEqual(food.map(entry => entry.snackConfig.id), expected);
+    assert.deepStrictEqual(Array.from(food, entry => entry.snackConfig.id), expected);
     assert.strictEqual(food.length, 7);
     assert.strictEqual(new Set(food).size, 7);
     assert(food.every(entry => Number.isFinite(entry.midi)));
