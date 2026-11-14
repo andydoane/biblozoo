@@ -15914,6 +15914,67 @@ function screenTitle(idx) {
       go(Screen.TODO_DEV);
     };
 
+    // Both Zoo To-Do entry points share one per-profile, once-per-day
+    // probability decision. The existing Daily plan/navigation is held as
+    // a continuation, not replaced or restarted by the minigame.
+    let zooSurpriseShowing = false;
+    const openZooTodoWithSurprise = (destination) => {
+      if (zooSurpriseShowing) return;
+      const policy = window.BibloZooZooSurprise;
+      const engine = window.BibloZooZooEscape;
+      const welcome = window.BibloZooWelcomeBack;
+      const id = activeProfile?.id || "";
+      if (!id || tutorialActive || document.hidden ||
+          !policy?.choose || !engine?.create || !welcome?.markup) {
+        destination();
+        return;
+      }
+      const kind = policy.choose(id, "daily");
+      if (!kind) { destination(); return; }
+
+      let overlay = null;
+      let controller = null;
+      let finished = false;
+      const complete = () => {
+        if (finished) return;
+        finished = true;
+        zooSurpriseShowing = false;
+        try { controller?.destroy(); } catch (_) {}
+        overlay?.remove();
+        destination();
+      };
+      try {
+        overlay = document.createElement("div");
+        overlay.className = "bz-welcome-overlay";
+        overlay.hidden = true;
+        overlay.tabIndex = -1;
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
+        overlay.innerHTML = welcome.markup("game");
+        document.body.appendChild(overlay);
+        controller = engine.create({
+          overlay, profileId: id, name: activeProfile.name,
+          petName: dailyPetName || undefined,
+          verseId: dailyHomePlan?.verseId || State.selectedVerseId || "",
+          // Home is NOT recovering audio. A recreational event must never
+          // call this or invent a successful recovery outcome.
+          recover: () => false,
+          onRecovered: complete,
+          onExit: complete
+        });
+        if (!controller) throw new Error("Zoo surprise unavailable");
+        zooSurpriseShowing = true;
+        overlay.hidden = false;
+        if (!controller.start() || !controller.startSurprise?.(kind))
+          throw new Error("Zoo surprise couldn't begin");
+        overlay.focus?.({ preventScroll: true });
+      } catch (_) {
+        // A cosmetic interruption must never strand a Daily task launch.
+        complete();
+      }
+    };
+
     const previewButton = (label, mode) =>
       dlgBtn(label, {
         onClick: () => {
@@ -18242,11 +18303,11 @@ function screenTitle(idx) {
       const plan =
         getDailyHomePlan();
 
-      openDailyTodoPreview(
+      openZooTodoWithSurprise(() => openDailyTodoPreview(
         shouldShowFocusedDailyTodo(plan)
           ? "actual"
           : ""
-      );
+      ));
     };
 
     bindLongPress(titleTodoBtn, {
@@ -18273,7 +18334,8 @@ function screenTitle(idx) {
           dailyHomePlan
         );
         clearDailyHomeOfferPresentation();
-        openDailyTodoPreview("actual");
+        dailyHomeOffer?.remove();
+        openZooTodoWithSurprise(() => openDailyTodoPreview("actual"));
       };
     }
 
