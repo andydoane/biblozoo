@@ -1577,7 +1577,7 @@ function testBounceFullClearTriggersBonusAndDrainsWithoutExtraBall() {
   const lastDue = 1120+(quantity-1)*450;
   hooks.updateBounceMode(runtime, 1 / 120, lastDue);
   assert.strictEqual(runtime.balls.length, quantity);
-  assert.deepStrictEqual(toPlain(runtime.balls.map(b=>b.config.id)),plannedColors);
+  assert.deepStrictEqual(toPlain(runtime.balls.map(b=>b.config.id)),toPlain(plannedColors));
   assert.strictEqual(state.bonusPending.length, 0);
   assert.strictEqual(state.ended, false, "No result before all bonus snacks fall");
 
