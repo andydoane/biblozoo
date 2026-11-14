@@ -836,6 +836,32 @@
   max-height: clamp(94px, 19vh, 140px);
   object-fit: contain;
 }
+/* Bounce only: display the active Zookeeper's profile picture between balls.
+   The chooser/second-step Tilt and Drag artwork remains unchanged. */
+.daily-feed-next-serve-avatar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.daily-feed-next-serve-avatar[hidden] {
+  display: none !important;
+}
+.daily-feed-next-serve-avatar .daily-feed-next-serve-profile {
+  width: min(100%, 130px);
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  box-shadow: none;
+}
+.daily-feed-next-serve-avatar .profile-picture-img {
+  object-fit: contain;
+}
+.daily-feed-next-serve-avatar .profile-picture-fallback,
+.daily-feed-next-serve-fallback {
+  font-size: clamp(44px, 12vw, 74px);
+  line-height: 1;
+}
 @media (orientation: landscape) and (max-height: 600px) {
   .daily-feed-control-option img { max-height: 68px; }
   .daily-feed-selected-control-tile { min-height: 84px; padding: 7px; }
