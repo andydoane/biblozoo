@@ -3997,47 +3997,79 @@ function testResizeMelodyPreservesTimingAndNoteStatus() {
   hooks.setActiveRuntimeForValidation(null);
 }
 
-function testPreviewNeverClaimsDailyCompletion() {
-  const preview = api.render({ session: {
-    feedMode: "bounce", dailyTodoSnack: true, dailyTodoPreview: true, petName: "Pip"
-  } });
-  assert.ok(!preview.includes("Zoo To-Do Complete!"));
-  assert.ok(!preview.includes("Thanks for the snack!"));
-  assert.ok(!preview.includes("is-daily-todo-snack"));
-  assert.ok(preview.includes("Back to Zoo"));
-  const daily = api.render({ session: { feedMode: "classic", dailyTodoSnack: true } });
-  assert.ok(daily.includes("Zoo To-Do Complete!"));
-  assert.ok(daily.includes("Back Home"));
+function testPreviewMatchesDailyResultsWithoutClaiming() {
+  const resultOverlayMarkup = html => html.slice(
+    html.indexOf('class="daily-feed-result-overlay"')
+  );
+  for (const mode of ["classic","labyrinth","bounce","melody"]) {
+    const preview = api.render({session:{
+      feedMode:mode,dailyTodoSnack:true,dailyTodoPreview:true,petName:"Pip"
+    }});
+    const daily = api.render({session:{
+      feedMode:mode,dailyTodoSnack:true,dailyTodoPreview:false,petName:"Pip"
+    }});
+    assert.strictEqual(resultOverlayMarkup(preview), resultOverlayMarkup(daily),
+      `${mode}: developer and real Daily ending must render the SAME card`);
+    assert.ok(preview.includes("✔ To-Do Complete!"));
+    assert.ok(!preview.includes("Zoo To-Do Complete!"));
+    assert.ok(preview.includes("Caught 0 Snacks"));
+    if (mode==="melody") {
+      assert.ok(preview.includes('dq_feed_music_note.png'));
+      assert.ok(preview.includes("× 0%"));
+    }
+  }
+  assert.ok(feedGameCssSource.includes("background: #24783c;"),
+    "Completion button must match the Zookeeper Stats pill green");
+  assert.ok(feedGameCssSource.includes(".daily-feed-result-note-image"),
+    "Melody uses the actual music-note image");
   const target = (mode, isPreview) => {
     const runtime = {
       mode, dailyTodoSnack: true, dailyTodoPreview: isPreview,
       zookeeperName: "Someone", petName: "Pip", running: true,
       rafId: 0, stage: {}, startOverlay: { hidden: false },
       resultOverlay: { hidden: true }, resultTitleEl: { textContent: "" },
-      resultScoreEl: { textContent: "" },
+      resultScoreEl: { textContent: "", innerHTML: "" },
       resultCatchesEl: { textContent: "", hidden: false },
       gameEl: { classList: { add() {} } },
       modeTimers: new Set(), modeController: { dispose() {} }
     };
     hooks.setActiveRuntimeForValidation(runtime);
-    hooks.showResult(runtime, {
-      mode, score: 5, caughtCount: 3, totalCount: 7, catchPercent: 71,
-      snacksCaught: 2, snacksTotal: 7
+    hooks.showResult(runtime,{
+      mode,score:5,caughtCount:3,totalCount:7,catchPercent:71,
+      snacksCaught:2,snacksTotal:7
     });
     return runtime;
   };
-  const previewRuntime = target("bounce", true);
-  assert.ok(!previewRuntime.resultTitleEl.textContent.includes("Thanks for the snack"));
-  assert.strictEqual(previewRuntime.resultScoreEl.textContent, "Score: 5");
-  assert.strictEqual(previewRuntime.resultCatchesEl.textContent, "Caught 3 of 7 snacks");
-  const melodyRuntime = target("melody", true);
-  assert.strictEqual(melodyRuntime.resultScoreEl.textContent, "Music Notes Caught: 71%");
-  assert.strictEqual(melodyRuntime.resultCatchesEl.textContent, "Caught 2 of 7 snacks");
-  assert.strictEqual(melodyRuntime.resultCatchesEl.hidden, false);
-  const dailyRuntime = target("classic", false);
-  assert.ok(dailyRuntime.resultTitleEl.textContent.includes("Thanks for the snack, Someone!"));
+  for (const mode of ["classic","labyrinth","bounce","melody"]) {
+    const previewRuntime=target(mode,true);
+    const dailyRuntime=target(mode,false);
+    assert.strictEqual(previewRuntime.resultTitleEl.textContent,
+      dailyRuntime.resultTitleEl.textContent);
+    assert.strictEqual(previewRuntime.resultCatchesEl.textContent,
+      dailyRuntime.resultCatchesEl.textContent);
+    assert.strictEqual(previewRuntime.resultScoreEl.innerHTML,
+      dailyRuntime.resultScoreEl.innerHTML);
+    assert.strictEqual(previewRuntime.resultScoreEl.textContent,
+      dailyRuntime.resultScoreEl.textContent);
+    assert.strictEqual(previewRuntime.resultTitleEl.textContent,
+      "Thanks for the snack, Someone!");
+    assert.strictEqual(previewRuntime.resultCatchesEl.textContent,
+      mode==="melody" ? "Caught 2 Snacks" : "Caught 3 Snacks");
+    if (mode==="melody") {
+      assert.ok(previewRuntime.resultScoreEl.innerHTML.includes(
+        'dq_feed_music_note.png'));
+      assert.ok(previewRuntime.resultScoreEl.innerHTML.includes("× 71%"));
+    } else {
+      assert.strictEqual(previewRuntime.resultScoreEl.textContent,"Score: 5");
+    }
+  }
+  // Rendering a congratulatory preview is not itself a claim: the actual
+  // onComplete/claimDailyTodoSnack path stays gated by preview flags.
+  assert.ok(appSource.includes("session?.dailyTodoPreview === true"));
+  assert.ok(appSource.includes("session.rewardClaimed = true"));
   hooks.setActiveRuntimeForValidation(null);
 }
+
 
 function testResizeClassicPreservesStarsBallsAndScore() {
   const runtime = makeResizableRuntime("classic");
@@ -4349,7 +4381,7 @@ async function main() {
     testResizeMelodyPreservesTimingAndNoteStatus,
     testResizeClassicPreservesStarsBallsAndScore,
     testTiltTouchSwitchingAndSensorUnavailability,
-    testPreviewNeverClaimsDailyCompletion,
+    testPreviewMatchesDailyResultsWithoutClaiming,
     testReducedMotionPreservesGameplayAndAudioSafety
   ];
 
