@@ -775,6 +775,9 @@
   let builtInPunctuationGlyphs = {};
   const openingQuoteGlyphCache = new WeakMap();
   const backgroundImageCache = new Map();
+  // A user-selected photo exists ONLY in this Ghost Writer JS session.
+  // No image bytes or filenames are written to localStorage or any server.
+  const customBackground = window.BibloZooGhostCustomBackground?.create?.() || null;
   const borderDoodleImageCache = new Map();
   const tintedBorderDoodleCache = new Map();
   const soundBuffers = new Map();
@@ -809,6 +812,7 @@
   function makeDefaultRemixOptions() {
     return {
       background: "ghost",
+      customDarken: true,
       textColor: "lightGray",
       referenceTextColor: "lightGray",
       referenceDecorationColor: "lightGray",
@@ -1619,6 +1623,7 @@
   function startRun(mode) {
     stopPlayback();
     clearGuideTimer();
+    customBackground?.clear(); // new run discards the previous session's photo
 
     selectedMode = mode === "advanced" ? "advanced" : "beginner";
     state.requiredChars = getRequiredCharsForMode(state.fullText, selectedMode);
@@ -5036,6 +5041,13 @@
 
   function getBackgroundConfig(options = {}) {
     const key = getBackgroundKey(options);
+    if (key === "custom" && customBackground?.hasImage()) {
+      return {
+        label: "My Photo", kind: "special", value: "#101114",
+        cardClass: "", texture: "sessionPhoto",
+        image: customBackground.getCanvas()
+      };
+    }
     return BACKGROUNDS[key] || BACKGROUNDS.ghost;
   }
 
@@ -5062,24 +5074,28 @@
   }
 
   function drawCoverImage(c, img, width, height) {
-    if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) {
+    // Existing static backgrounds are HTMLImageElements. Session-only
+    // imported photos are bounded canvas images without .complete/.natural*.
+    const sourceWidth = img?.naturalWidth || img?.width || 0;
+    const sourceHeight = img?.naturalHeight || img?.height || 0;
+    if (!img || img.complete === false || !(sourceWidth > 0) || !(sourceHeight > 0)) {
       return false;
     }
 
-    const imageRatio = img.naturalWidth / img.naturalHeight;
+    const imageRatio = sourceWidth / sourceHeight;
     const canvasRatio = width / height;
 
     let sourceX = 0;
     let sourceY = 0;
-    let sourceW = img.naturalWidth;
-    let sourceH = img.naturalHeight;
+    let sourceW = sourceWidth;
+    let sourceH = sourceHeight;
 
     if (imageRatio > canvasRatio) {
-      sourceW = img.naturalHeight * canvasRatio;
-      sourceX = (img.naturalWidth - sourceW) / 2;
+      sourceW = sourceHeight * canvasRatio;
+      sourceX = (sourceWidth - sourceW) / 2;
     } else {
-      sourceH = img.naturalWidth / canvasRatio;
-      sourceY = (img.naturalHeight - sourceH) / 2;
+      sourceH = sourceWidth / canvasRatio;
+      sourceY = (sourceHeight - sourceH) / 2;
     }
 
     c.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
@@ -5557,11 +5573,18 @@
     c.fillStyle = background.value;
     c.fillRect(0, 0, width, height);
 
-    if (background.texture === "image") {
-      const img = getBackgroundImage(background.imageSrc);
+    if (background.texture === "image" || background.texture === "sessionPhoto") {
+      const img = background.texture === "sessionPhoto"
+        ? background.image : getBackgroundImage(background.imageSrc);
 
       if (!drawCoverImage(c, img, width, height)) {
         c.fillStyle = background.value;
+        c.fillRect(0, 0, width, height);
+      }
+      // A subtle default darkening improves white-ink contrast on busy photos.
+      // It can be turned off in Remix, and applies to playback + PNG + MP4.
+      if (background.texture === "sessionPhoto" && options.customDarken !== false) {
+        c.fillStyle = "rgba(0, 0, 0, 0.22)";
         c.fillRect(0, 0, width, height);
       }
 
