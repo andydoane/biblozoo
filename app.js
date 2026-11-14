@@ -20890,6 +20890,9 @@ function screenDailySnack(idx) {
       go(Screen.TITLE);
     });
   } else {
+    const zookeeper =
+      getProfileApi()?.getActiveProfile?.();
+
     wrap.innerHTML = feedGame.render({
       session,
       profilePictureHtml:
@@ -20898,6 +20901,17 @@ function screenDailySnack(idx) {
           {
             className:
               "daily-feed-pet-avatar",
+            alt: ""
+          }
+        ),
+      // Bounce's between-ball tile uses the player's saved Zookeeper
+      // profile picture, not today's BibloPet or a control-method icon.
+      zookeeperPictureHtml:
+        profilePictureVisualHtml(
+          zookeeper?.avatarVerseId || "",
+          {
+            className:
+              "daily-feed-next-serve-profile",
             alt: ""
           }
         )
