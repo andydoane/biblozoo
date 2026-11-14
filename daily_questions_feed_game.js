@@ -1297,7 +1297,11 @@
     }
   }
 
-  function render({ session, profilePictureHtml = "" } = {}) {
+  function render({
+    session,
+    profilePictureHtml = "",
+    zookeeperPictureHtml = ""
+  } = {}) {
     const petName = String(session?.petName || "BibloPet").trim() || "BibloPet";
     const isDailyTodoSnack =
       session?.dailyTodoSnack === true && session?.dailyTodoPreview !== true;
@@ -1427,6 +1431,12 @@
               <div class="daily-feed-selected-control-tile" aria-hidden="true">
                 <img class="daily-feed-selected-control-icon"
                   data-daily-feed-selected-icon alt="" hidden>
+                ${mode === FEED_MODES.BOUNCE ? `
+                  <div class="daily-feed-next-serve-avatar"
+                    data-daily-feed-next-serve-avatar hidden>
+                    ${zookeeperPictureHtml || '<span class="daily-feed-next-serve-fallback" aria-hidden="true">🐾</span>'}
+                  </div>
+                ` : ""}
               </div>
               <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
                 ${feedInstructionPrompt(mode, tiltAvailable)}
@@ -4624,6 +4634,9 @@
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
     if (runtime.startSelectedIconEl) runtime.startSelectedIconEl.hidden = true;
+    // The white tile shows the player's Zookeeper avatar between balls,
+    // rather than the Tilt/Drag illustration used during control selection.
+    if (runtime.startServeAvatarEl) runtime.startServeAvatarEl.hidden = false;
     if (runtime.startConfirmButton) runtime.startConfirmButton.textContent = "Launch!";
     runtime.startOverlay.hidden = false;
   }
@@ -4958,6 +4971,7 @@
     if (runtime.startBallsEl) runtime.startBallsEl.hidden = false;
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = false;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = true;
+    if (runtime.startServeAvatarEl) runtime.startServeAvatarEl.hidden = true;
     if (runtime.startControlMessageEl) {
       runtime.startControlMessageEl.textContent = message;
       runtime.startControlMessageEl.hidden = !message;
@@ -4974,6 +4988,7 @@
     runtime.controlPhase = "instructions";
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
+    if (runtime.startServeAvatarEl) runtime.startServeAvatarEl.hidden = true;
     if (runtime.startSelectedIconEl) {
       runtime.startSelectedIconEl.src = `${ASSET_BASE}dq_feed_control_${choice}.png`;
       runtime.startSelectedIconEl.hidden = false;
@@ -5802,6 +5817,7 @@
       startChoiceEl: startOverlay.querySelector("[data-daily-feed-start-choice]"),
       startConfirmEl: startOverlay.querySelector("[data-daily-feed-start-confirm]"),
       startSelectedIconEl: startOverlay.querySelector("[data-daily-feed-selected-icon]"),
+      startServeAvatarEl: startOverlay.querySelector("[data-daily-feed-next-serve-avatar]"),
       startConfirmButton: startOverlay.querySelector("[data-daily-feed-confirm-button]"),
       startControlMessageEl: startOverlay.querySelector("[data-daily-feed-control-message]"),
       controlPhase: "choose",
