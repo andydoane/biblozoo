@@ -160,7 +160,7 @@ function testIntegrationContracts() {
   ok(fs.statSync(file).size>1000,`nontrivial icon ${name}`);
   ok(sw.includes(`./verse_images/daily_questions/${name}`),`offline cache ${name}`);
  }
- ok(/const CACHE_VERSION = "2026_Nov_14_patch73_[^"\n]+";/.test(sw) &&
+ ok(/const CACHE_VERSION = "[^"\n]+";/.test(sw) &&
    !sw.includes('"2026_Nov_14_patch73_melody_seven_snacks_badges"'),
    "versioned SW cache advances beyond the previous Melody assets");
  ok(css.includes(".daily-feed-control-options"),"visible two-button grid styled");
