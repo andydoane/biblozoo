@@ -1,6 +1,6 @@
 # BibloZoo — Step 3b iOS first-party privacy and release audit
 
-**Status (2026-11-15):** Review-only PR into `integration/native-audio-to-ios-prep`. The current production-ID branch has **not** been compiled with Apple's SDK or installed on a real iPhone for acceptance. This document records exactly what the source supports and what must still be verified. Do not treat it as a release certification.
+**Status (2026-11-15):** First-party manifest declarations merged via [PR #114](https://github.com/andydoane/biblozoo/pull/114); Step 3d [resource and Capacitor source audit](IOS-NATIVE-RESOURCE-AND-SPM-AUDIT.md) records additional package/build mapping evidence without claiming an Apple SDK privacy report. The current production-ID branch has **not** been compiled with Apple's SDK or installed on a real iPhone for acceptance. This document records exactly what the source supports and what must still be verified. Do not treat it as a release certification.
 
 ## 1. Required-reason API inventory — first-party Swift code
 
