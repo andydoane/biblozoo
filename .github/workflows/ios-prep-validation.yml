@@ -459,6 +459,9 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_only_ios_output.js
 
+      - name: Validate packaged production iOS developer controls
+        run: node scripts/validate_native_production_dev_hardening.js
+
       - name: Confirm bundled runtime files
         shell: bash
         run: |
