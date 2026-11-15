@@ -53,6 +53,9 @@ jobs:
       - name: Verify production iOS excludes legacy diagnostics at JS and Swift boundary
         run: node scripts/validate_native_production_diagnostics.js
 
+      - name: Verify native audio resource mappings and Capacitor package pins
+        run: node scripts/validate_native_ios_resource_packaging.js
+
       # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
       # plugin for grammar errors without needing UIKit/Capacitor modules.
       # Unlike regex assertions, this catches Swift's newline/infix failures
@@ -467,6 +470,9 @@ jobs:
 
       - name: Validate packaged production iOS developer controls
         run: node scripts/validate_native_production_dev_hardening.js
+
+      - name: Check packaged native audio resources and SDK version coherence
+        run: node scripts/validate_native_ios_resource_packaging.js
 
       - name: Confirm bundled runtime files
         shell: bash
