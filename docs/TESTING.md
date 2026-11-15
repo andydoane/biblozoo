@@ -1,6 +1,6 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## Native UIKit inactive-first Zoo return follow-up — Typer narration and Scrub mower (owner device PENDING)
+## [PR #105](https://github.com/andydoane/biblozoo/pull/105) — native UIKit inactive-first Zoo return follow-up for Typer narration and Scrub mower (owner device PENDING)
 
 **Owner evidence (2026-11-14 Detroit / 2026-11-15 UTC):** [PR #104](https://github.com/andydoane/biblozoo/pull/104) **MERGED** at `9d81c34a`. The owner tested DEV Force Pet Escape on a real Audio Test iPhone. Most recommended games worked, but when the phone was locked **while sound was actively playing**, (1) **Verse Typer** could show a foreign gray `Native speech isn't ready. Tap Try Again.` dialog; Try Again never recovered and Back was required; (2) **Scripture Scrub** locked mid-mower sound could finish the Pet Escape and LOCK GATE yet refuse further grass taps, although the menu still worked. DEV Force OFF ordinary Welcome Back did **not** reproduce Typer's bad dialog. This observation is real-device evidence of a regression, not proof of the source-level cause.
 
@@ -14,7 +14,7 @@
 3. Repeat both with DEV Force OFF (plain Welcome Back), lock once **before** narration/mower and once during it; verify previously working mode. Retry a second lock during cue, escape and Gate; no stale audio callback may thaw, award or resume a silent native mixer. Check denied Apple Music/YouTube PiP/AirPods return, mute, exit and session refusal—all require a fresh real tap.
 4. Quick regression: **Traffic Tap, Bible Bugs, Verse Snake**, and Verse Crawl/Balloons/Fish remain working; **Verse Jam** stays excluded on both DEV and Web. Normal native production surprise eligibility and Daily rewards/statistics remain unchanged.
 
-**Acceptance:** This follow-up is separate from the merged #104; Swift/iPhone SDK compilation and **real iPhone retest are pending**. Keep the fix PR unmerged until owner review and instruction.
+**Acceptance:** [PR #105](https://github.com/andydoane/biblozoo/pull/105) is open/unmerged and separate from merged #104; Swift/iPhone SDK compilation and **real iPhone retest are pending**. Keep the fix PR unmerged until owner review and instruction.
 
 
 ## Merged roadmap PR 1 / [PR #104](https://github.com/andydoane/biblozoo/pull/104) — shared standalone/compatible Playground Zoo cue-first recovery (owner found two active-audio regressions)
