@@ -14,6 +14,8 @@
 3. Repeat both with DEV Force OFF (plain Welcome Back), lock once **before** narration/mower and once during it; verify previously working mode. Retry a second lock during cue, escape and Gate; no stale audio callback may thaw, award or resume a silent native mixer. Check denied Apple Music/YouTube PiP/AirPods return, mute, exit and session refusal—all require a fresh real tap.
 4. Quick regression: **Traffic Tap, Bible Bugs, Verse Snake**, and Verse Crawl/Balloons/Fish remain working; **Verse Jam** stays excluded on both DEV and Web. Normal native production surprise eligibility and Daily rewards/statistics remain unchanged.
 
+**CI evidence:** [GitHub Actions #43673255337](https://github.com/andydoane/biblozoo/actions/runs/43673255337) PASS on source head `a40a5916`: complete Node suite including native UIKit inactive-first cue and exact Typer/Scrub owner VM replay, Linux Swift syntax parse and production Web build. This does NOT compile the real Apple SDK nor prove physical speaker/mower behavior. Recheck final PR head after the documentation update.
+
 **Acceptance:** [PR #105](https://github.com/andydoane/biblozoo/pull/105) is open/unmerged and separate from merged #104; Swift/iPhone SDK compilation and **real iPhone retest are pending**. Keep the fix PR unmerged until owner review and instruction.
 
 
