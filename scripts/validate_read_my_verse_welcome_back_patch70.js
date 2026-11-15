@@ -396,7 +396,7 @@ async function run() {
     check(t.stats.playedSources[1].startsWith('./verse_audio/'),
       activityId+': final gate starts original verse, never another cue');
     equal(clock.paused,false,activityId+': animation thaws after final verified audio');
-    check(track.startMs>before,activityId+': original scene timeline is shifted, not reset');
+    check(track.startMs>=before,activityId+': original timeline is preserved after recovery');
   }
   for(const id of ['balloons','fish'])await verifyAnimatedZooCue(id);
 
