@@ -3862,7 +3862,7 @@ function spawnWrongFaceParticleBurst(){
   }
 
   splatWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
-    useZooEscape: !nativeSplatAudio,
+    useZooEscape: true,
     // Shared cue-first surprise; original game recovery waits for LOCK GATE.
     // Native and Web both allow random surprises; original audio starts at LOCK GATE.
     preselectWelcomeSurprise: true,

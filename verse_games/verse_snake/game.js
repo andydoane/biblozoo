@@ -4543,7 +4543,7 @@
     // Existing Web-era Zoo Escape recovery is now available on native iOS and browser/PWA.
     // Failed native Snake PCM still requires explicit audio retry; it never
     // counts as sound success or creates a rescue by itself.
-    useZooEscape: !nativeSnakeAudio,
+    useZooEscape: true,
     // Shared cue-first surprise (original game recovery waits for LOCK GATE).
     // Native production keeps its existing no-Zoo policy; DEV force may test.
     preselectWelcomeSurprise: true,
