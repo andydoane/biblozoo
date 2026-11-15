@@ -1849,7 +1849,8 @@
         surpriseEnabled: true,
         // Only Crawl preselects a random/DEV escape before sound starts.
         // Other Read activities continue their established recovery behavior.
-        preselectWelcomeSurprise: true,
+        preselectWelcomeSurprise: () =>
+          state.activityId === VERSE_CRAWL_ACTIVITY_ID,
         verseId: () => state.verseId,
         getSoundContext: () => scrambleAudioContext?.state === "running"
           ? scrambleAudioContext : keySoundContext?.state === "running"
