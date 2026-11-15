@@ -1982,7 +1982,7 @@
   // foregrounded iOS media element may still have a frozen playback clock.
   // Do not thaw moving scenes on that unverified promise alone. This probe
   // intentionally observes the same media element the tap just started.
-  async function waitReadMediaProgress(audio, isCurrent, maxChecks = 6) {
+  async function waitReadMediaProgress(audio, isCurrent, maxChecks = 6, intervalMs = 220) {
     if (!audio || appApi?.isMuted?.()) return true;
     const initial = Number(audio.currentTime);
     if (!Number.isFinite(initial)) return false;
@@ -1991,7 +1991,7 @@
       if (readDeferredNarrationFinish || audio.ended) return true;
       const current = Number(audio.currentTime);
       if (Number.isFinite(current) && current > initial + 0.035) return true;
-      await new Promise(resolve => setTimeout(resolve, 220));
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
     const finished = !!readDeferredNarrationFinish || !!audio.ended;
     if (!finished && isCurrent()) recordReadRecoveryCheck("media-clock-stalled");
@@ -2042,18 +2042,25 @@
     }
     syncReadAudioOverlay();
     void (async () => {
-      const started = !!appApi?.isMuted?.() || !!song &&
-        await waitReadRecoveryResult(song.startPromise, 3000);
-      const narrated = !narrationStart ||
-        await waitReadRecoveryResult(narrationStart, 3000);
+      // Starting two separate native players and then checking them in
+      // sequence left an audible half-second (or longer) lead-in before a
+      // verified surprise could re-freeze Crawl. Check starts and real clock
+      // advancement concurrently; never substitute a play() ACK for a clock.
+      const [started, narrated] = await Promise.all([
+        !!appApi?.isMuted?.() || (!!song &&
+          waitReadRecoveryResult(song.startPromise, 3000)),
+        !narrationStart || waitReadRecoveryResult(narrationStart, 3000)
+      ]);
       const current = () => generation === readAudioRecoveryGeneration &&
         readAudioRecovery === recovery;
-      // Verse Crawl's direct HTML soundtrack is distinct from its narration.
-      // Recheck both clocks before releasing the frozen scene.
-      const movingSong = started && (appApi?.isMuted?.() ||
-        await waitReadMediaProgress(song?.audio, current));
-      const movingNarration = narrated && (!narrationStart ||
-        await waitReadMediaProgress(narrationAudio, current));
+      // Poll earlier for the first real native progress event, while keeping
+      // a bounded ~1.3s window and the exact original >35ms clock threshold.
+      const [movingSong, movingNarration] = await Promise.all([
+        started && (appApi?.isMuted?.() ||
+          waitReadMediaProgress(song?.audio, current, 14, 95)),
+        narrated && (!narrationStart ||
+          waitReadMediaProgress(narrationAudio, current, 14, 95))
+      ]);
       if (!current()) return;
       recordReadRecoveryCheck("crawl-resume-check", {
         soundtrackClockAdvanced: !!movingSong, narrationClockAdvanced: !!movingNarration
