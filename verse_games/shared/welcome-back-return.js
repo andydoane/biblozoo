@@ -56,6 +56,7 @@
     let hasBeenVisible = !doc.hidden;
     let generation = 0;
     let heldForSurprise = false;
+    let cueOnlyVerified = false;
     // Shared controller owns the optional short cue's lifetime, never the
     // game's native mixer, music clock, score, or activity timeline.
     let cueEpoch = 0;
@@ -98,7 +99,7 @@
             soundId: "pilot-unlock", volume: 0.55
           });
           if (!current() || played?.accepted !== true) return false;
-          // Only the real AVAudioPlayer currentTime/isPlaying can verify
+          // Only actual AVAudioPlayer.currentTime/isPlaying can verify
           // the native cue; a queued play ACK is not speaker readiness.
           for (let n = 0; n < 14; n++) {
             if (!current()) return false;
@@ -161,31 +162,51 @@
         // A selected surprise verifies the cue now. Original activity
         // audio stays stopped until the real LOCK GATE. A no-surprise tap
         // still invokes the exact old onContinue recovery path immediately.
+        const usingCue = preselectWelcomeSurprise && !!info?.plannedSurprise;
+        cueOnlyVerified = false;
         let outcome;
         try {
-          outcome = preselectWelcomeSurprise && info?.plannedSurprise
-            ? playSurpriseCueFromGesture() : onContinue();
+          outcome = usingCue ? playSurpriseCueFromGesture() : onContinue();
         } catch (_) { return false; }
-        return Promise.resolve(outcome).then(result =>
-          !disposed && pending && token === generation && !doc.hidden ? result : false,
-          () => false);
+        return Promise.resolve(outcome).then(result => {
+          const current = !disposed && pending &&
+            token === generation && !doc.hidden;
+          if (current && usingCue && result === true) cueOnlyVerified = true;
+          return current ? result : false;
+        }, () => false);
       },
       onSurpriseStart: () => {
         if (disposed || !pending || doc.hidden) return;
         // onContinue() has already verified sound and unpaused the owner.
         // A surprise is a second, deliberate pause, not a transparent UI.
         heldForSurprise = true;
-        try { onPause(); } catch (_) {}
+        // With cue-first recovery, the activity never left its original
+        // frozen state. Repeating onPause here can stop the native cue or
+        // invalidate checkpoint timers unnecessarily. Legacy owners still
+        // re-pause after their ordinary verified onContinue.
+        if (!cueOnlyVerified) {
+          try { onPause(); } catch (_) {}
+        }
       },
       onRecovered: () => {
         if (disposed || !pending || doc.hidden) return;
         if (!heldForSurprise) {
           stopSurpriseCue();
+          if (cueOnlyVerified) {
+            // A provisional surprise can fail its storage commit; a
+            // verified *cue* is not permission to resume game audio without
+            // another genuine tap. Reset to a fresh explicit Welcome Back.
+            cueOnlyVerified = false;
+            zoo.start();
+            overlay.hidden = false;
+            return;
+          }
           pending = false;
           overlay.hidden = true;
           return;
         }
         heldForSurprise = false;
+        cueOnlyVerified = false;
         stopSurpriseCue();
         const token = generation;
         // LOCK GATE is a new real user gesture, so an owner that requires
@@ -211,6 +232,7 @@
       },
       onExit: () => {
         if (disposed) return;
+        cueOnlyVerified = false;
         stopSurpriseCue();
         ++generation;
         pending = false;
@@ -246,6 +268,7 @@
         // re-priming sound, invalidate that attempt and restart Welcome Back.
         if (heldForSurprise) heldForSurprise = false;
         if (zoo.getStage?.() === "recovered") {
+          cueOnlyVerified = false;
           zoo.start();
           try { onPause(); } catch (_) {}
         }
@@ -273,6 +296,7 @@
       destroy() {
         if (disposed) return;
         disposed = true;
+        cueOnlyVerified = false;
         stopSurpriseCue();
         ++generation;
         pending = false;
