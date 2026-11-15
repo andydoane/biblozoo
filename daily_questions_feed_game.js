@@ -6222,6 +6222,7 @@
     runtime.zooCue = window.BibloZooWelcomeBackReturn?.createZooAudioCue?.() || null;
     runtime.zooCueVerified = false;
     runtime.zooHoldingForSurprise = false;
+    runtime.zooWasCueFirst = false;
     runtime.zooCueGeneration = 0;
     if (runtime.zooCue) runtime.resumeButton?.setAttribute?.("data-no-ui-sound", "");
     if (window.BibloZooZooEscape?.create) {
@@ -6266,6 +6267,7 @@
         },
         onSurpriseStart: () => {
           runtime.zooHoldingForSurprise = true;
+          runtime.zooWasCueFirst = runtime.zooCueVerified === true;
           // Cue-first holds the original round from the FIRST lock; another
           // onPause could invalidate live Melody/tilt checkpoints or cut cue.
           // The legacy pilot simulation still uses its original re-pause.
@@ -6291,15 +6293,16 @@
             runtime.zooCue.stop();
             runtime.zooCueVerified = false;
             ++runtime.zooCueGeneration;
-            const generation = runtime.feedResumeGeneration;
+            const gateToken = ++runtime.zooCueGeneration;
             // Do not pretend the old cue verified the Feeding game bank.
             // Prepare/reclaim the ORIGINAL owner in this real LOCK GATE tap.
             attemptFeedingResumeFromGesture(runtime, ok => {
               if (activeRuntime !== runtime || document.hidden ||
                   runtime.feedPageHidden ||
-                  runtime.feedResumeGeneration !== generation ||
+                  runtime.zooCueGeneration !== gateToken ||
                   !runtime.zooHoldingForSurprise) return;
               runtime.zooHoldingForSurprise = false;
+              runtime.zooWasCueFirst = false;
               if (ok && runtime.feedPausedAt == null) {
                 runtime.resumeOverlay.hidden = true;
                 runtime.zooSoundClockSample = null;
@@ -6310,8 +6313,17 @@
             }, true);
             return;
           }
-          // Legacy pilot path: its original audio recovery was verified on
-          // Let's go and intentionally re-froze for the simulated escape.
+          // Second lock revokes the cue proof. Never use the older pilot
+          // shortcut to unfreeze a *real* cue-first escape after an OS lock.
+          if (runtime.zooWasCueFirst) {
+            runtime.zooWasCueFirst = false;
+            runtime.zooHoldingForSurprise = false;
+            runtime.zooEscape?.start?.();
+            runtime.resumeOverlay.hidden = false;
+            return;
+          }
+          // Legacy pilot path: original audio was verified at Let's go,
+          // then intentionally re-frozen for the simulated escape.
           runtime.zooHoldingForSurprise = false;
           if (runtime.feedPausedAt != null) {
             runtime.feedAudioRecoveryVerified = true;
@@ -6328,6 +6340,7 @@
         onExit: () => {
           runtime.zooCue?.stop();
           runtime.zooCueVerified = false;
+          runtime.zooWasCueFirst = false;
           ++runtime.zooCueGeneration;
           if (activeRuntime !== runtime) return;
           // Exit is never conditioned on earning a daily reward: the host
