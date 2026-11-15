@@ -1,6 +1,6 @@
 # BibloZoo — Step 3d native audio resource and Capacitor package audit
 
-**Scope:** Review-only source + generated `dist/` checks on `integration/native-audio-to-ios-prep`, following [merged PR #115](https://github.com/andydoane/biblozoo/pull/115) at `13494adb` and its [post-merge Node/Web PASS](https://github.com/andydoane/biblozoo/actions/runs/43774921152). This is an **inventory and regression guard**, not a native runtime change or iOS signing/privacy certification.
+**Scope:** [PR #116](https://github.com/andydoane/biblozoo/pull/116) review-only source + generated `dist/` checks on `integration/native-audio-to-ios-prep`, following [merged PR #115](https://github.com/andydoane/biblozoo/pull/115) at `13494adb` and its [post-merge Node/Web PASS](https://github.com/andydoane/biblozoo/actions/runs/43774921152). This is an **inventory and regression guard**, not a native runtime change or iOS signing/privacy certification.
 
 ## Verified source mapping
 
