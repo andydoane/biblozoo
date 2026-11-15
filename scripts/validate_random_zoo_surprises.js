@@ -162,7 +162,7 @@ function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
 // or app switch never consumes ordinary daily odds; only verified selection
 // may commit the exact per-Zookeeper count, once.
 {
-  const store=storage(),p=policy(store,seededMath(0.50,0.90,0.99,0.12));
+  const store=storage(),p=policy(store,seededMath(0.50,0.99,0.12));
   const first=p.plan("child");
   assert.equal(first.kind,"break");
   assert.equal(store.getItem("biblozooZooSurprise:v2:child"),null,
