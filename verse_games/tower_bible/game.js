@@ -4024,6 +4024,9 @@
 
   towerWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
     useZooEscape: !nativeTowerAudio,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeTowerAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
