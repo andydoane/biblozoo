@@ -179,7 +179,8 @@
 
   function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
     getSoundContext, isSoundMuted, escapeText, preserveFocus = false,
-    suppressUiSound = false, useZooEscape = true } = {}) {
+    suppressUiSound = false, useZooEscape = true,
+    allowDevForceZooEscape = true } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
@@ -187,7 +188,7 @@
 
     // Original native-only playback remains a plain recovery in production.
     // The owner may opt in to full Zoo Escape *only in Audio Test DEV mode*.
-    const forceDevEscape =
+    const forceDevEscape = allowDevForceZooEscape &&
       root.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.() === true;
     if ((useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create) {
       const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
