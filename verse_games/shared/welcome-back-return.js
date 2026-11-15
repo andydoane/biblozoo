@@ -292,12 +292,31 @@
       zoo.resumeVisible?.(); // preserve stage/pets across a second task switch
       if (!preserveFocus) button?.focus?.({ preventScroll: true });
     }
+    // Native UIKit can report .inactive while WKWebView is still visible.
+    // Native Verse Typer and Scripture Scrub already call these same hooks
+    // through their app lifecycle; Zoo mode must implement the contract too.
+    // Never activate audio on app-active: only show the ordinary real-tap gate.
+    let nativeInactive = false;
+    function pauseFromNativeInactive() {
+      if (disposed || !shouldPrompt()) return false;
+      nativeInactive = true;
+      leave();
+      return pending;
+    }
+    function showAfterNativeActive() {
+      if (disposed || !nativeInactive) return false;
+      nativeInactive = false;
+      visible();
+      return pending;
+    }
     const pageHidden = () => leave();
     doc.addEventListener("visibilitychange", visible);
     root.addEventListener("pagehide", pageHidden);
     root.addEventListener("pageshow", visible);
     return Object.freeze({
       isPaused: () => pending,
+      pauseFromNativeInactive,
+      showAfterNativeActive,
       destroy() {
         if (disposed) return;
         disposed = true;

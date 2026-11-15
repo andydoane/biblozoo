@@ -13,6 +13,16 @@ const shared = read("verse_games/shared/welcome-back-return.js");
 const shell = read("verse_games/shared/game-shell.js");
 const swift = read("ios/App/App/BibloZooNativeSoundPlugin.swift");
 const workflow = read(".github/workflows/ios-prep-validation.yml");
+const typer = read("verse_playground/verse_typer/game.js");
+const scrub = read("verse_playground/scripture_scrub/game.js");
+assert.match(typer,/playgroundWelcome\?\.pauseFromNativeInactive\?\.\(\)/,
+  "Verse Typer routes UIKit inactive into shared native-return lifecycle");
+assert.match(scrub,/playgroundWelcome\?\.pauseFromNativeInactive\?\.\(\)/,
+  "Scripture Scrub routes UIKit inactive into shared native-return lifecycle");
+assert.match(typer,/const paused = playgroundWelcome\?\.pauseFromNativeInactive\?\.\(\) === true/,
+  "interrupted Typer narration uses explicit retryable Welcome Back rather than gray modal");
+assert.match(scrub,/mowerActive && !mowerAnimationFrame/,
+  "lost mower RAF is not allowed to block input after final gate");
 new vm.Script(shared);
 assert(workflow.includes("node scripts/validate_shared_zoo_audio_cue_transition.js"));
 const games = ["bible_bugs","dino_dash","foodslice","tower_bible",
@@ -56,7 +66,8 @@ assert(!/setActive\(|setCategory\(|play\(|MediaRecorder|getUserMedia/.test(metho
   "read-only native clock probe must NEVER start sound, alter session or record");
 
 function harness({native=false,muted=false,refuseCue=false,refuseGate=false,
-                  refuseActivation=false, noPlugin=false}={}){
+                  refuseActivation=false, noPlugin=false,
+                  nativeInactiveFirst=false}={}){
   const events=[],callbacks={doc:{},win:{}};
   let audioConstructed=0, cueStopCount=0, cueReads=0, gateCount=0, pauseCount=0;
   let paused=false, active=true;
@@ -122,15 +133,119 @@ function harness({native=false,muted=false,refuseCue=false,refuseGate=false,
     onExit(){events.push("owner-exit");}
   });
   assert(ctl);
-  doc.hidden=true;callbacks.doc.visibilitychange();
-  doc.hidden=false;callbacks.win.pageshow();
+  if (nativeInactiveFirst) {
+    // UIKit first: document.hidden is still FALSE, WebKit visibility has not
+    // fired, yet native narration/PCM will already be interrupted.
+    assert.equal(doc.hidden,false);
+    assert.equal(ctl.pauseFromNativeInactive(),true,
+      "UIKit inactive enters native Zoo owner pause before WebKit hides");
+    assert.equal(paused,true);
+    assert.equal(pauseCount,1);
+    // Repeated inactive + delayed WebKit visibility may not double-pause.
+    assert.equal(ctl.pauseFromNativeInactive(),true);
+    doc.hidden=true;callbacks.doc.visibilitychange();
+    assert.equal(pauseCount,1);
+    doc.hidden=false;callbacks.win.pageshow();
+    assert.equal(ctl.showAfterNativeActive(),true);
+    assert.equal(overlay.hidden,false);
+    assert.equal(ctl.showAfterNativeActive(),false,
+      "duplicate native active may not create a second recovery");
+  } else {
+    doc.hidden=true;callbacks.doc.visibilitychange();
+    doc.hidden=false;callbacks.win.pageshow();
+  }
   const flush=async()=>{for(let i=0;i<22;i++)await Promise.resolve();};
   return {doc,win,events,overlay,ctl,flush,
     get paused(){return paused;},get gateCount(){return gateCount;},
     get pauseCount(){return pauseCount;},get audioConstructed(){return audioConstructed;},
     get cueStopCount(){return cueStopCount;},get cueReads(){return cueReads;}};
 }
+// Exercise actual owner pause/resume implementations, not only shared
+// adapter stubs: narration loss and an in-flight mower have special clocks.
+function ownerFunction(source,name,next){
+  const start=source.indexOf("  function "+name+"(");
+  const end=source.indexOf("\n  function "+next+"(",start);
+  assert(start>=0 && end>start,"owner source changed: "+name);
+  return source.slice(start,end);
+}
+function verifyNativePlayingOwners(){
+  let stopped=0,holdFinished=0,typerClockPaused=0,typerClockResumed=0;
+  let typerReady=false,typerScheduled=false;
+  const t={
+    nativeTyperAudio:{stop(){stopped++;},isReady(){return typerReady;}},
+    state:{screen:"game",paused:false},
+    returnPaused:false,wasPausedBeforeReturn:false,muted:false,
+    finishNativeHold(){holdFinished++;},beginNativeHold(){},
+    welcomeClock:{pause(){typerClockPaused++;},resume(){typerClockResumed++;}},
+    scheduleCaterpillarPositionUpdate(){typerScheduled=true}
+  };
+  vm.runInNewContext(ownerFunction(typer,"pauseTyperForReturn","continueTyperAfterReturn")+
+    "\n"+ownerFunction(typer,"continueTyperAfterReturn","setScreen")+
+    "\nthis.testOwner={pauseTyperForReturn,continueTyperAfterReturn};",t);
+  t.testOwner.pauseTyperForReturn();
+  assert.equal(t.returnPaused,true,"native Verse Typer stops and freezes while narration plays");
+  assert.equal(t.state.paused,true);
+  assert.equal(stopped,1);
+  assert.equal(holdFinished,1);
+  assert.equal(typerClockPaused,1);
+  assert.equal(t.testOwner.continueTyperAfterReturn(),false,
+    "without a verified original Typer PCM bank the gate must not thaw narration");
+  assert.equal(t.returnPaused,true);
+  typerReady=true;
+  assert.equal(t.testOwner.continueTyperAfterReturn(),true);
+  assert.equal(t.returnPaused,false);
+  assert.equal(t.state.paused,false);
+  assert.equal(typerClockResumed,1);
+  assert.equal(typerScheduled,true,"Typer resumes same saved verse layout, not a new round");
+
+  let canceled=[],schedules=[],mowerSound=[],mowerStops=0,removed=0,coverage=0;
+  const sprite={remove(){removed++;}};
+  const c={
+    nativeScrubAudio:{},welcomePaused:false,menuOpen:false,
+    welcomeClock:{pause(){this.paused=true;},resume(){this.paused=false;},
+      now(){return 250;}},
+    pointerDown:true,lastPoint:{x:1,y:2},
+    glowTrailAnimationFrame:0,rainbowTrailAnimationFrame:0,
+    glowTrailSpots:[1],rainbowTrailParticles:[1],
+    mowerActive:true,mowerEndAt:1050,mowerAnimationFrame:19,
+    mowerResumeFrame:()=>{},deferredCoverageRound:null,
+    cancelAnimationFrame(id){canceled.push(id);},
+    requestAnimationFrame(fn){schedules.push(fn);return 20;},
+    stopMowerSound(){mowerStops++;},
+    startMowerSound(ms){mowerSound.push(ms);},
+    document:{querySelector(sel){
+      assert.equal(sel,"#scrubObjectLayer .scrub-mower-sprite");
+      return sprite;
+    }},
+    scheduleCoverageCheck(){coverage++;},
+    roundConfig(){return null;}
+  };
+  vm.runInNewContext(ownerFunction(scrub,"pauseScrubForReturn","continueScrubAfterReturn")+
+    "\n"+ownerFunction(scrub,"continueScrubAfterReturn","renderTitleScreen")+
+    "\nthis.testOwner={pauseScrubForReturn,continueScrubAfterReturn};",c);
+  c.testOwner.pauseScrubForReturn();
+  assert.equal(c.welcomePaused,true,"native mower is frozen during UIKit lock");
+  assert.equal(c.pointerDown,false);
+  assert.equal(c.mowerActive,true,"normal live mower checkpoint not discarded");
+  assert(canceled.includes(19),"in-flight frame canceled while paused");
+  assert.equal(c.testOwner.continueScrubAfterReturn(),true);
+  assert.equal(c.welcomePaused,false);
+  assert.equal(schedules.length,1,"saved mower frame resumes on verified gate");
+  assert.equal(mowerSound[0],800,"only remaining mower sound duration replays");
+  assert.equal(coverage,0,"no extra grass / score awarded at gate");
+
+  // The reported failure also needs a fail-safe for a rare missing stored
+  // RAF callback: otherwise mowerActive blocks every subsequent grass tap.
+  c.mowerActive=true;c.mowerAnimationFrame=23;c.mowerResumeFrame=null;
+  c.testOwner.pauseScrubForReturn();
+  c.testOwner.continueScrubAfterReturn();
+  assert.equal(c.mowerActive,false,"orphaned mower no longer blocks taps");
+  assert.equal(c.mowerEndAt,0);
+  assert.equal(removed,1,"only orphaned visual sprite is retired");
+  assert.equal(coverage,0,"recovery does not clear grass or credit a fake pass");
+}
 async function run(){
+  verifyNativePlayingOwners();
   {
     const h=harness();
     const result=h.win.visual.options.recover({plannedSurprise:"escape"});
@@ -204,7 +319,7 @@ async function run(){
     h.ctl.destroy();
   }
   {
-    const h=harness({native:true});
+    const h=harness({native:true,nativeInactiveFirst:true});
     assert.equal(await h.win.visual.options.recover({plannedSurprise:"escape"}),true);
     assert.equal(h.audioConstructed,0,"native-only never constructs HTML audio");
     assert(h.cueReads>0,"native cue must sample real AVAudioPlayer position");

@@ -1555,6 +1555,16 @@
       if (mowerActive && mowerEndAt > welcomeClock.now()) {
         void startMowerSound(mowerEndAt - welcomeClock.now());
       }
+    } else if (mowerActive && !mowerAnimationFrame) {
+      // In a rare UIKit lock/playback race WebKit can cancel an in-flight
+      // mower frame before its resume callback is retained. Never leave the
+      // invisible mowerActive input gate stuck forever after LOCK GATE.
+      // Keep all already-cleared grass/checkpoint data, but let the child
+      // make another normal mower pass; do not award coverage on recovery.
+      document.querySelector("#scrubObjectLayer .scrub-mower-sprite")?.remove();
+      mowerActive = false;
+      mowerEndAt = 0;
+      stopMowerSound();
     }
     const round = deferredCoverageRound;
     deferredCoverageRound = null;

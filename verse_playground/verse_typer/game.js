@@ -2998,8 +2998,16 @@
          nativeTyperFailure || !nativeTyperAudio.isReady()){
         if(!returnPaused && !state.paused && !nativeTyperPending &&
            !nativeTyperFailure && !nativeTyperAudio.isReady()){
-          nativeTyperRetry={kind:"resume",mode:null};
-          showNativeTyperFailure("Native speech isn't ready. Tap Try Again.");
+          // UIKit may invalidate native narration before WebKit reports
+          // visibilitychange. Treat lost session readiness as a new explicit
+          // Welcome Back, not a fatal speech/asset dialog whose Retry cannot
+          // reclaim the same game checkpoint during an unresolved return.
+          const paused = playgroundWelcome?.pauseFromNativeInactive?.() === true;
+          if(paused) playgroundWelcome?.showAfterNativeActive?.();
+          else {
+            nativeTyperRetry={kind:"resume",mode:null};
+            showNativeTyperFailure("Native speech isn't ready. Tap Try Again.");
+          }
         }
         await new Promise(resolve=>setTimeout(resolve,85));
         continue;
