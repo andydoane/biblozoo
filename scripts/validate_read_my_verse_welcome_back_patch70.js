@@ -14,7 +14,7 @@ function check(value, description) { assert.ok(value, description); checks++; }
 function equal(a, b, description) { assert.equal(a, b, description); checks++; }
 async function flush() { for (let i = 0; i < 30; i++) await Promise.resolve(); }
 
-function harness({rejectMedia = false, muted = true} = {}) {
+function harness({rejectMedia = false, muted = true, zoo = false} = {}) {
   const listeners = { doc: new Map(), win: new Map() };
   const elements = new Map();
   const timers = new Map();
@@ -78,6 +78,22 @@ function harness({rejectMedia = false, muted = true} = {}) {
     setInterval:()=>1,clearInterval(){},
     setTimeout(fn,ms){const id=++timerIndex;timers.set(id,{fn,ms});return id;},
   };
+  let zooController = null;
+  if (zoo) {
+    fakeWindow.BibloZooZooEscape = {create(options) {
+      let pending = false;
+      zooController = {
+        start() { pending = true; },
+        isPaused() { return pending; },
+        getStage() { return pending ? "welcome" : "recovered"; },
+        async verifiedTap() { return options.recover(); },
+        beginEscape() { options.onSurpriseStart?.("escape"); },
+        finishEscape() { pending = false; options.onRecovered?.(); },
+        exit() { pending = false; options.onExit?.(); }
+      };
+      return zooController;
+    }};
+  }
   const context = {window:fakeWindow,document:doc,Audio,Promise,console,Math,Date,
     setTimeout:fakeWindow.setTimeout,clearTimeout(id){timers.delete(id);},
     setInterval:fakeWindow.setInterval, clearInterval:fakeWindow.clearInterval,
@@ -96,6 +112,8 @@ function harness({rejectMedia = false, muted = true} = {}) {
     get recovery(){return readAudioRecovery;},
     get pendingTask(){return readPauseTimerTask;},
     get attempt(){return readAudioRecoveryAttempt;},
+    get verified(){return readZooVerifiedRecovery;},
+    get crawlMusic(){return crawlMusic;},
     setAnimatedScene(kind,scene){
       if (kind === "balloons") balloonSession = scene;
       else if (kind === "fish") fishSession = scene;
@@ -114,6 +132,7 @@ function harness({rejectMedia = false, muted = true} = {}) {
   };
   const fire = (kind,name) => {for (const fn of listeners[kind].get(name)||[])fn();};
   return {doc,elements,timers,listeners,fakeWindow,api,probe,stats,setup,fire,
+    get zoo(){return zooController;},
     overlay:()=>elements.get('readAudioResumeOverlay')};
 }
 
@@ -209,6 +228,72 @@ async function run() {
   equal(clock.currentTime,55,'animation resumes at the original timeline position');
   equal(animated.probe.state.chunkIndex,0,'Balloons chunk index is preserved');
   equal(animated.stats.mediaPlays,0,'no unexpected narration is launched in a silent scene');
+
+
+  // Zoo Escape is an additional pause gate after sound is verified: all
+  // eight Read activities share these timer/animation/continuation owners.
+  const quietZoo=harness({zoo:true,muted:true});
+  quietZoo.setup('unscramble','interacting');
+  let quietAdvanced=0;
+  quietZoo.probe.scheduleReadPauseTimer(()=>{quietAdvanced++;},440);
+  quietZoo.doc.hidden=true;quietZoo.fire('doc','visibilitychange');
+  quietZoo.doc.hidden=false;quietZoo.fire('win','pageshow');
+  check(!!quietZoo.zoo,'Read opened the actual owner Zoo interface');
+  equal(await quietZoo.zoo.verifiedTap(),true,'quiet Read audio/ack verification succeeds');
+  equal(quietZoo.probe.recovery.kind,'ack','verified Read still owns recovery until Zoo ends');
+  equal(quietZoo.timers.size,0,'no timer rearmed just because Let's go audio passed');
+  quietZoo.zoo.beginEscape();
+  equal(quietZoo.probe.recovery.kind,'ack','pet escape keeps same reading session frozen');
+  equal(quietZoo.timers.size,0,'timer cannot advance under escaped pets');
+  quietZoo.zoo.finishEscape();
+  equal(quietZoo.probe.recovery,null,'pen/LOCK GATE releases successful Read recovery');
+  equal(quietZoo.timers.size,1,'timer rearmed only after pen/LOCK GATE');
+  equal(quietAdvanced,0,'no silent interim progress');
+  [...quietZoo.timers.values()][0].fn();
+  equal(quietAdvanced,1,'timer resumes once, not twice');
+
+  const animatedZoo=harness({zoo:true,muted:true});
+  animatedZoo.setup('balloons','animating');
+  const zooClock={currentTime:55,paused:false,
+    pause(){this.paused=true;},play(){this.paused=false;}};
+  const zooScene={active:true,timers:new Set(),wordTracks:[],balloonTracks:[],
+    wrap:{classList:{add(){},remove(){}},getAnimations(){return [zooClock];}}};
+  animatedZoo.probe.setAnimatedScene('balloons',zooScene);
+  animatedZoo.doc.hidden=true;animatedZoo.fire('doc','visibilitychange');
+  animatedZoo.doc.hidden=false;animatedZoo.fire('win','pageshow');
+  check(animatedZoo.zoo.verifiedTap(),'Balloons owner begins verification');
+  await flush();
+  check(!!animatedZoo.probe.verified,'Balloons verified but not resumed');
+  equal(zooClock.paused,true,'Balloons stays frozen after Let's go');
+  animatedZoo.zoo.beginEscape();
+  equal(zooClock.paused,true,'Balloons stays paused while pet is out');
+  animatedZoo.zoo.finishEscape();
+  equal(zooClock.paused,false,'Balloons resumes only at LOCK GATE');
+  equal(animatedZoo.probe.recovery,null,'Balloons recovery released after escape');
+
+  const crawlZoo=harness({zoo:true,muted:true});
+  crawlZoo.setup('star_wars','animating');
+  const crawlClock={currentTime:95,paused:false,
+    pause(){this.paused=true;},play(){this.paused=false;}};
+  const crawlScene={active:true,timers:new Set(),wordTracks:[],balloonTracks:[],
+    wrap:{classList:{add(){},remove(){}},getAnimations(){return [crawlClock];}}};
+  crawlZoo.probe.setAnimatedScene('star_wars',crawlScene);
+  crawlZoo.doc.hidden=true;crawlZoo.fire('doc','visibilitychange');
+  crawlZoo.doc.hidden=false;crawlZoo.fire('win','pageshow');
+  check(crawlZoo.zoo.verifiedTap(),'Crawl owner begins verified HTML media restart');
+  await flush();
+  check(!!crawlZoo.probe.verified,'Crawl soundtrack verified but scene still held');
+  equal(crawlClock.paused,true,'Crawl text does not scroll behind Welcome Back');
+  check(crawlZoo.probe.crawlMusic?.audio,'Crawl soundtrack is an actual audio element');
+  crawlZoo.zoo.beginEscape();
+  equal(crawlZoo.probe.crawlMusic.audio.paused,true,
+    'Crawl soundtrack pauses while escaped pet is being rescued');
+  equal(crawlClock.paused,true,'Crawl animation does not scroll under escaped pet');
+  crawlZoo.zoo.finishEscape();
+  equal(crawlClock.paused,false,'Crawl resumes its animation after final lock');
+  equal(crawlZoo.probe.crawlMusic.audio.paused,false,
+    'Crawl soundtrack resumes from real pen/LOCK GATE gesture');
+  equal(crawlZoo.probe.recovery,null,'Crawl releases recovery after escape');
 
   const failure=harness({rejectMedia:true,muted:false});
   failure.setup('typewriter','playing');
