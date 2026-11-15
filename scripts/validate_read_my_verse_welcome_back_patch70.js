@@ -14,8 +14,8 @@ function check(value, description) { assert.ok(value, description); checks++; }
 function equal(a, b, description) { assert.equal(a, b, description); checks++; }
 async function flush() { for (let i = 0; i < 30; i++) await Promise.resolve(); }
 
-function harness({rejectMedia = false, rejectSources = [], muted = true,
-    zoo = false, progressMedia = false} = {}) {
+function harness({rejectMedia = false, rejectSources = [], rejectNarration = false,
+    muted = true, zoo = false, progressMedia = false} = {}) {
   const listeners = { doc: new Map(), win: new Map() };
   const elements = new Map();
   const timers = new Map();
@@ -70,7 +70,8 @@ function harness({rejectMedia = false, rejectSources = [], muted = true,
     pause(){this.paused=true;} load(){} setAttribute(){} removeAttribute(){}
     addEventListener(type,callback){(this.events[type] ||= []).push(callback);}
     play(){mediaPlays++;playedSources.push(this.src);this.paused=false;
-      return rejectMedia || rejectSources.includes(this.src)
+      return rejectMedia || rejectSources.includes(this.src) ||
+        (rejectNarration && this.src?.startsWith('./verse_audio/'))
         ? Promise.reject(Object.assign(new Error('interrupted'),{name:'NotAllowedError'}))
         : Promise.resolve();}
   }
@@ -126,6 +127,9 @@ function harness({rejectMedia = false, rejectSources = [], muted = true,
       if (kind === "balloons") balloonSession = scene;
       else if (kind === "fish") fishSession = scene;
       else crawlSession = scene;
+    },
+    setAnimatedNarration(session, item){
+      readActiveAnimatedNarration = {session, item};
     }
   };\n`+source.slice(pos);
   vm.runInContext(instrumented,context,{filename:'read_my_verse.js'});
