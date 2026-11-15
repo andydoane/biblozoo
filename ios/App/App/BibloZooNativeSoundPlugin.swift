@@ -18,6 +18,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "preload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "play", returnType: CAPPluginReturnPromise),
+        // Read-only real player-clock evidence for the original BibloPet
+        // unlock sample on an explicit Zoo return gesture (not a play ACK).
+        CAPPluginMethod(name: "getCuePlaybackState", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         // N7b DEV-only barrier: stop output worker before mic session proof.
         CAPPluginMethod(name: "devPrepareForMicrophone", returnType: CAPPluginReturnPromise),
@@ -2609,6 +2612,53 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         }
     }
 
+
+    // A deliberately narrow, read-only sample of the existing bundled
+    // pilot-unlock AVAudioPlayer. The shared Zoo return uses TWO real player
+    // positions to distinguish native sound progress from a bridge play ACK.
+    // Never activates audio, starts a player, reads arbitrary IDs/paths, or
+    // treats an old player as success after OS/foreground epoch revocation.
+    @objc func getCuePlaybackState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self,
+                  call.getString("soundId") == "pilot-unlock",
+                  self.hasGestureActivatedSession,
+                  self.unavailableReason() == nil else {
+                call.resolve(["ok": false, "reason": "not-ready"])
+                return
+            }
+            let epoch = self.playbackEpochSnapshot()
+            self.playbackQueue.async { [weak self] in
+                guard let self = self,
+                      self.isCurrentPlaybackEpoch(epoch),
+                      let player = self.players["pilot-unlock"] else {
+                    DispatchQueue.main.async {
+                        call.resolve(["ok": false, "reason": "no-current-cue"])
+                    }
+                    return
+                }
+                let pos = max(0, Int(player.currentTime * 1000))
+                let duration = max(0, Int(player.duration * 1000))
+                let playing = player.isPlaying
+                let completed = !playing && duration > 0 && pos > 35 &&
+                    pos >= duration - 45
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self,
+                          self.isCurrentPlaybackEpoch(epoch),
+                          self.hasGestureActivatedSession,
+                          self.unavailableReason() == nil else {
+                        call.resolve(["ok": false, "reason": "stale-session"])
+                        return
+                    }
+                    call.resolve([
+                        "ok": true, "soundId": "pilot-unlock",
+                        "positionMs": pos, "durationMs": duration,
+                        "playing": playing, "completed": completed
+                    ])
+                }
+            }
+        }
+    }
 
     // Guard native session on main; schedule ALL potentially synchronous
     // AVAudioPlayer operations on the dedicated serial queue. No Web fallback.
