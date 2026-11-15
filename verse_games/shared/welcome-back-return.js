@@ -36,7 +36,8 @@
   function attachZooReturn(options) {
     const { shouldPrompt, onPause, onContinue, onExit, profileId,
       pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
-      preserveFocus = false, suppressUiSound = false } = options;
+      preserveFocus = false, suppressUiSound = false,
+      preselectWelcomeSurprise = false } = options;
     const doc = root.document;
     const overlay = doc.createElement("div");
     overlay.className = "bz-welcome-overlay";
@@ -46,7 +47,8 @@
     overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
     overlay.innerHTML = root.BibloZooWelcomeBack.markup("game");
     const button = overlay.querySelector("[data-welcome-back-action]");
-    if (suppressUiSound) button?.setAttribute("data-no-ui-sound", "");
+    if (suppressUiSound || preselectWelcomeSurprise)
+      button?.setAttribute("data-no-ui-sound", "");
     doc.body.appendChild(overlay);
     let disposed = false;
     let pending = false;
@@ -54,15 +56,116 @@
     let hasBeenVisible = !doc.hidden;
     let generation = 0;
     let heldForSurprise = false;
+    // Shared controller owns the optional short cue's lifetime, never the
+    // game's native mixer, music clock, score, or activity timeline.
+    let cueEpoch = 0;
+    let cueCleanup = null;
+    function stopSurpriseCue() {
+      ++cueEpoch;
+      const cleanup = cueCleanup;
+      cueCleanup = null;
+      try { cleanup?.(); } catch (_) {}
+    }
+    function playSurpriseCueFromGesture() {
+      stopSurpriseCue();
+      const epoch = cueEpoch, token = generation;
+      const current = () => !disposed && pending && !doc.hidden &&
+        token === generation && epoch === cueEpoch;
+      // The child's explicit mute is intentionally silent. Do not start a
+      // competing external-audio takeover merely to play a decorative cue.
+      if (isSoundMuted?.() === true) return Promise.resolve(true);
+      if (root.BibloZooNativeOnlyOutput?.enabled === true) {
+        // Same .soloAmbient native owner as the games. Never instantiate
+        // HTMLAudioElement/Web Audio or count accepted play() as proof.
+        const api = root.Capacitor?.Plugins?.BibloZooNativeSound;
+        if (typeof api?.activateFromGesture !== "function" ||
+            typeof api?.preload !== "function" ||
+            typeof api?.play !== "function" ||
+            typeof api?.getCuePlaybackState !== "function" ||
+            typeof api?.stop !== "function") return Promise.resolve(false);
+        let activation;
+        try { activation = api.activateFromGesture({ purpose: "ui" }); }
+        catch (_) { return Promise.resolve(false); }
+        return (async () => {
+          const ready = await Promise.resolve(activation);
+          if (!current() || ready?.ready !== true) return false;
+          const prepared = await api.preload({ soundId: "pilot-unlock" });
+          if (!current() || prepared?.prepared !== true) return false;
+          // Install cancellation before the queued native play request.
+          cueCleanup = () => { void Promise.resolve(
+            api.stop({ soundId: "pilot-unlock" })).catch(() => {}); };
+          const played = await api.play({
+            soundId: "pilot-unlock", volume: 0.55
+          });
+          if (!current() || played?.accepted !== true) return false;
+          // Only the real AVAudioPlayer currentTime/isPlaying can verify
+          // the native cue; a queued play ACK is not speaker readiness.
+          for (let n = 0; n < 14; n++) {
+            if (!current()) return false;
+            const sample = await api.getCuePlaybackState({
+              soundId: "pilot-unlock"
+            });
+            if (!current()) return false;
+            if (sample?.ok === true && Number(sample.positionMs) > 35 &&
+                (sample.playing === true || sample.completed === true))
+              return true;
+            await new Promise(resolve => root.setTimeout(resolve, 95));
+          }
+          return false;
+        })().then(ok => {
+          if (!ok) stopSurpriseCue();
+          return ok;
+        }, () => { stopSurpriseCue(); return false; });
+      }
+      // Standalone and Playground pages share the same ../../ asset root.
+      // Web/PWA/Android keep their established HTML-media implementation.
+      const src = (pictureBase === "../../" ? "../../" : "") +
+        "ui_audio/ui_pet_unlock.mp3";
+      let audio, start;
+      try {
+        audio = new root.Audio(src);
+        audio.preload = "auto";
+        audio.volume = 0.55;
+        audio.setAttribute?.("playsinline", "");
+        audio.setAttribute?.("webkit-playsinline", "");
+        cueCleanup = () => {
+          try { audio.pause(); audio.removeAttribute?.("src"); audio.load?.(); }
+          catch (_) {}
+        };
+        // Direct click: no await or animation before audio.play().
+        start = audio.play();
+      } catch (_) { stopSurpriseCue(); return Promise.resolve(false); }
+      return Promise.resolve(start).then(async () => {
+        if (!current()) return false;
+        const initial = Number(audio.currentTime);
+        if (!Number.isFinite(initial)) return false;
+        for (let n = 0; n < 14; n++) {
+          if (!current()) return false;
+          if (audio.ended === true || Number(audio.currentTime) > initial + 0.035)
+            return true;
+          await new Promise(resolve => root.setTimeout(resolve, 95));
+        }
+        return false;
+      }).then(ok => {
+        if (!ok) stopSurpriseCue();
+        return ok;
+      }, () => { stopSurpriseCue(); return false; });
+    }
     const zoo = root.BibloZooZooEscape.create({
       overlay, profileId, pictureBase, name, petName, verseId,
       surpriseEnabled: true,
+      preselectWelcomeSurprise,
       getSoundContext, isSoundMuted,
-      recover: () => {
+      recover: info => {
         const token = generation;
-        // onContinue must run synchronously inside the real LOCK GATE click.
+        // A selected surprise verifies the cue now. Original activity
+        // audio stays stopped until the real LOCK GATE. A no-surprise tap
+        // still invokes the exact old onContinue recovery path immediately.
         let outcome;
-        try { outcome = onContinue(); } catch (_) { return false; }
+        try {
+          outcome = preselectWelcomeSurprise && info?.plannedSurprise
+            ? playSurpriseCueFromGesture() : onContinue();
+        } catch (_) { return false; }
         return Promise.resolve(outcome).then(result =>
           !disposed && pending && token === generation && !doc.hidden ? result : false,
           () => false);
@@ -77,11 +180,13 @@
       onRecovered: () => {
         if (disposed || !pending || doc.hidden) return;
         if (!heldForSurprise) {
+          stopSurpriseCue();
           pending = false;
           overlay.hidden = true;
           return;
         }
         heldForSurprise = false;
+        stopSurpriseCue();
         const token = generation;
         // LOCK GATE is a new real user gesture, so an owner that requires
         // iOS reactivation can retry it here. Keep the activity paused and
@@ -106,6 +211,7 @@
       },
       onExit: () => {
         if (disposed) return;
+        stopSurpriseCue();
         ++generation;
         pending = false;
         try {
@@ -130,6 +236,7 @@
     function leave() {
       if (disposed || away || !hasBeenVisible || !shouldPrompt()) return;
       away = true;
+      stopSurpriseCue();
       const wasPending = pending;
       pending = true;
       ++generation;
@@ -166,6 +273,7 @@
       destroy() {
         if (disposed) return;
         disposed = true;
+        stopSurpriseCue();
         ++generation;
         pending = false;
         doc.removeEventListener("visibilitychange", visible);
@@ -180,7 +288,7 @@
   function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
     getSoundContext, isSoundMuted, escapeText, preserveFocus = false,
     suppressUiSound = false, useZooEscape = true,
-    allowDevForceZooEscape = true } = {}) {
+    allowDevForceZooEscape = true, preselectWelcomeSurprise = false } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
@@ -194,7 +302,7 @@
       const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
         onExit, profileId, pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
         escapeText, preserveFocus,
-        suppressUiSound });
+        suppressUiSound, preselectWelcomeSurprise });
       if (controller) return controller;
     }
 
