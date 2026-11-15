@@ -8,6 +8,23 @@
   const allowed = () => root.BibloZooNativeOnlyOutput?.enabled === true &&
     root.Capacitor?.isNativePlatform?.() === true &&
     root.Capacitor?.getPlatform?.() === "ios";
+  // DEV-only opt-in, shared by main app and same-origin standalone pages.
+  // Never enable this on Web/PWA/Android or in an ordinary release build.
+  const FORCE_PET_ESCAPE_KEY = "biblozooDevForceWelcomePetEscape:v1";
+  function forcePetEscapeEnabled() {
+    if (!allowed()) return false;
+    try { return root.localStorage?.getItem(FORCE_PET_ESCAPE_KEY) === "1"; }
+    catch (_) { return false; }
+  }
+  function setForcePetEscape(enabled) {
+    if (!allowed()) return false;
+    try {
+      if (enabled) root.localStorage?.setItem(FORCE_PET_ESCAPE_KEY, "1");
+      else root.localStorage?.removeItem(FORCE_PET_ESCAPE_KEY);
+    } catch (_) { return false; }
+    updateButtons();
+    return forcePetEscapeEnabled();
+  }
   const panels = new Map();
   let drawer = null;
   let dock = null;
@@ -69,6 +86,13 @@
       drawer.hidden = true;
       root.BibloZooNativeReadCueLab?.open?.();
     }));
+    const force = forcePetEscapeEnabled();
+    const toggle = action("Force Pet Escape on Let's go!: " +
+      (force ? "ON ✓" : "OFF"), () => setForcePetEscape(!force));
+    toggle.setAttribute("aria-pressed", String(force));
+    toggle.setAttribute("aria-label",
+      "Force a pet escape after each successfully recovered Welcome Back tap");
+    drawer.appendChild(toggle);
   }
   function mount() {
     if (!allowed() || !doc.body || dock) return;
@@ -96,7 +120,8 @@
     doc.body.appendChild(dock);
     updateButtons();
   }
-  root.BibloZooDevTools = Object.freeze({register, open: () => {
+  root.BibloZooDevTools = Object.freeze({
+    register, forcePetEscapeEnabled, setForcePetEscape, open: () => {
     if (!allowed()) return;
     mount();
     if (drawer) { drawer.hidden = false; updateButtons(); }
