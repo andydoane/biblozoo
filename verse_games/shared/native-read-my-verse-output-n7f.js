@@ -31,6 +31,7 @@
     const verse = /^\.\/verse_audio\/([a-z0-9_-]{1,80})\.mp3$/.exec(src);
     if (verse) return "verse:" + verse[1];
     const fixed = Object.freeze({
+      "./ui_audio/ui_pet_unlock.mp3":"zoo-escape-cue",
       "./verse_images/read_my_verse/verse_crawl_theme_ducked.mp3":"crawl-theme",
       "./verse_images/read_my_verse/verse_crawl_theme_ending.mp3":"crawl-ending",
       "./verse_images/read_my_verse/typewriter_alert.mp3":"typewriter-alert",

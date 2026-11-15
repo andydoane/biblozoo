@@ -201,7 +201,7 @@ function auditOwners() {
   ok(learn.includes('const finishingZoo = !!learnZooEscape') &&
     learn.includes('learnZooEscape.start()'),
     "Learn reuses verified result without hiding dialog prematurely");
-  ok(readMyVerse.includes('const started = resumeReadAudioFromGesture()') &&
+  ok(readMyVerse.includes('const started = resumeReadAudioFromGesture({') &&
     readMyVerse.includes('waitReadMediaProgress') &&
     readMyVerse.includes('generation !== readAudioRecoveryGeneration'),
     "Read My Verse retains media/tone/soundtrack clock verification");

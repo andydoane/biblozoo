@@ -53,7 +53,7 @@ const readSource=[
                   "  function holdReadSceneDuringSurprise() {"),
   select(activity,"  function pauseReadForInterruption() {",
                   "  // play() fulfilling only means the request was accepted by WebKit."),
-  select(activity,"  function resumeReadAudioFromGesture() {",
+  select(activity,"  function resumeReadAudioFromGesture(options = {}) {",
                   "  function restorePausedReadSceneOnReturn() {"),
   select(activity,"  // N7f.2: UIApplication.willResignActive",
                   "  function stopAudio() {")
@@ -108,7 +108,8 @@ function fixture({activityId="keyboard",delayActivation=false}={}){
     readDeferredNarrationFinish:null,readPauseTimerTask:null,
     pauseTimer:0,crawlMusic:null,crawlEnding:null,
     activeAudio:null,readZooRecovery:null,
-    readZooEscape:null,readZooVerifiedRecovery:null,
+    readZooEscape:null,readZooVerifiedRecovery:null,readZooFinalRecovery:null,
+    stopReadZooCue(){},
     isTypingActivity:id=>id==="keyboard"||id==="typewriter",
     isAnimatedActivity:isAnimated,
     activeReadScene:()=>isAnimated(activityId)?scene:null,

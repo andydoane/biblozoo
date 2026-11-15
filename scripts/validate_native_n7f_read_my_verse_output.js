@@ -71,6 +71,7 @@ has(plug,'subdirectory: "public/verse_data"',
 has(plug,'subdirectory: "public/verse_audio"',
     "Narration bundled only from local approved verse assets");
 for(const item of [
+ '"zoo-escape-cue": ("ui_audio", "ui_pet_unlock")',
  '"crawl-theme": ("verse_images/read_my_verse"',
  '"crawl-ending": ("verse_images/read_my_verse"',
  '"typewriter-alert": ("verse_images/read_my_verse"',
@@ -225,6 +226,7 @@ async function exerciseNative(){
   for(const [src,id] of [
     ["./verse_audio/john_3_16a.mp3","verse:john_3_16a"],
     ["./verse_audio/john_3_16_ref.mp3","verse:john_3_16_ref"],
+    ["./ui_audio/ui_pet_unlock.mp3","zoo-escape-cue"],
     ["./verse_images/read_my_verse/verse_crawl_theme_ducked.mp3","crawl-theme"],
     ["./verse_images/read_my_verse/verse_crawl_theme_ending.mp3","crawl-ending"],
     ["./verse_images/read_my_verse/typewriter_1.mp3","typewriter-1"],

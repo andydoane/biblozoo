@@ -1773,6 +1773,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     // Do not accept paths, URLs, arbitrary clip keys or external IDs.
     private func bundledClip(_ key: String) -> URL? {
         let fixed: [String: (String, String)] = [
+            "zoo-escape-cue": ("ui_audio", "ui_pet_unlock"),
             "crawl-theme": ("verse_images/read_my_verse",
                             "verse_crawl_theme_ducked"),
             "crawl-ending": ("verse_images/read_my_verse",
