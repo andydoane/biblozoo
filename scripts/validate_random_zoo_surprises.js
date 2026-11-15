@@ -81,7 +81,7 @@ function seededMath(...values) {
   math.random = () => values.length ? values.shift() : 0.5;
   return math;
 }
-function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
+function policy(store, random, initialDay = "2026-11-13", nativeIos = false, devAllowed = true) {
   let day = initialDay;
   class DateForPolicy extends Date {
     constructor(...args) { super(...(args.length ? args : [day + "T12:00:00"])); }
@@ -90,7 +90,7 @@ function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
   const win = {localStorage:store,
     ...(nativeIos ? {Capacitor:{
       isNativePlatform:()=>true,getPlatform:()=>"ios"
-    }} : {})};
+    },BibloZooNativeOnlyOutput:{enabled:true,devToolsAllowed:devAllowed}} : {})};
   vm.runInNewContext(engine, {window:win,Math:random,Date:DateForPolicy,Promise,URL,console});
   return {choose:(id,source)=>win.BibloZooZooSurprise.choose(id,source),
     plan:id=>win.BibloZooZooSurprise.planWelcome(id),
@@ -186,6 +186,13 @@ function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
   assert.equal(store.getItem("biblozooZooSurprise:v2:child"),null,
     "DEV forced escape cannot write ordinary random odds");
 }
+{
+  const store=storage(),p=policy(store,seededMath(0.99,0.99),
+    "2026-11-13",true,false);
+  store.setItem("biblozooDevForceWelcomePetEscape:v1","1");
+  assert.equal(p.forced(),false,"production must ignore a stale DEV force flag");
+  assert.equal(p.plan("child"),null,"production cannot force a Zoo escape from DEV storage");
+}
 
 // The main-screen DEV Tools switch is a native Audio Test-only override:
  // every VERIFIED Welcome Back forces exactly a Pet Escape, WITHOUT writing
@@ -227,7 +234,7 @@ function rewrite(a,b) {
   fixture=fixture.replace(a,b);
 }
 rewrite("const win={document:doc,matchMedia:",
-  "const win={localStorage:options.localStorage,...(options.nativeIos ? {Capacitor:{isNativePlatform:()=>true,getPlatform:()=>\"ios\"}} : {}),document:doc,matchMedia:");
+  "const win={localStorage:options.localStorage,...(options.nativeIos ? {Capacitor:{isNativePlatform:()=>true,getPlatform:()=>\"ios\"},BibloZooNativeOnlyOutput:{enabled:true,devToolsAllowed:true}} : {}),document:doc,matchMedia:");
 rewrite("const sandbox={window:win,Date:FakeDate,Math,Promise,URL,console};",
   "const sandbox={window:win,Date:FakeDate,Math:options.randomMath || Math,Promise,URL,console};");
 rewrite('profileId:"p1",petName:"Milo",soundIsReady:',
