@@ -88,8 +88,9 @@ function environment(kind) {
 }
 
 async function main() {
-  assert.equal(config.appId, "com.andydoane.biblozoo.audiotest");
-  assert.match(build, /NATIVE_AUDIO_TEST_ID/);
+  assert.equal(config.appId, "com.andydoane.biblozoo");
+  assert.match(build, /com\.andydoane\.biblozoo\.audiotest/);
+  assert.match(build, /NATIVE_IOS_AUDIO_APP_IDS/);
   assert.match(build, /NATIVE_ONLY_GATE_PATH/);
   assert.match(build, /injectNativeOnlyAudioGuard\(\)/);
   assert.match(build, /path\.relative\(path\.dirname\(filePath\), scriptFile\)/);

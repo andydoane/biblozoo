@@ -52,8 +52,8 @@ has(readPlugin,'cues.removeAll()',
     "Generated RAM note players cleaned up");
 has(readPlugin,'return verse["published"] as? Bool == true',
     "Read source checks bundled published verse metadata");
-has(readPlugin,'self.isDevBundle',
-    "Native Read plugin requires separate Audio Test bundle");
+has(readPlugin,'self.isNativeAppBundle',
+    "Native Read output supports production BibloZoo");
 has(readPlugin,'AVAudioSession.sharedInstance().category == .soloAmbient',
     "Shared session remains nonmixing and nonducking");
 assert(!/notifyOthersOnDeactivation|\.mixWithOthers|\.duckOthers/.test(
