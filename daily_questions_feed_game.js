@@ -4716,8 +4716,17 @@
     const state = runtime.bounce;
     state.waitingServe = true;
     runtime.introUnlockAt = now + 550;
-    runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
-    runtime.startInstructionEl.textContent = "Tap to launch";
+    if (runtime.startTitleEl) {
+      runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
+      runtime.startTitleEl.hidden = false;
+    }
+    if (runtime.startBallsEl) runtime.startBallsEl.hidden = true;
+    // Launch is already written on the button; don't repeat it above.
+    if (runtime.startInstructionEl) {
+      runtime.startInstructionEl.textContent = "";
+      runtime.startInstructionEl.hidden = true;
+    }
+    runtime.startOverlay.classList?.add?.("is-bounce-serve");
     runtime.controlPhase = "serve";
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
@@ -5081,6 +5090,7 @@
   }
 
   function showFeedingControlChoice(runtime, message = "") {
+    runtime.startOverlay.classList?.remove?.("is-bounce-serve");
     runtime.controlPhase = "choose";
     // The game branding belongs to the chooser only, not the focused tutorial.
     if (runtime.startTitleEl) runtime.startTitleEl.hidden = false;
@@ -5096,6 +5106,7 @@
   }
 
   function showFeedingControlInstructions(runtime, choice) {
+    runtime.startOverlay.classList?.remove?.("is-bounce-serve");
     // Keep the selected-method screen minimal and avoid overflowing the card.
     if (runtime.startTitleEl) runtime.startTitleEl.hidden = true;
     if (runtime.startBallsEl) runtime.startBallsEl.hidden = true;
@@ -5110,6 +5121,7 @@
       runtime.startSelectedIconEl.hidden = false;
     }
     if (runtime.startInstructionEl) {
+      runtime.startInstructionEl.hidden = false;
       runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, choice);
     }
     if (runtime.startConfirmButton) runtime.startConfirmButton.textContent = "Got It!";
@@ -5291,9 +5303,11 @@
       runtime.startConfirmButton.textContent = "Got It!";
     }
     if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
+    // Audio preflight still runs on Got It!, but the transient status is
+    // not useful to a child. Show this line only for a real retry/error.
     if (runtime.nativePilotChoiceStatus) {
-      runtime.nativePilotChoiceStatus.hidden = false;
-      runtime.nativePilotChoiceStatus.textContent = "Getting sounds ready…";
+      runtime.nativePilotChoiceStatus.textContent = "";
+      runtime.nativePilotChoiceStatus.hidden = true;
     }
     const live = () => activeRuntime === runtime && !runtime.finished &&
       !runtime.roundStarted && runtime.controlPhase === "instructions" &&

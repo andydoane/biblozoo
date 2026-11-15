@@ -71,21 +71,31 @@ for(const mode of ["classic","labyrinth","melody"]){
  const html=window.BibloZooDailyFeedGame.render({session:{feedMode:mode},zookeeperPictureHtml:zookeeperMarkup});
  ok(!html.includes('data-daily-feed-next-serve-avatar'),`${mode}: no Bounce-only avatar tile`);
 }
+const serveClasses=new Set();
 const serve={
  mode:"bounce",bounce:{livesLeft:2},controlPhase:"playing",introUnlockAt:0,
- startOverlay:{hidden:true},startTitleEl:{textContent:""},
- startInstructionEl:{textContent:""},startChoiceEl:{hidden:false},
+ startOverlay:{hidden:true,classList:{
+   add(name){serveClasses.add(name);},remove(name){serveClasses.delete(name);}
+ }},
+ startTitleEl:{textContent:"",hidden:true},startBallsEl:{hidden:false},
+ startInstructionEl:{textContent:"",hidden:false},startChoiceEl:{hidden:false},
  startConfirmEl:{hidden:true},startSelectedIconEl:{hidden:false,src:"tilt.png"},
  startServeAvatarEl:{hidden:true},startConfirmButton:{textContent:""}
 };
 h.showBounceNextServe(serve,1000);
 eq(serve.controlPhase,"serve","next ball enters serve mode");
 eq(serve.startTitleEl.textContent,"2 Balls Left!","next-ball heading retained");
-eq(serve.startInstructionEl.textContent,"Tap to launch","next-ball instruction retained");
+eq(serve.startInstructionEl.textContent,"","remove redundant next-ball instruction");
+eq(serve.startInstructionEl.hidden,true,"next-ball instruction is not rendered");
+eq(serve.startTitleEl.hidden,false,"remaining-balls heading is visible");
+eq(serve.startBallsEl.hidden,true,"large snack decoration stays hidden");
+ok(serveClasses.has("is-bounce-serve"),"next-ball card receives compact layout");
 eq(serve.startConfirmButton.textContent,"Launch!","next-ball action retained");
 eq(serve.startSelectedIconEl.hidden,true,"Tilt/Drag icon hidden only on next ball");
 eq(serve.startServeAvatarEl.hidden,false,"Zookeeper avatar shown in white tile between balls");
 h.showFeedingControlInstructions(serve,"drag");
+ok(!serveClasses.has("is-bounce-serve"),"regular instructions restore full-width card");
+eq(serve.startInstructionEl.hidden,false,"control instructions become visible again");
 eq(serve.startServeAvatarEl.hidden,true,"Zookeeper avatar hidden when returning to Drag controls");
 ok(serve.startSelectedIconEl.src.endsWith("dq_feed_control_drag.png"),"original Drag image returns on instruction step");
 eq(serve.startSelectedIconEl.hidden,false,"control image visible on instruction step");

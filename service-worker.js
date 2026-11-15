@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Nov_15_patch73_remove_hero_white_feed_check";
+const CACHE_VERSION = "2026_Nov_15_patch73_feeding_popups_compact_bounce_no_audio_wait";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
