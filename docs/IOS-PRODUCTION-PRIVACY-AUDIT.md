@@ -1,6 +1,6 @@
 # BibloZoo — Step 3b iOS first-party privacy and release audit
 
-**Status (2026-11-15):** First-party manifest declarations merged via [PR #114](https://github.com/andydoane/biblozoo/pull/114); Step 3d [resource and Capacitor source audit](IOS-NATIVE-RESOURCE-AND-SPM-AUDIT.md) records additional package/build mapping evidence without claiming an Apple SDK privacy report. The current production-ID branch has **not** been compiled with Apple's SDK or installed on a real iPhone for acceptance. This document records exactly what the source supports and what must still be verified. Do not treat it as a release certification.
+**Status (2026-11-15):** First-party manifest declarations merged via [PR #114](https://github.com/andydoane/biblozoo/pull/114); Step 3d [PR #116](https://github.com/andydoane/biblozoo/pull/116) merged its [resource/Capacitor audit](IOS-NATIVE-RESOURCE-AND-SPM-AUDIT.md). The next source PR prepares an [Apple Xcode no-install archive and privacy-report review](IOS-MAC-NO-INSTALL-ARCHIVE-REVIEW.md). **No actual Mac archive or generated Apple Privacy Report exists as verified project evidence yet.** The current production-ID branch has **not** been compiled with Apple's SDK or installed on a real iPhone for acceptance. This document records exactly what the source supports and what must still be verified. Do not treat it as a release certification.
 
 ## 1. Required-reason API inventory — first-party Swift code
 

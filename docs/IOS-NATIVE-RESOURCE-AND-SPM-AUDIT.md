@@ -1,6 +1,6 @@
 # BibloZoo — Step 3d native audio resource and Capacitor package audit
 
-**Scope:** [PR #116](https://github.com/andydoane/biblozoo/pull/116) review-only source + generated `dist/` checks on `integration/native-audio-to-ios-prep`, following [merged PR #115](https://github.com/andydoane/biblozoo/pull/115) at `13494adb` and its [post-merge Node/Web PASS](https://github.com/andydoane/biblozoo/actions/runs/43774921152). This is an **inventory and regression guard**, not a native runtime change or iOS signing/privacy certification.
+**Scope:** [PR #116](https://github.com/andydoane/biblozoo/pull/116) MERGED 2026-11-15, source + generated `dist/` checks on `integration/native-audio-to-ios-prep`, following [merged PR #115](https://github.com/andydoane/biblozoo/pull/115) at `13494adb` and its [post-merge Node/Web PASS](https://github.com/andydoane/biblozoo/actions/runs/43774921152). This is an **inventory and regression guard**, not a native runtime change or iOS signing/privacy certification.
 
 ## Verified source mapping
 
@@ -18,6 +18,8 @@
 | App target `ios/App/App.xcodeproj/project.pbxproj` | Includes `CapApp-SPM` product, app privacy manifest in Resources and the direct native MP3 sound files. | Apple's actual Xcode `Product > Archive` result, signed .app resources, generated Privacy Report, Apple toolchain issues |
 
 **Do not modify `CapApp-SPM/Package.swift` manually.** Capacitor CLI manages it and `npx cap sync ios` may regenerate it. The absence of other *direct* local Swift package lines does not establish that resolved Capacitor/Cordova dependencies have no transitive privacy-relevant APIs. The [Step 3b privacy audit](IOS-PRODUCTION-PRIVACY-AUDIT.md) remains the source for declared first-party required reasons and open third-party privacy review.
+
+For the next phase, see the [no-install Mac archive and generated Privacy Report guide](IOS-MAC-NO-INSTALL-ARCHIVE-REVIEW.md); GitHub source/asset PASS is not equivalent to an Apple-signed app bundle.
 
 ## How to verify before owner installation
 
