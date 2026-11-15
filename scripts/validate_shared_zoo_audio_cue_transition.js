@@ -174,7 +174,7 @@ function verifyNativePlayingOwners(){
   const t={
     nativeTyperAudio:{stop(){stopped++;},isReady(){return typerReady;}},
     state:{screen:"game",paused:false},
-    returnPaused:false,wasPausedBeforeReturn:false,
+    returnPaused:false,wasPausedBeforeReturn:false,muted:false,
     finishNativeHold(){holdFinished++;},beginNativeHold(){},
     welcomeClock:{pause(){typerClockPaused++;},resume(){typerClockResumed++;}},
     scheduleCaterpillarPositionUpdate(){this.scheduled=true}
