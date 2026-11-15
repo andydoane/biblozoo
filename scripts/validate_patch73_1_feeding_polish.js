@@ -142,7 +142,9 @@ for (const name of ["tilt","drag"]){
  ok(img.readUInt32BE(24)>=190,`${name}: full image height with padding`);
  ok(sw.includes(`./verse_images/daily_questions/dq_feed_control_${name}.png`),`${name}: offline asset retained`);
 }
-ok(sw.includes("2026_Nov_14_patch73_melody_seven_snacks_badges"),"cache version bumped for new Melody art and badges");
+ok(/const CACHE_VERSION = "2026_Nov_14_patch73_[^"\n]+";/.test(sw) &&
+   !sw.includes('"2026_Nov_14_patch73_melody_seven_snacks_badges"'),
+   "cache version still includes Melody art and has advanced for later changes");
 ok(sw.includes("./verse_images/daily_questions/dq_feed_music_note.png"),"new music-note artwork available offline");
 ok(sw.includes("./verse_images/daily_zoo_todo/snacks_1000.gif.gif"),"animated 1000 badge available offline");
 console.log(`Patch 73.1 Feeding UI, imagery, weights, Melody contact tests passed (${count} checks).`);
