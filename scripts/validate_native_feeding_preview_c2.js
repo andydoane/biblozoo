@@ -771,14 +771,16 @@ async function main() {
   );
   assert.ok(nativeStartup.length>500);
   assert.doesNotMatch(nativeStartup,/resumeFeedAudioContext|feedAudioClockAdvances|new Audio\(|runtime\.nativePilotBackend\s*=\s*"web"/);
-  assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
+  assert.match(FEED,/if \(!fromZooSurprise &&[\s\S]*?runtime\.nativePilotBackend !== "native" \|\|[\s\S]*?isDevForceWelcomeEscapeEnabled[\s\S]*?runtime\.zooEscape\?\.start\?\.\(\)/,
+    "native preview keeps plain prompt except explicit developer force");
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-star"/);
   assert.match(FEED,/runtime\.nativePilotBackend === "native"[\s\S]*?runtime\.nativePilot\?\.play\("feed-chomp"/);
   // N4a preserves real-tap native Resume for Classic and Melody; test the
   // actual mode-specific gesture/re-prepare branch, not old comment wording.
   assert.match(FEED,/if \(runtime\.nativePilotBackend === "native"\) \{[\s\S]*?runtime\.nativePilot\?\.prepare\?\.\(\)/);
   assert.match(FEED,/native-resume-timeout/);
-  assert.match(FEED,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start\?\.\(\)/);
+  assert.match(FEED,/if \(!fromZooSurprise &&[\s\S]*?runtime\.nativePilotBackend !== "native" \|\|[\s\S]*?isDevForceWelcomeEscapeEnabled[\s\S]*?runtime\.zooEscape\?\.start\?\.\(\)/,
+    "native preview keeps plain prompt except explicit developer force");
   assert.match(FEED,/runtime\.nativePilot\?\.isReady\?\.\(\) !== true/);
   assert.match(FEED,/runtime\.nativePilot\?\.stop\?\.\(\)/);
   assert.match(FEED,/session\.dailyTodoPreview === true[\s\S]*?mode === FEED_MODES\.CLASSIC/);

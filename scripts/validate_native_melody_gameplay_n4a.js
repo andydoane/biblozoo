@@ -34,7 +34,8 @@ assert.match(continued,/shiftFeedingDeadlines\(runtime, elapsed\)/);
 assert.match(continued,/resumeMelodyAfterInterruption\(runtime, now\)/);
 assert.match(js,/nativeOnlyApp && \[FEED_MODES\.CLASSIC, FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
   "N4a Melody stays native alongside Classic, Labyrinth and Bounce");
-assert.match(js,/if \(runtime\.nativePilotBackend !== "native"\) runtime\.zooEscape\?\.start/);
+assert.match(js,/if \(!fromZooSurprise &&[\s\S]*?runtime\.nativePilotBackend !== "native" \|\|[\s\S]*?isDevForceWelcomeEscapeEnabled[\s\S]*?runtime\.zooEscape\?\.start/,
+  "Original native plain return preserved except explicit DEV force");
 assert.match(ci,/node scripts\/validate_native_melody_gameplay_n4a\.js/);
 
 function harness({nativeOnly=true,platform="ios",preloadOk=true}={}){

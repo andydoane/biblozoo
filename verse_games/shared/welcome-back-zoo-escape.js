@@ -114,6 +114,16 @@
   // are rare but remain possible. Pet Escapes roll separately on a non-break.
   // This v2 key intentionally ignores the obsolete one-roll-per-day v1 flags.
   const SURPRISE_PREFIX = "biblozooZooSurprise:v2:";
+  // Audio Test only: DEV Tools opts in to a deterministic escape on every
+  // verified Welcome Back. This never alters the real surprise odds record.
+  const FORCE_WELCOME_ESCAPE_KEY = "biblozooDevForceWelcomePetEscape:v1";
+  function forceWelcomePetEscapeEnabled() {
+    try {
+      return root.Capacitor?.isNativePlatform?.() === true &&
+        root.Capacitor?.getPlatform?.() === "ios" &&
+        root.localStorage?.getItem?.(FORCE_WELCOME_ESCAPE_KEY) === "1";
+    } catch (_) { return false; }
+  }
   const SURPRISE_CHANCES = Object.freeze({
     firstBreak: 0.55,
     extraDailyBreak: 0.05,
@@ -126,6 +136,8 @@
       String(date.getDate()).padStart(2, "0")].join("-");
   };
   function chooseSurprise(explicitId, source) {
+    if (source === "welcome" && forceWelcomePetEscapeEnabled())
+      return "escape";
     const id = profileForStats(explicitId);
     if (!id || (source !== "daily" && source !== "welcome")) return null;
     const key = SURPRISE_PREFIX + id;
@@ -157,11 +169,13 @@
     } catch (_) { return null; }
   }
   root.BibloZooZooSurprise = Object.freeze({
-    choose: chooseSurprise, chances: SURPRISE_CHANCES
+    choose: chooseSurprise, chances: SURPRISE_CHANCES,
+    isDevForceWelcomeEscapeEnabled: forceWelcomePetEscapeEnabled
   });
   const rand = (min, max) => min + Math.random() * (max - min);
 
-  function create({ overlay, recover, onRecovered, onExit, onRescue,
+  function create({ overlay, recover, onRecovered, onExit, onSurpriseStart,
+    onRescue,
     onBreakComplete, soundIsReady, onPop, onBounce, getSoundContext, isSoundMuted,
     isTestRun, surpriseEnabled = false,
     profileId, pictureBase = "",
@@ -298,10 +312,12 @@
     let dragging = null;
     let lastBounceSoundAt = -Infinity;
     let testScenario = null;
+    let forcedSurpriseTest = false;
     let testMenu = null;
     let testHoldTimer = 0;
     let testPointer = null;
-    const isDeveloperRun = () => !!testScenario || (typeof isTestRun === "function" && isTestRun() === true);
+    const isDeveloperRun = () => !!testScenario || forcedSurpriseTest ||
+      (typeof isTestRun === "function" && isTestRun() === true);
     const allowTestMenu = ENABLE_ZOO_RETURN_TEST_HARNESS &&
       !overlay.classList.contains("daily-feed-resume-overlay");
     const effectTimers = new Set();
@@ -1012,6 +1028,12 @@
       // Keep this exact controller's artwork, physics, pet-rescue counter,
       // LOCK GATE and cleanup; only replace the recovery-driven transition.
       surpriseMode = kind;
+      // Snapshot developer mode at selection, so switching the DEV toggle
+      // during a rescue cannot award permanent pet/break statistics.
+      forcedSurpriseTest = forceWelcomePetEscapeEnabled();
+      // The activity owner reasserts its own pause immediately before the
+      // surprise starts; audio recovery is NOT permission to run underneath.
+      try { onSurpriseStart?.(kind); } catch (_) {}
       if (kind === "break") breakPictures = possiblePictures();
       setStage(kind);
       log("zoo-surprise-start", { kind });
@@ -1023,6 +1045,7 @@
       cancelTestHold();
       closeTestMenu();
       testScenario = null;
+      forcedSurpriseTest = false;
       serial++;
       emptyField();
       pending = true;

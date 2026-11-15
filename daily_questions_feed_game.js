@@ -3538,7 +3538,8 @@
 
   function preventFeedTestContextMenu(event) { event.preventDefault(); }
 
-  function pauseFeedingGame(runtime, now = performance.now()) {
+  function pauseFeedingGame(runtime, now = performance.now(),
+      fromZooSurprise = false) {
     if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
         !runtime.running || runtime.finished || runtime.feedPausedAt != null) return false;
     runtime.feedPausedAt = now;
@@ -3582,7 +3583,10 @@
     setFeedingResumeStatus(runtime);
     // Native-only tests pause with explicit Resume/Back, not Zoo Escape
     // as an audio-repair minigame. All non-native paths retain that feature.
-    if (runtime.nativePilotBackend !== "native") runtime.zooEscape?.start?.();
+    if (!fromZooSurprise &&
+        (runtime.nativePilotBackend !== "native" ||
+          window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()))
+      runtime.zooEscape?.start?.();
     return true;
   }
 
@@ -6223,11 +6227,30 @@
             attemptFeedingResumeFromGesture(runtime, resolve);
           });
         },
+        onSurpriseStart: () => {
+          // The initial Let's go verified sound and started the game loop.
+          // Re-freeze that SAME rally before the pet-escape animation begins.
+          // Do not restart the Zoo controller while it is already escaping.
+          if (activeRuntime === runtime && runtime.feedPausedAt == null)
+            pauseFeedingGame(runtime, performance.now(), true);
+        },
         onRecovered: () => {
-          // The next *real* interruption must always use verified audio,
-          // never retain this manually chosen developer scenario.
+          // The final LOCK GATE / pen click releases the original round.
+          // No synthetic scoring, new serves or second reward claim.
           runtime.zooDevScenario = null;
-          if (activeRuntime === runtime && runtime.feedPausedAt == null) {
+          if (activeRuntime !== runtime) return;
+          if (runtime.feedPausedAt != null) {
+            runtime.feedAudioRecoveryVerified = true;
+            const continued = continueFeedingAfterGesture(
+              runtime, performance.now(), true);
+            if (!continued) {
+              // Audio may have been lost again during rescue. Keep a new
+              // deliberate Welcome Back rather than running silently.
+              runtime.zooEscape?.start?.();
+              return;
+            }
+          }
+          if (runtime.feedPausedAt == null) {
             runtime.resumeOverlay.hidden = true;
             runtime.zooSoundClockSample = null;
           }
@@ -6261,7 +6284,10 @@
       // Native-only intentionally never starts that controller. Its click
       // handler therefore ignores the tap. Route Native-only Resume directly
       // to the activity owner; preserve legacy Web/Zoo Escape handling.
-      if (runtime.zooEscape && runtime.nativePilotBackend !== "native") return;
+      if (runtime.zooEscape &&
+          (runtime.nativePilotBackend !== "native" ||
+            window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()))
+        return;
       event.preventDefault();
       event.stopPropagation();
       attemptFeedingResumeFromGesture(runtime);

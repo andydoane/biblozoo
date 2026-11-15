@@ -136,6 +136,36 @@ async function exerciseReturn() {
   eq(exitCount,1,"safe navigation invoked once");
   eq(c2.isPaused(),false,"exit releases pending state");
   c2.destroy();
+
+  // A real Pet Escape must be a SECOND pause: successful audio recovery
+  // cannot run the game underneath a rescued pet. The final pen gesture
+  // calls the original owner recovery again and only then releases clocks.
+  const h3=createHarness();
+  let gamePaused=false,gameProgress=0,holds=0,returns=0;
+  const c3=h3.window.BibloZooWelcomeBackReturn.attach({
+    shouldPrompt:()=>true,
+    onPause:()=>{gamePaused=true;holds++;},
+    onContinue:()=>{gamePaused=false;returns++;return Promise.resolve(true);},
+    onExit:()=>{}
+  });
+  h3.doc.hidden=true;h3.callbacks.doc.visibilitychange();
+  h3.doc.hidden=false;h3.callbacks.doc.visibilitychange();
+  eq(await h3.visual.options.recover(),true,"original Let's go verifies game recovery");
+  eq(gamePaused,false,"audio-ready owner has resumed temporarily");
+  h3.visual.options.onSurpriseStart("escape");
+  eq(gamePaused,true,"Pet Escape immediately freezes game again");
+  eq(holds,2,"Read/verse game owner got second pause, without reset");
+  if (!gamePaused) gameProgress++;
+  eq(gameProgress,0,"no progress during pet rescue");
+  eq(c3.isPaused(),true,"Zoo keeps pending gate for the entire escape");
+  h3.visual.options.onRecovered(); // actual LOCK GATE / pen click
+  eq(returns,2,"final pet rescue uses real new gesture to resume");
+  eq(c3.isPaused(),true,"pending until owner verifies final-lock audio");
+  await Promise.resolve();await Promise.resolve();
+  eq(c3.isPaused(),false,"only verified final-lock audio releases game");
+  eq(gamePaused,false,"game unpaused after pet rescue, never before");
+  eq(h3.overlay.hidden,true,"successful second recovery hides popup");
+  c3.destroy();
 }
 
 function auditOwners() {
@@ -143,8 +173,8 @@ function auditOwners() {
   // all pre-existing Web/PWA and other owners still default to Zoo Escape.
   ok(shared.includes('function attachZooReturn(options)') &&
     shared.includes('useZooEscape = true') &&
-    shared.includes('if (useZooEscape && root.BibloZooZooEscape?.create)'),
-    "default Zoo Escape opt-in with safe native Snake plain-UI override");
+    shared.includes('(useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create'),
+    "native-only plain recovery except explicit Audio Test DEV force");
   ok(shared.includes('onContinue();') && shared.includes('token === generation'),
     "shared owner runs within gesture and rejects stale asynchronous results");
   ok(zoo.includes('ok?.deferred === true') &&

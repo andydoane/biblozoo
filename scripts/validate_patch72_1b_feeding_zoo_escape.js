@@ -131,7 +131,7 @@ function staticContracts(){
    'attemptFeedingResumeFromGesture(runtime, resolve)','runtime.zooEscape?.start?.()',
    'runtime.zooEscape?.destroy?.()','runtime.onRecoveryExitToZoo || runtime.onBackToZoo',
    'soundIsReady: () => zooEscapeSoundReady(runtime)',
-   'if (runtime.zooEscape && runtime.nativePilotBackend !== "native") return;',
+   'window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()',
    'resumeButton.addEventListener("click", runtime.resumeButtonHandler);',
    'const continued = continueFeedingAfterGesture(runtime,',
    'report(continued)','feed-bounce-bonus-clock-check'])

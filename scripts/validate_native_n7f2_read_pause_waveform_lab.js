@@ -66,8 +66,12 @@ has(readActivity,"entry.remaining = Math.max(0, entry.remaining - (Date.now() - 
   "Animated scene timers never run down during switcher hold");
 has(readActivity,"scene?.active ? scene : null",
   "Only live Read scene can own animated recovery");
-has(readActivity,"readAudioRecovery = null;\n        thawReadPauseTimer();\n        thawReadTypingIntro();",
-  "Explicit acknowledgement not page return thaws typing intro");
+has(readActivity,"finishVerifiedReadRecovery(recovery, generation, () => {",
+  "Explicit verified acknowledgement still owns Read clock release");
+has(readActivity,"thawReadTypingIntro();",
+  "The same saved typing intro resumes only after verified audio and Zoo gate");
+has(readActivity,"readZooVerifiedRecovery",
+  "An active pet rescue must keep the typing intro suspended");
 assert(!/root\.(?:Audio|webkitAudioContext)\s*=/.test(adapter),
   "N7f2 never restores WebKit audio fallback");
 

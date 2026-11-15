@@ -16,6 +16,7 @@ const feeding = read("daily_questions_feed_game.js");
 const shell = read("verse_games/shared/game-shell.js");
 const profiles = read("profiles.js");
 const testing = read("scripts/validate_patch72_1a_zoo_escape.js");
+const devDock = read("verse_games/shared/native-dev-tools-dock-n7e.js");
 const workflow = read(".github/workflows/ios-prep-validation.yml");
 
 assert.match(workflow, /node scripts\/validate_random_zoo_surprises\.js/);
@@ -69,15 +70,19 @@ function seededMath(...values) {
   math.random = () => values.length ? values.shift() : 0.5;
   return math;
 }
-function policy(store, random, initialDay = "2026-11-13") {
+function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
   let day = initialDay;
   class DateForPolicy extends Date {
     constructor(...args) { super(...(args.length ? args : [day + "T12:00:00"])); }
     static now() { return new Date(day + "T12:00:00").valueOf(); }
   }
-  const win = {localStorage:store};
+  const win = {localStorage:store,
+    ...(nativeIos ? {Capacitor:{
+      isNativePlatform:()=>true,getPlatform:()=>"ios"
+    }} : {})};
   vm.runInNewContext(engine, {window:win,Math:random,Date:DateForPolicy,Promise,URL,console});
   return {choose:(id,source)=>win.BibloZooZooSurprise.choose(id,source),
+    forced:()=>win.BibloZooZooSurprise.isDevForceWelcomeEscapeEnabled(),
     setDay:d=>{day=d;}, stats:id=>win.BibloZooZooStats.get(id)};
 }
 
@@ -141,6 +146,33 @@ function policy(store, random, initialDay = "2026-11-13") {
     "Unavailable storage fails closed; don't strand normal task navigation");
 }
 
+// The main-screen DEV Tools switch is a native Audio Test-only override:
+ // every VERIFIED Welcome Back forces exactly a Pet Escape, WITHOUT writing
+ // ordinary random-schedule state or crediting fake rescue statistics.
+{
+  const store=storage(),p=policy(store,seededMath(0.99,0.99,0.99),
+    "2026-11-13",true);
+  const key="biblozooDevForceWelcomePetEscape:v1";
+  assert.equal(p.forced(),false);
+  store.setItem(key,"1");
+  assert.equal(p.forced(),true);
+  assert.equal(p.choose("child","welcome"),"escape");
+  assert.equal(p.choose("child","welcome"),"escape");
+  assert.equal(store.getItem("biblozooZooSurprise:v2:child"),null,
+    "DEV force must NOT consume normal Zoo Break odds or days");
+  store.removeItem(key);
+  assert.equal(p.forced(),false,"turning toggle OFF returns to normal odds");
+  const web=policy(store,seededMath(0.99,0.99),"2026-11-13",false);
+  store.setItem(key,"1");
+  assert.equal(web.forced(),false,"force option must never apply to PWA/Web");
+  const nativeAndroid=policy(store,seededMath(0.99,0.99),"2026-11-13",true);
+  assert.equal(nativeAndroid.forced(),true,"native iOS gate was exercised");
+  store.removeItem(key);
+  assert.match(devDock,/Force Pet Escape on Let's go!/);
+  assert.match(devDock,/aria-pressed/);
+  assert.match(devDock,/root\.BibloZooNativeOnlyOutput\?\.enabled === true/);
+  assert.match(devDock,/root\.Capacitor\?\.getPlatform\?\.\(\) === "ios"/);
+}
 // These original audio owners must continue their verified resume before
 // checking entertainment odds: no fake Let's go! tap, no random recovery.
 // Reuse the previously tested real controller fixture, including its fake DOM,

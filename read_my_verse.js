@@ -1645,6 +1645,74 @@
   // a play() promise alone is never a successful recovery.
   let readZooEscape = null;
   let readZooRecovery = null;
+  // The child's verified Let's go! restores audio readiness, NOT permission
+  // to advance Read progress while a pet escape is still on top.
+  let readZooVerifiedRecovery = null;
+  function finishVerifiedReadRecovery(recovery, generation, continueActivity) {
+    if (generation !== readAudioRecoveryGeneration ||
+        readAudioRecovery !== recovery) return false;
+    if (readZooEscape?.isPaused?.() && readZooRecovery === recovery) {
+      // Zoo decides between "no surprise" and an escape after this verified
+      // result. Keep the original recovery guard/scene clocks frozen until
+      // the controller calls onRecovered (immediately or at LOCK GATE).
+      readZooVerifiedRecovery = {
+        recovery, generation, continueActivity, pausedMedia: []
+      };
+      syncReadAudioOverlay();
+      return true;
+    }
+    readAudioRecovery = null;
+    continueActivity();
+    syncReadAudioOverlay();
+    return true;
+  }
+  function holdReadSceneDuringSurprise() {
+    const verified = readZooVerifiedRecovery;
+    if (!verified || verified.recovery !== readAudioRecovery) return;
+    if (verified.recovery.kind === "animated")
+      freezeReadScene(verified.recovery.scene);
+    freezeReadPauseTimer();
+    // Music/narration are restarted only by the child's later LOCK GATE tap.
+    // Never let an advancing soundtrack hide behind the escaping BibloPet.
+    const media = [crawlMusic?.audio, crawlEnding, activeAudio];
+    const seen = new Set();
+    for (const audio of media) {
+      if (!audio || seen.has(audio) || audio.paused) continue;
+      seen.add(audio);
+      try { audio.pause(); verified.pausedMedia.push(audio); } catch (_) {}
+    }
+  }
+  function finishReadZooSurprise(overlay) {
+    const verified = readZooVerifiedRecovery;
+    if (verified && verified.recovery === readAudioRecovery &&
+        verified.generation === readAudioRecoveryGeneration &&
+        !root.document.hidden && state.phase !== "idle" && !completionReported) {
+      readZooVerifiedRecovery = null;
+      // onRecovered is called from the actual pen/LOCK GATE gesture, so iOS
+      // gets a fresh user activation for paused media. This is not autoplay.
+      for (const audio of verified.pausedMedia) {
+        try {
+          const result = audio.play();
+          Promise.resolve(result).catch(() => {
+            if (!root.document.hidden && state.phase !== "idle")
+              pauseReadForInterruption();
+          });
+        } catch (_) { pauseReadForInterruption(); }
+      }
+      readAudioRecovery = null;
+      readZooRecovery = null;
+      verified.continueActivity();
+      overlay.hidden = true;
+      syncReadAudioOverlay();
+      return;
+    }
+    // If the child locked the phone AGAIN mid-rescue, the old media proof is
+    // invalid. Finish the pet rescue but require a new explicit Let's go.
+    readZooVerifiedRecovery = null;
+    readZooRecovery = null;
+    if (readAudioRecovery) syncReadAudioOverlay();
+    else overlay.hidden = true;
+  }
   function recoverReadZooFromGesture() {
     const recovery = readAudioRecovery;
     const generation = readAudioRecoveryGeneration;
@@ -1657,10 +1725,13 @@
         if (Date.now() >= deadline) return resolve(false);
         if (root.document.hidden || generation !== readAudioRecoveryGeneration ||
             state.phase === "idle" || completionReported) return resolve(false);
-        if (readAudioRecovery === null) {
-          // The owner only clears recovery after its playback/clock checks.
+        if (readZooVerifiedRecovery?.recovery === recovery &&
+            readZooVerifiedRecovery.generation === generation) {
+          // Audio is verified; the original scene is deliberately STILL
+          // paused until the surprise finishes or no surprise is chosen.
           return resolve(true);
         }
+        if (readAudioRecovery === null) return resolve(true);
         if (readAudioRecovery !== recovery ||
             (readAudioRecoveryAttempt === null && !!recovery.error)) {
           return resolve(false);
@@ -1728,7 +1799,8 @@
             ? keySoundContext : appApi?.getExistingAudioContext?.(),
         isSoundMuted: () => appApi?.isMuted?.() === true,
         recover: recoverReadZooFromGesture,
-        onRecovered: () => { readZooRecovery = null; overlay.hidden = true; },
+        onSurpriseStart: holdReadSceneDuringSurprise,
+        onRecovered: () => finishReadZooSurprise(overlay),
         onExit: exitSession
       });
     }
@@ -1829,6 +1901,7 @@
         freezeReadScene(readAudioRecovery.scene);
       // Another background event invalidates a pending Resume Audio attempt.
       if (root?.document?.hidden) {
+        readZooVerifiedRecovery = null;
         readAudioRecoveryGeneration += 1;
         readAudioRecoveryAttempt = null;
         stopReadNarration();
@@ -1995,13 +2068,13 @@
         syncReadAudioOverlay();
         return;
       }
-      readAudioRecovery = null;
-      thawReadPauseTimer();
-      thawReadScene(scene, Date.now() - recovery.startedAt);
-      syncReadAudioOverlay();
-      const delayedFinish = readDeferredNarrationFinish;
-      readDeferredNarrationFinish = null;
-      delayedFinish?.();
+      finishVerifiedReadRecovery(recovery, generation, () => {
+        thawReadPauseTimer();
+        thawReadScene(scene, Date.now() - recovery.startedAt);
+        const delayedFinish = readDeferredNarrationFinish;
+        readDeferredNarrationFinish = null;
+        delayedFinish?.();
+      });
     })();
     return true;
   }
@@ -2036,10 +2109,10 @@
         if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery ||
             root?.document?.hidden) return false;
         readAudioRecoveryAttempt = null;
-        readAudioRecovery = null;
-        thawReadPauseTimer();
-        thawReadTypingIntro();
-        syncReadAudioOverlay();
+        finishVerifiedReadRecovery(recovery, generation, () => {
+          thawReadPauseTimer();
+          thawReadTypingIntro();
+        });
         return true;
       }
       // Start any Web tone resume INSIDE the original tap, before awaiting.
@@ -2057,10 +2130,10 @@
             syncReadAudioOverlay();
             return;
           }
-          readAudioRecovery = null;
-          thawReadPauseTimer();
-          thawReadTypingIntro();
-          syncReadAudioOverlay();
+          finishVerifiedReadRecovery(recovery, generation, () => {
+            thawReadPauseTimer();
+            thawReadTypingIntro();
+          });
         }).catch(() => {
           if (generation !== readAudioRecoveryGeneration ||
               readAudioRecovery !== recovery) return;
@@ -2140,14 +2213,15 @@
         syncReadAudioOverlay();
         return;
       }
-      readAudioRecovery = null;
-      thawReadPauseTimer();
-      if (kind === "animated") thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
-      thawReadTypingIntro();
-      syncReadAudioOverlay();
-      const delayedFinish = readDeferredNarrationFinish;
-      readDeferredNarrationFinish = null;
-      delayedFinish?.();
+      finishVerifiedReadRecovery(recovery, generation, () => {
+        thawReadPauseTimer();
+        if (kind === "animated")
+          thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
+        thawReadTypingIntro();
+        const delayedFinish = readDeferredNarrationFinish;
+        readDeferredNarrationFinish = null;
+        delayedFinish?.();
+      });
     })();
     return true;
   }
@@ -2177,6 +2251,7 @@
     if (root?.BibloZooNativeReadOutputController?.enabled) void root.BibloZooNativeReadOutputController.stopAll();
     readAudioRecoveryGeneration += 1;
     readZooRecovery = null;
+    readZooVerifiedRecovery = null;
     readAudioRecovery = null;
     readAudioRecoveryAttempt = null;
     readActiveAnimatedNarration = null;
