@@ -160,7 +160,92 @@ function harness({native=false,muted=false,refuseCue=false,refuseGate=false,
     get pauseCount(){return pauseCount;},get audioConstructed(){return audioConstructed;},
     get cueStopCount(){return cueStopCount;},get cueReads(){return cueReads;}};
 }
+// Exercise actual owner pause/resume implementations, not only shared
+// adapter stubs: narration loss and an in-flight mower have special clocks.
+function ownerFunction(source,name,next){
+  const start=source.indexOf("  function "+name+"(");
+  const end=source.indexOf("\n  function "+next+"(",start);
+  assert(start>=0 && end>start,"owner source changed: "+name);
+  return source.slice(start,end);
+}
+function verifyNativePlayingOwners(){
+  let stopped=0,holdFinished=0,typerClockPaused=0,typerClockResumed=0;
+  let typerReady=false;
+  const t={
+    nativeTyperAudio:{stop(){stopped++;},isReady(){return typerReady;}},
+    state:{screen:"game",paused:false},
+    returnPaused:false,wasPausedBeforeReturn:false,
+    finishNativeHold(){holdFinished++;},beginNativeHold(){},
+    welcomeClock:{pause(){typerClockPaused++;},resume(){typerClockResumed++;}},
+    scheduleCaterpillarPositionUpdate(){this.scheduled=true}
+  };
+  vm.runInNewContext(ownerFunction(typer,"pauseTyperForReturn","continueTyperAfterReturn")+
+    "\n"+ownerFunction(typer,"continueTyperAfterReturn","setScreen")+
+    "\nthis.testOwner={pauseTyperForReturn,continueTyperAfterReturn};",t);
+  t.testOwner.pauseTyperForReturn();
+  assert.equal(t.returnPaused,true,"native Verse Typer stops and freezes while narration plays");
+  assert.equal(t.state.paused,true);
+  assert.equal(stopped,1);
+  assert.equal(holdFinished,1);
+  assert.equal(typerClockPaused,1);
+  assert.equal(t.testOwner.continueTyperAfterReturn(),false,
+    "without a verified original Typer PCM bank the gate must not thaw narration");
+  assert.equal(t.returnPaused,true);
+  typerReady=true;
+  assert.equal(t.testOwner.continueTyperAfterReturn(),true);
+  assert.equal(t.returnPaused,false);
+  assert.equal(t.state.paused,false);
+  assert.equal(typerClockResumed,1);
+  assert.equal(t.scheduled,true,"Typer resumes same saved verse layout, not a new round");
+
+  let canceled=[],schedules=[],mowerSound=[],mowerStops=0,removed=0,coverage=0;
+  const sprite={remove(){removed++;}};
+  const c={
+    nativeScrubAudio:{},welcomePaused:false,menuOpen:false,
+    welcomeClock:{pause(){this.paused=true;},resume(){this.paused=false;},
+      now(){return 250;}},
+    pointerDown:true,lastPoint:{x:1,y:2},
+    glowTrailAnimationFrame:0,rainbowTrailAnimationFrame:0,
+    glowTrailSpots:[1],rainbowTrailParticles:[1],
+    mowerActive:true,mowerEndAt:1050,mowerAnimationFrame:19,
+    mowerResumeFrame:()=>{},deferredCoverageRound:null,
+    cancelAnimationFrame(id){canceled.push(id);},
+    requestAnimationFrame(fn){schedules.push(fn);return 20;},
+    stopMowerSound(){mowerStops++;},
+    startMowerSound(ms){mowerSound.push(ms);},
+    document:{querySelector(sel){
+      assert.equal(sel,"#scrubObjectLayer .scrub-mower-sprite");
+      return sprite;
+    }},
+    scheduleCoverageCheck(){coverage++;},
+    roundConfig(){return null;}
+  };
+  vm.runInNewContext(ownerFunction(scrub,"pauseScrubForReturn","continueScrubAfterReturn")+
+    "\n"+ownerFunction(scrub,"continueScrubAfterReturn","renderTitleScreen")+
+    "\nthis.testOwner={pauseScrubForReturn,continueScrubAfterReturn};",c);
+  c.testOwner.pauseScrubForReturn();
+  assert.equal(c.welcomePaused,true,"native mower is frozen during UIKit lock");
+  assert.equal(c.pointerDown,false);
+  assert.equal(c.mowerActive,true,"normal live mower checkpoint not discarded");
+  assert(canceled.includes(19),"in-flight frame canceled while paused");
+  assert.equal(c.testOwner.continueScrubAfterReturn(),true);
+  assert.equal(c.welcomePaused,false);
+  assert.equal(schedules.length,1,"saved mower frame resumes on verified gate");
+  assert.equal(mowerSound[0],800,"only remaining mower sound duration replays");
+  assert.equal(coverage,0,"no extra grass / score awarded at gate");
+
+  // The reported failure also needs a fail-safe for a rare missing stored
+  // RAF callback: otherwise mowerActive blocks every subsequent grass tap.
+  c.mowerActive=true;c.mowerAnimationFrame=23;c.mowerResumeFrame=null;
+  c.testOwner.pauseScrubForReturn();
+  c.testOwner.continueScrubAfterReturn();
+  assert.equal(c.mowerActive,false,"orphaned mower no longer blocks taps");
+  assert.equal(c.mowerEndAt,0);
+  assert.equal(removed,1,"only orphaned visual sprite is retired");
+  assert.equal(coverage,0,"recovery does not clear grass or credit a fake pass");
+}
 async function run(){
+  verifyNativePlayingOwners();
   {
     const h=harness();
     const result=h.win.visual.options.recover({plannedSurprise:"escape"});
