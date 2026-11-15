@@ -53,6 +53,7 @@
     let away = false;
     let hasBeenVisible = !doc.hidden;
     let generation = 0;
+    let heldForSurprise = false;
     const zoo = root.BibloZooZooEscape.create({
       overlay, profileId, pictureBase, name, petName, verseId,
       surpriseEnabled: true,
@@ -66,10 +67,42 @@
           !disposed && pending && token === generation && !doc.hidden ? result : false,
           () => false);
       },
+      onSurpriseStart: () => {
+        if (disposed || !pending || doc.hidden) return;
+        // onContinue() has already verified sound and unpaused the owner.
+        // A surprise is a second, deliberate pause, not a transparent UI.
+        heldForSurprise = true;
+        try { onPause(); } catch (_) {}
+      },
       onRecovered: () => {
         if (disposed || !pending || doc.hidden) return;
-        pending = false;
-        overlay.hidden = true;
+        if (!heldForSurprise) {
+          pending = false;
+          overlay.hidden = true;
+          return;
+        }
+        heldForSurprise = false;
+        const token = generation;
+        // LOCK GATE is a new real user gesture, so an owner that requires
+        // iOS reactivation can retry it here. Keep the activity paused and
+        // the overlay visible while the second recovery is pending.
+        let outcome;
+        try { outcome = onContinue(); } catch (_) { outcome = false; }
+        Promise.resolve(outcome).then(ok => {
+          if (disposed || !pending || token !== generation || doc.hidden) return;
+          if (ok === true) {
+            pending = false;
+            overlay.hidden = true;
+          } else {
+            // Never continue an unsafe/failed recovery underneath a modal.
+            zoo.start();
+            overlay.hidden = false;
+          }
+        }, () => {
+          if (disposed || !pending || token !== generation || doc.hidden) return;
+          zoo.start();
+          overlay.hidden = false;
+        });
       },
       onExit: () => {
         if (disposed) return;
@@ -101,7 +134,16 @@
       pending = true;
       ++generation;
       overlay.hidden = true;
-      if (pending && wasPending) return; // keep rescued pets on mid-escape app switch
+      if (pending && wasPending) {
+        // Keep an unfinished pet rescue, but if LOCK GATE was already
+        // re-priming sound, invalidate that attempt and restart Welcome Back.
+        if (heldForSurprise) heldForSurprise = false;
+        if (zoo.getStage?.() === "recovered") {
+          zoo.start();
+          try { onPause(); } catch (_) {}
+        }
+        return;
+      }
       zoo.start(); // starts a genuinely new recovery session
       try { onPause(); } catch (_) { /* preserve navigation/lifecycle */ }
     }
@@ -143,9 +185,11 @@
         typeof onPause !== "function" ||
         typeof onContinue !== "function") return null;
 
-    // N6b opt-out affects only the isolated native Snake owner. Every other
-    // Web/Feeding/Playground owner keeps the existing Zoo Escape contract.
-    if (useZooEscape && root.BibloZooZooEscape?.create) {
+    // Original native-only playback remains a plain recovery in production.
+    // The owner may opt in to full Zoo Escape *only in Audio Test DEV mode*.
+    const forceDevEscape =
+      root.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.() === true;
+    if ((useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create) {
       const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
         onExit, profileId, pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
         escapeText, preserveFocus,
