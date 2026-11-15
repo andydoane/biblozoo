@@ -2703,6 +2703,11 @@
       // legacy Web/PWA/Android callers or unrelated Playground activities.
       useZooEscape: options.allowZooSurprises !== false && !options.nativeOnlyAudio,
       allowDevForceZooEscape: options.allowZooSurprises !== false,
+      // One shared cue-first transition for compatible Playground pages.
+      // Native-only games retain their original plain production return;
+      // the DEV forced-escape path can still validate cue-first recovery.
+      // Verse Jam passes allowZooSurprises:false and remains exempt.
+      preselectWelcomeSurprise: options.allowZooSurprises !== false,
       suppressUiSound: !!options.nativeOnlyAudio,
       escapeText: "Back to Playground",
       preserveFocus: true,
