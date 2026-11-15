@@ -29,7 +29,7 @@ assert.match(melody,/context\.createOscillator\(\)/);
 assert.match(caught,/playMelodyTone\(runtime, entry\.midi\)/);
 assert.match(caught,/runtime\.caughtCount \+= 1/);
 assert.match(resume,/runtime\.nativePilot\?\.prepare\?\.\(\)/);
-assert.match(resume,/continueFeedingAfterGesture\(runtime, performance\.now\(\), false\)/);
+assert.match(resume,/continueFeedingAfterGesture\(runtime,\s*performance\.now\(\), keepOverlay\)/);
 assert.match(continued,/shiftFeedingDeadlines\(runtime, elapsed\)/);
 assert.match(continued,/resumeMelodyAfterInterruption\(runtime, now\)/);
 assert.match(js,/nativeOnlyApp && \[FEED_MODES\.CLASSIC, FEED_MODES\.MELODY, FEED_MODES\.LABYRINTH, FEED_MODES\.BOUNCE\]\.includes\(mode\)/,
