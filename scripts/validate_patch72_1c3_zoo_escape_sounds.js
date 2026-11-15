@@ -39,7 +39,7 @@ for(const game of games){
   const context=game==='verse_splat'?'verseSplatAudioContext':game==='verse_snake'?'audioContext':'audioCtx';
   const start=js.indexOf('window.BibloZooWelcomeBackReturn?.attach?.({');
   ok(start>=0, `${game}: return controller present`);
-  const options=js.slice(start,start+550);
+  const options=js.slice(start,start+1100);
   ok(options.includes(`getSoundContext: () => ${context}`),`${game}: existing audio object, not an allocating getter`);
   ok(options.includes('isSoundMuted: () => muted'),`${game}: honors mute setting`);
 }

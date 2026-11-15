@@ -3675,6 +3675,9 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
   trafficWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
     useZooEscape: !nativeTrafficAudio,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeTrafficAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,

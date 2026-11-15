@@ -3429,6 +3429,9 @@
   setScreen("intro");
   welcomeBackController = window.BibloZooWelcomeBackReturn?.attach?.({
     useZooEscape: !nativeScrambleAudio,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeScrambleAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,

@@ -3311,6 +3311,9 @@
     // Native Bible Bugs only uses a plain manual Welcome Back recovery:
     // missing PCM can never launch an unrelated Zoo Break.
     useZooEscape: !nativeBugsAudio,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeBugsAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
