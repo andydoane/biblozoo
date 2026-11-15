@@ -313,6 +313,16 @@
   cursor: pointer;
 }
 
+.daily-feed-result-check {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.12em;
+  vertical-align: -0.12em;
+  color: #fff;
+  flex: none;
+}
+
 .daily-feed-result-back:active {
   transform: translateY(3px);
 

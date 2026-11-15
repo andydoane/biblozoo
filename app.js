@@ -15764,21 +15764,6 @@ function screenTitle(idx) {
         dailyHomePlan.verseId
       )
     : "";
-  // A new rescue is celebrated once, on the home screen. If a Daily To-Do
-  // invitation is occupying the foreground, leave the celebration pending.
-  const zooCelebration = activeProfile && !tutorialActive && !showDailyOffer
-    ? window.BibloZooZooStats?.acknowledgeCelebration?.(activeProfile.id)
-    : null;
-  const zooCelebrationHtml = zooCelebration
-    ? `<section class="title-zoo-hero-celebration" role="status" aria-live="polite" aria-label="Zoo rescue celebration">
-        <div class="title-zoo-hero-spark" aria-hidden="true">★</div>
-        <div class="title-zoo-hero-copy"><strong>Zoo Hero!</strong>
-          <span>${zooCelebration.petsRescued ? `${zooCelebration.petsRescued} BibloPet${zooCelebration.petsRescued === 1 ? "" : "s"} rescued!` : ""}
-          ${zooCelebration.zooBreaksStopped ? `${zooCelebration.zooBreaksStopped} Zoo Break${zooCelebration.zooBreaksStopped === 1 ? "" : "s"} stopped!` : ""}</span>
-        </div>
-        <button type="button" class="title-zoo-hero-close no-zoom" aria-label="Dismiss Zoo Hero celebration">Yay!</button>
-      </section>`
-    : "";
   const dailyOfferHtml = showDailyOffer
     ? `
       <div
@@ -15975,7 +15960,6 @@ function screenTitle(idx) {
         ${dailyProgressHtml}
       </button>
 
-      ${zooCelebrationHtml}
       <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
     </div>
@@ -15983,9 +15967,6 @@ function screenTitle(idx) {
     ${dailyOfferHtml}
   `;
 
-  wrap.querySelector(".title-zoo-hero-close")?.addEventListener("click", () => {
-    wrap.querySelector(".title-zoo-hero-celebration")?.remove();
-  });
   const titleMyVersesBtn = wrap.querySelector("#titleMyVersesBtn");
   if (titleMyVersesBtn) {
     titleMyVersesBtn.onclick = (e) => {
