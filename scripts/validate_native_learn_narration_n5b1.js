@@ -73,7 +73,7 @@ function mock({ ios=true, nativeOnly=true, activation=null, prepare=null }={}) {
   };
   const window={Capacitor:{isNativePlatform:()=>ios,getPlatform:()=>ios?"ios":"web",
     Plugins:{BibloZooNativeSound:api}},
-    BibloZooNativeOnlyOutput:{enabled:nativeOnly},document,
+    BibloZooNativeOnlyOutput:{enabled:nativeOnly,devToolsAllowed:nativeOnly},document,
     addEventListener(name,cb){listeners[name]=cb;},
     setTimeout,clearTimeout};
   vm.runInNewContext(controller,{window,document,Date,Promise,console,setTimeout,clearTimeout});

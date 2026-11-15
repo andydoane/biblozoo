@@ -159,7 +159,7 @@ function makeTest() {
   };
   const output={devPrepareForMicrophone(){calls.push("output-idle");
     return Promise.resolve({prepared:true})}};
-  const win={document:doc,BibloZooNativeOnlyOutput:{enabled:true},
+  const win={document:doc,BibloZooNativeOnlyOutput:{enabled:true,devToolsAllowed:true},
     addEventListener:(k,fn)=>winEvents[k]=fn,
     Capacitor:{isNativePlatform:()=>true,getPlatform:()=>"ios",
       Plugins:{BibloZooMicSessionProbe:mic,BibloZooNativeSound:output}}};

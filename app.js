@@ -48,6 +48,13 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // Set DEBUG_MODE = false when you’re ready to remove this.
 // =========================================================
 const DEBUG_MODE = false;
+
+// Hide progress/reset/utility debug shortcuts on production native iOS.
+// Leave their historical behavior on Web/PWA/Android and Audio Test.
+function allowDevShortcuts() {
+  return window.BibloZooNativeOnlyOutput?.enabled !== true ||
+    window.BibloZooNativeOnlyOutput?.devToolsAllowed === true;
+}
 // Release fallback: set false to restore Classic-only Daily feeding.
 // Developer Preview remains independent of this switch.
 const ENABLE_DAILY_FEEDING_VARIETY = true;
@@ -7695,7 +7702,7 @@ window.BibloZooDailyQuestions
     isMuted: () => muted,
 
     isDebugLongPressEnabled: () =>
-      FEATURES.DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true,
+      FEATURES.DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true && allowDevShortcuts(),
 
     getVerseList: () =>
       VERSE_LIST,
@@ -18412,7 +18419,7 @@ function screenTitle(idx) {
       ));
     };
 
-    bindLongPress(titleTodoBtn, {
+    if (allowDevShortcuts()) bindLongPress(titleTodoBtn, {
       delay: 1200,
       shouldStart: () => !isTutorialActive(),
       onLongPress:
@@ -18517,7 +18524,7 @@ function screenTitle(idx) {
       go(Screen.VERSE_DETAIL);
     };
 
-    bindLongPress(titleZooStrip, {
+    if (allowDevShortcuts()) bindLongPress(titleZooStrip, {
       delay:
         HIDDEN_DAILY_TODO_RESET_LONG_PRESS_MS,
 
@@ -18583,7 +18590,7 @@ function screenTitle(idx) {
     });
   }
 
-  bindLongPress(titleLogoSecretWrap, {
+  if (allowDevShortcuts()) bindLongPress(titleLogoSecretWrap, {
     delay: HIDDEN_LEARN_COMPLETE_LONG_PRESS_MS,
     shouldStart: () => HAS_VERSE_SELECTION && !!VERSE_ID,
     onLongPress: () => {
@@ -18708,7 +18715,7 @@ function screenSettings(idx) {
   const settingsHeading =
     wrap.querySelector(".settings-heading");
 
-  bindLongPress(settingsHeading, {
+  if (allowDevShortcuts()) bindLongPress(settingsHeading, {
     delay: HIDDEN_UTILITIES_LONG_PRESS_MS,
     onLongPress: () => {
       const returnTo =
@@ -20924,7 +20931,7 @@ function screenTodo(idx) {
 
   bindHomePill(wrap);
 
-  bindLongPress(wrap.querySelector("#todoComingSoonCard"), {
+  if (allowDevShortcuts()) bindLongPress(wrap.querySelector("#todoComingSoonCard"), {
     delay: 1000,
     onLongPress: () => {
       go(Screen.TODO_DEV);
@@ -23720,7 +23727,7 @@ function screenPractice(idx) {
 
   const practiceTitle = wrap.querySelector("#practiceTitle");
   if (practiceTitle) {
-    bindLongPress(practiceTitle, {
+    if (allowDevShortcuts()) bindLongPress(practiceTitle, {
       delay: HIDDEN_PRACTICE_LONG_PRESS_MS,
       onLongPress: () => launchHiddenPracticeGame()
     });

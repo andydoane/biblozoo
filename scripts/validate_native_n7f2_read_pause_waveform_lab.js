@@ -215,7 +215,7 @@ async function verifyAuditionActuallyWorks(){
   const calls=[];
   const root={
     document:doc,
-    BibloZooNativeOnlyOutput:{enabled:true},
+    BibloZooNativeOnlyOutput:{enabled:true,devToolsAllowed:true},
     Capacitor:{isNativePlatform:()=>true,getPlatform:()=>"ios",
       Plugins:{BibloZooNativeReadOutput:{
         auditionCue(args){calls.push({type:"audition",...args});

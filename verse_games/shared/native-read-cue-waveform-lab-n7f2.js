@@ -5,6 +5,7 @@
   "use strict";
   const doc = root.document;
   const allowed = () => root.BibloZooNativeOnlyOutput?.enabled === true &&
+      root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
     root.Capacitor?.isNativePlatform?.() === true &&
     root.Capacitor?.getPlatform?.() === "ios";
   if (!allowed() || !doc) return;

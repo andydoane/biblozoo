@@ -154,7 +154,7 @@ function createEnvironment({ios=true,enabled=true,denied=false,failedStart=false
   const output={devPrepareForMicrophone(){calls.push("handoff");
     return Promise.resolve({prepared:true,reason:"output-worker-idle"});}};
   const win={
-    document:doc,BibloZooNativeOnlyOutput:{enabled},
+    document:doc,BibloZooNativeOnlyOutput:{enabled,devToolsAllowed:enabled},
     Capacitor:{isNativePlatform:()=>ios,getPlatform:()=>ios?"ios":"web",
       Plugins:{BibloZooMicSessionProbe:mic,BibloZooNativeSound:output}},
     setTimeout:()=>1,clearTimeout:()=>{},

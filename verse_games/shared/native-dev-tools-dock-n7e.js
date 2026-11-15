@@ -6,6 +6,7 @@
   const doc = root.document;
   if (!doc) return;
   const allowed = () => root.BibloZooNativeOnlyOutput?.enabled === true &&
+      root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
     root.Capacitor?.isNativePlatform?.() === true &&
     root.Capacitor?.getPlatform?.() === "ios";
   // DEV-only opt-in, shared by main app and same-origin standalone pages.

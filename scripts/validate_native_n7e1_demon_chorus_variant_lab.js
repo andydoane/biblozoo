@@ -145,7 +145,7 @@ function makeNative(){
    },
    stopCapturePlayback(){calls.push("stop-play");return Promise.resolve({stopped:true})}
  };
- const win={document:doc,BibloZooNativeOnlyOutput:{enabled:true},
+ const win={document:doc,BibloZooNativeOnlyOutput:{enabled:true,devToolsAllowed:true},
    addEventListener:()=>{},
    Capacitor:{isNativePlatform:()=>true,getPlatform:()=>"ios",
     Plugins:{BibloZooMicSessionProbe:mic,
