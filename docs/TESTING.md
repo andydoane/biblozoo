@@ -1,6 +1,8 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Step 3a: harden developer-only controls on production iOS
+## CURRENT — Step 3b: first-party native iOS privacy manifest (Step 3a merged)
+
+**Current branch heads verified 2026-11-15:** [Step 3a PR #113](https://github.com/andydoane/biblozoo/pull/113) was merged at `264c4025` into `integration/native-audio-to-ios-prep`, with [post-merge Node/Web CI PASS](https://github.com/andydoane/biblozoo/actions/runs/43773542164). `ios-prep` remains untouched at `c0a3b4bf`. The historical Step 1/Step 2 language below is background, not current PR status. Step 3b [PR #114](https://github.com/andydoane/biblozoo/pull/114) is **review-only and not merged**: see `docs/IOS-PRODUCTION-PRIVACY-AUDIT.md` and `scripts/validate_native_ios_privacy_manifest.js` for source-grounded SystemBootTime/35F9.1 and FileTimestamp/3B52.1 declarations and explicit remaining Apple-SDK/physical privacy checks. No production-ID iPhone installation until a verified original-app backup, remaining Step 3 controls and explicit owner approval.
 
 **Owner completed Step 1 on 2026-11-15:** `integration/native-audio-to-ios-prep` exists at `70dd83564b1671505b47c5d4432b60c1f535ef35`, the same head as merged roadmap [PR #111](https://github.com/andydoane/biblozoo/pull/111). `ios-prep` remains unchanged.
 
