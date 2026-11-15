@@ -17,7 +17,7 @@ const scene = read("ios/App/App/SceneDelegate.swift");
 const pbx = read("ios/App/App.xcodeproj/project.pbxproj");
 const index = read("index.html");
 const config = JSON.parse(read("capacitor.config.json"));
-assert.equal(config.appId, "com.andydoane.biblozoo.audiotest");
+assert.equal(config.appId, "com.andydoane.biblozoo");
 const sounds = [
   ["pilot-unlock", "ui_audio/ui_pet_unlock.mp3", "ui_pet_unlock"],
   ["feed-star", "verse_images/daily_questions/dq_feed_star.mp3", "dq_feed_star"],
@@ -118,7 +118,8 @@ assert.match(gesture, /try AVAudioSession\.sharedInstance\(\)\.setActive\(true\)
 assert.match(gesture, /self\.interrupted = false/);
 assert.match(gesture, /catch let error as NSError/);
 assert.match(gesture, /"ready": false/);
-assert.match(scene, /Bundle\.main\.bundleIdentifier == "com\.andydoane\.biblozoo\.audiotest"/);
+assert.match(scene, /BibloZooIOSIdentity\.nativeAudioEnabled/);
+assert.match(scene, /static var experimentalToolsEnabled/);
 assert.match(scene, /"legacy-web-recovery-disabled"/);
 assert.match(swift, /private let maxTraceEvents = 28/);
 assert.match(swift, /"recentEvents": self\.eventTrace/);

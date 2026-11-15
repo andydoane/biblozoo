@@ -1,5 +1,15 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — production native-audio identity integration (Step 2; review only)
+
+**Owner completed Step 1 on 2026-11-15:** `integration/native-audio-to-ios-prep` exists at `70dd83564b1671505b47c5d4432b60c1f535ef35`, the same head as merged roadmap [PR #111](https://github.com/andydoane/biblozoo/pull/111). `ios-prep` remains unchanged.
+
+**Step 2 proposed source/test scope:** `fix/promote-native-audio-production-identity` targets only the integration branch. The code candidate restores `com.andydoane.biblozoo` and **BibloZoo** in Capacitor, Xcode Debug/Release and Info.plist; early built-HTML native-only guard must run on the normal iOS bundle and on the separate .audiotest bundle (never Web/PWA/Android). Swift explicitly separates `nativeAudioEnabled` for approved iOS app identities from `experimentalToolsEnabled` for DEV-only mic probes and Read audio auditions. Original Read playback, Flashcards mic/record and playback, image picker, legacy recovery disable and iOS App Switcher pause must work on production identity. Keep AVFoundation audio session category, no auto-resume, microphone privacy and stored progress unchanged.
+
+**Required before integrating and installing:** node validators for identity, sound plugin smoke, native-only output (also `npm run build` followed by output-gate assertion in every built HTML entrypoint), Flashcards capture/Read/legacy recovery; Swift grammar parse on Linux; Web build; actual Mac Apple-SDK Xcode build; hardware audible/mic and data-preservation gate in the [living integration roadmap](PROJECT-HANDOFF.md#current-priority--promote-native-ios-audio-into-ios-prep-roadmap-2026-11-15). **Do not test this production-ID candidate on an iPhone containing valuable original BibloZoo profiles before Step 3 DEV/privacy audit and a verified usable export/backup.** Step 2 CI success is not production integration approval.
+
+---
+
 ## CURRENT — [PR #107](https://github.com/andydoane/biblozoo/pull/107) Final Zoo surprise scope: Home Zoo To-Do + 12 Practice Games + 4 Playground apps (owner iPhone acceptance PENDING)
 
 **Owner decision, 2026-11-15:** [PR #106](https://github.com/andydoane/biblozoo/pull/106) is **MERGED** at `39909ea`; the owner reports **all real-iPhone Learn/Feeding tests PASSED**. The following narrowed eligibility / native production opt-in is a *new proposal*, not yet owner device-tested or approved for merge. Earlier PR #106 "OPEN / iPhone PENDING" descriptions below are historical.

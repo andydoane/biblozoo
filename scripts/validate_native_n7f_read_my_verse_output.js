@@ -38,8 +38,10 @@ const exportStart=swift.indexOf("@objc(BibloZooGhostWriterExportPlugin)",readSta
 assert(readStart >= 0 && exportStart > readStart,
   "Read playback and user-initiated export are separate native owners");
 const plug=swift.slice(readStart,exportStart);
-has(plug,'Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest"',
-    "Never native-activate normal/stable installed app");
+has(plug,"BibloZooIOSIdentity.nativeAudioEnabled",
+    "Read native output must work on the original production identity");
+has(plug,"BibloZooIOSIdentity.experimentalToolsEnabled",
+    "Read DEV audition still requires the separate Audio Test");
 has(plug,'AVAudioSession.sharedInstance().category == .soloAmbient',
     "Preserve single nonmixing output session category");
 has(plug,'try AVAudioSession.sharedInstance().setActive(true)',

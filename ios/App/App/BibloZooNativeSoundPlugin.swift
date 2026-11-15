@@ -890,7 +890,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         let appState = UIApplication.shared.applicationState == .active
             ? "active" : "not-active"
         var lines = [
-            "BibloZoo Audio Test | N2.2 Native Timing Report",
+            "BibloZoo | N2.2 Native Timing Report",
             "Manually copied from DEV panel; no automatic upload.",
             "App state: \(appState); interruption pending: \(interrupted); " +
                 "foreground epoch: \(foregroundEpoch); late chomp marks: \(lateChompMarks)",
@@ -2388,8 +2388,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         guard let pending = pendingFlashcardsMicHandoff else { return }
         pendingFlashcardsMicHandoff = nil
         let session = AVAudioSession.sharedInstance()
-        guard Bundle.main.bundleIdentifier ==
-                  "com.andydoane.biblozoo.audiotest",
+        guard BibloZooIOSIdentity.nativeAudioEnabled,
               UIApplication.shared.applicationState == .active,
               !wasOutsideForeground, !interrupted, !needsGestureAfterReset,
               beganEventCount - suspendedEventCount == pending.began,
@@ -3315,8 +3314,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     @objc func devPrepareForMicrophone(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self,
-                  Bundle.main.bundleIdentifier ==
-                    "com.andydoane.biblozoo.audiotest",
+                  BibloZooIOSIdentity.nativeAudioEnabled,
                   UIApplication.shared.applicationState == .active,
                   AVAudioSession.sharedInstance().category == .soloAmbient else {
                 call.resolve(["prepared":false,"reason":"unsafe-session-state"])
