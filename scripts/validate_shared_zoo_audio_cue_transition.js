@@ -170,14 +170,14 @@ function ownerFunction(source,name,next){
 }
 function verifyNativePlayingOwners(){
   let stopped=0,holdFinished=0,typerClockPaused=0,typerClockResumed=0;
-  let typerReady=false;
+  let typerReady=false,typerScheduled=false;
   const t={
     nativeTyperAudio:{stop(){stopped++;},isReady(){return typerReady;}},
     state:{screen:"game",paused:false},
     returnPaused:false,wasPausedBeforeReturn:false,muted:false,
     finishNativeHold(){holdFinished++;},beginNativeHold(){},
     welcomeClock:{pause(){typerClockPaused++;},resume(){typerClockResumed++;}},
-    scheduleCaterpillarPositionUpdate(){this.scheduled=true}
+    scheduleCaterpillarPositionUpdate(){typerScheduled=true}
   };
   vm.runInNewContext(ownerFunction(typer,"pauseTyperForReturn","continueTyperAfterReturn")+
     "\n"+ownerFunction(typer,"continueTyperAfterReturn","setScreen")+
@@ -196,7 +196,7 @@ function verifyNativePlayingOwners(){
   assert.equal(t.returnPaused,false);
   assert.equal(t.state.paused,false);
   assert.equal(typerClockResumed,1);
-  assert.equal(t.scheduled,true,"Typer resumes same saved verse layout, not a new round");
+  assert.equal(typerScheduled,true,"Typer resumes same saved verse layout, not a new round");
 
   let canceled=[],schedules=[],mowerSound=[],mowerStops=0,removed=0,coverage=0;
   const sprite={remove(){removed++;}};
