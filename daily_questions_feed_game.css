@@ -746,6 +746,20 @@
 .daily-feed-control-message[hidden],
 .daily-feed-selected-control-icon[hidden] { display: none !important; }
 .daily-feed-start-card { max-height: calc(100% - 12px); overflow-y: auto; }
+/* Bounce lost-ball relaunch: size the card to its title, avatar and Launch
+   button, not the full control-selection width. Keep safe viewport limits. */
+.daily-feed-start-overlay.is-bounce-serve .daily-feed-start-card {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: min(88vw, 440px);
+  gap: clamp(10px, 2vh, 16px);
+  padding: clamp(16px, 4vw, 26px) clamp(18px, 5vw, 30px);
+}
+.daily-feed-start-overlay.is-bounce-serve .daily-feed-start-confirm {
+  width: auto;
+  gap: clamp(8px, 1.5vh, 14px);
+}
+.daily-feed-start-instruction[hidden] { display: none !important; }
 .daily-feed-start-choice,
 .daily-feed-start-confirm {
   width: 100%;

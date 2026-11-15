@@ -1129,9 +1129,17 @@ function makeBounceRuntime(earnedStarPegCount = 0) {
     catcherX: 195,
     catcher: { style: { left: "" }, classList: { remove() {}, add() {} }, offsetWidth: 1 },
     petCircle: { style: { setProperty() {} } },
-    startOverlay: { hidden: true },
-    startTitleEl: { textContent: "" },
-    startInstructionEl: { textContent: "" },
+    startOverlay: { hidden: true, classList: {
+      tokens: new Set(),
+      add(name) { this.tokens.add(name); },
+      remove(name) { this.tokens.delete(name); },
+      contains(name) { return this.tokens.has(name); }
+    } },
+    startBallsEl: { hidden: false },
+    startTitleEl: { textContent: "", hidden: true },
+    startInstructionEl: { textContent: "", hidden: false },
+    startServeAvatarEl: { hidden: true },
+    startConfirmButton: { textContent: "" },
     pegs: [],
     balls: [],
     bursts: [],
@@ -1398,6 +1406,11 @@ function testBounceWhiteBallsAccelerateIndependently() {
 }
 
 function testBounceThreeLivesAndPopup() {
+  assert.match(feedGameCssSource,
+    /\.daily-feed-start-overlay\.is-bounce-serve \.daily-feed-start-card\s*\{[^}]*width:\s*fit-content;/,
+    "Only Bounce relaunch uses content-sized card");
+  assert.match(feedGameCssSource, /\.daily-feed-start-instruction\[hidden\]/,
+    "Hidden relaunch instruction occupies no card space");
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const state = runtime.bounce;
@@ -1409,7 +1422,16 @@ function testBounceThreeLivesAndPopup() {
     if (lives) {
       assert.strictEqual(state.waitingServe, true);
       assert.strictEqual(runtime.startTitleEl.textContent, `${lives} Balls Left!`);
-      assert.strictEqual(runtime.startInstructionEl.textContent, "Tap to launch");
+      assert.strictEqual(runtime.startInstructionEl.textContent, "");
+      assert.strictEqual(runtime.startInstructionEl.hidden, true,
+        "Redundant Tap to launch instruction is hidden");
+      assert.strictEqual(runtime.startTitleEl.hidden, false,
+        "Balls Left heading is visible on each relaunch");
+      assert.strictEqual(runtime.startBallsEl.hidden, true);
+      assert.strictEqual(runtime.startServeAvatarEl.hidden, false);
+      assert.strictEqual(runtime.startConfirmButton.textContent, "Launch!");
+      assert.strictEqual(runtime.startOverlay.classList.contains("is-bounce-serve"), true,
+        "Only the lost-ball relaunch uses the compact card");
       assert.strictEqual(runtime.startOverlay.hidden, false);
     } else {
       assert.strictEqual(state.ended, true);
