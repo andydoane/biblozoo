@@ -2345,7 +2345,8 @@
         // Balloons/Fish final LOCK GATE can fail even when its earlier
         // pet-unlock cue was verified. Return to an explicit Welcome Back,
         // never strand the disabled gate or thaw the scene on a play() ACK.
-        retryReadZooFinalRecovery(recovery);
+        if (readZooFinalRecovery === recovery)
+          retryReadZooFinalRecovery(recovery);
         syncReadAudioOverlay();
         return;
       }
