@@ -47,6 +47,10 @@ for(const name of ["KEYBOARD","TYPEWRITER","BALLOONS","FISH",
 }
 
 const readSource=[
+  // The genuine owner completion helper now keeps a surprise's clocks frozen;
+  // this isolated N7m test still checks the original no-Zoo native path.
+  select(activity,"  function finishVerifiedReadRecovery(recovery, generation, continueActivity) {",
+                  "  function holdReadSceneDuringSurprise() {"),
   select(activity,"  function pauseReadForInterruption() {",
                   "  // play() fulfilling only means the request was accepted by WebKit."),
   select(activity,"  function resumeReadAudioFromGesture() {",
@@ -104,6 +108,7 @@ function fixture({activityId="keyboard",delayActivation=false}={}){
     readDeferredNarrationFinish:null,readPauseTimerTask:null,
     pauseTimer:0,crawlMusic:null,crawlEnding:null,
     activeAudio:null,readZooRecovery:null,
+    readZooEscape:null,readZooVerifiedRecovery:null,
     isTypingActivity:id=>id==="keyboard"||id==="typewriter",
     isAnimatedActivity:isAnimated,
     activeReadScene:()=>isAnimated(activityId)?scene:null,
