@@ -55,7 +55,7 @@ for(const id of playground){
 }
 match(read("verse_playground/verse_jam/game.js"),/allowZooSurprises: false/,
   "Verse Jam excluded even with DEV Force");
-match(app,/learnZooEscape = window\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*preselectWelcomeSurprise: false/,
+match(app,/learnZooEscape = window\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*recoveryOnly: true,\s*preselectWelcomeSurprise: false/,
   "Learn Chunks and Echo retain recovery but no surprises");
 match(app,/recoveryOnly: true/, "Learn engine forbids failure-driven Zoo stages");
 match(app,/if \(!isNativeLearnListenMode\(\) &&/,
