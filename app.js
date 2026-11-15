@@ -12157,7 +12157,9 @@ function resumeInterruptedLearnAudio(fromMenuClose = false) {
 function pauseLearnAudioForInterruption() {
   // A second iOS task switch during a Zoo cue/pet/LOCK GATE invalidates
   // that sound attempt; never reuse the earlier AVAudioPlayer clock proof.
-  if (learnZooCueVerified || learnZooHoldingForSurprise) {
+  if ((typeof learnZooCueVerified !== "undefined" && learnZooCueVerified) ||
+      (typeof learnZooHoldingForSurprise !== "undefined" &&
+        learnZooHoldingForSurprise)) {
     learnZooCue?.stop();
     learnZooCueVerified = false;
     ++learnZooCueGeneration;
