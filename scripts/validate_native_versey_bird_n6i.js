@@ -191,7 +191,7 @@ async function welcome() {
   assert.match(game,/if \(nativeBirdAudio\) stopNativeBirdRound\(\);[\s\S]{0,180}if \(returnPaused\) return;/);
   assert.match(game,/nativeBirdAudio\.prepareFromGesture\(\)\.then\(result/);
   assert.match(game,/nativeAudioResumeResult/);
-  assert.match(game,/useZooEscape: !nativeBirdAudio/);
+  assert.match(game,/useZooEscape: true/);
   assert.match(game,/suppressUiSound: !!nativeBirdAudio/);
   assert.match(game,/birdWelcomeBack\?\.showAfterNativeActive/);
   assert.match(game,/birdWelcomeBack\?\.pauseFromNativeInactive/);

@@ -214,7 +214,7 @@ async function testWelcome(){
   assert.match(game,/towerWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
   assert.match(game,/nativeTowerAudio\.prepareFromGesture\(\)\.then\(result/);
   assert.match(game,/nativeAudioResumeResult/);
-  assert.match(game,/useZooEscape: !nativeTowerAudio/);
+  assert.match(game,/useZooEscape: true/);
   assert.match(game,/suppressUiSound: !!nativeTowerAudio/);
   assert.match(game,/if \(nativeTowerAudio\) return null;[\s\S]*function primeHtmlAudio/);
   assert.match(game,/if \(nativeTowerAudio\) return; \/\/ No iOS Web decoder/);

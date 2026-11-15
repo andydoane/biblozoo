@@ -19,7 +19,7 @@ assert.match(workflow,/validate_native_food_slice_n6d\.js/);
 assert.ok(html.indexOf("native-food-slice-audio.js")>0 &&
   html.indexOf("native-food-slice-audio.js")<html.indexOf('src="./game.js"'));
 assert.match(css,/fs-native-audio-failure/);
-assert.match(game,/useZooEscape: !nativeSliceAudio/);
+assert.match(game,/useZooEscape: true/);
 assert.match(game,/suppressUiSound: !!nativeSliceAudio/);
 assert.match(game,/sliceWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/sliceWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);

@@ -56,7 +56,7 @@ assert.match(game,/primeBibleBugsFromGesture\("resume", null, nextUiTapKey\(\)\)
 assert.match(game,/primeBibleBugsFromGesture\("resume"\)/);
 assert.match(game,/bugsWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/bugsWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
-assert.match(game,/useZooEscape: !nativeBugsAudio/);
+assert.match(game,/useZooEscape: true/);
 assert.match(game,/suppressUiSound: !!nativeBugsAudio/);
 assert.match(game,/nativeBugsAudio\.prepareFromGesture\(\)\.then/);
 assert.match(game,/function cancelNativeBugsPreflight/);

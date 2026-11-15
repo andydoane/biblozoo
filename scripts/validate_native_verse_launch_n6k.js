@@ -215,7 +215,7 @@ function entryAndMenus(){
     "asteroid bonus Game Close also re-prepares same PCM bank");
 }
 async function welcome(){
-  assert.match(game,/useZooEscape: !nativeLaunchAudio/);
+  assert.match(game,/useZooEscape: true/);
   assert.match(game,/suppressUiSound: !!nativeLaunchAudio/);
   assert.match(game,/launchWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
   assert.match(game,/launchWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);

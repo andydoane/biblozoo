@@ -20,7 +20,7 @@ assert.match(workflow,/validate_native_verse_invaders_n6g\.js/);
 assert.ok(html.includes("native-verse-invaders-audio.js") &&
  html.indexOf("native-verse-invaders-audio.js")<html.indexOf('src="./game.js"'));
 assert.match(css,/vinv-native-audio-failure/);
-assert.match(game,/useZooEscape: !nativeInvadersAudio/);
+assert.match(game,/useZooEscape: true/);
 assert.match(game,/suppressUiSound: !!nativeInvadersAudio/);
 assert.match(game,/invadersWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/invadersWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);

@@ -194,7 +194,7 @@ function realMenus(){
   assert.ok(calls.includes("stopRound")&&calls.includes("mode"));
 }
 async function welcome(){
-  assert.match(game,/useZooEscape: !nativeTrafficAudio/);
+  assert.match(game,/useZooEscape: true/);
   assert.match(game,/suppressUiSound: !!nativeTrafficAudio/);
   assert.match(game,/trafficWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
   assert.match(game,/trafficWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);

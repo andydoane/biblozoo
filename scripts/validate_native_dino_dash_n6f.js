@@ -18,7 +18,7 @@ assert.match(workflow,/validate_native_dino_dash_n6f\.js/);
 assert.ok(html.indexOf("native-dino-dash-audio.js")>0 &&
  html.indexOf("native-dino-dash-audio.js")<html.indexOf('src="./game.js"'));
 assert.match(css,/dd2-native-audio-failure/);
-assert.match(game,/useZooEscape: !nativeDinoAudio/);
+assert.match(game,/useZooEscape: true/);
 assert.match(game,/suppressUiSound: !!nativeDinoAudio/);
 assert.match(game,/dinoWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/dinoWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);

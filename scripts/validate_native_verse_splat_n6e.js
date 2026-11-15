@@ -14,7 +14,7 @@ assert.match(handoff,/N6e/);
 assert.match(workflow,/validate_native_verse_splat_n6e\.js/);
 assert.ok(html.indexOf("native-verse-splat-audio.js")>=0 &&
   html.indexOf("native-verse-splat-audio.js")<html.indexOf('src="./game.js"'));
-assert.match(game,/useZooEscape: !nativeSplatAudio/);
+assert.match(game,/useZooEscape: true/);
 assert.match(game,/suppressUiSound: !!nativeSplatAudio/);
 assert.match(game,/splatWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/splatWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
