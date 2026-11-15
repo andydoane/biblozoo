@@ -114,7 +114,7 @@ function makeNativeResumeHarness() {
     }
   };
   const src = sliceBetween(
-    '  function attemptFeedingResumeFromGesture(runtime, onSettled) {',
+    '  function attemptFeedingResumeFromGesture(runtime, onSettled,',
     '  function attachFeedInterruptionHandlers(runtime) {');
   vm.runInNewContext(src + '\nthis.__resume=attemptFeedingResumeFromGesture;', sandbox, {
     filename:"Feeding native activity resume"
