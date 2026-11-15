@@ -406,6 +406,7 @@ jobs:
           node scripts/validate_patch72_1b_feeding_zoo_escape.js
           node scripts/validate_patch72_1c_whole_app_zoo_escape.js
           node scripts/validate_shared_zoo_audio_cue_transition.js
+          node scripts/validate_learn_feeding_zoo_cue_transition.js
           node scripts/validate_patch72_1c1_whole_app_test_harness.js
           node scripts/validate_patch72_1c2_identity_artwork_exit.js
           node scripts/validate_patch72_1c3_zoo_escape_sounds.js
