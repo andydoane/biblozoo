@@ -346,6 +346,124 @@ async function run() {
     'LOCK GATE starts the original Crawl track, not a second cue');
   equal(cueAnimation.paused,false,'scene resumes only after final music clock moves');
 
+  // Balloons and Fish have the same frozen animated-scene owner as Crawl,
+  // but they may be narrating a verse OR between clips when interrupted.
+  // A selected surprise must not sneak in an initial verse narration burst.
+  function animatedZooFixture(activityId, {
+    narration = true, rejectMedia = false, rejectNarration = false,
+    muted = false
+  } = {}) {
+    const t = harness({zoo:true, muted, progressMedia:true, rejectMedia,
+      rejectNarration});
+    t.setup(activityId,'animating');
+    const clock={currentTime:75,paused:false,
+      pause(){this.paused=true;},play(){this.paused=false;}};
+    const track={startMs:12345};
+    const scene={active:true,timers:new Set(),wordTracks:[track],
+      balloonTracks:[],wrap:{
+        classList:{add(){},remove(){}},
+        getAnimations(){return [clock];}
+      }};
+    t.probe.setAnimatedScene(activityId,scene);
+    if(narration)t.probe.setAnimatedNarration(scene,{
+      index:0,audioStarted:true,audioDone:false,vanished:false
+    });
+    t.doc.hidden=true;t.fire('doc','visibilitychange');
+    t.doc.hidden=false;t.fire('win','pageshow');
+    return {t,clock,track};
+  }
+  async function verifyAnimatedZooCue(activityId) {
+    const {t,clock,track}=animatedZooFixture(activityId);
+    const before=track.startMs;
+    const tap=t.zoo.verifiedTap('escape');
+    await flush();t.runShortTimers();
+    equal(await tap,true,activityId+': cue clock verified before pet escape');
+    equal(t.stats.playedSources.length,1,
+      activityId+': verse narration must not start on initial selected-escape gesture');
+    equal(t.stats.playedSources[0],'./ui_audio/ui_pet_unlock.mp3',
+      activityId+': use original BibloPet unlock cue');
+    check(t.probe.verified?.cueOnly,activityId+': verified cue uses two-gesture path');
+    equal(clock.paused,true,activityId+': animation stays frozen throughout cue');
+    equal(track.startMs,before,activityId+': track clock does not progress under cue');
+    t.zoo.beginEscape();
+    equal(clock.paused,true,activityId+': pet rescue does not unfreeze narration scene');
+    t.zoo.finishEscape();
+    check(!!t.probe.recovery,activityId+': LOCK GATE waits for original narration proof');
+    await flush();
+    equal(t.probe.recovery,null,activityId+': verified narration releases recovery');
+    equal(t.stats.playedSources.length,2,
+      activityId+': only cue then original verse narration play');
+    check(t.stats.playedSources[1].startsWith('./verse_audio/'),
+      activityId+': final gate starts original verse, never another cue');
+    equal(clock.paused,false,activityId+': animation thaws after final verified audio');
+    check(track.startMs>before,activityId+': original scene timeline is shifted, not reset');
+  }
+  for(const id of ['balloons','fish'])await verifyAnimatedZooCue(id);
+
+  // In a narration gap, final LOCK GATE has no verse clip to play; the
+  // activity owner still needs a real session decision, and no fake audio.
+  for(const id of ['balloons','fish']){
+    const {t,clock}=animatedZooFixture(id,{narration:false});
+    const tap=t.zoo.verifiedTap('break');
+    await flush();t.runShortTimers();
+    equal(await tap,true,id+': quiet animation interval verifies the cue');
+    equal(t.stats.playedSources.length,1,
+      id+': no verse narration is manufactured just to prove audio');
+    t.zoo.beginEscape();t.zoo.finishEscape();
+    await flush();
+    equal(t.probe.recovery,null,id+': quiet interval final gesture resumes scene');
+    equal(t.stats.playedSources.length,1,id+': no extra audio on quiet final gate');
+    equal(clock.paused,false,id+': original quiet scene can continue');
+  }
+
+  for(const id of ['balloons','fish']){
+    const {t,clock}=animatedZooFixture(id,{rejectNarration:true});
+    const ready=t.zoo.verifiedTap('escape');
+    await flush();t.runShortTimers();
+    equal(await ready,true,id+': first gesture recovers with real cue');
+    t.zoo.beginEscape();t.zoo.finishEscape();
+    await flush();
+    check(!!t.probe.recovery,id+': rejected final narration does not pass');
+    check(t.zoo.isPaused(),id+': failed gate returns explicit Welcome Back');
+    equal(clock.paused,true,id+': rejected narration cannot thaw animated scene');
+    equal(t.stats.playedSources.length,2,
+      id+': final gesture actually attempted original narration');
+  }
+
+  for(const id of ['balloons','fish']){
+    const {t}=animatedZooFixture(id,{rejectMedia:true});
+    const tap=t.zoo.verifiedTap('escape');
+    await flush();t.runShortTimers();
+    equal(await tap,false,id+': refused cue cannot pass Zoo verifier');
+    check(!t.probe.verified,id+': no verified surprise on refused sound');
+    equal(t.probe.recovery.kind,'animated',id+': frozen checkpoint preserved');
+  }
+
+  // Do not replay an obsolete cue after a second iPhone lock.
+  for(const id of ['balloons','fish']){
+    const {t,clock}=animatedZooFixture(id);
+    const stale=t.zoo.verifiedTap('escape');
+    t.doc.hidden=true;t.fire('doc','visibilitychange');
+    await flush();t.runShortTimers();
+    equal(await stale,false,id+': second lock cancels old cue result');
+    check(!t.probe.verified,id+': stale audio must not authorize surprise');
+    equal(clock.paused,true,id+': second lock keeps original scene paused');
+  }
+
+  // A NO-surprise Welcome Back still starts the genuine narration directly;
+  // the BibloPet unlock cue is not a universal sound replacement.
+  for(const id of ['balloons','fish']){
+    const {t}=animatedZooFixture(id);
+    const tap=t.zoo.verifiedTap(null);
+    await flush();t.runShortTimers();
+    equal(await tap,true,id+': ordinary return verifies original narration');
+    equal(t.stats.playedSources.length,1,id+': only original narration starts');
+    check(t.stats.playedSources[0].startsWith('./verse_audio/'),
+      id+': no-surprise return never plays unlock cue');
+    t.zoo.finishEscape();
+    equal(t.probe.recovery,null,id+': ordinary verified return resumes without pen');
+  }
+
   const noCue=harness({zoo:true,muted:false,progressMedia:true});
   noCue.setup('star_wars','animating');
   noCue.doc.hidden=true;noCue.fire('doc','visibilitychange');
