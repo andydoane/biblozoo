@@ -127,7 +127,7 @@ function staticContracts(){
  for(const mode of ['classic','labyrinth','melody','bounce']){
   ok(feed.includes(`[FEED_MODES.${mode.toUpperCase()}]`),mode+' registered');
  }
- for(const text of ['window.BibloZooZooEscape.create({','recover: () => {',
+ for(const text of ['window.BibloZooZooEscape.create({','recover: info => {',
    'attemptFeedingResumeFromGesture(runtime, resolve)','runtime.zooEscape?.start?.()',
    'runtime.zooEscape?.destroy?.()','runtime.onRecoveryExitToZoo || runtime.onBackToZoo',
    'soundIsReady: () => zooEscapeSoundReady(runtime)',
