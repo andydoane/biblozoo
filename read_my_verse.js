@@ -49,9 +49,10 @@
   // Verse Crawl uses ordinary HTML audio for PWA, iOS and Android alike.
   const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme_ducked.mp3`;
   const CRAWL_ENDING_SRC = `${ASSET_BASE}verse_crawl_theme_ending.mp3`;
-  // The original BibloPet unlock clip becomes the deliberate, audible
-  // recovery probe when an escape is preselected; Crawl music stays quiet.
-  const CRAWL_ZOO_ESCAPE_CUE_SRC = "./ui_audio/ui_pet_unlock.mp3";
+  // The original BibloPet unlock clip is the deliberate audio-recovery cue
+  // for animated Read scenes (Crawl, Balloons and Fish) with a Zoo surprise.
+  // Their normal soundtrack/narration stays quiet until the real LOCK GATE.
+  const ANIMATED_READ_ZOO_CUE_SRC = "./ui_audio/ui_pet_unlock.mp3";
   const CRAWL_FANFARE_SECONDS = 7;
   const CRAWL_RESUME_SECONDS = 9;
   const CRAWL_ENDING_OVERLAP_MS = 1000;
@@ -1688,7 +1689,7 @@
       // the controller calls onRecovered (immediately or at LOCK GATE).
       readZooVerifiedRecovery = {
         recovery, generation, continueActivity, pausedMedia: [],
-        cueOnly: recovery.crawlCueVerified === true,
+        cueOnly: recovery.readZooCueVerified === true,
         surpriseStarted: false
       };
       syncReadAudioOverlay();
@@ -1726,13 +1727,14 @@
         stopReadZooCue();
         if (!verified.surpriseStarted) {
           // A rare storage/selection failure never earns a surprise. A
-          // verified cue cannot silently restart Crawl without a new tap.
+          // verified cue cannot silently restart the scene without a new tap.
           readZooEscape?.start?.();
           syncReadAudioOverlay();
           return;
         }
-        // This is the genuine LOCK GATE click. Start the *original* Crawl
-        // playback now and retain the Zoo overlay until BOTH clocks verify.
+        // This is the genuine LOCK GATE click. Resume the original
+        // animated activity audio on its own second real gesture, then
+        // retain the Zoo overlay until that owner's media checks verify.
         readZooFinalRecovery = verified.recovery;
         if (!resumeReadAudioFromGesture())
           retryReadZooFinalRecovery(verified.recovery);
@@ -1847,10 +1849,9 @@
       readZooEscape = root.BibloZooZooEscape.create({
         overlay, profileId: state.context?.profileId,
         surpriseEnabled: true,
-        // Only Crawl preselects a random/DEV escape before sound starts.
-        // Other Read activities continue their established recovery behavior.
-        preselectWelcomeSurprise: () =>
-          state.activityId === VERSE_CRAWL_ACTIVITY_ID,
+        // Only the three animated Read activities can preselect a cue.
+        // Quiet typing/word/sequence activities keep their existing return.
+        preselectWelcomeSurprise: () => isAnimatedActivity(state.activityId),
         verseId: () => state.verseId,
         getSoundContext: () => scrambleAudioContext?.state === "running"
           ? scrambleAudioContext : keySoundContext?.state === "running"
@@ -2075,9 +2076,9 @@
     });
   }
 
-  function resumeCrawlWithZooCueFromGesture(recovery, generation, nativeActivation) {
+  function resumeAnimatedReadWithZooCueFromGesture(recovery, generation, nativeActivation) {
     // The surprise was provisionally selected in the SAME real Let's go tap.
-    // Don't even start Crawl's theme or narration until the child's final
+    // Keep Crawl's theme and Balloons/Fish narration completely silent until
     // LOCK GATE. Reuse the original packaged pet-unlock MP3, not WebAudio or
     // a second native plugin that might compete for session ownership.
     stopReadZooCue();
@@ -2088,7 +2089,7 @@
     const muted = appApi?.isMuted?.() === true;
     if (!muted) {
       try {
-        cue = new Audio(CRAWL_ZOO_ESCAPE_CUE_SRC);
+        cue = new Audio(ANIMATED_READ_ZOO_CUE_SRC);
         cue.preload = "auto";
         cue.volume = 0.55;
         cue.setAttribute?.("playsinline", "");
@@ -2110,12 +2111,12 @@
       readAudioRecoveryAttempt = null;
       if (!nativeReady || !progressed || root?.document?.hidden) {
         stopReadZooCue();
-        recovery.crawlCueVerified = false;
+        recovery.readZooCueVerified = false;
         recovery.error = "Audio isn't ready yet. Try again!";
         syncReadAudioOverlay();
         return;
       }
-      recovery.crawlCueVerified = true;
+      recovery.readZooCueVerified = true;
       finishVerifiedReadRecovery(recovery, generation, () => {
         thawReadPauseTimer();
         thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
@@ -2216,6 +2217,9 @@
     const generation = readAudioRecoveryGeneration;
     readAudioRecoveryAttempt = { generation };
     recovery.error = "";
+    // A prior interrupted/failed cue cannot leak into a later ordinary
+    // recovery attempt. Final LOCK GATE verification uses a separate guard.
+    recovery.readZooCueVerified = false;
     if (recovery.kind === "ack") {
       // Nothing must replay. This real tap can prime nonessential UI effects,
       // but no asynchronous unlock can restart input or stall acknowledgement.
@@ -2266,10 +2270,13 @@
         });
       return true;
     }
+    if (recovery.kind === "animated" && isAnimatedActivity(state.activityId) &&
+        options?.plannedSurprise && readZooEscape?.isPaused?.()) {
+      return resumeAnimatedReadWithZooCueFromGesture(
+        recovery, generation, nativeActivation);
+    }
     if (recovery.kind === "animated" &&
         state.activityId === VERSE_CRAWL_ACTIVITY_ID) {
-      if (options?.plannedSurprise && readZooEscape?.isPaused?.())
-        return resumeCrawlWithZooCueFromGesture(recovery, generation, nativeActivation);
       return resumeInterruptedCrawlFromGesture(recovery, generation);
     }
     // Start the real narration / music first in this user gesture. App UI
@@ -2335,6 +2342,10 @@
         if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
         if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
         recovery.error = "Audio isn't ready yet. Try again!";
+        // Balloons/Fish final LOCK GATE can fail even when its earlier
+        // pet-unlock cue was verified. Return to an explicit Welcome Back,
+        // never strand the disabled gate or thaw the scene on a play() ACK.
+        retryReadZooFinalRecovery(recovery);
         syncReadAudioOverlay();
         return;
       }
