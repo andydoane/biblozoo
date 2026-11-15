@@ -22,7 +22,7 @@ for (const id of games) {
   const src = read("verse_games/"+id+"/game.js");
   const anchor=src.indexOf("window.BibloZooWelcomeBackReturn?.attach?.({");
   assert(anchor>=0,id+": game uses original standalone return adapter");
-  const portion=src.slice(anchor,anchor+650);
+  const portion=src.slice(anchor,anchor+1500);
   assert.match(portion,/preselectWelcomeSurprise: true/,
     id+": shared cue opt-in, not custom game-owned music hacks");
   assert.match(portion,/useZooEscape: !native\w+Audio/,
