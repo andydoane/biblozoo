@@ -68,7 +68,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
-        bridge?.registerPluginInstance(BibloZooAudioSessionDiagnosticsPlugin())
+        // The opt-in diagnostic event bridge is not part of child-facing
+        // production. Do not register it outside the isolated Audio Test.
+        if BibloZooIOSIdentity.experimentalToolsEnabled {
+            bridge?.registerPluginInstance(BibloZooAudioSessionDiagnosticsPlugin())
+        }
+        // Leave legacy recovery/state compatibility registered: on either
+        // native-audio bundle its mutating Web-clock path is already disabled.
         bridge?.registerPluginInstance(BibloZooAudioSessionRecoveryPlugin())
         // Branch-only explicit-tap AVAudioPlayer pilot. Never invoked automatically.
         bridge?.registerPluginInstance(BibloZooNativeSoundPlugin())
