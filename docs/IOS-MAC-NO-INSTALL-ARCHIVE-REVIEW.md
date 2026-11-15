@@ -1,6 +1,6 @@
 # BibloZoo — No-install Mac Xcode archive + privacy report review
 
-**Status:** Step 3e / Step 4 preparation, review-only on `integration/native-audio-to-ios-prep`. The author cannot access the owner's Mac or Xcode from GitHub Actions; **the actual Apple build, Privacy Report and signed-app evidence are NOT TESTED until the owner runs these steps and reports the result**.
+**Status:** Step 3e [PR #117](https://github.com/andydoane/biblozoo/pull/117) / Step 4 preparation, review-only on `integration/native-audio-to-ios-prep`. The author cannot access the owner's Mac or Xcode from GitHub Actions; **the actual Apple build, Privacy Report and signed-app evidence are NOT TESTED until the owner runs these steps and reports the result**.
 
 **Safety rule:** Creating an Xcode **archive** with a generic iOS destination does **not** mean installing or running BibloZoo on your iPhone. Do **not** click Xcode's Run/Play button, choose the original iPhone as the run destination, select `Distribute App` or overwrite/uninstall the existing `com.andydoane.biblozoo` app. Original Zookeeper profiles are local-only and a code rollback cannot restore missing data. Audio Test (`.audiotest`) is a separate app.
 
