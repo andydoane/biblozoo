@@ -169,12 +169,12 @@ async function exerciseReturn() {
 }
 
 function auditOwners() {
-  // Native-only clients retain plain Welcome Back by default. Verse Jam
-  // explicitly excludes *all* Zoo surprises on every platform, including
-  // the Audio Test DEV force override; other activities are unchanged.
+  // Default shared Welcome Back is surprise-free on every platform; only
+  // explicit Practice/Playground opt-ins participate. Verse Jam remains
+  // excluded even with native Audio Test DEV Force enabled.
   ok(shared.includes('function attachZooReturn(options)') &&
-    shared.includes('useZooEscape = true') &&
-    shared.includes('allowDevForceZooEscape = true') &&
+    shared.includes('useZooEscape = false') &&
+    shared.includes('allowDevForceZooEscape = false') &&
     shared.includes('(useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create') &&
     shared.includes('const forceDevEscape = allowDevForceZooEscape &&') &&
     shell.includes('allowDevForceZooEscape: options.allowZooSurprises !== false') &&

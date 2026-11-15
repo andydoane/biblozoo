@@ -3308,11 +3308,10 @@
 
   bugsWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
     // Web/Android retain their original Zoo Escape flow by default.
-    // Native Bible Bugs only uses a plain manual Welcome Back recovery:
-    // missing PCM can never launch an unrelated Zoo Break.
-    useZooEscape: !nativeBugsAudio,
+    // Native selected surprises first verify the pet cue; game PCM stays frozen until LOCK GATE.
+    useZooEscape: true,
     // Shared cue-first surprise (original game recovery waits for LOCK GATE).
-    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    // Native and Web both allow random surprises; original audio starts at LOCK GATE.
     preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeBugsAudio,
     getSoundContext: () => audioCtx,

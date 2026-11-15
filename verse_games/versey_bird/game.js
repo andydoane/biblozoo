@@ -7837,7 +7837,7 @@
   birdWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
     useZooEscape: !nativeBirdAudio,
     // Shared cue-first surprise; original game recovery waits for LOCK GATE.
-    // Native production retains its no-Zoo policy; DEV force may test.
+    // Native and Web both allow random surprises; original audio starts at LOCK GATE.
     preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeBirdAudio,
     getSoundContext: () => audioCtx,

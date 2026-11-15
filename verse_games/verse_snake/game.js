@@ -4540,9 +4540,9 @@
   }
 
   snakeWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
-    // Existing Web-era Zoo Escape recovery is retained on browser/PWA only.
-    // A missing native Snake PCM asset is an explicit audio retry, not an
-    // independent pet rescue or a fake sign of audible playback.
+    // Existing Web-era Zoo Escape recovery is now available on native iOS and browser/PWA.
+    // Failed native Snake PCM still requires explicit audio retry; it never
+    // counts as sound success or creates a rescue by itself.
     useZooEscape: !nativeSnakeAudio,
     // Shared cue-first surprise (original game recovery waits for LOCK GATE).
     // Native production keeps its existing no-Zoo policy; DEV force may test.

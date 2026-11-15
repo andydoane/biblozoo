@@ -352,15 +352,16 @@
 
   function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
     getSoundContext, isSoundMuted, escapeText, preserveFocus = false,
-    suppressUiSound = false, useZooEscape = true,
-    allowDevForceZooEscape = true, preselectWelcomeSurprise = false } = {}) {
+    suppressUiSound = false, useZooEscape = false,
+    allowDevForceZooEscape = false, preselectWelcomeSurprise = false } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
         typeof onContinue !== "function") return null;
 
-    // Original native-only playback remains a plain recovery in production.
-    // The owner may opt in to full Zoo Escape *only in Audio Test DEV mode*.
+    // Only explicit Practice Game / eligible Playground opt-ins may roll Zoo
+    // surprises. All other Welcome Back callers keep their original recovery,
+    // including when Audio Test DEV Force is enabled.
     const forceDevEscape = allowDevForceZooEscape &&
       root.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.() === true;
     if ((useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create) {

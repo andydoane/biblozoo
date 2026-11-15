@@ -41,9 +41,9 @@ assert.match(engine, /button\.disabled = attemptCount >= MAX_ATTEMPTS/);
 assert.match(engine, /let recovery;[\s\S]*?recoveryForAttempt\([\s\S]*?ok === true && running\(\)[\s\S]*?choose\?\.\(profileId, "welcome"\)/);
 assert.match(welcomeReturn, /try \{ outcome = onContinue\(\); \} catch/);
 assert.match(welcomeReturn, /surpriseEnabled: true/);
-assert.match(readGame, /surpriseEnabled: true/);
-assert.match(feeding, /surpriseEnabled: true/);
-assert.match(app, /surpriseEnabled: true/);
+assert.match(readGame, /surpriseEnabled: false/);
+assert.match(feeding, /surpriseEnabled: false/);
+assert.match(app, /surpriseEnabled: false/);
 assert.match(app, /const openZooTodoWithSurprise = \(destination\) =>/);
 assert.match(app, /const kind = policy\.choose\(id, "daily"\)/);
 assert.match(app, /recover: \(\) => false/);
@@ -51,8 +51,8 @@ assert.match(app, /onRecovered: complete,[\s\S]*?onExit: complete/);
 assert.match(app, /controller\.startSurprise\?\.\(kind\)/);
 assert.match(app, /titleTodoBtn\.onclick = \(e\) => \{[\s\S]*?openZooTodoWithSurprise\(\(\) => openDailyTodoPreview\(/);
 assert.match(app, /if \(dailyHomeReady\) \{[\s\S]*?dailyHomeOffer\?\.remove\(\);[\s\S]*?openZooTodoWithSurprise\(\(\) => openDailyTodoPreview\("actual"\)/);
-assert.match(shell, /useZooEscape: options\.allowZooSurprises !== false && !options\.nativeOnlyAudio/,
-  "Plain native Playground recovery and explicit no-surprise activity exclusion are preserved");
+assert.match(shell, /useZooEscape: options\.allowZooSurprises !== false/,
+  "Eligible native Playground apps now opt into surprises; Jam stays excluded");
 assert.match(shell, /allowDevForceZooEscape: options\.allowZooSurprises !== false/,
   "Explicit Playground exclusion also rejects the DEV forced-escape override");
 assert.match(welcomeReturn, /const forceDevEscape = allowDevForceZooEscape &&/,
@@ -64,8 +64,8 @@ assert.match(readGame, /const \[movingSong, movingNarration\] = await Promise\.a
   "Crawl verifies soundtrack and narration progress concurrently to reduce audible lead-in");
 assert.match(readGame, /waitReadMediaProgress\(song\?\.audio, current, 14, 95\)/,
   "Crawl checks real progress more frequently without bypassing the clock");
-assert.match(app, /if \(!isNativeLearnListenMode\(\)/,
-  "Native Learn audio recovery must not be silently converted into a minigame");
+assert.match(app, /if \(!isNativeLearnListenMode\(\) &&/,
+  "Native Learn Listen remains a plain recovery, even in DEV Force mode");
 
 function storage() {
   const map = new Map();

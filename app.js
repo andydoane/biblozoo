@@ -11927,16 +11927,16 @@ function ensureLearnAudioResumeOverlay() {
     </div>`;
   document.body.appendChild(overlay);
   const action = overlay.querySelector("#learnAudioResumeButton");
-  if ((!isNativeLearnListenMode() ||
-        window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()) &&
+  if (!isNativeLearnListenMode() &&
       window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
     // N5b.3: native-only lesson recovery is a plain explicit retry, NOT
     // a Zoo Escape/ZOO BREAK triggered by unconverted or missing clips.
     learnZooCue = window.BibloZooWelcomeBackReturn?.createZooAudioCue?.() || null;
     if (learnZooCue) action?.setAttribute("data-no-ui-sound", "");
     learnZooEscape = window.BibloZooZooEscape.create({
-      surpriseEnabled: true,
-      preselectWelcomeSurprise: !!learnZooCue,
+      // Learn is never a recreational Zoo surprise source on any platform.
+      surpriseEnabled: false,
+      preselectWelcomeSurprise: false,
       overlay, verseId: () => VERSE_ID,
       petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),
       getSoundContext: () => appAudioUnlocked && !appAudioRecoveryPending

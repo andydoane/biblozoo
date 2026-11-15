@@ -1,5 +1,26 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — Final Zoo surprise scope: Home Zoo To-Do + 12 Practice Games + 4 Playground apps (owner iPhone acceptance PENDING)
+
+**Owner decision, 2026-11-15:** [PR #106](https://github.com/andydoane/biblozoo/pull/106) is **MERGED** at \`39909ea\`; the owner reports **all real-iPhone Learn/Feeding tests PASSED**. The following narrowed eligibility / native production opt-in is a *new proposal*, not yet owner device-tested or approved for merge. Earlier PR #106 "OPEN / iPhone PENDING" descriptions below are historical.
+
+**Only permitted random recreational Zoo surprise entry points, same on iOS / Web / PWA / Android:**
+1. **Home Daily Zoo To-Do popup Ready** and **Home Zoo To-Do button**: the existing two calls to \`openZooTodoWithSurprise\`, sharing their original per-Zookeeper per-local-day odds and unchanged continuation into the actual Daily task. No Zoo surprise from the interior Zoo To-Do hub.
+2. **Practice Games — 12 Welcome Back dialogs:** Bible Bugs, Dino Dash, Food Slice, Tower of Bible, Traffic Tap, Verse Invaders, Verse Launch, Verse Munch, Verse Scramble, Scripture Snake, Verse Splat, Versey Bird.
+3. **Playground — four Welcome Back dialogs:** Ghost Writer, Scripture Scrub, Verse Typer, Wheel of Bible. **Verse Jam remains excluded** on every platform and even native DEV Force.
+
+**Explicitly ineligible even with native DEV Force Pet Escape ON:** all eight Read My Verse activities, all Learn Listen/Chunks/Echo modes, Daily Questions, Feeding Classic/Labyrinth/Bounce/Melody, Flashcards, the interior Zoo To-Do hub, Hide and Final Recall and any other Welcome Back. Their original safe interruption/resume, activity state, score, checkpoints and explicit audio proof must remain functional. Disabled surprises do **not** mean removing Welcome Back.
+
+**Automated/physical acceptance matrix:**
+- Run \`node scripts/validate_zoo_surprise_scope.js\` and the original \`validate_random_zoo_surprises.js\`, \`validate_shared_zoo_audio_cue_transition.js\`, \`validate_learn_feeding_zoo_cue_transition.js\`, full Node suite, Web production build and Linux Swift parse. Record exact PR-head Actions result; source/CI is never proof of an Apple Xcode build or actual iPhone speaker audibility.
+- **Physical Audio Test iPhone, DEV Force OFF:** Open each of the two Home To-Do entry points; confirm the shared daily random Break/Escape odds and continuation to the intended Daily page without duplicate credits. Interrupt a playing Practice Game plus each of Ghost Writer / Scripture Scrub / Verse Typer / Wheel of Bible, try selected surprise and no-surprise. On selected: Let's go! verifies *only* original BibloPet unlock cue, underlying game is still completely frozen, final real LOCK GATE verifies/restarts only that game's original native output/physics. On no-surprise: ordinary one-gesture owner recovery. Specifically test Verse Typer during spoken narration and Scripture Scrub during mower audio (regression #105).
+- **Physical iPhone, DEV Force ON:** Test force-trigger on representative Practice and all four eligible Playground games; cue-first original sound owner only on final LOCK GATE. Attempt excluded Read Crawl/Balloons/Fish/quiet activity, Learn Listen/Chunks/Echo, Feeding all four modes, Flashcards, Daily Questions and Verse Jam: **no forced pet and no random Break**; their normal Welcome Back still resumes safely. Native Home To-Do rolls are unaffected by the Welcome-only DEV switch.
+- **Interruption refusals:** lock again during cue/rescue/final gate; muted; Apple Music/YouTube PiP/AirPods active or session refusal; retry, Back/Exit, stale callbacks. No WebKit audio fallback on experimental native iOS, phantom narration or scores, lost physics, duplicate Snack/Daily awards or false verification.
+- **Web/PWA offline smoke:** confirm the same restricted eligibility, Home and 16 games still eligible, all excluded activities never surprise, and the changed PWA shell cache version updates. Android has the same surprise eligibility.
+- Keep the original first-break 55%, later Daily 5%, later Welcome 2%, Pet-after-no-break 15% policy unchanged, along with stored stats and profiles. No Swift audio category/asset changes. Base PR on \`experiment/native-ios-audio\`; **leave unmerged until explicit owner instruction**.
+
+---
+
 ## [PR #106](https://github.com/andydoane/biblozoo/pull/106) — grouped Learn (Listen/Chunks/Echo) + Feeding (Classic/Labyrinth/Bounce/Melody) cue-first, real iPhone PENDING
 
 **Baseline owner evidence:** [PR #105](https://github.com/andydoane/biblozoo/pull/105) is now **MERGED** as `fe02a513`; the owner independently retested **all previously failing Verse Typer active speech and Scripture Scrub mower active-sound lock scenarios with DEV Force Pet Escape ON and OFF on a real iPhone** and says all are working fine. Prior #104 other games and #102/#103 Read Crawl/Balloons/Fish are already device-tested. **This new grouped Learn/Feeding change has not yet been heard on a physical iPhone.**

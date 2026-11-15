@@ -15,17 +15,17 @@ function eq(a,b,msg){assert.equal(a,b,msg);checks++;}
 for(const source of [shared,learn,feed])new vm.Script(source);
 ok(shared.includes("createZooAudioCue, resumeAudioOnGesture"),
   "export original shared cue once for all adapted owners");
-ok(learn.includes("preselectWelcomeSurprise: !!learnZooCue") &&
+ok(learn.includes("preselectWelcomeSurprise: false") &&
    learn.includes("const resume = learnAudioInterrupted") &&
    learn.includes("if (!learnZooCueVerified) pauseLearnAudioForInterruption()"),
    "Learn keeps paused checkpoint until final real LOCK GATE");
-ok(learn.includes("(!isNativeLearnListenMode() ||") &&
-   learn.includes("isDevForceWelcomeEscapeEnabled?.()"),
-   "native Listen remains excluded from ordinary production Zoo");
-ok(feed.includes("preselectWelcomeSurprise: !!runtime.zooCue") &&
-   feed.includes("runtime.nativePilotBackend !== \"native\" ||") &&
-   feed.includes("isDevForceWelcomeEscapeEnabled?.()"),
-   "native Feeding retains plain production return, DEV force may select cue");
+ok(learn.includes("if (!isNativeLearnListenMode() &&") &&
+   learn.includes("surpriseEnabled: false"),
+   "all Learn modes keep normal recovery with no random/forced Zoo");
+ok(feed.includes("preselectWelcomeSurprise: false") &&
+   feed.includes("surpriseEnabled: false") &&
+   feed.includes("runtime.nativePilotBackend !== \"native\" ||"),
+   "all Feeding modes keep original recovery with no random/forced Zoo");
 ok(feed.includes("runtime.feedResumeGeneration !== generation") &&
    feed.includes("shiftFeedingDeadlines(runtime, elapsed)") &&
    feed.includes("runtime.feedAudioRecoveryVerified = true;"),
@@ -179,7 +179,7 @@ async function feedingChecks(){
       stop(){events.push("exit");},recordFeedAudioRecovery(){},
     };
     vm.runInNewContext(code,env);
-    eq(opts.preselectWelcomeSurprise,true,mode+" opts into dry-roll cue");
+    eq(opts.preselectWelcomeSurprise,false,mode+" never preselects in normal gameplay");
     eq(await opts.recover({plannedSurprise:"escape"}),true,mode+" first cue verified");
     eq(prepared,0,mode+" first tap NEVER resumes Feeding bank or score clock");
     eq(runtime.feedPausedAt,900,mode+" frozen Feeding checkpoint retained");
