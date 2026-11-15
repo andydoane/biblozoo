@@ -4664,9 +4664,9 @@
   }
 
   launchWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
-    useZooEscape: !nativeLaunchAudio,
+    useZooEscape: true,
     // Shared cue-first surprise (original game recovery waits for LOCK GATE).
-    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    // Native and Web both allow random surprises; original audio starts at LOCK GATE.
     preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeLaunchAudio,
     getSoundContext: () => audioCtx,

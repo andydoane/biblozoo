@@ -240,8 +240,8 @@ function mainGameContracts(){
  assert.match(game,/const SCRUB_ROUND_GROUPS = \[/);
  assert.match(game,/chosen\.push\(byId\.get\("archaeology"\)\)/);
  assert.match(shell,/typeof options\.restoreNativeOnGesture === "function"/);
- assert.match(shell,/useZooEscape: options\.allowZooSurprises !== false && !options\.nativeOnlyAudio/,
-  "native-only Playground audio still uses plain Welcome Back; Verse Jam may also opt out");
+ assert.match(shell,/useZooEscape: options\.allowZooSurprises !== false/,
+  "native Playground is eligible for Zoo; Verse Jam still explicitly opts out");
  assert.match(shell,/suppressUiSound: !!options\.nativeOnlyAudio/);
 }
 (async()=>{

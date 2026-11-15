@@ -82,6 +82,7 @@ async function exerciseReturn() {
   const h = createHarness();
   let active=true,pauseCount=0,gestureCount=0,exitCount=0;
   const ctl=h.window.BibloZooWelcomeBackReturn.attach({
+    useZooEscape:true,
     shouldPrompt:()=>active,
     onPause:()=>{pauseCount++;},
     onContinue:()=>{gestureCount++;return Promise.resolve(true);},
@@ -122,6 +123,7 @@ async function exerciseReturn() {
   // A second session's *stale* gesture must never claim verified recovery.
   const h2=createHarness();let resolve;
   const c2=h2.window.BibloZooWelcomeBackReturn.attach({
+    useZooEscape:true,
     shouldPrompt:()=>true,onPause:()=>{},
     onContinue:()=>new Promise(r=>resolve=r),onExit:()=>{exitCount++;}
   });
@@ -143,6 +145,7 @@ async function exerciseReturn() {
   const h3=createHarness();
   let gamePaused=false,gameProgress=0,holds=0,returns=0;
   const c3=h3.window.BibloZooWelcomeBackReturn.attach({
+    useZooEscape:true,
     shouldPrompt:()=>true,
     onPause:()=>{gamePaused=true;holds++;},
     onContinue:()=>{gamePaused=false;returns++;return Promise.resolve(true);},
@@ -169,12 +172,12 @@ async function exerciseReturn() {
 }
 
 function auditOwners() {
-  // Native-only clients retain plain Welcome Back by default. Verse Jam
-  // explicitly excludes *all* Zoo surprises on every platform, including
-  // the Audio Test DEV force override; other activities are unchanged.
+  // Default shared Welcome Back is surprise-free on every platform; only
+  // explicit Practice/Playground opt-ins participate. Verse Jam remains
+  // excluded even with native Audio Test DEV Force enabled.
   ok(shared.includes('function attachZooReturn(options)') &&
-    shared.includes('useZooEscape = true') &&
-    shared.includes('allowDevForceZooEscape = true') &&
+    shared.includes('useZooEscape = false') &&
+    shared.includes('allowDevForceZooEscape = false') &&
     shared.includes('(useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create') &&
     shared.includes('const forceDevEscape = allowDevForceZooEscape &&') &&
     shell.includes('allowDevForceZooEscape: options.allowZooSurprises !== false') &&

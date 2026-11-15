@@ -35,12 +35,12 @@ for (const id of games) {
   const portion=src.slice(anchor,anchor+1500);
   assert.match(portion,/preselectWelcomeSurprise: true/,
     id+": shared cue opt-in, not custom game-owned music hacks");
-  assert.match(portion,/useZooEscape: !native\w+Audio/,
-    id+": native production still excludes random Zoo surprises");
+  assert.match(portion,/useZooEscape: true/,
+    id+": native and browser games now allow random Zoo surprises");
   assert.match(portion,/onContinue:/,id+": final original game recovery retained");
 }
 assert.match(shell,/preselectWelcomeSurprise: options\.allowZooSurprises !== false/);
-assert.match(shell,/useZooEscape: options\.allowZooSurprises !== false && !options\.nativeOnlyAudio/);
+assert.match(shell,/useZooEscape: options\.allowZooSurprises !== false/);
 assert.match(shell,/allowDevForceZooEscape: options\.allowZooSurprises !== false/);
 assert.match(read("verse_playground/verse_jam/game.js"),/allowZooSurprises: false/,
   "Verse Jam remains fully excluded, including DEV Force");

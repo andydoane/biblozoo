@@ -26,7 +26,7 @@ assert.match(game, /app\.removeAttribute\("aria-busy"\)/);
 assert.match(game, /Sound was interrupted before the round began\. Tap Try Again/);
 assert.match(game, /onAppInactive: \(\) =>/);
 assert.match(game, /snakeWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);
-assert.match(game, /useZooEscape: !nativeSnakeAudio/);
+assert.match(game, /useZooEscape: true/);
 assert.match(native, /activateFromGesture\(\{ purpose: "game" \}\)/);
 assert.match(native, /preload\(\{ soundId \}\)/);
 assert.match(native, /if \(!current\(token\)\)/);

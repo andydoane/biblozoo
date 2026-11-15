@@ -1848,10 +1848,11 @@
     if (root?.BibloZooZooEscape?.create && root?.BibloZooWelcomeBack?.markup) {
       readZooEscape = root.BibloZooZooEscape.create({
         overlay, profileId: state.context?.profileId,
-        surpriseEnabled: true,
-        // Only the three animated Read activities can preselect a cue.
-        // Quiet typing/word/sequence activities keep their existing return.
-        preselectWelcomeSurprise: () => isAnimatedActivity(state.activityId),
+        // Read retains its original frozen-scene/audio recovery, with no
+        // random or DEV-forced Zoo surprise in any Read mode.
+        surpriseEnabled: false,
+        recoveryOnly: true,
+        preselectWelcomeSurprise: false,
         verseId: () => state.verseId,
         getSoundContext: () => scrambleAudioContext?.state === "running"
           ? scrambleAudioContext : keySoundContext?.state === "running"

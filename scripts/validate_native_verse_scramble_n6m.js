@@ -271,7 +271,7 @@ function virtualClock(){
   assert.equal(scope.now(),1000,"unpause does not fast-forward AI opponent");
 }
 async function welcome(){
-  assert.match(game,/useZooEscape: !nativeScrambleAudio/);
+  assert.match(game,/useZooEscape: true/);
   assert.match(game,/suppressUiSound: !!nativeScrambleAudio/);
   assert.match(game,/welcomeBackController\?\.pauseFromNativeInactive\?\.\(\)/);
   assert.match(game,/welcomeBackController\?\.showAfterNativeActive\?\.\(\)/);

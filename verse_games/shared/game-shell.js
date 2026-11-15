@@ -2701,11 +2701,11 @@
       isSoundMuted: options.isMuted,
       // N6n optional native Playground owner. This does not change any
       // legacy Web/PWA/Android callers or unrelated Playground activities.
-      useZooEscape: options.allowZooSurprises !== false && !options.nativeOnlyAudio,
+      useZooEscape: options.allowZooSurprises !== false,
       allowDevForceZooEscape: options.allowZooSurprises !== false,
       // One shared cue-first transition for compatible Playground pages.
-      // Native-only games retain their original plain production return;
-      // the DEV forced-escape path can still validate cue-first recovery.
+      // The four eligible Playground apps can now roll in native production;
+      // Verse Jam remains excluded, even with DEV Force enabled.
       // Verse Jam passes allowZooSurprises:false and remains exempt.
       preselectWelcomeSurprise: options.allowZooSurprises !== false,
       suppressUiSound: !!options.nativeOnlyAudio,

@@ -6241,8 +6241,11 @@
         petName: runtime.petName,
         reducedMotion: runtime.reducedMotion,
         isTestRun: () => !!runtime.zooDevScenario,
-        surpriseEnabled: true,
-        preselectWelcomeSurprise: !!runtime.zooCue,
+        // Feeding keeps its verified resume/score checkpoints but never
+        // triggers a recreational surprise, even in DEV Force mode.
+        surpriseEnabled: false,
+        recoveryOnly: true,
+        preselectWelcomeSurprise: false,
         recover: info => {
           // Pilot scenarios preserve their deliberately simulated outcomes;
           // they do not consume a real sound cue or commit production odds.

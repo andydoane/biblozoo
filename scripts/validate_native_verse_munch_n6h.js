@@ -19,7 +19,7 @@ assert.match(workflow,/validate_native_verse_munch_n6h\.js/);
 assert.ok(html.includes("native-verse-munch-audio.js") &&
  html.indexOf("native-verse-munch-audio.js")<html.indexOf('src="./game.js"'));
 assert.match(css,/vmunch-native-audio-failure/);
-assert.match(game,/useZooEscape: !nativeMunchAudio/);
+assert.match(game,/useZooEscape: true/);
 assert.match(game,/suppressUiSound: !!nativeMunchAudio/);
 assert.match(game,/munchWelcomeBack\?\.pauseFromNativeInactive\?\.\(\)/);
 assert.match(game,/munchWelcomeBack\?\.showAfterNativeActive\?\.\(\)/);

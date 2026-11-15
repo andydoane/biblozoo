@@ -189,7 +189,8 @@
   function create({ overlay, recover, onRecovered, onExit, onSurpriseStart,
     onRescue,
     onBreakComplete, soundIsReady, onPop, onBounce, getSoundContext, isSoundMuted,
-    isTestRun, surpriseEnabled = false, preselectWelcomeSurprise = false,
+    isTestRun, surpriseEnabled = false, recoveryOnly = false,
+    preselectWelcomeSurprise = false,
     profileId, pictureBase = "",
     petName, verseId, name, reducedMotion } = {}) {
     if (!overlay?.querySelector || typeof recover !== "function" ||
@@ -874,7 +875,9 @@
       log("welcome-back-recovery-retry", { attemptCount });
     }
     function handleRecoveryFailure(from) {
-      if (surpriseEnabled && !isDeveloperRun())
+      // Excluded owners must never enter the historical failure->pets ladder,
+      // even with DEV Force enabled or a deliberately denied native session.
+      if (recoveryOnly || (surpriseEnabled && !isDeveloperRun()))
         recoveryFailureWithoutSurprise();
       else finishFailure(from);
     }
@@ -918,7 +921,7 @@
       const preselect = typeof preselectWelcomeSurprise === "function"
         ? preselectWelcomeSurprise() === true : preselectWelcomeSurprise === true;
       let plannedSurprise = null;
-      if (from === "welcome" && surpriseEnabled && preselect &&
+      if (from === "welcome" && surpriseEnabled && !recoveryOnly && preselect &&
           !isDeveloperRun()) {
         try {
           plannedSurprise = root.BibloZooZooSurprise?.planWelcome?.(profileId) || null;
@@ -958,7 +961,7 @@
           // Only then may a separate recreational event appear. A failed
           // or deferred native audio result never triggers an event.
           let kind = null;
-          if (from === "welcome" && surpriseEnabled && !isDeveloperRun()) {
+          if (from === "welcome" && surpriseEnabled && !recoveryOnly && !isDeveloperRun()) {
             if (preselect) {
               // A failed commit cannot show an unaccounted random surprise.
               try {
@@ -1077,7 +1080,7 @@
       if (status) status.hidden = true;
     }
     function startSurprise(kind) {
-      if (!pending || disposed || surpriseMode ||
+      if (recoveryOnly || !pending || disposed || surpriseMode ||
           stage !== "welcome" || (kind !== "escape" && kind !== "break"))
         return false;
       // Keep this exact controller's artwork, physics, pet-rescue counter,
