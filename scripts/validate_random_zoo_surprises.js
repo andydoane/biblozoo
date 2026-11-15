@@ -191,7 +191,7 @@ function policy(store, random, initialDay = "2026-11-13", nativeIos = false, dev
     "2026-11-13",true,false);
   store.setItem("biblozooDevForceWelcomePetEscape:v1","1");
   assert.equal(p.forced(),false,"production must ignore a stale DEV force flag");
-  assert.equal(p.plan("child"),null,"production cannot force a Zoo escape from DEV storage");
+  assert.equal(p.plan("child").kind,null,"production cannot force a Zoo escape from DEV storage");
 }
 
 // The main-screen DEV Tools switch is a native Audio Test-only override:
