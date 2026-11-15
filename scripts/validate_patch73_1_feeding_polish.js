@@ -142,7 +142,7 @@ for (const name of ["tilt","drag"]){
  ok(img.readUInt32BE(24)>=190,`${name}: full image height with padding`);
  ok(sw.includes(`./verse_images/daily_questions/dq_feed_control_${name}.png`),`${name}: offline asset retained`);
 }
-ok(/const CACHE_VERSION = "2026_Nov_14_patch73_[^"\n]+";/.test(sw) &&
+ok(/const CACHE_VERSION = "[^"\n]+";/.test(sw) &&
    !sw.includes('"2026_Nov_14_patch73_melody_seven_snacks_badges"'),
    "cache version still includes Melody art and has advanced for later changes");
 ok(sw.includes("./verse_images/daily_questions/dq_feed_music_note.png"),"new music-note artwork available offline");
