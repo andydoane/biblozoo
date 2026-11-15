@@ -11860,6 +11860,7 @@ function isLearnAudioOverlayRecovery(recovery) {
 // Zoo Escape presents the pauses, and observes the actual verified outcome.
 let learnZooEscape = null;
 let learnZooRecovery = null;
+let learnZooHoldingForSurprise = false;
 function beginLearnZooRecovery() {
   const recovery = learnAudioInterrupted;
   if (!isLearnAudioOverlayRecovery(recovery)) return false;
@@ -11903,7 +11904,8 @@ function ensureLearnAudioResumeOverlay() {
     </div>`;
   document.body.appendChild(overlay);
   const action = overlay.querySelector("#learnAudioResumeButton");
-  if (!isNativeLearnListenMode() &&
+  if ((!isNativeLearnListenMode() ||
+        window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()) &&
       window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
     // N5b.3: native-only lesson recovery is a plain explicit retry, NOT
     // a Zoo Escape/ZOO BREAK triggered by unconverted or missing clips.
@@ -11915,8 +11917,38 @@ function ensureLearnAudioResumeOverlay() {
         ? appAudioContext : null,
       isSoundMuted: () => muted,
       recover: beginLearnZooRecovery,
-      onRecovered: () => { learnZooRecovery = null; overlay.hidden = true; },
-      onExit: () => { learnZooRecovery = null; go(Screen.TITLE); }
+      onSurpriseStart: () => {
+        // The first Let's go starts Learn audio for verification. Capture
+        // its current position, then stop it before pets can escape over it.
+        learnZooHoldingForSurprise = true;
+        pauseLearnAudioForInterruption();
+      },
+      onRecovered: () => {
+        if (!learnZooHoldingForSurprise) {
+          learnZooRecovery = null;
+          overlay.hidden = true;
+          return;
+        }
+        // The pen/LOCK GATE is another authentic iOS gesture. Recover the
+        // existing checkpoint rather than letting Learn run under the popup.
+        const resume = learnAudioInterrupted
+          ? beginLearnZooRecovery() : Promise.resolve(true);
+        Promise.resolve(resume).then(ok => {
+          learnZooHoldingForSurprise = false;
+          learnZooRecovery = null;
+          if (ok && !document.hidden) overlay.hidden = true;
+          else syncLearnAudioResumeOverlay();
+        }, () => {
+          learnZooHoldingForSurprise = false;
+          learnZooRecovery = null;
+          syncLearnAudioResumeOverlay();
+        });
+      },
+      onExit: () => {
+        learnZooHoldingForSurprise = false;
+        learnZooRecovery = null;
+        go(Screen.TITLE);
+      }
     });
   }
   if (!learnZooEscape && action) action.onclick = resumeInterruptedLearnAudio;
@@ -11924,6 +11956,13 @@ function ensureLearnAudioResumeOverlay() {
 }
 
 function syncLearnAudioResumeOverlay() {
+  if (learnZooHoldingForSurprise && learnZooEscape) {
+    // Keep the pet rescue in front while Learn owns a second intentional
+    // pause or the final-pen gesture is re-verifying native narration.
+    const overlay = document.getElementById("learnAudioResumeOverlay");
+    if (overlay) overlay.hidden = document.hidden;
+    return;
+  }
   const recovery = learnAudioResumeAttempt?.recovery || learnAudioInterrupted;
   // The menu's genuine Close gesture can resume native playback without
   // treating an intentional in-app pause as an OS interruption. Preserve the
