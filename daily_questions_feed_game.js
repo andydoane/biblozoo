@@ -6244,6 +6244,7 @@
         // Feeding keeps its verified resume/score checkpoints but never
         // triggers a recreational surprise, even in DEV Force mode.
         surpriseEnabled: false,
+        recoveryOnly: true,
         preselectWelcomeSurprise: false,
         recover: info => {
           // Pilot scenarios preserve their deliberately simulated outcomes;

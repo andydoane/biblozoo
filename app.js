@@ -11936,6 +11936,7 @@ function ensureLearnAudioResumeOverlay() {
     learnZooEscape = window.BibloZooZooEscape.create({
       // Learn is never a recreational Zoo surprise source on any platform.
       surpriseEnabled: false,
+      recoveryOnly: true,
       preselectWelcomeSurprise: false,
       overlay, verseId: () => VERSE_ID,
       petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),

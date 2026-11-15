@@ -20,10 +20,12 @@ ok(learn.includes("preselectWelcomeSurprise: false") &&
    learn.includes("if (!learnZooCueVerified) pauseLearnAudioForInterruption()"),
    "Learn keeps paused checkpoint until final real LOCK GATE");
 ok(learn.includes("if (!isNativeLearnListenMode() &&") &&
-   learn.includes("surpriseEnabled: false"),
+   learn.includes("surpriseEnabled: false") &&
+   learn.includes("recoveryOnly: true"),
    "all Learn modes keep normal recovery with no random/forced Zoo");
 ok(feed.includes("preselectWelcomeSurprise: false") &&
    feed.includes("surpriseEnabled: false") &&
+   feed.includes("recoveryOnly: true") &&
    feed.includes("runtime.nativePilotBackend !== \"native\" ||"),
    "all Feeding modes keep original recovery with no random/forced Zoo");
 ok(feed.includes("runtime.feedResumeGeneration !== generation") &&

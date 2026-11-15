@@ -57,11 +57,12 @@ match(read("verse_playground/verse_jam/game.js"),/allowZooSurprises: false/,
   "Verse Jam excluded even with DEV Force");
 match(app,/learnZooEscape = window\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*preselectWelcomeSurprise: false/,
   "Learn Chunks and Echo retain recovery but no surprises");
+match(app,/recoveryOnly: true/, "Learn engine forbids failure-driven Zoo stages");
 match(app,/if \(!isNativeLearnListenMode\(\) &&/,
   "Learn Listen keeps plain native recovery even with DEV Force");
-match(readMyVerse,/readZooEscape = root\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*preselectWelcomeSurprise: false/,
+match(readMyVerse,/readZooEscape = root\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*recoveryOnly: true,\s*preselectWelcomeSurprise: false/,
   "all eight Read activities keep their original recovery but no surprises");
-match(feed,/runtime\.zooEscape = window\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*preselectWelcomeSurprise: false/,
+match(feed,/runtime\.zooEscape = window\.BibloZooZooEscape\.create\(\{[\s\S]*?surpriseEnabled: false,\s*recoveryOnly: true,\s*preselectWelcomeSurprise: false/,
   "all four Feeding modes keep their audio owner without surprises");
 match(flashcards,/BibloZooWelcomeBackReturn\.attach\(\{/,
   "Flashcards ordinary Welcome Back retained");
@@ -77,8 +78,10 @@ match(app,/const kind = policy\.choose\(id, "daily"\)/,
   "both Home entrypoints preserve existing profile daily odds");
 assert.equal((app.match(/openZooTodoWithSurprise\(\(\) => openDailyTodoPreview\(/g)||[]).length,
   2,"only Home popup and Home button directly roll Daily surprises");checks++;
-match(zoo,/if \(from === "welcome" && surpriseEnabled && !isDeveloperRun\(\)\)/,
+match(zoo,/if \(from === "welcome" && surpriseEnabled && !recoveryOnly && !isDeveloperRun\(\)\)/,
   "recovery cannot roll surprise for an excluded owner");
+match(zoo,/if \(recoveryOnly \|\| \(surpriseEnabled && !isDeveloperRun\(\)\)\)/,
+  "recovery-only failures never cascade into pets, even under DEV Force");
 match(zoo,/if \(source === "welcome" && forceWelcomePetEscapeEnabled\(\)\)/,
   "DEV Force works only through an opted-in Welcome Back controller");
 console.log("Zoo surprise entrypoint scope PASS: "+checks+" checks, 2 Home, 12 Practice, 4 Playground, others excluded");

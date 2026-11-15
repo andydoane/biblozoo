@@ -35,7 +35,7 @@ for (const version of ["v1","v2"])
     "Deleting a Zookeeper's progress clears old/new daily chance records");
 assert.match(engine, /!kind \|\| !startSurprise\(kind\)\) successful\(\)/);
 assert.match(engine, /if \(surpriseMode\) \{[\s\S]*?successful\(\);[\s\S]*?return;[\s\S]*?if \(attemptCount >= MAX_ATTEMPTS\)/);
-assert.match(engine, /if \(surpriseEnabled && !isDeveloperRun\(\)\)[\s\S]*?recoveryFailureWithoutSurprise\(\)/);
+assert.match(engine, /if \(recoveryOnly \|\| \(surpriseEnabled && !isDeveloperRun\(\)\)\)[\s\S]*?recoveryFailureWithoutSurprise\(\)/);
 assert.match(engine, /handleRecoveryFailure\(from\)/);
 assert.match(engine, /button\.disabled = attemptCount >= MAX_ATTEMPTS/);
 assert.match(engine, /let recovery;[\s\S]*?recoveryForAttempt\([\s\S]*?ok === true && running\(\)[\s\S]*?choose\?\.\(profileId, "welcome"\)/);
@@ -231,13 +231,51 @@ rewrite("const win={document:doc,matchMedia:",
 rewrite("const sandbox={window:win,Date:FakeDate,Math,Promise,URL,console};",
   "const sandbox={window:win,Date:FakeDate,Math:options.randomMath || Math,Promise,URL,console};");
 rewrite('profileId:"p1",petName:"Milo",soundIsReady:',
-  'profileId:"p1",surpriseEnabled:!!options.surpriseEnabled,preselectWelcomeSurprise:!!options.preselectWelcomeSurprise,petName:"Milo",soundIsReady:');
+  'profileId:"p1",surpriseEnabled:!!options.surpriseEnabled,recoveryOnly:!!options.recoveryOnly,preselectWelcomeSurprise:!!options.preselectWelcomeSurprise,petName:"Milo",soundIsReady:');
 rewrite('recover:()=>{recovery.push(time);return answers.shift();}',
   'recover:info=>{recovery.push({time,info});return answers.shift();}');
 const harness=new Function("engine","vm","assert","URL","console",
   'let checks=0;\n'+fixture+'\nreturn harness;')(engine,vm,assert,URL,console);
 
 async function main() {
+  {
+    // Even an unavailable native session and the DEV Force switch must
+    // NEVER turn an excluded Learn/Read/Feeding return into rescue gameplay.
+    const store=storage();
+    store.setItem("biblozooDevForceWelcomePetEscape:v1","1");
+    const h=harness([false,false,false],{localStorage:store,
+      nativeIos:true,recoveryOnly:true,surpriseEnabled:false});
+    h.ctl.start();
+    assert.equal(h.ctl.startSurprise("escape"),false,
+      "recovery-only caller cannot open pets directly");
+    for(let i=0;i<3;i++){
+      h.button.trigger("click");
+      await Promise.resolve();
+      assert.equal(h.ctl.getStage(),"welcome",
+        "real failed owner audio must remain ordinary Welcome Back");
+      assert.equal(h.recovery[i].info.plannedSurprise,null);
+    }
+    assert.equal(h.button.disabled,true,
+      "after bounded denied-audio retries, offer safe Back not Zoo Escape");
+    assert.equal(store.getItem("biblozooZooSurprise:v2:p1"),null,
+      "recovery-only path cannot consume odds");
+    h.ctl.destroy();
+  }
+  {
+    // Defense in depth: even if an excluded owner accidentally passes
+    // surpriseEnabled:true, recoveryOnly prevents selection or direct entry.
+    const h=harness([true],{localStorage:storage(),nativeIos:true,
+      recoveryOnly:true,surpriseEnabled:true,preselectWelcomeSurprise:true});
+    h.ctl.start();
+    assert.equal(h.ctl.startSurprise("break"),false);
+    h.button.trigger("click");
+    assert.equal(h.recovery[0].info.plannedSurprise,null,
+      "no pet audio cue should be selected by a recovery-only owner");
+    await Promise.resolve();
+    assert.equal(h.ctl.getStage(),"recovered");
+    assert.equal(h.win.BibloZooZooStats.get("p1").petsRescued,0);
+    h.ctl.destroy();
+  }
   {
     const store=storage();
     const h=harness([false,true],{localStorage:store,surpriseEnabled:true,

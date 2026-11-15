@@ -1851,6 +1851,7 @@
         // Read retains its original frozen-scene/audio recovery, with no
         // random or DEV-forced Zoo surprise in any Read mode.
         surpriseEnabled: false,
+        recoveryOnly: true,
         preselectWelcomeSurprise: false,
         verseId: () => state.verseId,
         getSoundContext: () => scrambleAudioContext?.state === "running"
