@@ -4,7 +4,7 @@
 
 ## Base and scope
 
-- **Target branch:** `ios-prep` (not `main`)
+- **Target branch:** `ios-prep` for stable integration, or **`experiment/native-ios-audio` for isolated native Audio Test work** (never `main` unless explicitly requested)
 - **Base commit verified:** <!-- SHA -->
 - **Key files / state touched:** <!-- source, audio, profile storage, daily rewards, native, cache, etc. -->
 
@@ -44,7 +44,7 @@
 
 ## Living handoff — **required for every PR**
 
-- [ ] Read `docs/PROJECT-HANDOFF.md` **and verified it against current `ios-prep`**, PRs and code
+- [ ] Read `docs/PROJECT-HANDOFF.md` **and verified it against the current intended target branch** (`ios-prep` or `experiment/native-ios-audio`), PRs and code
 - [ ] Updated `docs/PROJECT-HANDOFF.md` **in this PR**: freshness stamp, relevant decisions, current status, remaining owner tests
 - [ ] Updated `docs/TESTING.md` and/or `docs/AUDIO-RECOVERY.md` if their contracts changed
 - [ ] Distinguished **implemented**, **merged**, **automated checks passed**, and **iPhone verified**
@@ -56,4 +56,4 @@
 
 ## Merge control
 
-**Please leave this PR unmerged for owner review.** After the owner merges into `ios-prep`, they will Pull Origin in GitHub Desktop, run `npm run build && npx cap sync ios`, and verify the final app on iPhone. Risky changes may be tested from the feature branch before merge.
+**Please leave this PR unmerged for owner review.** After the owner merges into the **stated target branch**, they will Pull Origin in the matching GitHub Desktop worktree, run `npm run build && npx cap sync ios`, and verify the intended app on iPhone. For native Audio Test experiments, use the separate worktree and `com.andydoane.biblozoo.audiotest`, never overwrite the stable `ios-prep` app. Risky changes may be tested from the feature branch before merge.
