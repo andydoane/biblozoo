@@ -74,7 +74,8 @@ assert.match(game, /nativeSnakeAudio\.play\("orb"/);
 assert.match(game, /if \(nativeSnakeAudio\) void nativeSnakeAudio\.stop\(\)/);
 assert.match(game, /useZooEscape: !nativeSnakeAudio/);
 assert.match(returns, /useZooEscape = true/);
-assert.match(returns, /if \(useZooEscape && root\.BibloZooZooEscape\?\.create\)/);
+assert.match(returns, /\(useZooEscape \|\| forceDevEscape\) && root\.BibloZooZooEscape\?\.create/,
+  "native Snake still defaults plain; explicit DEV mode may force rescue");
 assert.match(game, /renderModeSelect\(\)/);
 // N6b.1 owner UX cleanup: normal preparation must never open gray modal.
 assert.doesNotMatch(game, /"Getting native game sounds ready/);
