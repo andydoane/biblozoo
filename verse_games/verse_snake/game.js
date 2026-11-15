@@ -4544,6 +4544,9 @@
     // A missing native Snake PCM asset is an explicit audio retry, not an
     // independent pet rescue or a fake sign of audible playback.
     useZooEscape: !nativeSnakeAudio,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeSnakeAudio,
     getSoundContext: () => audioContext,
     isSoundMuted: () => muted,
