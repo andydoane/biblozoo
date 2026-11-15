@@ -1,6 +1,6 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## Grouped roadmap Phase 2 — Learn (Listen/Chunks/Echo) + Feeding (Classic/Labyrinth/Bounce/Melody) Zoo cue-first, real iPhone PENDING
+## [PR #106](https://github.com/andydoane/biblozoo/pull/106) — grouped Learn (Listen/Chunks/Echo) + Feeding (Classic/Labyrinth/Bounce/Melody) cue-first, real iPhone PENDING
 
 **Baseline owner evidence:** [PR #105](https://github.com/andydoane/biblozoo/pull/105) is now **MERGED** as `fe02a513`; the owner independently retested **all previously failing Verse Typer active speech and Scripture Scrub mower active-sound lock scenarios with DEV Force Pet Escape ON and OFF on a real iPhone** and says all are working fine. Prior #104 other games and #102/#103 Read Crawl/Balloons/Fish are already device-tested. **This new grouped Learn/Feeding change has not yet been heard on a physical iPhone.**
 
@@ -18,6 +18,8 @@
 5. **Feeding Bounce + Melody:** DEV Force ON lock during bounce impact/bonus window and a currently sounding Melody snack note. Ensure no bonus-period timeout or Melody note phase advances behind the pet; only verified original sound recovery at Gate shifts true deadlines, not earned snack count. Daily snack variants must not double-credit completion.
 6. **Failure and controls:** DEV Force OFF on all native Feeding remains plain verified Welcome Back. Lock again during cue, rescue, and final gate; with Apple Music/YouTube PiP/AirPods competing and an OS-denied session, game must stay frozen and accept a new actual tap or clean Back. Muted should not steal external audio priority for decorative cue. Test one Web/PWA selected surprise and no-surprise return, including offline cached BibloPet sound; Web clocks must advance, not just accept play() promises.
 7. **Regressions:** Smoke Verse Typer and Scripture Scrub active sound locks (merged #105), Traffic Tap, Verse Jam DEV-force exclusion, and Read Crawl/Balloons/Fish. Learn Daily tasks and Feeding Daily rewards are not to be confused with optional recreational Pet Escape odds.
+
+**Verified source CI:** [Actions run #43674552245](https://github.com/andydoane/biblozoo/actions/runs/43674552245) passed on implementation head `afbaebb2`: complete Node regression suite (including actual shared cue helper, Learn 3 modes, Feeding 4 modes, quiet phases/native session/owner failures), Linux Swift grammar, and production Web build. Earlier red runs were isolated legacy test harness assumptions (N7k optional state, N2.1 and N4a call signatures), adjusted without weakening audio checks. **No physical iPhone hearing or Apple SDK build occurred.** Revalidate final documentation head before declaring final-head CI green.
 
 **Evidence status:** This grouped PR has no confirmed Apple SDK/Xcode/iPhone result until owner tests after CI. It must remain OPEN and UNMERGED until explicit approval. Avoid silently broadening native surprise eligibility or changing rewards, mic privacy, media paths or audio session ownership.
 
