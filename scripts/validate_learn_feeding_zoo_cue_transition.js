@@ -205,11 +205,8 @@ async function feedingChecks(){
     pass=true;runtime.feedPausedAt=900;runtime.zooHoldingForSurprise=false;
     runtime.zooWasCueFirst=false;
     const count=prepared;
-    eq(await opts.recover({plannedSurprise:null}),undefined,
-      mode+" no-surprise owner Promise-based return");
-    // Actual callback is async but fake original returns a boolean, so
-    // recovery's Promise should settle after owner callback below.
-    await Promise.resolve();await Promise.resolve();
+    eq(await opts.recover({plannedSurprise:null}),true,
+      mode+" no-surprise original verified recovery");
     eq(prepared,count+1,mode+" no-surprise owner recovers immediately");
     // Cue verified but provisional odds commit failed: no fake game recovery.
     runtime.feedPausedAt=900;runtime.zooCueVerified=true;
