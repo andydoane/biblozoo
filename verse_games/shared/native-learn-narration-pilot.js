@@ -19,6 +19,7 @@
 
   function isAvailable() {
     return root.BibloZooNativeOnlyOutput?.enabled === true &&
+      root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
       root.Capacitor?.isNativePlatform?.() === true &&
       root.Capacitor?.getPlatform?.() === "ios";
   }

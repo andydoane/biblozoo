@@ -17,7 +17,8 @@
 
   function isExperimentalIOS() {
     try {
-      return root.Capacitor?.isNativePlatform?.() === true &&
+      return root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
+        root.Capacitor?.isNativePlatform?.() === true &&
         root.Capacitor?.getPlatform?.() === "ios";
     } catch (_) { return false; }
   }

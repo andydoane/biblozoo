@@ -14,7 +14,8 @@
     try {
       return root.Capacitor?.isNativePlatform?.() === true &&
         root.Capacitor?.getPlatform?.() === "ios" &&
-        root.BibloZooNativeOnlyOutput?.enabled === true;
+        root.BibloZooNativeOnlyOutput?.enabled === true &&
+      root.BibloZooNativeOnlyOutput?.devToolsAllowed === true;
     } catch (_) { return false; }
   }
   function micApi() { return root.Capacitor?.Plugins?.BibloZooMicSessionProbe; }

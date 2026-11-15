@@ -25,6 +25,10 @@
   if (!isNativeIOS()) return;
   if (root.BibloZooNativeOnlyOutput?.enabled === true) return;
 
+  // Replaced by npm run build; unbuilt source denies developer tools.
+  var packagedAppId = "__BIBLOZOO_PACKAGED_APP_ID__";
+  var devToolsAllowed = packagedAppId === "com.andydoane.biblozoo.audiotest";
+
   var blockedMediaPlays = 0;
   var mutedVideoPlays = 0;
   var failures = [];
@@ -155,6 +159,7 @@
 
   root.BibloZooNativeOnlyOutput = Object.freeze({
     enabled: true,
+    devToolsAllowed: devToolsAllowed,
     mode: "native-only-ios-experiment",
     status: function () {
       return {

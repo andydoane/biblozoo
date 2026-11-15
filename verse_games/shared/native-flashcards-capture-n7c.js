@@ -345,6 +345,9 @@
       return playWackyPreset(presetId, onStarted, true);
     }
     function playWackyPreset(presetId, onStarted, devVariant) {
+      // Never run a DEV-only DSP variant in production even if called directly.
+      if (devVariant && root.BibloZooNativeOnlyOutput?.devToolsAllowed !== true)
+        return Promise.resolve(false);
       const isAllowed = devVariant
         ? DEV_VARIANT_IDS.has(presetId)
         : OFFICIAL_WACKY_IDS.has(presetId);

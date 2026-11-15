@@ -82,6 +82,14 @@ function injectNativeOnlyAudioGuard() {
     if (!fs.existsSync(scriptFile)) {
         throw new Error("N1 native-only output gate is missing from the app bundle.");
     }
+    // Inject the configured Capacitor ID into the packaged early guard.
+    // Production denies JS developer controls; Audio Test keeps them.
+    const marker = "__BIBLOZOO_PACKAGED_APP_ID__";
+    const template = fs.readFileSync(scriptFile, "utf8");
+    if (template.split(marker).length !== 2)
+        throw new Error("Expected one packaged native identity marker.");
+    fs.writeFileSync(scriptFile, template.replace(marker, capConfig.appId));
+
     let injected = 0;
     const visit = (dir) => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

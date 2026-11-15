@@ -31,6 +31,7 @@
     ["chorus_alien", "Current Chorus Alien"]
   ]);
   const allowed = () => root.BibloZooNativeOnlyOutput?.enabled === true &&
+      root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
     root.Capacitor?.isNativePlatform?.() === true &&
     root.Capacitor?.getPlatform?.() === "ios";
   let backdrop=null, recorder=null, statusNode=null, buttons=[];
