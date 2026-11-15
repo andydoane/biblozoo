@@ -241,7 +241,7 @@ async function run() {
   check(!!quietZoo.zoo,'Read opened the actual owner Zoo interface');
   equal(await quietZoo.zoo.verifiedTap(),true,'quiet Read audio/ack verification succeeds');
   equal(quietZoo.probe.recovery.kind,'ack','verified Read still owns recovery until Zoo ends');
-  equal(quietZoo.timers.size,0,'no timer rearmed just because Let's go audio passed');
+  equal(quietZoo.timers.size,0,"no timer rearmed just because Let's go audio passed");
   quietZoo.zoo.beginEscape();
   equal(quietZoo.probe.recovery.kind,'ack','pet escape keeps same reading session frozen');
   equal(quietZoo.timers.size,0,'timer cannot advance under escaped pets');
@@ -264,7 +264,7 @@ async function run() {
   check(animatedZoo.zoo.verifiedTap(),'Balloons owner begins verification');
   await flush();
   check(!!animatedZoo.probe.verified,'Balloons verified but not resumed');
-  equal(zooClock.paused,true,'Balloons stays frozen after Let's go');
+  equal(zooClock.paused,true,"Balloons stays frozen after Let's go");
   animatedZoo.zoo.beginEscape();
   equal(zooClock.paused,true,'Balloons stays paused while pet is out');
   animatedZoo.zoo.finishEscape();
