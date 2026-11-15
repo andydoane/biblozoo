@@ -2701,7 +2701,8 @@
       isSoundMuted: options.isMuted,
       // N6n optional native Playground owner. This does not change any
       // legacy Web/PWA/Android callers or unrelated Playground activities.
-      useZooEscape: !options.nativeOnlyAudio,
+      useZooEscape: options.allowZooSurprises !== false && !options.nativeOnlyAudio,
+      allowDevForceZooEscape: options.allowZooSurprises !== false,
       suppressUiSound: !!options.nativeOnlyAudio,
       escapeText: "Back to Playground",
       preserveFocus: true,
