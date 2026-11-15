@@ -170,21 +170,21 @@ function makeRound() {
 async function exerciseStart() {
   // Native preflight may take time: the instructions remain with a disabled
   // Got It! button, but no unnecessary "Getting sounds ready" flash.
-  const pending = appHarness();
+  const preparing = appHarness();
   const waiting = makeRound();
-  pending.hooks.setRuntime(waiting);
+  preparing.hooks.setRuntime(waiting);
   waiting.nativePilotChoiceStatus.hidden = false;
   waiting.nativePilotChoiceStatus.textContent = "Previous retry message";
-  const finishActivation = pending.defer();
-  const startPromise = pending.hooks.nativeBegin(waiting);
+  const releasePreflight = preparing.defer();
+  const preparingStart = preparing.hooks.nativeBegin(waiting);
   assert.equal(waiting.nativePilotChoicePending, true);
   assert.equal(waiting.startConfirmButton.disabled, true);
   assert.equal(waiting.nativePilotChoiceStatus.hidden, true,
     "Hide transient preparation text for every native Feeding mode");
   assert.equal(waiting.nativePilotChoiceStatus.textContent, "",
     "Clear stale retry text while preparing native output");
-  finishActivation({ready:true,reason:"ready"});
-  await startPromise;
+  releasePreflight({ready:true,reason:"ready"});
+  await preparingStart;
   assert.equal(waiting.roundStarted, true,
     "Removing preparation copy cannot block real native startup");
 
