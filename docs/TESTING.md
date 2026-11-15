@@ -1,6 +1,6 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## Roadmap PR 1 — shared standalone/compatible Playground Zoo cue-first recovery (owner device PENDING)
+## Roadmap PR 1 / [PR #104](https://github.com/andydoane/biblozoo/pull/104) — shared standalone/compatible Playground Zoo cue-first recovery (owner device PENDING)
 
 **Baseline:** [PR #103](https://github.com/andydoane/biblozoo/pull/103) merged at `59cc8f67`. Owner confirms **Balloons and Fish working fine** on a real iPhone, following the successful Verse Crawl cue from [PR #102](https://github.com/andydoane/biblozoo/pull/102). That is evidence for **those three Read scenes only**, not this PR's Swift/standalone/Playground changes. The multi-PR plan (current shared adapter; next Learn + Feeding; optional quiet Read/special case cleanup) is maintained in [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md#zoo-return-audio-transition--pr-roadmap-maintain-and-update-in-every-later-pr).
 
