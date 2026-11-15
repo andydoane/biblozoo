@@ -81,7 +81,8 @@ async function testBridge(){
  assert.match(swift,/gain \* 0\.85/);
  assert.match(swift,/public\/verse_audio/); // reuse native Learn narration
  assert.match(shell,/typeof options\.restoreNativeOnGesture === "function"/);
- assert.match(shell,/useZooEscape: !options\.nativeOnlyAudio/);
+ assert.match(shell,/useZooEscape: options\.allowZooSurprises !== false && !options\.nativeOnlyAudio/,
+  "native-only Playground audio still uses plain Welcome Back; Verse Jam may also opt out");
  assert.match(shell,/suppressUiSound: !!options\.nativeOnlyAudio/);
  assert.match(game,/restoreNativeOnGesture: nativeTyperAudio \? \(\) =>/);
  assert.match(game,/if\(nativeTyperAudio\)return playNativeTyperChunk\(file,runToken\)/);

@@ -4402,6 +4402,9 @@
     },
     getAudioContext: () => nativeJamAudio ? null : audioCtx,
     nativeOnlyAudio: !!nativeJamAudio,
+    // The music-timing game never joins random or DEV-forced Zoo surprises.
+    // Keep its original single verified Welcome Back / Resume Beat flow.
+    allowZooSurprises: false,
     restoreNativeOnGesture: nativeJamAudio ? () =>
       nativeJamAudio.prepareFromGesture().then(result => {
         audioUnlocked = result?.ready === true;

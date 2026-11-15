@@ -51,8 +51,19 @@ assert.match(app, /onRecovered: complete,[\s\S]*?onExit: complete/);
 assert.match(app, /controller\.startSurprise\?\.\(kind\)/);
 assert.match(app, /titleTodoBtn\.onclick = \(e\) => \{[\s\S]*?openZooTodoWithSurprise\(\(\) => openDailyTodoPreview\(/);
 assert.match(app, /if \(dailyHomeReady\) \{[\s\S]*?dailyHomeOffer\?\.remove\(\);[\s\S]*?openZooTodoWithSurprise\(\(\) => openDailyTodoPreview\("actual"\)/);
-assert.match(shell, /useZooEscape: !options\.nativeOnlyAudio/,
-  "Existing native-only Playground audio return must still keep its approved plain recovery UI");
+assert.match(shell, /useZooEscape: options\.allowZooSurprises !== false && !options\.nativeOnlyAudio/,
+  "Plain native Playground recovery and explicit no-surprise activity exclusion are preserved");
+assert.match(shell, /allowDevForceZooEscape: options\.allowZooSurprises !== false/,
+  "Explicit Playground exclusion also rejects the DEV forced-escape override");
+assert.match(welcomeReturn, /const forceDevEscape = allowDevForceZooEscape &&/,
+  "Shared controller respects an activity-level DEV force exemption");
+const verseJam = read("verse_playground/verse_jam/game.js");
+assert.match(verseJam, /allowZooSurprises: false/,
+  "Verse Jam never enables Zoo Break or Pet Escape, even with DEV force ON");
+assert.match(readGame, /const \[movingSong, movingNarration\] = await Promise\.all\(\[/,
+  "Crawl verifies soundtrack and narration progress concurrently to reduce audible lead-in");
+assert.match(readGame, /waitReadMediaProgress\(song\?\.audio, current, 14, 95\)/,
+  "Crawl checks real progress more frequently without bypassing the clock");
 assert.match(app, /if \(!isNativeLearnListenMode\(\)/,
   "Native Learn audio recovery must not be silently converted into a minigame");
 
@@ -215,6 +226,12 @@ async function main() {
     h.button.trigger("click");
     assert.equal(h.recovery.length,1,"completed gate never repeats audio recovery");
     assert.equal(h.fired.filter(x=>x==="recovered").length,1);
+    assert.equal(h.button.disabled,true,"Lock Gate immediately acknowledges completion");
+    assert.equal(h.button.textContent,"Opening the gate...",
+      "do not flash the ordinary Welcome Back button while the owner finishes");
+    h.button.trigger("click");
+    assert.equal(h.fired.filter(x=>x==="recovered").length,1,
+      "repeated LOCK GATE input cannot double-release gameplay");
     assert.equal(h.win.BibloZooZooStats.get("p1").petsRescued,1,
       "real rescued pet credits profile once");
     h.ctl.destroy();
@@ -233,6 +250,8 @@ async function main() {
     h.button.trigger("click");
     assert.equal(h.recovery.length,1);
     assert.equal(h.fired.filter(x=>x==="recovered").length,1);
+    assert.equal(h.button.textContent,"Opening the gate...",
+      "Zoo Break also retains its completion artwork until owner recovery");
     assert.equal(h.win.BibloZooZooStats.get("p1").petsRescued,total);
     assert.equal(h.win.BibloZooZooStats.get("p1").zooBreaksStopped,1);
     h.ctl.destroy();

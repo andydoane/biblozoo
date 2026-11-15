@@ -804,8 +804,30 @@
       pending = false;
       stage = "recovered";
       emptyField();
-      resetDisplay();
-      try { onRecovered?.(); } catch (_) {}
+      if (surpriseMode) {
+        // A standalone activity may need another asynchronous native audio
+        // preparation on this genuine LOCK GATE gesture. Do not reset to the
+        // original Welcome Back artwork while it is working: that causes a
+        // confusing flash and makes a correctly accepted tap look ignored.
+        // start() resets this presentation if recovery must be retried.
+        instruction.hidden = true;
+        pen.hidden = true;
+        exitButton.hidden = true;
+        button.hidden = false;
+        button.disabled = true;
+        button.textContent = "Opening the gate...";
+        if (status) {
+          status.hidden = false;
+          status.textContent = "Getting your game ready...";
+        }
+      } else {
+        resetDisplay();
+      }
+      try { onRecovered?.(); } catch (_) {
+        // A failed activity callback must not strand the child at a disabled
+        // gate. Return to a fresh explicit Welcome Back recovery attempt.
+        start();
+      }
       log("zoo-escape-recovered", { attemptCount });
     }
     function finishFailure(from) {
