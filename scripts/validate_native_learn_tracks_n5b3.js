@@ -52,7 +52,7 @@ assert.match(app, /result\.durationMs \/ 1000/);
 assert.match(app, /if \(!result\.ended\)/);
 assert.match(app, /finishLearnAudioResumeAttempt\(attempt\)/);
 assert.match(app, /\? 7500 : 3500/);
-assert.match(app, /!isNativeLearnListenMode\(\) &&\s+window\.BibloZooZooEscape/);
+assert.match(app, /\(!isNativeLearnListenMode\(\) \|\|[\s\S]*?isDevForceWelcomeEscapeEnabled[\s\S]*?window\.BibloZooZooEscape/, "Native Learn Listen normally has plain recovery; explicit DEV force enables escape testing");
 assert.match(app, /function goToListenAndStart\(/);
 assert.match(app, /window\.BibloZooNativeLearnListen\.hasPrimedGesture\(\)/);
 assert.match(app, /listenPlay\("listen_ref", 0, true\)/);
