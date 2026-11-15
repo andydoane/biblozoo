@@ -127,7 +127,7 @@ function staticContracts(){
  for(const mode of ['classic','labyrinth','melody','bounce']){
   ok(feed.includes(`[FEED_MODES.${mode.toUpperCase()}]`),mode+' registered');
  }
- for(const text of ['window.BibloZooZooEscape.create({','recover: () => {',
+ for(const text of ['window.BibloZooZooEscape.create({','recover: info => {',
    'attemptFeedingResumeFromGesture(runtime, resolve)','runtime.zooEscape?.start?.()',
    'runtime.zooEscape?.destroy?.()','runtime.onRecoveryExitToZoo || runtime.onBackToZoo',
    'soundIsReady: () => zooEscapeSoundReady(runtime)',
@@ -153,8 +153,39 @@ function staticContracts(){
     sw.includes('"./verse_games/shared/welcome-back-zoo-escape.js"'),
     'Versioned PWA precaches current Feeding and Zoo Escape source');
 }
+function verifySecondLockCancelsPendingFinalGate() {
+  const h=fakeHarness();
+  const {runtime}=makeRuntime('bounce',makeContext(true));
+  h.hooks.setActive(runtime);
+  ok(h.hooks.pauseFeedingGame(runtime,Date.now()-300),
+    "first lock freezes original Bounce rally");
+  let stops=0;
+  runtime.zooCue={stop(){stops++;}};
+  runtime.zooCueVerified=true;
+  runtime.zooCueGeneration=7;
+  runtime.feedResumePending=true;
+  runtime.feedAudioRecoveryVerified=true;
+  runtime.feedResumeWatchdog=setTimeout(()=>{},1000);
+  const generation=runtime.feedResumeGeneration;
+  eq(h.hooks.pauseFeedingGame(runtime),false,
+    "second iOS lock cannot re-freeze or reset the same rally");
+  eq(runtime.feedResumeGeneration,generation+1,
+    "second lock invalidates an in-flight original native-bank recovery");
+  eq(runtime.feedResumePending,false,
+    "second lock clears the stale pending Gate callback");
+  eq(runtime.feedAudioRecoveryVerified,false,
+    "a prior cue/prepare cannot claim recovered Feeding audio");
+  eq(runtime.zooCueVerified,false,
+    "second lock revokes preselected BibloPet cue proof");
+  eq(runtime.zooCueGeneration,8,
+    "second lock invalidates cue and final-gate task token");
+  eq(stops,1,"second lock stops old cue");
+  ok(runtime.feedPausedAt!==null,"Bounce score and physics remain frozen");
+  h.hooks.setActive(null);
+}
 async function main(){
  staticContracts();
+ verifySecondLockCancelsPendingFinalGate();
  for(const mode of ['classic','labyrinth','melody','bounce']) await verifyMode(mode);
  for(const mode of ['classic','labyrinth','melody','bounce']) await verifyFrozenClock(mode);
  const h=fakeHarness();

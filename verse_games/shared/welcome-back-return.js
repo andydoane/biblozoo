@@ -29,52 +29,28 @@
     return false;
   }
 
-  // Patch 72.1C: one lifecycle adapter for the 12 verse games, Playground,
-  // Flashcards, and applicable quiet daily tasks. Owners still supply their
-  // own pause, verified recovery/acknowledgement, and navigation callbacks.
-  // The old controller below remains the safe fallback if Zoo Escape is absent.
-  function attachZooReturn(options) {
-    const { shouldPrompt, onPause, onContinue, onExit, profileId,
-      pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
-      preserveFocus = false, suppressUiSound = false,
-      preselectWelcomeSurprise = false } = options;
-    const doc = root.document;
-    const overlay = doc.createElement("div");
-    overlay.className = "bz-welcome-overlay";
-    overlay.hidden = true;
-    overlay.setAttribute("role", "dialog");
-    overlay.setAttribute("aria-modal", "true");
-    overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
-    overlay.innerHTML = root.BibloZooWelcomeBack.markup("game");
-    const button = overlay.querySelector("[data-welcome-back-action]");
-    if (suppressUiSound || preselectWelcomeSurprise)
-      button?.setAttribute("data-no-ui-sound", "");
-    doc.body.appendChild(overlay);
-    let disposed = false;
-    let pending = false;
-    let away = false;
-    let hasBeenVisible = !doc.hidden;
-    let generation = 0;
-    let heldForSurprise = false;
-    let cueOnlyVerified = false;
+  // Shared between standalone/Playground, Learn and Feeding. The caller
+  // owns gameplay/verse checkpoints; this only proves the fixed BibloPet
+  // unlock sound (real advancing native/player clock or Web media clock).
+  // It NEVER unlocks the original activity audio or commits surprise odds.
+  function createZooAudioCue() {
     // Shared controller owns the optional short cue's lifetime, never the
     // game's native mixer, music clock, score, or activity timeline.
     let cueEpoch = 0;
     let cueCleanup = null;
-    function stopSurpriseCue() {
+    function stop() {
       ++cueEpoch;
       const cleanup = cueCleanup;
       cueCleanup = null;
       try { cleanup?.(); } catch (_) {}
     }
-    function playSurpriseCueFromGesture() {
-      stopSurpriseCue();
-      const epoch = cueEpoch, token = generation;
-      const current = () => !disposed && pending && !doc.hidden &&
-        token === generation && epoch === cueEpoch;
+    function playFromGesture({ isMuted, assetRoot = "", isCurrent } = {}) {
+      stop();
+      const epoch = cueEpoch;
+      const current = () => epoch === cueEpoch && isCurrent?.() === true;
       // The child's explicit mute is intentionally silent. Do not start a
       // competing external-audio takeover merely to play a decorative cue.
-      if (isSoundMuted?.() === true) return Promise.resolve(true);
+      if (isMuted?.() === true) return Promise.resolve(true);
       if (root.BibloZooNativeOnlyOutput?.enabled === true) {
         // Same .soloAmbient native owner as the games. Never instantiate
         // HTMLAudioElement/Web Audio or count accepted play() as proof.
@@ -119,13 +95,13 @@
           }
           return false;
         })().then(ok => {
-          if (!ok) stopSurpriseCue();
+          if (!ok) stop();
           return ok;
-        }, () => { stopSurpriseCue(); return false; });
+        }, () => { stop(); return false; });
       }
       // Standalone and Playground pages share the same ../../ asset root.
       // Web/PWA/Android keep their established HTML-media implementation.
-      const src = (pictureBase === "../../" ? "../../" : "") +
+      const src = (assetRoot === "../../" ? "../../" : "") +
         "ui_audio/ui_pet_unlock.mp3";
       let audio, start;
       try {
@@ -140,7 +116,7 @@
         };
         // Direct click: no await or animation before audio.play().
         start = audio.play();
-      } catch (_) { stopSurpriseCue(); return Promise.resolve(false); }
+      } catch (_) { stop(); return Promise.resolve(false); }
       return Promise.resolve(start).then(async () => {
         if (!current()) return false;
         const initial = Number(audio.currentTime);
@@ -153,9 +129,50 @@
         }
         return false;
       }).then(ok => {
-        if (!ok) stopSurpriseCue();
+        if (!ok) stop();
         return ok;
-      }, () => { stopSurpriseCue(); return false; });
+      }, () => { stop(); return false; });
+    }
+    return Object.freeze({ playFromGesture, stop });
+  }
+
+  // Patch 72.1C: one lifecycle adapter for the 12 verse games, Playground,
+  // Flashcards, and applicable quiet daily tasks. Owners still supply their
+  // own pause, verified recovery/acknowledgement, and navigation callbacks.
+  // The old controller below remains the safe fallback if Zoo Escape is absent.
+  function attachZooReturn(options) {
+    const { shouldPrompt, onPause, onContinue, onExit, profileId,
+      pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
+      preserveFocus = false, suppressUiSound = false,
+      preselectWelcomeSurprise = false } = options;
+    const doc = root.document;
+    const overlay = doc.createElement("div");
+    overlay.className = "bz-welcome-overlay";
+    overlay.hidden = true;
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
+    overlay.innerHTML = root.BibloZooWelcomeBack.markup("game");
+    const button = overlay.querySelector("[data-welcome-back-action]");
+    if (suppressUiSound || preselectWelcomeSurprise)
+      button?.setAttribute("data-no-ui-sound", "");
+    doc.body.appendChild(overlay);
+    let disposed = false;
+    let pending = false;
+    let away = false;
+    let hasBeenVisible = !doc.hidden;
+    let generation = 0;
+    let heldForSurprise = false;
+    let cueOnlyVerified = false;
+    const surpriseCue = createZooAudioCue();
+    const stopSurpriseCue = () => surpriseCue.stop();
+    function playSurpriseCueFromGesture() {
+      const token = generation;
+      return surpriseCue.playFromGesture({
+        isMuted: isSoundMuted, assetRoot: pictureBase,
+        isCurrent: () => !disposed && pending && !doc.hidden &&
+          token === generation
+      });
     }
     const zoo = root.BibloZooZooEscape.create({
       overlay, profileId, pictureBase, name, petName, verseId,
@@ -710,7 +727,7 @@
   }
 
   root.BibloZooWelcomeBackReturn = Object.freeze({
-    attach, resumeAudioOnGesture, isNativeAudioDeferred,
+    attach, createZooAudioCue, resumeAudioOnGesture, isNativeAudioDeferred,
     nativeAudioResumeResult
   });
 })(window);

@@ -1131,6 +1131,8 @@
       runtime.resizeObserver?.disconnect();
       runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
       destroyFeedZooTestHarness(runtime);
+      runtime.zooCue?.stop();
+      runtime.zooCueGeneration = (runtime.zooCueGeneration || 0) + 1;
       // Destroy animations, timers, input captures and overlay handlers before
       // the Feeding DOM can be replaced by its owning screen.
       runtime.zooEscape?.destroy?.();
@@ -3540,8 +3542,25 @@
 
   function pauseFeedingGame(runtime, now = performance.now(),
       fromZooSurprise = false) {
+    if (runtime?.feedPausedAt != null) {
+      // A SECOND OS lock while a cue, pet, or final native-bank recovery is
+      // pending must revoke BOTH the cue and the owner's asynchronous
+      // recovery. UIKit may report inactive before document.hidden changes.
+      runtime.zooCue?.stop();
+      runtime.zooCueVerified = false;
+      runtime.zooCueGeneration = (runtime.zooCueGeneration || 0) + 1;
+      if (runtime.feedResumePending) {
+        runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+        runtime.feedResumePending = false;
+        runtime.feedAudioRecoveryVerified = false;
+        clearTimeout(runtime.feedResumeWatchdog);
+        runtime.feedResumeWatchdog = null;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      }
+      return false;
+    }
     if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
-        !runtime.running || runtime.finished || runtime.feedPausedAt != null) return false;
+        !runtime.running || runtime.finished) return false;
     runtime.feedPausedAt = now;
     runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
     runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
@@ -3631,7 +3650,8 @@
 
   // Called by a real click, never automatically on pageshow. Do not queue
   // stale effects; the same button remains usable if iOS rejects resume().
-  function attemptFeedingResumeFromGesture(runtime, onSettled) {
+  function attemptFeedingResumeFromGesture(runtime, onSettled,
+      keepOverlay = false) {
     // onSettled is optional: legacy callers still get the old return boolean;
     // Zoo Escape gets a definitive, clock-verified completion notification.
     const report = (ok) => {
@@ -3681,7 +3701,8 @@
           return;
         }
         runtime.feedAudioRecoveryVerified = true;
-        const resumed = continueFeedingAfterGesture(runtime, performance.now(), false);
+        const resumed = continueFeedingAfterGesture(runtime,
+          performance.now(), keepOverlay);
         report(resumed);
       };
       runtime.feedResumeWatchdog = setTimeout(
@@ -3783,7 +3804,7 @@
       // Only a verified user gesture can dismiss the activity's overlay.
       runtime.feedAudioRecoveryVerified = true;
       const continued = continueFeedingAfterGesture(runtime,
-        performance.now(), !!runtime.zooEscape);
+        performance.now(), keepOverlay || !!runtime.zooEscape);
       if (continued) {
         runtime.feedAudioNeedsFreshContext = false;
         runtime.feedAudioReplacements = 0;
@@ -6204,9 +6225,15 @@
       if (shouldClose !== false) stop();
     };
 
-    // Feeding is the first activity to opt into Zoo Escape. The shared
-    // controller supplies UI and a bounded state machine; only Feeding owns
-    // its audio probe, session/score data, and navigation cleanup.
+    // The sound cue is now the shared same-output-owner unlock verification;
+    // no Feeding-mode-specific audio engine or gameplay checkpoint is made.
+    // Native production keeps plain Welcome Back except existing DEV force.
+    runtime.zooCue = window.BibloZooWelcomeBackReturn?.createZooAudioCue?.() || null;
+    runtime.zooCueVerified = false;
+    runtime.zooHoldingForSurprise = false;
+    runtime.zooWasCueFirst = false;
+    runtime.zooCueGeneration = 0;
+    if (runtime.zooCue) runtime.resumeButton?.setAttribute?.("data-no-ui-sound", "");
     if (window.BibloZooZooEscape?.create) {
       runtime.zooEscape = window.BibloZooZooEscape.create({
         overlay: runtime.resumeOverlay,
@@ -6215,37 +6242,101 @@
         reducedMotion: runtime.reducedMotion,
         isTestRun: () => !!runtime.zooDevScenario,
         surpriseEnabled: true,
-        recover: () => {
-          // A deliberate pilot scenario substitutes only this bool result.
-          // Normal players still enter the unchanged verified audio path.
-          if (runtime.zooDevScenario) {
-            return getFeedZooTestResult(runtime);
+        preselectWelcomeSurprise: !!runtime.zooCue,
+        recover: info => {
+          // Pilot scenarios preserve their deliberately simulated outcomes;
+          // they do not consume a real sound cue or commit production odds.
+          if (runtime.zooDevScenario) return getFeedZooTestResult(runtime);
+          if (info?.plannedSurprise && runtime.zooCue) {
+            const token = ++runtime.zooCueGeneration;
+            runtime.zooCueVerified = false;
+            runtime.zooCue.stop();
+            // A selected surprise must NOT call the original Feeding audio
+            // resume here. Keep native bank, mode physics, deadlines and
+            // daily reward/checkpoint exactly frozen until LOCK GATE.
+            return runtime.zooCue.playFromGesture({
+              assetRoot: "",
+              isMuted: () => window.BibloZooApp?.isMuted?.() === true,
+              isCurrent: () => activeRuntime === runtime && runtime.running &&
+                !runtime.finished && runtime.feedPausedAt != null &&
+                !runtime.feedPageHidden && !document.hidden &&
+                token === runtime.zooCueGeneration
+            }).then(ok => {
+              if (activeRuntime !== runtime || document.hidden ||
+                  token !== runtime.zooCueGeneration) return false;
+              runtime.zooCueVerified = ok === true;
+              return ok === true;
+            }, () => false);
           }
           return new Promise(resolve => {
-            // Native activation and AudioContext.resume() stay directly
-            // inside the child's click in real (non-test) gameplay.
+            // No selected surprise: unchanged real user gesture invokes
+            // this particular Feeding mode's native/Web clock verification.
             attemptFeedingResumeFromGesture(runtime, resolve);
           });
         },
         onSurpriseStart: () => {
-          // The initial Let's go verified sound and started the game loop.
-          // Re-freeze that SAME rally before the pet-escape animation begins.
-          // Do not restart the Zoo controller while it is already escaping.
-          if (activeRuntime === runtime && runtime.feedPausedAt == null)
+          runtime.zooHoldingForSurprise = true;
+          runtime.zooWasCueFirst = runtime.zooCueVerified === true;
+          // Cue-first holds the original round from the FIRST lock; another
+          // onPause could invalidate live Melody/tilt checkpoints or cut cue.
+          // The legacy pilot simulation still uses its original re-pause.
+          if (!runtime.zooCueVerified && activeRuntime === runtime &&
+              runtime.feedPausedAt == null)
             pauseFeedingGame(runtime, performance.now(), true);
         },
         onRecovered: () => {
-          // The final LOCK GATE / pen click releases the original round.
-          // No synthetic scoring, new serves or second reward claim.
+          // The final LOCK GATE / pen click is a NEW real gesture.
           runtime.zooDevScenario = null;
           if (activeRuntime !== runtime) return;
+          if (runtime.zooCueVerified && !runtime.zooHoldingForSurprise) {
+            // Cue-only success but provisional surprise commit failed.
+            // Original game remains stopped: require a fresh real tap.
+            runtime.zooCue.stop();
+            runtime.zooCueVerified = false;
+            ++runtime.zooCueGeneration;
+            runtime.zooEscape?.start?.();
+            runtime.resumeOverlay.hidden = false;
+            return;
+          }
+          if (runtime.zooCueVerified && runtime.zooHoldingForSurprise) {
+            runtime.zooCue.stop();
+            runtime.zooCueVerified = false;
+            ++runtime.zooCueGeneration;
+            const gateToken = ++runtime.zooCueGeneration;
+            // Do not pretend the old cue verified the Feeding game bank.
+            // Prepare/reclaim the ORIGINAL owner in this real LOCK GATE tap.
+            attemptFeedingResumeFromGesture(runtime, ok => {
+              if (activeRuntime !== runtime || document.hidden ||
+                  runtime.feedPageHidden ||
+                  runtime.zooCueGeneration !== gateToken ||
+                  !runtime.zooHoldingForSurprise) return;
+              runtime.zooHoldingForSurprise = false;
+              runtime.zooWasCueFirst = false;
+              if (ok && runtime.feedPausedAt == null) {
+                runtime.resumeOverlay.hidden = true;
+                runtime.zooSoundClockSample = null;
+              } else {
+                runtime.zooEscape?.start?.();
+                runtime.resumeOverlay.hidden = false;
+              }
+            }, true);
+            return;
+          }
+          // Second lock revokes the cue proof. Never use the older pilot
+          // shortcut to unfreeze a *real* cue-first escape after an OS lock.
+          if (runtime.zooWasCueFirst) {
+            runtime.zooWasCueFirst = false;
+            runtime.zooHoldingForSurprise = false;
+            runtime.zooEscape?.start?.();
+            runtime.resumeOverlay.hidden = false;
+            return;
+          }
+          // Legacy pilot path: original audio was verified at Let's go,
+          // then intentionally re-frozen for the simulated escape.
+          runtime.zooHoldingForSurprise = false;
           if (runtime.feedPausedAt != null) {
             runtime.feedAudioRecoveryVerified = true;
-            const continued = continueFeedingAfterGesture(
-              runtime, performance.now(), true);
-            if (!continued) {
-              // Audio may have been lost again during rescue. Keep a new
-              // deliberate Welcome Back rather than running silently.
+            if (!continueFeedingAfterGesture(runtime, performance.now(), true)) {
               runtime.zooEscape?.start?.();
               return;
             }
@@ -6256,6 +6347,10 @@
           }
         },
         onExit: () => {
+          runtime.zooCue?.stop();
+          runtime.zooCueVerified = false;
+          runtime.zooWasCueFirst = false;
+          ++runtime.zooCueGeneration;
           if (activeRuntime !== runtime) return;
           // Exit is never conditioned on earning a daily reward: the host
           // may provide an explicit abort path with no completion credit.
