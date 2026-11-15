@@ -13,6 +13,16 @@ const shared = read("verse_games/shared/welcome-back-return.js");
 const shell = read("verse_games/shared/game-shell.js");
 const swift = read("ios/App/App/BibloZooNativeSoundPlugin.swift");
 const workflow = read(".github/workflows/ios-prep-validation.yml");
+const typer = read("verse_playground/verse_typer/game.js");
+const scrub = read("verse_playground/scripture_scrub/game.js");
+assert.match(typer,/playgroundWelcome\?\.pauseFromNativeInactive\?\.\(\)/,
+  "Verse Typer routes UIKit inactive into shared native-return lifecycle");
+assert.match(scrub,/playgroundWelcome\?\.pauseFromNativeInactive\?\.\(\)/,
+  "Scripture Scrub routes UIKit inactive into shared native-return lifecycle");
+assert.match(typer,/const paused = playgroundWelcome\?\.pauseFromNativeInactive\?\.\(\) === true/,
+  "interrupted Typer narration uses explicit retryable Welcome Back rather than gray modal");
+assert.match(scrub,/mowerActive && !mowerAnimationFrame/,
+  "lost mower RAF is not allowed to block input after final gate");
 new vm.Script(shared);
 assert(workflow.includes("node scripts/validate_shared_zoo_audio_cue_transition.js"));
 const games = ["bible_bugs","dino_dash","foodslice","tower_bible",
@@ -56,7 +66,8 @@ assert(!/setActive\(|setCategory\(|play\(|MediaRecorder|getUserMedia/.test(metho
   "read-only native clock probe must NEVER start sound, alter session or record");
 
 function harness({native=false,muted=false,refuseCue=false,refuseGate=false,
-                  refuseActivation=false, noPlugin=false}={}){
+                  refuseActivation=false, noPlugin=false,
+                  nativeInactiveFirst=false}={}){
   const events=[],callbacks={doc:{},win:{}};
   let audioConstructed=0, cueStopCount=0, cueReads=0, gateCount=0, pauseCount=0;
   let paused=false, active=true;
@@ -122,8 +133,27 @@ function harness({native=false,muted=false,refuseCue=false,refuseGate=false,
     onExit(){events.push("owner-exit");}
   });
   assert(ctl);
-  doc.hidden=true;callbacks.doc.visibilitychange();
-  doc.hidden=false;callbacks.win.pageshow();
+  if (nativeInactiveFirst) {
+    // UIKit first: document.hidden is still FALSE, WebKit visibility has not
+    // fired, yet native narration/PCM will already be interrupted.
+    assert.equal(doc.hidden,false);
+    assert.equal(ctl.pauseFromNativeInactive(),true,
+      "UIKit inactive enters native Zoo owner pause before WebKit hides");
+    assert.equal(paused,true);
+    assert.equal(pauseCount,1);
+    // Repeated inactive + delayed WebKit visibility may not double-pause.
+    assert.equal(ctl.pauseFromNativeInactive(),true);
+    doc.hidden=true;callbacks.doc.visibilitychange();
+    assert.equal(pauseCount,1);
+    doc.hidden=false;callbacks.win.pageshow();
+    assert.equal(ctl.showAfterNativeActive(),true);
+    assert.equal(overlay.hidden,false);
+    assert.equal(ctl.showAfterNativeActive(),false,
+      "duplicate native active may not create a second recovery");
+  } else {
+    doc.hidden=true;callbacks.doc.visibilitychange();
+    doc.hidden=false;callbacks.win.pageshow();
+  }
   const flush=async()=>{for(let i=0;i<22;i++)await Promise.resolve();};
   return {doc,win,events,overlay,ctl,flush,
     get paused(){return paused;},get gateCount(){return gateCount;},
@@ -204,7 +234,7 @@ async function run(){
     h.ctl.destroy();
   }
   {
-    const h=harness({native:true});
+    const h=harness({native:true,nativeInactiveFirst:true});
     assert.equal(await h.win.visual.options.recover({plannedSurprise:"escape"}),true);
     assert.equal(h.audioConstructed,0,"native-only never constructs HTML audio");
     assert(h.cueReads>0,"native cue must sample real AVAudioPlayer position");
