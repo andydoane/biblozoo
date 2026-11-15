@@ -412,6 +412,7 @@ jobs:
           node scripts/validate_patch72_1c2_identity_artwork_exit.js
           node scripts/validate_patch72_1c3_zoo_escape_sounds.js
           node scripts/validate_patch72_1d_zookeeper_stats.js
+          node scripts/validate_remove_hero_white_feed_check.js
 
       - name: Validate Verse Launch menu and bonus pause
         shell: bash

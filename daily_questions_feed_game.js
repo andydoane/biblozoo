@@ -1539,7 +1539,8 @@
               type="button"
               data-daily-feed-result-back
             >
-              ✔ To-Do Complete!
+              <svg class="daily-feed-result-check" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m4 12 5 5L20 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>To-Do Complete!</span>
             </button>
           </div>
         </div>
