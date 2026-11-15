@@ -10,7 +10,7 @@ const swift=read("ios/App/App/BibloZooNativeSoundPlugin.swift");
 const fixture=read("scripts/validate_audio_diagnostics_patch55.js");
 const build=read("scripts/build.js");
 assert.match(diag,/BibloZooNativeOnlyOutput\?\.enabled === true &&\s*root\.BibloZooNativeOnlyOutput\?\.devToolsAllowed !== true\) return;/);
-assert.match(build,/native-only-output\.js/);
+assert.match(build,/native-only-ios-output\.js/);
 // Verify a persisted old 'on' switch never even reads storage, registers a
 // window API, instruments fetch/media, or installs an Audio log panel.
 for(const allow of [false,undefined]){
