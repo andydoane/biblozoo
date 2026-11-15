@@ -135,9 +135,9 @@
     return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"),
       String(date.getDate()).padStart(2, "0")].join("-");
   };
-  function chooseSurprise(explicitId, source) {
+  function chooseSurprise(explicitId, source, deferCommit = false) {
     if (source === "welcome" && forceWelcomePetEscapeEnabled())
-      return "escape";
+      return deferCommit ? { kind: "escape", commit: () => true } : "escape";
     const id = profileForStats(explicitId);
     if (!id || (source !== "daily" && source !== "welcome")) return null;
     const key = SURPRISE_PREFIX + id;
@@ -162,14 +162,26 @@
       // A shown/selected Zoo Break reduces today's future odds even if the
       // child later exits the rescue. Actual caught-pet and stopped-break
       // statistics still depend on real rescues and a completed LOCK GATE.
-      root.localStorage.setItem(key, JSON.stringify({
-        day, breaksTriggered: priorBreaks + (isBreak ? 1 : 0)
-      }));
-      return kind;
+      // Read's Verse Crawl may preselect its cue before starting any music.
+      // The ordinary odds/day record is committed ONLY when its real audio
+      // recovery succeeds; a failed/hidden attempt has no entertainment side
+      // effects. All other owners keep the existing immediate choose() path.
+      const commit = () => {
+        try {
+          root.localStorage.setItem(key, JSON.stringify({
+            day, breaksTriggered: priorBreaks + (isBreak ? 1 : 0)
+          }));
+          return true;
+        } catch (_) { return false; }
+      };
+      if (deferCommit) return { kind, commit };
+      return commit() ? kind : null;
     } catch (_) { return null; }
   }
   root.BibloZooZooSurprise = Object.freeze({
-    choose: chooseSurprise, chances: SURPRISE_CHANCES,
+    choose: (id, source) => chooseSurprise(id, source),
+    planWelcome: id => chooseSurprise(id, "welcome", true),
+    chances: SURPRISE_CHANCES,
     isDevForceWelcomeEscapeEnabled: forceWelcomePetEscapeEnabled
   });
   const rand = (min, max) => min + Math.random() * (max - min);
@@ -177,7 +189,7 @@
   function create({ overlay, recover, onRecovered, onExit, onSurpriseStart,
     onRescue,
     onBreakComplete, soundIsReady, onPop, onBounce, getSoundContext, isSoundMuted,
-    isTestRun, surpriseEnabled = false,
+    isTestRun, surpriseEnabled = false, preselectWelcomeSurprise = false,
     profileId, pictureBase = "",
     petName, verseId, name, reducedMotion } = {}) {
     if (!overlay?.querySelector || typeof recover !== "function" ||
@@ -900,10 +912,21 @@
       button.disabled = true;
       exitButton.hidden = false;
       log("zoo-escape-gesture", { stage: from, attemptCount });
+      // Verse Crawl may need to select a cue BEFORE asking native Read to
+      // play sound. This is a dry roll: no stats or stored odds are touched
+      // unless the owner's original verified recovery reports success.
+      let plannedSurprise = null;
+      if (from === "welcome" && surpriseEnabled && preselectWelcomeSurprise &&
+          !isDeveloperRun()) {
+        try {
+          plannedSurprise = root.BibloZooZooSurprise?.planWelcome?.(profileId) || null;
+        } catch (_) {}
+      }
       // Invoke recovery synchronously while WebKit's direct user activation
       // exists. Do not await a cosmetic animation before calling this.
       let recovery;
-      try { recovery = recoveryForAttempt({ stage: from, attempt: attemptCount }); }
+      try { recovery = recoveryForAttempt({ stage: from, attempt: attemptCount,
+        plannedSurprise: plannedSurprise?.kind || null }); }
       catch (_) { recovery = false; }
       watchdog = root.setTimeout(() => {
         watchdog = 0;
@@ -934,8 +957,16 @@
           // or deferred native audio result never triggers an event.
           let kind = null;
           if (from === "welcome" && surpriseEnabled && !isDeveloperRun()) {
-            try { kind = root.BibloZooZooSurprise?.choose?.(profileId, "welcome"); }
-            catch (_) { /* No surprise may block recovered gameplay. */ }
+            if (preselectWelcomeSurprise) {
+              // A failed commit cannot show an unaccounted random surprise.
+              try {
+                if (plannedSurprise?.commit?.() === true)
+                  kind = plannedSurprise.kind;
+              } catch (_) {}
+            } else {
+              try { kind = root.BibloZooZooSurprise?.choose?.(profileId, "welcome"); }
+              catch (_) { /* No surprise may block recovered gameplay. */ }
+            }
           }
           if (!kind || !startSurprise(kind)) successful();
         } else if (running()) handleRecoveryFailure(from);
