@@ -119,7 +119,8 @@
   const FORCE_WELCOME_ESCAPE_KEY = "biblozooDevForceWelcomePetEscape:v1";
   function forceWelcomePetEscapeEnabled() {
     try {
-      return root.Capacitor?.isNativePlatform?.() === true &&
+      return root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
+        root.Capacitor?.isNativePlatform?.() === true &&
         root.Capacitor?.getPlatform?.() === "ios" &&
         root.localStorage?.getItem?.(FORCE_WELCOME_ESCAPE_KEY) === "1";
     } catch (_) { return false; }
@@ -332,6 +333,8 @@
     const isDeveloperRun = () => !!testScenario || forcedSurpriseTest ||
       (typeof isTestRun === "function" && isTestRun() === true);
     const allowTestMenu = ENABLE_ZOO_RETURN_TEST_HARNESS &&
+      (root.BibloZooNativeOnlyOutput?.enabled !== true ||
+       root.BibloZooNativeOnlyOutput?.devToolsAllowed === true) &&
       !overlay.classList.contains("daily-feed-resume-overlay");
     const effectTimers = new Set();
     const laterEffect = (callback, delay) => {

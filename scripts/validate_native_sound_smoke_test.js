@@ -255,6 +255,7 @@ function environment(options = {}) {
     : { isNativePlatform: () => true, getPlatform: () => "ios", Plugins: options.missing ? {} : { BibloZooNativeSound: api } };
   const win = {
     document: doc, Capacitor: cap,
+     BibloZooNativeOnlyOutput: {devToolsAllowed: options.platform !== "web"},
     addEventListener() {},
     setTimeout(cb, ms) { const id = ++nextTimer; timed.set(id, { cb, ms }); return id; },
     clearTimeout(id) { timed.delete(id); }

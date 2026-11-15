@@ -3431,6 +3431,8 @@
 
   function attachFeedZooTestHarness(runtime) {
     if (!ENABLE_FEED_ZOO_ESCAPE_TEST_HARNESS ||
+        (window.BibloZooNativeOnlyOutput?.enabled === true &&
+         window.BibloZooNativeOnlyOutput?.devToolsAllowed !== true) ||
         !runtime?.zooEscape || !runtime.gameEl) return;
     const badge = runtime.gameEl.querySelector(".daily-feed-score-badge");
     if (!badge) return;

@@ -1416,6 +1416,11 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             // Empty preset means the unchanged dry recorded-voice path.
             let effectId = call.getString("presetId") ?? ""
             let devVariant = call.getBool("devVariant") == true
+            // Reject DEV alternate Wacky voices in production even on direct bridge calls.
+            guard !devVariant || self.isDevBundle else {
+                call.resolve(["started": false, "reason": "dev-only"])
+                return
+            }
             guard effectId.isEmpty || Self.wackyPresetIds.contains(effectId) ||
                   (devVariant && Self.n7e1Variants[effectId] != nil) else {
                 call.resolve(["started": false, "reason": "unknown-preset"])
