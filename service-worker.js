@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Nov_14_patch73_melody_seven_snacks_badges";
+const CACHE_VERSION = "2026_Nov_14_patch73_zoo_gate_verse_jam_exclusion";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
