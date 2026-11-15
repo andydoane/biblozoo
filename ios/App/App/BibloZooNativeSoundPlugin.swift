@@ -961,8 +961,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // until the user explicitly pastes it into a chat.
     @objc func copyTimingReport(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self else {
-                call.resolve(["copied": false, "reason": "unavailable"]); return
+            guard let self = self, BibloZooIOSIdentity.experimentalToolsEnabled else {
+                call.resolve(["copied": false, "reason": "dev-only"]); return
             }
             guard UIApplication.shared.applicationState == .active else {
                 call.resolve(["copied": false, "reason": "not-foreground"]); return
@@ -978,8 +978,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // measured latency or alters playback. No personal content is stored.
     @objc func markRecentChompLate(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self else {
-                call.resolve(["marked": false, "reason": "unavailable"]); return
+            guard let self = self, BibloZooIOSIdentity.experimentalToolsEnabled else {
+                call.resolve(["marked": false, "reason": "dev-only"]); return
             }
             let now = ProcessInfo.processInfo.systemUptime
             guard let index = self.soundTimingEvents.lastIndex(where: {
@@ -2558,7 +2558,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // (Apple exposes no public isActive property).
     @objc func getDebugState(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self else {
+            guard let self = self, BibloZooIOSIdentity.experimentalToolsEnabled else {
                 call.resolve(["available": false])
                 return
             }
@@ -3244,6 +3244,10 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // Release builds acknowledge fixed markers but produce no NSLog.
     @objc func traceJamTransition(_ call: CAPPluginCall) {
         onMain {
+            guard BibloZooIOSIdentity.experimentalToolsEnabled else {
+                call.resolve(["ok": false, "reason": "dev-only"])
+                return
+            }
             guard let phase = call.getString("phase"),
                   ["stop-request","stop-complete","phrase-scheduled",
                    "word-visible","next-groove"].contains(phase),

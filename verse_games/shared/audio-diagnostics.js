@@ -2,6 +2,13 @@
 (function installBibloZooAudioDiagnostics(root) {
   "use strict";
 
+  // On production native iOS, deny opt-in instrumentation BEFORE reading
+  // stale localStorage flags or installing any API wrappers/listeners.
+  // The separately signed Audio Test may still opt in; Web/PWA/Android stay
+  // unchanged. This is defense in depth beyond hiding the DEV Tools drawer.
+  if (root.BibloZooNativeOnlyOutput?.enabled === true &&
+      root.BibloZooNativeOnlyOutput?.devToolsAllowed !== true) return;
+
   const ENABLE_KEY = "biblozooAudioDiagnostics";
   const LOG_KEY = "biblozooAudioDiagnosticsLog";
   const MAX_EVENTS = 300;
