@@ -1674,8 +1674,8 @@
     if (generation !== readAudioRecoveryGeneration ||
         readAudioRecovery !== recovery) return false;
     if (readZooFinalRecovery === recovery) {
-      // The child used LOCK GATE as a second genuine audio gesture. Both
-      // Crawl's soundtrack and active narration just passed their old clocks.
+      // The child used LOCK GATE as a second genuine audio gesture. The
+      // original activity-owned soundtrack/narration passed its old checks.
       readZooFinalRecovery = null;
       readZooRecovery = null;
       readAudioRecovery = null;
