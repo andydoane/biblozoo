@@ -93,6 +93,7 @@ function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
     }} : {})};
   vm.runInNewContext(engine, {window:win,Math:random,Date:DateForPolicy,Promise,URL,console});
   return {choose:(id,source)=>win.BibloZooZooSurprise.choose(id,source),
+    plan:id=>win.BibloZooZooSurprise.planWelcome(id),
     forced:()=>win.BibloZooZooSurprise.isDevForceWelcomeEscapeEnabled(),
     setDay:d=>{day=d;}, stats:id=>win.BibloZooZooStats.get(id)};
 }
@@ -157,6 +158,35 @@ function policy(store, random, initialDay = "2026-11-13", nativeIos = false) {
     "Unavailable storage fails closed; don't strand normal task navigation");
 }
 
+// Crawl's provisional roll is pure until a real owner audio success. Failure
+// or app switch never consumes ordinary daily odds; only verified selection
+// may commit the exact per-Zookeeper count, once.
+{
+  const store=storage(),p=policy(store,seededMath(0.50,0.90,0.99,0.12));
+  const first=p.plan("child");
+  assert.equal(first.kind,"break");
+  assert.equal(store.getItem("biblozooZooSurprise:v2:child"),null,
+    "Crawl must not pre-credit random Zoo odds before sound verification");
+  const second=p.plan("child");
+  assert.equal(second.kind,"escape","failed first roll does not commit but next tap can roll");
+  assert.equal(store.getItem("biblozooZooSurprise:v2:child"),null);
+  assert.equal(second.commit(),true,"verified audio commits the selected outcome");
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:child")).breaksTriggered,0,
+    "Pet Escape does not consume first Zoo Break chance");
+  assert.equal(first.commit(),true);
+  assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:child")).breaksTriggered,1,
+    "selected Zoo Break is counted only when the verified reservation commits");
+}
+{
+  const store=storage(),p=policy(store,seededMath(0.99,0.98),"2026-11-13",true);
+  store.setItem("biblozooDevForceWelcomePetEscape:v1","1");
+  const plan=p.plan("child");
+  assert.equal(plan.kind,"escape","DEV force participates in preselected cue");
+  assert.equal(plan.commit(),true);
+  assert.equal(store.getItem("biblozooZooSurprise:v2:child"),null,
+    "DEV forced escape cannot write ordinary random odds");
+}
+
 // The main-screen DEV Tools switch is a native Audio Test-only override:
  // every VERIFIED Welcome Back forces exactly a Pet Escape, WITHOUT writing
  // ordinary random-schedule state or crediting fake rescue statistics.
@@ -197,15 +227,51 @@ function rewrite(a,b) {
   fixture=fixture.replace(a,b);
 }
 rewrite("const win={document:doc,matchMedia:",
-  "const win={localStorage:options.localStorage,document:doc,matchMedia:");
+  "const win={localStorage:options.localStorage,...(options.nativeIos ? {Capacitor:{isNativePlatform:()=>true,getPlatform:()=>\"ios\"}} : {}),document:doc,matchMedia:");
 rewrite("const sandbox={window:win,Date:FakeDate,Math,Promise,URL,console};",
   "const sandbox={window:win,Date:FakeDate,Math:options.randomMath || Math,Promise,URL,console};");
 rewrite('profileId:"p1",petName:"Milo",soundIsReady:',
-  'profileId:"p1",surpriseEnabled:!!options.surpriseEnabled,petName:"Milo",soundIsReady:');
+  'profileId:"p1",surpriseEnabled:!!options.surpriseEnabled,preselectWelcomeSurprise:!!options.preselectWelcomeSurprise,petName:"Milo",soundIsReady:');
+rewrite('recover:()=>{recovery.push(time);return answers.shift();}',
+  'recover:info=>{recovery.push({time,info});return answers.shift();}');
 const harness=new Function("engine","vm","assert","URL","console",
   'let checks=0;\n'+fixture+'\nreturn harness;')(engine,vm,assert,URL,console);
 
 async function main() {
+  {
+    const store=storage();
+    const h=harness([false,true],{localStorage:store,surpriseEnabled:true,
+      preselectWelcomeSurprise:true,randomMath:seededMath(0.99,0.1,0.99,0.1)});
+    h.ctl.start();
+    h.button.trigger("click");
+    assert.equal(h.recovery[0].info.plannedSurprise,"escape",
+      "first real tap preselects cue before owner recovery");
+    assert.equal(store.getItem("biblozooZooSurprise:v2:p1"),null,
+      "selected pet cannot change odds until sound succeeds");
+    await Promise.resolve();
+    assert.equal(h.ctl.getStage(),"welcome",
+      "an unverified cue cannot make the escape visible");
+    h.button.trigger("click");
+    assert.equal(h.recovery[1].info.plannedSurprise,"escape");
+    await Promise.resolve();
+    assert.equal(h.ctl.getStage(),"escape",
+      "verified cue allows the preselected escape to begin");
+    assert.equal(JSON.parse(store.getItem("biblozooZooSurprise:v2:p1")).breaksTriggered,0);
+    h.ctl.destroy();
+  }
+  {
+    const store=storage();
+    store.setItem("biblozooDevForceWelcomePetEscape:v1","1");
+    const h=harness([true],{localStorage:store,surpriseEnabled:true,
+      nativeIos:true,preselectWelcomeSurprise:true});
+    h.ctl.start();h.button.trigger("click");
+    assert.equal(h.recovery[0].info.plannedSurprise,"escape");
+    await Promise.resolve();
+    assert.equal(h.ctl.getStage(),"escape","DEV forced cue selected before playback");
+    assert.equal(store.getItem("biblozooZooSurprise:v2:p1"),null,
+      "DEV cue verification does not burn normal Break odds");
+    h.ctl.destroy();
+  }
   {
     // Child taps the real Welcome Back action. A verified audio result is
     // mandatory BEFORE the random Pet Escape becomes visible.
