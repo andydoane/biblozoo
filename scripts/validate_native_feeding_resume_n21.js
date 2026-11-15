@@ -45,6 +45,8 @@ function installResumeHandler(runtime, calls) {
     '    runtime.resumeButtonHandler = (event) => {',
     '    runtime.resumeBackHandler = (event) => {');
   vm.runInNewContext(fn, {
+    window:{BibloZooZooSurprise:{isDevForceWelcomeEscapeEnabled:() =>
+      runtime.forceDevPetEscape === true}},
     runtime, attemptFeedingResumeFromGesture: target => {
       assert.equal(target, runtime);
       calls.push("native-resume");
@@ -135,8 +137,8 @@ async function run() {
   assert.doesNotMatch(FEED, /if \(!runtime\.zooEscape\)\s*\{\s*\/\/ Older builds[\s\S]*?resumeButton\.addEventListener\("click", runtime\.resumeButtonHandler\)/,
     "the old controller-exists guard must not leave Native-only Resume inert");
   assert.match(FEED,
-    /if \(runtime\.zooEscape && runtime\.nativePilotBackend !== "native"\) return/,
-    "Web Zoo Escape must continue owning its active Resume clicks");
+    /if \(runtime\.zooEscape &&[\s\S]*?runtime\.nativePilotBackend !== "native" \|\|[\s\S]*?isDevForceWelcomeEscapeEnabled/,
+    "Web Zoo Escape and native explicit DEV force own their resume clicks");
 
   // Native-only leaves Zoo Escape installed but NEVER calls start(). This was
   // exactly the iPhone report: disabled old handler, no owner handler.
