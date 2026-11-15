@@ -162,7 +162,7 @@
       // A shown/selected Zoo Break reduces today's future odds even if the
       // child later exits the rescue. Actual caught-pet and stopped-break
       // statistics still depend on real rescues and a completed LOCK GATE.
-      // Read's Verse Crawl may preselect its cue before starting any music.
+      // Animated Read activities may preselect a cue before starting narration/music.
       // The ordinary odds/day record is committed ONLY when its real audio
       // recovery succeeds; a failed/hidden attempt has no entertainment side
       // effects. All other owners keep the existing immediate choose() path.
@@ -912,7 +912,7 @@
       button.disabled = true;
       exitButton.hidden = false;
       log("zoo-escape-gesture", { stage: from, attemptCount });
-      // Verse Crawl may need to select a cue BEFORE asking native Read to
+      // Animated Read activities may need to select a cue BEFORE asking native Read to
       // play sound. This is a dry roll: no stats or stored odds are touched
       // unless the owner's original verified recovery reports success.
       const preselect = typeof preselectWelcomeSurprise === "function"
