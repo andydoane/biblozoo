@@ -3618,7 +3618,7 @@ function testClassicRenderContract() {
   assert.ok(normal.includes("Catch the BibloSnacks!"));
   assert.ok(normal.includes("Drag to steer and catch the snacks!"));
   assert.ok(normal.includes("Thanks for the snack!"));
-  assert.ok(normal.includes("✔ To-Do Complete!"));
+  assert.ok(normal.includes('class="daily-feed-result-check"') && normal.includes("<span>To-Do Complete!</span>"));
   assert.ok(normal.includes("Tilt or drag Pip left and right"));
   assert.ok(normal.includes("<span>pet</span>"));
 
@@ -3632,7 +3632,7 @@ function testClassicRenderContract() {
   assert.ok(daily.includes("is-daily-todo-snack"));
   assert.ok(daily.includes("Thanks for the snack!"));
   assert.ok(!daily.includes("Zoo To-Do Complete!"));
-  assert.ok(daily.includes("✔ To-Do Complete!"));
+  assert.ok(daily.includes('class="daily-feed-result-check"') && daily.includes("<span>To-Do Complete!</span>"));
 }
 
 function testClassicScheduledBalls() {
@@ -4010,7 +4010,7 @@ function testPreviewMatchesDailyResultsWithoutClaiming() {
     }});
     assert.strictEqual(resultOverlayMarkup(preview), resultOverlayMarkup(daily),
       `${mode}: developer and real Daily ending must render the SAME card`);
-    assert.ok(preview.includes("✔ To-Do Complete!"));
+    assert.ok(preview.includes('class="daily-feed-result-check"') && preview.includes("<span>To-Do Complete!</span>"));
     assert.ok(!preview.includes("Zoo To-Do Complete!"));
     assert.ok(preview.includes("Caught 0 Snacks"));
     if (mode==="melody") {
