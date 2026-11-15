@@ -99,17 +99,22 @@
             soundId: "pilot-unlock", volume: 0.55
           });
           if (!current() || played?.accepted !== true) return false;
-          // Only actual AVAudioPlayer.currentTime/isPlaying can verify
-          // the native cue; a queued play ACK is not speaker readiness.
+          // Compare TWO real AVAudioPlayer clock samples. A nonzero
+          // position or a native play() ACK alone is not sound recovery.
+          let initial = null;
           for (let n = 0; n < 14; n++) {
             if (!current()) return false;
             const sample = await api.getCuePlaybackState({
               soundId: "pilot-unlock"
             });
             if (!current()) return false;
-            if (sample?.ok === true && Number(sample.positionMs) > 35 &&
-                (sample.playing === true || sample.completed === true))
-              return true;
+            const position = Number(sample?.positionMs);
+            if (sample?.ok === true && Number.isFinite(position)) {
+              if (initial === null) initial = position;
+              else if (position > initial + 35 &&
+                  (sample.playing === true || sample.completed === true))
+                return true;
+            }
             await new Promise(resolve => root.setTimeout(resolve, 95));
           }
           return false;
