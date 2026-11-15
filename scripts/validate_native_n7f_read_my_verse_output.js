@@ -72,7 +72,7 @@ has(plug,'subdirectory: "public/verse_audio"',
     "Narration bundled only from local approved verse assets");
 for(const item of [
  '"zoo-escape-cue": ("ui_audio", "ui_pet_unlock")',
- '"crawl-theme": ("verse_images/read_my_verse"'
+ '"crawl-theme": ("verse_images/read_my_verse"',
  '"crawl-ending": ("verse_images/read_my_verse"',
  '"typewriter-alert": ("verse_images/read_my_verse"',
  '"keyboard-alert": ("verse_images/read_my_verse"',
