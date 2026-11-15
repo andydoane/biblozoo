@@ -47,6 +47,9 @@ jobs:
       - name: Verify production iOS developer controls are hidden
         run: node scripts/validate_native_production_dev_hardening.js
 
+      - name: Validate iOS first-party privacy manifest and protected-resource purposes
+        run: node scripts/validate_native_ios_privacy_manifest.js
+
       # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
       # plugin for grammar errors without needing UIKit/Capacitor modules.
       # Unlike regex assertions, this catches Swift's newline/infix failures
