@@ -39,7 +39,8 @@ assert.match(shared,/preselectWelcomeSurprise = false/,
 assert.match(shared,/root\.BibloZooNativeOnlyOutput\?\.enabled === true/);
 assert.match(shared,/api\.activateFromGesture\(\{ purpose: "ui" \}\)/);
 assert.match(shared,/api\.getCuePlaybackState\(/);
-assert.match(shared,/sample\?\.ok === true && Number\(sample\.positionMs\) > 35/);
+assert.match(shared,/position > initial \+ 35/,
+  "native cue must show two genuinely advancing player positions");
 assert.match(shared,/root\.Audio\(src\)/);
 assert.match(shared,/if \(!cueOnlyVerified\)/);
 assert.match(swift,/CAPPluginMethod\(name: "getCuePlaybackState"/);
