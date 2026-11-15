@@ -3543,11 +3543,20 @@
   function pauseFeedingGame(runtime, now = performance.now(),
       fromZooSurprise = false) {
     if (runtime?.feedPausedAt != null) {
-      // A SECOND OS lock while a cue or pet is onscreen does not run the
-      // original game clocks; invalidate the old audible cue immediately.
+      // A SECOND OS lock while a cue, pet, or final native-bank recovery is
+      // pending must revoke BOTH the cue and the owner's asynchronous
+      // recovery. UIKit may report inactive before document.hidden changes.
       runtime.zooCue?.stop();
       runtime.zooCueVerified = false;
       runtime.zooCueGeneration = (runtime.zooCueGeneration || 0) + 1;
+      if (runtime.feedResumePending) {
+        runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+        runtime.feedResumePending = false;
+        runtime.feedAudioRecoveryVerified = false;
+        clearTimeout(runtime.feedResumeWatchdog);
+        runtime.feedResumeWatchdog = null;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      }
       return false;
     }
     if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
