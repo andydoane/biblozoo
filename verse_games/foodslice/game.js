@@ -2952,6 +2952,9 @@
 
   sliceWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
     useZooEscape: !nativeSliceAudio,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
     suppressUiSound: !!nativeSliceAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
