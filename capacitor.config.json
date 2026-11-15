@@ -1,6 +1,6 @@
 {
-  "appId": "com.andydoane.biblozoo.audiotest",
-  "appName": "BibloZoo Audio Test",
+  "appId": "com.andydoane.biblozoo",
+  "appName": "BibloZoo",
   "webDir": "dist",
   "backgroundColor": "#000000"
 }

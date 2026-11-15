@@ -70,14 +70,14 @@ for (const dir of runtimeDirs) copyEntry(dir);
  * N1: An early output guard must run on EVERY Capacitor HTML entrypoint,
  * including standalone games and Playground pages. Inject into the built
  * web assets, not the source HTML, so the normal web/PWA/Android deployment
- * stays unaffected. Never apply the gate to the original BibloZoo app ID.
+ * stays unaffected. The production BibloZoo iOS build must also receive the guard.
  */
-const NATIVE_AUDIO_TEST_ID = "com.andydoane.biblozoo.audiotest";
+const NATIVE_IOS_AUDIO_APP_IDS = new Set(["com.andydoane.biblozoo", "com.andydoane.biblozoo.audiotest"]);
 const NATIVE_ONLY_GATE_PATH = "verse_games/shared/native-only-ios-output.js";
 const capConfig = JSON.parse(fs.readFileSync(path.join(root, "capacitor.config.json"), "utf8"));
 
 function injectNativeOnlyAudioGuard() {
-    if (capConfig.appId !== NATIVE_AUDIO_TEST_ID) return 0;
+    if (!NATIVE_IOS_AUDIO_APP_IDS.has(capConfig.appId)) return 0;
     const scriptFile = path.join(dist, NATIVE_ONLY_GATE_PATH);
     if (!fs.existsSync(scriptFile)) {
         throw new Error("N1 native-only output gate is missing from the app bundle.");

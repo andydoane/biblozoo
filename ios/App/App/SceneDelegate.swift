@@ -3,6 +3,18 @@ import Capacitor
 import AVFAudio
 import QuartzCore
 
+// Production BibloZoo and the isolated Audio Test both use the native
+// AVFoundation path; diagnostic-only utilities still require Audio Test.
+enum BibloZooIOSIdentity {
+    static var nativeAudioEnabled: Bool {
+        guard let id = Bundle.main.bundleIdentifier else { return false }
+        return id == "com.andydoane.biblozoo" || id == "com.andydoane.biblozoo.audiotest"
+    }
+    static var experimentalToolsEnabled: Bool {
+        Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest"
+    }
+}
+
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     // N7f.2: freeze the presented iOS view the INSTANT the scene loses
@@ -11,7 +23,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private var switcherPausedLayerTime: CFTimeInterval?
 
     func sceneWillResignActive(_ scene: UIScene) {
-        guard Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest",
+        guard BibloZooIOSIdentity.nativeAudioEnabled,
               switcherPausedLayerTime == nil,
               let layer = window?.rootViewController?.view.layer else { return }
         let clock = layer.convertTime(CACurrentMediaTime(), from: nil)
@@ -192,7 +204,7 @@ final class BibloZooAudioSessionRecoveryPlugin: CAPPlugin, CAPBridgedPlugin {
             // BibloZooNativeSound.activateFromGesture session owner.
             // Retain the older path for historical source/VM compatibility;
             // it cannot change the session in this experimental iOS bundle.
-            if Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest" {
+            if BibloZooIOSIdentity.nativeAudioEnabled {
                 call.resolve(["attempted": false, "activated": false,
                               "reason": "legacy-web-recovery-disabled"])
                 return
@@ -377,8 +389,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private var isDevBundle: Bool {
-        return Bundle.main.bundleIdentifier ==
-            "com.andydoane.biblozoo.audiotest"
+        BibloZooIOSIdentity.experimentalToolsEnabled
+    }
+    private var isNativeAppBundle: Bool {
+        BibloZooIOSIdentity.nativeAudioEnabled
     }
 
     private func permissionLabel() -> String {
@@ -508,9 +522,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // tap; reading state or opening the app NEVER requests a permission.
     @objc func requestPermission(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   UIApplication.shared.applicationState == .active else {
-                call.resolve(["granted":false,"reason":"not-foreground-dev"])
+                call.resolve(["granted":false,"reason":"not-foreground-native"])
                 return
             }
             guard !self.requestInFlight && !self.isProbing &&
@@ -710,9 +724,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // acknowledged stopping AVAudioEngine nodes. No input engine yet.
     @objc func prepareCapture(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   UIApplication.shared.applicationState == .active else {
-                call.resolve(["prepared": false, "reason": "not-foreground-dev"])
+                call.resolve(["prepared": false, "reason": "not-foreground-native"])
                 return
             }
             let session = AVAudioSession.sharedInstance()
@@ -778,7 +792,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // completed. No microphone stream samples are collected before this call.
     @objc func beginCapture(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle, self.capturePrepared,
+            guard let self = self, self.isNativeAppBundle, self.capturePrepared,
                   !self.captureRunning,
                   UIApplication.shared.applicationState == .active else {
                 call.resolve(["started": false, "reason": "not-prepared"])
@@ -1018,7 +1032,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func finishCapture(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle else {
+            guard let self = self, self.isNativeAppBundle else {
                 call.resolve(["ready": false, "reason": "unavailable"])
                 return
             }
@@ -1031,7 +1045,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // goes into user profiles, a temp file or cloud backup.
     @objc func discardCapture(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle else {
+            guard let self = self, self.isNativeAppBundle else {
                 call.resolve(["discarded": false, "reason": "unavailable"])
                 return
             }
@@ -1059,7 +1073,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getCaptureState(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle else {
+            guard let self = self, self.isNativeAppBundle else {
                 call.resolve(["available": false])
                 return
             }
@@ -1383,7 +1397,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     // does not use WebAudio, HTMLMediaElement or an AVAudioRecorder file.
     @objc func playCapture(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   UIApplication.shared.applicationState == .active,
                   !self.capturePrepared, !self.captureRunning,
                   !self.isProbing, self.playbackEngine == nil else {
@@ -1625,7 +1639,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stopCapturePlayback(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle else {
+            guard let self = self, self.isNativeAppBundle else {
                 call.resolve(["stopped": false, "reason": "unavailable"])
                 return
             }
@@ -1680,7 +1694,10 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     private var generation = 0
 
     private var isDevBundle: Bool {
-        Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest"
+        BibloZooIOSIdentity.experimentalToolsEnabled
+    }
+    private var isNativeAppBundle: Bool {
+        BibloZooIOSIdentity.nativeAudioEnabled
     }
     private func onMain(_ action: @escaping () -> Void) {
         if Thread.isMainThread { action() }
@@ -1860,7 +1877,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     }
     @objc func activateFromGesture(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   UIApplication.shared.applicationState == .active,
                   AVAudioSession.sharedInstance().category == .soloAmbient else {
                 call.resolve(["activated": false, "reason": "not-ready"])
@@ -1878,7 +1895,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     }
     @objc func playClip(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   UIApplication.shared.applicationState == .active,
                   self.ownedByReadGesture,
                   let id = call.getString("requestId"), id.count > 0,
@@ -1933,7 +1950,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     }
     @objc func seekClip(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   let id = call.getString("requestId"),
                   let player = self.clips[id],
                   let ms = call.getDouble("positionMs"),
@@ -2033,7 +2050,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     }
     @objc func playCue(_ call: CAPPluginCall) {
         onMain { [weak self] in
-            guard let self = self, self.isDevBundle,
+            guard let self = self, self.isNativeAppBundle,
                   self.ownedByReadGesture,
                   UIApplication.shared.applicationState == .active,
                   let kind = call.getString("kind"),
@@ -2548,7 +2565,7 @@ final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
 
     private func begin(_ call: CAPPluginCall, makePicker: @escaping () -> UIViewController) {
         DispatchQueue.main.async {
-            guard Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest",
+            guard BibloZooIOSIdentity.nativeAudioEnabled,
                   UIApplication.shared.applicationState == .active,
                   self.pendingCall == nil,
                   let presenter = self.bridge?.viewController,

@@ -1,6 +1,6 @@
-/* N1 — output-only isolation in the separate BibloZoo Audio Test iOS app.
+/* N1 — output-only isolation in production BibloZoo iOS and the separate Audio Test.
  * This script is injected FIRST into every packaged HTML entrypoint by
- * scripts/build.js, and only when capacitor.config.json has the .audiotest ID.
+ * scripts/build.js, when capacitor.config.json uses an approved BibloZoo iOS app ID.
  *
  * This is intentionally NOT a native audio engine: the existing Capacitor
  * BibloZooNativeSound/AVAudioPlayer plugin remains the only permitted sound
@@ -20,7 +20,7 @@
     } catch (_) { return root.location?.protocol === "capacitor:"; }
   }
 
-  // The build adds this script only to the independent .audiotest bundle.
+  // The build adds this script only to approved native iOS bundles.
   // On a web/PWA/Android page, even one served from dist, do nothing.
   if (!isNativeIOS()) return;
   if (root.BibloZooNativeOnlyOutput?.enabled === true) return;
@@ -72,7 +72,7 @@
           }
           blockedMediaPlays += 1;
           try { this.pause(); } catch (_) { }
-          var message = "WebKit media sound is disabled in BibloZoo Audio Test";
+          var message = "WebKit media sound is disabled in BibloZoo iOS";
           var error = typeof root.DOMException === "function"
             ? new root.DOMException(message, "NotSupportedError")
             : new Error(message);
