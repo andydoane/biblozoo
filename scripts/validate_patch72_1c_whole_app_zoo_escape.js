@@ -169,12 +169,17 @@ async function exerciseReturn() {
 }
 
 function auditOwners() {
-  // N6b isolated native Snake opts out of accidental Zoo Break, while
-  // all pre-existing Web/PWA and other owners still default to Zoo Escape.
+  // Native-only clients retain plain Welcome Back by default. Verse Jam
+  // explicitly excludes *all* Zoo surprises on every platform, including
+  // the Audio Test DEV force override; other activities are unchanged.
   ok(shared.includes('function attachZooReturn(options)') &&
     shared.includes('useZooEscape = true') &&
-    shared.includes('(useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create'),
-    "native-only plain recovery except explicit Audio Test DEV force");
+    shared.includes('allowDevForceZooEscape = true') &&
+    shared.includes('(useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create') &&
+    shared.includes('const forceDevEscape = allowDevForceZooEscape &&') &&
+    shell.includes('allowDevForceZooEscape: options.allowZooSurprises !== false') &&
+    read('verse_playground/verse_jam/game.js').includes('allowZooSurprises: false'),
+    "Verse Jam fully opts out while other DEV and normal Zoo returns remain available");
   ok(shared.includes('onContinue();') && shared.includes('token === generation'),
     "shared owner runs within gesture and rejects stale asynchronous results");
   ok(zoo.includes('ok?.deferred === true') &&
