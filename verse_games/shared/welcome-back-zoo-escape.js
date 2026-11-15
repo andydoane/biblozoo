@@ -915,8 +915,10 @@
       // Verse Crawl may need to select a cue BEFORE asking native Read to
       // play sound. This is a dry roll: no stats or stored odds are touched
       // unless the owner's original verified recovery reports success.
+      const preselect = typeof preselectWelcomeSurprise === "function"
+        ? preselectWelcomeSurprise() === true : preselectWelcomeSurprise === true;
       let plannedSurprise = null;
-      if (from === "welcome" && surpriseEnabled && preselectWelcomeSurprise &&
+      if (from === "welcome" && surpriseEnabled && preselect &&
           !isDeveloperRun()) {
         try {
           plannedSurprise = root.BibloZooZooSurprise?.planWelcome?.(profileId) || null;
@@ -957,7 +959,7 @@
           // or deferred native audio result never triggers an event.
           let kind = null;
           if (from === "welcome" && surpriseEnabled && !isDeveloperRun()) {
-            if (preselectWelcomeSurprise) {
+            if (preselect) {
               // A failed commit cannot show an unaccounted random surprise.
               try {
                 if (plannedSurprise?.commit?.() === true)
