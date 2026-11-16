@@ -1,6 +1,6 @@
 # BibloZoo — Original Zookeeper family backup: safe, private preflight
 
-**Status (2026-11-15):** Step 3g [PR #119](https://github.com/andydoane/biblozoo/pull/119) review-only on `integration/native-audio-to-ios-prep`, following #118 Mac archive privacy declarations (app, Capacitor and Cordova: no declared tracking/collected data; app's two required-reason APIs) and `npm audit --omit=dev` = **0 vulnerabilities**. **The owner has NOT provided evidence of a saved, checked or independently restored original Zookeeper backup. No production-ID installation authorized.**
+**Status (2026-11-15):** Step 3g [PR #119](https://github.com/andydoane/biblozoo/pull/119) MERGED on `integration/native-audio-to-ios-prep`; post-merge CI PASS. Owner reports multiple private copies of the original-family JSON and a **successful disposable Mac Safari private-window restore of all 11 Zookeepers**. Several restored profiles' visible verse progress and BibloPets matched the original iPhone. Separate CLI structural checker output was not reported. No production-ID iPhone installation has been authorized. The #118 archive's three privacy manifests declared no tracking/collection; `npm audit --omit=dev` reported 0 vulnerabilities at that time.
 
 ## Why this matters
 
@@ -32,12 +32,12 @@ Type a space after the command, then **drag your saved family backup .json file 
 
 ## What remains before considering a production-ID installation
 
-- [ ] Original app's **Export Family Backup** file actually exists and is stored in at least two safe locations.
-- [ ] Local checker prints **FAMILY BACKUP STRUCTURE PASS**; number of profiles matches what you see in the original app. Record the output (NOT the backup itself).
-- [ ] Independently prove a restore works **in a disposable, separate test environment** without touching or clearing the original app's Zookeepers. A schema check cannot prove restore behavior, avatars, verse mastery, pets or data fidelity; do not attempt on original iPhone. Agree on a test-device/worktree plan first.
+- [x] Owner reports multiple private original-family backup copies, including a copy imported successfully on Mac. Keep at least one safe copy away from the original iPhone.
+- [ ] Local CLI checker `FAMILY BACKUP STRUCTURE PASS` output not reported. The separate Mac import produced all 11 profiles and sampled profile contents; don't mistake that for a reported CLI result.
+- [x] Owner reports **successful separate Mac Safari private-window restore**: 11 Zookeepers appeared, and several sampled profiles' visible verse progress and BibloPets matched the original iPhone. This is not exhaustive data validation and did not touch or clear the original iPhone app.
 - [ ] Review preservation of **standalone Zoo rescue stats/odds**; original v2 backup does not include these.
 - [ ] Decide remaining Apple SDK privacy/API declaration, accessibility and full phone audio/microphone/interruptions gates; the owner explicitly approves any original-ID install.
 
-**After export and local file check:** Share only whether an exported file exists, how many Zookeepers are in it, and whether Terminal said PASS/NOT VERIFIED. No JSON file needs to be provided here. A PASS does not clear the no-install gate by itself.
+**Privacy:** Do not upload the family JSON. Owner reports Mac browser restore PASS (11 profiles, sampled progress/pets), but that does not cover independent Zoo rescue-stat keys or guarantee preservation on an original-ID install. The CLI check remains optional follow-up evidence rather than an unreported PASS. **Explicit owner approval is still required before an iPhone production-ID installation.**
 
 **Developer note:** Synthetic `node scripts/validate_family_backup_file_test.js` runs in CI with **fake** profiles; `scripts/validate_family_backup_file.js` reads a user-provided path only when the owner runs it on their Mac. Every future PR must update `docs/PROJECT-HANDOFF.md` in the same PR.
