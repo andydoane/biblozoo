@@ -1,6 +1,6 @@
 # BibloZoo — No-install Mac Xcode archive + privacy report review
 
-**Status:** Step 3e [PR #117](https://github.com/andydoane/biblozoo/pull/117) / Step 4 preparation, review-only on `integration/native-audio-to-ios-prep`. The author cannot access the owner's Mac or Xcode from GitHub Actions; **the actual Apple build, Privacy Report and signed-app evidence are NOT TESTED until the owner runs these steps and reports the result**.
+**Status (2026-11-15):** Step 3e [PR #117](https://github.com/andydoane/biblozoo/pull/117) MERGED. Owner ran this guide on Mac and reported **successful Xcode Archive** and `node scripts/inspect_ios_archive.js` **PASS**, with 16 sampled archived resources and app/Capacitor/Cordova privacy manifest filenames. This is an actual production-identity Apple-SDK archive, **not physical phone acceptance**. Apple's generated privacy PDF was inspected and proved **blank (one page, 806 bytes)**; this may occur with no declared collection/tracking but is not privacy certification. Step 3f [PR #118](https://github.com/andydoane/biblozoo/pull/118) will inspect the actual three bundled manifest declarations. Original Zookeeper backup and iPhone tests remain NOT TESTED.
 
 **Safety rule:** Creating an Xcode **archive** with a generic iOS destination does **not** mean installing or running BibloZoo on your iPhone. Do **not** click Xcode's Run/Play button, choose the original iPhone as the run destination, select `Distribute App` or overwrite/uninstall the existing `com.andydoane.biblozoo` app. Original Zookeeper profiles are local-only and a code rollback cannot restore missing data. Audio Test (`.audiotest`) is a separate app.
 
@@ -44,6 +44,17 @@ node scripts/inspect_ios_archive.js
 The checker automatically selects the **newest matching original-ID BibloZoo archive made in the last 48 hours**. It **only reads** that archive; it does not build, modify, install, publish, copy data, upload or access Zookeeper profiles. It checks the app's real bundle identifier, home-screen name, microphone/Photos purpose strings, first-party privacy manifest reasons, the six root-bundled sound files, ten representative bundled `public/` resources, and the correctly injected production native-only audio guard. It enumerates any extra SDK manifests embedded under Frameworks/PlugIns/Watch **without declaring those dependencies privacy-safe**. Never treat `PASS` as speaker, microphone, signed-distribution or full-privacy approval.
 
 If the newest archive is older than 48 hours, the check refuses it. Make a new generic iOS archive instead of declaring an old one current. A checker failure is a prompt for review, not a reason to delete or reinstall the original app.
+
+## Part E — Follow-up for the blank Apple report (after Step 3f PR #118 is merged)
+
+The Xcode archive already passed. **No new archive or production-ID phone installation is needed just to inspect the manifest contents.** Use the existing Terminal in the integration worktree to run:
+
+```bash
+node scripts/audit_ios_archive_privacy_manifests.js
+npm audit --omit=dev
+```
+
+The first command only reads the newest matching production Xcode archive and displays the actual app, Capacitor and Cordova manifest declarations. The second command only **reports** advisories on non-dev npm dependencies, helping us distinguish runtime risk from toolchain issues. **Do not run `npm audit fix`, change any bundle ID, delete the original app, press Run or install on your original iPhone.** If the first command says the archive is older than 48 hours, share that message: an explicit archive path can be supplied later without another build. Share the output from both commands (no personal Zookeeper data is read). Even if the manifests say no collection/tracking, we still need a separate compliance review of actual SDK API use.
 
 ## What to send back to the assistant
 

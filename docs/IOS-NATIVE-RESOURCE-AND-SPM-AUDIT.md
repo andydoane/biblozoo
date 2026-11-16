@@ -21,6 +21,8 @@
 
 For the next phase, see the [no-install Mac archive and generated Privacy Report guide](IOS-MAC-NO-INSTALL-ARCHIVE-REVIEW.md); GitHub source/asset PASS is not equivalent to an Apple-signed app bundle.
 
+**Owner Mac confirmation (2026-11-15, after #117):** `npm run build` + `node scripts/validate_native_ios_resource_packaging.js` printed 127 native MP3 mapping entries and **171 distinct source-and-dist required assets PASS**. `npx cap sync ios` succeeded. Owner's first Apple Xcode Archive completed, and read-only `node scripts/inspect_ios_archive.js` printed PASS for original `com.andydoane.biblozoo` ID and 16 sampled actual archived .app resources. This confirms the *sampled* resource paths physically exist in the built bundle, not that every sound plays on the speaker or that original profile data is safe during an install. Keep all on-iPhone acceptance and backup steps pending.
+
 ## How to verify before owner installation
 
 1. **CI source:** run `node scripts/validate_native_ios_resource_packaging.js` before a build to check source/Xcode references/locked versions; normal CI also runs the first-party privacy manifest, Flashcards, Read, Learn/game and production DEV tests.
