@@ -59,6 +59,9 @@ jobs:
       - name: Test read-only Xcode archive inspector without a Mac or iPhone
         run: node scripts/validate_ios_archive_inspector.js
 
+      - name: Test read-only archived SDK privacy manifest summaries
+        run: node scripts/validate_ios_archive_privacy_manifest_summary.js
+
       # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
       # plugin for grammar errors without needing UIKit/Capacitor modules.
       # Unlike regex assertions, this catches Swift's newline/infix failures
