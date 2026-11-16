@@ -62,6 +62,9 @@ jobs:
       - name: Test read-only archived SDK privacy manifest summaries
         run: node scripts/validate_ios_archive_privacy_manifest_summary.js
 
+      - name: Test offline family backup structure validator without using real profiles
+        run: node scripts/validate_family_backup_file_test.js
+
       # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
       # plugin for grammar errors without needing UIKit/Capacitor modules.
       # Unlike regex assertions, this catches Swift's newline/infix failures
