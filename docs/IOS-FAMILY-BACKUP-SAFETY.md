@@ -1,6 +1,6 @@
 # BibloZoo — Original Zookeeper family backup: safe, private preflight
 
-**Status (2026-11-15):** Step 3g [PR #119](https://github.com/andydoane/biblozoo/pull/119) MERGED on `integration/native-audio-to-ios-prep`; post-merge CI PASS. Owner reports multiple private copies of the original-family JSON and a **successful disposable Mac Safari private-window restore of all 11 Zookeepers**. Several restored profiles' visible verse progress and BibloPets matched the original iPhone. Separate CLI structural checker output was not reported. No production-ID iPhone installation has been authorized. The #118 archive's three privacy manifests declared no tracking/collection; `npm audit --omit=dev` reported 0 vulnerabilities at that time.
+**Status (2026-11-15):** Step 3g [PR #119](https://github.com/andydoane/biblozoo/pull/119) MERGED on `integration/native-audio-to-ios-prep`; post-merge CI PASS. Owner reports multiple private copies of the original-family JSON and a **successful disposable Mac Safari private-window restore of all 11 Zookeepers**. Several restored profiles' visible verse progress and BibloPets matched the original iPhone. Owner subsequently ran the **offline CLI structural checker successfully**: `FAMILY BACKUP STRUCTURE PASS`, family v2, **11 Zookeepers**, **149 verse-progress records**, **602009 bytes**. A first attempt without a file path correctly failed; a second attempt with the private local JSON path passed. No production-ID iPhone installation has been authorized. The #118 archive's three privacy manifests declared no tracking/collection; `npm audit --omit=dev` reported 0 vulnerabilities at that time.
 
 ## Why this matters
 
@@ -33,11 +33,11 @@ Type a space after the command, then **drag your saved family backup .json file 
 ## What remains before considering a production-ID installation
 
 - [x] Owner reports multiple private original-family backup copies, including a copy imported successfully on Mac. Keep at least one safe copy away from the original iPhone.
-- [ ] Local CLI checker `FAMILY BACKUP STRUCTURE PASS` output not reported. The separate Mac import produced all 11 profiles and sampled profile contents; don't mistake that for a reported CLI result.
+- [x] Owner shared actual local CLI checker output: `FAMILY BACKUP STRUCTURE PASS` (read only, offline; NO IMPORT), family v2, 11 profiles, 149 verse-progress records, 602009 bytes. This validates the file's basic structure, not all data fidelity.
 - [x] Owner reports **successful separate Mac Safari private-window restore**: 11 Zookeepers appeared, and several sampled profiles' visible verse progress and BibloPets matched the original iPhone. This is not exhaustive data validation and did not touch or clear the original iPhone app.
 - [ ] Review preservation of **standalone Zoo rescue stats/odds**; original v2 backup does not include these.
 - [ ] Decide remaining Apple SDK privacy/API declaration, accessibility and full phone audio/microphone/interruptions gates; the owner explicitly approves any original-ID install.
 
-**Privacy:** Do not upload the family JSON. Owner reports Mac browser restore PASS (11 profiles, sampled progress/pets), but that does not cover independent Zoo rescue-stat keys or guarantee preservation on an original-ID install. The CLI check remains optional follow-up evidence rather than an unreported PASS. **Explicit owner approval is still required before an iPhone production-ID installation.**
+**Privacy:** Do not upload the family JSON. Owner reports Mac browser restore PASS (11 profiles, sampled progress/pets), but that does not cover independent Zoo rescue-stat keys or guarantee preservation on an original-ID install. The CLI checker now has an owner-reported PASS; the separately witnessed Safari restore is a distinct main-data smoke test. **Explicit owner approval is still required before an iPhone production-ID installation.**
 
 **Developer note:** Synthetic `node scripts/validate_family_backup_file_test.js` runs in CI with **fake** profiles; `scripts/validate_family_backup_file.js` reads a user-provided path only when the owner runs it on their Mac. Every future PR must update `docs/PROJECT-HANDOFF.md` in the same PR.
