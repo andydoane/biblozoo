@@ -1,5 +1,12 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+
+## CURRENT HARDWARE FINDINGS — owner audio/gameplay issue inventory (2026-11-17)
+
+**Read the detailed [iPhone owner audio findings](IOS-OWNER-AUDIO-FINDINGS-2026-11-17.md) before continuing acceptance.** Eighteen recorded issue/design entries: one cross-cutting Silent Mode policy, two Learn, one Daily Questions, one Traffic Tap, two Playground, five Flashcards, six Read My Verse; plus older Read activity access/testing coverage and the owner's “no Home master mute button” preference. Current status **OWNER-REPORTED, UNFIXED; root cause unverified**. User reports other attempted items worked, but no automatic certification of unreported/optional combinations. The owner did not confirm which exact integration source revision was installed for each test.
+
+A later, separately approved **roadmap-of-PRs documentation PR** may sequence fixes. This inventory PR deliberately contains **no runtime code changes**, no audio-category policy decision and no requested new production-ID iPhone installation. Hold `integration/native-audio-to-ios-prep` → `ios-prep` promotion pending owner-observed hardware acceptance and data safety; preserve the distinct production 10-profile and Audio Test 11-profile backups. The previously merged Review/Listen picker still needs explicit physical device verification.
+
 ## CURRENT CI FOLLOW-UP — stale Zoo Escape cache-version assertions after PR #124 (2026-11-17)
 
 **Observed failure:** Owner merged PR #124 to `integration/native-audio-to-ios-prep` and [post-merge run 44181689651](https://github.com/andydoane/biblozoo/actions/runs/44181689651) failed **Node regression checks** in `Validate Zoo Escape and cross-app recovery` while **Production web build PASSED**. The first failure was `scripts/validate_patch72_1c_whole_app_zoo_escape.js:46` — `AssertionError: fresh PWA cache generation`. PR #124 had rightly renamed `CACHE_VERSION` to refresh all ten Listen Activities icons; six old tests had a hardcoded `patch72_1|73` cache-name requirement. This was an **invalid/too-specific test assumption**, not proof of a runtime regression or of passing iPhone audio.
