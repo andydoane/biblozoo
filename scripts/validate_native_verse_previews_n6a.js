@@ -18,7 +18,7 @@ const handoff = read("docs/PROJECT-HANDOFF.md");
 new Function(app);
 assert.match(app, /playVersePreview: playVerseDetailListen/);
 assert.match(app, /stopVersePreview: cancelVerseDetailListen/);
-assert.match(flashcards, /await api\.playVersePreview\(selected\.id\)/);
+assert.match(flashcards, /await api\.playVersePreview\(selected\.id,\s*\{\s*onInterrupted: showFlashcardsNativeAudioWelcomeBack\s*\}\)/);
 assert.match(flashcards, /if \(previewPlaying\) api\?\.stopVersePreview\?\.\(\)/);
 assert.match(app, /id="btnDetailListen"/);
 // N6b owner request: N6a-added *visible* playback status below the
