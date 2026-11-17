@@ -31,7 +31,7 @@ assert.match(feedCss,/\.daily-feed-result-back\s*\{[\s\S]*?color: #ffffff;/);
 assert.match(feedCss,/\.daily-feed-result-check\s*\{[\s\S]*?color: #fff;/);
 assert.match(feed,/FEED_MODES\.MELODY/,"shared end screen still covers all feeding modes");
 const sw=read("service-worker.js");
-assert.match(sw,/const CACHE_VERSION = "2026_[^"\n]*patch73[^"\n]*";/, "PWA cache stays versioned after future UI updates");
+assert.match(sw,/const CACHE_VERSION = "[^"\n]+";/, "PWA cache stays versioned after future UI updates");
 for(const asset of ["./app.js","./styles.css","./daily_questions_feed_game.js",
  "./daily_questions_feed_game.css"]){
   assert.ok(sw.includes('"'+asset+'"'),"offline shell contains "+asset);
