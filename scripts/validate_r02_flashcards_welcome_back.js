@@ -195,6 +195,7 @@ function instructionFixture() {
   assert.equal(g.notices.length,0);
 
   const i=flashcardsFixture();
+  i.hooks.instructions(); // Real render/sync instantiates the instruction owner.
   i.setInstruction("playing");
   i.triggerNative({active:false,reason:"audio-interruption"});
   assert.equal(i.paused,1,"Instruction playback shows Welcome Back from Swift .began");
