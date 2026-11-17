@@ -200,6 +200,12 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_n7e_wacky_replay.js
 
+      # R01 regression: a real Flashcards Record barrier drains the Swift
+      # PCM bank. A subsequent real UI tap must rewarm both pop samples.
+      - name: Validate R01 Flashcards native mic handoff restores UI pops on next tap
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r01_flashcards_ui_pop_handoff.js
+
       - name: Validate N7d.2 Flashcards foreground audio ownership and genuine AirPods interruptions
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_n7d2_flashcards_foreground_audio_ownership.js
