@@ -65,6 +65,9 @@ jobs:
       - name: Test offline family backup structure validator without using real profiles
         run: node scripts/validate_family_backup_file_test.js
 
+      - name: Validate child Review hub, Listen Activities and Daily reward isolation
+        run: node scripts/validate_learn_listen_activities.js
+
       # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
       # plugin for grammar errors without needing UIKit/Capacitor modules.
       # Unlike regex assertions, this catches Swift's newline/infix failures

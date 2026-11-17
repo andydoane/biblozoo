@@ -3,7 +3,7 @@
    App scope: /biblozoo/
    ========================================================= */
 
-const CACHE_VERSION = "2026_Nov_15_patch73_feeding_popups_compact_bounce_no_audio_wait";
+const CACHE_VERSION = "2026_Nov_17_review_listen_activities_freeplay";
 const SHELL_CACHE =
   `biblozoo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE =
@@ -129,6 +129,19 @@ const CORE_PATHS = [
   "./verse_fonts/SpecialElite-Regular.ttf",
   "./verse_fonts/VT323-Regular.ttf",
   "./verse_fonts/NewsCycle-Bold.ttf",
+
+  // Home Review → Learn/Listen cards and eight child-facing Read activity icons.
+  // Keep available after the PWA shell has been installed online.
+  "./verse_images/game_icons/app_icon_review_verse.png",
+  "./verse_images/game_icons/app_icon_listen_to_verse.png",
+  "./verse_images/game_icons/app_icon_balloons.png",
+  "./verse_images/game_icons/app_icon_fish.png",
+  "./verse_images/game_icons/app_icon_typewriter.png",
+  "./verse_images/game_icons/app_icon_keyboard.png",
+  "./verse_images/game_icons/app_icon_unscramble.png",
+  "./verse_images/game_icons/app_icon_verse_crawl.png",
+  "./verse_images/game_icons/app_icon_tap_words_in_order.png",
+  "./verse_images/game_icons/app_icon_chunk_audio_matching.png",
 
   "./verse_images/zoobreak_gate.png",
   "./verse_images/zoobreak_lock.png",

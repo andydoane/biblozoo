@@ -6646,6 +6646,43 @@ function exitDailyTodoRead(
 }
 
 
+// Free-play Listen Activities never enter or modify a Daily Zoo To-Do task.
+function isLearnListenReadContext(context, verseId = "", activityId = "") {
+  const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+  return !!(
+    context?.source === "learn_listen_activities" &&
+    profileId &&
+    context.profileId === profileId &&
+    context.verseId === VERSE_ID &&
+    context.readActivityId &&
+    window.BibloZooReadMyVerse?.READ_ACTIVITY_MANIFEST?.[context.readActivityId]?.enabled &&
+    (!verseId || verseId === context.verseId) &&
+    (!activityId || activityId === context.readActivityId) &&
+    !context.planId &&
+    !context.planDay &&
+    !context.taskId &&
+    !context.launchToken &&
+    !context.previewScope &&
+    context.readTestMode === "normal"
+  );
+}
+
+function completeReadMyVerseContext({ context = null, verseId = "", readActivityId = "" } = {}) {
+  if (context?.source === "learn_listen_activities") {
+    if (!isLearnListenReadContext(context, verseId, readActivityId)) return false;
+    return transitionToAppScreen(Screen.LISTEN_ACTIVITIES);
+  }
+  return completeDailyTodoRead({ context, verseId, readActivityId });
+}
+
+function exitReadMyVerseContext(context = null) {
+  if (context?.source === "learn_listen_activities") {
+    if (!isLearnListenReadContext(context)) return false;
+    return transitionToAppScreen(Screen.LISTEN_ACTIVITIES);
+  }
+  return exitDailyTodoRead(context);
+}
+
 function loadDailyTodoQuestionsRuntime(
   previewScope = ""
 ) {
@@ -9868,6 +9905,8 @@ const Screen = {
   NEW_VERSE_PICKER: "new_verse_picker",
   PROGRESS: "progress",
   VERSE_DETAIL: "verse_detail",
+  LEARN_HUB: "learn_hub",
+  LISTEN_ACTIVITIES: "listen_activities",
   LEARN_LEVEL: "learn_level",
   PRACTICE_GATE: "practice_gate",
   LEARN_INSTRUCTION: "learn_instruction",
@@ -9909,6 +9948,8 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PET_STATS,
   Screen.ZOOKEEPER_STATS,
   Screen.VERSE_DETAIL,
+  Screen.LEARN_HUB,
+  Screen.LISTEN_ACTIVITIES,
   Screen.LEARN_LEVEL,
   Screen.PRACTICE_GATE,
   Screen.LEARN_INSTRUCTION,
@@ -10004,6 +10045,7 @@ window.BibloZooFlashcards
 window.BibloZooReadMyVerse
   ?.initialize?.({
     getVerseList: () => VERSE_LIST,
+    getActiveProfileId: () => getProfileApi()?.getActiveProfileId?.() || "",
     makeSlide,
     scheduleSmartLearnTextFit,
     isMuted: () => muted,
@@ -10013,9 +10055,9 @@ window.BibloZooReadMyVerse
     requestRender: () => render(),
     onWordActivated: () => true,
     onContextComplete:
-      completeDailyTodoRead,
+      completeReadMyVerseContext,
     onContextExit:
-      exitDailyTodoRead,
+      exitReadMyVerseContext,
     goToHome: () => go(Screen.TITLE)
   });
 
@@ -10232,6 +10274,10 @@ const TITLE_OPTIONS = [
     id: "learn",
     label: "Learn the Verse",
     action: () => {
+      if (State.hasLearnedVerse && HAS_VERSE_SELECTION) {
+        go(Screen.LEARN_HUB);
+        return;
+      }
       State.learnLevel = "not_at_all";
       State.learnStartScreen = Screen.LISTEN;
 
@@ -11292,6 +11338,10 @@ function go(nextScreen) {
         const keepArrivedMenuScreen =
           nextScreen ===
             Screen.PRACTICE_HUB ||
+          nextScreen ===
+            Screen.LEARN_HUB ||
+          nextScreen ===
+            Screen.LISTEN_ACTIVITIES ||
           nextScreen ===
             Screen.PRACTICE ||
           nextScreen ===
@@ -13612,6 +13662,8 @@ function renderNav() {
     State.screen !== Screen.NEW_VERSE_PICKER &&
     State.screen !== Screen.CELEBRATION &&
     State.screen !== Screen.LEARN_LEVEL &&
+    State.screen !== Screen.LEARN_HUB &&
+    State.screen !== Screen.LISTEN_ACTIVITIES &&
     State.screen !== Screen.PRACTICE_GATE &&
     State.screen !== Screen.PRACTICE_HUB &&
     State.screen !== Screen.PRACTICE &&
@@ -18491,6 +18543,10 @@ function screenTitle(idx) {
       }
 
       if (action === "learn") {
+        if (State.hasLearnedVerse) {
+          go(Screen.LEARN_HUB);
+          return;
+        }
         State.learnLevel = "not_at_all";
         State.learnStartScreen = Screen.LISTEN;
 
@@ -23526,6 +23582,133 @@ function screenPracticeGate(idx) {
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
+// Child-facing Read My Verse picker (not DEV tooling or Daily task credit).
+// Keep internal Read activity IDs unchanged to preserve assigned Daily reviews.
+const LISTEN_ACTIVITY_CARDS = Object.freeze([
+  { id: "balloons", title: "Balloons", iconImage: IMG_DIR + "game_icons/app_icon_balloons.png", cardColor: "#ffc751", cardTextColor: "#333333" },
+  { id: "fish", title: "Fish", iconImage: IMG_DIR + "game_icons/app_icon_fish.png", cardColor: "#40b9c5", cardTextColor: "#0d454b" },
+  { id: "typewriter", title: "Typewriter", iconImage: IMG_DIR + "game_icons/app_icon_typewriter.png", cardColor: "#7f66c6", cardTextColor: "#ffffff" },
+  { id: "keyboard", title: "Keyboard", iconImage: IMG_DIR + "game_icons/app_icon_keyboard.png", cardColor: "#444444", cardTextColor: "#ffffff" },
+  { id: "unscramble", title: "Unscramble", iconImage: IMG_DIR + "game_icons/app_icon_unscramble.png", cardColor: "#a7cb6f", cardTextColor: "#333333" },
+  { id: "star_wars", title: "Space", iconImage: IMG_DIR + "game_icons/app_icon_verse_crawl.png", cardColor: "#f2f2f2", cardTextColor: "#333333" },
+  { id: "tap_words_order", title: "Tap in Order", iconImage: IMG_DIR + "game_icons/app_icon_tap_words_in_order.png", cardColor: "#7f66c6", cardTextColor: "#ffffff" },
+  { id: "chunk_sequence", title: "Sound Sequence", iconImage: IMG_DIR + "game_icons/app_icon_chunk_audio_matching.png", cardColor: "#ff5a51", cardTextColor: "#333333" }
+].map((item) => Object.freeze(item)));
+
+function screenLearnHub(idx) {
+  [
+    IMG_DIR + "game_icons/app_icon_review_verse.png",
+    IMG_DIR + "game_icons/app_icon_listen_to_verse.png",
+    ...LISTEN_ACTIVITY_CARDS.map((item) => item.iconImage)
+  ].forEach(preloadPracticeMenuImage);
+
+  const wrap = document.createElement("div");
+  wrap.className = "title-screen practice-screen";
+  wrap.innerHTML = `
+    <div class="title-content practice-content">
+      <div class="practice-title-row">
+        ${homePillHtml()}
+        <h2 id="learnHubTitle">Learn</h2>
+        <div class="practice-title-spacer" aria-hidden="true"></div>
+      </div>
+      <div class="practice-scroll-wrap">
+        <div class="practice-card-list">
+          ${renderPracticeHubCard({
+            id: "learn-again", title: "Learn Again", icon: "📖",
+            iconImage: IMG_DIR + "game_icons/app_icon_review_verse.png",
+            iconAlt: "Learn Again", cardColor: "#ffc751", cardTextColor: "#333333"
+          })}
+          ${renderPracticeHubCard({
+            id: "listen-activities", title: "Listen", icon: "🔊",
+            iconImage: IMG_DIR + "game_icons/app_icon_listen_to_verse.png",
+            iconAlt: "Listen", cardColor: "#7f66c6", cardTextColor: "#ffffff"
+          })}
+        </div>
+      </div>
+    </div>
+    <div class="practice-scroll-vignette" aria-hidden="true"></div>
+  `;
+  bindHomePill(wrap);
+  wrap.querySelectorAll("[data-practice-hub-choice]").forEach((btn) => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      if (btn.dataset.practiceHubChoice === "learn-again") {
+        State.learnLevel = "not_at_all";
+        State.learnStartScreen = Screen.LISTEN;
+        resetLearn(false);
+        startLearnInstruction("listen");
+      } else if (btn.dataset.practiceHubChoice === "listen-activities") {
+        go(Screen.LISTEN_ACTIVITIES);
+      }
+    };
+  });
+  return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
+}
+
+function screenListenActivities(idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "title-screen practice-screen";
+  wrap.innerHTML = `
+    <div class="title-content practice-content">
+      <div class="practice-title-row">
+        ${practiceBackPillHtml("Back to Learn")}
+        <h2 id="listenActivitiesTitle">Listen Activities</h2>
+        <div class="practice-title-spacer" aria-hidden="true"></div>
+      </div>
+      <div class="practice-scroll-wrap">
+        <div class="practice-card-list">
+          ${LISTEN_ACTIVITY_CARDS.map((item) => renderPracticeHubCard({
+            id: item.id, title: item.title, icon: "🔊", iconImage: item.iconImage,
+            iconAlt: item.title, cardColor: item.cardColor,
+            cardTextColor: item.cardTextColor
+          })).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="practice-scroll-vignette" aria-hidden="true"></div>
+  `;
+  const back = wrap.querySelector("[data-practice-back-pill]");
+  if (back) back.onclick = (event) => {
+    event.stopPropagation();
+    go(Screen.LEARN_HUB);
+  };
+  wrap.querySelectorAll("[data-practice-hub-choice]").forEach((btn) => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      const activityId = btn.dataset.practiceHubChoice;
+      const module = window.BibloZooReadMyVerse;
+      const verse = VERSE_LIST.find((item) => item?.id === VERSE_ID);
+      const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+      if (!State.hasLearnedVerse || !verse || !profileId ||
+          !module?.isActivityEligibleForVerse?.(activityId, verse)) {
+        showDialog({
+          title: "Choose another verse",
+          body: "This activity needs verse audio chunks that aren't available for this verse.",
+          actions: [dlgBtn("OK", { onClick: closeDialog })]
+        });
+        return;
+      }
+      const context = {
+        source: "learn_listen_activities",
+        profileId, verseId: VERSE_ID, readActivityId: activityId,
+        readTestMode: "normal"
+      };
+      if (!module.startForVerse(VERSE_ID, activityId, context)) {
+        showDialog({
+          title: "Activity isn't ready",
+          body: "Try another verse or choose a different Listen Activity.",
+          actions: [dlgBtn("OK", { onClick: closeDialog })]
+        });
+        return;
+      }
+      // Start native sound synchronously inside the genuine card tap.
+      // Returning from the activity never creates a synthetic Daily task.
+      if (!transitionToAppScreen(Screen.READ_MY_VERSE)) module.stopSession?.();
+    };
+  });
+  return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
+}
+
 function screenPracticeHub(idx) {
   preloadPracticeHubImages();
   preloadPracticeListImages();
@@ -23941,6 +24124,8 @@ function render() {
       slide = screenZookeeperStats(idx);
     }
     if (screen === Screen.VERSE_DETAIL) slide = screenVerseDetail(idx);
+    if (screen === Screen.LEARN_HUB) slide = screenLearnHub(idx);
+    if (screen === Screen.LISTEN_ACTIVITIES) slide = screenListenActivities(idx);
     if (screen === Screen.LEARN_LEVEL) slide = screenLearnLevel(idx);
     if (screen === Screen.PRACTICE_GATE) slide = screenPracticeGate(idx);
     if (screen === Screen.LEARN_INSTRUCTION) slide = screenLearnInstruction(idx);
