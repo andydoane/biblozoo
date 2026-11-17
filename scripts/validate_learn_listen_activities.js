@@ -127,6 +127,47 @@ assert.equal(Read.validateContext({
   source: "daily_todo", profileId: "profile-test-only",
   verseId: "john_3_16", readActivityId: "typewriter"
 }, "john_3_16", "typewriter"), null);
+// Execute the real callback dispatch in isolation, not just source matching.
+const routedScreens = [];
+let dailyCompletions = 0;
+let dailyExits = 0;
+const hookHarness = new Function(
+  "getProfileApi", "window", "VERSE_ID", "Screen",
+  "transitionToAppScreen", "completeDailyTodoRead", "exitDailyTodoRead",
+  freeHooks + "\nreturn {completeReadMyVerseContext, exitReadMyVerseContext};"
+)(
+  () => ({ getActiveProfileId: () => "profile-test-only" }),
+  { BibloZooReadMyVerse: Read },
+  "john_3_16",
+  { LISTEN_ACTIVITIES: "listen_activities" },
+  (screen) => { routedScreens.push(screen); return true; },
+  () => { dailyCompletions++; return true; },
+  () => { dailyExits++; return true; }
+);
+const childContext = {
+  source: "learn_listen_activities", profileId: "profile-test-only",
+  verseId: "john_3_16", readActivityId: "typewriter",
+  readTestMode: "normal"
+};
+assert.equal(hookHarness.completeReadMyVerseContext({
+  context: childContext, verseId: "john_3_16", readActivityId: "typewriter"
+}), true);
+assert.equal(hookHarness.exitReadMyVerseContext(childContext), true);
+assert.deepEqual(routedScreens, ["listen_activities", "listen_activities"]);
+assert.equal(dailyCompletions, 0);
+assert.equal(dailyExits, 0);
+assert.equal(hookHarness.completeReadMyVerseContext({
+  context: {...childContext, taskId: "review"},
+  verseId: "john_3_16", readActivityId: "typewriter"
+}), false);
+assert.equal(dailyCompletions, 0);
+assert.equal(hookHarness.completeReadMyVerseContext({
+  context: {source: "daily_todo"}, verseId: "john_3_16",
+  readActivityId: "typewriter"
+}), true);
+assert.equal(hookHarness.exitReadMyVerseContext({source: "daily_todo"}), true);
+assert.equal(dailyCompletions, 1);
+assert.equal(dailyExits, 1);
 const noChunks = {verseText: "Hello.", echoParts: ["Hello."]};
 assert.equal(Read.isActivityEligibleForVerse("chunk_sequence", noChunks), false);
 console.log("PASS: Review hub, 10 real icons, ordered 8 Read activities, secure child free play, original Daily isolation and native gesture source.");
