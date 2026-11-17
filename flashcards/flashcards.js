@@ -156,7 +156,14 @@
     recording?.pause?.();
     stopWackyPlayback();
     instructions()?.interrupt();
+    const hadPreview = previewPlaying;
     stopVersePreview(); // revoke the pending Listen promise BEFORE its error toast
+    // Retain the old unconditional host-audio stop even if this local button
+    // was no longer marked "playing" (a stale Verse Detail owner can exist).
+    // Do not double-stop an actively owned Flashcards preview.
+    if (!hadPreview) {
+      try { api?.stopVersePreview?.(); } catch (_) {}
+    }
   }
 
   // A real AVAudioSession .began can happen while UIKit stays ACTIVE and
