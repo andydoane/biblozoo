@@ -93,12 +93,14 @@
   let finishCountdown = null;
   let welcomeBack = null;
   let instructionNarration = null;
+  let nativeAudioInterruptionBound = false;
 
   function instructions() {
     if (!instructionNarration && window.BibloZooFlashcardsInstructions?.create) {
       instructionNarration = window.BibloZooFlashcardsInstructions.create({
         onChange: requestRender,
         onError: showFlashcardsToast,
+        onInterrupted: showFlashcardsNativeAudioWelcomeBack,
         isMuted: () => api?.isMuted?.() === true
       });
     }
@@ -154,7 +156,44 @@
     recording?.pause?.();
     stopWackyPlayback();
     instructions()?.interrupt();
-    try { api?.stopVersePreview?.(); } catch (_) {}
+    stopVersePreview(); // revoke the pending Listen promise BEFORE its error toast
+  }
+
+  // A real AVAudioSession .began can happen while UIKit stays ACTIVE and
+  // WebKit never emits visibilitychange (e.g. AirPods Play for Apple Music).
+  // Reuse the existing plain Welcome Back controller; the child's next tap
+  // owns any later narration retry. No passive AVAudioSession activation.
+  function showFlashcardsNativeAudioWelcomeBack() {
+    if (!IS_NATIVE_CAPACITOR ||
+        window.BibloZooNativeOnlyOutput?.enabled !== true ||
+        api?.isActive?.() !== true || document.hidden) return false;
+    ensureFlashcardWelcomeBack();
+    if (!welcomeBack?.pauseFromNativeInactive ||
+        !welcomeBack?.showAfterNativeActive) return false;
+    if (!welcomeBack.isPaused?.()) welcomeBack.pauseFromNativeInactive();
+    welcomeBack.showAfterNativeActive();
+    return welcomeBack.isPaused?.() === true;
+  }
+
+  function bindNativeFlashcardsAudioInterruptions() {
+    if (nativeAudioInterruptionBound || !IS_NATIVE_CAPACITOR ||
+        window.BibloZooNativeOnlyOutput?.enabled !== true) return;
+    const sound = window.Capacitor?.Plugins?.BibloZooNativeSound;
+    if (typeof sound?.addListener !== "function") return;
+    nativeAudioInterruptionBound = true;
+    try {
+      Promise.resolve(sound.addListener("biblozooAppLifecycle", event => {
+        // Only Swift's *genuine* interruption-began signal, and only while
+        // Flashcards owns an active instruction/verse. Ignore normal
+        // foreground, route/setup, mic and in-app navigation notifications.
+        if (event?.active !== false ||
+            event.reason !== "audio-interruption" ||
+            api?.isActive?.() !== true || document.hidden) return;
+        if (previewPlaying ||
+            instructionNarration?.snapshot?.()?.status === "playing")
+          showFlashcardsNativeAudioWelcomeBack();
+      })).catch(() => { nativeAudioInterruptionBound = false; });
+    } catch (_) { nativeAudioInterruptionBound = false; }
   }
 
   function ensureFlashcardWelcomeBack() {
@@ -787,7 +826,11 @@
     previewMessage = "";
     requestRender();
     let completed = false;
-    try { completed = await api.playVersePreview(selected.id); }
+    try {
+      completed = await api.playVersePreview(selected.id, {
+        onInterrupted: showFlashcardsNativeAudioWelcomeBack
+      });
+    }
     catch (_) { /* Show the retry message below. */ }
     if (request !== previewRequest) return;
     previewPlaying = false;
@@ -1606,6 +1649,7 @@
   function initialize(nextApi) {
     api = nextApi || null;
     ensureFlashcardWelcomeBack();
+    bindNativeFlashcardsAudioInterruptions();
     if (!recording) recording = window.BibloZooRecording.create({
       onChange: () => {
         const audio =
