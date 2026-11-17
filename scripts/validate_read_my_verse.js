@@ -413,7 +413,7 @@ function testChunkAudioMatchingRules() {
 
   assert.strictEqual(
     manifest.title,
-    "Chunk Audio Matching"
+    "Sound Sequence"
   );
   assert.strictEqual(manifest.enabled, true);
   assert.strictEqual(
