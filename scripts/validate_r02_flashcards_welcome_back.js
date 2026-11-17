@@ -56,12 +56,13 @@ function instructionFixture() {
     onInterrupted() {interrupted++;owner.interrupt();},
     isMuted: () => false
   });
+  const pump = () => frames.splice(0).forEach(fn => fn());
   const start = () => {
     owner.sync("difficulty_intro", "really_well", "john_11_35");
-    frames.splice(0).forEach(fn => fn());
+    pump();
     assert.equal(pending.length,1,"Native instruction play must be requested");
   };
-  return {owner,errors,start,pending,
+  return {owner,errors,start,pump,pending,
     resolve(value){const p=pending.shift();assert(p);p.resolve(value);},
     get interrupted(){return interrupted;},get stops(){return stops;}};
 }
@@ -84,6 +85,7 @@ function instructionFixture() {
   assert.equal(b.errors.length,1,"Real narration failure keeps retry toast");
   assert.equal(b.owner.snapshot().failed,true);
   b.owner.retryFromGesture();
+  b.pump();
   b.resolve({ended:true,reason:"native-ended"});
   await tick();
   assert.equal(b.owner.snapshot().locked,false,
