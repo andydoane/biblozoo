@@ -1,5 +1,24 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT R01 PR — Flashcards UI pop restoration after native recording (pending device test, 2026-11-17)
+
+**Issue ID:** `FLASH-01`. **Review PR:** [#128](https://github.com/andydoane/biblozoo/pull/128), branch `fix/r01-flashcards-ui-pops-after-recording` → integration only; **NOT tested on owner iPhone**, no install, no merge, no stored profile or voice data changed. The identified bug is a stale JS UI-pop `ready` cache after the recording microphone barrier deallocates the shared native PCM bank. A one-call invalidation now happens **before** that barrier. Only a future **real user tap** may activate/reload the UI samples; there is no autonomous audio session takeover or WebAudio fallback.
+
+**CI status:** [PR #128 run 44191269823](https://github.com/andydoane/biblozoo/actions/runs/44191269823) reports **Node regression PASS / production web build PASS** for the initial code/test revision. A newer documentation-only commit requires checking the latest run again. **Real iPhone audio NOT TESTED.**
+
+**CI contract:** `node scripts/validate_r01_flashcards_ui_pop_handoff.js` uses the *actual* `native-ui-audio.js`, `flashcards/recording.js`, and `native-flashcards-capture-n7c.js` in a fake iOS Capacitor environment where `devPrepareForMicrophone` discards the PCM effect bank. It verifies the initial UI pop, real Record/Stop and retained RAM take, **no automatic activation/PCM rewarm after recording**, and **both pops re-preloaded on the next genuine eligible UI tap**, with subsequent taps audible; mic-permission denial must not drain the bank. Existing CI still covers native session handoff, Read, Feeding, Web/PWA and Swift syntax. These checks cannot prove real speaker audibility, iPhone session correctness or runtime microphone privacy.
+
+**Owner physical iPhone test (only after owner approves an updated production-ID installation):**
+1. Confirm the expected **10 production Zookeepers** and keep an off-device private production-family backup before any update; never import the separate 11-profile Audio Test backup. On the revised integration build, have the **Silent switch OFF**, speaker volume audible, and close Apple Music/PiP for the normal baseline.
+2. Open an existing profile; tap ordinary Home/menu buttons that usually make the two UI **pop** sounds. Open **Flashcards**, tap navigation buttons that normally pop *before* recording. Do not judge the deliberately silent **Record / Stop / Play My Recording** controls, which carry `data-no-ui-sound`.
+3. Tap Record, allow the normal **3–2–1** countdown, speak a *nonprivate* short test phrase into the mic, Stop. Confirm the recording UI is sane; audio captured/replayed normally. **Do not send or save** the recorded voice.
+4. Tap the ordinary *eligible* Flashcards navigation/Next/Back controls after capture: UI pops should recover instead of remaining permanently silent. The first tap may perform a bounded asynchronous native warmup; a delayed/absent first pop is worth reporting, but **subsequent taps must consistently sound**. No double pops or stale sound from a prior screen.
+5. Return to **main Home** and navigate several menus; UI pops must still sound. Reenter Flashcards, record/stop a **second** new take, and repeat Steps 4–5. No accumulation of silent state, no second mic permission prompt, no missing recordings or skipped progress.
+6. **Safety smoke:** With AirPods connected and/or Apple Music playing, a true Record tap may claim audio, but a normal Stop must not **automatically resume or steal** external music. With locked/held App Switcher or genuinely interrupted capture, no phantom pop, recording restart or auto-output activation may occur. Existing Flashcards interruption-error and AirPods route bugs (`FLASH-02..04`) are **separate future roadmap items** and need not be falsely marked fixed by R01.
+7. Verify 10 profiles/sampled verse progress and BibloPets unchanged; confirm optional Web/PWA/Android UI pops still work if available. Report **PASS / FAIL / NOT TESTED** with iPhone audio route, where pops stopped/returned, and whether the issue persisted after leaving Flashcards. Do not send backups, identifying data or voice clips.
+
+**Do not mark R01 complete** from code/CI alone. The owner must merge the PR and explicitly authorize/install the revised production bundle ID before the on-device result can be recorded. Keep R02–R17 separate.
+
 
 ## CURRENT PLANNED iOS AUDIO PR ROADMAP — proposal, not implemented (2026-11-17)
 
