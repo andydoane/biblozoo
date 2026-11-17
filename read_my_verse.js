@@ -1132,11 +1132,16 @@
       return false;
     }
 
-    return !!selectActivityChunks(
+    const selected = selectActivityChunks(
       verse,
       activityId,
       readTestMode
     );
+    // startForVerse requires 1–8 chunks; avoid offering an unusable
+    // child-facing card for an incompatible verse.
+    return !!selected &&
+      selected.chunks.length > 0 &&
+      selected.chunks.length <= 8;
   }
 
   function normalizeReadTestMode(
@@ -1461,6 +1466,28 @@
           cleanString(context.previewScope)
         )
     };
+
+    if (normalized.source === "learn_listen_activities") {
+      // Normal, child-facing free play has no Daily plan, task, launch
+      // token or DEV preview. It cannot use the Daily completion hook.
+      if (
+        !normalized.profileId ||
+        normalized.profileId !==
+          cleanString(appApi?.getActiveProfileId?.()) ||
+        normalized.verseId !== cleanString(verseId) ||
+        normalized.readActivityId !== cleanString(activityId) ||
+        !READ_ACTIVITY_MANIFEST[normalized.readActivityId]?.enabled ||
+        normalized.readTestMode !== "normal" ||
+        normalized.previewScope ||
+        normalized.planId ||
+        normalized.planDay ||
+        normalized.taskId ||
+        normalized.launchToken
+      ) {
+        return null;
+      }
+      return normalized;
+    }
 
     if (
       normalized.source !== "daily_todo" ||
