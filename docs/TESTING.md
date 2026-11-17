@@ -4,6 +4,8 @@
 
 **Issue ID:** `FLASH-01`. **Review PR:** [#128](https://github.com/andydoane/biblozoo/pull/128), branch `fix/r01-flashcards-ui-pops-after-recording` → integration only; **NOT tested on owner iPhone**, no install, no merge, no stored profile or voice data changed. The identified bug is a stale JS UI-pop `ready` cache after the recording microphone barrier deallocates the shared native PCM bank. A one-call invalidation now happens **before** that barrier. Only a future **real user tap** may activate/reload the UI samples; there is no autonomous audio session takeover or WebAudio fallback.
 
+**CI status:** [PR #128 run 44191269823](https://github.com/andydoane/biblozoo/actions/runs/44191269823) reports **Node regression PASS / production web build PASS** for the initial code/test revision. A newer documentation-only commit requires checking the latest run again. **Real iPhone audio NOT TESTED.**
+
 **CI contract:** `node scripts/validate_r01_flashcards_ui_pop_handoff.js` uses the *actual* `native-ui-audio.js`, `flashcards/recording.js`, and `native-flashcards-capture-n7c.js` in a fake iOS Capacitor environment where `devPrepareForMicrophone` discards the PCM effect bank. It verifies the initial UI pop, real Record/Stop and retained RAM take, **no automatic activation/PCM rewarm after recording**, and **both pops re-preloaded on the next genuine eligible UI tap**, with subsequent taps audible; mic-permission denial must not drain the bank. Existing CI still covers native session handoff, Read, Feeding, Web/PWA and Swift syntax. These checks cannot prove real speaker audibility, iPhone session correctness or runtime microphone privacy.
 
 **Owner physical iPhone test (only after owner approves an updated production-ID installation):**
