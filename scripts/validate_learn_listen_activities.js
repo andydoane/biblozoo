@@ -39,6 +39,7 @@ for (const [id] of cards) {
   assert.equal(Read.READ_ACTIVITY_MANIFEST[id]?.enabled, true,
     "missing native Read activity: " + id);
 }
+assert.equal(Read.READ_ACTIVITY_MANIFEST.chunk_sequence.title, "Sound Sequence");
 
 // Reuse Practice visual layout, while keeping its own child-facing routes.
 for (const name of ["LEARN_HUB", "LISTEN_ACTIVITIES"]) {
