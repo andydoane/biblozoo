@@ -9063,7 +9063,7 @@ function waitForVerseDetailAudioEnd(token) {
   });
 }
 
-async function playVerseDetailListen(verseId) {
+async function playVerseDetailListen(verseId, { onInterrupted } = {}) {
   const listenToken =
     cancelVerseDetailListen();
   if (muted || document.hidden) return false;
@@ -9111,6 +9111,14 @@ async function playVerseDetailListen(verseId) {
               // and stale completion must never count as success.
               finish(true);
             } else if (event.kind === "interrupted") {
+              // Flashcards needs its own Welcome Back for external media
+              // taking the native session while the iPhone remains active.
+              // The callback cancels its pending Listen generation before
+              // finish(false) could be mistaken for a broken audio file.
+              if (State.screen === Screen.FLASHCARDS &&
+                  typeof onInterrupted === "function") {
+                try { onInterrupted(); } catch (_) {}
+              }
               finish(false, "Playback paused. Tap Listen to start again.");
             } else if (event.kind === "failed") {
               finish(false, "Sound isn't ready. Tap Listen to try again.");
