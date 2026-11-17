@@ -206,6 +206,12 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r01_flashcards_ui_pop_handoff.js
 
+      # R02: Apple Music/AirPods native narration interruption is recoverable
+      # Welcome Back, not a corrupt file. Test both instructions and verse.
+      - name: Validate R02 Flashcards native audio Welcome Back interruption routing
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r02_flashcards_welcome_back.js
+
       - name: Validate N7d.2 Flashcards foreground audio ownership and genuine AirPods interruptions
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_n7d2_flashcards_foreground_audio_ownership.js

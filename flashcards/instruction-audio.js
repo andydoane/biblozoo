@@ -36,7 +36,7 @@
       : SOURCES[view] || null;
   }
 
-  function create({ onChange, onError, isMuted } = {}) {
+  function create({ onChange, onError, onInterrupted, isMuted } = {}) {
     let current = null;
     let serial = 0;
     const nativeOnly = () =>
@@ -102,7 +102,20 @@
         }
         a.nativeStarted = true;
         Promise.resolve(player.play(a.source.id))
-          .then(result => change(a, result?.ended === true ? "done" : "failed", attempt))
+          .then(result => {
+            // An actual native interruption is not a bad MP3. Let Flashcards
+            // open its existing Welcome Back before any red error toast.
+            // stop()/interrupt() revokes this attempt so late callbacks cannot
+            // unlock the next screen or announce a second failure.
+            if (result?.reason === "interrupted" &&
+                still(a) && a.status === "playing" &&
+                a.attempt === attempt && !root.document?.hidden &&
+                typeof onInterrupted === "function") {
+              onInterrupted();
+              return;
+            }
+            change(a, result?.ended === true ? "done" : "failed", attempt);
+          })
           .catch(() => change(a, "failed", attempt));
       } else {
         const audio = new root.Audio("flashcards/" + a.source.file);
