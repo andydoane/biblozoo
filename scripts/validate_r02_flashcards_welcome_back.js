@@ -227,7 +227,8 @@ function instructionFixture() {
     let token=0,active=false,cancelWait=null;
     const sound={startFromGesture({onEvent}){listener=onEvent;return Promise.resolve({ready:true});}};
     const sandbox={
-      muted:false,document:{hidden:false},window:{BibloZooNativeLearnListen:sound},
+      muted:false,document:{hidden:false,addEventListener(){}},
+      window:{BibloZooNativeLearnListen:sound,addEventListener(){}},
       Screen:{FLASHCARDS:"FLASHCARDS",VERSE_DETAIL:"VERSE_DETAIL"},
       State:{screen},isNativeLearnListenMode:()=>true,
       setVerseDetailPreviewStatus(m){notice=m||"";},
