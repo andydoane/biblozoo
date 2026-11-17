@@ -257,7 +257,7 @@
       }),
       chunk_sequence: Object.freeze({
         id: CHUNK_SEQUENCE_ACTIVITY_ID,
-        title: "Chunk Audio Matching",
+        title: "Sound Sequence",
         enabled: true,
         backgrounds: Object.freeze({
           phone:
@@ -6621,7 +6621,7 @@
         : ""
     ].filter(Boolean).join(" ");
     wrap.innerHTML = `
-      <button class="read-my-verse-back read-chunk-sequence-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Chunk Audio Matching">‹</button>
+      <button class="read-my-verse-back read-chunk-sequence-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Sound Sequence">‹</button>
       <main class="read-chunk-sequence-stage" style="${animatedBackgroundStyle(manifest)}">
         <div class="read-chunk-sequence-progress" role="group" aria-label="Sequence progress">
           ${renderChunkSequenceProgressHtml()}
