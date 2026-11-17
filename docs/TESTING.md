@@ -3,7 +3,7 @@
 
 ## CURRENT PLANNED iOS AUDIO PR ROADMAP — proposal, not implemented (2026-11-17)
 
-Read [`docs/IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md`](IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md) for **R01–R17**: fourteen focused recovery/loudness/gameplay PR candidates (R01–R14), a separate owner Silent Mode design decision (R15), a conditional implementation only if authorized (R16), and final integration/promotion gates (R17). The codes are **planning IDs, not existing PRs**. All proposed changes would target `integration/native-audio-to-ios-prep` first. **This roadmap PR is docs-only** and requires no installation.
+Read [`docs/IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md`](IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md) in [PR #127](https://github.com/andydoane/biblozoo/pull/127) for **R01–R17**: fourteen focused recovery/loudness/gameplay PR candidates (R01–R14), a separate owner Silent Mode design decision (R15), a conditional implementation only if authorized (R16), and final integration/promotion gates (R17). The codes are **planning IDs, not existing PRs**. All proposed changes would target `integration/native-audio-to-ios-prep` first. **This roadmap PR is docs-only** and requires no installation.
 
 **Owner clarification supersedes the initial issue inventory text:** “Typer not tested” was left in accidentally from **before PR #124**; after the child-facing Review → Learn → Listen Activities feature, owner could launch/test that previously inaccessible activity. `READ-ACCESS` is **RESOLVED** and not a remaining bug. The separately observed `READ-01` Typewriter/Keyboard opening-quote chunk mismatch stays **OPEN**, as do the other reported defects. Do not misrepresent picker accessibility as comprehensive audio/interruptions PASS.
 
