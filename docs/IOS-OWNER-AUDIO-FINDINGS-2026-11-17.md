@@ -50,7 +50,7 @@ The owner supplied **no Feeding-specific failures** in this report, across Class
 
 ## G. Flashcards
 
-**Post-report status, November 17, 2026:** Owner merged [R01 PR #128](https://github.com/andydoane/biblozoo/pull/128) and retested Flashcards/Home UI pops on a physical iPhone; the owner says **FLASH-01 is fixed**. The older below reproduction remains historical evidence. **FLASH-02 and FLASH-03 remain unverified**: the R02 code candidate now routes real native instruction and verse-narration interruptions to existing Welcome Back, but no owner iPhone AirPods/Apple Music retest of that candidate has yet occurred. Do not mark those issues closed on simulated Node/Web evidence. R03, R09 and unrelated issues are unaffected.
+**Post-report status, November 17, 2026:** Owner merged [R01 PR #128](https://github.com/andydoane/biblozoo/pull/128) and retested Flashcards/Home UI pops on a physical iPhone; the owner says **FLASH-01 is fixed**. The older below reproduction remains historical evidence. **FLASH-02 and FLASH-03 remain unverified**: [R02 PR #129](https://github.com/andydoane/biblozoo/pull/129) now routes real native instruction and verse-narration interruptions to existing Welcome Back, but no owner iPhone AirPods/Apple Music retest of that candidate has yet occurred. Do not mark those issues closed on simulated Node/Web evidence. R03, R09 and unrelated issues are unaffected.
 
 
 
