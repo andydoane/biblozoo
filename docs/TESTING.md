@@ -2,7 +2,7 @@
 
 ## CURRENT OWNER ACCEPTANCE — Review → Learn hub → Listen Activities (feature PR; not yet device-tested, 2026-11-17)
 
-**Branch:** `feature/review-learn-listen-activities` → `integration/native-audio-to-ios-prep`, without changes to stable `ios-prep`. This child-facing path exists for ALL eight original Read My Verse activities; it is **not** the production DEV tester, cannot choose DEV read modes and cannot claim a real Daily task. Keep other audio checklist findings separate and don't call hardware success from source/CI.
+**Branch:** [PR #124](https://github.com/andydoane/biblozoo/pull/124), `feature/review-learn-listen-activities` → `integration/native-audio-to-ios-prep`, without changes to stable `ios-prep`. This child-facing path exists for ALL eight original Read My Verse activities; it is **not** the production DEV tester, cannot choose DEV read modes and cannot claim a real Daily task. Keep other audio checklist findings separate and don't call hardware success from source/CI.
 
 **Regression/CI:** `node scripts/validate_learn_listen_activities.js` verifies the ten uploaded PNGs, eight ordered colors/labels/internal IDs, Review versus Learn actions, screen arrows, native gesture source, profile-bound normal free-play context, and no Daily reward token. Existing `node scripts/validate_read_my_verse.js`, Daily To-Do, N7f/N7g/N7m, PWA build and full suite should stay green. All manual phone checks below **NOT TESTED** until owner reports them.
 
