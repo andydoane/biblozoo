@@ -155,6 +155,14 @@
         if (permission?.granted !== true) return failed(
           permission?.reason === "permission-denied" ? "permission-denied" :
           "permission-required");
+        // R01: The native microphone barrier discards the *shared* PCM
+        // output bank, including Home/Flashcards ui-pop-1 and ui-pop-2.
+        // Invalidate their JS "ready" cache BEFORE that barrier: otherwise
+        // every later tap tries to play an effect Swift has already disposed.
+        // This only revokes cached readiness; it does not stop anything,
+        // activate an audio session, or steal Apple Music in the background.
+        // The next real UI tap performs the existing gesture-bound rewarm.
+        root.BibloZooNativeUiAudio?.invalidate?.();
         // All AVAudioEngine playback nodes must actually finish stopping
         // before the shared AVAudioSession changes category.
         const handoff = await output.devPrepareForMicrophone();
