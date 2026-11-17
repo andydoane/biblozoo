@@ -10,6 +10,15 @@ const read = (name) => fs.readFileSync(path.join(root, name), "utf8");
 const app = read("app.js");
 const moduleSource = read("read_my_verse.js");
 const Read = require("../read_my_verse.js");
+const sw = read("service-worker.js");
+assert.match(sw, /const CACHE_VERSION = "[^"]+";/);
+for (const img of ["app_icon_review_verse.png", "app_icon_listen_to_verse.png",
+  "app_icon_balloons.png", "app_icon_fish.png", "app_icon_typewriter.png",
+  "app_icon_keyboard.png", "app_icon_unscramble.png", "app_icon_verse_crawl.png",
+  "app_icon_tap_words_in_order.png", "app_icon_chunk_audio_matching.png"]) {
+  assert.ok(sw.includes('"./verse_images/game_icons/' + img + '"'),
+    "PWA offline core path missing: " + img);
+}
 
 const cards = [
   ["balloons", "Balloons", "app_icon_balloons.png", "#ffc751"],
