@@ -1,11 +1,19 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
 
+## CURRENT PLANNED iOS AUDIO PR ROADMAP — proposal, not implemented (2026-11-17)
+
+Read [`docs/IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md`](IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md) in [PR #127](https://github.com/andydoane/biblozoo/pull/127) for **R01–R17**: fourteen focused recovery/loudness/gameplay PR candidates (R01–R14), a separate owner Silent Mode design decision (R15), a conditional implementation only if authorized (R16), and final integration/promotion gates (R17). The codes are **planning IDs, not existing PRs**. All proposed changes would target `integration/native-audio-to-ios-prep` first. **This roadmap PR is docs-only** and requires no installation.
+
+**Owner clarification supersedes the initial issue inventory text:** “Typer not tested” was left in accidentally from **before PR #124**; after the child-facing Review → Learn → Listen Activities feature, owner could launch/test that previously inaccessible activity. `READ-ACCESS` is **RESOLVED** and not a remaining bug. The separately observed `READ-01` Typewriter/Keyboard opening-quote chunk mismatch stays **OPEN**, as do the other reported defects. Do not misrepresent picker accessibility as comprehensive audio/interruptions PASS.
+
+**Required later test discipline:** Each implementation PR updates the living handoff and issue roadmap with actual PR number and hardware PASS/FAIL/NOT TESTED, retains good Web/PWA/Android behavior, does not commit private backup or voice data, and does not install a new production-ID iPhone build without owner approval. **Only after** issue closure/approved deferrals, CI, native Mac build/Archive/privacy/resource verification, private 10-profile production backup and Zoo stats decision, real iPhone regression of all affected features/interruptions, and owner review should a final `integration/native-audio-to-ios-prep` → `ios-prep` promotion PR be proposed. That internal merge is **not** App Store distribution.
+
 ## CURRENT HARDWARE FINDINGS — owner audio/gameplay issue inventory (2026-11-17)
 
 **Read the detailed [iPhone owner audio findings](IOS-OWNER-AUDIO-FINDINGS-2026-11-17.md) in [documentation PR #126](https://github.com/andydoane/biblozoo/pull/126) before continuing acceptance.** Eighteen recorded issue/design entries: one cross-cutting Silent Mode policy, two Learn, one Daily Questions, one Traffic Tap, two Playground, five Flashcards, six Read My Verse; plus older Read activity access/testing coverage and the owner's “no Home master mute button” preference. Current status **OWNER-REPORTED, UNFIXED; root cause unverified**. User reports other attempted items worked, but no automatic certification of unreported/optional combinations. The owner did not confirm which exact integration source revision was installed for each test.
 
-A later, separately approved **roadmap-of-PRs documentation PR** may sequence fixes. This inventory PR deliberately contains **no runtime code changes**, no audio-category policy decision and no requested new production-ID iPhone installation. Hold `integration/native-audio-to-ios-prep` → `ios-prep` promotion pending owner-observed hardware acceptance and data safety; preserve the distinct production 10-profile and Audio Test 11-profile backups. The previously merged Review/Listen picker still needs explicit physical device verification.
+The separately requested [**R01–R17 roadmap**](IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md) now sequences fixes (documentation-only; **no runtime code, Silent Mode implementation or iPhone installation**). Hold `integration/native-audio-to-ios-prep` → `ios-prep` promotion pending owner-observed hardware acceptance and data safety; preserve the distinct production 10-profile and Audio Test 11-profile backups. The owner clarified that the previously merged Review/Listen picker **allowed testing the previously missed Read activity**. More complete audio/interruption/reward verification of the picker and original Daily path remains open.
 
 ## CURRENT CI FOLLOW-UP — stale Zoo Escape cache-version assertions after PR #124 (2026-11-17)
 
