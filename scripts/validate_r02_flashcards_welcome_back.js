@@ -76,8 +76,10 @@ function instructionFixture() {
   await tick();
   assert.equal(a.interrupted,1,"Real native interruption routed to owner");
   assert.equal(a.errors.length,0,"No red missing-file toast on interruption");
-  assert.equal(a.owner.snapshot().status,"failed",
-    "Narrator stays stopped; child must explicitly retry");
+  assert.equal(a.owner.snapshot().status,"interrupted",
+    "Native instruction stays stopped but the child can choose Next or Replay");
+  assert.equal(a.owner.snapshot().locked,false,
+    "An interrupted instruction must not force replay before Next");
   assert(a.stops>0,"Interruption releases native narration");
 
   const b=instructionFixture();
