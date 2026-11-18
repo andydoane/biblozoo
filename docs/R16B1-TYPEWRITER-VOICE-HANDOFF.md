@@ -1,5 +1,14 @@
 # R16b.1 / AUDIO-01 — Typewriter key-alert → spoken-verse handoff
 
+## CURRENT R16b.1 accepted / R16b.2 Verse Crawl decision pending — 2026-11-18
+
+**Latest iPhone owner confirmation:** [R16b.1 PR #150](https://github.com/andydoane/biblozoo/pull/150) was **MERGED** into `integration/native-audio-to-ios-prep` at `3ba8a7d73230c96bc58266f9d9a0b3a740659555`; exact post-merge [GitHub Actions #44390620242](https://github.com/andydoane/biblozoo/actions/runs/44390620242) **PASS**. After the focused test plan, owner said **“Everything worked as it was supposed to.”** Record **OWNER PASS** for R16b.1 Typewriter's false Welcome Back repair and its expected Silent ON/OFF key/narration behavior, without inventing separate device logs or specific pass claims for unenumerated cases. Supersedes older “PR under review / owner hardware pending” notes below, which remain historical context.
+
+**Remaining AUDIO-01 boundary:** Owner previously reported Read **Balloons/Fish Silent ON working**, and **Verse Crawl Silent OFF music+voice normal**, but **Verse Crawl Silent ON text only (no spoken verse, no music)**. That last condition is still an **open exception to Option B** and cannot be called full Silent Mode success. No change to Crawl has been authorized. Next is an owner **product decision**, then a separately scoped R16b.2 PR; only afterward is R17 full iPhone acceptance/promotion appropriate. [R16b.2 explicit options and risks](R16B2-VERSE-CRAWL-SILENT-MODE-DECISION.md).
+
+**CLOSEOUT AFTER OWNER TEST:** [PR #150](https://github.com/andydoane/biblozoo/pull/150) **MERGED** to integration `3ba8a7d73230c96bc58266f9d9a0b3a740659555`, [post-merge CI #44390620242](https://github.com/andydoane/biblozoo/actions/runs/44390620242) **PASS**. Owner responded after the focused iPhone tests **“Everything worked as it was supposed to.”** Treat the Typewriter false-Welcome-Back regression as **resolved/OWNER PASS** for the reported outcome; older source-fix candidate and “hardware pending” text below is historical. No separate case-specific OS/AirPods traces were given. Full AUDIO-01 remains open due to Crawl narration under Silent ON. [Next decision: R16b.2](R16B2-VERSE-CRAWL-SILENT-MODE-DECISION.md).
+
+
 **R16b.1 CI checkpoint:** [GitHub Actions run 44389883666](https://github.com/andydoane/biblozoo/actions/runs/44389883666) **PASS** at code+documentation SHA `8c1df08ffa68820979ee5fa3d3ee69a81c9e0f0c`: new R16b.1 key/voice regression, existing R16a/R16b and full Node suite, Linux Swift source parser, and production web build. This is **not** an Xcode iOS SDK compile or physical Typewriter test. After these status-doc updates, verify CI once more for the final PR head; owner iPhone PASS still pending.
 
 
