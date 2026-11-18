@@ -51,7 +51,8 @@ const session={active:true,musicButton:button,musicEnabled:true,musicSwitching:f
 const makeAudio=(position)=>({currentTime:position,
   pause(){events.push("voice-stop");return Promise.resolve({stopped:true});}});
 let failures=0;
-const ctx={Promise,Number,Math,root:{document:{hidden:false}},
+const ctx={Promise,Number,Math,root:{document:{hidden:false},
+    BibloZooNativeReadOutputController:{enabled:true}},
   crawlSession:session,readAudioRecovery:null,completionReported:false,
   readActiveAnimatedNarration:{session,item},activeAudio:makeAudio(2.125),
   audioRequest:4,readAudioStartPromise:Promise.resolve(),
@@ -90,6 +91,25 @@ async function run(){
   await session.musicSwitchQueue;
   assert.equal(failures,1,"native stop failure must fail closed");
   assert(!events.some(x=>x.startsWith("voice-start:")),"no voice after failed stop");
+
+  // Web/PWA/Android must not restart the current verse or defer a
+  // media play() beyond the actual click: just change soundtrack.
+  const webEvents=[];
+  const webSession={active:true,musicButton:button,musicEnabled:true,
+    endingStarted:false};
+  const web={...ctx,
+    root:{document:{hidden:false},BibloZooNativeReadOutputController:{enabled:false}},
+    crawlSession:webSession,
+    stopCrawlMusic(){webEvents.push("stop");},
+    stopCrawlEnding(){webEvents.push("ending");},
+    startCrawlMusic(){webEvents.push("start");},
+    playCrawlAudio(){throw Error("web toggle must not restart the verse");}
+  };
+  vm.runInNewContext(toggleSource+"\\nthis.toggleCrawlMusic=toggleCrawlMusic;",web);
+  web.toggleCrawlMusic(webSession);
+  assert.deepEqual(webEvents,["stop","ending"]);
+  web.toggleCrawlMusic(webSession);
+  assert.deepEqual(webEvents,["stop","ending","start"]);
 
   // Real native Audio shim returns the stop acknowledgement without
   // inventing media 'ended' or an OS interruption.
