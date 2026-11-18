@@ -755,7 +755,7 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             // essential-voice category change, not an AirPods disconnect.
             // A delayed categoryChange must not invalidate narration/PCM.
             if self.lastRouteReasonCode ==
-                AVAudioSession.RouteChangeReason.categoryChange.rawValue {
+                Int(AVAudioSession.RouteChangeReason.categoryChange.rawValue) {
                 self.appendTrace("category-changed")
                 return
             }
