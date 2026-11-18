@@ -133,10 +133,12 @@ function testTypewriterIntroCutscene() {
     "Reserve the complete intro while individual letters are typed");
   assert.ok(js.includes('class="read-typewriter-intro-tail"'),
     "The words 'the verse.' must stay together on the second line");
-  const fixedLines = css.indexOf('.read-typewriter-intro-head,\\n.read-typewriter-intro-tail {');
+  const fixedLines = css.indexOf('.read-typewriter-intro-head,');
   assert.ok(fixedLines >= 0,
     "The head/tail must share a single two-line CSS layout");
   const fixedRule = css.slice(fixedLines, css.indexOf('}', fixedLines));
+  assert.ok(fixedRule.includes('.read-typewriter-intro-tail {'),
+    "The first and second intro lines must share the no-wrap rule");
   assert.ok(fixedRule.includes('display: block') &&
     fixedRule.includes('width: max-content') &&
     fixedRule.includes('white-space: pre'),
