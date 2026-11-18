@@ -1,0 +1,42 @@
+# R16b.1 / AUDIO-01 — Typewriter key-alert → spoken-verse handoff
+
+**Prepared:** 2026-11-18, owner-approved iOS stabilization work. **Source branch:** `fix/r16b1-read-typewriter-optional-key-handoff`, based on integration commit `60f187a57626710e98ae7c325b5376d1160190de` after [R16b PR #149](https://github.com/andydoane/biblozoo/pull/149) merged. **Status:** SOURCE FIX CANDIDATE; CI and physical iPhone acceptance must be separately recorded. No automatic merge or promotion to `ios-prep`/`main`.
+
+## Exact owner iPhone results after #149
+
+- **Read / Typewriter, Silent ON, iPhone:** key clicks were correctly quiet, but **every attempt to play a spoken verse chunk opened Welcome Back**. The verse audio would play only **after an explicit Let's go** tap. **FAIL** for uninterrupted Typewriter verse playback.
+- **Read / Typewriter, Silent OFF:** ordinary key clicks audible; the **same false Welcome Back before each spoken verse segment**. **FAIL**. This is not a physical Silent-switch problem.
+- **Read / Balloons and Fish, Silent ON:** owner reported **PASS**, narrated verse and optional sound behavior as expected. No Silent OFF claim; do not infer a full matrix.
+- **Read / Verse Crawl, Silent OFF:** owner reports original voice+music works normally (**PASS for normal mode**).
+- **Read / Verse Crawl, Silent ON, speaker:** **text only; no music and no spoken voice** (observed and expected **partial R16b scope**, NOT full Option B compliance). The existing music/voice overlap has not been redesigned and must not be silently promoted.
+- No owner data was supplied for Keyboard, Tap Order, Unscramble, Chunk Sequence, OS App Switcher lock, AirPods, exact iOS version, or installed app SHA for #149 beyond the merged integration commit. Keep those **NOT TESTED**.
+
+## Source-backed cause
+
+`read_my_verse.js` calls `playChunkAlertSound()` on the final character and **immediately** calls `finishCurrentChunk()` / `playCurrentChunk()`. The established behavior intentionally keeps the final optional alert active with `stopKeySoundVoices({ keepChunkAlert: true })`, allowing key/alert + voice overlap in normal non-Silent operation.
+
+In the initial R16b native plugin, essential voice refused playback whenever **any** prior Read `AVAudioPlayer` remained in `clips` (`clips.isEmpty` requirement). A transient key/alert thus caused a truthful but overly strict `voice-overlap-unsafe` refusal. The Read adapter's `NativeAudio.play()` rejects; its existing `beginReadNarration` and `error` handlers invoke `pauseReadForInterruption()`, which shows Welcome Back as if the phone had been interrupted. Owner's repeatable false popup is consistent with this exact source collision. No OS category or key/alert clock log was supplied for this exact run, so this is a **source-derived diagnosis awaiting iPhone confirmation**, not a fabricated OS trace.
+
+## Smallest safety-preserving repair
+
+- Maintain fixed, validated source keys for each active native Read clip in `clipSources`, with guaranteed cleanup on real end, explicit stop, stopAll/Exit and OS interruption.
+- Preflight Read essential voice while iOS `soloAmbient` is active, with exact independent `read-narration` lease owner, **no other voice**, **no queued generated Read notes**, and **all existing native clips limited to approved short typing effects**. Allowlist is `typewriter-1..3`, `typewriter-alert`, `keyboard-1..7`, and `keyboard-alert`.
+- Once actual spoken player **prepares successfully**, stop only these short optional clips and emit `biblozooReadOutput kind:"interrupted" reason:"superseded-by-spoken-verse"` to retire their real JS owners, **not** `ended`, and **not** `biblozooReadLifecycle`. This preserves truthful no-false-verse-end progress. Only **after all effects have stopped**, start the shared `.playback` essential voice lease, then the prepared spoken `AVAudioPlayer`. No incidental effect can continue audibly under the foreground voice lease.
+- The prior cap of eight simultaneous incidental player requests remains. Incoming optional clips and generated notes still require `soloAmbient`. No permission or background capability changes, no auto-restart after real iOS interruptions, no WebAudio fallback.
+- **Never** preempt music (`crawl-theme`, `crawl-ending`), a Zoo recovery cue, a different verse/narrator, or any unknown source. Those still fail closed as `voice-overlap-unsafe`; no clip is discarded just because the new verse request arrived. No cross-activity/Flashcards change.
+- Normal Silent OFF Typewriter's final alert may **end early** when verse starts: this is an intentional minimal tradeoff rather than making optional alert audible under Silent Mode. Earlier key clicks and other normal optional sounds remain unchanged. If the owner wants longer overlapping alert and voice in non-Silent mode, it requires a distinct, user-approved audio design; do not add a category hack.
+
+## Regression and owner acceptance
+
+`node scripts/validate_r16b1_typewriter_effect_voice_handoff.js` is wired into branch CI. It validates the actual Swift source allowlist, preempt-before-lease ordering, no Crawl/voice preemption, optional pool bounds, native clip ID/source cleanup, and a real JS adapter VM scenario: two optional key/alert players interrupted (not ended), spoken verse naturally ended by its own event, and another optional key still reusable. Existing R16a and R16b source regressions are adjusted for the limited exception. Run full N7f/N7g/N7m/R07/R08/R10/Read restoration, Swift parse and production web build. These are not an Xcode iOS SDK link or physical speaker proof.
+
+**After CI green and owner-controlled PR merge**, run a **short iPhone test**:
+
+1. **Silent ON, speaker:** Typewriter final key(s) → actual spoken verse segments, repeated twice. **No Welcome Back** from an ordinary typing action; verse audible; keys/alerts quiet. Check visual progression still waits for true spoken end and no skipped chunk.
+2. **Silent OFF:** Typewriter keys normally audible; verse segments start automatically without Welcome Back, no duplicated verse, no zombie sound. The short final alert may be cut at speech start; record observation if distracting.
+3. **Balloons/Fish Silent ON:** spot-check one spoken segment to ensure prior pass remains.
+4. **Genuine interruption:** During a speaking Typewriter segment, **lock or hold App Switcher**, return: actual Welcome Back must still require a deliberate Let's go tap, no background narration or automatic completion. Do not claim this PASS until reported.
+5. **Crawl:** Normal Silent OFF music+voice must still work; Silent ON remains **text only** under current unsolved Crawl boundary. It is NOT a Typewriter acceptance failure; do not mark full R16b complete or change audio policy without a separate owner decision.
+6. Optional quick Learn Chunks/Echo Menu, Flashcards RAM voice replay, Apple Music/PiP and AirPods if convenient; no broad retest required for this narrow fix.
+
+**Privacy and release:** Never uninstall or modify original production 10 Zookeeper profiles, separate Audio Test 11 profiles, saved recordings or backups. No new permission, telemetry, user data, audio file output, background mode or external-media takeover. Mark exact installed SHA/route/Silent setting and PASS/FAIL/NOT TESTED in living docs when reported. Keep `ios-prep` and `main` unchanged; R17 acceptance remains deferred until Read's Crawl decision and all owner gates.
