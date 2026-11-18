@@ -8,6 +8,8 @@
 
 **Verification gate:** New `scripts/validate_r16b2_crawl_music_toggle.js` (source contracts plus actual native JS adapter and toggle VM) is wired into GitHub Actions with prior R16a/R16b/Read/Swift-parse/web-build regressions. **Physical-iPhone testing is NOT YET DONE.** The owner must try both button directions during narration with speaker Silent ON/OFF, recovery and Exit, and make sure no false Welcome Back, audible leaked music, truncated progress or false reward occurs. CI alone cannot establish physical audio correctness. [Scoped device checklist](TESTING.md) and [focused decision history](R16B2-VERSE-CRAWL-SILENT-MODE-DECISION.md).
 
+**PR status:** [R16b.2 PR #152](https://github.com/andydoane/biblozoo/pull/152) is OPEN (initially draft), **not merged**. Automated checks must pass on the final exact PR head; owner iPhone result is still pending.
+
 **Release discipline:** Implement on short-lived branch `feat/r16b2-verse-crawl-music-toggle` targeting only `integration/native-audio-to-ios-prep`. Leave `ios-prep`, `main`, and the 10 original production / 11 separate Audio Test profiles intact. R17 final owner acceptance/promotion remains blocked until this change is merged and physically verified. The older R16b.2 three-option decision notes below are historical, superseded by this owner-approved toggle design.
 
 ### R16b.2 owner physical iPhone test — run AFTER merge (PENDING)
