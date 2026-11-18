@@ -2,6 +2,8 @@
 
 ## CURRENT R16b.3 — clarified owner music toggle policy after #152 iPhone FAIL (2026-11-18)
 
+**Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
+
 **Actual owner test of merged [#152](https://github.com/andydoane/biblozoo/pull/152):** Silent OFF, initial music+verse audible and music-button OFF left verse audible — **PASS for observed flow**. Silent ON, initial music+verse were both silent, while music-button OFF enabled verse alone — **FAIL against owner's now explicit default**. The music-note PNG also fills too much of its button. This is a physical user report, not an inferred or log-backed test. #152 is **MERGED to integration**, not pending.
 
 **Owner's newly chosen behavior:** Both **Silent ON and Silent OFF** always start Verse Crawl with **music + spoken verse audible**. One tap on the upper-right yellow music note turns **only music/ending OFF**, fading the button; verse continues without pause/restart. A second tap restores music and keeps narration continuous. Same behavior in both physical switch positions. No startup popup, no automatic switch detection, no persistent preference, no extra child taps to hear the default soundtrack. Owner's exact `verse_images/game_ui/ui_icon_music_notes.png` image remains, but rendered smaller inside the existing `#ffc751` button (touch target not reduced).
