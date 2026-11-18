@@ -60,7 +60,9 @@ assert(adapter.includes('epoch !== lifecycleEpoch'),
 // Swift stub's clock starts at 0 after OS interruption: the old
 // play(atTime: deviceCurrentTime + 0) violates Apple's strictly-future rule.
 // Compile the extracted *production* helper, never a reimplementation.
-// Relax only PRIVATE visibility in this isolated mock fixture so its test\n// driver can call the actual, otherwise verbatim production Swift function.\nconst swiftHarness = `
+// Relax only PRIVATE visibility in this isolated mock fixture so its test
+// driver can call the actual, otherwise verbatim production Swift function.
+const swiftHarness = `
 import Foundation
 final class AVAudioPlayer {
     static var deviceClock: Double = 0
