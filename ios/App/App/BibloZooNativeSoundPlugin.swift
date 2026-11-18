@@ -751,6 +751,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             self.routeEventCount += 1
             self.lastRouteReasonCode =
                 (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.intValue ?? -1
+            // R16a: .soloAmbient -> .playback -> .soloAmbient is our OWN
+            // essential-voice category change, not an AirPods disconnect.
+            // A delayed categoryChange must not invalidate narration/PCM.
+            if self.lastRouteReasonCode ==
+                Int(AVAudioSession.RouteChangeReason.categoryChange.rawValue) {
+                self.appendTrace("category-changed")
+                return
+            }
             self.forgetPlayback()
             self.appendTrace("route-changed")
         })
@@ -3542,6 +3550,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         narrationPlayer?.delegate = nil
         narrationPlayer?.stop()
         narrationPlayer = nil
+        // Release only our own essential-voice lease, never the microphone's
+        // .playAndRecord category or another owner's output priority.
+        BibloZooEssentialVoiceSession.end(owner: "native-narration")
         narrationRequestId = nil
         narrationCurrentSoundID = nil
         narrationCompleted = false
@@ -3637,7 +3648,20 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             guard !self.narrationCompleted else {
                 call.resolve(["accepted": false, "reason": "already-ended"]); return
             }
+            // Only the explicitly initiated, allowlisted spoken MP3 player
+            // may ignore Silent Mode. Session is already gesture-activated;
+            // this lease neither calls setActive nor starts any other sound.
+            guard BibloZooEssentialVoiceSession.begin(
+                owner: "native-narration") else {
+                self.stopNarrationPlayer(reason: "voice-session-unavailable")
+                call.resolve(["accepted": false,
+                              "reason": "voice-session-unavailable"])
+                return
+            }
             let accepted = player.play()
+            if !accepted {
+                self.stopNarrationPlayer(reason: "play-denied")
+            }
             var state = self.narrationSnapshot()
             state["accepted"] = accepted
             state["reason"] = accepted ? "started" : "play-denied"
@@ -3654,6 +3678,8 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 call.resolve(["paused": false, "reason": "stale-request"]); return
             }
             player.pause()
+            // A paused narrator does not retain the silent-switch exception.
+            BibloZooEssentialVoiceSession.end(owner: "native-narration")
             var state = self.narrationSnapshot()
             state["paused"] = true
             call.resolve(state)
@@ -3715,6 +3741,9 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                   UIApplication.shared.applicationState == .active,
                   !self.interrupted else { return }
             self.narrationCompleted = flag
+            // Restore default sound-effects policy before the next scene
+            // or instruction may make a new, separately owned sound.
+            BibloZooEssentialVoiceSession.end(owner: "native-narration")
             self.notifyListeners("biblozooNarration", data: [
                 "type": flag ? "ended" : "failed",
                 "requestId": requestId,
