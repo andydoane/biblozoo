@@ -470,6 +470,41 @@
     });
   }
 
+  // R12 / READ-01: echoParts boundaries are aligned to spoken words, so
+  // buildDisplayChunks may leave an OPENING quote after the previous spoken
+  // phrase (for example: "They replied, ‘" | "Believe in the Lord...").
+  // Only Typewriter/Keyboard need the quote to be displayed with the words
+  // it introduces. Move those exact characters across the VISUAL boundary,
+  // never alter canonical verseText, narration chunk indices, or other games.
+  function groupTypingOpeningQuotes(chunks) {
+    const result = [...chunks];
+    for (let index = 1; index < result.length; index += 1) {
+      const previous = result[index - 1];
+      // Curly opening quotes are unambiguous; straight quotes are treated
+      // as openers only when preceded by space or opening punctuation.
+      // Do NOT move curly closers (’ ”), contractions, or end-of-word
+      // straight closing quotes such as "Jesus'".
+      const match = /([\u2018\u201c\u00ab\u2039\u201e\u201a"'\u0020\t\u00a0]*)$/u.exec(previous);
+      if (!match || !/[\u2018\u201c\u00ab\u2039\u201e\u201a"']/u.test(match[1]))
+        continue;
+      const tail = match[1];
+      const before = previous.slice(0, -tail.length);
+      // The match also permits intervening/trailing spaces; avoid
+      // stealing ordinary whitespace from a previous chunk that has no
+      // opening quote, and never empty a previous spoken phrase.
+      if (!before.trim()) continue;
+      const quotes = tail.match(/[\u2018\u201c\u00ab\u2039\u201e\u201a"']/gu) || [];
+      if (quotes.length === 0) continue;
+      const allCurlyOpen = quotes.every((q) =>
+        /[\u2018\u201c\u00ab\u2039\u201e\u201a]/u.test(q));
+      if (!allCurlyOpen && !/[\s([{:;,\u2014\u2013-]$/u.test(before))
+        continue;
+      result[index - 1] = before;
+      result[index] = tail + result[index];
+    }
+    return result;
+  }
+
   function getChunkAudioPath(
     verseId,
     chunkIndex,
@@ -988,10 +1023,19 @@
       return null;
     }
 
-    const chunks = buildDisplayChunks(
+    const originalChunks = buildDisplayChunks(
       verse?.verseText,
       verse?.echoParts
     );
+    // R12: Only these two typing displays move a stranded OPENING quote
+    // to the next visually typed phrase. The canonical text stays exact,
+    // and audioIndices remain [0, 1, ...] for the original echoParts.
+    // If an unmatched echoParts fallback produced non-canonical slices,
+    // leave that exceptional text alone rather than changing its layout.
+    const chunks = isTypingActivity(activityId) &&
+      originalChunks.join("") === String(verse?.verseText || "")
+      ? groupTypingOpeningQuotes(originalChunks)
+      : originalChunks;
 
     if (!chunks.length) return null;
 
