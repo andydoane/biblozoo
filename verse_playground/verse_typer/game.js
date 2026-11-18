@@ -2481,6 +2481,9 @@
 
   function scheduleCaterpillarPositionUpdate(options = {}) {
     requestAnimationFrame(() => {
+      // UIKit may be inactive while the App Switcher still paints WebKit.
+      // Preserve the frozen frame; R06 resume reschedules positioning.
+      if (returnPaused || document.hidden) return;
       updateCaterpillarPosition(options);
     });
   }
@@ -2490,6 +2493,12 @@
 
     requestAnimationFrame(() => {
       if (state.screen !== "game" || state.currentItem !== item) return;
+      if (returnPaused || document.hidden) {
+        // Never start an entrance/exit while the game is inactive.
+        // Retry after the virtual game clock is thawed by Let's go.
+        trackedTimeout(() => prepareTravelAnimation(animationState, item), 0);
+        return;
+      }
 
       updateCaterpillarPosition({ instant: true });
       updateTravelDistances();
@@ -3288,6 +3297,34 @@
     if (old !== audioCtx) { try { void old.close?.().catch?.(() => {}); } catch (_) {} }
     return !!audioCtx && audioCtx !== old;
   }
+  // R06 / PLAY-01: the game clock already pauses on UIKit inactive, but
+  // CSS's caterpillar tail color, crawl, ripple, head, and sparkle visuals
+  // have independent compositor timelines. Preserve the original frame.
+  let pausedTyperAnimations = [];
+  let typerVisualsFrozen = false;
+  function freezeTyperVisualsForReturn() {
+    if (typerVisualsFrozen || state.screen !== "game") return;
+    typerVisualsFrozen = true;
+    pausedTyperAnimations = Array.from(app.getAnimations?.({ subtree: true }) || [])
+      .filter(animation => animation.playState === "running");
+    for (const animation of pausedTyperAnimations) {
+      try { animation.pause(); } catch (_) {}
+    }
+    // Covers new CSS keyframes if WebKit paints the held switcher thumbnail.
+    document.documentElement?.classList?.add("vt-return-visual-paused");
+  }
+  function thawTyperVisualsAfterReturn() {
+    document.documentElement?.classList?.remove("vt-return-visual-paused");
+    typerVisualsFrozen = false;
+    const animations = pausedTyperAnimations;
+    pausedTyperAnimations = [];
+    // Play captured animations ONLY after successful child recovery. No
+    // restart/recreation; WAAPI's currentTime is the saved original frame.
+    for (const animation of animations) {
+      try { if (animation.playState === "paused") animation.play(); }
+      catch (_) {}
+    }
+  }
   function pauseTyperForReturn() {
     if(returnPaused)return;
     // End any menu/narration hold before Welcome Back owns the clock,
@@ -3298,19 +3335,25 @@
     wasPausedBeforeReturn=state.paused;
     state.paused=true;
     welcomeClock.pause();
+    freezeTyperVisualsForReturn();
   }
   function continueTyperAfterReturn() {
+    // A refused native audio recovery MUST leave the exact frame frozen
+    // behind Welcome Back. Do not advance after an unsuccessful gesture.
     if(nativeTyperAudio && !muted && !nativeTyperAudio.isReady())return false;
     welcomeClock.resume();
     returnPaused=false;
     state.paused=wasPausedBeforeReturn;
     if(state.paused)beginNativeHold();
+    thawTyperVisualsAfterReturn();
     if(state.screen==="game")scheduleCaterpillarPositionUpdate({instant:true});
     return true;
   }
 
   function setScreen(screen) {
     if (screen !== "game") {
+      // Navigation/Exit must not leave the entire game CSS frozen.
+      thawTyperVisualsAfterReturn();
       if(nativeTyperAudio && state.screen==="game"){
         stopNativeTyperRound();
         finishNativeHold();
