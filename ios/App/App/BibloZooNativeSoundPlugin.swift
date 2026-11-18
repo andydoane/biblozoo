@@ -2417,6 +2417,22 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
         appendTrace("flashcards-capture-handoff-restored")
     }
 
+    // R16a.2: UI pops and incidental game effects are optional. A tap on
+    // Learn's Menu while a spoken Chunk/Echo owns .playback must reject the
+    // optional effect without stopping that narrator or manufacturing an
+    // OS interruption/Welcome Back. Do NOT ignore a real UIKit/OS reset,
+    // interruption or media takeover; the usual forgetPlayback path owns those.
+    private func optionalEffectDeniedByActiveNarration(_ reason: String) -> Bool {
+        guard reason == "category-not-soloambient",
+              BibloZooEssentialVoiceSession.isActive(owner: "native-narration"),
+              UIApplication.shared.applicationState == .active,
+              !wasOutsideForeground, !interrupted,
+              !needsGestureAfterInterruption, !needsGestureAfterReset,
+              !AVAudioSession.sharedInstance().isOtherAudioPlaying,
+              narrationPlayer?.isPlaying == true else { return false }
+        return true
+    }
+
     private func unavailableReason() -> String? {
         if UIApplication.shared.applicationState != .active { return "not-foreground" }
         let session = AVAudioSession.sharedInstance()
@@ -3081,7 +3097,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 requestedMidi = nil
             }
             if let reason = self.unavailableReason() {
-                self.forgetPlayback()
+                // R16a.2: The child's Menu/UI tap can arrive during a real
+                // narrator's .playback lease. It must be quiet and rejected,
+                // but NOT cancel voice as if a system interruption occurred.
+                // All other unavailability keeps the existing fail-closed
+                // teardown (including real interrupted/reset/inactive state).
+                if !self.optionalEffectDeniedByActiveNarration(reason) {
+                    self.forgetPlayback()
+                }
                 call.resolve(["accepted": false, "reason": reason])
                 return
             }
