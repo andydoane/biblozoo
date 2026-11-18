@@ -1592,7 +1592,9 @@
     // voice overlap under .soloAmbient until that product tradeoff is solved.
     // Only the iOS native adapter exposes this marker; browsers unchanged.
     if (root?.BibloZooNativeReadOutputController?.enabled === true &&
-        state.activityId !== VERSE_CRAWL_ACTIVITY_ID) {
+        (state.activityId !== VERSE_CRAWL_ACTIVITY_ID ||
+          (crawlSession?.active && crawlSession.musicEnabled === false &&
+            !crawlMusic && !crawlEnding))) {
       audio?.markEssentialVoice?.();
     }
     let result;
@@ -2251,7 +2253,8 @@
     stopCrawlEnding();
     readAudioStartPromise = null;
     // Play BEFORE awaiting any promise, so iOS sees this as a direct tap.
-    startCrawlMusic("interruption-resume", CRAWL_RESUME_SECONDS);
+    if (scene?.musicEnabled !== false)
+      startCrawlMusic("interruption-resume", CRAWL_RESUME_SECONDS);
     const song = crawlMusic;
     if (recovery.narration && recovery.narration.session.active) {
       const { session, item } = recovery.narration;
@@ -2260,7 +2263,7 @@
     }
     const narrationStart = readAudioStartPromise;
     const narrationAudio = activeAudio;
-    if (hadEnding && scene?.active) {
+    if (hadEnding && scene?.active && scene.musicEnabled !== false) {
       scene.endingStarted = false;
       startCrawlEnding(scene);
     }
@@ -2276,7 +2279,7 @@
       // verified surprise could re-freeze Crawl. Check starts and real clock
       // advancement concurrently; never substitute a play() ACK for a clock.
       const [started, narrated] = await Promise.all([
-        !!appApi?.isMuted?.() || (!!song &&
+        scene?.musicEnabled === false || !!appApi?.isMuted?.() || (!!song &&
           waitReadRecoveryResult(song.startPromise, 3000)),
         !narrationStart || waitReadRecoveryResult(narrationStart, 3000)
       ]);
@@ -2285,7 +2288,7 @@
       // Poll earlier for the first real native progress event, while keeping
       // a bounded ~1.3s window and the exact original >35ms clock threshold.
       const [movingSong, movingNarration] = await Promise.all([
-        started && (appApi?.isMuted?.() ||
+        started && (scene?.musicEnabled === false || appApi?.isMuted?.() ||
           waitReadMediaProgress(song?.audio, current, 14, 95)),
         narrated && (!narrationStart ||
           waitReadMediaProgress(narrationAudio, current, 14, 95))
@@ -4442,7 +4445,8 @@
   // The pre-ducked track is intentionally played without Web Audio or JS
   // volume automation. Direct HTML media is the proven Patch 20B recovery path.
   function startCrawlMusic(reason = "unspecified", resumeAt = 0) {
-    if (appApi?.isMuted?.() || !root?.Audio) return;
+    if (appApi?.isMuted?.() || !root?.Audio ||
+        (crawlSession?.active && !crawlSession.musicEnabled)) return;
     try {
       const audio = root?.BibloZooNativeReadOutputController?.enabled
         ? new Audio(CRAWL_MUSIC_SRC)
@@ -4456,6 +4460,7 @@
           "html-media-direct-20j", failed: false };
       crawlMusic = music;
       audio.addEventListener?.("error", () => {
+        if (crawlMusic !== music) return; // Intentional toggle/Exit isn't interruption.
         music.failed = true;
         // A real AirPods Play/route loss can interrupt only the theme while
         // its animation is running. Freeze Read's own scene and require
@@ -4477,6 +4482,7 @@
       music.startPromise = Promise.resolve(audio.play()).then(
         () => true,
         () => {
+          if (crawlMusic !== music) return false; // Retired track is harmless.
           music.failed = true;
           if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
           return false;
@@ -4489,26 +4495,38 @@
   function stopCrawlMusic() {
     const music = crawlMusic;
     crawlMusic = null;
-    if (!music) return;
+    if (!music) return Promise.resolve({ stopped: true });
     try {
-      music.audio.pause();
+      const stopped = Promise.resolve(music.audio.pause());
       music.audio.removeAttribute?.("src");
       music.audio.load?.();
-    } catch (error) { /* Audio teardown remains best effort. */ }
+      return stopped;
+    } catch (error) { return Promise.resolve({ stopped: false }); }
   }
 
   function stopCrawlEnding() {
     const ending = crawlEnding;
     crawlEnding = null;
-    if (!ending) return;
-    try { ending.pause(); ending.removeAttribute?.("src"); ending.load?.(); }
-    catch (error) { /* Audio teardown remains best effort. */ }
+    if (!ending) return Promise.resolve({ stopped: true });
+    try {
+      const stopped = Promise.resolve(ending.pause());
+      ending.removeAttribute?.("src");
+      ending.load?.();
+      return stopped;
+    } catch (error) { return Promise.resolve({ stopped: false }); }
   }
 
   function startCrawlEnding(session) {
     if (!session?.active || session.endingStarted) return;
     session.endingStarted = true;
     session.endingDone = false;
+    if (!session.musicEnabled) {
+      session.endingDone = true;
+      stopCrawlMusic();
+      stopCrawlEnding();
+      completeCrawlIfReady(session);
+      return;
+    }
     if (appApi?.isMuted?.() || !root?.Audio) {
       session.endingDone = true;
       completeCrawlIfReady(session);
@@ -4565,8 +4583,8 @@
 
   function waitForCrawlFanfare(session, start) {
     let music = crawlMusic;
-    if (!music || music.failed || appApi?.isMuted?.()) {
-      if (music?.failed || appApi?.isMuted?.()) stopCrawlMusic();
+    if (!session.musicEnabled || !music || music.failed || appApi?.isMuted?.()) {
+      if (!session.musicEnabled || music?.failed || appApi?.isMuted?.()) stopCrawlMusic();
       start();
       return;
     }
@@ -4581,7 +4599,7 @@
         lastTime = -1;
         session.fanfareLastProgress = Date.now();
       }
-      if (crawlMusic !== music || music.failed || music.audio.ended ||
+      if (!session.musicEnabled || crawlMusic !== music || music.failed || music.audio.ended ||
           appApi?.isMuted?.()) {
         stopCrawlMusic();
         start();
@@ -4853,8 +4871,12 @@
     }
   }
 
-  function playCrawlAudio(session, item) {
+  function playCrawlAudio(session, item, resumeAt = 0) {
     if (!session.active || item.audioStarted || item.vanished) return;
+    if (session.musicSwitching) {
+      session.pendingNarration = { item, position: resumeAt };
+      return;
+    }
     item.audioStarted = true;
     state.phase = "playing";
     readActiveAnimatedNarration = { session, item };
@@ -4877,6 +4899,10 @@
     try {
       activeAudio = new Audio(src);
       activeAudio.preload = "auto";
+      if (resumeAt > 0) {
+        // Native shim seeks the NEW clip before play, preserving verse position.
+        try { activeAudio.currentTime = resumeAt; } catch (_) {}
+      }
       activeAudio.addEventListener("ended", finish, { once: true });
       activeAudio.addEventListener("error", () => {
         if (root?.document?.hidden) pauseReadForInterruption();
@@ -4945,6 +4971,84 @@
     }, motion.durationMs + 1500);
   }
 
+  // R16b.2: child-initiated music choice, never hardware Silent-switch
+  // detection. Wait for actual native stopClip acknowledgements before
+  // changing from soloAmbient soundtrack to music-free spoken-verse playback
+  // or vice versa. Neither direction creates a synthetic OS interruption.
+  function toggleCrawlMusic(session) {
+    if (!session?.active || crawlSession !== session || readAudioRecovery ||
+        root?.document?.hidden || session.endingStarted || completionReported)
+      return;
+    session.musicEnabled = !session.musicEnabled;
+    session.musicButton?.classList.toggle("is-off", !session.musicEnabled);
+    session.musicButton?.setAttribute("aria-pressed", String(session.musicEnabled));
+    session.musicButton?.setAttribute("aria-label", session.musicEnabled
+      ? "Turn Verse Crawl music off" : "Turn Verse Crawl music on");
+    // Browser/PWA/Android has no native shared-category lease. Keep its
+    // current spoken verse player running and switch music immediately
+    // within this real tap (important for iOS Safari's gesture policy).
+    if (root?.BibloZooNativeReadOutputController?.enabled !== true) {
+      if (session.musicEnabled) startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
+      else { stopCrawlMusic(); stopCrawlEnding(); }
+      return;
+    }
+    const epoch = ++session.musicToggleEpoch;
+    session.musicSwitching = true;
+    session.musicSwitchQueue = Promise.resolve(session.musicSwitchQueue)
+      .catch(() => {}).then(async () => {
+        if (!session.active || crawlSession !== session || readAudioRecovery ||
+            root?.document?.hidden) {
+          session.musicSwitching = false;
+          return;
+        }
+        let restart = session.pendingNarration;
+        let stoppedNarration = Promise.resolve({ stopped: true });
+        const owner = readActiveAnimatedNarration;
+        if (owner?.session === session && activeAudio && !owner.item.audioDone) {
+          const previous = activeAudio;
+          restart = { item: owner.item,
+            position: Math.max(0, Number(previous.currentTime) || 0) };
+          session.pendingNarration = restart;
+          // An intentional toggle invalidates the old playback completion
+          // BEFORE stopping it; only the newly started narration advances.
+          audioRequest += 1;
+          activeAudio = null;
+          readAudioStartPromise = null;
+          owner.item.audioStarted = false;
+          stoppedNarration = Promise.resolve(previous.pause());
+        }
+        const stops = await Promise.all([
+          stoppedNarration, stopCrawlMusic(), stopCrawlEnding()
+        ]);
+        if (epoch !== session.musicToggleEpoch) return;
+        if (!session.active || crawlSession !== session || readAudioRecovery ||
+            root?.document?.hidden) {
+          session.musicSwitching = false;
+          return;
+        }
+        if (stops.some(result => result?.stopped === false)) {
+          session.musicSwitching = false;
+          pauseReadForInterruption(); // Never call a failed switch audible success.
+          return;
+        }
+        session.musicSwitching = false;
+        if (session.musicEnabled)
+          startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
+        restart = session.pendingNarration || restart;
+        session.pendingNarration = null;
+        if (restart?.item && !restart.item.audioDone && !restart.item.vanished) {
+          restart.item.audioStarted = false;
+          playCrawlAudio(session, restart.item, restart.position);
+        }
+      }).catch(() => {
+        if (session.active && crawlSession === session &&
+            !root?.document?.hidden && !readAudioRecovery) {
+          session.musicSwitching = false;
+          pauseReadForInterruption();
+        }
+      });
+  }
+
   function renderCrawlScreen(idx, verse) {
     if (crawlSession) {
       stopCrawlSequence();
@@ -4958,6 +5062,11 @@
       (state.reducedMotion ? " is-reduced-motion" : "");
     wrap.innerHTML = `
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Verse Crawl">‹</button>
+      <button class="read-crawl-music-toggle no-zoom" type="button"
+        data-read-crawl-music-toggle data-no-ui-sound aria-pressed="true"
+        aria-label="Turn Verse Crawl music off">
+        <img src="./verse_images/game_ui/ui_icon_music_notes.png" alt="" aria-hidden="true">
+      </button>
       <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
         <header class="read-animated-header">
           <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
@@ -4977,9 +5086,18 @@
       reference: String(verse.ref || state.verseId),
       scene: wrap.querySelector(".read-animated-scene"),
       window: wrap.querySelector("[data-read-crawl-window]"),
+      musicButton: wrap.querySelector("[data-read-crawl-music-toggle]"),
+      musicEnabled: true, musicSwitching: false,
+      musicToggleEpoch: 0, musicSwitchQueue: Promise.resolve(),
+      pendingNarration: null,
       items: new Map(), timers: new Set()
     };
     crawlSession = session;
+    session.musicButton.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleCrawlMusic(session);
+    };
     attachReadRecoveryScene(session);
     let started = false;
     const start = () => {

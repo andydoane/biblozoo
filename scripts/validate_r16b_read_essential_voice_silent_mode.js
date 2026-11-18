@@ -127,6 +127,7 @@ async function run(){
   const ctx={
     root:{BibloZooNativeReadOutputController:{enabled:true}},
     state:{activityId:"balloons"},VERSE_CRAWL_ACTIVITY_ID:"star_wars",
+    crawlSession:null,crawlMusic:null,crawlEnding:null,
     readDeferredNarrationFinish:null,readAudioStartPromise:null,
     activeAudio:null,completionReported:false,
     readNarrationBlocked:()=>false,pauseReadForInterruption(){},
@@ -139,8 +140,14 @@ async function run(){
   assert.equal(marked,1);
   ctx.state.activityId="star_wars";
   await ctx.beginReadNarration(fake);
-  assert.equal(marked,1,"Crawl must remain explicitly excluded");
-  assert.equal(played,2);
+  assert.equal(marked,1,"Crawl with music must remain excluded");
+  ctx.crawlSession={active:true,musicEnabled:false};
+  await ctx.beginReadNarration(fake);
+  assert.equal(marked,2,"Only music-free Crawl may lease spoken voice");
+  ctx.crawlMusic={audio:{}}; // An overlapping soundtrack still fails closed.
+  await ctx.beginReadNarration(fake);
+  assert.equal(marked,2,"Never mark Crawl voice while theme is live");
+  assert.equal(played,4);
   await controller.stopAll();
   assert.equal(calls.some(x=>x.kind==="stopAll"),true);
   console.log("R16b Read essential voice: PASS (source + native adapter VM; hardware pending)");
