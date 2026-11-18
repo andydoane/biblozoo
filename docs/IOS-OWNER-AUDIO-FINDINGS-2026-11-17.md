@@ -1,5 +1,12 @@
 # iPhone owner audio and gameplay acceptance findings — 2026-11-17
 
+## CURRENT R15 / AUDIO-01 — Silent Mode product decision, owner selection pending (2026-11-18)
+
+**R14 / `PRACTICE-01` owner report:** [PR #144](https://github.com/andydoane/biblozoo/pull/144) has merged into `integration/native-audio-to-ios-prep` at `30ff939d700ad7a49fb030ed1e8715c40b9c0af7`. The owner confirms the post-merge Traffic Tap bonus-truck test worked and asks that it be marked **CLOSED / PHYSICAL IPHONE PASS**. Original observation below stays as historical reproduction evidence. No precise installed iOS/SHA or exhaustive optional mode matrix was supplied.
+
+**R15 decision brief:** [docs/R15-IOS-SILENT-MODE-AUDIO-POLICY.md](R15-IOS-SILENT-MODE-AUDIO-POLICY.md) evaluates **A** current `.soloAmbient` plus “Can't hear?” help, **B** essential child-initiated spoken/learning sound audible in Silent Mode (**proposal, not approved**), **C** carefully scoped hybrid. Need explicit owner choice and whether important game correctness cues must be audible. R15 is documentation-only: `AUDIO-01` is **NOT FIXED / owner policy NOT YET SELECTED**; there is **no new physical iPhone behavior to test** until conditional R16. Retain the owner's no-Home-master-mute preference, preserve single owner-initiated session activation and microphone/external media behavior, and do not claim hardware Silent switch detection. Separate production 10-profile and Audio Test 11-profile datasets remain private and noninterchangeable.
+
+
 > **Status: ORIGINAL OWNER FINDINGS WITH LATER OWNER-VERIFIED FIXES; CURRENT ISSUE STATUS IS BELOW.** This is an issue inventory from the owner's extensive physical-iPhone checklist, **not** a fix, feature roadmap, claim of regression cause, or proof of iOS acceptance. The owner reported **only problems**, stating that other attempted checklist items appeared to work. Therefore, unlisted areas may be recorded as *owner reported no problem*, **not** as independently verified PASS or as proof every optional interruption/device combination was attempted. Preserve the original descriptions and any uncertainty below when triaging.
 
 ## CURRENT R14 / PRACTICE-01 — Traffic Tap bonus-truck pacing ([PR #144](https://github.com/andydoane/biblozoo/pull/144))
