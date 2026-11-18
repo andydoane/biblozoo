@@ -1,5 +1,8 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
 ## CURRENT R16b / AUDIO-01 — owner device gate for isolated Read speech (2026-11-18)
 
 **Baseline:** R16a.2 PR #148 is **merged + owner iPhone PASS** for Chunks/Echo Menu; CI passed. Owner's earlier Silent Mode speaker test: narration/Flashcards voice audible, Home/Verse Scramble effects quiet; AirPods effect output observed with `SoloAmbient`, not app playback leakage.
