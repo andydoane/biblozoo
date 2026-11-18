@@ -22,6 +22,14 @@ enum BibloZooIOSIdentity {
 enum BibloZooEssentialVoiceSession {
     private static var owner: String?
 
+    // Read-only owner proof for the optional-effect fail-closed path.
+    // A denied button pop is not a genuine interruption while this exact
+    // foreground narration lease owns .playback. Never inspect Silent switch.
+    static func isActive(owner requested: String) -> Bool {
+        return Thread.isMainThread && owner == requested &&
+            AVAudioSession.sharedInstance().category == .playback
+    }
+
     static func begin(owner requested: String) -> Bool {
         guard Thread.isMainThread,
               UIApplication.shared.applicationState == .active else { return false }
