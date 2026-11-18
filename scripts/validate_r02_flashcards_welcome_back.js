@@ -196,10 +196,20 @@ function instructionFixture() {
   }
 
   const f=flashcardsFixture();
+  assert.match(f.difficultyUI(),/Listen to the Verse/);
   const p=f.hooks.toggleVersePreview();
   assert.equal(f.hooks.playing(),true);
+  assert.match(f.difficultyUI(),/Stop Listening/);
+  const beforeInterruptionRender=f.renders;
   f.triggerVerseInterruption();
   await p;
+  assert.equal(f.hooks.playing(),false,"Interrupt clears Listen state");
+  assert(f.renders>beforeInterruptionRender,
+    "Interrupted Listen must repaint its button underneath Welcome Back");
+  assert.match(f.difficultyUI(),/aria-pressed="false"[\s\S]*?Listen to the Verse/,
+    "After interruption, the visible button accurately says Listen");
+  assert.doesNotMatch(f.difficultyUI(),/Stop Listening/,
+    "No stale Stop label after native interruption");
   assert.equal(f.paused,1,"Verse interruption opens shared paused state");
   assert.equal(f.prompt.pending,true);
   assert.equal(f.visible,1,"Welcome Back shown even while UIKit remains active");
@@ -207,6 +217,16 @@ function instructionFixture() {
   assert.equal(f.notices.length,0,"Canceled Listen never shows red toast");
   f.triggerNative({active:false,reason:"audio-interruption"});
   assert.equal(f.paused,1,"Duplicate native signal cannot pause twice");
+  const stoppedBeforeReplay=f.stops;
+  const replay=f.hooks.toggleVersePreview();
+  assert.match(f.difficultyUI(),/Stop Listening/,
+    "Next child Listen tap must start playback, not merely clear a stale state");
+  assert.equal(f.stops,stoppedBeforeReplay,
+    "Fresh Listen cannot be mistaken for Stop after interruption");
+  f.resolvePreview(true);
+  await replay;
+  assert.match(f.difficultyUI(),/Listen to the Verse/,
+    "Real native end restores the default Listen label");
 
   const g=flashcardsFixture();
   const q=g.hooks.toggleVersePreview();
@@ -220,13 +240,30 @@ function instructionFixture() {
   assert.equal(g.notices.length,0);
 
   const i=flashcardsFixture();
+  i.hooks.prepareIntro();
   i.hooks.instructions(); // Real render/sync instantiates the instruction owner.
   i.setInstruction("playing");
+  assert.equal(i.introUI().buttons.flashcardsSkipRecordingBtn.disabled,true,
+    "Next is disabled while instructions are audibly in progress");
   i.triggerNative({active:false,reason:"audio-interruption"});
   assert.equal(i.paused,1,"Instruction playback shows Welcome Back from Swift .began");
   assert.equal(i.notices.length,0);
-  assert.equal(i.hooks.instructions().snapshot().status,"failed",
+  assert.equal(i.hooks.instructions().snapshot().status,"interrupted",
     "Instructions cannot silently auto-restart after Welcome Back");
+  const interruptedIntro=i.introUI();
+  assert.equal(interruptedIntro.buttons.flashcardsSkipRecordingBtn.disabled,false,
+    "After native interruption, Next must be enabled without a replay");
+  assert.match(interruptedIntro.html,/>Next<\/button>/);
+  await interruptedIntro.buttons.flashcardsSkipRecordingBtn.onclick();
+  assert.equal(i.hooks.view(),"recording_intro",
+    "Explicit Next advances without replaying the interrupted explanation");
+
+  const blocked=flashcardsFixture();
+  blocked.hooks.prepareIntro();
+  blocked.hooks.instructions();
+  blocked.setInstruction("failed");
+  assert.equal(blocked.introUI().buttons.flashcardsSkipRecordingBtn.disabled,true,
+    "Actual playback failure is still locked and requires Replay Instructions");
 
   const j=flashcardsFixture();
   const fail=j.hooks.toggleVersePreview();
