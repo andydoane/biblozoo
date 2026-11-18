@@ -1,5 +1,8 @@
 # iPhone owner audio and gameplay acceptance findings — 2026-11-17
 
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
 ## CURRENT owner audio findings / R16b tracking — 2026-11-18
 
 **Owner explicitly reported R16a.2 [PR #148](https://github.com/andydoane/biblozoo/pull/148) merged and successful on iPhone:** Treat Chunks/Echo **Learn Menu → proper menu, no fake Welcome Back** as **OWNER PASS** for the reported test. Its merged SHA is `bdd7d657ee1cf723e36429f5accbee9363fb26ec` and integration CI passed. Do NOT invent an unreported exact iPhone OS version, installed SHA, AirPods route or exhaustive genuine-interruption retest.
