@@ -147,6 +147,13 @@ jobs:
       # R08: real Swift Read AVAudioPlayer scheduling helper is compiled
       # against a zeroed post-interruption device clock; never test hearing
       # or Apple SDK linkage from the Linux runner.
+      # R09 / FLASH-05: compile production Swift level estimator and
+      # real PCM copy against synthetic speech/silence/transients. No voices,
+      # output hardware, audio-session activation or Mac SDK in this test.
+      - name: Validate R09 Flashcards measured dry voice replay safety
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r09_flashcards_measured_dry_level.js
+
       - name: Validate R08 native Read cue first-note and melody spacing
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r08_read_native_cue_timing.js

@@ -346,6 +346,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var savedCaptureKey = -1 // captureWorker only
     private var savedTakeId = "" // captureWorker only, opaque RAM take token
     private var savedSampleRate = 0.0 // captureWorker only
+    // R09: read-only, bounded per-take scalar metrics. No sample leaves RAM.
+    // The original saved PCM stays identical; only the DRY playback copy may
+    // use the measured safe replay gain, never Wacky effects or capture.
+    private var savedDryReplayGain: Float = 1.0 // captureWorker only
+    private var savedRmsDbFS = -120 // captureWorker only
+    private var savedPeakDbFS = -120 // captureWorker only
     private var workerLastLevelAt: TimeInterval = 0 // captureWorker only
     private var captureLevel: Double? // main thread, 0...1 only
     private var playbackEngine: AVAudioEngine? // main thread
@@ -745,6 +751,49 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
 
+    // R09 / FLASH-05: source PCM level inspection in memory on the
+    // capture worker, NOT a system-volume or microphone gain change.
+    // Measurement mode can provide quieter raw input than Web's processed
+    // MediaRecorder. Never blindly boost silence/noise, a hot recording, or
+    // a high transient. Limit a genuinely quiet take to +5.1 dB (1.8x)
+    // AND a strict 0.84 full-scale original peak ceiling. Rounded decibel
+    // numbers are diagnostic-only; no voice bytes/identity are exposed.
+    private static func n7cDryReplayLevel(
+        _ samples: [Float]
+    ) -> (gain: Float, rmsDbFS: Int, peakDbFS: Int) {
+        guard samples.count >= 256 else { return (1, -120, -120) }
+        var sumSquares = 0.0
+        var activeSquares = 0.0
+        var activeFrames = 0
+        var peak = 0.0
+        for sample in samples {
+            guard sample.isFinite else { return (1, -120, -120) }
+            let absolute = abs(Double(sample))
+            peak = max(peak, absolute)
+            sumSquares += absolute * absolute
+            if absolute >= 0.012 {
+                activeSquares += absolute * absolute
+                activeFrames += 1
+            }
+        }
+        let rms = sqrt(sumSquares / Double(samples.count))
+        let rmsDbFS = Int(max(-120.0,
+            min(0.0, (20.0 * log10(max(0.000001, rms))).rounded())))
+        let peakDbFS = Int(max(-120.0,
+            min(0.0, (20.0 * log10(max(0.000001, peak))).rounded())))
+        guard peak >= 0.035 && peak < 0.84,
+              activeFrames >= max(256, samples.count / 200) else {
+            return (1, rmsDbFS, peakDbFS)
+        }
+        let activeRms = sqrt(activeSquares / Double(activeFrames))
+        guard activeRms < 0.085 else {
+            return (1, rmsDbFS, peakDbFS)
+        }
+        let gain = min(1.8, 0.085 / max(0.000001, activeRms),
+                       0.84 / peak)
+        return (Float(max(1.0, gain)), rmsDbFS, peakDbFS)
+    }
+
     // N7c captures *only* on the child's Flashcards Record gesture.
     // Permission was requested by that gesture through requestPermission,
     // and the output owner's devPrepareForMicrophone barrier already
@@ -788,6 +837,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.savedCaptureKey = -1
                 self.savedTakeId = ""
                 self.savedSampleRate = 0
+                self.savedDryReplayGain = 1.0
+                self.savedRmsDbFS = -120
+                self.savedPeakDbFS = -120
                 self.workerLastLevelAt = 0
             }
             // If activation fails (e.g. phone call), the capture teardown
@@ -991,6 +1043,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                        rate >= 8000 && restoreOK
             if keep {
                 self.savedSamples = self.captureSamples
+                let levels = Self.n7cDryReplayLevel(self.savedSamples)
+                self.savedDryReplayGain = levels.gain
+                self.savedRmsDbFS = levels.rmsDbFS
+                self.savedPeakDbFS = levels.peakDbFS
                 self.savedCaptureKey = token
                 self.savedTakeId = savedId
                 self.savedSampleRate = rate
@@ -999,6 +1055,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.savedCaptureKey = -1
                 self.savedTakeId = ""
                 self.savedSampleRate = 0
+                self.savedDryReplayGain = 1.0
+                self.savedRmsDbFS = -120
+                self.savedPeakDbFS = -120
             }
             self.captureSamples.removeAll(keepingCapacity: false)
             self.workerCaptureKey = -1
@@ -1091,6 +1150,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 self.savedCaptureKey = -1
                 self.savedTakeId = ""
                 self.savedSampleRate = 0
+                self.savedDryReplayGain = 1.0
+                self.savedRmsDbFS = -120
+                self.savedPeakDbFS = -120
                 DispatchQueue.main.async {
                     call.resolve(["discarded": true])
                 }
@@ -1114,6 +1176,12 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         "recording": self.captureRunning,
                         "hasTake": frames >= 256,
                         "frameCount": frames,
+                        // Coarse numeric sound levels, available only in
+                        // this existing read-only native diagnostic method.
+                        // No PCM, voice file, profile ID or upload.
+                        "rmsDbFS": self.savedRmsDbFS,
+                        "peakDbFS": self.savedPeakDbFS,
+                        "dryReplayGain": Double(self.savedDryReplayGain),
                         "level": self.captureLevel ?? 0,
                         "playing": self.playbackEngine != nil,
                         "restored": self.captureRestoreOK,
@@ -1506,7 +1574,17 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.savedSamples.withUnsafeBufferPointer { source in
                     guard let base = source.baseAddress else { return }
-                    samplesOut[0].update(from: base, count: source.count)
+                    // Bounded R09 correction ONLY for explicit Play My
+                    // Recording. Copy-on-play; saved RAM take is untouched,
+                    // and all Wacky DSP variants still receive original PCM.
+                    if effectId.isEmpty && self.savedDryReplayGain > 1.0 {
+                        for i in 0..<source.count {
+                            let amplified = base[i] * self.savedDryReplayGain
+                            samplesOut[0][i] = max(-0.84, min(0.84, amplified))
+                        }
+                    } else {
+                        samplesOut[0].update(from: base, count: source.count)
+                    }
                 }
                 buffer.frameLength = AVAudioFrameCount(totalFrames)
                 let voiceSeconds = Double(self.savedSamples.count) /
