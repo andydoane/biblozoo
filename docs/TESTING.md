@@ -1,6 +1,17 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT R16a.2 / AUDIO-01 — Learn Chunks/Echo Menu false Welcome Back fix proposed (2026-11-18)
+## CURRENT R16b / AUDIO-01 — owner device gate for isolated Read speech (2026-11-18)
+
+**Baseline:** R16a.2 PR #148 is **merged + owner iPhone PASS** for Chunks/Echo Menu; CI passed. Owner's earlier Silent Mode speaker test: narration/Flashcards voice audible, Home/Verse Scramble effects quiet; AirPods effect output observed with `SoloAmbient`, not app playback leakage.
+
+**R16b candidate `fix/r16b-read-verse-voice-silent-mode-safe-scope` / NOT TESTED:** Source-approved Read My Verse verse narration outside Verse Crawl receives an owner-limited short `.playback` lease. Typewriter/Keyboard, Tap Order/Unscramble/Chunk Sequence, Balloons/Fish get essential voice; optional Read cues/soundtrack/UI still `.soloAmbient`. No active clips/scheduled notes may overlap category lease; stop/end/failure/OS release. **Verse Crawl remains mixed `.soloAmbient` and is NOT a passing Silent-ON voice case for this PR.** Its original normal-mode soundtrack overlap must not regress.
+
+**Automation:** `node scripts/validate_r16b_read_essential_voice_silent_mode.js` + all existing N7f/N7g/N7m/R08/R10 Read, R16a/R16a.2, N7j Learn menu, N7k and native-only source checks, Linux Swift parse and web build. Assert PASS only after the workflow finishes for **exact proposed SHA**. These do NOT prove Xcode SDK compile/physical acoustic output.
+
+**Owner iPhone check after CI+review/merge:** Silent ON **phone speaker**: Read Typewriter/Keyboard and one Balloons or Fish spoken chunk audible, optional key/score sounds quiet. One Tap Order/Chunk Sequence speech tap if convenient. Silent OFF: same speech still works, normal feedback still works. Verify **Verse Crawl** normal Silent-OFF voice/music overlap and Silent-ON theme quiet on speaker; don't falsely claim Crawl voice solved. Interrupt while Read voice plays by locking/holding App Switcher: actual Welcome Back gate, no auto-resume/score or zombie sound. Spot-check Read Exit, Learn Menu and Flashcards replay; verify AirPods route only if comfortable. Mark each test PASS/FAIL/NOT TESTED and provide exact SHA/bundle/speaker vs AirPods/Silent position. Do NOT expose child voice/profile IDs/backups. See [full R16b acceptance matrix](R16B-READ-SILENT-MODE-VOICE-BOUNDARY.md).
+
+
+## HISTORICAL R16a.2 proposal before merge/device testing / AUDIO-01 — Learn Chunks/Echo Menu false Welcome Back fix proposed (2026-11-18)
 
 **Owner iPhone evidence and separate issues:** On physical iPhone with Silent ON and **speaker** output, owner reports **narration audible / Home UI pops and Verse Scramble effects quiet — PASS for tested Option B acoustic distinction**. With **AirPods**, all those native optional effects remain audible although debug logs show `AVAudioSessionCategorySoloAmbient` with `BluetoothA2DPOutput`. This is **route-dependent behavior** observed on the device, NOT a stale voice `.playback` lease; do **not** force special Bluetooth muting or claim native Silent-switch detection. Apple’s audio guidance emphasizes the user's choice of output/headphones and silencing nonessential audio; use normal OS category behavior rather than speculative workaround. Flashcards including recorded-voice playback still works in Silent Mode, as owner confirmed. [R16a.1 diagnostic PR #147](https://github.com/andydoane/biblozoo/pull/147) is merged.
 
