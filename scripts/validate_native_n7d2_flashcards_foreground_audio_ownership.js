@@ -61,7 +61,7 @@ assert(prepare.includes("self.ownsFlashcardsForegroundAudio = true") &&
   prepare.includes("self.capturePrepared = true"),
   "Record only claims priority AFTER successful OS activation, with rollback");
 assert(play.includes("self.ownsFlashcardsForegroundAudio = true") &&
-  play.indexOf("try AVAudioSession.sharedInstance().setActive(true)") <
+  play.indexOf("try session.setActive(true)") <
   play.indexOf("self.ownsFlashcardsForegroundAudio = true"),
   "Recorded-voice Play must claim priority only after a real user-tap activation");
 assert(stop.includes('reason == "stopped-by-user"') &&
