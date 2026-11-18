@@ -1645,10 +1645,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         }
                         // AirPods removal may finish while the graph is
                         // assembled. Never auto-replay or claim heard audio.
+                        let currentPorts = session.currentRoute.outputs
+                            .map { $0.portType.rawValue }.sorted()
                         guard self.playbackRouteEpoch == routeEpoch,
-                              session.currentRoute.outputs.map {
-                                  $0.portType.rawValue
-                              }.sorted() == outputPorts else {
+                              currentPorts == outputPorts else {
                             self.stopPlaybackInternal(reason: "route-changed",
                                                       notify: false)
                             call.resolve(["started": false,
