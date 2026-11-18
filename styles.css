@@ -4780,6 +4780,17 @@ Game Mix Loading Screen
   overflow: hidden;
 }
 
+/* R04: iOS's held App Switcher can leave WKWebView visible while UIKit is
+   inactive. The native Learn owner applies this only while its existing
+   Welcome Back controller is paused. Freeze keyframe/loop visuals in the
+   still-visible app thumbnail; the saved WAAPI animations cover an active
+   CSS transition and resume only after the child's Let's go! tap. */
+.learn-hide-native-paused .learn-screen-remove *,
+.learn-hide-native-paused .learn-screen-remove *::before,
+.learn-hide-native-paused .learn-screen-remove *::after {
+  animation-play-state: paused !important;
+}
+
 .learn-hide-transition-card.is-transitioning-out .smart-learn-text-remove {
   animation: learnHideVerseFadeOut 180ms ease-in both;
 }
