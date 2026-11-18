@@ -229,8 +229,10 @@
   padding: clamp(12px, 3vw, 28px);
   color: #30271f;
   font-family: "Special Elite", Georgia, serif;
-  /* Use the exact font size computed for the verse, not an intro clamp. */
-  font-size: var(--typewriter-intro-font-size, 40px);
+  /* R12b: independently fit the fixed two-line instruction to the
+     visible intro box, never to the variable length of the Bible verse.
+     The fallback is responsive until the first layout/font measurement. */
+  font-size: var(--typewriter-intro-font-size, clamp(24px, 8vw, 56px));
   line-height: 1.16;
   text-align: center;
   pointer-events: none;
@@ -248,14 +250,22 @@
   text-align: center;
 }
 
-.read-typewriter-intro-guide,
-.read-typewriter-intro-untyped {
+.read-typewriter-intro-guide {
+  display: block; /* invisible full-size two-line measuring reference */
   visibility: hidden;
 }
+.read-typewriter-intro-untyped {
+  visibility: hidden; /* typed letters occupy their final positions */
+}
 
-/* Keep "the verse." together if the phrase occupies two lines. */
+/* R12b: both complete lines have fixed breaks, with no browser rewrap.
+   A 12-character first line cannot turn into "Tap to" / "type" when
+   Acts 5:29 or another long verse changes the verse's fitted font. */
+.read-typewriter-intro-head,
 .read-typewriter-intro-tail {
-  white-space: nowrap;
+  display: block;
+  width: max-content;
+  white-space: pre;
 }
 
 .read-typewriter-intro-text {
