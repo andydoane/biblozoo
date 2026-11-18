@@ -110,6 +110,7 @@ function harness() {
     },
     restoreGhostPlaybackFromBackground(){throw Error("retry unexpectedly lost mode action");},
     stopPlayback(){},clearGuideTimer(){},
+    helpHtml(){return "<p>Draw the verse</p>";},
     app:{classList:{add(){}},innerHTML:""},
     shell(){return {renderModeSelect(opts){modeOptions=opts;}};},
     playUiTapSound(){calls.ui++;},
@@ -124,6 +125,9 @@ function harness() {
     "let nativeGhostRetryLabel = 'start';",
     "const NATIVE_PREPARING_DEFER_MS = 350;",
     "let uiSoundFlip=false;",
+    "const GAME_ICON='👻', GAME_ICON_HTML='', GAME_THEME={};",
+    "const HELP_OVERLAY_ID='ghost-help';",
+    "const MODES=[{id:'beginner',label:'Beginner'},{id:'advanced',label:'Advanced'}];",
     "const state={screen:'intro'};"
   ].join("\n");
   vm.runInNewContext(prefix + "\n" + dialogs + "\n" + mode +
