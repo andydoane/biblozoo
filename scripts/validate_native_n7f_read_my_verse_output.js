@@ -98,8 +98,14 @@ has(plug,"private func wavData(midi: Int, seconds: Double, gain: Double,",
     "Fixed native-RAM synthesized activity feedback");
 has(plug,'["order", "scramble", "negative"].contains(kind)',
     "No caller arbitrary oscillator frequency or uploaded sound");
-has(plug,"player.play(atTime: player.deviceCurrentTime + delay)",
-    "Short fixed note delays are driven by native player clock");
+has(plug,"private func playPreparedReadCueNotes(",
+    "Read cues use the shared prepared native-player scheduling owner");
+has(plug,"guard first.player.play() else",
+    "First note plays immediately, not at an invalid zero-clock timestamp");
+has(plug,"let anchorTime = first.player.deviceCurrentTime",
+    "Subsequent fixed notes share a single running device clock");
+has(plug,"note.player.play(atTime: anchorTime + note.delay)",
+    "Melody offsets use the same audio device timestamp");
 assert(!/getUserMedia\(|MediaRecorder\(|requestPermission\(/.test(plug),
     "N7f is output ONLY, never microphone input");
 const activeSwift = plug.replace(/\/\/[^\n]*/g, "");

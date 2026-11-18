@@ -2127,6 +2127,37 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         }
         return data
     }
+    // R08 / READ-05+06: play(atTime:) requires a STRICTLY FUTURE device
+    // clock. After Apple Music/AirPods interruption and a quiet interval,
+    // deviceCurrentTime can be zero; scheduling the first note at exactly
+    // deviceCurrentTime + 0 risks losing the tap. Start its prepared player
+    // immediately, then anchor every later note to THAT running device clock
+    // (not to separate clocks read while constructing each WAV/player).
+    // Scheduled future notes must remain strongly held until delegate end
+    // or explicit interruption/Exit/stopCues; isPlaying can be false before
+    // the future start and is not a safe pruning test.
+    private func playPreparedReadCueNotes(
+        _ prepared: [(player: AVAudioPlayer, delay: Double)]
+    ) -> Int {
+        guard let first = prepared.first else { return 0 }
+        guard first.player.play() else {
+            prepared.forEach { $0.player.stop() }
+            return 0
+        }
+        cues.append(first.player)
+        let anchorTime = first.player.deviceCurrentTime
+        var started = 1
+        for note in prepared.dropFirst() {
+            if note.player.play(atTime: anchorTime + note.delay) {
+                cues.append(note.player)
+                started += 1
+            } else {
+                note.player.stop()
+            }
+        }
+        return started
+    }
+
     @objc func playCue(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self, self.isNativeAppBundle,
@@ -2166,24 +2197,30 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 gain = 0.22; duration = complete ? 0.2 : 0.17
                 square = false
             }
-            self.cues.removeAll(where: { !$0.isPlaying })
-            while self.cues.count + notes.count > 12 && !self.cues.isEmpty {
-                self.cues.removeFirst().stop()
-            }
-            var scheduled = 0
+            // Prepare the WHOLE fixed melody first: sample decoding cannot
+            // consume the 90/100ms note spacing after the first audible tap.
+            var prepared: [(player: AVAudioPlayer, delay: Double)] = []
             for (midi, delay) in notes {
                 guard let player = try? AVAudioPlayer(
                     data: self.wavData(midi: midi, seconds: duration,
-                                       gain: gain, square: square)) else {
-                    continue
+                                       gain: gain, square: square)),
+                    player.prepareToPlay() else {
+                    prepared.forEach { $0.player.stop() }
+                    call.resolve(["played": false,
+                                  "reason": "cue-prepare-failed",
+                                  "noteCount": 0])
+                    return
                 }
                 player.delegate = self
-                player.prepareToPlay()
-                if player.play(atTime: player.deviceCurrentTime + delay) {
-                    self.cues.append(player)
-                    scheduled += 1
-                }
+                prepared.append((player: player, delay: delay))
             }
+            // The delegate removes completed voices. Do not prune future
+            // scheduled notes using isPlaying (not yet audible != stale).
+            while self.cues.count + prepared.count > 12 &&
+                  !self.cues.isEmpty {
+                self.cues.removeFirst().stop()
+            }
+            let scheduled = self.playPreparedReadCueNotes(prepared)
             call.resolve(["played": scheduled == notes.count,
                           "noteCount": scheduled])
         }
@@ -2233,19 +2270,26 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             // audition. The child-facing playCue() behavior is untouched.
             self.cues.forEach { $0.stop() }
             self.cues.removeAll()
-            var count = 0
+            // Keep DEV waveform comparisons on the identical reliable
+            // native cue timing path; otherwise a zero-clock first note could
+            // invalidate later READ-04 level/timbre comparisons.
+            var prepared: [(player: AVAudioPlayer, delay: Double)] = []
             for (midi, delay) in notes {
                 guard let player = try? AVAudioPlayer(
                     data: self.wavData(midi: midi, seconds: duration,
                                        gain: 0.22, square: false,
-                                       waveform: waveform)) else { continue }
-                player.delegate = self
-                player.prepareToPlay()
-                if player.play(atTime: player.deviceCurrentTime + delay) {
-                    self.cues.append(player)
-                    count += 1
+                                       waveform: waveform)),
+                    player.prepareToPlay() else {
+                    prepared.forEach { $0.player.stop() }
+                    call.resolve(["played": false,
+                                  "reason": "cue-prepare-failed",
+                                  "noteCount": 0])
+                    return
                 }
+                player.delegate = self
+                prepared.append((player: player, delay: delay))
             }
+            let count = self.playPreparedReadCueNotes(prepared)
             call.resolve(["played": count == notes.count,
                           "noteCount": count])
         }
