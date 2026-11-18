@@ -2423,13 +2423,22 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     // OS interruption/Welcome Back. Do NOT ignore a real UIKit/OS reset,
     // interruption or media takeover; the usual forgetPlayback path owns those.
     private func optionalEffectDeniedByActiveNarration(_ reason: String) -> Bool {
+        // Read's source-approved, music-free spoken verse now has its own
+        // lease owner. UI pops must never turn an optional category refusal
+        // into a destructive interruption of that essential Read voice.
+        let nativeNarration =
+            BibloZooEssentialVoiceSession.isActive(owner: "native-narration") &&
+            narrationPlayer?.isPlaying == true
+        let readNarration =
+            BibloZooEssentialVoiceSession.isActive(owner: "read-narration")
         guard reason == "category-not-soloambient",
-              BibloZooEssentialVoiceSession.isActive(owner: "native-narration"),
+              nativeNarration || readNarration,
               UIApplication.shared.applicationState == .active,
               !wasOutsideForeground, !interrupted,
               !needsGestureAfterInterruption, !needsGestureAfterReset,
-              !AVAudioSession.sharedInstance().isOtherAudioPlaying,
-              narrationPlayer?.isPlaying == true else { return false }
+              !AVAudioSession.sharedInstance().isOtherAudioPlaying else {
+            return false
+        }
         return true
     }
 
