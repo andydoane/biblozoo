@@ -65,7 +65,7 @@ has(flashPlay, "session.category == .soloAmbient", "Flashcards replay must start
 has(flashPlay, "try session.setActive(true)", "only a real replay request activates OS audio");
 has(flashPlay, "BibloZooEssentialVoiceSession.begin(", "Flashcards must lease after output activation");
 has(flashPlay, 'owner: "flashcards-replay"', "Flashcards lease is separately owned");
-has(flashPlay, 'reason: "voice-session-unavailable"', "failed lease must abort safely");
+has(flashPlay, '"reason": "voice-session-unavailable"', "failed lease must abort safely");
 has(flashPlay, "session.category == .playback", "fresh output graph must match voice category");
 const replayStop = block(scene, "private func stopPlaybackInternal(", "@objc func stopCapturePlayback(");
 has(replayStop, 'BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")', "replay finish/stop/interrupt must restore");
