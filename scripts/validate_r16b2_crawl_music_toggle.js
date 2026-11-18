@@ -105,7 +105,7 @@ async function run(){
     startCrawlMusic(){webEvents.push("start");},
     playCrawlAudio(){throw Error("web toggle must not restart the verse");}
   };
-  vm.runInNewContext(toggleSource+"\\nthis.toggleCrawlMusic=toggleCrawlMusic;",web);
+  vm.runInNewContext(toggleSource+"\nthis.toggleCrawlMusic=toggleCrawlMusic;",web);
   web.toggleCrawlMusic(webSession);
   assert.deepEqual(webEvents,["stop","ending"]);
   web.toggleCrawlMusic(webSession);
