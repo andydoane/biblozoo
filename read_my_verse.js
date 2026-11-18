@@ -3546,7 +3546,10 @@
     if (state.phase !== "pause") return;
     clearReadChunkNarrationWatchdog();
 
-    // Let the completion alert finish while spoken chunk audio begins.
+    // Preserve the original short completion-alert overlap on Web/PWA/
+    // Android. On native iOS only, R16b.1 preempts a transient key/alert
+    // player BEFORE the spoken verse leases the shared .playback category.
+    // Never let an optional alert veto narration or follow it into Silent ON.
     stopKeySoundVoices({ keepChunkAlert: true });
     stopScrambleRewards();
     if (negativeFeedbackAudio) {

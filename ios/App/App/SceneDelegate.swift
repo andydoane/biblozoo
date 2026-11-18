@@ -1966,6 +1966,9 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         CAPPluginMethod(name: "stopCues", returnType: CAPPluginReturnPromise)
     ]
     private var clips: [String: AVAudioPlayer] = [:]
+    // R16b.1: retain the fixed, validated source key for each active Read
+    // player. Only short typing samples may be displaced by spoken verse.
+    private var clipSources: [String: String] = [:]
     private var cues: [AVAudioPlayer] = []
     private var watches: [NSObjectProtocol] = []
     private var progressTimer: Timer?
@@ -1980,6 +1983,43 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
               id == nil || id == current else { return }
         essentialVoiceClipId = nil
         BibloZooEssentialVoiceSession.end(owner: "read-narration")
+    }
+
+    // R16b.1: Typewriter/Keyboard intentionally fire a final short key
+    // alert just before a child-authorized spoken verse. They are optional,
+    // and unlike Crawl music/Zoo/verse speech, may be stopped to make room
+    // for that essential narrator without borrowing its .playback category.
+    private func isTransientTypingEffect(_ key: String) -> Bool {
+        if key == "typewriter-alert" || key == "keyboard-alert" {
+            return true
+        }
+        let prefix: String
+        let maximum: Int
+        if key.hasPrefix("typewriter-") {
+            prefix = "typewriter-"; maximum = 3
+        } else if key.hasPrefix("keyboard-") {
+            prefix = "keyboard-"; maximum = 7
+        } else {
+            return false
+        }
+        guard let number = Int(key.dropFirst(prefix.count)) else {
+            return false
+        }
+        return (1...maximum).contains(number)
+    }
+
+    // Call only after proving ALL active Read clips are transient typing
+    // samples and NO cues/other voice are active. An "interrupted" event
+    // lets the adapter retire an optional clip; it is NOT an app lifecycle
+    // interruption and must never invent a spoken-verse ended event.
+    private func stopTransientTypingEffectsForVoice() {
+        for (id, player) in clips {
+            player.stop()
+            emit("interrupted", id: id, player: player,
+                 reason: "superseded-by-spoken-verse")
+        }
+        clips.removeAll()
+        clipSources.removeAll()
     }
 
     private var isDevBundle: Bool {
@@ -2168,6 +2208,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             }
         }
         clips.removeAll()
+        clipSources.removeAll()
         cues.forEach { $0.stop() }
         cues.removeAll()
         releaseEssentialVoice()
@@ -2200,8 +2241,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                   UIApplication.shared.applicationState == .active,
                   self.ownedByReadGesture,
                   let id = call.getString("requestId"), id.count > 0,
-                  id.count <= 64, self.clips.count < 8 ||
-                  self.clips[id] != nil else {
+                  id.count <= 64 else {
                 call.resolve(["started": false, "reason": "not-ready"])
                 return
             }
@@ -2218,18 +2258,30 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                                  call.getBool("essentialVoice") == true
             let category = AVAudioSession.sharedInstance().category
             if essentialVoice {
-                // AVAudioSession is app-wide. No soundtrack, scheduled cue,
-                // previous voice or miscellaneous clip may leak when the
-                // short-lived voice category starts. Fail explicitly rather
-                // than silently dropping the soundtrack or faking an ended.
+                // The session category is shared by every Read clip.
+                // A last Typewriter/Keyboard key alert may still own a
+                // nonvoice player when narration starts. ONLY these
+                // fixed-key transient samples may be displaced; NEVER
+                // soundtrack, Zoo cue, another verse, or generated notes.
                 guard category == .soloAmbient,
                       self.essentialVoiceClipId == nil,
-                      self.clips.isEmpty, self.cues.isEmpty else {
+                      self.cues.isEmpty,
+                      self.clips.keys.allSatisfy({
+                          guard let source = self.clipSources[$0] else {
+                              return false
+                          }
+                          return self.isTransientTypingEffect(source)
+                      }) else {
                     call.resolve(["started": false,
                                   "reason": "voice-overlap-unsafe"])
                     return
                 }
             } else {
+                // Preserve the original bounded optional-effects pool.
+                guard self.clips.count < 8 || self.clips[id] != nil else {
+                    call.resolve(["started": false, "reason": "not-ready"])
+                    return
+                }
                 // Music, UI effects, typing taps, Crawl and the zoo cue
                 // ALWAYS stay within the Silent-switch-respecting category.
                 guard category == .soloAmbient else {
@@ -2240,6 +2292,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             }
             self.clips[id]?.stop()
             self.clips[id] = nil
+            self.clipSources.removeValue(forKey: id)
             do {
                 let player = try AVAudioPlayer(contentsOf: url)
                 player.delegate = self
@@ -2256,6 +2309,10 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                                              max(0, seekMs / 1000))
                 }
                 if essentialVoice {
+                    // The preflight above proved these are ONLY transient
+                    // typing sounds. Stop them BEFORE .playback, otherwise
+                    // a short optional alert would be audible with Silent ON.
+                    self.stopTransientTypingEffectsForVoice()
                     guard BibloZooEssentialVoiceSession.begin(
                         owner: "read-narration") else {
                         call.resolve(["started": false,
@@ -2270,6 +2327,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                     return
                 }
                 self.clips[id] = player
+                self.clipSources[id] = key
                 self.armProgress()
                 self.emit("started", id: id, player: player)
                 call.resolve(["started": true,
@@ -2284,10 +2342,12 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     @objc func stopClip(_ call: CAPPluginCall) {
         onMain { [weak self] in
             guard let self = self else { call.resolve(["stopped":false]); return }
-            if let id = call.getString("requestId"),
-               let player = self.clips.removeValue(forKey: id) {
-                player.stop()
-                self.releaseEssentialVoice(for: id)
+            if let id = call.getString("requestId") {
+                if let player = self.clips.removeValue(forKey: id) {
+                    player.stop()
+                    self.releaseEssentialVoice(for: id)
+                }
+                self.clipSources.removeValue(forKey: id)
             }
             call.resolve(["stopped": true])
         }
@@ -2320,6 +2380,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 self.emit(flag ? "ended" : "interrupted", id: id,
                           player: player, reason: flag ? "" : "player-failed")
                 self.clips.removeValue(forKey: id)
+                self.clipSources.removeValue(forKey: id)
                 self.releaseEssentialVoice(for: id)
             } else {
                 self.cues.removeAll(where: { $0 === player })
