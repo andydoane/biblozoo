@@ -757,6 +757,11 @@
   let nativeGhostPendingAction = null;
   let nativeGhostPreflightGeneration = 0;
   let nativeGhostPreflightPending = false;
+  let nativeGhostPreparingTimer = 0;
+  // R13 / PLAY-02: a fast native bank preparation should never flash a
+  // full-screen loading popup for a single iPhone frame. Truly slow work
+  // retains the original child-readable preparation and Back controls.
+  const NATIVE_PREPARING_DEFER_MS = 350;
   let nativeGhostRetryLabel = "start";
   let audioContext = null;
   let audioUnlocked = false;
@@ -1434,9 +1439,26 @@
     uiSoundFlip = !uiSoundFlip;
     return key;
   }
-  function clearNativeGhostDialogs() {
+  function clearNativeGhostPreparing() {
+    clearTimeout(nativeGhostPreparingTimer);
+    nativeGhostPreparingTimer = 0;
     document.getElementById("ghostNativePreparing")?.remove();
+  }
+  function clearNativeGhostDialogs() {
+    clearNativeGhostPreparing();
     document.getElementById("ghostNativeAudioFailure")?.remove();
+  }
+  function deferNativeGhostPreparing(token) {
+    // No modal on a quick success. Once the operation remains pending for a
+    // meaningful interval, show the original progress dialog, not a silent
+    // hang. Fence old taps, UIKit inactive and hidden WebKit before painting.
+    clearNativeGhostPreparing();
+    nativeGhostPreparingTimer = setTimeout(() => {
+      nativeGhostPreparingTimer = 0;
+      if (token !== nativeGhostPreflightGeneration ||
+          !nativeGhostPreflightPending || document.hidden) return;
+      showNativeGhostPreparing();
+    }, NATIVE_PREPARING_DEFER_MS);
   }
   function showNativeGhostPreparing() {
     if (!nativeGhostAudio || document.hidden) return;
@@ -1459,6 +1481,7 @@
       nativeGhostPreflightGeneration++;
       nativeGhostPreflightPending = false;
       nativeGhostPendingAction = null;
+      clearNativeGhostDialogs();
       void nativeGhostAudio.stop();
       bridge().exitGame?.();
     });
@@ -1518,11 +1541,16 @@
     };
     // Synchronous gesture activation occurs inside prepareFromGesture.
     const preparation = nativeGhostAudio.prepareFromGesture(uiTap);
-    showNativeGhostPreparing();
+    // The action remains owned by this real mode/replay tap. Keep the
+    // selector on-screen for fast preflight, rather than painting a modal
+    // that disappears a fraction of a second later. A delayed failure still
+    // displays the original explicit retry/error UI.
+    clearNativeGhostDialogs();
+    deferNativeGhostPreparing(token);
     void Promise.resolve(preparation).then(result => {
       if (token !== nativeGhostPreflightGeneration || document.hidden) return;
       nativeGhostPreflightPending = false;
-      document.getElementById("ghostNativePreparing")?.remove();
+      clearNativeGhostPreparing();
       if (result?.ready === true && nativeGhostAudio.isReady()) {
         clearNativeGhostDialogs();
         nativeGhostPendingAction = null;
@@ -1545,7 +1573,7 @@
     nativeGhostAudio.configure({
       onAppInactive: () => {
         pauseGhostPlaybackForBackground();
-        document.getElementById("ghostNativePreparing")?.remove();
+        clearNativeGhostPreparing();
         playgroundWelcome?.pauseFromNativeInactive?.();
       },
       onAppActive: () => {
@@ -1609,6 +1637,16 @@
       theme: GAME_THEME,
       modes: MODES,
       onBack: () => {
+        // The unobscured mode selector stays usable during the first 350ms
+        // of a native preflight. A real Back tap MUST fence the pending
+        // promise; it may never open Training after leaving Mode Select.
+        if (nativeGhostPreflightPending) {
+          nativeGhostPreflightGeneration++;
+          nativeGhostPreflightPending = false;
+          nativeGhostPendingAction = null;
+          clearNativeGhostDialogs();
+          void nativeGhostAudio?.stop();
+        }
         playUiTapSound();
         renderIntro();
       },
