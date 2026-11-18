@@ -36,7 +36,10 @@ assert.match(play, /key\.hasPrefix\("verse:"\) &&\s*call\.getBool\("essentialVoi
   "only source-approved published verse requests can lease");
 assert.match(play, /category == \.soloAmbient/);
 assert.match(play, /self\.essentialVoiceClipId == nil/);
-assert.match(play, /self\.clips\.isEmpty, self\.cues\.isEmpty/);
+assert.match(play, /self\.cues\.isEmpty/);
+assert.match(play, /self\.clips\.keys\.allSatisfy/);
+assert.match(play, /self\.isTransientTypingEffect\(source\)/);
+assert.match(play, /self\.stopTransientTypingEffectsForVoice\(\)\s*guard BibloZooEssentialVoiceSession\.begin/);
 assert.match(play, /"voice-overlap-unsafe"/);
 assert.match(play, /guard BibloZooEssentialVoiceSession\.begin\(\s*owner: "read-narration"\)/);
 assert.match(play, /self\.essentialVoiceClipId = id/);
