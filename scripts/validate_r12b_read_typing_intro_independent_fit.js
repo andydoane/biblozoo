@@ -26,8 +26,7 @@ const verseFit = scope("  function restoreReadTypingFit(wrap) {",
 const scheduler = scope("  function scheduleReadTypingVerseFit(wrap) {",
   "  function renderKeyboardScreen(");
 const keyboard = scope("  function renderKeyboardScreen(", "  // Compare the largest fitting font");
-const typewriter = scope("  // A reference travels as the first animated item", "  return Object.freeze(");
-// The latter covers multiple renderers; assert precise Typewriter markup too.
+// Assert exact real Typewriter and Keyboard templates retain the ghost guide.
 const endSource=js.slice(js.indexOf("    const hasIntro = state.typewriterIntroPhase !== \"done\";",js.indexOf("  function renderScreen(")));
 assert(endSource.includes("read-typewriter-intro-guide"));
 assert(keyboard.includes("read-typewriter-intro-guide"));
@@ -54,12 +53,14 @@ function rule(sel) {
   assert(pos >= 0,"Missing CSS: " + sel);
   return css.slice(pos, css.indexOf("}", pos));
 }
-for(const selector of [".read-typewriter-intro-head",".read-typewriter-intro-tail"]){
-  const s=rule(".read-typewriter-intro-head,");
-  assert(s.includes("display: block") && s.includes("width: max-content") &&
-    s.includes("white-space: pre"),
-    selector + " must be a measured unbreakable separate line");
-}
+const headAndTail = ".read-typewriter-intro-head,\n.read-typewriter-intro-tail {";
+const pairStart=css.indexOf(headAndTail);
+assert(pairStart>=0,"Both intro lines share a fixed no-wrap geometry");
+const lineRule=css.slice(pairStart,css.indexOf("}",pairStart));
+assert(lineRule.includes("display: block") &&
+  lineRule.includes("width: max-content") &&
+  lineRule.includes("white-space: pre"),
+  "First and second intro lines are independently measured and unbreakable");
 assert(rule(".read-typewriter-intro-guide").includes("visibility: hidden"),
   "fully reserved guide is invisible but measurable");
 assert(rule(".read-typewriter-intro-text").includes("position: absolute"),
