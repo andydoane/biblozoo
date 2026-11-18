@@ -153,6 +153,13 @@ jobs:
       # R10 / READ-04: compile and run ACTUAL native Swift WAV synthesis
       # at updated word/finish gains, verify bounded two/four-note mixes.
       # This cannot demonstrate actual speaker/AirPods perceived loudness.
+      # R11 / LEARN-01: execute the actual Learn overlay sync function
+      # and shared Welcome Back with simulated busy, rotating, retry and
+      # fallback states. No new audio activation or pause owner.
+      - name: Validate R11 Learn Welcome Back single busy message and retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r11_learn_welcome_back_busy_status.js
+
       - name: Validate R10 native Read cue relative level and melody peaks
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r10_read_native_cue_loudness.js
