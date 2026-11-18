@@ -647,6 +647,11 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
     private var lastNativePlayQueueMs = -1
     private var lastNativePlayCallMs = -1
     private var lastNativePlayedSoundId = "none"
+    // R16a.1: one DEBUG-only read-only observation per optional effect family.
+    // No child data, sound IDs, voice samples, profile IDs or route device names.
+    #if DEBUG
+    private var silentProbeLoggedKinds = Set<String>()
+    #endif
     // Bounded in-memory diagnostics. No pet/profile/verse, media audio,
     // permissions, device identifiers or route names. Main thread only.
     private let maxSoundTimingEvents = 80
@@ -2516,6 +2521,14 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                     ? "initial-activation-accepted"
                     : "foreground-activation-accepted"
                 self.lastActivationResult = "os-accepted"
+                #if DEBUG
+                if purpose == "ui" || purpose == "game" {
+                    let session = AVAudioSession.sharedInstance()
+                    NSLog("[BibloZooSilentProbe] phase=gesture-activation " +
+                          "purpose=\(purpose) category=\(session.category.rawValue) " +
+                          "mode=\(session.mode.rawValue)")
+                }
+                #endif
                 self.appendTrace("activation-os-accepted")
                 finish(["ready": true, "attempted": true,
                               "reason": "os-accepted", "backend": "avfoundation"])
@@ -3072,6 +3085,28 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
                 call.resolve(["accepted": false, "reason": reason])
                 return
             }
+            #if DEBUG
+            // Observe the ACTUAL native optional-effect request after the
+            // existing .soloAmbient gate, before the serial playback worker.
+            // Never query a private/unavailable Silent switch state.
+            let probeKind: String?
+            if soundId == "ui-pop-1" || soundId == "ui-pop-2" {
+                probeKind = "ui-pop"
+            } else if soundId.hasPrefix("scramble-") {
+                probeKind = "verse-scramble"
+            } else {
+                probeKind = nil
+            }
+            if let kind = probeKind,
+               self.silentProbeLoggedKinds.insert(kind).inserted {
+                let session = AVAudioSession.sharedInstance()
+                let outputs = session.currentRoute.outputs
+                    .map { $0.portType.rawValue }.joined(separator: ",")
+                NSLog("[BibloZooSilentProbe] optional kind=\(kind) " +
+                      "phase=allowed-play category=\(session.category.rawValue) " +
+                      "mode=\(session.mode.rawValue) outputs=\(outputs)")
+            }
+            #endif
             let epoch = self.playbackEpochSnapshot()
             let enqueuedAt = ProcessInfo.processInfo.systemUptime
             let receivedAtEpochMs = Date().timeIntervalSince1970 * 1000
