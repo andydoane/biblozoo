@@ -26,6 +26,9 @@ assert.match(appSource, /async function playVerseDetailListen\(verseId, \{ onInt
 assert.match(flashcardsSource, /event\.reason !== "audio-interruption"/);
 assert.match(flashcardsSource, /onInterrupted: showFlashcardsNativeAudioWelcomeBack/);
 assert.match(flashcardsSource, /stopVersePreview\(\); \/\/ revoke the pending Listen promise/);
+assert.match(flashcardsSource, /if \(hadPreview && state\.view === "difficulty"\) requestRender\(\)/);
+assert.match(flashcardsSource, /retry\.textContent = "Replay Instructions"/);
+assert.match(instructionSource, /locked: !!current && !\["done", "interrupted"\]\.includes\(current\.status\)/);
 assert.match(workflow, /node scripts\/validate_r02_flashcards_welcome_back\.js/);
 for (const p of ["docs/PROJECT-HANDOFF.md", "docs/TESTING.md",
   "docs/IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md"])
@@ -73,8 +76,10 @@ function instructionFixture() {
   await tick();
   assert.equal(a.interrupted,1,"Real native interruption routed to owner");
   assert.equal(a.errors.length,0,"No red missing-file toast on interruption");
-  assert.equal(a.owner.snapshot().status,"failed",
-    "Narrator stays stopped; child must explicitly retry");
+  assert.equal(a.owner.snapshot().status,"interrupted",
+    "Native instruction stays stopped but the child can choose Next or Replay");
+  assert.equal(a.owner.snapshot().locked,false,
+    "An interrupted instruction must not force replay before Next");
   assert(a.stops>0,"Interruption releases native narration");
 
   const b=instructionFixture();
@@ -96,7 +101,7 @@ function instructionFixture() {
     const docEvents={}, nativeEvents={}, notices=[], timers=new Map();
     let nextTimer=0, paused=0, visible=0, stopPreview=0, renders=0;
     let instructionState="idle", previewRequest=null;
-    const doc={hidden:false,
+    const doc={hidden:false,querySelector(){return null;},
       body:{appendChild(n){notices.push(n);return n;}},
       createElement(tag){return {tag,setAttribute(){},remove(){
         const at=notices.indexOf(this);if(at>=0)notices.splice(at,1);
@@ -127,22 +132,26 @@ function instructionFixture() {
       BibloZooRecording:{create:()=>({snapshot:()=>({status:"idle"}),
         dispose(){},interruptCapture(){},pause(){},stopFun(){}})},
       BibloZooFlashcardsInstructions:{create(cfg){return{
-        snapshot:()=>({status:instructionState,locked:instructionState==="playing"}),
-        interrupt(){instructionState="failed";},
+        snapshot:()=>({status:instructionState,
+          locked:["playing","failed"].includes(instructionState),
+          failed:["failed","interrupted"].includes(instructionState)}),
+        interrupt(){instructionState=native?"interrupted":"failed";},
         stop(){instructionState="idle";},
         primeFromGesture(){},
         triggerInterrupt(){cfg.onInterrupted();}
       };}},
       BibloZooWelcomeBackReturn:{attach(o){options=o;return prompt;}},
+      matchMedia:()=>({matches:true}),
       addEventListener(){}
     };
     const marker="  window.BibloZooFlashcards = Object.freeze({";
     assert(flashcardsSource.includes(marker));
-    const hooks="  window.__r02 = { toggleVersePreview, stopVersePreview, instructions, "+
+    const hooks="  window.__r02 = { toggleVersePreview, stopVersePreview, "+
+      "renderDifficulty, renderRecordingIntro, instructions, "+
       "nativeInterruption:showFlashcardsNativeAudioWelcomeBack, "+
       "prepare(){state.view='difficulty';state.selectedVerseId='john_11_35';}, "+
-      "setInstruction(s){instructionNarration;}, "+
-      "playing:()=>previewPlaying };\n";
+      "prepareIntro(){state.view='difficulty_intro';state.difficulty='really_well';state.selectedVerseId='john_11_35';}, "+
+      "view:()=>state.view, playing:()=>previewPlaying };\n";
     vm.runInNewContext(flashcardsSource.replace(marker,hooks+marker),{
       window:win,document:doc,console,Math,Date,Promise,Object,
       setTimeout(fn){const id=++nextTimer;timers.set(id,fn);return id;},
@@ -160,7 +169,25 @@ function instructionFixture() {
     };
     win.BibloZooFlashcards.initialize(api);
     win.__r02.prepare();
-    return {win,doc,notices,prompt,nativeEvents,
+    function difficultyUI() {
+      const wrap={innerHTML:"",querySelector:()=>({onclick:null}),
+        querySelectorAll:()=>[]};
+      win.__r02.renderDifficulty(wrap);
+      return wrap.innerHTML;
+    }
+    function introUI() {
+      const buttons={
+        flashcardsRecordStartBtn:{style:{},disabled:false,setAttribute(){},onclick:null},
+        flashcardsIntroBackBtn:{disabled:false,onclick:null},
+        flashcardsSkipRecordingBtn:{disabled:false,onclick:null}
+      };
+      const wrap={innerHTML:"",isConnected:true,querySelector(selector){
+        return buttons[selector.slice(1)]||null;
+      }};
+      win.__r02.renderRecordingIntro(wrap);
+      return {html:wrap.innerHTML,buttons};
+    }
+    return {win,doc,notices,prompt,nativeEvents,difficultyUI,introUI,
       hooks:win.__r02,
       resolvePreview(v){assert(previewRequest);const r=previewRequest;previewRequest=null;r(v);},
       triggerNative(e){nativeEvents.biblozooAppLifecycle?.(e);},
@@ -171,10 +198,20 @@ function instructionFixture() {
   }
 
   const f=flashcardsFixture();
+  assert.match(f.difficultyUI(),/Listen to the Verse/);
   const p=f.hooks.toggleVersePreview();
   assert.equal(f.hooks.playing(),true);
+  assert.match(f.difficultyUI(),/Stop Listening/);
+  const beforeInterruptionRender=f.renders;
   f.triggerVerseInterruption();
   await p;
+  assert.equal(f.hooks.playing(),false,"Interrupt clears Listen state");
+  assert(f.renders>beforeInterruptionRender,
+    "Interrupted Listen must repaint its button underneath Welcome Back");
+  assert.match(f.difficultyUI(),/aria-pressed="false"[\s\S]*?Listen to the Verse/,
+    "After interruption, the visible button accurately says Listen");
+  assert.doesNotMatch(f.difficultyUI(),/Stop Listening/,
+    "No stale Stop label after native interruption");
   assert.equal(f.paused,1,"Verse interruption opens shared paused state");
   assert.equal(f.prompt.pending,true);
   assert.equal(f.visible,1,"Welcome Back shown even while UIKit remains active");
@@ -182,6 +219,17 @@ function instructionFixture() {
   assert.equal(f.notices.length,0,"Canceled Listen never shows red toast");
   f.triggerNative({active:false,reason:"audio-interruption"});
   assert.equal(f.paused,1,"Duplicate native signal cannot pause twice");
+  const stoppedBeforeReplay=f.stops;
+  f.prompt.pending=false; // child has acknowledged Welcome Back
+  const replay=f.hooks.toggleVersePreview();
+  assert.match(f.difficultyUI(),/Stop Listening/,
+    "Next child Listen tap must start playback, not merely clear a stale state");
+  assert.equal(f.stops,stoppedBeforeReplay,
+    "Fresh Listen cannot be mistaken for Stop after interruption");
+  f.resolvePreview(true);
+  await replay;
+  assert.match(f.difficultyUI(),/Listen to the Verse/,
+    "Real native end restores the default Listen label");
 
   const g=flashcardsFixture();
   const q=g.hooks.toggleVersePreview();
@@ -195,13 +243,30 @@ function instructionFixture() {
   assert.equal(g.notices.length,0);
 
   const i=flashcardsFixture();
+  i.hooks.prepareIntro();
   i.hooks.instructions(); // Real render/sync instantiates the instruction owner.
   i.setInstruction("playing");
+  assert.equal(i.introUI().buttons.flashcardsSkipRecordingBtn.disabled,true,
+    "Next is disabled while instructions are audibly in progress");
   i.triggerNative({active:false,reason:"audio-interruption"});
   assert.equal(i.paused,1,"Instruction playback shows Welcome Back from Swift .began");
   assert.equal(i.notices.length,0);
-  assert.equal(i.hooks.instructions().snapshot().status,"failed",
+  assert.equal(i.hooks.instructions().snapshot().status,"interrupted",
     "Instructions cannot silently auto-restart after Welcome Back");
+  const interruptedIntro=i.introUI();
+  assert.equal(interruptedIntro.buttons.flashcardsSkipRecordingBtn.disabled,false,
+    "After native interruption, Next must be enabled without a replay");
+  assert.match(interruptedIntro.html,/>Next<\/button>/);
+  await interruptedIntro.buttons.flashcardsSkipRecordingBtn.onclick();
+  assert.equal(i.hooks.view(),"recording_intro",
+    "Explicit Next advances without replaying the interrupted explanation");
+
+  const blocked=flashcardsFixture();
+  blocked.hooks.prepareIntro();
+  blocked.hooks.instructions();
+  blocked.setInstruction("failed");
+  assert.equal(blocked.introUI().buttons.flashcardsSkipRecordingBtn.disabled,true,
+    "Actual playback failure is still locked and requires Replay Instructions");
 
   const j=flashcardsFixture();
   const fail=j.hooks.toggleVersePreview();

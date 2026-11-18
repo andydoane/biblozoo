@@ -72,7 +72,7 @@
       a.status = status;
       cleanup(a);
       if (status === "failed") {
-        onError?.("Instructions couldn't play. Tap Try Instructions Again.");
+        onError?.("Instructions couldn't play. Tap Replay Instructions.");
       }
       onChange?.();
     }
@@ -149,8 +149,11 @@
     }
     function snapshot() {
       return {
-        locked: !!current && current.status !== "done",
-        failed: current?.status === "failed",
+        // Interrupted iOS narration is safely stopped, so the child may
+        // choose Next instead of having to replay spoken instructions.
+        // Genuine file/playback failures keep the existing locked retry gate.
+        locked: !!current && !["done", "interrupted"].includes(current.status),
+        failed: ["failed", "interrupted"].includes(current?.status),
         status: current?.status || "idle",
         soundId: current?.source.id || null
       };
@@ -160,7 +163,7 @@
       if (nativeOnly()) tracks()?.primeFromGesture?.();
     }
     function retryFromGesture() {
-      if (!current || current.status !== "failed") return;
+      if (!current || !["failed", "interrupted"].includes(current.status)) return;
       primeFromGesture();
       const a = current;
       a.attempt += 1; // revoke an earlier failed attempt's late promise
@@ -177,7 +180,9 @@
       if (!current || current.status !== "playing") return;
       const a = current;
       a.attempt += 1;
-      a.status = "failed";
+      // Preserve browser/PWA/Android failure gating. Native iOS may
+      // explicitly skip an interrupted (not completed) instruction via Next.
+      a.status = nativeOnly() ? "interrupted" : "failed";
       cleanup(a);
       if (a.nativeStarted) tracks()?.stop?.();
       a.nativeStarted = false;

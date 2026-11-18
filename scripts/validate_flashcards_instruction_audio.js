@@ -108,7 +108,7 @@ async function main() {
   h.resolve({ended: false, reason: "interrupted"});
   await tick();
   assert.equal(h.owner.snapshot().failed, true);
-  assert(h.errors.at(-1).includes("Try Instructions Again"));
+  assert(h.errors.at(-1).includes("Replay Instructions"));
   h.owner.retryFromGesture();
   assert.equal(h.primes, 1, "retry must claim from real user gesture");
   assert.equal(h.owner.snapshot().locked, true);
@@ -129,10 +129,15 @@ async function main() {
   h.root.document.hidden = true;
   h.events.get("visibilitychange")();
   assert.equal(h.owner.snapshot().failed, true);
+  assert.equal(h.owner.snapshot().status, "interrupted");
+  assert.equal(h.owner.snapshot().locked, false,
+    "Native interruption permits skipping optional spoken instructions");
   h.root.document.hidden = false;
   h.owner.sync("comparison", "pretty_good", "other_verse");
   h.pump();
   assert.equal(h.owner.snapshot().failed, true, "foreground must not auto-replay");
+  assert.equal(h.owner.snapshot().status, "interrupted",
+    "Rerender must not start a new instruction or relock Next");
   h.resolve({ended: false}); // stale currently pending call
   await tick();
   assert.equal(h.owner.snapshot().failed, true);

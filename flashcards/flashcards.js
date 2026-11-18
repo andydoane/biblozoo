@@ -164,6 +164,11 @@
     if (!hadPreview) {
       try { api?.stopVersePreview?.(); } catch (_) {}
     }
+    // The request generation is already invalidated, but Welcome Back is
+    // a body overlay: the underlying Listen button must also be repainted.
+    // Otherwise it still *says* Stop Listening while the next tap starts
+    // a fresh preview. Only redraw when a live preview was interrupted.
+    if (hadPreview && state.view === "difficulty") requestRender();
   }
 
   // A real AVAudioSession .began can happen while UIKit stays ACTIVE and
@@ -1615,7 +1620,7 @@
         retry.type = "button";
         retry.id = "flashcardsInstructionRetryBtn";
         retry.className = "flashcards-secondary-btn flashcards-instruction-retry";
-        retry.textContent = "Try Instructions Again";
+        retry.textContent = "Replay Instructions";
         retry.onclick = () => instructions()?.retryFromGesture();
         actions.appendChild(retry);
       }
