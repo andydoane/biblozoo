@@ -1,5 +1,8 @@
 # BibloZoo — Living Project Handoff
 
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
 ## CURRENT R16b / AUDIO-01 — Read My Verse isolated voice candidate; Crawl still open (2026-11-18)
 
 **Previous owner acceptance / merged baseline:** R16a.2 [PR #148](https://github.com/andydoane/biblozoo/pull/148) merged to `integration/native-audio-to-ios-prep` at `bdd7d657ee1cf723e36429f5accbee9363fb26ec`; its PR and post-merge CI both passed. Owner expressly retested **Learn Chunks/Echo Menu and says PR successful / PASS on iPhone**. Prior owner tests: Learn/Flashcards spoken narration and Flashcards RAM recording/replay work with Silent ON; on **iPhone speaker** Home pops and Verse Scramble are quiet while Silent ON; on **AirPods** optional effects were audible under `SoloAmbient` with Bluetooth A2DP route, which remains the OS route behavior (no app headphone mute hack).
