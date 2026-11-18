@@ -1,6 +1,18 @@
 # Native iOS audio stabilization — proposed sequence of focused PRs
 
-## CURRENT R16a.2 / AUDIO-01 — Learn Chunks/Echo Menu false Welcome Back fix proposed (2026-11-18)
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
+## CURRENT plan — R16b isolated Read voice candidate, R17 deferred (2026-11-18)
+
+**R16a sequence closed for owner-tested cases:** #146 introduced essential Learn/Flashcards speech, #147 DEBUG-only acoustic diagnostics, #148 fixed Learn Chunks/Echo false Welcome Back; all are merged into integration. Owner tested #148 and reported **PASS**, and earlier speaker Silent ON Home/Verse Scramble quiet + voice audible, Flashcards RAM playback working. No special AirPods muting rule; session `soloAmbient` remains correct default.
+
+**R16b first code slice (candidate, no owner hardware evidence):** Source-approved **Read** spoken verse clips in activities with no intentionally concurrent music get a distinct short `.playback` lease via shared session owner. Existing animations/feedback/score timing remain; incidental Read sounds cannot borrow lease. Native effect denial while essential voice is active must not manufacture Welcome Back. Test in [R16b scope/acceptance brief](R16B-READ-SILENT-MODE-VOICE-BOUNDARY.md), then mark each device case PASS/FAIL/NOT TESTED. Production/PWA/Android untouched.
+
+**Required second Read decision:** Verse Crawl **theme+verse** and **theme+ending** intentionally overlap. The OS audio category is app-wide, so separate Silent Mode treatment cannot be obtained merely by tagging each AVAudioPlayer. Do NOT put Crawl soundtrack into `.playback` or remove its overlap without owner consent. Evaluate a separately opt-in **Voice Only** mode or explicit design compromise; finish R16b only after approval and iPhone test. **R17** final cross-app/privacy/interruptions/silent-mode acceptance and owner-managed integration → `ios-prep` promotion remain blocked. `main` untouched.
+
+
+## HISTORICAL R16a.2 proposal before merge/device testing / AUDIO-01 — Learn Chunks/Echo Menu false Welcome Back fix proposed (2026-11-18)
 
 **Owner iPhone evidence and separate issues:** On physical iPhone with Silent ON and **speaker** output, owner reports **narration audible / Home UI pops and Verse Scramble effects quiet — PASS for tested Option B acoustic distinction**. With **AirPods**, all those native optional effects remain audible although debug logs show `AVAudioSessionCategorySoloAmbient` with `BluetoothA2DPOutput`. This is **route-dependent behavior** observed on the device, NOT a stale voice `.playback` lease; do **not** force special Bluetooth muting or claim native Silent-switch detection. Apple’s audio guidance emphasizes the user's choice of output/headphones and silencing nonessential audio; use normal OS category behavior rather than speculative workaround. Flashcards including recorded-voice playback still works in Silent Mode, as owner confirmed. [R16a.1 diagnostic PR #147](https://github.com/andydoane/biblozoo/pull/147) is merged.
 

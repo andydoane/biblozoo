@@ -139,6 +139,9 @@
       this._playingRequest=null;
       this._requestId="";
       this._clipId=clipIdFor(this._src);
+      // Only read_my_verse.js marks an actual spoken-verse activity for
+      // Silent Mode. The Crawl theme/ending and all effect clips stay false.
+      this._essentialVoice=false;
       listen();
       // N7g: a newly allocated Audio object is not itself an active player.
       // Register only when play() actually starts a native attempt.
@@ -153,6 +156,7 @@
       if(this._requestId) this.pause();
       this._src=next;
       this._clipId=clipIdFor(next);
+      this._essentialVoice=false; // Never inherit voice trust after src change.
       this._position=0;
       this.duration=NaN;
       this.ended=false;
@@ -176,6 +180,13 @@
       if(name==="src") this.src="";
     }
     load() { /* Bundled native audio is loaded exclusively on a real Play. */ }
+    markEssentialVoice() {
+      // Validated verse: sources only, never Crawl soundtrack, ending, UI
+      // effects or arbitrary caller URLs. The activity also excludes Crawl.
+      if (!this._clipId.startsWith("verse:")) return false;
+      this._essentialVoice=true;
+      return true;
+    }
     addEventListener(name,fn,options) {
       if(typeof fn!=="function")return;
       const entries=this._handlers.get(name)||[];
@@ -265,6 +276,7 @@
           throw mkError("stale-or-inactive");
         const started=await api().playClip({
           requestId,clipId:this._clipId,
+          essentialVoice:this._essentialVoice===true,
           positionMs:Math.max(0,this._position*1000),
           volume:this.muted?0:Math.max(0,Math.min(1,this.volume))
         });

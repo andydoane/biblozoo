@@ -75,7 +75,10 @@ has(record, "guard session.category == .soloAmbient", "Record never inherits pla
 has(record, "session.setCategory(.playAndRecord", "Record remains microphone-owned");
 lacks(record, "BibloZooEssentialVoiceSession.begin", "never change recording via voice policy");
 const read = block(scene, "final class BibloZooNativeReadOutputPlugin", "// Ghost Writer only");
-has(read, "category == .soloAmbient", "Read remains unchanged and is NOT falsely claimed as R16a coverage");
-lacks(read, "BibloZooEssentialVoiceSession.begin", "Read's mixed soundtrack/narration requires separate review");
+has(read, "category == .soloAmbient", "Read still requires normal nonvoice category to activate");
+has(read, 'BibloZooEssentialVoiceSession.begin(', "R16b later adds separately owned, music-free Read verse lease");
+has(read, 'owner: "read-narration"', "R16b Read never borrows R16a native narration owner");
+has(read, 'self.clips.isEmpty, self.cues.isEmpty', "R16b must reject overlapping Read music/effects");
+has(read, 'category == .soloAmbient else', "R16b still gates incidental Read sound");
 
 console.log("R16a voice-session source boundaries: PASS (not a physical Silent Mode or Xcode test)");

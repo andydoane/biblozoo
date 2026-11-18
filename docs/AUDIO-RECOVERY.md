@@ -1,6 +1,18 @@
 # BibloZoo — Audio Recovery and Zoo Escape Contract
 
-## CURRENT R16a.2 / AUDIO-01 — Learn Chunks/Echo Menu false Welcome Back fix proposed (2026-11-18)
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
+## CURRENT R16b / AUDIO-01 — Read short-lived verse voice lease; optional-sound isolation (2026-11-18)
+
+**Merged and owner-PASS baseline:** R16a.2 #148 fixed Chunks/Echo Menu's false Welcome Back triggered by denied UI pop. Owner confirmed success on iPhone. Silent ON speaker tests: true Learn/Flashcards voice audible, decorative Home/Verse Scramble quiet. AirPods A2DP output behaved differently under OS `soloAmbient`; do not add special route muting.
+
+**R16b pending owner test:** Read's existing `BibloZooNativeReadOutputPlugin` still activates output `soloAmbient` only from actual Start/Resume. The native adapter `NativeAudio.markEssentialVoice()` can tag only published verse audio; `read_my_verse.js` tags it only in activities WITHOUT soundtrack overlap. Swift `playClip` requires a single foreground owner, zero other Read clips/cues, then calls shared `BibloZooEssentialVoiceSession.begin(owner:"read-narration")`; it restores via `releaseEssentialVoice` on real AVAudioPlayer delegate end, stopClip, stopAll/Exit, OS interruption/route/media loss, player error and deinit. It **never** sets session category itself, activates automatically, borrows Flashcards mic or claims a synthetic ended event. Read optional `playClip` and generated `playCue` require `soloAmbient`, and global app UI-pop category denial is non-destructive only for a demonstrably active foreground essential Read voice, without masking genuine iOS interruption.
+
+**Not solved:** **Verse Crawl** soundtrack + narration/ending overlap. A single process-wide `.playback` would make optional music audible with Silent ON; original Crawl remains `.soloAmbient` until an owner-approved music/voice treatment. Avoid hacks based on an unavailable hardware Silent-switch API and preserve user foreground gesture and OS media priority. [Scope and tests](R16B-READ-SILENT-MODE-VOICE-BOUNDARY.md).
+
+
+## HISTORICAL R16a.2 proposal before merge/device testing / AUDIO-01 — Learn Chunks/Echo Menu false Welcome Back fix proposed (2026-11-18)
 
 **Owner iPhone evidence and separate issues:** On physical iPhone with Silent ON and **speaker** output, owner reports **narration audible / Home UI pops and Verse Scramble effects quiet — PASS for tested Option B acoustic distinction**. With **AirPods**, all those native optional effects remain audible although debug logs show `AVAudioSessionCategorySoloAmbient` with `BluetoothA2DPOutput`. This is **route-dependent behavior** observed on the device, NOT a stale voice `.playback` lease; do **not** force special Bluetooth muting or claim native Silent-switch detection. Apple’s audio guidance emphasizes the user's choice of output/headphones and silencing nonessential audio; use normal OS category behavior rather than speculative workaround. Flashcards including recorded-voice playback still works in Silent Mode, as owner confirmed. [R16a.1 diagnostic PR #147](https://github.com/andydoane/biblozoo/pull/147) is merged.
 

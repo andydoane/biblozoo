@@ -1971,6 +1971,16 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     private var progressTimer: Timer?
     private var ownedByReadGesture = false
     private var generation = 0
+    // R16b: at most one actual bundled spoken verse owns .playback.
+    // Crawl's music+voice scene is deliberately excluded at the JS caller.
+    private var essentialVoiceClipId: String?
+
+    private func releaseEssentialVoice(for id: String? = nil) {
+        guard let current = essentialVoiceClipId,
+              id == nil || id == current else { return }
+        essentialVoiceClipId = nil
+        BibloZooEssentialVoiceSession.end(owner: "read-narration")
+    }
 
     private var isDevBundle: Bool {
         BibloZooIOSIdentity.experimentalToolsEnabled
@@ -2052,6 +2062,17 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         progressTimer?.invalidate()
         clips.values.forEach { $0.stop() }
         cues.forEach { $0.stop() }
+        // If the plugin is disposed without a normal stopAll, release the
+        // process-wide category lease without touching another voice owner.
+        if essentialVoiceClipId != nil {
+            if Thread.isMainThread {
+                BibloZooEssentialVoiceSession.end(owner: "read-narration")
+            } else {
+                DispatchQueue.main.async {
+                    BibloZooEssentialVoiceSession.end(owner: "read-narration")
+                }
+            }
+        }
     }
     // Validated published JSON, never a user-provided filename.
     private func publishedVerse(_ id: String) -> Bool {
@@ -2149,6 +2170,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         clips.removeAll()
         cues.forEach { $0.stop() }
         cues.removeAll()
+        releaseEssentialVoice()
         progressTimer?.invalidate()
         progressTimer = nil
         // Never reactivate on OS interruption/foreground return. Do not
@@ -2188,6 +2210,34 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 call.resolve(["started": false, "reason": "unpublished-clip"])
                 return
             }
+            // R16b: ONLY source-approved Read verse MP3s may use the
+            // foreground essential-voice category, and only when the Read
+            // activity has marked its narration path as music-free.
+            // Crawl remains .soloAmbient to preserve its overlapping theme.
+            let essentialVoice = key.hasPrefix("verse:") &&
+                                 call.getBool("essentialVoice") == true
+            let category = AVAudioSession.sharedInstance().category
+            if essentialVoice {
+                // AVAudioSession is app-wide. No soundtrack, scheduled cue,
+                // previous voice or miscellaneous clip may leak when the
+                // short-lived voice category starts. Fail explicitly rather
+                // than silently dropping the soundtrack or faking an ended.
+                guard category == .soloAmbient,
+                      self.essentialVoiceClipId == nil,
+                      self.clips.isEmpty, self.cues.isEmpty else {
+                    call.resolve(["started": false,
+                                  "reason": "voice-overlap-unsafe"])
+                    return
+                }
+            } else {
+                // Music, UI effects, typing taps, Crawl and the zoo cue
+                // ALWAYS stay within the Silent-switch-respecting category.
+                guard category == .soloAmbient else {
+                    call.resolve(["started": false,
+                                  "reason": "category-not-soloambient"])
+                    return
+                }
+            }
             self.clips[id]?.stop()
             self.clips[id] = nil
             do {
@@ -2196,13 +2246,26 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 player.numberOfLoops = 0
                 let volume = call.getDouble("volume") ?? 1
                 player.volume = Float(min(1, max(0, volume)))
-                player.prepareToPlay()
+                guard player.prepareToPlay() else {
+                    call.resolve(["started": false, "reason": "prepare-failed"])
+                    return
+                }
                 let seekMs = call.getDouble("positionMs") ?? 0
                 if seekMs > 0 {
                     player.currentTime = min(player.duration,
                                              max(0, seekMs / 1000))
                 }
+                if essentialVoice {
+                    guard BibloZooEssentialVoiceSession.begin(
+                        owner: "read-narration") else {
+                        call.resolve(["started": false,
+                                      "reason": "voice-session-unavailable"])
+                        return
+                    }
+                    self.essentialVoiceClipId = id
+                }
                 guard player.play() else {
+                    self.releaseEssentialVoice(for: id)
                     call.resolve(["started": false, "reason": "player-refused"])
                     return
                 }
@@ -2213,6 +2276,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                               "positionMs": Int(player.currentTime * 1000),
                               "durationMs": Int(player.duration * 1000)])
             } catch {
+                self.releaseEssentialVoice(for: id)
                 call.resolve(["started": false, "reason": "decode-failed"])
             }
         }
@@ -2223,6 +2287,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             if let id = call.getString("requestId"),
                let player = self.clips.removeValue(forKey: id) {
                 player.stop()
+                self.releaseEssentialVoice(for: id)
             }
             call.resolve(["stopped": true])
         }
@@ -2255,6 +2320,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 self.emit(flag ? "ended" : "interrupted", id: id,
                           player: player, reason: flag ? "" : "player-failed")
                 self.clips.removeValue(forKey: id)
+                self.releaseEssentialVoice(for: id)
             } else {
                 self.cues.removeAll(where: { $0 === player })
             }
@@ -2363,6 +2429,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             guard let self = self, self.isNativeAppBundle,
                   self.ownedByReadGesture,
                   UIApplication.shared.applicationState == .active,
+                  AVAudioSession.sharedInstance().category == .soloAmbient,
                   let kind = call.getString("kind"),
                   ["order", "scramble", "negative"].contains(kind) else {
                 call.resolve(["played": false, "reason": "not-ready"])
