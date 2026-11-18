@@ -76,7 +76,7 @@ assert(!playMethod.includes("!session.isOtherAudioPlaying") &&
   "Explicit native Play may ask iOS to interrupt another media app");
 has(swift,"session.category == .soloAmbient",
   "Don't override temporary recording category");
-has(swift,"try AVAudioSession.sharedInstance().setActive(true)",
+has(playMethod,"try session.setActive(true)",
   "Play must require real explicit tap rather than session activation on foreground");
 has(swift,"self.playbackGeneration += 1",
   "Stop/Exit invalidate pending PCM preparation before late start");

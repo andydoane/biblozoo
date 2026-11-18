@@ -212,6 +212,12 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r02_flashcards_welcome_back.js
 
+      # R03: AirPods -> speaker route changes must never claim silent native
+      # voice as played, lose the RAM take, or auto-activate before a Play tap.
+      - name: Validate R03 Flashcards AirPods-to-speaker native replay route recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r03_flashcards_route_replay.js
+
       - name: Validate N7d.2 Flashcards foreground audio ownership and genuine AirPods interruptions
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_n7d2_flashcards_foreground_audio_ownership.js
