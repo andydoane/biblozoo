@@ -10,7 +10,7 @@ The owner rejected a startup popup and selected a **top-right music-note toggle*
 - **Control/accessibility:** Button is upper-right, `aria-pressed`, labeled Turn Verse Crawl music off/on, 44–56px safe-area-aware touch target and reduced-motion-friendly fade. Original music defaults ON on every fresh activity; web/PWA/Android normal default is unchanged.
 - **Safety:** No global `.playback` while optional music is playing, no app-wide mute, microphone/backup/reward/storage changes, background playback, unproven Silent-switch sensor, new cloud logs, or auto media takeover. Protect original 10 production and separate 11 Audio Test Zookeepers.
 
-**Candidate branch:** `feat/r16b2-verse-crawl-music-toggle` → `integration/native-audio-to-ios-prep` only. Add focused native adapter/toggle regression and full Actions; owner must merge and physically confirm Silent ON/OFF, ON→OFF→ON while speech is active, actual verse progress, genuine lock/App Switcher/PiP, and Exit/start reset. **Physical iPhone: NOT TESTED for this change.** R17 final comprehensive acceptance remains deferred.
+**Open candidate:** [R16b.2 PR #152](https://github.com/andydoane/biblozoo/pull/152) from `feat/r16b2-verse-crawl-music-toggle` → `integration/native-audio-to-ios-prep` only; leave unmerged. Add focused native adapter/toggle regression and full Actions; owner must merge and physically confirm Silent ON/OFF, ON→OFF→ON while speech is active, actual verse progress, genuine lock/App Switcher/PiP, and Exit/start reset. **Physical iPhone: NOT TESTED for this change.** R17 final comprehensive acceptance remains deferred.
 
 ## HISTORICAL decision options (before owner selected toggle)
 
