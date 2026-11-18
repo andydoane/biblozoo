@@ -170,12 +170,19 @@ function ownerFunction(source,name,next){
 }
 function verifyNativePlayingOwners(){
   let stopped=0,holdFinished=0,typerClockPaused=0,typerClockResumed=0;
+  let typerVisualPaused=0,typerVisualResumed=0;
   let typerReady=false,typerScheduled=false;
   const t={
     nativeTyperAudio:{stop(){stopped++;},isReady(){return typerReady;}},
     state:{screen:"game",paused:false},
     returnPaused:false,wasPausedBeforeReturn:false,muted:false,
     finishNativeHold(){holdFinished++;},beginNativeHold(){},
+    // This legacy Zoo Escape test slices ONLY the existing Verse Typer
+    // clock owner functions. R06's new isolated visual-owner functions
+    // are exercised fully in validate_r06_playground_verse_typer_visual_freeze;
+    // these strict shims verify the clock owner invokes them at the right gate.
+    freezeTyperVisualsForReturn(){typerVisualPaused++;},
+    thawTyperVisualsAfterReturn(){typerVisualResumed++;},
     welcomeClock:{pause(){typerClockPaused++;},resume(){typerClockResumed++;}},
     scheduleCaterpillarPositionUpdate(){typerScheduled=true}
   };
@@ -188,14 +195,20 @@ function verifyNativePlayingOwners(){
   assert.equal(stopped,1);
   assert.equal(holdFinished,1);
   assert.equal(typerClockPaused,1);
+  assert.equal(typerVisualPaused,1,
+    "Native Verse Typer also freezes its compositor frame on UIKit inactive");
   assert.equal(t.testOwner.continueTyperAfterReturn(),false,
     "without a verified original Typer PCM bank the gate must not thaw narration");
   assert.equal(t.returnPaused,true);
+  assert.equal(typerVisualResumed,0,
+    "Rejected native audio readiness cannot thaw the original visual frame");
   typerReady=true;
   assert.equal(t.testOwner.continueTyperAfterReturn(),true);
   assert.equal(t.returnPaused,false);
   assert.equal(t.state.paused,false);
   assert.equal(typerClockResumed,1);
+  assert.equal(typerVisualResumed,1,
+    "Exact same visuals resume only after successful original PCM readiness");
   assert.equal(typerScheduled,true,"Typer resumes same saved verse layout, not a new round");
 
   let canceled=[],schedules=[],mowerSound=[],mowerStops=0,removed=0,coverage=0;

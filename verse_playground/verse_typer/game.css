@@ -58,6 +58,20 @@ body {
   -webkit-touch-callout: none;
 }
 
+/* R06 / PLAY-01: the held iPhone App Switcher can still paint the
+   WKWebView thumbnail while UIKit is inactive. Game time is already frozen
+   by Verse Typer's Welcome Back clock; independent compositor keyframes
+   (head/ripple, caterpillar tail colors, rainbow, sparkles, butterfly)
+   must freeze at the SAME visual frame. JS also pauses captured WAAPI
+   animations/transitions without resetting their currentTime. The shared
+   Welcome Back overlay lives outside #app and is intentionally unaffected. */
+html.vt-return-visual-paused #app,
+html.vt-return-visual-paused #app *,
+html.vt-return-visual-paused #app *::before,
+html.vt-return-visual-paused #app *::after {
+  animation-play-state: paused !important;
+}
+
 #app.vm-shell {
   min-height: 100dvh;
   height: 100dvh;
