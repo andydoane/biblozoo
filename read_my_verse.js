@@ -5847,15 +5847,17 @@
     };
   }
 
-  // Keep the words "the verse." together if the intro wraps. Reserve the
-  // complete sentence while typing so neither line shifts as letters appear.
+  // R12b: two fixed lines, independent of the selected Bible verse.
+  // Reserve BOTH full lines with invisible letters so typing does not
+  // change the layout while the existing single-character clock runs.
   function renderTypingIntroText(count) {
     const head = "Tap to type ";
     const tail = "the verse.";
     const headCount = Math.min(count, head.length);
     const tailCount = Math.max(0, count - head.length);
-    return `${escapeHtml(head.slice(0, headCount))}` +
-      `<span class="read-typewriter-intro-untyped">${escapeHtml(head.slice(headCount))}</span>` +
+    return `<span class="read-typewriter-intro-head">` +
+      `${escapeHtml(head.slice(0, headCount))}` +
+      `<span class="read-typewriter-intro-untyped">${escapeHtml(head.slice(headCount))}</span></span>` +
       `<span class="read-typewriter-intro-tail">${escapeHtml(tail.slice(0, tailCount))}` +
       `<span class="read-typewriter-intro-untyped">${escapeHtml(tail.slice(tailCount))}</span></span>`;
   }
@@ -6024,6 +6026,49 @@
     return `${state.verseId}|${state.activityId}|${state.readTestMode}`;
   }
 
+  // R12b: the intro is an instruction, not part of the verse. Its ONLY
+  // sizing inputs are the current intro box and the two fixed guide lines.
+  // The guide uses the actual loaded Special Elite/Keyboard font; measuring
+  // both lines avoids width guesses and guarantees "Tap to type" / "the verse."
+  // stay exactly two lines on short and long verses alike.
+  function fitReadTypingIntro(wrap) {
+    const intro = wrap.querySelector("[data-read-typewriter-intro]");
+    const guide = intro?.querySelector(".read-typewriter-intro-guide");
+    const head = guide?.querySelector(".read-typewriter-intro-head");
+    const tail = guide?.querySelector(".read-typewriter-intro-tail");
+    if (!intro || !guide || !head || !tail) return;
+    const computed = root.getComputedStyle(intro);
+    const width = intro.clientWidth -
+      (parseFloat(computed.paddingLeft) || 0) -
+      (parseFloat(computed.paddingRight) || 0);
+    const height = intro.clientHeight -
+      (parseFloat(computed.paddingTop) || 0) -
+      (parseFloat(computed.paddingBottom) || 0);
+    if (width <= 0 || height <= 0) return;
+
+    const fits = (size) => {
+      intro.style.setProperty("--typewriter-intro-font-size", `${size}px`);
+      return head.getBoundingClientRect().width <= width * 0.98 &&
+        tail.getBoundingClientRect().width <= width * 0.98 &&
+        guide.getBoundingClientRect().height <= height * 0.96;
+    };
+    // Bound the search to avoid enormous text on an unusually wide screen;
+    // the two-line geometry and available height take precedence.
+    const minimum = 10;
+    let low = minimum;
+    let high = Math.max(minimum, Math.min(180, width * 0.55));
+    if (!fits(minimum)) return; // keep smallest size on tiny/zoomed screens
+    for (let i = 0; i < 12; i += 1) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) low = mid;
+      else high = mid;
+    }
+    // Use a fractional CSS pixel to fill the width without rounding up
+    // into a third line or clipping a glyph.
+    intro.style.setProperty("--typewriter-intro-font-size",
+      `${Math.floor(low * 10) / 10}px`);
+  }
+
   function restoreReadTypingFit(wrap) {
     const cache = typingFitCache;
     if (!cache || cache.key !== typingFitKey() ||
@@ -6035,9 +6080,6 @@
     block.style.maxWidth = `${cache.width}px`;
     block.style.setProperty("--smart-line-height", cache.lineHeight);
     block.style.setProperty("--smart-font-size", `${cache.fontSize}px`);
-    // The intro shares the fitted verse size, including when fit is cached.
-    wrap.querySelector("[data-read-typewriter-intro]")
-      ?.style.setProperty("--typewriter-intro-font-size", `${cache.fontSize}px`);
     block.classList.add("is-fit-ready");
   }
 
@@ -6114,9 +6156,6 @@
     }
     const fontSize = Math.floor(best);
     block.style.setProperty("--smart-font-size", `${fontSize}px`);
-    // Keep the introduction matched to the real verse on every refit/resize.
-    wrap.querySelector("[data-read-typewriter-intro]")
-      ?.style.setProperty("--typewriter-intro-font-size", `${fontSize}px`);
     typingFitCache = {
       key: typingFitKey(),
       viewportWidth: root.innerWidth,
@@ -6133,7 +6172,11 @@
   function scheduleReadTypingVerseFit(wrap) {
     activeTypingFitWrap = wrap;
     const run = (force = false) => {
-      if (wrap.isConnected) fitReadTypingVerseText(wrap, force);
+      if (!wrap.isConnected) return;
+      // Independent intro sizing must run on first mount, device rotation,
+      // and actual font load; verse content retains its own cached fit.
+      fitReadTypingIntro(wrap);
+      fitReadTypingVerseText(wrap, force);
     };
     root.requestAnimationFrame(() => run());
     root.setTimeout(() => run(), 120);
@@ -6145,8 +6188,10 @@
       root.addEventListener("resize", () => {
         const active = activeTypingFitWrap;
         if (active?.isConnected) {
-          root.requestAnimationFrame(() =>
-            fitReadTypingVerseText(active, true));
+          root.requestAnimationFrame(() => {
+            fitReadTypingIntro(active);
+            fitReadTypingVerseText(active, true);
+          });
         }
       });
     }
