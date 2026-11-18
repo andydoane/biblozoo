@@ -346,7 +346,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var savedCaptureKey = -1 // captureWorker only
     private var savedTakeId = "" // captureWorker only, opaque RAM take token
     private var savedSampleRate = 0.0 // captureWorker only
-    // R09: read-only, bounded per-take scalar metrics. No sample leaves RAM.
+    // R09b: read-only, bounded per-take scalar metrics. No sample leaves RAM.
     // The original saved PCM stays identical; only the DRY playback copy may
     // use the measured safe replay gain, never Wacky effects or capture.
     private var savedDryReplayGain: Float = 1.0 // captureWorker only
@@ -751,13 +751,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
 
-    // R09 / FLASH-05: source PCM level inspection in memory on the
-    // capture worker, NOT a system-volume or microphone gain change.
-    // Measurement mode can provide quieter raw input than Web's processed
-    // MediaRecorder. Never blindly boost silence/noise, a hot recording, or
-    // a high transient. Limit a genuinely quiet take to +5.1 dB (1.8x)
-    // AND a strict 0.84 full-scale original peak ceiling. Rounded decibel
-    // numbers are diagnostic-only; no voice bytes/identity are exposed.
+    // R09b / FLASH-05 follow-up: measure the retained mono take once on the
+    // serial capture worker. Audio content never leaves native RAM. Do not
+    // mistake a single high consonant for speech loudness; a separate bounded
+    // output-only dynamics stage controls transients on DRY replay.
     private static func n7cDryReplayLevel(
         _ samples: [Float]
     ) -> (gain: Float, rmsDbFS: Int, peakDbFS: Int) {
@@ -768,11 +765,13 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         var peak = 0.0
         for sample in samples {
             guard sample.isFinite else { return (1, -120, -120) }
-            let absolute = abs(Double(sample))
-            peak = max(peak, absolute)
-            sumSquares += absolute * absolute
-            if absolute >= 0.012 {
-                activeSquares += absolute * absolute
+            let magnitude = abs(Double(sample))
+            peak = max(peak, magnitude)
+            sumSquares += magnitude * magnitude
+            // Exclude most silence and low-level noise from the speech
+            // average; do not alter the recorded source or input tap.
+            if magnitude >= 0.012 {
+                activeSquares += magnitude * magnitude
                 activeFrames += 1
             }
         }
@@ -781,17 +780,67 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             min(0.0, (20.0 * log10(max(0.000001, rms))).rounded())))
         let peakDbFS = Int(max(-120.0,
             min(0.0, (20.0 * log10(max(0.000001, peak))).rounded())))
-        guard peak >= 0.035 && peak < 0.84,
+        guard peak >= 0.028,
               activeFrames >= max(256, samples.count / 200) else {
             return (1, rmsDbFS, peakDbFS)
         }
         let activeRms = sqrt(activeSquares / Double(activeFrames))
-        guard activeRms < 0.085 else {
+        // Avoid boosting near-silence/noise or already comfortably loud
+        // recordings. Peak protection happens in n7cRenderDryVoice, not
+        // by vetoing an entire take because of one sharp consonant.
+        guard activeRms >= 0.017 && activeRms < 0.18 else {
             return (1, rmsDbFS, peakDbFS)
         }
-        let gain = min(1.8, 0.085 / max(0.000001, activeRms),
-                       0.84 / peak)
-        return (Float(max(1.0, gain)), rmsDbFS, peakDbFS)
+        let gain = min(3.2, max(1.0, 0.16 / activeRms))
+        return (Float(gain), rmsDbFS, peakDbFS)
+    }
+
+    // Dry Play only: smooth activity-dependent makeup gain and a gentle
+    // 2:1 peak compressor above 0.22 full-scale, with short attack /
+    // 80 ms release and a final 0.84 sample safety ceiling. Both gain
+    // envelopes are evaluated on the capture worker, not the render/input
+    // callback or main thread. The saved PCM remains byte-for-byte intact.
+    // An approximately 12 ms activity attack and 180 ms falloff leave long
+    // gaps at original noise level instead of boosting room noise endlessly.
+    private static func n7cRenderDryVoice(
+        _ source: UnsafeBufferPointer<Float>,
+        into output: UnsafeMutablePointer<Float>,
+        sampleRate: Double,
+        makeupGain: Float
+    ) {
+        let rate = max(8000.0, min(96000.0, sampleRate))
+        let attack = exp(-1.0 / (rate * 0.012))
+        let activityRelease = exp(-1.0 / (rate * 0.180))
+        let compressionRelease = exp(-1.0 / (rate * 0.080))
+        let maximumMakeup = min(3.2, max(1.0, Double(makeupGain)))
+        var activity = 0.0
+        var reduction = 1.0
+        for i in 0..<source.count {
+            let sample = Double(source[i])
+            if !sample.isFinite {
+                output[i] = 0
+                continue
+            }
+            let magnitude = abs(sample)
+            let activitySmoothing = magnitude > activity
+                ? attack : activityRelease
+            activity = activity * activitySmoothing +
+                magnitude * (1.0 - activitySmoothing)
+            let speechWeight = max(0.0, min(1.0,
+                (activity - 0.008) / 0.022))
+            let boosted = sample * (1.0 +
+                (maximumMakeup - 1.0) * speechWeight)
+            let postGainPeak = abs(boosted)
+            let wanted = postGainPeak > 0.22
+                ? sqrt(0.22 / postGainPeak) : 1.0
+            // Instant attenuation for peaks, smooth release to avoid
+            // audible per-sample gain flutter between vowel cycles.
+            reduction = wanted < reduction
+                ? wanted : reduction * compressionRelease +
+                    wanted * (1.0 - compressionRelease)
+            let corrected = boosted * reduction
+            output[i] = Float(max(-0.84, min(0.84, corrected)))
+        }
     }
 
     // N7c captures *only* on the child's Flashcards Record gesture.
@@ -940,7 +989,11 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                             }
                             let rms = sqrt(sum / Double(max(count, 1)))
                             let db = 20.0 * log10(max(0.00001, rms))
-                            let level = max(0.0, min(1.0, (db + 55) / 55))
+                            // R09b: 16 bars are an encouraging speech ACTIVITY
+                            // indicator, not an RMS/clipping meter. At
+                            // -27.5 dBFS (old 50%), show ~64%; near -15
+                            // dBFS reaches the top. Audio PCM is unchanged.
+                            let level = max(0.0, min(1.0, (db + 50) / 35))
                             DispatchQueue.main.async { [weak self] in
                                 guard let self = self,
                                       self.captureGeneration == token,
@@ -1574,14 +1627,14 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 self.savedSamples.withUnsafeBufferPointer { source in
                     guard let base = source.baseAddress else { return }
-                    // Bounded R09 correction ONLY for explicit Play My
-                    // Recording. Copy-on-play; saved RAM take is untouched,
-                    // and all Wacky DSP variants still receive original PCM.
+                    // R09b: a temporary output-only, speech-aware dry
+                    // dynamics copy. The untouched saved PCM powers ALL
+                    // Wacky/chorus variants; repeat Play never compounds.
                     if effectId.isEmpty && self.savedDryReplayGain > 1.0 {
-                        for i in 0..<source.count {
-                            let amplified = base[i] * self.savedDryReplayGain
-                            samplesOut[0][i] = max(-0.84, min(0.84, amplified))
-                        }
+                        Self.n7cRenderDryVoice(source,
+                            into: samplesOut[0],
+                            sampleRate: self.savedSampleRate,
+                            makeupGain: self.savedDryReplayGain)
                     } else {
                         samplesOut[0].update(from: base, count: source.count)
                     }
