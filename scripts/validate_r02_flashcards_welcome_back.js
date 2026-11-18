@@ -99,7 +99,7 @@ function instructionFixture() {
     const docEvents={}, nativeEvents={}, notices=[], timers=new Map();
     let nextTimer=0, paused=0, visible=0, stopPreview=0, renders=0;
     let instructionState="idle", previewRequest=null;
-    const doc={hidden:false,
+    const doc={hidden:false,querySelector(){return null;},
       body:{appendChild(n){notices.push(n);return n;}},
       createElement(tag){return {tag,setAttribute(){},remove(){
         const at=notices.indexOf(this);if(at>=0)notices.splice(at,1);
@@ -218,6 +218,7 @@ function instructionFixture() {
   f.triggerNative({active:false,reason:"audio-interruption"});
   assert.equal(f.paused,1,"Duplicate native signal cannot pause twice");
   const stoppedBeforeReplay=f.stops;
+  f.prompt.pending=false; // child has acknowledged Welcome Back
   const replay=f.hooks.toggleVersePreview();
   assert.match(f.difficultyUI(),/Stop Listening/,
     "Next child Listen tap must start playback, not merely clear a stale state");
