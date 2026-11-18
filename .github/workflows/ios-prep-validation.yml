@@ -156,6 +156,14 @@ jobs:
       # R11 / LEARN-01: execute the actual Learn overlay sync function
       # and shared Welcome Back with simulated busy, rotating, retry and
       # fallback states. No new audio activation or pause owner.
+      # R12 / READ-01: execute real Typewriter/Keyboard chunk selection
+      # against curly/straight opening and closing quote boundaries.
+      # This tests exact canonical characters and original narration indices,
+      # not actual iPhone typing presentation or audio hardware.
+      - name: Validate R12 Read Typewriter and Keyboard quote-boundary ownership
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r12_read_typing_opening_quotes.js
+
       - name: Validate R11 Learn Welcome Back single busy message and retry
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r11_learn_welcome_back_busy_status.js
