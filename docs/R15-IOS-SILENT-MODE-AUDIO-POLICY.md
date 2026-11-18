@@ -1,5 +1,8 @@
 # R15 / AUDIO-01 — iOS Silent Mode product-policy decision brief
 
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
 ## CURRENT implementation status — R16b Read music-free voice candidate (2026-11-18)
 
 **Owner Option B stays unchanged:** only spoken instructions/verse and child's explicitly replayed voice may bypass Silent Mode; incidental UI, feedback, music and decorative effects may not. **Merged/owner iPhone PASS** R16a.2 #148 fixed Learn Chunks/Echo Menu false Welcome Back; previous owner speaker tests confirmed Learn/Flashcards voice audible under Silent ON with Home/Verse Scramble quiet. AirPods effects were audible under native `SoloAmbient` Bluetooth route; do not invent a headphone-specific mute workaround.
