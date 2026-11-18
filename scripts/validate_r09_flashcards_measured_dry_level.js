@@ -47,7 +47,7 @@ assert(swift.includes("self.playbackRouteEpoch == routeEpoch"));
 assert(swift.includes("try session.setActive(true)"));
 assert(js.includes("playCapture({takeId: takeMetadata.takeId})"),
  "ordinary child Play uses the unchanged dry preset");
-assert(js.includes("presetId: nativeId"),"Wacky still selects an effect");
+assert(js.includes("takeId: takeMetadata.takeId, presetId"),"Wacky still selects an effect");
 assert(web.includes("getUserMedia({ audio: true })"),
  "original Web/Android mic setup untouched");
 assert(!swift.slice(start,stop).includes("AVAudioSession"),
