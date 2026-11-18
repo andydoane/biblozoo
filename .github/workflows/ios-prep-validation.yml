@@ -139,6 +139,12 @@ jobs:
 
       # N7k: early iOS lifecycle and quiet interval checkpoints for Chunks
       # and Echo; held App Switcher during yellow speaking must Welcome Back.
+      # R04: Learn Missing Words must freeze in a held iOS App Switcher
+      # even when WebKit stays visible; return only via real Welcome Back.
+      - name: Validate R04 Learn Missing Words inactive app-switcher freeze
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r04_learn_missing_words_inactive_pause.js
+
       - name: Validate N7k Learn Chunks and Echo silent-phase native interruptions
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_learn_quiet_interruption_n7k.js
