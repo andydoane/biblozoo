@@ -171,6 +171,16 @@ for(const activity of ["typewriter","keyboard"]) {
  same(all.chunks,[curly.verseText],activity+" one_chunk keeps whole original");
  same(all.audioIndices,[0],activity+" one_chunk uses one full-verse file");
  eq(all.usesChunkAudio,false,activity+" one_chunk selects full-verse narration");
+ for(const mode of ["forced_short","forced_long"]){
+   const original=api.buildDisplayChunks(curly.verseText,curly.echoParts);
+   const indices=original.map((chunk,index)=>({index,length:Array.from(chunk).length}))
+      .sort((a,b)=>mode==="forced_short" ? a.length-b.length : b.length-a.length);
+   const forced=api.selectActivityChunks(curly,activity,mode);
+   same(forced.audioIndices,[indices[0].index],
+     activity+" "+mode+" must still select original spoken echoPart index");
+   eq(forced.chunks.length,1,activity+" "+mode+" keeps one selected displayed phrase");
+   eq(forced.usesChunkAudio,true,activity+" "+mode+" uses original numbered audio");
+ }
  const fallback={
    verseText:"They replied, ‘Believe in the Lord.",
    echoParts:["They replied, ‘","Unavailable phrase"]
