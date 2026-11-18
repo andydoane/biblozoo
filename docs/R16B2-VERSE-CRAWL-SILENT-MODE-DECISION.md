@@ -1,6 +1,21 @@
-# R16b.2 / AUDIO-01 — Verse Crawl Silent Mode product decision (owner approval pending)
+# R16b.2 / AUDIO-01 — Verse Crawl reversible music control
 
-**Prepared:** 2026-11-18. **Status:** DESIGN OPTIONS ONLY — no executable change, no approved selection. This document is a proposed next step after owner-confirmed R16b.1 success, not a claim that Verse Crawl narration in Silent Mode works.
+## CURRENT — owner-approved music-note toggle, source PR candidate (2026-11-18)
+
+The owner rejected a startup popup and selected a **top-right music-note toggle**, using their uploaded `verse_images/game_ui/ui_icon_music_notes.png` artwork in a yellow `#ffc751` circular button. It starts Music ON, a tap fades the button and turns music OFF, a second tap restores Music ON. No preference persists to the next Verse Crawl run; no new modal or special Silent-switch detection.
+
+- **Music ON:** Original native Crawl theme, narration and ending overlap under app-wide `.soloAmbient`. With the phone Silent switch ON the OS silences them as it does today.
+- **Music OFF:** Both Crawl theme and ending stop and remain absent. Source-approved verse narration alone can hold the short essential `.playback` lease, including with physical Silent Mode ON. Stop confirmations precede changing the audio category; tapping during narration resumes that **same** clip at its last-known position, without claiming that a Node test proves physical audibility.
+- **Turn music back ON:** First stop and release the exclusive essential voice lease, then restore original native Crawl music+speech under `.soloAmbient`. Rapid toggles are serialized, old callbacks cannot finish verses or fabricate a Welcome Back; a real OS interruption still requires its existing explicit recovery.
+- **Control/accessibility:** Button is upper-right, `aria-pressed`, labeled Turn Verse Crawl music off/on, 44–56px safe-area-aware touch target and reduced-motion-friendly fade. Original music defaults ON on every fresh activity; web/PWA/Android normal default is unchanged.
+- **Safety:** No global `.playback` while optional music is playing, no app-wide mute, microphone/backup/reward/storage changes, background playback, unproven Silent-switch sensor, new cloud logs, or auto media takeover. Protect original 10 production and separate 11 Audio Test Zookeepers.
+
+**Candidate branch:** `feat/r16b2-verse-crawl-music-toggle` → `integration/native-audio-to-ios-prep` only. Add focused native adapter/toggle regression and full Actions; owner must merge and physically confirm Silent ON/OFF, ON→OFF→ON while speech is active, actual verse progress, genuine lock/App Switcher/PiP, and Exit/start reset. **Physical iPhone: NOT TESTED for this change.** R17 final comprehensive acceptance remains deferred.
+
+## HISTORICAL decision options (before owner selected toggle)
+
+**Prepared:** 2026-11-18. **Historical status:** DESIGN OPTIONS ONLY. The proposals below are retained for rationale; the owner has since chosen the reversible note button instead. No physical test is implied.
+
 
 ## Verified baseline
 
