@@ -32,6 +32,11 @@ enum BibloZooEssentialVoiceSession {
             try session.setCategory(.playback, mode: .default, options: [])
             guard session.category == .playback else { return false }
             owner = requested
+            #if DEBUG
+            // Only session category is logged. This is not audibility proof.
+            NSLog("[BibloZooSilentProbe] phase=voice-begin " +
+                  "category=\(session.category.rawValue)")
+            #endif
             return true
         } catch {
             return false
@@ -47,6 +52,10 @@ enum BibloZooEssentialVoiceSession {
         guard session.category == .playback else { return false }
         do {
             try session.setCategory(.soloAmbient, mode: .default, options: [])
+            #if DEBUG
+            NSLog("[BibloZooSilentProbe] phase=voice-end " +
+                  "category=\(session.category.rawValue)")
+            #endif
             return session.category == .soloAmbient
         } catch {
             // Leave failures explicit for existing category-not-soloambient gates.
