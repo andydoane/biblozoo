@@ -48,7 +48,7 @@ assert(play.includes("UIApplication.shared.applicationState == .active") &&
 assert(!play.includes("!session.isOtherAudioPlaying") &&
   !play.includes("!AVAudioSession.sharedInstance().isOtherAudioPlaying"),
   "Neither early nor late native Play may pre-veto Apple Music");
-assert(play.includes("try AVAudioSession.sharedInstance().setActive(true)") &&
+assert(play.includes("try session.setActive(true)") &&
   play.includes("completionCallbackType: .dataPlayedBack") &&
   play.includes('reason: "start-failed"'),
   "Real OS activation, real completion event and honest OS failure remain");
