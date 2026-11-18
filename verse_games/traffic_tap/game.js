@@ -2251,6 +2251,22 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     };
   }
 
+  // R14 / PRACTICE-01: the bonus trailer has its own cinematic traversal,
+  // separate from regular vehicle acceleration, collision and streak speeds.
+  // The old 130px/s (capped at 190) made the long trailer linger. Use a
+  // brisk, bounded pace with the same Normal/Fast/Max preset the player
+  // selected for the rest of Traffic Tap. A fixed speed is captured for each
+  // intro/outro; the original delta-clock and offscreen completion gates
+  // still determine when the bonus round begins and when results appear.
+  function bonusTruckTravelSpeed() {
+    return Math.round(clamp(
+      300 * trafficSpeedMultiplier() *
+        window.VerseGameShell.getGameSpeedMultiplier(),
+      280,
+      560
+    ));
+  }
+
   function startBonusTruckIntro(now = gameNow()) {
     state.bonusTruckMode = "intro";
 
@@ -2261,7 +2277,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
     state.bonusIntroTarget = pickBonusTargetEmoji();
     state.bonusTruckWidth = metrics.totalWidth;
     state.bonusTruckX = state.fieldWidth + 28;
-    state.bonusTruckSpeed = Math.round(clamp(130 * trafficSpeedMultiplier(), 120, 190));
+    state.bonusTruckSpeed = bonusTruckTravelSpeed();
     state.overlayMessage = "";
     state.overlayUntil = 0;
 
@@ -2278,7 +2294,7 @@ In the bonus round, tap as many of the target vehicle as you can.`;
 
     state.bonusTruckWidth = metrics.totalWidth;
     state.bonusTruckX = state.fieldWidth + 28;
-    state.bonusTruckSpeed = Math.round(clamp(130 * trafficSpeedMultiplier(), 120, 190));
+    state.bonusTruckSpeed = bonusTruckTravelSpeed();
     state.overlayMessage = "";
     state.overlayUntil = 0;
 
