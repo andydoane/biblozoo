@@ -372,6 +372,14 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_ui_audio_n5a.js
 
+      # R13 / PLAY-02: the real native Ghost Writer mode-select preflight
+      # must not flash its "Getting spooky sounds ready" popup on a quick
+      # resolution. Long waits, actual denial/Retry, held App Switcher,
+      # real Back cancellation and original gesture-owned PCM stay intact.
+      - name: Validate R13 Ghost Writer mode selection without native loading flash
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r13_ghost_writer_mode_preparing_flash.js
+
       - name: Validate N6r Playground Ghost Writer five native spooky clips, timing and PiP
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_playground_ghost_writer_n6r.js
