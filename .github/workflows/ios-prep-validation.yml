@@ -160,6 +160,13 @@ jobs:
       # against curly/straight opening and closing quote boundaries.
       # This tests exact canonical characters and original narration indices,
       # not actual iPhone typing presentation or audio hardware.
+      # R12b: the fixed two-line Typewriter/Keyboard intro must fit its own
+      # screen box independently of verse length or the verse font cache.
+      # Execute the actual renderer/fitter with synthetic narrow/wide layouts.
+      - name: Validate R12b Typewriter Keyboard independent two-line intro
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r12b_read_typing_intro_independent_fit.js
+
       - name: Validate R12 Read Typewriter and Keyboard quote-boundary ownership
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r12_read_typing_opening_quotes.js
