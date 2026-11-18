@@ -242,7 +242,11 @@ async function testNativePreview() {
   onEvent({kind:"interrupted",stage:"reference"});
   assert.equal(await interruptedPlay,false,"Native interruption settles Daily voice");
   assert.equal(interrupted,1,"Daily owner gets direct source interruption callback");
-  assert.equal(stops>=1,true,"Previous native player stopped on next explicit Listen");
+  const explicitStop=win.__preview.playVerseDetailListen("john_3_16");
+  win.__preview.cancelVerseDetailListen();
+  assert.equal(await explicitStop,false,"Close/Stop cancels an in-flight Daily preview");
+  assert.equal(stops>=1,true,
+    "Explicit Daily Stop releases the native narration owner; no ghost voice");
 }
 
 (async()=>{await testDaily();await testNativePreview();
