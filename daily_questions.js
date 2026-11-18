@@ -3269,7 +3269,8 @@
           event.stopPropagation();
 
           if (
-            !dailySession ||
+            !dailySession || document.hidden ||
+            dailyQuestionsReturnPaused() ||
             dailySession.phase !==
               SESSION_PHASES.VERSE ||
             dailySession.verseAudioPlaying
