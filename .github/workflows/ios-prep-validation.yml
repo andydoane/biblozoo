@@ -139,6 +139,18 @@ jobs:
 
       # N7k: early iOS lifecycle and quiet interval checkpoints for Chunks
       # and Echo; held App Switcher during yellow speaking must Welcome Back.
+      # R05: Native Check the Verse Listen interrupts while UIKit may stay
+      # active; reject stale Listening labels and old async completions.
+      - name: Validate R05 Daily Check the Verse native Welcome Back and Listen retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r05_daily_check_verse_native_recovery.js
+
+      # R04 owner follow-up bundled here: normal in-app Menu must pause
+      # the exact Missing Words countdown/animation, not show Welcome Back.
+      - name: Validate R04 Missing Words Learn Menu pause follow-up
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r04_learn_menu_pause_followup.js
+
       # R04: Learn Missing Words must freeze in a held iOS App Switcher
       # even when WebKit stays visible; return only via real Welcome Back.
       - name: Validate R04 Learn Missing Words inactive app-switcher freeze

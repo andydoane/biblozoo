@@ -109,6 +109,12 @@ function harness(mode = "listen", { native = true, muted = false } = {}) {
     render(){calls.push(["render"]);win.__test?.syncLearnAudioResumeOverlay?.();},
     resetLearn(x){calls.push(["exit",x]);},
     safePlay(){calls.push(["web-resume"]);return Promise.resolve();},
+    // R05's small R04 follow-up added HIDE-only menu clock helpers.
+    // This older N7j VM slices out ONLY the menu source to test
+    // Listen/Chunks/Echo. Provide strict non-HIDE shims here; the new
+    // validate_r04_learn_menu_pause_followup.js runs the actual helpers.
+    pauseHideForMenu(){assert.notEqual(State.screen,"hide");},
+    resumeHideFromMenu(){assert.notEqual(State.screen,"hide");},
     setTimeout(fn,delay){calls.push(["watchdog",delay]);return 1;},
     clearTimeout(){}
   };

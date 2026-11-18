@@ -1035,6 +1035,10 @@ function openLearnMenu() {
       learnMenuNativeRecovery = learnAudioInterrupted;
     }
   }
+  // R04 follow-up: ordinary Learn Menu is a pause, not a UIKit departure.
+  // Freeze the active Missing Words countdown/transition and original
+  // animation frame without creating Welcome Back or consuming a word.
+  pauseHideForMenu();
   learnMenuOpen = true;
   syncLearnAudioResumeOverlay();
   learnMenuPausedAudio = !isNativeLearnListenMode() && !audioEl.paused;
@@ -1055,6 +1059,9 @@ function closeLearnMenu() {
   menu.setAttribute("aria-hidden", "true");
 
   learnMenuOpen = false;
+  // Only this actual Menu Close gesture resumes Missing Words, unless
+  // the OS interruption controller still owns a separate Welcome Back.
+  resumeHideFromMenu();
   const menuRecovery = learnMenuNativeRecovery;
   learnMenuNativeRecovery = null;
   // Close is an actual user tap: it may invoke the *existing* native
@@ -9097,7 +9104,8 @@ async function playVerseDetailListen(verseId, { onInterrupted } = {}) {
           onEvent: (event) => {
             if (settled || listenToken !== verseDetailListenToken ||
                 !verseDetailListenActive || document.hidden ||
-                ![Screen.VERSE_DETAIL, Screen.FLASHCARDS].includes(State.screen))
+                ![Screen.VERSE_DETAIL, Screen.FLASHCARDS,
+                  Screen.DAILY_SESSION].includes(State.screen))
               return;
             if (event.kind === "stage" || event.kind === "playing") {
               setVerseDetailPreviewStatus(
@@ -9111,11 +9119,12 @@ async function playVerseDetailListen(verseId, { onInterrupted } = {}) {
               // and stale completion must never count as success.
               finish(true);
             } else if (event.kind === "interrupted") {
-              // Flashcards needs its own Welcome Back for external media
-              // taking the native session while the iPhone remains active.
-              // The callback cancels its pending Listen generation before
-              // finish(false) could be mistaken for a broken audio file.
-              if (State.screen === Screen.FLASHCARDS &&
+              // Flashcards and Daily Check the Verse own their own
+              // Welcome Back for external media taking the native session
+              // while UIKit may remain active. Notify those controllers
+              // BEFORE finish(false) resolves the interrupted request.
+              if ([Screen.FLASHCARDS, Screen.DAILY_SESSION]
+                    .includes(State.screen) &&
                   typeof onInterrupted === "function") {
                 try { onInterrupted(); } catch (_) {}
               }
@@ -11266,6 +11275,7 @@ function go(nextScreen) {
 
   if (from === Screen.HIDE && nextScreen !== Screen.HIDE) {
     releaseHideActivityVisuals();
+    learnHideMenuPaused = false;
     appReturnPausedAt = 0;
     State.sayVerseActive = false;
     State.sayVerseStartedAt = 0;
@@ -11397,6 +11407,7 @@ function setScreen(screen) {
   }
   if (State.screen === Screen.HIDE && screen !== Screen.HIDE) {
     releaseHideActivityVisuals();
+    learnHideMenuPaused = false;
     appReturnPausedAt = 0;
   }
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
@@ -12736,13 +12747,21 @@ function waitForDuration(timeoutMs = 2000) {
 // prompt. Timed Learn exercise clocks remain frozen until the child's gesture.
 let appActivityReturn = null;
 let appReturnPausedAt = 0;
+// R04 menu follow-up: this is a purely in-app paused HIDE, never an OS
+// interruption or a new Welcome Back. Share the same frozen clock to
+// avoid double-counting if UIKit becomes inactive while the menu is open.
+let learnHideMenuPaused = false;
 // R04: UIKit may report inactive while held App Switcher keeps WebKit
 // visible. Freeze the current Missing Words clock and live visual animations
 // at that event; recover through the EXISTING user-tap Welcome Back only.
 let appActivityNativeLifecycleBound = false;
 let pausedHideAnimations = [];
+let hideActivityVisualsPaused = false;
 function pauseHideActivityVisuals() {
-  if (State.screen !== Screen.HIDE) return;
+  // Menu plus UIKit can pause the same frame; never overwrite the
+  // original running-animation handles with already-paused animations.
+  if (State.screen !== Screen.HIDE || hideActivityVisualsPaused) return;
+  hideActivityVisualsPaused = true;
   const stage = document.querySelector?.(".learn-screen-remove");
   pausedHideAnimations = Array.from(stage?.getAnimations?.({ subtree: true }) || [])
     .filter(animation => animation.playState === "running");
@@ -12753,6 +12772,7 @@ function pauseHideActivityVisuals() {
   document.documentElement?.classList?.add("learn-hide-native-paused");
 }
 function releaseHideActivityVisuals(resume = false) {
+  hideActivityVisualsPaused = false;
   document.documentElement?.classList?.remove("learn-hide-native-paused");
   const paused = pausedHideAnimations;
   pausedHideAnimations = [];
@@ -12761,6 +12781,26 @@ function releaseHideActivityVisuals(resume = false) {
     try { if (animation.playState === "paused") animation.play(); }
     catch (_) {}
   }
+}
+function pauseHideForMenu() {
+  if (State.screen !== Screen.HIDE || learnHideMenuPaused) return;
+  learnHideMenuPaused = true;
+  if (!appReturnPausedAt) appReturnPausedAt = performance.now();
+  pauseHideActivityVisuals();
+}
+function resumeHideFromMenu() {
+  if (!learnHideMenuPaused) return;
+  learnHideMenuPaused = false;
+  // A real OS switch while the menu was open still needs Let's go!.
+  // Menu Close is not permission to dismiss the native interruption.
+  if (document.hidden || appActivityReturn?.isPaused?.()) return;
+  if (appReturnPausedAt) {
+    const delta = Math.max(0, performance.now() - appReturnPausedAt);
+    if (State.screen === Screen.HIDE && State.sayVerseStartedAt)
+      State.sayVerseStartedAt += delta;
+    appReturnPausedAt = 0;
+  }
+  releaseHideActivityVisuals(State.screen === Screen.HIDE);
 }
 function bindNativeAppActivityReturn() {
   if (appActivityNativeLifecycleBound || !appActivityReturn ||
@@ -12812,6 +12852,10 @@ function attachAppActivityReturn() {
     },
     onContinue: () => {
       if (document.hidden) return false;
+      // A held switcher can interrupt an OPEN Learn menu. Acknowledging
+      // the OS never resumes the HIDE clock through that still-open menu;
+      // the eventual Menu Close gesture owns the remaining pause.
+      if (State.screen === Screen.HIDE && learnHideMenuPaused) return true;
       // Navigation may have changed while iOS was away: discard stale prompt.
       if (![Screen.TODO_DEV, Screen.HIDE, Screen.FINAL_RECALL]
           .includes(State.screen)) {
@@ -12832,6 +12876,7 @@ function attachAppActivityReturn() {
     },
     onExit: () => {
       appReturnPausedAt = 0;
+      learnHideMenuPaused = false;
       releaseHideActivityVisuals();
       go(Screen.TITLE);
     },
@@ -12846,11 +12891,13 @@ function attachAppActivityReturn() {
 async function waitForActiveLearnTime(ms) {
   let remaining = Math.max(0, ms);
   let last = performance.now();
-  while (remaining > 0 || document.hidden || appActivityReturn?.isPaused?.()) {
+  while (remaining > 0 || document.hidden || learnHideMenuPaused ||
+         appActivityReturn?.isPaused?.()) {
     await new Promise(resolve => setTimeout(resolve,
       Math.max(25, Math.min(50, remaining))));
     const now = performance.now();
-    if (!document.hidden && !appActivityReturn?.isPaused?.()) {
+    if (!document.hidden && !learnHideMenuPaused &&
+        !appActivityReturn?.isPaused?.()) {
       remaining -= Math.min(100, now - last);
     }
     last = now;
