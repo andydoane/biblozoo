@@ -15,6 +15,46 @@ enum BibloZooIOSIdentity {
     }
 }
 
+// R16a: a single foreground-only OS audio-session lease for narration and
+// RAM-only recorded voice. AVAudioSession is process-wide; optional game sounds
+// must NEVER borrow this category. No automatic activation, Silent switch probe,
+// background audio or extra child-data collection. Calls happen on main only.
+enum BibloZooEssentialVoiceSession {
+    private static var owner: String?
+
+    static func begin(owner requested: String) -> Bool {
+        guard Thread.isMainThread,
+              UIApplication.shared.applicationState == .active else { return false }
+        let session = AVAudioSession.sharedInstance()
+        if owner == requested { return session.category == .playback }
+        guard owner == nil, session.category == .soloAmbient else { return false }
+        do {
+            try session.setCategory(.playback, mode: .default, options: [])
+            guard session.category == .playback else { return false }
+            owner = requested
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    @discardableResult
+    static func end(owner requested: String) -> Bool {
+        guard Thread.isMainThread, owner == requested else { return false }
+        owner = nil
+        let session = AVAudioSession.sharedInstance()
+        if session.category == .soloAmbient { return true }
+        guard session.category == .playback else { return false }
+        do {
+            try session.setCategory(.soloAmbient, mode: .default, options: [])
+            return session.category == .soloAmbient
+        } catch {
+            // Leave failures explicit for existing category-not-soloambient gates.
+            return false
+        }
+    }
+}
+
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     // N7f.2: freeze the presented iOS view the INSTANT the scene loses
@@ -1666,11 +1706,21 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                                       "reason": "activation-failed"])
                         return
                     }
+                    // Only the child's real Play My Recording tap may lease
+                    // non-silent essential voice output; never on foreground.
+                    guard BibloZooEssentialVoiceSession.begin(
+                        owner: "flashcards-replay") else {
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "voice-session-unavailable"])
+                        return
+                    }
                     let outputPorts = session.currentRoute.outputs
                         .map { $0.portType.rawValue }.sorted()
                     guard !outputPorts.isEmpty,
                           self.playbackRouteEpoch == routeEpoch,
-                          session.category == .soloAmbient else {
+                          session.category == .playback else {
+                        BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")
                         self.releaseFlashcardsAudioPriority()
                         call.resolve(["started": false,
                                       "reason": "output-route-changed"])
@@ -1682,6 +1732,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     let outputFormat = engine.outputNode.outputFormat(forBus: 0)
                     guard outputFormat.sampleRate > 0,
                           outputFormat.channelCount > 0 else {
+                        BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")
                         self.releaseFlashcardsAudioPriority()
                         call.resolve(["started": false,
                                       "reason": "output-not-ready"])
@@ -1829,6 +1880,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         playbackTakeId = ""
         playbackStartedAt = nil
         playbackOutputPorts = []
+        BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")
         // Ending a normal take or manually stopping it only stops the PCM
         // player. Keep the foreground nonmixing AVAudioSession active so
         // Apple Music/PiP stays paused until its OWN next Play gesture.
