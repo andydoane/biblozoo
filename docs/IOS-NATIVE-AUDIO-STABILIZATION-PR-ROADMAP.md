@@ -1,5 +1,8 @@
 # Native iOS audio stabilization — proposed sequence of focused PRs
 
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
 ## CURRENT plan — R16b isolated Read voice candidate, R17 deferred (2026-11-18)
 
 **R16a sequence closed for owner-tested cases:** #146 introduced essential Learn/Flashcards speech, #147 DEBUG-only acoustic diagnostics, #148 fixed Learn Chunks/Echo false Welcome Back; all are merged into integration. Owner tested #148 and reported **PASS**, and earlier speaker Silent ON Home/Verse Scramble quiet + voice audible, Flashcards RAM playback working. No special AirPods muting rule; session `soloAmbient` remains correct default.
