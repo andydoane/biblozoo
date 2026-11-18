@@ -2270,19 +2270,26 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             // audition. The child-facing playCue() behavior is untouched.
             self.cues.forEach { $0.stop() }
             self.cues.removeAll()
-            var count = 0
+            // Keep DEV waveform comparisons on the identical reliable
+            // native cue timing path; otherwise a zero-clock first note could
+            // invalidate later READ-04 level/timbre comparisons.
+            var prepared: [(player: AVAudioPlayer, delay: Double)] = []
             for (midi, delay) in notes {
                 guard let player = try? AVAudioPlayer(
                     data: self.wavData(midi: midi, seconds: duration,
                                        gain: 0.22, square: false,
-                                       waveform: waveform)) else { continue }
-                player.delegate = self
-                player.prepareToPlay()
-                if player.play(atTime: player.deviceCurrentTime + delay) {
-                    self.cues.append(player)
-                    count += 1
+                                       waveform: waveform)),
+                    player.prepareToPlay() else {
+                    prepared.forEach { $0.player.stop() }
+                    call.resolve(["played": false,
+                                  "reason": "cue-prepare-failed",
+                                  "noteCount": 0])
+                    return
                 }
+                player.delegate = self
+                prepared.append((player: player, delay: delay))
             }
+            let count = self.playPreparedReadCueNotes(prepared)
             call.resolve(["played": count == notes.count,
                           "noteCount": count])
         }
