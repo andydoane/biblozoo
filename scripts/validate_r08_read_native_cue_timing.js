@@ -47,9 +47,9 @@ for (const text of [
   "[(base, 0), (base + 4, 0.1)]",
   "[(base, 0), (base + 4, 0.09)",
   "(base + 7, 0.19), (base + 12, 0.3)]",
-  "gain = wrong ? 0.11 : 0.22",
-  "gain = 0.22; duration = complete ? 0.2 : 0.17"
-])assert(child.includes(text), "Retain original scale/spacing/level: " + text);
+  "gain = wrong ? 0.13 : (complete ? 0.28 : 0.32)",
+  "gain = complete ? 0.28 : 0.32"
+])assert(child.includes(text), "Retain R08 note scale/spacing and R10 calibrated level: " + text);
 assert(activity.includes('playOrderTone(data.nextIndex, data.nextIndex >= data.tokens.length)'));
 assert(activity.includes('playScrambleReward(count, complete)'));
 assert(activity.includes('if (!heard || !tonesReady || !nativeReady || root?.document?.hidden)'),
