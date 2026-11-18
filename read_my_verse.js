@@ -1586,6 +1586,15 @@
   }
 
   function beginReadNarration(audio, fallback) {
+    // R16b: narrated verse clips in Read activities WITHOUT overlapping
+    // soundtrack may use the same short-lived essential-voice session as
+    // Learn/Flashcards. Verse Crawl retains its original pre-ducked music +
+    // voice overlap under .soloAmbient until that product tradeoff is solved.
+    // Only the iOS native adapter exposes this marker; browsers unchanged.
+    if (root?.BibloZooNativeReadOutputController?.enabled === true &&
+        state.activityId !== VERSE_CRAWL_ACTIVITY_ID) {
+      audio?.markEssentialVoice?.();
+    }
     let result;
     try { result = audio.play(); } catch (error) { result = Promise.reject(error); }
     const promise = Promise.resolve(result);
