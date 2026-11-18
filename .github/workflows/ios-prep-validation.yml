@@ -144,6 +144,13 @@ jobs:
       # the still-visible held App Switcher thumbnail until real Let's go.
       # R07: Read Balloons/Fish must re-seek their original CSS/WAAPI frames
       # before thaw, and scene timeouts must ignore 10+ seconds of OS inactivity.
+      # R08: real Swift Read AVAudioPlayer scheduling helper is compiled
+      # against a zeroed post-interruption device clock; never test hearing
+      # or Apple SDK linkage from the Linux runner.
+      - name: Validate R08 native Read cue first-note and melody spacing
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r08_read_native_cue_timing.js
+
       - name: Validate R07 Read Balloons and Fish active-time visual resume
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r07_read_balloons_fish_pause_clock.js
