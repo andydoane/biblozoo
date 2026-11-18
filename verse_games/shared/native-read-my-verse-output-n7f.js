@@ -241,8 +241,15 @@
     pause() {
       const id=this._requestId;
       this._stopLocal();
-      try{void Promise.resolve(api()?.stopClip?.({requestId:id})).catch(()=>{});}
-      catch(_){}
+      // R16b.2: the Crawl music toggle must await the native stop before
+      // replacing the app-wide audio category. Existing callers may ignore
+      // this Promise; an intentional stop never emits a fake interruption.
+      if (!id) return Promise.resolve({stopped:true});
+      try {
+        return Promise.resolve(api()?.stopClip?.({requestId:id})).then(
+          result => ({stopped:result?.stopped === true}),
+          () => ({stopped:false}));
+      } catch(_) { return Promise.resolve({stopped:false}); }
     }
     async play() {
       if(root.document?.hidden || !this._clipId ||
