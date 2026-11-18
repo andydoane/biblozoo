@@ -1586,15 +1586,12 @@
   }
 
   function beginReadNarration(audio, fallback) {
-    // R16b: narrated verse clips in Read activities WITHOUT overlapping
-    // soundtrack may use the same short-lived essential-voice session as
-    // Learn/Flashcards. Verse Crawl retains its original pre-ducked music +
-    // voice overlap under .soloAmbient until that product tradeoff is solved.
-    // Only the iOS native adapter exposes this marker; browsers unchanged.
+    // R16b.3: standalone Read speech still has its short source-validated
+    // essential-voice lease. Verse Crawl gets a separate explicit category
+    // lease at Start/Welcome Back, so NO Crawl clip is individually marked
+    // essential and music + narration can share its category safely.
     if (root?.BibloZooNativeReadOutputController?.enabled === true &&
-        (state.activityId !== VERSE_CRAWL_ACTIVITY_ID ||
-          (crawlSession?.active && crawlSession.musicEnabled === false &&
-            !crawlMusic && !crawlEnding))) {
+        state.activityId !== VERSE_CRAWL_ACTIVITY_ID) {
       audio?.markEssentialVoice?.();
     }
     let result;
@@ -2328,7 +2325,9 @@
     // but don't mistake an unverified Promise/gesture for recovered audio.
     // Keyboard/Typewriter quiet states have no AVAudioPlayer to verify.
     const nativeActivation = nativeMode
-      ? root.BibloZooNativeReadOutputController.activateFromGesture()
+      ? root.BibloZooNativeReadOutputController.activateFromGesture({
+          crawlSession: state.activityId === VERSE_CRAWL_ACTIVITY_ID
+        })
       : Promise.resolve(true);
     const generation = readAudioRecoveryGeneration;
     readAudioRecoveryAttempt = { generation };
@@ -2673,7 +2672,9 @@
     // Claim audio priority only on this actual Start interaction.
     // Subsequent animated chunk timers may NEVER seize it anew.
     if (root?.BibloZooNativeReadOutputController?.enabled)
-      void root.BibloZooNativeReadOutputController.activateFromGesture();
+      void root.BibloZooNativeReadOutputController.activateFromGesture({
+        crawlSession: safeActivityId === VERSE_CRAWL_ACTIVITY_ID
+      });
     // Start in the launch gesture so iOS permits music playback.
     if (safeActivityId === VERSE_CRAWL_ACTIVITY_ID) {
       startCrawlMusic("activity-launch");
@@ -4873,10 +4874,6 @@
 
   function playCrawlAudio(session, item, resumeAt = 0) {
     if (!session.active || item.audioStarted || item.vanished) return;
-    if (session.musicSwitching) {
-      session.pendingNarration = { item, position: resumeAt };
-      return;
-    }
     item.audioStarted = true;
     state.phase = "playing";
     readActiveAnimatedNarration = { session, item };
@@ -4971,10 +4968,11 @@
     }, motion.durationMs + 1500);
   }
 
-  // R16b.2: child-initiated music choice, never hardware Silent-switch
-  // detection. Wait for actual native stopClip acknowledgements before
-  // changing from soloAmbient soundtrack to music-free spoken-verse playback
-  // or vice versa. Neither direction creates a synthetic OS interruption.
+  // R16b.3: Music ON or OFF is solely a per-session track choice. The
+  // native iOS Verse Crawl Start/Welcome Back gesture already owns a scoped
+  // .playback lease, so toggling NEVER stops/restarts narration, changes the
+  // shared category, or triggers a fabricated interruption. Works with the
+  // hardware Silent switch in either position without probing its state.
   function toggleCrawlMusic(session) {
     if (!session?.active || crawlSession !== session || readAudioRecovery ||
         root?.document?.hidden || session.endingStarted || completionReported)
@@ -4984,69 +4982,12 @@
     session.musicButton?.setAttribute("aria-pressed", String(session.musicEnabled));
     session.musicButton?.setAttribute("aria-label", session.musicEnabled
       ? "Turn Verse Crawl music off" : "Turn Verse Crawl music on");
-    // Browser/PWA/Android has no native shared-category lease. Keep its
-    // current spoken verse player running and switch music immediately
-    // within this real tap (important for iOS Safari's gesture policy).
-    if (root?.BibloZooNativeReadOutputController?.enabled !== true) {
-      if (session.musicEnabled) startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
-      else { stopCrawlMusic(); stopCrawlEnding(); }
-      return;
+    if (session.musicEnabled)
+      startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
+    else {
+      stopCrawlMusic();
+      stopCrawlEnding();
     }
-    const epoch = ++session.musicToggleEpoch;
-    session.musicSwitching = true;
-    session.musicSwitchQueue = Promise.resolve(session.musicSwitchQueue)
-      .catch(() => {}).then(async () => {
-        if (!session.active || crawlSession !== session || readAudioRecovery ||
-            root?.document?.hidden) {
-          session.musicSwitching = false;
-          return;
-        }
-        let restart = session.pendingNarration;
-        let stoppedNarration = Promise.resolve({ stopped: true });
-        const owner = readActiveAnimatedNarration;
-        if (owner?.session === session && activeAudio && !owner.item.audioDone) {
-          const previous = activeAudio;
-          restart = { item: owner.item,
-            position: Math.max(0, Number(previous.currentTime) || 0) };
-          session.pendingNarration = restart;
-          // An intentional toggle invalidates the old playback completion
-          // BEFORE stopping it; only the newly started narration advances.
-          audioRequest += 1;
-          activeAudio = null;
-          readAudioStartPromise = null;
-          owner.item.audioStarted = false;
-          stoppedNarration = Promise.resolve(previous.pause());
-        }
-        const stops = await Promise.all([
-          stoppedNarration, stopCrawlMusic(), stopCrawlEnding()
-        ]);
-        if (epoch !== session.musicToggleEpoch) return;
-        if (!session.active || crawlSession !== session || readAudioRecovery ||
-            root?.document?.hidden) {
-          session.musicSwitching = false;
-          return;
-        }
-        if (stops.some(result => result?.stopped === false)) {
-          session.musicSwitching = false;
-          pauseReadForInterruption(); // Never call a failed switch audible success.
-          return;
-        }
-        session.musicSwitching = false;
-        if (session.musicEnabled)
-          startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
-        restart = session.pendingNarration || restart;
-        session.pendingNarration = null;
-        if (restart?.item && !restart.item.audioDone && !restart.item.vanished) {
-          restart.item.audioStarted = false;
-          playCrawlAudio(session, restart.item, restart.position);
-        }
-      }).catch(() => {
-        if (session.active && crawlSession === session &&
-            !root?.document?.hidden && !readAudioRecovery) {
-          session.musicSwitching = false;
-          pauseReadForInterruption();
-        }
-      });
   }
 
   function renderCrawlScreen(idx, verse) {
@@ -5087,9 +5028,7 @@
       scene: wrap.querySelector(".read-animated-scene"),
       window: wrap.querySelector("[data-read-crawl-window]"),
       musicButton: wrap.querySelector("[data-read-crawl-music-toggle]"),
-      musicEnabled: true, musicSwitching: false,
-      musicToggleEpoch: 0, musicSwitchQueue: Promise.resolve(),
-      pendingNarration: null,
+      musicEnabled: true,
       items: new Map(), timers: new Set()
     };
     crawlSession = session;
