@@ -26,6 +26,9 @@ assert.match(appSource, /async function playVerseDetailListen\(verseId, \{ onInt
 assert.match(flashcardsSource, /event\.reason !== "audio-interruption"/);
 assert.match(flashcardsSource, /onInterrupted: showFlashcardsNativeAudioWelcomeBack/);
 assert.match(flashcardsSource, /stopVersePreview\(\); \/\/ revoke the pending Listen promise/);
+assert.match(flashcardsSource, /if \(hadPreview && state\.view === "difficulty"\) requestRender\(\)/);
+assert.match(flashcardsSource, /retry\.textContent = "Replay Instructions"/);
+assert.match(instructionSource, /locked: !!current && !\["done", "interrupted"\]\.includes\(current\.status\)/);
 assert.match(workflow, /node scripts\/validate_r02_flashcards_welcome_back\.js/);
 for (const p of ["docs/PROJECT-HANDOFF.md", "docs/TESTING.md",
   "docs/IOS-NATIVE-AUDIO-STABILIZATION-PR-ROADMAP.md"])
@@ -127,22 +130,26 @@ function instructionFixture() {
       BibloZooRecording:{create:()=>({snapshot:()=>({status:"idle"}),
         dispose(){},interruptCapture(){},pause(){},stopFun(){}})},
       BibloZooFlashcardsInstructions:{create(cfg){return{
-        snapshot:()=>({status:instructionState,locked:instructionState==="playing"}),
-        interrupt(){instructionState="failed";},
+        snapshot:()=>({status:instructionState,
+          locked:["playing","failed"].includes(instructionState),
+          failed:["failed","interrupted"].includes(instructionState)}),
+        interrupt(){instructionState=native?"interrupted":"failed";},
         stop(){instructionState="idle";},
         primeFromGesture(){},
         triggerInterrupt(){cfg.onInterrupted();}
       };}},
       BibloZooWelcomeBackReturn:{attach(o){options=o;return prompt;}},
+      matchMedia:()=>({matches:true}),
       addEventListener(){}
     };
     const marker="  window.BibloZooFlashcards = Object.freeze({";
     assert(flashcardsSource.includes(marker));
-    const hooks="  window.__r02 = { toggleVersePreview, stopVersePreview, instructions, "+
+    const hooks="  window.__r02 = { toggleVersePreview, stopVersePreview, "+
+      "renderDifficulty, renderRecordingIntro, instructions, "+
       "nativeInterruption:showFlashcardsNativeAudioWelcomeBack, "+
       "prepare(){state.view='difficulty';state.selectedVerseId='john_11_35';}, "+
-      "setInstruction(s){instructionNarration;}, "+
-      "playing:()=>previewPlaying };\n";
+      "prepareIntro(){state.view='difficulty_intro';state.difficulty='really_well';state.selectedVerseId='john_11_35';}, "+
+      "view:()=>state.view, playing:()=>previewPlaying };\n";
     vm.runInNewContext(flashcardsSource.replace(marker,hooks+marker),{
       window:win,document:doc,console,Math,Date,Promise,Object,
       setTimeout(fn){const id=++nextTimer;timers.set(id,fn);return id;},
@@ -160,7 +167,25 @@ function instructionFixture() {
     };
     win.BibloZooFlashcards.initialize(api);
     win.__r02.prepare();
-    return {win,doc,notices,prompt,nativeEvents,
+    function difficultyUI() {
+      const wrap={innerHTML:"",querySelector:()=>({onclick:null}),
+        querySelectorAll:()=>[]};
+      win.__r02.renderDifficulty(wrap);
+      return wrap.innerHTML;
+    }
+    function introUI() {
+      const buttons={
+        flashcardsRecordStartBtn:{style:{},disabled:false,setAttribute(){},onclick:null},
+        flashcardsIntroBackBtn:{disabled:false,onclick:null},
+        flashcardsSkipRecordingBtn:{disabled:false,onclick:null}
+      };
+      const wrap={innerHTML:"",isConnected:true,querySelector(selector){
+        return buttons[selector.slice(1)]||null;
+      }};
+      win.__r02.renderRecordingIntro(wrap);
+      return {html:wrap.innerHTML,buttons};
+    }
+    return {win,doc,notices,prompt,nativeEvents,difficultyUI,introUI,
       hooks:win.__r02,
       resolvePreview(v){assert(previewRequest);const r=previewRequest;previewRequest=null;r(v);},
       triggerNative(e){nativeEvents.biblozooAppLifecycle?.(e);},
