@@ -1582,24 +1582,36 @@
     return entry;
   }
 
+  // R07 / READ-02+03: WebKit can display a frozen Balloons/Fish frame
+  // while its CSS animation player and wall-clock collision deadlines drift.
+  // Capture RUNNING players before changing CSS play-state, and keep the
+  // original timestamps until the genuine Welcome Back recovery succeeds.
   function freezeReadScene(session) {
     if (!session?.active) return;
-    session.wrap?.classList.add("read-audio-paused");
-    // WebKit can advance CSS animations while backgrounded even with a paused
-    // ancestor style. Snapshot each actual animation timeline and pause it
-    // directly; on pageshow, restore the saved times before the next paint.
+    if (session.readSceneFrozenAt == null) session.readSceneFrozenAt = Date.now();
     const frozen = session.pausedAnimations ||= new Map();
     let animations = [];
     try { animations = session.wrap?.getAnimations?.({ subtree: true }) || []; }
-    catch (err) { /* CSS pause remains the fallback. */ }
+    catch (_) { /* Scoped CSS pause remains the fallback. */ }
     for (const animation of animations) {
       try {
-        if (!frozen.has(animation)) frozen.set(animation, animation.currentTime);
-        animation.pause();
-        // Set after pause(): Safari may otherwise overwrite our restored
-        // position with its already-advanced background timeline.
-        if (frozen.get(animation) !== null) animation.currentTime = frozen.get(animation);
-      } catch (err) { /* A finished or detached animation is harmless. */ }
+        if (!frozen.has(animation)) {
+          // Authored-paused, finished and idle players are not ours to resume.
+          // Old test stubs without playState represent running players.
+          if (["paused", "finished", "idle"].includes(animation.playState)) continue;
+          frozen.set(animation, animation.currentTime);
+        }
+        if (animation.playState !== "paused") animation.pause();
+        const frame = frozen.get(animation);
+        if (frame != null) animation.currentTime = frame;
+      } catch (_) { /* Detached WebKit players cannot block scene recovery. */ }
+    }
+    // Apply the style AFTER capturing the running players. A later WebKit
+    // restyle or repeated lifecycle event must not replace the first frame.
+    session.wrap?.classList.add("read-audio-paused");
+    for (const [animation, frame] of frozen) {
+      try { if (frame != null) animation.currentTime = frame; }
+      catch (_) { /* The element may have left the scene. */ }
     }
     for (const entry of session.timers) {
       if (!entry.id) continue;
@@ -1611,19 +1623,34 @@
 
   function thawReadScene(session, pausedMs = 0) {
     if (!session?.active) return;
-    // Balloon collision tracks use wall-clock times, unlike CSS animations.
+    // Use THIS scene's first frozen timestamp. A late-mounted or replaced
+    // scene must not inherit elapsed time from an earlier recovery overlay.
+    const elapsed = session.readSceneFrozenAt == null
+      ? Math.max(0, pausedMs)
+      : Math.max(0, Date.now() - session.readSceneFrozenAt);
+    session.readSceneFrozenAt = null;
     for (const track of [...(session.wordTracks || []), ...(session.balloonTracks || [])]) {
-      track.startMs += pausedMs;
+      track.startMs += elapsed;
     }
     session.fanfareLastProgress = Date.now();
-    session.wrap?.classList.remove("read-audio-paused");
-    for (const [animation, originalTime] of session.pausedAnimations || []) {
+    const frozen = session.pausedAnimations;
+    // Re-seek before removing the CSS pause class. Otherwise removing that
+    // class may first expose a 10+ second compositor catch-up / animationend.
+    for (const [animation, frame] of frozen || []) {
       try {
-        if (originalTime !== null) animation.currentTime = originalTime;
-        animation.play();
-      } catch (err) { /* The element may have left the scene. */ }
+        if (animation.playState === "running") animation.pause();
+        if (frame != null) animation.currentTime = frame;
+      } catch (_) { /* A detached player must never stop the remaining timers. */ }
     }
-    session.pausedAnimations?.clear();
+    session.wrap?.classList.remove("read-audio-paused");
+    for (const [animation, frame] of frozen || []) {
+      try {
+        if (frame != null) animation.currentTime = frame;
+        if (animation.playState === "paused" || animation.playState == null)
+          animation.play();
+      } catch (_) { /* Preserve the usable scene if a player was replaced. */ }
+    }
+    frozen?.clear();
     for (const entry of session.timers) if (!entry.id) entry.arm();
   }
 
