@@ -21,7 +21,7 @@ function section(src, start, end) {
 }
 const lease = section(scene, "enum BibloZooEssentialVoiceSession", "class SceneDelegate:");
 assert.match(lease, /static func isActive\(owner requested: String\) -> Bool/);
-assert.match(lease, /Thread\.isMainThread && owner == requested &&[\s\S]*?session\.category == \.playback/);
+assert.match(lease, /Thread\.isMainThread && owner == requested &&[\s\S]*?AVAudioSession\.sharedInstance\(\)\.category == \.playback/);
 assert.match(lease, /setCategory\(\.soloAmbient, mode: \.default/);
 assert.match(lease, /setCategory\(\.playback, mode: \.default/);
 const guard = section(sound, "private func optionalEffectDeniedByActiveNarration", "private func unavailableReason()");
