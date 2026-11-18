@@ -258,7 +258,14 @@
             !Number.isInteger(reply.playToken)) {
           status = "ready";
           playbackFailed = true;
-          message = "Playback couldn't start. Tap Play to try again.";
+          // R03: an AirPods-to-speaker handoff can race native engine
+          // preparation. A failed route check is RETRYABLE, not a played
+          // recording and never a reason to discard the saved RAM take.
+          // Other native/format failures retain their original guidance.
+          message = ["output-route-changed", "output-not-ready",
+            "stale-or-route-changed"].includes(reply?.reason)
+            ? "Audio output changed. Tap Play to try again."
+            : "Playback couldn't start. Tap Play to try again.";
           notify();
           return false;
         }
@@ -435,7 +442,9 @@
       } else {
         status = "ready";
         playbackFailed = true;
-        message = "Playback was interrupted. Tap Play to retry.";
+        message = event.reason === "route-changed"
+          ? "Audio output changed. Tap Play to try again."
+          : "Playback was interrupted. Tap Play to retry.";
       }
       notify();
     }
