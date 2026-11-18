@@ -1,6 +1,9 @@
 # R16b / AUDIO-01 — Read My Verse essential voice vs overlapping soundtrack
 
-**Prepared:** 2026-11-18 (America/Detroit). **Branch:** `fix/r16b-read-verse-voice-silent-mode-safe-scope` from verified integration `bdd7d657ee1cf723e36429f5accbee9363fb26ec`. **Status:** IMPLEMENTATION CANDIDATE / PARTIAL; CI and physical iPhone PASS **NOT YET ESTABLISHED**. Do not merge automatically, move `ios-prep` or `main`, or claim R16/AUDIO-01 closed.
+**R16b automation on initial PR head:** **PASS** at `d8f137b9d7fa1e49ee37caa700e959a6042e93bb` — [GitHub Actions run 44386375595](https://github.com/andydoane/biblozoo/actions/runs/44386375595), including new Read voice source/adapter VM tests, existing regressions, Swift source parsing and production web build. This is **not** an Xcode iOS SDK build or iPhone audibility evidence; after this documentation follow-up, verify final SHA CI again. Owner physical Read testing and Crawl product decision are still pending.
+
+
+**Prepared:** 2026-11-18 (America/Detroit). **Branch:** `fix/r16b-read-verse-voice-silent-mode-safe-scope` from verified integration `bdd7d657ee1cf723e36429f5accbee9363fb26ec`. **Status:** IMPLEMENTATION CANDIDATE / PARTIAL; CI **PASS on initial PR SHA**, physical iPhone PASS **NOT YET ESTABLISHED**. Do not merge automatically, move `ios-prep` or `main`, or claim R16/AUDIO-01 closed.
 
 ## Owner-approved policy and preexisting device findings
 
