@@ -1,6 +1,16 @@
 # Native iOS audio stabilization — proposed sequence of focused PRs
 
-## CURRENT R16b.1 accepted / R16b.2 Verse Crawl decision pending — 2026-11-18
+## CURRENT R16b.2 / AUDIO-01 — owner-selected reversible Verse Crawl music button (2026-11-18)
+
+**Owner design approved for implementation, NOT yet iPhone-tested:** Verse Crawl starts with its original music and spoken verse; a top-right circular `#ffc751` button uses the owner's newly uploaded `verse_images/game_ui/ui_icon_music_notes.png`. Tap it once to fade the button and choose **music OFF / spoken verse only**. Tap again to restore **music ON / original music + narration**. No startup popup, hardware Silent-switch detection, global mute change, or saved preference. Each session starts in original music mode.
+
+**Native safety boundary:** Music ON preserves the original `.soloAmbient` soundtrack/verse overlap (both respond to iPhone Silent Mode). Music OFF stops both Crawl theme and ending, awaits stop acknowledgements, and only then starts source-validated verse speech under a short-lived `.playback` essential-voice lease, so verse narration can be heard with Silent ON while optional music is never carried into the lease. Switching during a verse retires only its current player and restarts the same verse clip from its last known position; reversing the toggle stops that lease before restoring the original music. The existing interruption, external-media priority, no-autoplay, and explicit Welcome Back rules remain; no WebAudio fallback or new permissions.
+
+**Verification gate:** New `scripts/validate_r16b2_crawl_music_toggle.js` (source contracts plus actual native JS adapter and toggle VM) is wired into GitHub Actions with prior R16a/R16b/Read/Swift-parse/web-build regressions. **Physical-iPhone testing is NOT YET DONE.** The owner must try both button directions during narration with speaker Silent ON/OFF, recovery and Exit, and make sure no false Welcome Back, audible leaked music, truncated progress or false reward occurs. CI alone cannot establish physical audio correctness. [Scoped device checklist](TESTING.md) and [focused decision history](R16B2-VERSE-CRAWL-SILENT-MODE-DECISION.md).
+
+**Release discipline:** Implement on short-lived branch `feat/r16b2-verse-crawl-music-toggle` targeting only `integration/native-audio-to-ios-prep`. Leave `ios-prep`, `main`, and the 10 original production / 11 separate Audio Test profiles intact. R17 final owner acceptance/promotion remains blocked until this change is merged and physically verified. The older R16b.2 three-option decision notes below are historical, superseded by this owner-approved toggle design.
+
+## HISTORICAL R16b.1 accepted / R16b.2 decision proposal (before owner toggle approval) — 2026-11-18
 
 **Latest iPhone owner confirmation:** [R16b.1 PR #150](https://github.com/andydoane/biblozoo/pull/150) was **MERGED** into `integration/native-audio-to-ios-prep` at `3ba8a7d73230c96bc58266f9d9a0b3a740659555`; exact post-merge [GitHub Actions #44390620242](https://github.com/andydoane/biblozoo/actions/runs/44390620242) **PASS**. After the focused test plan, owner said **“Everything worked as it was supposed to.”** Record **OWNER PASS** for R16b.1 Typewriter's false Welcome Back repair and its expected Silent ON/OFF key/narration behavior, without inventing separate device logs or specific pass claims for unenumerated cases. Supersedes older “PR under review / owner hardware pending” notes below, which remain historical context.
 
