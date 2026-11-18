@@ -12131,8 +12131,15 @@ function syncLearnAudioResumeOverlay() {
   });
   if (button) button.disabled = !!learnAudioResumeAttempt;
   const status = overlay.querySelector("#learnAudioResumeStatus");
+  // R11 / LEARN-01: shared Welcome Back already rotates its playful
+  // progress message in the reserved action/button slot. Never mirror that
+  // message into this separate aria-live status row underneath it. Keep the
+  // row available for a REAL failed verification / "Try again!" explanation.
+  // If shared markup is unavailable, retain a nonduplicated busy status
+  // for the older local fallback that has no progress slot.
+  const hasInlineProgress = !!overlay.querySelector("[data-welcome-back-progress]");
   status.textContent = learnAudioResumeAttempt
-    ? (window.BibloZooWelcomeBack?.getMessage?.(overlay) || "Cleaning the zoo...")
+    ? (hasInlineProgress ? "" : "Checking sound...")
     : learnAudioResumeError;
   status.hidden = !status.textContent;
 }
