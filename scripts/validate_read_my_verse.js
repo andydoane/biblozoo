@@ -133,10 +133,14 @@ function testTypewriterIntroCutscene() {
     "Reserve the complete intro while individual letters are typed");
   assert.ok(js.includes('class="read-typewriter-intro-tail"'),
     "The words 'the verse.' must stay together on the second line");
-  assert.ok(rule('.read-typewriter-intro-head').includes('white-space: pre'),
-    "The entire first intro line must remain unbroken");
-  assert.ok(rule('.read-typewriter-intro-tail').includes('white-space: pre'),
-    "The entire second intro line must remain unbroken");
+  const fixedLines = css.indexOf('.read-typewriter-intro-head,\\n.read-typewriter-intro-tail {');
+  assert.ok(fixedLines >= 0,
+    "The head/tail must share a single two-line CSS layout");
+  const fixedRule = css.slice(fixedLines, css.indexOf('}', fixedLines));
+  assert.ok(fixedRule.includes('display: block') &&
+    fixedRule.includes('width: max-content') &&
+    fixedRule.includes('white-space: pre'),
+    "Both full intro lines are independent, nonbreaking, and measurable");
   assert.ok(rule('.read-keyboard-intro').includes('color: #65ff72'),
     "Keyboard must retain its green terminal styling");
   assert.ok(css.includes('grid-template-rows: auto minmax(0, 1fr)'),
