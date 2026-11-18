@@ -1,6 +1,12 @@
 # R15 / AUDIO-01 — iOS Silent Mode product-policy decision brief
 
-## CURRENT R16b.1 accepted / R16b.2 Verse Crawl decision pending — 2026-11-18
+## CURRENT R16b.3 owner-approved Verse Crawl exception to Option B (2026-11-18)
+
+**R15 policy supersession applies ONLY to Verse Crawl:** Owner physically tested [merged R16b.2 PR #152](https://github.com/andydoane/biblozoo/pull/152) and clarified the desired result: **both Verse Crawl background music and spoken verse must be audible even while the hardware Silent switch is ON**, by default. The upper-right yellow music-note button then silences **only the soundtrack** and leaves the voice playing; a second tap restores music. Same behavior with Silent OFF. Notes artwork must be smaller inside its unchanged button. #152 is **owner FAIL for Silent ON Music ON** (initial silence, verse only after button OFF); **Silent OFF music and button OFF voice-only observed PASS**. User's explicit choice replaces the historical proposed two-mode/audio-category handoff for this one activity; no modal and no Silent-switch detection.
+
+**Technical exception:** On a real Verse Crawl Start or verified post-interruption Welcome Back gesture, native iOS Read may hold `read-crawl` `.playback` for a **single foreground Crawl activity**. Native source allowlist restricts its audible files to published verse, fixed Crawl theme and ending; incidental other game/UI effects, generated cues, and all other activities keep R15's original Silent Mode discipline. Exit/stopAll/OS interruption ends lease. Do not infer hardware audibility from source tests. Proposed corrective branch `fix/r16b3-verse-crawl-music-on-silent-mode` targets integration only; device acceptance after owner-reviewed merge **PENDING**, R17 remains blocked. Historic policy text follows below.
+
+## HISTORICAL R16b.1 policy and R16b.2 design proposal — superseded for Crawl
 
 **Latest iPhone owner confirmation:** [R16b.1 PR #150](https://github.com/andydoane/biblozoo/pull/150) was **MERGED** into `integration/native-audio-to-ios-prep` at `3ba8a7d73230c96bc58266f9d9a0b3a740659555`; exact post-merge [GitHub Actions #44390620242](https://github.com/andydoane/biblozoo/actions/runs/44390620242) **PASS**. After the focused test plan, owner said **“Everything worked as it was supposed to.”** Record **OWNER PASS** for R16b.1 Typewriter's false Welcome Back repair and its expected Silent ON/OFF key/narration behavior, without inventing separate device logs or specific pass claims for unenumerated cases. Supersedes older “PR under review / owner hardware pending” notes below, which remain historical context.
 
