@@ -104,7 +104,7 @@ has(audition,'self.cues.forEach { $0.stop() }',
   "Fresh sample replaces preceding voices, not overlaps/auto repeat");
 has(audition,"self.cues.removeAll()",
   "Stop and release old sample before next selection");
-has(audition,"gain: 0.22, square: false,",
+has(audition,"gain: auditionGain, square: false,",
   "Fixed shared baseline note volume for all shapes");
 const wav=plug.slice(plug.indexOf("    private func wavData("),
   plug.indexOf("    @objc func playCue("));
