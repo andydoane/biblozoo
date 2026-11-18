@@ -2309,6 +2309,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             let duration: Double
             let square: Bool
             if kind == "negative" {
+                // READ-04: optional negative remains deliberately gentle.
                 notes = [(48, 0)]; gain = 0.08
                 duration = 0.15; square = true
             } else if kind == "order" {
@@ -2317,7 +2318,13 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                     [(midi, 0), (midi + 4, 0.09),
                      (midi + 7, 0.18), (midi + 12, 0.27)] :
                     [(midi, 0)]
-                gain = wrong ? 0.11 : 0.22
+                // R10 / READ-04: other native game beeps can have a
+                // substantially stronger source level than these Read
+                // waves. Boost ONLY normal native word feedback by about
+                // +3.3 dB (0.22 -> 0.32); staggered completion notes use
+                // a softer 0.28 each to avoid a startling stacked flourish.
+                // Incorrect taps remain quiet, negative stays at 0.08.
+                gain = wrong ? 0.13 : (complete ? 0.28 : 0.32)
                 duration = wrong ? 0.14 : 0.17
                 square = wrong
             } else {
@@ -2325,7 +2332,10 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                     [(base, 0), (base + 4, 0.09),
                      (base + 7, 0.19), (base + 12, 0.3)] :
                     [(base, 0), (base + 4, 0.1)]
-                gain = 0.22; duration = complete ? 0.2 : 0.17
+                // Identical correct-word/finish calibration as order.
+                // No native/WebAudio fallback or AVAudioSession changes.
+                gain = complete ? 0.28 : 0.32
+                duration = complete ? 0.2 : 0.17
                 square = false
             }
             // Prepare the WHOLE fixed melody first: sample decoding cannot
@@ -2397,6 +2407,10 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                          (base + 7, 0.18), (base + 12, 0.27)]
                 duration = 0.17
             }
+            // DEV audition compares timbres at the same newly calibrated
+            // child-facing volume: one-word 0.32, multi-note finish 0.28.
+            // All waveform variants receive an identical per-sample gain.
+            let auditionGain = sample == "scramble-word" ? 0.32 : 0.28
             // Another sample tap replaces (not layers with) the old
             // audition. The child-facing playCue() behavior is untouched.
             self.cues.forEach { $0.stop() }
@@ -2408,7 +2422,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
             for (midi, delay) in notes {
                 guard let player = try? AVAudioPlayer(
                     data: self.wavData(midi: midi, seconds: duration,
-                                       gain: 0.22, square: false,
+                                       gain: auditionGain, square: false,
                                        waveform: waveform)),
                     player.prepareToPlay() else {
                     prepared.forEach { $0.player.stop() }
