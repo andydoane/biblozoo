@@ -353,6 +353,10 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     private var playbackGeneration = 0 // main thread
     private var playbackTakeId = ""
     private var playbackStartedAt: Date?
+    // R03: a physical route change during the async Play-tap PCM copy
+    // invalidates that pending request. Main-thread bookkeeping only.
+    private var playbackRouteEpoch = 0
+    private var playbackOutputPorts: [String] = []
     // N7e: effect nodes and bounded pitch automation for the CURRENT
     // playback generation only. None of these store or export voice samples.
     private var playbackEffects: [AVAudioNode] = []
@@ -481,7 +485,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 switch routeReason {
                 case .oldDeviceUnavailable, .newDeviceAvailable,
                      .noSuitableRouteForCategory:
-                    break
+                    self.playbackRouteEpoch += 1
                 default:
                     return
                 }
@@ -494,8 +498,15 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                 // Genuine external route loss/connection during playback
                 // still cancels this take rather than continuing on speaker.
                 if self.playbackEngine != nil {
-                    if let started = self.playbackStartedAt,
-                       Date().timeIntervalSince(started) >= 0.5 {
+                    // Detect an actual hardware output switch even during
+                    // the previous 0.5s startup grace. For same-output late
+                    // notices retain the existing setup guard.
+                    let ports = AVAudioSession.sharedInstance()
+                        .currentRoute.outputs.map { $0.portType.rawValue }.sorted()
+                    if ports != self.playbackOutputPorts ||
+                       (self.playbackStartedAt.map {
+                           Date().timeIntervalSince($0) >= 0.5
+                       } == true) {
                         self.stopPlaybackInternal(reason: "route-changed",
                                                   notify: true)
                     }
@@ -510,6 +521,16 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     self.stopCaptureInternal(retain: false,
                         reason: "route-changed", call: nil)
                 }
+            })
+        // An output sample-rate/channel change may stop AVAudioEngine even
+        // without a timely route notification. Handle on the main queue,
+        // never synchronously in the engine's internal callback.
+        observers.append(center.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: nil,
+            queue: .main) { [weak self] note in
+                guard let self = self, let engine = note.object as? AVAudioEngine,
+                      self.playbackEngine === engine else { return }
+                self.stopPlaybackInternal(reason: "route-changed", notify: true)
             })
     }
 
@@ -1438,6 +1459,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
             }
             self.playbackGeneration += 1
             let playToken = self.playbackGeneration
+            let routeEpoch = self.playbackRouteEpoch
             self.captureWorker.async { [weak self] in
                 guard let self = self else { return }
                 guard self.savedCaptureKey >= 0,
@@ -1495,12 +1517,45 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                           UIApplication.shared.applicationState == .active,
                           AVAudioSession.sharedInstance().category == .soloAmbient,
                           !self.captureRunning, !self.capturePrepared,
-                          self.playbackEngine == nil else {
+                          self.playbackEngine == nil,
+                          self.playbackRouteEpoch == routeEpoch else {
                         call.resolve(["started": false,
-                                      "reason": "stale-or-inactive"])
+                                      "reason": "stale-or-route-changed"])
+                        return
+                    }
+                    // R03: after AirPods disconnect, the previously inactive
+                    // output format may be stale. Activate only on this real
+                    // Play tap BEFORE constructing the fresh output graph.
+                    let session = AVAudioSession.sharedInstance()
+                    do {
+                        try session.setActive(true)
+                        self.ownsFlashcardsForegroundAudio = true
+                    } catch {
+                        call.resolve(["started": false,
+                                      "reason": "activation-failed"])
+                        return
+                    }
+                    let outputPorts = session.currentRoute.outputs
+                        .map { $0.portType.rawValue }.sorted()
+                    guard !outputPorts.isEmpty,
+                          self.playbackRouteEpoch == routeEpoch,
+                          session.category == .soloAmbient else {
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "output-route-changed"])
                         return
                     }
                     let engine = AVAudioEngine()
+                    // Build against the ACTIVE iPhone/Bluetooth hardware.
+                    // Reject a disabled output instead of a silent success.
+                    let outputFormat = engine.outputNode.outputFormat(forBus: 0)
+                    guard outputFormat.sampleRate > 0,
+                          outputFormat.channelCount > 0 else {
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "output-not-ready"])
+                        return
+                    }
                     let player = AVAudioPlayerNode()
                     engine.attach(player)
                     // N7e: all ten effects are generated by AVFoundation
@@ -1519,12 +1574,11 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                         chorusVoices = []
                     }
                     do {
-                        // A deliberate Play tap, not a foreground callback.
-                        // Leave the normal .soloAmbient category unchanged.
-                        try AVAudioSession.sharedInstance().setActive(true)
-                        self.ownsFlashcardsForegroundAudio = true
+                        // The child-initiated session is already active; the
+                        // newly assembled engine now targets its output.
                         self.playbackEngine = engine
                         self.playbackNode = player
+                        self.playbackOutputPorts = outputPorts
                         self.playbackChorusPlayers = chorusVoices
                         self.playbackTakeId = requestedId
                         self.playbackStartedAt = Date()
@@ -1589,6 +1643,18 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                                                           notify: true)
                             }
                         }
+                        // AirPods removal may finish while the graph is
+                        // assembled. Never auto-replay or claim heard audio.
+                        guard self.playbackRouteEpoch == routeEpoch,
+                              session.currentRoute.outputs.map {
+                                  $0.portType.rawValue
+                              }.sorted() == outputPorts else {
+                            self.stopPlaybackInternal(reason: "route-changed",
+                                                      notify: false)
+                            call.resolve(["started": false,
+                                          "reason": "output-route-changed"])
+                            return
+                        }
                         try engine.start()
                         for voice in chorusVoices { voice.play() }
                         player.play()
@@ -1599,6 +1665,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
                     } catch {
                         self.stopPlaybackInternal(reason: "start-failed",
                                                   notify: false)
+                        self.releaseFlashcardsAudioPriority()
                         call.resolve(["started": false,
                                       "reason": "start-failed"])
                     }
@@ -1630,6 +1697,7 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         playbackEffects.removeAll()
         playbackTakeId = ""
         playbackStartedAt = nil
+        playbackOutputPorts = []
         // Ending a normal take or manually stopping it only stops the PCM
         // player. Keep the foreground nonmixing AVAudioSession active so
         // Apple Music/PiP stays paused until its OWN next Play gesture.
