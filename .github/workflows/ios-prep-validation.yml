@@ -420,6 +420,13 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_verse_scramble_n6m.js
 
+      # R14 / PRACTICE-01: run the actual Traffic Tap bonus truck intro,
+      # outro, game-speed presets, offscreen gates and pause/resume branches.
+      # Synthetic frame fixtures are not physical iPhone gameplay-feel proof.
+      - name: Validate R14 Traffic Tap bonus truck entrance and exit pacing
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r14_traffic_tap_bonus_truck_pacing.js
+
       - name: Validate N6l Traffic Tap 1 zoom MP3 + 13 generated native PCM cues and PiP
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_traffic_tap_n6l.js
