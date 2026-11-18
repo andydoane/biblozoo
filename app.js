@@ -11265,6 +11265,8 @@ function go(nextScreen) {
   cancelLearnAudio();
 
   if (from === Screen.HIDE && nextScreen !== Screen.HIDE) {
+    releaseHideActivityVisuals();
+    appReturnPausedAt = 0;
     State.sayVerseActive = false;
     State.sayVerseStartedAt = 0;
     State.sayVerseDurationMs = 0;
@@ -11392,6 +11394,10 @@ function setScreen(screen) {
     if (State.screen === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
     if (State.screen === Screen.VERSE_DETAIL) cancelVerseDetailListen();
     if (State.screen === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
+  }
+  if (State.screen === Screen.HIDE && screen !== Screen.HIDE) {
+    releaseHideActivityVisuals();
+    appReturnPausedAt = 0;
   }
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
     window.BibloZooFlashcards?.stopSession?.();
@@ -12730,6 +12736,52 @@ function waitForDuration(timeoutMs = 2000) {
 // prompt. Timed Learn exercise clocks remain frozen until the child's gesture.
 let appActivityReturn = null;
 let appReturnPausedAt = 0;
+// R04: UIKit may report inactive while held App Switcher keeps WebKit
+// visible. Freeze the current Missing Words clock and live visual animations
+// at that event; recover through the EXISTING user-tap Welcome Back only.
+let appActivityNativeLifecycleBound = false;
+let pausedHideAnimations = [];
+function pauseHideActivityVisuals() {
+  if (State.screen !== Screen.HIDE) return;
+  const stage = document.querySelector?.(".learn-screen-remove");
+  pausedHideAnimations = Array.from(stage?.getAnimations?.({ subtree: true }) || [])
+    .filter(animation => animation.playState === "running");
+  for (const animation of pausedHideAnimations) {
+    try { animation.pause(); } catch (_) {}
+  }
+  // Also pauses CSS animations if a render replaces the original nodes.
+  document.documentElement?.classList?.add("learn-hide-native-paused");
+}
+function releaseHideActivityVisuals(resume = false) {
+  document.documentElement?.classList?.remove("learn-hide-native-paused");
+  const paused = pausedHideAnimations;
+  pausedHideAnimations = [];
+  if (!resume) return;
+  for (const animation of paused) {
+    try { if (animation.playState === "paused") animation.play(); }
+    catch (_) {}
+  }
+}
+function bindNativeAppActivityReturn() {
+  if (appActivityNativeLifecycleBound || !appActivityReturn ||
+      window.BibloZooNativeOnlyOutput?.enabled !== true ||
+      window.Capacitor?.getPlatform?.() !== "ios") return;
+  const bridge = window.Capacitor?.Plugins?.BibloZooNativeSound;
+  if (typeof bridge?.addListener !== "function") return;
+  appActivityNativeLifecycleBound = true;
+  try {
+    Promise.resolve(bridge.addListener("biblozooAppLifecycle", event => {
+      // Native .inactive can arrive while document.hidden remains false.
+      // Delegate to the existing controller, which deduplicates WebKit
+      // visibility and never unfreezes before a child's Let's go! gesture.
+      if (State.screen !== Screen.HIDE) return;
+      if (event?.active === false)
+        appActivityReturn?.pauseFromNativeInactive?.();
+      else if (event?.active === true)
+        appActivityReturn?.showAfterNativeActive?.();
+    })).catch(() => { appActivityNativeLifecycleBound = false; });
+  } catch (_) { appActivityNativeLifecycleBound = false; }
+}
 
 function shouldPromptAppActivityReturn() {
   if (State.isSliding) return false;
@@ -12738,7 +12790,9 @@ function shouldPromptAppActivityReturn() {
     // use their existing retry control rather than an extra modal.
     return !State.todoInfoPage;
   }
-  return (State.screen === Screen.HIDE && State.sayVerseActive) ||
+  return (State.screen === Screen.HIDE &&
+      (State.sayVerseActive || State.hideAutoStarting ||
+       !!State.hideTransitionPhase)) ||
     (State.screen === Screen.FINAL_RECALL && State.finalRecallActive);
 }
 
@@ -12754,12 +12808,17 @@ function attachAppActivityReturn() {
       } else if (!appReturnPausedAt) {
         appReturnPausedAt = performance.now();
       }
+      if (State.screen === Screen.HIDE) pauseHideActivityVisuals();
     },
     onContinue: () => {
       if (document.hidden) return false;
       // Navigation may have changed while iOS was away: discard stale prompt.
       if (![Screen.TODO_DEV, Screen.HIDE, Screen.FINAL_RECALL]
-          .includes(State.screen)) { appReturnPausedAt = 0; return true; }
+          .includes(State.screen)) {
+        appReturnPausedAt = 0;
+        releaseHideActivityVisuals();
+        return true;
+      }
       if (appReturnPausedAt) {
         const delta = Math.max(0, performance.now() - appReturnPausedAt);
         if (State.screen === Screen.HIDE && State.sayVerseStartedAt)
@@ -12768,15 +12827,18 @@ function attachAppActivityReturn() {
           State.finalRecallStartedAt += delta;
         appReturnPausedAt = 0;
       }
+      releaseHideActivityVisuals(State.screen === Screen.HIDE);
       return true;
     },
     onExit: () => {
       appReturnPausedAt = 0;
+      releaseHideActivityVisuals();
       go(Screen.TITLE);
     },
     escapeText: "Back to Title",
     suppressUiSound: true
   });
+  bindNativeAppActivityReturn();
 }
 
 // These time-limited Learn exercises must not progress during iOS backgrounding
@@ -12784,8 +12846,9 @@ function attachAppActivityReturn() {
 async function waitForActiveLearnTime(ms) {
   let remaining = Math.max(0, ms);
   let last = performance.now();
-  while (remaining > 0) {
-    await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
+  while (remaining > 0 || document.hidden || appActivityReturn?.isPaused?.()) {
+    await new Promise(resolve => setTimeout(resolve,
+      Math.max(25, Math.min(50, remaining))));
     const now = performance.now();
     if (!document.hidden && !appActivityReturn?.isPaused?.()) {
       remaining -= Math.min(100, now - last);
@@ -13063,13 +13126,12 @@ function waitMs(ms) {
 }
 
 function clearHideTransitionAfterAnimation() {
-  setTimeout(() => {
+  // Never clear a visible hide/fade phase on inactive wall-clock time.
+  void waitForActiveLearnTime(900).then(() => {
+    if (State.screen !== Screen.HIDE) return;
     State.hideTransitionPhase = "";
-
-    if (State.screen === Screen.HIDE) {
-      render();
-    }
-  }, 900);
+    render();
+  });
 }
 
 async function startHideRoundWithTransition() {
@@ -13079,7 +13141,7 @@ async function startHideRoundWithTransition() {
   State.hideTransitionPhase = "out";
   render();
 
-  await waitMs(180);
+  await waitForActiveLearnTime(180);
 
   if (State.screen !== Screen.HIDE) {
     State.hideTransitionPhase = "";
@@ -13123,6 +13185,9 @@ async function startHideRound() {
 
   setAudioSrc(AUDIO_FILE);
   const d = await waitForDuration();
+  // Metadata may resolve after UIKit became inactive: start the visible
+  // say-the-verse deadline only after an explicit Welcome Back recovery.
+  await waitForActiveLearnTime(0);
   const durationMs = (isFinite(d) && d > 0)
     ? d * 1000 * hideTimerMultiplier()
     : 6500;
