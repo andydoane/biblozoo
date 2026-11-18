@@ -4984,6 +4984,14 @@
     session.musicButton?.setAttribute("aria-pressed", String(session.musicEnabled));
     session.musicButton?.setAttribute("aria-label", session.musicEnabled
       ? "Turn Verse Crawl music off" : "Turn Verse Crawl music on");
+    // Browser/PWA/Android has no native shared-category lease. Keep its
+    // current spoken verse player running and switch music immediately
+    // within this real tap (important for iOS Safari's gesture policy).
+    if (root?.BibloZooNativeReadOutputController?.enabled !== true) {
+      if (session.musicEnabled) startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
+      else { stopCrawlMusic(); stopCrawlEnding(); }
+      return;
+    }
     const epoch = ++session.musicToggleEpoch;
     session.musicSwitching = true;
     session.musicSwitchQueue = Promise.resolve(session.musicSwitchQueue)
