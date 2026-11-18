@@ -1,9 +1,18 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT R16b.1 accepted / R16b.2 Verse Crawl decision pending — 2026-11-18
+
+**Latest iPhone owner confirmation:** [R16b.1 PR #150](https://github.com/andydoane/biblozoo/pull/150) was **MERGED** into `integration/native-audio-to-ios-prep` at `3ba8a7d73230c96bc58266f9d9a0b3a740659555`; exact post-merge [GitHub Actions #44390620242](https://github.com/andydoane/biblozoo/actions/runs/44390620242) **PASS**. After the focused test plan, owner said **“Everything worked as it was supposed to.”** Record **OWNER PASS** for R16b.1 Typewriter's false Welcome Back repair and its expected Silent ON/OFF key/narration behavior, without inventing separate device logs or specific pass claims for unenumerated cases. Supersedes older “PR under review / owner hardware pending” notes below, which remain historical context.
+
+**Remaining AUDIO-01 boundary:** Owner previously reported Read **Balloons/Fish Silent ON working**, and **Verse Crawl Silent OFF music+voice normal**, but **Verse Crawl Silent ON text only (no spoken verse, no music)**. That last condition is still an **open exception to Option B** and cannot be called full Silent Mode success. No change to Crawl has been authorized. Next is an owner **product decision**, then a separately scoped R16b.2 PR; only afterward is R17 full iPhone acceptance/promotion appropriate. [R16b.2 explicit options and risks](R16B2-VERSE-CRAWL-SILENT-MODE-DECISION.md).
+
+**Handoff:** Do not ask owner to redo Typewriter on the already accepted #150 merge or call it untested. Recommended next choice: add a clearly offered **Hear the Verse** (voice-only) mode alongside original **Music + Words** Verse Crawl; no automatic Silent-switch detection or soundtrack leakage. Wait for owner approval of behavior/labels/default before making R16b.2 code changes. Protect 10 production and 11 test Zookeeper profiles, Flashcards RAM recordings, `ios-prep` and `main`.
+
+
 **R16b.1 CI checkpoint:** [GitHub Actions run 44389883666](https://github.com/andydoane/biblozoo/actions/runs/44389883666) **PASS** at code+documentation SHA `8c1df08ffa68820979ee5fa3d3ee69a81c9e0f0c`: new R16b.1 key/voice regression, existing R16a/R16b and full Node suite, Linux Swift source parser, and production web build. This is **not** an Xcode iOS SDK compile or physical Typewriter test. After these status-doc updates, verify CI once more for the final PR head; owner iPhone PASS still pending.
 
 
-## CURRENT R16b.1 / AUDIO-01 — owner Typewriter regression, targeted fix under review (2026-11-18)
+## HISTORICAL R16b.1 proposal and pre-fix owner report / AUDIO-01 — owner Typewriter regression, targeted fix under review (2026-11-18)
 
 **Merged baseline:** [R16b PR #149](https://github.com/andydoane/biblozoo/pull/149) merged into `integration/native-audio-to-ios-prep` as `60f187a57626710e98ae7c325b5376d1160190de`; [post-merge CI 44387158750](https://github.com/andydoane/biblozoo/actions/runs/44387158750) **PASS**. Owner device test of that **merged** version reveals a specific new failure: **Typewriter Silent ON** key clicks quiet, but an unwanted **Welcome Back** appears before each verse segment; voice plays after the child's Let's go tap. **Typewriter Silent OFF** ordinary key clicks audible but the *same false Welcome Back* before each spoken segment. Mark Typewriter **FAIL in both positions**; do not call R16b passed. **Balloons/Fish Silent ON** owner reports as expected (**PASS for observed flow only**). **Verse Crawl Silent OFF** normal music+spoken verse (**PASS**); **Crawl Silent ON** text only, music and voice absent (**known unimplemented Option B spoken-voice gap**). No other Read activity, interruption, headphone route, or explicit OS version test is inferred.
 
