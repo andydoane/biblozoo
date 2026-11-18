@@ -137,6 +137,9 @@ function fixture({native=true, muted=false}={}) {
     updateTravelDistances(){calls.push("distances");},
     startRippleDelayLoop(){calls.push("ripple");},
     stopCrawlVisual(){calls.push("stop-crawl");},
+    // Use actual game's fixed 830ms enter crawl and 1000ms exit
+    // constants in this isolated VM (its source slice excludes declarations).
+    ENTER_CRAWL_STOP_MS:830,EXIT_DONE_MS:1000,
     performance:{now:()=>wall}
   };
   vm.runInNewContext(actual+
