@@ -150,6 +150,13 @@ jobs:
       # R09 / FLASH-05: compile production Swift level estimator and
       # real PCM copy against synthetic speech/silence/transients. No voices,
       # output hardware, audio-session activation or Mac SDK in this test.
+      # R10 / READ-04: compile and run ACTUAL native Swift WAV synthesis
+      # at updated word/finish gains, verify bounded two/four-note mixes.
+      # This cannot demonstrate actual speaker/AirPods perceived loudness.
+      - name: Validate R10 native Read cue relative level and melody peaks
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r10_read_native_cue_loudness.js
+
       - name: Validate R09 Flashcards measured dry voice replay safety
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_r09_flashcards_measured_dry_level.js
