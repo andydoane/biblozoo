@@ -31,7 +31,7 @@ assert(daily.includes("dailyQuestionsReturnPaused() ||") &&
        daily.includes("stopDailyVerseListen()"),
   "No new verse playback while Welcome Back blocks the app");
 assert(app.includes("Screen.DAILY_SESSION].includes(State.screen)") &&
-       app.includes("Screen.DAILY_SESSION].includes(State.screen)"),
+       /if \(\[Screen\.FLASHCARDS, Screen\.DAILY_SESSION\]\s*\.includes\(State\.screen\)/.test(app),
   "Shared native ref/verse playback recognizes Daily panel for ended and interrupted");
 assert(workflow.includes("node scripts/validate_r05_daily_check_verse_native_recovery.js"));
 for(const p of ["docs/PROJECT-HANDOFF.md","docs/TESTING.md",
@@ -130,6 +130,7 @@ function fixture(ios=true) {
 }
 
 async function tick(){for(let i=0;i<7;i++)await Promise.resolve();}
+const lastRendered=events=>events.filter(e=>e.startsWith("render:")).at(-1);
 async function testDaily() {
   const f=fixture();
   assert.equal(typeof f.native,"function","Native Daily lifecycle bound at init");
@@ -138,7 +139,7 @@ async function testDaily() {
   const first=f.tap();await tick();
   assert.equal(f.attempts.length,1);
   assert.equal(f.session.verseAudioPlaying,true);
-  assert.equal(f.events.at(-1),"render:Listening...");
+  assert.equal(lastRendered(f.events),"render:Listening...");
   // UIKit goes inactive while held App Switcher still renders.
   assert.equal(f.doc.hidden,false);
   f.native({active:false,reason:"willResignActive"});
@@ -149,7 +150,7 @@ async function testDaily() {
   assert.equal(f.session.questionIndex,1,"Question index preserved");
   assert.equal(f.session.earnedStarPegCount,2,"No new reward");
   assert.equal(f.session.verseAudioPlaying,false,"Stale Listening cleared immediately");
-  assert.equal(f.events.at(-1),"render:Listen to the Verse",
+  assert.equal(lastRendered(f.events),"render:Listen to the Verse",
     "Visible WebKit button repainted as retry, not stale disabled Listening");
   assert.equal(f.stops,1,"Native published voice stopped");
   f.native({active:true,reason:"didBecomeActive"});
@@ -165,10 +166,10 @@ async function testDaily() {
   f.attempts[0].resolve(false);await first;await tick();
   assert.equal(f.session.verseAudioPlaying,true,
     "Late cancelled voice cannot clear new attempt on same verse");
-  assert.equal(f.events.at(-1),"render:Listening...");
+  assert.equal(lastRendered(f.events),"render:Listening...");
   f.attempts[1].resolve(true);await second;await tick();
   assert.equal(f.session.verseAudioPlaying,false,"Actual completed native verse resets Listen");
-  assert.equal(f.events.at(-1),"render:Listen to the Verse");
+  assert.equal(lastRendered(f.events),"render:Listen to the Verse");
   assert.equal(f.credits,0,"No completion/grade from Listen or interruption");
 
   const external=fixture();
