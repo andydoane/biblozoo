@@ -50,7 +50,7 @@ The owner supplied **no Feeding-specific failures** in this report, across Class
 
 ## G. Flashcards
 
-**Post-report status, November 17, 2026:** Owner merged [R01 PR #128](https://github.com/andydoane/biblozoo/pull/128) and retested Flashcards/Home UI pops on a physical iPhone; the owner says **FLASH-01 is fixed**. The older below reproduction remains historical evidence. **FLASH-02 and FLASH-03 have a PARTIAL owner iPhone retest after merged [R02 PR #129](https://github.com/andydoane/biblozoo/pull/129)**: Apple Music/AirPods Welcome Back is reported mostly working, but interruption still leaves instruction Next disabled and verse Listen mislabeled Stop Listening. A focused follow-up is pending; neither issue is fully resolved yet. Do not mark those issues closed on simulated Node/Web evidence. R03, R09 and unrelated issues are unaffected.
+**Post-report status, November 17, 2026:** Owner merged [R01 PR #128](https://github.com/andydoane/biblozoo/pull/128) and retested Flashcards/Home UI pops on a physical iPhone; the owner says **FLASH-01 is fixed**. The older below reproduction remains historical evidence. **FLASH-02 and FLASH-03 have a PARTIAL owner iPhone retest after merged [R02 PR #129](https://github.com/andydoane/biblozoo/pull/129)**: Apple Music/AirPods Welcome Back is reported mostly working, but interruption still leaves instruction Next disabled and verse Listen mislabeled Stop Listening. A focused [PR #130](https://github.com/andydoane/biblozoo/pull/130) is under review; neither issue is fully resolved yet. Do not mark those issues closed on simulated Node/Web evidence. R03, R09 and unrelated issues are unaffected.
 
 
 
