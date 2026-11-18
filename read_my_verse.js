@@ -1101,7 +1101,10 @@
         .map((chunk, index) => ({
           chunk,
           index,
-          length: Array.from(chunk).length
+          // DEV forced-short/long must choose the SAME original spoken
+          // segment as before R12; moving a quote visually cannot
+          // change which echoParts audio suffix the test selects.
+          length: Array.from(originalChunks[index]).length
         }))
         .filter((entry) =>
           isChunkEligible(
