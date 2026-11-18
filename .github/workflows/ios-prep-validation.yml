@@ -420,6 +420,11 @@ jobs:
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_verse_scramble_n6m.js
 
+      # R16a.1 / AUDIO-01: DEBUG-only one-shot read-only session category
+      # probes on actual Home UI pops and Verse Scramble native effects.
+      - name: Validate R16a.1 scoped Silent Mode effect diagnostics
+        run: node scripts/validate_r16a1_silent_mode_effect_probe.js
+
       # R16a / AUDIO-01: regression for child-gesture narration and RAM voice
       # Silent Mode category leases, cleanup, route and mic safety boundaries.
       - name: Validate R16a essential voice Silent Mode lease boundaries

@@ -1,6 +1,17 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT R16a / AUDIO-01 — Option B selected; native essential voice candidate
+## CURRENT R16a.1 / AUDIO-01 — owner acoustic results; optional sounds FAIL, diagnosis open (2026-11-18)
+
+**R16a [#146](https://github.com/andydoane/biblozoo/pull/146) MERGED** to `integration/native-audio-to-ios-prep` at `edce98365b4e0df1f26ce64ff5032a34477b9934`; final CI **PASS** ([run](https://github.com/andydoane/biblozoo/actions/runs/44365718307)). Owner tested on a physical iPhone: **Learn the Verse spoken narration PASS with Silent ON and OFF; Flashcards instruction narration PASS with Silent ON and OFF; full Flashcards flow through recording and audible recorded-voice replay PASS for the observed scenario.** No claim for every Listen/Chunks/Echo state, Wacky variant, AirPods, interruptions or iOS version beyond what the owner reported.
+
+**Unexpected owner result / policy FAIL:** With the iPhone set to **Silent ON**, Home/main-page native UI pops and **Verse Scramble game effects and notes remain audible**. The owner quit/restarted BibloZoo and tested Verse Scramble **directly, before entering Learn or Flashcards**, then built via Xcode a **second time** and reproduced the same sound behavior. This **disproves the proposed simple explanation that a prior narration playback lease alone leaked into the next game**. The owner-approved Option B still requires gameplay/feedback/music/UI effects to respect Silent Mode. **Do not mark R16/AUDIO-01 complete, and do not promote to `ios-prep`.**
+
+**Next narrow diagnosis:** `diagnostics/r16a1-silent-mode-effect-session` adds **DEBUG-only read-only Xcode console** `[BibloZooSilentProbe]` lines at first allowed native UI-pop and Verse Scramble effect, native UI/game gesture activation, and short essential-voice category begin/end. Each line contains **only public audio category/mode/output-port type and a fixed sound class**: no microphone, personal profile, verse, ID, voice PCM, routes' device names, network or storage. It makes **NO category/mute/playback behavior change**. Source strongly suggests the native game effects are guarded by `.soloAmbient`, which Apple documents as honoring Silent Mode; the actual category at the sound request is still **UNKNOWN until Xcode diagnostics**. No public API exposes reliable hardware Silent-switch state, so do not add speculative sensor detection or automatically mute all sound. See `docs/TESTING.md` for the limited owner-gated observation.
+
+**Owner coordination:** No additional exhaustive game test needed now. The user has already reproduced clean-launch sounds twice. Request only the `[BibloZooSilentProbe]` console lines from a **reviewed, correctly built DEBUG app** with Silent ON, one Home pop and one Verse Scramble correct-note/effect, once the diagnostic PR is ready. The original production 10 Zookeeper profiles and distinct 11 Audio Test profiles must not be changed, mixed or uploaded.
+
+
+## HISTORICAL R16a proposal (before owner iPhone tests) / AUDIO-01 — Option B selected; native essential voice candidate
 
 **R15 owner product decision APPROVED (2026-11-18):** Option **B** for **spoken narration, spoken instructions and child's voice replay ONLY** under iPhone Silent Mode. **Gameplay correctness/mistake chimes, timing notes, button/UI pops, background music and all decorative effects remain optional** (quiet in Silent Mode). This was a deliberate recommendation the owner explicitly accepted; no Home master mute, physical Silent switch detection or background audio.
 
