@@ -484,7 +484,7 @@
       // as openers only when preceded by space or opening punctuation.
       // Do NOT move curly closers (’ ”), contractions, or end-of-word
       // straight closing quotes such as "Jesus'".
-      const match = /([\u2018\u201c\u00ab\u2039\u201e\u201a"'\u0020\t\u00a0]*)$/u.exec(previous);
+      const match = /([\s\u00a0]*[\u2018\u201c\u00ab\u2039\u201e\u201a"']+[\s\u00a0]*)$/u.exec(previous);
       if (!match || !/[\u2018\u201c\u00ab\u2039\u201e\u201a"']/u.test(match[1]))
         continue;
       const tail = match[1];
@@ -497,7 +497,9 @@
       if (quotes.length === 0) continue;
       const allCurlyOpen = quotes.every((q) =>
         /[\u2018\u201c\u00ab\u2039\u201e\u201a]/u.test(q));
-      if (!allCurlyOpen && !/[\s([{:;,\u2014\u2013-]$/u.test(before))
+      const separated = /^[\s\u00a0]/u.test(tail);
+      if (!allCurlyOpen && !separated &&
+          !/[([{:,;\u2014\u2013-]$/u.test(before))
         continue;
       result[index - 1] = before;
       result[index] = tail + result[index];
