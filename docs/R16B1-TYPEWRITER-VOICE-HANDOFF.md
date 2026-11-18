@@ -1,5 +1,8 @@
 # R16b.1 / AUDIO-01 — Typewriter key-alert → spoken-verse handoff
 
+**R16b.1 CI checkpoint:** [GitHub Actions run 44389883666](https://github.com/andydoane/biblozoo/actions/runs/44389883666) **PASS** at code+documentation SHA `8c1df08ffa68820979ee5fa3d3ee69a81c9e0f0c`: new R16b.1 key/voice regression, existing R16a/R16b and full Node suite, Linux Swift source parser, and production web build. This is **not** an Xcode iOS SDK compile or physical Typewriter test. After these status-doc updates, verify CI once more for the final PR head; owner iPhone PASS still pending.
+
+
 **Prepared:** 2026-11-18, owner-approved iOS stabilization work. **Source branch:** `fix/r16b1-read-typewriter-optional-key-handoff`, based on integration commit `60f187a57626710e98ae7c325b5376d1160190de` after [R16b PR #149](https://github.com/andydoane/biblozoo/pull/149) merged. **Status:** SOURCE FIX CANDIDATE; CI and physical iPhone acceptance must be separately recorded. No automatic merge or promotion to `ios-prep`/`main`.
 
 ## Exact owner iPhone results after #149
