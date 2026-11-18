@@ -8,7 +8,7 @@
 - **Read / Typewriter, Silent OFF:** ordinary key clicks audible; the **same false Welcome Back before each spoken verse segment**. **FAIL**. This is not a physical Silent-switch problem.
 - **Read / Balloons and Fish, Silent ON:** owner reported **PASS**, narrated verse and optional sound behavior as expected. No Silent OFF claim; do not infer a full matrix.
 - **Read / Verse Crawl, Silent OFF:** owner reports original voice+music works normally (**PASS for normal mode**).
-- **Read / Verse Crawl, Silent ON, speaker:** **text only; no music and no spoken voice** (observed and expected **partial R16b scope**, NOT full Option B compliance). The existing music/voice overlap has not been redesigned and must not be silently promoted.
+- **Read / Verse Crawl, Silent ON (route not restated in this report):** **text only; no music and no spoken voice** (observed and expected **partial R16b scope**, NOT full Option B compliance). The existing music/voice overlap has not been redesigned and must not be silently promoted.
 - No owner data was supplied for Keyboard, Tap Order, Unscramble, Chunk Sequence, OS App Switcher lock, AirPods, exact iOS version, or installed app SHA for #149 beyond the merged integration commit. Keep those **NOT TESTED**.
 
 ## Source-backed cause
