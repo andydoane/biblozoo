@@ -1,6 +1,6 @@
 # R15 / AUDIO-01 — iOS Silent Mode product-policy decision brief
 
-**Prepared:** 2026-11-18 (America/Detroit). **Status:** PROPOSED / OWNER DECISION REQUIRED. Documentation-only; NO iOS/Swift/JavaScript/audio-category/UI behavior has changed. **Branch base:** `integration/native-audio-to-ios-prep` at `30ff939d700ad7a49fb030ed1e8715c40b9c0af7` (merged [R14 #144](https://github.com/andydoane/biblozoo/pull/144)). Owner now reports R14 iPhone test worked; record **R14 PRACTICE-01 OWNER-REPORTED PASS / CLOSED**, but no exact installed iPhone SHA/iOS/version/speed-case matrix was supplied.
+**PR:** [#145](https://github.com/andydoane/biblozoo/pull/145) (open; owner policy decision pending). **Prepared:** 2026-11-18 (America/Detroit). **Status:** PROPOSED / OWNER DECISION REQUIRED. Documentation-only; NO iOS/Swift/JavaScript/audio-category/UI behavior has changed. **Branch base:** `integration/native-audio-to-ios-prep` at `30ff939d700ad7a49fb030ed1e8715c40b9c0af7` (merged [R14 #144](https://github.com/andydoane/biblozoo/pull/144)). Owner now reports R14 iPhone test worked; record **R14 PRACTICE-01 OWNER-REPORTED PASS / CLOSED**, but no exact installed iPhone SHA/iOS/version/speed-case matrix was supplied.
 
 ## The decision
 
