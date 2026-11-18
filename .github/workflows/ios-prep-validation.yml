@@ -139,6 +139,13 @@ jobs:
 
       # N7k: early iOS lifecycle and quiet interval checkpoints for Chunks
       # and Echo; held App Switcher during yellow speaking must Welcome Back.
+      # R06 / PLAY-01: the native clock pauses but Verse Typer CSS
+      # caterpillar/tail/blink and in-flight transitions must ALSO freeze in
+      # the still-visible held App Switcher thumbnail until real Let's go.
+      - name: Validate R06 Playground Verse Typer native inactive visual freeze
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r06_playground_verse_typer_visual_freeze.js
+
       # R05: Native Check the Verse Listen interrupts while UIKit may stay
       # active; reject stale Listening labels and old async completions.
       - name: Validate R05 Daily Check the Verse native Welcome Back and Listen retry
