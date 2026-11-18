@@ -78,7 +78,9 @@ const read = block(scene, "final class BibloZooNativeReadOutputPlugin", "// Ghos
 has(read, "category == .soloAmbient", "Read still requires normal nonvoice category to activate");
 has(read, 'BibloZooEssentialVoiceSession.begin(', "R16b later adds separately owned, music-free Read verse lease");
 has(read, 'owner: "read-narration"', "R16b Read never borrows R16a native narration owner");
-has(read, 'self.clips.isEmpty, self.cues.isEmpty', "R16b must reject overlapping Read music/effects");
+has(read, 'self.cues.isEmpty', "Read must reject overlap with scheduled cues");
+has(read, 'self.clips.keys.allSatisfy', "R16b.1 permits only transient typing effects for preemption");
+has(read, 'self.isTransientTypingEffect(source)', "Other verse and Crawl music remain forbidden during voice");
 has(read, 'category == .soloAmbient else', "R16b still gates incidental Read sound");
 
 console.log("R16a voice-session source boundaries: PASS (not a physical Silent Mode or Xcode test)");
