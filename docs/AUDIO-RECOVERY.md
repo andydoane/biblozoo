@@ -1,6 +1,15 @@
 # BibloZoo — Audio Recovery and Zoo Escape Contract
 
-## CURRENT R16b.3 / AUDIO-01 — owner correction: music + verse audible in both Silent positions (2026-11-18)
+## CURRENT R17 audio status — approved Verse Crawl exception is owner-tested (2026-11-19)
+
+**Merged acceptance:** [R16b.3 #153](https://github.com/andydoane/biblozoo/pull/153) is **MERGED** into integration at `4619f248dbfcfed722b8de4e75320407455c1f20`; [post-merge Actions #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS**. Owner physically tested the corrected build and said **“doing exactly what we need”**; subsequent thorough iPhone test found **no issues**. Mark the approved R16b.3 default audible music+verse with either Silent-switch position, and the button's soundtrack-only mute/unmute, **OWNER PASS**. The historical #152 Silent-ON default FAIL below was fixed in #153; do not apply the obsolete #152 `.soloAmbient` Crawl rule to the current build.
+
+**Current Native policy:** For Verse Crawl only, a child-initiated Start or explicit Welcome Back owns a foreground `read-crawl` `.playback` session (theme + verse + ending allowlist) until Exit / true OS interruption. Its yellow music-note button affects only soundtrack, **not** narration's player or AVAudioSession category; ordinary UI, typing, Zoo and other game effects still follow their existing Silent Mode contracts. Do not auto-restart after lock/App Switcher/Apple Music/PiP/route reset, invent completed verse audio, or play incidental effects through this lease. Web/PWA/Android are not assigned this native exception.
+
+**R17:** Broad owner iPhone acceptance reported; no further runtime audio change currently requested. Preserve actual per-case evidence and distinguish unreported route tests. Final Xcode Archive/signing/privacy and family-backup protection still need separate promotion review. [R17 gate ledger](R17-IOS-PREP-PROMOTION-READINESS.md) · [living handoff](PROJECT-HANDOFF.md) · [testing](TESTING.md).
+
+
+## HISTORICAL R16b.3 corrective PR candidate before merge and owner test
 
 **Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
 
