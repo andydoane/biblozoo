@@ -1,5 +1,13 @@
 # iPhone owner audio and gameplay acceptance findings — 2026-11-17
 
+## 2026-11-19 — owner confirms merged R16b.3 and broad integration iPhone acceptance
+
+- [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **MERGED** to `integration/native-audio-to-ios-prep` at `4619f248dbfcfed722b8de4e75320407455c1f20`; exact merge-head [GitHub Actions #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS** (Node/web + Swift syntax; no Xcode SDK Archive).
+- After physical iPhone testing, owner explicitly reports the new Verse Crawl behavior is **“doing exactly what we need”**. Mark the previously failing Silent-ON default and reversible soundtrack-only music button as **R16b.3 OWNER PASS**; retain the merged #152 failure below as historical and superseded, not a live unresolved defect.
+- Owner further reports **“I've tested the app thoroughly and haven't found any issues.”** Record **broad owner integration smoke PASS / no issues found**. Exact observed device route, iOS version, all eight activities individually, media interruption, backup restoration, PWA and Android were not enumerated in this report and must not be individually marked PASS just from the broad statement.
+- Remaining **R17 release preflight** is a separate verification task: final integration Mac `npm run build`, `npx cap sync ios`, Xcode device build/Archive, signing/privacy/resources; 10-production vs 11-Audio-Test private backups, and family-v2 exclusion of independent Zoo stats. See [R17 ledger](R17-IOS-PREP-PROMOTION-READINESS.md) and [TESTING](TESTING.md). No authorization for an automatic promotion, `main` changes or another production app installation.
+
+
 ## 2026-11-18 R16b.3 owner Verse Crawl Silent Mode finding and clarified default
 
 **Source:** Direct owner report after physically testing merged [R16b.2 PR #152](https://github.com/andydoane/biblozoo/pull/152) on iPhone (no OS version or headphone route specifically supplied). This is newer than prior findings below.
