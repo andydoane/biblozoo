@@ -1,6 +1,21 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT R16b.3 / AUDIO-01 — owner correction: music + verse audible in both Silent positions (2026-11-18)
+## CURRENT R17 — owner-reported comprehensive iPhone PASS / promotion checks outstanding (2026-11-19)
+
+**Live merged integration:** [#153](https://github.com/andydoane/biblozoo/pull/153) MERGED at `4619f248dbfcfed722b8de4e75320407455c1f20`; [post-merge workflow #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS** for Node and production web build. This workflow parses Swift source but does **not** build/archive against Apple's native SDK. After merging the proposed R17 docs-only PR, recheck full CI at the **new integration HEAD**.
+
+**Owner physical-device result (new):** After installing/testing #153, owner reports **“doing exactly what we need”** for the approved Verse Crawl Silent Mode behavior and later **“I've tested the app thoroughly and haven't found any issues.”** Record (a) **R16b.3 OWNER PASS** for the intended soundtrack-only toggle with verse continuously audible and music audible in both Silent positions and (b) **R17 broad iPhone acceptance: OWNER REPORT PASS / no issues found**. This does **not** prove an individually enumerated PASS for every iOS version, AirPods route, lock/PiP interruption, accessibility setting, Web/PWA or Android combination; those are **NOT ITEMIZED**, not hidden failures. #152's Silent-ON failure is historical and superseded by #153.
+
+**Remaining R17 preflight:**
+1. On Mac **after this documentation PR merges to integration**, run `npm ci` (if needed), `npm run build`, `npx cap sync ios`, then a **real Xcode device build and Archive** with `com.andydoane.biblozoo`, signing Team/entitlements, required-reason privacy manifest/resource checks, microphone permission and production DEV-control gates; record actual result and any warnings. **Final HEAD Archive is NOT VERIFIED; do not pretend GitHub/Linux CI is Xcode.** A build/Archive can be reviewed before any phone reinstall.
+2. Confirm separate **private off-phone** family-v2 backup copies for the **10 production profiles** and the **11 distinct Audio Test profiles**. Production backup's earlier structural check PASS does not prove full restore; the current family-v2 export **does not include standalone Zoo rescue/surprise statistics**, so record a deliberate preservation/deferral decision before risky install or import. Never upload JSON/voice/profile data to a PR.
+3. Record any additional specific OS/Silent ON+OFF/speaker/Bluetooth/AirPods, Apple Music/YouTube PiP, real lock/held App Switcher, Read eight-activity, Daily rewards, PWA/offline/Android, microphone/Flashcards, accessibility outcomes **only if individually verified**; owner's general comprehensive report need not be repeated without cause. All unresolved gaps and explicit decisions belong in [R17 ledger](R17-IOS-PREP-PROMOTION-READINESS.md).
+4. Prepare a **separate** owner-reviewed promotion PR with **base `ios-prep`**, compare/head `integration/native-audio-to-ios-prep` only once documented gates are accepted. Do not merge that PR automatically, publish `main`, or reinstall the production app without owner consent.
+
+**Future stable handoff:** `ios-prep` already has `docs/PROJECT-HANDOFF.md`; the eventual promotion imports this updated **same canonical path** into stable. Every subsequent `ios-prep` PR must update the branch-local living handoff with current status and physical-test distinctions. The README and PR template document this recurring responsibility.
+
+
+## HISTORICAL R16b.3 pre-merge device checklist (superseded by #153 owner report)
 
 **Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
 
