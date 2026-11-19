@@ -1,6 +1,13 @@
 # R15 / AUDIO-01 — iOS Silent Mode product-policy decision brief
 
-## CURRENT R16b.3 owner-approved Verse Crawl exception to Option B (2026-11-18)
+## CURRENT R17 — selected audio policy closed by owner iPhone report (2026-11-19)
+
+**R15 policy decision and R16 implementation:** Spoken Bible verses/instructions and deliberately replayed child speech are approved to remain audible in Silent Mode; ordinary incidental game/UI effects remain Silent-switch-respecting. The **explicitly owner-approved Verse Crawl exception** permits its bundled soundtrack **and** verse under a real child-started native Crawl `.playback` lease, with yellow music-note button turning off/on *only* the soundtrack. This is not automatic Silent-switch detection or a broad game-music exemption.
+
+[R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **MERGED** at integration `4619f248dbfcfed722b8de4e75320407455c1f20`, post-merge [CI #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS**; owner tested on iPhone and reports it is **“doing exactly what we need”**. Mark the focused R16b.3 product outcome **OWNER PASS / CLOSED**; owner also reported a comprehensive iPhone test with no issues found. Detailed per-route results are not individually supplied. The historical #152 Silent-ON failure remains recorded below and was superseded by #153. [R17 release ledger](R17-IOS-PREP-PROMOTION-READINESS.md) lists independent Xcode Archive and data-safety gates still pending before `ios-prep` promotion.
+
+
+## HISTORICAL R16b.3 approved policy before owner #153 acceptance (2026-11-18)
 
 **Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
 
