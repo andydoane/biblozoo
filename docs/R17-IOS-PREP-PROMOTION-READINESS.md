@@ -1,6 +1,6 @@
 # R17 — final iOS integration acceptance and `ios-prep` promotion readiness
 
-**Status: R17 DOCUMENTATION CLOSEOUT CANDIDATE; PROMOTION NOT YET APPROVED OR MERGED.** Updated 2026-11-19 from the owner's iPhone reports and GitHub evidence. The current source is `integration/native-audio-to-ios-prep`; the proposed eventual destination is `ios-prep`. This document is an acceptance ledger, **not** evidence that a native Xcode Archive or full device test matrix has been independently witnessed.
+**Status: [R17 documentation/handoff closeout PR #154](https://github.com/andydoane/biblozoo/pull/154) is the candidate, targeting integration only; STABLE PROMOTION NOT YET APPROVED OR MERGED.** Updated 2026-11-19 from the owner's iPhone reports and GitHub evidence. The current source is `integration/native-audio-to-ios-prep`; the proposed eventual destination is `ios-prep`. This document is an acceptance ledger, **not** evidence that a native Xcode Archive or full device test matrix has been independently witnessed.
 
 ## Latest objective checkpoints
 
