@@ -77,9 +77,15 @@ assert.match(picker, /module\?\.isActivityEligibleForVerse/);
 assert.match(picker, /transitionToAppScreen\(Screen\.READ_MY_VERSE\)/);
 assert.doesNotMatch(picker, /beginTask|saveDailyTodoReadRuntime|setPendingCompletion/);
 
-// Native sound stays launched from the actual card-tap call into startForVerse.
-assert.match(moduleSource, /Claim audio priority only on this actual Start interaction/);
-assert.match(moduleSource, /BibloZooNativeReadOutputController\.activateFromGesture\(\)/);
+// Native sound remains claimed in the real card-tap Start; R16b.3 passes
+// an activity-scoped flag so only Verse Crawl may activate its bounded
+// music+verse session. Learn/Listen free-play keeps the same daily isolation.
+const startOwner = moduleSource.slice(
+  moduleSource.indexOf("  function startForVerse("),
+  moduleSource.indexOf("  function chooseKeySoundIndex("));
+assert.match(startOwner, /Claim audio priority only on this actual Start interaction/);
+assert.match(startOwner, /BibloZooNativeReadOutputController\.activateFromGesture\(\{\s*crawlSession:\s*safeActivityId === VERSE_CRAWL_ACTIVITY_ID\s*\}\)/);
+assert.match(startOwner, /if \(safeActivityId === VERSE_CRAWL_ACTIVITY_ID\) \{\s*startCrawlMusic\("activity-launch"\)/);
 
 // No fake Daily plan tokens, DEV shortcuts, or recording permissions in free play.
 const freeHooks = app.slice(app.indexOf("function isLearnListenReadContext("),
