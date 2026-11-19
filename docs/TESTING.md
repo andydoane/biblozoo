@@ -1,6 +1,38 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT R16b.2 / AUDIO-01 — owner-selected reversible Verse Crawl music button (2026-11-18)
+## CURRENT R16b.3 / AUDIO-01 — owner correction: music + verse audible in both Silent positions (2026-11-18)
+
+**Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
+
+**Physical iPhone findings on merged [PR #152](https://github.com/andydoane/biblozoo/pull/152):** #152 **MERGED** to `integration/native-audio-to-ios-prep` at `6b23ff8fed0f`. Owner reports **Silent OFF: original music and verse on start; button OFF silences only music while verse continues — PASS for this observed behavior**. **Silent ON: initial music AND verse are silent; button OFF makes verse audible but no music — FAIL for the owner's newly clarified intended default.** Owner also reports the PNG music notes need to be **smaller within the existing yellow button**. Do not mistake merged source/CI status for owner acceptance.
+
+**Owner's clarified product policy supersedes the narrower R15 optional-music rule for this activity only:** Verse Crawl music is now an intentional **explicit exception**. With **either iPhone Silent switch position**, a new Crawl session starts **Music ON**, with **both theme and spoken verse audible**. A tap on the top-right `#ffc751` music button fades it and turns **only soundtrack/ending OFF**; verse audio continues uninterrupted. Another tap restores music, with no verse pause/restart, no popup, no stored preference, and no Silent-switch detection. Smaller PNG artwork is inset within the same 44–56px accessible tap target. Other BibloZoo game/UI sounds must continue respecting Silent Mode.
+
+**R16b.3 technical boundary:** On the actual child Start and explicit Welcome Back, iOS native Read may request a scoped `read-crawl` app-wide `.playback` lease. The native plugin admits **only source-validated Crawl theme, ending and published verse audio** under it; all incidental UI/typing/Zoo sounds and generated notes are excluded. No extra standalone verse lease is taken, and toggling music does **not** modify the category or interrupt/restart speech. The lease ends on Exit/`stopAll`, true OS interruption, route loss and media reset; no background mode, auto-play-after-foreground, Apple Music takeover, private data writes, mic or profile change. Web/PWA/Android keep their normal platform audio rules and soundtrack-only toggle.
+
+**Verification:** R16b.3 adds `scripts/validate_r16b3_crawl_silent_mode_session.js`, revises the earlier R16b/R16b.2 regression, and runs full GitHub Actions including Swift source parsing and production web build. **Physical iPhone outcome for this corrective change: NOT TESTED** until the owner merges and runs the focused test. Run **Silent ON and OFF separately:** (1) default Music ON = theme+verse audible; (2) tap OFF during actual verse speech = theme silent, same voice continues; (3) tap ON = music returns, same voice continues; (4) rapid taps, before/after opening fanfare, final ending, completion and restart reset; (5) lock/held App Switcher/PiP/Apple Music and optional AirPods route; genuine interruptions require explicit Welcome Back and audio-clock validation. Record PASS/FAIL/NOT TESTED per item; no assumption of Xcode SDK build or acoustic proof from CI.
+
+**Branch/owner gate:** `fix/r16b3-verse-crawl-music-on-silent-mode` targets only `integration/native-audio-to-ios-prep`. Do **not** merge without owner review or promote to `ios-prep`/`main`; R17 broad acceptance remains separate. Protect original 10 family profiles, separate 11 Audio Test profiles, all RAM recordings and off-phone backups.
+
+### R16b.3 physical iPhone acceptance — PENDING
+
+Use the integration iPhone build after owner-reviewed merge, without resetting/reinstalling family data. Test both iPhone speaker Silent switch ON and OFF **independently**. Log the audio route, device/iOS version if known, and PASS/FAIL/NOT TESTED per row.
+
+| Test | Silent OFF | Silent ON |
+|---|---|---|
+| Fresh Verse Crawl starts with **both music + narration audible**, yellow note button full opacity | NOT TESTED for R16b.3 | NOT TESTED for R16b.3 |
+| Tap music button OFF **mid-spoken-verse**; music/ending stop; narration continues smoothly, button fades, no Welcome Back | NOT TESTED | NOT TESTED |
+| Tap button ON again mid-verse; music resumes, narration does not pause/restart | NOT TESTED | NOT TESTED |
+| Tap OFF then ON before the 7-second fanfare ends and repeat later; no stalled chunk/text or ghost completion | NOT TESTED | NOT TESTED |
+| Finish activity once while music OFF and once ON; legitimate credits, one completion, no duplicate reward | NOT TESTED | NOT TESTED |
+| Exit → restart resets music button to ON; no leaked music/voice on Home or other Read activity | NOT TESTED | NOT TESTED |
+| Genuine lock/App Switcher/media-route/Apple Music/PiP interruption freezes scene and sound; explicit Welcome Back only and verified real media clock before progression | NOT TESTED | NOT TESTED |
+| Optional general game/UI sounds still respect iPhone Silent switch outside Verse Crawl; Learn, Flashcards, Typewriter, Balloons/Fish spot-check | NOT TESTED | NOT TESTED |
+
+**Owner's #152 baseline (not new PR PASS):** Silent OFF music+voice and button OFF voice-only behaved correctly; Silent ON music+voice did **not** play initially, so that version is **FAIL** against this now-approved product behavior. No forced headphones Bluetooth mute, audio recording, cloud logs, or profile changes.
+
+
+## HISTORICAL R16b.2 implementation before owner Silent ON test (merged #152; superseded by R16b.3)
 
 **Owner design approved for implementation, NOT yet iPhone-tested:** Verse Crawl starts with its original music and spoken verse; a top-right circular `#ffc751` button uses the owner's newly uploaded `verse_images/game_ui/ui_icon_music_notes.png`. Tap it once to fade the button and choose **music OFF / spoken verse only**. Tap again to restore **music ON / original music + narration**. No startup popup, hardware Silent-switch detection, global mute change, or saved preference. Each session starts in original music mode.
 

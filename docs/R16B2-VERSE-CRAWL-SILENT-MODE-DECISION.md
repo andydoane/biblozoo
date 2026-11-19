@@ -1,6 +1,20 @@
 # R16b.2 / AUDIO-01 — Verse Crawl reversible music control
 
-## CURRENT — owner-approved music-note toggle, source PR candidate (2026-11-18)
+## CURRENT R16b.3 — clarified owner music toggle policy after #152 iPhone FAIL (2026-11-18)
+
+**Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
+
+**Actual owner test of merged [#152](https://github.com/andydoane/biblozoo/pull/152):** Silent OFF, initial music+verse audible and music-button OFF left verse audible — **PASS for observed flow**. Silent ON, initial music+verse were both silent, while music-button OFF enabled verse alone — **FAIL against owner's now explicit default**. The music-note PNG also fills too much of its button. This is a physical user report, not an inferred or log-backed test. #152 is **MERGED to integration**, not pending.
+
+**Owner's newly chosen behavior:** Both **Silent ON and Silent OFF** always start Verse Crawl with **music + spoken verse audible**. One tap on the upper-right yellow music note turns **only music/ending OFF**, fading the button; verse continues without pause/restart. A second tap restores music and keeps narration continuous. Same behavior in both physical switch positions. No startup popup, no automatic switch detection, no persistent preference, no extra child taps to hear the default soundtrack. Owner's exact `verse_images/game_ui/ui_icon_music_notes.png` image remains, but rendered smaller inside the existing `#ffc751` button (touch target not reduced).
+
+**Scoped iOS architecture:** Unlike earlier R16b.2, keep a single `AVAudioSession` `.playback` lease from genuine Crawl Start/Welcome Back to Exit/interruption for the entire scene. This intentionally makes the **Crawl music** audible through iPhone Silent Mode as requested. The allowed native clips are ONLY `crawl-theme`, `crawl-ending`, and validated published `verse:` audio; no UI/tap/Zoo/typing/other optional clips. No per-verse second lease, app-wide UI sound leak, generated sounds, unknown media, background mode, automatic foreground restart, OS switch probe or replay-without-gesture. Other activities retain Option B. Control music by stopping/restarting soundtrack only, without disrupting any in-progress verse or score/animation timing. Apple Music/route conflicts must still fail closed or use explicit Welcome Back.
+
+**R16b.3 status:** Corrective code, regressions and documentation on `fix/r16b3-verse-crawl-music-on-silent-mode` → `integration/native-audio-to-ios-prep`, owner review/merge pending; no physical iPhone result for corrected build yet. Preserve original family/Audio Test data and separately gate R17.
+
+## HISTORICAL R16b.2 implementation selected before #152 owner's Silent ON test (now superseded)
+
+
 
 The owner rejected a startup popup and selected a **top-right music-note toggle**, using their uploaded `verse_images/game_ui/ui_icon_music_notes.png` artwork in a yellow `#ffc751` circular button. It starts Music ON, a tap fades the button and turns music OFF, a second tap restores Music ON. No preference persists to the next Verse Crawl run; no new modal or special Silent-switch detection.
 

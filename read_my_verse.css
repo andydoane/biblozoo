@@ -1600,7 +1600,7 @@ button.read-unscramble-token.is-solved {
   height: clamp(44px, 11vw, 56px);
   border: 0;
   border-radius: 999px;
-  padding: 7px;
+  padding: clamp(12px, 3vw, 15px);
   background: #ffc751;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.38);
   cursor: pointer;

@@ -2431,8 +2431,12 @@ final class BibloZooNativeSoundPlugin: CAPPlugin, CAPBridgedPlugin, AVAudioPlaye
             narrationPlayer?.isPlaying == true
         let readNarration =
             BibloZooEssentialVoiceSession.isActive(owner: "read-narration")
+        // A denied incidental UI pop while the explicit Crawl soundtrack
+        // lease is active is also NOT a genuine OS audio interruption.
+        let readCrawl =
+            BibloZooEssentialVoiceSession.isActive(owner: "read-crawl")
         guard reason == "category-not-soloambient",
-              nativeNarration || readNarration,
+              nativeNarration || readNarration || readCrawl,
               UIApplication.shared.applicationState == .active,
               !wasOutsideForeground, !interrupted,
               !needsGestureAfterInterruption, !needsGestureAfterReset,

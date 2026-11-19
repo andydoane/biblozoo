@@ -82,15 +82,17 @@
     listen();
     return () => inactiveCallbacks.delete(callback);
   }
-  function activateFromGesture() {
+  function activateFromGesture(options = {}) {
     if (!enabled || root.document?.hidden ||
         typeof api()?.activateFromGesture !== "function")
       return Promise.resolve(false);
     listen();
-    // Only the owner calling this in a real Start/Resume interaction can
-    // request .soloAmbient takeover. Animated verse timers never reactivate.
+    // R16b.3: Read Start or explicit Welcome Back carries a validated
+    // Crawl-only flag. Never auto-activate due to timers, category changes,
+    // silent-switch guesses, player events, or foreground transitions.
+    const crawlSession = options?.crawlSession === true;
     const epoch = ++lifecycleEpoch;
-    activation = Promise.resolve(api().activateFromGesture())
+    activation = Promise.resolve(api().activateFromGesture({crawlSession}))
       .then(r => epoch === lifecycleEpoch && r?.activated === true,
         () => false);
     return activation;

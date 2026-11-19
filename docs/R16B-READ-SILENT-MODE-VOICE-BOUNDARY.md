@@ -1,5 +1,12 @@
 # R16b / AUDIO-01 — Read My Verse essential voice vs overlapping soundtrack
 
+## CURRENT R16b.3 clarified owner Verse Crawl lease exception (2026-11-18)
+
+R16b originally excluded soundtrack-overlapping Verse Crawl from standalone voice-only `.playback`, correctly protecting other Read optional effects. **Do not remove those standalone-voice protections.** After owner hardware test of [merged R16b.2 #152](https://github.com/andydoane/biblozoo/pull/152), owner has explicitly asked for BOTH **music and spoken verse** audible even when iPhone Silent is ON, and soundtrack-only reversible button regardless of switch state. #152 Silent OFF behavior passed the observed flow; Silent ON initial music+verse was absent (**owner FAIL**), although button OFF made verse audible. PNG music notes should be smaller.
+
+**Scoped corrective [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153):** `read-crawl` owns the shared `.playback` session only from a real Crawl Start or explicit Welcome Back. Native admission limits it to source-validated Crawl theme, ending and published verse; NO typing/other Read UI/Zoo clips or generated notes borrow that session. The scene keeps the lease until Exit/stopAll or true OS interruption, no background playback or silent-switch probe. Music button simply stops/starts soundtrack; it does not stop/restart verse or alter the lease. Other music-free Read activities still use their original `read-narration` short voice leases. **Physical iPhone test on new fix is PENDING** and R17 is still gated. The R16b standalone-only source rationale below remains historical.
+
+
 ## CURRENT R16b.1 accepted / R16b.2 Verse Crawl decision pending — 2026-11-18
 
 **Latest iPhone owner confirmation:** [R16b.1 PR #150](https://github.com/andydoane/biblozoo/pull/150) was **MERGED** into `integration/native-audio-to-ios-prep` at `3ba8a7d73230c96bc58266f9d9a0b3a740659555`; exact post-merge [GitHub Actions #44390620242](https://github.com/andydoane/biblozoo/actions/runs/44390620242) **PASS**. After the focused test plan, owner said **“Everything worked as it was supposed to.”** Record **OWNER PASS** for R16b.1 Typewriter's false Welcome Back repair and its expected Silent ON/OFF key/narration behavior, without inventing separate device logs or specific pass claims for unenumerated cases. Supersedes older “PR under review / owner hardware pending” notes below, which remain historical context.

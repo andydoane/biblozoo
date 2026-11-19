@@ -1949,7 +1949,9 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
 // published, installed app bundle; no caller URLs/paths, mic, user files,
 // network access, WebAudio/HTML fallback, or silent fake completion.
 // Independent AVAudioPlayers allow Verse Crawl soundtrack + real narration
-// + ending overlap. OS .soloAmbient session is shared, never mixed/ducked.
+// + ending overlap. A strictly scoped, user-started Crawl lease permits
+// this owner's soundtrack + verse in Silent Mode without exposing optional
+// Read effects or other game sound to .playback.
 @objc(BibloZooNativeReadOutputPlugin)
 final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     AVAudioPlayerDelegate {
@@ -1974,9 +1976,14 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     private var progressTimer: Timer?
     private var ownedByReadGesture = false
     private var generation = 0
-    // R16b: at most one actual bundled spoken verse owns .playback.
-    // Crawl's music+voice scene is deliberately excluded at the JS caller.
+    // R16b: standalone verse speech owns a short .playback lease. R16b.3:
+    // deliberate Verse Crawl Start/Resume owns a separate, bounded playback
+    // lease for ONLY its approved theme, ending and published verse files.
     private var essentialVoiceClipId: String?
+
+    private func releaseCrawlSession() {
+        BibloZooEssentialVoiceSession.end(owner: "read-crawl")
+    }
 
     private func releaseEssentialVoice(for id: String? = nil) {
         guard let current = essentialVoiceClipId,
@@ -2113,6 +2120,13 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 }
             }
         }
+        if Thread.isMainThread {
+            releaseCrawlSession()
+        } else {
+            DispatchQueue.main.async {
+                BibloZooEssentialVoiceSession.end(owner: "read-crawl")
+            }
+        }
     }
     // Validated published JSON, never a user-provided filename.
     private func publishedVerse(_ id: String) -> Bool {
@@ -2212,6 +2226,7 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
         cues.forEach { $0.stop() }
         cues.removeAll()
         releaseEssentialVoice()
+        releaseCrawlSession()
         progressTimer?.invalidate()
         progressTimer = nil
         // Never reactivate on OS interruption/foreground return. Do not
@@ -2219,14 +2234,33 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
     }
     @objc func activateFromGesture(_ call: CAPPluginCall) {
         onMain { [weak self] in
+            let session = AVAudioSession.sharedInstance()
+            // Only a real Read Start or explicit Welcome Back gesture may
+            // request this narrowly scoped Verse Crawl Silent Mode exception.
+            let crawl = call.getBool("crawlSession") == true
+            let crawlAlreadyOwned =
+                BibloZooEssentialVoiceSession.isActive(owner: "read-crawl")
             guard let self = self, self.isNativeAppBundle,
                   UIApplication.shared.applicationState == .active,
-                  AVAudioSession.sharedInstance().category == .soloAmbient else {
+                  (!crawl && session.category == .soloAmbient ||
+                   crawl && (session.category == .soloAmbient ||
+                             crawlAlreadyOwned)),
+                  (!crawl || crawlAlreadyOwned ||
+                   (!session.isOtherAudioPlaying && self.clips.isEmpty &&
+                    self.cues.isEmpty && self.essentialVoiceClipId == nil))
+                  else {
                 call.resolve(["activated": false, "reason": "not-ready"])
                 return
             }
             do {
-                try AVAudioSession.sharedInstance().setActive(true)
+                try session.setActive(true)
+                if crawl && !BibloZooEssentialVoiceSession.begin(
+                    owner: "read-crawl") {
+                    self.ownedByReadGesture = false
+                    call.resolve(["activated": false,
+                                  "reason": "crawl-session-unavailable"])
+                    return
+                }
                 self.ownedByReadGesture = true
                 call.resolve(["activated": true])
             } catch {
@@ -2250,14 +2284,27 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                 call.resolve(["started": false, "reason": "unpublished-clip"])
                 return
             }
-            // R16b: ONLY source-approved Read verse MP3s may use the
-            // foreground essential-voice category, and only when the Read
-            // activity has marked its narration path as music-free.
-            // Crawl remains .soloAmbient to preserve its overlapping theme.
+            // A single process-wide category applies to all players.
+            // R16b.3: an explicitly started Crawl owns a special, bounded
+            // .playback session; do NOT permit any other optional game sound
+            // or a second essential-verse lease to borrow it.
+            let crawlOwned =
+                BibloZooEssentialVoiceSession.isActive(owner: "read-crawl")
             let essentialVoice = key.hasPrefix("verse:") &&
                                  call.getBool("essentialVoice") == true
             let category = AVAudioSession.sharedInstance().category
-            if essentialVoice {
+            if crawlOwned {
+                guard !essentialVoice,
+                      category == .playback,
+                      self.essentialVoiceClipId == nil,
+                      self.cues.isEmpty,
+                      (key == "crawl-theme" || key == "crawl-ending" ||
+                       key.hasPrefix("verse:")) else {
+                    call.resolve(["started": false,
+                                  "reason": "crawl-session-scope"])
+                    return
+                }
+            } else if essentialVoice {
                 // The session category is shared by every Read clip.
                 // A last Typewriter/Keyboard key alert may still own a
                 // nonvoice player when narration starts. ONLY these
@@ -2282,8 +2329,8 @@ final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
                     call.resolve(["started": false, "reason": "not-ready"])
                     return
                 }
-                // Music, UI effects, typing taps, Crawl and the zoo cue
-                // ALWAYS stay within the Silent-switch-respecting category.
+                // Outside the explicit Crawl lease, incidental sounds
+                // stay within the Silent-switch-respecting category.
                 guard category == .soloAmbient else {
                     call.resolve(["started": false,
                                   "reason": "category-not-soloambient"])

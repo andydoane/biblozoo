@@ -1,6 +1,7 @@
 "use strict";
 // R16b: actual Read JS controller VM + source/ownership regression. No iOS
-// SDK link or physical speaker proof. Crawl intentionally remains excluded.
+// SDK link or physical speaker proof. Crawl remains excluded from the
+// separate per-verse lease, even when its soundtrack is toggled off.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -140,13 +141,13 @@ async function run(){
   assert.equal(marked,1);
   ctx.state.activityId="star_wars";
   await ctx.beginReadNarration(fake);
-  assert.equal(marked,1,"Crawl with music must remain excluded");
+  assert.equal(marked,1,"Crawl uses one explicit Start-owned session");
   ctx.crawlSession={active:true,musicEnabled:false};
   await ctx.beginReadNarration(fake);
-  assert.equal(marked,2,"Only music-free Crawl may lease spoken voice");
-  ctx.crawlMusic={audio:{}}; // An overlapping soundtrack still fails closed.
+  assert.equal(marked,1,"Music-OFF Crawl must not claim a second voice lease");
+  ctx.crawlMusic={audio:{}};
   await ctx.beginReadNarration(fake);
-  assert.equal(marked,2,"Never mark Crawl voice while theme is live");
+  assert.equal(marked,1,"Music-ON Crawl must not claim a second voice lease");
   assert.equal(played,4);
   await controller.stopAll();
   assert.equal(calls.some(x=>x.kind==="stopAll"),true);
