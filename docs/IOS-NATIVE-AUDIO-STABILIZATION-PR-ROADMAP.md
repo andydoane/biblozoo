@@ -1,6 +1,17 @@
 # Native iOS audio stabilization — proposed sequence of focused PRs
 
-## CURRENT R16b.3 / AUDIO-01 — owner correction: music + verse audible in both Silent positions (2026-11-18)
+## CURRENT R17 — integration accepted on iPhone; release gates before stable `ios-prep` (2026-11-19)
+
+**Phase status:** R01–R14 focused fixes owner-reported PASS, R15 Silent Mode policy selected, R16a/b focused audio fixes owner-reported PASS, and R16b.3's corrected Verse Crawl music policy **OWNER PASS**. [R16b.3 #153](https://github.com/andydoane/biblozoo/pull/153) **MERGED** on integration at `4619f248dbfcfed722b8de4e75320407455c1f20`. The owner physically tested #153 and reported **“doing exactly what we need”**; then reported **“I've tested the app thoroughly and haven't found any issues.”** Treat this as strong *general integration* owner acceptance, not per-route test logs for every R17 matrix case. [Post-merge CI #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS** for exact merged SHA (Node/build + Swift syntax, not Xcode Archive). Retain earlier #152 Silent-ON FAIL as historical and superseded by #153.
+
+**R17 docs-only closeout on integration:** `docs/r17-acceptance-closeout-ios-prep-handoff` updates the [explicit issue ledger, evidence and remaining gates](R17-IOS-PREP-PROMOTION-READINESS.md), [canonical living handoff](PROJECT-HANDOFF.md) and [testing guide](TESTING.md), plus persistent maintenance instructions. It does **not** change playback, profiles, installs or stable `ios-prep`. Re-run automation at the new integration HEAD **after docs closeout merge**.
+
+**Before the separate promotion PR:** (1) Mac final integration `npm run build`, `npx cap sync ios`, actual Xcode build **and Archive** / signing/resources/privacy (not yet verified for final head); (2) owner-confirmed private, separately protected **10 production** and **11 Audio Test** family backups; known family-v2 **Zoo rescue/surprise stats omission** considered/explicitly accepted or mitigated; (3) precise owner decision on non-itemized hardware and cross-platform acceptance (no invented PASS). Only then open an **owner-reviewed** base `ios-prep` ← compare `integration/native-audio-to-ios-prep` PR. No auto merge, `main` change, app distribution or device reinstall in R17 docs PR.
+
+**Stable handoff continuity:** `ios-prep` already contains `docs/PROJECT-HANDOFF.md` from [early PR #2](https://github.com/andydoane/biblozoo/pull/2), but its old snapshot is stale. Promotion imports this **updated same path**; every future `ios-prep` PR must update it in that PR. See the README and PR template. This fulfills the owner's request for a regularly maintained living handoff without duplicate competing documents.
+
+
+## HISTORICAL R16b.3 open candidate / owner test pending (superseded by #153 merge and PASS)
 
 **Corrective PR status:** [R16b.3 PR #153](https://github.com/andydoane/biblozoo/pull/153) is **OPEN, not merged**, targeting only `integration/native-audio-to-ios-prep`. CI must pass on the final exact head; physical iPhone acceptance **NOT TESTED** for this correction. The old [#152](https://github.com/andydoane/biblozoo/pull/152) is **MERGED**, with owner-reported Silent-ON failure recorded below.
 
