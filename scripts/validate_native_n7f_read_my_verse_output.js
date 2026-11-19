@@ -148,8 +148,14 @@ has(activity,"new root.Audio(",
 for(const part of ["new Audio(src)","new Audio(CRAWL_MUSIC_SRC)",
  "new Audio(CRAWL_ENDING_SRC)","new Audio("])
   has(activity,part,"Native Read media paths select the local native ctor");
-has(activity,"void root.BibloZooNativeReadOutputController.activateFromGesture();",
-    "Actual user Start/Resume is the only activation site");
+has(activity,`void root.BibloZooNativeReadOutputController.activateFromGesture({
+        crawlSession: safeActivityId === VERSE_CRAWL_ACTIVITY_ID
+      });`,
+    "Actual user Start requests a scoped Crawl lease only for Verse Crawl");
+has(activity,`root.BibloZooNativeReadOutputController.activateFromGesture({
+          crawlSession: state.activityId === VERSE_CRAWL_ACTIVITY_ID
+        })`,
+    "Explicit Welcome Back reclaims the same scoped Crawl lease");
 has(activity,"void root.BibloZooNativeReadOutputController.stopAll();",
     "Exit cancels native narration and overlapping Crawl output");
 has(activity,'root.BibloZooNativeReadOutputController.playCue("order", nextIndex, complete, wrong)',
