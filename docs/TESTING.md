@@ -1,6 +1,19 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT R17 — owner-reported comprehensive iPhone PASS / promotion checks outstanding (2026-11-19)
+## CURRENT — stable `ios-prep` post-promotion verification (2026-11-19 EST / 2026-11-20 UTC)
+
+**GitHub promotion:** [PR #155](https://github.com/andydoane/biblozoo/pull/155) **MERGED** integration → `ios-prep` at `c31d8ee182aaa6d156fd24ca4a2360d1d90bbae7`; [post-merge stable Actions #44664211870](https://github.com/andydoane/biblozoo/actions/runs/44664211870) **PASS**. Prior [PR head Actions #44626934792](https://github.com/andydoane/biblozoo/actions/runs/44626934792) and integration [post-closeout Actions #44626315053](https://github.com/andydoane/biblozoo/actions/runs/44626315053) **PASS**. GitHub workflow validates Node/production web and Swift *source parsing*, not a native SDK Archive. Source integration branch deleted remotely after the owner merge.
+
+**Owner Mac/Xcode build:** Owner used exact pre-promotion integration commit `cacd602a`, completed `npm ci`, `npm run build`, `npx cap sync ios` with clean worktree; opened Xcode, **Build/Archive succeeded**. Owner supplied Organizer screenshot of a new arm64 Archive for `com.andydoane.biblozoo` (1.0/1). `npm audit --omit=dev` reported **zero production dependency vulnerabilities**. This is owner-observed evidence of Xcode compilation/archiving, not an independently generated App Store privacy report or publication.
+
+**Owner stable-branch setup and device smoke:** After merging #155, owner pulled `ios-prep` to `c31d8ee` on Mac (`git status`: clean, tracking `origin/ios-prep`), reported familiar VS Code/Xcode/GitHub Desktop setup, **built the promoted app on the phone and reports it works**. Earlier owner R16b.3 iPhone acceptance and broad integration test with no issues found still stand. **Do not claim individually tested** iOS versions, AirPods/Silent switch/PiP/lock combinations on the new stable build unless separately reported.
+
+**Safety:** Owner confirms separate, private off-phone backups for **10 production** and **11 different Audio Test** profiles; no upload, restore or reset is part of this docs PR. Family-v2 export **excludes some standalone Zoo rescue/surprise statistics**, so full restoration fidelity is **NOT VERIFIED**. No App Store/TestFlight, `main`, or device migration implied by PR #155.
+
+**Living handoff:** `docs/PROJECT-HANDOFF.md` is the now-promoted canonical stable `ios-prep` document. Update it **in the same PR every time** for new gameplay, native code, docs or CI work, with real SHA, tests and owner evidence; do not let historical “current” paragraphs override the newest verified section. This docs-only stable closeout refresh does **not** change app code and requires no redundant iPhone retest.
+
+
+## HISTORICAL R17 — pre-promotion owner acceptance (superseded by #155 merge)
 
 **Live merged integration:** [#153](https://github.com/andydoane/biblozoo/pull/153) MERGED at `4619f248dbfcfed722b8de4e75320407455c1f20`; [post-merge workflow #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS** for Node and production web build. This workflow parses Swift source but does **not** build/archive against Apple's native SDK. After merging the proposed R17 docs-only PR, recheck full CI at the **new integration HEAD**.
 
