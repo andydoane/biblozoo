@@ -1,6 +1,17 @@
 # Native iOS audio stabilization — proposed sequence of focused PRs
 
-## CURRENT R17 — integration accepted on iPhone; release gates before stable `ios-prep` (2026-11-19)
+## CURRENT R17 CLOSEOUT — `ios-prep` is promoted and owner-tested (2026-11-19 EST / 2026-11-20 UTC)
+
+**Stable promotion complete:** [PR #155](https://github.com/andydoane/biblozoo/pull/155) merged `integration/native-audio-to-ios-prep` → `ios-prep` as `c31d8ee182aaa6d156fd24ca4a2360d1d90bbae7`; exact stable-head [Actions #44664211870](https://github.com/andydoane/biblozoo/actions/runs/44664211870) **PASS**. Owner deleted remote integration branch; **`ios-prep` is now the normal development/PR target**. R01–R16 focused fixes previously accepted on physical iPhone, with #152 Silent-ON failure historically superseded by owner-accepted #153.
+
+**Final owner hardware verification:** On the exact pre-promotion integration source `cacd602a`, Mac `npm ci`, `npm run build`, `npx cap sync ios`, Xcode **Build + Archive** succeeded (owner Organizer screenshot, production `com.andydoane.biblozoo` arm64 app), `npm audit --omit=dev` reported **0 production vulnerabilities**. After merge, the owner pulled the stable Mac checkout to `c31d8ee`, configured VS Code/Xcode/GitHub Desktop, **built the promoted app on iPhone and reports it works**. Record owner report, not fabricated per-device/route checks. [Full final R17 evidence and caveats](R17-IOS-PREP-PROMOTION-READINESS.md).
+
+**Data and release boundary:** Owner confirms private backups for 10 original production and distinct 11 Audio Test profiles. The family-v2 export's separate Zoo rescue/surprise-state omission remains a **known restoration gap**, not waived or repaired. No `main` merge, TestFlight/App Store distribution, unapproved reset/import or profile-data upload occurred as part of branch promotion. Any later data migration needs its own safety decision.
+
+**One continuously maintained handoff:** The stable canonical [`docs/PROJECT-HANDOFF.md`](PROJECT-HANDOFF.md) must be reviewed and updated **in every future `ios-prep` PR** (code, tests, docs or CI). This first post-promotion documentation-only PR updates the handoff with the real merge SHA, green CI and owner report, without touching runtime code. Older R17 proposed steps below are historical and must not be treated as pending promotion work.
+
+
+## HISTORICAL R17 — pre-promotion readiness snapshot (superseded by merged #155)
 
 **Phase status:** R01–R14 focused fixes owner-reported PASS, R15 Silent Mode policy selected, R16a/b focused audio fixes owner-reported PASS, and R16b.3's corrected Verse Crawl music policy **OWNER PASS**. [R16b.3 #153](https://github.com/andydoane/biblozoo/pull/153) **MERGED** on integration at `4619f248dbfcfed722b8de4e75320407455c1f20`. The owner physically tested #153 and reported **“doing exactly what we need”**; then reported **“I've tested the app thoroughly and haven't found any issues.”** Treat this as strong *general integration* owner acceptance, not per-route test logs for every R17 matrix case. [Post-merge CI #44439057661](https://github.com/andydoane/biblozoo/actions/runs/44439057661) **PASS** for exact merged SHA (Node/build + Swift syntax, not Xcode Archive). Retain earlier #152 Silent-ON FAIL as historical and superseded by #153.
 
