@@ -1,6 +1,21 @@
 # R17 — final iOS integration acceptance and `ios-prep` promotion readiness
 
-**Status: [R17 documentation/handoff closeout PR #154](https://github.com/andydoane/biblozoo/pull/154) is the candidate, targeting integration only; STABLE PROMOTION NOT YET APPROVED OR MERGED.** Updated 2026-11-19 from the owner's iPhone reports and GitHub evidence. The current source is `integration/native-audio-to-ios-prep`; the proposed eventual destination is `ios-prep`. This document is an acceptance ledger, **not** evidence that a native Xcode Archive or full device test matrix has been independently witnessed.
+## CURRENT — R17 promotion completed; stable `ios-prep` owner smoke PASS
+
+**PROMOTED:** Owner merged [PR #155](https://github.com/andydoane/biblozoo/pull/155) from `integration/native-audio-to-ios-prep` to `ios-prep`, merge commit `c31d8ee182aaa6d156fd24ca4a2360d1d90bbae7` (2026-11-19 EST / 2026-11-20 UTC), and deleted the GitHub integration source branch. Exact new stable-HEAD [Actions #44664211870](https://github.com/andydoane/biblozoo/actions/runs/44664211870) **PASS**. The earlier [promotion PR-specific Actions #44626934792](https://github.com/andydoane/biblozoo/actions/runs/44626934792) and final integration-head [Actions #44626315053](https://github.com/andydoane/biblozoo/actions/runs/44626315053) also **PASS** at source `cacd602a`. These automate Node/Web validation; they are not evidence of an Apple SDK build.
+
+**OWNER MAC XCODE BUILD/ARCHIVE PASSED:** From detached pre-promotion integration `cacd602a`, owner supplied terminal results showing `npm ci`, `npm run build`, `npx cap sync ios` complete and a clean Git worktree; Xcode Organizer screenshot confirms an iOS arm64 Archive for `com.andydoane.biblozoo` version 1.0 (1). `npm audit --omit=dev`: **0 production dependency vulnerabilities** (full dev-inclusive `npm ci` audit had 7 warnings; do not conflate). Full Archive privacy report/manual resource audit beyond the reported compile is **not independently evidenced**.
+
+**OWNER STABLE BUILD/PHONE PASS:** Following #155, owner fast-forwarded `/Users/andydoane/Developer/biblozoo` to `ios-prep` commit `c31d8ee`; `git status` reported clean and up to date with `origin/ios-prep`. Owner then reported familiar GitHub Desktop/VS Code/Xcode setup complete, **built the app on their iPhone and reports it works**. Earlier owner broadly tested integration without finding issues, and separately accepted R16b.3 Verse Crawl. Do not invent a second complete hardware/audio route matrix for the stable build or iOS version.
+
+**OWNER DATA SAFETY CONFIRMED:** Owner stated both private off-phone backups are held: **10 original production profiles** and **11 distinct Audio Test profiles**. No data is attached to this repo. **KNOWN UNRESOLVED RESTORATION SCOPE:** family-v2 exports omit standalone Zoo rescue/surprise localStorage state; no independent full production-family restore has been evidenced. Do not describe this as solved or install/restore/reset without explicit owner consent. No TestFlight, App Store or `main` merge is part of R17.
+
+**CURRENT DEVELOPMENT AND LIVING HANDOFF:** Normal work now targets **`ios-prep`**. The former integration branch was deleted remotely after the promotion, though local worktrees may remain. The one canonical handoff is [`docs/PROJECT-HANDOFF.md`](PROJECT-HANDOFF.md), originally present on stable and now refreshed by the promotion. Update that exact file in **every future `ios-prep` PR** with verified branch SHA, actual test/owner evidence, new findings and next action. This is maintained through the PR workflow, not by an automatic background service. This first stable-branch status refresh is docs-only, proposed for owner review.
+
+## HISTORICAL — R17 pre-promotion checklist and decision record
+
+
+**Historical status at the time:** [R17 docs closeout PR #154](https://github.com/andydoane/biblozoo/pull/154) was then an integration-only candidate; stable promotion was not yet merged. Superseded by the CURRENT section above. Updated 2026-11-19 from the owner's iPhone reports and GitHub evidence. The current source is `integration/native-audio-to-ios-prep`; the proposed eventual destination is `ios-prep`. This document is an acceptance ledger, **not** evidence that a native Xcode Archive or full device test matrix has been independently witnessed.
 
 ## Latest objective checkpoints
 
@@ -37,7 +52,7 @@ These rows distinguish targeted owner confirmations, policy decisions and the br
 
 **Interpretation:** All originally listed focused R01–R16 fix scopes have owner-reported closure (with the superseded #152 failure preserved). This is **not** a claim that every hardware route/OS/permission/accessibility combination was separately tested or that R17 packaging/data risks are closed.
 
-## Outstanding R17 promotion gates — do not turn unknown into PASS
+## Historical R17 pre-promotion gates (resolved or carried forward as specified in CURRENT)
 
 | Gate | Evidence currently held | Remaining owner / Mac action |
 | --- | --- | --- |
@@ -48,13 +63,13 @@ These rows distinguish targeted owner confirmations, policy decisions and the br
 | Cross-platform/offline/privacy accessibility | Automated Node/production web build PASS, no new runtime changes in docs PR | Final Web/PWA smoke, Android if feasible, and any unreported route/accessibility matrix remain **not individually recorded**; document any explicit owner deferral or additional evidence; no guessing |
 | Branch promotion | **NOT STARTED** | Once gates above are accepted, create a **separate** owner-reviewed PR, **base: `ios-prep`**, **compare/head: `integration/native-audio-to-ios-prep`**, with precise release ledger and handoff included. Do not merge the docs-only R17 PR directly into `ios-prep` or target `main` |
 
-## The living handoff will continue on `ios-prep`
+## Historical plan for living handoff continuity (now promoted)
 
 **Canonical handoff: [`docs/PROJECT-HANDOFF.md`](PROJECT-HANDOFF.md).** The current `ios-prep` branch **already has this file** (originally added by PR #2); it is outdated, not missing. The future promotion PR will bring the much newer integration copy of **the same path** into stable `ios-prep`. This is deliberate: one handoff per branch, **not** a second competing master file. README and PR template must point to and require updates to that branch-local canonical file **in every future `ios-prep` PR**, including docs-only and CI-only work.
 
 After an owner-approved promotion merge, verify `https://github.com/andydoane/biblozoo/blob/ios-prep/docs/PROJECT-HANDOFF.md` contains this R17 status and no longer says #153 is pending in its current section. Then in the **first subsequent `ios-prep` PR**, record the actual promotion PR number, final merge SHA, validation and any post-promotion observations at the top of that same canonical file. Preserve historical integration reports as history beneath fresh current status; never let an older “CURRENT” paragraph override a newer verified checkpoint.
 
-## Owner-controlled merge flow (future; not part of this PR)
+## Historical owner-controlled merge flow (completed for #155)
 
 1. Merge this **docs-only** closeout PR into **integration** after review and green checks; pull the integration branch in GitHub Desktop. This PR is **not the promotion**.
 2. Confirm the Mac Archive and data-safety acceptance above (or explicitly record what remains deferred and why). Verify the final source HEAD, clean working tree, full integration Actions PASS and private profiles remain protected.
