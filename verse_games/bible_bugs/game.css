@@ -1320,3 +1320,45 @@ body.bz-return-activity-paused #app *::before,
 body.bz-return-activity-paused #app *::after {
   animation-play-state: paused !important;
 }
+
+
+/* N6c: no loading modal on successful native prewarm. This appears ONLY
+   when a genuine native session/sample/effect error needs explicit retry. */
+.bb-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: max(22px, env(safe-area-inset-top)) 20px
+    max(22px, env(safe-area-inset-bottom));
+  background: rgba(12, 23, 30, .84);
+}
+.bb-native-audio-card {
+  box-sizing: border-box;
+  width: min(92vw, 410px);
+  border-radius: 24px;
+  padding: 26px 22px;
+  background: #fefdf8;
+  color: #1f2937;
+  text-align: center;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, .28);
+}
+.bb-native-audio-card h2 { margin: 0 0 12px; font-size: 1.45rem; }
+.bb-native-audio-card p { margin: 0 0 20px; line-height: 1.5; }
+.bb-native-audio-card button {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: #2d6a55;
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-top: 12px;
+}
+.bb-native-audio-card button:last-child {
+  background: #e5e7eb;
+  color: #1f2937;
+}

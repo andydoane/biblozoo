@@ -470,6 +470,156 @@
 
   const clamp = window.VerseGameShell.clamp;
 
+  // N6b: this is null outside the independent native-only iOS Audio Test.
+  // Browser/PWA/Android still use the original exact Web Audio sound owner.
+  const nativeSnakeAudio = window.BibloZooNativeSnakeAudio?.isAvailable?.()
+    ? window.BibloZooNativeSnakeAudio : null;
+  let nativeSnakeGateSerial = 0;
+  let nativeSnakeGatePending = false;
+  let nativeSnakeRetryMode = "round";
+  let snakeWelcomeBack = null;
+
+  function hideNativeSnakeGate() {
+    const gate = document.getElementById("vslNativeAudioGate");
+    if (gate) gate.remove();
+  }
+  function abandonNativeSnakePreflight() {
+    if (!nativeSnakeAudio || !nativeSnakeGatePending) return;
+    // N6b.1: Back/Mode Select remains available while preparing quietly.
+    // Late activation/preload must not launch a round after navigating away.
+    nativeSnakeGateSerial++;
+    nativeSnakeGatePending = false;
+    app.removeAttribute("aria-busy");
+    void nativeSnakeAudio.stop();
+  }
+  // N6b.1: this gray dialog is for REAL native failures only. Ordinary
+  // difficulty selection and successful resumes prepare the bank quietly.
+  function showNativeSnakeGate(message, canRetry = false) {
+    if (!nativeSnakeAudio) return;
+    let gate = document.getElementById("vslNativeAudioGate");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "vslNativeAudioGate";
+      gate.className = "vsl-native-audio-gate";
+      gate.innerHTML = `
+        <section class="vsl-native-audio-card" role="dialog"
+          aria-modal="true" aria-label="Scripture Snake native sound">
+          <h2>Scripture Snake</h2>
+          <p role="status" data-snake-native-status></p>
+          <div class="vsl-native-audio-actions">
+            <button type="button" data-snake-native-retry>Try Again</button>
+            <button type="button" data-snake-native-exit>Choose Difficulty</button>
+          </div>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-snake-native-retry]").onclick = () => {
+        if (!nativeSnakeGatePending) primeSnakeAudioAndContinue(nativeSnakeRetryMode);
+      };
+      gate.querySelector("[data-snake-native-exit]").onclick = () => {
+        nativeSnakeGateSerial++;
+        nativeSnakeGatePending = false;
+        hideNativeSnakeGate();
+        void nativeSnakeAudio.stop();
+        if (state.running) {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        } else {
+          renderModeSelect();
+        }
+      };
+    }
+    gate.querySelector("[data-snake-native-status]").textContent = message;
+    const retry = gate.querySelector("[data-snake-native-retry]");
+    retry.hidden = !canRetry;
+    retry.disabled = nativeSnakeGatePending;
+    gate.querySelector("[data-snake-native-exit]").textContent =
+      state.running ? "Back to Games" : "Choose Difficulty";
+  }
+  function primeSnakeAudioAndContinue(mode = "round", uiPopKey = null) {
+    // While a previous real gesture is preparing the sample bank, ignore
+    // duplicate difficulty/menu taps instead of restarting Swift preflight.
+    if (nativeSnakeGatePending) return;
+    if (!nativeSnakeAudio || muted) {
+      hideNativeSnakeGate();
+      if (mode === "round") renderGameScreen();
+      else setPaused(false, "");
+      return;
+    }
+    nativeSnakeRetryMode = mode;
+    const token = ++nativeSnakeGateSerial;
+    nativeSnakeGatePending = true;
+    hideNativeSnakeGate(); // close a previous *failure* dialog on genuine Retry
+    app.setAttribute("aria-busy", "true");
+    // No modal, spinner or extra text for routine successful preparation.
+    // Game stays on difficulty or paused menu until native bank is ready.
+    // The call below immediately invokes Swift activateFromGesture() on
+    // the child's mode-select / menu-close / Retry click, NOT from a timer.
+    const started = nativeSnakeAudio.prepareFromGesture(uiPopKey
+      ? { key: uiPopKey, volume: Math.min(1, Math.max(0,
+          (SOUND_VOLUMES[uiPopKey] ?? 0.7))) } : null);
+    void Promise.resolve(started).then(result => {
+      if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
+      nativeSnakeGatePending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        hideNativeSnakeGate();
+        if (mode === "round") renderGameScreen();
+        else setPaused(false, "");
+      } else {
+        showNativeSnakeGate(
+          "Native sound isn't ready. Try Again to prepare it before playing.", true);
+      }
+    }).catch(() => {
+      if (token !== nativeSnakeGateSerial || document.hidden || returnPaused) return;
+      nativeSnakeGatePending = false;
+      app.removeAttribute("aria-busy");
+      showNativeSnakeGate("Native sound isn't ready. Tap Try Again.", true);
+    });
+  }
+  if (nativeSnakeAudio) {
+    nativeSnakeAudio.configure({
+      onAppInactive: () => {
+        // A held App Switcher thumbnail may stay WebKit-visible. Invalidate
+        // any *initial* pending sound preflight without creating a gray
+        // "audio failed" popup when the child returns to difficulty selection.
+        if (nativeSnakeGatePending) {
+          nativeSnakeGateSerial++;
+          nativeSnakeGatePending = false;
+          app.removeAttribute("aria-busy");
+        }
+        // An active game still uses the SAME plain Welcome Back owner.
+        if (!state.running || completed) return;
+        if (!snakeWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Return displays Welcome Back, never automatically prepares audio.
+        snakeWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (document.hidden || muted || completed || returnPaused ||
+            !state.running || state.paused) return;
+        setPaused(true, "native-sound-error");
+        nativeSnakeGatePending = false;
+        nativeSnakeRetryMode = "resume";
+        showNativeSnakeGate(
+          "A native sound stopped. Retry to resume the same round.", true);
+      }
+    });
+    // If preflight is interrupted before gameplay starts, never leave a
+    // hidden loading gate waiting for an automatic foreground reactivation.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        nativeSnakeGateSerial++;
+        nativeSnakeGatePending = false;
+        app.removeAttribute("aria-busy");
+      } else if (document.getElementById("vslNativeAudioGate")) {
+        showNativeSnakeGate(
+          "Sound was paused while you were away. Tap Try Again.", true);
+      }
+    });
+  }
+
   function helpHtml(){
     return `
       <p>Guide the snake by pointing where you want it to slither.</p>
@@ -507,6 +657,9 @@
   }
 
   function unlockAudio() {
+    // The native game prepares its bank only during a real selection/retry.
+    // Never try Web Audio or an HTML silent element in .audiotest.
+    if (nativeSnakeAudio) return Promise.resolve(nativeSnakeAudio.isReady());
     const ctx = getAudioContext();
     if (!ctx || ctx.state === "closed") return Promise.resolve(false);
     if (ctx.state === "running") {
@@ -577,6 +730,7 @@
   // Capture the next legitimate gesture after an iOS audio interruption,
   // including a Menu/Remix tap that does not reach the playing field.
   function recoverSnakeAudioOnGesture() {
+    if (nativeSnakeAudio) return; // no automatic/hot-pointer reactivation
     if (!audioContext || audioContext.state !== "running") void unlockAudio();
   }
   document.addEventListener("pointerdown", recoverSnakeAudioOnGesture, true);
@@ -630,6 +784,17 @@
   }
 
   function playGameSound(key, volumeScale = 1) {
+    if (nativeSnakeAudio) {
+      const isUi = key === "uiTap1" || key === "uiTap2";
+      if (muted || returnPaused ||
+          (!isUi && (!state.running || state.paused || completed))) return;
+      // Identical original key and volume semantics; native controller
+      // maps keys to Swift's fixed resource IDs, not JS file paths.
+      const volume = Math.min(1, Math.max(0,
+        (SOUND_VOLUMES[key] ?? 0.7) * volumeScale));
+      nativeSnakeAudio.play(key, volume);
+      return;
+    }
     if (muted || !audioUnlocked) return;
 
     const ctx = getAudioContext();
@@ -658,6 +823,20 @@
   }
 
   function playOrbTone(sizeRatio = 0.25) {
+    if (nativeSnakeAudio) {
+      if (muted || returnPaused || !state.running || state.paused || completed)
+        return;
+      // Original six-note C5–C6 sequence and size-to-volume mapping.
+      // Swift supplies precomputed triangle PCM rather than Web oscillators.
+      const sizeBoost = clamp(
+        (sizeRatio - ORB_TUNING.minSizeHeadRatio) /
+          Math.max(0.001, ORB_TUNING.maxSizeHeadRatio -
+            ORB_TUNING.minSizeHeadRatio), 0, 1);
+      const index = orbToneIndex++ % ORB_TONE_TUNING.notes.length;
+      nativeSnakeAudio.play("orb",
+        Math.min(1, ORB_TONE_TUNING.volume + sizeBoost * 0.035), index);
+      return;
+    }
     if (muted || !audioUnlocked) return;
 
     const ctx = getAudioContext();
@@ -700,16 +879,26 @@
   }
 
 
-  function playUiTapSound() {
+  function nextUiTapKey() {
     uiTapToggle = !uiTapToggle;
-    playGameSound(uiTapToggle ? "uiTap1" : "uiTap2");
+    return uiTapToggle ? "uiTap1" : "uiTap2";
   }
-
+  function playUiTapSound(key = nextUiTapKey()) {
+    playGameSound(key);
+  }
   function unlockAndTap() {
+    if (nativeSnakeAudio) {
+      const key = nextUiTapKey();
+      // Game-less title/back buttons use the SAME native PCM worker, but
+      // prepare just two UI samples from the real child gesture.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeSnakeAudio.tapUiFromGesture(key, Math.min(1, Math.max(0,
+          (SOUND_VOLUMES[key] ?? 0.7))));
+      return;
+    }
+    // Browser path retains its original key flip only on successful unlock.
     void unlockAudio().then((unlocked) => {
-      if (unlocked) {
-        playUiTapSound();
-      }
+      if (unlocked) playUiTapSound();
     });
   }
 
@@ -748,6 +937,7 @@
     const menuOverlay = document.getElementById("vslGameMenuOverlay");
     if (!menuOverlay) return;
     setPaused(true, "menu");
+    if (nativeSnakeAudio) void nativeSnakeAudio.stop();
     menuOverlay.classList.add("is-open");
     menuOverlay.setAttribute("aria-hidden", "false");
   }
@@ -763,7 +953,17 @@
     setPaused(true, "help");
   }
 
+  // Shared game-shell owns Help navigation; wire only the native UI pop
+  // on its existing buttons, without replacing their click actions.
+  function wireNativeSnakeHelpPops() {
+    if (!nativeSnakeAudio) return;
+    document.getElementById("helpBtn")?.addEventListener("click", unlockAndTap);
+    document.getElementById(HELP_OVERLAY_ID + "CloseBtn")
+      ?.addEventListener("click", unlockAndTap);
+  }
+
   function renderIntroScreen(){
+    abandonNativeSnakePreflight();
     stopLoop();
     window.VerseGameShell.renderTitleScreen({
       app,
@@ -776,6 +976,7 @@
       backLabel: "Back to Practice Games",
       onBack: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
@@ -783,9 +984,11 @@
         renderModeSelect();
       }
     });
+    wireNativeSnakeHelpPops();
   }
 
   function renderModeSelect(){
+    abandonNativeSnakePreflight();
     stopLoop();
     window.VerseGameShell.renderModeSelect({
       app,
@@ -797,16 +1000,27 @@
       backLabel: `Back to ${GAME_TITLE} title`,
       onBack: () => {
         unlockAndTap();
+        // Keep UI-only PCM ready on pre-game Back; abort an actual pending
+        // game bank, but do not cut the just-requested button pop.
+        if (nativeSnakeAudio && nativeSnakeGatePending)
+          abandonNativeSnakePreflight();
+        else if (nativeSnakeAudio && state.running) void nativeSnakeAudio.stop();
         renderIntroScreen();
       },
       onSelect: (mode) => {
-        unlockAndTap();
+        if (nativeSnakeAudio && nativeSnakeGatePending) return;
         selectedMode = mode;
         completed = false;
         completionResult = null;
-        renderGameScreen();
+        if (nativeSnakeAudio) {
+          primeSnakeAudioAndContinue("round", muted ? null : nextUiTapKey());
+        } else {
+          unlockAndTap();
+          renderGameScreen();
+        }
       }
     });
+    wireNativeSnakeHelpPops();
   }
 
   function renderGameScreen(){
@@ -880,6 +1094,18 @@
     wireGameControls();
 
     requestAnimationFrame(() => {
+      // An iPhone may go inactive after the sound-bank Promise resolves but
+      // before this first RAF. Never start a newly silent round on return.
+      // Retry is a NEW child tap, not an automatic foreground activation.
+      if (nativeSnakeAudio &&
+          (document.hidden || returnPaused ||
+           (!muted && !nativeSnakeAudio.isReady()))) {
+        nativeSnakeGatePending = false;
+        nativeSnakeRetryMode = "round";
+        showNativeSnakeGate(
+          "Sound was interrupted before the round began. Tap Try Again.", true);
+        return;
+      }
       initializeGame();
       startLoop();
     });
@@ -975,24 +1201,46 @@
       onMuteToggle: () => {
         unlockAudio();
         muted = !muted;
+        if (nativeSnakeAudio && muted) void nativeSnakeAudio.stop();
         if (!muted) playUiTapSound();
         return muted;
       },
       onHowToPlay: openHelpFromMenu,
       onModeSelect: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) {
+          nativeSnakeGateSerial++;
+          nativeSnakeGatePending = false;
+          app.removeAttribute("aria-busy");
+          void nativeSnakeAudio.stop();
+          hideNativeSnakeGate();
+        }
         setPaused(false, "");
         renderModeSelect();
       },
       onExit: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) {
+          nativeSnakeGateSerial++;
+          nativeSnakeGatePending = false;
+          app.removeAttribute("aria-busy");
+          void nativeSnakeAudio.stop();
+          hideNativeSnakeGate();
+        }
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
-      onOpen: () => setPaused(true, "menu"),
+      onOpen: () => {
+        setPaused(true, "menu");
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
+      },
       onClose: () => {
-        unlockAndTap();
-        setPaused(false, "");
+        if (nativeSnakeAudio && !muted)
+          primeSnakeAudioAndContinue("resume", nextUiTapKey());
+        else {
+          unlockAndTap();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         unlockAndTap();
@@ -1015,13 +1263,18 @@
 
         unlockAndTap();
         setPaused(true, "speed");
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
 
         return true;
       },
 
       onClose: () => {
-        unlockAndTap();
-        setPaused(false, "");
+        if (nativeSnakeAudio && !muted)
+          primeSnakeAudioAndContinue("resume", nextUiTapKey());
+        else {
+          unlockAndTap();
+          setPaused(false, "");
+        }
       }
     });
   }
@@ -3060,15 +3313,18 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         completed = false;
         renderModeSelect();
       },
       onMoreGames: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         unlockAndTap();
+        if (nativeSnakeAudio) void nativeSnakeAudio.stop();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -4208,6 +4464,11 @@
   // Existing menu/help pauses stay in force after a task switch.
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeSnakeAudio) {
+      nativeSnakeGateSerial++;
+      nativeSnakeGatePending = false;
+      void nativeSnakeAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnContextReplacements = 0;
@@ -4243,14 +4504,24 @@
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
     // Unlock/prime now, inside the actual child's button gesture.
-    const attempt = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioContext,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      replaceContext: replaceWelcomeAudioContext,
-      muted
-    });
+    const attempt = nativeSnakeAudio
+      ? (muted
+          ? Promise.resolve(true)
+          : nativeSnakeAudio.prepareFromGesture().then(result =>
+              (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true)))) // actual Let's go! tap, no Web clock
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioContext,
+          isCurrent: () => returnPaused && session === returnSession &&
+            !document.hidden,
+          replaceContext: replaceWelcomeAudioContext,
+          muted
+        });
     return Promise.resolve(attempt).then(ok => {
+      // YouTube PiP owns .soloAmbient output while it plays. Defer without
+      // advancing game clocks or consuming a Welcome Back retry attempt.
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) return false;
       returnPaused = false;
       welcomeClock.resume();
@@ -4268,13 +4539,25 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  snakeWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    // Existing Web-era Zoo Escape recovery is now available on native iOS and browser/PWA.
+    // Failed native Snake PCM still requires explicit audio retry; it never
+    // counts as sound success or creates a rescue by itself.
+    useZooEscape: true,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native production keeps its existing no-Zoo policy; DEV force may test.
+    preselectWelcomeSurprise: true,
+    suppressUiSound: !!nativeSnakeAudio,
     getSoundContext: () => audioContext,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !completed,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeSnakeAudio) void nativeSnakeAudio.stop();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: launch.profileId,
     pictureBase: "../../"
   });

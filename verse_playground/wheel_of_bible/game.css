@@ -2757,3 +2757,33 @@ button.wob-ref-group {
     transform: scale(1) rotate(0);
   }
 }
+/* N6p: accessible, genuinely failed native PCM or spoken-verse
+   Retry/Back only; never display during successful bank prewarming. */
+.wheel-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0,0,0,.66);
+}
+.wheel-native-audio-card {
+  width: min(100%,360px);
+  padding: 22px;
+  border-radius: 16px;
+  background: white;
+  color: #202020;
+  text-align: center;
+  font: 600 17px/1.4 system-ui,sans-serif;
+}
+.wheel-native-audio-card button {
+  min-height: 44px;
+  margin: 6px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  color: white;
+  background: #333;
+  font: inherit;
+}

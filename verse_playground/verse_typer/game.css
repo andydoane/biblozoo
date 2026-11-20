@@ -58,6 +58,20 @@ body {
   -webkit-touch-callout: none;
 }
 
+/* R06 / PLAY-01: the held iPhone App Switcher can still paint the
+   WKWebView thumbnail while UIKit is inactive. Game time is already frozen
+   by Verse Typer's Welcome Back clock; independent compositor keyframes
+   (head/ripple, caterpillar tail colors, rainbow, sparkles, butterfly)
+   must freeze at the SAME visual frame. JS also pauses captured WAAPI
+   animations/transitions without resetting their currentTime. The shared
+   Welcome Back overlay lives outside #app and is intentionally unaffected. */
+html.vt-return-visual-paused #app,
+html.vt-return-visual-paused #app *,
+html.vt-return-visual-paused #app *::before,
+html.vt-return-visual-paused #app *::after {
+  animation-play-state: paused !important;
+}
+
 #app.vm-shell {
   min-height: 100dvh;
   height: 100dvh;
@@ -2120,3 +2134,7 @@ html.vt-native-capacitor .vt-root::before {
 .vt-streak-pill.is-streak-rainbow {
   box-shadow: none !important;
 }
+/* N6n: genuinely failed native PCM/chunk, never routine prewarm. */
+.vt-native-audio-failure{position:fixed;inset:0;z-index:10020;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.66)}
+.vt-native-audio-card{width:min(100%,360px);padding:22px;border-radius:16px;background:white;color:#202020;text-align:center;font:600 17px/1.4 system-ui,sans-serif}
+.vt-native-audio-card button{min-height:44px;margin:6px;padding:10px 16px;border:0;border-radius:9px;color:white;background:#333;font:inherit}

@@ -4,7 +4,7 @@
 
 ## Base and scope
 
-- **Target branch:** `ios-prep` (not `main`)
+- **Target branch:** During R17 closeout, use `integration/native-audio-to-ios-prep` for documentation/remaining stabilization; only the **separately approved promotion PR** targets `ios-prep` from that integration branch. After promotion, ordinary feature/doc PRs target stable `ios-prep` (never `main` unless explicitly requested). Isolated Audio Test branches use their separately approved target/identity.
 - **Base commit verified:** <!-- SHA -->
 - **Key files / state touched:** <!-- source, audio, profile storage, daily rewards, native, cache, etc. -->
 
@@ -44,16 +44,18 @@
 
 ## Living handoff — **required for every PR**
 
-- [ ] Read `docs/PROJECT-HANDOFF.md` **and verified it against current `ios-prep`**, PRs and code
-- [ ] Updated `docs/PROJECT-HANDOFF.md` **in this PR**: freshness stamp, relevant decisions, current status, remaining owner tests
+- [ ] Read the **one canonical branch-local** `docs/PROJECT-HANDOFF.md` and verified it against **this PR's actual target branch** (integration during R17, stable `ios-prep` after owner-approved promotion, or a separately authorized experiment), current GitHub SHA/PRs and the owner's real reports
+- [ ] Updated **that same file** `docs/PROJECT-HANDOFF.md` **in this PR**, even if the PR is docs-only, build-only, or CI-only: freshness stamp, branch/ref, tested evidence, status, known gaps and next owner action
 - [ ] Updated `docs/TESTING.md` and/or `docs/AUDIO-RECOVERY.md` if their contracts changed
 - [ ] Distinguished **implemented**, **merged**, **automated checks passed**, and **iPhone verified**
 - [ ] If any handoff update cannot be completed, explained the blocker below for owner review (do not silently skip)
 
 **Handoff changes / blockers:**
 
-<!-- Mention the updated sections, any caveat, and next action -->
+<!-- Mention the updated sections, current branch, any caveat, and next action. Do not assume the old integration-only 'CURRENT' headings remain authoritative after promotion. -->
+
+**Post-R17 `ios-prep` maintenance rule:** Stable `ios-prep` already contains a living handoff from [PR #2](https://github.com/andydoane/biblozoo/pull/2). The R17 promotion carries the newer integration copy into **the same path**, not a second competing file. Every subsequent `ios-prep` PR updates the **stable branch's copy** with verified current status and actual owner testing. The first stable follow-up should record the final promotion PR number, real merge SHA and post-merge checks. See [R17 gates](../docs/R17-IOS-PREP-PROMOTION-READINESS.md).
 
 ## Merge control
 
-**Please leave this PR unmerged for owner review.** After the owner merges into `ios-prep`, they will Pull Origin in GitHub Desktop, run `npm run build && npx cap sync ios`, and verify the final app on iPhone. Risky changes may be tested from the feature branch before merge.
+**Please leave this PR unmerged for owner review.** Before clicking Merge, verify **base** and **compare**: the final R17 promotion is **base `ios-prep` ← compare `integration/native-audio-to-ios-prep`**, not `main`. A docs-only R17 closeout PR targets **integration** and is **not** the promotion. After the owner merges into the stated target, **Fetch/Pull Origin** on that branch in GitHub Desktop; when a native build is required, run `npm run build && npx cap sync ios` and use the appropriate Xcode workspace. Do not install/replace the production-ID app, import a family backup, delete a branch/worktree, or reset local data as an implicit part of merging. Isolated Audio Test uses its separate `com.andydoane.biblozoo.audiotest` identity and profiles. The owner controls merge and any later device update.

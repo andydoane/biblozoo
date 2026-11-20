@@ -6,6 +6,136 @@
 (function installWelcomeBackReturn(root) {
   "use strict";
 
+  // N6h.1: .soloAmbient cannot mix with YouTube PiP. A blocked
+  // activateFromGesture is NOT a failed audio asset. Keep the same round
+  // frozen, let the child pause external audio, and retry by real tap.
+  const NATIVE_AUDIO_DEFERRED_REASONS = new Set([
+    "other-audio-playing", "interruption-pending",
+    "gesture-required-after-interruption", "activation-cooldown",
+    "foreground-attempt-limit", "not-foreground",
+    // Competing sessions with higher priority (calls, system media) may
+    // reject our one explicit takeover. This remains a retriable pause,
+    // NEVER the irreversible second-error/gray game popup.
+    "activation-os-rejected"
+  ]);
+  function isNativeAudioDeferred(result) {
+    return result?.ready !== true &&
+      NATIVE_AUDIO_DEFERRED_REASONS.has(result?.reason);
+  }
+  function nativeAudioResumeResult(result) {
+    if (result?.ready === true) return true;
+    if (isNativeAudioDeferred(result))
+      return { deferred: true, reason: result.reason };
+    return false;
+  }
+
+  // Shared between standalone/Playground, Learn and Feeding. The caller
+  // owns gameplay/verse checkpoints; this only proves the fixed BibloPet
+  // unlock sound (real advancing native/player clock or Web media clock).
+  // It NEVER unlocks the original activity audio or commits surprise odds.
+  function createZooAudioCue() {
+    // Shared controller owns the optional short cue's lifetime, never the
+    // game's native mixer, music clock, score, or activity timeline.
+    let cueEpoch = 0;
+    let cueCleanup = null;
+    function stop() {
+      ++cueEpoch;
+      const cleanup = cueCleanup;
+      cueCleanup = null;
+      try { cleanup?.(); } catch (_) {}
+    }
+    function playFromGesture({ isMuted, assetRoot = "", isCurrent } = {}) {
+      stop();
+      const epoch = cueEpoch;
+      const current = () => epoch === cueEpoch && isCurrent?.() === true;
+      // The child's explicit mute is intentionally silent. Do not start a
+      // competing external-audio takeover merely to play a decorative cue.
+      if (isMuted?.() === true) return Promise.resolve(true);
+      if (root.BibloZooNativeOnlyOutput?.enabled === true) {
+        // Same .soloAmbient native owner as the games. Never instantiate
+        // HTMLAudioElement/Web Audio or count accepted play() as proof.
+        const api = root.Capacitor?.Plugins?.BibloZooNativeSound;
+        if (typeof api?.activateFromGesture !== "function" ||
+            typeof api?.preload !== "function" ||
+            typeof api?.play !== "function" ||
+            typeof api?.getCuePlaybackState !== "function" ||
+            typeof api?.stop !== "function") return Promise.resolve(false);
+        let activation;
+        try { activation = api.activateFromGesture({ purpose: "ui" }); }
+        catch (_) { return Promise.resolve(false); }
+        return (async () => {
+          const ready = await Promise.resolve(activation);
+          if (!current() || ready?.ready !== true) return false;
+          const prepared = await api.preload({ soundId: "pilot-unlock" });
+          if (!current() || prepared?.prepared !== true) return false;
+          // Install cancellation before the queued native play request.
+          cueCleanup = () => { void Promise.resolve(
+            api.stop({ soundId: "pilot-unlock" })).catch(() => {}); };
+          const played = await api.play({
+            soundId: "pilot-unlock", volume: 0.55
+          });
+          if (!current() || played?.accepted !== true) return false;
+          // Compare TWO real AVAudioPlayer clock samples. A nonzero
+          // position or a native play() ACK alone is not sound recovery.
+          let initial = null;
+          for (let n = 0; n < 14; n++) {
+            if (!current()) return false;
+            const sample = await api.getCuePlaybackState({
+              soundId: "pilot-unlock"
+            });
+            if (!current()) return false;
+            const position = Number(sample?.positionMs);
+            if (sample?.ok === true && Number.isFinite(position)) {
+              if (initial === null) initial = position;
+              else if (position > initial + 35 &&
+                  (sample.playing === true || sample.completed === true))
+                return true;
+            }
+            await new Promise(resolve => root.setTimeout(resolve, 95));
+          }
+          return false;
+        })().then(ok => {
+          if (!ok) stop();
+          return ok;
+        }, () => { stop(); return false; });
+      }
+      // Standalone and Playground pages share the same ../../ asset root.
+      // Web/PWA/Android keep their established HTML-media implementation.
+      const src = (assetRoot === "../../" ? "../../" : "") +
+        "ui_audio/ui_pet_unlock.mp3";
+      let audio, start;
+      try {
+        audio = new root.Audio(src);
+        audio.preload = "auto";
+        audio.volume = 0.55;
+        audio.setAttribute?.("playsinline", "");
+        audio.setAttribute?.("webkit-playsinline", "");
+        cueCleanup = () => {
+          try { audio.pause(); audio.removeAttribute?.("src"); audio.load?.(); }
+          catch (_) {}
+        };
+        // Direct click: no await or animation before audio.play().
+        start = audio.play();
+      } catch (_) { stop(); return Promise.resolve(false); }
+      return Promise.resolve(start).then(async () => {
+        if (!current()) return false;
+        const initial = Number(audio.currentTime);
+        if (!Number.isFinite(initial)) return false;
+        for (let n = 0; n < 14; n++) {
+          if (!current()) return false;
+          if (audio.ended === true || Number(audio.currentTime) > initial + 0.035)
+            return true;
+          await new Promise(resolve => root.setTimeout(resolve, 95));
+        }
+        return false;
+      }).then(ok => {
+        if (!ok) stop();
+        return ok;
+      }, () => { stop(); return false; });
+    }
+    return Object.freeze({ playFromGesture, stop });
+  }
+
   // Patch 72.1C: one lifecycle adapter for the 12 verse games, Playground,
   // Flashcards, and applicable quiet daily tasks. Owners still supply their
   // own pause, verified recovery/acknowledgement, and navigation callbacks.
@@ -13,7 +143,8 @@
   function attachZooReturn(options) {
     const { shouldPrompt, onPause, onContinue, onExit, profileId,
       pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
-      preserveFocus = false, suppressUiSound = false } = options;
+      preserveFocus = false, suppressUiSound = false,
+      preselectWelcomeSurprise = false } = options;
     const doc = root.document;
     const overlay = doc.createElement("div");
     overlay.className = "bz-welcome-overlay";
@@ -23,32 +154,108 @@
     overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
     overlay.innerHTML = root.BibloZooWelcomeBack.markup("game");
     const button = overlay.querySelector("[data-welcome-back-action]");
-    if (suppressUiSound) button?.setAttribute("data-no-ui-sound", "");
+    if (suppressUiSound || preselectWelcomeSurprise)
+      button?.setAttribute("data-no-ui-sound", "");
     doc.body.appendChild(overlay);
     let disposed = false;
     let pending = false;
     let away = false;
     let hasBeenVisible = !doc.hidden;
     let generation = 0;
+    let heldForSurprise = false;
+    let cueOnlyVerified = false;
+    const surpriseCue = createZooAudioCue();
+    const stopSurpriseCue = () => surpriseCue.stop();
+    function playSurpriseCueFromGesture() {
+      const token = generation;
+      return surpriseCue.playFromGesture({
+        isMuted: isSoundMuted, assetRoot: pictureBase,
+        isCurrent: () => !disposed && pending && !doc.hidden &&
+          token === generation
+      });
+    }
     const zoo = root.BibloZooZooEscape.create({
       overlay, profileId, pictureBase, name, petName, verseId,
+      surpriseEnabled: true,
+      preselectWelcomeSurprise,
       getSoundContext, isSoundMuted,
-      recover: () => {
+      recover: info => {
         const token = generation;
-        // onContinue must run synchronously inside the real LOCK GATE click.
+        // A selected surprise verifies the cue now. Original activity
+        // audio stays stopped until the real LOCK GATE. A no-surprise tap
+        // still invokes the exact old onContinue recovery path immediately.
+        const usingCue = preselectWelcomeSurprise && !!info?.plannedSurprise;
+        cueOnlyVerified = false;
         let outcome;
-        try { outcome = onContinue(); } catch (_) { return false; }
-        return Promise.resolve(outcome).then(result =>
-          !disposed && pending && token === generation && !doc.hidden ? result : false,
-          () => false);
+        try {
+          outcome = usingCue ? playSurpriseCueFromGesture() : onContinue();
+        } catch (_) { return false; }
+        return Promise.resolve(outcome).then(result => {
+          const current = !disposed && pending &&
+            token === generation && !doc.hidden;
+          if (current && usingCue && result === true) cueOnlyVerified = true;
+          return current ? result : false;
+        }, () => false);
+      },
+      onSurpriseStart: () => {
+        if (disposed || !pending || doc.hidden) return;
+        // onContinue() has already verified sound and unpaused the owner.
+        // A surprise is a second, deliberate pause, not a transparent UI.
+        heldForSurprise = true;
+        // With cue-first recovery, the activity never left its original
+        // frozen state. Repeating onPause here can stop the native cue or
+        // invalidate checkpoint timers unnecessarily. Legacy owners still
+        // re-pause after their ordinary verified onContinue.
+        if (!cueOnlyVerified) {
+          try { onPause(); } catch (_) {}
+        }
       },
       onRecovered: () => {
         if (disposed || !pending || doc.hidden) return;
-        pending = false;
-        overlay.hidden = true;
+        if (!heldForSurprise) {
+          stopSurpriseCue();
+          if (cueOnlyVerified) {
+            // A provisional surprise can fail its storage commit; a
+            // verified *cue* is not permission to resume game audio without
+            // another genuine tap. Reset to a fresh explicit Welcome Back.
+            cueOnlyVerified = false;
+            zoo.start();
+            overlay.hidden = false;
+            return;
+          }
+          pending = false;
+          overlay.hidden = true;
+          return;
+        }
+        heldForSurprise = false;
+        cueOnlyVerified = false;
+        stopSurpriseCue();
+        const token = generation;
+        // LOCK GATE is a new real user gesture, so an owner that requires
+        // iOS reactivation can retry it here. Keep the activity paused and
+        // the overlay visible while the second recovery is pending.
+        let outcome;
+        try { outcome = onContinue(); } catch (_) { outcome = false; }
+        Promise.resolve(outcome).then(ok => {
+          if (disposed || !pending || token !== generation || doc.hidden) return;
+          if (ok === true) {
+            pending = false;
+            overlay.hidden = true;
+          } else {
+            // Never continue an unsafe/failed recovery underneath a modal.
+            zoo.start();
+            overlay.hidden = false;
+          }
+        }, () => {
+          if (disposed || !pending || token !== generation || doc.hidden) return;
+          zoo.start();
+          overlay.hidden = false;
+        });
       },
       onExit: () => {
         if (disposed) return;
+        cueOnlyVerified = false;
+        stopSurpriseCue();
         ++generation;
         pending = false;
         try {
@@ -73,11 +280,22 @@
     function leave() {
       if (disposed || away || !hasBeenVisible || !shouldPrompt()) return;
       away = true;
+      stopSurpriseCue();
       const wasPending = pending;
       pending = true;
       ++generation;
       overlay.hidden = true;
-      if (pending && wasPending) return; // keep rescued pets on mid-escape app switch
+      if (pending && wasPending) {
+        // Keep an unfinished pet rescue, but if LOCK GATE was already
+        // re-priming sound, invalidate that attempt and restart Welcome Back.
+        if (heldForSurprise) heldForSurprise = false;
+        if (zoo.getStage?.() === "recovered") {
+          cueOnlyVerified = false;
+          zoo.start();
+          try { onPause(); } catch (_) {}
+        }
+        return;
+      }
       zoo.start(); // starts a genuinely new recovery session
       try { onPause(); } catch (_) { /* preserve navigation/lifecycle */ }
     }
@@ -91,15 +309,36 @@
       zoo.resumeVisible?.(); // preserve stage/pets across a second task switch
       if (!preserveFocus) button?.focus?.({ preventScroll: true });
     }
+    // Native UIKit can report .inactive while WKWebView is still visible.
+    // Native Verse Typer and Scripture Scrub already call these same hooks
+    // through their app lifecycle; Zoo mode must implement the contract too.
+    // Never activate audio on app-active: only show the ordinary real-tap gate.
+    let nativeInactive = false;
+    function pauseFromNativeInactive() {
+      if (disposed || !shouldPrompt()) return false;
+      nativeInactive = true;
+      leave();
+      return pending;
+    }
+    function showAfterNativeActive() {
+      if (disposed || !nativeInactive) return false;
+      nativeInactive = false;
+      visible();
+      return pending;
+    }
     const pageHidden = () => leave();
     doc.addEventListener("visibilitychange", visible);
     root.addEventListener("pagehide", pageHidden);
     root.addEventListener("pageshow", visible);
     return Object.freeze({
       isPaused: () => pending,
+      pauseFromNativeInactive,
+      showAfterNativeActive,
       destroy() {
         if (disposed) return;
         disposed = true;
+        cueOnlyVerified = false;
+        stopSurpriseCue();
         ++generation;
         pending = false;
         doc.removeEventListener("visibilitychange", visible);
@@ -112,17 +351,24 @@
   }
 
   function attach({ shouldPrompt, onPause, onContinue, onExit, profileId, pictureBase, name, petName, verseId,
-    getSoundContext, isSoundMuted, escapeText, preserveFocus = false, suppressUiSound = false } = {}) {
+    getSoundContext, isSoundMuted, escapeText, preserveFocus = false,
+    suppressUiSound = false, useZooEscape = false,
+    allowDevForceZooEscape = false, preselectWelcomeSurprise = false } = {}) {
     if (!root.document?.body || !root.BibloZooWelcomeBack ||
         typeof shouldPrompt !== "function" ||
         typeof onPause !== "function" ||
         typeof onContinue !== "function") return null;
 
-    if (root.BibloZooZooEscape?.create) {
+    // Only explicit Practice Game / eligible Playground opt-ins may roll Zoo
+    // surprises. All other Welcome Back callers keep their original recovery,
+    // including when Audio Test DEV Force is enabled.
+    const forceDevEscape = allowDevForceZooEscape &&
+      root.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.() === true;
+    if ((useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create) {
       const controller = attachZooReturn({ shouldPrompt, onPause, onContinue,
         onExit, profileId, pictureBase, name, petName, verseId, getSoundContext, isSoundMuted,
         escapeText, preserveFocus,
-        suppressUiSound });
+        suppressUiSound, preselectWelcomeSurprise });
       if (controller) return controller;
     }
 
@@ -236,7 +482,10 @@
         escape.hidden = false;
         if (status) {
           status.hidden = false;
-          status.textContent = "Those sloths are taking their time...";
+          status.textContent = ["other-audio-playing",
+            "interruption-pending", "activation-os-rejected"].includes(ok.reason)
+            ? "BibloZoo couldn't start sound yet. Pause the video or tap Let's go! again."
+            : "Audio is busy. Tap Let's go! again when it's ready.";
         }
         log("welcome-back-recovery-deferred", { reason: ok.reason || "native-interruption" });
         return;
@@ -324,6 +573,24 @@
       }
     }
 
+    // N6b: native UIKit .inactive (swipe up and HOLD) can precede WebKit
+    // visibilitychange. This explicit owner-only signal uses the SAME
+    // plain Welcome Back overlay; no fake audio clock or auto-activation.
+    // The game alone elects to call these; Web/PWA/Android are unchanged.
+    let nativeInactive = false;
+    function pauseFromNativeInactive() {
+      if (disposed || !shouldPrompt()) return false;
+      nativeInactive = true;
+      leave();
+      return pending;
+    }
+    function showAfterNativeActive() {
+      if (disposed || !nativeInactive) return false;
+      nativeInactive = false;
+      visible(); // on actual return; never calls onContinue or audio
+      return pending;
+    }
+
     document.addEventListener("visibilitychange", visible);
     root.addEventListener("pagehide", pageHidden);
     root.addEventListener("pageshow", visible);
@@ -335,6 +602,8 @@
 
     return Object.freeze({
       isPaused: () => pending,
+      pauseFromNativeInactive,
+      showAfterNativeActive,
       destroy() {
         if (disposed) return;
         disposed = true;
@@ -458,5 +727,8 @@
     })();
   }
 
-  root.BibloZooWelcomeBackReturn = Object.freeze({ attach, resumeAudioOnGesture });
+  root.BibloZooWelcomeBackReturn = Object.freeze({
+    attach, createZooAudioCue, resumeAudioOnGesture, isNativeAudioDeferred,
+    nativeAudioResumeResult
+  });
 })(window);

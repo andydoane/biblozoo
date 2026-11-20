@@ -1,0 +1,53 @@
+/* Synthetic archive acceptance/refusal checks; never starts Xcode or a device. */
+"use strict";
+const fs=require("node:fs"),path=require("node:path"),os=require("node:os");
+const assert=require("node:assert/strict"),tool=require("./inspect_ios_archive.js");
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),"biblozoo-archive-check-"));
+const archive=path.join(tmp,"BibloZoo.xcarchive"),app=path.join(archive,"Products","Applications","App.app");
+function put(name,content="fixture"){
+  const file=path.join(app,name);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(file,content);
+  return file;
+}
+function info(id){
+  return '<?xml version="1.0"?><plist><dict>'+
+    '<key>CFBundleIdentifier</key><string>'+id+'</string>'+
+    '<key>CFBundleDisplayName</key><string>BibloZoo</string>'+
+    '<key>NSMicrophoneUsageDescription</key><string>Recording</string>'+
+    '<key>NSPhotoLibraryAddUsageDescription</key><string>Save Photos</string>'+
+    '</dict></plist>';
+}
+function privacy(reason="35F9.1"){
+  return '<?xml version="1.0"?><plist><dict>'+
+    '<key>NSPrivacyAccessedAPITypes</key><array>'+
+    '<string>NSPrivacyAccessedAPICategorySystemBootTime</string>'+
+    '<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>'+
+    '<string>'+reason+'</string><string>3B52.1</string></array>'+
+    '<key>NSPrivacyTracking</key><false/></dict></plist>';
+}
+try{
+ const plist=put("Info.plist",info("com.andydoane.biblozoo"));
+ const manifest=put("PrivacyInfo.xcprivacy",privacy());
+ for(const name of tool.rootMp3s)put(name);
+ for(const name of tool.publicFiles)put(path.join("public",name));
+ const guard=put("public/verse_games/shared/native-only-ios-output.js",
+   'var packagedAppId = "com.andydoane.biblozoo";');
+ put("public/index.html","<head><script data-biblozoo-native-only-output></script></head>");
+ put("Frameworks/Capacitor.framework/PrivacyInfo.xcprivacy",privacy());
+ const good=tool.inspectArchive(archive);
+ assert.equal(good.bundleId,"com.andydoane.biblozoo");
+ assert.deepEqual(good.sdkManifests,["Frameworks/Capacitor.framework/PrivacyInfo.xcprivacy"]);
+ fs.writeFileSync(plist,info("com.andydoane.biblozoo.audiotest"));
+ assert.throws(()=>tool.inspectArchive(archive),/Wrong bundle identity/);
+ fs.writeFileSync(plist,info("com.andydoane.biblozoo"));
+ fs.rmSync(path.join(app,"ui_pet_unlock.mp3"));
+ assert.throws(()=>tool.inspectArchive(archive),/Archive resources missing/);
+ put("ui_pet_unlock.mp3");
+ fs.writeFileSync(guard,'var packagedAppId = "__BIBLOZOO_PACKAGED_APP_ID__";');
+ assert.throws(()=>tool.inspectArchive(archive),/not production identity/);
+ fs.writeFileSync(guard,'var packagedAppId = "com.andydoane.biblozoo";');
+ fs.writeFileSync(manifest,privacy("00.00"));
+ assert.throws(()=>tool.inspectArchive(archive),/approved category\/reason/);
+ console.log("Step 3e PASS: synthetic archive acceptance and rejection for ID, resources, guard and privacy reasons.");
+}finally{fs.rmSync(tmp,{recursive:true,force:true});}

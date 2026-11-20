@@ -1050,3 +1050,34 @@ select{ font:inherit; }
 #app.is-welcome-return-paused * {
   animation-play-state: paused !important;
 }
+
+/* N6m: native iOS only, genuinely failed PCM retry/back — never show
+   during normal mode or Game Menu preflight. */
+.vsn-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0,0,0,.65);
+}
+.vsn-native-audio-card {
+  width: min(100%,360px);
+  border-radius: 16px;
+  padding: 22px;
+  background: white;
+  color: #202020;
+  text-align: center;
+  font: 600 17px/1.4 system-ui,sans-serif;
+}
+.vsn-native-audio-card button {
+  min-height: 44px;
+  margin: 6px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  background: #333;
+  color: white;
+  font: inherit;
+}

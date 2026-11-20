@@ -431,6 +431,14 @@ body {
 
 
 
+/* Prevent iOS press-and-hold Select Text/Callout only in the drawing
+ * surface; the rest of Ghost Writer (including recorder JSON) is untouched. */
+.ghost-draw-wrap, .ghost-draw-wrap *, #ghostDrawCanvas {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
 .ghost-guide-text {
   position: absolute;
   inset: 0;
@@ -485,6 +493,19 @@ body {
   min-height: 56px;
   font-size: clamp(18px, 4.8vw, 24px);
 }
+/* A hidden Cancel Video control must not occupy a row until encoding starts. */
+.ghost-remix-actions .vm-btn[hidden] { display: none !important; }
+/* One reserved status line avoids an unexpected jump when Photos completes. */
+.ghost-export-status {
+  margin: 0;
+  min-height: 1.45em;
+  padding: 2px 4px;
+  color: #e7ffdc;
+  font: 700 16px/1.35 "Baloo 2", system-ui, sans-serif;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.ghost-export-status.is-error { color: #ffe1df; }
 
 .ghost-training-card .ghost-train-actions {
   width: min(calc(100% - 24px), 440px);
@@ -745,6 +766,16 @@ body {
   transition: opacity .2s ease, transform .2s ease;
 }
 
+/* 1em matches the old emoji's font-relative footprint at every viewport size. */
+.ghost-playback-remix-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  vertical-align: -0.13em;
+  pointer-events: none;
+}
+
 .ghost-playback-remix-btn.is-visible {
   opacity: 1;
   transform: translateY(0);
@@ -938,6 +969,60 @@ body {
   color: #1f2028;
   background: #fff;
 }
+
+/* Session-only photo picker lives next to Background in both Remix modes. */
+.ghost-background-picker {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.ghost-background-picker .ghost-option {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ghost-background-import-btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: #7f66c6;
+  color: #ffffff;
+  font: 900 16px/1.1 "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ghost-background-import-btn:disabled { opacity: .55; }
+.ghost-background-import-btn:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+.ghost-background-picker input[hidden],
+.ghost-background-darken[hidden] { display: none !important; }
+.ghost-background-darken {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  width: fit-content;
+  min-height: 30px;
+  align-items: center;
+  gap: 9px;
+  color: #ffffff;
+  font: 800 15px/1.2 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-background-darken input {
+  width: 20px;
+  height: 20px;
+  accent-color: #7f66c6;
+}
+.ghost-background-import-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ffffff;
+  font: 700 14px/1.25 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-background-import-status:empty { display: none; }
 
 .ghost-remix-actions {
   grid-template-columns: 1fr 1fr;
@@ -1190,4 +1275,282 @@ html.gw-native-capacitor .ghost-playback-root::before {
   .ghost-remix-actions .ghost-full {
     grid-column: auto;
   }
+}
+
+
+/* Ghost Writer Photos export: Welcome Back proportions in BibloZoo purple.
+ * A fixed-size card and reserved phase/action slots keep progress, permission,
+ * success, and retry transitions from jumping around.
+ */
+.ghost-export-overlay[hidden],
+.ghost-export-overlay [hidden] { display: none !important; }
+.ghost-export-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: max(14px, env(safe-area-inset-top)) 16px
+    max(14px, env(safe-area-inset-bottom));
+  background: rgba(22, 14, 32, .83);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  touch-action: manipulation;
+}
+.ghost-export-dialog {
+  box-sizing: border-box;
+  flex: 0 1 360px;
+  width: min(100%, 360px);
+  max-height: min(88dvh, 590px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: clamp(18px, 4.5vw, 26px);
+  border: 0;
+  border-radius: 30px;
+  background: #7f66c6; /* BibloZoo's existing Purple palette color */
+  box-shadow: 0 12px 0 rgba(0, 0, 0, .25), 0 22px 50px rgba(0, 0, 0, .32);
+  color: #ffffff;
+  text-align: center;
+  font-family: "Baloo 2", system-ui, sans-serif;
+  touch-action: pan-y;
+}
+.ghost-export-dialog:focus { outline: none; }
+.ghost-export-avatar {
+  width: clamp(96px, 28vw, 136px);
+  height: clamp(96px, 28vw, 136px);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 9px;
+  border-radius: 25px;
+  background: #333333;
+}
+.ghost-export-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.ghost-export-title {
+  margin: 0;
+  min-height: 2.16em;
+  width: 100%;
+  flex: 0 0 2.16em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font: 900 clamp(27px, 7.2vw, 38px)/1.08 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-export-message {
+  margin: 0;
+  width: 100%;
+  min-height: 2.7em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font: 800 clamp(17px, 4.5vw, 20px)/1.35 "Baloo 2", system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+.ghost-export-phase-slot {
+  box-sizing: border-box;
+  height: 67px;
+  flex: 0 0 67px;
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+.ghost-export-phase-slot > * { grid-area: 1 / 1; }
+.ghost-export-progress {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: stretch;
+}
+.ghost-export-progress-track {
+  height: 15px;
+  border-radius: 999px;
+  background: rgba(37, 39, 51, .28);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .17);
+}
+.ghost-export-progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #333333;
+}
+.ghost-export-percentage {
+  color: #ffffff;
+  font: 900 19px/1 "Baloo 2", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.ghost-export-activity,
+.ghost-export-success-mark {
+  display: grid;
+  place-items: center;
+}
+.ghost-export-spinner {
+  display: block;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, .3);
+  border-top-color: #ffffff;
+  animation: ghost-export-spin 1s linear infinite;
+}
+.ghost-export-success-mark {
+  color: #ffffff;
+  font: 900 46px/1 "Baloo 2", system-ui, sans-serif;
+}
+@keyframes ghost-export-spin {
+  to { transform: rotate(360deg); }
+}
+.ghost-export-action-slot {
+  width: 100%;
+  height: 68px;
+  flex: 0 0 68px;
+  display: grid;
+  place-items: stretch;
+}
+.ghost-export-action-slot > * { grid-area: 1 / 1; }
+.ghost-export-action-hint,
+.ghost-export-action {
+  box-sizing: border-box;
+  margin: 0;
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  border-radius: 20px;
+  padding: 10px 12px;
+  background: #333333;
+  color: #ffffff;
+  font: 900 clamp(21px, 5.2vw, 28px)/1.1 "Baloo 2", system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, .24);
+  text-align: center;
+}
+.ghost-export-action {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ghost-export-action:active { transform: translateY(3px); }
+.ghost-export-action:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 4px;
+}
+.ghost-export-error-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ghost-export-error-actions .ghost-export-action {
+  min-width: 0;
+  font-size: clamp(18px, 4.8vw, 23px);
+}
+.ghost-export-back {
+  background: #514273;
+}
+@media (max-height: 620px) {
+  .ghost-export-dialog { gap: 8px; padding: 12px 18px; }
+  .ghost-export-avatar { width: 76px; height: 76px; border-radius: 18px; }
+  .ghost-export-title { font-size: clamp(24px, 6.3vw, 31px); }
+  .ghost-export-message { font-size: 16px; min-height: 2.4em; }
+  .ghost-export-phase-slot { height: 49px; flex-basis: 49px; }
+  .ghost-export-action-slot { height: 56px; flex-basis: 56px; }
+  .ghost-export-action, .ghost-export-action-hint { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-export-spinner { animation: none; border-color: #ffffff; }
+}
+
+
+/* Native Audio Test: camera-free Photos/Files chooser over locked Remix. */
+.ghost-photo-choice-overlay[hidden] { display: none !important; }
+.ghost-photo-choice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10200;
+  box-sizing: border-box;
+  padding: max(18px, env(safe-area-inset-top)) 16px
+    max(18px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(22, 14, 32, .83);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.ghost-photo-choice-dialog {
+  box-sizing: border-box;
+  width: min(100%, 370px);
+  max-height: 85dvh;
+  overflow-y: auto;
+  border-radius: 28px;
+  padding: clamp(18px, 5vw, 28px);
+  background: #7f66c6;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  font-family: "Baloo 2", system-ui, sans-serif;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, .27), 0 22px 45px rgba(0, 0, 0, .30);
+  text-align: center;
+}
+.ghost-photo-choice-dialog h2 {
+  margin: 0;
+  font: 900 clamp(25px, 7vw, 34px)/1.15 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-photo-choice-dialog > p {
+  margin: 0;
+  color: #ffffff;
+  font: 800 17px/1.3 "Baloo 2", system-ui, sans-serif;
+}
+.ghost-photo-choice-action {
+  width: 100%;
+  min-height: 62px;
+  border: 0;
+  border-radius: 19px;
+  background: #333333;
+  color: #ffffff;
+  font: 900 clamp(19px, 5vw, 25px)/1.14 "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, .22);
+}
+.ghost-photo-choice-action:disabled,
+.ghost-photo-choice-cancel:disabled { opacity: .6; }
+.ghost-photo-choice-cancel {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  padding: 12px 8px;
+  font: 900 20px/1.1 "Baloo 2", system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ghost-photo-choice-action:focus-visible,
+.ghost-photo-choice-cancel:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+}
+.ghost-photo-choice-status {
+  min-height: 1.4em;
+  overflow-wrap: anywhere;
+}
+@media (max-height: 560px) {
+  .ghost-photo-choice-dialog { padding: 12px 18px; gap: 8px; }
+  .ghost-photo-choice-action { min-height: 48px; }
 }

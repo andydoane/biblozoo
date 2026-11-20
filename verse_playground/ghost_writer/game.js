@@ -58,6 +58,25 @@
     "spooky4",
     "spooky5"
   ];
+  // N6r: isolated iOS owns actual speaker output through the existing Swift
+  // soloAmbient PCM engine; Web/PWA/Android keep their original Web Audio.
+  const nativeGhostAudio = window.BibloZooNativeGhostWriterAudio?.isAvailable?.()
+    ? window.BibloZooNativeGhostWriterAudio : null;
+  // Native Audio Test export is independent of AVAudioSession and microphones.
+  // Non-native Web/PWA keep their existing download behavior unchanged.
+  const nativeGhostExport = IS_NATIVE_CAPACITOR
+    ? window.Capacitor?.Plugins?.BibloZooGhostWriterExport || null : null;
+  // Camera-free: native Ghost Writer offers only PHPicker Photos and Files.
+  // Never fall back to <input type=file> in the native Audio Test app.
+  const nativePhotoPicker = IS_NATIVE_CAPACITOR
+    ? window.Capacitor?.Plugins?.BibloZooGhostBackgroundPicker || null : null;
+  let activeGhostVideoExport = null;
+  let activeGhostImageExport = false;
+  const NATIVE_TEMPORARY = new Set([
+    "other-audio-playing", "interruption-pending",
+    "gesture-required-after-interruption", "not-foreground", "stale",
+    "activation-cooldown", "foreground-attempt-limit", "activation-os-rejected"
+  ]);
 
   const SOUND_TUNING = {
     masterVolume: 0.82,
@@ -527,6 +546,16 @@
     ]
   };
 
+  // Standard full-screen social portrait, independent of device dimensions.
+  // No audio track is ever submitted to the native MP4 encoder.
+  const NATIVE_SOCIAL_VIDEO = Object.freeze({
+    width: 1080,
+    height: 1920,
+    fps: 30,
+    maxFrames: 5400,
+    endHoldFrames: 21
+  });
+
   const EXPORT_SIZES = {
     square: {
       label: "Square",
@@ -725,6 +754,15 @@
   let parsedRef = null;
   let selectedMode = "beginner";
   let muted = false;
+  let nativeGhostPendingAction = null;
+  let nativeGhostPreflightGeneration = 0;
+  let nativeGhostPreflightPending = false;
+  let nativeGhostPreparingTimer = 0;
+  // R13 / PLAY-02: a fast native bank preparation should never flash a
+  // full-screen loading popup for a single iPhone frame. Truly slow work
+  // retains the original child-readable preparation and Back controls.
+  const NATIVE_PREPARING_DEFER_MS = 350;
+  let nativeGhostRetryLabel = "start";
   let audioContext = null;
   let audioUnlocked = false;
   let audioUnlockPromise = null;
@@ -746,6 +784,9 @@
   let builtInPunctuationGlyphs = {};
   const openingQuoteGlyphCache = new WeakMap();
   const backgroundImageCache = new Map();
+  // A user-selected photo exists ONLY in this Ghost Writer JS session.
+  // No image bytes or filenames are written to localStorage or any server.
+  const customBackground = window.BibloZooGhostCustomBackground?.create?.() || null;
   const borderDoodleImageCache = new Map();
   const tintedBorderDoodleCache = new Map();
   const soundBuffers = new Map();
@@ -780,6 +821,7 @@
   function makeDefaultRemixOptions() {
     return {
       background: "ghost",
+      customDarken: true,
       textColor: "lightGray",
       referenceTextColor: "lightGray",
       referenceDecorationColor: "lightGray",
@@ -807,6 +849,7 @@
   }
 
   function getAudioContext() {
+    if (nativeGhostAudio) return null; // native must never create Web Audio
     // A closed iOS audio context cannot be resumed. A later genuine gesture
     // may create a new one while retaining the already decoded sound buffers.
     if (audioContext?.state === "closed") {
@@ -832,6 +875,10 @@
   }
 
   async function unlockAudio() {
+    // Generic drawing/focus callbacks must never activate a native session.
+    // Only an explicit Mode, Replay, Menu Close, Retry or Welcome Back gesture
+    // may invoke the native controller's prepareFromGesture().
+    if (nativeGhostAudio) return nativeGhostAudio.isReady();
     const ac = getAudioContext();
     if (!ac) return false;
     if (audioUnlocked && ac.state === "running") return true;
@@ -900,6 +947,7 @@
   }
 
   async function loadSoundBuffers() {
+    if (nativeGhostAudio) return false; // no native iOS Web fetch/decode
     if (soundLoadPromise) return soundLoadPromise;
 
     const ac = getAudioContext();
@@ -957,6 +1005,11 @@
   }
 
   function playGameSound(key, volumeKey = key) {
+    if (nativeGhostAudio) {
+      if (!muted && (key === "uiTap1" || key === "uiTap2"))
+        nativeGhostAudio.tapUiFromGesture(key, getSoundVolume(volumeKey));
+      return; // spooky clips use playSpooky(), never Web/HTML fallback
+    }
     if (muted) return;
 
     void (async () => {
@@ -988,6 +1041,12 @@
   }
 
   function playUiTapSound() {
+    if (nativeGhostAudio) {
+      const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+      uiSoundFlip = !uiSoundFlip;
+      if (!muted) nativeGhostAudio.tapUiFromGesture(key, getSoundVolume("uiTap"));
+      return;
+    }
     // Recover an interrupted spooky sequence on the child's next tap.
     recoverGhostSpookyAudio({ fromGesture: true });
     // Run the unlock path before the async sound-buffer work on this tap.
@@ -998,6 +1057,7 @@
   }
 
   function unlockAudioSoon() {
+    if (nativeGhostAudio) return; // drawing is not a native activation event
     void unlockAudio();
   }
 
@@ -1018,7 +1078,8 @@
   }
 
   function shuffleGhostSpookySoundKeys() {
-    const available = GHOST_SPOOKY_SOUND_KEYS.filter((key) => soundBuffers.has(key));
+    const available = GHOST_SPOOKY_SOUND_KEYS.filter((key) =>
+      nativeGhostAudio ? nativeGhostAudio.isReady() : soundBuffers.has(key));
     const out = [...available];
 
     for (let i = out.length - 1; i > 0; i -= 1) {
@@ -1046,6 +1107,11 @@
   }
 
   function stopCurrentSpookySource() {
+    if (nativeGhostAudio) {
+      spookySource = null;
+      void nativeGhostAudio.stopSpooky(); // scoped stop, retain warmed PCM
+      return;
+    }
     const source = spookySource;
     spookySource = null;
 
@@ -1081,6 +1147,33 @@
 
   function playNextGhostSpookySound(token) {
     if (!spookySoundActive || token !== spookySoundToken || muted) return;
+    if (nativeGhostAudio) {
+      if (document.hidden || !nativeGhostAudio.isReady()) {
+        pauseGhostPlaybackForBackground();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+        return;
+      }
+      const key = chooseGhostSpookySoundKey();
+      if (!key) return; // all five original clips were required in preflight
+      spookyLastKey = key;
+      // The Swift worker returns this exact clip's decoded duration, not an
+      // invented JS delay. A timeout only sequences decorative ambient sounds;
+      // it never advances handwriting, score or marks verse completion.
+      void nativeGhostAudio.playSpooky(key, getSoundVolume("ghostSpooky"))
+        .then(result => {
+          if (!spookySoundActive || token !== spookySoundToken ||
+              document.hidden || muted) return;
+          if (!result?.accepted || !(result.durationMs > 0)) return;
+          spookyTimer = setTimeout(() => {
+            spookyTimer = 0;
+            if (!spookySoundActive || token !== spookySoundToken ||
+                document.hidden || muted) return;
+            queueNextGhostSpookySound(token, getRandomSpookyGapMs());
+          }, result.durationMs);
+        });
+      return;
+    }
 
     const ac = getAudioContext();
 
@@ -1128,6 +1221,13 @@
     stopGhostSpookySounds();
 
     if (muted) return;
+    if (nativeGhostAudio && !nativeGhostAudio.isReady()) {
+      spookyRecoveryPending = true;
+      pauseGhostPlaybackForBackground();
+      playgroundWelcome?.pauseFromNativeInactive?.();
+      playgroundWelcome?.showAfterNativeActive?.();
+      return; // never start a silent iPhone replay
+    }
 
     spookySoundActive = true;
     spookyRecoveryPending = false;
@@ -1135,6 +1235,11 @@
     spookySoundQueue = [];
 
     const token = spookySoundToken;
+    if (nativeGhostAudio) {
+      // Preflight finished on an earlier real tap, never from rAF.
+      playNextGhostSpookySound(token);
+      return;
+    }
 
     void (async () => {
       // Playback starts in requestAnimationFrame, outside the Replay tap.
@@ -1176,6 +1281,22 @@
 
   function recoverGhostSpookyAudio({ fromGesture = false } = {}) {
     if (document.hidden || !spookyRecoveryPending) return;
+    if (nativeGhostAudio) {
+      // Full bank activation is exclusively owned by plain Welcome Back
+      // Let's go or a dedicated Retry/Replay gesture, never focus/RAF.
+      if (!nativeGhostAudio.isReady()) return;
+      const ps = playbackState;
+      if (!ps?.running || muted || ps.options.spookySounds === "off") {
+        spookyRecoveryPending = false;
+        return;
+      }
+      if (ps.backgroundPausedAt !== null ||
+          (!fromGesture && document.documentElement?.classList?.contains("bz-playground-welcome-paused")))
+        return;
+      spookyRecoveryPending = false;
+      startGhostSpookySounds();
+      return;
+    }
     const ps = playbackState;
     if (!ps?.running || ps.options.spookySounds === "off" || muted) {
       spookyRecoveryPending = false;
@@ -1203,6 +1324,7 @@
   }
 
   function onGhostAudioStateChange() {
+    if (nativeGhostAudio) return;
     if (!audioContext || audioContext.state !== "running") {
       noteGhostAudioInterruption();
       return;
@@ -1222,10 +1344,11 @@
     }
   }
 
-  function restoreGhostPlaybackFromBackground() {
+  function restoreGhostPlaybackFromBackground({ nativeGesture = false } = {}) {
     // Focus/pageshow is not permission to continue handwriting playback.
     // Wait for the shared acknowledgement and any required audio check.
-    if (document.hidden || document.documentElement?.classList?.contains("bz-playground-welcome-paused")) return;
+    if (document.hidden ||
+        (!nativeGesture && document.documentElement?.classList?.contains("bz-playground-welcome-paused"))) return;
     const ps = playbackState;
     if (ps?.running && ps.backgroundPausedAt !== null) {
       const elapsed = Math.max(0, performance.now() - ps.backgroundPausedAt);
@@ -1234,7 +1357,7 @@
       if (ps.pauseUntil) ps.pauseUntil += elapsed;
       if (!playbackRaf) playbackRaf = requestAnimationFrame(playbackFrame);
     }
-    recoverGhostSpookyAudio();
+    recoverGhostSpookyAudio({ fromGesture: nativeGesture });
   }
 
   function escapeHtml(value) {
@@ -1310,6 +1433,163 @@
     `;
   }
 
+
+  function nativeUiTapKey() {
+    const key = uiSoundFlip ? "uiTap2" : "uiTap1";
+    uiSoundFlip = !uiSoundFlip;
+    return key;
+  }
+  function clearNativeGhostPreparing() {
+    clearTimeout(nativeGhostPreparingTimer);
+    nativeGhostPreparingTimer = 0;
+    document.getElementById("ghostNativePreparing")?.remove();
+  }
+  function clearNativeGhostDialogs() {
+    clearNativeGhostPreparing();
+    document.getElementById("ghostNativeAudioFailure")?.remove();
+  }
+  function deferNativeGhostPreparing(token) {
+    // No modal on a quick success. Once the operation remains pending for a
+    // meaningful interval, show the original progress dialog, not a silent
+    // hang. Fence old taps, UIKit inactive and hidden WebKit before painting.
+    clearNativeGhostPreparing();
+    nativeGhostPreparingTimer = setTimeout(() => {
+      nativeGhostPreparingTimer = 0;
+      if (token !== nativeGhostPreflightGeneration ||
+          !nativeGhostPreflightPending || document.hidden) return;
+      showNativeGhostPreparing();
+    }, NATIVE_PREPARING_DEFER_MS);
+  }
+  function showNativeGhostPreparing() {
+    if (!nativeGhostAudio || document.hidden) return;
+    clearNativeGhostDialogs();
+    const overlay = document.createElement("div");
+    overlay.id = "ghostNativePreparing";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;" +
+      "display:flex;align-items:center;justify-content:center;padding:22px;" +
+      "background:rgba(5,5,16,.94);color:#fff;";
+    overlay.innerHTML = `<section role="status" aria-live="polite"
+      aria-label="Preparing Ghost Writer native sound" style="text-align:center;
+      max-width:350px;background:#252733;border:2px solid #d8d3ff;
+      border-radius:20px;padding:24px">
+      <h2>Getting spooky sounds ready…</h2>
+      <p>Your handwriting will stay here while the sounds prepare.</p>
+      <button id="ghostNativePreparingBack" type="button">Back to Playground</button>
+    </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#ghostNativePreparingBack")?.addEventListener("click", () => {
+      nativeGhostPreflightGeneration++;
+      nativeGhostPreflightPending = false;
+      nativeGhostPendingAction = null;
+      clearNativeGhostDialogs();
+      void nativeGhostAudio.stop();
+      bridge().exitGame?.();
+    });
+  }
+  function showNativeGhostFailure(label = "start") {
+    if (!nativeGhostAudio || document.hidden) return;
+    nativeGhostRetryLabel = label;
+    clearNativeGhostDialogs();
+    const overlay = document.createElement("div");
+    overlay.id = "ghostNativeAudioFailure";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;" +
+      "display:flex;align-items:center;justify-content:center;padding:22px;" +
+      "background:rgba(5,5,16,.94);color:#fff;";
+    overlay.innerHTML = `<section role="dialog" aria-modal="true"
+      aria-label="Ghost Writer native sound unavailable" style="text-align:center;
+      max-width:350px;background:#252733;border:2px solid #d8d3ff;
+      border-radius:20px;padding:24px">
+      <h2>Sound isn't ready</h2>
+      <p role="status">Ghost Writer is paused. Try again to prepare native sounds.</p>
+      <button id="ghostNativeTryAgain" type="button">Try Again</button>
+      <button id="ghostNativeBack" type="button">Back to Playground</button>
+    </section>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#ghostNativeTryAgain")?.addEventListener("click", () => {
+      // A real Try Again click owns native session activation.
+      primeNativeGhostFromGesture(nativeGhostPendingAction ||
+        (() => restoreGhostPlaybackFromBackground({ nativeGesture: true })),
+        nativeGhostRetryLabel);
+    });
+    overlay.querySelector("#ghostNativeBack")?.addEventListener("click", () => {
+      nativeGhostPreflightGeneration++;
+      nativeGhostPendingAction = null;
+      void nativeGhostAudio.stop();
+      bridge().exitGame?.();
+    });
+    overlay.querySelector("#ghostNativeTryAgain")?.focus?.();
+  }
+  // This function MUST be called in the original button-click stack.
+  // No session request is made by page visibility, rAF or a passive timer.
+  function primeNativeGhostFromGesture(action, label = "start") {
+    if (!nativeGhostAudio) { action?.(); return; }
+    if (nativeGhostPreflightPending) return;
+    nativeGhostPendingAction = action;
+    nativeGhostRetryLabel = label;
+    if (nativeGhostAudio.isReady()) {
+      clearNativeGhostDialogs();
+      nativeGhostPendingAction = null;
+      if (!muted) nativeGhostAudio.tapUiFromGesture(
+        nativeUiTapKey(), getSoundVolume("uiTap"));
+      action?.();
+      return;
+    }
+    const token = ++nativeGhostPreflightGeneration;
+    nativeGhostPreflightPending = true;
+    const uiTap = muted ? null : {
+      key: nativeUiTapKey(), volume: getSoundVolume("uiTap")
+    };
+    // Synchronous gesture activation occurs inside prepareFromGesture.
+    const preparation = nativeGhostAudio.prepareFromGesture(uiTap);
+    // The action remains owned by this real mode/replay tap. Keep the
+    // selector on-screen for fast preflight, rather than painting a modal
+    // that disappears a fraction of a second later. A delayed failure still
+    // displays the original explicit retry/error UI.
+    clearNativeGhostDialogs();
+    deferNativeGhostPreparing(token);
+    void Promise.resolve(preparation).then(result => {
+      if (token !== nativeGhostPreflightGeneration || document.hidden) return;
+      nativeGhostPreflightPending = false;
+      clearNativeGhostPreparing();
+      if (result?.ready === true && nativeGhostAudio.isReady()) {
+        clearNativeGhostDialogs();
+        nativeGhostPendingAction = null;
+        action?.();
+      } else if (NATIVE_TEMPORARY.has(result?.reason)) {
+        // Competing PiP/phone audio is an OS interruption, NOT PCM corruption.
+        // Keep the exact action/handwriting until ordinary Welcome Back Let's go.
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+      } else {
+        showNativeGhostFailure(label);
+      }
+    }).catch(() => {
+      if (token !== nativeGhostPreflightGeneration || document.hidden) return;
+      nativeGhostPreflightPending = false;
+      showNativeGhostFailure(label);
+    });
+  }
+  if (nativeGhostAudio) {
+    nativeGhostAudio.configure({
+      onAppInactive: () => {
+        pauseGhostPlaybackForBackground();
+        clearNativeGhostPreparing();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive: () => {
+        playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        pauseGhostPlaybackForBackground();
+        if (!document.hidden) {
+          nativeGhostPendingAction = () =>
+            restoreGhostPlaybackFromBackground({ nativeGesture: true });
+          showNativeGhostFailure("return");
+        }
+      }
+    });
+  }
+
   function renderIntro() {
     stopPlayback();
     clearGuideTimer();
@@ -1357,12 +1637,27 @@
       theme: GAME_THEME,
       modes: MODES,
       onBack: () => {
+        // The unobscured mode selector stays usable during the first 350ms
+        // of a native preflight. A real Back tap MUST fence the pending
+        // promise; it may never open Training after leaving Mode Select.
+        if (nativeGhostPreflightPending) {
+          nativeGhostPreflightGeneration++;
+          nativeGhostPreflightPending = false;
+          nativeGhostPendingAction = null;
+          clearNativeGhostDialogs();
+          void nativeGhostAudio?.stop();
+        }
         playUiTapSound();
         renderIntro();
       },
       onSelect: (mode) => {
-        playUiTapSound();
-        startRun(mode);
+        if (nativeGhostAudio && !muted) {
+          primeNativeGhostFromGesture(() => startRun(mode), "start");
+        } else {
+          // Muted training has no musical dependency or audio priority need.
+          playUiTapSound();
+          startRun(mode);
+        }
       }
     });
   }
@@ -1370,6 +1665,7 @@
   function startRun(mode) {
     stopPlayback();
     clearGuideTimer();
+    customBackground?.clear(); // new run discards the previous session's photo
 
     selectedMode = mode === "advanced" ? "advanced" : "beginner";
     state.requiredChars = getRequiredCharsForMode(state.fullText, selectedMode);
@@ -1422,12 +1718,26 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
+        if (nativeGhostAudio) {
+          muted = !muted;
+          if (muted) {
+            stopGhostSpookySounds();
+          } else {
+            // Mute can acknowledge silently; unmute requires a real gesture.
+            if (playbackState?.running && playbackState.options.spookySounds !== "off")
+              spookyRecoveryPending = true;
+            primeNativeGhostFromGesture(() => {
+              if (playbackState?.running)
+                recoverGhostSpookyAudio({ fromGesture: true });
+            }, "unmute");
+          }
+          return muted;
+        }
         if (muted) {
           muted = false;
           playUiTapSound();
           return muted;
         }
-
         playUiTapSound();
         muted = true;
         stopGhostSpookySounds();
@@ -1439,6 +1749,7 @@
       },
       onExit: () => {
         playUiTapSound();
+        if (nativeGhostAudio) void nativeGhostAudio.stop();
         bridge().exitGame?.();
       },
       onOpen: () => {
@@ -1446,7 +1757,16 @@
         return true;
       },
       onClose: () => {
-        playUiTapSound();
+        if (nativeGhostAudio && !muted) {
+          primeNativeGhostFromGesture(() => {
+            restoreGhostPlaybackFromBackground({ nativeGesture: true });
+          }, "menu");
+        } else {
+          // Muted menu close never takes over another audio session.
+          playUiTapSound();
+          if (nativeGhostAudio)
+            restoreGhostPlaybackFromBackground({ nativeGesture: true });
+        }
       },
       onBackFromHelp: () => { }
     });
@@ -2053,6 +2373,12 @@
     const wrap = document.getElementById("ghostDrawWrap");
     if (!canvas || !wrap) return;
 
+    // Long-press selection and the iOS context menu are blocked only on
+    // the drawing surface, not in the menus or text fields elsewhere.
+    const suppressCallout = event => event.preventDefault();
+    wrap.addEventListener("selectstart", suppressCallout, { capture: true });
+    wrap.addEventListener("contextmenu", suppressCallout, { capture: true });
+
     const rect = wrap.getBoundingClientRect();
     const c = setupCanvasForDpr(canvas, rect.width, rect.height);
     c.clearRect(0, 0, rect.width, rect.height);
@@ -2523,12 +2849,15 @@
 
     wireMenu();
     document.getElementById("ghostWriteBtn")?.addEventListener("click", () => {
-      playUiTapSound();
-      renderPlayback({
-        options: makeDefaultRemixOptions(),
+      const options = makeDefaultRemixOptions();
+      const begin = () => renderPlayback({
+        options,
         markPractice: true,
         returnTo: "remix"
       });
+      if (nativeGhostAudio && !muted && options.spookySounds !== "off")
+        primeNativeGhostFromGesture(begin, "playback");
+      else { playUiTapSound(); begin(); }
     });
   }
 
@@ -2555,7 +2884,7 @@
           >
 
           <button class="ghost-playback-remix-btn" id="ghostPlaybackRemixBtn" type="button" aria-label="Open remix screen">
-            🔄 Remix
+            <img class="ghost-playback-remix-icon" src="../../verse_images/icon_remix.png" alt="" aria-hidden="true" draggable="false"> Remix
           </button>
         </div>
       </div>
@@ -2623,6 +2952,83 @@
     remixBtn?.classList.add("is-visible");
   }
 
+  // Appended as a sibling of the Remix stage: the modal can inert all
+  // background elements without trapping its own Cancel/Done buttons.
+  function ghostPhotoChoiceOverlayHtml() {
+    if (!IS_NATIVE_CAPACITOR) return "";
+    return `
+      <div class="ghost-photo-choice-overlay" id="ghostPhotoChoiceOverlay" hidden>
+        <section class="ghost-photo-choice-dialog" data-ghost-photo-choice-dialog
+                 role="dialog" aria-modal="true" tabindex="-1"
+                 aria-labelledby="ghostPhotoChoiceTitle"
+                 aria-describedby="ghostPhotoChoiceDescription">
+          <h2 id="ghostPhotoChoiceTitle">Import Background</h2>
+          <p id="ghostPhotoChoiceDescription">Where's your picture?</p>
+          <button type="button" class="ghost-photo-choice-action"
+                  data-ghost-photo-choice-photos>
+            Choose from Photos
+          </button>
+          <button type="button" class="ghost-photo-choice-action"
+                  data-ghost-photo-choice-files>
+            Choose from Files
+          </button>
+          <button type="button" class="ghost-photo-choice-cancel"
+                  data-ghost-photo-choice-cancel>Cancel</button>
+          <p class="ghost-photo-choice-status" data-ghost-photo-choice-status
+             role="status" aria-live="polite"></p>
+        </section>
+      </div>`;
+  }
+
+  function ghostExportOverlayHtml() {
+    if (!nativeGhostExport) return "";
+    return `
+      <div class="ghost-export-overlay" id="ghostExportOverlay" hidden>
+        <section class="ghost-export-dialog" role="dialog" aria-modal="true"
+                 aria-labelledby="ghostExportTitle"
+                 aria-describedby="ghostExportMessage"
+                 data-ghost-export-dialog tabindex="-1">
+          <div class="ghost-export-avatar" aria-hidden="true">
+            <img src="../../verse_images/game_icons/app_icon_ghost_writer.png" alt="">
+          </div>
+          <h2 class="ghost-export-title" id="ghostExportTitle"
+              data-ghost-export-title aria-live="polite">Making your video!</h2>
+          <p class="ghost-export-message" id="ghostExportMessage"
+             data-ghost-export-message>Our ghost is hard at work...</p>
+          <div class="ghost-export-phase-slot">
+            <div class="ghost-export-progress" data-ghost-export-progress
+                 role="progressbar" aria-label="Video frames prepared"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+              <div class="ghost-export-progress-track">
+                <div class="ghost-export-progress-bar" data-ghost-export-bar></div>
+              </div>
+              <div class="ghost-export-percentage"
+                   data-ghost-export-percentage aria-hidden="true">0%</div>
+            </div>
+            <div class="ghost-export-activity" data-ghost-export-activity
+                 aria-hidden="true" hidden><span class="ghost-export-spinner"></span></div>
+            <div class="ghost-export-success-mark" data-ghost-export-success
+                 aria-hidden="true" hidden>✓</div>
+          </div>
+          <div class="ghost-export-action-slot">
+            <p class="ghost-export-action-hint" data-ghost-export-action-hint hidden>
+              Saving...
+            </p>
+            <button class="ghost-export-action" type="button"
+                    data-ghost-export-cancel hidden>Cancel</button>
+            <button class="ghost-export-action" type="button"
+                    data-ghost-export-done hidden>Done!</button>
+            <div class="ghost-export-error-actions" data-ghost-export-error-actions hidden>
+              <button class="ghost-export-action" type="button"
+                      data-ghost-export-retry hidden>Try Again</button>
+              <button class="ghost-export-action ghost-export-back" type="button"
+                      data-ghost-export-back hidden>Back</button>
+            </div>
+          </div>
+        </section>
+      </div>`;
+  }
+
   function renderRemix() {
     stopPlayback();
     clearGuideTimer();
@@ -2639,12 +3045,24 @@
 
     const background = getBackgroundConfig(state.remix);
     const isSimple = state.remixMode !== "more";
+    const videoSaveControls = nativeGhostExport
+      ? `<button class="vm-btn vm-btn-secondary" id="ghostSaveVideoBtn" type="button">Save Video</button>
+         <button class="vm-btn vm-btn-secondary" id="ghostShareVideoBtn" type="button">Share Video</button>
+         <button class="vm-btn vm-btn-secondary" id="ghostCancelVideoBtn" type="button" hidden>Cancel Video</button>`
+      : "";
+    const pictureShareControls = nativeGhostExport
+      ? `<button class="vm-btn vm-btn-secondary" id="ghostShareImageBtn" type="button">Share Picture</button>`
+      : "";
+    const exportStatus = nativeGhostExport
+      ? `<p class="ghost-export-status ghost-full" id="ghostExportStatus"
+             role="status" aria-live="polite" aria-atomic="true"></p>`
+      : "";
 
     const settingsHtml = isSimple ? `
           <div class="ghost-remix-section">
             <div class="ghost-section-title">🖼️ Background</div>
             <div class="ghost-options">
-              ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+              ${selectImportBackgroundHtml()}
             </div>
           </div>
 
@@ -2686,6 +3104,9 @@
             <div class="ghost-remix-actions">
               <button class="vm-btn" id="ghostReplayBtn" type="button">Replay</button>
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
+              ${pictureShareControls}
+              ${videoSaveControls}
+              ${exportStatus}
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
@@ -2694,7 +3115,7 @@
           <div class="ghost-remix-section">
             <div class="ghost-section-title">🖼️ Background</div>
             <div class="ghost-options">
-              ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+              ${selectImportBackgroundHtml()}
             </div>
           </div>
 
@@ -2746,6 +3167,9 @@
               <button class="vm-btn vm-btn-secondary" id="ghostAgainBtn" type="button">Start Over</button>
               ${selectOptionHtml("ghostExportSizeSelect", "Picture Shape", state.remix.exportSize || "square", EXPORT_SIZES)}
               <button class="vm-btn vm-btn-secondary" id="ghostSaveImageBtn" type="button">Save Picture</button>
+              ${pictureShareControls}
+              ${videoSaveControls}
+              ${exportStatus}
 
               <button class="vm-btn vm-btn-secondary ghost-full" id="ghostBackBtn" type="button">Back to Playground</button>
             </div>
@@ -2802,6 +3226,16 @@
       </div>
     `, { menu: true, wide: true, rootClass: "is-remix-screen" });
 
+    if (nativeGhostExport) {
+      app.querySelector(".ghost-writer-root")?.insertAdjacentHTML(
+        "beforeend", ghostExportOverlayHtml()
+      );
+    }
+    if (IS_NATIVE_CAPACITOR) {
+      app.querySelector(".ghost-writer-root")?.insertAdjacentHTML(
+        "beforeend", ghostPhotoChoiceOverlayHtml()
+      );
+    }
     wireMenu();
     wireRemixControls();
     drawRemixPreview();
@@ -2841,12 +3275,39 @@
       const selected = key === value ? " selected" : "";
       return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(obj.label || key)}</option>`;
     }).join("");
+    const custom = customBackground?.hasImage()
+      ? `<option value="custom"${value === "custom" ? " selected" : ""}>My Photo</option>`
+      : "";
 
     return `
       <div class="ghost-option">
         <label for="${escapeHtml(id)}">${escapeHtml(label)}</label>
-        <select id="${escapeHtml(id)}">${options}</select>
+        <select id="${escapeHtml(id)}">${options}${custom}</select>
       </div>
+    `;
+  }
+
+  function selectImportBackgroundHtml() {
+    const current = state.remix.background === "custom" && customBackground?.hasImage();
+    return `
+      <div class="ghost-background-picker">
+        ${selectBackgroundHtml("ghostBackgroundSelect", "Background", state.remix.background)}
+        <button type="button" class="ghost-background-import-btn"
+                id="ghostImportBackgroundBtn" aria-label="Import a photo background">
+          Import
+        </button>
+        ${IS_NATIVE_CAPACITOR ? "" : `<input type="file" id="ghostImportBackgroundInput" hidden
+               accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif"
+               aria-label="Choose a photo background">`}
+      </div>
+      <label class="ghost-background-darken" id="ghostBackgroundDarkenRow"
+             ${current ? "" : "hidden"}>
+        <input type="checkbox" id="ghostBackgroundDarkenToggle"
+               ${state.remix.customDarken !== false ? "checked" : ""}>
+        Darken Background
+      </label>
+      <p class="ghost-background-import-status" id="ghostBackgroundImportStatus"
+         role="status" aria-live="polite"></p>
     `;
   }
 
@@ -2869,6 +3330,14 @@
 
   function wireRemixControls() {
     const background = document.getElementById("ghostBackgroundSelect");
+    const importButton = document.getElementById("ghostImportBackgroundBtn");
+    const importInput = document.getElementById("ghostImportBackgroundInput");
+    const nativeChoice = IS_NATIVE_CAPACITOR
+      ? window.BibloZooGhostPhotoChoice?.create?.(
+          document.getElementById("ghostPhotoChoiceOverlay")) : null;
+    const importStatus = document.getElementById("ghostBackgroundImportStatus");
+    const darkenRow = document.getElementById("ghostBackgroundDarkenRow");
+    const darkenToggle = document.getElementById("ghostBackgroundDarkenToggle");
     const textColor = document.getElementById("ghostTextColorSelect");
     const speed = document.getElementById("ghostSpeedSelect");
     const thickness = document.getElementById("ghostThicknessSelect");
@@ -2889,6 +3358,11 @@
     const update = () => {
       state.remix.background = background?.value || state.remix.background;
       state.remix.style = state.remix.background;
+      if (darkenToggle) state.remix.customDarken = darkenToggle.checked;
+      if (darkenRow) {
+        darkenRow.hidden = !(state.remix.background === "custom" &&
+          customBackground?.hasImage());
+      }
       state.remix.textColor = textColor?.value || state.remix.textColor;
       state.remix.speed = speed?.value || state.remix.speed;
       state.remix.thickness = thickness?.value || state.remix.thickness;
@@ -2947,6 +3421,68 @@
       if (el) el.onchange = update;
     });
 
+    // The native iOS WKWebView file chooser (and regular browser picker)
+    // opens from a *real* user tap. It offers Photos/Files without library
+    // browsing permission and the chosen pixels stay in JS memory only.
+    importButton?.addEventListener("click", () => {
+      if (!customBackground) return;
+      playUiTapSound();
+      if (IS_NATIVE_CAPACITOR) {
+        if (!nativeChoice || !nativePhotoPicker?.choosePhoto ||
+            !nativePhotoPicker?.chooseFile) {
+          if (importStatus) importStatus.textContent =
+            "Photo importing isn't ready. Please rebuild the Audio Test app.";
+          return; // fail closed: NEVER reopen WKWebView's Take Photo menu
+        }
+        nativeChoice.open({
+          onChoose: source => source === "photos"
+            ? nativePhotoPicker.choosePhoto() : nativePhotoPicker.chooseFile(),
+          onImported: picked => customBackground.importDataUrl(
+            picked.dataUrl, picked.name),
+          onReady: () => {
+            if (state.screen !== "remix") {
+              customBackground.clear();
+              return;
+            }
+            state.remix.background = "custom";
+            state.remix.style = "custom";
+            state.remix.customDarken = true;
+            renderRemix();
+          }
+        });
+      } else {
+        importInput?.click(); // Web/PWA keeps its existing browser file picker
+      }
+    });
+    importInput?.addEventListener("change", async () => {
+      const file = importInput.files?.[0];
+      importInput.value = ""; // selecting the same photo again must work
+      if (!file || !customBackground) return; // picker cancel is a no-op
+      importButton.disabled = true;
+      if (importStatus) importStatus.textContent = "Preparing your photo...";
+      try {
+        const result = await customBackground.importFile(file);
+        if (!result) return; // superseded by newer import/reset
+        if (state.screen !== "remix") {
+          customBackground.clear();
+          return;
+        }
+        state.remix.background = "custom";
+        state.remix.style = "custom";
+        state.remix.customDarken = true; // subtle default, optional to disable
+        renderRemix(); // rebuild both Simple/More selectors + redraw preview
+      } catch (error) {
+        console.warn("Ghost Writer photo import failed", error);
+        if (importStatus?.isConnected) {
+          importStatus.textContent = error?.message ||
+            "That photo couldn't be opened. Try a JPG or PNG.";
+        }
+      } finally {
+        if (importButton?.isConnected) importButton.disabled = false;
+      }
+    });
+    darkenToggle?.addEventListener("change", update);
+
     remixModeButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
         const nextMode = btn.dataset.remixMode === "more" ? "more" : "simple";
@@ -2959,52 +3495,160 @@
     });
 
     document.getElementById("ghostReplayBtn")?.addEventListener("click", () => {
-      playUiTapSound();
       sanitizeRemixOptions(state.remix);
-      renderPlayback({ options: { ...state.remix }, markPractice: false, returnTo: "remix" });
+      const options = { ...state.remix };
+      const replay = () => renderPlayback({
+        options, markPractice: false, returnTo: "remix"
+      });
+      if (nativeGhostAudio && options.spookySounds !== "off" && !muted)
+        primeNativeGhostFromGesture(replay, "replay");
+      else { playUiTapSound(); replay(); }
     });
 
-    document.getElementById("ghostSaveImageBtn")?.addEventListener("click", () => {
-      playUiTapSound();
-      sanitizeRemixOptions(state.remix);
+    const saveImageBtn = document.getElementById("ghostSaveImageBtn");
+    const shareImageBtn = document.getElementById("ghostShareImageBtn");
+    const saveVideoBtn = document.getElementById("ghostSaveVideoBtn");
+    const shareVideoBtn = document.getElementById("ghostShareVideoBtn");
+    const cancelVideoBtn = document.getElementById("ghostCancelVideoBtn");
+    const exportStatus = document.getElementById("ghostExportStatus");
+    const exportDialog = nativeGhostExport
+      ? window.BibloZooGhostExportDialog?.create?.(
+          document.getElementById("ghostExportOverlay"))
+      : null;
 
-      const imageOptions = state.remixMode === "simple"
+    const announceExport = (message, failed = false) => {
+      if (!exportStatus?.isConnected) return;
+      exportStatus.textContent = message;
+      exportStatus.classList.toggle("is-error", failed);
+    };
+
+    function pictureOptions() {
+      sanitizeRemixOptions(state.remix);
+      return state.remixMode === "simple"
         ? { ...state.remix, exportSize: "phone" }
         : { ...state.remix };
-
-      saveGhostWriterImage(imageOptions);
-    });
-
-    const saveVideoBtn = document.getElementById("ghostSaveVideoBtn");
-
-    if (saveVideoBtn && !isReplayVideoSupported()) {
-      saveVideoBtn.hidden = true;
     }
 
-    saveVideoBtn?.addEventListener("click", async () => {
+    function setExportActionsDisabled(disabled) {
+      for (const button of [saveImageBtn, shareImageBtn, saveVideoBtn, shareVideoBtn]) {
+        if (button?.isConnected) button.disabled = disabled;
+      }
+    }
+
+    async function onPictureAction(destination, button) {
+      if (!button || button.disabled || activeGhostImageExport ||
+          activeGhostVideoExport) return;
+      const modal = destination === "photos" ? exportDialog : null;
+      if (modal && !modal.open("picture", {
+        onRetry: () => { void onPictureAction("photos", saveImageBtn); }
+      })) return;
       playUiTapSound();
-
-      if (!isReplayVideoSupported()) {
-        saveVideoBtn.hidden = true;
-        return;
+      activeGhostImageExport = true;
+      setExportActionsDisabled(true);
+      if (!modal) {
+        button.textContent = destination === "photos" ? "Saving Picture..." : "Sharing Picture...";
+        announceExport(destination === "photos" ? "Saving picture to Photos..." : "Preparing picture...");
       }
-
-      sanitizeRemixOptions(state.remix);
-
-      const originalText = saveVideoBtn.textContent;
-      saveVideoBtn.disabled = true;
-      saveVideoBtn.textContent = "Making Video...";
-
       try {
-        await saveGhostWriterReplayVideo({ ...state.remix });
-      } catch (err) {
-        console.warn("Ghost Writer video export failed", err);
-        alert("Sorry, this browser could not save the replay video.");
+        const result = await saveGhostWriterImage(
+          pictureOptions(), destination,
+          () => { if (modal) modal.saving(); }
+        );
+        if (modal && result?.saved === true) {
+          modal.success(); // PhotoKit confirmed, never just sheet presentation
+        } else if (destination === "photos" && result?.saved === true) {
+          announceExport("Picture saved to Photos! 🎉");
+        } else if (destination === "share" && result?.presented === true) {
+          announceExport("Choose where to share your picture.");
+        }
+      } catch (error) {
+        console.warn("Ghost Writer picture export failed", error);
+        const detail = "Couldn't save your picture. " +
+          "Check Photos permission in Settings, or try Share Picture.";
+        if (modal) modal.error(detail);
+        else announceExport(destination === "photos" ? detail
+          : "Couldn't open picture sharing. Please try again.", true);
       } finally {
-        saveVideoBtn.disabled = false;
-        saveVideoBtn.textContent = originalText || "Save Replay Video";
+        activeGhostImageExport = false;
+        setExportActionsDisabled(false);
+        if (button.isConnected)
+          button.textContent = destination === "photos" ? "Save Picture" : "Share Picture";
       }
+    }
+    saveImageBtn?.addEventListener("click", () => void onPictureAction("photos", saveImageBtn));
+    shareImageBtn?.addEventListener("click", () => void onPictureAction("share", shareImageBtn));
+
+    // Share Video keeps its original inline cancellation and share-sheet
+    // behavior. Save Video uses the modal's Cancel in the same reserved slot.
+    cancelVideoBtn?.addEventListener("click", () => {
+      if (!activeGhostVideoExport) return;
+      activeGhostVideoExport.cancelled = true;
+      cancelVideoBtn.disabled = true;
+      cancelVideoBtn.textContent = "Stopping...";
+      announceExport("Stopping video export...");
     });
+
+    async function onVideoAction(destination, button) {
+      if (!nativeGhostExport || !button || button.disabled ||
+          activeGhostImageExport || activeGhostVideoExport) return;
+      const job = { cancelled: false };
+      const modal = destination === "photos" ? exportDialog : null;
+      if (modal && !modal.open("video", {
+        onCancel: () => { job.cancelled = true; },
+        onRetry: () => { void onVideoAction("photos", saveVideoBtn); }
+      })) return;
+      playUiTapSound();
+      sanitizeRemixOptions(state.remix);
+      activeGhostVideoExport = job;
+      setExportActionsDisabled(true);
+      if (!modal && cancelVideoBtn?.isConnected) {
+        cancelVideoBtn.hidden = false;
+        cancelVideoBtn.disabled = false;
+      }
+      if (!modal) announceExport("Preparing silent portrait video...");
+      try {
+        const result = await saveGhostWriterNativeVideo({ ...state.remix }, job,
+          (label, stage) => {
+            if (modal) {
+              if (stage?.phase === "saving") modal.saving();
+              else if (stage?.phase === "making")
+                modal.setProgress(stage.progress);
+            } else if (button.isConnected) {
+              button.textContent = label;
+            }
+          }, destination);
+        if (job.cancelled || result?.cancelled) {
+          if (modal) modal.close();
+          else announceExport("Video export cancelled.");
+        } else if (destination === "photos" && result?.saved === true) {
+          if (modal) modal.success();
+          else announceExport("Video saved to Photos! 🎉");
+        } else if (destination === "share" && result?.presented === true) {
+          announceExport("Choose where to share your video.");
+        }
+      } catch (error) {
+        if (!job.cancelled) {
+          console.warn("Ghost Writer native MP4 export failed", error);
+          const detail = "Couldn't save your video. " +
+            "Check Photos permission in Settings, or try Share Video.";
+          if (modal) modal.error(detail);
+          else announceExport(destination === "photos" ? detail
+            : "Couldn't share video. Please try again.", true);
+        } else if (modal) modal.close();
+      } finally {
+        if (activeGhostVideoExport === job) activeGhostVideoExport = null;
+        setExportActionsDisabled(false);
+        if (button.isConnected)
+          button.textContent = destination === "photos" ? "Save Video" : "Share Video";
+        if (cancelVideoBtn?.isConnected) {
+          cancelVideoBtn.hidden = true;
+          cancelVideoBtn.disabled = false;
+          cancelVideoBtn.textContent = "Cancel Video";
+        }
+      }
+    }
+    saveVideoBtn?.addEventListener("click", () => void onVideoAction("photos", saveVideoBtn));
+    shareVideoBtn?.addEventListener("click", () => void onVideoAction("share", shareVideoBtn));
 
     const startOverBtn = document.getElementById("ghostAgainBtn");
     const startOverConfirm = document.getElementById("ghostStartOverConfirm");
@@ -3034,8 +3678,9 @@
     });
 
     startOverConfirmBtn?.addEventListener("click", () => {
-      playUiTapSound();
-      startRun(selectedMode);
+      if (nativeGhostAudio && !muted) primeNativeGhostFromGesture(
+        () => startRun(selectedMode), "start-over");
+      else { playUiTapSound(); startRun(selectedMode); }
     });
 
     startOverConfirm?.addEventListener("click", (event) => {
@@ -4577,6 +5222,13 @@
 
   function getBackgroundConfig(options = {}) {
     const key = getBackgroundKey(options);
+    if (key === "custom" && customBackground?.hasImage()) {
+      return {
+        label: "My Photo", kind: "special", value: "#101114",
+        cardClass: "", texture: "sessionPhoto",
+        image: customBackground.getCanvas()
+      };
+    }
     return BACKGROUNDS[key] || BACKGROUNDS.ghost;
   }
 
@@ -4603,24 +5255,28 @@
   }
 
   function drawCoverImage(c, img, width, height) {
-    if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) {
+    // Existing static backgrounds are HTMLImageElements. Session-only
+    // imported photos are bounded canvas images without .complete/.natural*.
+    const sourceWidth = img?.naturalWidth || img?.width || 0;
+    const sourceHeight = img?.naturalHeight || img?.height || 0;
+    if (!img || img.complete === false || !(sourceWidth > 0) || !(sourceHeight > 0)) {
       return false;
     }
 
-    const imageRatio = img.naturalWidth / img.naturalHeight;
+    const imageRatio = sourceWidth / sourceHeight;
     const canvasRatio = width / height;
 
     let sourceX = 0;
     let sourceY = 0;
-    let sourceW = img.naturalWidth;
-    let sourceH = img.naturalHeight;
+    let sourceW = sourceWidth;
+    let sourceH = sourceHeight;
 
     if (imageRatio > canvasRatio) {
-      sourceW = img.naturalHeight * canvasRatio;
-      sourceX = (img.naturalWidth - sourceW) / 2;
+      sourceW = sourceHeight * canvasRatio;
+      sourceX = (sourceWidth - sourceW) / 2;
     } else {
-      sourceH = img.naturalWidth / canvasRatio;
-      sourceY = (img.naturalHeight - sourceH) / 2;
+      sourceH = sourceWidth / canvasRatio;
+      sourceY = (sourceHeight - sourceH) / 2;
     }
 
     c.drawImage(img, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
@@ -5098,11 +5754,18 @@
     c.fillStyle = background.value;
     c.fillRect(0, 0, width, height);
 
-    if (background.texture === "image") {
-      const img = getBackgroundImage(background.imageSrc);
+    if (background.texture === "image" || background.texture === "sessionPhoto") {
+      const img = background.texture === "sessionPhoto"
+        ? background.image : getBackgroundImage(background.imageSrc);
 
       if (!drawCoverImage(c, img, width, height)) {
         c.fillStyle = background.value;
+        c.fillRect(0, 0, width, height);
+      }
+      // A subtle default darkening improves white-ink contrast on busy photos.
+      // It can be turned off in Remix, and applies to playback + PNG + MP4.
+      if (background.texture === "sessionPhoto" && options.customDarken !== false) {
+        c.fillStyle = "rgba(0, 0, 0, 0.22)";
         c.fillRect(0, 0, width, height);
       }
 
@@ -5464,7 +6127,22 @@
     );
   }
 
-  async function saveGhostWriterImage(options = state.remix) {
+  // These names appear when a family shares an original file to Files or
+  // AirDrop. Photos may independently choose a library-managed filename.
+  function makeFriendlyExportFilename(kind, extension) {
+    const clean = value => String(value || "")
+      .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+      .replace(/\s+/g, " ").trim();
+    const username = clean(
+      window.BibloZooProfiles?.getActiveProfile?.()?.name || "Zookeeper"
+    ).slice(0, 40) || "Zookeeper";
+    const reference = clean(String(parsedRef?.display || ctx.verseRef || "Verse")
+      .replace(/:/g, "_")).slice(0, 48) || "Verse";
+    return username + "'s " + kind + " - " + reference + "." + extension;
+  }
+
+  async function saveGhostWriterImage(options = state.remix, destination = "photos",
+                                      onReadyToSave = null) {
     const cleanOptions = sanitizeRemixOptions({ ...options });
     const size = EXPORT_SIZES[cleanOptions.exportSize || "square"] || EXPORT_SIZES.square;
     await waitForExportAssets(cleanOptions);
@@ -5481,6 +6159,23 @@
 
     const filename = makeExportFilename(size);
 
+    if (IS_NATIVE_CAPACITOR) {
+      const method = destination === "share" ? "shareImage" : "saveImage";
+      if (typeof nativeGhostExport?.[method] !== "function") {
+        throw new Error("Native picture saving is unavailable.");
+      }
+      // Save goes straight to PhotoKit; Share preserves the original file
+      // name in iOS Files/AirDrop. Never fall back to WKWebView downloads.
+      onReadyToSave?.(); // Canvas is rendered; PhotoKit is about to begin.
+      const result = await nativeGhostExport[method]({
+        png: canvas.toDataURL("image/png"),
+        name: makeFriendlyExportFilename("Picture", "png")
+      });
+      if (destination === "share" ? result?.presented !== true : result?.saved !== true)
+        throw new Error("The picture export was not confirmed.");
+      return result;
+    }
+
     if (canvas.toBlob) {
       canvas.toBlob((blob) => {
         if (!blob) {
@@ -5495,6 +6190,110 @@
     }
 
     downloadCanvasDataUrl(canvas, filename);
+  }
+
+  function estimateReplayVideoFrames(placements, speed) {
+    let milliseconds = 700;
+    for (const entry of placements) {
+      const decoration = entry?.type === "referenceDecoration";
+      const glyph = decoration ? null : getGlyph(entry.char, entry.colorIndex || 0);
+      const pieces = decoration
+        ? getReferenceDecorationPieceCount(entry.decoration)
+        : (glyph ? countStrokePieces(glyph.strokes) : 1);
+      milliseconds += decoration
+        ? clamp((160 + pieces * 18) * (speed?.multiplier || 1), 180, 900)
+        : clamp((92 + pieces * 15) * (speed?.multiplier || 1), 65, 480);
+      milliseconds += (entry.pauseAfter || 0) * (speed?.pauseMultiplier || 1);
+    }
+    return Math.ceil(milliseconds * NATIVE_SOCIAL_VIDEO.fps / 1000);
+  }
+
+  async function saveGhostWriterNativeVideo(options, job, showProgress, destination = "photos") {
+    if (!nativeGhostExport?.beginVideo || !nativeGhostExport?.appendVideoFrame ||
+        !nativeGhostExport?.finishVideo || !nativeGhostExport?.cancelVideo) {
+      throw new Error("Native MP4 export bridge is unavailable.");
+    }
+    const cleanOptions = sanitizeRemixOptions({ ...options });
+    const size = NATIVE_SOCIAL_VIDEO;
+    let token = null;
+    let shared = false;
+    try {
+      showProgress("Preparing Video...", { phase: "making", progress: 0 });
+      await waitForExportAssets(cleanOptions);
+      if (job.cancelled || state.screen !== "remix" || document.hidden)
+        return { cancelled: true };
+
+      const canvas = document.createElement("canvas");
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const c = canvas.getContext("2d", { alpha: false });
+      if (!c) throw new Error("Could not render the video.");
+      const placements = buildPlaybackPlacements(makeLayout(size.width, size.height, cleanOptions));
+      const speed = SPEEDS[cleanOptions.speed] || SPEEDS.normal;
+      const expected = estimateReplayVideoFrames(placements, speed);
+      if (expected > size.maxFrames - size.endHoldFrames) {
+        throw new Error("This verse's video is longer than the 3-minute safety limit.");
+      }
+      const start = performance.now();
+      const ps = {
+        running: true, c, width: size.width, height: size.height,
+        options: cleanOptions, placements, index: 0,
+        charStart: start, pauseUntil: 0, speed,
+        lastTip: null, lastDirectionDeg: null,
+        directionWiggle: 0, vaporTrail: []
+      };
+      clearPlaybackCanvas(c, size.width, size.height, cleanOptions);
+      const begun = await nativeGhostExport.beginVideo({
+        name: makeFriendlyExportFilename("Video", "mp4")
+      });
+      token = begun?.token;
+      if (!token || begun.width !== size.width || begun.height !== size.height ||
+          begun.fps !== size.fps) {
+        throw new Error("Native video settings do not match the social export.");
+      }
+
+      let completeFrames = 0, frameCount = 0;
+      for (; frameCount < size.maxFrames; frameCount++) {
+        if (job.cancelled || state.screen !== "remix" || document.hidden) {
+          job.cancelled = true;
+          break;
+        }
+        const virtualTime = start + frameCount * 1000 / size.fps;
+        const finished = drawReplayVideoFrame(ps, virtualTime);
+        if (finished) completeFrames++;
+        // Transfer and ACK only ONE compressed JPEG frame at a time:
+        // no unbounded JS arrays and no microphone/audio stream.
+        const jpeg = canvas.toDataURL("image/jpeg", 0.83);
+        await nativeGhostExport.appendVideoFrame({
+          token, index: frameCount, jpeg
+        });
+        if (frameCount % 15 === 0) {
+          const percent = Math.min(99,
+            Math.floor(100 * (frameCount + 1) / Math.max(expected, 1)));
+          showProgress("Making Video... " + percent + "%",
+            { phase: "making", progress: percent });
+          // Yield to touch, accessibility and cancellation between batches.
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        if (completeFrames >= size.endHoldFrames) { frameCount++; break; }
+      }
+      if (job.cancelled) return { cancelled: true };
+      if (completeFrames < size.endHoldFrames) {
+        throw new Error("The verse animation exceeded the safe video duration.");
+      }
+      showProgress(destination === "share"
+        ? "Opening Video Share..." : "Saving to Photos...",
+        { phase: "saving" });
+      const result = await nativeGhostExport.finishVideo({ token, destination });
+      if (destination === "share" ? result?.presented !== true : result?.saved !== true)
+        throw new Error("The video export was not confirmed.");
+      shared = true;
+      return result; // Photos confirmation or sheet presentation, NOT both.
+    } finally {
+      if (token && !shared) {
+        try { await nativeGhostExport.cancelVideo({ token }); } catch (_) {}
+      }
+    }
   }
 
   function isReplayVideoSupported() {
@@ -6472,26 +7271,79 @@
     return !!fresh && fresh !== old;
   }
   playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
-    isActive: () => ["training", "punctuationRecorder", "ready", "playback", "remix"].includes(state.screen),
+    isActive: () => ["training", "punctuationRecorder", "ready",
+      "playback", "remix"].includes(state.screen) ||
+      (nativeGhostAudio && nativeGhostPendingAction !== null),
     onPause: pauseGhostPlaybackForBackground,
-    onResume: restoreGhostPlaybackFromBackground,
-    getAudioContext: () => audioContext,
+    onResume: () => {
+      if (nativeGhostAudio) {
+        // Native welcome is an actual Let's go gesture; the whole PCM bank
+        // must have been prepared before handwriting/ambience can continue.
+        if (!muted && !nativeGhostAudio.isReady()) return false;
+        if (nativeGhostPendingAction) {
+          const action = nativeGhostPendingAction;
+          nativeGhostPendingAction = null;
+          nativeGhostPreflightGeneration++;
+          nativeGhostPreflightPending = false;
+          clearNativeGhostDialogs();
+          action();
+          return true;
+        }
+        restoreGhostPlaybackFromBackground({ nativeGesture: true });
+        return true;
+      }
+      restoreGhostPlaybackFromBackground();
+      return true;
+    },
+    nativeOnlyAudio: !!nativeGhostAudio,
+    getAudioContext: () => nativeGhostAudio ? null : audioContext,
+    restoreNativeOnGesture: nativeGhostAudio ? () => {
+      if (muted) return Promise.resolve(true);
+      // This function is invoked synchronously in the real Let's go click
+      // by shared Welcome Back. Never request activation on focus/pageshow.
+      return nativeGhostAudio.prepareFromGesture().then(result => {
+        if (result?.ready === true && nativeGhostAudio.isReady()) return true;
+        if (NATIVE_TEMPORARY.has(result?.reason))
+          return { deferred: true, reason: "native-interruption" };
+        nativeGhostPendingAction = () =>
+          restoreGhostPlaybackFromBackground({ nativeGesture: true });
+        showNativeGhostFailure("return");
+        return false;
+      });
+    } : undefined,
     unlockAudio,
     replaceAudioContext: replaceGhostWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    onExit: nativeGhostAudio ? () => { void nativeGhostAudio.stop(); } : undefined
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pauseGhostPlaybackForBackground();
+    if (document.hidden) {
+      pauseGhostPlaybackForBackground();
+      playgroundWelcome?.pauseFromNativeInactive?.();
+    } else if (nativeGhostAudio) {
+      playgroundWelcome?.showAfterNativeActive?.();
+    } else {
+      restoreGhostPlaybackFromBackground();
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    pauseGhostPlaybackForBackground();
+    if (nativeGhostAudio) void nativeGhostAudio.stop();
+  });
+  window.addEventListener("pageshow", () => {
+    if (nativeGhostAudio) playgroundWelcome?.showAfterNativeActive?.();
     else restoreGhostPlaybackFromBackground();
   });
-  window.addEventListener("pagehide", pauseGhostPlaybackForBackground);
-  window.addEventListener("pageshow", restoreGhostPlaybackFromBackground);
-  window.addEventListener("focus", restoreGhostPlaybackFromBackground);
+  window.addEventListener("focus", () => {
+    if (nativeGhostAudio) playgroundWelcome?.showAfterNativeActive?.();
+    else restoreGhostPlaybackFromBackground();
+  });
 
-  // Capture the next genuine interaction before any async click/render work.
-  // Keyboard activation is covered by the regular playUiTapSound() handler.
-  app.addEventListener("pointerdown", () => {
+  // The Web fallback retains the original pointer-gesture recovery.
+  // On isolated native iOS, only the explicit modal/menu/replay handler
+  // may activate the audio session. Canvas strokes cannot do so.
+  if (!nativeGhostAudio) app.addEventListener("pointerdown", () => {
     recoverGhostSpookyAudio({ fromGesture: true });
   }, { capture: true });
 

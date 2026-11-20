@@ -1,0 +1,50 @@
+# N6b.1 — quiet Scripture Snake sound preparation (PR #38)
+
+> The owner-facing iPhone acceptance guide for [PR #38](https://github.com/andydoane/biblozoo/pull/38), **only** on `experiment/native-ios-audio`. Base is owner-merged [N6b #37](https://github.com/andydoane/biblozoo/pull/37), commit `c33c15a3024d03f805f9281cc5d67b3b401f920f`. Separate Mac worktree `biblozoo-native-audio`; iOS test app **BibloZoo Audio Test** (`com.andydoane.biblozoo.audiotest`). Original BibloZoo installed app, stable `ios-prep` and Web/PWA/Android **untouched**. The owner alone reviews and merges.
+
+## Why a follow-up?
+
+After merging N6b, the owner played Scripture Snake **multiple times, with multiple task switches**, and said its interruption recovery **worked nicely every time**. The only concern reported was **new light-gray popups after choosing a difficulty and sometimes after returning from a task switch**. These come from the newly introduced `vslNativeAudioGate` overlay: before N6b.1, the game called `showNativeSnakeGate("Getting native game sounds ready…")` at the start of **every** successful native bank preflight. This was introduced by N6b for safety, not original Scripture Snake UI. The report establishes successful user-tested multi-switch recovery, **not** a separate confirmation of every collision effect/acoustic timing/device/difficulty.
+
+## Precise behavior change
+
+- Normal **Choose Difficulty** gestures still synchronously call the *sole* Swift `activateFromGesture({purpose:"game"})`; the existing N6b native-only fixed MP3/orb/UI PCM bank is prewarmed off the physics collision path. **The light-gray loading gate is no longer rendered during normal preparation.** The original difficulty screen stays visible, game does not move until all assets are ready and `aria-busy="true"` marks the existing game root semantically while waiting (no added child-visible progress text).
+- Normal **menu/speed Close** and plain **Welcome Back → Let's go!** likewise warm the exact same native bank **quietly** while the same game remains paused. On success, resume the identical round, with no extra gray overlay, no catch-up physics and **no automatic sound on foreground**.
+- The **gray Try Again / Choose Difficulty (or Back to Games)** gate is deliberately retained **only** when a real native session/bank failure, unexpected in-round playback failure, or rare first-frame-after-interruption readiness failure occurs. This is not decorative/test-only UI: removing it entirely could start a silent game without any way to retry. Pressing Try Again is the actual fresh gesture; the failure gate closes while that retry prewarms, and reappears only if failure recurs.
+- Because no modal covers the original difficulty buttons during preflight, rapid duplicate difficulty taps are ignored, and Back/title/mode/exit cancels/invalidate pending preflight; delayed Swift results cannot start a game from another screen. UIKit `.inactive` (even while held WebKit thumbnail is visible) and WebKit hidden also invalidate pending first-run preparation **without inventing a gray error on return**. Returning to difficulty calls for another **real button tap**. A running game still uses plain, explicit **Welcome Back** after task switch.
+- **No changes** to Swift resources, audio category `.soloAmbient`, the single native output owner, PCM mappings, game sounds, snake physics/score/medals/pet or verse progression, Web Audio on nonnative platforms, Learn, Flashcards, Playground, microphone/DSP or Zoo surprise features.
+
+## Source CI result
+
+The full native Snake source VM/asset and historical Node regressions plus production web build **passed** at commit `351a6574` ([GitHub Actions #42438471987](https://github.com/andydoane/biblozoo/actions/runs/42438471987)). Final docs-only HEAD must also pass. These checks **do not** compile Swift or establish actual speaker output; the physical iPhone test remains owner acceptance.
+
+## Source, build and platform gates
+
+Run these in the dedicated Mac worktree after **the owner reviews and merges** the PR into `experiment/native-ios-audio` (or with the PR branch checked out for pre-merge verification):
+
+```sh
+node scripts/validate_native_snake_quiet_preflight_n6b1.js
+node scripts/validate_native_snake_effects_n6b.js
+node scripts/validate_native_verse_previews_n6a.js
+node scripts/validate_native_learn_tracks_n5b3.js
+node scripts/validate_native_only_ios_output.js
+npm run build && npx cap sync ios && npx cap open ios
+```
+
+GitHub Actions also executes all earlier N1–N6b Node/VM/source and Zoo/Flashcards/recovery regressions plus production web build. **Green Linux Actions is not Swift Xcode compilation, a human-heard iPhone speaker test or audio latency measurement.** Owner physically verifies with Xcode on iPhone, using separate **BibloZoo Audio Test** only.
+
+## Full physical iPhone procedure — also include directly in chat
+
+1. **Confirm isolated app.** Launch **BibloZoo Audio Test**, not the original BibloZoo. Open Practice Games → **Scripture Snake**, select John 3:16.
+2. **Normal difficulty selection.** From the Snake difficulty screen choose Easy. The old difficulty screen may stay present briefly while the fixed native sound bank prewarms. **No new light-gray “Getting native game sounds ready…” popup should appear.** The snake must not move until native readiness succeeds; then gameplay starts. Try Medium/Hard later and check the same absence of routine gray dialog.
+3. **Normal sounds and scoring.** Collect a correct word, deliberately choose a wrong word, eat fruit, collect two glowing orbs (different short notes), and activate double-tap boost. Listen for native effects and normal movement. Enter the bonus round to hear bonus start, mini-snake eat and bonus result. If practical, finish a full Snake game: the same score and medals/rewards rules apply and sound preparation never marks completion.
+4. **Speed/Game menu.** While playing, open the Game Menu, then Close; also open/close the speed menu and How to Play as applicable. The snake should remain paused while its native bank is re-prepared and **no light-gray loading popup appears on the successful close**. The *same* snake state continues, not a reset. Mute/unmute deliberately; muted play remains quiet; there must be no ghost effects under the menu.
+5. **Held App Switcher.** During movement, swipe up and **HOLD** in the iPhone App Switcher without switching to another app. Sound and game clock stop even if the WebKit app thumbnail remains visible. Return to Snake: its **existing plain Welcome Back** should appear; no narration/effects/motion should auto-resume. Tap **Let's go!** and confirm the *same* game resumes once sounds are prepared, **without a second gray “Getting ready” modal** or Zoo Break.
+6. **Full app switch, repeated.** Switch completely to another app during Snake, return, tap **Let's go!**, and verify success as above. Repeat several times, including during a bonus/game effect if practical. No stale effects, phantom scores, unexpected snake jumping, duplicate audio, auto foreground playback or extra routine gray dialog.
+7. **Interrupt initial preparation.** At the difficulty screen, select Easy and, while it is preparing (if you can catch it), quickly swipe up and hold App Switcher or switch apps. On return to the difficulty page, no automatic Snake round should start, no gray **failure** should be manufactured merely because the app left, and another deliberate difficulty tap must be able to retry. The timing window may be too short to reproduce; do not treat not catching it as a failure.
+8. **Navigation during preparation.** At difficulty selection, quickly tap a difficulty and Back while the bank is still preparing, if possible. The game must **not launch unexpectedly afterward**. Rapidly selecting a difficulty twice should not duplicate starts or layer sounds. If initial preparation is too fast to interrupt on a physical phone, the Node VM regression specifically covers this race.
+9. **Real native error (only if it happens naturally).** If the sound session/asset actually fails, the **light-gray Try Again dialog is intentionally retained** and is NOT a regression. It must not start an unverified silent game or switch to blocked Web Audio. Tap Try Again, and if the retry succeeds the error popup should disappear. Do not remove/delete bundled assets to induce a failure.
+10. **Regress other activities.** Check BibloPet Detail John 3:16 Listen/Stop **without the removed N6a progress text**, Flashcards, the full John 3:16 Learn narration/instructions/Chunks/Echo, Psalm 23:4 interruption recovery, DEV native narrator, native UI pops, and four Feeding modes (Classic, Melody, Labyrinth, Bounce). The existing N5a first UI pop after cold/return can occasionally be dropped under the 350ms prewarm ceiling (N9 debt). It is **not** a reason to excuse missing Snake collision effects after successful full-bank prewarm.
+11. **If something does go wrong**, before restarting use DEV **Inspect native state** and **Copy Audio Timing Report**. Record whether the popup was *normal preparation, real failure, or plain Welcome Back*, what screen/verse/medium was active, what you heard, whether UIKit was held inactive or fully backgrounded, and whether Snake movement/score changed. A short-effect timing report is not an acoustic speaker measurement.
+
+**Acceptance standard:** This is a small *presentation/safe-stale-cancellation* follow-up. The owner should no longer see any **routine** N6b gray sound-preparation popup, but a genuine native fault must retain an explicit recovery choice. **A welcome-back dialog on a real task switch is expected** and is not the removed gray popup. Do not regress independently owner-tested N6b switch recovery. Future work: N6c other game activity; N7 microphone/DSP; N8 independent Zoo; N9 reliability. Preserve project-handoff update in every PR.

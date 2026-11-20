@@ -77,6 +77,7 @@ function loadFeedGameForValidation() {
     makeBounceWhiteBall,
     launchBounceServe,
     spawnBounceSnack,
+    startBounceFullClearBonus,
     breakBounceBrick,
     collideBounceBallWithBricks,
     normalizeBounceBallVelocity,
@@ -112,6 +113,11 @@ function loadFeedGameForValidation() {
     normalizeFeedMelodyNotes,
     createMelodyLanePath,
     createMelodyTimeline,
+    MUSIC_NOTE_BALL,
+    MELODY_SNACK_COUNT,
+    assignMelodySnacks,
+    catchMelodyNote,
+    spawnMelodyNote,
     midiToFrequency,
     calculateMelodyCatchPercent,
     initializeMelodyMode,
@@ -140,6 +146,7 @@ function loadFeedGameForValidation() {
     detachMelodyInterruptionHandlers,
     advanceLabyrinthPet,
     recoverStuckLabyrinthBall,
+    isLabyrinthBallRestingOnPlatform,
     buildScheduledBalls,
     chooseBackground,
     createPegField,
@@ -1009,7 +1016,9 @@ function testLabyrinthStuckRecoveryNudgesTowardGap() {
       y: 300,
       gapCenter: 320,
       gapWidth: 100,
-      segments: []
+      segments: [{
+        x: 0, y: 300, width: 240, height: 14
+      }]
     }
   ];
 
@@ -1026,16 +1035,15 @@ function testLabyrinthStuckRecoveryNudgesTowardGap() {
     labyrinthReleaseCount: 0
   };
 
-  assert.strictEqual(
-    hooks.recoverStuckLabyrinthBall(
-      runtime,
-      ball,
-      1000 +
-        hooks.LABYRINTH_STUCK_MS +
-        1
-    ),
-    true
-  );
+  assert.strictEqual(hooks.LABYRINTH_STUCK_MS, 10000,
+    "Stuck recovery must allow a full ten seconds of steering");
+  assert.strictEqual(hooks.isLabyrinthBallRestingOnPlatform(runtime, ball), true);
+  assert.strictEqual(hooks.recoverStuckLabyrinthBall(runtime, ball, 9999), false,
+    "No autopilot before the ten-second stuck timer");
+  const airborne = { ...ball, y: 200, labyrinthProgressY: 200 };
+  assert.strictEqual(hooks.recoverStuckLabyrinthBall(runtime, airborne, 11001), false,
+    "Even a stalled timer must not steer an airborne snack");
+  assert.strictEqual(hooks.recoverStuckLabyrinthBall(runtime, ball, 11001), true);
   assert.ok(
     ball.vx > 0,
     "Stuck recovery should nudge a snack toward the nearby gap"
@@ -1121,9 +1129,17 @@ function makeBounceRuntime(earnedStarPegCount = 0) {
     catcherX: 195,
     catcher: { style: { left: "" }, classList: { remove() {}, add() {} }, offsetWidth: 1 },
     petCircle: { style: { setProperty() {} } },
-    startOverlay: { hidden: true },
-    startTitleEl: { textContent: "" },
-    startInstructionEl: { textContent: "" },
+    startOverlay: { hidden: true, classList: {
+      tokens: new Set(),
+      add(name) { this.tokens.add(name); },
+      remove(name) { this.tokens.delete(name); },
+      contains(name) { return this.tokens.has(name); }
+    } },
+    startBallsEl: { hidden: false },
+    startTitleEl: { textContent: "", hidden: true },
+    startInstructionEl: { textContent: "", hidden: false },
+    startServeAvatarEl: { hidden: true },
+    startConfirmButton: { textContent: "" },
     pegs: [],
     balls: [],
     bursts: [],
@@ -1390,6 +1406,11 @@ function testBounceWhiteBallsAccelerateIndependently() {
 }
 
 function testBounceThreeLivesAndPopup() {
+  assert.match(feedGameCssSource,
+    /\.daily-feed-start-overlay\.is-bounce-serve \.daily-feed-start-card\s*\{[^}]*width:\s*fit-content;/,
+    "Only Bounce relaunch uses content-sized card");
+  assert.match(feedGameCssSource, /\.daily-feed-start-instruction\[hidden\]/,
+    "Hidden relaunch instruction occupies no card space");
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const state = runtime.bounce;
@@ -1401,7 +1422,16 @@ function testBounceThreeLivesAndPopup() {
     if (lives) {
       assert.strictEqual(state.waitingServe, true);
       assert.strictEqual(runtime.startTitleEl.textContent, `${lives} Balls Left!`);
-      assert.strictEqual(runtime.startInstructionEl.textContent, "Tap to launch");
+      assert.strictEqual(runtime.startInstructionEl.textContent, "");
+      assert.strictEqual(runtime.startInstructionEl.hidden, true,
+        "Redundant Tap to launch instruction is hidden");
+      assert.strictEqual(runtime.startTitleEl.hidden, false,
+        "Balls Left heading is visible on each relaunch");
+      assert.strictEqual(runtime.startBallsEl.hidden, true);
+      assert.strictEqual(runtime.startServeAvatarEl.hidden, false);
+      assert.strictEqual(runtime.startConfirmButton.textContent, "Launch!");
+      assert.strictEqual(runtime.startOverlay.classList.contains("is-bounce-serve"), true,
+        "Only the lost-ball relaunch uses the compact card");
       assert.strictEqual(runtime.startOverlay.hidden, false);
     } else {
       assert.strictEqual(state.ended, true);
@@ -1462,30 +1492,35 @@ function testBounceGrayBricksCannotFinishWhileSnacksRemain() {
   assert.strictEqual(runtime.finishAt, 0);
 }
 
-function testBounceLastSnackFinishesWithGrayBricksStanding() {
+function testBounceFinalRallyAfterAllSnackBricks() {
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const state = runtime.bounce;
-  const lastSnack = state.bricks.find((brick) => brick.config?.id === "rainbow");
-  // All other snack bricks have already released and resolved their food.
-  state.bricks.forEach((brick) => {
+  const lastSnack = state.bricks.find(brick => brick.config?.id === "rainbow");
+  state.bricks.forEach(brick => {
     if (brick.config && brick !== lastSnack) brick.active = false;
   });
-  assert.ok(state.bricks.some((brick) => brick.active && !brick.config));
+  assert.ok(state.bricks.some(brick => brick.active && !brick.config));
   assert.strictEqual(hooks.launchBounceServe(runtime), true);
-  hooks.updateBounceMode(runtime, 1 / 120, 1000);
-  assert.strictEqual(state.snacksReleased, false);
-
-  // The last colored brick releases the final snack. Gray bricks remain.
   hooks.breakBounceBrick(runtime, lastSnack, {}, 1000);
-  assert.strictEqual(runtime.balls.length, 1);
-  hooks.updateBounceMode(runtime, 1 / 120, 1008);
   assert.strictEqual(state.snacksReleased, true);
-  assert.strictEqual(state.whiteBalls.length, 0,
-    "No more white-ball rebounds are needed after the last food brick");
-  assert.ok(state.bricks.some((brick) => brick.active && !brick.config));
-  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1008), false,
-    "The final snack must finish falling before the results screen");
+  assert.strictEqual(state.bonusTriggered, false);
+  hooks.updateBounceMode(runtime, 1 / 120, 1008);
+  assert.strictEqual(state.whiteBalls.length, 1,
+    "Last snack brick must no longer delete the white ball");
+  assert.strictEqual(state.waitingServe, false);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1008), false);
+
+  state.whiteBalls[0].y = runtime.height + 50;
+  hooks.updateBounceMode(runtime, 1 / 120, 1010);
+  assert.strictEqual(state.ended, true,
+    "Missing all live balls after all snacks ends the final rally");
+  assert.strictEqual(state.livesLeft, 2,
+    "Unused launches do not restart the final rally");
+  assert.strictEqual(hooks.launchBounceServe(runtime), false);
+  assert.strictEqual(runtime.balls.length, 1,
+    "Previously released food still gets a chance to fall");
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1010), false);
 
   runtime.balls[0].x = state.paddleX;
   runtime.balls[0].y = runtime.petCenterY - 5;
@@ -1496,43 +1531,119 @@ function testBounceLastSnackFinishesWithGrayBricksStanding() {
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1016), false);
   assert.strictEqual(runtime.finishAt, 1916);
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1916), true);
-
-  const result = hooks.getModeController("bounce").buildResult({
-    mode: "bounce", score: 7, caughtCount: 3, totalCount: 7
-  });
-  assert.deepStrictEqual(toPlain(result), {
-    mode: "bounce", score: 7, caughtCount: 3,
-    totalCount: 7, completed: true
-  });
 }
 
-function testBounceLastSnackMissStillAllowsCompletion() {
+function testBounceBonusBallCountsAndUniqueColors() {
+  for (const balls of [1,2,3]) {
+    for (const choice of [0,0.999]) {
+      const runtime = makeBounceRuntime(2);
+      hooks.initializeBounceMode(runtime);
+      const state = runtime.bounce;
+      assert.strictEqual(hooks.launchBounceServe(runtime), true);
+      state.whiteBalls = Array.from({length:balls}, (_,i) =>
+        hooks.makeBounceWhiteBall(runtime, 125 + 35*i, 430)
+      );
+      state.livesLeft = 3;
+      assert.strictEqual(hooks.startBounceFullClearBonus(runtime, 1000, () => choice), true);
+      const queued = state.bonusPending;
+      const expectedCount = balls*2 + (choice===0 ? 0 : 1);
+      assert.strictEqual(queued.length, expectedCount,
+        `${balls} active on-screen balls: exact 2x or 2x+1 bonus`);
+      assert.strictEqual(new Set(queued.map(item => item.config.id)).size,
+        expectedCount, "Bonus colors must never repeat");
+      assert.strictEqual(queued.some(item => item.config.id==="rainbow"),
+        expectedCount===7, "Only seventh bonus snack may be Rainbow");
+      assert.ok(queued.every((item,i) =>
+        item.x >= 0 && item.x <= runtime.width &&
+        item.at === 1120 + i*450
+      ), "Alternate randomized left/right spawn lanes and stagger their release");
+      assert.strictEqual(hooks.startBounceFullClearBonus(runtime, 1001, () => choice), false,
+        "Bonus can only be queued once");
+      assert.strictEqual(state.livesLeft, 3,
+        "Unused launches must not affect bonus quantity");
+    }
+  }
+}
+
+function testBounceFullClearTriggersBonusAndDrainsWithoutExtraBall() {
+  const runtime = makeBounceRuntime(2);
+  hooks.initializeBounceMode(runtime);
+  const state = runtime.bounce;
+  assert.strictEqual(hooks.launchBounceServe(runtime), true);
+  // Two on-screen star balls plus the launch ball, regardless of lives left.
+  state.whiteBalls = Array.from({length:3}, (_,i) =>
+    hooks.makeBounceWhiteBall(runtime, 140 + i*30, 350)
+  );
+  state.livesLeft = 1;
+  const lastBrick = state.bricks.find(brick => !brick.config && !brick.isStar);
+  state.bricks.forEach(brick => {
+    if (brick !== lastBrick) brick.active = false;
+  });
+  state.snacksReleased = true;
+  hooks.breakBounceBrick(runtime, lastBrick, state.whiteBalls[0], 1000);
+  assert.strictEqual(state.bonusTriggered, true);
+  assert.strictEqual(state.snacksReleased, true);
+  const quantity = state.bonusPending.length;
+  assert.ok([6,7].includes(quantity),
+    "Three live balls earn 6 or 7 bonus snacks");
+  const plannedColors = state.bonusPending.map(item => item.config.id);
+  assert.strictEqual(new Set(plannedColors).size, quantity);
+  hooks.updateBounceMode(runtime, 1 / 120, 1008);
+  assert.strictEqual(state.whiteBalls.length, 0,
+    "After a full clear the white balls leave and the snack shower begins");
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1008), false);
+  hooks.updateBounceMode(runtime, 1 / 120, 1100);
+  assert.strictEqual(runtime.balls.length, 0, "First bonus snack respects stagger");
+  hooks.updateBounceMode(runtime, 1 / 120, 1120);
+  assert.strictEqual(runtime.balls.length, 1);
+  const lastDue = 1120+(quantity-1)*450;
+  hooks.updateBounceMode(runtime, 1 / 120, lastDue);
+  assert.strictEqual(runtime.balls.length, quantity);
+  assert.deepStrictEqual(toPlain(runtime.balls.map(b=>b.config.id)),toPlain(plannedColors));
+  assert.strictEqual(state.bonusPending.length, 0);
+  assert.strictEqual(state.ended, false, "No result before all bonus snacks fall");
+
+  // Catch all bonus food via original hitbox, scoring, and sound path.
+  runtime.balls.forEach(ball => {
+    ball.x = state.paddleX;
+    ball.y = runtime.petCenterY - 5;
+  });
+  hooks.updateBounceMode(runtime, 1 / 120, lastDue+8);
+  assert.strictEqual(runtime.balls.length, 0);
+  assert.strictEqual(runtime.caughtCount, quantity);
+  assert.strictEqual(runtime.score, quantity===7 ? 11 : quantity,
+    "Rainbow is five points but just one eaten snack");
+  assert.strictEqual(state.ended, true);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, lastDue+8), false);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, lastDue+908), true);
+  hooks.updateBounceMode(runtime, 1 / 120, lastDue+916);
+  assert.strictEqual(runtime.caughtCount, quantity, "No duplicate bonus credit");
+  assert.strictEqual(hooks.launchBounceServe(runtime), false);
+}
+
+function testBounceNoFoodLeftStillNeedsFinalBallToExit() {
   const runtime = makeBounceRuntime(0);
   hooks.initializeBounceMode(runtime);
   const state = runtime.bounce;
-  state.bricks.forEach((brick) => {
+  state.bricks.forEach(brick => {
     if (brick.config) brick.active = false;
   });
   assert.strictEqual(hooks.launchBounceServe(runtime), true);
   hooks.updateBounceMode(runtime, 1 / 120, 1000);
   assert.strictEqual(state.snacksReleased, true);
-  assert.ok(state.bricks.some((brick) => brick.active),
-    "The game must not require breaking remaining gray bricks");
-  assert.strictEqual(state.livesLeft, 3);
-
-  runtime.balls = [{
-    x: 10, y: runtime.height + 30, vy: 120,
-    radius: 10, rotation: 0
-  }];
+  assert.ok(state.bricks.some(brick => brick.active),
+    "Gray bricks need not be cleared for normal end");
+  assert.strictEqual(state.ended, false);
+  assert.strictEqual(hooks.isBounceModeComplete(runtime, 1000), false);
+  state.whiteBalls[0].y = runtime.height + 50;
   hooks.updateBounceMode(runtime, 1 / 120, 1010);
-  assert.strictEqual(runtime.balls.length, 0);
-  assert.strictEqual(runtime.caughtCount, 0);
-  assert.strictEqual(runtime.score, 0);
+  assert.strictEqual(state.ended, true);
+  assert.strictEqual(hooks.launchBounceServe(runtime), false,
+    "Spare launches cannot be used after last food brick");
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1010), false);
-  assert.strictEqual(runtime.finishAt, 1910,
-    "Missing the final released snack must not stall the round");
   assert.strictEqual(hooks.isBounceModeComplete(runtime, 1910), true);
 }
+
 
 function testMelodyExactOdeToJoySequence() {
   const reference = extractVerseTyperOdeToJoy();
@@ -2046,6 +2157,57 @@ function testMelodyMidiFrequencyMatchesVerseTyper() {
   );
 }
 
+function testSevenRealMelodySnacksAndUnchangedNotes() {
+  const expected = ["red","yellow","orange","green","blue","purple","rainbow"];
+  for (const tune of hooks.FEED_MELODIES) {
+    const timeline = hooks.createMelodyTimeline(tune.notes, 390, {bpm:tune.bpm});
+    const preserved = timeline.map(entry =>
+      [entry.midi,entry.x,entry.spawnOffsetMs,entry.arrivalOffsetMs,entry.beats]);
+    assert.strictEqual(hooks.assignMelodySnacks(timeline), 7,
+      "Every shipped tune, including the shortest, has seven spaced food notes");
+    assert.deepStrictEqual(timeline.map(entry =>
+      [entry.midi,entry.x,entry.spawnOffsetMs,entry.arrivalOffsetMs,entry.beats]),preserved,
+      "Changing food graphics must NEVER change note timing, pitch, lane or rests");
+    const food = timeline.filter(entry => entry.snackConfig);
+    assert.deepStrictEqual(Array.from(food, entry => entry.snackConfig.id), expected);
+    assert.strictEqual(food.length, 7);
+    assert.strictEqual(new Set(food).size, 7);
+    assert(food.every(entry => Number.isFinite(entry.midi)));
+    assert(timeline.filter(entry => Number.isFinite(entry.midi)).length > 7,
+      "Ordinary musical notes stay present and are not food");
+    const intervals=food.slice(1).map((entry,i)=>
+      entry.arrivalOffsetMs-food[i].arrivalOffsetMs);
+    assert(intervals.every(n=>n>0),
+      "Food must be separated across increasing musical arrival times");
+  }
+  assert.strictEqual(hooks.MELODY_SNACK_COUNT,7);
+  assert.strictEqual(hooks.MUSIC_NOTE_BALL.asset,
+    "./verse_images/daily_questions/dq_feed_music_note.png");
+
+  const tune=hooks.getFeedMelodyById("odeToJoy");
+  const timeline=hooks.createMelodyTimeline(tune.notes,390,{bpm:tune.bpm});
+  hooks.assignMelodySnacks(timeline);
+  const food=timeline.find(entry=>entry.snackConfig);
+  const plain=timeline.find(entry=>Number.isFinite(entry.midi)&&!entry.snackConfig);
+  // The real scheduler first transitions a note from pending to active.
+  plain.status = "active";
+  food.status = "active";
+  const runtime={mode:"melody",caughtCount:0,snacksCaught:0,totalCount:60,
+    score:0,scoreEl:null,scorePopupsEl:null,catcher:null,
+    audioContext:null,melody:{classifiedCount:0}};
+  hooks.catchMelodyNote(runtime,{melodyEntry:plain,config:hooks.MUSIC_NOTE_BALL});
+  assert.strictEqual(runtime.caughtCount,1);
+  assert.strictEqual(runtime.snacksCaught,0,
+    "An ordinary played note may affect percent but never food");
+  hooks.catchMelodyNote(runtime,{melodyEntry:food,config:food.snackConfig});
+  assert.strictEqual(runtime.caughtCount,2);
+  assert.strictEqual(runtime.snacksCaught,1,
+    "Only the seven colored food visuals credit Snacks Eaten");
+  hooks.catchMelodyNote(runtime,{melodyEntry:food,config:food.snackConfig});
+  assert.strictEqual(runtime.snacksCaught,1,"A duplicate collision cannot count food twice");
+  assert.strictEqual(runtime.score,3,"Two of 60 notes still count toward the original percentage");
+}
+
 function testMelodyPercentageScoring() {
   assert.strictEqual(hooks.calculateMelodyCatchPercent(60, 60), 100);
   assert.strictEqual(hooks.calculateMelodyCatchPercent(0, 60), 0);
@@ -2067,11 +2229,14 @@ function testMelodyPercentageScoring() {
       caughtCount: 46,
       totalCount: 60,
       completed: true,
-      catchPercent: 77
+      catchPercent: 77,
+      snacksCaught: 0,
+      snacksTotal: 7
     }
   );
   assert.ok(
-    source.includes("`Snacks Caught: ${Number(result.catchPercent) || 0}%`")
+    source.includes('class="daily-feed-result-note-image"'),
+    "Melody score uses actual note art with unchanged catch percentage"
   );
 }
 
@@ -2670,6 +2835,10 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
       `${prefix}dq_feed_ball_${ball.id}.png`
     ),
     `${prefix}dq_feed_ball_rainbow.png`,
+    `${prefix}dq_feed_music_note.png`,
+    ...[10,25,50,100,200,300,400,500,600,700,800,900]
+      .map(n => `./verse_images/daily_zoo_todo/snacks_${n}.png`),
+    "./verse_images/daily_zoo_todo/snacks_1000.gif.gif",
     `${prefix}dq_feed_star_peg.png`,
     `${prefix}dq_feed_shadow.png`,
     `${prefix}dq_feed_control_tilt.png`,
@@ -2677,7 +2846,7 @@ function testDailyFeedAssetsArePrecachedWithoutRiskingShellInstall() {
     `${prefix}dq_feed_star.mp3`,
     `${prefix}dq_feed_chomp.mp3`
   ];
-  assert.strictEqual(expected.length, 35);
+  assert.strictEqual(expected.length, 49);
   assert.deepStrictEqual(paths, expected);
   assert.strictEqual(new Set(paths).size, paths.length);
   assert.ok(sw.includes("await precacheDailyFeedAssets(cache);"));
@@ -2740,7 +2909,7 @@ async function testDailyFeedPrecacheSurvivesIndividualFailures() {
     await installing;
     assert.strictEqual(
       [...cached.values()].filter((value) => value === "feed").length,
-      failOne ? 34 : 35
+      failOne ? 48 : 49
     );
     assert.ok(cached.has("https://example.org/biblozoo/daily_questions_feed_game.js"));
     assert.strictEqual(warnings.length, failOne ? 1 : 0);
@@ -3470,8 +3639,8 @@ function testClassicRenderContract() {
   assert.ok(!normal.includes("data-daily-feed-paddle"));
   assert.ok(normal.includes("Catch the BibloSnacks!"));
   assert.ok(normal.includes("Drag to steer and catch the snacks!"));
-  assert.ok(normal.includes("Great Catching!"));
-  assert.ok(normal.includes("Back to Zoo"));
+  assert.ok(normal.includes("Thanks for the snack!"));
+  assert.ok(normal.includes('class="daily-feed-result-check"') && normal.includes("<span>To-Do Complete!</span>"));
   assert.ok(normal.includes("Tilt or drag Pip left and right"));
   assert.ok(normal.includes("<span>pet</span>"));
 
@@ -3484,8 +3653,8 @@ function testClassicRenderContract() {
 
   assert.ok(daily.includes("is-daily-todo-snack"));
   assert.ok(daily.includes("Thanks for the snack!"));
-  assert.ok(daily.includes("Zoo To-Do Complete!"));
-  assert.ok(daily.includes("Back Home"));
+  assert.ok(!daily.includes("Zoo To-Do Complete!"));
+  assert.ok(daily.includes('class="daily-feed-result-check"') && daily.includes("<span>To-Do Complete!</span>"));
 }
 
 function testClassicScheduledBalls() {
@@ -3850,45 +4019,79 @@ function testResizeMelodyPreservesTimingAndNoteStatus() {
   hooks.setActiveRuntimeForValidation(null);
 }
 
-function testPreviewNeverClaimsDailyCompletion() {
-  const preview = api.render({ session: {
-    feedMode: "bounce", dailyTodoSnack: true, dailyTodoPreview: true, petName: "Pip"
-  } });
-  assert.ok(!preview.includes("Zoo To-Do Complete!"));
-  assert.ok(!preview.includes("Thanks for the snack!"));
-  assert.ok(!preview.includes("is-daily-todo-snack"));
-  assert.ok(preview.includes("Back to Zoo"));
-  const daily = api.render({ session: { feedMode: "classic", dailyTodoSnack: true } });
-  assert.ok(daily.includes("Zoo To-Do Complete!"));
-  assert.ok(daily.includes("Back Home"));
+function testPreviewMatchesDailyResultsWithoutClaiming() {
+  const resultOverlayMarkup = html => html.slice(
+    html.indexOf('class="daily-feed-result-overlay"')
+  );
+  for (const mode of ["classic","labyrinth","bounce","melody"]) {
+    const preview = api.render({session:{
+      feedMode:mode,dailyTodoSnack:true,dailyTodoPreview:true,petName:"Pip"
+    }});
+    const daily = api.render({session:{
+      feedMode:mode,dailyTodoSnack:true,dailyTodoPreview:false,petName:"Pip"
+    }});
+    assert.strictEqual(resultOverlayMarkup(preview), resultOverlayMarkup(daily),
+      `${mode}: developer and real Daily ending must render the SAME card`);
+    assert.ok(preview.includes('class="daily-feed-result-check"') && preview.includes("<span>To-Do Complete!</span>"));
+    assert.ok(!preview.includes("Zoo To-Do Complete!"));
+    assert.ok(preview.includes("Caught 0 Snacks"));
+    if (mode==="melody") {
+      assert.ok(preview.includes('dq_feed_music_note.png'));
+      assert.ok(preview.includes("× 0%"));
+    }
+  }
+  assert.ok(feedGameCssSource.includes("background: #24783c;"),
+    "Completion button must match the Zookeeper Stats pill green");
+  assert.ok(feedGameCssSource.includes(".daily-feed-result-note-image"),
+    "Melody uses the actual music-note image");
   const target = (mode, isPreview) => {
     const runtime = {
       mode, dailyTodoSnack: true, dailyTodoPreview: isPreview,
       zookeeperName: "Someone", petName: "Pip", running: true,
       rafId: 0, stage: {}, startOverlay: { hidden: false },
       resultOverlay: { hidden: true }, resultTitleEl: { textContent: "" },
-      resultScoreEl: { textContent: "" },
+      resultScoreEl: { textContent: "", innerHTML: "" },
       resultCatchesEl: { textContent: "", hidden: false },
       gameEl: { classList: { add() {} } },
       modeTimers: new Set(), modeController: { dispose() {} }
     };
     hooks.setActiveRuntimeForValidation(runtime);
-    hooks.showResult(runtime, {
-      mode, score: 5, caughtCount: 3, totalCount: 7, catchPercent: 71
+    hooks.showResult(runtime,{
+      mode,score:5,caughtCount:3,totalCount:7,catchPercent:71,
+      snacksCaught:2,snacksTotal:7
     });
     return runtime;
   };
-  const previewRuntime = target("bounce", true);
-  assert.ok(!previewRuntime.resultTitleEl.textContent.includes("Thanks for the snack"));
-  assert.strictEqual(previewRuntime.resultScoreEl.textContent, "Score: 5");
-  assert.strictEqual(previewRuntime.resultCatchesEl.textContent, "Caught 3 of 7 snacks");
-  const melodyRuntime = target("melody", true);
-  assert.strictEqual(melodyRuntime.resultScoreEl.textContent, "Snacks Caught: 71%");
-  assert.strictEqual(melodyRuntime.resultCatchesEl.hidden, true);
-  const dailyRuntime = target("classic", false);
-  assert.ok(dailyRuntime.resultTitleEl.textContent.includes("Thanks for the snack, Someone!"));
+  for (const mode of ["classic","labyrinth","bounce","melody"]) {
+    const previewRuntime=target(mode,true);
+    const dailyRuntime=target(mode,false);
+    assert.strictEqual(previewRuntime.resultTitleEl.textContent,
+      dailyRuntime.resultTitleEl.textContent);
+    assert.strictEqual(previewRuntime.resultCatchesEl.textContent,
+      dailyRuntime.resultCatchesEl.textContent);
+    assert.strictEqual(previewRuntime.resultScoreEl.innerHTML,
+      dailyRuntime.resultScoreEl.innerHTML);
+    assert.strictEqual(previewRuntime.resultScoreEl.textContent,
+      dailyRuntime.resultScoreEl.textContent);
+    assert.strictEqual(previewRuntime.resultTitleEl.textContent,
+      "Thanks for the snack, Someone!");
+    assert.strictEqual(previewRuntime.resultCatchesEl.textContent,
+      mode==="melody" ? "Caught 2 Snacks" : "Caught 3 Snacks");
+    if (mode==="melody") {
+      assert.ok(previewRuntime.resultScoreEl.innerHTML.includes(
+        'dq_feed_music_note.png'));
+      assert.ok(previewRuntime.resultScoreEl.innerHTML.includes("× 71%"));
+    } else {
+      assert.strictEqual(previewRuntime.resultScoreEl.textContent,"Score: 5");
+    }
+  }
+  // Rendering a congratulatory preview is not itself a claim: the actual
+  // onComplete/claimDailyTodoSnack path stays gated by preview flags.
+  assert.ok(appSource.includes("session?.dailyTodoPreview === true"));
+  assert.ok(appSource.includes("session.rewardClaimed = true"));
   hooks.setActiveRuntimeForValidation(null);
 }
+
 
 function testResizeClassicPreservesStarsBallsAndScore() {
   const runtime = makeResizableRuntime("classic");
@@ -4120,8 +4323,10 @@ async function main() {
     testBounceWhiteBallsAccelerateIndependently,
     testBounceThreeLivesAndPopup,
     testBounceGrayBricksCannotFinishWhileSnacksRemain,
-    testBounceLastSnackFinishesWithGrayBricksStanding,
-    testBounceLastSnackMissStillAllowsCompletion,
+    testBounceFinalRallyAfterAllSnackBricks,
+    testBounceBonusBallCountsAndUniqueColors,
+    testBounceFullClearTriggersBonusAndDrainsWithoutExtraBall,
+    testBounceNoFoodLeftStillNeedsFinalBallToExit,
     testBounceOverlayLifecycleAndRealDailyIsolation,
     testMelodyExactOdeToJoySequence,
     testMelodyTuneRegistryAndSelection,
@@ -4135,6 +4340,7 @@ async function main() {
     testMelodyLaneTargetsStayWithinTwoLanes,
     testMelodyMidiFrequencyMatchesVerseTyper,
     testMelodyPercentageScoring,
+    testSevenRealMelodySnacksAndUnchangedNotes,
     testMelodyIgnoresQuestionStars,
     testMelodyCompletionWaitsForFinalArrival,
     testMelodyAudioAndBackgroundSafety,
@@ -4197,7 +4403,7 @@ async function main() {
     testResizeMelodyPreservesTimingAndNoteStatus,
     testResizeClassicPreservesStarsBallsAndScore,
     testTiltTouchSwitchingAndSensorUnavailability,
-    testPreviewNeverClaimsDailyCompletion,
+    testPreviewMatchesDailyResultsWithoutClaiming,
     testReducedMotionPreservesGameplayAndAudioSafety
   ];
 

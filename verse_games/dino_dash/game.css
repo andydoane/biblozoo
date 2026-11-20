@@ -993,3 +993,43 @@ body.bz-return-activity-paused *::before,
 body.bz-return-activity-paused *::after {
   animation-play-state: paused !important;
 }
+
+/* N6f: failure-only native PCM gate. Successful preparation has no overlay. */
+.dd2-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .54);
+}
+.dd2-native-audio-card {
+  box-sizing: border-box;
+  width: min(90vw, 380px);
+  padding: 26px 22px;
+  border-radius: 24px;
+  background: #fefdf8;
+  color: #1f2937;
+  text-align: center;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, .28);
+}
+.dd2-native-audio-card h2 { margin: 0 0 12px; font-size: 1.45rem; }
+.dd2-native-audio-card p { margin: 0 0 20px; line-height: 1.5; }
+.dd2-native-audio-card button {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: #2d6a55;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 12px;
+}
+.dd2-native-audio-card button:last-child {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+.dd2-native-audio-card button:focus-visible { outline: 3px solid #a7cb6f; }

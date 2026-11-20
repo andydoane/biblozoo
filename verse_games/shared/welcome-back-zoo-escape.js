@@ -106,11 +106,92 @@
   const statsApi = Object.freeze({ get: id => readStats(profileForStats(id)),
     acknowledgeCelebration, storageKey: id => statsKey(profileForStats(id)) });
   root.BibloZooZooStats = statsApi;
+
+  // Purely recreational surprise rolls, NEVER an audio recovery mechanism.
+  // Every eligible tap rolls again: the two Zoo To-Do buttons share "daily",
+  // and Welcome Back rolls ONLY after the existing verified recovery gesture.
+  // The first Zoo Break shown today has 55% odds; further breaks that day
+  // are rare but remain possible. Pet Escapes roll separately on a non-break.
+  // This v2 key intentionally ignores the obsolete one-roll-per-day v1 flags.
+  const SURPRISE_PREFIX = "biblozooZooSurprise:v2:";
+  // Audio Test only: DEV Tools opts in to a deterministic escape on every
+  // verified Welcome Back. This never alters the real surprise odds record.
+  const FORCE_WELCOME_ESCAPE_KEY = "biblozooDevForceWelcomePetEscape:v1";
+  function forceWelcomePetEscapeEnabled() {
+    try {
+      return root.BibloZooNativeOnlyOutput?.devToolsAllowed === true &&
+        root.Capacitor?.isNativePlatform?.() === true &&
+        root.Capacitor?.getPlatform?.() === "ios" &&
+        root.localStorage?.getItem?.(FORCE_WELCOME_ESCAPE_KEY) === "1";
+    } catch (_) { return false; }
+  }
+  const SURPRISE_CHANCES = Object.freeze({
+    firstBreak: 0.55,
+    extraDailyBreak: 0.05,
+    extraWelcomeBreak: 0.02,
+    petAfterNoBreak: 0.15
+  });
+  const localDay = () => {
+    const date = new Date();
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")].join("-");
+  };
+  function chooseSurprise(explicitId, source, deferCommit = false) {
+    if (source === "welcome" && forceWelcomePetEscapeEnabled())
+      return deferCommit ? { kind: "escape", commit: () => true } : "escape";
+    const id = profileForStats(explicitId);
+    if (!id || (source !== "daily" && source !== "welcome")) return null;
+    const key = SURPRISE_PREFIX + id;
+    try {
+      // If storage is unavailable, fail closed instead of offering a Zoo
+      // Break whose first-of-day state cannot be durably remembered.
+      const raw = root.localStorage?.getItem?.(key);
+      if (raw === undefined) return null;
+      const parsed = raw ? JSON.parse(raw) : null;
+      const day = localDay();
+      const priorBreaks = parsed?.day === day &&
+        Number.isSafeInteger(parsed.breaksTriggered) &&
+        parsed.breaksTriggered >= 0 ? parsed.breaksTriggered : 0;
+      const breakChance = priorBreaks === 0
+        ? SURPRISE_CHANCES.firstBreak
+        : source === "daily"
+          ? SURPRISE_CHANCES.extraDailyBreak
+          : SURPRISE_CHANCES.extraWelcomeBreak;
+      const isBreak = Math.random() < breakChance;
+      const kind = isBreak ? "break" :
+        Math.random() < SURPRISE_CHANCES.petAfterNoBreak ? "escape" : null;
+      // A shown/selected Zoo Break reduces today's future odds even if the
+      // child later exits the rescue. Actual caught-pet and stopped-break
+      // statistics still depend on real rescues and a completed LOCK GATE.
+      // Animated Read activities may preselect a cue before starting narration/music.
+      // The ordinary odds/day record is committed ONLY when its real audio
+      // recovery succeeds; a failed/hidden attempt has no entertainment side
+      // effects. All other owners keep the existing immediate choose() path.
+      const commit = () => {
+        try {
+          root.localStorage.setItem(key, JSON.stringify({
+            day, breaksTriggered: priorBreaks + (isBreak ? 1 : 0)
+          }));
+          return true;
+        } catch (_) { return false; }
+      };
+      if (deferCommit) return { kind, commit };
+      return commit() ? kind : null;
+    } catch (_) { return null; }
+  }
+  root.BibloZooZooSurprise = Object.freeze({
+    choose: (id, source) => chooseSurprise(id, source),
+    planWelcome: id => chooseSurprise(id, "welcome", true),
+    chances: SURPRISE_CHANCES,
+    isDevForceWelcomeEscapeEnabled: forceWelcomePetEscapeEnabled
+  });
   const rand = (min, max) => min + Math.random() * (max - min);
 
-  function create({ overlay, recover, onRecovered, onExit, onRescue,
+  function create({ overlay, recover, onRecovered, onExit, onSurpriseStart,
+    onRescue,
     onBreakComplete, soundIsReady, onPop, onBounce, getSoundContext, isSoundMuted,
-    isTestRun,
+    isTestRun, surpriseEnabled = false, recoveryOnly = false,
+    preselectWelcomeSurprise = false,
     profileId, pictureBase = "",
     petName, verseId, name, reducedMotion } = {}) {
     if (!overlay?.querySelector || typeof recover !== "function" ||
@@ -240,15 +321,20 @@
     let selected = null;
     let breakCredited = false;
     let completedBreakStats = false;
+    let surpriseMode = null;
     let pets = [];
     let dragging = null;
     let lastBounceSoundAt = -Infinity;
     let testScenario = null;
+    let forcedSurpriseTest = false;
     let testMenu = null;
     let testHoldTimer = 0;
     let testPointer = null;
-    const isDeveloperRun = () => !!testScenario || (typeof isTestRun === "function" && isTestRun() === true);
+    const isDeveloperRun = () => !!testScenario || forcedSurpriseTest ||
+      (typeof isTestRun === "function" && isTestRun() === true);
     const allowTestMenu = ENABLE_ZOO_RETURN_TEST_HARNESS &&
+      (root.BibloZooNativeOnlyOutput?.enabled !== true ||
+       root.BibloZooNativeOnlyOutput?.devToolsAllowed === true) &&
       !overlay.classList.contains("daily-feed-resume-overlay");
     const effectTimers = new Set();
     const laterEffect = (callback, delay) => {
@@ -734,8 +820,30 @@
       pending = false;
       stage = "recovered";
       emptyField();
-      resetDisplay();
-      try { onRecovered?.(); } catch (_) {}
+      if (surpriseMode) {
+        // A standalone activity may need another asynchronous native audio
+        // preparation on this genuine LOCK GATE gesture. Do not reset to the
+        // original Welcome Back artwork while it is working: that causes a
+        // confusing flash and makes a correctly accepted tap look ignored.
+        // start() resets this presentation if recovery must be retried.
+        instruction.hidden = true;
+        pen.hidden = true;
+        exitButton.hidden = true;
+        button.hidden = false;
+        button.disabled = true;
+        button.textContent = "Opening the gate...";
+        if (status) {
+          status.hidden = false;
+          status.textContent = "Getting your game ready...";
+        }
+      } else {
+        resetDisplay();
+      }
+      try { onRecovered?.(); } catch (_) {
+        // A failed activity callback must not strand the child at a disabled
+        // gate. Return to a fresh explicit Welcome Back recovery attempt.
+        start();
+      }
       log("zoo-escape-recovered", { attemptCount });
     }
     function finishFailure(from) {
@@ -753,6 +861,30 @@
         transitionTimer = root.setTimeout(() => { transitionTimer = 0; exitToZoo(); }, reduced ? 60 : 420);
       }
     }
+    // Real audio failure is handled separately from RANDOM entertainment.
+    // Developer-only scripted legacy recovery stages remain available for
+    // deterministic regression, but production never invents a zoo rescue
+    // because an audio session was unavailable.
+    function recoveryFailureWithoutSurprise() {
+      if (!running()) return;
+      button.disabled = attemptCount >= MAX_ATTEMPTS;
+      exitButton.hidden = false;
+      if (status) {
+        status.hidden = false;
+        status.textContent = attemptCount >= MAX_ATTEMPTS
+          ? "Sound isn't ready. Use Back to Zoo to leave safely."
+          : "Sound isn't ready yet. Tap Let's go! again, or Back to Zoo.";
+      }
+      log("welcome-back-recovery-retry", { attemptCount });
+    }
+    function handleRecoveryFailure(from) {
+      // Excluded owners must never enter the historical failure->pets ladder,
+      // even with DEV Force enabled or a deliberately denied native session.
+      if (recoveryOnly || (surpriseEnabled && !isDeveloperRun()))
+        recoveryFailureWithoutSurprise();
+      else finishFailure(from);
+    }
+
     // This never synthesizes success. A scripted failure/deferred result skips
     // the owner's audio handler. A scripted "real" result invokes the owner's
     // original recovery SYNCHRONOUSLY inside the real LOCK GATE click.
@@ -770,6 +902,14 @@
     function attempt() {
       if (!running() || busy || (stage !== "welcome" && stage !== "escape" && stage !== "break")) return;
       if ((stage === "escape" || stage === "break") && !instruction.hidden) return;
+      // A random rescue is NOT an audio recovery attempt. The child
+      // completes the same rescue and LOCK GATE, without calling recover()
+      // a second time, stealing session priority, or faking a sound check.
+      if (surpriseMode) {
+        if (stage === surpriseMode && total > 0 && rescued === total &&
+            (stage !== "break" || spawning === total)) successful();
+        return;
+      }
       if (attemptCount >= MAX_ATTEMPTS) return;
       const from = stage;
       attemptCount++;
@@ -778,17 +918,30 @@
       button.disabled = true;
       exitButton.hidden = false;
       log("zoo-escape-gesture", { stage: from, attemptCount });
+      // Animated Read activities may need to select a cue BEFORE asking native Read to
+      // play sound. This is a dry roll: no stats or stored odds are touched
+      // unless the owner's original verified recovery reports success.
+      const preselect = typeof preselectWelcomeSurprise === "function"
+        ? preselectWelcomeSurprise() === true : preselectWelcomeSurprise === true;
+      let plannedSurprise = null;
+      if (from === "welcome" && surpriseEnabled && !recoveryOnly && preselect &&
+          !isDeveloperRun()) {
+        try {
+          plannedSurprise = root.BibloZooZooSurprise?.planWelcome?.(profileId) || null;
+        } catch (_) {}
+      }
       // Invoke recovery synchronously while WebKit's direct user activation
       // exists. Do not await a cosmetic animation before calling this.
       let recovery;
-      try { recovery = recoveryForAttempt({ stage: from, attempt: attemptCount }); }
+      try { recovery = recoveryForAttempt({ stage: from, attempt: attemptCount,
+        plannedSurprise: plannedSurprise?.kind || null }); }
       catch (_) { recovery = false; }
       watchdog = root.setTimeout(() => {
         watchdog = 0;
         if (disposed || !busy || token !== serial) return;
         busy = false;
         button.disabled = false;
-        finishFailure(from);
+        handleRecoveryFailure(from);
       }, RECOVERY_WATCHDOG_MS);
       Promise.resolve(recovery).then(ok => {
         if (disposed || token !== serial || !busy) return;
@@ -805,13 +958,31 @@
             status.hidden = false;
           }
           log("zoo-escape-recovery-deferred", { stage: from, reason: ok.reason || "native-interruption" });
-        } else if (ok === true && running()) successful();
-        else if (running()) finishFailure(from);
+        } else if (ok === true && running()) {
+          // The real Welcome Back / Let's go! recovery has ALREADY run
+          // inside the child's click and returned verified success.
+          // Only then may a separate recreational event appear. A failed
+          // or deferred native audio result never triggers an event.
+          let kind = null;
+          if (from === "welcome" && surpriseEnabled && !recoveryOnly && !isDeveloperRun()) {
+            if (preselect) {
+              // A failed commit cannot show an unaccounted random surprise.
+              try {
+                if (plannedSurprise?.commit?.() === true)
+                  kind = plannedSurprise.kind;
+              } catch (_) {}
+            } else {
+              try { kind = root.BibloZooZooSurprise?.choose?.(profileId, "welcome"); }
+              catch (_) { /* No surprise may block recovered gameplay. */ }
+            }
+          }
+          if (!kind || !startSurprise(kind)) successful();
+        } else if (running()) handleRecoveryFailure(from);
       }, () => {
         if (disposed || token !== serial || !busy) return;
         busy = false;
         if (watchdog) { root.clearTimeout(watchdog); watchdog = 0; }
-        finishFailure(from);
+        handleRecoveryFailure(from);
       });
     }
     function exitToZoo() {
@@ -838,7 +1009,7 @@
     }
     function showTestMenu() {
       cancelTestHold();
-      if (!allowTestMenu || !running() || busy || testMenu) return;
+      if (!allowTestMenu || surpriseMode || !running() || busy || testMenu) return;
       const menu = doc.createElement("div");
       menu.className = "bz-zoo-dev-menu";
       menu.setAttribute("role", "dialog");
@@ -877,7 +1048,7 @@
       content.querySelector?.("button")?.focus?.({ preventScroll: true });
     }
     function testPointerDown(event) {
-      if (!allowTestMenu || !running() || busy || testMenu ||
+      if (!allowTestMenu || surpriseMode || !running() || busy || testMenu ||
           (event.button != null && event.button !== 0)) return;
       cancelTestHold();
       testPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -911,12 +1082,31 @@
       exitButton.hidden = true;
       if (status) status.hidden = true;
     }
+    function startSurprise(kind) {
+      if (recoveryOnly || !pending || disposed || surpriseMode ||
+          stage !== "welcome" || (kind !== "escape" && kind !== "break"))
+        return false;
+      // Keep this exact controller's artwork, physics, pet-rescue counter,
+      // LOCK GATE and cleanup; only replace the recovery-driven transition.
+      surpriseMode = kind;
+      // Snapshot developer mode at selection, so switching the DEV toggle
+      // during a rescue cannot award permanent pet/break statistics.
+      forcedSurpriseTest = forceWelcomePetEscapeEnabled();
+      // The activity owner reasserts its own pause immediately before the
+      // surprise starts; audio recovery is NOT permission to run underneath.
+      try { onSurpriseStart?.(kind); } catch (_) {}
+      if (kind === "break") breakPictures = possiblePictures();
+      setStage(kind);
+      log("zoo-surprise-start", { kind });
+      return true;
+    }
     function start() {
       if (disposed) return false;
       preloadDefaultPetName();
       cancelTestHold();
       closeTestMenu();
       testScenario = null;
+      forcedSurpriseTest = false;
       serial++;
       emptyField();
       pending = true;
@@ -927,6 +1117,7 @@
       spawning = 0;
       breakCredited = false;
       completedBreakStats = false;
+      surpriseMode = null;
       stage = "welcome";
       resetDisplay();
       log("zoo-escape-start");
@@ -968,7 +1159,7 @@
     pen.addEventListener("click", tapPen);
     exitButton.addEventListener("click", exitToZoo);
     doc.addEventListener("visibilitychange", onVisibility);
-    return Object.freeze({ start, resumeVisible, destroy, exit: exitToZoo,
+    return Object.freeze({ start, startSurprise, resumeVisible, destroy, exit: exitToZoo,
       isPaused: () => pending, getStage: () => stage,
       getState: () => ({ stage, pending, attemptCount, total, spawning, rescued,
         active: pets.filter(p => p.state !== "rescued").length }) });

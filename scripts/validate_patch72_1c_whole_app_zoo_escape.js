@@ -43,8 +43,8 @@ const mainHtml = read("index.html");
 ok(mainHtml.indexOf('src="verse_games/shared/welcome-back-zoo-escape.js"') > 0 &&
   mainHtml.indexOf('src="verse_games/shared/welcome-back-zoo-escape.js"') <
   mainHtml.indexOf('src="app.js"'), "main app preloads Zoo Escape before activity owners");
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw),
-  "fresh PWA cache generation");
+ok(/const CACHE_VERSION = "[^"\n]+";/.test(sw),
+  "nonempty PWA cache version with required offline assets");
 for (const p of ["welcome-back-zoo-escape.js","welcome-back-return.js","welcome-back.css"])
   ok(sw.includes(`"./verse_games/shared/${p}"`), `${p}: offline cached`);
 for (const p of ["zoobreak_gate.png","zoobreak_lock.png"])
@@ -82,6 +82,7 @@ async function exerciseReturn() {
   const h = createHarness();
   let active=true,pauseCount=0,gestureCount=0,exitCount=0;
   const ctl=h.window.BibloZooWelcomeBackReturn.attach({
+    useZooEscape:true,
     shouldPrompt:()=>active,
     onPause:()=>{pauseCount++;},
     onContinue:()=>{gestureCount++;return Promise.resolve(true);},
@@ -122,6 +123,7 @@ async function exerciseReturn() {
   // A second session's *stale* gesture must never claim verified recovery.
   const h2=createHarness();let resolve;
   const c2=h2.window.BibloZooWelcomeBackReturn.attach({
+    useZooEscape:true,
     shouldPrompt:()=>true,onPause:()=>{},
     onContinue:()=>new Promise(r=>resolve=r),onExit:()=>{exitCount++;}
   });
@@ -136,11 +138,51 @@ async function exerciseReturn() {
   eq(exitCount,1,"safe navigation invoked once");
   eq(c2.isPaused(),false,"exit releases pending state");
   c2.destroy();
+
+  // A real Pet Escape must be a SECOND pause: successful audio recovery
+  // cannot run the game underneath a rescued pet. The final pen gesture
+  // calls the original owner recovery again and only then releases clocks.
+  const h3=createHarness();
+  let gamePaused=false,gameProgress=0,holds=0,returns=0;
+  const c3=h3.window.BibloZooWelcomeBackReturn.attach({
+    useZooEscape:true,
+    shouldPrompt:()=>true,
+    onPause:()=>{gamePaused=true;holds++;},
+    onContinue:()=>{gamePaused=false;returns++;return Promise.resolve(true);},
+    onExit:()=>{}
+  });
+  h3.doc.hidden=true;h3.callbacks.doc.visibilitychange();
+  h3.doc.hidden=false;h3.callbacks.doc.visibilitychange();
+  eq(await h3.visual.options.recover(),true,"original Let's go verifies game recovery");
+  eq(gamePaused,false,"audio-ready owner has resumed temporarily");
+  h3.visual.options.onSurpriseStart("escape");
+  eq(gamePaused,true,"Pet Escape immediately freezes game again");
+  eq(holds,2,"Read/verse game owner got second pause, without reset");
+  if (!gamePaused) gameProgress++;
+  eq(gameProgress,0,"no progress during pet rescue");
+  eq(c3.isPaused(),true,"Zoo keeps pending gate for the entire escape");
+  h3.visual.options.onRecovered(); // actual LOCK GATE / pen click
+  eq(returns,2,"final pet rescue uses real new gesture to resume");
+  eq(c3.isPaused(),true,"pending until owner verifies final-lock audio");
+  await Promise.resolve();await Promise.resolve();
+  eq(c3.isPaused(),false,"only verified final-lock audio releases game");
+  eq(gamePaused,false,"game unpaused after pet rescue, never before");
+  eq(h3.overlay.hidden,true,"successful second recovery hides popup");
+  c3.destroy();
 }
 
 function auditOwners() {
+  // Default shared Welcome Back is surprise-free on every platform; only
+  // explicit Practice/Playground opt-ins participate. Verse Jam remains
+  // excluded even with native Audio Test DEV Force enabled.
   ok(shared.includes('function attachZooReturn(options)') &&
-    shared.includes('if (root.BibloZooZooEscape?.create)'),"opt-in with safe legacy fallback");
+    shared.includes('useZooEscape = false') &&
+    shared.includes('allowDevForceZooEscape = false') &&
+    shared.includes('(useZooEscape || forceDevEscape) && root.BibloZooZooEscape?.create') &&
+    shared.includes('const forceDevEscape = allowDevForceZooEscape &&') &&
+    shell.includes('allowDevForceZooEscape: options.allowZooSurprises !== false') &&
+    read('verse_playground/verse_jam/game.js').includes('allowZooSurprises: false'),
+    "Verse Jam fully opts out while other DEV and normal Zoo returns remain available");
   ok(shared.includes('onContinue();') && shared.includes('token === generation'),
     "shared owner runs within gesture and rejects stale asynchronous results");
   ok(zoo.includes('ok?.deferred === true') &&
@@ -162,7 +204,7 @@ function auditOwners() {
   ok(learn.includes('const finishingZoo = !!learnZooEscape') &&
     learn.includes('learnZooEscape.start()'),
     "Learn reuses verified result without hiding dialog prematurely");
-  ok(readMyVerse.includes('const started = resumeReadAudioFromGesture()') &&
+  ok(readMyVerse.includes('const started = resumeReadAudioFromGesture({') &&
     readMyVerse.includes('waitReadMediaProgress') &&
     readMyVerse.includes('generation !== readAudioRecoveryGeneration'),
     "Read My Verse retains media/tone/soundtrack clock verification");

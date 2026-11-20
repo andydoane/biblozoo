@@ -214,7 +214,9 @@ const petCode = snippet("let petUnlockAudioEl = null;", "function getAppAudioCon
 function makePet() {
   const audioEl = mockAudio(), document = { hidden: false };
   let clock = 1000, fallback = 0, muted = false;
-  const ctx = { document, muted, audioEl, console: { warn() {} }, UI_PET_UNLOCK_VOLUME: 0.55,
+  // Legacy Patch 23B models Web/PWA, not the native-only Audio Test app.
+  const window = { BibloZooNativeOnlyOutput: { enabled: false } };
+  const ctx = { window, document, muted, audioEl, console: { warn() {} }, UI_PET_UNLOCK_VOLUME: 0.55,
     State: { screen: "pet" }, Screen: { PET_UNLOCK: "pet" }, performance: { now: () => clock },
     ensurePetUnlockAudio: () => audioEl,
     playUiTapFallbackNow: () => fallback++

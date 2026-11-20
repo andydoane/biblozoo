@@ -1,0 +1,179 @@
+/* Review → Learn → Listen Activities free-play and navigation contract.
+ * Synthetic checks only; NEVER import family data or grant a real Daily reward.
+ * Physical iPhone sound, navigation and interruptions still require owner tests. */
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const root = path.resolve(__dirname, "..");
+const read = (name) => fs.readFileSync(path.join(root, name), "utf8");
+const app = read("app.js");
+const moduleSource = read("read_my_verse.js");
+const Read = require("../read_my_verse.js");
+const sw = read("service-worker.js");
+assert.match(sw, /const CACHE_VERSION = "[^"]+";/);
+for (const img of ["app_icon_review_verse.png", "app_icon_listen_to_verse.png",
+  "app_icon_balloons.png", "app_icon_fish.png", "app_icon_typewriter.png",
+  "app_icon_keyboard.png", "app_icon_unscramble.png", "app_icon_verse_crawl.png",
+  "app_icon_tap_words_in_order.png", "app_icon_chunk_audio_matching.png"]) {
+  assert.ok(sw.includes('"./verse_images/game_icons/' + img + '"'),
+    "PWA offline core path missing: " + img);
+}
+
+const cards = [
+  ["balloons", "Balloons", "app_icon_balloons.png", "#ffc751"],
+  ["fish", "Fish", "app_icon_fish.png", "#40b9c5"],
+  ["typewriter", "Typewriter", "app_icon_typewriter.png", "#7f66c6"],
+  ["keyboard", "Keyboard", "app_icon_keyboard.png", "#444444"],
+  ["unscramble", "Unscramble", "app_icon_unscramble.png", "#a7cb6f"],
+  ["star_wars", "Space", "app_icon_verse_crawl.png", "#f2f2f2"],
+  ["tap_words_order", "Tap in Order", "app_icon_tap_words_in_order.png", "#7f66c6"],
+  ["chunk_sequence", "Sound Sequence", "app_icon_chunk_audio_matching.png", "#ff5a51"]
+];
+
+for (const img of ["app_icon_review_verse.png", "app_icon_listen_to_verse.png",
+  ...cards.map((c) => c[2])]) {
+  assert.ok(fs.statSync(path.join(root, "verse_images/game_icons", img)).size > 0,
+    "uploaded icon missing or empty: " + img);
+}
+
+const listStart = app.indexOf("const LISTEN_ACTIVITY_CARDS = Object.freeze([");
+const listEnd = app.indexOf("].map((item) => Object.freeze(item)))", listStart);
+assert.ok(listStart >= 0 && listEnd > listStart);
+const list = app.slice(listStart, listEnd);
+const ids = [...list.matchAll(/\{ id: "([^"]+)", title: "([^"]+)", iconImage: IMG_DIR \+ "game_icons\/([^"]+)", cardColor: "(#[0-9a-f]{6})"/g)]
+  .map((m) => m.slice(1, 5));
+assert.deepEqual(ids, cards, "card titles/order/icons/colors must match owner selection");
+for (const [id] of cards) {
+  assert.equal(Read.READ_ACTIVITY_MANIFEST[id]?.enabled, true,
+    "missing native Read activity: " + id);
+}
+assert.equal(Read.READ_ACTIVITY_MANIFEST.chunk_sequence.title, "Sound Sequence");
+
+// Reuse Practice visual layout, while keeping its own child-facing routes.
+for (const name of ["LEARN_HUB", "LISTEN_ACTIVITIES"]) {
+  assert.match(app, new RegExp(name + ': "[a-z_]+"' ));
+  assert.match(app, new RegExp("Screen\\." + name + "\\) slide = screen"));
+}
+const homeTap = app.slice(app.indexOf('if (action === "learn") {'),
+  app.indexOf('if (action === "practice") {', app.indexOf('if (action === "learn") {')));
+assert.match(homeTap, /State\.hasLearnedVerse/);
+assert.match(homeTap, /go\(Screen\.LEARN_HUB\)/);
+assert.match(homeTap, /resetLearn\(false\)/);
+assert.match(homeTap, /startLearnInstruction\("listen"\)/);
+const hub = app.slice(app.indexOf("function screenLearnHub("), app.indexOf("function screenListenActivities("));
+const picker = app.slice(app.indexOf("function screenListenActivities("), app.indexOf("function screenPracticeHub("));
+assert.match(hub, /homePillHtml\(\)/);
+assert.match(hub, /renderPracticeHubCard/);
+assert.match(hub, /id: "learn-again"/);
+assert.match(hub, /id: "listen-activities"/);
+assert.match(hub, /go\(Screen\.LISTEN_ACTIVITIES\)/);
+assert.match(picker, /practiceBackPillHtml\("Back to Learn"\)/);
+assert.match(picker, /go\(Screen\.LEARN_HUB\)/);
+assert.match(picker, /renderPracticeHubCard/);
+assert.match(picker, /source: "learn_listen_activities"/);
+assert.match(picker, /module\.startForVerse\(VERSE_ID, activityId, context\)/);
+assert.match(picker, /module\?\.isActivityEligibleForVerse/);
+assert.match(picker, /transitionToAppScreen\(Screen\.READ_MY_VERSE\)/);
+assert.doesNotMatch(picker, /beginTask|saveDailyTodoReadRuntime|setPendingCompletion/);
+
+// Native sound remains claimed in the real card-tap Start; R16b.3 passes
+// an activity-scoped flag so only Verse Crawl may activate its bounded
+// music+verse session. Learn/Listen free-play keeps the same daily isolation.
+const startOwner = moduleSource.slice(
+  moduleSource.indexOf("  function startForVerse("),
+  moduleSource.indexOf("  function chooseKeySoundIndex("));
+assert.match(startOwner, /Claim audio priority only on this actual Start interaction/);
+assert.match(startOwner, /BibloZooNativeReadOutputController\.activateFromGesture\(\{\s*crawlSession:\s*safeActivityId === VERSE_CRAWL_ACTIVITY_ID\s*\}\)/);
+assert.match(startOwner, /if \(safeActivityId === VERSE_CRAWL_ACTIVITY_ID\) \{\s*startCrawlMusic\("activity-launch"\)/);
+
+// No fake Daily plan tokens, DEV shortcuts, or recording permissions in free play.
+const freeHooks = app.slice(app.indexOf("function isLearnListenReadContext("),
+  app.indexOf("function loadDailyTodoQuestionsRuntime("));
+assert.match(freeHooks, /completeDailyTodoRead\(\{ context, verseId, readActivityId \}\)/);
+assert.match(freeHooks, /exitDailyTodoRead\(context\)/);
+assert.match(freeHooks, /transitionToAppScreen\(Screen\.LISTEN_ACTIVITIES\)/);
+assert.doesNotMatch(freeHooks, /setPendingCompletion|beginTask|recordFlashcardAttempt|saveProgress/);
+assert.match(app, /onContextComplete:\s*completeReadMyVerseContext/);
+assert.match(app, /onContextExit:\s*exitReadMyVerseContext/);
+
+Read.initialize({getActiveProfileId: () => "profile-test-only"});
+for (const [activityId] of cards) {
+  const free = {
+    source: "learn_listen_activities",
+    profileId: "profile-test-only",
+    verseId: "john_3_16",
+    readActivityId: activityId,
+    readTestMode: "normal"
+  };
+  const result = Read.validateContext(free, "john_3_16", activityId);
+  assert.equal(result?.source, "learn_listen_activities");
+  assert.equal(result?.readActivityId, activityId);
+  assert.equal(result?.taskId, "");
+  assert.equal(result?.launchToken, "");
+  assert.equal(Read.validateContext({...free, profileId: "other-profile"},
+    "john_3_16", activityId), null, "profile mismatch must not launch");
+  assert.equal(Read.validateContext({...free, planId: "fake-plan"},
+    "john_3_16", activityId), null, "cannot spoof a Daily plan");
+  assert.equal(Read.validateContext({...free, taskId: "review"},
+    "john_3_16", activityId), null, "cannot spoof a Daily task");
+  assert.equal(Read.validateContext({...free, previewScope: "read_test"},
+    "john_3_16", activityId), null, "normal free play cannot enter DEV mode");
+  assert.equal(Read.validateContext(free, "other-verse", activityId), null);
+}
+assert.equal(Read.validateContext({
+  source: "learn_listen_activities",
+  profileId: "profile-test-only",
+  verseId: "john_3_16",
+  readActivityId: "not-real",
+  readTestMode: "normal"
+}, "john_3_16", "not-real"), null);
+// Original incomplete Daily context must still be rejected.
+assert.equal(Read.validateContext({
+  source: "daily_todo", profileId: "profile-test-only",
+  verseId: "john_3_16", readActivityId: "typewriter"
+}, "john_3_16", "typewriter"), null);
+// Execute the real callback dispatch in isolation, not just source matching.
+const routedScreens = [];
+let dailyCompletions = 0;
+let dailyExits = 0;
+const hookHarness = new Function(
+  "getProfileApi", "window", "VERSE_ID", "Screen",
+  "transitionToAppScreen", "completeDailyTodoRead", "exitDailyTodoRead",
+  freeHooks + "\nreturn {completeReadMyVerseContext, exitReadMyVerseContext};"
+)(
+  () => ({ getActiveProfileId: () => "profile-test-only" }),
+  { BibloZooReadMyVerse: Read },
+  "john_3_16",
+  { LISTEN_ACTIVITIES: "listen_activities" },
+  (screen) => { routedScreens.push(screen); return true; },
+  () => { dailyCompletions++; return true; },
+  () => { dailyExits++; return true; }
+);
+const childContext = {
+  source: "learn_listen_activities", profileId: "profile-test-only",
+  verseId: "john_3_16", readActivityId: "typewriter",
+  readTestMode: "normal"
+};
+assert.equal(hookHarness.completeReadMyVerseContext({
+  context: childContext, verseId: "john_3_16", readActivityId: "typewriter"
+}), true);
+assert.equal(hookHarness.exitReadMyVerseContext(childContext), true);
+assert.deepEqual(routedScreens, ["listen_activities", "listen_activities"]);
+assert.equal(dailyCompletions, 0);
+assert.equal(dailyExits, 0);
+assert.equal(hookHarness.completeReadMyVerseContext({
+  context: {...childContext, taskId: "review"},
+  verseId: "john_3_16", readActivityId: "typewriter"
+}), false);
+assert.equal(dailyCompletions, 0);
+assert.equal(hookHarness.completeReadMyVerseContext({
+  context: {source: "daily_todo"}, verseId: "john_3_16",
+  readActivityId: "typewriter"
+}), true);
+assert.equal(hookHarness.exitReadMyVerseContext({source: "daily_todo"}), true);
+assert.equal(dailyCompletions, 1);
+assert.equal(dailyExits, 1);
+const noChunks = {verseText: "Hello.", echoParts: ["Hello."]};
+assert.equal(Read.isActivityEligibleForVerse("chunk_sequence", noChunks), false);
+console.log("PASS: Review hub, 10 real icons, ordered 8 Read activities, secure child free play, original Daily isolation and native gesture source.");

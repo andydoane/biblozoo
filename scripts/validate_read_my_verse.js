@@ -109,14 +109,19 @@ function testTypewriterIntroCutscene() {
   assert.ok(rule('.read-typewriter-intro.is-fading').includes('opacity: 0'));
   assert.ok(css.includes('transition: opacity 300ms ease-out'));
   const introStyle = rule('.read-typewriter-intro');
-  assert.ok(introStyle.includes('font-size: var(--typewriter-intro-font-size, 40px)'),
-    "Intro must match the fitted verse size, not use a smaller clamp");
+  assert.ok(introStyle.includes('font-size: var(--typewriter-intro-font-size, clamp('),
+    "Intro has a responsive fallback independent of verse length");
   assert.ok(introStyle.includes('text-align: center'),
-    "Wrapped intro lines should be centered");
+    "Two fixed intro lines remain centered");
   assert.ok(js.includes('`${cache.fontSize}px`'),
-    "Cached verse fit must retain its font size");
-  assert.strictEqual((js.match(/setProperty\("--typewriter-intro-font-size"/g) || []).length, 2,
-    "Both cached and freshly computed verse fits must size the intro");
+    "Cached verse fit must retain its own font size");
+  assert.ok(js.includes('function fitReadTypingIntro(wrap)'),
+    "R12b supplies a dedicated screen-width intro fitter");
+  assert.ok(!js.includes("intro shares the fitted verse size") &&
+    !js.includes("introduction matched to the real verse"),
+    "Verse fit must not drive intro font");
+  assert.ok(js.includes("fitReadTypingIntro(active);"),
+    "Resize must remeasure the independent intro");
   assert.ok(css.includes('.read-typewriter-screen.is-reduced-motion .read-typewriter-intro'));
   assert.ok(js.includes('if (isTypingActivity(safeActivityId))'),
     "Both typing activities should run the opening cutscene");
@@ -128,8 +133,16 @@ function testTypewriterIntroCutscene() {
     "Reserve the complete intro while individual letters are typed");
   assert.ok(js.includes('class="read-typewriter-intro-tail"'),
     "The words 'the verse.' must stay together on the second line");
-  assert.ok(rule('.read-typewriter-intro-tail').includes('white-space: nowrap'),
-    "Do not wrap 'the' and 'verse.' onto separate lines");
+  const fixedLines = css.indexOf('.read-typewriter-intro-head,');
+  assert.ok(fixedLines >= 0,
+    "The head/tail must share a single two-line CSS layout");
+  const fixedRule = css.slice(fixedLines, css.indexOf('}', fixedLines));
+  assert.ok(fixedRule.includes('.read-typewriter-intro-tail {'),
+    "The first and second intro lines must share the no-wrap rule");
+  assert.ok(fixedRule.includes('display: block') &&
+    fixedRule.includes('width: max-content') &&
+    fixedRule.includes('white-space: pre'),
+    "Both full intro lines are independent, nonbreaking, and measurable");
   assert.ok(rule('.read-keyboard-intro').includes('color: #65ff72'),
     "Keyboard must retain its green terminal styling");
   assert.ok(css.includes('grid-template-rows: auto minmax(0, 1fr)'),
@@ -413,7 +426,7 @@ function testChunkAudioMatchingRules() {
 
   assert.strictEqual(
     manifest.title,
-    "Chunk Audio Matching"
+    "Sound Sequence"
   );
   assert.strictEqual(manifest.enabled, true);
   assert.strictEqual(

@@ -1,8 +1,8 @@
 # BibloZoo
 
-> **Working on BibloZoo?** Start with the [Living Project Handoff](docs/PROJECT-HANDOFF.md). For audio and iOS interruption safeguards, read [Audio Recovery](docs/AUDIO-RECOVERY.md); for validation and physical iPhone testing, see [Testing & PR Workflow](docs/TESTING.md).
+> **Working on BibloZoo?** Start with the branch-local **canonical [Living Project Handoff](docs/PROJECT-HANDOFF.md)**, then consult [Audio Recovery](docs/AUDIO-RECOVERY.md), [Testing & PR Workflow](docs/TESTING.md), and the [R17 integration-to-`ios-prep` acceptance ledger](docs/R17-IOS-PREP-PROMOTION-READINESS.md) while promotion is pending. The `ios-prep` branch **already has** its own copy of this handoff (original PR #2); the R17 promotion will refresh it to the verified integration version.
 >
-> **Development workflow:** Create feature branches from `ios-prep` and submit pull requests **targeting `ios-prep`**. The owner reviews/merges, pulls in GitHub Desktop, and runs the Capacitor/iPhone build. **Every PR must review and update the living handoff in the same PR.** See the [PR template](.github/pull_request_template.md). Do not submit normal feature PRs to `main`.
+> **Development workflow:** Until R17 promotion, remaining stabilization/docs PRs branch from and target `integration/native-audio-to-ios-prep`; the **separate** promotion PR will have base `ios-prep` and compare `integration/native-audio-to-ios-prep`. **After owner-reviewed promotion**, ordinary work branches from and targets stable `ios-prep` (not `main`). On **every** subsequent code, docs-only, build, or CI PR, update **`docs/PROJECT-HANDOFF.md` in that PR**, based on the actual target branch and current GitHub/owner evidence—never let a stale note override live commits. The owner reviews/merges and then pulls in GitHub Desktop. See the [PR template](.github/pull_request_template.md). No automatic promotion, installed-app update, or `main` merge.
 
 
 BibloZoo is a Bible verse memorization app built around guided learning, practice games, family profiles, and collectible BibloPets. It runs as a web/PWA experience and, on the `ios-prep` branch, as a packaged native iOS app using Capacitor.

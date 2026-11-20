@@ -87,6 +87,35 @@
   let rewardPopupTimeoutId = 0;
   let dailyQuestionReturn = null;
   let cancelQuestionPageTransition = null;
+  // R05: the published native verse preview may finish or be invalidated
+  // after a later Listen tap. Only the matching Daily attempt may redraw it.
+  let dailyVerseListenRequest = 0;
+  let nativeDailyLifecycleBound = false;
+  function stopDailyVerseListen() {
+    ++dailyVerseListenRequest;
+    appApi?.stopDailyAudio?.();
+    if (dailySession) dailySession.verseAudioPlaying = false;
+  }
+  function bindNativeDailyQuestionsLifecycle() {
+    if (nativeDailyLifecycleBound || !dailyQuestionReturn ||
+        window.BibloZooNativeOnlyOutput?.enabled !== true ||
+        window.Capacitor?.getPlatform?.() !== "ios") return;
+    const bridge = window.Capacitor?.Plugins?.BibloZooNativeSound;
+    if (typeof bridge?.addListener !== "function") return;
+    nativeDailyLifecycleBound = true;
+    try {
+      Promise.resolve(bridge.addListener("biblozooAppLifecycle", event => {
+        // UIKit becomes inactive inside a held App Switcher without WebKit
+        // visibilitychange. Feed that to the EXISTING Daily controller,
+        // never directly to playVerseDetailListen (which needs a real tap).
+        if (!dailyQuestionsCanPrompt()) return;
+        if (event?.active === false)
+          dailyQuestionReturn?.pauseFromNativeInactive?.();
+        else if (event?.active === true)
+          dailyQuestionReturn?.showAfterNativeActive?.();
+      })).catch(() => { nativeDailyLifecycleBound = false; });
+    } catch (_) { nativeDailyLifecycleBound = false; }
+  }
 
   // The Daily Questions overlay is an activity gate, never a session mutation.
   // The Feeding reward game has its own independent interruption controller.
@@ -105,11 +134,14 @@
     cancelQuestionPageTransition?.();
     clearDailyQuestionRewardPopupTimer();
     if (dailySession) dailySession.showStarRewardPopup = false;
-    // Verse Help uses app-owned HTML media. Never resume its narration
-    // automatically; the child's original Listen button remains available.
+    // Check the Verse uses the shared published-verse native/HTML preview.
+    // Cancel the exact pending attempt, do not grant question completion,
+    // and redraw the currently visible (possibly not hidden!) iOS card so
+    // stale disabled "Listening..." becomes explicit Listen to the Verse.
     if (dailySession?.phase === SESSION_PHASES.VERSE) {
-      appApi?.stopDailyAudio?.();
-      dailySession.verseAudioPlaying = false;
+      const wasListening = dailySession.verseAudioPlaying === true;
+      stopDailyVerseListen();
+      if (wasListening && !document.hidden) appApi?.renderApp?.();
     }
   }
 
@@ -133,6 +165,7 @@
       escapeText: "Back to Title",
       suppressUiSound: true
     });
+    bindNativeDailyQuestionsLifecycle();
   }
 
   const LATER_STORAGE_PREFIX =
@@ -148,6 +181,9 @@
   }
 
   function prepareDailyQuestionAnswerSounds() {
+    // N7h: the isolated iOS experiment must NEVER instantiate HTMLAudio
+    // for these effects. The native worker owns the original fixed MP3s.
+    if (window.BibloZooNativeOnlyOutput?.enabled === true) return;
     if (typeof Audio === "undefined") {
       return;
     }
@@ -174,6 +210,7 @@
   }
 
   function stopDailyQuestionAnswerSounds() {
+    window.BibloZooNativeDailyQuestionAudio?.stop?.();
     for (const audio of [correctAnswerAudio, incorrectAnswerAudio]) {
       if (!audio) continue;
       try { audio.pause(); } catch (err) { }
@@ -183,6 +220,21 @@
 
   function playDailyQuestionAnswerSound(isCorrect) {
     if (isDailyQuestionAudioMuted()) return;
+
+    // Only the native bridge may produce answer sound in Audio Test iOS.
+    // No HTML/WebAudio fallback when the bridge is absent or refuses audio.
+    if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+      const session = dailySession;
+      window.BibloZooNativeDailyQuestionAudio?.tapAnswer?.({
+        correct: isCorrect,
+        isCurrent: () => dailySession === session &&
+          session?.phase === SESSION_PHASES.QUESTION &&
+          session.answered === true &&
+          session.answerCorrect === isCorrect &&
+          !isDailyQuestionAudioMuted() && !dailyQuestionsReturnPaused()
+      });
+      return;
+    }
 
     prepareDailyQuestionAnswerSounds();
     const audio = isCorrect ? correctAnswerAudio : incorrectAnswerAudio;
@@ -224,12 +276,28 @@
       session.answered ||
       session.questionAudioPlaying ||
       isDailyQuestionAudioMuted() ||
-      typeof Audio === "undefined"
+      (typeof Audio === "undefined" &&
+       window.BibloZooNativeOnlyOutput?.enabled !== true)
     ) return;
 
+    // The generated Sounds Like? prompt is also a fixed, published verse
+    // chunk. Use the already allowlisted N7f AVAudioPlayer facade on iOS;
+    // only Web/PWA/Android may instantiate the original HTML Audio.
+    const nativeOnly = window.BibloZooNativeOnlyOutput?.enabled === true;
+    const readOutput = window.BibloZooNativeReadOutputController;
+    if (nativeOnly && (!readOutput?.enabled || !readOutput.clipIdFor(source)))
+      return;
     stopGeneratedQuestionAudio();
     let audio;
-    try { audio = new Audio(source); } catch (err) { return; }
+    try {
+      if (nativeOnly) {
+        // This must happen synchronously in the child's Play Sound tap.
+        void readOutput.activateFromGesture();
+        audio = new readOutput.NativeAudio(source);
+      } else {
+        audio = new Audio(source);
+      }
+    } catch (err) { return; }
 
     generatedQuestionAudio = audio;
     session.questionAudioPlaying = true;
@@ -1538,12 +1606,7 @@
     window.BibloZooDailyFeedGame
       ?.stop?.();
 
-    appApi?.stopDailyAudio?.();
-
-    if (dailySession) {
-      dailySession.verseAudioPlaying =
-        false;
-    }
+    stopDailyVerseListen();
   }
 
   async function requestRewardTiltPermission() {
@@ -3155,10 +3218,7 @@
           return;
         }
 
-        appApi?.stopDailyAudio?.();
-
-        dailySession.verseAudioPlaying =
-          false;
+        stopDailyVerseListen();
 
         dailySession.phase =
           SESSION_PHASES.QUESTION;
@@ -3209,7 +3269,8 @@
           event.stopPropagation();
 
           if (
-            !dailySession ||
+            !dailySession || document.hidden ||
+            dailyQuestionsReturnPaused() ||
             dailySession.phase !==
               SESSION_PHASES.VERSE ||
             dailySession.verseAudioPlaying
@@ -3230,33 +3291,38 @@
             return;
           }
 
-          const verseId =
-            dailySession.verseId;
-
-          dailySession.verseAudioPlaying =
-            true;
-
+          const session = dailySession;
+          const verseId = session.verseId;
+          const request = ++dailyVerseListenRequest;
+          session.verseAudioPlaying = true;
           appApi?.renderApp?.();
 
           try {
-            await playVerseAudio(
-              verseId
-            );
-          } finally {
-            if (
-              dailySession &&
-              dailySession.verseId ===
-                verseId
-            ) {
-              dailySession.verseAudioPlaying =
-                false;
-
-              if (
-                dailySession.phase ===
-                  SESSION_PHASES.VERSE
-              ) {
-                appApi?.renderApp?.();
+            await playVerseAudio(verseId, {
+              // A real native narration interruption may occur while the
+              // iPhone stays foreground (AirPods/Apple Music). Route that
+              // event through the one shared Daily Welcome Back controller.
+              // It is NOT a damaged verse asset and never auto-replays.
+              onInterrupted: () => {
+                if (dailySession !== session ||
+                    request !== dailyVerseListenRequest ||
+                    session.phase !== SESSION_PHASES.VERSE) return;
+                dailyQuestionReturn?.pauseFromNativeInactive?.();
+                dailyQuestionReturn?.showAfterNativeActive?.();
               }
+            });
+          } catch (_) {
+            // A real missing asset/bridge failure remains a visible,
+            // user-retryable Listen control, not a counterfeit completion.
+          } finally {
+            // An older cancelled promise must NEVER clear the "Listening..."
+            // state of a new, child-initiated attempt on the same verse.
+            if (dailySession === session &&
+                request === dailyVerseListenRequest) {
+              ++dailyVerseListenRequest;
+              session.verseAudioPlaying = false;
+              if (session.phase === SESSION_PHASES.VERSE &&
+                  !document.hidden) appApi?.renderApp?.();
             }
           }
         };

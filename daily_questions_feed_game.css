@@ -258,6 +258,22 @@
     0 5px 0 rgba(0, 0, 0, 0.16);
 }
 
+/* Melody's existing edible music-note image replaces the textual score
+   label; its numerical score remains the original notes-caught percent. */
+.daily-feed-result-score:has(.daily-feed-result-note-image) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+.daily-feed-result-note-image {
+  display: block;
+  width: clamp(25px, 6vw, 34px);
+  height: clamp(25px, 6vw, 34px);
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
 .daily-feed-result-catches {
   font-size: clamp(17px, 4.3vw, 23px);
   font-weight: 800;
@@ -266,17 +282,6 @@
 }
 
 .daily-feed-result-catches[hidden] { display: none; }
-
-.daily-feed-result-complete {
-  color: var(--purple);
-
-  font-size:
-    clamp(24px, 6vw, 34px);
-  font-weight: 900;
-  line-height: 1.05;
-
-  text-wrap: balance;
-}
 
 .daily-feed-game.is-daily-todo-snack
 .daily-feed-result-card {
@@ -292,7 +297,8 @@
 
   padding: 10px 22px;
 
-  background: var(--purple);
+  /* Match the Zookeeper Stats green and white lettering exactly. */
+  background: #24783c;
   color: #ffffff;
 
   font: inherit;
@@ -305,6 +311,16 @@
     0 6px 0 rgba(0, 0, 0, 0.22);
 
   cursor: pointer;
+}
+
+.daily-feed-result-check {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.12em;
+  vertical-align: -0.12em;
+  color: #fff;
+  flex: none;
 }
 
 .daily-feed-result-back:active {
@@ -730,6 +746,20 @@
 .daily-feed-control-message[hidden],
 .daily-feed-selected-control-icon[hidden] { display: none !important; }
 .daily-feed-start-card { max-height: calc(100% - 12px); overflow-y: auto; }
+/* Bounce lost-ball relaunch: size the card to its title, avatar and Launch
+   button, not the full control-selection width. Keep safe viewport limits. */
+.daily-feed-start-overlay.is-bounce-serve .daily-feed-start-card {
+  box-sizing: border-box;
+  width: fit-content;
+  max-width: min(88vw, 440px);
+  gap: clamp(10px, 2vh, 16px);
+  padding: clamp(16px, 4vw, 26px) clamp(18px, 5vw, 30px);
+}
+.daily-feed-start-overlay.is-bounce-serve .daily-feed-start-confirm {
+  width: auto;
+  gap: clamp(8px, 1.5vh, 14px);
+}
+.daily-feed-start-instruction[hidden] { display: none !important; }
 .daily-feed-start-choice,
 .daily-feed-start-confirm {
   width: 100%;
@@ -836,8 +866,114 @@
   max-height: clamp(94px, 19vh, 140px);
   object-fit: contain;
 }
+/* Bounce only: display the active Zookeeper's profile picture between balls.
+   The chooser/second-step Tilt and Drag artwork remains unchanged. */
+.daily-feed-next-serve-avatar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.daily-feed-next-serve-avatar[hidden] {
+  display: none !important;
+}
+.daily-feed-next-serve-avatar .daily-feed-next-serve-profile {
+  width: min(100%, 130px);
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  box-shadow: none;
+}
+.daily-feed-next-serve-avatar .profile-picture-img {
+  object-fit: contain;
+}
+.daily-feed-next-serve-avatar .profile-picture-fallback,
+.daily-feed-next-serve-fallback {
+  font-size: clamp(44px, 12vw, 74px);
+  line-height: 1;
+}
 @media (orientation: landscape) and (max-height: 600px) {
   .daily-feed-control-option img { max-height: 68px; }
   .daily-feed-selected-control-tile { min-height: 84px; padding: 7px; }
   .daily-feed-selected-control-icon { max-height: 76px; }
+}
+
+
+/* EXPERIMENT C.2: tester-only, default-OFF native star/chomp preview.
+   Visible only in Classic Feeding preview on the separate .audiotest app. */
+.daily-feed-native-pilot-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 12px;
+  background: #fff7db;
+  font: 700 clamp(13px, 3vw, 16px)/1.25 "Baloo 2", system-ui, sans-serif;
+  color: #333;
+  pointer-events: auto;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.daily-feed-native-pilot-opt input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  accent-color: #1c6572;
+}
+.daily-feed-native-pilot-status {
+  min-height: 16px;
+  margin: 0;
+  color: #333;
+  font: 700 12px/1.2 "Baloo 2", system-ui, sans-serif;
+}
+.daily-feed-native-pilot-badge {
+  position: absolute;
+  /* The separate DEV Native Audio test panel occupies the top-right. */
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  right: 12px;
+  z-index: 15;
+  max-width: 44vw;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: rgba(18, 58, 68, .9);
+  color: #fff;
+  font: 700 11px/1.3 system-ui, sans-serif;
+  text-align: right;
+  pointer-events: none;
+}
+.daily-feed-control-got-it:disabled {
+  opacity: .55;
+  cursor: wait;
+}
+
+/* C.2c temporary iOS Classic tester startup sequence. Read-only in-memory
+   counters; deliberately not a sound-health indicator or release UI. */
+.daily-feed-native-pilot-phases {
+  position: absolute;
+  bottom: calc(57px + env(safe-area-inset-bottom));
+  right: 12px;
+  z-index: 15;
+  width: min(310px, 80vw);
+  max-height: min(38vh, 210px);
+  overflow: hidden;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(18, 58, 68, .90);
+  color: #fff;
+  font: 600 10px/1.3 ui-monospace, Menlo, Consolas, monospace;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* N5a: pilot trace/badges never leak into normal native-only Feeding UI.
+   A real preflight failure may reveal the short retry status explicitly.
+   Honor [hidden] even on a flex-based DEV label if it is ever rendered. */
+.daily-feed-native-pilot-opt[hidden],
+.daily-feed-native-pilot-badge[hidden],
+.daily-feed-native-pilot-phases[hidden],
+.daily-feed-native-pilot-status[hidden] {
+  display: none !important;
 }

@@ -69,7 +69,7 @@ function fakeTimers() {
 
 function createEnvironment({ enabled = false, sharedStorage = store(),
   pathname = "/biblozoo/index.html", native = false,
-  isPwa = false, ready = "loading" } = {}) {
+  nativeDevAllowed = true, isPwa = false, ready = "loading" } = {}) {
   if (enabled) sharedStorage.setItem("biblozooAudioDiagnostics", "1");
   const timers = fakeTimers();
   const doc = emitter();
@@ -152,6 +152,8 @@ function createEnvironment({ enabled = false, sharedStorage = store(),
     location: { pathname, href: docUrl, protocol: native ? "capacitor:" : "https:" },
     navigator: { standalone: isPwa },
     Capacitor: native ? { isNativePlatform: () => true } : undefined,
+    BibloZooNativeOnlyOutput: native ?
+      { enabled: true, devToolsAllowed: nativeDevAllowed } : undefined,
     matchMedia: () => ({ matches: isPwa }),
     console: { debug: (...args) => messages.push(args) },
     setTimeout: timers.setTimeout,
@@ -188,6 +190,22 @@ async function main() {
     eq(e.Source.prototype.start, e.originals.sourceStart, "No source scheduling wrapper when disabled");
     eq(e.doc.callbacks.size, 0, "No developer lifecycle listeners when disabled");
     eq(e.elements.size, 0, "No developer buttons when disabled");
+  }
+  // A stale opt-in or ?audioDiag=on must never expose the developer
+  // overlay or instrument playback in production-identity native iOS.
+  {
+    const e = createEnvironment({ native: true, nativeDevAllowed: false,
+      enabled: true, ready: "complete" });
+    ok(!e.win.BibloZooAudioDiagnostics,
+      "production iOS ignores persisted enabled diagnostics");
+    eq(e.Context.prototype.resume, e.originals.resume,
+      "production iOS audio contexts are not wrapped");
+    eq(e.Media.prototype.play, e.originals.mediaPlay,
+      "production native playback is not instrumented");
+    eq(e.win.fetch, e.originals.fetch,
+      "production iOS fetch remains unwrapped");
+    eq(e.elements.size, 0, "production iOS creates no audio log panel");
+    eq(e.doc.callbacks.size, 0, "production iOS installs no diagnostic listeners");
   }
   for (const env of [
     { label: "ordinary-browser", options: {} },

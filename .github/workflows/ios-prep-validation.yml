@@ -1,15 +1,20 @@
-# Run automated checks for BibloZoo's active iOS integration branch.
-# This checks JavaScript and web assets on Linux. It does NOT build the
-# native Xcode app, publish GitHub Pages, or replace physical iPhone testing.
-name: ios-prep validation
+# Run checks for stable iOS, isolated Audio Test and production integration branches.
+# This checks JavaScript, web assets, and Swift source syntax on Linux for
+# the native-audio experiment. It does NOT build/link the iOS Xcode app,
+# type-check against iOS SDKs, or replace physical iPhone testing.
+name: BibloZoo branch validation
 
 on:
   pull_request:
     branches:
       - ios-prep
+      - experiment/native-ios-audio
+      - integration/native-audio-to-ios-prep
   push:
     branches:
       - ios-prep
+      - experiment/native-ios-audio
+      - integration/native-audio-to-ios-prep
 
 permissions:
   contents: read
@@ -39,6 +44,510 @@ jobs:
       - name: Verify tracked LF line endings
         run: node scripts/validate_tracked_lf_endings.js
 
+      - name: Verify production iOS developer controls are hidden
+        run: node scripts/validate_native_production_dev_hardening.js
+
+      - name: Validate iOS first-party privacy manifest and protected-resource purposes
+        run: node scripts/validate_native_ios_privacy_manifest.js
+
+      - name: Verify production iOS excludes legacy diagnostics at JS and Swift boundary
+        run: node scripts/validate_native_production_diagnostics.js
+
+      - name: Verify native audio resource mappings and Capacitor package pins
+        run: node scripts/validate_native_ios_resource_packaging.js
+
+      - name: Test read-only Xcode archive inspector without a Mac or iPhone
+        run: node scripts/validate_ios_archive_inspector.js
+
+      - name: Test read-only archived SDK privacy manifest summaries
+        run: node scripts/validate_ios_archive_privacy_manifest_summary.js
+
+      - name: Test offline family backup structure validator without using real profiles
+        run: node scripts/validate_family_backup_file_test.js
+
+      - name: Validate child Review hub, Listen Activities and Daily reward isolation
+        run: node scripts/validate_learn_listen_activities.js
+
+      # GitHub's Ubuntu runner has Swift; frontend -parse checks the FULL
+      # plugin for grammar errors without needing UIKit/Capacitor modules.
+      # Unlike regex assertions, this catches Swift's newline/infix failures
+      # from N6q.1. It is NOT an iOS SDK type-check or Xcode build.
+      - name: Parse experimental native sound plugin with Swift compiler
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: |
+          command -v swiftc
+          swiftc -frontend -parse ios/App/App/BibloZooNativeSoundPlugin.swift
+          # N7b adds a DEV-only mic plugin in the existing Xcode SceneDelegate
+          # source, so parse the actual modified Swift file too.
+          swiftc -frontend -parse ios/App/App/SceneDelegate.swift
+
+      # Welcome Back presentation only: measure full-size name against button
+      # width and swap playful busy copy into fixed slot without layout jumps.
+      # Recreation only: real Let's go! recovery must run FIRST and succeed,
+      # while both Zoo To-Do buttons share the same one-per-day chance.
+      - name: Validate random Zoo surprises and preserved audio recovery
+        run: node scripts/validate_random_zoo_surprises.js
+
+      - name: Validate shared Welcome Back name sizing and stable recovery progress
+        run: node scripts/validate_welcome_back_fit_progress_ui.js
+
+      # Native Audio Test only: no WKWebView Take Photo path, no camera
+      # permission, separate PhotosUI/Files pickers and WebKit draw-pad hold.
+      - name: Validate Ghost Writer camera-free picker and guide long press
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_ghost_writer_camera_free_picker.js
+
+      # Imported Ghost Writer photos stay in bounded JS RAM, never profile
+      # storage. Exercise actual loader, replacement, aspect-cover and cleanup.
+      - name: Validate Ghost Writer session photo backgrounds
+        run: node scripts/validate_ghost_writer_custom_background.js
+
+      # Native Photos saving uses a purple Welcome Back-style modal.
+      # Exercise its real focus lock, progress, cancel, retry, and cleanup.
+      - name: Validate Ghost Writer purple export popup and accessibility
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_ghost_writer_export_modal.js
+
+      # Native Audio Test only: Ghost Writer PNG Save Picture share sheet,
+      # 1080x1920 30fps H.264 MP4 silent export and cancel/cleanup.
+      - name: Validate native Ghost Writer picture share and silent social MP4
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_ghost_writer_export.js
+
+      # Ghost Writer finished-playback Remix button swaps its OS emoji for
+      # the existing 1em PNG; verify path, sizing, and click semantics.
+      - name: Validate Ghost Writer Remix button PNG and sizing
+        run: node scripts/validate_ghost_writer_remix_icon.js
+
+      # Real Daily Zoo To-Do Classic Feeding must use the same native Got It!
+      # preparation as its DEV preview and other three native Feeding modes.
+      - name: Validate native Classic Feeding from Daily Zoo To-Do
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_classic_zoo_todo_audio.js
+
+      # N7m: external PiP Play/AirPods remote Play can interrupt an ACTIVE
+      # Read game while no native clip is owned; it still needs Welcome Back.
+      - name: Validate N7m Read native external-audio takeover recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_read_external_audio_n7m.js
+
+      # N7l: original BibloPet box MP3 and four Zoo To-Do onboarding voices
+      # must be native-only on Audio Test iOS, with no dead retry button.
+      - name: Validate N7l native pet unlock and onboarding narration
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_pet_unlock_onboarding_n7l.js
+
+      # N7k: early iOS lifecycle and quiet interval checkpoints for Chunks
+      # and Echo; held App Switcher during yellow speaking must Welcome Back.
+      # R06 / PLAY-01: the native clock pauses but Verse Typer CSS
+      # caterpillar/tail/blink and in-flight transitions must ALSO freeze in
+      # the still-visible held App Switcher thumbnail until real Let's go.
+      # R07: Read Balloons/Fish must re-seek their original CSS/WAAPI frames
+      # before thaw, and scene timeouts must ignore 10+ seconds of OS inactivity.
+      # R08: real Swift Read AVAudioPlayer scheduling helper is compiled
+      # against a zeroed post-interruption device clock; never test hearing
+      # or Apple SDK linkage from the Linux runner.
+      # R09 / FLASH-05: compile production Swift level estimator and
+      # real PCM copy against synthetic speech/silence/transients. No voices,
+      # output hardware, audio-session activation or Mac SDK in this test.
+      # R10 / READ-04: compile and run ACTUAL native Swift WAV synthesis
+      # at updated word/finish gains, verify bounded two/four-note mixes.
+      # This cannot demonstrate actual speaker/AirPods perceived loudness.
+      # R11 / LEARN-01: execute the actual Learn overlay sync function
+      # and shared Welcome Back with simulated busy, rotating, retry and
+      # fallback states. No new audio activation or pause owner.
+      # R12 / READ-01: execute real Typewriter/Keyboard chunk selection
+      # against curly/straight opening and closing quote boundaries.
+      # This tests exact canonical characters and original narration indices,
+      # not actual iPhone typing presentation or audio hardware.
+      # R12b: the fixed two-line Typewriter/Keyboard intro must fit its own
+      # screen box independently of verse length or the verse font cache.
+      # Execute the actual renderer/fitter with synthetic narrow/wide layouts.
+      - name: Validate R12b Typewriter Keyboard independent two-line intro
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r12b_read_typing_intro_independent_fit.js
+
+      - name: Validate R12 Read Typewriter and Keyboard quote-boundary ownership
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r12_read_typing_opening_quotes.js
+
+      - name: Validate R11 Learn Welcome Back single busy message and retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r11_learn_welcome_back_busy_status.js
+
+      - name: Validate R10 native Read cue relative level and melody peaks
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r10_read_native_cue_loudness.js
+
+      - name: Validate R09 Flashcards measured dry voice replay safety
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r09_flashcards_measured_dry_level.js
+
+      - name: Validate R08 native Read cue first-note and melody spacing
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r08_read_native_cue_timing.js
+
+      - name: Validate R07 Read Balloons and Fish active-time visual resume
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r07_read_balloons_fish_pause_clock.js
+
+      - name: Validate R06 Playground Verse Typer native inactive visual freeze
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r06_playground_verse_typer_visual_freeze.js
+
+      # R05: Native Check the Verse Listen interrupts while UIKit may stay
+      # active; reject stale Listening labels and old async completions.
+      - name: Validate R05 Daily Check the Verse native Welcome Back and Listen retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r05_daily_check_verse_native_recovery.js
+
+      # R04 owner follow-up bundled here: normal in-app Menu must pause
+      # the exact Missing Words countdown/animation, not show Welcome Back.
+      - name: Validate R04 Missing Words Learn Menu pause follow-up
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r04_learn_menu_pause_followup.js
+
+      # R04: Learn Missing Words must freeze in a held iOS App Switcher
+      # even when WebKit stays visible; return only via real Welcome Back.
+      - name: Validate R04 Learn Missing Words inactive app-switcher freeze
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r04_learn_missing_words_inactive_pause.js
+
+      - name: Validate N7k Learn Chunks and Echo silent-phase native interruptions
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_learn_quiet_interruption_n7k.js
+
+      # N7j: a temporary Learn in-app menu should resume native audio on its
+      # actual Close tap, without treating it as an OS Welcome Back event.
+      - name: Validate N7j Learn menu native Close resume versus real interruption
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_learn_menu_close_n7j.js
+
+      # N7i: actual New Verse picker full-verse speaker uses N5b.2 native
+      # AVAudioPlayer; test Stop/switch/Exit/mute and unchanged browser preview.
+      - name: Validate N7i New Verse picker native-only verse previews
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_new_verse_picker_n7i.js
+
+      # N7h: Daily Questions answer MP3 and generated Sounds Like prompt must
+      # use the native bridge in Audio Test iOS, never HTML/WebAudio fallback.
+      - name: Validate N7h Daily Questions native audio and interruption safety
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_daily_questions_audio_n7h.js
+
+      # N7a is a docs/source-contract audit, not native capture. Restrict
+      # it to the isolated native-audio experiment and keep current iOS
+      # behavior untouched until each sensitive input/DSP PR is approved.
+      - name: Validate N7g integrated Read media lifecycle, stale events and RAM-only Flashcards contracts
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7g_integrated_audio_lifecycle.js
+
+      - name: Validate N7f.2 immediate Read task-switch freeze and 6-waveform DEV tone auditions
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7f2_read_pause_waveform_lab.js
+
+      # Newly uploaded five Flashcards instruction MP3s: native real-ended
+      # playback gating, browser mirror, retry and comparison text fitting.
+      - name: Validate Flashcards instruction autoplay and comparison text fitting
+        run: node scripts/validate_flashcards_instruction_audio.js
+
+      # A retained native Flashcards take restores the original foreground
+      # audio session. Narration may start without a second tap, but never
+      # after real interruptions or incomplete category restoration.
+      - name: Validate post-recording native Flashcards instruction handoff
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_flashcards_native_instruction_handoff.js
+
+      - name: Validate N7f.1 Flashcards coral top toast and stable Next/Continue controls
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_flashcards_top_toast_n7f1.js
+
+      - name: Validate N7f Read My Verse native output and owner-selected Wacky character voices
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7f_read_my_verse_output.js
+
+      - name: Validate N7e.1 five Demon and five independent Chorus DEV variants
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7e1_demon_chorus_variant_lab.js
+
+      - name: Validate N7e all ten native Wacky Replay presets and compact DEV Lab
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7e_wacky_replay.js
+
+      # R01 regression: a real Flashcards Record barrier drains the Swift
+      # PCM bank. A subsequent real UI tap must rewarm both pop samples.
+      - name: Validate R01 Flashcards native mic handoff restores UI pops on next tap
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r01_flashcards_ui_pop_handoff.js
+
+      # R02: Apple Music/AirPods native narration interruption is recoverable
+      # Welcome Back, not a corrupt file. Test both instructions and verse.
+      - name: Validate R02 Flashcards native audio Welcome Back interruption routing
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r02_flashcards_welcome_back.js
+
+      # R03: AirPods -> speaker route changes must never claim silent native
+      # voice as played, lose the RAM take, or auto-activate before a Play tap.
+      - name: Validate R03 Flashcards AirPods-to-speaker native replay route recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r03_flashcards_route_replay.js
+
+      - name: Validate N7d.2 Flashcards foreground audio ownership and genuine AirPods interruptions
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7d2_flashcards_foreground_audio_ownership.js
+
+      - name: Validate N7d.1 Flashcards explicit Apple Music/AirPods Record and Play takeover
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7d1_flashcards_audio_takeover.js
+
+      - name: Validate N7d Flashcards real native mic levels and listened-to-take completion
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7d_flashcards_meter_replay.js
+
+      - name: Validate N7c Flashcards native 3-2-1 capture and interrupted RAM take lifecycle
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7c_flashcards_capture.js
+
+      - name: Validate N7b explicit DEV mic permission and session restore proof
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7b_mic_session_probe.js
+
+      - name: Validate N7a Flashcards recording and Wacky DSP source audit
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_n7_recording_audit_n7a.js
+
+      - name: Validate experimental iOS app identity
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_audio_test_identity.js
+
+      - name: Validate native sound smoke test source and bridge
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_sound_smoke_test.js
+
+      - name: Validate opt-in Native Feeding Classic preview (experiment only)
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_feeding_preview_c2.js
+
+      - name: Validate N2.1 native Feeding Resume and async lifecycle
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_feeding_resume_n21.js
+
+      - name: Validate N2.2 audio timing and user-copied diagnostic report
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_audio_timing_n22.js
+
+      - name: Validate N3a predecoded native Feeding effects
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_pcm_effects_n3a.js
+
+      - name: Validate N3b native peg notes, bounded voices and Resume wording
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_peg_voices_n3b.js
+
+      - name: Validate N3c cold native first-launch preflight and explicit retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_first_launch_n3c.js
+
+      - name: Validate N3d fixed native Melody note bank and DEV hearing gate
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_melody_bank_n3d.js
+
+      - name: Validate N4a native Melody gameplay, gesture preflight and explicit Resume
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_melody_gameplay_n4a.js
+
+      - name: Validate N4a.1 iOS App Switcher inactive pause and Resume safety
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_app_switcher_pause_n4a1.js
+
+      - name: Validate N4b native Labyrinth landings, catch effects and retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_labyrinth_gameplay_n4b.js
+
+      - name: Validate N4c native Bounce impacts, bonuses, catches and retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_bounce_gameplay_n4c.js
+
+      - name: Validate N5a native UI taps and quiet Feeding helper UI
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_ui_audio_n5a.js
+
+      # R13 / PLAY-02: the real native Ghost Writer mode-select preflight
+      # must not flash its "Getting spooky sounds ready" popup on a quick
+      # resolution. Long waits, actual denial/Retry, held App Switcher,
+      # real Back cancellation and original gesture-owned PCM stay intact.
+      - name: Validate R13 Ghost Writer mode selection without native loading flash
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r13_ghost_writer_mode_preparing_flash.js
+
+      - name: Validate N6r Playground Ghost Writer five native spooky clips, timing and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_playground_ghost_writer_n6r.js
+
+      - name: Validate N6q.5 Great score button, native final stop ACK and source C-major finale
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_jam_score_finale_n6q5.js
+
+      - name: Validate N6q.4 original ios-prep two-layer interstitials and timed scoped native stop
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_jam_original_transition_n6q4.js
+
+      - name: Validate N6q.3 Jam title and speed UI pops, Got It press and transition chords
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_jam_ui_phrases_n6q3.js
+
+      - name: Validate N6q.1 Jam watchdog, early beat cues, fast prewarm and Great finale
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_jam_timing_n6q1.js
+
+      - name: Validate N6q Playground Verse Jam native PCM, groove, and PiP recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_playground_verse_jam_n6q.js
+
+      - name: Validate N6p Playground Wheel 38 native PCM, published speech, spin and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_playground_wheel_n6p.js
+
+      - name: Validate N6o Playground Scripture Scrub 28 native PCM, 2-percent melody, mower and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_playground_scripture_scrub_n6o.js
+
+      - name: Validate N6n Playground Verse Typer native PCM, chunk narrator and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_playground_verse_typer_n6n.js
+
+      - name: Validate N6m Verse Scramble final 18-ID native PCM, original melodies, menu and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_scramble_n6m.js
+
+      # R16b.3 / AUDIO-01: owner observed that R16b.2 Silent ON
+      # initial music+voice were silent; now both are heard by a narrowly
+      # approved Crawl-only lease from a genuine Start/Welcome Back gesture.
+      # Music button toggles soundtrack without touching speech.
+      - name: Validate R16b.3 Crawl Silent-ON music-plus-verse session
+        run: node scripts/validate_r16b3_crawl_silent_mode_session.js
+
+      # R16b.2 button and owner PNG retained; updated regression confirms
+      # soundtrack-only toggle behavior and no change to spoken verse.
+      - name: Validate corrected Verse Crawl music toggle and native output
+        run: node scripts/validate_r16b2_crawl_music_toggle.js
+
+      # R16b.1 / READ: Typewriter's optional key/alert cannot veto the
+      # real verse narrator or fabricate an OS Welcome Back.
+      - name: Validate R16b.1 Typewriter key-alert to spoken verse handoff
+        run: node scripts/validate_r16b1_typewriter_effect_voice_handoff.js
+
+      # R16b / AUDIO-01: standalone Read verse narration short-lived
+      # .playback lease, optional-sound denial, Crawl music isolation.
+      - name: Validate R16b scoped Read narration in Silent Mode
+        run: node scripts/validate_r16b_read_essential_voice_silent_mode.js
+
+      # R16a.2 / AUDIO-01: a denied optional Menu pop must not manufacture
+      # a Chunks/Echo interruption while the actual narrator owns .playback.
+      - name: Validate R16a.2 Learn Menu optional UI audio collision
+        run: node scripts/validate_r16a2_native_menu_optional_sound_guard.js
+
+      # R16a.1 / AUDIO-01: DEBUG-only one-shot read-only session category
+      # probes on actual Home UI pops and Verse Scramble native effects.
+      - name: Validate R16a.1 scoped Silent Mode effect diagnostics
+        run: node scripts/validate_r16a1_silent_mode_effect_probe.js
+
+      # R16a / AUDIO-01: regression for child-gesture narration and RAM voice
+      # Silent Mode category leases, cleanup, route and mic safety boundaries.
+      - name: Validate R16a essential voice Silent Mode lease boundaries
+        run: node scripts/validate_r16a_essential_voice_silent_mode.js
+
+      # R14 / PRACTICE-01: run the actual Traffic Tap bonus truck intro,
+      # outro, game-speed presets, offscreen gates and pause/resume branches.
+      # Synthetic frame fixtures are not physical iPhone gameplay-feel proof.
+      - name: Validate R14 Traffic Tap bonus truck entrance and exit pacing
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_r14_traffic_tap_bonus_truck_pacing.js
+
+      - name: Validate N6l Traffic Tap 1 zoom MP3 + 13 generated native PCM cues and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_traffic_tap_n6l.js
+
+      - name: Validate N6k Verse Launch 8 MP3 + 4 native generated PCM cues and PiP
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_launch_n6k.js
+
+      - name: Validate N6j Tower of Bible 6 MP3 + 2 native synthesized cues and PiP recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_tower_bible_n6j.js
+
+      - name: Validate N6i Versey Bird native PCM, checkpoint wake and PiP recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_versey_bird_n6i.js
+
+      - name: Validate N6h.2 explicit PiP takeover on Home and seven games, OS-denial retry
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_pip_takeover_n6h2.js
+
+      - name: Validate N6h.1 YouTube PiP interruption, seven native games and Home/Feeding recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_pip_interruption_n6h1.js
+
+      - name: Validate N6h Verse Munch native PCM, actual mobile touchend menus and held App Switcher
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_munch_n6h.js
+
+      - name: Validate N6g Verse Invaders 15 unique PCM IDs, real menu/bonus and held App Switcher
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_invaders_n6g.js
+
+      - name: Validate N6f Dino Dash native PCM, actual jump/menu/halfway sun callbacks and held App Switcher
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_dino_dash_n6f.js
+
+      - name: Validate N6e Verse Splat native PCM, real buttons and held App Switcher
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_splat_n6e.js
+
+      - name: Validate N6d Food Slice native 12-ID PCM, actual buttons and held App Switcher
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_food_slice_n6d.js
+
+      - name: Validate N6c.2 Scripture Snake real title, Back, Help and mode callbacks
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_snake_title_ui_n6c2.js
+
+      - name: Validate N6c.1 native-only Snake and Bible Bugs first UI pops and mode bank lifecycle
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_standalone_ui_pops_n6c1.js
+
+      - name: Validate N6c native Bible Bugs fixed PCM samples, lifecycle and quiet gesture preflight
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_bible_bugs_n6c.js
+
+      - name: Validate N6b.1 quiet Scripture Snake native audio prep and failure-only retry UI
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_snake_quiet_preflight_n6b1.js
+
+      - name: Validate N6b native Scripture Snake fixed sample and orb bank, gesture/Welcome Back recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_snake_effects_n6b.js
+
+      - name: Validate N6a native BibloPet Detail and Flashcards verse previews
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_verse_previews_n6a.js
+
+      - name: Validate N5b.3 native Learn instructions, chunks, Echo and source recovery
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_learn_tracks_n5b3.js
+
+      - name: Validate N5b.2 published native Learn Listen reference and verse
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_learn_listen_n5b2.js
+
+      - name: Validate N5b.1 native Learn narration player DEV proof
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_learn_narration_n5b1.js
+
+      - name: Validate N1 native-only WebKit sound output isolation
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_only_ios_output.js
+
       - name: Validate daily activity and verse flows
         shell: bash
         run: |
@@ -66,10 +575,14 @@ jobs:
           node scripts/validate_patch72_1a_zoo_escape.js
           node scripts/validate_patch72_1b_feeding_zoo_escape.js
           node scripts/validate_patch72_1c_whole_app_zoo_escape.js
+          node scripts/validate_shared_zoo_audio_cue_transition.js
+          node scripts/validate_zoo_surprise_scope.js
+          node scripts/validate_learn_feeding_zoo_cue_transition.js
           node scripts/validate_patch72_1c1_whole_app_test_harness.js
           node scripts/validate_patch72_1c2_identity_artwork_exit.js
           node scripts/validate_patch72_1c3_zoo_escape_sounds.js
           node scripts/validate_patch72_1d_zookeeper_stats.js
+          node scripts/validate_remove_hero_white_feed_check.js
 
       - name: Validate Verse Launch menu and bonus pause
         shell: bash
@@ -106,6 +619,16 @@ jobs:
 
       - name: Build production web bundle for Capacitor
         run: npm run build
+
+      - name: Validate N1 guard placement in every packaged HTML entrypoint
+        if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
+        run: node scripts/validate_native_only_ios_output.js
+
+      - name: Validate packaged production iOS developer controls
+        run: node scripts/validate_native_production_dev_hardening.js
+
+      - name: Check packaged native audio resources and SDK version coherence
+        run: node scripts/validate_native_ios_resource_packaging.js
 
       - name: Confirm bundled runtime files
         shell: bash

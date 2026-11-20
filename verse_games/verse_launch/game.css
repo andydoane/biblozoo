@@ -1901,3 +1901,34 @@ body.bz-return-activity-paused #app *,
 body.bz-return-activity-paused .vl-flight-unit {
   animation-play-state: paused !important;
 }
+
+/* N6k native-only failure/Retry; never displayed during normal preload. */
+.vl-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, .65);
+}
+.vl-native-audio-card {
+  width: min(100%, 360px);
+  max-width: 360px;
+  padding: 22px;
+  text-align: center;
+  border-radius: 16px;
+  background: white;
+  color: #202020;
+  font: 600 17px/1.4 system-ui,sans-serif;
+}
+.vl-native-audio-card button {
+  min-height: 44px;
+  margin: 6px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 9px;
+  color: white;
+  background: #333;
+  font: inherit;
+}

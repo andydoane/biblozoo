@@ -1,9 +1,105 @@
 import UIKit
 import Capacitor
 import AVFAudio
+import QuartzCore
+
+// Production BibloZoo and the isolated Audio Test both use the native
+// AVFoundation path; diagnostic-only utilities still require Audio Test.
+enum BibloZooIOSIdentity {
+    static var nativeAudioEnabled: Bool {
+        guard let id = Bundle.main.bundleIdentifier else { return false }
+        return id == "com.andydoane.biblozoo" || id == "com.andydoane.biblozoo.audiotest"
+    }
+    static var experimentalToolsEnabled: Bool {
+        Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.audiotest"
+    }
+}
+
+// R16a: a single foreground-only OS audio-session lease for narration and
+// RAM-only recorded voice. AVAudioSession is process-wide; optional game sounds
+// must NEVER borrow this category. No automatic activation, Silent switch probe,
+// background audio or extra child-data collection. Calls happen on main only.
+enum BibloZooEssentialVoiceSession {
+    private static var owner: String?
+
+    // Read-only owner proof for the optional-effect fail-closed path.
+    // A denied button pop is not a genuine interruption while this exact
+    // foreground narration lease owns .playback. Never inspect Silent switch.
+    static func isActive(owner requested: String) -> Bool {
+        return Thread.isMainThread && owner == requested &&
+            AVAudioSession.sharedInstance().category == .playback
+    }
+
+    static func begin(owner requested: String) -> Bool {
+        guard Thread.isMainThread,
+              UIApplication.shared.applicationState == .active else { return false }
+        let session = AVAudioSession.sharedInstance()
+        if owner == requested { return session.category == .playback }
+        guard owner == nil, session.category == .soloAmbient else { return false }
+        do {
+            try session.setCategory(.playback, mode: .default, options: [])
+            guard session.category == .playback else { return false }
+            owner = requested
+            #if DEBUG
+            // Only session category is logged. This is not audibility proof.
+            NSLog("[BibloZooSilentProbe] phase=voice-begin " +
+                  "category=\(session.category.rawValue)")
+            #endif
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    @discardableResult
+    static func end(owner requested: String) -> Bool {
+        guard Thread.isMainThread, owner == requested else { return false }
+        owner = nil
+        let session = AVAudioSession.sharedInstance()
+        if session.category == .soloAmbient { return true }
+        guard session.category == .playback else { return false }
+        do {
+            try session.setCategory(.soloAmbient, mode: .default, options: [])
+            #if DEBUG
+            NSLog("[BibloZooSilentProbe] phase=voice-end " +
+                  "category=\(session.category.rawValue)")
+            #endif
+            return session.category == .soloAmbient
+        } catch {
+            // Leave failures explicit for existing category-not-soloambient gates.
+            return false
+        }
+    }
+}
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    // N7f.2: freeze the presented iOS view the INSTANT the scene loses
+    // foreground activity, even if WKWebView delays document.visibilitychange
+    // while the user holds the App Switcher. This is a visual pause only.
+    private var switcherPausedLayerTime: CFTimeInterval?
+
+    func sceneWillResignActive(_ scene: UIScene) {
+        guard BibloZooIOSIdentity.nativeAudioEnabled,
+              switcherPausedLayerTime == nil,
+              let layer = window?.rootViewController?.view.layer else { return }
+        let clock = layer.convertTime(CACurrentMediaTime(), from: nil)
+        switcherPausedLayerTime = clock
+        layer.speed = 0
+        layer.timeOffset = clock
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        guard let paused = switcherPausedLayerTime,
+              let layer = window?.rootViewController?.view.layer else { return }
+        layer.speed = 1
+        layer.timeOffset = 0
+        layer.beginTime = 0
+        layer.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil) - paused
+        switcherPausedLayerTime = nil
+        // Read My Verse remains frozen by its own read-audio-paused class
+        // until an explicit owner Resume Audio tap verifies actual playback.
+    }
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
@@ -29,8 +125,27 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
-        bridge?.registerPluginInstance(BibloZooAudioSessionDiagnosticsPlugin())
+        // The opt-in diagnostic event bridge is not part of child-facing
+        // production. Do not register it outside the isolated Audio Test.
+        if BibloZooIOSIdentity.experimentalToolsEnabled {
+            bridge?.registerPluginInstance(BibloZooAudioSessionDiagnosticsPlugin())
+        }
+        // Leave legacy recovery/state compatibility registered: on either
+        // native-audio bundle its mutating Web-clock path is already disabled.
         bridge?.registerPluginInstance(BibloZooAudioSessionRecoveryPlugin())
+        // Branch-only explicit-tap AVAudioPlayer pilot. Never invoked automatically.
+        bridge?.registerPluginInstance(BibloZooNativeSoundPlugin())
+        // N7b DEV-only explicit microphone permission and 4-second RAM-only
+        // input-level probe; never wired into Flashcards or auto-started.
+        bridge?.registerPluginInstance(BibloZooMicSessionProbePlugin())
+        // N7f output-only Read My Verse playback, exact .audiotest bundle.
+        bridge?.registerPluginInstance(BibloZooNativeReadOutputPlugin())
+        // Ghost Writer: user-initiated PNG share and silent H.264 MP4 export.
+        // No microphone, audio output, Photos-library read, or server upload.
+        bridge?.registerPluginInstance(BibloZooGhostWriterExportPlugin())
+        // Select an EXISTING photo or image file; no camera permission or
+        // UIImagePickerController "Take Photo" path is ever offered.
+        bridge?.registerPluginInstance(BibloZooGhostBackgroundPickerPlugin())
     }
 }
 
@@ -147,6 +262,16 @@ final class BibloZooAudioSessionRecoveryPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func reactivateAfterClockStall(_ call: CAPPluginCall) {
         DispatchQueue.main.async { [weak self] in
+            // N2: the .audiotest app is native-output ONLY. This legacy
+            // Web-clock recovery bridge must NEVER compete with the
+            // BibloZooNativeSound.activateFromGesture session owner.
+            // Retain the older path for historical source/VM compatibility;
+            // it cannot change the session in this experimental iOS bundle.
+            if BibloZooIOSIdentity.nativeAudioEnabled {
+                call.resolve(["attempted": false, "activated": false,
+                              "reason": "legacy-web-recovery-disabled"])
+                return
+            }
             guard let self = self else {
                 call.resolve(["attempted": false, "activated": false, "reason": "unavailable"])
                 return
@@ -222,5 +347,2924 @@ final class BibloZooAudioSessionRecoveryPlugin: CAPPlugin, CAPBridgedPlugin {
                 ])
             }
         }
+    }
+}
+
+
+// N7b only: separate experimental microphone INPUT/route proof. The existing
+// NativeSound plugin remains sole PLAYBACK owner; its DEV handoff drains the
+// serial output worker before this plugin temporarily changes AVAudioSession.
+// Nothing here saves voice samples, sends audio to speakers, logs content,
+// restarts the microphone on foreground, or replaces Flashcards recording.
+// Remove DEV probe before any stable integration; session policy for N7c
+// remains subject to owner approval and real-device testing.
+@objc(BibloZooMicSessionProbePlugin)
+final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "BibloZooMicSessionProbePlugin"
+    public let jsName = "BibloZooMicSessionProbe"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "requestPermission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginProbe", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endProbe", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getProbeState", returnType: CAPPluginReturnPromise),
+        // N7c Flashcards capture. Opaque RAM take, never a file or JS bytes.
+        CAPPluginMethod(name: "prepareCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "finishCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "discardCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCaptureState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playCapture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopCapturePlayback", returnType: CAPPluginReturnPromise)
+    ]
+
+    private let maximumSeconds: TimeInterval = 4.0
+    private var microphoneEngine: AVAudioEngine?
+    private var savedCategory: AVAudioSession.Category?
+    private var savedMode: AVAudioSession.Mode?
+    private var savedOptions: AVAudioSession.CategoryOptions?
+    private var requestInFlight = false
+    private var generation = 0
+    private var isProbing = false
+    private var startedAt: Date?
+    private var lastPeakPercent = 0
+    private var buffersObserved = 0
+    private var lastReason = "not-started"
+    private var restorationSucceeded = true
+    private var observers: [NSObjectProtocol] = []
+
+    // N7c: one bounded, temporary voice take; NEVER files, JS payloads,
+    // profile data, network or microphone monitoring. Samples and their
+    // opaque ID are owned ONLY by captureWorker, not the main/callback thread.
+    private let captureWorker = DispatchQueue(
+        label: "com.biblozoo.n7c.capture", qos: .userInitiated)
+    private var captureSamples: [Float] = [] // captureWorker only
+    private var savedSamples: [Float] = [] // captureWorker only
+    private var workerCaptureKey = -1 // captureWorker only
+    private var savedCaptureKey = -1 // captureWorker only
+    private var savedTakeId = "" // captureWorker only, opaque RAM take token
+    private var savedSampleRate = 0.0 // captureWorker only
+    // R09b: read-only, bounded per-take scalar metrics. No sample leaves RAM.
+    // The original saved PCM stays identical; only the DRY playback copy may
+    // use the measured safe replay gain, never Wacky effects or capture.
+    private var savedDryReplayGain: Float = 1.0 // captureWorker only
+    private var savedRmsDbFS = -120 // captureWorker only
+    private var savedPeakDbFS = -120 // captureWorker only
+    private var workerLastLevelAt: TimeInterval = 0 // captureWorker only
+    private var captureLevel: Double? // main thread, 0...1 only
+    private var playbackEngine: AVAudioEngine? // main thread
+    private var playbackNode: AVAudioPlayerNode? // main thread
+    private var playbackGeneration = 0 // main thread
+    private var playbackTakeId = ""
+    private var playbackStartedAt: Date?
+    // R03: a physical route change during the async Play-tap PCM copy
+    // invalidates that pending request. Main-thread bookkeeping only.
+    private var playbackRouteEpoch = 0
+    private var playbackOutputPorts: [String] = []
+    // N7e: effect nodes and bounded pitch automation for the CURRENT
+    // playback generation only. None of these store or export voice samples.
+    private var playbackEffects: [AVAudioNode] = []
+    // N7e.1: additional output-only voices for DEV chorus comparison.
+    private var playbackChorusPlayers: [AVAudioPlayerNode] = []
+    private var playbackPitchWorkItems: [DispatchWorkItem] = []
+    private var playbackWackyTapInstalled = false
+    private var playbackWackyStartNotified = false
+    private var captureEngine: AVAudioEngine?
+    // Separate session snapshot from the N7b DEV probe. Sharing the DEV
+    // savedCategory slot would let its interruption observer restore a
+    // Flashcards-owned microphone session prematurely.
+    private var captureSavedCategory: AVAudioSession.Category?
+    private var captureSavedMode: AVAudioSession.Mode?
+    private var captureSavedOptions: AVAudioSession.CategoryOptions?
+    private var capturePrepared = false
+    private var captureRunning = false
+    private var captureGeneration = 0 // main thread
+    private var captureLimitMs = 120000
+    private var captureSampleRate = 0.0
+    private var captureStartedAt: Date?
+    private var capturePreparedAt: Date?
+    private var captureRestoreOK = true
+    // N7d.2: Foreground-only audio priority starts ONLY on a true
+    // Flashcards Record/Play tap. Normal completion keeps Apple Music paused.
+    // External interruption or leaving the app relinquishes this claim.
+    private var ownsFlashcardsForegroundAudio = false
+
+    private func releaseFlashcardsAudioPriority() {
+        guard ownsFlashcardsForegroundAudio else { return }
+        ownsFlashcardsForegroundAudio = false
+        // Never ask iOS to auto-resume the interrupted app's music.
+        do { try AVAudioSession.sharedInstance().setActive(false) }
+        catch { /* A real OS interruption may already have deactivated us. */ }
+    }
+
+    private func onMain(_ work: @escaping () -> Void) {
+        if Thread.isMainThread { work() }
+        else { DispatchQueue.main.async(execute: work) }
+    }
+
+    private var isDevBundle: Bool {
+        BibloZooIOSIdentity.experimentalToolsEnabled
+    }
+    private var isNativeAppBundle: Bool {
+        BibloZooIOSIdentity.nativeAudioEnabled
+    }
+
+    private func permissionLabel() -> String {
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted: return "granted"
+        case .denied: return "denied"
+        case .undetermined: return "undetermined"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private func state() -> [String: Any] {
+        let session = AVAudioSession.sharedInstance()
+        return [
+            "available": isDevBundle,
+            "permission": permissionLabel(),
+            "foreground": UIApplication.shared.applicationState == .active,
+            "running": isProbing,
+            "category": session.category.rawValue,
+            "mode": session.mode.rawValue,
+            "otherAudioPlaying": session.isOtherAudioPlaying,
+            "inputPorts": session.currentRoute.inputs.map { $0.portType.rawValue },
+            "outputPorts": session.currentRoute.outputs.map { $0.portType.rawValue },
+            "peakPercent": lastPeakPercent,
+            "buffersObserved": buffersObserved,
+            "reason": lastReason,
+            "restored": restorationSucceeded
+        ]
+    }
+
+    public override func load() {
+        super.load()
+        // Only .began is an actual *new* OS interruption. The old
+        // observer cancelled live recording on .ended as well, including a
+        // just-ended Apple Music handoff. Never auto-resume on .ended.
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil,
+            queue: .main) { [weak self] notification in
+                guard let self = self,
+                      let raw = (notification.userInfo?[
+                        AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
+                      raw == AVAudioSession.InterruptionType.began.rawValue else {
+                    return
+                }
+                self.stopProbe(reason: "interrupted")
+                self.stopCaptureInternal(retain: false,
+                                         reason: "interrupted", call: nil)
+                self.stopPlaybackInternal(reason: "interrupted", notify: true)
+                self.releaseFlashcardsAudioPriority()
+            })
+        // UIKit inactive/background or real media-services loss/reset always
+        // cancels live work, even if a WebView callback never runs.
+        for name in [UIApplication.willResignActiveNotification,
+                     UIApplication.didEnterBackgroundNotification,
+                     AVAudioSession.mediaServicesWereLostNotification,
+                     AVAudioSession.mediaServicesWereResetNotification] {
+            observers.append(center.addObserver(forName: name, object: nil,
+                queue: .main) { [weak self] _ in
+                    self?.stopProbe(reason: "interrupted")
+                    self?.stopCaptureInternal(retain: false,
+                                              reason: "interrupted", call: nil)
+                    self?.stopPlaybackInternal(reason: "interrupted",
+                                                notify: true)
+                    self?.releaseFlashcardsAudioPriority()
+                })
+        }
+        observers.append(center.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: nil,
+            queue: .main) { [weak self] notification in
+                guard let self = self,
+                      let raw = (notification.userInfo?[
+                        AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue,
+                      let routeReason = AVAudioSession.RouteChangeReason(
+                        rawValue: raw) else { return }
+                // An app-owned .soloAmbient ↔ .playAndRecord category change,
+                // output override or Bluetooth A2DP/HFP reconfiguration is
+                // not the same as unplugging AirPods. Those notifications can
+                // arrive late, even after the old 0.5s safety window.
+                switch routeReason {
+                case .oldDeviceUnavailable, .newDeviceAvailable,
+                     .noSuitableRouteForCategory:
+                    self.playbackRouteEpoch += 1
+                default:
+                    return
+                }
+                if self.isProbing {
+                    if let started = self.startedAt,
+                       Date().timeIntervalSince(started) >= 0.5 {
+                        self.stopProbe(reason: "route-changed")
+                    }
+                }
+                // Genuine external route loss/connection during playback
+                // still cancels this take rather than continuing on speaker.
+                if self.playbackEngine != nil {
+                    // Detect an actual hardware output switch even during
+                    // the previous 0.5s startup grace. For same-output late
+                    // notices retain the existing setup guard.
+                    let ports = AVAudioSession.sharedInstance()
+                        .currentRoute.outputs.map { $0.portType.rawValue }.sorted()
+                    if ports != self.playbackOutputPorts ||
+                       (self.playbackStartedAt.map {
+                           Date().timeIntervalSince($0) >= 0.5
+                       } == true) {
+                        self.stopPlaybackInternal(reason: "route-changed",
+                                                  notify: true)
+                    }
+                }
+                // During the 3→2→1 countdown, AirPods may still be
+                // negotiating their microphone route. Don't interpret that
+                // as a recording interruption; beginCapture checks format.
+                // Once *recording*, an actual route change cancels safely.
+                if self.captureRunning ||
+                   (self.capturePrepared &&
+                    routeReason == .noSuitableRouteForCategory) {
+                    self.stopCaptureInternal(retain: false,
+                        reason: "route-changed", call: nil)
+                }
+            })
+        // An output sample-rate/channel change may stop AVAudioEngine even
+        // without a timely route notification. Handle on the main queue,
+        // never synchronously in the engine's internal callback.
+        observers.append(center.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: nil,
+            queue: .main) { [weak self] note in
+                guard let self = self, let engine = note.object as? AVAudioEngine,
+                      self.playbackEngine === engine else { return }
+                self.stopPlaybackInternal(reason: "route-changed", notify: true)
+            })
+    }
+
+    deinit {
+        for token in observers { NotificationCenter.default.removeObserver(token) }
+        if microphoneEngine != nil || savedCategory != nil {
+            stopProbe(reason: "disposed")
+        }
+        if capturePrepared || captureRunning {
+            stopCaptureInternal(retain: false, reason: "disposed", call: nil)
+        }
+        stopPlaybackInternal(reason: "disposed", notify: false)
+    }
+
+    // The ONLY microphone-permission prompt. Called on explicit DEV button
+    // tap; reading state or opening the app NEVER requests a permission.
+    @objc func requestPermission(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["granted":false,"reason":"not-foreground-native"])
+                return
+            }
+            guard !self.requestInFlight && !self.isProbing &&
+                  !self.capturePrepared && !self.captureRunning else {
+                call.resolve(["granted":false,"reason":"busy"])
+                return
+            }
+            self.requestInFlight = true
+            AVAudioSession.sharedInstance().requestRecordPermission {
+                [weak self] granted in
+                DispatchQueue.main.async {
+                    guard let self = self else {
+                        call.resolve(["granted":false,"reason":"unavailable"])
+                        return
+                    }
+                    self.requestInFlight = false
+                    self.lastReason = granted ? "permission-granted" :
+                                                "permission-denied"
+                    call.resolve(["granted":granted,
+                                  "reason":self.lastReason,
+                                  "permission":self.permissionLabel()])
+                }
+            }
+        }
+    }
+
+    // Native session/probe starts ONLY on the second explicit DEV tap,
+    // after permission already granted AND the output worker's stop barrier
+    // has acknowledged. Never run at app launch or from visibility return.
+    // Dev candidate: playAndRecord + measurement + speaker default. A future
+    // production session/route configuration is NOT approved by this pilot.
+    @objc func beginProbe(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["started":false,"reason":"not-foreground-dev"])
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            guard self.permissionLabel() == "granted" else {
+                call.resolve(["started":false,"reason":"permission-required"])
+                return
+            }
+            guard !self.isProbing && self.savedCategory == nil &&
+                  !self.capturePrepared && !self.captureRunning &&
+                  !self.requestInFlight else {
+                call.resolve(["started":false,"reason":"busy"])
+                return
+            }
+            guard session.category == .soloAmbient else {
+                call.resolve(["started":false,"reason":"category-not-soloambient"])
+                return
+            }
+            // In particular, DON'T take priority from YouTube PiP still
+            // playing. The owner can test paused PiP / an idle foreground.
+            guard !session.isOtherAudioPlaying else {
+                call.resolve(["started":false,"reason":"other-audio-playing"])
+                return
+            }
+            self.savedCategory = session.category
+            self.savedMode = session.mode
+            self.savedOptions = session.categoryOptions
+            self.restorationSucceeded = false
+            self.generation += 1
+            let token = self.generation
+            self.lastPeakPercent = 0
+            self.buffersObserved = 0
+            self.startedAt = Date()
+            do {
+                try session.setCategory(.playAndRecord, mode: .measurement,
+                                        options: [.defaultToSpeaker])
+                try session.setActive(true)
+
+                let engine = AVAudioEngine()
+                let input = engine.inputNode
+                let format = input.outputFormat(forBus: 0)
+                guard format.sampleRate >= 8000,
+                      format.channelCount > 0,
+                      format.commonFormat == .pcmFormatFloat32 else {
+                    self.stopProbe(reason: "unsupported-input-format")
+                    call.resolve(["started":false,
+                                  "reason":"unsupported-input-format"])
+                    return
+                }
+                // Input tap ONLY. No audio is connected to output; no
+                // recording file, Blob, persistent buffer, upload or replay.
+                input.installTap(onBus: 0, bufferSize: 1024,
+                                 format: format) { [weak self] buffer, _ in
+                    guard let channels = buffer.floatChannelData else { return }
+                    let length = Int(buffer.frameLength)
+                    if length == 0 { return }
+                    let channelCount = min(2, Int(buffer.format.channelCount))
+                    var total: Double = 0
+                    var count = 0
+                    for channel in 0..<channelCount {
+                        var frame = 0
+                        while frame < length {
+                            let sample = Double(channels[channel][frame])
+                            total += sample * sample
+                            count += 1
+                            frame += 16
+                        }
+                    }
+                    let rms = sqrt(total / Double(max(1,count)))
+                    // An unexpected nonfinite input sample must NEVER
+                    // become Int(NaN) and crash the physical DEV test app.
+                    let safeRms = rms.isFinite ? max(rms, 0.00001) : 0.00001
+                    let db = 20 * log10(safeRms)
+                    let percent = max(0, min(100, Int((db + 55) * 100 / 55)))
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self, self.generation == token,
+                              self.isProbing else { return }
+                        self.buffersObserved += 1
+                        self.lastPeakPercent = max(self.lastPeakPercent, percent)
+                    }
+                }
+                self.microphoneEngine = engine
+                try engine.start()
+                self.isProbing = true
+                self.lastReason = "sampling-level-only"
+                self.startedAt = Date()
+                DispatchQueue.main.asyncAfter(deadline: .now() +
+                    self.maximumSeconds) { [weak self] in
+                        guard let self = self, self.generation == token,
+                              self.isProbing else { return }
+                        self.stopProbe(reason: "time-limit")
+                    }
+                call.resolve(["started":true,"reason":"sampling-level-only",
+                              "maximumSeconds":Int(self.maximumSeconds),
+                              "category":session.category.rawValue])
+            } catch {
+                self.stopProbe(reason: "setup-failed")
+                call.resolve(["started":false,"reason":"setup-failed"])
+            }
+        }
+    }
+
+    // Stop and restore earlier category/mode/options without re-activating
+    // the output session. Games regain it ONLY through a later real tap.
+    // The shared output-plugin DEV handoff already invalidated its bank.
+    private func stopProbe(reason: String) {
+        guard microphoneEngine != nil || savedCategory != nil else { return }
+        generation += 1
+        isProbing = false
+        if let engine = microphoneEngine {
+            engine.inputNode.removeTap(onBus: 0)
+            engine.stop()
+        }
+        microphoneEngine = nil
+        let category = savedCategory
+        let mode = savedMode
+        let options = savedOptions
+        savedCategory = nil
+        savedMode = nil
+        savedOptions = nil
+        startedAt = nil
+        let session = AVAudioSession.sharedInstance()
+        var deactivated = true
+        do {
+            try session.setActive(false, options: [.notifyOthersOnDeactivation])
+        } catch {
+            deactivated = false
+        }
+        var categoryRestored = false
+        if let category = category, let mode = mode, let options = options {
+            do {
+                try session.setCategory(category, mode: mode, options: options)
+                categoryRestored = session.category == category &&
+                                   session.mode == mode
+            } catch {
+                categoryRestored = false
+            }
+        }
+        restorationSucceeded = deactivated && categoryRestored
+        lastReason = restorationSucceeded ? reason : "restore-failed"
+    }
+
+    @objc func endProbe(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["stopped":false,"reason":"unavailable"])
+                return
+            }
+            let wasRunning = self.microphoneEngine != nil ||
+                             self.savedCategory != nil
+            self.stopProbe(reason: "stopped-by-user")
+            call.resolve(["stopped":wasRunning,
+                          "reason":self.lastReason,
+                          "restored":self.restorationSucceeded])
+        }
+    }
+
+
+    // R09b / FLASH-05 follow-up: measure the retained mono take once on the
+    // serial capture worker. Audio content never leaves native RAM. Do not
+    // mistake a single high consonant for speech loudness; a separate bounded
+    // output-only dynamics stage controls transients on DRY replay.
+    private static func n7cDryReplayLevel(
+        _ samples: [Float]
+    ) -> (gain: Float, rmsDbFS: Int, peakDbFS: Int) {
+        guard samples.count >= 256 else { return (1, -120, -120) }
+        var sumSquares = 0.0
+        var activeSquares = 0.0
+        var activeFrames = 0
+        var peak = 0.0
+        for sample in samples {
+            guard sample.isFinite else { return (1, -120, -120) }
+            let magnitude = abs(Double(sample))
+            peak = max(peak, magnitude)
+            sumSquares += magnitude * magnitude
+            // Exclude most silence and low-level noise from the speech
+            // average; do not alter the recorded source or input tap.
+            if magnitude >= 0.012 {
+                activeSquares += magnitude * magnitude
+                activeFrames += 1
+            }
+        }
+        let rms = sqrt(sumSquares / Double(samples.count))
+        let rmsDbFS = Int(max(-120.0,
+            min(0.0, (20.0 * log10(max(0.000001, rms))).rounded())))
+        let peakDbFS = Int(max(-120.0,
+            min(0.0, (20.0 * log10(max(0.000001, peak))).rounded())))
+        guard peak >= 0.028,
+              activeFrames >= max(256, samples.count / 200) else {
+            return (1, rmsDbFS, peakDbFS)
+        }
+        let activeRms = sqrt(activeSquares / Double(activeFrames))
+        // Avoid boosting near-silence/noise or already comfortably loud
+        // recordings. Peak protection happens in n7cRenderDryVoice, not
+        // by vetoing an entire take because of one sharp consonant.
+        guard activeRms >= 0.017 && activeRms < 0.18 else {
+            return (1, rmsDbFS, peakDbFS)
+        }
+        let gain = min(3.2, max(1.0, 0.16 / activeRms))
+        return (Float(gain), rmsDbFS, peakDbFS)
+    }
+
+    // Dry Play only: smooth activity-dependent makeup gain and a gentle
+    // 2:1 peak compressor above 0.22 full-scale, with short attack /
+    // 80 ms release and a final 0.84 sample safety ceiling. Both gain
+    // envelopes are evaluated on the capture worker, not the render/input
+    // callback or main thread. The saved PCM remains byte-for-byte intact.
+    // An approximately 12 ms activity attack and 180 ms falloff leave long
+    // gaps at original noise level instead of boosting room noise endlessly.
+    private static func n7cRenderDryVoice(
+        _ source: UnsafeBufferPointer<Float>,
+        into output: UnsafeMutablePointer<Float>,
+        sampleRate: Double,
+        makeupGain: Float
+    ) {
+        let rate = max(8000.0, min(96000.0, sampleRate))
+        let attack = exp(-1.0 / (rate * 0.012))
+        let activityRelease = exp(-1.0 / (rate * 0.180))
+        let compressionRelease = exp(-1.0 / (rate * 0.080))
+        let maximumMakeup = min(3.2, max(1.0, Double(makeupGain)))
+        var activity = 0.0
+        var reduction = 1.0
+        for i in 0..<source.count {
+            let sample = Double(source[i])
+            if !sample.isFinite {
+                output[i] = 0
+                continue
+            }
+            let magnitude = abs(sample)
+            let activitySmoothing = magnitude > activity
+                ? attack : activityRelease
+            activity = activity * activitySmoothing +
+                magnitude * (1.0 - activitySmoothing)
+            let speechWeight = max(0.0, min(1.0,
+                (activity - 0.008) / 0.022))
+            let boosted = sample * (1.0 +
+                (maximumMakeup - 1.0) * speechWeight)
+            let postGainPeak = abs(boosted)
+            let wanted = postGainPeak > 0.22
+                ? sqrt(0.22 / postGainPeak) : 1.0
+            // Instant attenuation for peaks, smooth release to avoid
+            // audible per-sample gain flutter between vowel cycles.
+            reduction = wanted < reduction
+                ? wanted : reduction * compressionRelease +
+                    wanted * (1.0 - compressionRelease)
+            let corrected = boosted * reduction
+            output[i] = Float(max(-0.84, min(0.84, corrected)))
+        }
+    }
+
+    // N7c captures *only* on the child's Flashcards Record gesture.
+    // Permission was requested by that gesture through requestPermission,
+    // and the output owner's devPrepareForMicrophone barrier already
+    // acknowledged stopping AVAudioEngine nodes. No input engine yet.
+    @objc func prepareCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["prepared": false, "reason": "not-foreground-native"])
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            guard self.permissionLabel() == "granted" else {
+                call.resolve(["prepared": false, "reason": "permission-required"])
+                return
+            }
+            guard !self.isProbing && !self.capturePrepared &&
+                  !self.captureRunning && self.playbackEngine == nil &&
+                  self.captureSavedCategory == nil &&
+                  !self.requestInFlight else {
+                call.resolve(["prepared": false, "reason": "busy"])
+                return
+            }
+            // N7d.1: An explicit Record tap may interrupt Apple Music/PiP.
+            // isOtherAudioPlaying is not an OS rejection; setActive decides.
+            guard session.category == .soloAmbient else {
+                call.resolve(["prepared": false, "reason": "unsafe-session-state"])
+                return
+            }
+            self.captureSavedCategory = session.category
+            self.captureSavedMode = session.mode
+            self.captureSavedOptions = session.categoryOptions
+            self.captureRestoreOK = false
+            self.captureLevel = nil
+            self.captureGeneration += 1
+            let captureKey = self.captureGeneration
+            self.captureWorker.async {
+                self.workerCaptureKey = captureKey
+                self.captureSamples.removeAll(keepingCapacity: false)
+                self.savedSamples.removeAll(keepingCapacity: false)
+                self.savedCaptureKey = -1
+                self.savedTakeId = ""
+                self.savedSampleRate = 0
+                self.savedDryReplayGain = 1.0
+                self.savedRmsDbFS = -120
+                self.savedPeakDbFS = -120
+                self.workerLastLevelAt = 0
+            }
+            // If activation fails (e.g. phone call), the capture teardown
+            // MUST run even though a mic engine was never started.
+            self.capturePrepared = true
+            self.capturePreparedAt = Date()
+            do {
+                // N7b owner-tested candidate, used only for explicitly
+                // initiated Flashcards capture in the isolated Audio Test.
+                // A final production audio-session policy remains N7g-gated.
+                try session.setCategory(.playAndRecord, mode: .measurement,
+                                        options: [.defaultToSpeaker])
+                try session.setActive(true)
+                self.ownsFlashcardsForegroundAudio = true
+                self.captureRunning = false
+                self.lastReason = "capture-prepared"
+                call.resolve(["prepared": true, "reason": "capture-prepared"])
+            } catch let error as NSError {
+                self.stopCaptureInternal(retain: false,
+                    reason: "prepare-failed", call: nil)
+                call.resolve(["prepared": false, "reason": "prepare-failed",
+                              "errorDomain": error.domain,
+                              "errorCode": error.code])
+            }
+        }
+    }
+
+    // Called after Flashcards' ORIGINAL painted 3,2,1 countdown has fully
+    // completed. No microphone stream samples are collected before this call.
+    @objc func beginCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle, self.capturePrepared,
+                  !self.captureRunning,
+                  UIApplication.shared.applicationState == .active else {
+                call.resolve(["started": false, "reason": "not-prepared"])
+                return
+            }
+            let requestMs = call.getInt("limitMs") ?? 120000
+            self.captureLimitMs = max(1000, min(120000, requestMs))
+            let token = self.captureGeneration
+            do {
+                let engine = AVAudioEngine()
+                let input = engine.inputNode
+                let format = input.outputFormat(forBus: 0)
+                guard format.sampleRate >= 8000,
+                      format.sampleRate <= 96000,
+                      format.channelCount > 0,
+                      format.commonFormat == .pcmFormatFloat32 else {
+                    self.stopCaptureInternal(retain: false,
+                        reason: "unsupported-format", call: nil)
+                    call.resolve(["started": false,
+                                  "reason": "unsupported-format"])
+                    return
+                }
+                let sampleRate = format.sampleRate
+                let maxFrames = Int((Double(self.captureLimitMs) / 1000.0) *
+                                     sampleRate) + 1024
+                // Hard RAM cap: <= ~46 MiB of mono Float32 for 120s at 96k.
+                let frameCap = min(12_000_000, maxFrames)
+                input.installTap(onBus: 0, bufferSize: 1024,
+                                 format: format) { [weak self] buffer, _ in
+                    guard let self = self,
+                          let data = buffer.floatChannelData else { return }
+                    let frames = Int(buffer.frameLength)
+                    if frames <= 0 { return }
+                    let channels = min(2, Int(buffer.format.channelCount))
+                    var mono: [Float] = []
+                    mono.reserveCapacity(frames)
+                    for frame in 0..<frames {
+                        var total: Float = 0
+                        for channel in 0..<channels {
+                            let sample = data[channel][frame]
+                            total += sample.isFinite ? sample : 0
+                        }
+                        mono.append(total / Float(max(1, channels)))
+                    }
+                    // Input callback NEVER writes disk, blocks on a lock,
+                    // updates UIKit, or calls AVAudioSession/Capacitor.
+                    self.captureWorker.async { [weak self] in
+                        guard let self = self,
+                              self.workerCaptureKey == token else { return }
+                        let space = max(0, frameCap - self.captureSamples.count)
+                        if space > 0 {
+                            self.captureSamples.append(
+                                contentsOf: mono.prefix(space))
+                        }
+                        // Meter only: one bounded 0...1 RMS level, at most
+                        // about 12 updates/sec; PCM stays on captureWorker.
+                        let uptime = ProcessInfo.processInfo.systemUptime
+                        if uptime - self.workerLastLevelAt >= 0.08 {
+                            self.workerLastLevelAt = uptime
+                            var sum: Double = 0
+                            var count = 0
+                            for i in stride(from: 0, to: mono.count, by: 16) {
+                                let value = Double(mono[i])
+                                sum += value * value
+                                count += 1
+                            }
+                            let rms = sqrt(sum / Double(max(count, 1)))
+                            let db = 20.0 * log10(max(0.00001, rms))
+                            // R09b: 16 bars are an encouraging speech ACTIVITY
+                            // indicator, not an RMS/clipping meter. At
+                            // -27.5 dBFS (old 50%), show ~64%; near -15
+                            // dBFS reaches the top. Audio PCM is unchanged.
+                            let level = max(0.0, min(1.0, (db + 50) / 35))
+                            DispatchQueue.main.async { [weak self] in
+                                guard let self = self,
+                                      self.captureGeneration == token,
+                                      self.captureRunning else { return }
+                                self.captureLevel = level
+                                self.notifyListeners("biblozooCaptureLevel",
+                                    data: ["captureKey": token,
+                                           "level": level])
+                            }
+                        }
+                    }
+                }
+                self.captureEngine = engine
+                try engine.start()
+                self.captureSampleRate = sampleRate
+                self.captureStartedAt = Date()
+                self.captureRunning = true
+                self.captureLevel = nil
+                self.lastReason = "capturing"
+                // Protect even if Web JS timers/background callbacks stall.
+                DispatchQueue.main.asyncAfter(
+                    deadline: .now() + .milliseconds(self.captureLimitMs)
+                ) { [weak self] in
+                    guard let self = self,
+                          self.captureGeneration == token,
+                          self.captureRunning else { return }
+                    self.stopCaptureInternal(retain: true,
+                        reason: "time-limit", call: nil)
+                }
+                call.resolve(["started": true, "reason": "capturing",
+                              "limitMs": self.captureLimitMs,
+                              "captureKey": token])
+            } catch {
+                self.stopCaptureInternal(retain: false,
+                    reason: "engine-start-failed", call: nil)
+                call.resolve(["started": false, "reason": "engine-start-failed"])
+            }
+        }
+    }
+
+    // Flush queued input buffers before returning one opaque RAM take.
+    // N7d replay uses the same saved samples; no audio data enters JavaScript.
+    private func stopCaptureInternal(retain: Bool, reason: String,
+                                     call: CAPPluginCall?) {
+        guard capturePrepared || captureRunning else {
+            if let call = call {
+                call.resolve(["ready": false, "reason": "not-capturing"])
+            }
+            return
+        }
+        let wasRecording = captureRunning
+        let token = captureGeneration
+        let rate = captureSampleRate
+        captureRunning = false
+        capturePrepared = false
+        captureLevel = nil
+        captureStartedAt = nil
+        capturePreparedAt = nil
+        if let engine = captureEngine {
+            if wasRecording { engine.inputNode.removeTap(onBus: 0) }
+            engine.stop()
+        }
+        captureEngine = nil
+        let session = AVAudioSession.sharedInstance()
+        let category = captureSavedCategory
+        let mode = captureSavedMode
+        let options = captureSavedOptions
+        captureSavedCategory = nil
+        captureSavedMode = nil
+        captureSavedOptions = nil
+        // Normal Stop/timeout keeps the user-claimed nonmixing audio
+        // session ACTIVE, but restores .soloAmbient after mic input ends.
+        // Deactivation with .notifyOthersOnDeactivation used to restart the
+        // interrupted MP3 and relinquish priority on every completed take.
+        let keepPriority = UIApplication.shared.applicationState == .active &&
+            (reason == "stopped-by-user" || reason == "time-limit" ||
+             reason == "discarded")
+        var categoryRestored = false
+        if let category = category, let mode = mode, let options = options {
+            do {
+                try session.setCategory(category, mode: mode, options: options)
+                categoryRestored = session.category == category &&
+                                   session.mode == mode
+            } catch { categoryRestored = false }
+        }
+        captureRestoreOK = categoryRestored
+        if !keepPriority || !categoryRestored {
+            // Genuine interruption, background, failed setup, or route
+            // loss must NEVER reclaim the other app's session on its own.
+            self.releaseFlashcardsAudioPriority()
+        }
+        lastReason = captureRestoreOK ? reason : "restore-failed"
+        let restoreOK = captureRestoreOK
+        let savedId = UUID().uuidString
+        captureWorker.async { [weak self] in
+            guard let self = self else { return }
+            let count = self.workerCaptureKey == token
+                ? self.captureSamples.count : 0
+            let keep = retain && wasRecording && count >= 256 &&
+                       rate >= 8000 && restoreOK
+            if keep {
+                self.savedSamples = self.captureSamples
+                let levels = Self.n7cDryReplayLevel(self.savedSamples)
+                self.savedDryReplayGain = levels.gain
+                self.savedRmsDbFS = levels.rmsDbFS
+                self.savedPeakDbFS = levels.peakDbFS
+                self.savedCaptureKey = token
+                self.savedTakeId = savedId
+                self.savedSampleRate = rate
+            } else {
+                self.savedSamples.removeAll(keepingCapacity: false)
+                self.savedCaptureKey = -1
+                self.savedTakeId = ""
+                self.savedSampleRate = 0
+                self.savedDryReplayGain = 1.0
+                self.savedRmsDbFS = -120
+                self.savedPeakDbFS = -120
+            }
+            self.captureSamples.removeAll(keepingCapacity: false)
+            self.workerCaptureKey = -1
+            let durationMs = count > 0 && rate > 0
+                ? Int(Double(count) / rate * 1000) : 0
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                if self.captureGeneration != token {
+                    call?.resolve(["ready": false, "reason": "stale"])
+                    return
+                }
+                self.lastReason = restoreOK
+                    ? (keep ? "captured" : reason) : "restore-failed"
+                // Complete the *same* Record-gesture audio handoff before
+                // resolving ready to JS. This is NOT a new audio activation.
+                // Never announce on interrupted/failed/discarded capture,
+                // lost foreground audio ownership, or external audio takeover.
+                if keep && restoreOK &&
+                   (reason == "stopped-by-user" || reason == "time-limit") &&
+                   self.ownsFlashcardsForegroundAudio &&
+                   UIApplication.shared.applicationState == .active &&
+                   AVAudioSession.sharedInstance().category == .soloAmbient &&
+                   !AVAudioSession.sharedInstance().isOtherAudioPlaying {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("biblozoo.flashcards.capture-restored"),
+                        object: nil)
+                }
+                if let call = call {
+                    call.resolve([
+                        "ready": keep,
+                        "reason": self.lastReason,
+                        "takeId": keep ? savedId : "",
+                        "durationMs": durationMs,
+                        "frameCount": count,
+                        "restored": restoreOK
+                    ])
+                } else if retain && reason == "time-limit" {
+                    // Deliver the completed take only AFTER the captureWorker
+                    // has flushed its in-flight tap buffers into RAM.
+                    self.notifyListeners("biblozooCaptureLifecycle", data: [
+                        "kind": "completed",
+                        "ready": keep,
+                        "takeId": keep ? savedId : "",
+                        "durationMs": durationMs,
+                        "frameCount": count,
+                        "restored": restoreOK
+                    ])
+                } else if !retain &&
+                    (reason == "interrupted" || reason == "route-changed") {
+                    self.notifyListeners("biblozooCaptureLifecycle", data: [
+                        "kind": "interrupted",
+                        "reason": reason
+                    ])
+                }
+            }
+        }
+    }
+
+    @objc func finishCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle else {
+                call.resolve(["ready": false, "reason": "unavailable"])
+                return
+            }
+            self.stopCaptureInternal(retain: true,
+                reason: "stopped-by-user", call: call)
+        }
+    }
+
+    // Always release sample memory on Exit/Re-record/Skip. No take ever
+    // goes into user profiles, a temp file or cloud backup.
+    @objc func discardCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle else {
+                call.resolve(["discarded": false, "reason": "unavailable"])
+                return
+            }
+            self.stopCaptureInternal(retain: false,
+                reason: "discarded", call: nil)
+            // Cancel delayed playCapture worker preparation even if no
+            // player node exists yet; then stop any currently audible take.
+            self.playbackGeneration += 1
+            self.stopPlaybackInternal(reason: "discarded", notify: false)
+            self.captureGeneration += 1
+            self.captureWorker.async { [weak self] in
+                guard let self = self else { return }
+                self.workerCaptureKey = -1
+                self.captureSamples.removeAll(keepingCapacity: false)
+                self.savedSamples.removeAll(keepingCapacity: false)
+                self.savedCaptureKey = -1
+                self.savedTakeId = ""
+                self.savedSampleRate = 0
+                self.savedDryReplayGain = 1.0
+                self.savedRmsDbFS = -120
+                self.savedPeakDbFS = -120
+                DispatchQueue.main.async {
+                    call.resolve(["discarded": true])
+                }
+            }
+        }
+    }
+
+    @objc func getCaptureState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle else {
+                call.resolve(["available": false])
+                return
+            }
+            self.captureWorker.async { [weak self] in
+                guard let self = self else { return }
+                let frames = self.savedSamples.count
+                DispatchQueue.main.async {
+                    call.resolve([
+                        "available": true,
+                        "prepared": self.capturePrepared,
+                        "recording": self.captureRunning,
+                        "hasTake": frames >= 256,
+                        "frameCount": frames,
+                        // Coarse numeric sound levels, available only in
+                        // this existing read-only native diagnostic method.
+                        // No PCM, voice file, profile ID or upload.
+                        "rmsDbFS": self.savedRmsDbFS,
+                        "peakDbFS": self.savedPeakDbFS,
+                        "dryReplayGain": Double(self.savedDryReplayGain),
+                        "level": self.captureLevel ?? 0,
+                        "playing": self.playbackEngine != nil,
+                        "restored": self.captureRestoreOK,
+                        "reason": self.lastReason
+                    ])
+                }
+            }
+        }
+    }
+
+
+    // N7e: native-only effects use AVAudioUnitTimePitch so speed and pitch
+    // remain independent like the original SoundTouch-based browser presets.
+    // The dynamic presets get a bounded number of UI-queue pitch changes.
+    private static let wackyPresetIds: Set<String> = [
+        "squirrel", "giant", "sleepy", "rocket", "roller_coaster",
+        "ascending", "descending", "demon", "chorus_alien", "cave"
+    ]
+
+    // N7e.1 experiment only: five clean-first Demon alternatives and
+    // five real multi-voice Chorus choices. Original two IDs stay unchanged.
+    // Variants require a separate native DEV flag, not child random Wacky.
+    private struct N7e1Variant {
+        let cents: Float
+        let rate: Float
+        let lowPassHz: Float
+        let roomWet: Float
+        let distortionWet: Float
+        let echoSeconds: Double
+        let echoWet: Float
+        let tailSeconds: Double
+        let layerDetunes: [Float]
+        let layerDelays: [Double]
+        let layerVolumes: [Float]
+        let dryVolume: Float
+    }
+
+    private static let n7e1Variants: [String: N7e1Variant] = [
+        "demon_clean": N7e1Variant(cents: -600, rate: 0.94,
+            lowPassHz: 2150, roomWet: 18, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 1,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_shadow": N7e1Variant(cents: -800, rate: 0.92,
+            lowPassHz: 1620, roomWet: 34, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 2,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_abyss": N7e1Variant(cents: -1000, rate: 0.9,
+            lowPassHz: 1180, roomWet: 25, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 1.7,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_whisper": N7e1Variant(cents: -400, rate: 0.97,
+            lowPassHz: 2600, roomWet: 27, distortionWet: 0,
+            echoSeconds: 0.12, echoWet: 16, tailSeconds: 1.6,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "demon_thunder": N7e1Variant(cents: -700, rate: 0.91,
+            lowPassHz: 1850, roomWet: 24, distortionWet: 3,
+            echoSeconds: 0.17, echoWet: 19, tailSeconds: 1.8,
+            layerDetunes: [], layerDelays: [],
+            layerVolumes: [], dryVolume: 1),
+        "chorus_air": N7e1Variant(cents: 200, rate: 0.98,
+            lowPassHz: 0, roomWet: 0, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.22,
+            layerDetunes: [-10,10], layerDelays: [0.015,0.029],
+            layerVolumes: [0.18,0.18], dryVolume: 0.64),
+        "chorus_swarm": N7e1Variant(cents: 300, rate: 0.98,
+            lowPassHz: 0, roomWet: 0, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.22,
+            layerDetunes: [-23,23], layerDelays: [0.012,0.035],
+            layerVolumes: [0.22,0.22], dryVolume: 0.56),
+        "chorus_cosmic": N7e1Variant(cents: 500, rate: 0.93,
+            lowPassHz: 0, roomWet: 13, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 1.1,
+            layerDetunes: [-42,42], layerDelays: [0.023,0.047],
+            layerVolumes: [0.21,0.21], dryVolume: 0.58),
+        "chorus_choir": N7e1Variant(cents: 0, rate: 0.96,
+            lowPassHz: 0, roomWet: 9, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.75,
+            layerDetunes: [-14,14], layerDelays: [0.026,0.052],
+            layerVolumes: [0.25,0.25], dryVolume: 0.5),
+        "chorus_wobble": N7e1Variant(cents: 300, rate: 0.98,
+            lowPassHz: 0, roomWet: 9, distortionWet: 0,
+            echoSeconds: 0, echoWet: 0, tailSeconds: 0.7,
+            layerDetunes: [-27,27], layerDelays: [0.017,0.043],
+            layerVolumes: [0.23,0.23], dryVolume: 0.54)
+    ]
+
+    private func n7e1WireChorusLayers(_ variant: N7e1Variant,
+                                     engine: AVAudioEngine,
+                                     format: AVAudioFormat) -> [AVAudioPlayerNode] {
+        guard variant.layerDetunes.count == 2 &&
+              variant.layerDelays.count == 2 &&
+              variant.layerVolumes.count == 2 else { return [] }
+        var players: [AVAudioPlayerNode] = []
+        // The two additional independent time-pitch chains use the SAME
+        // opaque RAM take; distinct detune+12–52ms offsets create genuine
+        // chorus voices instead of the original static single delay.
+        for index in 0..<2 {
+            let voice = AVAudioPlayerNode()
+            voice.volume = variant.layerVolumes[index]
+            let tune = AVAudioUnitTimePitch()
+            tune.pitch = variant.cents + variant.layerDetunes[index]
+            tune.rate = variant.rate
+            tune.overlap = 8
+            let delay = AVAudioUnitDelay()
+            delay.delayTime = variant.layerDelays[index]
+            delay.feedback = 0
+            delay.wetDryMix = 100
+            engine.attach(voice)
+            engine.attach(tune)
+            engine.attach(delay)
+            engine.connect(voice, to: tune, format: format)
+            engine.connect(tune, to: delay, format: format)
+            engine.connect(delay, to: engine.mainMixerNode, format: format)
+            playbackEffects.append(tune)
+            playbackEffects.append(delay)
+            players.append(voice)
+        }
+        return players
+    }
+
+    // N7f owner decision: promote Haunted Whisper and Wobbling Chorus to
+    // the existing child IDs while retaining the separately selectable DEV
+    // alternatives. No changes to the child's ten-preset random catalog.
+    private func n7fApprovedPreset(_ id: String) -> String {
+        switch id {
+        case "demon": return "demon_whisper" // owner D4
+        case "chorus_alien": return "chorus_wobble" // owner C5
+        default: return id
+        }
+    }
+
+    private func n7eRate(_ preset: String) -> Float {
+        if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)] {
+            return variant.rate
+        }
+        switch preset {
+        case "squirrel": return 1.15
+        case "giant": return 0.9
+        case "sleepy": return 0.55
+        case "rocket": return 1.65
+        case "demon": return 0.92
+        case "chorus_alien": return 0.98
+        default: return 1
+        }
+    }
+
+    private func n7eCents(_ preset: String, at time: Double,
+                          duration: Double) -> Float {
+        if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)] {
+            if n7fApprovedPreset(preset) == "chorus_wobble" {
+                return variant.cents + Float(75 * sin(time * 2 * .pi * 1.8))
+            }
+            return variant.cents
+        }
+        switch preset {
+        case "squirrel": return 900
+        case "giant": return -700
+        case "sleepy": return -300
+        case "rocket": return 400
+        case "demon": return -800
+        case "chorus_alien": return 300
+        case "ascending":
+            return Float(-1000 + 2000 * min(1, max(0, time / max(0.01, duration))))
+        case "descending":
+            return Float(1000 - 2000 * min(1, max(0, time / max(0.01, duration))))
+        case "roller_coaster":
+            // Original browser repeats +12, -12, +10, -10 semitones
+            // in smooth 0.75s intervals through LONG recordings too.
+            // Cycle instead of flattening after the fourth pitch swing.
+            let targets: [Float] = [1200, -1200, 1000, -1000]
+            let step = 0.75
+            let position = max(0, time / step)
+            let index = Int(position)
+            let fraction = Float(position - Double(index))
+            let previous: Float = index == 0 ? 0 :
+                targets[(index - 1) % targets.count]
+            let next = targets[index % targets.count]
+            let result = previous + (next - previous) * fraction
+            // A complete take returns toward natural pitch at its tail.
+            if duration - time < 0.10 {
+                return result * Float(max(0, (duration - time) / 0.10))
+            }
+            return result
+        default: return 0
+        }
+    }
+
+    private func n7eSchedulePitch(_ preset: String, unit: AVAudioUnitTimePitch,
+                                  token: Int, duration: Double) {
+        guard preset == "roller_coaster" || preset == "ascending" ||
+              preset == "descending" || preset == "chorus_wobble" ||
+              preset == "chorus_alien" else {
+            return
+        }
+        // 80ms nominal, never more than 160 queued callbacks for long takes.
+        let count = min(160, max(1, Int(duration / 0.08)))
+        for step in 1...count {
+            let offset = duration * Double(step) / Double(count)
+            let cents = n7eCents(preset, at: offset, duration: duration)
+            let work = DispatchWorkItem { [weak self, weak unit] in
+                guard let self = self,
+                      self.playbackGeneration == token,
+                      self.playbackEngine != nil else { return }
+                unit?.pitch = cents
+            }
+            playbackPitchWorkItems.append(work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + offset, execute: work)
+        }
+    }
+
+    private func n7eWireEffects(_ preset: String, engine: AVAudioEngine,
+                                player: AVAudioPlayerNode,
+                                format: AVAudioFormat) -> AVAudioUnitTimePitch? {
+        guard !preset.isEmpty else {
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+            return nil
+        }
+        let pitch = AVAudioUnitTimePitch()
+        pitch.rate = n7eRate(preset)
+        pitch.pitch = n7eCents(preset, at: 0, duration: 1)
+        pitch.overlap = 8
+        engine.attach(pitch)
+        var effects: [AVAudioNode] = [pitch]
+        if let variant = Self.n7e1Variants[n7fApprovedPreset(preset)] {
+            // Clean-first Demon presets avoid the owner-reported corrupted
+            // MP3 distortion. Chorus variant volume sums are near 1.0.
+            if variant.lowPassHz > 0 {
+                let eq = AVAudioUnitEQ(numberOfBands: 1)
+                eq.bands[0].filterType = .lowPass
+                eq.bands[0].frequency = variant.lowPassHz
+                eq.bands[0].bypass = false
+                engine.attach(eq)
+                effects.append(eq)
+            }
+            if variant.distortionWet > 0 {
+                let drive = AVAudioUnitDistortion()
+                drive.loadFactoryPreset(.multiBrokenSpeaker)
+                drive.wetDryMix = variant.distortionWet
+                engine.attach(drive)
+                effects.append(drive)
+            }
+            if variant.echoSeconds > 0 {
+                let echo = AVAudioUnitDelay()
+                echo.delayTime = variant.echoSeconds
+                echo.feedback = 7
+                echo.wetDryMix = variant.echoWet
+                engine.attach(echo)
+                effects.append(echo)
+            }
+            if variant.roomWet > 0 {
+                let reverb = AVAudioUnitReverb()
+                reverb.loadFactoryPreset(.largeRoom)
+                reverb.wetDryMix = variant.roomWet
+                engine.attach(reverb)
+                effects.append(reverb)
+            }
+            player.volume = variant.dryVolume
+        } else if preset == "demon" {
+            let eq = AVAudioUnitEQ(numberOfBands: 1)
+            let band = eq.bands[0]
+            band.filterType = .lowPass
+            band.frequency = 1500
+            band.bypass = false
+            engine.attach(eq)
+            effects.append(eq)
+            let drive = AVAudioUnitDistortion()
+            drive.loadFactoryPreset(.multiBrokenSpeaker)
+            drive.wetDryMix = 14
+            engine.attach(drive)
+            effects.append(drive)
+            let reverb = AVAudioUnitReverb()
+            reverb.loadFactoryPreset(.largeRoom)
+            reverb.wetDryMix = 52
+            engine.attach(reverb)
+            effects.append(reverb)
+        } else if preset == "chorus_alien" {
+            let chorus = AVAudioUnitDelay()
+            chorus.delayTime = 0.014
+            chorus.feedback = 0
+            chorus.wetDryMix = 34
+            engine.attach(chorus)
+            effects.append(chorus)
+        } else if preset == "cave" {
+            let reverb = AVAudioUnitReverb()
+            reverb.loadFactoryPreset(.largeHall)
+            reverb.wetDryMix = 58
+            engine.attach(reverb)
+            effects.append(reverb)
+        }
+        var previous: AVAudioNode = player
+        for effect in effects {
+            engine.connect(previous, to: effect, format: format)
+            previous = effect
+        }
+        engine.connect(previous, to: engine.mainMixerNode, format: format)
+        playbackEffects = effects
+        return pitch
+    }
+
+    // N7d: only the explicit "Play My Recording" gesture may start
+    // playback. ONE fresh AVAudioEngine+AVAudioPlayerNode is owned here
+    // while the previously captured mono PCM stays opaque in RAM on the
+    // capture worker. This never connects microphone input to output and
+    // does not use WebAudio, HTMLMediaElement or an AVAudioRecorder file.
+    @objc func playCapture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle,
+                  UIApplication.shared.applicationState == .active,
+                  !self.capturePrepared, !self.captureRunning,
+                  !self.isProbing, self.playbackEngine == nil else {
+                call.resolve(["started": false, "reason": "not-ready"])
+                return
+            }
+            let session = AVAudioSession.sharedInstance()
+            // N7d.1: An explicit Play tap may reclaim nonmixing .soloAmbient
+            // from Apple Music, subject to iOS activation priority.
+            guard session.category == .soloAmbient else {
+                call.resolve(["started": false,
+                              "reason": "category-not-soloambient"])
+                return
+            }
+            let requestedId = call.getString("takeId") ?? ""
+            // Empty preset means the unchanged dry recorded-voice path.
+            let effectId = call.getString("presetId") ?? ""
+            let devVariant = call.getBool("devVariant") == true
+            // Reject DEV alternate Wacky voices in production even on direct bridge calls.
+            guard !devVariant || self.isDevBundle else {
+                call.resolve(["started": false, "reason": "dev-only"])
+                return
+            }
+            guard effectId.isEmpty || Self.wackyPresetIds.contains(effectId) ||
+                  (devVariant && Self.n7e1Variants[effectId] != nil) else {
+                call.resolve(["started": false, "reason": "unknown-preset"])
+                return
+            }
+            guard !requestedId.isEmpty else {
+                call.resolve(["started": false, "reason": "missing-take"])
+                return
+            }
+            self.playbackGeneration += 1
+            let playToken = self.playbackGeneration
+            let routeEpoch = self.playbackRouteEpoch
+            self.captureWorker.async { [weak self] in
+                guard let self = self else { return }
+                guard self.savedCaptureKey >= 0,
+                      self.savedTakeId == requestedId,
+                      self.savedSamples.count >= 256,
+                      self.savedSamples.count <= 12_000_000,
+                      self.savedSampleRate >= 8000,
+                      self.savedSampleRate <= 96000,
+                      let format = AVAudioFormat(
+                        standardFormatWithSampleRate: self.savedSampleRate,
+                        channels: 1) else {
+                    DispatchQueue.main.async {
+                        call.resolve(["started": false, "reason": "take-unavailable"])
+                    }
+                    return
+                }
+                // Reverb/delay tails need actual silent source frames after
+                // speech; the normal dry take is byte-for-byte unchanged.
+                let tail: Double = Self.n7e1Variants[
+                    self.n7fApprovedPreset(effectId)]?.tailSeconds ??
+                    (effectId == "cave" ? 3.2 :
+                     effectId == "demon" ? 2.4 :
+                     effectId == "chorus_alien" ? 0.2 : 0)
+                let totalFrames = self.savedSamples.count +
+                    Int(self.savedSampleRate * tail)
+                guard totalFrames <= 12_500_000,
+                      let buffer = AVAudioPCMBuffer(
+                        pcmFormat: format,
+                        frameCapacity: AVAudioFrameCount(totalFrames)),
+                      let samplesOut = buffer.floatChannelData else {
+                    DispatchQueue.main.async {
+                        call.resolve(["started": false,
+                                      "reason": "take-unavailable"])
+                    }
+                    return
+                }
+                // PCM copy and bounded silence tail run only on the serial
+                // worker, never the WebView/main/render/audio callback.
+                if tail > 0 {
+                    // Only atmosphere effects need extra zeroed tail frames.
+                    // Dry playback keeps N7d's original direct PCM copy.
+                    memset(samplesOut[0], 0,
+                           totalFrames * MemoryLayout<Float>.size)
+                }
+                self.savedSamples.withUnsafeBufferPointer { source in
+                    guard let base = source.baseAddress else { return }
+                    // R09b: a temporary output-only, speech-aware dry
+                    // dynamics copy. The untouched saved PCM powers ALL
+                    // Wacky/chorus variants; repeat Play never compounds.
+                    if effectId.isEmpty && self.savedDryReplayGain > 1.0 {
+                        Self.n7cRenderDryVoice(source,
+                            into: samplesOut[0],
+                            sampleRate: self.savedSampleRate,
+                            makeupGain: self.savedDryReplayGain)
+                    } else {
+                        samplesOut[0].update(from: base, count: source.count)
+                    }
+                }
+                buffer.frameLength = AVAudioFrameCount(totalFrames)
+                let voiceSeconds = Double(self.savedSamples.count) /
+                    self.savedSampleRate / Double(self.n7eRate(effectId))
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self,
+                          self.playbackGeneration == playToken,
+                          UIApplication.shared.applicationState == .active,
+                          AVAudioSession.sharedInstance().category == .soloAmbient,
+                          !self.captureRunning, !self.capturePrepared,
+                          self.playbackEngine == nil,
+                          self.playbackRouteEpoch == routeEpoch else {
+                        call.resolve(["started": false,
+                                      "reason": "stale-or-route-changed"])
+                        return
+                    }
+                    // R03: after AirPods disconnect, the previously inactive
+                    // output format may be stale. Activate only on this real
+                    // Play tap BEFORE constructing the fresh output graph.
+                    let session = AVAudioSession.sharedInstance()
+                    do {
+                        try session.setActive(true)
+                        self.ownsFlashcardsForegroundAudio = true
+                    } catch {
+                        call.resolve(["started": false,
+                                      "reason": "activation-failed"])
+                        return
+                    }
+                    // Only the child's real Play My Recording tap may lease
+                    // non-silent essential voice output; never on foreground.
+                    guard BibloZooEssentialVoiceSession.begin(
+                        owner: "flashcards-replay") else {
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "voice-session-unavailable"])
+                        return
+                    }
+                    let outputPorts = session.currentRoute.outputs
+                        .map { $0.portType.rawValue }.sorted()
+                    guard !outputPorts.isEmpty,
+                          self.playbackRouteEpoch == routeEpoch,
+                          session.category == .playback else {
+                        BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "output-route-changed"])
+                        return
+                    }
+                    let engine = AVAudioEngine()
+                    // Build against the ACTIVE iPhone/Bluetooth hardware.
+                    // Reject a disabled output instead of a silent success.
+                    let outputFormat = engine.outputNode.outputFormat(forBus: 0)
+                    guard outputFormat.sampleRate > 0,
+                          outputFormat.channelCount > 0 else {
+                        BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "output-not-ready"])
+                        return
+                    }
+                    let player = AVAudioPlayerNode()
+                    engine.attach(player)
+                    // N7e: all ten effects are generated by AVFoundation
+                    // nodes, not WebAudio. Keep nodes alive until stop/ended.
+                    let pitch = self.n7eWireEffects(effectId, engine: engine,
+                        player: player, format: format)
+                    // DEV-only chorus processing: two independent voices,
+                    // same real RAM take and shared output-only session.
+                    let chorusVoices: [AVAudioPlayerNode]
+                    if let variant = Self.n7e1Variants[
+                        self.n7fApprovedPreset(effectId)],
+                       !variant.layerDetunes.isEmpty {
+                        chorusVoices = self.n7e1WireChorusLayers(
+                            variant, engine: engine, format: format)
+                    } else {
+                        chorusVoices = []
+                    }
+                    do {
+                        // The child-initiated session is already active; the
+                        // newly assembled engine now targets its output.
+                        self.playbackEngine = engine
+                        self.playbackNode = player
+                        self.playbackOutputPorts = outputPorts
+                        self.playbackChorusPlayers = chorusVoices
+                        self.playbackTakeId = requestedId
+                        self.playbackStartedAt = Date()
+                        self.playbackWackyStartNotified = false
+                        // N7e Wacky: bridge started:true confirms engine
+                        // acceptance, NOT audible effect. One-time child
+                        // Wacky eligibility needs a render-buffer signal
+                        // from the REAL post-DSP native mixer. Only a
+                        // boolean event crosses JS, never microphone PCM.
+                        if !effectId.isEmpty {
+                            engine.mainMixerNode.installTap(
+                                onBus: 0, bufferSize: 1024,
+                                format: nil) { [weak self] audio, _ in
+                                guard audio.frameLength > 0,
+                                      let channels = audio.floatChannelData else {
+                                    return
+                                }
+                                let frames = min(512, Int(audio.frameLength))
+                                var audible = false
+                                for sample in stride(from: 0, to: frames, by: 16) {
+                                    if abs(channels[0][sample]) > 0.0001 {
+                                        audible = true
+                                        break
+                                    }
+                                }
+                                if !audible { return }
+                                DispatchQueue.main.async { [weak self] in
+                                    guard let self = self,
+                                          self.playbackGeneration == playToken,
+                                          self.playbackEngine != nil,
+                                          !self.playbackWackyStartNotified else {
+                                        return
+                                    }
+                                    self.playbackWackyStartNotified = true
+                                    self.notifyListeners("biblozooCapturePlayback", data: [
+                                        "kind": "started",
+                                        "takeId": requestedId,
+                                        "playToken": playToken
+                                    ])
+                                }
+                            }
+                            self.playbackWackyTapInstalled = true
+                        }
+                        if let pitch = pitch {
+                            self.n7eSchedulePitch(effectId, unit: pitch,
+                                token: playToken, duration: voiceSeconds)
+                        }
+                        // Each chorus layer consumes the exact same buffer,
+                        // not an uploaded, serialized or fabricated sample.
+                        for voice in chorusVoices {
+                            voice.scheduleBuffer(buffer, at: nil,
+                                options: [], completionHandler: nil)
+                        }
+                        player.scheduleBuffer(buffer,
+                            completionCallbackType: .dataPlayedBack) {
+                            [weak self] _ in
+                            DispatchQueue.main.async {
+                                guard let self = self,
+                                      self.playbackGeneration == playToken,
+                                      self.playbackEngine != nil else { return }
+                                self.stopPlaybackInternal(reason: "ended",
+                                                          notify: true)
+                            }
+                        }
+                        // AirPods removal may finish while the graph is
+                        // assembled. Never auto-replay or claim heard audio.
+                        let currentPorts = session.currentRoute.outputs
+                            .map { $0.portType.rawValue }.sorted()
+                        guard self.playbackRouteEpoch == routeEpoch,
+                              currentPorts == outputPorts else {
+                            self.stopPlaybackInternal(reason: "route-changed",
+                                                      notify: false)
+                            call.resolve(["started": false,
+                                          "reason": "output-route-changed"])
+                            return
+                        }
+                        try engine.start()
+                        for voice in chorusVoices { voice.play() }
+                        player.play()
+                        call.resolve(["started": true,
+                                      "reason": "native-playing",
+                                      "playToken": playToken,
+                                      "presetId": effectId])
+                    } catch {
+                        self.stopPlaybackInternal(reason: "start-failed",
+                                                  notify: false)
+                        self.releaseFlashcardsAudioPriority()
+                        call.resolve(["started": false,
+                                      "reason": "start-failed"])
+                    }
+                }
+            }
+        }
+    }
+
+    // Called by actual Stop Playback, pagehide or other native lifecycle.
+    // Never clears savedSamples: re-play is possible until Exit/Re-record.
+    private func stopPlaybackInternal(reason: String, notify: Bool) {
+        guard playbackEngine != nil || playbackNode != nil else { return }
+        let token = playbackGeneration
+        let take = playbackTakeId
+        playbackGeneration += 1 // invalidate in-flight AVAudio callbacks
+        if playbackWackyTapInstalled {
+            playbackEngine?.mainMixerNode.removeTap(onBus: 0)
+            playbackWackyTapInstalled = false
+        }
+        playbackWackyStartNotified = false
+        for item in playbackPitchWorkItems { item.cancel() }
+        playbackPitchWorkItems.removeAll()
+        for voice in playbackChorusPlayers { voice.stop() }
+        playbackChorusPlayers.removeAll()
+        playbackNode?.stop()
+        playbackEngine?.stop()
+        playbackNode = nil
+        playbackEngine = nil
+        playbackEffects.removeAll()
+        playbackTakeId = ""
+        playbackStartedAt = nil
+        playbackOutputPorts = []
+        BibloZooEssentialVoiceSession.end(owner: "flashcards-replay")
+        // Ending a normal take or manually stopping it only stops the PCM
+        // player. Keep the foreground nonmixing AVAudioSession active so
+        // Apple Music/PiP stays paused until its OWN next Play gesture.
+        // A true interruption, route loss or setup failure relinquishes it.
+        if reason != "ended" && reason != "stopped-by-user" &&
+           reason != "discarded" {
+            self.releaseFlashcardsAudioPriority()
+        }
+        if notify {
+            notifyListeners("biblozooCapturePlayback", data: [
+                "kind": reason == "ended" ? "ended" : "interrupted",
+                "reason": reason,
+                "takeId": take,
+                "playToken": token
+            ])
+        }
+    }
+
+    @objc func stopCapturePlayback(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle else {
+                call.resolve(["stopped": false, "reason": "unavailable"])
+                return
+            }
+            // Explicit Pause also invalidates an in-flight PCM copy: a
+            // late worker callback must NEVER start playing on its own.
+            self.playbackGeneration += 1
+            self.stopPlaybackInternal(reason: "stopped-by-user",
+                                      notify: false)
+            call.resolve(["stopped": true])
+        }
+    }
+
+    // Purely read-only status; never grants permission, requests capture,
+    // sets the category, resumes the mic or activates audio.
+    @objc func getProbeState(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle else {
+                call.resolve(["available":false])
+                return
+            }
+            call.resolve(self.state())
+        }
+    }
+}
+
+
+// N7f: Read My Verse OUTPUT only. All source MP3 clips must be from the
+// published, installed app bundle; no caller URLs/paths, mic, user files,
+// network access, WebAudio/HTML fallback, or silent fake completion.
+// Independent AVAudioPlayers allow Verse Crawl soundtrack + real narration
+// + ending overlap. A strictly scoped, user-started Crawl lease permits
+// this owner's soundtrack + verse in Silent Mode without exposing optional
+// Read effects or other game sound to .playback.
+@objc(BibloZooNativeReadOutputPlugin)
+final class BibloZooNativeReadOutputPlugin: CAPPlugin, CAPBridgedPlugin,
+    AVAudioPlayerDelegate {
+    public let identifier = "BibloZooNativeReadOutputPlugin"
+    public let jsName = "BibloZooNativeReadOutput"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "activateFromGesture", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "seekClip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopAll", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "playCue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "auditionCue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopCues", returnType: CAPPluginReturnPromise)
+    ]
+    private var clips: [String: AVAudioPlayer] = [:]
+    // R16b.1: retain the fixed, validated source key for each active Read
+    // player. Only short typing samples may be displaced by spoken verse.
+    private var clipSources: [String: String] = [:]
+    private var cues: [AVAudioPlayer] = []
+    private var watches: [NSObjectProtocol] = []
+    private var progressTimer: Timer?
+    private var ownedByReadGesture = false
+    private var generation = 0
+    // R16b: standalone verse speech owns a short .playback lease. R16b.3:
+    // deliberate Verse Crawl Start/Resume owns a separate, bounded playback
+    // lease for ONLY its approved theme, ending and published verse files.
+    private var essentialVoiceClipId: String?
+
+    private func releaseCrawlSession() {
+        BibloZooEssentialVoiceSession.end(owner: "read-crawl")
+    }
+
+    private func releaseEssentialVoice(for id: String? = nil) {
+        guard let current = essentialVoiceClipId,
+              id == nil || id == current else { return }
+        essentialVoiceClipId = nil
+        BibloZooEssentialVoiceSession.end(owner: "read-narration")
+    }
+
+    // R16b.1: Typewriter/Keyboard intentionally fire a final short key
+    // alert just before a child-authorized spoken verse. They are optional,
+    // and unlike Crawl music/Zoo/verse speech, may be stopped to make room
+    // for that essential narrator without borrowing its .playback category.
+    private func isTransientTypingEffect(_ key: String) -> Bool {
+        if key == "typewriter-alert" || key == "keyboard-alert" {
+            return true
+        }
+        let prefix: String
+        let maximum: Int
+        if key.hasPrefix("typewriter-") {
+            prefix = "typewriter-"; maximum = 3
+        } else if key.hasPrefix("keyboard-") {
+            prefix = "keyboard-"; maximum = 7
+        } else {
+            return false
+        }
+        guard let number = Int(key.dropFirst(prefix.count)) else {
+            return false
+        }
+        return (1...maximum).contains(number)
+    }
+
+    // Call only after proving ALL active Read clips are transient typing
+    // samples and NO cues/other voice are active. An "interrupted" event
+    // lets the adapter retire an optional clip; it is NOT an app lifecycle
+    // interruption and must never invent a spoken-verse ended event.
+    private func stopTransientTypingEffectsForVoice() {
+        for (id, player) in clips {
+            player.stop()
+            emit("interrupted", id: id, player: player,
+                 reason: "superseded-by-spoken-verse")
+        }
+        clips.removeAll()
+        clipSources.removeAll()
+    }
+
+    private var isDevBundle: Bool {
+        BibloZooIOSIdentity.experimentalToolsEnabled
+    }
+    private var isNativeAppBundle: Bool {
+        BibloZooIOSIdentity.nativeAudioEnabled
+    }
+    private func onMain(_ action: @escaping () -> Void) {
+        if Thread.isMainThread { action() }
+        else { DispatchQueue.main.async(execute: action) }
+    }
+    public override func load() {
+        super.load()
+        let center = NotificationCenter.default
+        watches.append(center.addObserver(forName:
+            AVAudioSession.interruptionNotification, object: nil,
+            queue: .main) { [weak self] note in
+                guard let raw = (note.userInfo?[
+                    AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
+                    raw == AVAudioSession.InterruptionType.began.rawValue else {
+                    return
+                }
+                // N7m: PiP Play and AirPods/Apple Music Play can take over
+                // audio while UIApplication stays ACTIVE, including a quiet
+                // Keyboard/Typewriter interval with zero owned AVAudioPlayers.
+                // Report the OS event to Read's activity owner independently
+                // of player events; NEVER activate or restart on a callback.
+                self?.notifyListeners("biblozooReadLifecycle", data: [
+                    "phase": "audioInterruptionBegan"
+                ])
+                self?.cancelAll(reason: "interrupted")
+            })
+        for name in [UIApplication.willResignActiveNotification,
+                     UIApplication.didEnterBackgroundNotification,
+                     AVAudioSession.mediaServicesWereLostNotification,
+                     AVAudioSession.mediaServicesWereResetNotification] {
+            watches.append(center.addObserver(forName: name, object: nil,
+                queue: .main) { [weak self] _ in
+                    if name == UIApplication.willResignActiveNotification {
+                        // Native event precedes WebKit's sometimes-late
+                        // visibilitychange during the held multitask gesture.
+                        self?.notifyListeners("biblozooReadLifecycle",
+                            data: ["phase": "willResignActive"])
+                    } else if name == AVAudioSession.mediaServicesWereLostNotification ||
+                              name == AVAudioSession.mediaServicesWereResetNotification {
+                        // A silent Read animation has no player callback;
+                        // freeze its screen/timers even on a media-server reset.
+                        self?.notifyListeners("biblozooReadLifecycle",
+                            data: ["phase": "mediaServicesInterrupted"])
+                    }
+                    self?.cancelAll(reason: "interrupted")
+                })
+        }
+        // N7d.2 parity: only genuine route loss/arrival invalidates current
+        // Read audio. Category/override/AirPods setup notices are not the
+        // same as actual device disconnect and can arrive late.
+        watches.append(center.addObserver(forName:
+            AVAudioSession.routeChangeNotification, object: nil,
+            queue: .main) { [weak self] note in
+                guard let raw = (note.userInfo?[
+                    AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue,
+                    let reason = AVAudioSession.RouteChangeReason(
+                        rawValue: raw) else { return }
+                switch reason {
+                case .oldDeviceUnavailable, .newDeviceAvailable,
+                     .noSuitableRouteForCategory:
+                    // Only genuine device/route changes, never late setup,
+                    // override or category notices, pause quiet Read phases.
+                    self?.notifyListeners("biblozooReadLifecycle", data: [
+                        "phase": "routeInterrupted"
+                    ])
+                    self?.cancelAll(reason: "interrupted")
+                default: break
+                }
+            })
+    }
+    deinit {
+        watches.forEach { NotificationCenter.default.removeObserver($0) }
+        progressTimer?.invalidate()
+        clips.values.forEach { $0.stop() }
+        cues.forEach { $0.stop() }
+        // If the plugin is disposed without a normal stopAll, release the
+        // process-wide category lease without touching another voice owner.
+        if essentialVoiceClipId != nil {
+            if Thread.isMainThread {
+                BibloZooEssentialVoiceSession.end(owner: "read-narration")
+            } else {
+                DispatchQueue.main.async {
+                    BibloZooEssentialVoiceSession.end(owner: "read-narration")
+                }
+            }
+        }
+        if Thread.isMainThread {
+            releaseCrawlSession()
+        } else {
+            DispatchQueue.main.async {
+                BibloZooEssentialVoiceSession.end(owner: "read-crawl")
+            }
+        }
+    }
+    // Validated published JSON, never a user-provided filename.
+    private func publishedVerse(_ id: String) -> Bool {
+        guard id.count > 0 && id.count <= 65 &&
+              id.range(of: "^[a-z0-9_-]+$",
+                       options: .regularExpression) != nil,
+              let url = Bundle.main.url(forResource: id,
+                withExtension: "json", subdirectory: "public/verse_data"),
+              let data = try? Data(contentsOf: url),
+              let verse = (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any] else { return false }
+        return verse["published"] as? Bool == true &&
+               verse["verseId"] as? String == id
+    }
+    // Do not accept paths, URLs, arbitrary clip keys or external IDs.
+    private func bundledClip(_ key: String) -> URL? {
+        let fixed: [String: (String, String)] = [
+            "zoo-escape-cue": ("ui_audio", "ui_pet_unlock"),
+            "crawl-theme": ("verse_images/read_my_verse",
+                            "verse_crawl_theme_ducked"),
+            "crawl-ending": ("verse_images/read_my_verse",
+                             "verse_crawl_theme_ending"),
+            "typewriter-alert": ("verse_images/read_my_verse",
+                                 "typewriter_alert"),
+            "keyboard-alert": ("verse_images/read_my_verse",
+                               "keyboard_alert"),
+            "incorrect": ("verse_images/daily_questions", "dq_incorrect")
+        ]
+        if let entry = fixed[key] {
+            return Bundle.main.url(forResource: entry.1, withExtension: "mp3",
+                subdirectory: "public/" + entry.0)
+        }
+        if key.hasPrefix("typewriter-"), let index =
+            Int(key.dropFirst("typewriter-".count)),
+            (1...3).contains(index) {
+            return Bundle.main.url(forResource: "typewriter_\(index)",
+                withExtension: "mp3",
+                subdirectory: "public/verse_images/read_my_verse")
+        }
+        if key.hasPrefix("keyboard-"), let index =
+            Int(key.dropFirst("keyboard-".count)),
+            (1...7).contains(index) {
+            return Bundle.main.url(forResource: "keyboard_\(index)",
+                withExtension: "mp3",
+                subdirectory: "public/verse_images/read_my_verse")
+        }
+        guard key.hasPrefix("verse:") else { return nil }
+        let stem = String(key.dropFirst("verse:".count))
+        guard stem.count <= 80 &&
+              stem.range(of: "^[a-z0-9_-]+$",
+                         options: .regularExpression) != nil else { return nil }
+        var valid = publishedVerse(stem)
+        if stem.hasSuffix("_ref") {
+            valid = publishedVerse(String(stem.dropLast(4)))
+        } else if !valid, let letter = stem.last,
+                  letter >= "a" && letter <= "z" {
+            valid = publishedVerse(String(stem.dropLast()))
+        }
+        guard valid else { return nil }
+        return Bundle.main.url(forResource: stem, withExtension: "mp3",
+            subdirectory: "public/verse_audio")
+    }
+    private func emit(_ kind: String, id: String,
+                      player: AVAudioPlayer, reason: String = "") {
+        notifyListeners("biblozooReadOutput", data: [
+            "kind": kind, "requestId": id,
+            "positionMs": Int(player.currentTime * 1000),
+            "durationMs": Int(player.duration * 1000),
+            "reason": reason
+        ])
+    }
+    private func armProgress() {
+        guard progressTimer == nil else { return }
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.14,
+            repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                for (id, player) in self.clips where player.isPlaying {
+                    self.emit("progress", id: id, player: player)
+                }
+                if self.clips.isEmpty {
+                    self.progressTimer?.invalidate()
+                    self.progressTimer = nil
+                }
+            }
+    }
+    private func cancelAll(reason: String) {
+        generation += 1
+        ownedByReadGesture = false
+        for (id, player) in clips {
+            player.stop()
+            if reason == "interrupted" {
+                emit("interrupted", id: id, player: player, reason: reason)
+            }
+        }
+        clips.removeAll()
+        clipSources.removeAll()
+        cues.forEach { $0.stop() }
+        cues.removeAll()
+        releaseEssentialVoice()
+        releaseCrawlSession()
+        progressTimer?.invalidate()
+        progressTimer = nil
+        // Never reactivate on OS interruption/foreground return. Do not
+        // send .notifyOthersOnDeactivation, which auto-resumes Apple Music.
+    }
+    @objc func activateFromGesture(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            let session = AVAudioSession.sharedInstance()
+            // Only a real Read Start or explicit Welcome Back gesture may
+            // request this narrowly scoped Verse Crawl Silent Mode exception.
+            let crawl = call.getBool("crawlSession") == true
+            let crawlAlreadyOwned =
+                BibloZooEssentialVoiceSession.isActive(owner: "read-crawl")
+            guard let self = self, self.isNativeAppBundle,
+                  UIApplication.shared.applicationState == .active,
+                  (!crawl && session.category == .soloAmbient ||
+                   crawl && (session.category == .soloAmbient ||
+                             crawlAlreadyOwned)),
+                  (!crawl || crawlAlreadyOwned ||
+                   (!session.isOtherAudioPlaying && self.clips.isEmpty &&
+                    self.cues.isEmpty && self.essentialVoiceClipId == nil))
+                  else {
+                call.resolve(["activated": false, "reason": "not-ready"])
+                return
+            }
+            do {
+                try session.setActive(true)
+                if crawl && !BibloZooEssentialVoiceSession.begin(
+                    owner: "read-crawl") {
+                    self.ownedByReadGesture = false
+                    call.resolve(["activated": false,
+                                  "reason": "crawl-session-unavailable"])
+                    return
+                }
+                self.ownedByReadGesture = true
+                call.resolve(["activated": true])
+            } catch {
+                self.ownedByReadGesture = false
+                call.resolve(["activated": false, "reason": "os-denied"])
+            }
+        }
+    }
+    @objc func playClip(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle,
+                  UIApplication.shared.applicationState == .active,
+                  self.ownedByReadGesture,
+                  let id = call.getString("requestId"), id.count > 0,
+                  id.count <= 64 else {
+                call.resolve(["started": false, "reason": "not-ready"])
+                return
+            }
+            guard let key = call.getString("clipId"),
+                  let url = self.bundledClip(key) else {
+                call.resolve(["started": false, "reason": "unpublished-clip"])
+                return
+            }
+            // A single process-wide category applies to all players.
+            // R16b.3: an explicitly started Crawl owns a special, bounded
+            // .playback session; do NOT permit any other optional game sound
+            // or a second essential-verse lease to borrow it.
+            let crawlOwned =
+                BibloZooEssentialVoiceSession.isActive(owner: "read-crawl")
+            let essentialVoice = key.hasPrefix("verse:") &&
+                                 call.getBool("essentialVoice") == true
+            let category = AVAudioSession.sharedInstance().category
+            if crawlOwned {
+                guard !essentialVoice,
+                      category == .playback,
+                      self.essentialVoiceClipId == nil,
+                      self.cues.isEmpty,
+                      (key == "crawl-theme" || key == "crawl-ending" ||
+                       key.hasPrefix("verse:")) else {
+                    call.resolve(["started": false,
+                                  "reason": "crawl-session-scope"])
+                    return
+                }
+            } else if essentialVoice {
+                // The session category is shared by every Read clip.
+                // A last Typewriter/Keyboard key alert may still own a
+                // nonvoice player when narration starts. ONLY these
+                // fixed-key transient samples may be displaced; NEVER
+                // soundtrack, Zoo cue, another verse, or generated notes.
+                guard category == .soloAmbient,
+                      self.essentialVoiceClipId == nil,
+                      self.cues.isEmpty,
+                      self.clips.keys.allSatisfy({
+                          guard let source = self.clipSources[$0] else {
+                              return false
+                          }
+                          return self.isTransientTypingEffect(source)
+                      }) else {
+                    call.resolve(["started": false,
+                                  "reason": "voice-overlap-unsafe"])
+                    return
+                }
+            } else {
+                // Preserve the original bounded optional-effects pool.
+                guard self.clips.count < 8 || self.clips[id] != nil else {
+                    call.resolve(["started": false, "reason": "not-ready"])
+                    return
+                }
+                // Outside the explicit Crawl lease, incidental sounds
+                // stay within the Silent-switch-respecting category.
+                guard category == .soloAmbient else {
+                    call.resolve(["started": false,
+                                  "reason": "category-not-soloambient"])
+                    return
+                }
+            }
+            self.clips[id]?.stop()
+            self.clips[id] = nil
+            self.clipSources.removeValue(forKey: id)
+            do {
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.delegate = self
+                player.numberOfLoops = 0
+                let volume = call.getDouble("volume") ?? 1
+                player.volume = Float(min(1, max(0, volume)))
+                guard player.prepareToPlay() else {
+                    call.resolve(["started": false, "reason": "prepare-failed"])
+                    return
+                }
+                let seekMs = call.getDouble("positionMs") ?? 0
+                if seekMs > 0 {
+                    player.currentTime = min(player.duration,
+                                             max(0, seekMs / 1000))
+                }
+                if essentialVoice {
+                    // The preflight above proved these are ONLY transient
+                    // typing sounds. Stop them BEFORE .playback, otherwise
+                    // a short optional alert would be audible with Silent ON.
+                    self.stopTransientTypingEffectsForVoice()
+                    guard BibloZooEssentialVoiceSession.begin(
+                        owner: "read-narration") else {
+                        call.resolve(["started": false,
+                                      "reason": "voice-session-unavailable"])
+                        return
+                    }
+                    self.essentialVoiceClipId = id
+                }
+                guard player.play() else {
+                    self.releaseEssentialVoice(for: id)
+                    call.resolve(["started": false, "reason": "player-refused"])
+                    return
+                }
+                self.clips[id] = player
+                self.clipSources[id] = key
+                self.armProgress()
+                self.emit("started", id: id, player: player)
+                call.resolve(["started": true,
+                              "positionMs": Int(player.currentTime * 1000),
+                              "durationMs": Int(player.duration * 1000)])
+            } catch {
+                self.releaseEssentialVoice(for: id)
+                call.resolve(["started": false, "reason": "decode-failed"])
+            }
+        }
+    }
+    @objc func stopClip(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self else { call.resolve(["stopped":false]); return }
+            if let id = call.getString("requestId") {
+                if let player = self.clips.removeValue(forKey: id) {
+                    player.stop()
+                    self.releaseEssentialVoice(for: id)
+                }
+                self.clipSources.removeValue(forKey: id)
+            }
+            call.resolve(["stopped": true])
+        }
+    }
+    @objc func seekClip(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle,
+                  let id = call.getString("requestId"),
+                  let player = self.clips[id],
+                  let ms = call.getDouble("positionMs"),
+                  ms.isFinite else {
+                call.resolve(["seeked": false]); return
+            }
+            player.currentTime = min(player.duration, max(0, ms / 1000))
+            self.emit("progress", id: id, player: player)
+            call.resolve(["seeked": true])
+        }
+    }
+    @objc func stopAll(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            self?.cancelAll(reason: "stopped")
+            call.resolve(["stopped": true])
+        }
+    }
+    public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer,
+                                            successfully flag: Bool) {
+        onMain { [weak self] in
+            guard let self = self else { return }
+            if let id = self.clips.first(where: { $0.value === player })?.key {
+                self.emit(flag ? "ended" : "interrupted", id: id,
+                          player: player, reason: flag ? "" : "player-failed")
+                self.clips.removeValue(forKey: id)
+                self.clipSources.removeValue(forKey: id)
+                self.releaseEssentialVoice(for: id)
+            } else {
+                self.cues.removeAll(where: { $0 === player })
+            }
+        }
+    }
+    // Source-authored fixed note patterns, synthesized entirely in
+    // native RAM. No user-supplied frequency, waveform, path or PCM.
+    private func wavData(midi: Int, seconds: Double, gain: Double,
+                         square: Bool = false,
+                         waveform: String = "current") -> Data {
+        let rate = 44_100
+        let count = min(22_050, max(512, Int(Double(rate) * seconds)))
+        var data = Data()
+        func bytes(_ value: String) {
+            data.append(contentsOf: value.utf8)
+        }
+        func word(_ value: UInt16) {
+            var le = value.littleEndian
+            withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+        }
+        func dword(_ value: UInt32) {
+            var le = value.littleEndian
+            withUnsafeBytes(of: &le) { data.append(contentsOf: $0) }
+        }
+        bytes("RIFF"); dword(UInt32(36 + count * 2))
+        bytes("WAVEfmt "); dword(16); word(1); word(1)
+        dword(UInt32(rate)); dword(UInt32(rate * 2))
+        word(2); word(16)
+        bytes("data"); dword(UInt32(count * 2))
+        let hz = 440 * pow(2, Double(midi - 69) / 12)
+        for index in 0..<count {
+            let t = Double(index) / Double(rate)
+            let phase = (t * hz).truncatingRemainder(dividingBy: 1)
+            let triangle = 4 * abs(phase - 0.5) - 1
+            let sine = sin(2 * Double.pi * phase)
+            let wave: Double
+            switch waveform {
+            case "sine":
+                wave = sine
+            case "soft-square":
+                // Rounded harmonics avoid the hard edges of a full square.
+                wave = 0.78 * sine + 0.22 * sin(3 * 2 * Double.pi * phase)
+            case "sawtooth":
+                wave = 2 * phase - 1
+            case "warm":
+                wave = 0.55 * triangle + 0.45 * sine
+            default:
+                // "current" is byte-for-byte the same triangle or square
+                // chosen by the existing child playCue() call.
+                wave = square ? (phase < 0.5 ? 1 : -1) : triangle
+            }
+            let attack = min(1, Double(index) / (0.018 * Double(rate)))
+            let release = min(1, Double(count - index) /
+                              (0.04 * Double(rate)))
+            let envelope: Double
+            if waveform == "web-triangle" {
+                // The original WEB oscillator has an exponential decay
+                // after a 20ms attack. Compare WITHOUT promoting it yet.
+                let rise = min(1, t / 0.02)
+                let decayed = pow(0.0001,
+                    max(0, t - 0.02) / max(0.01, seconds - 0.02))
+                envelope = rise * decayed
+            } else {
+                envelope = max(0, min(attack, release))
+            }
+            let sample = max(-1, min(1,
+                (waveform == "web-triangle" ? triangle : wave)
+                * gain * envelope))
+            word(UInt16(bitPattern: Int16(sample * 32767)))
+        }
+        return data
+    }
+    // R08 / READ-05+06: play(atTime:) requires a STRICTLY FUTURE device
+    // clock. After Apple Music/AirPods interruption and a quiet interval,
+    // deviceCurrentTime can be zero; scheduling the first note at exactly
+    // deviceCurrentTime + 0 risks losing the tap. Start its prepared player
+    // immediately, then anchor every later note to THAT running device clock
+    // (not to separate clocks read while constructing each WAV/player).
+    // Scheduled future notes must remain strongly held until delegate end
+    // or explicit interruption/Exit/stopCues; isPlaying can be false before
+    // the future start and is not a safe pruning test.
+    private func playPreparedReadCueNotes(
+        _ prepared: [(player: AVAudioPlayer, delay: Double)]
+    ) -> Int {
+        guard let first = prepared.first else { return 0 }
+        guard first.player.play() else {
+            prepared.forEach { $0.player.stop() }
+            return 0
+        }
+        cues.append(first.player)
+        let anchorTime = first.player.deviceCurrentTime
+        var started = 1
+        for note in prepared.dropFirst() {
+            if note.player.play(atTime: anchorTime + note.delay) {
+                cues.append(note.player)
+                started += 1
+            } else {
+                note.player.stop()
+            }
+        }
+        return started
+    }
+
+    @objc func playCue(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle,
+                  self.ownedByReadGesture,
+                  UIApplication.shared.applicationState == .active,
+                  AVAudioSession.sharedInstance().category == .soloAmbient,
+                  let kind = call.getString("kind"),
+                  ["order", "scramble", "negative"].contains(kind) else {
+                call.resolve(["played": false, "reason": "not-ready"])
+                return
+            }
+            let index = min(64, max(1, call.getInt("index") ?? 1))
+            let complete = call.getBool("complete") == true
+            let wrong = call.getBool("wrong") == true
+            let scale = [60, 62, 64, 67, 69, 72]
+            let base = scale[(index - 1) % scale.count]
+            let notes: [(Int, Double)]
+            let gain: Double
+            let duration: Double
+            let square: Bool
+            if kind == "negative" {
+                // READ-04: optional negative remains deliberately gentle.
+                notes = [(48, 0)]; gain = 0.08
+                duration = 0.15; square = true
+            } else if kind == "order" {
+                let midi = wrong ? 48 : base
+                notes = wrong ? [(midi, 0)] : complete ?
+                    [(midi, 0), (midi + 4, 0.09),
+                     (midi + 7, 0.18), (midi + 12, 0.27)] :
+                    [(midi, 0)]
+                // R10 / READ-04: other native game beeps can have a
+                // substantially stronger source level than these Read
+                // waves. Boost ONLY normal native word feedback by about
+                // +3.3 dB (0.22 -> 0.32); staggered completion notes use
+                // a softer 0.28 each to avoid a startling stacked flourish.
+                // Incorrect taps remain quiet, negative stays at 0.08.
+                gain = wrong ? 0.13 : (complete ? 0.28 : 0.32)
+                duration = wrong ? 0.14 : 0.17
+                square = wrong
+            } else {
+                notes = complete ?
+                    [(base, 0), (base + 4, 0.09),
+                     (base + 7, 0.19), (base + 12, 0.3)] :
+                    [(base, 0), (base + 4, 0.1)]
+                // Identical correct-word/finish calibration as order.
+                // No native/WebAudio fallback or AVAudioSession changes.
+                gain = complete ? 0.28 : 0.32
+                duration = complete ? 0.2 : 0.17
+                square = false
+            }
+            // Prepare the WHOLE fixed melody first: sample decoding cannot
+            // consume the 90/100ms note spacing after the first audible tap.
+            var prepared: [(player: AVAudioPlayer, delay: Double)] = []
+            for (midi, delay) in notes {
+                guard let player = try? AVAudioPlayer(
+                    data: self.wavData(midi: midi, seconds: duration,
+                                       gain: gain, square: square)),
+                    player.prepareToPlay() else {
+                    prepared.forEach { $0.player.stop() }
+                    call.resolve(["played": false,
+                                  "reason": "cue-prepare-failed",
+                                  "noteCount": 0])
+                    return
+                }
+                player.delegate = self
+                prepared.append((player: player, delay: delay))
+            }
+            // The delegate removes completed voices. Do not prune future
+            // scheduled notes using isPlaying (not yet audible != stale).
+            while self.cues.count + prepared.count > 12 &&
+                  !self.cues.isEmpty {
+                self.cues.removeFirst().stop()
+            }
+            let scheduled = self.playPreparedReadCueNotes(prepared)
+            call.resolve(["played": scheduled == notes.count,
+                          "noteCount": scheduled])
+        }
+    }
+    // N7f.2: audition ONLY. An explicit DEV Tools sample tap activates
+    // the same nonmixing output session; it NEVER replaces child playCue()
+    // and never captures, writes or bridges a voice recording.
+    @objc func auditionCue(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isDevBundle,
+                  UIApplication.shared.applicationState == .active,
+                  AVAudioSession.sharedInstance().category == .soloAmbient,
+                  let sample = call.getString("sample"),
+                  ["scramble-word", "scramble-finish", "order-finish"]
+                    .contains(sample),
+                  let waveform = call.getString("waveform"),
+                  ["current", "web-triangle", "sine", "soft-square",
+                   "sawtooth", "warm"].contains(waveform) else {
+                call.resolve(["played": false, "reason": "dev-only-or-invalid"])
+                return
+            }
+            do {
+                // The lab only starts audio on a fresh button tap.
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                call.resolve(["played": false, "reason": "os-denied"])
+                return
+            }
+            // Fixed deterministic notes let the owner compare TIMBRE using
+            // the same exact pitches, volumes and delays for every choice.
+            let base = 67 // fourth note of the existing six-note scale
+            let notes: [(Int, Double)]
+            let duration: Double
+            if sample == "scramble-word" {
+                notes = [(base, 0), (base + 4, 0.1)]
+                duration = 0.17
+            } else if sample == "scramble-finish" {
+                notes = [(base, 0), (base + 4, 0.09),
+                         (base + 7, 0.19), (base + 12, 0.3)]
+                duration = 0.2
+            } else {
+                notes = [(base, 0), (base + 4, 0.09),
+                         (base + 7, 0.18), (base + 12, 0.27)]
+                duration = 0.17
+            }
+            // DEV audition compares timbres at the same newly calibrated
+            // child-facing volume: one-word 0.32, multi-note finish 0.28.
+            // All waveform variants receive an identical per-sample gain.
+            let auditionGain = sample == "scramble-word" ? 0.32 : 0.28
+            // Another sample tap replaces (not layers with) the old
+            // audition. The child-facing playCue() behavior is untouched.
+            self.cues.forEach { $0.stop() }
+            self.cues.removeAll()
+            // Keep DEV waveform comparisons on the identical reliable
+            // native cue timing path; otherwise a zero-clock first note could
+            // invalidate later READ-04 level/timbre comparisons.
+            var prepared: [(player: AVAudioPlayer, delay: Double)] = []
+            for (midi, delay) in notes {
+                guard let player = try? AVAudioPlayer(
+                    data: self.wavData(midi: midi, seconds: duration,
+                                       gain: auditionGain, square: false,
+                                       waveform: waveform)),
+                    player.prepareToPlay() else {
+                    prepared.forEach { $0.player.stop() }
+                    call.resolve(["played": false,
+                                  "reason": "cue-prepare-failed",
+                                  "noteCount": 0])
+                    return
+                }
+                player.delegate = self
+                prepared.append((player: player, delay: delay))
+            }
+            let count = self.playPreparedReadCueNotes(prepared)
+            call.resolve(["played": count == notes.count,
+                          "noteCount": count])
+        }
+    }
+    @objc func stopCues(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            self?.cues.forEach { $0.stop() }
+            self?.cues.removeAll()
+            call.resolve(["stopped": true])
+        }
+    }
+}
+
+
+// Ghost Writer only: explicit local image/share and silent social-video export.
+// Each JPEG frame is submitted and ACKed separately from JavaScript; no audio
+// tracks, microphone, network transfer, or unbounded frame arrays are created.
+// Registered only in the Audio Test native app (not Web/PWA/Android).
+import AVFoundation
+import CoreVideo
+import Photos
+
+@objc(BibloZooGhostWriterExportPlugin)
+final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "BibloZooGhostWriterExportPlugin"
+    public let jsName = "BibloZooGhostWriterExport"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "beginVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "appendVideoFrame", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "finishVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelVideo", returnType: CAPPluginReturnPromise)
+    ]
+
+    private let exportQueue = DispatchQueue(label: "com.andydoane.biblozoo.ghostexport")
+    private let videoWidth = 1080
+    private let videoHeight = 1920
+    private let videoFPS: Int32 = 30
+    private let maximumFrames = 5400 // 3 minutes, bounded even for long verses.
+
+    private final class VideoJob {
+        let token: String
+        let url: URL
+        let writer: AVAssetWriter
+        let input: AVAssetWriterInput
+        let adaptor: AVAssetWriterInputPixelBufferAdaptor
+        var nextFrame = 0
+
+        init(token: String, url: URL, writer: AVAssetWriter,
+             input: AVAssetWriterInput, adaptor: AVAssetWriterInputPixelBufferAdaptor) {
+            self.token = token
+            self.url = url
+            self.writer = writer
+            self.input = input
+            self.adaptor = adaptor
+        }
+    }
+    // Accessed ONLY from exportQueue. No concurrent writers.
+    private var videoJob: VideoJob?
+
+    private func temporaryURL(extension ext: String, name: String) -> URL? {
+        // Preserve the friendly filename for Files/AirDrop in a unique temp
+        // folder. Ignore paths and illegal characters from JavaScript.
+        let stem = ((name as NSString).lastPathComponent as NSString).deletingPathExtension
+        let safe = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: " -_'"))
+        let cleaned = stem.unicodeScalars.map {
+            safe.contains($0) ? String($0) : "_"
+        }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("biblozoo-ghost-\(UUID().uuidString)")
+        do {
+            try FileManager.default.createDirectory(at: folder,
+                                                    withIntermediateDirectories: true)
+            return folder.appendingPathComponent(
+                String(cleaned.prefix(76)).isEmpty ? "Ghost Writer" : String(cleaned.prefix(76)))
+                .appendingPathExtension(ext)
+        } catch {
+            return nil
+        }
+    }
+
+    private func cleanupExport(at url: URL) {
+        let folder = url.deletingLastPathComponent()
+        guard folder.lastPathComponent.hasPrefix("biblozoo-ghost-"),
+              folder.deletingLastPathComponent().standardizedFileURL ==
+                FileManager.default.temporaryDirectory.standardizedFileURL else { return }
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    private func saveToPhotos(_ url: URL, video: Bool, call: CAPPluginCall) {
+        // PhotoKit add-only: no access to the child's existing library.
+        // Complete the Promise only after the OS confirms the asset was saved.
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState == .active else {
+                self.cleanupExport(at: url)
+                call.reject("Return to BibloZoo to save to Photos.")
+                return
+            }
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                guard status == .authorized || status == .limited else {
+                    self.cleanupExport(at: url)
+                    call.reject("Allow BibloZoo to Add Photos in Settings, or use Share.")
+                    return
+                }
+                PHPhotoLibrary.shared().performChanges({
+                    // Non-optional creation request: a no-op change block
+                    // must never return a false-positive "Saved!".
+                    let request = PHAssetCreationRequest.forAsset()
+                    let options = PHAssetResourceCreationOptions()
+                    options.originalFilename = url.lastPathComponent
+                    request.addResource(with: video ? .video : .photo,
+                                        fileURL: url, options: options)
+                }, completionHandler: { saved, error in
+                    self.cleanupExport(at: url)
+                    if saved {
+                        call.resolve(["saved": true, "destination": "photos"])
+                    } else {
+                        call.reject(error?.localizedDescription ??
+                                    "Photos could not save the Ghost Writer export.")
+                    }
+                })
+            }
+        }
+    }
+
+    private func presentShare(_ items: [Any], call: CAPPluginCall,
+                              cleanupURL: URL? = nil) {
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState == .active,
+                  let presenter = self.bridge?.viewController,
+                  presenter.presentedViewController == nil else {
+                if let url = cleanupURL { self.cleanupExport(at: url) }
+                call.reject("Please return to BibloZoo and try sharing again.")
+                return
+            }
+            let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX,
+                                            y: presenter.view.bounds.midY,
+                                            width: 1, height: 1)
+                popover.permittedArrowDirections = []
+            }
+            sheet.completionWithItemsHandler = { _, _, _, _ in
+                if let url = cleanupURL { self.cleanupExport(at: url) }
+            }
+            presenter.present(sheet, animated: true) {
+                // A share sheet opened; this does NOT claim the user saved.
+                call.resolve(["presented": true])
+            }
+        }
+    }
+
+    private func imageExportURL(_ call: CAPPluginCall) -> URL? {
+        guard let encoded = call.getString("png"),
+              encoded.hasPrefix("data:image/png;base64,") else { return nil }
+        let base64 = String(encoded.dropFirst("data:image/png;base64,".count))
+        guard base64.count <= 28_000_000,
+              let bytes = Data(base64Encoded: base64), bytes.count <= 20_000_000,
+              UIImage(data: bytes) != nil,
+              let url = temporaryURL(extension: "png",
+                                     name: call.getString("name") ?? "Ghost Writer Picture") else {
+            return nil
+        }
+        do {
+            try bytes.write(to: url, options: .atomic)
+            return url
+        } catch {
+            cleanupExport(at: url)
+            return nil
+        }
+    }
+
+    @objc func shareImage(_ call: CAPPluginCall) {
+        exportQueue.async {
+            guard let url = self.imageExportURL(call) else {
+                call.reject("Could not prepare the Ghost Writer PNG.")
+                return
+            }
+            // Unlike UIImage, sharing the PNG URL preserves the readable
+            // filename in Files, AirDrop and compatible destination apps.
+            self.presentShare([url], call: call, cleanupURL: url)
+        }
+    }
+
+    @objc func saveImage(_ call: CAPPluginCall) {
+        exportQueue.async {
+            guard let url = self.imageExportURL(call) else {
+                call.reject("Could not prepare the Ghost Writer PNG.")
+                return
+            }
+            self.saveToPhotos(url, video: false, call: call)
+        }
+    }
+
+    @objc func beginVideo(_ call: CAPPluginCall) {
+        exportQueue.async {
+            guard self.videoJob == nil else {
+                call.reject("A Ghost Writer video is already exporting."); return
+            }
+            guard let url = self.temporaryURL(
+                extension: "mp4", name: call.getString("name") ?? "Ghost Writer Video") else {
+                call.reject("Could not create a temporary MP4 file.")
+                return
+            }
+            do {
+                let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+                writer.shouldOptimizeForNetworkUse = true
+                let settings: [String: Any] = [
+                    AVVideoCodecKey: AVVideoCodecType.h264,
+                    AVVideoWidthKey: self.videoWidth,
+                    AVVideoHeightKey: self.videoHeight,
+                    AVVideoCompressionPropertiesKey: [
+                        AVVideoAverageBitRateKey: 4_500_000,
+                        AVVideoExpectedSourceFrameRateKey: self.videoFPS,
+                        AVVideoMaxKeyFrameIntervalKey: self.videoFPS * 2,
+                        AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
+                    ]
+                ]
+                let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
+                input.expectsMediaDataInRealTime = false
+                guard writer.canAdd(input) else {
+                    call.reject("H.264 video export isn't supported on this device."); return
+                }
+                writer.add(input)
+                let attributes: [String: Any] = [
+                    kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                    kCVPixelBufferWidthKey as String: self.videoWidth,
+                    kCVPixelBufferHeightKey as String: self.videoHeight,
+                    kCVPixelBufferCGImageCompatibilityKey as String: true,
+                    kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
+                ]
+                let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                    assetWriterInput: input, sourcePixelBufferAttributes: attributes)
+                guard writer.startWriting() else {
+                    call.reject(writer.error?.localizedDescription ?? "Unable to start video encoding.")
+                    self.cleanupExport(at: url)
+                    return
+                }
+                writer.startSession(atSourceTime: .zero)
+                let token = UUID().uuidString
+                self.videoJob = VideoJob(token: token, url: url, writer: writer,
+                                         input: input, adaptor: adaptor)
+                call.resolve(["token": token, "width": self.videoWidth,
+                              "height": self.videoHeight, "fps": self.videoFPS])
+            } catch {
+                self.cleanupExport(at: url)
+                call.reject("Could not start MP4 export: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func fail(_ job: VideoJob, _ call: CAPPluginCall, _ message: String) {
+        job.writer.cancelWriting()
+        self.cleanupExport(at: job.url)
+        videoJob = nil
+        call.reject(message)
+    }
+
+    private func makeBuffer(from jpeg: Data, job: VideoJob) -> CVPixelBuffer? {
+        guard let image = UIImage(data: jpeg), let cgImage = image.cgImage,
+              let pool = job.adaptor.pixelBufferPool else { return nil }
+        var buffer: CVPixelBuffer?
+        guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buffer)
+                == kCVReturnSuccess, let pixelBuffer = buffer else { return nil }
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        let info = CGBitmapInfo.byteOrder32Little.rawValue |
+            CGImageAlphaInfo.premultipliedFirst.rawValue
+        guard let context = CGContext(data: base, width: videoWidth, height: videoHeight,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: info) else { return nil }
+        // The JPEG frame is already upright; the extra Quartz flip in #86
+        // inverted the handwriting within an otherwise portrait MP4.
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: CGFloat(videoWidth),
+                                         height: CGFloat(videoHeight)))
+        return pixelBuffer
+    }
+
+    @objc func appendVideoFrame(_ call: CAPPluginCall) {
+        let token = call.getString("token") ?? ""
+        let index = call.getInt("index") ?? -1
+        let encoded = call.getString("jpeg") ?? ""
+        exportQueue.async {
+            guard let job = self.videoJob, job.token == token else {
+                call.reject("Video export is no longer active."); return
+            }
+            guard index == job.nextFrame, index >= 0, index < self.maximumFrames else {
+                self.fail(job, call, "Video frames must arrive in order (maximum 3 minutes).")
+                return
+            }
+            guard encoded.hasPrefix("data:image/jpeg;base64,"),
+                  encoded.count <= 12_000_000,
+                  let jpeg = Data(base64Encoded:
+                    String(encoded.dropFirst("data:image/jpeg;base64,".count))),
+                  jpeg.count <= 9_000_000,
+                  let buffer = self.makeBuffer(from: jpeg, job: job) else {
+                self.fail(job, call, "Could not read an export frame."); return
+            }
+            // Backpressure on a private queue: never freeze UIKit or hold
+            // hundreds of megabytes of frame data in JavaScript/Swift.
+            let deadline = Date().addingTimeInterval(8)
+            while !job.input.isReadyForMoreMediaData && Date() < deadline &&
+                  job.writer.status == .writing {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            guard job.input.isReadyForMoreMediaData,
+                  job.writer.status == .writing else {
+                self.fail(job, call, "The video encoder stopped responding."); return
+            }
+            let time = CMTime(value: Int64(index), timescale: self.videoFPS)
+            guard job.adaptor.append(buffer, withPresentationTime: time) else {
+                self.fail(job, call,
+                          job.writer.error?.localizedDescription ?? "Could not encode a video frame.")
+                return
+            }
+            job.nextFrame += 1
+            call.resolve(["accepted": true, "frames": job.nextFrame])
+        }
+    }
+
+    @objc func finishVideo(_ call: CAPPluginCall) {
+        let token = call.getString("token") ?? ""
+        exportQueue.async {
+            guard let job = self.videoJob, job.token == token else {
+                call.reject("Video export is no longer active."); return
+            }
+            guard job.nextFrame >= self.videoFPS else {
+                self.fail(job, call, "Video must include at least one second."); return
+            }
+            self.videoJob = nil
+            job.input.markAsFinished()
+            job.writer.finishWriting {
+                guard job.writer.status == .completed else {
+                    self.cleanupExport(at: job.url)
+                    call.reject(job.writer.error?.localizedDescription ??
+                                "The video could not be finished.")
+                    return
+                }
+                if call.getString("destination") == "share" {
+                    self.presentShare([job.url], call: call, cleanupURL: job.url)
+                } else {
+                    // Save Video defaults to Photos: success only on a
+                    // confirmed PhotoKit transaction, never a share-sheet open.
+                    self.saveToPhotos(job.url, video: true, call: call)
+                }
+            }
+        }
+    }
+
+    @objc func cancelVideo(_ call: CAPPluginCall) {
+        let token = call.getString("token") ?? ""
+        exportQueue.async {
+            guard let job = self.videoJob, job.token == token else {
+                call.resolve(["cancelled": false]); return
+            }
+            self.videoJob = nil
+            job.writer.cancelWriting()
+            self.cleanupExport(at: job.url)
+            call.resolve(["cancelled": true])
+        }
+    }
+}
+
+
+// NATIVE AUDIO TEST ONLY: Ghost Writer session-photo chooser.
+// PHPicker (Photos) and UIDocumentPicker (Files) are deliberately distinct:
+// neither opens UIImagePickerController's camera/capture option.
+// Images are downsampled to a bounded opaque JPEG in RAM and returned once
+// to the existing session-only JS canvas. No persistent files, raw EXIF,
+// library enumeration, background upload or Photo read permission.
+import PhotosUI
+import UniformTypeIdentifiers
+import ImageIO
+
+@objc(BibloZooGhostBackgroundPickerPlugin)
+final class BibloZooGhostBackgroundPickerPlugin: CAPPlugin, CAPBridgedPlugin,
+                                                   PHPickerViewControllerDelegate,
+                                                   UIDocumentPickerDelegate {
+    public let identifier = "BibloZooGhostBackgroundPickerPlugin"
+    public let jsName = "BibloZooGhostBackgroundPicker"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "choosePhoto", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "chooseFile", returnType: CAPPluginReturnPromise)
+    ]
+
+    private var pendingCall: CAPPluginCall?
+    private let maxFileBytes: Int64 = 18 * 1024 * 1024
+    private let maxPixels: Int64 = 80_000_000
+    private let maxEdge = 2560
+    private let maxJPEGBytes = 8 * 1024 * 1024
+
+    private func begin(_ call: CAPPluginCall, makePicker: @escaping () -> UIViewController) {
+        DispatchQueue.main.async {
+            guard BibloZooIOSIdentity.nativeAudioEnabled,
+                  UIApplication.shared.applicationState == .active,
+                  self.pendingCall == nil,
+                  let presenter = self.bridge?.viewController,
+                  presenter.presentedViewController == nil else {
+                call.reject("Photo picker is busy. Please try again.")
+                return
+            }
+            self.pendingCall = call
+            let picker = makePicker()
+            if let popover = picker.popoverPresentationController {
+                popover.sourceView = presenter.view
+                popover.sourceRect = CGRect(x: presenter.view.bounds.midX,
+                                            y: presenter.view.bounds.midY,
+                                            width: 1, height: 1)
+                popover.permittedArrowDirections = []
+            }
+            presenter.present(picker, animated: true)
+        }
+    }
+
+    @objc func choosePhoto(_ call: CAPPluginCall) {
+        begin(call) {
+            var config = PHPickerConfiguration()
+            config.filter = .images
+            config.selectionLimit = 1
+            config.preferredAssetRepresentationMode = .compatible
+            let picker = PHPickerViewController(configuration: config)
+            picker.delegate = self
+            return picker
+        }
+    }
+
+    @objc func chooseFile(_ call: CAPPluginCall) {
+        begin(call) {
+            let picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [.image], asCopy: false)
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            return picker
+        }
+    }
+
+    private func finish(cancelled: Bool = false, image: Data? = nil,
+                        name: String = "My Photo", error: String? = nil) {
+        DispatchQueue.main.async {
+            guard let call = self.pendingCall else { return }
+            self.pendingCall = nil
+            if let error = error {
+                call.reject(error)
+            } else if cancelled {
+                call.resolve(["cancelled": true])
+            } else if let image = image {
+                call.resolve([
+                    "name": String(name.prefix(100)),
+                    "dataUrl": "data:image/jpeg;base64," + image.base64EncodedString()
+                ])
+            } else {
+                call.reject("Could not import that photo.")
+            }
+        }
+    }
+
+    private func readBoundedPhoto(at url: URL) throws -> Data {
+        // Photos item-provider representations are scoped to the callback.
+        // Files caller separately manages security scope + coordinated read.
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let bytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        guard bytes > 0 && bytes <= maxFileBytes else {
+            throw NSError(domain: "GhostPhoto", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "Choose a photo smaller than 18 MB."])
+        }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, [
+                    kCGImageSourceShouldCache: false
+                ] as CFDictionary),
+              CGImageSourceGetCount(source) > 0 else {
+            throw NSError(domain: "GhostPhoto", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "That image could not be opened. Try a JPG or PNG."])
+        }
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as NSDictionary?
+        let width = (props?[kCGImagePropertyPixelWidth] as? NSNumber)?.int64Value ?? 0
+        let height = (props?[kCGImagePropertyPixelHeight] as? NSNumber)?.int64Value ?? 0
+        guard width > 0 && height > 0 && width <= maxPixels / height else {
+            throw NSError(domain: "GhostPhoto", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "This photo is too large. Choose a smaller one."])
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxEdge
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+                  source, 0, options as CFDictionary) else {
+            throw NSError(domain: "GhostPhoto", code: 4,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "The photo could not be prepared."])
+        }
+        let image = UIImage(cgImage: thumbnail)
+        guard let jpeg = image.jpegData(compressionQuality: 0.82),
+              jpeg.count <= maxJPEGBytes ||
+                (image.jpegData(compressionQuality: 0.60)?.count ?? Int.max) <= maxJPEGBytes
+        else {
+            throw NSError(domain: "GhostPhoto", code: 5,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "The photo is too complex. Try a smaller image."])
+        }
+        if jpeg.count <= maxJPEGBytes { return jpeg }
+        guard let compact = image.jpegData(compressionQuality: 0.60) else {
+            throw NSError(domain: "GhostPhoto", code: 6,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not encode the photo."])
+        }
+        return compact
+    }
+
+    private func importURL(_ url: URL, name: String) {
+        // Open in place: no persistent Files copy inside BibloZoo. Access
+        // is security-scoped only for this single import, with coordinated
+        // reads so iCloud/File Provider changes cannot race decoding.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            let coordinator = NSFileCoordinator(filePresenter: nil)
+            var coordinateError: NSError?
+            var decodeError: Error?
+            var result: Data?
+            coordinator.coordinate(readingItemAt: url, options: [], error: &coordinateError) {
+                readableURL in
+                do {
+                    result = try self.readBoundedPhoto(at: readableURL)
+                } catch {
+                    decodeError = error
+                }
+            }
+            if let jpeg = result {
+                self.finish(image: jpeg, name: name)
+            } else {
+                self.finish(error: decodeError?.localizedDescription ??
+                    coordinateError?.localizedDescription ??
+                    "That file couldn't be opened. Try an image from Photos.")
+            }
+        }
+    }
+
+    // PHPicker shows ONLY existing photo-library images. No app-wide Photos
+    // read permission and no camera action are requested.
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard let result = results.first else {
+            finish(cancelled: true)
+            return
+        }
+        let provider = result.itemProvider
+        let format = provider.registeredTypeIdentifiers.first {
+            UTType($0)?.conforms(to: .image) == true
+        }
+        guard let type = format else {
+            finish(error: "Choose a photo image, not a video.")
+            return
+        }
+        provider.loadFileRepresentation(forTypeIdentifier: type) { [weak self] url, error in
+            guard let self = self else { return }
+            guard let url = url else {
+                self.finish(error: error?.localizedDescription ??
+                            "That photo could not be opened.")
+                return
+            }
+            // File representations may be removed as soon as this handler
+            // returns; synchronously decode it here, not on a later queue.
+            do {
+                let jpeg = try self.readBoundedPhoto(at: url)
+                self.finish(image: jpeg, name: provider.suggestedName ?? "My Photo")
+            } catch {
+                self.finish(error: error.localizedDescription)
+            }
+        }
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController,
+                        didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else { finish(cancelled: true); return }
+        importURL(url, name: url.lastPathComponent)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        finish(cancelled: true)
     }
 }

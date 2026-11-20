@@ -18,6 +18,13 @@
   const ASSET_BASE =
     "./verse_images/read_my_verse/";
   const AUDIO_BASE = "./verse_audio/";
+  // N7f: shadow Audio ONLY inside this activity, never window.Audio.
+  // Browser/PWA/Android remains its original Audio constructor.
+  // Refer to the native controller through root in activity functions,
+  // not a closure-only binding. The older Read recovery regression harness
+  // also extracts and executes those individual functions in isolation.
+  const Audio = root?.BibloZooNativeReadOutputController?.enabled
+    ? root.BibloZooNativeReadOutputController.NativeAudio : root?.Audio;
   const TYPEWRITER_ACTIVITY_ID =
     "typewriter";
   const VERSE_CRAWL_ACTIVITY_ID =
@@ -42,6 +49,10 @@
   // Verse Crawl uses ordinary HTML audio for PWA, iOS and Android alike.
   const CRAWL_MUSIC_SRC = `${ASSET_BASE}verse_crawl_theme_ducked.mp3`;
   const CRAWL_ENDING_SRC = `${ASSET_BASE}verse_crawl_theme_ending.mp3`;
+  // The original BibloPet unlock clip is the deliberate audio-recovery cue
+  // for animated Read scenes (Crawl, Balloons and Fish) with a Zoo surprise.
+  // Their normal soundtrack/narration stays quiet until the real LOCK GATE.
+  const ANIMATED_READ_ZOO_CUE_SRC = "./ui_audio/ui_pet_unlock.mp3";
   const CRAWL_FANFARE_SECONDS = 7;
   const CRAWL_RESUME_SECONDS = 9;
   const CRAWL_ENDING_OVERLAP_MS = 1000;
@@ -246,7 +257,7 @@
       }),
       chunk_sequence: Object.freeze({
         id: CHUNK_SEQUENCE_ACTIVITY_ID,
-        title: "Chunk Audio Matching",
+        title: "Sound Sequence",
         enabled: true,
         backgrounds: Object.freeze({
           phone:
@@ -294,6 +305,7 @@
   let animationTimer = 0;
   let wordFeedbackTimer = 0;
   let typewriterIntroTimer = 0;
+  let typewriterIntroTask = null;
   let typewriterIntroWrap = null;
   let chunkGlowFadeTimer = 0;
   let lastKeySoundIndex = -1;
@@ -456,6 +468,43 @@
 
       return text.slice(from, to);
     });
+  }
+
+  // R12 / READ-01: echoParts boundaries are aligned to spoken words, so
+  // buildDisplayChunks may leave an OPENING quote after the previous spoken
+  // phrase (for example: "They replied, ‘" | "Believe in the Lord...").
+  // Only Typewriter/Keyboard need the quote to be displayed with the words
+  // it introduces. Move those exact characters across the VISUAL boundary,
+  // never alter canonical verseText, narration chunk indices, or other games.
+  function groupTypingOpeningQuotes(chunks) {
+    const result = [...chunks];
+    for (let index = 1; index < result.length; index += 1) {
+      const previous = result[index - 1];
+      // Curly opening quotes are unambiguous; straight quotes are treated
+      // as openers only when preceded by space or opening punctuation.
+      // Do NOT move curly closers (’ ”), contractions, or end-of-word
+      // straight closing quotes such as "Jesus'".
+      const match = /([\s\u00a0]*[\u2018\u201c\u00ab\u2039\u201e\u201a"']+[\s\u00a0]*)$/u.exec(previous);
+      if (!match || !/[\u2018\u201c\u00ab\u2039\u201e\u201a"']/u.test(match[1]))
+        continue;
+      const tail = match[1];
+      const before = previous.slice(0, -tail.length);
+      // The match also permits intervening/trailing spaces; avoid
+      // stealing ordinary whitespace from a previous chunk that has no
+      // opening quote, and never empty a previous spoken phrase.
+      if (!before.trim()) continue;
+      const quotes = tail.match(/[\u2018\u201c\u00ab\u2039\u201e\u201a"']/gu) || [];
+      if (quotes.length === 0) continue;
+      const allCurlyOpen = quotes.every((q) =>
+        /[\u2018\u201c\u00ab\u2039\u201e\u201a]/u.test(q));
+      const separated = /^[\s\u00a0]/u.test(tail);
+      if (!allCurlyOpen && !separated &&
+          !/[([{:,;\u2014\u2013-]$/u.test(before))
+        continue;
+      result[index - 1] = before;
+      result[index] = tail + result[index];
+    }
+    return result;
   }
 
   function getChunkAudioPath(
@@ -976,10 +1025,19 @@
       return null;
     }
 
-    const chunks = buildDisplayChunks(
+    const originalChunks = buildDisplayChunks(
       verse?.verseText,
       verse?.echoParts
     );
+    // R12: Only these two typing displays move a stranded OPENING quote
+    // to the next visually typed phrase. The canonical text stays exact,
+    // and audioIndices remain [0, 1, ...] for the original echoParts.
+    // If an unmatched echoParts fallback produced non-canonical slices,
+    // leave that exceptional text alone rather than changing its layout.
+    const chunks = isTypingActivity(activityId) &&
+      originalChunks.join("") === String(verse?.verseText || "")
+      ? groupTypingOpeningQuotes(originalChunks)
+      : originalChunks;
 
     if (!chunks.length) return null;
 
@@ -1043,7 +1101,10 @@
         .map((chunk, index) => ({
           chunk,
           index,
-          length: Array.from(chunk).length
+          // DEV forced-short/long must choose the SAME original spoken
+          // segment as before R12; moving a quote visually cannot
+          // change which echoParts audio suffix the test selects.
+          length: Array.from(originalChunks[index]).length
         }))
         .filter((entry) =>
           isChunkEligible(
@@ -1120,11 +1181,16 @@
       return false;
     }
 
-    return !!selectActivityChunks(
+    const selected = selectActivityChunks(
       verse,
       activityId,
       readTestMode
     );
+    // startForVerse requires 1–8 chunks; avoid offering an unusable
+    // child-facing card for an incompatible verse.
+    return !!selected &&
+      selected.chunks.length > 0 &&
+      selected.chunks.length <= 8;
   }
 
   function normalizeReadTestMode(
@@ -1450,6 +1516,28 @@
         )
     };
 
+    if (normalized.source === "learn_listen_activities") {
+      // Normal, child-facing free play has no Daily plan, task, launch
+      // token or DEV preview. It cannot use the Daily completion hook.
+      if (
+        !normalized.profileId ||
+        normalized.profileId !==
+          cleanString(appApi?.getActiveProfileId?.()) ||
+        normalized.verseId !== cleanString(verseId) ||
+        normalized.readActivityId !== cleanString(activityId) ||
+        !READ_ACTIVITY_MANIFEST[normalized.readActivityId]?.enabled ||
+        normalized.readTestMode !== "normal" ||
+        normalized.previewScope ||
+        normalized.planId ||
+        normalized.planDay ||
+        normalized.taskId ||
+        normalized.launchToken
+      ) {
+        return null;
+      }
+      return normalized;
+    }
+
     if (
       normalized.source !== "daily_todo" ||
       !normalized.profileId ||
@@ -1498,6 +1586,14 @@
   }
 
   function beginReadNarration(audio, fallback) {
+    // R16b.3: standalone Read speech still has its short source-validated
+    // essential-voice lease. Verse Crawl gets a separate explicit category
+    // lease at Start/Welcome Back, so NO Crawl clip is individually marked
+    // essential and music + narration can share its category safely.
+    if (root?.BibloZooNativeReadOutputController?.enabled === true &&
+        state.activityId !== VERSE_CRAWL_ACTIVITY_ID) {
+      audio?.markEssentialVoice?.();
+    }
     let result;
     try { result = audio.play(); } catch (error) { result = Promise.reject(error); }
     const promise = Promise.resolve(result);
@@ -1505,7 +1601,8 @@
     readAudioStartPromise = promise;
     promise.catch((error) => {
       if (activeAudio !== audio || completionReported) return;
-      if (readNarrationBlocked(error)) pauseReadForInterruption();
+      if (root?.BibloZooNativeReadOutputController?.enabled || readNarrationBlocked(error))
+        pauseReadForInterruption();
       else fallback?.();
     });
     return promise;
@@ -1542,24 +1639,36 @@
     return entry;
   }
 
+  // R07 / READ-02+03: WebKit can display a frozen Balloons/Fish frame
+  // while its CSS animation player and wall-clock collision deadlines drift.
+  // Capture RUNNING players before changing CSS play-state, and keep the
+  // original timestamps until the genuine Welcome Back recovery succeeds.
   function freezeReadScene(session) {
     if (!session?.active) return;
-    session.wrap?.classList.add("read-audio-paused");
-    // WebKit can advance CSS animations while backgrounded even with a paused
-    // ancestor style. Snapshot each actual animation timeline and pause it
-    // directly; on pageshow, restore the saved times before the next paint.
+    if (session.readSceneFrozenAt == null) session.readSceneFrozenAt = Date.now();
     const frozen = session.pausedAnimations ||= new Map();
     let animations = [];
     try { animations = session.wrap?.getAnimations?.({ subtree: true }) || []; }
-    catch (err) { /* CSS pause remains the fallback. */ }
+    catch (_) { /* Scoped CSS pause remains the fallback. */ }
     for (const animation of animations) {
       try {
-        if (!frozen.has(animation)) frozen.set(animation, animation.currentTime);
-        animation.pause();
-        // Set after pause(): Safari may otherwise overwrite our restored
-        // position with its already-advanced background timeline.
-        if (frozen.get(animation) !== null) animation.currentTime = frozen.get(animation);
-      } catch (err) { /* A finished or detached animation is harmless. */ }
+        if (!frozen.has(animation)) {
+          // Authored-paused, finished and idle players are not ours to resume.
+          // Old test stubs without playState represent running players.
+          if (["paused", "finished", "idle"].includes(animation.playState)) continue;
+          frozen.set(animation, animation.currentTime);
+        }
+        if (animation.playState !== "paused") animation.pause();
+        const frame = frozen.get(animation);
+        if (frame != null) animation.currentTime = frame;
+      } catch (_) { /* Detached WebKit players cannot block scene recovery. */ }
+    }
+    // Apply the style AFTER capturing the running players. A later WebKit
+    // restyle or repeated lifecycle event must not replace the first frame.
+    session.wrap?.classList.add("read-audio-paused");
+    for (const [animation, frame] of frozen) {
+      try { if (frame != null) animation.currentTime = frame; }
+      catch (_) { /* The element may have left the scene. */ }
     }
     for (const entry of session.timers) {
       if (!entry.id) continue;
@@ -1571,19 +1680,34 @@
 
   function thawReadScene(session, pausedMs = 0) {
     if (!session?.active) return;
-    // Balloon collision tracks use wall-clock times, unlike CSS animations.
+    // Use THIS scene's first frozen timestamp. A late-mounted or replaced
+    // scene must not inherit elapsed time from an earlier recovery overlay.
+    const elapsed = session.readSceneFrozenAt == null
+      ? Math.max(0, pausedMs)
+      : Math.max(0, Date.now() - session.readSceneFrozenAt);
+    session.readSceneFrozenAt = null;
     for (const track of [...(session.wordTracks || []), ...(session.balloonTracks || [])]) {
-      track.startMs += pausedMs;
+      track.startMs += elapsed;
     }
     session.fanfareLastProgress = Date.now();
-    session.wrap?.classList.remove("read-audio-paused");
-    for (const [animation, originalTime] of session.pausedAnimations || []) {
+    const frozen = session.pausedAnimations;
+    // Re-seek before removing the CSS pause class. Otherwise removing that
+    // class may first expose a 10+ second compositor catch-up / animationend.
+    for (const [animation, frame] of frozen || []) {
       try {
-        if (originalTime !== null) animation.currentTime = originalTime;
-        animation.play();
-      } catch (err) { /* The element may have left the scene. */ }
+        if (animation.playState === "running") animation.pause();
+        if (frame != null) animation.currentTime = frame;
+      } catch (_) { /* A detached player must never stop the remaining timers. */ }
     }
-    session.pausedAnimations?.clear();
+    session.wrap?.classList.remove("read-audio-paused");
+    for (const [animation, frame] of frozen || []) {
+      try {
+        if (frame != null) animation.currentTime = frame;
+        if (animation.playState === "paused" || animation.playState == null)
+          animation.play();
+      } catch (_) { /* Preserve the usable scene if a player was replaced. */ }
+    }
+    frozen?.clear();
     for (const entry of session.timers) if (!entry.id) entry.arm();
   }
 
@@ -1636,11 +1760,131 @@
   // a play() promise alone is never a successful recovery.
   let readZooEscape = null;
   let readZooRecovery = null;
-  function recoverReadZooFromGesture() {
+  // The child's verified Let's go! restores audio readiness, NOT permission
+  // to advance Read progress while a pet escape is still on top.
+  let readZooVerifiedRecovery = null;
+  let readZooFinalRecovery = null;
+  let readZooCueAudio = null;
+  function stopReadZooCue() {
+    const audio = readZooCueAudio;
+    readZooCueAudio = null;
+    if (!audio) return;
+    try { audio.pause(); audio.removeAttribute?.("src"); audio.load?.(); }
+    catch (_) { /* A retired cue cannot block explicit Read recovery. */ }
+  }
+  function retryReadZooFinalRecovery(recovery) {
+    if (readZooFinalRecovery !== recovery) return;
+    readZooFinalRecovery = null;
+    readZooRecovery = recovery;
+    // The previous Zoo rescue is finished. Failure must present a NEW real
+    // Let's go gesture, never resume audio under a dismissed/disabled gate.
+    readZooEscape?.start?.();
+    syncReadAudioOverlay();
+  }
+  function finishVerifiedReadRecovery(recovery, generation, continueActivity) {
+    if (generation !== readAudioRecoveryGeneration ||
+        readAudioRecovery !== recovery) return false;
+    if (readZooFinalRecovery === recovery) {
+      // The child used LOCK GATE as a second genuine audio gesture. The
+      // original activity-owned soundtrack/narration passed its old checks.
+      readZooFinalRecovery = null;
+      readZooRecovery = null;
+      readAudioRecovery = null;
+      continueActivity();
+      syncReadAudioOverlay();
+      return true;
+    }
+    if (readZooEscape?.isPaused?.() && readZooRecovery === recovery) {
+      // Zoo decides between "no surprise" and an escape after this verified
+      // result. Keep the original recovery guard/scene clocks frozen until
+      // the controller calls onRecovered (immediately or at LOCK GATE).
+      readZooVerifiedRecovery = {
+        recovery, generation, continueActivity, pausedMedia: [],
+        cueOnly: recovery.readZooCueVerified === true,
+        surpriseStarted: false
+      };
+      syncReadAudioOverlay();
+      return true;
+    }
+    readAudioRecovery = null;
+    continueActivity();
+    syncReadAudioOverlay();
+    return true;
+  }
+  function holdReadSceneDuringSurprise() {
+    const verified = readZooVerifiedRecovery;
+    if (!verified || verified.recovery !== readAudioRecovery) return;
+    verified.surpriseStarted = true;
+    if (verified.recovery.kind === "animated")
+      freezeReadScene(verified.recovery.scene);
+    freezeReadPauseTimer();
+    // Music/narration are restarted only by the child's later LOCK GATE tap.
+    // Never let an advancing soundtrack hide behind the escaping BibloPet.
+    const media = [crawlMusic?.audio, crawlEnding, activeAudio];
+    const seen = new Set();
+    for (const audio of media) {
+      if (!audio || seen.has(audio) || audio.paused) continue;
+      seen.add(audio);
+      try { audio.pause(); verified.pausedMedia.push(audio); } catch (_) {}
+    }
+  }
+  function finishReadZooSurprise(overlay) {
+    const verified = readZooVerifiedRecovery;
+    if (verified && verified.recovery === readAudioRecovery &&
+        verified.generation === readAudioRecoveryGeneration &&
+        !root.document.hidden && state.phase !== "idle" && !completionReported) {
+      readZooVerifiedRecovery = null;
+      if (verified.cueOnly) {
+        stopReadZooCue();
+        if (!verified.surpriseStarted) {
+          // A rare storage/selection failure never earns a surprise. A
+          // verified cue cannot silently restart the scene without a new tap.
+          readZooEscape?.start?.();
+          syncReadAudioOverlay();
+          return;
+        }
+        // This is the genuine LOCK GATE click. Resume the original
+        // animated activity audio on its own second real gesture, then
+        // retain the Zoo overlay until that owner's media checks verify.
+        readZooFinalRecovery = verified.recovery;
+        if (!resumeReadAudioFromGesture())
+          retryReadZooFinalRecovery(verified.recovery);
+        return;
+      }
+      // onRecovered is called from the actual pen/LOCK GATE gesture, so iOS
+      // gets a fresh user activation for paused media. This is not autoplay.
+      for (const audio of verified.pausedMedia) {
+        try {
+          const result = audio.play();
+          Promise.resolve(result).catch(() => {
+            if (!root.document.hidden && state.phase !== "idle")
+              pauseReadForInterruption();
+          });
+        } catch (_) { pauseReadForInterruption(); }
+      }
+      readAudioRecovery = null;
+      readZooRecovery = null;
+      verified.continueActivity();
+      overlay.hidden = true;
+      syncReadAudioOverlay();
+      return;
+    }
+    // If the child locked the phone AGAIN mid-rescue, the old media proof is
+    // invalid. Finish the pet rescue but require a new explicit Let's go.
+    readZooVerifiedRecovery = null;
+    readZooFinalRecovery = null;
+    stopReadZooCue();
+    readZooRecovery = null;
+    if (readAudioRecovery) syncReadAudioOverlay();
+    else overlay.hidden = true;
+  }
+  function recoverReadZooFromGesture(info) {
     const recovery = readAudioRecovery;
     const generation = readAudioRecoveryGeneration;
     if (!recovery || root.document.hidden) return false;
-    const started = resumeReadAudioFromGesture(); // direct user gesture
+    const started = resumeReadAudioFromGesture({
+      plannedSurprise: info?.plannedSurprise || null
+    }); // direct user gesture
     if (!started) return false;
     return new Promise(resolve => {
       const deadline = Date.now() + 6900;
@@ -1648,10 +1892,13 @@
         if (Date.now() >= deadline) return resolve(false);
         if (root.document.hidden || generation !== readAudioRecoveryGeneration ||
             state.phase === "idle" || completionReported) return resolve(false);
-        if (readAudioRecovery === null) {
-          // The owner only clears recovery after its playback/clock checks.
+        if (readZooVerifiedRecovery?.recovery === recovery &&
+            readZooVerifiedRecovery.generation === generation) {
+          // Audio is verified; the original scene is deliberately STILL
+          // paused until the surprise finishes or no surprise is chosen.
           return resolve(true);
         }
+        if (readAudioRecovery === null) return resolve(true);
         if (readAudioRecovery !== recovery ||
             (readAudioRecoveryAttempt === null && !!recovery.error)) {
           return resolve(false);
@@ -1712,13 +1959,19 @@
     if (root?.BibloZooZooEscape?.create && root?.BibloZooWelcomeBack?.markup) {
       readZooEscape = root.BibloZooZooEscape.create({
         overlay, profileId: state.context?.profileId,
+        // Read retains its original frozen-scene/audio recovery, with no
+        // random or DEV-forced Zoo surprise in any Read mode.
+        surpriseEnabled: false,
+        recoveryOnly: true,
+        preselectWelcomeSurprise: false,
         verseId: () => state.verseId,
         getSoundContext: () => scrambleAudioContext?.state === "running"
           ? scrambleAudioContext : keySoundContext?.state === "running"
             ? keySoundContext : appApi?.getExistingAudioContext?.(),
         isSoundMuted: () => appApi?.isMuted?.() === true,
         recover: recoverReadZooFromGesture,
-        onRecovered: () => { readZooRecovery = null; overlay.hidden = true; },
+        onSurpriseStart: holdReadSceneDuringSurprise,
+        onRecovered: () => finishReadZooSurprise(overlay),
         onExit: exitSession
       });
     }
@@ -1811,8 +2064,18 @@
   function pauseReadForInterruption() {
     if (!state.verseId || state.phase === "idle" || completionReported) return false;
     if (readAudioRecovery) {
+      // Repeated native/background events must NEVER unfreeze a typing intro
+      // or a CSS scene that is already awaiting a real Resume Audio tap.
+      if (root?.BibloZooNativeReadOutputController?.enabled &&
+          isTypingActivity(state.activityId)) freezeReadTypingIntro();
+      if (readAudioRecovery.kind === "animated")
+        freezeReadScene(readAudioRecovery.scene);
       // Another background event invalidates a pending Resume Audio attempt.
       if (root?.document?.hidden) {
+        readZooVerifiedRecovery = null;
+        if (readZooFinalRecovery) readZooRecovery = null;
+        readZooFinalRecovery = null;
+        stopReadZooCue();
         readAudioRecoveryGeneration += 1;
         readAudioRecoveryAttempt = null;
         stopReadNarration();
@@ -1831,6 +2094,8 @@
       syncReadAudioOverlay();
       return false;
     }
+    readZooFinalRecovery = null;
+    stopReadZooCue();
     readEffectRecoveryPending = true;
     readToneClockProbe = null;
     const scene = activeReadScene();
@@ -1845,16 +2110,20 @@
       recovery = { kind: "chunk" };
     }
     if (!recovery) {
-      // Typing and word activities need acknowledgement, not an invented
-      // audio replay or a new game pause state. Keep the existing intro policy.
-      if (isTypingActivity(state.activityId) && state.typewriterIntroPhase !== "done") {
-        finishTypewriterIntro();
-      }
+      // Web/PWA/Android retains its original typing-intro return behavior.
+      // Only the native Audio Test gets exact intro timeline freeze/resume.
+      if (!root?.BibloZooNativeReadOutputController?.enabled &&
+          isTypingActivity(state.activityId) &&
+          state.typewriterIntroPhase !== "done") finishTypewriterIntro();
       recovery = { kind: "ack" };
     }
     recovery.startedAt = Date.now();
     recovery.error = "";
     readAudioRecovery = recovery;
+    // Freeze BOTH short Typewriter/Keyboard intro timers AND cursor CSS.
+    // These must not finish while the held App Switcher is on screen.
+    if (root?.BibloZooNativeReadOutputController?.enabled &&
+        isTypingActivity(state.activityId)) freezeReadTypingIntro();
     readAudioRecoveryGeneration += 1;
     readAudioRecoveryAttempt = null;
     if (recovery.kind === "animated") {
@@ -1889,7 +2158,7 @@
   // foregrounded iOS media element may still have a frozen playback clock.
   // Do not thaw moving scenes on that unverified promise alone. This probe
   // intentionally observes the same media element the tap just started.
-  async function waitReadMediaProgress(audio, isCurrent, maxChecks = 6) {
+  async function waitReadMediaProgress(audio, isCurrent, maxChecks = 6, intervalMs = 220) {
     if (!audio || appApi?.isMuted?.()) return true;
     const initial = Number(audio.currentTime);
     if (!Number.isFinite(initial)) return false;
@@ -1898,7 +2167,7 @@
       if (readDeferredNarrationFinish || audio.ended) return true;
       const current = Number(audio.currentTime);
       if (Number.isFinite(current) && current > initial + 0.035) return true;
-      await new Promise(resolve => setTimeout(resolve, 220));
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
     const finished = !!readDeferredNarrationFinish || !!audio.ended;
     if (!finished && isCurrent()) recordReadRecoveryCheck("media-clock-stalled");
@@ -1919,6 +2188,58 @@
     });
   }
 
+  function resumeAnimatedReadWithZooCueFromGesture(recovery, generation, nativeActivation) {
+    // The surprise was provisionally selected in the SAME real Let's go tap.
+    // Keep Crawl's theme and Balloons/Fish narration completely silent until
+    // LOCK GATE. Reuse the original packaged pet-unlock MP3, not WebAudio or
+    // a second native plugin that might compete for session ownership.
+    stopReadZooCue();
+    const current = () => generation === readAudioRecoveryGeneration &&
+      readAudioRecovery === recovery;
+    let cue = null;
+    let start = Promise.resolve(true);
+    const muted = appApi?.isMuted?.() === true;
+    if (!muted) {
+      try {
+        cue = new Audio(ANIMATED_READ_ZOO_CUE_SRC);
+        cue.preload = "auto";
+        cue.volume = 0.55;
+        cue.setAttribute?.("playsinline", "");
+        cue.setAttribute?.("webkit-playsinline", "");
+        readZooCueAudio = cue;
+        // play() must be issued synchronously inside this real tap.
+        start = Promise.resolve(cue.play());
+      } catch (_) { start = Promise.resolve(false); }
+    }
+    syncReadAudioOverlay();
+    void (async () => {
+      const [nativeReady, cueStarted] = await Promise.all([
+        Promise.resolve(nativeActivation).catch(() => false),
+        waitReadRecoveryResult(start, 3000)
+      ]);
+      const progressed = muted || (cueStarted && !!cue &&
+        await waitReadMediaProgress(cue, current, 14, 95));
+      if (!current()) return;
+      readAudioRecoveryAttempt = null;
+      if (!nativeReady || !progressed || root?.document?.hidden) {
+        stopReadZooCue();
+        recovery.readZooCueVerified = false;
+        recovery.error = "Audio isn't ready yet. Try again!";
+        syncReadAudioOverlay();
+        return;
+      }
+      recovery.readZooCueVerified = true;
+      finishVerifiedReadRecovery(recovery, generation, () => {
+        thawReadPauseTimer();
+        thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
+        const delayedFinish = readDeferredNarrationFinish;
+        readDeferredNarrationFinish = null;
+        delayedFinish?.();
+      });
+    })();
+    return true;
+  }
+
   // Patch 20J: restore the frozen verse scene, not the old Web Audio graph.
   // The HTML soundtrack restarts at the configurable, already-ducked mark
   // from this user gesture. No native plugin and no scene reset are involved.
@@ -1929,7 +2250,8 @@
     stopCrawlEnding();
     readAudioStartPromise = null;
     // Play BEFORE awaiting any promise, so iOS sees this as a direct tap.
-    startCrawlMusic("interruption-resume", CRAWL_RESUME_SECONDS);
+    if (scene?.musicEnabled !== false)
+      startCrawlMusic("interruption-resume", CRAWL_RESUME_SECONDS);
     const song = crawlMusic;
     if (recovery.narration && recovery.narration.session.active) {
       const { session, item } = recovery.narration;
@@ -1938,7 +2260,7 @@
     }
     const narrationStart = readAudioStartPromise;
     const narrationAudio = activeAudio;
-    if (hadEnding && scene?.active) {
+    if (hadEnding && scene?.active && scene.musicEnabled !== false) {
       scene.endingStarted = false;
       startCrawlEnding(scene);
     }
@@ -1949,18 +2271,25 @@
     }
     syncReadAudioOverlay();
     void (async () => {
-      const started = !!appApi?.isMuted?.() || !!song &&
-        await waitReadRecoveryResult(song.startPromise, 3000);
-      const narrated = !narrationStart ||
-        await waitReadRecoveryResult(narrationStart, 3000);
+      // Starting two separate native players and then checking them in
+      // sequence left an audible half-second (or longer) lead-in before a
+      // verified surprise could re-freeze Crawl. Check starts and real clock
+      // advancement concurrently; never substitute a play() ACK for a clock.
+      const [started, narrated] = await Promise.all([
+        scene?.musicEnabled === false || !!appApi?.isMuted?.() || (!!song &&
+          waitReadRecoveryResult(song.startPromise, 3000)),
+        !narrationStart || waitReadRecoveryResult(narrationStart, 3000)
+      ]);
       const current = () => generation === readAudioRecoveryGeneration &&
         readAudioRecovery === recovery;
-      // Verse Crawl's direct HTML soundtrack is distinct from its narration.
-      // Recheck both clocks before releasing the frozen scene.
-      const movingSong = started && (appApi?.isMuted?.() ||
-        await waitReadMediaProgress(song?.audio, current));
-      const movingNarration = narrated && (!narrationStart ||
-        await waitReadMediaProgress(narrationAudio, current));
+      // Poll earlier for the first real native progress event, while keeping
+      // a bounded ~1.3s window and the exact original >35ms clock threshold.
+      const [movingSong, movingNarration] = await Promise.all([
+        started && (scene?.musicEnabled === false || appApi?.isMuted?.() ||
+          waitReadMediaProgress(song?.audio, current, 14, 95)),
+        narrated && (!narrationStart ||
+          waitReadMediaProgress(narrationAudio, current, 14, 95))
+      ]);
       if (!current()) return;
       recordReadRecoveryCheck("crawl-resume-check", {
         soundtrackClockAdvanced: !!movingSong, narrationClockAdvanced: !!movingNarration
@@ -1972,26 +2301,40 @@
         stopCrawlMusic();
         stopCrawlEnding();
         recovery.error = "Audio isn't ready yet. Try again!";
+        retryReadZooFinalRecovery(recovery);
         syncReadAudioOverlay();
         return;
       }
-      readAudioRecovery = null;
-      thawReadPauseTimer();
-      thawReadScene(scene, Date.now() - recovery.startedAt);
-      syncReadAudioOverlay();
-      const delayedFinish = readDeferredNarrationFinish;
-      readDeferredNarrationFinish = null;
-      delayedFinish?.();
+      finishVerifiedReadRecovery(recovery, generation, () => {
+        thawReadPauseTimer();
+        thawReadScene(scene, Date.now() - recovery.startedAt);
+        const delayedFinish = readDeferredNarrationFinish;
+        readDeferredNarrationFinish = null;
+        delayedFinish?.();
+      });
     })();
     return true;
   }
 
-  function resumeReadAudioFromGesture() {
+  function resumeReadAudioFromGesture(options = {}) {
+    // A user-tapped Welcome Back is the only post-interruption takeover.
     const recovery = readAudioRecovery;
     if (!recovery || readAudioRecoveryAttempt || root?.document?.hidden) return false;
+    const nativeMode = root?.BibloZooNativeReadOutputController?.enabled === true;
+    // N7m: Invoke the session claim synchronously on the REAL Let's go tap,
+    // but don't mistake an unverified Promise/gesture for recovered audio.
+    // Keyboard/Typewriter quiet states have no AVAudioPlayer to verify.
+    const nativeActivation = nativeMode
+      ? root.BibloZooNativeReadOutputController.activateFromGesture({
+          crawlSession: state.activityId === VERSE_CRAWL_ACTIVITY_ID
+        })
+      : Promise.resolve(true);
     const generation = readAudioRecoveryGeneration;
     readAudioRecoveryAttempt = { generation };
     recovery.error = "";
+    // A prior interrupted/failed cue cannot leak into a later ordinary
+    // recovery attempt. Final LOCK GATE verification uses a separate guard.
+    recovery.readZooCueVerified = false;
     if (recovery.kind === "ack") {
       // Nothing must replay. This real tap can prime nonessential UI effects,
       // but no asynchronous unlock can restart input or stall acknowledgement.
@@ -2003,30 +2346,49 @@
         (state.activityId === TAP_WORDS_ORDER_ACTIVITY_ID ||
           state.activityId === UNSCRAMBLE_ACTIVITY_ID) &&
         !!(root?.AudioContext || root?.webkitAudioContext);
-      if (!needsToneRecovery) {
+      if (!needsToneRecovery && !nativeMode) {
+        // Preserve the original Web/PWA/Android immediate quiet ACK.
         if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery ||
             root?.document?.hidden) return false;
         readAudioRecoveryAttempt = null;
-        readAudioRecovery = null;
-        thawReadPauseTimer();
-        syncReadAudioOverlay();
+        finishVerifiedReadRecovery(recovery, generation, () => {
+          thawReadPauseTimer();
+          thawReadTypingIntro();
+        });
         return true;
       }
-      // Starting context.resume() here retains the original user gesture.
-      const toneCheck = prepareReadTonesFromGesture();
-      void Promise.resolve(toneCheck).then(ready => {
-        if (generation !== readAudioRecoveryGeneration || readAudioRecovery !== recovery) return;
-        readAudioRecoveryAttempt = null;
-        if (!ready || root?.document?.hidden) {
+      // Start any Web tone resume INSIDE the original tap, before awaiting.
+      // Native-only quiet pages need a confirmed native session claim before
+      // the fixed overlay may disappear. This is NOT speaker output proof.
+      const toneCheck = needsToneRecovery
+        ? prepareReadTonesFromGesture() : Promise.resolve(true);
+      void Promise.all([Promise.resolve(nativeActivation), Promise.resolve(toneCheck)])
+        .then(([nativeReady, tonesReady]) => {
+          if (generation !== readAudioRecoveryGeneration ||
+              readAudioRecovery !== recovery) return;
+          readAudioRecoveryAttempt = null;
+          if (!nativeReady || !tonesReady || root?.document?.hidden) {
+            recovery.error = "Audio isn't ready yet. Try again!";
+            syncReadAudioOverlay();
+            return;
+          }
+          finishVerifiedReadRecovery(recovery, generation, () => {
+            thawReadPauseTimer();
+            thawReadTypingIntro();
+          });
+        }).catch(() => {
+          if (generation !== readAudioRecoveryGeneration ||
+              readAudioRecovery !== recovery) return;
+          readAudioRecoveryAttempt = null;
           recovery.error = "Audio isn't ready yet. Try again!";
           syncReadAudioOverlay();
-          return;
-        }
-        readAudioRecovery = null;
-        thawReadPauseTimer();
-        syncReadAudioOverlay();
-      });
+        });
       return true;
+    }
+    if (recovery.kind === "animated" && isAnimatedActivity(state.activityId) &&
+        options?.plannedSurprise && readZooEscape?.isPaused?.()) {
+      return resumeAnimatedReadWithZooCueFromGesture(
+        recovery, generation, nativeActivation);
     }
     if (recovery.kind === "animated" &&
         state.activityId === VERSE_CRAWL_ACTIVITY_ID) {
@@ -2078,9 +2440,13 @@
       const heard = started && (appApi?.isMuted?.() || !narrationAudio ||
         await waitReadMediaProgress(narrationAudio, current));
       const tonesReady = await toneReady;
+      // An animated Balloons/Fish quiet interval may have no narration
+      // promise at all. Never unfreeze its timers merely because there was
+      // no clip to fail: require the real native session decision as well.
+      const nativeReady = await Promise.resolve(nativeActivation).catch(() => false);
       if (!current()) return;
       readAudioRecoveryAttempt = null;
-      if (!heard || !tonesReady || root?.document?.hidden) {
+      if (!heard || !tonesReady || !nativeReady || root?.document?.hidden) {
         stopReadNarration();
         if (kind === "sequence") {
           recovery.data.activeButtonIndex = -1;
@@ -2091,16 +2457,23 @@
         if (crawlMusic) { try { crawlMusic.audio.pause(); } catch (err) { } }
         if (crawlEnding) { try { crawlEnding.pause(); } catch (err) { } }
         recovery.error = "Audio isn't ready yet. Try again!";
+        // Balloons/Fish final LOCK GATE can fail even when its earlier
+        // pet-unlock cue was verified. Return to an explicit Welcome Back,
+        // never strand the disabled gate or thaw the scene on a play() ACK.
+        if (readZooFinalRecovery === recovery)
+          retryReadZooFinalRecovery(recovery);
         syncReadAudioOverlay();
         return;
       }
-      readAudioRecovery = null;
-      thawReadPauseTimer();
-      if (kind === "animated") thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
-      syncReadAudioOverlay();
-      const delayedFinish = readDeferredNarrationFinish;
-      readDeferredNarrationFinish = null;
-      delayedFinish?.();
+      finishVerifiedReadRecovery(recovery, generation, () => {
+        thawReadPauseTimer();
+        if (kind === "animated")
+          thawReadScene(recovery.scene, Date.now() - recovery.startedAt);
+        thawReadTypingIntro();
+        const delayedFinish = readDeferredNarrationFinish;
+        readDeferredNarrationFinish = null;
+        delayedFinish?.();
+      });
     })();
     return true;
   }
@@ -2116,10 +2489,23 @@
   });
   root?.addEventListener?.("pagehide", pauseReadForInterruption);
   root?.addEventListener?.("pageshow", restorePausedReadSceneOnReturn);
+  // N7f.2: UIApplication.willResignActive precedes WebKit visibilitychange
+  // while the owner HOLDS the multitask/app switcher. Native freezes the
+  // presented layer instantly; this callback freezes the READ scene,
+  // intro timers and pending score clocks until a real Welcome Back tap.
+  root?.BibloZooNativeReadOutputController?.onAppInactive?.(
+    () => {
+      if (appApi?.isActive?.() === false) return;
+      pauseReadForInterruption();
+    });
 
   function stopAudio() {
+    stopReadZooCue();
+    readZooFinalRecovery = null;
+    if (root?.BibloZooNativeReadOutputController?.enabled) void root.BibloZooNativeReadOutputController.stopAll();
     readAudioRecoveryGeneration += 1;
     readZooRecovery = null;
+    readZooVerifiedRecovery = null;
     readAudioRecovery = null;
     readAudioRecoveryAttempt = null;
     readActiveAnimatedNarration = null;
@@ -2168,6 +2554,7 @@
     clearTimeout(wordFeedbackTimer);
     clearTimeout(typewriterIntroTimer);
     typewriterIntroTimer = 0;
+    typewriterIntroTask = null;
     typewriterIntroWrap = null;
     pauseTimer = 0;
     animationTimer = 0;
@@ -2282,6 +2669,12 @@
     state.decorations =
       createDecorations(safeActivityId);
 
+    // Claim audio priority only on this actual Start interaction.
+    // Subsequent animated chunk timers may NEVER seize it anew.
+    if (root?.BibloZooNativeReadOutputController?.enabled)
+      void root.BibloZooNativeReadOutputController.activateFromGesture({
+        crawlSession: safeActivityId === VERSE_CRAWL_ACTIVITY_ID
+      });
     // Start in the launch gesture so iOS permits music playback.
     if (safeActivityId === VERSE_CRAWL_ACTIVITY_ID) {
       startCrawlMusic("activity-launch");
@@ -2444,7 +2837,8 @@
     if (!keySoundAudio.length && root?.Audio) {
       keySoundAudio = sources.flatMap((src) =>
         Array.from({ length: KEY_SOUND_FALLBACK_VOICES }, () => {
-          const audio = new root.Audio(src);
+          const audio = root?.BibloZooNativeReadOutputController?.enabled
+            ? new Audio(src) : new root.Audio(src);
           audio.preload = "auto";
           audio.setAttribute("playsinline", "");
           audio.setAttribute("webkit-playsinline", "");
@@ -2615,6 +3009,7 @@
   }
 
   function stopScrambleRewards() {
+    if (root?.BibloZooNativeReadOutputController?.enabled) void root.BibloZooNativeReadOutputController.stopCues();
     scrambleSoundVoices.forEach(({ oscillator, gain }) => {
       try { oscillator.onended = null; oscillator.stop(); } catch (err) { }
       try { oscillator.disconnect(); gain.disconnect(); } catch (err) { }
@@ -2631,6 +3026,10 @@
   // Notes are scheduled together, so no delayed callback can outlive a game.
   function playScrambleReward(solvedCount, complete) {
     if (appApi?.isMuted?.()) return;
+    if (root?.BibloZooNativeReadOutputController?.enabled) {
+      root.BibloZooNativeReadOutputController.playCue("scramble", solvedCount, complete, false);
+      return;
+    }
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
     if (!AudioContextClass) return;
     try {
@@ -2674,6 +3073,10 @@
   // completion flourish. These voices use the same lifecycle as Scramble's.
   function playOrderTone(nextIndex, complete = false, wrong = false) {
     if (appApi?.isMuted?.()) return;
+    if (root?.BibloZooNativeReadOutputController?.enabled) {
+      root.BibloZooNativeReadOutputController.playCue("order", nextIndex, complete, wrong);
+      return;
+    }
     const AudioContextClass = root?.AudioContext || root?.webkitAudioContext;
     if (!AudioContextClass) return;
     try {
@@ -2805,6 +3208,10 @@
   }
 
   function playGeneratedNegativeTone() {
+    if (root?.BibloZooNativeReadOutputController?.enabled) {
+      root.BibloZooNativeReadOutputController.playCue("negative", 1, false, true);
+      return;
+    }
     const AudioContextClass =
       root?.AudioContext ||
       root?.webkitAudioContext;
@@ -2865,9 +3272,9 @@
 
     if (!negativeFeedbackAudio) {
       negativeFeedbackAudio =
-        new root.Audio(
-          READ_FEEDBACK_ASSETS.negative
-        );
+        root?.BibloZooNativeReadOutputController?.enabled
+          ? new Audio(READ_FEEDBACK_ASSETS.negative)
+          : new root.Audio(READ_FEEDBACK_ASSETS.negative);
       negativeFeedbackAudio.preload =
         "auto";
       negativeFeedbackAudio.setAttribute(
@@ -3143,7 +3550,10 @@
     if (state.phase !== "pause") return;
     clearReadChunkNarrationWatchdog();
 
-    // Let the completion alert finish while spoken chunk audio begins.
+    // Preserve the original short completion-alert overlap on Web/PWA/
+    // Android. On native iOS only, R16b.1 preempts a transient key/alert
+    // player BEFORE the spoken verse leases the shared .playback category.
+    // Never let an optional alert veto narration or follow it into Silent ON.
     stopKeySoundVoices({ keepChunkAlert: true });
     stopScrambleRewards();
     if (negativeFeedbackAudio) {
@@ -3204,7 +3614,8 @@
       activeAudio.addEventListener(
         "error",
         () => {
-          if (root?.document?.hidden) pauseReadForInterruption();
+          if (root?.document?.hidden || root?.BibloZooNativeReadOutputController?.enabled)
+            pauseReadForInterruption();
           else finish();
         },
         { once: true }
@@ -3599,7 +4010,8 @@
 
     try {
       activeAudio?.pause?.();
-      activeAudio = new root.Audio(src);
+      activeAudio = root?.BibloZooNativeReadOutputController?.enabled
+        ? new Audio(src) : new root.Audio(src);
       activeAudio.preload = "auto";
       activeAudio.setAttribute(
         "playsinline",
@@ -3613,7 +4025,8 @@
       activeAudio.addEventListener(
         "error",
         () => {
-          if (root?.document?.hidden) pauseReadForInterruption();
+          if (root?.document?.hidden || root?.BibloZooNativeReadOutputController?.enabled)
+            pauseReadForInterruption();
           else finish();
         },
         { once: true }
@@ -4033,18 +4446,28 @@
   // The pre-ducked track is intentionally played without Web Audio or JS
   // volume automation. Direct HTML media is the proven Patch 20B recovery path.
   function startCrawlMusic(reason = "unspecified", resumeAt = 0) {
-    if (appApi?.isMuted?.() || !root?.Audio) return;
+    if (appApi?.isMuted?.() || !root?.Audio ||
+        (crawlSession?.active && !crawlSession.musicEnabled)) return;
     try {
-      const audio = new root.Audio(CRAWL_MUSIC_SRC);
+      const audio = root?.BibloZooNativeReadOutputController?.enabled
+        ? new Audio(CRAWL_MUSIC_SRC)
+        : new root.Audio(CRAWL_MUSIC_SRC);
       audio.preload = "auto";
       audio.loop = false;
       audio.setAttribute?.("playsinline", "");
       audio.setAttribute?.("webkit-playsinline", "");
       const music = { audio, context: null, gain: null,
-        engine: "html-media-direct-20j", failed: false };
+        engine: root?.BibloZooNativeReadOutputController?.enabled ? "native-read-n7f" :
+          "html-media-direct-20j", failed: false };
       crawlMusic = music;
       audio.addEventListener?.("error", () => {
+        if (crawlMusic !== music) return; // Intentional toggle/Exit isn't interruption.
         music.failed = true;
+        // A real AirPods Play/route loss can interrupt only the theme while
+        // its animation is running. Freeze Read's own scene and require
+        // Resume Audio; an automatic next chunk must never steal priority.
+        if (root?.BibloZooNativeReadOutputController?.enabled)
+          pauseReadForInterruption();
       });
       if (resumeAt > 0) {
         const seek = () => {
@@ -4059,7 +4482,12 @@
       // play() is invoked synchronously during the launch/resume gesture.
       music.startPromise = Promise.resolve(audio.play()).then(
         () => true,
-        () => { music.failed = true; return false; });
+        () => {
+          if (crawlMusic !== music) return false; // Retired track is harmless.
+          music.failed = true;
+          if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
+          return false;
+        });
     } catch (error) {
       stopCrawlMusic();
     }
@@ -4068,26 +4496,38 @@
   function stopCrawlMusic() {
     const music = crawlMusic;
     crawlMusic = null;
-    if (!music) return;
+    if (!music) return Promise.resolve({ stopped: true });
     try {
-      music.audio.pause();
+      const stopped = Promise.resolve(music.audio.pause());
       music.audio.removeAttribute?.("src");
       music.audio.load?.();
-    } catch (error) { /* Audio teardown remains best effort. */ }
+      return stopped;
+    } catch (error) { return Promise.resolve({ stopped: false }); }
   }
 
   function stopCrawlEnding() {
     const ending = crawlEnding;
     crawlEnding = null;
-    if (!ending) return;
-    try { ending.pause(); ending.removeAttribute?.("src"); ending.load?.(); }
-    catch (error) { /* Audio teardown remains best effort. */ }
+    if (!ending) return Promise.resolve({ stopped: true });
+    try {
+      const stopped = Promise.resolve(ending.pause());
+      ending.removeAttribute?.("src");
+      ending.load?.();
+      return stopped;
+    } catch (error) { return Promise.resolve({ stopped: false }); }
   }
 
   function startCrawlEnding(session) {
     if (!session?.active || session.endingStarted) return;
     session.endingStarted = true;
     session.endingDone = false;
+    if (!session.musicEnabled) {
+      session.endingDone = true;
+      stopCrawlMusic();
+      stopCrawlEnding();
+      completeCrawlIfReady(session);
+      return;
+    }
     if (appApi?.isMuted?.() || !root?.Audio) {
       session.endingDone = true;
       completeCrawlIfReady(session);
@@ -4095,7 +4535,9 @@
     }
     let ending;
     try {
-      ending = new root.Audio(CRAWL_ENDING_SRC);
+      ending = root?.BibloZooNativeReadOutputController?.enabled
+        ? new Audio(CRAWL_ENDING_SRC)
+        : new root.Audio(CRAWL_ENDING_SRC);
       ending.preload = "auto";
       ending.setAttribute?.("playsinline", "");
       ending.setAttribute?.("webkit-playsinline", "");
@@ -4108,7 +4550,10 @@
         completeCrawlIfReady(session);
       };
       ending.addEventListener?.("ended", finish, { once: true });
-      ending.addEventListener?.("error", finish, { once: true });
+      ending.addEventListener?.("error", () => {
+        if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
+        else finish();
+      }, { once: true });
       Promise.resolve(ending.play()).then(
         () => {
           if (crawlEnding !== ending) return;
@@ -4120,9 +4565,16 @@
             }
           }, CRAWL_ENDING_OVERLAP_MS);
         },
-        () => finish());
-      // Never strand completion if WebKit omits ended/error.
-      crawlTimer(session, finish, 6500);
+        () => {
+          if (root?.BibloZooNativeReadOutputController?.enabled) pauseReadForInterruption();
+          else finish();
+        });
+      // Native never gives verse completion for an elapsed watchdog alone.
+      crawlTimer(session, () => {
+        if (root?.BibloZooNativeReadOutputController?.enabled && !session.endingDone)
+          pauseReadForInterruption();
+        else finish();
+      }, 6500);
     } catch (error) {
       session.endingDone = true;
       stopCrawlEnding();
@@ -4132,8 +4584,8 @@
 
   function waitForCrawlFanfare(session, start) {
     let music = crawlMusic;
-    if (!music || music.failed || appApi?.isMuted?.()) {
-      if (music?.failed || appApi?.isMuted?.()) stopCrawlMusic();
+    if (!session.musicEnabled || !music || music.failed || appApi?.isMuted?.()) {
+      if (!session.musicEnabled || music?.failed || appApi?.isMuted?.()) stopCrawlMusic();
       start();
       return;
     }
@@ -4148,7 +4600,7 @@
         lastTime = -1;
         session.fanfareLastProgress = Date.now();
       }
-      if (crawlMusic !== music || music.failed || music.audio.ended ||
+      if (!session.musicEnabled || crawlMusic !== music || music.failed || music.audio.ended ||
           appApi?.isMuted?.()) {
         stopCrawlMusic();
         start();
@@ -4420,7 +4872,7 @@
     }
   }
 
-  function playCrawlAudio(session, item) {
+  function playCrawlAudio(session, item, resumeAt = 0) {
     if (!session.active || item.audioStarted || item.vanished) return;
     item.audioStarted = true;
     state.phase = "playing";
@@ -4444,6 +4896,10 @@
     try {
       activeAudio = new Audio(src);
       activeAudio.preload = "auto";
+      if (resumeAt > 0) {
+        // Native shim seeks the NEW clip before play, preserving verse position.
+        try { activeAudio.currentTime = resumeAt; } catch (_) {}
+      }
       activeAudio.addEventListener("ended", finish, { once: true });
       activeAudio.addEventListener("error", () => {
         if (root?.document?.hidden) pauseReadForInterruption();
@@ -4512,6 +4968,28 @@
     }, motion.durationMs + 1500);
   }
 
+  // R16b.3: Music ON or OFF is solely a per-session track choice. The
+  // native iOS Verse Crawl Start/Welcome Back gesture already owns a scoped
+  // .playback lease, so toggling NEVER stops/restarts narration, changes the
+  // shared category, or triggers a fabricated interruption. Works with the
+  // hardware Silent switch in either position without probing its state.
+  function toggleCrawlMusic(session) {
+    if (!session?.active || crawlSession !== session || readAudioRecovery ||
+        root?.document?.hidden || session.endingStarted || completionReported)
+      return;
+    session.musicEnabled = !session.musicEnabled;
+    session.musicButton?.classList.toggle("is-off", !session.musicEnabled);
+    session.musicButton?.setAttribute("aria-pressed", String(session.musicEnabled));
+    session.musicButton?.setAttribute("aria-label", session.musicEnabled
+      ? "Turn Verse Crawl music off" : "Turn Verse Crawl music on");
+    if (session.musicEnabled)
+      startCrawlMusic("music-button", CRAWL_RESUME_SECONDS);
+    else {
+      stopCrawlMusic();
+      stopCrawlEnding();
+    }
+  }
+
   function renderCrawlScreen(idx, verse) {
     if (crawlSession) {
       stopCrawlSequence();
@@ -4525,6 +5003,11 @@
       (state.reducedMotion ? " is-reduced-motion" : "");
     wrap.innerHTML = `
       <button class="read-my-verse-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Verse Crawl">‹</button>
+      <button class="read-crawl-music-toggle no-zoom" type="button"
+        data-read-crawl-music-toggle data-no-ui-sound aria-pressed="true"
+        aria-label="Turn Verse Crawl music off">
+        <img src="./verse_images/game_ui/ui_icon_music_notes.png" alt="" aria-hidden="true">
+      </button>
       <main class="read-animated-stage" style="${animatedBackgroundStyle(manifest)}">
         <header class="read-animated-header">
           <div class="read-animated-reference">${escapeHtml(verse.ref || state.verseId)}</div>
@@ -4544,9 +5027,16 @@
       reference: String(verse.ref || state.verseId),
       scene: wrap.querySelector(".read-animated-scene"),
       window: wrap.querySelector("[data-read-crawl-window]"),
+      musicButton: wrap.querySelector("[data-read-crawl-music-toggle]"),
+      musicEnabled: true,
       items: new Map(), timers: new Set()
     };
     crawlSession = session;
+    session.musicButton.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleCrawlMusic(session);
+    };
     attachReadRecoveryScene(session);
     let started = false;
     const start = () => {
@@ -5426,17 +5916,67 @@
     };
   }
 
-  // Keep the words "the verse." together if the intro wraps. Reserve the
-  // complete sentence while typing so neither line shifts as letters appear.
+  // R12b: two fixed lines, independent of the selected Bible verse.
+  // Reserve BOTH full lines with invisible letters so typing does not
+  // change the layout while the existing single-character clock runs.
   function renderTypingIntroText(count) {
     const head = "Tap to type ";
     const tail = "the verse.";
     const headCount = Math.min(count, head.length);
     const tailCount = Math.max(0, count - head.length);
-    return `${escapeHtml(head.slice(0, headCount))}` +
-      `<span class="read-typewriter-intro-untyped">${escapeHtml(head.slice(headCount))}</span>` +
+    return `<span class="read-typewriter-intro-head">` +
+      `${escapeHtml(head.slice(0, headCount))}` +
+      `<span class="read-typewriter-intro-untyped">${escapeHtml(head.slice(headCount))}</span></span>` +
       `<span class="read-typewriter-intro-tail">${escapeHtml(tail.slice(0, tailCount))}` +
       `<span class="read-typewriter-intro-untyped">${escapeHtml(tail.slice(tailCount))}</span></span>`;
+  }
+
+  // Short typewriter/keyboard cutscene steps used to run on bare timeouts.
+  // Keep the SAME callback and remaining milliseconds across a held switch.
+  // Only the already-existing Resume Audio action can re-arm them.
+  function scheduleTypewriterIntroStep(callback, milliseconds) {
+    clearTimeout(typewriterIntroTimer);
+    const task = { callback, remaining: Math.max(0, milliseconds),
+      startedAt: 0, id: 0 };
+    task.arm = () => {
+      if (readAudioRecovery || root?.document?.hidden) return;
+      task.startedAt = Date.now();
+      task.id = setTimeout(() => {
+        task.id = 0;
+        typewriterIntroTimer = 0;
+        if (typewriterIntroTask !== task) return;
+        if (readAudioRecovery || root?.document?.hidden) {
+          task.remaining = 0;
+          return;
+        }
+        typewriterIntroTask = null;
+        callback();
+      }, task.remaining);
+      typewriterIntroTimer = task.id;
+    };
+    typewriterIntroTask = task;
+    task.arm();
+  }
+
+  function freezeReadTypingIntro() {
+    const wrap = typewriterIntroWrap || root?.document?.querySelector?.(
+      ".read-typewriter-screen, .read-keyboard-screen");
+    wrap?.classList?.add?.("read-audio-paused");
+    const task = typewriterIntroTask;
+    if (!task?.id) return;
+    clearTimeout(task.id);
+    task.id = 0;
+    typewriterIntroTimer = 0;
+    task.remaining = Math.max(0,
+      task.remaining - (Date.now() - task.startedAt));
+  }
+
+  function thawReadTypingIntro() {
+    const wrap = typewriterIntroWrap || root?.document?.querySelector?.(
+      ".read-typewriter-screen, .read-keyboard-screen");
+    wrap?.classList?.remove?.("read-audio-paused");
+    if (typewriterIntroTask && !typewriterIntroTask.id)
+      typewriterIntroTask.arm();
   }
 
   // Both typing activities share the cutscene timing, but retain their own
@@ -5444,6 +5984,7 @@
   function finishTypewriterIntro() {
     clearTimeout(typewriterIntroTimer);
     typewriterIntroTimer = 0;
+    typewriterIntroTask = null;
     if (state.typewriterIntroPhase === "done") return;
     state.typewriterIntroPhase = "done";
     typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")?.remove();
@@ -5458,7 +5999,7 @@
     state.typewriterIntroPhase = "fading";
     typewriterIntroWrap?.querySelector("[data-read-typewriter-intro]")
       ?.classList.add("is-fading");
-    typewriterIntroTimer = setTimeout(
+    scheduleTypewriterIntroStep(
       finishTypewriterIntro,
       state.reducedMotion ? 0 : TYPEWRITER_INTRO_FADE_MS
     );
@@ -5471,7 +6012,7 @@
     state.typewriterIntroStarted = true;
 
     if (state.typewriterIntroPhase === "hold") {
-      typewriterIntroTimer = setTimeout(
+      scheduleTypewriterIntroStep(
         fadeTypewriterIntro, TYPEWRITER_INTRO_HOLD_MS);
       return;
     }
@@ -5488,13 +6029,13 @@
 
       if (state.typewriterIntroCount >= TYPEWRITER_INTRO_TEXT.length) {
         state.typewriterIntroPhase = "hold";
-        typewriterIntroTimer = setTimeout(
+        scheduleTypewriterIntroStep(
           fadeTypewriterIntro, TYPEWRITER_INTRO_HOLD_MS);
       } else {
-        typewriterIntroTimer = setTimeout(typeNext, TYPEWRITER_INTRO_KEY_MS);
+        scheduleTypewriterIntroStep(typeNext, TYPEWRITER_INTRO_KEY_MS);
       }
     };
-    typewriterIntroTimer = setTimeout(typeNext, TYPEWRITER_INTRO_KEY_MS);
+    scheduleTypewriterIntroStep(typeNext, TYPEWRITER_INTRO_KEY_MS);
   }
 
   function scheduleTypewriterIntro(wrap) {
@@ -5554,6 +6095,49 @@
     return `${state.verseId}|${state.activityId}|${state.readTestMode}`;
   }
 
+  // R12b: the intro is an instruction, not part of the verse. Its ONLY
+  // sizing inputs are the current intro box and the two fixed guide lines.
+  // The guide uses the actual loaded Special Elite/Keyboard font; measuring
+  // both lines avoids width guesses and guarantees "Tap to type" / "the verse."
+  // stay exactly two lines on short and long verses alike.
+  function fitReadTypingIntro(wrap) {
+    const intro = wrap.querySelector("[data-read-typewriter-intro]");
+    const guide = intro?.querySelector(".read-typewriter-intro-guide");
+    const head = guide?.querySelector(".read-typewriter-intro-head");
+    const tail = guide?.querySelector(".read-typewriter-intro-tail");
+    if (!intro || !guide || !head || !tail) return;
+    const computed = root.getComputedStyle(intro);
+    const width = intro.clientWidth -
+      (parseFloat(computed.paddingLeft) || 0) -
+      (parseFloat(computed.paddingRight) || 0);
+    const height = intro.clientHeight -
+      (parseFloat(computed.paddingTop) || 0) -
+      (parseFloat(computed.paddingBottom) || 0);
+    if (width <= 0 || height <= 0) return;
+
+    const fits = (size) => {
+      intro.style.setProperty("--typewriter-intro-font-size", `${size}px`);
+      return head.getBoundingClientRect().width <= width * 0.98 &&
+        tail.getBoundingClientRect().width <= width * 0.98 &&
+        guide.getBoundingClientRect().height <= height * 0.96;
+    };
+    // Bound the search to avoid enormous text on an unusually wide screen;
+    // the two-line geometry and available height take precedence.
+    const minimum = 10;
+    let low = minimum;
+    let high = Math.max(minimum, Math.min(180, width * 0.55));
+    if (!fits(minimum)) return; // keep smallest size on tiny/zoomed screens
+    for (let i = 0; i < 12; i += 1) {
+      const mid = (low + high) / 2;
+      if (fits(mid)) low = mid;
+      else high = mid;
+    }
+    // Use a fractional CSS pixel to fill the width without rounding up
+    // into a third line or clipping a glyph.
+    intro.style.setProperty("--typewriter-intro-font-size",
+      `${Math.floor(low * 10) / 10}px`);
+  }
+
   function restoreReadTypingFit(wrap) {
     const cache = typingFitCache;
     if (!cache || cache.key !== typingFitKey() ||
@@ -5565,9 +6149,6 @@
     block.style.maxWidth = `${cache.width}px`;
     block.style.setProperty("--smart-line-height", cache.lineHeight);
     block.style.setProperty("--smart-font-size", `${cache.fontSize}px`);
-    // The intro shares the fitted verse size, including when fit is cached.
-    wrap.querySelector("[data-read-typewriter-intro]")
-      ?.style.setProperty("--typewriter-intro-font-size", `${cache.fontSize}px`);
     block.classList.add("is-fit-ready");
   }
 
@@ -5644,9 +6225,6 @@
     }
     const fontSize = Math.floor(best);
     block.style.setProperty("--smart-font-size", `${fontSize}px`);
-    // Keep the introduction matched to the real verse on every refit/resize.
-    wrap.querySelector("[data-read-typewriter-intro]")
-      ?.style.setProperty("--typewriter-intro-font-size", `${fontSize}px`);
     typingFitCache = {
       key: typingFitKey(),
       viewportWidth: root.innerWidth,
@@ -5663,7 +6241,11 @@
   function scheduleReadTypingVerseFit(wrap) {
     activeTypingFitWrap = wrap;
     const run = (force = false) => {
-      if (wrap.isConnected) fitReadTypingVerseText(wrap, force);
+      if (!wrap.isConnected) return;
+      // Independent intro sizing must run on first mount, device rotation,
+      // and actual font load; verse content retains its own cached fit.
+      fitReadTypingIntro(wrap);
+      fitReadTypingVerseText(wrap, force);
     };
     root.requestAnimationFrame(() => run());
     root.setTimeout(() => run(), 120);
@@ -5675,8 +6257,10 @@
       root.addEventListener("resize", () => {
         const active = activeTypingFitWrap;
         if (active?.isConnected) {
-          root.requestAnimationFrame(() =>
-            fitReadTypingVerseText(active, true));
+          root.requestAnimationFrame(() => {
+            fitReadTypingIntro(active);
+            fitReadTypingVerseText(active, true);
+          });
         }
       });
     }
@@ -6227,7 +6811,7 @@
         : ""
     ].filter(Boolean).join(" ");
     wrap.innerHTML = `
-      <button class="read-my-verse-back read-chunk-sequence-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Chunk Audio Matching">‹</button>
+      <button class="read-my-verse-back read-chunk-sequence-back no-zoom" type="button" data-read-exit data-no-ui-sound aria-label="Exit Sound Sequence">‹</button>
       <main class="read-chunk-sequence-stage" style="${animatedBackgroundStyle(manifest)}">
         <div class="read-chunk-sequence-progress" role="group" aria-label="Sequence progress">
           ${renderChunkSequenceProgressHtml()}

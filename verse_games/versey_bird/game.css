@@ -907,3 +907,34 @@ body.bz-return-activity-paused *::before,
 body.bz-return-activity-paused *::after {
   animation-play-state: paused !important;
 }
+
+/* N6i: native-only PCM failure; never shown on successful preparation. */
+.vb2-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, .65);
+}
+.vb2-native-audio-card {
+  background: #fff;
+  color: #202020;
+  border-radius: 16px;
+  padding: 22px;
+  max-width: 360px;
+  width: min(100%, 360px);
+  text-align: center;
+  font: 600 17px/1.4 system-ui, sans-serif;
+}
+.vb2-native-audio-card button {
+  margin: 6px;
+  padding: 10px 16px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: #333;
+  color: #fff;
+  font: inherit;
+}

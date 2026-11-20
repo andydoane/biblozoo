@@ -116,6 +116,106 @@
     "us", "was", "we", "were", "who", "with", "you", "your"
   ]);
 
+  // N6p Wheel native-only output: thirty-six source-authored exact
+  // MIDI/waveform/envelope presets, plus two shared native UI pops.
+  // Long verse and reference recordings use existing N5b AVAudioPlayer.
+  const nativeWheelAudio=window.BibloZooNativeWheelOfBibleAudio?.isAvailable?.()
+    ? window.BibloZooNativeWheelOfBibleAudio : null;
+  let nativeWheelGeneration=0,nativeWheelPending=false,nativeWheelFailure=false;
+  let nativeWheelMenuOpen=false,nativeWheelRetryKind="resume";
+  let nativeWheelPopFlip=false;
+  function nativeWheelUiKey(){
+    const key=nativeWheelPopFlip?"uiTap2":"uiTap1";
+    nativeWheelPopFlip=!nativeWheelPopFlip;
+    return key;
+  }
+  function stopNativeWheelRun(){
+    if(!nativeWheelAudio)return;
+    nativeWheelGeneration++;
+    nativeWheelPending=false;
+    app?.removeAttribute("aria-busy");
+    void nativeWheelAudio.stop();
+  }
+  function clearNativeWheelFailure(){
+    nativeWheelFailure=false;
+    document.getElementById("wheelNativeAudioFailure")?.remove();
+  }
+  function showNativeWheelFailure(message){
+    if(!nativeWheelAudio)return;
+    nativeWheelFailure=true;
+    nativeWheelAudio.stopSpoken();
+    if(state.screen!=="intro" && !welcomePaused)pauseWheelForReturn();
+    let overlay=document.getElementById("wheelNativeAudioFailure");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.id="wheelNativeAudioFailure";
+      overlay.className="wheel-native-audio-failure";
+      overlay.innerHTML=`<section class="wheel-native-audio-card" role="dialog"
+        aria-modal="true" aria-label="Wheel of Bible native audio issue">
+        <h2>Wheel of Bible</h2><p role="status" data-wheel-status></p>
+        <button type="button" data-wheel-retry>Try Again</button>
+        <button type="button" data-wheel-back>Back to Playground</button>
+      </section>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector("[data-wheel-retry]").onclick=()=>
+        primeWheelNativeFromGesture(nativeWheelRetryKind);
+      overlay.querySelector("[data-wheel-back]").onclick=()=>{
+        clearNativeWheelFailure();
+        stopNativeWheelRun();
+        bridge().exitGame?.();
+      };
+    }
+    overlay.querySelector("[data-wheel-status]").textContent=message;
+  }
+  function primeWheelNativeFromGesture(kind="start",uiKey=null){
+    if(!nativeWheelAudio || nativeWheelPending || document.hidden)return;
+    if(welcomePaused && kind==="start")return;
+    nativeWheelRetryKind=kind;
+    clearNativeWheelFailure();
+    if(muted){
+      if(kind==="start")void beginRun();
+      else if(kind==="resume" && !nativeWheelMenuOpen)resumeWheelAfterReturn();
+      return;
+    }
+    const token=++nativeWheelGeneration;
+    nativeWheelPending=true;
+    if(kind==="resume" && !welcomePaused)pauseWheelForReturn();
+    app?.setAttribute("aria-busy","true");
+    // Must call Swift activateFromGesture in this ACTUAL child button tap.
+    const preparing=nativeWheelAudio.prepareFromGesture(uiKey
+      ? {key:uiKey,volume:.42} : null);
+    void Promise.resolve(preparing).then(result=>{
+      if(token!==nativeWheelGeneration || document.hidden)return;
+      nativeWheelPending=false;
+      app?.removeAttribute("aria-busy");
+      if(result?.ready===true){
+        clearNativeWheelFailure();
+        if(kind==="start")void beginRun();
+        else if(kind==="resume"){
+          if(nativeWheelMenuOpen)nativeWheelMenuOpen=false;
+          resumeWheelAfterReturn();
+        }
+        return;
+      }
+      const why=String(result?.reason||"");
+      if(["activation-os-rejected","other-audio-playing",
+          "interruption-pending","not-foreground",
+          "gesture-required-after-interruption","activation-cooldown",
+          "foreground-attempt-limit","stale"].includes(why)){
+        // Higher-priority YouTube PiP is a temporary OS denial, NOT a
+        // permanently damaged PCM bank. Native callback shows plain
+        // retryable Welcome Back when an activity is already in progress.
+        return;
+      }
+      showNativeWheelFailure("Native wheel sounds are not ready. Tap Try Again.");
+    }).catch(()=>{
+      if(token!==nativeWheelGeneration || document.hidden)return;
+      nativeWheelPending=false;
+      app?.removeAttribute("aria-busy");
+      showNativeWheelFailure("Native wheel sounds are not ready. Tap Try Again.");
+    });
+  }
+
   let muted = false;
   let audioCtx = null;
   let masterGain = null;
@@ -168,6 +268,7 @@
   // Stop actual Web Audio nodes, rather than merely muting masterGain or
   // stopping future JS timers. Every oscillator is disconnected on ended/stop.
   function stopLiveTones() {
+    if(nativeWheelAudio)return 0; // native owner stops bank on pause
     toneGeneration += 1; // Invalidates any earlier async unlock/play promise.
     const stopped = activeToneSources.size;
     for (const source of Array.from(activeToneSources)) {
@@ -268,6 +369,7 @@
   }
   function pauseWheelForReturn() {
     if (welcomePaused) return;
+    if(nativeWheelAudio)void nativeWheelAudio.stop();
     welcomePaused = true;
     welcomeClock.pause();
     const remaining = remainingSpinTickIndex();
@@ -289,6 +391,9 @@
   }
   function resumeWheelAfterReturn() {
     if (!welcomePaused) return true;
+    if(nativeWheelAudio && nativeWheelMenuOpen)return true;
+    if(nativeWheelAudio && !muted && !nativeWheelAudio.isReady())
+      return false; // never release game clock without hot PCM bank
     welcomeClock.resume();
     welcomePaused = false;
     pausedVisualAnimations.forEach(anim => { try { anim.play(); } catch (_) {} });
@@ -803,6 +908,7 @@
   }
 
   function createVerseAudioElement() {
+    if(nativeWheelAudio)return null;
     if (verseAudioEl) return verseAudioEl;
     verseAudioEl = document.createElement("audio");
     verseAudioEl.preload = "auto";
@@ -815,6 +921,7 @@
 
   function audioContextConstructor() { return window.AudioContext || window.webkitAudioContext; }
   function createAudio() {
+    if(nativeWheelAudio)return; // no browser oscillator on iOS
     if (audioCtx) { if (masterGain) masterGain.gain.value = muted ? 0 : WEB_AUDIO_MASTER_VOLUME; return; }
     const AudioCtor = audioContextConstructor();
     if (!AudioCtor) return;
@@ -825,6 +932,7 @@
   }
 
   function primeHtmlAudio() {
+    if(nativeWheelAudio)return Promise.resolve(false);
     if (htmlAudioPrimed) return Promise.resolve(true);
     if (htmlAudioPrimePromise) return htmlAudioPrimePromise;
     if (!silenceAudioEl) {
@@ -866,6 +974,7 @@
   }
 
   function preloadSpokenVerse() {
+    if(nativeWheelAudio)return; // native N5b published AVAudioPlayer
     const verse = getVerseAudioCandidates()[0];
     if (verse) {
       const audio = createVerseAudioElement();
@@ -884,6 +993,7 @@
   }
 
   async function unlockAudio() {
+    if(nativeWheelAudio)return nativeWheelAudio.isReady();
     createAudio(); createVerseAudioElement();
     if (!audioCtx || !masterGain) return false;
     if (audioUnlocked && audioCtx.state === "running") return true;
@@ -905,6 +1015,7 @@
   }
 
   function replaceWheelWelcomeContext() {
+    if(nativeWheelAudio)return false;
     const old = audioCtx;
     if (!old || !(window.AudioContext || window.webkitAudioContext)) return false;
     // Web Audio nodes and pending unlock promises from the old context must
@@ -924,7 +1035,18 @@
   function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
   function playTone({ midi = 60, duration = 0.12, volume = 0.18, type = "triangle",
     tag = "effect", allowDeferred = true } = {}) {
-    if (muted || welcomePaused || document.hidden) return;
+    if (muted || welcomePaused || document.hidden ||
+        nativeWheelPending || nativeWheelFailure || nativeWheelMenuOpen) return;
+    if(nativeWheelAudio){
+      // Exact finite source tuple only; pre-rendered on Swift serial worker.
+      // No Web oscillator, deferred unlock or hot buffer decode on iOS.
+      if(!nativeWheelAudio.playToneRecipe(midi,duration,volume,type) &&
+         nativeWheelAudio.isReady()){
+        nativeWheelRetryKind="resume";
+        showNativeWheelFailure("A Wheel sound is unavailable. Tap Try Again.");
+      }
+      return;
+    }
     createAudio();
     if (!audioCtx || !masterGain) return;
     if (audioCtx.state !== "running") {
@@ -1104,8 +1226,49 @@
     gameTimeout(() => playTone({ midi: 76, duration: .12, volume: .16, type: "triangle" }), 145);
   }
 
-  function stopVerseAudio() { if (!verseAudioEl) return; try { verseAudioEl.pause(); verseAudioEl.currentTime = 0; } catch (err) { } }
-  async function tryPlayAudioCandidatesAndWait(candidates, fallbackMs = 1200) {
+  function stopVerseAudio() {
+    if(nativeWheelAudio){nativeWheelAudio.stopSpoken();return;}
+    if (!verseAudioEl) return;
+    try { verseAudioEl.pause(); verseAudioEl.currentTime = 0; } catch (err) {}
+  }
+  // The original Wheel opens with the entire verse and then its reference.
+  // Native iOS cannot use the old HTML <audio> branch: re-use the already
+  // published, bundled Learn narration allowlist instead. A spoken phase
+  // advances ONLY on a matching AVAudioPlayerDelegate "ended" notification.
+  async function playNativeWheelSpoken(kind){
+    if(muted)return true; // intentional user mute, never fake audible
+    let positionMs=0;
+    while(state.screen==="verseIntro"){
+      if(nativeWheelPending || nativeWheelFailure || welcomePaused ||
+         nativeWheelMenuOpen || document.hidden ||
+         !nativeWheelAudio.isReady()){
+        // Await an explicit real Menu Close / Welcome Back / Retry tap.
+        // This is an unpaused polling timeout, NOT a successful speech timer.
+        await new Promise(resolve=>setTimeout(resolve,85));
+        continue;
+      }
+      const result=await nativeWheelAudio.playSpoken(ctx.verseId,kind,positionMs);
+      if(state.screen!=="verseIntro")return false;
+      if(result?.ended===true)return true;
+      positionMs=Math.max(0,Number(result?.positionMs)||positionMs);
+      if(result?.reason==="interrupted")continue;
+      const temporary=["activation-os-rejected","other-audio-playing",
+        "interruption-pending","gesture-required-after-interruption",
+        "not-foreground"].includes(String(result?.reason||""));
+      if(temporary){
+        pauseWheelForReturn();
+        playgroundWelcome?.pauseFromNativeInactive?.();
+        playgroundWelcome?.showAfterNativeActive?.();
+        continue;
+      }
+      nativeWheelRetryKind="resume";
+      showNativeWheelFailure("The published verse recording couldn't finish. Tap Try Again.");
+    }
+    return false;
+  }
+  async function tryPlayAudioCandidatesAndWait(candidates, fallbackMs = 1200,
+    nativeKind = "ref") {
+    if(nativeWheelAudio)return playNativeWheelSpoken(nativeKind);
     const audio = createVerseAudioElement();
     audio.muted = muted;
     audio.volume = muted ? 0 : 1;
@@ -1155,7 +1318,8 @@
   }
 
   async function tryPlayVerseAudio() {
-    return tryPlayAudioCandidatesAndWait(getVerseAudioCandidates(), estimateListenMs());
+    return tryPlayAudioCandidatesAndWait(getVerseAudioCandidates(),
+      estimateListenMs(),"verse");
   }
   function estimateListenMs() {
     const wordCount = state.words.length || String(state.verseText || "").split(/\s+/).filter(Boolean).length;
@@ -1205,20 +1369,55 @@
       helpOverlayId: HELP_OVERLAY_ID,
       isMuted: () => muted,
       onMuteToggle: () => {
-        muted = !muted;
-        if (masterGain && audioCtx) masterGain.gain.setValueAtTime(muted ? 0 : WEB_AUDIO_MASTER_VOLUME, audioCtx.currentTime);
-        if (verseAudioEl) verseAudioEl.muted = muted;
-        if (muted) {
-          nextSpinTick = remainingSpinTickIndex();
+        muted=!muted;
+        if(masterGain && audioCtx)
+          masterGain.gain.setValueAtTime(muted?0:WEB_AUDIO_MASTER_VOLUME,audioCtx.currentTime);
+        if(verseAudioEl)verseAudioEl.muted=muted;
+        if(muted){
+          nextSpinTick=remainingSpinTickIndex();
           cancelQueuedSpinTicks();
           stopLiveTones();
-        } else if (wheelSpinPending && !welcomePaused) {
+          if(nativeWheelAudio)void nativeWheelAudio.stop();
+        }else if(wheelSpinPending && !welcomePaused && !nativeWheelAudio){
           scheduleRemainingSpinTicks();
         }
         return muted;
       },
-      onHowToPlay: () => { document.getElementById(MENU_OVERLAY_ID)?.classList.remove("is-open"); shell().openHelp?.(HELP_OVERLAY_ID, "back", "Back"); },
-      onExit: () => { stopVerseAudio(); clearTimers(); bridge().exitGame?.(); }
+      onHowToPlay: () => {
+        document.getElementById(MENU_OVERLAY_ID)?.classList.remove("is-open");
+        shell().openHelp?.(HELP_OVERLAY_ID,"back","Back");
+      },
+      onOpen: () => {
+        if(nativeWheelAudio){
+          if(nativeWheelMenuOpen || nativeWheelPending ||
+             nativeWheelFailure || playgroundWelcome?.isPaused?.())return false;
+          nativeWheelMenuOpen=true;
+          pauseWheelForReturn();
+          nativeWheelAudio.tapUiFromGesture(nativeWheelUiKey(),.42);
+        }
+        return true;
+      },
+      onClose: () => {
+        if(!nativeWheelAudio)return;
+        if(nativeWheelPending || playgroundWelcome?.isPaused?.()){
+          // The shell closes DOM first. Keep the menu reachable after a
+          // blocked Close while Welcome Back or a preflight is in flight.
+          const overlay=document.getElementById(MENU_OVERLAY_ID);
+          overlay?.classList.add("is-open");
+          overlay?.setAttribute("aria-hidden","false");
+          return;
+        }
+        // The same real Menu Close tap must re-own iOS session priority
+        // and warm all 38 fixed clips BEFORE wheel/prize timers unpause.
+        primeWheelNativeFromGesture("resume",nativeWheelUiKey());
+      },
+      onBackFromHelp: () => {
+        // Help Back should restore the menu; stay paused until Close.
+      },
+      onExit: () => {
+        if(nativeWheelAudio)stopNativeWheelRun();
+        stopVerseAudio();clearTimers();bridge().exitGame?.();
+      }
     });
   }
 
@@ -1234,8 +1433,20 @@
     shell().renderTitleScreen?.({
       app, title: GAME_TITLE, icon: GAME_ICON, iconHtml: GAME_ICON_HTML, helpHtml: helpHtml(), helpOverlayId: HELP_OVERLAY_ID,
       startText: "Start", helpText: "How to Play", theme: GAME_THEME, backLabel: "Back to Verse Playground",
-      onBack: () => bridge().exitGame?.(),
-      onStart: async () => { createVerseAudioElement(); primeHtmlAudio(); unlockAudio(); await beginRun(); }
+      onBack: () => {
+        if(nativeWheelAudio)stopNativeWheelRun();
+        bridge().exitGame?.();
+      },
+      onStart: async () => {
+        if(nativeWheelAudio){
+          primeWheelNativeFromGesture("start",nativeWheelUiKey());
+          return;
+        }
+        createVerseAudioElement();
+        primeHtmlAudio();
+        unlockAudio();
+        await beginRun();
+      }
     });
   }
 
@@ -1289,7 +1500,9 @@
     `, { status: "Today's Verse", rootClass: "is-simple-screen is-meet-screen" });
     wireGameMenu();
     document.getElementById("meetVerseBtn")?.addEventListener("click", () => {
-      void unlockAudio();
+      if(nativeWheelAudio && (!nativeWheelAudio.isReady() ||
+         nativeWheelPending || nativeWheelFailure || welcomePaused))return;
+      if(!nativeWheelAudio)void unlockAudio();
       void playVerseIntro();
     });
   }
@@ -1344,7 +1557,8 @@
     }
 
     if (state.screen !== "verseIntro") return;
-    const refPlayed = await tryPlayAudioCandidatesAndWait(getReferenceAudioCandidates(), 1600);
+    const refPlayed = await tryPlayAudioCandidatesAndWait(
+      getReferenceAudioCandidates(),1600,"ref");
     if (refPlayed === "blocked") {
       offerSpokenAudioRetry("Tap to hear the reference", () => playVerseIntroRecordings("reference"));
       return;
@@ -1391,7 +1605,9 @@
   }
 
   async function spinWheel() {
-    if (welcomePaused || wheelSpinPending || document.hidden) return;
+    if (welcomePaused || wheelSpinPending || document.hidden ||
+        nativeWheelPending || nativeWheelFailure || nativeWheelMenuOpen ||
+        (nativeWheelAudio && !muted && !nativeWheelAudio.isReady())) return;
     wheelSpinPending = true;
     const btn = document.getElementById("spinWheelBtn"); if (btn) btn.disabled = true;
     await unlockAudio();
@@ -3799,7 +4015,14 @@
     if (shell().renderCompleteScreen) {
       shell().renderCompleteScreen({
         app, title: "Wheel Complete!", icon: GAME_ICON, iconHtml: GAME_ICON_HTML, statsText, playAgainText: "Play Again", moreGamesText: "Back to Playground", backLabel: "Back to Playground", theme: GAME_THEME,
-        onPlayAgain: () => beginRun(), onMoreGames: () => bridge().exitGame?.()
+        onPlayAgain: () => {
+          if(nativeWheelAudio)primeWheelNativeFromGesture("start",nativeWheelUiKey());
+          else void beginRun();
+        },
+        onMoreGames: () => {
+          if(nativeWheelAudio)stopNativeWheelRun();
+          bridge().exitGame?.();
+        }
       });
     } else {
       app.innerHTML = `<div class="wob-root"><div class="wob-panel"><div class="wob-big-title">Complete!</div><button class="wob-btn" id="backBtn">Back</button></div></div>`;
@@ -3807,16 +4030,55 @@
     }
   }
 
-  // Patch 68: shared Playground return, with a frozen spin/bonus clock.
-  // Progress and selected wheel segment remain in memory throughout recovery.
+  // N6p: the opt-in shared Playground return owns the same wheel/prize
+  // game clock AND active spoken verse/reference intro. Never reactivate on
+  // passive foreground. Only the child's actual Let's go gesture can call
+  // Swift activateFromGesture and rewarm all 38 fixed tone/UI buffers.
+  if(nativeWheelAudio){
+    nativeWheelAudio.configure({
+      onAppInactive: () => {
+        if(nativeWheelPending)stopNativeWheelRun();
+        if(state.screen==="intro" || state.completed)return;
+        playgroundWelcome?.pauseFromNativeInactive?.();
+      },
+      onAppActive: () => {
+        if(state.screen!=="intro" && !state.completed)
+          playgroundWelcome?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if(muted || welcomePaused || nativeWheelPending ||
+           nativeWheelFailure || nativeWheelMenuOpen ||
+           document.hidden || state.completed || state.screen==="intro")return;
+        nativeWheelRetryKind="resume";
+        showNativeWheelFailure("A native Wheel sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden && nativeWheelPending)stopNativeWheelRun();
+    });
+  }
   playgroundWelcome = shell().attachPlaygroundWelcomeBack?.({
-    isActive: () => !state.completed && !["intro", "meetVerse", "verseIntro"].includes(state.screen),
+    // Speech in the Meet Verse / verseIntro stages also needs Welcome Back;
+    // the original Web/PWA/Android prompt policy is kept unchanged.
+    isActive: () => nativeWheelAudio
+      ? !state.completed && state.screen!=="intro"
+      : !state.completed && !["intro","meetVerse","verseIntro"].includes(state.screen),
     onPause: pauseWheelForReturn,
     onResume: resumeWheelAfterReturn,
     getAudioContext: () => audioCtx,
     unlockAudio,
     replaceAudioContext: replaceWheelWelcomeContext,
-    isMuted: () => muted
+    isMuted: () => muted,
+    nativeOnlyAudio: !!nativeWheelAudio,
+    restoreNativeOnGesture: nativeWheelAudio ? () => {
+      if(muted)return Promise.resolve(true);
+      // This function is called synchronously from Welcome Back's click,
+      // never from page load, timers or an app-foreground notification.
+      return nativeWheelAudio.prepareFromGesture().then(result=>
+        window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+        (result?.ready===true));
+    } : undefined,
+    onExit: () => {if(nativeWheelAudio)stopNativeWheelRun();}
   });
 
   renderIntro();

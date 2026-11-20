@@ -48,6 +48,13 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 // Set DEBUG_MODE = false when you’re ready to remove this.
 // =========================================================
 const DEBUG_MODE = false;
+
+// Hide progress/reset/utility debug shortcuts on production native iOS.
+// Leave their historical behavior on Web/PWA/Android and Audio Test.
+function allowDevShortcuts() {
+  return window.BibloZooNativeOnlyOutput?.enabled !== true ||
+    window.BibloZooNativeOnlyOutput?.devToolsAllowed === true;
+}
 // Release fallback: set false to restore Classic-only Daily feeding.
 // Developer Preview remains independent of this switch.
 const ENABLE_DAILY_FEEDING_VARIETY = true;
@@ -985,9 +992,26 @@ function ensureLearnMenuOverlay() {
   if (exitBtn) {
     exitBtn.onclick = () => {
       learnMenuPausedAudio = false;
+      // Exit Learn is not a request to restart a menu-paused narration.
+      learnMenuNativeRecovery = null;
       closeLearnMenu();
       resetLearn(true);
     };
+  }
+
+  // A held iOS App Switcher can make UIKit inactive before WebKit hides.
+  // Once that happens, the pending menu-close shortcut is NOT authorized:
+  // keep the real interruption's explicit Welcome Back / Let's go! gate.
+  if (isNativeLearnListenMode()) {
+    try {
+      Promise.resolve(window.Capacitor?.Plugins?.BibloZooNativeSound
+        ?.addListener?.("biblozooAppLifecycle", event => {
+          if (learnMenuOpen && (event?.active === false ||
+                                event?.active === true)) {
+            learnMenuNativeRecovery = null;
+          }
+        })).catch(() => {});
+    } catch (_) { /* visibility/pagehide/blur are also safety guards. */ }
   }
 }
 
@@ -997,9 +1021,27 @@ function openLearnMenu() {
   const menu = document.getElementById("learnMenuOverlay");
   if (!menu) return;
 
+  // A deliberately opened menu is different from a system interruption.
+  // Stop the native player and retain its exact Listen/Chunk/Echo checkpoint,
+  // but only the matching menu Close gesture may restore it silently.
+  learnMenuNativeRecovery = null;
+  if (isNativeLearnListenMode() &&
+      ((State.screen === Screen.LISTEN && State.listenPlaying) ||
+       (State.screen === Screen.CHUNKS && State.chunkRunning) ||
+       (State.screen === Screen.ECHO && State.echoRunning))) {
+    const before = learnAudioInterrupted;
+    pauseLearnAudioForInterruption();
+    if (!before && isLearnAudioOverlayRecovery(learnAudioInterrupted)) {
+      learnMenuNativeRecovery = learnAudioInterrupted;
+    }
+  }
+  // R04 follow-up: ordinary Learn Menu is a pause, not a UIKit departure.
+  // Freeze the active Missing Words countdown/transition and original
+  // animation frame without creating Welcome Back or consuming a word.
+  pauseHideForMenu();
   learnMenuOpen = true;
   syncLearnAudioResumeOverlay();
-  learnMenuPausedAudio = !audioEl.paused;
+  learnMenuPausedAudio = !isNativeLearnListenMode() && !audioEl.paused;
 
   try {
     audioEl.pause();
@@ -1017,6 +1059,22 @@ function closeLearnMenu() {
   menu.setAttribute("aria-hidden", "true");
 
   learnMenuOpen = false;
+  // Only this actual Menu Close gesture resumes Missing Words, unless
+  // the OS interruption controller still owns a separate Welcome Back.
+  resumeHideFromMenu();
+  const menuRecovery = learnMenuNativeRecovery;
+  learnMenuNativeRecovery = null;
+  // Close is an actual user tap: it may invoke the *existing* native
+  // startFromGesture / primeFromGesture immediately, at the saved checkpoint.
+  // Do not show Welcome Back for a simple in-app menu round trip. If iOS
+  // actually became inactive, hidden, muted, or another owner took over,
+  // the shortcut is revoked and the normal manual recovery gate remains.
+  if (menuRecovery && menuRecovery === learnAudioInterrupted &&
+      isNativeLearnListenMode() && !muted && !document.hidden &&
+      isLearnAudioOverlayRecovery(menuRecovery) &&
+      resumeInterruptedLearnAudio(true)) {
+    return;
+  }
   syncLearnAudioResumeOverlay();
 
   if (learnMenuPausedAudio) {
@@ -1062,6 +1120,15 @@ const UI_PET_UNLOCK_VOLUME = 0.55;
 
 let learnMenuOpen = false;
 let learnMenuPausedAudio = false;
+let learnMenuNativeRecovery = null;
+// The menu itself must never authorize playback after a genuine OS departure.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) learnMenuNativeRecovery = null;
+});
+window.addEventListener("pagehide", () => { learnMenuNativeRecovery = null; });
+window.addEventListener("blur", () => {
+  if (learnMenuOpen) learnMenuNativeRecovery = null;
+});
 // A backgrounded spoken lesson waits for a deliberate tap in a fixed overlay.
 // Short instruction narration is optional and never needs its own retry UI.
 let learnAudioInterrupted = null;
@@ -1070,6 +1137,112 @@ let learnAudioResumeError = "";
 let learnShortInstructionNeedsRender = false;
 let activeLearnInstructionRequest = null;
 let activeLearnAudioWaitCancel = null;
+// N5b.2: native Listen owns its own source/position checkpoint. This is
+// local transient playback state, never user progress or completion.
+let nativeListenCheckpoint = null;
+let nativeListenError = "";
+// N5b.3: transient native audio checkpoint, never verse/score progress.
+let nativeLearnPartCheckpoint = null;
+let nativeLearnTrackError = "";
+// N7k: Chunks has an audible-clip gap; Echo has the yellow-text speaking turn.
+// Both are ACTIVE Learn activity even with no native AVAudioPlayer running.
+// This is transient timing state, never an earned part or user recording.
+let nativeLearnQuietCheckpoint = null;
+let nativeLearnActivityLifecycleBound = false;
+function bindNativeLearnActivityLifecycle() {
+  if (nativeLearnActivityLifecycleBound || !isNativeLearnTracksMode()) return;
+  const bridge = window.Capacitor?.Plugins?.BibloZooNativeSound;
+  if (typeof bridge?.addListener !== "function") return;
+  nativeLearnActivityLifecycleBound = true;
+  try {
+    Promise.resolve(bridge.addListener("biblozooAppLifecycle", event => {
+      // UIKit reports INACTIVE even when a held App Switcher leaves WebKit
+      // document.hidden=false. The native track owner has no current player
+      // during a speaking/gap timer, so only the ACTIVITY can catch this.
+      if (event?.active !== false && event?.active !== true) return;
+      const activeLearn =
+        (State.screen === Screen.CHUNKS &&
+          (State.chunkRunning || State.chunkAutoStarting)) ||
+        (State.screen === Screen.ECHO &&
+          (State.echoRunning || State.echoAutoStarting));
+      if (!activeLearn || learnMenuOpen) return;
+      pauseLearnAudioForInterruption();
+      if (!document.hidden && learnAudioInterrupted) render();
+    })).catch(() => { nativeLearnActivityLifecycleBound = false; });
+  } catch (_) { nativeLearnActivityLifecycleBound = false; }
+}
+
+function isNativeLearnTracksMode() {
+  return window.BibloZooNativeLearnTracks?.isAvailable?.() === true;
+}
+function primeNativeLearnTracks() {
+  if (isNativeLearnTracksMode() && !muted) {
+    window.BibloZooNativeLearnTracks.primeFromGesture();
+  }
+}
+function nativeInstructionSoundId(key) {
+  const valid = ["listen", "meaning", "chunks1", "chunks2",
+    "echo1", "remove", "final", "games"];
+  if (!valid.includes(key)) return "";
+  return "learn-instruction-" +
+    (key === "echo1" && ["a_little", "pretty_well"].includes(State.learnLevel)
+      ? "echo_start" : key);
+}
+function nativeLearnTrackProgress(mode, index, progress) {
+  if (!progress || document.hidden) return;
+  nativeLearnPartCheckpoint = {
+    verseId: VERSE_ID, mode, index, positionMs: progress.positionMs
+  };
+  const attempt = learnAudioResumeAttempt;
+  if (!attempt || attempt.narrationVerified ||
+      attempt.recovery?.mode !== mode ||
+      attempt.recovery?.screen !== State.screen) return;
+  // Native position evidence from the current, matching source only.
+  if (index !== attempt.recovery.index ||
+      progress.positionMs > (attempt.recovery.positionMs || 0) + 40) {
+    attempt.narrationVerified = true;
+    finishLearnAudioResumeAttempt(attempt);
+  }
+}
+// Resuming a child's silent Echo turn cannot produce an AVAudioPlayer event.
+// Only real foreground delay-clock movement may dismiss the recovery overlay
+// for the SAME quiet phase. This does NOT mean a sound was heard or award credit.
+function nativeLearnQuietResumeProgress(mode, index, phase, remainingMs) {
+  const attempt = learnAudioResumeAttempt;
+  if (!attempt || attempt.narrationVerified || attempt.quietPhaseVerified ||
+      attempt.recovery?.mode !== mode || attempt.recovery.index !== index ||
+      attempt.recovery.quietPhase !== phase ||
+      attempt.recovery.screen !== State.screen ||
+      document.hidden || learnMenuOpen || muted) return;
+  const initial = Number(attempt.recovery.quietRemainingMs);
+  if (!Number.isFinite(initial) || remainingMs > initial - 30) return;
+  attempt.quietPhaseVerified = true; // UI clock, NOT native audio ended.
+  finishLearnAudioResumeAttempt(attempt);
+}
+function failNativeLearnTrack(mode, index, reason) {
+  if (document.hidden || learnAudioInterrupted) return;
+  // A stopped native source during a real OS audio interruption is NOT a
+  // missing asset. Preserve the Welcome Back route instead of inserting the
+  // inline Start/error row and shifting the Learn page layout.
+  if (reason === "interrupted") {
+    pauseLearnAudioForInterruption();
+    if (!document.hidden && learnAudioInterrupted) render();
+    return;
+  }
+  nativeLearnTrackError = "Sound isn't ready. Tap Start to try again.";
+  nativeLearnPartCheckpoint = {
+    verseId: VERSE_ID, mode, index, positionMs: 0
+  };
+  if (learnAudioResumeAttempt?.recovery?.mode === mode) {
+    failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+    return;
+  }
+  if (mode === "chunk") State.chunkAutoFallbackReady = true;
+  if (mode === "echo") State.echoAutoFallbackReady = true;
+  // A missing local clip is a retry, never an unrelated pet rescue.
+  if (State.screen === (mode === "chunk" ? Screen.CHUNKS : Screen.ECHO))
+    render();
+}
 
 let muted = false;
 
@@ -1104,9 +1277,20 @@ let lastUiTapFallbackAt = 0;
 let petUnlockAudioEl = null;
 let lastPetUnlockSoundAt = 0;
 let petUnlockSoundGeneration = 0;
+let petUnlockNativeLifecycleBound = false;
 
 function stopPetUnlockPackageSound() {
   petUnlockSoundGeneration += 1;
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    // N7l: the original boxed BibloPet clip is already bundled and allowlisted
+    // as the native DEV pilot-unlock AVAudioPlayer. Scoped Stop leaves other
+    // audio banks/session ownership untouched; do not call browser Audio.
+    try {
+      void Promise.resolve(window.Capacitor?.Plugins?.BibloZooNativeSound
+        ?.stop?.({ soundId: "pilot-unlock" })).catch(() => {});
+    } catch (_) { /* Leaving the page cannot be blocked by audio cleanup. */ }
+    return;
+  }
   try {
     petUnlockAudioEl?.pause();
     if (petUnlockAudioEl) petUnlockAudioEl.currentTime = 0;
@@ -1196,7 +1380,7 @@ function playTinyUnlockBlip(ctx) {
 }
 
 function playUiTapFallbackNow() {
-  if (muted) return;
+  if (muted || isNativeUiAudioMode()) return;
 
   const nowMs = performance.now();
 
@@ -1243,6 +1427,9 @@ function playUiTapFallbackNow() {
 }
 
 function primeAppAudioFromGesture({ playFeedback = false } = {}) {
+  // The capture handler alone activates native UI sound. Never use Web Audio
+  // or a second activation path on the isolated iOS native-only app.
+  if (isNativeUiAudioMode()) return;
   // Start activation inside the gesture; optional tap feedback follows once
   // the context is confirmed to be running, never on a suspended context.
   const started = performance.now();
@@ -1281,6 +1468,10 @@ function ensurePetUnlockAudio() {
 }
 
 function preloadPetUnlockSoundBuffer() {
+  // No HTMLAudioElement may be constructed on the native-only iOS build.
+  // Native preflight is deliberately reserved for the box-opening gesture.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true)
+    return Promise.resolve(null);
   const audio = ensurePetUnlockAudio();
 
   try {
@@ -1300,6 +1491,45 @@ function playPetUnlockPackageSound({ allowFallback = true } = {}) {
   lastPetUnlockSoundAt = nowMs;
 
   const generation = ++petUnlockSoundGeneration;
+  // N7l: play the ORIGINAL ui_pet_unlock.mp3 from Swift's existing bundled
+  // pilot-unlock AVAudioPlayer on the real Open Box button click. No WebKit
+  // playback, oscillator, tap-pop fallback or hidden auto-reactivation.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    const api = window.Capacitor?.Plugins?.BibloZooNativeSound;
+    if (typeof api?.activateFromGesture !== "function" ||
+        typeof api?.preload !== "function" ||
+        typeof api?.play !== "function" ||
+        typeof api?.stop !== "function") return;
+    if (!petUnlockNativeLifecycleBound &&
+        typeof api.addListener === "function") {
+      petUnlockNativeLifecycleBound = true;
+      try {
+        void Promise.resolve(api.addListener("biblozooAppLifecycle", event => {
+          if (event?.active === false || event?.active === true)
+            stopPetUnlockPackageSound();
+        })).catch(() => { petUnlockNativeLifecycleBound = false; });
+      } catch (_) { petUnlockNativeLifecycleBound = false; }
+    }
+    const stillCurrent = () =>
+      generation === petUnlockSoundGeneration &&
+      State.screen === Screen.PET_UNLOCK && !muted && !document.hidden &&
+      performance.now() - nowMs <= 1600;
+    let activation;
+    try {
+      // This call, unlike the async prepare/play, must occur inside the tap.
+      activation = api.activateFromGesture({ purpose: "ui" });
+    } catch (_) { return; }
+    void Promise.resolve(activation).then(async ready => {
+      if (ready?.ready !== true || !stillCurrent()) return;
+      const prepared = await api.preload({ soundId: "pilot-unlock" });
+      if (prepared?.prepared !== true || !stillCurrent()) return;
+      // Scheduling is not proof the child heard the sound; box rewards and
+      // animation never depend on a native ACK.
+      await api.play({ soundId: "pilot-unlock", volume: UI_PET_UNLOCK_VOLUME,
+        eventId: "pet-unlock-" + generation, requestEpochMs: Date.now() });
+    }).catch(() => { /* Fail closed; box can always be opened. */ });
+    return;
+  }
   const audio = ensurePetUnlockAudio();
   const fallbackIfCurrent = (err) => {
     console.warn("Could not play BibloPet unlock sound", err);
@@ -1447,6 +1677,7 @@ function feedingResumeOwnsAudioGesture() {
 }
 
 function unlockAppAudio() {
+  if (isNativeUiAudioMode()) return Promise.resolve(false);
   if (document.hidden || feedingResumeOwnsAudioGesture()) return Promise.resolve(false);
 
   if (appAudioFreshContextOnGesture) {
@@ -1571,6 +1802,8 @@ function unlockAppAudio() {
 }
 
 function playUiTapSound({ force = false } = {}) {
+  // Only the genuine capture-phase gesture dispatches native UI sounds.
+  if (isNativeUiAudioMode()) return;
   if (muted) return;
 
   const ctx = getAppAudioContext();
@@ -1621,7 +1854,8 @@ function toggleMute() {
   muted = !muted;
   applyMute();
   window.BibloZooDailyQuestions?.onMuteChanged?.(muted);
-  if (!muted) void unlockAppAudio();
+  if (muted) window.BibloZooNativeUiAudio?.invalidate?.({ stop: true });
+  if (!muted && !isNativeUiAudioMode()) void unlockAppAudio();
   if (muted) {
     // The existing mute control pauses audioEl. Also release a lesson that
     // would otherwise remain forever waiting for a now-impossible ended event.
@@ -1928,6 +2162,24 @@ async function playLearnInstructionAudio() {
   State.audioMode = "instruction";
   updateLearnInstructionReadyUi();
 
+  if (isNativeLearnTracksMode()) {
+    // Optional short prompt is also printed on the instruction card.
+    // Play only if native can prepare the allowlisted packaged clip;
+    // failure must never disable the original Continue button.
+    const id = nativeInstructionSoundId(State.learnInstructionKey);
+    const result = id && !muted
+      ? await window.BibloZooNativeLearnTracks.play(id)
+      : { ended: false, reason: muted ? "muted" : "invalid-instruction" };
+    if (my !== echoCancelToken || document.hidden ||
+        State.screen !== Screen.LEARN_INSTRUCTION) return;
+    State.instructionPlaying = false;
+    State.instructionKey = "";
+    State.audioMode = null;
+    State.learnInstructionReady = true;
+    updateLearnInstructionReadyUi();
+    return;
+  }
+
   setAudioSrc(`${AUDIO_DIR}${cfg.audio}`);
   audioEl.currentTime = 0;
 
@@ -1967,6 +2219,13 @@ async function playLearnInstructionAudio() {
 
 async function continueLearnInstruction() {
   const key = State.learnInstructionKey;
+  if (key === "listen" && isNativeLearnListenMode() && !muted) {
+    // Native activation synchronously inside the existing Continue gesture;
+    // narration begins only when the Listen slide has settled.
+    window.BibloZooNativeLearnListen.primeFromGesture();
+  } else if (["chunks1", "chunks2", "echo1"].includes(key)) {
+    primeNativeLearnTracks();
+  }
 
   State.learnInstructionReady = false;
   State.learnInstructionAudioStarted = false;
@@ -2012,6 +2271,7 @@ async function continueLearnInstruction() {
     }
 
     if (isTutorialActive()) {
+      primeZooTodoTutorialNativeAudioFromGesture();
       State.todoTutorialJustFinishedLearn = true;
       markTutorialLearnDone(VERSE_ID);
       go(Screen.TODO_DEV);
@@ -6393,6 +6653,43 @@ function exitDailyTodoRead(
 }
 
 
+// Free-play Listen Activities never enter or modify a Daily Zoo To-Do task.
+function isLearnListenReadContext(context, verseId = "", activityId = "") {
+  const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+  return !!(
+    context?.source === "learn_listen_activities" &&
+    profileId &&
+    context.profileId === profileId &&
+    context.verseId === VERSE_ID &&
+    context.readActivityId &&
+    window.BibloZooReadMyVerse?.READ_ACTIVITY_MANIFEST?.[context.readActivityId]?.enabled &&
+    (!verseId || verseId === context.verseId) &&
+    (!activityId || activityId === context.readActivityId) &&
+    !context.planId &&
+    !context.planDay &&
+    !context.taskId &&
+    !context.launchToken &&
+    !context.previewScope &&
+    context.readTestMode === "normal"
+  );
+}
+
+function completeReadMyVerseContext({ context = null, verseId = "", readActivityId = "" } = {}) {
+  if (context?.source === "learn_listen_activities") {
+    if (!isLearnListenReadContext(context, verseId, readActivityId)) return false;
+    return transitionToAppScreen(Screen.LISTEN_ACTIVITIES);
+  }
+  return completeDailyTodoRead({ context, verseId, readActivityId });
+}
+
+function exitReadMyVerseContext(context = null) {
+  if (context?.source === "learn_listen_activities") {
+    if (!isLearnListenReadContext(context)) return false;
+    return transitionToAppScreen(Screen.LISTEN_ACTIVITIES);
+  }
+  return exitDailyTodoRead(context);
+}
+
 function loadDailyTodoQuestionsRuntime(
   previewScope = ""
 ) {
@@ -6800,6 +7097,17 @@ function exitDailyTodoQuestions(
   return true;
 }
 
+function showNewDailyTodoDayMessage() {
+  showDialog({
+    title: "A New Day at the Zoo!",
+    body:
+      "Yesterday's Daily Tasks have ended. Complete today's fresh three tasks to earn today's snack.",
+    actions: [
+      dlgBtn("OK", { onClick: closeDialog })
+    ]
+  });
+}
+
 function getReadyDailySnackRuntime(
   requestedPlan = null,
   now = new Date()
@@ -6946,6 +7254,7 @@ async function startDailyTodoSnack(
     rewardTiltEnabled,
     rewardScore: 0,
     rewardCaught: 0,
+    rewardSnacksCaught: 0,
     rewardComplete: false,
     rewardClaimed: false
   };
@@ -6976,6 +7285,10 @@ function claimDailyTodoSnack(
         Number(session.rewardCaught) ||
         0
       );
+    // Preview results may display snacks, but cannot persist achievements.
+    session.rewardSnacksCaught = session.feedMode === "melody"
+      ? Math.max(0, Number(result.snacksCaught) || 0)
+      : Math.max(0, Number(result.caughtCount) || 0);
     session.rewardComplete = true;
     session.rewardClaimed = true;
     return true;
@@ -7013,6 +7326,11 @@ function claimDailyTodoSnack(
       {
         planId: session.planId,
         now: new Date(),
+        // Melody's many playable music notes are NOT all food; only its
+        // seven colored BibloSnacks count. Other modes catch food directly.
+        snacksCaught: session.feedMode === "melody"
+          ? Math.max(0, Number(result.snacksCaught) || 0)
+          : Math.max(0, Number(result.caughtCount) || 0),
         // The emergency Classic-only switch must not consume
         // a rotation turn, even when Classic was already assigned.
         feedMode: ENABLE_DAILY_FEEDING_VARIETY
@@ -7041,6 +7359,9 @@ function claimDailyTodoSnack(
       0,
       Number(result.caughtCount) || 0
     );
+  session.rewardSnacksCaught = session.feedMode === "melody"
+    ? Math.max(0, Number(result.snacksCaught) || 0)
+    : session.rewardCaught;
   session.rewardComplete = true;
   session.rewardClaimed = true;
   return true;
@@ -7425,7 +7746,7 @@ window.BibloZooDailyQuestions
     isMuted: () => muted,
 
     isDebugLongPressEnabled: () =>
-      FEATURES.DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true,
+      FEATURES.DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS === true && allowDevShortcuts(),
 
     getVerseList: () =>
       VERSE_LIST,
@@ -8672,9 +8993,33 @@ let verseDetailListenToken = 0;
 let cancelVerseDetailListenWait = null;
 let verseDetailListenActive = false;
 
+// N6a: the same reference→verse preview is shared by BibloPet Detail and
+// Flashcards. Only the Detail screen has this status element; Flashcards
+// owns its existing independent Listen/retry button.
+function setVerseDetailPreviewStatus(message = "") {
+  // The shared preview API also runs in Flashcards and in the historical
+  // source-level HTML-audio recovery harness without a rendered Detail UI.
+  if (typeof State === "undefined" || typeof Screen === "undefined" ||
+      State.screen !== Screen.VERSE_DETAIL ||
+      typeof document.getElementById !== "function") return;
+  const button = document.getElementById("btnDetailListen");
+  if (button) button.textContent = verseDetailListenActive
+    ? "Stop Listening" : "Listen to the Verse";
+  // N6b UX cleanup: no visible playback/status paragraph under this button.
+  // Stop Listening still changes the button itself, and failures allow
+  // the normal explicit Listen retry; native audio lifecycle is unchanged.
+}
+
 function cancelVerseDetailListen() {
   verseDetailListenToken += 1;
+  const hadNativePreview = verseDetailListenActive &&
+    typeof isNativeLearnListenMode === "function" &&
+    isNativeLearnListenMode();
   verseDetailListenActive = false;
+  // N6a: stop only a preview owned by this function; leaving Verse Detail
+  // or Flashcards must never cut a newer unrelated Learn narration request.
+  if (hadNativePreview) window.BibloZooNativeLearnListen.stop();
+  setVerseDetailPreviewStatus();
 
   const cancelWait =
     cancelVerseDetailListenWait;
@@ -8725,12 +9070,84 @@ function waitForVerseDetailAudioEnd(token) {
   });
 }
 
-async function playVerseDetailListen(verseId) {
+async function playVerseDetailListen(verseId, { onInterrupted } = {}) {
   const listenToken =
     cancelVerseDetailListen();
   if (muted || document.hidden) return false;
   verseDetailListenActive = true;
 
+  if (typeof isNativeLearnListenMode === "function" &&
+      isNativeLearnListenMode()) {
+    // This function is called synchronously from the real Verse Detail or
+    // Flashcards Listen button. N5b.2's source-owner invokes Swift
+    // activateFromGesture BEFORE any await, then independently validates
+    // published ref+whole-verse files and request IDs. No HTML/Web fallback.
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (completed, message = "") => {
+        if (settled) return;
+        settled = true;
+        if (cancelVerseDetailListenWait === cancel)
+          cancelVerseDetailListenWait = null;
+        if (listenToken === verseDetailListenToken) {
+          verseDetailListenActive = false;
+          setVerseDetailPreviewStatus(message);
+        }
+        resolve(completed === true);
+      };
+      const cancel = () => finish(false);
+      cancelVerseDetailListenWait = cancel;
+      setVerseDetailPreviewStatus("Preparing the verse…");
+      try {
+        const start = window.BibloZooNativeLearnListen.startFromGesture({
+          verseId,
+          onEvent: (event) => {
+            if (settled || listenToken !== verseDetailListenToken ||
+                !verseDetailListenActive || document.hidden ||
+                ![Screen.VERSE_DETAIL, Screen.FLASHCARDS,
+                  Screen.DAILY_SESSION].includes(State.screen))
+              return;
+            if (event.kind === "stage" || event.kind === "playing") {
+              setVerseDetailPreviewStatus(
+                event.stage === "verse" ? "Reading the verse…" :
+                  "Reading the verse reference…"
+              );
+            } else if (event.kind === "completed" &&
+                       event.stage === "verse") {
+              // Flashcards' async Listen button awaits exactly this true
+              // completion; reference end, native accepted, position clock
+              // and stale completion must never count as success.
+              finish(true);
+            } else if (event.kind === "interrupted") {
+              // Flashcards and Daily Check the Verse own their own
+              // Welcome Back for external media taking the native session
+              // while UIKit may remain active. Notify those controllers
+              // BEFORE finish(false) resolves the interrupted request.
+              if ([Screen.FLASHCARDS, Screen.DAILY_SESSION]
+                    .includes(State.screen) &&
+                  typeof onInterrupted === "function") {
+                try { onInterrupted(); } catch (_) {}
+              }
+              finish(false, "Playback paused. Tap Listen to start again.");
+            } else if (event.kind === "failed") {
+              finish(false, "Sound isn't ready. Tap Listen to try again.");
+            }
+          }
+        });
+        Promise.resolve(start).then(result => {
+          if (result?.ready !== true && result?.reason !== "stale")
+            finish(false, "Sound isn't ready. Tap Listen to try again.");
+        }).catch(() => {
+          finish(false, "Sound isn't ready. Tap Listen to try again.");
+        });
+      } catch (_) {
+        finish(false, "Sound isn't ready. Tap Listen to try again.");
+      }
+    });
+  }
+
+  // Existing Web/PWA/Android HTML audio and Flashcards completion contract
+  // remain byte-for-byte unchanged below this native-only branch.
   const verseRefAudioFile =
     `${AUDIO_DIR}${verseId}_ref.mp3`;
 
@@ -9505,6 +9922,8 @@ const Screen = {
   NEW_VERSE_PICKER: "new_verse_picker",
   PROGRESS: "progress",
   VERSE_DETAIL: "verse_detail",
+  LEARN_HUB: "learn_hub",
+  LISTEN_ACTIVITIES: "listen_activities",
   LEARN_LEVEL: "learn_level",
   PRACTICE_GATE: "practice_gate",
   LEARN_INSTRUCTION: "learn_instruction",
@@ -9546,6 +9965,8 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PET_STATS,
   Screen.ZOOKEEPER_STATS,
   Screen.VERSE_DETAIL,
+  Screen.LEARN_HUB,
+  Screen.LISTEN_ACTIVITIES,
   Screen.LEARN_LEVEL,
   Screen.PRACTICE_GATE,
   Screen.LEARN_INSTRUCTION,
@@ -9641,6 +10062,7 @@ window.BibloZooFlashcards
 window.BibloZooReadMyVerse
   ?.initialize?.({
     getVerseList: () => VERSE_LIST,
+    getActiveProfileId: () => getProfileApi()?.getActiveProfileId?.() || "",
     makeSlide,
     scheduleSmartLearnTextFit,
     isMuted: () => muted,
@@ -9650,9 +10072,9 @@ window.BibloZooReadMyVerse
     requestRender: () => render(),
     onWordActivated: () => true,
     onContextComplete:
-      completeDailyTodoRead,
+      completeReadMyVerseContext,
     onContextExit:
-      exitDailyTodoRead,
+      exitReadMyVerseContext,
     goToHome: () => go(Screen.TITLE)
   });
 
@@ -9869,6 +10291,10 @@ const TITLE_OPTIONS = [
     id: "learn",
     label: "Learn the Verse",
     action: () => {
+      if (State.hasLearnedVerse && HAS_VERSE_SELECTION) {
+        go(Screen.LEARN_HUB);
+        return;
+      }
       State.learnLevel = "not_at_all";
       State.learnStartScreen = Screen.LISTEN;
 
@@ -10703,6 +11129,8 @@ function renderPracticeGameCard(game, verseProgress) {
 
 
 function resetLearn(goTitle = false) {
+  nativeLearnPartCheckpoint = null;
+  nativeLearnTrackError = "";
   learnAudioInterrupted = null;
   clearLearnAudioResumeTimers(learnAudioResumeAttempt);
   learnAudioResumeAttempt = null;
@@ -10846,6 +11274,9 @@ function go(nextScreen) {
   cancelLearnAudio();
 
   if (from === Screen.HIDE && nextScreen !== Screen.HIDE) {
+    releaseHideActivityVisuals();
+    learnHideMenuPaused = false;
+    appReturnPausedAt = 0;
     State.sayVerseActive = false;
     State.sayVerseStartedAt = 0;
     State.sayVerseDurationMs = 0;
@@ -10928,6 +11359,10 @@ function go(nextScreen) {
           nextScreen ===
             Screen.PRACTICE_HUB ||
           nextScreen ===
+            Screen.LEARN_HUB ||
+          nextScreen ===
+            Screen.LISTEN_ACTIVITIES ||
+          nextScreen ===
             Screen.PRACTICE ||
           nextScreen ===
             Screen.PLAYGROUND ||
@@ -10969,6 +11404,11 @@ function setScreen(screen) {
     if (State.screen === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
     if (State.screen === Screen.VERSE_DETAIL) cancelVerseDetailListen();
     if (State.screen === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
+  }
+  if (State.screen === Screen.HIDE && screen !== Screen.HIDE) {
+    releaseHideActivityVisuals();
+    learnHideMenuPaused = false;
+    appReturnPausedAt = 0;
   }
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
     window.BibloZooFlashcards?.stopSession?.();
@@ -11072,6 +11512,7 @@ function learnLevelNext() {
 }
 
 function learnLevelRun() {
+  primeNativeLearnTracks(); // real user tap before instruction slide
   const opt = LEARN_LEVEL_OPTIONS[State.learnLevelIndex];
 
   State.learnLevel = opt.level;
@@ -11501,9 +11942,33 @@ function isLearnAudioOverlayRecovery(recovery) {
 // Zoo Escape presents the pauses, and observes the actual verified outcome.
 let learnZooEscape = null;
 let learnZooRecovery = null;
-function beginLearnZooRecovery() {
+let learnZooHoldingForSurprise = false;
+let learnZooCue = null;
+let learnZooCueVerified = false;
+let learnZooCueGeneration = 0;
+function beginLearnZooRecovery(info = {}) {
   const recovery = learnAudioInterrupted;
   if (!isLearnAudioOverlayRecovery(recovery)) return false;
+  if (info?.plannedSurprise) {
+    // Selected Break/Escape: verify ONLY the fixed BibloPet unlock cue
+    // during Let's go. The original Listen / Chunks / Echo narration,
+    // checkpoints and quiet-turn clocks stay frozen until LOCK GATE.
+    ++learnZooCueGeneration;
+    const token = learnZooCueGeneration;
+    learnZooCueVerified = false;
+    learnZooCue?.stop();
+    return learnZooCue?.playFromGesture({
+      isMuted: () => muted, assetRoot: "",
+      isCurrent: () => token === learnZooCueGeneration &&
+        !document.hidden && State.screen === recovery.screen &&
+        learnAudioInterrupted === recovery && learnZooRecovery === recovery
+    }).then(ok => {
+      if (token !== learnZooCueGeneration || document.hidden ||
+          learnAudioInterrupted !== recovery) return false;
+      if (ok === true) learnZooCueVerified = true;
+      return ok === true;
+    }, () => false) || false;
+  }
   const started = resumeInterruptedLearnAudio(); // inside the real click
   if (!started) return false;
   return new Promise(resolve => {
@@ -11544,16 +12009,77 @@ function ensureLearnAudioResumeOverlay() {
     </div>`;
   document.body.appendChild(overlay);
   const action = overlay.querySelector("#learnAudioResumeButton");
-  if (window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
+  if (!isNativeLearnListenMode() &&
+      window.BibloZooZooEscape?.create && window.BibloZooWelcomeBack?.markup) {
+    // N5b.3: native-only lesson recovery is a plain explicit retry, NOT
+    // a Zoo Escape/ZOO BREAK triggered by unconverted or missing clips.
+    learnZooCue = window.BibloZooWelcomeBackReturn?.createZooAudioCue?.() || null;
+    if (learnZooCue) action?.setAttribute("data-no-ui-sound", "");
     learnZooEscape = window.BibloZooZooEscape.create({
+      // Learn is never a recreational Zoo surprise source on any platform.
+      surpriseEnabled: false,
+      recoveryOnly: true,
+      preselectWelcomeSurprise: false,
       overlay, verseId: () => VERSE_ID,
       petName: () => getBibloPetDisplayNameForVerseId(VERSE_ID),
       getSoundContext: () => appAudioUnlocked && !appAudioRecoveryPending
         ? appAudioContext : null,
       isSoundMuted: () => muted,
       recover: beginLearnZooRecovery,
-      onRecovered: () => { learnZooRecovery = null; overlay.hidden = true; },
-      onExit: () => { learnZooRecovery = null; go(Screen.TITLE); }
+      onSurpriseStart: () => {
+        learnZooHoldingForSurprise = true;
+        // Cue-first: the original interrupted lesson has not restarted, so
+        // pausing it again can invalidate its native part/gap checkpoint.
+        // Legacy non-cue recovery still uses its old verified re-pause.
+        if (!learnZooCueVerified) pauseLearnAudioForInterruption();
+      },
+      onRecovered: () => {
+        if (!learnZooHoldingForSurprise) {
+          if (learnZooCueVerified) {
+            // Cue verified but provisional odds commit did NOT produce a pet.
+            // Never dismiss Welcome Back with the lesson still frozen.
+            learnZooCue?.stop();
+            learnZooCueVerified = false;
+            ++learnZooCueGeneration;
+            learnZooEscape.start();
+            overlay.hidden = false;
+            return;
+          }
+          learnZooRecovery = null;
+          overlay.hidden = true;
+          return;
+        }
+        // LOCK GATE is the second real gesture. Retire the cue before the
+        // original Learn owner starts sound and verifies its source clock.
+        learnZooCue?.stop();
+        learnZooCueVerified = false;
+        ++learnZooCueGeneration;
+        const recovery = learnZooRecovery;
+        const resume = learnAudioInterrupted
+          ? beginLearnZooRecovery() : Promise.resolve(false);
+        const finish = ok => {
+          if (document.hidden || State.screen !== recovery?.screen ||
+              learnZooRecovery !== recovery) return;
+          learnZooHoldingForSurprise = false;
+          if (ok === true) {
+            learnZooRecovery = null;
+            overlay.hidden = true;
+          } else {
+            // Failed native/HTML narration remains frozen and retryable.
+            learnZooEscape.start();
+            syncLearnAudioResumeOverlay();
+          }
+        };
+        Promise.resolve(resume).then(finish, () => finish(false));
+      },
+      onExit: () => {
+        learnZooCue?.stop();
+        ++learnZooCueGeneration;
+        learnZooCueVerified = false;
+        learnZooHoldingForSurprise = false;
+        learnZooRecovery = null;
+        go(Screen.TITLE);
+      }
     });
   }
   if (!learnZooEscape && action) action.onclick = resumeInterruptedLearnAudio;
@@ -11561,8 +12087,19 @@ function ensureLearnAudioResumeOverlay() {
 }
 
 function syncLearnAudioResumeOverlay() {
+  if (learnZooHoldingForSurprise && learnZooEscape) {
+    // Keep the pet rescue in front while Learn owns a second intentional
+    // pause or the final-pen gesture is re-verifying native narration.
+    const overlay = document.getElementById("learnAudioResumeOverlay");
+    if (overlay) overlay.hidden = document.hidden;
+    return;
+  }
   const recovery = learnAudioResumeAttempt?.recovery || learnAudioInterrupted;
+  // The menu's genuine Close gesture can resume native playback without
+  // treating an intentional in-app pause as an OS interruption. Preserve the
+  // existing Welcome Back gate for real inactivity or a failed menu resume.
   const show = !document.hidden && !learnMenuOpen &&
+    !learnAudioResumeAttempt?.menuClose &&
     isLearnAudioOverlayRecovery(recovery);
   const existing = document.getElementById("learnAudioResumeOverlay");
   if (!show) {
@@ -11594,8 +12131,15 @@ function syncLearnAudioResumeOverlay() {
   });
   if (button) button.disabled = !!learnAudioResumeAttempt;
   const status = overlay.querySelector("#learnAudioResumeStatus");
+  // R11 / LEARN-01: shared Welcome Back already rotates its playful
+  // progress message in the reserved action/button slot. Never mirror that
+  // message into this separate aria-live status row underneath it. Keep the
+  // row available for a REAL failed verification / "Try again!" explanation.
+  // If shared markup is unavailable, retain a nonduplicated busy status
+  // for the older local fallback that has no progress slot.
+  const hasInlineProgress = !!overlay.querySelector("[data-welcome-back-progress]");
   status.textContent = learnAudioResumeAttempt
-    ? (window.BibloZooWelcomeBack?.getMessage?.(overlay) || "Cleaning the zoo...")
+    ? (hasInlineProgress ? "" : "Checking sound...")
     : learnAudioResumeError;
   status.hidden = !status.textContent;
 }
@@ -11632,7 +12176,8 @@ function verifyLearnNarrationProgress(attempt, narrationSrc, startingTime) {
 }
 
 function finishLearnAudioResumeAttempt(attempt) {
-  if (learnAudioResumeAttempt !== attempt || !attempt.narrationVerified ||
+  if (learnAudioResumeAttempt !== attempt ||
+      (!attempt.narrationVerified && !attempt.quietPhaseVerified) ||
       document.hidden || State.screen !== attempt.recovery.screen) {
     return;
   }
@@ -11656,7 +12201,7 @@ function failLearnAudioResumeAttempt(attempt) {
   if (!document.hidden) render();
 }
 
-function resumeInterruptedLearnAudio() {
+function resumeInterruptedLearnAudio(fromMenuClose = false) {
   const recovery = learnAudioInterrupted;
   if (document.hidden || learnMenuOpen || learnAudioResumeAttempt ||
       !isLearnAudioOverlayRecovery(recovery)) return false;
@@ -11665,19 +12210,26 @@ function resumeInterruptedLearnAudio() {
   // An unrelated UI AudioContext must never veto successfully advancing
   // narration. Keep unlockAppAudio() best-effort and non-blocking.
   if (muted) toggleMute();
-  try { void Promise.resolve(unlockAppAudio()).catch(() => {}); }
-  catch (_) { /* Optional UI effects may remain silent. */ }
-  const attempt = { recovery, narrationVerified: false, progressTimer: null, watchdog: null };
+  // An iOS native-only Listen resume must not create or unlock Web sound.
+  // Existing Web/PWA/Android HTML recovery keeps its previous UI primer.
+  if (window.BibloZooNativeLearnListen?.isAvailable?.() !== true) {
+    try { void Promise.resolve(unlockAppAudio()).catch(() => {}); }
+    catch (_) { /* Optional UI effects may remain silent. */ }
+  }
+  const attempt = { recovery, narrationVerified: false, progressTimer: null,
+    watchdog: null, menuClose: fromMenuClose === true };
   learnAudioResumeAttempt = attempt;
   learnAudioInterrupted = null;
   learnAudioResumeError = "";
 
   if (recovery.mode === "listen") {
-    listenPlay(recovery.listenMode);
+    listenPlay(recovery.listenMode, recovery.positionMs || 0);
   } else if (recovery.mode === "chunk") {
+    primeNativeLearnTracks(); // actual Welcome Back tap, not after slide
     learnAudioInterrupted = recovery;
     void startChunkFlow();
   } else if (recovery.mode === "echo") {
+    primeNativeLearnTracks();
     learnAudioInterrupted = recovery;
     void startEchoFlow();
   }
@@ -11685,12 +12237,23 @@ function resumeInterruptedLearnAudio() {
   // A play() request can resolve even when the media timeline is frozen.
   // Only verified currentTime progress clears the gate; the watchdog keeps a
   // hung play() or frozen timeline retryable, without changing Learn progress.
-  attempt.watchdog = setTimeout(() => failLearnAudioResumeAttempt(attempt), 3500);
+  attempt.watchdog = setTimeout(() => failLearnAudioResumeAttempt(attempt),
+    isNativeLearnTracksMode() && ["chunk", "echo"].includes(recovery.mode)
+      ? 7500 : 3500);
   syncLearnAudioResumeOverlay();
   return true;
 }
 
 function pauseLearnAudioForInterruption() {
+  // A second iOS task switch during a Zoo cue/pet/LOCK GATE invalidates
+  // that sound attempt; never reuse the earlier AVAudioPlayer clock proof.
+  if ((typeof learnZooCueVerified !== "undefined" && learnZooCueVerified) ||
+      (typeof learnZooHoldingForSurprise !== "undefined" &&
+        learnZooHoldingForSurprise)) {
+    learnZooCue?.stop();
+    learnZooCueVerified = false;
+    ++learnZooCueGeneration;
+  }
   if (learnMenuOpen) return;
   if (learnAudioResumeAttempt) {
     // A second background event while restoration is pending cannot be
@@ -11725,11 +12288,51 @@ function pauseLearnAudioForInterruption() {
 
   let recovery = null;
   if (screen === Screen.CHUNKS && (State.chunkRunning || State.chunkAutoStarting)) {
-    recovery = { screen, mode: "chunk", index: State.chunkRunning ? State.chunkIndex : 0 };
+    const checkpoint = isNativeLearnTracksMode() &&
+      nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnPartCheckpoint.mode === "chunk" ? nativeLearnPartCheckpoint : null;
+    const quiet = isNativeLearnTracksMode() &&
+      nativeLearnQuietCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnQuietCheckpoint.mode === "chunk" &&
+      nativeLearnQuietCheckpoint.phase === "chunk-gap"
+      ? nativeLearnQuietCheckpoint : null;
+    recovery = {
+      screen, mode: "chunk",
+      index: quiet?.index ?? checkpoint?.index ??
+        (State.chunkRunning ? State.chunkIndex : 0),
+      ...(quiet ? { positionMs: 0, quietPhase: quiet.phase,
+          quietRemainingMs: quiet.remainingMs } :
+        checkpoint ? { positionMs: checkpoint.positionMs } : {})
+    };
   } else if (screen === Screen.ECHO && (State.echoRunning || State.echoAutoStarting)) {
-    recovery = { screen, mode: "echo", index: State.echoRunning ? State.echoIndex : 0 };
+    const checkpoint = isNativeLearnTracksMode() &&
+      nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnPartCheckpoint.mode === "echo" ? nativeLearnPartCheckpoint : null;
+    const quiet = isNativeLearnTracksMode() &&
+      nativeLearnQuietCheckpoint?.verseId === VERSE_ID &&
+      nativeLearnQuietCheckpoint.mode === "echo" &&
+      nativeLearnQuietCheckpoint.phase === "echo-repeat"
+      ? nativeLearnQuietCheckpoint : null;
+    recovery = {
+      screen, mode: "echo",
+      index: quiet?.index ?? checkpoint?.index ??
+        (State.echoRunning ? State.echoIndex : 0),
+      ...(quiet ? { positionMs: 0, quietPhase: quiet.phase,
+          quietRemainingMs: quiet.remainingMs } :
+        checkpoint ? { positionMs: checkpoint.positionMs } : {})
+    };
   } else if (screen === Screen.LISTEN && (State.listenPlaying || State.listenAutoStarting)) {
-    recovery = { screen, mode: "listen", listenMode: State.listenPlaying ? State.audioMode : "listen_ref" };
+    const checkpoint = isNativeLearnListenMode() &&
+      nativeListenCheckpoint?.verseId === VERSE_ID
+      ? nativeListenCheckpoint : null;
+    recovery = {
+      screen, mode: "listen",
+      listenMode: checkpoint?.mode ||
+        (State.listenPlaying ? State.audioMode : "listen_ref"),
+      ...(isNativeLearnListenMode() ? {
+        verseId: VERSE_ID, positionMs: checkpoint?.positionMs || 0
+      } : {})
+    };
   }
   if (!recovery) return;
 
@@ -11780,7 +12383,7 @@ function waitForAudioEnd() {
   });
 }
 
-function waitForPausableDelay(ms, generation = echoCancelToken) {
+function waitForPausableDelay(ms, generation = echoCancelToken, onRemaining = null) {
   return new Promise((resolve) => {
     let remaining = ms;
     let last = performance.now();
@@ -11790,6 +12393,7 @@ function waitForPausableDelay(ms, generation = echoCancelToken) {
       const now = performance.now();
       if (!learnMenuOpen && !document.hidden) remaining -= now - last;
       last = now;
+      if (typeof onRemaining === "function") onRemaining(Math.max(0, remaining));
       if (remaining <= 0) return resolve(true);
       setTimeout(tick, 50);
     }
@@ -11814,11 +12418,24 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
     }
 
     const file = instructionAudioFile(key);
-    setAudioSrc(file);
-    audioEl.currentTime = 0;
+    if (isNativeLearnTracksMode()) {
+      const id = nativeInstructionSoundId(key);
+      const result = id && !muted
+        ? await window.BibloZooNativeLearnTracks.play(id)
+        : { ended: false, reason: "muted-or-unknown-instruction" };
+      if (my !== echoCancelToken || document.hidden) return;
+      // Original short prompt is nonblocking; the text remains on screen
+      // and failure does not corrupt the lesson or trigger a Zoo Escape.
+      if (!result.ended) {
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
+    } else {
+      setAudioSrc(file);
+      audioEl.currentTime = 0;
 
-    try {
-      await safePlay();
+      try {
+        await safePlay();
     } catch (e) {
       if (my !== echoCancelToken || document.hidden) return;
       if (e?.name === "NotAllowedError" || e?.name === "AbortError") {
@@ -11835,11 +12452,12 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
       return;
     }
 
-    const ended = await waitForAudioEnd();
-    if (my !== echoCancelToken || document.hidden) return;
-    if (!ended) {
-      if (doneFlag) State[doneFlag] = true;
-      return;
+      const ended = await waitForAudioEnd();
+      if (my !== echoCancelToken || document.hidden) return;
+      if (!ended) {
+        if (doneFlag) State[doneFlag] = true;
+        return;
+      }
     }
 
     if (doneFlag) {
@@ -11869,8 +12487,94 @@ async function playInstruction(key, { doneFlag = null, delayMs = 0, after = null
   }
 }
 
-function listenPlay(resumeMode = "listen_ref") {
+// N5b.2: only packaged .audiotest iOS uses native narration in Listen.
+// Keep the same HTML audio source, timing and completion for Web/PWA/Android.
+function isNativeLearnListenMode() {
+  return window.BibloZooNativeLearnListen?.isAvailable?.() === true;
+}
+
+function handleNativeLearnListenEvent(event) {
+  if (!isNativeLearnListenMode() || !event ||
+      event.verseId !== VERSE_ID || State.screen !== Screen.LISTEN) return;
+
+  // A native UIKit App Switcher inactive signal can arrive while WebKit is
+  // still visibly rendering the thumbnail. Preserve current stage/checkpoint
+  // and enter the existing owner-controlled Welcome Back immediately.
+  if (event.kind === "interrupted") {
+    nativeListenCheckpoint = {
+      verseId: event.verseId,
+      mode: event.stage === "verse" ? "listen_verse" : "listen_ref",
+      positionMs: event.positionMs || 0
+    };
+    if (State.listenPlaying || learnAudioResumeAttempt)
+      pauseLearnAudioForInterruption();
+    if (!document.hidden) render();
+    return;
+  }
+  if (!State.listenPlaying || document.hidden || muted ||
+      learnAudioInterrupted) return;
+
+  const mode = event.stage === "verse" ? "listen_verse" : "listen_ref";
+  if (event.kind === "stage" || event.kind === "playing" ||
+      event.kind === "progress" || event.kind === "stage-ended") {
+    State.audioMode = mode;
+    nativeListenCheckpoint = {
+      verseId: event.verseId, mode,
+      positionMs: event.positionMs || 0
+    };
+    const attempt = learnAudioResumeAttempt;
+    if (attempt?.recovery?.mode === "listen") {
+      // A native player timeline must actually progress before Welcome Back
+      // closes. A resolved AVAudioPlayer.play() / UI pop never passes.
+      const expectedMode = attempt.recovery.listenMode || "listen_ref";
+      const previousMs = Number(attempt.recovery.positionMs) || 0;
+      if (event.kind === "stage-ended" ||
+          (event.kind === "progress" &&
+            (mode !== expectedMode ||
+              event.positionMs > previousMs + 40))) {
+        attempt.narrationVerified = true;
+        finishLearnAudioResumeAttempt(attempt);
+      }
+    }
+    if (event.kind === "stage") render();
+    return;
+  }
+  if (event.kind === "failed") {
+    if (learnAudioResumeAttempt?.recovery?.mode === "listen") {
+      failLearnAudioResumeAttempt(learnAudioResumeAttempt);
+      return;
+    }
+    // Do not start a known-silent Listen pass or award Listen completion.
+    State.listenPlaying = false;
+    State.listenAutoFallbackReady = true;
+    State.audioMode = null;
+    nativeListenError = "Sound isn't ready yet. Tap to try again.";
+    render();
+    return;
+  }
+  if (event.kind === "completed" && event.stage === "verse") {
+    // Only the currently owned, native-validated verse-ended event advances
+    // Learn. A reference end, UI pop, Web HTML ended or stale ID cannot.
+    nativeListenError = "";
+    State.listenPlaying = false;
+    State.audioMode = null;
+    State.listenDone = true;
+    nativeListenCheckpoint = null;
+    startLearnInstruction("meaning");
+  }
+}
+
+function listenPlay(resumeMode = "listen_ref", nativeResumeMs = 0,
+    fromPrimedGesture = false) {
   if (document.hidden) return;
+  if (isNativeLearnListenMode() && muted) {
+    State.listenPlaying = false;
+    State.listenAutoFallbackReady = true;
+    State.audioMode = null;
+    nativeListenError = "Unmute to hear this verse.";
+    render();
+    return;
+  }
   const mode = resumeMode === "listen_verse" ? "listen_verse" : "listen_ref";
   learnAudioInterrupted = null;
   State.listenAutoStarting = false;
@@ -11878,6 +12582,43 @@ function listenPlay(resumeMode = "listen_ref") {
   State.listenPlaying = true;
   State.listenDone = false;
   State.audioMode = mode;
+
+  if (isNativeLearnListenMode()) {
+    nativeListenError = "";
+    nativeListenCheckpoint = {
+      verseId: VERSE_ID, mode,
+      positionMs: nativeResumeMs
+    };
+    // The genuine Listen/Let's go! click is the ONLY activation entrypoint.
+    // This call invokes Swift activateFromGesture synchronously (pre-await).
+    void window.BibloZooNativeLearnListen.startFromGesture({
+      verseId: VERSE_ID,
+      stage: mode === "listen_verse" ? "verse" : "reference",
+      positionMs: nativeResumeMs,
+      fromPrimedGesture,
+      onEvent: handleNativeLearnListenEvent
+    }).then(result => {
+      if (result?.ready !== true && result?.reason !== "stale" &&
+          State.screen === Screen.LISTEN && State.listenPlaying &&
+          !document.hidden && !learnAudioInterrupted) {
+        // The controller also sends a request-owned failure event; this is
+        // only a safe fallback if the bridge failed before event delivery.
+        handleNativeLearnListenEvent({
+          kind: "failed", verseId: VERSE_ID,
+          stage: mode === "listen_verse" ? "verse" : "reference"
+        });
+      }
+    }).catch(() => {
+      if (State.screen === Screen.LISTEN && State.listenPlaying &&
+          !document.hidden && !learnAudioInterrupted) {
+        handleNativeLearnListenEvent({
+          kind: "failed", verseId: VERSE_ID, stage: "reference"
+        });
+      }
+    });
+    render();
+    return;
+  }
 
   setAudioSrc(mode === "listen_verse" ? AUDIO_FILE : refAudioFile());
   audioEl.currentTime = 0;
@@ -11904,7 +12645,9 @@ function listenPlay(resumeMode = "listen_ref") {
 }
 
 audioEl.addEventListener("ended", () => {
-  if (document.hidden || learnAudioInterrupted) return;
+  // A stale HTMLMediaElement ended must not complete native Listen.
+  if (document.hidden || learnAudioInterrupted ||
+      (isNativeLearnListenMode() && State.screen === Screen.LISTEN)) return;
   if (State.screen === Screen.LISTEN && State.listenPlaying && State.audioMode === "listen_ref") {
     State.audioMode = "listen_verse";
 
@@ -12011,6 +12754,81 @@ function waitForDuration(timeoutMs = 2000) {
 // prompt. Timed Learn exercise clocks remain frozen until the child's gesture.
 let appActivityReturn = null;
 let appReturnPausedAt = 0;
+// R04 menu follow-up: this is a purely in-app paused HIDE, never an OS
+// interruption or a new Welcome Back. Share the same frozen clock to
+// avoid double-counting if UIKit becomes inactive while the menu is open.
+let learnHideMenuPaused = false;
+// R04: UIKit may report inactive while held App Switcher keeps WebKit
+// visible. Freeze the current Missing Words clock and live visual animations
+// at that event; recover through the EXISTING user-tap Welcome Back only.
+let appActivityNativeLifecycleBound = false;
+let pausedHideAnimations = [];
+let hideActivityVisualsPaused = false;
+function pauseHideActivityVisuals() {
+  // Menu plus UIKit can pause the same frame; never overwrite the
+  // original running-animation handles with already-paused animations.
+  if (State.screen !== Screen.HIDE || hideActivityVisualsPaused) return;
+  hideActivityVisualsPaused = true;
+  const stage = document.querySelector?.(".learn-screen-remove");
+  pausedHideAnimations = Array.from(stage?.getAnimations?.({ subtree: true }) || [])
+    .filter(animation => animation.playState === "running");
+  for (const animation of pausedHideAnimations) {
+    try { animation.pause(); } catch (_) {}
+  }
+  // Also pauses CSS animations if a render replaces the original nodes.
+  document.documentElement?.classList?.add("learn-hide-native-paused");
+}
+function releaseHideActivityVisuals(resume = false) {
+  hideActivityVisualsPaused = false;
+  document.documentElement?.classList?.remove("learn-hide-native-paused");
+  const paused = pausedHideAnimations;
+  pausedHideAnimations = [];
+  if (!resume) return;
+  for (const animation of paused) {
+    try { if (animation.playState === "paused") animation.play(); }
+    catch (_) {}
+  }
+}
+function pauseHideForMenu() {
+  if (State.screen !== Screen.HIDE || learnHideMenuPaused) return;
+  learnHideMenuPaused = true;
+  if (!appReturnPausedAt) appReturnPausedAt = performance.now();
+  pauseHideActivityVisuals();
+}
+function resumeHideFromMenu() {
+  if (!learnHideMenuPaused) return;
+  learnHideMenuPaused = false;
+  // A real OS switch while the menu was open still needs Let's go!.
+  // Menu Close is not permission to dismiss the native interruption.
+  if (document.hidden || appActivityReturn?.isPaused?.()) return;
+  if (appReturnPausedAt) {
+    const delta = Math.max(0, performance.now() - appReturnPausedAt);
+    if (State.screen === Screen.HIDE && State.sayVerseStartedAt)
+      State.sayVerseStartedAt += delta;
+    appReturnPausedAt = 0;
+  }
+  releaseHideActivityVisuals(State.screen === Screen.HIDE);
+}
+function bindNativeAppActivityReturn() {
+  if (appActivityNativeLifecycleBound || !appActivityReturn ||
+      window.BibloZooNativeOnlyOutput?.enabled !== true ||
+      window.Capacitor?.getPlatform?.() !== "ios") return;
+  const bridge = window.Capacitor?.Plugins?.BibloZooNativeSound;
+  if (typeof bridge?.addListener !== "function") return;
+  appActivityNativeLifecycleBound = true;
+  try {
+    Promise.resolve(bridge.addListener("biblozooAppLifecycle", event => {
+      // Native .inactive can arrive while document.hidden remains false.
+      // Delegate to the existing controller, which deduplicates WebKit
+      // visibility and never unfreezes before a child's Let's go! gesture.
+      if (State.screen !== Screen.HIDE) return;
+      if (event?.active === false)
+        appActivityReturn?.pauseFromNativeInactive?.();
+      else if (event?.active === true)
+        appActivityReturn?.showAfterNativeActive?.();
+    })).catch(() => { appActivityNativeLifecycleBound = false; });
+  } catch (_) { appActivityNativeLifecycleBound = false; }
+}
 
 function shouldPromptAppActivityReturn() {
   if (State.isSliding) return false;
@@ -12019,7 +12837,9 @@ function shouldPromptAppActivityReturn() {
     // use their existing retry control rather than an extra modal.
     return !State.todoInfoPage;
   }
-  return (State.screen === Screen.HIDE && State.sayVerseActive) ||
+  return (State.screen === Screen.HIDE &&
+      (State.sayVerseActive || State.hideAutoStarting ||
+       !!State.hideTransitionPhase)) ||
     (State.screen === Screen.FINAL_RECALL && State.finalRecallActive);
 }
 
@@ -12035,12 +12855,21 @@ function attachAppActivityReturn() {
       } else if (!appReturnPausedAt) {
         appReturnPausedAt = performance.now();
       }
+      if (State.screen === Screen.HIDE) pauseHideActivityVisuals();
     },
     onContinue: () => {
       if (document.hidden) return false;
+      // A held switcher can interrupt an OPEN Learn menu. Acknowledging
+      // the OS never resumes the HIDE clock through that still-open menu;
+      // the eventual Menu Close gesture owns the remaining pause.
+      if (State.screen === Screen.HIDE && learnHideMenuPaused) return true;
       // Navigation may have changed while iOS was away: discard stale prompt.
       if (![Screen.TODO_DEV, Screen.HIDE, Screen.FINAL_RECALL]
-          .includes(State.screen)) { appReturnPausedAt = 0; return true; }
+          .includes(State.screen)) {
+        appReturnPausedAt = 0;
+        releaseHideActivityVisuals();
+        return true;
+      }
       if (appReturnPausedAt) {
         const delta = Math.max(0, performance.now() - appReturnPausedAt);
         if (State.screen === Screen.HIDE && State.sayVerseStartedAt)
@@ -12049,15 +12878,19 @@ function attachAppActivityReturn() {
           State.finalRecallStartedAt += delta;
         appReturnPausedAt = 0;
       }
+      releaseHideActivityVisuals(State.screen === Screen.HIDE);
       return true;
     },
     onExit: () => {
       appReturnPausedAt = 0;
+      learnHideMenuPaused = false;
+      releaseHideActivityVisuals();
       go(Screen.TITLE);
     },
     escapeText: "Back to Title",
     suppressUiSound: true
   });
+  bindNativeAppActivityReturn();
 }
 
 // These time-limited Learn exercises must not progress during iOS backgrounding
@@ -12065,10 +12898,13 @@ function attachAppActivityReturn() {
 async function waitForActiveLearnTime(ms) {
   let remaining = Math.max(0, ms);
   let last = performance.now();
-  while (remaining > 0) {
-    await new Promise(resolve => setTimeout(resolve, Math.min(50, remaining)));
+  while (remaining > 0 || document.hidden || learnHideMenuPaused ||
+         appActivityReturn?.isPaused?.()) {
+    await new Promise(resolve => setTimeout(resolve,
+      Math.max(25, Math.min(50, remaining))));
     const now = performance.now();
-    if (!document.hidden && !appActivityReturn?.isPaused?.()) {
+    if (!document.hidden && !learnHideMenuPaused &&
+        !appActivityReturn?.isPaused?.()) {
       remaining -= Math.min(100, now - last);
     }
     last = now;
@@ -12120,11 +12956,32 @@ function runAfterSlide(fn, { timeoutMs = 2200, intervalMs = 50 } = {}) {
 }
 
 function goToListenAndStart() {
+  nativeListenCheckpoint = null;
+  nativeListenError = "";
+  const nativePrimed = isNativeLearnListenMode() &&
+    window.BibloZooNativeLearnListen.hasPrimedGesture();
   State.listenDone = false;
-  State.listenAutoStarting = true;
-  State.listenAutoFallbackReady = false;
+  State.listenAutoStarting = !isNativeLearnListenMode();
+  State.listenAutoFallbackReady = isNativeLearnListenMode();
+  if (nativePrimed) {
+    State.listenAutoStarting = true;
+    State.listenAutoFallbackReady = false;
+  }
 
   go(Screen.LISTEN);
+  if (isNativeLearnListenMode()) {
+    // The preceding instruction Continue tap already activated the session.
+    // Start speech at slide completion without a second button/tap. If that
+    // gesture was unavailable, keep the explicit tap-to-play safety fallback.
+    if (nativePrimed) runAfterSlide(() => {
+      if (State.screen === Screen.LISTEN && State.listenAutoStarting &&
+          !State.listenPlaying && !learnAudioInterrupted &&
+          !learnAudioResumeAttempt && !document.hidden) {
+        listenPlay("listen_ref", 0, true);
+      }
+    });
+    return;
+  }
 
   runAfterSlide(() => {
     if (
@@ -12154,6 +13011,9 @@ function goToListenAndStart() {
 
 
 function goToChunksAndStart() {
+  bindNativeLearnActivityLifecycle();
+  nativeLearnTrackError = "";
+  nativeLearnPartCheckpoint = null; // new pass; not an interrupted resume
   State.chunkAutoStarting = true;
   State.chunkAutoFallbackReady = false;
 
@@ -12191,6 +13051,9 @@ function goToChunksAndStart() {
 
 
 function goToEchoAndStart() {
+  bindNativeLearnActivityLifecycle();
+  nativeLearnTrackError = "";
+  nativeLearnPartCheckpoint = null;
   State.echoDone = false;
   State.echoRunning = false;
   State.echoIndex = 0;
@@ -12317,13 +13180,12 @@ function waitMs(ms) {
 }
 
 function clearHideTransitionAfterAnimation() {
-  setTimeout(() => {
+  // Never clear a visible hide/fade phase on inactive wall-clock time.
+  void waitForActiveLearnTime(900).then(() => {
+    if (State.screen !== Screen.HIDE) return;
     State.hideTransitionPhase = "";
-
-    if (State.screen === Screen.HIDE) {
-      render();
-    }
-  }, 900);
+    render();
+  });
 }
 
 async function startHideRoundWithTransition() {
@@ -12333,7 +13195,7 @@ async function startHideRoundWithTransition() {
   State.hideTransitionPhase = "out";
   render();
 
-  await waitMs(180);
+  await waitForActiveLearnTime(180);
 
   if (State.screen !== Screen.HIDE) {
     State.hideTransitionPhase = "";
@@ -12377,6 +13239,9 @@ async function startHideRound() {
 
   setAudioSrc(AUDIO_FILE);
   const d = await waitForDuration();
+  // Metadata may resolve after UIKit became inactive: start the visible
+  // say-the-verse deadline only after an explicit Welcome Back recovery.
+  await waitForActiveLearnTime(0);
   const durationMs = (isFinite(d) && d > 0)
     ? d * 1000 * hideTimerMultiplier()
     : 6500;
@@ -12475,10 +13340,20 @@ async function startFinalRecallFlow() {
 
 async function startChunkFlow() {
   if (State.chunkRunning || document.hidden) return;
-  const startIndex = learnAudioInterrupted?.mode === "chunk" &&
+  bindNativeLearnActivityLifecycle();
+  const recovery = learnAudioInterrupted?.mode === "chunk" &&
     learnAudioInterrupted.screen === Screen.CHUNKS
-    ? learnAudioInterrupted.index : 0;
+    ? learnAudioInterrupted : null;
+  const checkpoint = isNativeLearnTracksMode() &&
+    nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+    nativeLearnPartCheckpoint.mode === "chunk"
+    ? nativeLearnPartCheckpoint : null;
+  const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
+  const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
+  const resumeQuiet = recovery?.quietPhase === "chunk-gap"
+    ? { phase: "chunk-gap", remainingMs: recovery.quietRemainingMs } : null;
   learnAudioInterrupted = null;
+  nativeLearnTrackError = "";
 
   State.chunkAutoStarting = false;
   State.chunkAutoFallbackReady = false;
@@ -12486,10 +13361,11 @@ async function startChunkFlow() {
   // cancel any prior learn audio sequence
   cancelLearnAudio();
 
-  await runChunkSequence(startIndex);
+  await runChunkSequence(startIndex, startPositionMs, resumeQuiet);
 }
 
-async function runChunkSequence(startIndex = 0) {
+async function runChunkSequence(startIndex = 0, resumePositionMs = 0,
+    resumeQuiet = null) {
   const my = ++echoCancelToken;
   let completed = false;
 
@@ -12507,37 +13383,100 @@ async function runChunkSequence(startIndex = 0) {
 
       const part = learnParts[i];
       const file = part.file;
-
-      setAudioSrc(file);
-      audioEl.currentTime = 0;
-
       State.chunkIndex = i;
       render();
+      let d;
+      const resumingGap = i === startIndex &&
+        resumeQuiet?.phase === "chunk-gap" && isNativeLearnTracksMode();
 
-      try {
-        await safePlay();
-      } catch (e) {
+      if (resumingGap) {
+        // The preceding chunk actually ended. Continue its quiet pause;
+        // do not replay or skip a chunk merely because of an app switch.
+      } else if (isNativeLearnTracksMode()) {
+        const positionMs = i === startIndex ? resumePositionMs : 0;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "chunk", index: i, positionMs
+        };
+        if (muted) {
+          failNativeLearnTrack("chunk", i, "muted");
+          return;
+        }
+        const result = await window.BibloZooNativeLearnTracks.play(
+          `learn-part-${VERSE_ID}-${i}`, {
+            positionMs,
+            onProgress: progress => nativeLearnTrackProgress("chunk", i, progress),
+            onInterrupted: progress => {
+              nativeLearnPartCheckpoint = {
+                verseId: VERSE_ID, mode: "chunk", index: i,
+                positionMs: progress.positionMs || 0
+              };
+              pauseLearnAudioForInterruption();
+              if (!document.hidden) render();
+            }
+          });
         if (my !== echoCancelToken || document.hidden) return;
-        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
-        return;
+        if (!result.ended) {
+          failNativeLearnTrack("chunk", i, result.reason);
+          return;
+        }
+        // A genuine current native ended event, not a JS timer, allows the
+        // *next* part. Duration is from this very same native player.
+        d = result.durationMs / 1000;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "chunk", index: i + 1, positionMs: 0
+        };
+        const attempt = learnAudioResumeAttempt;
+        if (attempt?.recovery?.mode === "chunk" &&
+            !attempt.narrationVerified) {
+          attempt.narrationVerified = true; // verified native ended
+          finishLearnAudioResumeAttempt(attempt);
+        }
+      } else {
+        setAudioSrc(file);
+        audioEl.currentTime = 0;
+        try {
+          await safePlay();
+        } catch (e) {
+          if (my !== echoCancelToken || document.hidden) return;
+          learnAudioInterrupted = {
+            screen: Screen.CHUNKS, mode: "chunk", index: i
+          };
+          return;
+        }
+        const ended = await waitForAudioEnd();
+        if (my !== echoCancelToken || document.hidden) return;
+        if (!ended) {
+          learnAudioInterrupted = {
+            screen: Screen.CHUNKS, mode: "chunk", index: i
+          };
+          return;
+        }
+        d = await waitForDuration();
       }
-
-      const ended = await waitForAudioEnd();
-      if (my !== echoCancelToken || document.hidden) return;
-      if (!ended) {
-        learnAudioInterrupted = { screen: Screen.CHUNKS, mode: "chunk", index: i };
-        return;
-      }
-
-      const d = await waitForDuration();
-      const pauseMs = (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
-      const elapsed = await waitForPausableDelay(pauseMs, my);
+      const pauseMs = resumingGap
+        ? Math.max(75, Number(resumeQuiet.remainingMs) || 0)
+        : (isFinite(d) && d > 0) ? Math.max(500, d * 0.35 * 1000) : 700;
+      if (isNativeLearnTracksMode()) nativeLearnQuietCheckpoint = {
+        verseId: VERSE_ID, mode: "chunk", phase: "chunk-gap",
+        index: i, remainingMs: pauseMs
+      };
+      const elapsed = await waitForPausableDelay(pauseMs, my, remaining => {
+        if (!isNativeLearnTracksMode()) return;
+        if (nativeLearnQuietCheckpoint?.mode === "chunk" &&
+            nativeLearnQuietCheckpoint.index === i)
+          nativeLearnQuietCheckpoint.remainingMs = remaining;
+        if (resumingGap) nativeLearnQuietResumeProgress("chunk", i,
+          "chunk-gap", remaining);
+      });
+      if (my === echoCancelToken) nativeLearnQuietCheckpoint = null;
 
       if (!elapsed || my !== echoCancelToken || document.hidden) return;
     }
 
     setAudioSrc(AUDIO_FILE);
     State.audioMode = null;
+    nativeLearnTrackError = "";
+    nativeLearnPartCheckpoint = null;
     State.chunkDone = true;
     State.chunkPassCount = Math.min(2, State.chunkPassCount + 1);
     completed = true;
@@ -12562,10 +13501,20 @@ async function runChunkSequence(startIndex = 0) {
 
 async function startEchoFlow() {
   if (State.echoRunning || document.hidden) return;
-  const startIndex = learnAudioInterrupted?.mode === "echo" &&
+  bindNativeLearnActivityLifecycle();
+  const recovery = learnAudioInterrupted?.mode === "echo" &&
     learnAudioInterrupted.screen === Screen.ECHO
-    ? learnAudioInterrupted.index : 0;
+    ? learnAudioInterrupted : null;
+  const checkpoint = isNativeLearnTracksMode() &&
+    nativeLearnPartCheckpoint?.verseId === VERSE_ID &&
+    nativeLearnPartCheckpoint.mode === "echo"
+    ? nativeLearnPartCheckpoint : null;
+  const startIndex = recovery?.index ?? checkpoint?.index ?? 0;
+  const startPositionMs = recovery?.positionMs ?? checkpoint?.positionMs ?? 0;
+  const resumeQuiet = recovery?.quietPhase === "echo-repeat"
+    ? { phase: "echo-repeat", remainingMs: recovery.quietRemainingMs } : null;
   learnAudioInterrupted = null;
+  nativeLearnTrackError = "";
 
   State.echoAutoStarting = false;
   State.echoAutoFallbackReady = false;
@@ -12573,13 +13522,15 @@ async function startEchoFlow() {
   // cancel any prior
   cancelLearnAudio();
 
-  await runEchoSequence(startIndex);
+  await runEchoSequence(startIndex, startPositionMs, resumeQuiet);
 }
 
 let echoCancelToken = 0;
 
 function cancelLearnAudio() {
   echoCancelToken++;
+  window.BibloZooNativeLearnListen?.stop?.();
+  window.BibloZooNativeLearnTracks?.stop?.();
   activeLearnInstructionRequest = null;
   if (activeLearnAudioWaitCancel) activeLearnAudioWaitCancel();
   try { audioEl.pause(); audioEl.currentTime = 0; } catch (e) { }
@@ -12592,9 +13543,11 @@ function cancelLearnAudio() {
   State.chunkRunning = false;
   State.echoRunning = false;
   State.echoSpeaking = false;
+  nativeLearnQuietCheckpoint = null;
 }
 
-async function runEchoSequence(startIndex = 0) {
+async function runEchoSequence(startIndex = 0, resumePositionMs = 0,
+    resumeQuiet = null) {
   const my = ++echoCancelToken;
 
   State.echoDone = false;
@@ -12617,36 +13570,92 @@ async function runEchoSequence(startIndex = 0) {
 
       const part = learnParts[i];
       const file = part.file;
-
-      setAudioSrc(file);
-      audioEl.currentTime = 0;
-
       State.echoIndex = i;
       State.echoSpeaking = false;
       updateEchoStageState();
+      let d;
+      const resumingRepeat = i === startIndex &&
+        resumeQuiet?.phase === "echo-repeat" && isNativeLearnTracksMode();
 
-      try {
-        await safePlay();
-      } catch (e) {
+      if (resumingRepeat) {
+        // Yellow text = the child speaking; there is no AVAudioPlayer to
+        // resume. Restore the SAME remaining turn, without re-playing audio.
+      } else if (isNativeLearnTracksMode()) {
+        const positionMs = i === startIndex ? resumePositionMs : 0;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "echo", index: i, positionMs
+        };
+        if (muted) {
+          failNativeLearnTrack("echo", i, "muted");
+          return;
+        }
+        const result = await window.BibloZooNativeLearnTracks.play(
+          `learn-part-${VERSE_ID}-${i}`, {
+            positionMs,
+            onProgress: progress => nativeLearnTrackProgress("echo", i, progress),
+            onInterrupted: progress => {
+              nativeLearnPartCheckpoint = {
+                verseId: VERSE_ID, mode: "echo", index: i,
+                positionMs: progress.positionMs || 0
+              };
+              pauseLearnAudioForInterruption();
+              if (!document.hidden) render();
+            }
+          });
         if (my !== echoCancelToken || document.hidden) return;
-        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
-        return;
-      }
-
-      const ended = await waitForAudioEnd();
-      if (my !== echoCancelToken || document.hidden) return;
-      if (!ended) {
-        learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
-        return;
+        if (!result.ended) {
+          failNativeLearnTrack("echo", i, result.reason);
+          return;
+        }
+        d = result.durationMs / 1000;
+        nativeLearnPartCheckpoint = {
+          verseId: VERSE_ID, mode: "echo", index: i + 1, positionMs: 0
+        };
+        const attempt = learnAudioResumeAttempt;
+        if (attempt?.recovery?.mode === "echo" &&
+            !attempt.narrationVerified) {
+          attempt.narrationVerified = true;
+          finishLearnAudioResumeAttempt(attempt);
+        }
+      } else {
+        setAudioSrc(file);
+        audioEl.currentTime = 0;
+        try {
+          await safePlay();
+        } catch (e) {
+          if (my !== echoCancelToken || document.hidden) return;
+          learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+          return;
+        }
+        const ended = await waitForAudioEnd();
+        if (my !== echoCancelToken || document.hidden) return;
+        if (!ended) {
+          learnAudioInterrupted = { screen: Screen.ECHO, mode: "echo", index: i };
+          return;
+        }
+        d = await waitForDuration();
       }
 
       State.echoSpeaking = true;
       updateEchoStageState();
 
       // Give the child time to repeat: duration × 1.25 (fallback 2s if unknown)
-      const d = await waitForDuration();
-      const repeatMs = (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
-      const elapsed = await waitForPausableDelay(repeatMs, my);
+      const repeatMs = resumingRepeat
+        ? Math.max(75, Number(resumeQuiet.remainingMs) || 0)
+        : (isFinite(d) && d > 0) ? (d * 1.25 * 1000) : 2000;
+      if (isNativeLearnTracksMode()) nativeLearnQuietCheckpoint = {
+        verseId: VERSE_ID, mode: "echo", phase: "echo-repeat",
+        index: i, remainingMs: repeatMs
+      };
+      const elapsed = await waitForPausableDelay(repeatMs, my, remaining => {
+        if (!isNativeLearnTracksMode()) return;
+        if (nativeLearnQuietCheckpoint?.mode === "echo" &&
+            nativeLearnQuietCheckpoint.index === i)
+          nativeLearnQuietCheckpoint.remainingMs = remaining;
+        if (resumingRepeat) nativeLearnQuietResumeProgress("echo", i,
+          "echo-repeat", remaining);
+      });
+      if (my === echoCancelToken) nativeLearnQuietCheckpoint = null;
 
       if (!elapsed || my !== echoCancelToken || document.hidden) return;
 
@@ -12657,6 +13666,8 @@ async function runEchoSequence(startIndex = 0) {
     // restore main verse audio for later
     setAudioSrc(AUDIO_FILE);
 
+    nativeLearnTrackError = "";
+    nativeLearnPartCheckpoint = null;
     State.echoDone = true;
     State.echoRunning = false;
     State.echoSpeaking = false;
@@ -12778,6 +13789,8 @@ function renderNav() {
     State.screen !== Screen.NEW_VERSE_PICKER &&
     State.screen !== Screen.CELEBRATION &&
     State.screen !== Screen.LEARN_LEVEL &&
+    State.screen !== Screen.LEARN_HUB &&
+    State.screen !== Screen.LISTEN_ACTIVITIES &&
     State.screen !== Screen.PRACTICE_GATE &&
     State.screen !== Screen.PRACTICE_HUB &&
     State.screen !== Screen.PRACTICE &&
@@ -13803,6 +14816,8 @@ function activateProfileFromPicker(profileId) {
 
   try {
     profileApi?.setActiveProfile?.(profileId);
+    // Existing Zookeeper selection tap can lead straight to tutorial page 1.
+    if (isTutorialActive()) primeZooTodoTutorialNativeAudioFromGesture();
 
     void continueAfterProfileActivation()
       .catch((err) => {
@@ -13915,6 +14930,10 @@ function updateProfileEditorValidationUi(rootEl) {
 
 async function submitProfileEditor() {
   if (State.profileEditorBusy) return;
+  // N7l: the Create Zookeeper gesture is the first opportunity to preflight
+  // tutorial page 1; validation/storage awaits must not initiate audio later.
+  if (State.profileEditorMode !== PROFILE_EDITOR_MODES.EDIT)
+    primeZooTodoTutorialNativeAudioFromGesture();
 
   const profileApi = getProfileApi();
 
@@ -14931,21 +15950,6 @@ function screenTitle(idx) {
         dailyHomePlan.verseId
       )
     : "";
-  // A new rescue is celebrated once, on the home screen. If a Daily To-Do
-  // invitation is occupying the foreground, leave the celebration pending.
-  const zooCelebration = activeProfile && !tutorialActive && !showDailyOffer
-    ? window.BibloZooZooStats?.acknowledgeCelebration?.(activeProfile.id)
-    : null;
-  const zooCelebrationHtml = zooCelebration
-    ? `<section class="title-zoo-hero-celebration" role="status" aria-live="polite" aria-label="Zoo rescue celebration">
-        <div class="title-zoo-hero-spark" aria-hidden="true">★</div>
-        <div class="title-zoo-hero-copy"><strong>Zoo Hero!</strong>
-          <span>${zooCelebration.petsRescued ? `${zooCelebration.petsRescued} BibloPet${zooCelebration.petsRescued === 1 ? "" : "s"} rescued!` : ""}
-          ${zooCelebration.zooBreaksStopped ? `${zooCelebration.zooBreaksStopped} Zoo Break${zooCelebration.zooBreaksStopped === 1 ? "" : "s"} stopped!` : ""}</span>
-        </div>
-        <button type="button" class="title-zoo-hero-close no-zoom" aria-label="Dismiss Zoo Hero celebration">Yay!</button>
-      </section>`
-    : "";
   const dailyOfferHtml = showDailyOffer
     ? `
       <div
@@ -15142,7 +16146,6 @@ function screenTitle(idx) {
         ${dailyProgressHtml}
       </button>
 
-      ${zooCelebrationHtml}
       <div class="home-zoo-space">${titleZooStripHtml()}</div>
 
     </div>
@@ -15150,9 +16153,6 @@ function screenTitle(idx) {
     ${dailyOfferHtml}
   `;
 
-  wrap.querySelector(".title-zoo-hero-close")?.addEventListener("click", () => {
-    wrap.querySelector(".title-zoo-hero-celebration")?.remove();
-  });
   const titleMyVersesBtn = wrap.querySelector("#titleMyVersesBtn");
   if (titleMyVersesBtn) {
     titleMyVersesBtn.onclick = (e) => {
@@ -15200,6 +16200,67 @@ function screenTitle(idx) {
       );
 
       go(Screen.TODO_DEV);
+    };
+
+    // Both Zoo To-Do entry points share one per-profile, once-per-day
+    // probability decision. The existing Daily plan/navigation is held as
+    // a continuation, not replaced or restarted by the minigame.
+    let zooSurpriseShowing = false;
+    const openZooTodoWithSurprise = (destination) => {
+      if (zooSurpriseShowing) return;
+      const policy = window.BibloZooZooSurprise;
+      const engine = window.BibloZooZooEscape;
+      const welcome = window.BibloZooWelcomeBack;
+      const id = activeProfile?.id || "";
+      if (!id || tutorialActive || document.hidden ||
+          !policy?.choose || !engine?.create || !welcome?.markup) {
+        destination();
+        return;
+      }
+      const kind = policy.choose(id, "daily");
+      if (!kind) { destination(); return; }
+
+      let overlay = null;
+      let controller = null;
+      let finished = false;
+      const complete = () => {
+        if (finished) return;
+        finished = true;
+        zooSurpriseShowing = false;
+        try { controller?.destroy(); } catch (_) {}
+        overlay?.remove();
+        destination();
+      };
+      try {
+        overlay = document.createElement("div");
+        overlay.className = "bz-welcome-overlay";
+        overlay.hidden = true;
+        overlay.tabIndex = -1;
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-labelledby", "verseGameWelcomeTitle");
+        overlay.innerHTML = welcome.markup("game");
+        document.body.appendChild(overlay);
+        controller = engine.create({
+          overlay, profileId: id, name: activeProfile.name,
+          petName: dailyPetName || undefined,
+          verseId: dailyHomePlan?.verseId || State.selectedVerseId || "",
+          // Home is NOT recovering audio. A recreational event must never
+          // call this or invent a successful recovery outcome.
+          recover: () => false,
+          onRecovered: complete,
+          onExit: complete
+        });
+        if (!controller) throw new Error("Zoo surprise unavailable");
+        zooSurpriseShowing = true;
+        overlay.hidden = false;
+        if (!controller.start() || !controller.startSurprise?.(kind))
+          throw new Error("Zoo surprise couldn't begin");
+        overlay.focus?.({ preventScroll: true });
+      } catch (_) {
+        // A cosmetic interruption must never strand a Daily task launch.
+        complete();
+      }
     };
 
     const previewButton = (label, mode) =>
@@ -17530,14 +18591,14 @@ function screenTitle(idx) {
       const plan =
         getDailyHomePlan();
 
-      openDailyTodoPreview(
+      openZooTodoWithSurprise(() => openDailyTodoPreview(
         shouldShowFocusedDailyTodo(plan)
           ? "actual"
           : ""
-      );
+      ));
     };
 
-    bindLongPress(titleTodoBtn, {
+    if (allowDevShortcuts()) bindLongPress(titleTodoBtn, {
       delay: 1200,
       shouldStart: () => !isTutorialActive(),
       onLongPress:
@@ -17561,7 +18622,8 @@ function screenTitle(idx) {
           dailyHomePlan
         );
         clearDailyHomeOfferPresentation();
-        openDailyTodoPreview("actual");
+        dailyHomeOffer?.remove();
+        openZooTodoWithSurprise(() => openDailyTodoPreview("actual"));
       };
     }
 
@@ -17608,6 +18670,10 @@ function screenTitle(idx) {
       }
 
       if (action === "learn") {
+        if (State.hasLearnedVerse) {
+          go(Screen.LEARN_HUB);
+          return;
+        }
         State.learnLevel = "not_at_all";
         State.learnStartScreen = Screen.LISTEN;
 
@@ -17641,7 +18707,7 @@ function screenTitle(idx) {
       go(Screen.VERSE_DETAIL);
     };
 
-    bindLongPress(titleZooStrip, {
+    if (allowDevShortcuts()) bindLongPress(titleZooStrip, {
       delay:
         HIDDEN_DAILY_TODO_RESET_LONG_PRESS_MS,
 
@@ -17707,7 +18773,7 @@ function screenTitle(idx) {
     });
   }
 
-  bindLongPress(titleLogoSecretWrap, {
+  if (allowDevShortcuts()) bindLongPress(titleLogoSecretWrap, {
     delay: HIDDEN_LEARN_COMPLETE_LONG_PRESS_MS,
     shouldStart: () => HAS_VERSE_SELECTION && !!VERSE_ID,
     onLongPress: () => {
@@ -17832,7 +18898,7 @@ function screenSettings(idx) {
   const settingsHeading =
     wrap.querySelector(".settings-heading");
 
-  bindLongPress(settingsHeading, {
+  if (allowDevShortcuts()) bindLongPress(settingsHeading, {
     delay: HIDDEN_UTILITIES_LONG_PRESS_MS,
     onLongPress: () => {
       const returnTo =
@@ -18308,7 +19374,20 @@ let zooTodoTutorialAudioAttempt = null;
 const zooTodoTutorialAutoAttempted = new Set();
 const zooTodoTutorialNeedsRetry = new Set();
 
+function primeZooTodoTutorialNativeAudioFromGesture() {
+  // Only explicit existing Create/Choose Zookeeper/Next/Practice-time taps
+  // may reclaim AVAudioSession. Preparing the next tutorial page in the same
+  // gesture preserves ios-prep's AUTOMATIC page narration; no new button.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true &&
+      isNativeLearnTracksMode() && !muted && !document.hidden) {
+    window.BibloZooNativeLearnTracks.primeFromGesture();
+  }
+}
+
 function renderZooTodoTutorialAudioRetry(pageNumber) {
+  // N7l native iOS: the broken visible retry control has no part in the
+  // original four-page flow; retain the Web/PWA version and markup there.
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) return "";
   if (!zooTodoTutorialNeedsRetry.has(pageNumber) ||
       hasPlayedZooTodoTutorialPageAudio(pageNumber)) return "";
   return `<div class="todo-tutorial-actions" style="margin-top:10px">
@@ -18324,6 +19403,14 @@ function stopZooTodoTutorialPageAudio({ offerRetry = false } = {}) {
   zooTodoTutorialAudioAttempt = null;
   zooTodoTutorialAudioGeneration += 1;
   clearTimeout(attempt.startupTimer);
+  if (attempt.native === true) {
+    // The tutorial owns exactly one native narrator; don't release Learn,
+    // Read or another screen when no tutorial narration is active.
+    window.BibloZooNativeLearnTracks?.stop?.();
+    if (offerRetry && !hasPlayedZooTodoTutorialPageAudio(attempt.pageNumber))
+      zooTodoTutorialNeedsRetry.add(attempt.pageNumber);
+    return;
+  }
   audioEl.removeEventListener("ended", attempt.onEnd);
   audioEl.removeEventListener("error", attempt.onError);
   audioEl.removeEventListener("pause", attempt.onPause);
@@ -18573,6 +19660,34 @@ function playZooTodoTutorialPageAudio(pageNumber, { explicit = false } = {}) {
   zooTodoTutorialAudioAttempt = attempt;
   const isCurrent = () => zooTodoTutorialAudioAttempt === attempt &&
     zooTodoTutorialAudioGeneration === generation;
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    // Same four original tutorial_page_*.mp3 files as ios-prep, decoded by
+    // Swift AVAudioPlayer under fixed tutorial-page-1..4 IDs. No WebKit
+    // Audio construction, HTML play(), synthesized tones or auto-resume.
+    attempt.native = true;
+    if (!isNativeLearnTracksMode()) {
+      stopZooTodoTutorialPageAudio({ offerRetry: true });
+      return;
+    }
+    try {
+      void Promise.resolve(window.BibloZooNativeLearnTracks.play(
+        "tutorial-page-" + pageNumber
+      )).then(result => {
+        if (!isCurrent()) return;
+        const ended = result?.ended === true;
+        stopZooTodoTutorialPageAudio({ offerRetry: !ended });
+        if (!ended || document.hidden || muted ||
+            State.screen !== Screen.TODO_DEV ||
+            getZooTodoTutorialPageNumber() !== pageNumber) return;
+        // Only an actual native AVAudioPlayer 'ended' event marks heard.
+        markZooTodoTutorialPageAudioPlayed(pageNumber);
+        zooTodoTutorialNeedsRetry.delete(pageNumber);
+      }).catch(() => {
+        if (isCurrent()) stopZooTodoTutorialPageAudio({ offerRetry: true });
+      });
+    } catch (_) { stopZooTodoTutorialPageAudio({ offerRetry: true }); }
+    return;
+  }
   const fail = (err) => {
     if (!isCurrent()) return;
     if (err) console.warn("Could not play Zoo To-Do tutorial audio", err);
@@ -18689,6 +19804,7 @@ function bindZooTodoTutorial(rootEl) {
       e.stopPropagation();
 
       const nextPage = Number(btn.getAttribute("data-tutorial-next") || 1);
+      primeZooTodoTutorialNativeAudioFromGesture();
       stopZooTodoTutorialPageAudio();
 
       if (nextPage === 2) {
@@ -19276,7 +20392,11 @@ function stopNewVersePickerPreviewAudio() {
   const audio = newVersePreviewAudio;
   newVersePreviewAudio = null;
   newVersePreviewVerseId = "";
-  if (audio) {
+  if (audio?.native === true) {
+    // The picker owns this one native narration only. Never cancel another
+    // Learn/Detail/Flashcards request when no picker preview is active.
+    window.BibloZooNativeLearnListen?.stop?.();
+  } else if (audio) {
     try {
       audio.pause();
       audio.currentTime = 0;
@@ -19315,6 +20435,66 @@ function toggleNewVersePickerPreviewAudio(verseId) {
     return;
   }
 
+  // N7i: "Choose a New Verse" is a FULL-VERSE preview (no reference
+  // prelude). The Audio Test iOS bundle forbids HTML/Web Audio, so reuse
+  // the already accepted N5b.2 AVAudioPlayer/Swift narration bridge.
+  // Start must be invoked synchronously inside this actual speaker tap.
+  // A missing/denied native bridge FAILS CLOSED, never via new Audio().
+  if (window.BibloZooNativeOnlyOutput?.enabled === true) {
+    const listen = window.BibloZooNativeLearnListen;
+    if (!listen?.isAvailable?.()) {
+      showDialog({
+        title: "Verse audio unavailable",
+        body: "This verse couldn't play right now. You can still choose it.",
+        actions: [dlgBtn("OK", { onClick: closeDialog })]
+      });
+      return;
+    }
+    const preview = { native: true };
+    const token = ++newVersePreviewToken;
+    newVersePreviewAudio = preview;
+    newVersePreviewVerseId = verseId;
+    const isCurrent = () =>
+      token === newVersePreviewToken &&
+      newVersePreviewAudio === preview &&
+      newVersePreviewVerseId === verseId &&
+      State.screen === Screen.NEW_VERSE_PICKER &&
+      !muted && !document.hidden;
+    const finish = () => {
+      if (isCurrent()) stopNewVersePickerPreviewAudio();
+    };
+    const failed = () => {
+      if (!isCurrent()) return;
+      stopNewVersePickerPreviewAudio();
+      showDialog({
+        title: "Verse audio unavailable",
+        body: "This verse couldn't play right now. You can still choose it.",
+        actions: [dlgBtn("OK", { onClick: closeDialog })]
+      });
+    };
+    updateNewVersePickerAudioButtons();
+    try {
+      const request = listen.startFromGesture({
+        verseId,
+        stage: "verse",
+        onEvent: (event) => {
+          if (!isCurrent()) return;
+          if (event.kind === "completed" && event.stage === "verse") finish();
+          else if (event.kind === "interrupted") finish();
+          else if (event.kind === "failed") failed();
+        }
+      });
+      Promise.resolve(request).then(result => {
+        if (isCurrent() && result?.ready !== true && result?.reason !== "stale")
+          failed();
+      }).catch(failed);
+    } catch (_) {
+      failed();
+    }
+    return;
+  }
+
+  // Original browser/PWA/Android picker preview, unchanged below.
   const audio = new Audio(`${AUDIO_DIR}${encodeURIComponent(verseId)}.mp3`);
   const token = ++newVersePreviewToken;
   audio.preload = "auto";
@@ -19934,7 +21114,7 @@ function screenTodo(idx) {
 
   bindHomePill(wrap);
 
-  bindLongPress(wrap.querySelector("#todoComingSoonCard"), {
+  if (allowDevShortcuts()) bindLongPress(wrap.querySelector("#todoComingSoonCard"), {
     delay: 1000,
     onLongPress: () => {
       go(Screen.TODO_DEV);
@@ -19978,6 +21158,9 @@ function screenDailySnack(idx) {
       go(Screen.TITLE);
     });
   } else {
+    const zookeeper =
+      getProfileApi()?.getActiveProfile?.();
+
     wrap.innerHTML = feedGame.render({
       session,
       profilePictureHtml:
@@ -19986,6 +21169,17 @@ function screenDailySnack(idx) {
           {
             className:
               "daily-feed-pet-avatar",
+            alt: ""
+          }
+        ),
+      // Bounce's between-ball tile uses the player's saved Zookeeper
+      // profile picture, not today's BibloPet or a control-method icon.
+      zookeeperPictureHtml:
+        profilePictureVisualHtml(
+          zookeeper?.avatarVerseId || "",
+          {
+            className:
+              "daily-feed-next-serve-profile",
             alt: ""
           }
         )
@@ -20044,6 +21238,10 @@ function screenDailySnack(idx) {
     navHidden: true,
     inner: wrap
   });
+}
+
+function dailyTodoApiDayKey() {
+  return window.BibloZooDailyTodo?.localDayKey?.() || "";
 }
 
 function screenTodoDev(idx) {
@@ -20203,6 +21401,29 @@ function screenTodoDev(idx) {
   dailyTodoUi?.promoteMedalToasts?.(
     wrap
   );
+
+  // A page left open over midnight must not accept yesterday's
+  // checklist taps, even if iOS delayed its background timer.
+  if (dailyPreviewMode === "actual" && dailyPreviewPlan) {
+    wrap.addEventListener("click", (event) => {
+      if (
+        !event.target?.closest?.(
+          "[data-daily-todo-preview-task], [data-daily-complete-task]"
+        )
+      ) {
+        return;
+      }
+
+      const today = dailyTodoApiDayKey();
+      if (!today || dailyPreviewPlan.day === today) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      getOrCreateDailyTodoPreviewPlan();
+      render();
+      showNewDailyTodoDayMessage();
+    }, true);
+  }
 
   bindHomePill(wrap);
 
@@ -20510,6 +21731,16 @@ function screenTodoDev(idx) {
         if (launched) return;
 
         snackRow.disabled = false;
+        if (
+          dailyPreviewMode === "actual" &&
+          dailyPreviewPlan.day !== dailyTodoApiDayKey()
+        ) {
+          getOrCreateDailyTodoPreviewPlan();
+          render();
+          showNewDailyTodoDayMessage();
+          return;
+        }
+
         showDialog({
           title: "Snack Unavailable",
           body:
@@ -21079,6 +22310,10 @@ function screenVerseDetail(idx) {
   const btnDetailListen = wrap.querySelector("#btnDetailListen");
   if (btnDetailListen) {
     btnDetailListen.onclick = () => {
+      if (isNativeLearnListenMode() && verseDetailListenActive) {
+        cancelVerseDetailListen(); // explicit Stop, no accidental restart
+        return;
+      }
       try {
         audioEl.pause();
         audioEl.currentTime = 0;
@@ -21534,11 +22769,13 @@ function screenZookeeperStats(idx) {
       stats
     ) || {
       streak: [],
-      tasks: []
+      tasks: [],
+      snacks: []
     };
   const hasBadges =
     earnedBadges.streak.length > 0 ||
-    earnedBadges.tasks.length > 0;
+    earnedBadges.tasks.length > 0 ||
+    (earnedBadges.snacks?.length || 0) > 0;
   const profileName =
     String(profile?.name || "Zookeeper")
       .trim() || "Zookeeper";
@@ -21611,6 +22848,12 @@ function screenZookeeperStats(idx) {
             </div>
           </div>
           <div class="detail-row zookeeper-stat-row">
+            <div class="detail-label">Snacks Eaten</div>
+            <div class="zookeeper-stat-value">
+              ${stats.totalSnacksEaten || 0}
+            </div>
+          </div>
+          <div class="detail-row zookeeper-stat-row">
             <div class="detail-label">BibloPets Rescued</div>
             <div class="zookeeper-stat-value">
               ${zooEscapeStats.petsRescued}
@@ -21636,6 +22879,10 @@ function screenZookeeperStats(idx) {
               ${zookeeperBadgeGroupHtml(
                 "Task Badges",
                 earnedBadges.tasks
+              )}
+              ${zookeeperBadgeGroupHtml(
+                "Snack Badges",
+                earnedBadges.snacks || []
               )}
             `
             : `
@@ -21880,6 +23127,10 @@ function screenListen(idx) {
               : ``
           }
 
+          ${isNativeLearnListenMode() && nativeListenError &&
+               !State.listenPlaying ? `
+            <p role="status" class="coach-text">${escapeHtml(nativeListenError)}</p>
+          ` : ""}
           <div class="coach-actions">
             ${(
         isListenSlideExiting ||
@@ -22001,6 +23252,9 @@ function screenChunks(idx) {
   const chunkBottomHtml = showChunkAction
     ? `
       <div class="learn-coach learn-bottom-zone">
+        ${isNativeLearnTracksMode() && nativeLearnTrackError
+          ? `<p class="coach-text" role="status">${escapeHtml(nativeLearnTrackError)}</p>`
+          : ""}
         <div class="coach-actions">
           <button class="carousel-main no-zoom" id="btnChunks" style="max-width:520px;">
             ${buttonLabel}
@@ -22034,6 +23288,7 @@ function screenChunks(idx) {
         return;
       }
 
+      primeNativeLearnTracks(); // explicit Start retry tap
       await startChunkFlow();
     };
   }
@@ -22065,6 +23320,9 @@ function screenEcho(idx) {
   const echoBottomHtml = showEchoAction
     ? `
       <div class="learn-coach learn-bottom-zone">
+        ${isNativeLearnTracksMode() && nativeLearnTrackError
+          ? `<p class="coach-text" role="status">${escapeHtml(nativeLearnTrackError)}</p>`
+          : ""}
         <div class="coach-actions">
           <button class="carousel-main no-zoom" id="btnEcho" style="max-width:520px;">
             ${State.echoDone ? (hideWordsPerRound() === 2 ? "Remove Words" : "Remove a Word") : "▶ Start Echo"}
@@ -22098,6 +23356,7 @@ function screenEcho(idx) {
         return;
       }
 
+      primeNativeLearnTracks();
       await startEchoFlow();
     };
   }
@@ -22340,6 +23599,9 @@ function screenFinalRecall(idx) {
           markLearnCompleted(VERSE_ID);
         }
 
+        // Practice time is a real button gesture; activate the next original
+        // tutorial-page-4 narrator before the async slide/page transition.
+        primeZooTodoTutorialNativeAudioFromGesture();
         State.todoTutorialJustFinishedLearn = true;
         markTutorialLearnDone(VERSE_ID);
         go(Screen.TODO_DEV);
@@ -22444,6 +23706,133 @@ function screenPracticeGate(idx) {
 
   bindHomePill(wrap);
 
+  return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
+}
+
+// Child-facing Read My Verse picker (not DEV tooling or Daily task credit).
+// Keep internal Read activity IDs unchanged to preserve assigned Daily reviews.
+const LISTEN_ACTIVITY_CARDS = Object.freeze([
+  { id: "balloons", title: "Balloons", iconImage: IMG_DIR + "game_icons/app_icon_balloons.png", cardColor: "#ffc751", cardTextColor: "#333333" },
+  { id: "fish", title: "Fish", iconImage: IMG_DIR + "game_icons/app_icon_fish.png", cardColor: "#40b9c5", cardTextColor: "#0d454b" },
+  { id: "typewriter", title: "Typewriter", iconImage: IMG_DIR + "game_icons/app_icon_typewriter.png", cardColor: "#7f66c6", cardTextColor: "#ffffff" },
+  { id: "keyboard", title: "Keyboard", iconImage: IMG_DIR + "game_icons/app_icon_keyboard.png", cardColor: "#444444", cardTextColor: "#ffffff" },
+  { id: "unscramble", title: "Unscramble", iconImage: IMG_DIR + "game_icons/app_icon_unscramble.png", cardColor: "#a7cb6f", cardTextColor: "#333333" },
+  { id: "star_wars", title: "Space", iconImage: IMG_DIR + "game_icons/app_icon_verse_crawl.png", cardColor: "#f2f2f2", cardTextColor: "#333333" },
+  { id: "tap_words_order", title: "Tap in Order", iconImage: IMG_DIR + "game_icons/app_icon_tap_words_in_order.png", cardColor: "#7f66c6", cardTextColor: "#ffffff" },
+  { id: "chunk_sequence", title: "Sound Sequence", iconImage: IMG_DIR + "game_icons/app_icon_chunk_audio_matching.png", cardColor: "#ff5a51", cardTextColor: "#333333" }
+].map((item) => Object.freeze(item)));
+
+function screenLearnHub(idx) {
+  [
+    IMG_DIR + "game_icons/app_icon_review_verse.png",
+    IMG_DIR + "game_icons/app_icon_listen_to_verse.png",
+    ...LISTEN_ACTIVITY_CARDS.map((item) => item.iconImage)
+  ].forEach(preloadPracticeMenuImage);
+
+  const wrap = document.createElement("div");
+  wrap.className = "title-screen practice-screen";
+  wrap.innerHTML = `
+    <div class="title-content practice-content">
+      <div class="practice-title-row">
+        ${homePillHtml()}
+        <h2 id="learnHubTitle">Learn</h2>
+        <div class="practice-title-spacer" aria-hidden="true"></div>
+      </div>
+      <div class="practice-scroll-wrap">
+        <div class="practice-card-list">
+          ${renderPracticeHubCard({
+            id: "learn-again", title: "Learn Again", icon: "📖",
+            iconImage: IMG_DIR + "game_icons/app_icon_review_verse.png",
+            iconAlt: "Learn Again", cardColor: "#ffc751", cardTextColor: "#333333"
+          })}
+          ${renderPracticeHubCard({
+            id: "listen-activities", title: "Listen", icon: "🔊",
+            iconImage: IMG_DIR + "game_icons/app_icon_listen_to_verse.png",
+            iconAlt: "Listen", cardColor: "#7f66c6", cardTextColor: "#ffffff"
+          })}
+        </div>
+      </div>
+    </div>
+    <div class="practice-scroll-vignette" aria-hidden="true"></div>
+  `;
+  bindHomePill(wrap);
+  wrap.querySelectorAll("[data-practice-hub-choice]").forEach((btn) => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      if (btn.dataset.practiceHubChoice === "learn-again") {
+        State.learnLevel = "not_at_all";
+        State.learnStartScreen = Screen.LISTEN;
+        resetLearn(false);
+        startLearnInstruction("listen");
+      } else if (btn.dataset.practiceHubChoice === "listen-activities") {
+        go(Screen.LISTEN_ACTIVITIES);
+      }
+    };
+  });
+  return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
+}
+
+function screenListenActivities(idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "title-screen practice-screen";
+  wrap.innerHTML = `
+    <div class="title-content practice-content">
+      <div class="practice-title-row">
+        ${practiceBackPillHtml("Back to Learn")}
+        <h2 id="listenActivitiesTitle">Listen Activities</h2>
+        <div class="practice-title-spacer" aria-hidden="true"></div>
+      </div>
+      <div class="practice-scroll-wrap">
+        <div class="practice-card-list">
+          ${LISTEN_ACTIVITY_CARDS.map((item) => renderPracticeHubCard({
+            id: item.id, title: item.title, icon: "🔊", iconImage: item.iconImage,
+            iconAlt: item.title, cardColor: item.cardColor,
+            cardTextColor: item.cardTextColor
+          })).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="practice-scroll-vignette" aria-hidden="true"></div>
+  `;
+  const back = wrap.querySelector("[data-practice-back-pill]");
+  if (back) back.onclick = (event) => {
+    event.stopPropagation();
+    go(Screen.LEARN_HUB);
+  };
+  wrap.querySelectorAll("[data-practice-hub-choice]").forEach((btn) => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      const activityId = btn.dataset.practiceHubChoice;
+      const module = window.BibloZooReadMyVerse;
+      const verse = VERSE_LIST.find((item) => item?.id === VERSE_ID);
+      const profileId = getProfileApi()?.getActiveProfileId?.() || "";
+      if (!State.hasLearnedVerse || !verse || !profileId ||
+          !module?.isActivityEligibleForVerse?.(activityId, verse)) {
+        showDialog({
+          title: "Choose another verse",
+          body: "This activity needs verse audio chunks that aren't available for this verse.",
+          actions: [dlgBtn("OK", { onClick: closeDialog })]
+        });
+        return;
+      }
+      const context = {
+        source: "learn_listen_activities",
+        profileId, verseId: VERSE_ID, readActivityId: activityId,
+        readTestMode: "normal"
+      };
+      if (!module.startForVerse(VERSE_ID, activityId, context)) {
+        showDialog({
+          title: "Activity isn't ready",
+          body: "Try another verse or choose a different Listen Activity.",
+          actions: [dlgBtn("OK", { onClick: closeDialog })]
+        });
+        return;
+      }
+      // Start native sound synchronously inside the genuine card tap.
+      // Returning from the activity never creates a synthetic Daily task.
+      if (!transitionToAppScreen(Screen.READ_MY_VERSE)) module.stopSession?.();
+    };
+  });
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
@@ -22648,7 +24037,7 @@ function screenPractice(idx) {
 
   const practiceTitle = wrap.querySelector("#practiceTitle");
   if (practiceTitle) {
-    bindLongPress(practiceTitle, {
+    if (allowDevShortcuts()) bindLongPress(practiceTitle, {
       delay: HIDDEN_PRACTICE_LONG_PRESS_MS,
       onLongPress: () => launchHiddenPracticeGame()
     });
@@ -22862,6 +24251,8 @@ function render() {
       slide = screenZookeeperStats(idx);
     }
     if (screen === Screen.VERSE_DETAIL) slide = screenVerseDetail(idx);
+    if (screen === Screen.LEARN_HUB) slide = screenLearnHub(idx);
+    if (screen === Screen.LISTEN_ACTIVITIES) slide = screenListenActivities(idx);
     if (screen === Screen.LEARN_LEVEL) slide = screenLearnLevel(idx);
     if (screen === Screen.PRACTICE_GATE) slide = screenPracticeGate(idx);
     if (screen === Screen.LEARN_INSTRUCTION) slide = screenLearnInstruction(idx);
@@ -22968,6 +24359,10 @@ const UI_TAP_SOUND_SELECTOR = [
 
 let appUiTapSoundsBound = false;
 
+function isNativeUiAudioMode() {
+  return window.BibloZooNativeUiAudio?.isAvailable?.() === true;
+}
+
 function getUiTapSoundTarget(eventTarget) {
   if (!eventTarget || typeof eventTarget.closest !== "function") return null;
 
@@ -22986,9 +24381,9 @@ function setupAppUiTapSounds() {
   if (appUiTapSoundsBound) return;
   appUiTapSoundsBound = true;
 
-  // Start preparing the real MP3 tap sounds before
-  // the user's first interaction.
-  void preloadUiTapSoundBuffers();
+  // Browser/PWA/Android retain decoded Web Audio. Native-only iOS must
+  // defer Swift activation and prewarm to the first actual UI gesture.
+  if (!isNativeUiAudioMode()) void preloadUiTapSoundBuffers();
 
   function handleUiTapGesture(event) {
     if (event.button !== undefined && event.button !== 0) return;
@@ -23002,6 +24397,14 @@ function setupAppUiTapSounds() {
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget || feedingResumeOwnsAudioGesture()) return;
     const gestureScreen = State.screen;
+    if (isNativeUiAudioMode()) {
+      window.BibloZooNativeUiAudio.tapFromGesture({
+        volume: UI_TAP_VOLUME,
+        isCurrent: () => !muted && !document.hidden &&
+          State.screen === gestureScreen && tapTarget.isConnected
+      });
+      return;
+    }
 
     // Start/resume from the touch gesture. A newly unlocked context may
     // settle just after this handler, so provide one short-lived tap response.
@@ -23033,6 +24436,15 @@ function setupAppUiTapSounds() {
     const tapTarget = getUiTapSoundTarget(event.target);
     if (!tapTarget || feedingResumeOwnsAudioGesture()) return;
     const gestureScreen = State.screen;
+
+    if (isNativeUiAudioMode()) {
+      window.BibloZooNativeUiAudio.tapFromGesture({
+        volume: UI_TAP_VOLUME,
+        isCurrent: () => !muted && !document.hidden &&
+          State.screen === gestureScreen && tapTarget.isConnected
+      });
+      return;
+    }
 
     const started = performance.now();
     const unlockPromise = unlockAppAudio();
@@ -23630,15 +25042,53 @@ function refreshDailySurfacesForNewDay() {
   render();
 }
 
+// Schedule the exact next local midnight (including DST boundaries).
+// iOS may suspend this timer, so foreground/pageshow/focus recheck too.
+let dailyDayBoundaryRefreshTimer = null;
+
+function scheduleDailyDayBoundaryRefresh() {
+  if (dailyDayBoundaryRefreshTimer !== null) {
+    clearTimeout(dailyDayBoundaryRefreshTimer);
+  }
+  const now = new Date();
+  const tomorrow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1
+  );
+  const delay = Math.max(
+    50,
+    tomorrow.getTime() - now.getTime() + 50
+  );
+
+  dailyDayBoundaryRefreshTimer = setTimeout(() => {
+    dailyDayBoundaryRefreshTimer = null;
+    refreshDailySurfacesForNewDay();
+    scheduleDailyDayBoundaryRefresh();
+  }, delay);
+}
+
+function checkDailyDayBoundaryOnReturn() {
+  refreshDailySurfacesForNewDay();
+  scheduleDailyDayBoundaryRefresh();
+}
+
 document.addEventListener(
   "visibilitychange",
-  refreshDailySurfacesForNewDay
+  checkDailyDayBoundaryOnReturn
 );
 
 window.addEventListener(
   "pageshow",
-  refreshDailySurfacesForNewDay
+  checkDailyDayBoundaryOnReturn
 );
+
+window.addEventListener(
+  "focus",
+  checkDailyDayBoundaryOnReturn
+);
+
+scheduleDailyDayBoundaryRefresh();
 
 (async function init() {
   if (

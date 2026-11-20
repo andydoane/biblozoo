@@ -21,6 +21,15 @@
     points: 5,
     trailColors: ["#ff5a51", "#ff963f", "#ffc751", "#78ad4f", "#46aef0", "#7f66c6"]
   });
+  // Melody keeps ALL playable note gestures and original pitches/percentage,
+  // but only these seven colorful art pieces are edible BibloSnacks.
+  const MELODY_SNACK_COUNT = 7;
+  const MUSIC_NOTE_BALL = Object.freeze({
+    id: "music-note",
+    color: "#ffffff",
+    asset: `${ASSET_BASE}dq_feed_music_note.png`,
+    points: 0
+  });
   const PEG_NOTE_FREQUENCIES = Object.freeze([
     523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
   ]);
@@ -36,6 +45,8 @@
   // Web Audio clock is necessary (but not sufficient) evidence of usable sound.
   const FEED_AUDIO_CLOCK_PROBE_MS = 180;
   const FEED_AUDIO_CLOCK_MIN_ADVANCE = 0.012;
+  // C.2d: Native-only does not depend on the Web Audio clock.
+  const FEED_NATIVE_STATE_READ_TIMEOUT_MS = 500;
   const FEED_AUDIO_REPLACEMENT_COOLDOWN_MS = 1500;
   const FEED_AUDIO_REPLACEMENT_BURST_LIMIT = 2;
   const FEED_AUDIO_REPLACEMENT_BACKOFF_MS = 15000;
@@ -130,7 +141,9 @@
   const LABYRINTH_BALL_SIZE_MULTIPLIER = 2;
   const LABYRINTH_GRAVITY_SCALE = 0.60;
   const LABYRINTH_MAX_VERTICAL_SPEED_SCALE = 0.55;
-  const LABYRINTH_STUCK_MS = 3500;
+  // A last-resort rescue for a snack genuinely resting on a solid platform.
+  // Give the child ten seconds to steer before nudging it toward a gap.
+  const LABYRINTH_STUCK_MS = 10000;
   const LABYRINTH_STEER_ACCELERATION_SCALE = 3.2;
   const LABYRINTH_MAX_HORIZONTAL_SPEED_SCALE = 0.72;
   const LABYRINTH_HORIZONTAL_DAMPING = 0.982;
@@ -918,6 +931,7 @@
     const balls = {};
     for (const config of SOLID_BALLS) balls[config.id] = createImage(config.asset);
     balls.rainbow = createImage(RAINBOW_BALL.asset);
+    balls[MUSIC_NOTE_BALL.id] = createImage(MUSIC_NOTE_BALL.asset);
     return {
       balls,
       star: createImage(`${ASSET_BASE}dq_feed_star_peg.png`)
@@ -1117,6 +1131,8 @@
       runtime.resizeObserver?.disconnect();
       runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
       destroyFeedZooTestHarness(runtime);
+      runtime.zooCue?.stop();
+      runtime.zooCueGeneration = (runtime.zooCueGeneration || 0) + 1;
       // Destroy animations, timers, input captures and overlay handlers before
       // the Feeding DOM can be replaced by its owning screen.
       runtime.zooEscape?.destroy?.();
@@ -1135,6 +1151,11 @@
         runtime.startOverlay.removeEventListener(
           "click",
           runtime.startOverlayHandler
+        );
+      }
+      if (runtime.nativePilotCheckbox && runtime.nativePilotChangeHandler) {
+        runtime.nativePilotCheckbox.removeEventListener(
+          "change", runtime.nativePilotChangeHandler
         );
       }
 
@@ -1280,7 +1301,11 @@
     }
   }
 
-  function render({ session, profilePictureHtml = "" } = {}) {
+  function render({
+    session,
+    profilePictureHtml = "",
+    zookeeperPictureHtml = ""
+  } = {}) {
     const petName = String(session?.petName || "BibloPet").trim() || "BibloPet";
     const isDailyTodoSnack =
       session?.dailyTodoSnack === true && session?.dailyTodoPreview !== true;
@@ -1291,6 +1316,18 @@
       resolveFeedMode(session?.feedMode);
     const modeConfig =
       getFeedModeConfig(mode);
+    // In Audio Test iOS, every Feeding mode (including real Zoo To-Do
+    // Classic) must prepare native sound on Got It!. Retain the optional
+    // Classic developer preview on other builds; leave Web/PWA unchanged.
+    const nativeOnlyApp = window.BibloZooNativeOnlyOutput?.enabled === true;
+    const nativePilotPreview =
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
+      ((session?.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
+        (nativeOnlyApp && [FEED_MODES.CLASSIC, FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
+    // Only the legacy comparison preview offers a DEV checkbox. Real
+    // Audio Test gameplay is always native and must not render that control.
+    const nativeClassicChoice = nativePilotPreview && !nativeOnlyApp &&
+      mode === FEED_MODES.CLASSIC;
     const stageAriaLabel =
       mode === FEED_MODES.LABYRINTH
         ? "Tilt or drag to steer the falling snacks while the BibloPet moves automatically"
@@ -1311,6 +1348,15 @@
           <span class="daily-feed-score-label">${mode === FEED_MODES.MELODY ? "Caught" : "Score"}</span>
           <strong class="daily-feed-score-value" data-daily-feed-score>${mode === FEED_MODES.MELODY ? "0%" : "0"}</strong>
         </div>
+        ${nativePilotPreview
+          ? '<div class="daily-feed-native-pilot-badge" data-daily-feed-native-badge role="status" aria-live="polite"' +
+              (nativeOnlyApp ? ' hidden' : '') + '>' +
+              (nativeOnlyApp ? 'Native ONLY: prepare on Got It!' : 'Preview audio: Web (default)') + '</div>'
+          : ""}
+        ${nativePilotPreview
+          ? '<div class="daily-feed-native-pilot-phases" data-daily-feed-native-phases aria-label="Read-only native sound startup trace"' +
+              (nativeOnlyApp ? ' hidden' : '') + '>Native-only diagnostic: select the DEV checkbox</div>'
+          : ""}
 
         <div class="daily-feed-stage" data-daily-feed-stage role="application"
           aria-label="${stageAriaLabel}">
@@ -1335,6 +1381,7 @@
           role="dialog"
           aria-modal="true"
           aria-label="Feeding game instructions"
+          ${nativePilotPreview ? "data-no-ui-sound" : ""}
         >
           <div class="daily-feed-start-card">
             <div
@@ -1388,10 +1435,29 @@
               <div class="daily-feed-selected-control-tile" aria-hidden="true">
                 <img class="daily-feed-selected-control-icon"
                   data-daily-feed-selected-icon alt="" hidden>
+                ${mode === FEED_MODES.BOUNCE ? `
+                  <div class="daily-feed-next-serve-avatar"
+                    data-daily-feed-next-serve-avatar hidden>
+                    ${zookeeperPictureHtml || '<span class="daily-feed-next-serve-fallback" aria-hidden="true">🐾</span>'}
+                  </div>
+                ` : ""}
               </div>
               <div class="daily-feed-start-instruction" data-daily-feed-start-instruction>
                 ${feedInstructionPrompt(mode, tiltAvailable)}
               </div>
+              ${nativeClassicChoice ? `
+                <label class="daily-feed-native-pilot-opt"
+                  data-daily-feed-native-pilot-opt data-no-ui-sound
+                  ${nativeOnlyApp ? "hidden" : ""}>
+                  <input type="checkbox" data-daily-feed-native-opt-in>
+                  <span>DEV: Native ONLY (no Web fallback; star + chomp)</span>
+                </label>
+              ` : ""}
+              ${nativePilotPreview ? `
+                <p class="daily-feed-native-pilot-status" data-daily-feed-native-choice-status
+                  role="status" aria-live="polite" ${nativeOnlyApp ? "hidden" : ""}>${nativeOnlyApp
+                    ? "" : "Web effects are the default."}</p>
+              ` : ""}
               <button class="daily-feed-control-got-it no-zoom" type="button"
                 data-daily-feed-confirm-button>Got It!</button>
             </div>
@@ -1421,8 +1487,12 @@
             <h2 class="bz-welcome-title">Welcome back,<span class="bz-welcome-name-line"
                 data-welcome-back-name-line><span class="bz-welcome-name"
                 data-welcome-back-name>Zookeeper</span><span class="bz-welcome-punctuation">!</span></span></h2>
-            <button class="daily-feed-resume-button bz-welcome-action no-zoom"
-              type="button" data-welcome-back-action data-daily-feed-resume>Let's go!</button>
+            <div class="bz-welcome-action-slot" data-welcome-back-action-slot>
+              <button class="daily-feed-resume-button bz-welcome-action no-zoom"
+                type="button" data-welcome-back-action data-daily-feed-resume>Let's go!</button>
+              <p class="bz-welcome-progress" data-welcome-back-progress
+                role="status" aria-live="polite" aria-atomic="true" hidden></p>
+            </div>
             <p class="daily-feed-resume-status bz-welcome-status"
                data-welcome-back-status data-daily-feed-resume-status
                role="status" aria-live="polite" hidden></p>
@@ -1449,32 +1519,28 @@
               class="daily-feed-result-title"
               data-daily-feed-result-title
             >
-              ${isDailyTodoSnack ? "Thanks for the snack!" : "Great Catching!"}
+              Thanks for the snack!
             </div>
 
             <div
               class="daily-feed-result-score"
               data-daily-feed-result-score
             >
-              ${mode === FEED_MODES.MELODY ? "Snacks Caught: 0%" : "Score: 0"}
+              ${mode === FEED_MODES.MELODY
+                ? `<img class="daily-feed-result-note-image" src="${MUSIC_NOTE_BALL.asset}" alt="Music note"><span>× 0%</span>`
+                : "Score: 0"}
             </div>
-            <div class="daily-feed-result-catches" data-daily-feed-result-catches
-              ${mode === FEED_MODES.MELODY ? "hidden" : ""}>
-              Caught 0 of 7 snacks
+            <div class="daily-feed-result-catches" data-daily-feed-result-catches>
+              Caught 0 Snacks
             </div>
-
-            ${isDailyTodoSnack ? `
-              <div class="daily-feed-result-complete">
-                Zoo To-Do Complete!
-              </div>
-            ` : ""}
 
             <button
               class="daily-feed-result-back no-zoom"
               type="button"
               data-daily-feed-result-back
             >
-              ${isDailyTodoSnack ? "Back Home" : "Back to Zoo"}
+              <svg class="daily-feed-result-check" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><path d="m4 12 5 5L20 6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>To-Do Complete!</span>
             </button>
           </div>
         </div>
@@ -1572,6 +1638,7 @@
       if (!audio) continue;
       try { audio.pause(); audio.currentTime = 0; } catch (err) { }
     }
+    runtime?.nativePilot?.stop?.();
   }
 
   // Silent-first Zoo Escape effects: no new context, no resume(), no promise
@@ -1579,6 +1646,7 @@
   function zooEscapeSoundReady(runtime) {
     const context = runtime?.audioContext;
     if (!runtime || activeRuntime !== runtime || !context ||
+        runtime.nativePilotBackend === "native" ||
         context.state !== "running" || document.hidden || runtime.feedPageHidden ||
         runtime.feedPausedAt == null) return false;
     const wall = performance.now();
@@ -1595,6 +1663,7 @@
   }
 
   function playZooEscapeSound(runtime, kind) {
+    if (runtime?.nativePilotBackend === "native") return;
     // Bouncing ten pets could otherwise create dozens of simultaneous notes.
     const now = performance.now();
     const minGap = kind === "bounce" ? 180 : 85;
@@ -1605,8 +1674,20 @@
   }
 
   function playPegTone(runtime, now) {
+    // Native-only Classic, Labyrinth and Bounce share six prewarmed
+    // sine notes. Melody's distinct catch notes use a triangle bank.
+    const nativePegMode = runtime.nativePilotBackend === "native" &&
+      [FEED_MODES.CLASSIC, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(runtime.mode);
+    if (runtime.nativePilotBackend === "native" && !nativePegMode) return;
     const context = runtime.audioContext;
-    if (!context || context.state !== "running" || now - runtime.lastPegSoundAt < 55) return;
+    if (nativePegMode) {
+      // A stale physics callback must not emit a new impact while Welcome
+      // Back is holding the round, even if native stop is still queued.
+      if (runtime.feedPausedAt != null ||
+          runtime.nativePilot?.isReady?.() !== true ||
+          now - runtime.lastPegSoundAt < 55) return;
+    } else if (!context || context.state !== "running" ||
+               now - runtime.lastPegSoundAt < 55) return;
 
     let noteIndex = Math.floor(Math.random() * PEG_NOTE_FREQUENCIES.length);
     if (noteIndex === runtime.lastPegNoteIndex) {
@@ -1614,6 +1695,14 @@
     }
     runtime.lastPegNoteIndex = noteIndex;
     runtime.lastPegSoundAt = now;
+
+    if (nativePegMode) {
+      // Reuse the same per-hit event metadata as star/chomp. The note
+      // index is a bounded allowlisted pitch, not an oscillator frequency.
+      runtime.nativePilot?.play("feed-peg",
+        feedingSoundVolume(FEED_COLLISION_TONE_VOLUME), Date.now(), noteIndex);
+      return;
+    }
 
     try {
       const oscillator = context.createOscillator();
@@ -1635,7 +1724,13 @@
     } catch (err) { }
   }
 
-  function playStarSound(runtime) {
+  function playStarSound(runtime, collisionEpochMs) {
+    if (runtime.nativePilotBackend === "native") {
+      // Same collision frame, now with an approximate timing marker.
+      runtime.nativePilot?.play("feed-star", feedingSoundVolume(0.78),
+        collisionEpochMs);
+      return;
+    }
     const context = runtime.audioContext;
 
     if (
@@ -1705,7 +1800,13 @@
     } catch (err) { }
   }
 
-  function playChompSound(runtime) {
+  function playChompSound(runtime, collisionEpochMs) {
+    if (runtime.nativePilotBackend === "native") {
+      // A rejected native call never triggers an in-round web fallback.
+      runtime.nativePilot?.play("feed-chomp", feedingSoundVolume(0.85),
+        collisionEpochMs);
+      return;
+    }
     const context = runtime.audioContext;
 
     if (context && context.state !== "closed") {
@@ -1766,9 +1867,11 @@
 
   function triggerStarPeg(runtime, peg, now) {
     if (!peg?.isStar) return;
+    const collisionEpochMs = runtime.nativePilotBackend === "native"
+      ? Date.now() : undefined;
     peg.isStar = false;
     createStarBurst(runtime, peg, now);
-    playStarSound(runtime);
+    playStarSound(runtime, collisionEpochMs);
     spawnStarBonusBalls(runtime, now);
   }
 
@@ -1927,11 +2030,15 @@
   }
 
   function catchBall(runtime, ball) {
+    // Snapshot before DOM score/pop animation: this is the actual physics
+    // collision callback, not a timestamp taken later in the native worker.
+    const collisionEpochMs = runtime.nativePilotBackend === "native"
+      ? Date.now() : undefined;
     runtime.score += ball.points;
     runtime.caughtCount += 1;
     updateScoreBadge(runtime);
     showCatchScore(runtime, ball);
-    playChompSound(runtime);
+    playChompSound(runtime, collisionEpochMs);
     pulseFeedPet(runtime);
   }
 
@@ -2501,6 +2608,17 @@
     return ball.id % 2 === 0 ? -1 : 1;
   }
 
+  function isLabyrinthBallRestingOnPlatform(runtime, ball) {
+    const tolerance = Math.max(2, (ball?.radius || 0) * 0.12);
+    return (runtime.labyrinth?.platformRows || []).some(row =>
+      (row.segments || []).some(segment =>
+        ball.x + ball.radius > segment.x &&
+        ball.x - ball.radius < segment.x + segment.width &&
+        Math.abs(ball.y + ball.radius - segment.y) <= tolerance
+      )
+    );
+  }
+
   function recoverStuckLabyrinthBall(
     runtime,
     ball,
@@ -2547,7 +2665,10 @@
 
     if (
       now - ball.labyrinthProgressAt <
-      LABYRINTH_STUCK_MS
+      LABYRINTH_STUCK_MS ||
+      // Never steer a free-falling snack, even when frame throttling has
+      // kept it inside the movement threshold for a long time.
+      !isLabyrinthBallRestingOnPlatform(runtime, ball)
     ) {
       return false;
     }
@@ -2925,6 +3046,31 @@
     return configs[index % configs.length];
   }
 
+  function assignMelodySnacks(timeline) {
+    // Place one of each six solid colors and the rainbow at spaced musical
+    // TIMES, not every Nth array entry: songs include rests and half-beats.
+    // This never changes pitches, note/beat offsets, lanes or arrival times.
+    const notes = timeline.filter(entry => Number.isFinite(entry.midi));
+    const count = Math.min(MELODY_SNACK_COUNT, notes.length);
+    if (!count) return 0;
+    const first = notes[0].arrivalOffsetMs;
+    const span = notes[notes.length - 1].arrivalOffsetMs - first;
+    let previous = -1;
+    for (let index = 0; index < count; index += 1) {
+      const target = first + span * (index + 1) / (count + 1);
+      const lastAllowed = notes.length - (count - index);
+      let selected = previous + 1;
+      for (let candidate = selected + 1; candidate <= lastAllowed; candidate += 1) {
+        if (Math.abs(notes[candidate].arrivalOffsetMs - target) <
+            Math.abs(notes[selected].arrivalOffsetMs - target))
+          selected = candidate;
+      }
+      notes[selected].snackConfig = getMelodySnackConfig(index);
+      previous = selected;
+    }
+    return count;
+  }
+
   function updateMelodyScore(runtime) {
     const state = runtime?.melody;
     if (!state) return;
@@ -2948,6 +3094,17 @@
   }
 
   function playMelodyTone(runtime, midi) {
+    // The .audiotest iOS backend is native-only. Once a Melody note is
+    // caught, request a fixed prewarmed Swift triangle buffer; do not create
+    // an AudioContext or oscillator even if the native bridge refuses.
+    if (runtime?.nativePilotBackend === "native") {
+      if (runtime.mode !== FEED_MODES.MELODY ||
+          runtime.feedPausedAt != null || runtime.melody?.pausedAt != null ||
+          !Number.isInteger(midi) || midi < 55 || midi > 83 ||
+          runtime.nativePilot?.isReady?.() !== true) return false;
+      return runtime.nativePilot.play("feed-melody",
+        feedingSoundVolume(MELODY_TONE_VOLUME), Date.now(), midi);
+    }
     const context = runtime?.audioContext;
     const state = runtime?.melody;
 
@@ -3038,6 +3195,7 @@
       timeline.filter(
         (entry) => Number.isFinite(entry.midi)
       ).length;
+    const snacksTotal = assignMelodySnacks(timeline);
 
     runtime.pegs = [];
     runtime.bursts = [];
@@ -3047,8 +3205,10 @@
     runtime.nextScheduledAt = Infinity;
     runtime.score = 0;
     runtime.caughtCount = 0;
+    runtime.snacksCaught = 0;
     runtime.totalCount = totalCount;
     runtime.melody = {
+      snacksTotal,
       tuneId: tune?.id || "odeToJoy",
       tuneLabel:
         String(tune?.label || "").trim(),
@@ -3185,6 +3345,9 @@
       for (const point of ball.trail || []) shift(point, "bornAt");
     }
     for (const burst of runtime.bursts || []) shift(burst, "startedAt");
+    // A locked/paused iPhone must not release all staggered Bounce bonus
+    // snacks at once on foreground return. Shift only unspawned deadlines.
+    for (const item of runtime.bounce?.bonusPending || []) shift(item, "at");
   }
 
   function armTiltObservationFallback(runtime) {
@@ -3222,8 +3385,17 @@
       runtime.resumeStatus.textContent = message;
       runtime.resumeStatus.hidden = !message;
     }
-    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay, { retry: !!message, busy: !!runtime.feedResumePending });
-    if (!window.BibloZooWelcomeBack && runtime.resumeButton) runtime.resumeButton.textContent = message ? "Try again!" : "Let's go!";
+    // "Preparing native sounds..." is progress, not an error. Keep the
+    // button's Let's go! label while disabled; show Try again! only when
+    // native preparation actually fails and the user can retry.
+    const nativePreparing = runtime.nativePilotBackend === "native" &&
+      runtime.feedResumePending === true;
+    const retry = !!message && !nativePreparing;
+    window.BibloZooWelcomeBack?.setAction?.(runtime.resumeOverlay,
+      { retry, busy: !!runtime.feedResumePending });
+    if (!window.BibloZooWelcomeBack && runtime.resumeButton) {
+      runtime.resumeButton.textContent = retry ? "Try again!" : "Let's go!";
+    }
   }
 
   // Developer-only manual test. Simulated outcomes replace ONLY the Feeding
@@ -3259,6 +3431,8 @@
 
   function attachFeedZooTestHarness(runtime) {
     if (!ENABLE_FEED_ZOO_ESCAPE_TEST_HARNESS ||
+        (window.BibloZooNativeOnlyOutput?.enabled === true &&
+         window.BibloZooNativeOnlyOutput?.devToolsAllowed !== true) ||
         !runtime?.zooEscape || !runtime.gameEl) return;
     const badge = runtime.gameEl.querySelector(".daily-feed-score-badge");
     if (!badge) return;
@@ -3369,9 +3543,27 @@
 
   function preventFeedTestContextMenu(event) { event.preventDefault(); }
 
-  function pauseFeedingGame(runtime, now = performance.now()) {
+  function pauseFeedingGame(runtime, now = performance.now(),
+      fromZooSurprise = false) {
+    if (runtime?.feedPausedAt != null) {
+      // A SECOND OS lock while a cue, pet, or final native-bank recovery is
+      // pending must revoke BOTH the cue and the owner's asynchronous
+      // recovery. UIKit may report inactive before document.hidden changes.
+      runtime.zooCue?.stop();
+      runtime.zooCueVerified = false;
+      runtime.zooCueGeneration = (runtime.zooCueGeneration || 0) + 1;
+      if (runtime.feedResumePending) {
+        runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+        runtime.feedResumePending = false;
+        runtime.feedAudioRecoveryVerified = false;
+        clearTimeout(runtime.feedResumeWatchdog);
+        runtime.feedResumeWatchdog = null;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      }
+      return false;
+    }
     if (!runtime || activeRuntime !== runtime || !runtime.roundStarted ||
-        !runtime.running || runtime.finished || runtime.feedPausedAt != null) return false;
+        !runtime.running || runtime.finished) return false;
     runtime.feedPausedAt = now;
     runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
     runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
@@ -3411,9 +3603,12 @@
     }
     if (runtime.resumeButton) runtime.resumeButton.disabled = false;
     setFeedingResumeStatus(runtime);
-    // Only start the minigame for a genuinely active, interrupted round.
-    // New interruptions reset its stage and cancel every previous animation.
-    runtime.zooEscape?.start?.();
+    // Native-only tests pause with explicit Resume/Back, not Zoo Escape
+    // as an audio-repair minigame. All non-native paths retain that feature.
+    if (!fromZooSurprise &&
+        (runtime.nativePilotBackend !== "native" ||
+          window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()))
+      runtime.zooEscape?.start?.();
     return true;
   }
 
@@ -3421,7 +3616,10 @@
     if (!runtime || activeRuntime !== runtime || !runtime.running ||
         runtime.finished || runtime.feedPausedAt == null ||
         runtime.feedPageHidden || document.hidden ||
-        (runtime.audioContext && runtime.audioContext.state !== "running")) return false;
+        (runtime.nativePilotBackend === "native" &&
+          runtime.nativePilot?.isReady?.() !== true) ||
+        (runtime.nativePilotBackend !== "native" &&
+          runtime.audioContext && runtime.audioContext.state !== "running")) return false;
     const elapsed = Math.max(0, now - runtime.feedPausedAt);
     // Shift time-dependent effects, including Classic's 22s expiry and
     // Labyrinth's stuck-ball timer. Never touch positions or rewards.
@@ -3455,7 +3653,8 @@
 
   // Called by a real click, never automatically on pageshow. Do not queue
   // stale effects; the same button remains usable if iOS rejects resume().
-  function attemptFeedingResumeFromGesture(runtime, onSettled) {
+  function attemptFeedingResumeFromGesture(runtime, onSettled,
+      keepOverlay = false) {
     // onSettled is optional: legacy callers still get the old return boolean;
     // Zoo Escape gets a definitive, clock-verified completion notification.
     const report = (ok) => {
@@ -3466,6 +3665,59 @@
         document.hidden || runtime.feedResumePending) {
       report(false);
       return false;
+    }
+    if (runtime.nativePilotBackend === "native") {
+      // No Web clock, Web AudioRecoveryCoordinator or rescue minigame.
+      // The real Resume tap re-prepares exactly this mode's native buffers
+      // (Classic samples/pegs, or Melody note bank) before unfreezing time.
+      runtime.feedResumePending = true;
+      setFeedingResumeStatus(runtime,
+        "Getting sounds ready…");
+      if (runtime.resumeButton) runtime.resumeButton.disabled = true;
+      const generation = ++runtime.feedResumeGeneration;
+      let settled = false;
+      const finish = (ready, reason) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(runtime.feedResumeWatchdog);
+        runtime.feedResumeWatchdog = null;
+        if (activeRuntime !== runtime ||
+            runtime.feedResumeGeneration !== generation ||
+            runtime.feedPausedAt == null || runtime.finished ||
+            document.hidden || runtime.feedPageHidden) {
+          report(false);
+          return;
+        }
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        if (!ready) {
+          // No silent backend change. Keep the same frozen round with
+          // explicit retry/Back; never award progress for an audio failure.
+          const detail = typeof reason === "string" &&
+            /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
+          setFeedingResumeStatus(runtime,
+            ["other-audio-playing", "interruption-pending",
+              "gesture-required-after-interruption"].includes(detail)
+              ? "Pause the other video's audio, then tap Let's go!"
+              : "Sound isn't ready yet. Tap Try again! or Back.");
+          report(false);
+          return;
+        }
+        runtime.feedAudioRecoveryVerified = true;
+        const resumed = continueFeedingAfterGesture(runtime,
+          performance.now(), keepOverlay);
+        report(resumed);
+      };
+      runtime.feedResumeWatchdog = setTimeout(
+        () => finish(false, "native-resume-timeout"), 4200);
+      try {
+        void Promise.resolve(runtime.nativePilot?.prepare?.() ||
+          { ready: false, reason: "missing-bridge" }).then(
+          value => finish(value?.ready === true, value?.reason),
+          () => finish(false, "native-prepare-error")
+        );
+      } catch (_) { finish(false, "native-prepare-error"); }
+      return true;
     }
     const Ctor = window.AudioContext || window.webkitAudioContext;
     const needsReplacement = runtime.feedAudioNeedsFreshContext ||
@@ -3520,40 +3772,81 @@
     if (runtime.resumeButton) runtime.resumeButton.disabled = true;
     const generation = ++runtime.feedResumeGeneration;
     const context = runtime.audioContext;
+    // A native preview's players are forgotten on interruption. Re-preload
+    // BOTH IDs from this real Resume tap; never resume those sounds on
+    // foreground by itself or change audio engines during the round.
+    const nativeRetry = runtime.nativePilotBackend === "native"
+      ? Promise.resolve(runtime.nativePilot?.prepare?.()).catch(
+        () => ({ ready: false, reason: "native-prepare-error" }))
+      : null;
     let settled = false;
-    const settle = (ready, reason) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(runtime.feedResumeWatchdog);
-      runtime.feedResumeWatchdog = null;
-      if (activeRuntime !== runtime || runtime.feedResumeGeneration !== generation ||
-          runtime.feedPausedAt == null || runtime.audioContext !== context) {
+    const valid = () => activeRuntime === runtime &&
+      runtime.feedResumeGeneration === generation &&
+      runtime.feedPausedAt != null && runtime.audioContext === context &&
+      !document.hidden && !runtime.feedPageHidden;
+    const finishResume = (nativeReady) => {
+      if (!valid()) {
+        if (activeRuntime === runtime && runtime.feedResumeGeneration === generation) {
+          runtime.feedResumePending = false;
+          if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        }
         report(false);
         return;
       }
       runtime.feedResumePending = false;
       if (runtime.resumeButton) runtime.resumeButton.disabled = false;
-      if (!ready || document.hidden || runtime.feedPageHidden) {
-        if (!document.hidden && !runtime.feedPageHidden) {
-          runtime.feedAudioNeedsFreshContext = !!Ctor;
-          recordFeedAudioRecovery("feed-audio-resume-failed", runtime,
-            { reason: reason || "unavailable" });
-          setFeedingResumeStatus(runtime,
-            "Sound isn't ready yet. Wait a moment, then try again or go back.");
-        }
+      if (!nativeReady) {
+        // Native stays the chosen backend. Never silently play Web Audio
+        // after an interrupted or failed native preflight mid-round.
+        recordFeedAudioRecovery("feed-native-preview-resume-blocked", runtime);
+        setFeedingResumeStatus(runtime,
+          "Native sounds aren't ready. Tap Resume again or go back.");
         report(false);
         return;
       }
-      // Only the verified gesture path can dismiss the interruption overlay.
+      // Only a verified user gesture can dismiss the activity's overlay.
       runtime.feedAudioRecoveryVerified = true;
       const continued = continueFeedingAfterGesture(runtime,
-        performance.now(), !!runtime.zooEscape);
+        performance.now(), keepOverlay || !!runtime.zooEscape);
       if (continued) {
         runtime.feedAudioNeedsFreshContext = false;
         runtime.feedAudioReplacements = 0;
         recordFeedAudioRecovery("feed-audio-resume-verified", runtime);
       }
       report(continued);
+    };
+    const settle = (ready, reason) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(runtime.feedResumeWatchdog);
+      runtime.feedResumeWatchdog = null;
+      if (!valid()) {
+        if (activeRuntime === runtime && runtime.feedResumeGeneration === generation) {
+          runtime.feedResumePending = false;
+          if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        }
+        report(false);
+        return;
+      }
+      if (!ready) {
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        runtime.feedAudioNeedsFreshContext = !!Ctor;
+        recordFeedAudioRecovery("feed-audio-resume-failed", runtime,
+          { reason: reason || "unavailable" });
+        setFeedingResumeStatus(runtime,
+          "Sound isn't ready yet. Wait a moment, then try again or go back.");
+        report(false);
+        return;
+      }
+      if (nativeRetry) {
+        // Web clock verification still owns recovery; the additional native
+        // preflight must also finish before the SAME frozen round continues.
+        void nativeRetry.then(result => finishResume(result?.ready === true),
+          () => finishResume(false));
+      } else {
+        finishResume(true);
+      }
     };
     // Older browsers with no Web Audio continue to use the existing HTML
     // audio fallback. Do not trap them behind an impossible clock probe.
@@ -3630,14 +3923,50 @@
     return true;
   }
 
+  // UIKit can make WKWebView inactive in the App Switcher while document.hidden
+  // stays false and rAF keeps running. Swift already stops all sound there;
+  // this activity-owned pause must freeze the SAME round's physics and melody.
+  // Even a delayed "active" event is evidence of a transition: never resume
+  // automatically. A fresh Welcome Back tap must re-preload the native bank.
+  function pauseNativeFeedingForAppSwitcher(runtime) {
+    if (!runtime || activeRuntime !== runtime ||
+        runtime.nativePilotBackend !== "native") return;
+    const pending = runtime.feedResumePending === true;
+    pauseFeedingGame(runtime);
+    if (pending && runtime.feedPausedAt != null) {
+      // A second leave during async Resume must invalidate its original tap.
+      runtime.feedResumeGeneration = (runtime.feedResumeGeneration || 0) + 1;
+      runtime.feedResumePending = false;
+      runtime.nativePilot?.stop?.();
+      if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      setFeedingResumeStatus(runtime);
+    }
+  }
+
   function attachFeedInterruptionHandlers(runtime) {
     runtime.feedVisibilityHandler = () => {
-      if (document.hidden) pauseFeedingGame(runtime);
+      if (document.hidden) {
+        pauseFeedingGame(runtime);
+        if (runtime.nativePilotBackend === "native" && runtime.feedPausedAt != null) {
+          // A second hide while Resume is pending invalidates all async
+          // native attempts and leaves Zoo Escape's overlay available.
+          runtime.nativePilot?.stop?.();
+          runtime.feedResumeGeneration += 1;
+          runtime.feedResumePending = false;
+          if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+        }
+      }
       // Returning never automatically unfreezes the round.
     };
     runtime.feedPageHideHandler = () => {
       runtime.feedPageHidden = true;
       pauseFeedingGame(runtime);
+      if (runtime.nativePilotBackend === "native" && runtime.feedPausedAt != null) {
+        runtime.nativePilot?.stop?.();
+        runtime.feedResumeGeneration += 1;
+        runtime.feedResumePending = false;
+        if (runtime.resumeButton) runtime.resumeButton.disabled = false;
+      }
     };
     runtime.feedPageShowHandler = () => {
       runtime.feedPageHidden = false;
@@ -3645,10 +3974,61 @@
     document.addEventListener("visibilitychange", runtime.feedVisibilityHandler);
     window.addEventListener("pagehide", runtime.feedPageHideHandler);
     window.addEventListener("pageshow", runtime.feedPageShowHandler);
+
+    // N4a.1: only the isolated native-only iOS experiment needs an explicit
+    // UIKit inactive signal. Other platforms keep their existing Web gates.
+    if (runtime.nativePilotAllowed &&
+        window.BibloZooNativeOnlyOutput?.enabled === true &&
+        window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true) {
+      const native = window.Capacitor?.Plugins?.BibloZooNativeSound;
+      const generation = (runtime.feedNativeLifecycleGeneration || 0) + 1;
+      runtime.feedNativeLifecycleGeneration = generation;
+      if (typeof native?.addListener === "function") {
+        try {
+          // Both inactive AND returned-active force a pause. The latter
+          // repairs a missed WKWebView callback if the switcher suspended JS.
+          const handle = native.addListener("biblozooAppLifecycle", state => {
+            if (activeRuntime !== runtime ||
+                runtime.feedNativeLifecycleGeneration !== generation ||
+                (state?.active !== false && state?.active !== true)) return;
+            pauseNativeFeedingForAppSwitcher(runtime);
+          });
+          void Promise.resolve(handle).then(listener => {
+            if (activeRuntime === runtime &&
+                runtime.feedNativeLifecycleGeneration === generation) {
+              runtime.feedNativeLifecycleHandle = listener;
+            } else {
+              try { void Promise.resolve(listener?.remove?.()).catch(() => {}); }
+              catch (_) { /* no activity to retain this listener */ }
+            }
+          }, () => { /* window focus/blur remains a fallback */ });
+        } catch (_) { /* no automatic Web/audio fallback */ }
+      }
+      // WKWebView visibilitychange is unreliable for the multitasking deck.
+      // Focus/blur are supplementary local signals, never audio activators.
+      runtime.feedNativeFocusHandler = () =>
+        pauseNativeFeedingForAppSwitcher(runtime);
+      window.addEventListener("blur", runtime.feedNativeFocusHandler);
+      window.addEventListener("focus", runtime.feedNativeFocusHandler);
+    }
   }
 
   function detachFeedInterruptionHandlers(runtime) {
     if (!runtime) return;
+    runtime.feedNativeLifecycleGeneration =
+      (runtime.feedNativeLifecycleGeneration || 0) + 1;
+    if (runtime.feedNativeLifecycleHandle) {
+      try {
+        void Promise.resolve(runtime.feedNativeLifecycleHandle.remove?.())
+          .catch(() => {});
+      } catch (_) { /* cleanup must not block navigation */ }
+      runtime.feedNativeLifecycleHandle = null;
+    }
+    if (runtime.feedNativeFocusHandler) {
+      window.removeEventListener("blur", runtime.feedNativeFocusHandler);
+      window.removeEventListener("focus", runtime.feedNativeFocusHandler);
+      runtime.feedNativeFocusHandler = null;
+    }
     if (runtime.feedVisibilityHandler) {
       document.removeEventListener("visibilitychange", runtime.feedVisibilityHandler);
       runtime.feedVisibilityHandler = null;
@@ -3665,7 +4045,7 @@
 
   function spawnMelodyNote(runtime, entry) {
     const radius = getFeedStarPegDiameter(runtime) / 2;
-    const config = getMelodySnackConfig(entry.index);
+    const config = entry.snackConfig || MUSIC_NOTE_BALL;
     const x = clamp(
       Number(entry.x) || runtime.width / 2,
       radius * 1.25,
@@ -3704,13 +4084,18 @@
     if (!entry || entry.status !== "active") return;
 
     entry.status = "caught";
-    runtime.caughtCount += 1;
+    runtime.caughtCount += 1; // Every played note still counts toward Caught %.
+    if (entry.snackConfig) {
+      // ONLY the seven visible colored BibloSnacks count toward food badges.
+      runtime.snacksCaught = (Number(runtime.snacksCaught) || 0) + 1;
+    }
     runtime.melody.classifiedCount += 1;
     updateMelodyScore(runtime);
     playMelodyTone(runtime, entry.midi);
 
-    // The melody note takes the place of a chomp sound, but pet feedback is shared.
-    showCatchScore(runtime, { config: ball.config, points: 1 });
+    // Notes stay musical; only actual food shows a +1 snack popup.
+    if (entry.snackConfig)
+      showCatchScore(runtime, { config: ball.config, points: 1 });
     pulseFeedPet(runtime);
   }
 
@@ -3883,7 +4268,9 @@
       ...buildStandardResult(runtime),
       score: catchPercent,
       totalCount: runtime.totalCount,
-      catchPercent
+      catchPercent,
+      snacksCaught: Math.max(0, Number(runtime.snacksCaught) || 0),
+      snacksTotal: Math.max(0, Number(runtime.melody?.snacksTotal) || MELODY_SNACK_COUNT)
     };
   }
 
@@ -4035,6 +4422,10 @@
       livesLeft: BOUNCE_SERVES,
       waitingServe: true,
       snacksReleased: false,
+      // Full-clear food is a one-shot reward; its queued snacks use the same
+      // catch physics and score path as food released from colored bricks.
+      bonusTriggered: false,
+      bonusPending: [],
       ended: false
     };
   }
@@ -4077,6 +4468,40 @@
     });
   }
 
+  function startBounceFullClearBonus(runtime, now, random = Math.random) {
+    const state = runtime.bounce;
+    if (!state || state.bonusTriggered) return false;
+    // Count ONLY white balls physically on-screen at the final brick hit.
+    // Unused launches and star balls pending creation do not qualify.
+    const activeCount = Math.min(3, state.whiteBalls.filter(ball =>
+      ball.y + ball.radius >= 0 && ball.y - ball.radius <= runtime.height
+    ).length);
+    if (!activeCount) return false;
+
+    const bonusCount = activeCount * 2 +
+      Math.floor(clamp(random(), 0, 0.999999) * 2);
+    const solids = SOLID_BALLS.slice();
+    for (let i = solids.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(clamp(random(), 0, 0.999999) * (i + 1));
+      [solids[i], solids[j]] = [solids[j], solids[i]];
+    }
+    const colors = solids.slice(0, Math.min(bonusCount, solids.length));
+    if (bonusCount === 7) colors.push(RAINBOW_BALL);
+
+    // Alternate left and right, with randomized lanes and a gentle stagger,
+    // so the player can steer for each falling piece instead of facing a wall.
+    state.bonusPending = colors.map((config, index) => ({
+      config,
+      x: runtime.width * (
+        (index % 2 === 0 ? 0.12 : 0.56) + clamp(random(), 0, 0.999999) * 0.30
+      ),
+      at: now + 120 + index * 450
+    }));
+    state.bonusTriggered = true;
+    state.snacksReleased = true;
+    return true;
+  }
+
   function breakBounceBrick(runtime, brick, ball, now) {
     if (!brick.active) return;
     brick.active = false;
@@ -4092,6 +4517,15 @@
       playStarSound(runtime);
     } else {
       playPegTone(runtime, now);
+    }
+    const state = runtime.bounce;
+    if (!state.bricks.some(item => item.active && item.config)) {
+      // This is the LAST permitted rally: no more launches once all seven
+      // colored bricks have opened, even if the player has serves left.
+      state.snacksReleased = true;
+    }
+    if (!state.bricks.some(item => item.active)) {
+      startBounceFullClearBonus(runtime, now);
     }
   }
 
@@ -4284,12 +4718,24 @@
     const state = runtime.bounce;
     state.waitingServe = true;
     runtime.introUnlockAt = now + 550;
-    runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
-    runtime.startInstructionEl.textContent = "Tap to launch";
+    if (runtime.startTitleEl) {
+      runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
+      runtime.startTitleEl.hidden = false;
+    }
+    if (runtime.startBallsEl) runtime.startBallsEl.hidden = true;
+    // Launch is already written on the button; don't repeat it above.
+    if (runtime.startInstructionEl) {
+      runtime.startInstructionEl.textContent = "";
+      runtime.startInstructionEl.hidden = true;
+    }
+    runtime.startOverlay.classList?.add?.("is-bounce-serve");
     runtime.controlPhase = "serve";
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
     if (runtime.startSelectedIconEl) runtime.startSelectedIconEl.hidden = true;
+    // The white tile shows the player's Zookeeper avatar between balls,
+    // rather than the Tilt/Drag illustration used during control selection.
+    if (runtime.startServeAvatarEl) runtime.startServeAvatarEl.hidden = false;
     if (runtime.startConfirmButton) runtime.startConfirmButton.textContent = "Launch!";
     runtime.startOverlay.hidden = false;
   }
@@ -4297,40 +4743,71 @@
   function updateBounceMode(runtime, dt, now) {
     const state = runtime.bounce;
     if (!state) return;
-    if (!state.ended && !state.snacksReleased && !state.waitingServe) {
+    if (state.bonusTriggered) {
+      // The count was frozen at the last brick impact. No more bouncing
+      // once the full-clear food shower has begun.
+      state.whiteBalls = [];
+      state.pendingWhiteBalls = [];
+    }
+    if (!state.ended && !state.bonusTriggered && !state.waitingServe) {
       const steps = Math.max(1, Math.ceil(dt / BOUNCE_STEP));
       const step = dt / steps;
       for (let i = 0; i < steps; i += 1) {
         state.whiteBalls = state.whiteBalls.filter(
           (ball) => updateBounceWhiteBall(runtime, ball, step, now)
         );
-        if (state.pendingWhiteBalls.length) {
-          state.whiteBalls.push(...state.pendingWhiteBalls);
-          state.pendingWhiteBalls.length = 0;
-        }
-        // Feeding, not clearing gray bricks, is the objective.
-        // Stop the rally after the seventh snack brick is broken;
-        // let released snacks finish falling before showing results.
-        if (!state.bricks.some((brick) => brick.active && brick.config)) {
-          state.snacksReleased = true;
+        if (state.bonusTriggered) {
+          // All bricks cleared. The final active-ball count was snapshotted
+          // at impact; stop bouncing and let the snack shower take over.
           state.whiteBalls = [];
           state.pendingWhiteBalls = [];
           break;
         }
+        if (state.pendingWhiteBalls.length) {
+          state.whiteBalls.push(...state.pendingWhiteBalls);
+          state.pendingWhiteBalls.length = 0;
+        }
+        if (!state.bricks.some((brick) => brick.active && brick.config)) {
+          state.snacksReleased = true;
+        }
         if (!state.whiteBalls.length) break;
       }
-      if (!state.snacksReleased && !state.whiteBalls.length) {
+      if (!state.bonusTriggered && !state.whiteBalls.length) {
         state.livesLeft -= 1;
-        if (state.livesLeft > 0) {
+        if (!state.snacksReleased && state.livesLeft > 0) {
           showBounceNextServe(runtime, now);
         } else {
+          // After the seventh food brick the current on-screen balls are
+          // the final chance at clearing the board, regardless of launches.
+          // Any falling food still gets a chance to reach the BibloPet.
           state.ended = true;
-          runtime.balls = [];
         }
       }
     }
-    if (!state.waitingServe && !state.ended) {
+
+    if (state.bonusTriggered && state.bonusPending.length) {
+      while (state.bonusPending.length &&
+             state.bonusPending[0].at <= now) {
+        const entry = state.bonusPending.shift();
+        const radius = getFeedStarPegDiameter(runtime) / 2;
+        spawnBounceSnack(runtime, {
+          config: entry.config,
+          x: entry.x,
+          width: 0,
+          y: -radius * 2,
+          height: 0
+        });
+      }
+    }
+    // Continue collecting drops after a last-ball miss or a full clear.
+    // No early result while an original or bonus snack is still falling.
+    if (!state.waitingServe && runtime.balls.length) {
       updateBounceSnacks(runtime, dt);
+    }
+    if (state.bonusTriggered &&
+        state.bonusPending.length === 0 &&
+        runtime.balls.length === 0) {
+      state.ended = true;
     }
     updateBouncePetLean(runtime, dt);
   }
@@ -4402,7 +4879,8 @@
 
   function isBounceModeComplete(runtime, now) {
     const state = runtime.bounce;
-    if (!state?.ended && !(state?.snacksReleased && runtime.balls.length === 0)) {
+    if (!state?.ended || runtime.balls.length > 0 ||
+        state.bonusPending.length > 0) {
       runtime.finishAt = 0;
       return false;
     }
@@ -4417,6 +4895,7 @@
     if (!runtime?.bounce) return;
     runtime.bounce.whiteBalls = [];
     runtime.bounce.pendingWhiteBalls = [];
+    runtime.bounce.bonusPending = [];
     runtime.bounce.waitingServe = false;
   }
 
@@ -4541,6 +5020,7 @@
     runtime.feedFrameGeneration = (runtime.feedFrameGeneration || 0) + 1;
     clearTimeout(runtime.feedStartAudioWatchdog);
     clearTimeout(runtime.feedResumeWatchdog);
+    runtime.nativePilot?.stop?.();
     runtime.gameEl?.classList?.remove?.("is-interruption-paused");
     if (runtime.resumeOverlay) runtime.resumeOverlay.hidden = true;
 
@@ -4568,31 +5048,28 @@
     stopAudioContext(runtime.audioContext);
     runtime.audioContext = null;
 
-    const copy =
-      getResultCopy(
-        result.score,
-        result.caughtCount,
-        runtime.petName
-      );
-
     runtime.gameEl.classList.add(
       "is-finished"
     );
 
     runtime.startOverlay.hidden = true;
+    // Debug Feeding previews must show the identical result screen to a
+    // real Daily To-Do run, while their onComplete path stays non-awarding.
     runtime.resultTitleEl.textContent =
-      runtime.dailyTodoSnack && !runtime.dailyTodoPreview
-        ? `Thanks for the snack, ${runtime.zookeeperName}!`
-        : copy.title;
-    runtime.resultScoreEl.textContent =
-      result.mode === FEED_MODES.MELODY
-        ? `Snacks Caught: ${Number(result.catchPercent) || 0}%`
-        : `Score: ${result.score}`;
+      `Thanks for the snack, ${runtime.zookeeperName}!`;
+    if (result.mode === FEED_MODES.MELODY) {
+      const percent = Math.max(0, Number(result.catchPercent) || 0);
+      runtime.resultScoreEl.innerHTML =
+        `<img class="daily-feed-result-note-image" src="${MUSIC_NOTE_BALL.asset}" alt="Music note"><span>× ${percent}%</span>`;
+    } else {
+      runtime.resultScoreEl.textContent = `Score: ${result.score}`;
+    }
     if (runtime.resultCatchesEl) {
-      const caught = Math.max(0, Number(result.caughtCount) || 0);
-      const total = Math.max(0, Number(result.totalCount) || 0);
-      runtime.resultCatchesEl.textContent = `Caught ${caught} of ${total} snacks`;
-      runtime.resultCatchesEl.hidden = result.mode === FEED_MODES.MELODY;
+      const caught = result.mode === FEED_MODES.MELODY
+        ? Math.max(0, Number(result.snacksCaught) || 0)
+        : Math.max(0, Number(result.caughtCount) || 0);
+      runtime.resultCatchesEl.textContent = `Caught ${caught} Snacks`;
+      runtime.resultCatchesEl.hidden = false;
     }
     runtime.resultOverlay.hidden = false;
   }
@@ -4615,12 +5092,14 @@
   }
 
   function showFeedingControlChoice(runtime, message = "") {
+    runtime.startOverlay.classList?.remove?.("is-bounce-serve");
     runtime.controlPhase = "choose";
     // The game branding belongs to the chooser only, not the focused tutorial.
     if (runtime.startTitleEl) runtime.startTitleEl.hidden = false;
     if (runtime.startBallsEl) runtime.startBallsEl.hidden = false;
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = false;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = true;
+    if (runtime.startServeAvatarEl) runtime.startServeAvatarEl.hidden = true;
     if (runtime.startControlMessageEl) {
       runtime.startControlMessageEl.textContent = message;
       runtime.startControlMessageEl.hidden = !message;
@@ -4629,6 +5108,7 @@
   }
 
   function showFeedingControlInstructions(runtime, choice) {
+    runtime.startOverlay.classList?.remove?.("is-bounce-serve");
     // Keep the selected-method screen minimal and avoid overflowing the card.
     if (runtime.startTitleEl) runtime.startTitleEl.hidden = true;
     if (runtime.startBallsEl) runtime.startBallsEl.hidden = true;
@@ -4637,11 +5117,13 @@
     runtime.controlPhase = "instructions";
     if (runtime.startChoiceEl) runtime.startChoiceEl.hidden = true;
     if (runtime.startConfirmEl) runtime.startConfirmEl.hidden = false;
+    if (runtime.startServeAvatarEl) runtime.startServeAvatarEl.hidden = true;
     if (runtime.startSelectedIconEl) {
       runtime.startSelectedIconEl.src = `${ASSET_BASE}dq_feed_control_${choice}.png`;
       runtime.startSelectedIconEl.hidden = false;
     }
     if (runtime.startInstructionEl) {
+      runtime.startInstructionEl.hidden = false;
       runtime.startInstructionEl.textContent = feedInstructionPrompt(runtime.mode, choice);
     }
     if (runtime.startConfirmButton) runtime.startConfirmButton.textContent = "Got It!";
@@ -4680,6 +5162,226 @@
     }
     runtime.tiltPermissionPreapproved = true;
     showFeedingControlInstructions(runtime, "tilt");
+  }
+
+  // Stage C.2c: snapshots are read-only and in-memory. They show the native
+  // interruption sequence around Web-clock and native-preload boundaries.
+  // Requests are async: "before-web" is captured on the separate checkbox
+  // gesture, not guaranteed to describe the exact instant of Got It!.
+  function nativeFeedDebugNumber(value) {
+    return Number.isInteger(value) && value >= 0 && value < 100000 ? value : "?";
+  }
+
+  function boundedNativeFeedStage(promise, timeoutMs) {
+    let timer;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("stage-timeout")), timeoutMs);
+      })
+    ]).finally(() => clearTimeout(timer));
+  }
+
+  async function recordNativePreviewPhase(runtime, label) {
+    if (!runtime?.nativePilotAllowed || activeRuntime !== runtime ||
+        document.hidden || runtime.feedPageHidden ||
+        !runtime.nativePilotCheckbox?.checked) return;
+    if (!runtime.nativePilotTrace) runtime.nativePilotTrace = [];
+    const step = { label, text: "reading…" };
+    runtime.nativePilotTrace.push(step);
+    // Developer-only counts, not persistent telemetry or user audio content.
+    if (runtime.nativePilotTrace.length > 5) runtime.nativePilotTrace.shift();
+    const paint = () => {
+      if (activeRuntime === runtime && runtime.nativePilotPhases) {
+        runtime.nativePilotPhases.textContent = runtime.nativePilotTrace
+          .map(item => item.label + ": " + item.text).join("\n");
+      }
+    };
+    paint();
+    try {
+      const api = window.Capacitor?.Plugins?.BibloZooNativeSound;
+      if (typeof api?.getDebugState !== "function") {
+        step.text = "bridge-unavailable";
+      } else {
+        const state = await boundedNativeFeedStage(
+          api.getDebugState(), FEED_NATIVE_STATE_READ_TIMEOUT_MS);
+        if (activeRuntime !== runtime || document.hidden ||
+            !runtime.nativePilotCheckbox?.checked) return;
+        const last = typeof state?.lastSignal === "string" &&
+          /^[a-z][a-z0-9-]{0,40}$/.test(state.lastSignal)
+            ? state.lastSignal : "?";
+        const reason = Number.isInteger(state?.lastReasonCode) &&
+          state.lastReasonCode >= -1 && state.lastReasonCode < 10000
+            ? state.lastReasonCode : "?";
+        step.text = state?.available === true
+          ? "pending=" + (state.pending === true ? "YES" : "no") +
+            " began=" + nativeFeedDebugNumber(state.beganCount) +
+            " ended=" + nativeFeedDebugNumber(state.endedCount) +
+            " events=" + nativeFeedDebugNumber(state.eventCount) +
+            " last=" + last + " reason=" + reason
+          : "bridge-unavailable";
+      }
+    } catch (_) {
+      step.text = "read-timeout-or-error";
+    }
+    paint();
+  }
+
+  // The unchecked Web baseline prepares its original sounds only when
+  // explicitly chosen. The native-only path never calls this helper.
+  function prepareWebClassicPreviewOnTap(runtime) {
+    // N1: the separate native-only iOS package must never prepare Web output.
+    if (window.BibloZooNativeOnlyOutput?.enabled === true) return;
+    if (runtime.audioContext || runtime.starAudio || runtime.chompAudio) return;
+    runtime.audioContext = prepareAudio();
+    if (runtime.audioContext) return;
+    // Preserve the existing HTML fallback on devices without Web Audio.
+    try {
+      runtime.starAudio = new Audio(`${ASSET_BASE}dq_feed_star.mp3`);
+      runtime.starAudio.preload = "auto";
+      runtime.starAudio.volume = feedingSoundVolume(0.82);
+      runtime.starAudio.load();
+      runtime.chompAudio = new Audio(`${ASSET_BASE}dq_feed_chomp.mp3`);
+      runtime.chompAudio.preload = "auto";
+      runtime.chompAudio.volume = feedingSoundVolume(0.85);
+      runtime.chompAudio.load();
+    } catch (_) { /* Web baseline keeps its original best-effort behavior. */ }
+  }
+
+  async function startPreviewRoundWithAudioChoice(runtime) {
+    if (!runtime || activeRuntime !== runtime ||
+        runtime.nativePilotChoicePending || runtime.roundStarted ||
+        runtime.finished || runtime.controlPhase !== "instructions") return;
+    const forceNativeOnly = window.BibloZooNativeOnlyOutput?.enabled === true;
+    if ((!runtime.nativePilotAllowed ||
+        runtime.nativePilotCheckbox?.checked !== true) && !forceNativeOnly) {
+      // Explicit Web comparison, not an audio-error fallback from Native.
+      runtime.nativePilotBackend = "web";
+      prepareWebClassicPreviewOnTap(runtime);
+      if (runtime.nativePilotBadge)
+        runtime.nativePilotBadge.textContent = "Preview audio: Web (explicit choice)";
+      startRound(runtime);
+      return;
+    }
+
+    // C.2d experiment: once the owner chooses Native, do not create, resume,
+    // clock-probe or silently select Web Audio. A failed native sound remains
+    // intentionally SILENT and carries an accurate diagnostic reason.
+    runtime.nativePilotBackend = "native";
+    // Native-only packaging has no Web comparison: the historical checkbox
+    // remains only for older source/VM tests, not for this iOS installation.
+    if (forceNativeOnly && runtime.nativePilotCheckbox)
+      runtime.nativePilotCheckbox.checked = true;
+    if (preparedAudioContext) {
+      stopAudioContext(preparedAudioContext);
+      preparedAudioContext = null;
+    }
+    const factory = window.BibloZooFeedingNativeAudioPilot;
+    const pilot = factory?.create?.({
+      mode: runtime.mode === FEED_MODES.MELODY ? "melody" :
+        runtime.mode === FEED_MODES.LABYRINTH ? "labyrinth" :
+        runtime.mode === FEED_MODES.BOUNCE ? "bounce" : "classic",
+      isCurrent: () => activeRuntime === runtime && !runtime.finished &&
+        !document.hidden && !runtime.feedPageHidden,
+      onInterruption: () => {
+        // YouTube PiP may interrupt before UIKit resigns active. The
+        // original Feeding pause overlay owns the same saved round.
+        pauseNativeFeedingForAppSwitcher(runtime);
+      },
+      onFailure: (reason) => {
+        if (activeRuntime !== runtime || runtime.finished) return;
+        if (runtime.nativePilotBadge) {
+          const detail = typeof reason === "string" &&
+            /^[a-z][a-z0-9-]{0,55}$/.test(reason) ? reason : "bridge-error";
+          runtime.nativePilotBadge.textContent =
+            "Native ONLY failed (" + detail + "); silent effects. Exit/retry";
+        }
+        void recordNativePreviewPhase(runtime, "play-fail");
+      }
+    });
+    runtime.nativePilotChoicePending = true;
+    if (runtime.startConfirmButton) {
+      runtime.startConfirmButton.disabled = true;
+      runtime.startConfirmButton.textContent = "Got It!";
+    }
+    if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = true;
+    // Audio preflight still runs on Got It!, but the transient status is
+    // not useful to a child. Show this line only for a real retry/error.
+    if (runtime.nativePilotChoiceStatus) {
+      runtime.nativePilotChoiceStatus.textContent = "";
+      runtime.nativePilotChoiceStatus.hidden = true;
+    }
+    const live = () => activeRuntime === runtime && !runtime.finished &&
+      !runtime.roundStarted && runtime.controlPhase === "instructions" &&
+      !document.hidden && !runtime.feedPageHidden;
+    const cancelStale = () => {
+      pilot?.stop?.();
+      if (activeRuntime === runtime) {
+        runtime.nativePilotChoicePending = false;
+        if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+        if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
+      }
+    };
+    // Read-only state is not a readiness gate; it cannot veto native audio.
+    await recordNativePreviewPhase(runtime, "before-native");
+    if (!live()) { cancelStale(); return; }
+    let result;
+    try {
+      result = await pilot?.prepare?.() || { ready: false, reason: "missing-bridge" };
+    } catch (_) { result = { ready: false, reason: "prepare-error" }; }
+    if (!live()) { cancelStale(); return; }
+    await recordNativePreviewPhase(runtime, "after-native");
+    if (!live()) { cancelStale(); return; }
+
+    runtime.nativePilotChoicePending = false;
+    if (runtime.startConfirmButton) runtime.startConfirmButton.disabled = false;
+    if (runtime.nativePilotCheckbox) runtime.nativePilotCheckbox.disabled = false;
+    if (result?.ready !== true || !pilot) {
+      // A failed cold-start MUST NOT begin a silent round. Leave the same
+      // Instructions/Got It! gate visible so the user can deliberately retry
+      // after a brief iOS activation cooldown or choose Back. No Web fallback,
+      // automatic retry timer, score award or sound is triggered here.
+      pilot?.stop?.();
+      runtime.nativePilot = null;
+      const reason = typeof result?.reason === "string" &&
+        /^[a-z][a-z0-9-]{0,55}$/.test(result.reason)
+        ? result.reason : "bridge-error";
+      // Child-facing popup stays simple. Diagnostic reason remains available
+      // in the hidden pilot badge and manual DEV timing report.
+      const message = ["other-audio-playing", "interruption-pending",
+        "gesture-required-after-interruption"].includes(reason)
+        ? "Pause the other video's audio, then tap Try Again."
+        : "Sound isn't ready yet. Tap Try Again or Back.";
+      if (runtime.nativePilotBadge) {
+        runtime.nativePilotBadge.textContent =
+          "Native ONLY unavailable (" + reason + "); round not started";
+      }
+      if (runtime.nativePilotChoiceStatus) {
+        runtime.nativePilotChoiceStatus.hidden = false;
+        runtime.nativePilotChoiceStatus.textContent = message;
+      }
+      if (runtime.startConfirmButton)
+        runtime.startConfirmButton.textContent = "Try Again";
+      void recordNativePreviewPhase(runtime, "preflight-failed");
+      return;
+    }
+
+    runtime.nativePilot = pilot;
+    if (runtime.nativePilotBadge)
+      runtime.nativePilotBadge.textContent =
+        runtime.mode === FEED_MODES.MELODY
+          ? "Native ONLY: Melody notes ready; Web audio OFF"
+          : runtime.mode === FEED_MODES.LABYRINTH
+            ? "Native ONLY: Labyrinth tones/catches ready; Web audio OFF"
+            : runtime.mode === FEED_MODES.BOUNCE
+              ? "Native ONLY: Bounce rebounds/bonus/catches ready; Web audio OFF"
+              : "Native ONLY: star/chomp ready; Web audio OFF";
+    if (runtime.nativePilotChoiceStatus) {
+      runtime.nativePilotChoiceStatus.textContent = "";
+      runtime.nativePilotChoiceStatus.hidden = true;
+    }
+    startRound(runtime);
+    void recordNativePreviewPhase(runtime, "round-start");
   }
 
   function startRound(runtime) {
@@ -4744,7 +5446,8 @@
     // Starting is itself a gesture. Give its Web Audio resume promise a
     // chance to settle BEFORE advancing game time, rather than flashing a
     // needless second Resume prompt during an ordinary new round.
-    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+    if (runtime.nativePilotBackend !== "native" &&
+        runtime.audioContext && runtime.audioContext.state !== "running") {
       const beganAt = performance.now();
       runtime.feedStartAudioWatchdog = setTimeout(() => {
         runtime.feedStartAudioWatchdog = null;
@@ -4793,7 +5496,8 @@
       pauseFeedingGame(runtime, runtime.lastFrameAt);
       return;
     }
-    if (runtime.audioContext && runtime.audioContext.state !== "running") {
+    if (runtime.nativePilotBackend !== "native" &&
+        runtime.audioContext && runtime.audioContext.state !== "running") {
       pauseFeedingGame(runtime, now);
       return;
     }
@@ -5118,14 +5822,24 @@
     const petRect =
       petCircle.getBoundingClientRect();
 
-    const audioContext =
-      preparedAudioContext ||
-      prepareAudio();
-
+    // Retain legacy opt-in Classic preview. Every native-only Feeding
+    // mode, including real Zoo To-Do Classic, prepares on the Got It! tap;
+    // never allocate Web/HTML output in the isolated iOS app.
+    const nativePilotAllowed =
+      window.BibloZooFeedingNativeAudioPilot?.isIOS?.() === true &&
+      ((session.dailyTodoPreview === true && mode === FEED_MODES.CLASSIC) ||
+        (window.BibloZooNativeOnlyOutput?.enabled === true &&
+         [FEED_MODES.CLASSIC, FEED_MODES.MELODY, FEED_MODES.LABYRINTH, FEED_MODES.BOUNCE].includes(mode)));
+    if (nativePilotAllowed && preparedAudioContext) {
+      stopAudioContext(preparedAudioContext);
+      preparedAudioContext = null;
+    }
+    const audioContext = nativePilotAllowed
+      ? null : (preparedAudioContext || prepareAudio());
     preparedAudioContext = null;
 
     const starAudio =
-      audioContext
+      audioContext || nativePilotAllowed
         ? null
         : new Audio(
           `${ASSET_BASE}dq_feed_star.mp3`
@@ -5140,7 +5854,7 @@
       } catch (err) { }
     }
 
-    const chompAudio = audioContext
+    const chompAudio = audioContext || nativePilotAllowed
       ? null
       : new Audio(`${ASSET_BASE}dq_feed_chomp.mp3`);
 
@@ -5154,10 +5868,29 @@
     const scheduled =
       buildScheduledBalls();
 
+    const nativePilotCheckbox = nativePilotAllowed
+      ? startOverlay.querySelector("[data-daily-feed-native-opt-in]") : null;
+    if (window.BibloZooNativeOnlyOutput?.enabled === true && nativePilotCheckbox) {
+      nativePilotCheckbox.checked = true;
+    }
+
     const runtime = {
       running: false,
       roundStarted: false,
       finished: false,
+      nativePilotAllowed,
+      nativePilotCheckbox,
+      nativePilotChoiceStatus: nativePilotAllowed
+        ? startOverlay.querySelector("[data-daily-feed-native-choice-status]") : null,
+      nativePilotBadge: nativePilotAllowed
+        ? gameEl.querySelector("[data-daily-feed-native-badge]") : null,
+      nativePilotPhases: nativePilotAllowed
+        ? gameEl.querySelector("[data-daily-feed-native-phases]") : null,
+      nativePilotTrace: [],
+      nativePilot: null,
+      nativePilotBackend: "web",
+      nativePilotChoicePending: false,
+      nativePilotChangeHandler: null,
       requestedMode,
       earnedStarPegCount,
       requestedMelodyId:
@@ -5216,6 +5949,7 @@
       startChoiceEl: startOverlay.querySelector("[data-daily-feed-start-choice]"),
       startConfirmEl: startOverlay.querySelector("[data-daily-feed-start-confirm]"),
       startSelectedIconEl: startOverlay.querySelector("[data-daily-feed-selected-icon]"),
+      startServeAvatarEl: startOverlay.querySelector("[data-daily-feed-next-serve-avatar]"),
       startConfirmButton: startOverlay.querySelector("[data-daily-feed-confirm-button]"),
       startControlMessageEl: startOverlay.querySelector("[data-daily-feed-control-message]"),
       controlPhase: "choose",
@@ -5444,6 +6178,16 @@
       };
 
     runtime.startOverlayHandler = (event) => {
+      // The ordinary intro uses delegated clicks and preventDefault to
+      // avoid accidental gestures. That same preventDefault canceled the
+      // iPhone's checkbox/label default toggle in the experimental preview.
+      // Let ONLY the native-choice label and its input retain their normal
+      // click default; they never start a round or choose a control.
+      if (runtime.nativePilotAllowed &&
+          event.target?.closest?.("[data-daily-feed-native-pilot-opt]")) {
+        event.stopPropagation();
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       if (activeRuntime !== runtime || runtime.feedPausedAt != null) return;
@@ -5477,7 +6221,11 @@
           }
           runtime.rafId = scheduleFeedFrame(runtime);
         } else {
-          startRound(runtime);
+          if (runtime.nativePilotAllowed) {
+            void startPreviewRoundWithAudioChoice(runtime);
+          } else {
+            startRound(runtime);
+          }
         }
       } else if (runtime.controlPhase === "serve" &&
                  runtime.mode === FEED_MODES.BOUNCE && runtime.roundStarted) {
@@ -5494,9 +6242,15 @@
       if (shouldClose !== false) stop();
     };
 
-    // Feeding is the first activity to opt into Zoo Escape. The shared
-    // controller supplies UI and a bounded state machine; only Feeding owns
-    // its audio probe, session/score data, and navigation cleanup.
+    // The sound cue is now the shared same-output-owner unlock verification;
+    // no Feeding-mode-specific audio engine or gameplay checkpoint is made.
+    // Native production keeps plain Welcome Back except existing DEV force.
+    runtime.zooCue = window.BibloZooWelcomeBackReturn?.createZooAudioCue?.() || null;
+    runtime.zooCueVerified = false;
+    runtime.zooHoldingForSurprise = false;
+    runtime.zooWasCueFirst = false;
+    runtime.zooCueGeneration = 0;
+    if (runtime.zooCue) runtime.resumeButton?.setAttribute?.("data-no-ui-sound", "");
     if (window.BibloZooZooEscape?.create) {
       runtime.zooEscape = window.BibloZooZooEscape.create({
         overlay: runtime.resumeOverlay,
@@ -5504,28 +6258,119 @@
         petName: runtime.petName,
         reducedMotion: runtime.reducedMotion,
         isTestRun: () => !!runtime.zooDevScenario,
-        recover: () => {
-          // A deliberate pilot scenario substitutes only this bool result.
-          // Normal players still enter the unchanged verified audio path.
-          if (runtime.zooDevScenario) {
-            return getFeedZooTestResult(runtime);
+        // Feeding keeps its verified resume/score checkpoints but never
+        // triggers a recreational surprise, even in DEV Force mode.
+        surpriseEnabled: false,
+        recoveryOnly: true,
+        preselectWelcomeSurprise: false,
+        recover: info => {
+          // Pilot scenarios preserve their deliberately simulated outcomes;
+          // they do not consume a real sound cue or commit production odds.
+          if (runtime.zooDevScenario) return getFeedZooTestResult(runtime);
+          if (info?.plannedSurprise && runtime.zooCue) {
+            const token = ++runtime.zooCueGeneration;
+            runtime.zooCueVerified = false;
+            runtime.zooCue.stop();
+            // A selected surprise must NOT call the original Feeding audio
+            // resume here. Keep native bank, mode physics, deadlines and
+            // daily reward/checkpoint exactly frozen until LOCK GATE.
+            return runtime.zooCue.playFromGesture({
+              assetRoot: "",
+              isMuted: () => window.BibloZooApp?.isMuted?.() === true,
+              isCurrent: () => activeRuntime === runtime && runtime.running &&
+                !runtime.finished && runtime.feedPausedAt != null &&
+                !runtime.feedPageHidden && !document.hidden &&
+                token === runtime.zooCueGeneration
+            }).then(ok => {
+              if (activeRuntime !== runtime || document.hidden ||
+                  token !== runtime.zooCueGeneration) return false;
+              runtime.zooCueVerified = ok === true;
+              return ok === true;
+            }, () => false);
           }
           return new Promise(resolve => {
-            // Native activation and AudioContext.resume() stay directly
-            // inside the child's click in real (non-test) gameplay.
+            // No selected surprise: unchanged real user gesture invokes
+            // this particular Feeding mode's native/Web clock verification.
             attemptFeedingResumeFromGesture(runtime, resolve);
           });
         },
+        onSurpriseStart: () => {
+          runtime.zooHoldingForSurprise = true;
+          runtime.zooWasCueFirst = runtime.zooCueVerified === true;
+          // Cue-first holds the original round from the FIRST lock; another
+          // onPause could invalidate live Melody/tilt checkpoints or cut cue.
+          // The legacy pilot simulation still uses its original re-pause.
+          if (!runtime.zooCueVerified && activeRuntime === runtime &&
+              runtime.feedPausedAt == null)
+            pauseFeedingGame(runtime, performance.now(), true);
+        },
         onRecovered: () => {
-          // The next *real* interruption must always use verified audio,
-          // never retain this manually chosen developer scenario.
+          // The final LOCK GATE / pen click is a NEW real gesture.
           runtime.zooDevScenario = null;
-          if (activeRuntime === runtime && runtime.feedPausedAt == null) {
+          if (activeRuntime !== runtime) return;
+          if (runtime.zooCueVerified && !runtime.zooHoldingForSurprise) {
+            // Cue-only success but provisional surprise commit failed.
+            // Original game remains stopped: require a fresh real tap.
+            runtime.zooCue.stop();
+            runtime.zooCueVerified = false;
+            ++runtime.zooCueGeneration;
+            runtime.zooEscape?.start?.();
+            runtime.resumeOverlay.hidden = false;
+            return;
+          }
+          if (runtime.zooCueVerified && runtime.zooHoldingForSurprise) {
+            runtime.zooCue.stop();
+            runtime.zooCueVerified = false;
+            ++runtime.zooCueGeneration;
+            const gateToken = ++runtime.zooCueGeneration;
+            // Do not pretend the old cue verified the Feeding game bank.
+            // Prepare/reclaim the ORIGINAL owner in this real LOCK GATE tap.
+            attemptFeedingResumeFromGesture(runtime, ok => {
+              if (activeRuntime !== runtime || document.hidden ||
+                  runtime.feedPageHidden ||
+                  runtime.zooCueGeneration !== gateToken ||
+                  !runtime.zooHoldingForSurprise) return;
+              runtime.zooHoldingForSurprise = false;
+              runtime.zooWasCueFirst = false;
+              if (ok && runtime.feedPausedAt == null) {
+                runtime.resumeOverlay.hidden = true;
+                runtime.zooSoundClockSample = null;
+              } else {
+                runtime.zooEscape?.start?.();
+                runtime.resumeOverlay.hidden = false;
+              }
+            }, true);
+            return;
+          }
+          // Second lock revokes the cue proof. Never use the older pilot
+          // shortcut to unfreeze a *real* cue-first escape after an OS lock.
+          if (runtime.zooWasCueFirst) {
+            runtime.zooWasCueFirst = false;
+            runtime.zooHoldingForSurprise = false;
+            runtime.zooEscape?.start?.();
+            runtime.resumeOverlay.hidden = false;
+            return;
+          }
+          // Legacy pilot path: original audio was verified at Let's go,
+          // then intentionally re-frozen for the simulated escape.
+          runtime.zooHoldingForSurprise = false;
+          if (runtime.feedPausedAt != null) {
+            runtime.feedAudioRecoveryVerified = true;
+            if (!continueFeedingAfterGesture(runtime, performance.now(), true)) {
+              runtime.zooEscape?.start?.();
+              return;
+            }
+          }
+          if (runtime.feedPausedAt == null) {
             runtime.resumeOverlay.hidden = true;
             runtime.zooSoundClockSample = null;
           }
         },
         onExit: () => {
+          runtime.zooCue?.stop();
+          runtime.zooCueVerified = false;
+          runtime.zooWasCueFirst = false;
+          ++runtime.zooCueGeneration;
           if (activeRuntime !== runtime) return;
           // Exit is never conditioned on earning a daily reward: the host
           // may provide an explicit abort path with no completion credit.
@@ -5550,6 +6395,14 @@
     attachFeedZooTestHarness(runtime);
 
     runtime.resumeButtonHandler = (event) => {
+      // The shared Zoo Escape controller attaches to this same button, but
+      // Native-only intentionally never starts that controller. Its click
+      // handler therefore ignores the tap. Route Native-only Resume directly
+      // to the activity owner; preserve legacy Web/Zoo Escape handling.
+      if (runtime.zooEscape &&
+          (runtime.nativePilotBackend !== "native" ||
+            window.BibloZooZooSurprise?.isDevForceWelcomeEscapeEnabled?.()))
+        return;
       event.preventDefault();
       event.stopPropagation();
       attemptFeedingResumeFromGesture(runtime);
@@ -5561,7 +6414,8 @@
       // The visible Back pill is available throughout all three stages.
       // A Daily Questions reward may decline the normal Back action, so its
       // owner supplies an explicit abort without awarding completion credit.
-      const exit = runtime.zooEscape?.isPaused?.()
+      const exit = runtime.nativePilotBackend === "native" ||
+        runtime.zooEscape?.isPaused?.()
         ? (runtime.onRecoveryExitToZoo || runtime.onBackToZoo)
         : runtime.onBackToZoo;
       const shouldClose = exit?.();
@@ -5598,12 +6452,36 @@
       "click",
       runtime.startOverlayHandler
     );
+    if (runtime.nativePilotAllowed && runtime.nativePilotCheckbox) {
+      runtime.nativePilotChangeHandler = () => {
+        if (activeRuntime !== runtime || runtime.roundStarted ||
+            runtime.finished || runtime.controlPhase !== "instructions") return;
+        if (runtime.nativePilotChoiceStatus) {
+          runtime.nativePilotChoiceStatus.textContent =
+            runtime.nativePilotCheckbox.checked
+              ? "Native ONLY selected. Got It! tests native star/chomp, no Web fallback."
+              : "Web effects selected (default).";
+        }
+        runtime.nativePilotTrace = [];
+        if (runtime.nativePilotPhases && !runtime.nativePilotCheckbox.checked) {
+          runtime.nativePilotPhases.textContent = "Native-only diagnostic: Web comparison selected";
+        }
+        if (runtime.nativePilotCheckbox.checked) {
+          // Separate checkbox gesture precedes Got It!, so this is our
+          // best read-only baseline without consuming Got It's activation.
+          void recordNativePreviewPhase(runtime, "selected-native");
+        }
+      };
+      runtime.nativePilotCheckbox.addEventListener(
+        "change", runtime.nativePilotChangeHandler
+      );
+    }
 
     exitButton.addEventListener("click", runtime.exitHandler);
-    if (!runtime.zooEscape) {
-      // Older builds without the shared controller retain a usable resume.
-      resumeButton.addEventListener("click", runtime.resumeButtonHandler);
-    }
+    // The Native-only tester never calls zooEscape.start(), so its shared
+    // Welcome Back button is inert unless Feeding installs its own listener.
+    // The handler above ignores non-native taps when Zoo Escape owns them.
+    resumeButton.addEventListener("click", runtime.resumeButtonHandler);
     resumeBackButton.addEventListener("click", runtime.resumeBackHandler);
 
     resultBackButton.addEventListener(
@@ -5630,6 +6508,9 @@
             session.rewardCaught
           ) || 0
         );
+      // Preserve the independent seven-snack score when returning to a
+      // completed Melody result; never infer food from music-note catches.
+      runtime.snacksCaught = Math.max(0, Number(session.rewardSnacksCaught) || 0);
 
       showResult(
         runtime,

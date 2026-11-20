@@ -1304,3 +1304,33 @@ body.bz-return-activity-paused #app *,
 body.bz-return-activity-paused .vl-flight-unit {
   animation-play-state: paused !important;
 }
+
+/* N6l: accessible native-only error retry. No dialog during healthy prewarm. */
+.tt-native-audio-failure {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0,0,0,.65);
+}
+.tt-native-audio-card {
+  width: min(100%,360px);
+  padding: 22px;
+  border-radius: 16px;
+  background: white;
+  color: #202020;
+  text-align: center;
+  font: 600 17px/1.4 system-ui,sans-serif;
+}
+.tt-native-audio-card button {
+  margin: 6px;
+  padding: 10px 16px;
+  min-height: 44px;
+  border: none;
+  border-radius: 9px;
+  background: #333;
+  color: white;
+  font: inherit;
+}

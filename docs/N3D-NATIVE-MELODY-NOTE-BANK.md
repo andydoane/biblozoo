@@ -1,0 +1,42 @@
+# N3d — Fixed Native Melody Note Bank (DEV-only Listening Gate)
+
+> [PR #27](https://github.com/andydoane/biblozoo/pull/27) is the **next roadmap N3 increment** against `experiment/native-ios-audio`, following merged [PR #26](https://github.com/andydoane/biblozoo/pull/26) (N3c first-launch reliability). Only the separate `BibloZoo Audio Test` (`com.andydoane.biblozoo.audiotest`) is affected. **This PR does not migrate actual Melody gameplay.** Stable `ios-prep`, installed original BibloZoo, Web/PWA/Android, scores/pet rewards, microphone/recordings and Zoo surprises are out of scope.
+
+## Why this is N3, not N4
+
+The roadmap explicitly places **native Melody tone/voice groundwork** in N3; **N4** owns wider Feeding gameplay integration, including Got It!, same-round Resume/Back, audio failure handling, game clocks and scoring. Current Melody already has its own tune list, note scheduling/score and page lifecycle. It produces a **220 ms Web triangle oscillator** per caught note on browser/PWA/Android. Experimental native-only iOS deliberately blocks Web/HTML sound globally, so actual Melody-mode music is currently **silent**. Replacing `playMelodyTone` without adding Melody-specific native gesture, preflight, interruption and replay gates would risk a false-success game; N3d therefore **only prepares a reusable native note backend**.
+
+**Recent owner evidence (November 7, 2026):** After merged N3c #26, a native Classic test with an app switch began with accepted native `os-accepted`, all star/chomp/peg preloads accepted and native sound scheduled in 0–2ms. Two further **fresh starts with a YouTube video already running in Picture-in-Picture** succeeded in the end: first had `feed-peg | stale` during its initial preflight then a second explicit preparation `not-needed` followed by all three successful preloads; the second PiP start had a single successful `os-accepted` and star/chomp/peg preloads, no snafu. Both PiP reports had **80 retained gameplay events, no >=120ms software dispatch** (roughly 1–3ms), foreground epoch **0** and no pending interruption. The first PiP `stale` means the request became obsolete; its precise cause is **not known**. A previous N3b post-build run had been totally silent once, but later N3c startup reports are positive. These results justify continuing N3 in a staged way **while retaining N3c first-tap diagnostics**. None of those tests physically heard this new Melody bank yet.
+
+## Implementation
+
+- **Swift sound ID:** `feed-melody` is a new explicitly allowlisted generated note backend in `ios/App/App/BibloZooNativeSoundPlugin.swift`. The existing sound IDs `pilot-unlock`, `feed-star`, `feed-chomp`, and `feed-peg` remain unchanged. Never accept a filename, tune, arbitrary frequency, MIDI outside the **fixed 55…83** integer range, or user-controlled asset path. The existing `daily_questions_feed_game.js` melody tune inventory is within this range; the contract validator checks it. A single `midi:64` means **E4**.
+- **PCM preflight:** Only when an actual user taps the **DEV Melody E4 button**, the same native `activateFromGesture({purpose:"dev"})` gate and `preload({soundId:"feed-melody"})` build **29 mono `AVAudioPCMBuffer`s** at 44.1kHz and 220ms per note on the existing serial native worker. Frequency is mathematically determined by `440 × 2^((midi - 69)/12)`, shape is a **triangle wave** with 12ms attack and fading tail, matching the broad character/duration of the browser version. There is **no sequence, song playback, Web Audio context, automatic app-launch activation or background prewarm**. Every new note is already generated before any playback request.
+- **Native bounded voices:** The existing `AVAudioEngine` prestarts exactly **six** Melody `AVAudioPlayerNode` voices without scheduling audible buffers. On one legitimate `play({soundId:"feed-melody",midi:64,volume:0.25})`, the native worker only retrieves one predecoded note buffer, rotates to a prestarted voice, sets volume and invokes `scheduleBuffer(buffer,at:nil,options:[.interrupts])`. No new oscillator/engine start, CPU-intensive synthesis, MP3 decode or audio-session policy change happens on playback. Once the six-voice pool wraps, it may interrupt a still-playing older note; overlap is deliberately bounded. User-copyable report rows identify `backend=avengine-melody`. **Scheduled isn't proof of heard speaker onset.**
+- **Lifecycle/privacy:** The existing serial worker-generation guard and `discardEffectsOnWorker` now clear Melody buffers/voices alongside Classic star/chomp/peg on `stop`, background, interruption, route change or media reset. A new human tap must prewarm again. Existing .soloAmbient category, first-launch N3c explicit activation and preflight history, output-only permissions, 80-row report and no Web/HTML fallback are preserved. No personal or recorded audio, persistence or network tracking.
+- **DEV only:** The existing `verse_games/shared/native-sound-smoke-test.js` panel adds **Melody E4** next to star/chomp. It explicitly asks iOS to activate, preloads the fixed bank and requests **one** test note at volume 0.25. It reports a request rather than claiming sound heard. The button is disabled during preflight, blocked after failed native prep, and stopped on background. **Actual Melody gameplay, its song rotation, score, catch timeline, pauses, auto-completion and Web oscillator remain unchanged.** In the native-only experiment, its not-yet-migrated Web output is still intentionally silent and should not be misrepresented as migrated.
+
+## Owner's Xcode and physical iPhone gate
+
+After owner review and merge, from the dedicated `biblozoo-native-audio` worktree, Fetch/Pull `experiment/native-ios-audio`:
+
+```sh
+node scripts/validate_native_melody_bank_n3d.js
+node scripts/validate_native_sound_smoke_test.js
+node scripts/validate_native_pcm_effects_n3a.js
+node scripts/validate_native_peg_voices_n3b.js
+node scripts/validate_native_first_launch_n3c.js
+npm run build
+node scripts/validate_native_only_ios_output.js
+npx cap sync ios
+npx cap open ios
+```
+
+Run **BibloZoo Audio Test** on an actual iPhone. Node regression and GitHub production build **cannot compile Swift** or establish human hearing.
+
+1. **First fresh launch:** In DEV, tap **Melody E4** once. The status should say the note was requested; listen for **one short, gentle triangle-like pitch** (not a song, not a loop). Does it sound musical and adequately loud relative to the existing **Play star**, **Play chomp**, and Classic peg notes? If a native request fails, read the visible error. If you hear no sound **copy DEV → Copy Audio Timing Report before restarting** and report whether preflight shows `gesture os-accepted`, `preload feed-melody prepared`, and a `feed-melody avengine-melody` event.
+2. **Repetition/background:** Tap Melody E4 several times and ensure it replays cleanly, with no stuck notes or excessive clipping. Switch to a video app/PiP, return and **tap again**; an explicit new gesture should re-prepare sound as required, without auto-sounding on foreground. Try closing the DEV panel; it must stop prepared output. A brief prewarm delay is permitted **before** sound on the DEV button, not after a gameplay collision.
+3. **Classic regression:** Start Native-only Classic through its regular Got It! route, listen for pleasant peg beeps and immediate star/chomp, smooth animation and successful same-round task-switch Resume. Existing N3c **Try Again**/Back after a genuine failed preflight and manually copied activation history must still work. No extra WebKit/HTML sound or UI pop.
+4. **Original Melody unaffected:** The native-only experiment's **Melody game mode is not yet migrated**; it is still intentionally silent, and should retain its timing/score/rewards/Back. Compare original installed BibloZoo Web baseline only if desired. Do not call this a Melody gameplay pass until its own N4 migration PR.
+
+**Pass gate:** The owner hears a clean **single native DEV Melody note**, validates first-tap and post-task-switch playback, no Classic regression or unexpected output, and reports sound quality. On a first-try failure, copy native timing/preflight log *before* restarting. This N3d approval would justify planning the **N4 Melody gameplay integration** and then other Feeding modes. There is no public app promotion or stable `ios-prep` merge in this PR. Independent Zoo Escape/ZOO BREAK surprises remain **N8**.

@@ -160,7 +160,9 @@ function testIntegrationContracts() {
   ok(fs.statSync(file).size>1000,`nontrivial icon ${name}`);
   ok(sw.includes(`./verse_images/daily_questions/${name}`),`offline cache ${name}`);
  }
- ok(/2026_Oct_28_patch73_1_feeding_intro_polish/.test(sw),"versioned SW cache refreshed");
+ ok(/const CACHE_VERSION = "[^"\n]+";/.test(sw) &&
+   !sw.includes('"2026_Nov_14_patch73_melody_seven_snacks_badges"'),
+   "versioned SW cache advances beyond the previous Melody assets");
  ok(css.includes(".daily-feed-control-options"),"visible two-button grid styled");
  ok(css.includes(".daily-feed-control-option:focus-visible"),"keyboard controls visibly focusable");
  ok(css.includes(".daily-feed-start-confirm[hidden]"),"hidden phase actually hidden");

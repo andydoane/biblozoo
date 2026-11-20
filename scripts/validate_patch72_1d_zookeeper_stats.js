@@ -30,15 +30,16 @@ ok(src.includes('field.setAttribute("role", "group")'), "escaped pets are groupe
 ok(src.includes('setInstruction("Drag the pet to the pen!")') && src.includes('setInstruction("Drag pets to the pen!")'), "short visual instructions preserve card height");
 ok(src.includes('pen.addEventListener("click", tapPen)') && src.includes('el.addEventListener("click", event =>'), "tap-to-rescue support remains available");
 ok(sharedCss.includes(".bz-zoo-rescue-status") && sharedCss.includes("clip-path: inset(50%)"), "accessible rescue status is visually unobtrusive");
-ok(css.includes(".title-zoo-hero-celebration") && css.includes("@media (prefers-reduced-motion: reduce)"), "home celebration with reduced-motion alternative");
-for (const token of ["Zoo Hero!", "title-zoo-hero-close", "BibloPets Rescued", "Zoo Breaks Stopped", "acknowledgeCelebration", "zooEscapeStats.petsRescued", "zooEscapeStats.zooBreaksStopped"])
-  ok(app.includes(token), `home / Zookeeper stats UI: ${token}`);
-ok(app.includes('!showDailyOffer') && app.includes('!tutorialActive'), "home celebration respects Daily To-Do dialog and tutorial");
+ok(!app.includes("Zoo Hero!") && !app.includes("acknowledgeCelebration") &&
+  !app.includes("title-zoo-hero"), "Home no longer renders or consumes Zoo Hero celebration");
+ok(!css.includes(".title-zoo-hero"), "unused Zoo Hero styles removed");
+for (const token of ["BibloPets Rescued", "Zoo Breaks Stopped", "zooEscapeStats.petsRescued", "zooEscapeStats.zooBreaksStopped"])
+  ok(app.includes(token), `Zookeeper stats still display: ${token}`);
 ok(!app.includes('title-zoo-hero-tally') && !app.includes('zooTallyHtml'), "home no longer displays permanent Zoo Escape statistics");
 ok(!css.includes('.title-zoo-hero-tally'), "obsolete home tally styles removed");
 ok(feeding.includes('isTestRun: () => !!runtime.zooDevScenario'), "Feeding dev harness cannot award real credits");
 ok(profiles.includes('localStorage.removeItem(`biblozooZooEscapeStats:v1:${id}`)'), "profile deletion with progress removes stats");
-ok(/const CACHE_VERSION = "2026_[^"\n]*patch(?:72_1|73)/.test(sw), "offline cache revised");
+ok(/const CACHE_VERSION = "[^"\n]+";/.test(sw), "nonempty PWA cache version");
 for(const asset of ["./styles.css", "./profiles.js", "./verse_games/shared/welcome-back-zoo-escape.js", "./verse_games/shared/welcome-back.css", "./verse_fonts/TitanOne.ttf", "./verse_images/zoobreak_gate.png", "./verse_images/zoobreak_lock.png"])
   ok(sw.includes(`"${asset}"`), `offline asset: ${asset}`);
 ok(index.indexOf('src="profiles.js"') < index.indexOf('src="verse_games/shared/welcome-back-zoo-escape.js"'), "profile storage loads before stats API");

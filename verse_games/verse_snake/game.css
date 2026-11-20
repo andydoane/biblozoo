@@ -1039,3 +1039,50 @@ body.bz-return-activity-paused *::before,
 body.bz-return-activity-paused *::after {
   animation-play-state: paused !important;
 }
+
+
+/* N6b: native audio readiness is a genuine per-gesture gate on iOS Audio
+   Test only. Never hide unavailable effects or continue a silent round. */
+.vsl-native-audio-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: max(22px, env(safe-area-inset-top)) 20px
+    max(22px, env(safe-area-inset-bottom));
+  background: rgba(14, 18, 32, 0.84);
+}
+.vsl-native-audio-gate[hidden] { display: none; }
+.vsl-native-audio-card {
+  box-sizing: border-box;
+  width: min(92vw, 410px);
+  border-radius: 24px;
+  padding: 26px 22px;
+  background: #fefdf8;
+  color: #1f2937;
+  text-align: center;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, .28);
+}
+.vsl-native-audio-card h2 { margin: 0 0 12px; font-size: 1.45rem; }
+.vsl-native-audio-card p { margin: 0 0 20px; line-height: 1.5; }
+.vsl-native-audio-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vsl-native-audio-actions button {
+  min-height: 48px;
+  border: 0;
+  border-radius: 16px;
+  background: #2d6a55;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vsl-native-audio-actions button:last-child {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+.vsl-native-audio-actions button:disabled { opacity: .5; }

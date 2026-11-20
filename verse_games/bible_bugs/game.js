@@ -271,6 +271,119 @@
     uiSoundFlip: false
   };
 
+  // N6c: dedicated native-only Bible Bugs output in separate iOS Audio Test.
+  // Web/PWA/Android retain the exact existing Web Audio game below.
+  const nativeBugsAudio = window.BibloZooNativeBibleBugsAudio?.isAvailable?.()
+    ? window.BibloZooNativeBibleBugsAudio : null;
+  let nativeBugsSession = 0;
+  let nativeBugsPending = false;
+  let nativeBugsRetry = { kind: "round", mode: null };
+  let bugsWelcomeBack = null;
+
+  function hideNativeBugsFailure() {
+    document.getElementById("bbNativeAudioFailure")?.remove();
+  }
+  function cancelNativeBugsPreflight() {
+    if (!nativeBugsAudio || !nativeBugsPending) return;
+    nativeBugsSession++;
+    nativeBugsPending = false;
+    app.removeAttribute("aria-busy");
+    void nativeBugsAudio.stop(); // stale completion must never start this screen
+  }
+  function showNativeBugsFailure(message) {
+    if (!nativeBugsAudio) return;
+    let gate = document.getElementById("bbNativeAudioFailure");
+    if (!gate) {
+      gate = document.createElement("div");
+      gate.id = "bbNativeAudioFailure";
+      gate.className = "bb-native-audio-failure";
+      gate.innerHTML = `
+        <section class="bb-native-audio-card" role="dialog" aria-modal="true"
+          aria-label="Bible Bugs native audio problem">
+          <h2>Bible Bugs</h2>
+          <p role="status" data-bugs-audio-status></p>
+          <button type="button" data-bugs-audio-retry>Try Again</button>
+          <button type="button" data-bugs-audio-exit>Back</button>
+        </section>`;
+      document.body.appendChild(gate);
+      gate.querySelector("[data-bugs-audio-retry]").onclick = () =>
+        primeBibleBugsFromGesture(nativeBugsRetry.kind, nativeBugsRetry.mode);
+      gate.querySelector("[data-bugs-audio-exit]").onclick = () => {
+        cancelNativeBugsPreflight();
+        hideNativeBugsFailure();
+        void nativeBugsAudio.stop();
+        if (state.running) {
+          stopLoop();
+          window.VerseGameBridge.exitGame();
+        } else renderModeSelect();
+      };
+    }
+    gate.querySelector("[data-bugs-audio-status]").textContent = message;
+  }
+  function primeBibleBugsFromGesture(kind = "round", mode = null, uiPopKey = null) {
+    if (nativeBugsPending) return;
+    if (!nativeBugsAudio || muted) {
+      hideNativeBugsFailure();
+      if (kind === "round") startGame(mode);
+      else setPaused(false, "");
+      return;
+    }
+    nativeBugsRetry = { kind, mode };
+    const token = ++nativeBugsSession;
+    nativeBugsPending = true;
+    hideNativeBugsFailure(); // normal success remains quiet (N6b.1 pattern)
+    app.setAttribute("aria-busy", "true");
+    // This invokes Swift activateFromGesture immediately in the REAL tap.
+    // Never start a silent unprepared game or reactivate on foreground.
+    const attempt = nativeBugsAudio.prepareFromGesture(uiPopKey
+      ? { key: uiPopKey, volume: soundVolume("uiTap") } : null);
+    void Promise.resolve(attempt).then(result => {
+      if (token !== nativeBugsSession || document.hidden || returnPaused) return;
+      nativeBugsPending = false;
+      app.removeAttribute("aria-busy");
+      if (result?.ready === true) {
+        if (kind === "round") startGame(mode);
+        else setPaused(false, "");
+      } else {
+        showNativeBugsFailure("Native sounds aren't ready. Tap Try Again.");
+      }
+    }).catch(() => {
+      if (token !== nativeBugsSession || document.hidden || returnPaused) return;
+      nativeBugsPending = false;
+      app.removeAttribute("aria-busy");
+      showNativeBugsFailure("Native sounds aren't ready. Tap Try Again.");
+    });
+  }
+  if (nativeBugsAudio) {
+    nativeBugsAudio.configure({
+      onAppInactive: () => {
+        if (nativeBugsPending) cancelNativeBugsPreflight();
+        // UIKit inactive may be a held App Switcher WebKit thumbnail.
+        if (!state.running || state.done) return;
+        if (!bugsWelcomeBack?.pauseFromNativeInactive?.())
+          pauseForTaskSwitch();
+      },
+      onAppActive: () => {
+        // Show plain Welcome Back; NEVER activate output on foreground.
+        bugsWelcomeBack?.showAfterNativeActive?.();
+      },
+      onPlaybackFailure: () => {
+        if (muted || document.hidden || returnPaused || state.done ||
+            !state.running || state.paused) return;
+        setPaused(true, "native-audio-error");
+        nativeBugsRetry = { kind: "resume", mode: null };
+        showNativeBugsFailure("A native sound stopped. Tap Try Again.");
+      }
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        cancelNativeBugsPreflight();
+      }
+      // A return does not create a failure popup or invoke audio. If a
+      // real failure gate was already open, the child can tap Try Again.
+    });
+  }
+
   preloadBibleBugsImages();
   renderIntro();
 
@@ -297,6 +410,10 @@
   }
 
   function unlockAudio() {
+    // Native-only iOS is never allowed to prime Web Audio or silent HTML.
+    // A gameplay collision cannot activate a native session: preparation
+    // occurs exclusively during Choose Difficulty/Close/Retry/Let's go tap.
+    if (nativeBugsAudio) return Promise.resolve(nativeBugsAudio.isReady());
     // A real gesture takes priority over an automatic foreground refresh.
     if (audioForegroundRecoveryInFlight) {
       audioForegroundRecoveryGeneration += 1;
@@ -530,6 +647,15 @@
   }
 
   async function playGameSound(key, volumeKey = key) {
+    if (nativeBugsAudio) {
+      if (muted || returnPaused || document.hidden) return;
+      const isUi = key === "uiTap1" || key === "uiTap2";
+      if (!isUi && (!state.running || state.paused)) return;
+      // The original random pop choice and relative volume remain unchanged;
+      // fixed IDs map to Swift-allowlisted local PCM resources. No fallback.
+      nativeBugsAudio.play(key, soundVolume(volumeKey));
+      return;
+    }
     if (muted) return;
 
     const ctx = getAudioContext();
@@ -559,9 +685,20 @@
     }
   }
 
-  function playUiTapSound() {
+  function nextUiTapKey() {
     const key = state.uiSoundFlip ? "uiTap2" : "uiTap1";
     state.uiSoundFlip = !state.uiSoundFlip;
+    return key;
+  }
+  function playUiTapSound() {
+    const key = nextUiTapKey();
+    if (nativeBugsAudio) {
+      // Pre-game title/back taps need an independent *UI-only* native
+      // preflight. Neither Web Audio nor a started game bank is required.
+      if (!muted && !returnPaused && !document.hidden)
+        nativeBugsAudio.tapUiFromGesture(key, soundVolume("uiTap"));
+      return;
+    }
     playGameSound(key, "uiTap");
   }
 
@@ -611,6 +748,7 @@
 
 
   function renderIntro() {
+    cancelNativeBugsPreflight();
     stopLoop();
 
     shell.renderTitleScreen({
@@ -625,6 +763,10 @@
       backLabel: "Back to Practice Games",
       onBack: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) {
+          cancelNativeBugsPreflight();
+          void nativeBugsAudio.stop();
+        }
         window.VerseGameBridge.exitGame();
       },
       onStart: () => {
@@ -635,6 +777,7 @@
   }
 
   function renderModeSelect() {
+    cancelNativeBugsPreflight();
     stopLoop();
 
     shell.renderModeSelect({
@@ -647,11 +790,25 @@
       backLabel: `Back to ${GAME_TITLE} title`,
       onBack: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) {
+          // A pre-game Back must not immediately discard the UI pop it
+          // just scheduled. Only a pending game bank needs cancellation.
+          if (nativeBugsPending) cancelNativeBugsPreflight();
+          else if (state.running) void nativeBugsAudio.stop();
+        }
         renderIntro();
       },
       onSelect: (mode) => {
-        playUiTapAndUnlock();
-        startGame(mode);
+        if (nativeBugsAudio && nativeBugsPending) return;
+        if (nativeBugsAudio) {
+          // One real tap: activate the game bank and schedule its UI pop
+          // after the two UI buffers prepare, before full game PCM decode.
+          primeBibleBugsFromGesture("round", mode,
+            muted ? null : nextUiTapKey());
+        } else {
+          playUiTapAndUnlock();
+          startGame(mode);
+        }
       }
     });
   }
@@ -797,6 +954,7 @@
       onMuteToggle: () => {
         playUiTapAndUnlock();
         muted = !muted;
+        if (nativeBugsAudio && muted) void nativeBugsAudio.stop();
         return muted;
       },
       onHowToPlay: () => {
@@ -805,22 +963,32 @@
       },
       onModeSelect: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         setPaused(false, "");
         stopLoop();
         renderModeSelect();
       },
       onExit: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) {
+          cancelNativeBugsPreflight();
+          void nativeBugsAudio.stop();
+        }
         stopLoop();
         window.VerseGameBridge.exitGame();
       },
       onOpen: () => {
         playUiTapAndUnlock();
         setPaused(true, "menu");
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
       },
       onClose: () => {
-        playUiTapAndUnlock();
-        setPaused(false, "");
+        if (nativeBugsAudio && !muted)
+          primeBibleBugsFromGesture("resume", null, nextUiTapKey());
+        else {
+          playUiTapAndUnlock();
+          setPaused(false, "");
+        }
       },
       onBackFromHelp: () => {
         playUiTapAndUnlock();
@@ -840,7 +1008,9 @@
     function closeMenu() {
       overlay.classList.remove("is-open");
       overlay.setAttribute("aria-hidden", "true");
-      setPaused(false, "");
+      // Touch fallback MUST honor exactly the same native readiness gate.
+      if (nativeBugsAudio && !muted) primeBibleBugsFromGesture("resume");
+      else setPaused(false, "");
     }
 
     function wireTouchButton(id, action) {
@@ -862,12 +1032,14 @@
     wireTouchButton(`${GAME_MENU_ID}ModeSelectBtn`, () => {
       overlay.classList.remove("is-open");
       overlay.setAttribute("aria-hidden", "true");
+      if (nativeBugsAudio) void nativeBugsAudio.stop();
       setPaused(false, "");
       stopLoop();
       renderModeSelect();
     });
 
     wireTouchButton(`${GAME_MENU_ID}ExitBtn`, () => {
+      if (nativeBugsAudio) void nativeBugsAudio.stop();
       stopLoop();
       window.VerseGameBridge.exitGame();
     });
@@ -878,6 +1050,7 @@
 
     wireTouchButton(`${GAME_MENU_ID}MuteBtn`, () => {
       muted = !muted;
+      if (nativeBugsAudio && muted) void nativeBugsAudio.stop();
 
       const muteButton = document.getElementById(`${GAME_MENU_ID}MuteBtn`);
       if (muteButton) {
@@ -907,7 +1080,8 @@
 
         setPaused(true, "menu");
       } else {
-        setPaused(false, "");
+        if (nativeBugsAudio && !muted) primeBibleBugsFromGesture("resume");
+        else setPaused(false, "");
       }
     }
 
@@ -2330,14 +2504,17 @@
       backLabel: "Back to Practice Games",
       onPlayAgain: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         renderModeSelect();
       },
       onMoreGames: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         window.VerseGameBridge.exitGame();
       },
       onChangeVerse: () => {
         playUiTapAndUnlock();
+        if (nativeBugsAudio) void nativeBugsAudio.stop();
         window.VerseGameBridge.returnToVersePicker();
       }
     });
@@ -3077,6 +3254,10 @@
 
   function pauseForTaskSwitch() {
     returnSession += 1;
+    if (nativeBugsAudio) {
+      cancelNativeBugsPreflight();
+      void nativeBugsAudio.stop();
+    }
     if (returnPaused) return;
     returnPaused = true;
     returnRecoveryFailures = 0;
@@ -3089,19 +3270,28 @@
   function continueFromWelcomeBack() {
     if (!returnPaused || document.hidden) return false;
     const session = returnSession;
-    if (returnRecoveryFailures > 0 && returnContextReplacements < 1) {
+    if (!nativeBugsAudio &&
+        returnRecoveryFailures > 0 && returnContextReplacements < 1) {
       returnContextReplacements++;
       audioForegroundFreshContextOnGesture = true;
       audioUnlocked = false;
     }
-    // Execute the gesture-owned unlock before yielding to any promise.
-    const restore = window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
-      unlock: () => { audioUnlocked = false; return unlockAudio(); },
-      getContext: () => audioCtx,
-      isCurrent: () => returnPaused && session === returnSession && !document.hidden,
-      muted
-    });
+    // Native gesture calls Swift activation NOW, inside the actual
+    // Welcome Back Let's go! tap. No AudioContext/replacement in iOS.
+    const restore = nativeBugsAudio
+      ? (muted ? Promise.resolve(true) :
+        nativeBugsAudio.prepareFromGesture().then(result => (window.BibloZooWelcomeBackReturn.nativeAudioResumeResult?.(result) ??
+              (result?.ready === true))))
+      : window.BibloZooWelcomeBackReturn.resumeAudioOnGesture({
+          unlock: () => { audioUnlocked = false; return unlockAudio(); },
+          getContext: () => audioCtx,
+          isCurrent: () => returnPaused && session === returnSession && !document.hidden,
+          muted
+        });
     return Promise.resolve(restore).then(ok => {
+      // YouTube PiP owns .soloAmbient output while it plays. Defer without
+      // advancing game clocks or consuming a Welcome Back retry attempt.
+      if (ok?.deferred === true) return ok;
       if (!ok || document.hidden || session !== returnSession) {
         returnRecoveryFailures++;
         return false;
@@ -3116,13 +3306,24 @@
     });
   }
 
-  window.BibloZooWelcomeBackReturn?.attach?.({
+  bugsWelcomeBack = window.BibloZooWelcomeBackReturn?.attach?.({
+    // Web/Android retain their original Zoo Escape flow by default.
+    // Native selected surprises first verify the pet cue; game PCM stays frozen until LOCK GATE.
+    useZooEscape: true,
+    // Shared cue-first surprise (original game recovery waits for LOCK GATE).
+    // Native and Web both allow random surprises; original audio starts at LOCK GATE.
+    preselectWelcomeSurprise: true,
+    suppressUiSound: !!nativeBugsAudio,
     getSoundContext: () => audioCtx,
     isSoundMuted: () => muted,
     shouldPrompt: () => state.running && !state.done,
     onPause: pauseForTaskSwitch,
     onContinue: continueFromWelcomeBack,
-    onExit: () => { returnSession += 1; window.VerseGameBridge.exitGame(); },
+    onExit: () => {
+      returnSession += 1;
+      if (nativeBugsAudio) void nativeBugsAudio.stop();
+      window.VerseGameBridge.exitGame();
+    },
     profileId: window.VerseGameBridge.getLaunchParams().profileId,
     pictureBase: "../../"
   });

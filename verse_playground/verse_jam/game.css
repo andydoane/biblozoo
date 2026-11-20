@@ -199,9 +199,11 @@ body {
   box-shadow: 0 14px 26px rgba(0, 0, 0, .26), inset 0 -6px 0 rgba(0, 0, 0, .16);
   cursor: pointer;
   touch-action: manipulation;
+  transition: transform 75ms ease-out, box-shadow 75ms ease-out;
 }
 
-.versejam-headphones-button:active {
+.versejam-headphones-button:active,
+.versejam-headphones-button.is-pressed {
   transform: translateY(2px) scale(.98);
   box-shadow: 0 9px 18px rgba(0, 0, 0, .24), inset 0 -4px 0 rgba(0, 0, 0, .16);
 }
