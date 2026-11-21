@@ -1,6 +1,24 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — stable `ios-prep` post-promotion verification (2026-11-19 EST / 2026-11-20 UTC)
+## CURRENT — WHEEL-01 muted Wheel of Bible Game Menu on iPad (2026-11-21)
+
+**Owner reproduction / bug:** In native iPad Wheel of Bible, opening Game Menu freezes a running raining Bible Bux animation correctly. Muting from the menu and closing it can leave the game clock/animation permanently paused; the menu button then rejects reopening even though task-switching still shows a responsive Welcome Back. Report reproduced; no Xcode JavaScript stack trace was captured.
+
+**Code explanation / proposed correction:** The Wheel menu's `onOpen` sets `nativeWheelMenuOpen=true` before `pauseWheelForReturn()`. In the muted `primeWheelNativeFromGesture("resume")` path, the old `!nativeWheelMenuOpen` guard suppresses both unlock and `resumeWheelAfterReturn()`, so `welcomePaused` remains true and the next menu tap is ignored. The unmuted path already clears the lock on successful preflight. New `fix/ipad-wheel-menu-mute-resume` makes muted Close first clear `nativeWheelMenuOpen` and then restore the original animation and timer ownership without sound activation. No change to native plugins, AVAudioSession or gameplay payout.
+
+**Targeted automated check:** `node scripts/validate_wheel_menu_mute_resume.js` (also in `ios-prep-validation.yml`): loads the actual production Wheel menu/prime/pause/resume function bodies under a fake DOM/clock and checks muted Close resumes timers and animations, no native session activation while muted, next menu opens, and unmuting then closing preserves native preflight/reentry. **Test and final PR-head CI result not yet recorded at authoring; do not label PASS before actual execution.** GitHub Node/Web/Swift grammar CI never replaces Apple's Xcode build or on-device animation observation.
+
+**Focused owner iPad test AFTER owner-reviewed merge and explicit device build:**
+1. In Wheel of Bible, reach the **raining Bible Bux** moment. Open Game Menu: animation/time should pause. Tap Mute, Close: rain/timers should resume *without sound*. Immediately reopen Game Menu; button must respond.
+2. While the menu is open, tap Unmute and Close: game resumes and intended audio works after native preflight. Repeat Mute → Close and reopen several times (including toggling twice inside one menu); no locked button, frozen payout, duplicate Bible Bux or skipped step.
+3. Repeat normal menu open/close **without** toggling mute during spinning, verse/prize and result transitions. The game must resume; no accidental cash/score changes, duplicate tones or lost input.
+4. While mid-game, hold App Switcher or switch apps and return. Genuine Welcome Back still appears and its real gesture safely resumes (or offers an honest retry when external media owns audio). Menu/Help/Exit remain reachable; do not auto-resume while backgrounded.
+5. Record actual iPad model/iPadOS/audio route and the steps personally tried as **PASS / FAIL / NOT TESTED**. The uploaded Xcode debug trace has normal bridge audio traffic and lifecycle events, but no menu-specific JS exception that would independently prove this fix works.
+
+**Safety:** Test against an existing owner-approved build; never uninstall, import/restore family backups, clear local storage or infer data preservation from CI. Keep 10 original production Zookeepers separate from 11 Audio Test profiles; standalone Zoo rescue/surprise stats remain outside family-v2 exports.
+
+---
+## HISTORICAL — stable `ios-prep` post-promotion verification (2026-11-19 EST / 2026-11-20 UTC)
 
 **GitHub promotion:** [PR #155](https://github.com/andydoane/biblozoo/pull/155) **MERGED** integration → `ios-prep` at `c31d8ee182aaa6d156fd24ca4a2360d1d90bbae7`; [post-merge stable Actions #44664211870](https://github.com/andydoane/biblozoo/actions/runs/44664211870) **PASS**. Prior [PR head Actions #44626934792](https://github.com/andydoane/biblozoo/actions/runs/44626934792) and integration [post-closeout Actions #44626315053](https://github.com/andydoane/biblozoo/actions/runs/44626315053) **PASS**. GitHub workflow validates Node/production web and Swift *source parsing*, not a native SDK Archive. Source integration branch deleted remotely after the owner merge.
 
