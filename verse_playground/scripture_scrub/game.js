@@ -1503,8 +1503,8 @@
 
   function helpHtml() {
     return `
-      <p><strong>Reveal the verse!</strong></p>
-      <p>Scrub, wipe, rake, peel, mow, and dig to clean up the verse!</p>
+      <p>Use your finger to uncover the verse!</p>
+      <p>Swipe, tap, or drag to clear away what is hiding the words.</p>
     `;
   }
 

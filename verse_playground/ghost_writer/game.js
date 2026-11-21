@@ -1427,8 +1427,8 @@
   function helpHtml() {
     return `
       <ul class="ghost-help-list">
-        <li>Write each letter using your finger.</li>
-        <li>When finished, watch the ghost write the verse in your own handwriting.</li>
+        <li>Draw each letter with your finger.</li>
+        <li>Then watch the ghost write the verse using your letters!</li>
       </ul>
     `;
   }
