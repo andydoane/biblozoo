@@ -622,10 +622,8 @@
 
   function helpHtml(){
     return `
-      <p>Guide the snake by pointing where you want it to slither.</p>
-      <p>Follow the arrow to the words and eat the correct one.</p>
-      <p>Double tap for a speed boost. Eat fruit to change color. Eat orbs to grow your tail. The longer your tail gets, the faster your speed boost recharges.</p>
-    `;
+    Point where you want the snake to go.<br><br>Follow the arrow and eat the next word of the verse.<br><br>Double-tap to go faster! Fruit changes your color, and glowing orbs grow your tail.
+  `;
   }
 
   function renderHelpOverlay(){

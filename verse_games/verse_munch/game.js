@@ -911,25 +911,19 @@ const FACE_MAP = {
 
 function introHelpHtml(){
   return `
-    Words will scroll by along the bottom.<br><br>
-    Tap a word to feed it to Versey Monster.<br><br>
-    Feed him the next correct word of the verse and he'll be happy. Any other words will make him mad!
+    Words move across the bottom of the screen.<br><br>Tap the next word of the verse to feed Versey Monster.<br><br>Right words make him happy. Wrong words make him grumpy!
   `;
 }
 
 function modeHelpHtml(){
   return `
-    Easy: slower animation timing and gentler pace.<br><br>
-    Medium: balanced default timing.<br><br>
-    Hard: snappier timing and less dwell before the next choice.
+    Easy: The words move slowly.<br><br>Medium: The words move a little faster.<br><br>Hard: The words move fast!
   `;
 }
 
 function gameHelpHtml(){
   return `
-    Words will scroll by along the bottom.<br><br>
-    Tap a word to feed it to Versey Monster.<br><br>
-    Feed him the next correct word of the verse and he'll be happy. Any other words will make him mad!
+    Words move across the bottom of the screen.<br><br>Tap the next word of the verse to feed Versey Monster.<br><br>Right words make him happy. Wrong words make him grumpy!
   `;
 }
 

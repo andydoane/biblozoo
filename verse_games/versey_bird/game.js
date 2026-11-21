@@ -1952,27 +1952,20 @@
 
   function introHelpHtml(){
     return `
-      Tap to flap.<br><br>
-      Collect the next correct word. Avoid wrong words, bees, and boulders.<br><br>
-      When the verse is finished, see how long you can fly through the pipes.
-    `;
+    Tap to flap your wings!<br><br>Fly into the cloud with the next word of the verse.<br><br>Dodge bees, boulders, and wrong words. After the verse, fly through the pipes!
+  `;
   }
 
   function modeHelpHtml(){
     return `
-      Easy: gentler flying and easier decoys.<br><br>
-      Medium: balanced flying with trickier decoys.<br><br>
-      Hard: faster flying with the toughest decoys.
-    `;
+    Easy: Fly slowly with easier word choices.<br><br>Medium: Fly a little faster.<br><br>Hard: Fly fast and watch out for tricky words!
+  `;
   }
 
   function gameHelpHtml(){
     return `
-      Tap or click to flap.<br><br>
-      Collect the next correct word cloud. Avoid decoy clouds, bees, and boulders.<br><br>
-      Missing a correct word resets your streak in Medium and Hard only.<br><br>
-      After the verse is built, fly through as many pipes as you can.
-    `;
+    Tap to flap your wings!<br><br>Fly into the cloud with the next word of the verse.<br><br>Dodge bees, boulders, and wrong words. After the verse, fly through the pipes!
+  `;
   }
 
   function renderIntro(){
