@@ -2510,7 +2510,7 @@
 
   function helpHtml(){
     return `
-    Look at the word in the yellow box.<br><br>Tap the mixed-up magnet letters to spell that word!<br><br>In the bonus round, find the hidden letters before the computer does.
+    Look at the word in the yellow box.<br><br>Tap the mixed-up magnet letters to spell it! Keep spelling words to finish the verse.<br><br>In the bonus round, find the hidden letters before the computer does.
   `;
   }
 
