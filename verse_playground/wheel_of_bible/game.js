@@ -174,7 +174,13 @@
     clearNativeWheelFailure();
     if(muted){
       if(kind==="start")void beginRun();
-      else if(kind==="resume" && !nativeWheelMenuOpen)resumeWheelAfterReturn();
+      else if(kind==="resume"){
+        // A muted Menu Close needs no iOS audio preflight, but it must
+        // release the menu lock before the wheel/prize clock can thaw.
+        // Otherwise the hidden menu remains "open" and rejects future taps.
+        nativeWheelMenuOpen=false;
+        resumeWheelAfterReturn();
+      }
       return;
     }
     const token=++nativeWheelGeneration;
