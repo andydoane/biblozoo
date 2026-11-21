@@ -1165,7 +1165,7 @@
 
   function helpHtml() {
     return `
-    Tap the next word to launch it into the verse!<br><br>Then help your rocket reach the moon.<br><br>Tilt your phone or tap the arrows to dodge asteroids!
+    Tap the next word to launch it into the verse!<br><br>Then help your rocket reach the moon.<br><br>Tilt your phone or tablet, or tap the arrows to dodge asteroids!
   `;
   }
 

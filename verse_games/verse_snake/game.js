@@ -622,7 +622,7 @@
 
   function helpHtml(){
     return `
-    Point where you want the snake to go.<br><br>Follow the arrow and eat the next word of the verse.<br><br>Double-tap to go faster! Fruit changes your color, and glowing orbs grow your tail.
+    Point where you want the snake to go.<br><br>Follow the arrow and eat the next word of the verse.<br><br>Double-tap to go faster! Fruit changes your color, and glowing dots grow your tail.
   `;
   }
 
