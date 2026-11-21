@@ -901,9 +901,9 @@
   }
 
   function helpHtml() {
-    return `Tap a color button to shoot the alien of that color.<br><br>
-      Shoot the next correct word of the verse until you finish it.<br><br>
-      Then see how many aliens you can shoot down in the bonus round.`;
+    return `
+    Tap a color button to zap the alien of that color.<br><br>Zap the alien with the next word of the verse.<br><br>In the bonus round, zap as many aliens as you can!
+  `;
   }
 
   function wireCommonNav() {

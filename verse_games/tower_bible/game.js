@@ -827,9 +827,9 @@
   }
 
   function helpHtml() {
-    return `Tap the correct brick when it reaches the center arrows.<br><br>
-      The closer you tap to the center, the straighter your tower will build.<br><br>
-      Keep your tower from leaning too far left or right.`;
+    return `
+    Tap the brick with the next word when it reaches the middle arrows.<br><br>Tap close to the middle to build a straight tower.<br><br>Don't let it tip over!
+  `;
   }
 
   function wireCommonNav() {

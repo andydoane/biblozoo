@@ -603,8 +603,9 @@
   }
 
   function helpHtml() {
-    return `Tap to slice the food of each correct word.<br><br>
-      When the verse is finished, slice as much food as you can during the bonus round.`;
+    return `
+    Tap the flying food with the next word of the verse.<br><br>Keep going until the verse is done!<br><br>Then tap as much food as you can in the bonus round.
+  `;
   }
 
   function wireCommonNav() {
