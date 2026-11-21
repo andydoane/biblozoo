@@ -1347,9 +1347,9 @@
   }
 
   function helpHtml() {
-    return `Add the next word to the verse by tapping its car.<br><br>
-Continue until the verse is finished.<br><br>
-In the bonus round, tap as many of the target vehicle as you can.`;
+    return `
+    Tap the car with the next word of the verse.<br><br>Keep going until the verse is done!<br><br>In the bonus round, tap cars that match the picture.
+  `;
   }
 
   function wireCommonNav() {

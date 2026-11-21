@@ -4265,9 +4265,7 @@
 
   function helpHtml() {
     return `
-      Listen to the rhythm patter, then tap the verse words to match the beat.<br><br>
-      The better you match the rhythm, the more Groovy points you earn.<br><br>
-      Each time through the verse gets faster.
+      Listen to the beat, then tap the verse words in time with it!<br><br>Stay on the beat to earn Groovy points.<br><br>Each round gets a little faster.
     `;
   }
 

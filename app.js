@@ -15102,9 +15102,6 @@ function screenProfileWelcome(idx) {
         onerror="this.style.display='none'"
       >
 
-      <div class="profile-welcome-version">
-        Version ${escapeHtml(APP_VERSION)}
-      </div>
     </div>
   `;
 
@@ -15757,7 +15754,6 @@ function screenIntro(idx) {
     <div class="presented">Presented by</div>
     <div class="site">eatyourbible.com</div>
     <div class="hint">Tap anywhere to start.</div>
-    <div class="hint">Version 1.15a</div>
   `;
 
   let introStarted = false;

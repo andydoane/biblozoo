@@ -940,9 +940,9 @@
   }
 
   function helpHtml() {
-    return `Eat bugs to add words to the verse.<br><br>
-      Tap the bug with the correct words until you finish the verse.<br><br>
-      During the bonus round, eat as many bugs as you can. Watch out for stink bugs!`;
+    return `
+    Tap the bug with the next word of the verse to feed the frog.<br><br>Keep going until the verse is finished!<br><br>In the bonus round, gobble up bugs, but watch out for stink bugs!
+  `;
   }
 
   function wireCommonNav() {

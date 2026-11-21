@@ -1331,10 +1331,10 @@
   function helpHtml() {
     return `
       <div class="wob-help-copy">
-        <p>Spin the wheel, then pick a letter.</p>
-        <p>Every matching letter tile on the gameboard earns you Bible Bux.</p>
-        <p>Tap the wiggling tiles to solve each Word Challenge to earn even more.</p>
-        <p>In the final Round, fill in as many missing letters as you can.</p>
+        <p>Spin the wheel and pick a letter.</p>
+        <p>Find a matching letter on the board to earn Bible Bux!</p>
+        <p>Tap the wiggling tiles to solve word puzzles.</p>
+        <p>In the last round, fill in as many missing letters of the verse as you can.</p>
       </div>
     `;
   }
