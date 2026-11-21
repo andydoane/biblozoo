@@ -1334,7 +1334,7 @@
         <p>Spin the wheel and pick a letter.</p>
         <p>Find a matching letter on the board to earn Bible Bux!</p>
         <p>Tap the wiggling tiles to solve word puzzles.</p>
-        <p>In the last round, fill in as many missing letters as you can.</p>
+        <p>In the last round, fill in as many missing letters of the verse as you can.</p>
       </div>
     `;
   }

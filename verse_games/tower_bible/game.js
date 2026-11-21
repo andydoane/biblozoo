@@ -828,7 +828,7 @@
 
   function helpHtml() {
     return `
-    Tap the brick with the next word when it reaches the middle arrows.<br><br>Tap close to the middle to build a straight tower.<br><br>Don't let it tip over!
+    Tap the brick with the next word of the verse when it reaches the middle arrows.<br><br>Tap close to the middle to build a straight tower.<br><br>Don't let it tip over!
   `;
   }
 
