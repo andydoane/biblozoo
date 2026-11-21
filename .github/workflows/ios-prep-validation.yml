@@ -47,6 +47,9 @@ jobs:
       - name: Validate child-friendly How to Play and intro splash copy
         run: node scripts/validate_child_friendly_how_to_play.js
 
+      - name: Validate Wheel of Bible native menu mute and resume
+        run: node scripts/validate_wheel_menu_mute_resume.js
+
       - name: Verify production iOS developer controls are hidden
         run: node scripts/validate_native_production_dev_hardening.js
 
