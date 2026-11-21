@@ -3277,9 +3277,7 @@
 
   function helpHtml() {
     return `
-      Type each caterpillar word.<br><br>
-      Advanced hides the letters, but you can tap the caterpillar for a hint.<br><br>
-      Complete the Mega-Pillar by typing the entire verse in one go!
+      Type the words on the caterpillar.<br><br>In Advanced mode, the letters are hidden. Tap the caterpillar if you need a hint!<br><br>Then try the Mega-Pillar: type the whole verse!
     `;
   }
 

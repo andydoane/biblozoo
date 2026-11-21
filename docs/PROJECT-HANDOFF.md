@@ -1,6 +1,21 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — stable `ios-prep` is promoted, owner-built and owner-tested (R17 closeout, 2026-11-19 EST / 2026-11-20 UTC)
+## CURRENT — R18 kid-friendly How to Play and intro cleanup (candidate, 2026-11-20)
+
+**Stable baseline, verified before editing:** `ios-prep` is the active branch. The owner merged the post-promotion [living-handoff PR #156](https://github.com/andydoane/biblozoo/pull/156); stable starting SHA for this work is `bcdabedacfb7205fc771cb161d5fe334dafad65d`. [Promotion PR #155](https://github.com/andydoane/biblozoo/pull/155) remains merged at `c31d8ee182aaa6d156fd24ca4a2360d1d90bbae7`; previously owner-built on iPhone and reported working. No open PRs were present when this new candidate branch was created. Confirm all current branches/checks live before a future PR merge.
+
+**Owner's new request:** Before wider device and TestFlight testing, simplify the **How to Play** directions of **all 12 external Practice Games** and **5 external Playground apps** so children see only basic controls, next verse word/action, and the essential bonus/ending goal. Keep each game's distinctive terminology (frog, rocket, Bible Bux, Groovy points), eliminate confusing technical terms, and keep intro/mode/in-game help consistent. The R18 source changes are copy-only, including a single shared Verse Splat help body for its otherwise divergent in-game modal. No gameplay, timing, native audio, profile/data, permissions, assets or signing changes are intended.
+
+**Welcome title cleanup:** Remove the visible `profile-welcome-version` pill below the BibloZoo intro logo and its now-unused CSS, plus an obsolete child-facing `Version 1.15a` hint in another intro implementation. **Keep `APP_VERSION` and the Settings version label** for support/debug. An automated `scripts/validate_child_friendly_how_to_play.js` check covers 17 activity source files, duplicated title/in-game help, short copy, stale jargon, and removed version-pill markup; run it in the normal Node workflow.
+
+**Testing and owner gate:** This is a proposed `fix/r18-kid-friendly-how-to-play-intro-version` → `ios-prep` PR; it is **not merged or hardware-tested yet**. Require exact-head GitHub Actions green and owner review before merge. Once accepted, owner should spot-check How to Play on game title, difficulty and in-game menus, plus a fresh/returning welcome splash on different screen sizes as part of their planned multi-device review. No need to reinstall or reset existing family profiles solely for a text PR; family-v2 export still omits some Zoo rescue/surprise statistics. Preserve separate private 10-production and 11-Audio-Test backups.
+
+**App Store path (future, not performed):** Owner plans broader device testing, developer membership as an **individual** using their personal legal name, TestFlight outside-family beta, then App Store review. No Developer Program enrollment, TestFlight upload, `main` promotion or app public release is evidenced here. Privacy, content rights and kid-facing App Store compliance remain a separate readiness review.
+
+**Permanent rule:** This same `docs/PROJECT-HANDOFF.md` is the canonical `ios-prep` living handoff and must be updated with verified status in **every PR**, including docs and CI-only PRs. Historical entries below are not current status.
+
+
+## HISTORICAL — stable R17 post-promotion state (2026-11-19 EST / 2026-11-20 UTC; superseded by R18)
 
 **Canonical branch and source of truth:** `ios-prep` is now the **active stable iOS development and normal PR target**. The owner reviewed and **MERGED [R17 promotion PR #155](https://github.com/andydoane/biblozoo/pull/155)** (source `integration/native-audio-to-ios-prep` → base `ios-prep`) at `c31d8ee182aaa6d156fd24ca4a2360d1d90bbae7`; the exact promoted-head [post-merge GitHub Actions #44664211870](https://github.com/andydoane/biblozoo/actions/runs/44664211870) **PASS**. The source integration branch was deleted on GitHub after the promotion (its full committed history is retained in `ios-prep`); do not target the deleted branch. **`main` was not merged or published.** Check live GitHub SHA/status before taking new work.
 

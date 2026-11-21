@@ -671,26 +671,20 @@
 
   function introHelpHtml(){
     return `
-      Tap  to jump.<br><br>
-      Tap again in the air to double jump.<br><br>
-      Collect the correct stone tablets and avoid wrong words, obstacles, flying enemies, and gaps.
-    `;
+    Tap to jump! Tap again in the air for a double jump.<br><br>Grab the stone tablet with the next word of the verse.<br><br>Watch out for obstacles, flying enemies, and gaps!
+  `;
   }
 
   function modeHelpHtml(){
     return `
-      Easy: gentler speed and easier decoys.<br><br>
-      Medium: balanced speed with trickier decoys.<br><br>
-      Hard: faster running with the toughest decoys.
-    `;
+    Easy: A slower run with easier word choices.<br><br>Medium: A little faster, with trickier choices.<br><br>Hard: Fast running and tricky choices!
+  `;
   }
 
   function gameHelpHtml(){
     return `
-      Tap, click, or press Space to jump. Tap again in the air to double jump.<br><br>
-      Collect the next correct word tablet. Avoid decoy tablets, obstacles, flying enemies, and ground gaps.<br><br>
-      Missing a correct word resets your streak in Medium and Hard only.
-    `;
+    Tap to jump! Tap again in the air for a double jump.<br><br>Grab the stone tablet with the next word of the verse.<br><br>Watch out for obstacles, flying enemies, and gaps!
+  `;
   }
 
   function getHalfwayFeedEchoParts() {

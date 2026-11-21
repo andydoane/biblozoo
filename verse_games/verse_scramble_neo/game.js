@@ -2510,10 +2510,8 @@
 
   function helpHtml(){
     return `
-      Spell the word in the yellow box by tapping the scrambled magnet letters in order.<br><br>
-      Continue until you finish the verse.<br><br>
-      During the bonus round, find each hidden letter before the computer does.
-    `;
+    Look at the word in the yellow box.<br><br>Tap the mixed-up magnet letters to spell it! Keep spelling words to finish the verse.<br><br>In the bonus round, find the hidden letters before the computer does.
+  `;
   }
 
   function renderHelpOverlay(){

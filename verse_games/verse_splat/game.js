@@ -1200,7 +1200,9 @@ function applyBuildTextRender(){
 
 
 function nonGameHelpHtml(){
-  return `Tap blobs with correct words to splatter paint. Try to splatter paint into every grid square.`;
+  return `
+    Tap the bouncing blob with the next word of the verse.<br><br>Then tap the Bible book and verse numbers.<br><br>Keep splatting colorful paint across the board!
+  `;
 }
 
 function renderHelpOverlay(){
@@ -1293,7 +1295,7 @@ function overlayMarkup(){
       <div class="vsp-overlay">
         <div class="vsp-overlay-card">
           <div class="vsp-overlay-title">How to Play</div>
-          <div class="vsp-overlay-copy">Tap the next correct blob word to build the verse. After the verse, finish the book and then the reference. Wrong taps poof blobs away.</div>
+          <div class="vsp-overlay-copy">${nonGameHelpHtml()}</div>
           <div class="vsp-overlay-actions">
             <button class="vm-btn vsp-menu-action" data-action="close-help">${state.helpBackMode ? 'Back' : 'OK'}</button>
           </div>
