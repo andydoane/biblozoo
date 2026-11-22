@@ -74,6 +74,9 @@ jobs:
       - name: Validate IP09 Bounce touch callouts and Verse Launch post-cutscene Tilt or Drag
         run: node scripts/validate_ip09_touch_verse_launch.js
 
+      - name: Validate IP10 fifth-round Verse Scramble picture hunt and Verse Launch popup consistency
+        run: node scripts/validate_ip10_scramble_picture_hunt.js
+
       - name: Validate Wheel final letter modal and permanent Welcome Back Home
         run: node scripts/validate_welcome_home_wheel_followup.js
 
