@@ -29,7 +29,10 @@ for(const name of feedImages) {
   assert.ok(game.includes("../../verse_images/daily_questions/"+name), "uses same Feeding UI art");
   assert.ok(feed.includes(name), "original Feeding art unchanged");
 }
-assert.match(css,/\.vl-steering-overlay\s*\{[^}]*z-index:\s*40;/s);
+assert.match(css,/\.vl-steering-overlay\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*40;/s);
+assert.match(css,/\.vl-space-controls\[hidden\]/);
+assert.match(game,/\$\{renderAstroSteeringChoice\(\)\}\s*\$\{renderHelpOverlay\(\)\}/,
+  "control chooser is sibling to the nonselectable asteroid stage, not within it");
 assert.match(css,/\.vl-steering-option:focus-visible/);
 assert.match(css,/#vlAstroStage\s*\{[^}]*touch-action:\s*none;[^}]*-webkit-touch-callout:\s*none;/s);
 assert.match(feedCss,/\.daily-feed-game\[data-daily-feed-mode="bounce"\] \.daily-feed-stage/);
@@ -52,9 +55,12 @@ function harness({touch=true,sensor=true,permission="granted"}={}) {
     captures:[],released:[],
     getBoundingClientRect:()=>({left:100,top:20,width:400,height:600}),
     setPointerCapture(id){this.captures.push(id);},
-    releasePointerCapture(id){this.released.push(id);},
-    insertAdjacentHTML(_,html){rendered=html;dialog=makeDialog();}
+    releasePointerCapture(id){this.released.push(id);}
   };
+  const arrows={hidden:false};
+  // Chooser lives OUTSIDE the touch-suppressed game stage so the control
+  // buttons and explanatory copy retain normal accessibility/callouts.
+  const screen={insertAdjacentHTML(_,html){rendered=html;dialog=makeDialog();}};
   function makeDialog() {
     return {
       remove(){dialog=null;},
@@ -80,7 +86,9 @@ function harness({touch=true,sensor=true,permission="granted"}={}) {
     matchMedia:q=>({matches:touch&&q==="(pointer: coarse)"}),
     innerHeight:800};
   const document={hidden:false,
-    querySelector:sel=>sel==="#vlAstroStage"?stage:sel==="#vlSteeringOverlay"?dialog:
+    querySelector:sel=>sel==="#vlAstroStage"?stage:
+      sel===".vl-asteroid-screen"?screen:sel==="#vlArrowControls"?arrows:
+      sel==="#vlSteeringOverlay"?dialog:
       sel==="#vlSteeringConfirm"&&state.astroControlPhase==="instructions"?{onclick:null}:null};
   const jq=sel=>document.querySelector(sel);
   const ctx={state,astroInput,window,document,navigator:{maxTouchPoints:touch?5:0},
@@ -102,7 +110,7 @@ function harness({touch=true,sensor=true,permission="granted"}={}) {
   delete ctx.$;
   ctx.$=jq;
   vm.createContext(ctx);vm.runInContext(src,ctx);
-  return {ctx,state,astroInput,stage,api:ctx.ip09,
+  return {ctx,state,astroInput,stage,arrows,api:ctx.ip09,
     get started(){return started;},get permissionCalls(){return permissionCalls;},
     get html(){return rendered;},get moves(){return visualMoves;}};
 }
@@ -122,6 +130,7 @@ async function steeringCases() {
   await drag.api.chooseAstroSteering("drag");
   assert.equal(drag.state.astroControlPhase,"instructions");
   assert.equal(drag.astroInput.controlMode,"drag");
+  assert.equal(drag.arrows.hidden,false,"Drag can retain arrow accessibility fallback");
   assert.equal(drag.permissionCalls,0);
   assert.match(drag.html,/Drag your finger to dodge asteroids/);
   assert.match(drag.html,/Got It!/);
@@ -170,6 +179,7 @@ async function steeringCases() {
   await pending;
   assert.equal(tilt.astroInput.controlMode,"tilt");
   assert.equal(tilt.astroInput.tiltEnabled,true);
+  assert.equal(tilt.arrows.hidden,true,"Tilt hides pointer arrows after chooser");
   assert.equal(tilt.state.astroControlPhase,"instructions");
   tilt.api.confirmAstroSteering();
   assert.equal(tilt.started,1);
