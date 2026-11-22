@@ -25,6 +25,12 @@
   const ZOO_NOTE_FREQUENCIES = Object.freeze([
     523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98
   ]);
+  // Mirror app.js SVG_HOME: standalone games do not load app.js, but use
+  // the same white house glyph as the app's charcoal Home pill.
+  const ZOO_HOME_SVG = `<svg class="nav-icon" viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <path d="M12 3L3 10h2v9h5v-6h4v6h5v-9h2L12 3z" fill="#ffffff"/>
+  </svg>`;
   const RECOVERY_WATCHDOG_MS = 7500;
   // Identical vector silhouette used by Traffic Tap and Verse Launch for wrong answers.
   // No platform-dependent cloud emoji; no dependency on the other game's DOM.
@@ -289,6 +295,18 @@
     exitButton.textContent = "Back to Zoo";
     exitButton.hidden = true;
     card.appendChild(exitButton);
+    // Zoo Break alone uses the app's top-left Home icon instead of this
+    // bottom exit. Keep the bottom link for a lone escape or denied audio.
+    const homeButton = doc.createElement("button");
+    homeButton.type = "button";
+    homeButton.className = "bz-zoo-home no-zoom";
+    homeButton.setAttribute("aria-label", "Back to Zoo");
+    homeButton.innerHTML = ZOO_HOME_SVG;
+    homeButton.hidden = true;
+    // Focus order follows the top-left visual order, before the dialog card.
+    // Most owners place the card directly in the overlay; handle wrappers too.
+    if (card.parentNode === overlay) overlay.insertBefore(homeButton, card);
+    else overlay.insertBefore(homeButton, overlay.firstChild || null);
     const field = doc.createElement("div");
     field.className = "bz-zoo-field";
     field.setAttribute("role", "group");
@@ -524,25 +542,49 @@
         title.appendChild(line);
       }
     }
-    function setInstruction(text) {
+    function showExit(visible) {
+      // A Zoo Break has an icon-only top-left Home, but other recovery paths
+      // retain their existing text link so denied audio always has an exit.
+      const useHome = visible && stage === "break";
+      homeButton.hidden = !useHome;
+      exitButton.hidden = !visible || useHome;
+    }
+    function setInstruction(text, balance = false) {
       instruction.textContent = text;
       instruction.hidden = false;
+      instruction.classList.toggle("bz-zoo-instruction-balanced", balance);
       button.hidden = true;
       button.disabled = false;
+      button.classList.remove("bz-zoo-lock-processing");
+      button.removeAttribute?.("aria-busy");
     }
-    function setLockButton() {
-      instruction.hidden = true;
-      button.hidden = false;
-      button.replaceChildren();
+    function lockIcon() {
       const icon = doc.createElement("img");
       icon.src = lockSrc;
       icon.alt = "";
       icon.className = "bz-zoo-lock-icon";
+      return icon;
+    }
+    function setLockButton(focus = true) {
+      instruction.hidden = true;
+      button.hidden = false;
+      button.classList.remove("bz-zoo-lock-processing");
+      button.removeAttribute?.("aria-busy");
+      button.setAttribute("aria-label", "Lock Gate");
+      const icon = lockIcon();
       icon.onerror = () => { icon.replaceWith(doc.createTextNode("🔒")); };
-      button.appendChild(icon);
-      button.appendChild(doc.createTextNode(" LOCK GATE"));
+      button.replaceChildren(icon, doc.createTextNode(" LOCK GATE"));
       button.disabled = false;
-      button.focus?.({ preventScroll: true });
+      if (focus) button.focus?.({ preventScroll: true });
+    }
+    function setLockProcessing() {
+      // No layout replacement: this is the SAME full-width button and slot.
+      // Screen readers get status while sighted players see only the lock art.
+      button.classList.add("bz-zoo-lock-processing");
+      button.replaceChildren(lockIcon());
+      button.setAttribute("aria-label", "Locking the gate");
+      button.setAttribute("aria-busy", "true");
+      button.disabled = true;
     }
     function shakeCard(kind) {
       if (reduced) return;
@@ -558,7 +600,7 @@
       card.classList.toggle("bz-zoo-active", next === "escape" || next === "break");
       overlay.classList.toggle("bz-zoo-escape", next === "escape" || next === "break");
       pen.hidden = next !== "escape" && next !== "break";
-      exitButton.hidden = next === "welcome" || next === "recovered" || next === "exiting";
+      showExit(next === "escape" || next === "break");
       if (status) status.hidden = true;
       if (next === "escape") {
         rescueStatus.textContent = "One BibloPet escaped. Select it and the pen to rescue it.";
@@ -573,7 +615,7 @@
         emptyField();
         rescueStatus.textContent = "Zoo Break! Select each escaped BibloPet, then select the pen.";
         setTitle("WARNING!", "Zoo BREAK!");
-        setInstruction("Drag pets to the pen!");
+        setInstruction("Drag pets to the pen!", true);
         total = MIN_PETS + Math.floor(Math.random() * (MAX_PETS - MIN_PETS + 1));
         spawning = 0;
         rescued = 0;
@@ -800,7 +842,14 @@
         raf = 0;
         lastFrame = 0;
         if (spawnTimer) { root.clearTimeout(spawnTimer); spawnTimer = 0; }
-        if (watchdog) { root.clearTimeout(watchdog); watchdog = 0; busy = false; serial++; button.disabled = false; }
+        if (watchdog) {
+          root.clearTimeout(watchdog);
+          watchdog = 0;
+          busy = false;
+          serial++;
+          if (button.classList.contains("bz-zoo-lock-processing")) setLockButton(false);
+          else button.disabled = false;
+        }
         if (transitionTimer) { root.clearTimeout(transitionTimer); transitionTimer = 0; }
         // Intentional: keep stage and captured pets when the child switches away.
       } else if (running()) {
@@ -828,10 +877,9 @@
         // start() resets this presentation if recovery must be retried.
         instruction.hidden = true;
         pen.hidden = true;
-        exitButton.hidden = true;
+        showExit(false);
         button.hidden = false;
-        button.disabled = true;
-        button.textContent = "Opening the gate...";
+        setLockProcessing();
         if (status) {
           status.hidden = false;
           status.textContent = "Getting your game ready...";
@@ -855,7 +903,7 @@
         setStage("break");
       } else {
         stage = "exiting";
-        exitButton.hidden = true;
+        showExit(false);
         overlay.classList.add("bz-zoo-fade-black");
         log("zoo-escape-terminal", { attemptCount, rescued, total });
         transitionTimer = root.setTimeout(() => { transitionTimer = 0; exitToZoo(); }, reduced ? 60 : 420);
@@ -868,7 +916,7 @@
     function recoveryFailureWithoutSurprise() {
       if (!running()) return;
       button.disabled = attemptCount >= MAX_ATTEMPTS;
-      exitButton.hidden = false;
+      showExit(true);
       if (status) {
         status.hidden = false;
         status.textContent = attemptCount >= MAX_ATTEMPTS
@@ -907,7 +955,10 @@
       // a second time, stealing session priority, or faking a sound check.
       if (surpriseMode) {
         if (stage === surpriseMode && total > 0 && rescued === total &&
-            (stage !== "break" || spawning === total)) successful();
+            (stage !== "break" || spawning === total)) {
+          setLockProcessing();
+          successful();
+        }
         return;
       }
       if (attemptCount >= MAX_ATTEMPTS) return;
@@ -916,7 +967,8 @@
       busy = true;
       const token = ++serial;
       button.disabled = true;
-      exitButton.hidden = false;
+      if (from === "escape" || from === "break") setLockProcessing();
+      showExit(true);
       log("zoo-escape-gesture", { stage: from, attemptCount });
       // Animated Read activities may need to select a cue BEFORE asking native Read to
       // play sound. This is a dry roll: no stats or stored odds are touched
@@ -940,7 +992,8 @@
         watchdog = 0;
         if (disposed || !busy || token !== serial) return;
         busy = false;
-        button.disabled = false;
+        if (button.classList.contains("bz-zoo-lock-processing")) setLockButton(false);
+        else button.disabled = false;
         handleRecoveryFailure(from);
       }, RECOVERY_WATCHDOG_MS);
       Promise.resolve(recovery).then(ok => {
@@ -951,8 +1004,9 @@
           // A native interruption/cooldown is not a failed user attempt.
           // Keep the same gate, allow another *real* tap, and expose Back.
           attemptCount = Math.max(0, attemptCount - 1);
-          button.disabled = false;
-          exitButton.hidden = false;
+          if (button.classList.contains("bz-zoo-lock-processing")) setLockButton(false);
+          else button.disabled = false;
+          showExit(true);
           if (status) {
             status.textContent = "Sound isn't ready yet. Try again!";
             status.hidden = false;
@@ -987,14 +1041,16 @@
     }
     function exitToZoo() {
       if (disposed) return;
+      const wasBreak = stage === "break" || !homeButton.hidden;
       stage = "exiting";
       pending = false;
       serial++;
       emptyField();
       log("zoo-escape-exit", { attemptCount, rescued, total });
       try { onExit?.({ attemptCount, rescued, total, completedBreak: breakCredited }); } catch (_) {
-        // A caller can provide its own visible navigation fallback.
-        exitButton.hidden = false;
+        // If the owner navigation throws, never hide the only safe exit.
+        homeButton.hidden = !wasBreak;
+        exitButton.hidden = wasBreak;
         overlay.classList.remove("bz-zoo-fade-black");
       }
     }
@@ -1075,11 +1131,14 @@
       title.innerHTML = originalTitle; // original template content, not user data
       root.BibloZooWelcomeBack?.populate?.(overlay, { profileId, name, pictureBase: safeBase });
       button.innerHTML = originalButton;
+      button.classList.remove("bz-zoo-lock-processing");
+      button.removeAttribute?.("aria-label");
+      button.removeAttribute?.("aria-busy");
       button.hidden = false;
       button.disabled = false;
       instruction.hidden = true;
       pen.hidden = true;
-      exitButton.hidden = true;
+      showExit(false);
       if (status) status.hidden = true;
     }
     function startSurprise(kind) {
@@ -1143,9 +1202,10 @@
       button.removeEventListener("click", attempt);
       pen.removeEventListener("click", tapPen);
       exitButton.removeEventListener("click", exitToZoo);
+      homeButton.removeEventListener("click", exitToZoo);
       field.remove(); effects.remove(); rescueStatus.remove(); pen.remove(); instruction.remove();
       slot.parentNode?.insertBefore(button, slot);
-      slot.remove(); exitButton.remove();
+      slot.remove(); exitButton.remove(); homeButton.remove();
       resetDisplay();
     }
     if (allowTestMenu) {
@@ -1158,6 +1218,7 @@
     button.addEventListener("click", attempt);
     pen.addEventListener("click", tapPen);
     exitButton.addEventListener("click", exitToZoo);
+    homeButton.addEventListener("click", exitToZoo);
     doc.addEventListener("visibilitychange", onVisibility);
     return Object.freeze({ start, startSurprise, resumeVisible, destroy, exit: exitToZoo,
       isPaused: () => pending, getStage: () => stage,

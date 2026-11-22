@@ -27,7 +27,7 @@ ok(src.includes('if (!isDeveloperRun()) addStat(profileId, "pet")'), "simulated 
 ok(src.includes('if (reduced) {') && src.includes('pet.state = "ready"') && src.includes('if (!reduced && !raf'), "reduced motion uses stationary and instantly catchable pets");
 ok(src.includes('pen.focus?.({ preventScroll: true })'), "keyboard tap-select flow can reach pen");
 ok(src.includes('field.setAttribute("role", "group")'), "escaped pets are grouped for screen readers");
-ok(src.includes('setInstruction("Drag the pet to the pen!")') && src.includes('setInstruction("Drag pets to the pen!")'), "short visual instructions preserve card height");
+ok(src.includes('setInstruction("Drag the pet to the pen!")') && src.includes('setInstruction("Drag pets to the pen!", true)') && sharedCss.includes(".bz-zoo-instruction-balanced") && sharedCss.includes("text-wrap: balance;"), "single-pet short instruction and Zoo Break balanced copy preserve their shared action slot");
 ok(src.includes('pen.addEventListener("click", tapPen)') && src.includes('el.addEventListener("click", event =>'), "tap-to-rescue support remains available");
 ok(sharedCss.includes(".bz-zoo-rescue-status") && sharedCss.includes("clip-path: inset(50%)"), "accessible rescue status is visually unobtrusive");
 ok(!app.includes("Zoo Hero!") && !app.includes("acknowledgeCelebration") &&

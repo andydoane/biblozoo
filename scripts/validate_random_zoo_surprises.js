@@ -338,8 +338,11 @@ async function main() {
     assert.equal(h.recovery.length,1,"completed gate never repeats audio recovery");
     assert.equal(h.fired.filter(x=>x==="recovered").length,1);
     assert.equal(h.button.disabled,true,"Lock Gate immediately acknowledges completion");
-    assert.equal(h.button.textContent,"Opening the gate...",
-      "do not flash the ordinary Welcome Back button while the owner finishes");
+    assert.equal(h.button.children.length,1,"pending gate retains exactly one visual child");
+    assert.equal(h.button.children[0].className,"bz-zoo-lock-icon",
+      "completed single-pet gate retains centered lock artwork instead of text");
+    assert.equal(h.button.getAttribute("aria-busy"),"true",
+      "accessible status remains available during transition");
     h.button.trigger("click");
     assert.equal(h.fired.filter(x=>x==="recovered").length,1,
       "repeated LOCK GATE input cannot double-release gameplay");
@@ -361,8 +364,9 @@ async function main() {
     h.button.trigger("click");
     assert.equal(h.recovery.length,1);
     assert.equal(h.fired.filter(x=>x==="recovered").length,1);
-    assert.equal(h.button.textContent,"Opening the gate...",
-      "Zoo Break also retains its completion artwork until owner recovery");
+    assert.equal(h.button.children.length,1,"Zoo Break pending gate is image only");
+    assert.equal(h.button.children[0].className,"bz-zoo-lock-icon",
+      "Zoo Break keeps the real lock illustration during transition");
     assert.equal(h.win.BibloZooZooStats.get("p1").petsRescued,total);
     assert.equal(h.win.BibloZooZooStats.get("p1").zooBreaksStopped,1);
     h.ctl.destroy();
