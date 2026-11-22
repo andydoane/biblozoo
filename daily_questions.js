@@ -3482,9 +3482,23 @@
                           true;
                       }
 
-                      clearSessionState();
+                      // A completed Feeding game now returns by the app's
+                      // existing black fade. If navigation is already busy
+                      // or the app is hidden, retain the session/result so
+                      // Back to Zoo can be retried without duplicate credit.
+                      const fadeReturn =
+                        appApi?.goToTitleAfterFeeding;
+                      if (
+                        typeof fadeReturn === "function" &&
+                        fadeReturn() === false
+                      ) {
+                        return false;
+                      }
 
-                      appApi?.goToTitle?.();
+                      clearSessionState();
+                      if (typeof fadeReturn !== "function") {
+                        appApi?.goToTitle?.();
+                      }
 
                       return true;
                     }
