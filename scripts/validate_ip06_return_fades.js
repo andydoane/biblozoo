@@ -172,6 +172,7 @@ function tutorialHarness({tutorial = true, mission = null} = {}) {
     },
     finalRecallNode: () => ({}), getVerseFitClass: () => "",
     escapeHtml: s => s, verseIdToRef: () => "Reference",
+    learnInstructionLineHtml: s => s,
     getFinalRecallPct: () => 0,
     scheduleSmartLearnTextFit() {},
     makeSlide: ({inner}) => inner,
