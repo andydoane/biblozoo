@@ -2559,7 +2559,7 @@
             <div class="vsn-fridge-board" id="vsnBoard">
               <button class="vsn-menu-pill no-zoom" id="vsnMenuPill" aria-label="Game Menu" type="button">☰</button>
 
-              <div class="vsn-target-note ${targetIsBlank ? "is-blank" : ""}" id="vsnTargetNote" aria-live="polite"${pictureRound ? ' aria-label="Find the matching pet picture"' : ""}>
+              <div class="vsn-target-note ${targetIsBlank ? "is-blank" : ""}" id="vsnTargetNote" aria-live="polite"${pictureRound ? ` aria-label="Find pet picture ${state.bonusPictureTarget.pictureNumber}"` : ""}>
                 <div class="vsn-target-text" id="vsnTargetText">${targetIsBlank ? "" : targetHtml}</div>
               </div>
 
