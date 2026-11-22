@@ -54,7 +54,21 @@
   .daily-zoo-todo-profile-picture {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
+}
+
+/* IP03: the Daily Zoo To-Do pet photo is not a circular avatar.
+   The shared profile visual crops to cover by default; override only
+   this Daily task context, including its completion illustration. */
+.todo-dev-screen.is-daily-mode
+  .daily-zoo-todo-profile-picture {
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.todo-dev-screen.is-daily-mode
+  .daily-zoo-todo-profile-picture .profile-picture-img {
+  object-fit: contain;
 }
 
 .daily-zoo-todo-pet
@@ -637,7 +651,6 @@
   .daily-zoo-todo-profile-picture {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
 }
 
 .daily-completion-pet
