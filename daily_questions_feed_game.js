@@ -6045,6 +6045,18 @@
     };
 
     activeRuntime = runtime;
+    // IP09: the Bounce canvas/catcher are pure gesture surfaces, not
+    // selectable prose. On iPadOS this also blocks a held-touch magnifier
+    // and context menu; intro/result overlays and other modes are untouched.
+    if (mode === FEED_MODES.BOUNCE) {
+      const preventBouncePlayfieldCallout = (event) => {
+        if (activeRuntime === runtime && !runtime.finished) {
+          event.preventDefault();
+        }
+      };
+      stage.addEventListener("contextmenu", preventBouncePlayfieldCallout);
+      stage.addEventListener("selectstart", preventBouncePlayfieldCallout);
+    }
     runtime.modeController
       .initialize(runtime);
     attachFeedInterruptionHandlers(runtime);
