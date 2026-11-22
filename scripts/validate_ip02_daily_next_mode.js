@@ -107,6 +107,7 @@ const session={
 };
 const scope={
   dailySession:session,SESSION_PHASES:{QUESTION:"question",REFLECTION:"reflection"},
+  DAILY_QUESTION_REWARD_POPUP_MS:900,DAILY_QUESTION_NEXT_SETTLE_MS:320,
   questionPageTransition:false,cancelQuestionPageTransition:null,
   rewardPopupTimeoutId:0, document, console,
   setTimeout:setFakeTimeout, clearTimeout:id=>timers.delete(id),
