@@ -2011,6 +2011,48 @@
   }
 
 
+  // A public verse + difficulty determines distinct picture choices without
+  // using any private Zookeeper/profile data. Seven is coprime with 24,
+  // so visiting the pool in steps of seven never repeats a picture.
+  function bonusPictureSeed() {
+    const text = String(ctx.verseId || "biblozoo") + "|" +
+      String(selectedMode || "easy");
+    let hash = 2166136261;
+    for (const char of text) {
+      hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function prepareBonusPictureRound() {
+    const seed = bonusPictureSeed();
+    const count = BONUS_PICTURE_COUNT_BY_MODE[selectedMode] || 12;
+    const poolSize = BONUS_PICTURE_VERSE_IDS.length;
+    const choices = [];
+
+    for (let i = 0; i < count; i++) {
+      const index = ((seed % poolSize) + i * 7) % poolSize;
+      const verseId = BONUS_PICTURE_VERSE_IDS[index];
+      choices.push({
+        pictureNumber: index + 1,
+        src: `${PROFILE_PICTURE_DIR}profile_picture_${verseId}.png`
+      });
+    }
+
+    state.bonusPictureChoices = choices;
+    state.bonusPictureTarget = choices[(seed >>> 16) % choices.length];
+
+    // Warm bundled assets during the existing intro + four letter rounds.
+    // No fetch, timers, bonus clock changes, or wait for image loading.
+    bonusPicturePreloads = typeof Image === "function"
+      ? choices.map(choice => {
+          const img = new Image();
+          img.src = choice.src;
+          return img;
+        })
+      : [];
+  }
+
   function startBonusIntro() {
     state.bonusActive = true;
     state.bonusStage = "intro";
@@ -2022,6 +2064,7 @@
     state.bonusRoundToken += 1;
     state.busy = true;
     state.tiles = [];
+    prepareBonusPictureRound();
     render();
 
     const token = state.bonusRoundToken;
@@ -2055,10 +2098,17 @@
     state.bonusPointerRunning = false;
     state.bonusRoundToken += 1;
 
-    const color = randomItem(MAGNET_COLORS);
-    state.bonusTargetLetter = randomItem(LETTERS);
-    state.bonusTargetColor = color;
-    state.bonusTargetShade = darkenHexColor(color, 30);
+    if (state.bonusRound < 5) {
+      // Original letter/color hunt is untouched in rounds 1–4.
+      const color = randomItem(MAGNET_COLORS);
+      state.bonusTargetLetter = randomItem(LETTERS);
+      state.bonusTargetColor = color;
+      state.bonusTargetShade = darkenHexColor(color, 30);
+    } else {
+      state.bonusTargetLetter = "";
+      state.bonusTargetColor = "";
+      state.bonusTargetShade = "";
+    }
     state.tiles = [];
 
     render();
@@ -2087,6 +2137,8 @@
   }
 
   function startBonusFinal() {
+    // Image nodes are no longer displayed; release prefetch references.
+    bonusPicturePreloads = [];
     state.bonusStage = "final";
     state.bonusResultText = "";
     state.bonusResultKind = "";
