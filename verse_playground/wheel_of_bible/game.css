@@ -1387,7 +1387,10 @@ button.wob-ref-group {
 .wob-final-intro-subtitle {
   display: inline-block;
   width: max-content;
-  max-width: min(100%, 720px);
+  /* The long sentence used to hit its 720px limit and visually fill
+     the whole iPad panel. Wrap at a deliberately compact caption width,
+     leaving breathing room on phones without changing the type or padding. */
+  max-width: min(92%, 500px);
   min-width: 0;
   padding: 8px 16px;
   align-self: center;
@@ -1526,6 +1529,8 @@ button.wob-ref-group {
 }
 
 .wob-final-modal {
+  /* This modal is attached to .wob-root, not the narrower .wob-card,
+     so its existing dimmer reaches the entire viewport on iPad. */
   position: absolute;
   inset: 0;
   z-index: 50;

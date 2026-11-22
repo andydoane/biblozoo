@@ -63,15 +63,18 @@ assert.equal(bounceTitle(1),"1 ball left!");
 assert.equal(bounceTitle(2),"2 Balls Left!");
 assert.equal(bounceTitle(3),"3 Balls Left!");
 
-// Wheel pill measures intrinsic content and clamps; popup overlays root bounds.
+// Wheel pill stays compact on iPad and clamps on phone; both overlays reach full root.
 const intro=rules(wheelCss,".wob-final-intro-subtitle");
-for(const part of ["width: max-content;","max-width: min(100%, 720px);",
+for(const part of ["width: max-content;","max-width: min(92%, 500px);",
  "padding: 8px 16px;","overflow-wrap: break-word;"]) assert.ok(intro.includes(part));
 assert.ok(wheel.includes("One minute to fill in as many missing letters as possible."));
 const wobRoot=rules(wheelCss,".wob-root");
 assert.ok(wobRoot.includes("position: relative;"));
 assert.ok(wobRoot.includes("height: 100dvh;") && wobRoot.includes("width: 100%;"));
 const dim=rules(wheelCss,".wob-times-up-overlay");
+const fill=rules(wheelCss,".wob-final-modal");
+for(const part of ["position: absolute;","inset: 0;","z-index: 50;","background: rgba(0, 0, 0, .42);"])
+  assert.ok(fill.includes(part), "full-screen interactive final word dimmer");
 for(const part of ["position: absolute;","inset: 0;","pointer-events: none;"]) assert.ok(dim.includes(part));
 const wStart=wheel.indexOf("  async function showTimesUpPopup() {");
 const wEnd=wheel.indexOf("  async function renderMoneyTotalScreen()",wStart);
@@ -103,6 +106,12 @@ vm.runInNewContext(wheel.slice(wStart,wEnd)+
   assert.equal(prizeCalls,2);
   assert.equal(sleeps.join(","),"2500,320,2500,320");
 
+  // The separate interactive Fill the Blanks modal must use the same
+  // full-root ancestor as Time's Up rather than the max-width card.
+  const finalCode=wheel.slice(wheel.indexOf("  function renderFinalModal() {"),
+    wheel.indexOf("  function finalWordHtml(active) {"));
+  assert.ok(finalCode.includes('document.querySelector(".wob-root")?.appendChild(modal);'));
+  assert.ok(!finalCode.includes('document.querySelector(".wob-card")?.appendChild(modal);'));
   // One continuous full-height starfield; retain old playable dimensions and
   // bottom safe-area padding; remove tablet board rounded corners.
   assert.ok(rules(launchCss,".vl-root").includes("var(--vl-starfield-main)"));

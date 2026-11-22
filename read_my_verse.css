@@ -2242,10 +2242,13 @@ button.read-unscramble-token.is-solved {
   font-family: "Baloo 2", system-ui, sans-serif;
   text-align: center;
 }
-/* Patch 70: the greeting, portrait, and action are styled only by the
-   shared welcome-back.css. Read My Verse owns this overlay's Back control. */
-/* Same Back control as other activities, above the full-screen resume overlay.
-   It is outside the shared Welcome Back dialog card. */
+/* Read retains its original Back arrow as a safe fallback when the Zoo
+   controller is unavailable. Once the controller starts, its permanent
+   top-left Home is the ONLY exit shown; recovery callbacks are unchanged. */
+.read-audio-resume-overlay[data-zoo-stage] .read-audio-overlay-back {
+  display: none !important;
+}
+/* Fallback Back control lives outside the shared Welcome Back card. */
 .read-audio-resume-overlay .read-audio-overlay-back {
   position: fixed;
   z-index: 1;

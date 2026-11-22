@@ -3782,7 +3782,10 @@
     modal.innerHTML = `<div class="wob-final-modal-panel"><div class="wob-big-title">Fill the Blanks</div>${finalWordHtml(active)}<div class="wob-choice-grid is-rowed is-wide">${choiceRowsHtml(active.choices, state.finalFlash, state.finalBad, "final-choice")}</div><div class="wob-bonus-line">Streak: ${escapeHtml(String(state.finalLetterStreak))} • Next: ${escapeHtml(formatMoney((state.finalLetterStreak + 1) * 100))}</div></div>`;
 
     document.getElementById("wobFinalModal")?.remove();
-    document.querySelector(".wob-card")?.appendChild(modal);
+    // Match Time's Up: the modal's dimmer belongs to the full-screen
+    // root, not the max-width .wob-stage / .wob-card. Keep the original
+    // interactive letter-choice panel and input/re-render lifecycle.
+    document.querySelector(".wob-root")?.appendChild(modal);
     modal
       .querySelectorAll(
         "[data-final-choice]"

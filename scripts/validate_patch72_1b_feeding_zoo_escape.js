@@ -141,8 +141,9 @@ function staticContracts(){
  ok(shared.includes('MAX_ATTEMPTS = 3'),'shared recovery cap three gestures');
  ok(shared.includes('SPAWN_MS = 1000')&&shared.includes('MAX_PETS = 10'),'up to ten overlapping pets');
  ok(shared.includes('EMERGE_MS = 750'),'protected emergence retained');
- ok(css.includes('.daily-feed-resume-overlay .bz-zoo-exit { display: none !important; }'),
-    'Feeding reuses native Back pill without changing popup height');
+ ok(css.includes('.daily-feed-resume-overlay[data-zoo-stage] .daily-feed-resume-back {') &&
+    css.includes('display: none !important;'),
+    'Feeding hides its independent Back only when the shared Home controller starts; native-only fallback keeps Back');
  ok(daily.includes('onRecoveryExitToZoo: () => {'),'Daily Questions offers explicit abort');
  ok(daily.includes('clearSessionState();')&&daily.includes('appApi?.goToTitle?.();'),
     'Daily Questions emergency exit returns title, not award completion');
