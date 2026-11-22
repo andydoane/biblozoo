@@ -267,6 +267,16 @@
     return !!getLaunchParams().mix;
   }
 
+  function isDailyTodoLaunch() {
+    // The bridge validates the complete Daily To-Do token/assigned mode.
+    // A normal game launch or unrelated legacy Zoo To-Do is unaffected.
+    try {
+      return window.VerseGameBridge?.isDailyTodoLaunch?.() === true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function getGameMixMode() {
     const mode = String(getLaunchParams().mode || "").trim();
     return ["easy", "medium", "hard"].includes(mode) ? mode : "";
@@ -2465,7 +2475,8 @@
   } = {}) {
     const safeId = escapeHtml(id);
     const gameMix = isGameMixLaunch();
-    const effectiveShowModeSelect = gameMix ? false : showModeSelect;
+    const effectiveShowModeSelect =
+      showModeSelect && !gameMix && !isDailyTodoLaunch();
     const effectiveExitText = gameMix ? "Exit Game Mix" : exitText;
 
     return `
@@ -2600,6 +2611,9 @@ ${showMute ? `<button
 
     if (modeSelectBtn) {
       modeSelectBtn.onclick = () => {
+        // Defense in depth for an old/stale DOM: an assigned Daily mode
+        // cannot be replaced with a manual selection or restart the game.
+        if (isDailyTodoLaunch()) return;
         if (overlay) {
           overlay.classList.remove("is-open");
           overlay.setAttribute("aria-hidden", "true");
