@@ -290,16 +290,19 @@
     instruction.hidden = true;
     instruction.setAttribute("aria-live", "polite");
     slot.appendChild(instruction);
+    // This is only presentation. The existing onExit remains the single
+    // safe way out of Welcome Back / single-pet Escape / Zoo Break.
+    // Keep its Home target outside the card and before it in focus order,
+    // including the Welcome stage BEFORE the first Let's go! gesture.
     const exitButton = doc.createElement("button");
     exitButton.type = "button";
-    exitButton.className = "bz-zoo-exit no-zoom";
-    exitButton.textContent = "Back to Zoo";
+    exitButton.className = "bz-zoo-home no-zoom";
+    exitButton.setAttribute("aria-label", "Back to Zoo");
+    exitButton.innerHTML = ZOO_HOME_SVG;
     exitButton.hidden = true;
-    card.appendChild(exitButton);
-    // One *physical* exit control is moved and restyled between stages.
-    // The old two-button arrangement could leave a visible bottom Back
-    // while the separate Home was absent/obscured by a host overlay.
-    // Reusing this node makes that inconsistent state impossible.
+    if (card.parentNode === overlay)
+      overlay.insertBefore(exitButton, card);
+    else overlay.insertBefore(exitButton, overlay.firstChild || null);
     const field = doc.createElement("div");
     field.className = "bz-zoo-field";
     field.setAttribute("role", "group");
@@ -535,37 +538,12 @@
         title.appendChild(line);
       }
     }
-    function showExit(visible, stageForExit = stage) {
-      // destroy() invokes resetDisplay() after removing injected nodes.
-      // Never reparent the exit after teardown or leak a clickable Back.
-      if (disposed) {
-        exitButton.hidden = true;
-        return;
-      }
-      const useHome = visible && stageForExit === "break";
-      // Class and DOM placement are changed together before making the
-      // control visible. There is never a second Back/Home to get out of sync.
-      if (useHome) {
-        if (exitButton.className !== "bz-zoo-home no-zoom") {
-          exitButton.className = "bz-zoo-home no-zoom";
-          exitButton.innerHTML = ZOO_HOME_SVG;
-        }
-        // Top-left position and first keyboard/focus order, even with hosts
-        // whose card is wrapped in another element.
-        if (exitButton.parentNode !== overlay) {
-          if (card.parentNode === overlay)
-            overlay.insertBefore(exitButton, card);
-          else overlay.insertBefore(exitButton, overlay.firstChild || null);
-        }
-      } else {
-        if (exitButton.className !== "bz-zoo-exit no-zoom") {
-          exitButton.className = "bz-zoo-exit no-zoom";
-          exitButton.textContent = "Back to Zoo";
-        }
-        if (exitButton.parentNode !== card) card.appendChild(exitButton);
-      }
-      exitButton.setAttribute("aria-label", "Back to Zoo");
-      exitButton.hidden = !visible;
+    function showExit(visible) {
+      // Every visible Welcome Back stage has the same top-left Home icon.
+      // Never introduce the old bottom Back link after Let's go! or a
+      // failed/deferred native recovery. hide only during confirmed close,
+      // terminal fade or teardown; keep audio owner callbacks unchanged.
+      exitButton.hidden = disposed || !visible;
     }
     function setInstruction(text, balance = false) {
       // Two actual lines need their own natural row height, otherwise the
@@ -574,13 +552,15 @@
       instruction.className = balance
         ? "bz-zoo-instruction bz-zoo-instruction-balanced"
         : "bz-zoo-instruction";
-      if (balance && text === "Drag pets to the pen!") {
-        // text-wrap:balance by itself does NOT wrap a one-line string on
-        // wide iPads. These visually balanced lines are intentional.
-        // The trailing blank preserves the exact combined readable phrase.
+      if (balance && (text === "Drag pets to the pen!" ||
+          text === "Drag the pet to the pen!")) {
+        // A CSS balance hint does not FORCE two lines on wide iPads.
+        // Explicitly balance both the Zoo Break and single-pet messages,
+        // preserving the exact full phrase for assistive technology.
         const first = doc.createElement("span");
         first.className = "bz-zoo-instruction-line";
-        first.textContent = "Drag pets ";
+        first.textContent = text === "Drag pets to the pen!"
+          ? "Drag pets " : "Drag the pet ";
         const second = doc.createElement("span");
         second.className = "bz-zoo-instruction-line";
         second.textContent = "to the pen!";
@@ -641,13 +621,13 @@
       overlay.classList.toggle("bz-zoo-escape", next === "escape" || next === "break");
       overlay.setAttribute("data-zoo-stage", next);
       pen.hidden = next !== "escape" && next !== "break";
-      showExit(next === "escape" || next === "break");
+      showExit(true);
       if (status) status.hidden = true;
       if (next === "escape") {
         rescueStatus.textContent = "One BibloPet escaped. Select it and the pen to rescue it.";
         shakeCard("escape");
         setTitle(activePetName(), "escaped!");
-        setInstruction("Drag the pet to the pen!");
+        setInstruction("Drag the pet to the pen!", true);
         total = 1;
         spawning = 0;
         rescued = 0;
@@ -918,7 +898,7 @@
         // start() resets this presentation if recovery must be retried.
         instruction.hidden = true;
         pen.hidden = true;
-        showExit(false);
+        showExit(true);
         button.hidden = false;
         setLockProcessing();
         if (status) {
@@ -1082,8 +1062,6 @@
     }
     function exitToZoo() {
       if (disposed) return;
-      const wasBreak = stage === "break" ||
-        exitButton.className === "bz-zoo-home no-zoom";
       stage = "exiting";
       pending = false;
       serial++;
@@ -1091,7 +1069,7 @@
       log("zoo-escape-exit", { attemptCount, rescued, total });
       try { onExit?.({ attemptCount, rescued, total, completedBreak: breakCredited }); } catch (_) {
         // If host navigation throws, restore the same reachable exit.
-        showExit(true, wasBreak ? "break" : "escape");
+        showExit(true);
         overlay.classList.remove("bz-zoo-fade-black");
       }
     }
@@ -1181,7 +1159,7 @@
       button.disabled = false;
       instruction.hidden = true;
       pen.hidden = true;
-      showExit(false);
+      showExit(true);
       if (status) status.hidden = true;
     }
     function startSurprise(kind) {

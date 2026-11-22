@@ -62,6 +62,9 @@ jobs:
       - name: Validate IP05 result screens and full-board overlays
         run: node scripts/validate_ip05_result_visuals.js
 
+      - name: Validate Wheel final letter modal and permanent Welcome Back Home
+        run: node scripts/validate_welcome_home_wheel_followup.js
+
       - name: Validate Wheel of Bible native menu mute and resume
         run: node scripts/validate_wheel_menu_mute_resume.js
 

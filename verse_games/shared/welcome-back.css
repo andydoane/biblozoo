@@ -211,9 +211,9 @@
 }
 .bz-zoo-action-slot > * { grid-area: 1 / 1; }
 .bz-zoo-action-slot .bz-welcome-action { min-height: 64px; }
-/* The forced two-line Break instruction is taller than the ordinary 64px
- * button. Let BOTH nested grid slots grow for the hint; once LOCK GATE
- * appears the controller removes this class and restores 64px exactly. */
+/* The forced two-line Escape / Break instructions may exceed the normal
+ * 64px button. Let BOTH nested slots grow only while showing the hint;
+ * once LOCK GATE appears restore the original 64px button height. */
 .bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint,
 .bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint .bz-zoo-action-slot {
   height: auto;
@@ -245,16 +245,16 @@
   text-align: center;
   text-wrap: balance;
 }
-/* Explicit two-line Zoo Break copy: a balanced wrap even when the phrase
- * would otherwise fit in one line on iPad. Allow long text to grow/scroll. */
+/* Both single-pet and Zoo Break copy use explicit balanced lines even
+ * when the phrase would otherwise fit in one line on iPad. */
 .bz-zoo-instruction-balanced .bz-zoo-instruction-line {
   display: block;
   width: 100%;
   overflow-wrap: anywhere;
 }
-/* The SAME exit button is moved from the bottom of the card to the
- * overlay top-left during Zoo Break. No extra Back link can remain behind.
- * Shared white app Home glyph, charcoal pill and safe-area offsets. */
+/* ONE permanent Home at overlay top-left, from the FIRST Welcome Back
+ * frame through single-pet Escape and Zoo Break. No bottom text Back link.
+ * Same app white glyph / charcoal pill / iOS safe-area offsets. */
 .bz-zoo-home {
   position: absolute;
   z-index: 12;

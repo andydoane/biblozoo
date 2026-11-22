@@ -23,7 +23,8 @@ assert.doesNotMatch(engine, /Opening the gate/i);
 assert.doesNotMatch(engine, /const homeButton\s*=/,
   "no duplicate Home node may diverge from a still-visible Back");
 assert.match(engine, /exitButton\.className\s*=\s*"bz-zoo-home no-zoom"/);
-assert.match(engine, /exitButton\.className\s*=\s*"bz-zoo-exit no-zoom"/);
+assert.doesNotMatch(engine, /exitButton\.className\s*=\s*"bz-zoo-exit no-zoom"/,
+  "no old bottom text Back form can appear during welcome or escape");
 assert.match(engine, /overlay\.setAttribute\("data-zoo-stage", next\)/);
 assert.match(css, /\.bz-zoo-instruction-balanced \.bz-zoo-instruction-line\s*\{[^}]*display:\s*block/s);
 assert.match(css, /\.bz-zoo-instruction-balanced \.bz-zoo-instruction-line\s*\{[^}]*overflow-wrap:\s*anywhere/s);
@@ -35,10 +36,10 @@ assert.match(css, /\.bz-zoo-home\s*\{[^}]*safe-area-inset-left/s);
 assert.match(css, /\.bz-zoo-home\s*\{[^}]*background:\s*#333333;[^}]*color:\s*#ffffff/s);
 assert.match(css, /\.bz-zoo-home:focus-visible\s*\{/);
 assert.match(css, /\.bz-zoo-home\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/);
-assert.match(feedingCss, /\.daily-feed-resume-overlay\[data-zoo-stage="break"\] \.daily-feed-resume-back\s*\{[^}]*display:\s*none\s*!important/s,
-  "Feeding's independent arrow is not a duplicate exit during Zoo Break");
-assert.match(feedingCss, /\.daily-feed-resume-overlay \.bz-zoo-exit\s*\{[^}]*display:\s*none\s*!important/s,
-  "Feeding still keeps its own safe Back when not in Zoo Break");
+assert.match(feedingCss, /\.daily-feed-resume-overlay\[data-zoo-stage\] \.daily-feed-resume-back\s*\{[^}]*display:\s*none\s*!important/s,
+  "Feeding host Back hidden during every shared Welcome Back / Escape / Break stage");
+assert.match(read("read_my_verse.css"), /\.read-audio-resume-overlay\[data-zoo-stage\] \.read-audio-overlay-back\s*\{[^}]*display:\s*none\s*!important/s,
+  "Read My Verse's independent arrow hidden only under the shared controller");
 
 const fixture = read("scripts/validate_patch72_1a_zoo_escape.js");
 const from = fixture.indexOf("function harness(");
@@ -71,47 +72,45 @@ function assertLock(h, busy) {
   assert.equal(h.button.getAttribute("aria-busy"), busy ? "true" : "");
   assert.equal(h.button.getAttribute("aria-label"), busy ? "Locking the gate" : "Lock Gate");
 }
-function assertBreak(h, oldExit) {
-  assert.equal(h.ctl.getStage(), "break");
-  assert.equal(h.overlay.getAttribute("data-zoo-stage"), "break");
-  assert.equal(visibleExit(h), oldExit, "same exit button is reparented, not duplicated");
-  assert.equal(bottom(h), undefined, "no bottom Back element AT ALL during Zoo Break");
-  assert.equal(home(h), oldExit, "same button becomes Home at overlay top-left");
-  assert.equal(oldExit.hidden, false);
-  assert.ok(oldExit.innerHTML.includes(iconPath), "real white app Home SVG is in the visible button");
-  assert.equal(oldExit.getAttribute("aria-label"), "Back to Zoo");
-  assert.equal(oldExit.listeners.click.length, 1, "only one exit navigation listener");
-  assert.ok(h.overlay.children.indexOf(oldExit) < h.overlay.children.indexOf(h.card),
-    "top-left Home comes before popup in focus order");
-  const text = instruction(h);
-  assert.equal(text.className, "bz-zoo-instruction bz-zoo-instruction-balanced");
-  assert.equal(h.button.parentNode.parentNode.classList.contains("bz-zoo-balanced-hint"), !text.hidden,
-    "two-line hint gets natural height only while visible; LOCK GATE restores old height");
-  assert.equal(text.getAttribute("aria-label"), "Drag pets to the pen!");
-  assert.deepEqual(text.children.map(n => n.textContent), ["Drag pets ", "to the pen!"],
-    "explicit balanced lines remain two lines even when iPad has ample width");
-  assert.deepEqual(text.children.map(n => n.className),
+function assertHome(h, exit, expectedStage) {
+  assert.equal(h.ctl.getStage(), expectedStage);
+  assert.equal(h.overlay.getAttribute("data-zoo-stage"), expectedStage);
+  assert.equal(visibleExit(h), exit, "exactly the same Home for all three stages");
+  assert.equal(bottom(h), undefined, "no bottom text Back, including Welcome");
+  assert.equal(home(h), exit, "Home lives outside the card");
+  assert.equal(exit.hidden, false, "top-left safe Home always visible");
+  assert.ok(exit.innerHTML.includes(iconPath), "real app white Home path");
+  assert.equal(exit.getAttribute("aria-label"), "Back to Zoo");
+  assert.equal(exit.listeners.click.length, 1);
+  assert.ok(h.overlay.children.indexOf(exit) < h.overlay.children.indexOf(h.card),
+    "top-left Home first in focus order");
+}
+function assertBalancedHint(h, textValue, line1) {
+  const hint=instruction(h);
+  assert.equal(hint.className, "bz-zoo-instruction bz-zoo-instruction-balanced");
+  assert.equal(h.button.parentNode.parentNode.classList.contains("bz-zoo-balanced-hint"), !hint.hidden,
+    "both nested action slots expand only while instruction visible");
+  assert.equal(hint.getAttribute("aria-label"), textValue);
+  assert.deepEqual(hint.children.map(x=>x.textContent), [line1, "to the pen!"],
+    "real two-line copy even on wide iPads");
+  assert.deepEqual(hint.children.map(x=>x.className),
     ["bz-zoo-instruction-line", "bz-zoo-instruction-line"]);
+}
+function assertBreak(h, exit) {
+  assertHome(h,exit,"break");
+  assertBalancedHint(h,"Drag pets to the pen!","Drag pets ");
 }
 
 async function main() {
   const h = harness([false, false, { deferred: true }], { reduced: true });
   h.ctl.start();
   const exit = visibleExit(h);
-  assert.equal(exit, bottom(h));
-  assert.equal(exit.hidden, true);
-  assert.equal(home(h), undefined);
+  assertHome(h,exit,"welcome");
   h.button.trigger("click");
+  assertHome(h,exit,"welcome"); // Home survives the user's real recovery tap
   await Promise.resolve();
-  assert.equal(h.ctl.getStage(), "escape");
-  assert.equal(h.overlay.getAttribute("data-zoo-stage"), "escape");
-  assert.equal(visibleExit(h), exit);
-  assert.equal(bottom(h), exit);
-  assert.equal(exit.textContent, "Back to Zoo");
-  assert.equal(exit.hidden, false, "single pet still has its safe bottom exit");
-  assert.equal(home(h), undefined);
-  assert.equal(instruction(h).textContent, "Drag the pet to the pen!");
-  assert.equal(instruction(h).children.length, 0);
+  assertHome(h,exit,"escape");
+  assertBalancedHint(h,"Drag the pet to the pen!","Drag the pet ");
   h.advance(1200);
   h.rescueFirst();
   assertLock(h, false);
@@ -153,6 +152,7 @@ async function main() {
   const direct = harness([], { reduced: true });
   direct.ctl.start();
   const directExit = visibleExit(direct);
+  assertHome(direct,directExit,"welcome");
   assert.equal(direct.ctl.startSurprise("break"), true);
   assertBreak(direct, directExit);
   directExit.trigger("click");
@@ -166,9 +166,8 @@ async function main() {
   denied.ctl.start();
   denied.button.trigger("click"); await Promise.resolve();
   assert.equal(denied.ctl.getStage(), "escape");
-  assert.equal(home(denied), undefined);
-  assert.equal(bottom(denied).hidden, false);
-  bottom(denied).trigger("click");
+  assertHome(denied,home(denied),"escape");
+  home(denied).trigger("click");
   assert.equal(denied.fired.filter(x => x.exit).length, 1);
   denied.ctl.destroy();
 
@@ -190,6 +189,6 @@ async function main() {
     "successful Break completion is exactly once");
   completed.ctl.destroy();
 
-  console.log("IP04 follow-up PASS: actual two balanced lines, exactly one relocated Home/Back button, Feeding host Back suppression, accessible lock/exit, native deferred retry and safe no-credit exit");
+  console.log("IP04 follow-up PASS: permanently visible Home from Welcome through Escape/Break, two balanced hints, no text Back or host duplicates, original lock and deferred audio/credit safety");
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });
