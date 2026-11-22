@@ -4757,6 +4757,23 @@ Game Mix Loading Screen
   letter-spacing: 0.02em;
 }
 
+/* IP07: Final Test only. The visible initial and its measured, single
+   unbroken line form one no-wrap word; punctuation remains attached by the
+   existing learn-token-with-punctuation wrapper. Earlier Remove Words keeps
+   its underscore glyphs and original tap-to-reveal presentation. */
+.learn-verse.missing-words-theme .final-recall-missing-word {
+  white-space: nowrap;
+}
+.learn-verse.missing-words-theme .final-recall-remaining-line {
+  display: inline-block;
+  height: 0.78em;
+  border-bottom: 0.065em solid currentColor;
+  box-sizing: border-box;
+  vertical-align: baseline;
+  transform: translateY(0.07em);
+  white-space: nowrap;
+}
+
 .learn-verse .revealed-word {
   color: #ffd54f;
 }
