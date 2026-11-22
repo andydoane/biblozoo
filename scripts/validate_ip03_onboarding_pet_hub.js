@@ -12,7 +12,7 @@ const dailyCss = read("daily_zoo_todo.css");
 const profileCss = read("profiles.css");
 
 function cssRule(selector) {
-  const start = css.indexOf(selector + " {");
+  const start = css.lastIndexOf(selector + " {");
   assert.ok(start >= 0, "expected CSS rule " + selector);
   const end = css.indexOf("}", start);
   assert.ok(end > start, "expected closing brace for " + selector);
