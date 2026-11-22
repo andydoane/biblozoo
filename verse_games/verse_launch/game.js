@@ -2031,14 +2031,14 @@
             </div>
           </div>
           ${renderAstroLandingOverlay()}
-          ${renderAstroSteeringChoice()}
           ${shouldShowAstroArrowButtons() ? `
-            <div class="vl-space-controls">
+            <div class="vl-space-controls" id="vlArrowControls">
               <button class="vl-space-arrow no-zoom" id="vlLeftBtn" type="button" aria-label="Move left">‹</button>
               <button class="vl-space-arrow no-zoom" id="vlRightBtn" type="button" aria-label="Move right">›</button>
             </div>
           ` : ""}
         </div>
+        ${renderAstroSteeringChoice()}
         ${renderHelpOverlay()}
         ${renderGameMenuOverlay()}
       </div>`;
@@ -2326,10 +2326,12 @@
     state.astroControlMessage = message;
     astroInput.controlMode = null;
     astroInput.tiltEnabled = false;
-    const stage = $("#vlAstroStage");
-    if (!stage) return;
+    const screen = $(".vl-asteroid-screen");
+    if (!screen) return;
+    const arrows = $("#vlArrowControls");
+    if (arrows) arrows.hidden = false;
     $("#vlSteeringOverlay")?.remove();
-    stage.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
+    screen.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
     wireAstroSteeringChoice();
   }
 
@@ -2338,10 +2340,12 @@
     astroInput.controlMode = choice;
     state.astroControlPhase = "instructions";
     state.astroControlMessage = "";
-    const stage = $("#vlAstroStage");
-    if (!stage) return;
+    const screen = $(".vl-asteroid-screen");
+    if (!screen) return;
+    const arrows = $("#vlArrowControls");
+    if (arrows) arrows.hidden = choice === "tilt";
     $("#vlSteeringOverlay")?.remove();
-    stage.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
+    screen.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
     wireAstroSteeringChoice();
   }
 
