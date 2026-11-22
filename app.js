@@ -19574,68 +19574,6 @@ function renderZooTodoTutorialHtml(pageOverride = null, options = {}) {
   return renderNormalZooTodoListHtml();
 }
 
-function equalizeZooTodoTutorialClipboardPages(rootEl = document) {
-  const papers = Array.from(rootEl.querySelectorAll(".todo-dev-paper"));
-
-  papers.forEach((paper) => {
-    const currentNote = paper.querySelector(".todo-tutorial-note[data-tutorial-page]");
-    const currentPage = currentNote?.getAttribute("data-tutorial-page") || "";
-
-    // IP03: on iPad the first welcome clipboard should size to its own
-    // short copy, not the taller page-2/3 instructions. On iPhone retain
-    // the established equal-height tutorial transition behavior.
-    // Paper/page overflow-y scrolling remains owned by existing CSS.
-    const tabletWelcomePage =
-      currentPage === "1" &&
-      window.matchMedia?.("(min-width: 700px)")?.matches === true;
-
-    if (!["1", "2", "3"].includes(currentPage) || tabletWelcomePage) {
-      paper.style.removeProperty("--todo-tutorial-note-min-height");
-      return;
-    }
-
-    paper.style.removeProperty("--todo-tutorial-note-min-height");
-
-    const paperStyles = window.getComputedStyle(paper);
-    const paddingLeft = parseFloat(paperStyles.paddingLeft) || 0;
-    const paddingRight = parseFloat(paperStyles.paddingRight) || 0;
-    const paddingTop = parseFloat(paperStyles.paddingTop) || 0;
-    const contentWidth = Math.max(0, paper.clientWidth - paddingLeft - paddingRight);
-
-    if (!contentWidth) return;
-
-    const measure = document.createElement("div");
-    measure.className = "todo-tutorial-measure";
-    measure.setAttribute("aria-hidden", "true");
-
-    measure.style.left = `${paddingLeft}px`;
-    measure.style.top = `${paddingTop}px`;
-    measure.style.width = `${contentWidth}px`;
-
-    // Measure page 2 plus page 3's taller "returning" version.
-    // Page 4 is intentionally ignored because it does not immediately transition
-    // to another clipboard tutorial page.
-    measure.innerHTML = [
-      renderZooTodoTutorialHtml(2),
-      renderZooTodoTutorialHtml(3, { forceReturning: true })
-    ].join("");
-
-    paper.appendChild(measure);
-
-    const heights = Array.from(measure.querySelectorAll(".todo-tutorial-note"))
-      .map((note) => Math.ceil(note.getBoundingClientRect().height))
-      .filter((height) => height > 0);
-
-    measure.remove();
-
-    const minHeight = Math.max(...heights, 0);
-
-    if (minHeight > 0) {
-      paper.style.setProperty("--todo-tutorial-note-min-height", `${minHeight}px`);
-    }
-  });
-}
-
 function playZooTodoTutorialPageAudio(pageNumber, { explicit = false } = {}) {
   const src = TUTORIAL_PAGE_AUDIO[pageNumber];
   if (!src || State.screen !== Screen.TODO_DEV ||
@@ -19774,19 +19712,6 @@ function refreshZooTodoTutorialPage(rootEl) {
       pageNumber
     );
   }
-
-  requestAnimationFrame(() => {
-    if (
-      State.screen !== Screen.TODO_DEV ||
-      !rootEl?.isConnected
-    ) {
-      return;
-    }
-
-    equalizeZooTodoTutorialClipboardPages(
-      rootEl
-    );
-  });
 }
 
 
@@ -24308,14 +24233,6 @@ function render() {
   updateSlideTransforms();
 
   renderNav();
-
-  if (State.screen === Screen.TODO_DEV) {
-    requestAnimationFrame(() => {
-      if (State.screen === Screen.TODO_DEV) {
-        equalizeZooTodoTutorialClipboardPages(document);
-      }
-    });
-  }
 
   if (State.screen === Screen.VERSE_DETAIL && savedDetailScrollTop > 0) {
     requestAnimationFrame(() => {
