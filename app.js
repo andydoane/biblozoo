@@ -9602,6 +9602,43 @@ function getElementVerticalPaddingPx(el) {
   return top + bottom;
 }
 
+// IP07: size the one-piece Final Test blanks from the same Baloo font
+// metrics that the existing smart fitter uses. Store only a token index
+// in the DOM: the unrevealed letters never become visible DOM/ARIA text.
+// Fixed 100px canvas measurements become em values, so every binary-search
+// font size and every resize uses proportionate line widths automatically.
+function measureFinalRecallUnderlines(block) {
+  if (!block?.classList?.contains("smart-learn-text-final")) return;
+  const lines = block.querySelectorAll(".final-recall-remaining-line");
+  if (!lines.length) return;
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext?.("2d");
+  if (!context) return; // Renderer supplies a count-based em fallback.
+
+  const sample = block.querySelector(".final-recall-missing-word");
+  if (!sample) return;
+  const styles = window.getComputedStyle(sample);
+  context.font = `${styles.fontStyle || "normal"} ${styles.fontWeight || "900"} 100px ${styles.fontFamily || '"Baloo 2", sans-serif'}`;
+
+  lines.forEach((line) => {
+    const index = Number(line.dataset.finalTokenIndex);
+    const word = tokens[index];
+    if (!Number.isInteger(index) || word?.type !== TokenType.WORD) return;
+
+    const remainingLetters = Array.from(word.text).slice(1).join("");
+    const letterCount = Array.from(remainingLetters).length;
+    if (!letterCount) return;
+    const measured = context.measureText(remainingLetters).width;
+    if (!Number.isFinite(measured) || measured <= 0) return;
+
+    // Match the hint's existing 0.02em Baloo tracking, but paint one
+    // continuous stroke rather than separated underscore glyphs.
+    const emWidth = measured / 100 + letterCount * 0.02;
+    line.style.width = `${emWidth.toFixed(3)}em`;
+  });
+}
+
 function fitSmartLearnText(root = document) {
   const blocks = root.querySelectorAll("[data-smart-learn-text]");
 
@@ -9615,6 +9652,10 @@ function fitSmartLearnText(root = document) {
     const stageHeight = stage.clientHeight;
 
     if (stageWidth <= 0 || stageHeight <= 0) return;
+
+    // Set line widths BEFORE the existing ten-step fit search, and again
+    // whenever this fitter runs after Web fonts settle or a resize.
+    measureFinalRecallUnderlines(block);
 
     const stageContentWidth = Math.max(120, stageWidth - getElementHorizontalPaddingPx(stage));
     const stageContentHeight = Math.max(120, stageHeight - getElementVerticalPaddingPx(stage));
@@ -11927,11 +11968,32 @@ function finalRecallNode(showVerse = false) {
     if (showVerse) {
       node = document.createTextNode(t.text);
     } else if (t.type === TokenType.WORD) {
+      const letters = Array.from(t.text);
+      const first = letters[0] || "";
+      const missingCount = Math.max(0, letters.length - 1);
       const span = document.createElement("span");
       span.className =
-        "hintable no-zoom underscore";
-      span.textContent =
-        underscoresForWord(t.text);
+        "hintable no-zoom underscore final-recall-missing-word";
+      // Screen readers hear the actual first-letter clue and how many
+      // letters are missing, never an invented word or the hidden answer.
+      if (missingCount) {
+        span.setAttribute(
+          "aria-label",
+          `${first}, ${missingCount} ${missingCount === 1 ? "letter" : "letters"} missing`
+        );
+      }
+      span.appendChild(document.createTextNode(first));
+
+      if (missingCount) {
+        const line = document.createElement("span");
+        line.className = "final-recall-remaining-line";
+        line.setAttribute("aria-hidden", "true");
+        line.dataset.finalTokenIndex = String(i);
+        // This count-based fallback is overridden by measured Baloo
+        // glyph widths before smart fitting, including when fonts load.
+        line.style.width = `${(missingCount * 0.55).toFixed(2)}em`;
+        span.appendChild(line);
+      }
 
       node = span;
     } else {
