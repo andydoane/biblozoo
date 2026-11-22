@@ -288,8 +288,9 @@ select {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* IP05: extend the starfield to the game viewport bottom. */
-  padding: 0;
+  /* Preserve the original bottom safe-area/gameplay sizing. The parent
+   * .vl-root already paints the full starfield behind this space. */
+  padding: 0 0 var(--vl-game-bottom-pad);
 }
 
 .vl-game-board {
@@ -300,10 +301,9 @@ select {
   flex-direction: column;
   border-radius: 0;
   overflow: hidden;
-  background:
-    linear-gradient(rgba(0, 0, 0, .06), rgba(0, 0, 0, .06)),
-    var(--vl-starfield-main) center center / cover no-repeat,
-    var(--vl-shell);
+  /* IP05: paint one continuous starfield on .vl-root rather than a
+   * separately clipped image on this inner gameplay board. */
+  background: transparent;
 }
 
 @media (min-width: 700px) {
