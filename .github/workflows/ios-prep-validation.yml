@@ -71,6 +71,9 @@ jobs:
       - name: Validate IP08 Verse Splat and Bible Bugs bonus pace and book-wave fade
         run: node scripts/validate_ip08_practice_bonus_pacing.js
 
+      - name: Validate IP09 Bounce touch callouts and Verse Launch post-cutscene Tilt or Drag
+        run: node scripts/validate_ip09_touch_verse_launch.js
+
       - name: Validate Wheel final letter modal and permanent Welcome Back Home
         run: node scripts/validate_welcome_home_wheel_followup.js
 
