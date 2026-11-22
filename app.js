@@ -2217,6 +2217,24 @@ async function playLearnInstructionAudio() {
   updateLearnInstructionReadyUi();
 }
 
+// IP06: Keep tutorial Final Test credit and audio priming in the original
+// child gesture, but return to Zoo To-Do through the existing app fade.
+// Both the ordinary Final Test button and the tutorial's games-instruction
+// fallback call this one guarded route. Normal Learn → Practice is unchanged.
+function returnFromTutorialFinalTest() {
+  if (document.hidden || State.isSliding || appPageTransitionStarted) {
+    return false;
+  }
+
+  State.hasLearnedVerse = true;
+  if (VERSE_ID) markLearnCompleted(VERSE_ID);
+  // Native narration preparation MUST remain synchronous with this tap.
+  primeZooTodoTutorialNativeAudioFromGesture();
+  State.todoTutorialJustFinishedLearn = true;
+  markTutorialLearnDone(VERSE_ID);
+  return transitionToAppScreen(Screen.TODO_DEV);
+}
+
 async function continueLearnInstruction() {
   const key = State.learnInstructionKey;
   if (key === "listen" && isNativeLearnListenMode() && !muted) {
@@ -2264,20 +2282,13 @@ async function continueLearnInstruction() {
   }
 
   if (key === "games") {
-    State.hasLearnedVerse = true;
-
-    if (VERSE_ID) {
-      markLearnCompleted(VERSE_ID);
-    }
-
     if (isTutorialActive()) {
-      primeZooTodoTutorialNativeAudioFromGesture();
-      State.todoTutorialJustFinishedLearn = true;
-      markTutorialLearnDone(VERSE_ID);
-      go(Screen.TODO_DEV);
+      returnFromTutorialFinalTest();
       return;
     }
 
+    State.hasLearnedVerse = true;
+    if (VERSE_ID) markLearnCompleted(VERSE_ID);
     go(Screen.PRACTICE_HUB);
   }
 }
@@ -7811,7 +7822,11 @@ window.BibloZooDailyQuestions
       go(Screen.DAILY_SESSION),
 
     goToTitle: () =>
-      go(Screen.TITLE)
+      go(Screen.TITLE),
+    // Only the completed Daily Questions Feeding result uses this fade.
+    // Other Daily Questions Back, abort, and audio recovery keep their route.
+    goToTitleAfterFeeding: () =>
+      !document.hidden && transitionToAppScreen(Screen.TITLE)
   });
 
 function getVerseListItemById(verseId) {
@@ -11409,6 +11424,15 @@ function setScreen(screen) {
     releaseHideActivityVisuals();
     learnHideMenuPaused = false;
     appReturnPausedAt = 0;
+  }
+  // The app fade uses setScreen() rather than go(). Preserve go()'s Final
+  // Test teardown so a later Learn/Back visit cannot inherit reveal/timer.
+  if (State.screen === Screen.FINAL_RECALL && screen !== Screen.FINAL_RECALL) {
+    State.finalRecallActive = false;
+    State.finalRecallStartedAt = 0;
+    State.finalRecallDurationMs = 0;
+    State.finalRecallDone = false;
+    State.finalRecallRevealed = false;
   }
   if (State.screen === Screen.FLASHCARDS && screen !== Screen.FLASHCARDS) {
     window.BibloZooFlashcards?.stopSession?.();
@@ -21151,9 +21175,12 @@ function screenDailySnack(idx) {
           onBackToZoo: () => {
             // Quitting a feeding game is always allowed. Reward progress
             // is claimed only by onComplete; an unfinished snack remains
-            // available to play again from Daily To-Do.
+            // available to play again from Daily To-Do. Start the fade
+            // BEFORE clearing the session so a blocked/rapid tap can retry.
+            if (document.hidden || !transitionToAppScreen(Screen.TITLE)) {
+              return false;
+            }
             State.dailySnackSession = null;
-            go(Screen.TITLE);
             return true;
           }
         }
@@ -23522,18 +23549,7 @@ function screenFinalRecall(idx) {
       }
 
       if (isTutorialActive()) {
-        State.hasLearnedVerse = true;
-
-        if (VERSE_ID) {
-          markLearnCompleted(VERSE_ID);
-        }
-
-        // Practice time is a real button gesture; activate the next original
-        // tutorial-page-4 narrator before the async slide/page transition.
-        primeZooTodoTutorialNativeAudioFromGesture();
-        State.todoTutorialJustFinishedLearn = true;
-        markTutorialLearnDone(VERSE_ID);
-        go(Screen.TODO_DEV);
+        returnFromTutorialFinalTest();
         return;
       }
 
