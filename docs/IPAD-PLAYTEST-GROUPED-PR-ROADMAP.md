@@ -4,7 +4,7 @@
 
 ### Active packet — IP01 external How to Play / Game Menu consistency
 
-**Candidate branch:** [`fix/ip01-external-help-menu-consistency`](https://github.com/andydoane/biblozoo/tree/fix/ip01-external-help-menu-consistency) → `ios-prep`; **base:** `2b3497dc5dc6054dfbbc531817627707123944a7`. Owner explicitly requested this packet after merging #159. **8/8 requested observations have a scoped code change pending owner review**, not a merged or iPad/iPhone PASS. The review PR number, final head SHA and exact-head CI must be recorded once known; do not substitute the older stable #159 checks for IP01. All subsequent packets still await explicit implementation requests.
+**Candidate [implementation PR #160](https://github.com/andydoane/biblozoo/pull/160): OPEN / UNMERGED; owner iPad/iPhone NOT TESTED.** Branch [`fix/ip01-external-help-menu-consistency`](https://github.com/andydoane/biblozoo/tree/fix/ip01-external-help-menu-consistency) → `ios-prep`; **base:** `2b3497dc5dc6054dfbbc531817627707123944a7`. Owner explicitly requested this packet after merging #159. **8/8 requested observations have a scoped code change pending owner review**, not a merged or iPad/iPhone PASS. The review PR number, final head SHA and exact-head CI must be recorded once known; do not substitute the older stable #159 checks for IP01. All subsequent packets still await explicit implementation requests.
 
 | IP01 checklist | Implemented in proposed branch (not owner-verified) |
 | --- | --- |
