@@ -1295,7 +1295,7 @@
       case FEED_MODES.MELODY:
         return `${control} to catch snacks and play the tune!`;
       case FEED_MODES.BOUNCE:
-        return `${control} to rebound the white ball; feed your pet the colored snacks!`;
+        return `${control} to Bounce! Feed your pet the colored snacks!`;
       default:
         return `${control} to steer and catch the snacks!`;
     }
