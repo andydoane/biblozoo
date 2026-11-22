@@ -2303,9 +2303,12 @@
               ${state.astroControlMessage ? "" : "hidden"}>${escapeHtml(state.astroControlMessage)}</p>
           </div>
           <div class="vl-steering-instructions" ${state.astroControlPhase === "instructions" ? "" : "hidden"}>
-            <img class="vl-steering-selected-icon"
-              src="../../verse_images/daily_questions/dq_feed_control_${selected === "tilt" ? "tilt" : "drag"}.png"
-              alt="" draggable="false">
+            <div class="vl-steering-option vl-steering-selected-card" aria-hidden="true">
+              <img class="vl-steering-selected-icon"
+                src="../../verse_images/daily_questions/dq_feed_control_${selected === "tilt" ? "tilt" : "drag"}.png"
+                alt="" draggable="false">
+              <span>${selected === "tilt" ? "Tilt" : "Drag"}</span>
+            </div>
             <p>${instructions}</p>
             <button class="vl-steering-confirm no-zoom" id="vlSteeringConfirm"
               type="button">Got It!</button>
