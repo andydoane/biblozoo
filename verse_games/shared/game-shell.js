@@ -2460,7 +2460,8 @@
     modeSelectText = "Mode Select",
     exitText = "Exit Game",
     closeText = "Close",
-    showModeSelect = true
+    showModeSelect = true,
+    showMute = true
   } = {}) {
     const safeId = escapeHtml(id);
     const gameMix = isGameMixLaunch();
@@ -2473,13 +2474,13 @@
           <div class="vm-game-menu-header">
             <div class="vm-game-menu-title">${escapeHtml(title)}</div>
 
-            <button
+${showMute ? `<button
               class="vm-game-menu-mute-btn"
               id="${safeId}MuteBtn"
               type="button"
               aria-label="${muted ? "Unmute" : "Mute"}"
               title="${muted ? "Unmute" : "Mute"}"
-            >${muted ? "🔇" : "🔊"}</button>
+            >${muted ? "🔇" : "🔊"}</button>` : ""}
           </div>
 
           <div class="vm-game-menu-actions">

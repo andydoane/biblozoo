@@ -1201,7 +1201,9 @@ function applyBuildTextRender(){
 
 function nonGameHelpHtml(){
   return `
-    Tap the bouncing blob with the next word of the verse.<br><br>Then tap the Bible book and verse numbers.<br><br>Keep splatting colorful paint across the board!
+    <p>Tap the bouncing blob with the next word of the verse.</p>
+    <p>Each splat fills in squares on the board.</p>
+    <p>Fill in every square to earn a surprise painting!</p>
   `;
 }
 
@@ -1294,10 +1296,10 @@ function overlayMarkup(){
     return `
       <div class="vsp-overlay">
         <div class="vsp-overlay-card">
-          <div class="vsp-overlay-title">How to Play</div>
+          <div class="vsp-overlay-title vsp-overlay-title-help">How to Play</div>
           <div class="vsp-overlay-copy">${nonGameHelpHtml()}</div>
           <div class="vsp-overlay-actions">
-            <button class="vm-btn vsp-menu-action" data-action="close-help">${state.helpBackMode ? 'Back' : 'OK'}</button>
+            <button class="vm-btn vsp-menu-action vsp-help-action" data-action="close-help">${state.helpBackMode ? 'Back' : 'OK'}</button>
           </div>
         </div>
       </div>

@@ -2471,10 +2471,13 @@
   }
 
   function openHelpFromMenu(){
-    const overlay = document.getElementById(HELP_OVERLAY_ID);
-    if (overlay){
-      overlay.removeAttribute("hidden");
-    }
+    // Menu's custom handler owns showing Help; removing hidden is not
+    // enough because the shared overlay stays display:none until is-open.
+    const menu = document.getElementById(MENU_OVERLAY_ID);
+    menu?.classList.remove("is-open");
+    menu?.setAttribute("aria-hidden", "true");
+    window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
+    document.getElementById(`${HELP_OVERLAY_ID}CloseBtn`)?.focus?.({preventScroll:true});
   }
 
   function setPaused(paused, reason = ""){

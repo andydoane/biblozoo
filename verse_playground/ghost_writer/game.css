@@ -1092,15 +1092,18 @@ body {
   box-shadow: 0 2px 0 rgba(0, 0, 0, .28);
 }
 
-.ghost-help-list {
+.ghost-help-copy {
   margin: 0;
-  padding-left: 1.1em;
-  text-align: left;
+  text-align: center;
   font-weight: 800;
   line-height: 1.22;
 }
 
-.ghost-help-list li+li {
+.ghost-help-copy p {
+  margin: 0;
+}
+
+.ghost-help-copy p + p {
   margin-top: 8px;
 }
 

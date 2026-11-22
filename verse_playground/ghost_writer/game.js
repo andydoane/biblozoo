@@ -1426,10 +1426,10 @@
 
   function helpHtml() {
     return `
-      <ul class="ghost-help-list">
-        <li>Draw each letter with your finger.</li>
-        <li>Then watch the ghost write the verse using your letters!</li>
-      </ul>
+      <div class="ghost-help-copy">
+        <p>Draw each letter with your finger.</p>
+        <p>Then watch the ghost write the verse using your letters!</p>
+      </div>
     `;
   }
 

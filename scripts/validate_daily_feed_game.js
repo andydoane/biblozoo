@@ -1176,7 +1176,7 @@ function testBounceRenderAndControllerContract() {
   assert.ok(paddleCss.includes("border-radius: 999px"));
   assert.ok(paddleCss.includes("box-sizing: border-box"));
   assert.ok(paddleCss.includes("var(--daily-feed-pet-size"));
-  assert.ok(markup.includes("Drag to rebound the white ball; feed your pet the colored snacks!"));
+  assert.ok(markup.includes("Drag to Bounce! Feed your pet the colored snacks!"));
   assert.ok(markup.includes(
     "bounce the white ball while Pip catches colored snacks"
   ));
@@ -3838,7 +3838,7 @@ function testModeAwareInstructionsAndTiltFallback() {
     classic: "Drag to steer and catch the snacks!",
     labyrinth: "Drag to guide snacks through the gaps!",
     melody: "Drag to catch snacks and play the tune!",
-    bounce: "Drag to rebound the white ball; feed your pet the colored snacks!"
+    bounce: "Drag to Bounce! Feed your pet the colored snacks!"
   };
   Object.entries(expected).forEach(([mode, instruction]) => {
     assert.ok(api.render({ session: { feedMode: mode } }).includes(instruction));

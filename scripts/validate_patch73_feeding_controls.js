@@ -58,7 +58,7 @@ function makeUi(){
  equal(drag.controlPhase,"instructions","shows second screen");
  equal(drag.startConfirmEl.hidden,false,"second step visible");
  equal(drag.startChoiceEl.hidden,true,"first step hidden");
- check(drag.startInstructionEl.textContent.startsWith("Drag to rebound"),"Drag-specific Bounce prompt");
+ check(drag.startInstructionEl.textContent.startsWith("Drag to Bounce"),"Drag-specific Bounce prompt");
  equal(drag.startConfirmButton.textContent,"Got It!","confirmation label");
  const denied=makeUi();hooks.setActive(denied);
  window.DeviceOrientationEvent={requestPermission:()=>Promise.resolve("denied")};
@@ -71,7 +71,7 @@ function makeUi(){
  await hooks.chooseFeedingControl(granted,"tilt");
  equal(granted.controlMode,"tilt","Tilt selected after permission");
  equal(granted.tiltEnabled,true,"Tilt activates motion input");
- check(granted.startInstructionEl.textContent.startsWith("Tilt to rebound"),"Tilt-specific Bounce prompt");
+ check(granted.startInstructionEl.textContent.startsWith("Tilt to Bounce"),"Tilt-specific Bounce prompt");
  const missing=makeUi();hooks.setActive(missing);delete window.DeviceOrientationEvent;
  await hooks.chooseFeedingControl(missing,"tilt");
  equal(missing.controlMode,null,"missing sensor does not start");
