@@ -69,6 +69,25 @@
   const PROFILE_PICTURE_FALLBACK_SRC =
     `${PROFILE_PICTURE_DIR}profile_picture_fallback.png`;
 
+  // IP10: a curated set of existing PUBLIC bundled pet art, not Zookeeper
+  // photos/profile identifiers. The 24 filenames are checked by CI.
+  // A fixed pool also works offline when verse_list.json cannot be fetched.
+  const BONUS_PICTURE_VERSE_IDS = [
+    "genesis_1_1", "genesis_1_27", "exodus_15_11", "joshua_1_9",
+    "psalm_23_4", "psalm_46_1", "psalm_91_1", "psalm_119_105",
+    "proverbs_3_5", "isaiah_26_3", "isaiah_41_10", "daniel_2_44",
+    "matthew_5_16", "matthew_6_26", "matthew_11_28", "luke_2_11",
+    "john_3_16", "john_14_6", "acts_16_31", "romans_5_8",
+    "romans_8_28", "1_corinthians_15_22", "galatians_5_22_23",
+    "ephesians_2_8_9"
+  ];
+
+  const BONUS_PICTURE_COUNT_BY_MODE = {
+    easy: 12,
+    medium: 16,
+    hard: 20
+  };
+
   const PROFILE_MAGNET_COLORS = [
     "#ff5a51",
     "#ffa351",
@@ -272,6 +291,7 @@
   let lastProfileRewardVerseId = "";
   let queuedProfileReward = null;
   let queuedProfileRewardPromise = null;
+  let bonusPicturePreloads = [];
 
   const uiSoundBuffers = new Map();
   const uiSoundBufferPromises = new Map();
@@ -318,6 +338,8 @@
     bonusTargetLetter: "",
     bonusTargetColor: "",
     bonusTargetShade: "",
+    bonusPictureChoices: [],
+    bonusPictureTarget: null,
     bonusRoundToken: 0,
     bonusDeadline: 0,
     bonusPointerRunning: false,
@@ -1458,6 +1480,9 @@
     state.bonusTargetLetter = "";
     state.bonusTargetColor = "";
     state.bonusTargetShade = "";
+    state.bonusPictureChoices = [];
+    state.bonusPictureTarget = null;
+    bonusPicturePreloads = [];
     state.bonusRoundToken += 1;
     state.bonusDeadline = 0;
     state.bonusPointerRunning = false;
@@ -1945,6 +1970,20 @@
   }
 
   function renderBonusFindHtml(){
+    if (state.bonusRound === 5 && state.bonusPictureTarget) {
+      return `
+        <div class="vsn-instruction-message vsn-bonus-find-message"
+          id="vsnInstructionMessage" aria-label="Find the matching pet picture">
+          <div class="vsn-instruction-line">
+            ${Array.from("FIND").map((ch, index) => introLetterHtml(ch, index)).join("")}
+          </div>
+          <div class="vsn-instruction-line">
+            <img class="vsn-bonus-find-picture"
+              src="${escapeHtml(state.bonusPictureTarget.src)}"
+              alt="Pet picture ${state.bonusPictureTarget.pictureNumber}" draggable="false">
+          </div>
+        </div>`;
+    }
     return `
       <div class="vsn-instruction-message vsn-bonus-find-message" id="vsnInstructionMessage" aria-label="Find ${escapeHtml(state.bonusTargetLetter)}">
         <div class="vsn-instruction-line">
@@ -1986,6 +2025,48 @@
   }
 
 
+  // A public verse + difficulty determines distinct picture choices without
+  // using any private Zookeeper/profile data. Seven is coprime with 24,
+  // so visiting the pool in steps of seven never repeats a picture.
+  function bonusPictureSeed() {
+    const text = String(ctx.verseId || "biblozoo") + "|" +
+      String(selectedMode || "easy");
+    let hash = 2166136261;
+    for (const char of text) {
+      hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function prepareBonusPictureRound() {
+    const seed = bonusPictureSeed();
+    const count = BONUS_PICTURE_COUNT_BY_MODE[selectedMode] || 12;
+    const poolSize = BONUS_PICTURE_VERSE_IDS.length;
+    const choices = [];
+
+    for (let i = 0; i < count; i++) {
+      const index = ((seed % poolSize) + i * 7) % poolSize;
+      const verseId = BONUS_PICTURE_VERSE_IDS[index];
+      choices.push({
+        pictureNumber: index + 1,
+        src: `${PROFILE_PICTURE_DIR}profile_picture_${verseId}.png`
+      });
+    }
+
+    state.bonusPictureChoices = choices;
+    state.bonusPictureTarget = choices[(seed >>> 16) % choices.length];
+
+    // Warm bundled assets during the existing intro + four letter rounds.
+    // No fetch, timers, bonus clock changes, or wait for image loading.
+    bonusPicturePreloads = typeof Image === "function"
+      ? choices.map(choice => {
+          const img = new Image();
+          img.src = choice.src;
+          return img;
+        })
+      : [];
+  }
+
   function startBonusIntro() {
     state.bonusActive = true;
     state.bonusStage = "intro";
@@ -1997,6 +2078,7 @@
     state.bonusRoundToken += 1;
     state.busy = true;
     state.tiles = [];
+    prepareBonusPictureRound();
     render();
 
     const token = state.bonusRoundToken;
@@ -2030,10 +2112,17 @@
     state.bonusPointerRunning = false;
     state.bonusRoundToken += 1;
 
-    const color = randomItem(MAGNET_COLORS);
-    state.bonusTargetLetter = randomItem(LETTERS);
-    state.bonusTargetColor = color;
-    state.bonusTargetShade = darkenHexColor(color, 30);
+    if (state.bonusRound < 5) {
+      // Original letter/color hunt is untouched in rounds 1–4.
+      const color = randomItem(MAGNET_COLORS);
+      state.bonusTargetLetter = randomItem(LETTERS);
+      state.bonusTargetColor = color;
+      state.bonusTargetShade = darkenHexColor(color, 30);
+    } else {
+      state.bonusTargetLetter = "";
+      state.bonusTargetColor = "";
+      state.bonusTargetShade = "";
+    }
     state.tiles = [];
 
     render();
@@ -2062,6 +2151,8 @@
   }
 
   function startBonusFinal() {
+    // Image nodes are no longer displayed; release prefetch references.
+    bonusPicturePreloads = [];
     state.bonusStage = "final";
     state.bonusResultText = "";
     state.bonusResultKind = "";
@@ -2097,7 +2188,25 @@
       token === state.bonusRoundToken;
   }
 
+  function makeBonusPictureTiles() {
+    // The same player-vs-pointer target contract used by letter rounds:
+    // exactly one picture target and distinct decoys, no extra scoring.
+    return shuffle(state.bonusPictureChoices.map(picture => ({
+      id: `vsn_tile_${state.tileSeed++}`,
+      source: picture === state.bonusPictureTarget
+        ? "bonus-target" : "bonus-decoy",
+      isBonusTarget: picture === state.bonusPictureTarget,
+      isBonusPicture: true,
+      pictureSrc: picture.src,
+      pictureNumber: picture.pictureNumber,
+      rotation: Math.round(Math.random() * 24 - 12)
+    })));
+  }
+
   function makeBonusTiles() {
+    if (state.bonusRound === 5 && state.bonusPictureTarget) {
+      return makeBonusPictureTiles();
+    }
     const targetTile = {
       id: `vsn_tile_${state.tileSeed++}`,
       char: state.bonusTargetLetter,
@@ -2175,6 +2284,13 @@
 
   function renderBonusTargetHtml() {
     if (state.bonusStage !== "round") return "";
+    if (state.bonusRound === 5 && state.bonusPictureTarget) {
+      return `<span class="vsn-bonus-picture-target">
+        <span>Find:</span>
+        <img src="${escapeHtml(state.bonusPictureTarget.src)}"
+          alt="Pet picture ${state.bonusPictureTarget.pictureNumber}" draggable="false">
+      </span>`;
+    }
     return `Find: <span class="vsn-bonus-target-letter" style="color:${state.bonusTargetColor};">${escapeHtml(state.bonusTargetLetter)}</span>`;
   }
 
@@ -2351,6 +2467,17 @@
   }
 
   function renderScrambleTileHtml(tile) {
+    if (tile.isBonusPicture) {
+      // Raw artwork only: no circular/rounded frame, crop, or decorative
+      // border. A transparent button keeps finger + keyboard hit targets.
+      return `
+        <button class="vsn-magnet vsn-bonus-picture-tile no-zoom is-spawning"
+          type="button" id="${tile.id}" data-tile-id="${tile.id}"
+          style="--magnet-rot:${tile.rotation}deg;"
+          aria-label="Pet picture ${tile.pictureNumber}">
+          <img src="${escapeHtml(tile.pictureSrc)}" alt="" draggable="false">
+        </button>`;
+    }
     if (tile.isProfileReward) {
       const shapeClass =
         tile.profileShape === "circle"
@@ -2396,6 +2523,10 @@
   function renderGame(){
     const buildRender = renderBuildText();
     const rootBonusClass = state.bonusActive ? "vsn-bonus-active" : "";
+    const pictureRound = state.bonusActive && state.bonusRound === 5 &&
+      !!state.bonusPictureTarget &&
+      (state.bonusStage === "find" || state.bonusStage === "round");
+    const rootPictureClass = pictureRound ? "vsn-bonus-picture-round" : "";
     const targetIsBlank = state.showingInstruction ||
       state.bonusStage === "intro" ||
       state.bonusStage === "find" ||
@@ -2416,7 +2547,7 @@
             : state.tiles.map(renderScrambleTileHtml).join("");
 
     app.innerHTML = `
-      <div class="vsn-root vsn-mode-${selectedMode || "easy"} ${rootBonusClass}">
+      <div class="vsn-root vsn-mode-${selectedMode || "easy"} ${rootBonusClass} ${rootPictureClass}">
         <div class="vsn-stage">
           <div class="vsn-build-wrap">
             <div class="vsn-build vm-build vm-build--${BUILD_AREA}" id="vsnBuild">
@@ -2428,11 +2559,11 @@
             <div class="vsn-fridge-board" id="vsnBoard">
               <button class="vsn-menu-pill no-zoom" id="vsnMenuPill" aria-label="Game Menu" type="button">☰</button>
 
-              <div class="vsn-target-note ${targetIsBlank ? "is-blank" : ""}" id="vsnTargetNote" aria-live="polite">
+              <div class="vsn-target-note ${targetIsBlank ? "is-blank" : ""}" id="vsnTargetNote" aria-live="polite"${pictureRound ? ` aria-label="Find pet picture ${state.bonusPictureTarget.pictureNumber}"` : ""}>
                 <div class="vsn-target-text" id="vsnTargetText">${targetIsBlank ? "" : targetHtml}</div>
               </div>
 
-              <div class="vsn-letter-field ${isMessageField ? "is-message-field" : ""}" id="vsnLetterField" aria-label="Scrambled magnet letters">
+              <div class="vsn-letter-field ${isMessageField ? "is-message-field" : ""}" id="vsnLetterField" aria-label="${pictureRound ? "Pet pictures: find the matching picture" : "Scrambled magnet letters"}">
                 ${fieldHtml}
               </div>
               ${renderBonusPointerHtml()}
@@ -2510,7 +2641,7 @@
 
   function helpHtml(){
     return `
-    Look at the word in the yellow box.<br><br>Tap the mixed-up magnet letters to spell it! Keep spelling words to finish the verse.<br><br>In the bonus round, find the hidden letters before the computer does.
+    Look at the word in the yellow box.<br><br>Tap the mixed-up magnet letters to spell it! Keep spelling words to finish the verse.<br><br>In bonus rounds 1–4, find the hidden letters before the computer does. In round 5, find the matching pet picture!
   `;
   }
 
