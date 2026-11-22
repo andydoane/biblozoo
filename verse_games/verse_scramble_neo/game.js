@@ -69,6 +69,25 @@
   const PROFILE_PICTURE_FALLBACK_SRC =
     `${PROFILE_PICTURE_DIR}profile_picture_fallback.png`;
 
+  // IP10: a curated set of existing PUBLIC bundled pet art, not Zookeeper
+  // photos/profile identifiers. The 24 filenames are checked by CI.
+  // A fixed pool also works offline when verse_list.json cannot be fetched.
+  const BONUS_PICTURE_VERSE_IDS = [
+    "genesis_1_1", "genesis_1_27", "exodus_15_11", "joshua_1_9",
+    "psalm_23_4", "psalm_46_1", "psalm_91_1", "psalm_119_105",
+    "proverbs_3_5", "isaiah_26_3", "isaiah_41_10", "daniel_2_44",
+    "matthew_5_16", "matthew_6_26", "matthew_11_28", "luke_2_11",
+    "john_3_16", "john_14_6", "acts_16_31", "romans_5_8",
+    "romans_8_28", "1_corinthians_15_22", "galatians_5_22_23",
+    "ephesians_2_8_9"
+  ];
+
+  const BONUS_PICTURE_COUNT_BY_MODE = {
+    easy: 12,
+    medium: 16,
+    hard: 20
+  };
+
   const PROFILE_MAGNET_COLORS = [
     "#ff5a51",
     "#ffa351",
@@ -272,6 +291,7 @@
   let lastProfileRewardVerseId = "";
   let queuedProfileReward = null;
   let queuedProfileRewardPromise = null;
+  let bonusPicturePreloads = [];
 
   const uiSoundBuffers = new Map();
   const uiSoundBufferPromises = new Map();
@@ -318,6 +338,8 @@
     bonusTargetLetter: "",
     bonusTargetColor: "",
     bonusTargetShade: "",
+    bonusPictureChoices: [],
+    bonusPictureTarget: null,
     bonusRoundToken: 0,
     bonusDeadline: 0,
     bonusPointerRunning: false,
@@ -1458,6 +1480,9 @@
     state.bonusTargetLetter = "";
     state.bonusTargetColor = "";
     state.bonusTargetShade = "";
+    state.bonusPictureChoices = [];
+    state.bonusPictureTarget = null;
+    bonusPicturePreloads = [];
     state.bonusRoundToken += 1;
     state.bonusDeadline = 0;
     state.bonusPointerRunning = false;
