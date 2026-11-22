@@ -1442,7 +1442,7 @@ select {
 /* Reuse Feeding's two-stage yellow control-choice presentation and its
    Tilt/Drag illustrations, without importing Feeding's reward/audio state. */
 .vl-steering-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 40;
   display: flex;
@@ -1452,6 +1452,7 @@ select {
   background: rgba(25, 18, 34, .58);
 }
 .vl-steering-overlay[hidden],
+.vl-space-controls[hidden],
 .vl-steering-choice[hidden],
 .vl-steering-instructions[hidden],
 .vl-steering-message[hidden] {
