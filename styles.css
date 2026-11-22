@@ -1706,6 +1706,13 @@ Zoo To-Do Clipboard Prototype
   padding-left: 0.1em;
 }
 
+/* IP03: a numbered list reads naturally with ordinary line wrapping;
+   keep the existing balanced wrapping for tutorial paragraphs. */
+.todo-tutorial-note[data-tutorial-page="2"] .todo-tutorial-body ol,
+.todo-tutorial-note[data-tutorial-page="2"] .todo-tutorial-body li {
+  text-wrap: wrap;
+}
+
 .todo-tutorial-actions {
   display: flex;
   justify-content: center;
@@ -6231,6 +6238,7 @@ BibloPet Unlock Screen
 
 .pet-unlock-care-text {
   width: min(92vw, 520px);
+  max-width: 100%;
   font-size: clamp(19px, 4.8vw, 31px);
   font-weight: 900;
   line-height: 1.08;

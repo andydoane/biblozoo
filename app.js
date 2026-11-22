@@ -19581,7 +19581,15 @@ function equalizeZooTodoTutorialClipboardPages(rootEl = document) {
     const currentNote = paper.querySelector(".todo-tutorial-note[data-tutorial-page]");
     const currentPage = currentNote?.getAttribute("data-tutorial-page") || "";
 
-    if (!["1", "2", "3"].includes(currentPage)) {
+    // IP03: on iPad the first welcome clipboard should size to its own
+    // short copy, not the taller page-2/3 instructions. On iPhone retain
+    // the established equal-height tutorial transition behavior.
+    // Paper/page overflow-y scrolling remains owned by existing CSS.
+    const tabletWelcomePage =
+      currentPage === "1" &&
+      window.matchMedia?.("(min-width: 700px)")?.matches === true;
+
+    if (!["1", "2", "3"].includes(currentPage) || tabletWelcomePage) {
       paper.style.removeProperty("--todo-tutorial-note-min-height");
       return;
     }
@@ -22482,8 +22490,6 @@ function screenPetUnlock(idx) {
       </div>
 
       <div class="pet-unlock-reveal-phase" aria-live="polite">
-        <div class="pet-unlock-care-text">${escapeHtml(careText)}</div>
-
         <div class="pet-unlock-card">
           <div class="pet-unlock-reveal-pet pet-emoji-unlocked">
             ${bibloPetVisualHtml(verseId, petEmoji)}
@@ -22506,6 +22512,8 @@ function screenPetUnlock(idx) {
             </button>
           `}
         </div>
+
+        <div class="pet-unlock-care-text">${escapeHtml(careText)}</div>
       </div>
     </div>
   `;
@@ -23715,7 +23723,7 @@ const LISTEN_ACTIVITY_CARDS = Object.freeze([
   { id: "unscramble", title: "Unscramble", iconImage: IMG_DIR + "game_icons/app_icon_unscramble.png", cardColor: "#a7cb6f", cardTextColor: "#333333" },
   { id: "star_wars", title: "Space", iconImage: IMG_DIR + "game_icons/app_icon_verse_crawl.png", cardColor: "#f2f2f2", cardTextColor: "#333333" },
   { id: "tap_words_order", title: "Tap in Order", iconImage: IMG_DIR + "game_icons/app_icon_tap_words_in_order.png", cardColor: "#7f66c6", cardTextColor: "#ffffff" },
-  { id: "chunk_sequence", title: "Sound Sequence", iconImage: IMG_DIR + "game_icons/app_icon_chunk_audio_matching.png", cardColor: "#ff5a51", cardTextColor: "#333333" }
+  { id: "chunk_sequence", title: "Sound Sequence", iconImage: IMG_DIR + "game_icons/app_icon_chunk_audio_matching.png", cardColor: "#ff5a51", cardTextColor: "#ffffff" }
 ].map((item) => Object.freeze(item)));
 
 function screenLearnHub(idx) {
