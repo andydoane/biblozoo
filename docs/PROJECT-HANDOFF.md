@@ -12,7 +12,7 @@
 3. Change Feeding Bounce control prompt in `daily_questions_feed_game.js` to `Drag to Bounce!` / `Tilt to Bounce!`; update old Patch 73 expectation test.
 4. Scripture Snake first help sentence: “Tap and hold where you want the snake to go.”
 5. Ghost Writer `helpHtml` becomes two centered paragraphs instead of left-aligned `ul/li` list.
-6. Shared Help title pill and bottom Close/Back buttons in `verse_games/shared/shell.css` explicitly use existing `--vm-purple` and white text in all 12 games + 5 Playground apps; per-game theme remains for **other** UI elements. No broad media query/phone layout geometry changes.
+6. Shared Help title pill and bottom Close/Back buttons in `verse_games/shared/shell.css` explicitly use existing `--vm-purple` and white text in all 12 games + 5 Playground apps; **Verse Splat's additional custom in-game Help popup** also gets a scoped purple title pill and action in `verse_splat/game.css`. Per-game theme remains for **other** UI elements. No broad media query/phone layout geometry changes.
 7. Repair Versey Bird and Dino Dash Game Menu → How to Play callbacks: merely clearing `hidden` did not satisfy shared CSS `.is-open`. They now hide Menu, use shared `openHelp(...,"back","Back")` and focus visible Back; shared onBackFromHelp returns to paused game menu; game clocks and native preflight remain unchanged.
 8. Add backwards-compatible `showMute=true` option to shared Game Menu markup; **Verse Jam only** passes `showMute:false`. Preserve internal `setMuted`, audio session, actual mute state, other games' Mute controls and close/recovery paths.
 
