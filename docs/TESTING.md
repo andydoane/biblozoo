@@ -1,6 +1,17 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — WHEEL-01 muted Wheel of Bible Game Menu on iPad (2026-11-21)
+## CURRENT — iPad playtest and iPhone layout preservation gate (2026-11-21)
+
+The owner has **accepted the merged** [WHEEL-01 #158](https://github.com/andydoane/biblozoo/pull/158) Game Menu Mute → Close repair on real **iPad** (“Your fix worked well”); stable `ios-prep` merge SHA `428a60fb1984ce75c2f04555d72d303c3f549316`, exact [post-merge CI #44946754695](https://github.com/andydoane/biblozoo/actions/runs/44946754695) **PASS**. Prior WHEEL-01 candidate test steps below are now historical; owner acceptance is specific to the reported regression, not an itemized all-orientation device matrix.
+
+New [iPad grouped roadmap](IPAD-PLAYTEST-GROUPED-PR-ROADMAP.md) covers **34** owner-reported observations in **10 proposed IP01–IP10 PR packets**. These are **PLANNED / NOT IMPLEMENTED**, and docs-only planning changes require no phone reinstall. Every later packet must update the roadmap and the **same** [living handoff](PROJECT-HANDOFF.md), run focused regressions and full final-head GitHub Actions where applicable, and distinguish automation, Apple Xcode SDK build, and real iPad/iPhone observation.
+
+**Hard layout regression gate in each implementation PR:** compare iPad portrait/landscape **and iPhone portrait/landscape**, including narrow phone viewport, safe areas, long verse/profile text, enlarged fonts, reduced-motion settings and keyboard/touch accessibility. Ensure iPad-specific visual changes don't cause unintended iPhone changes. Use scoped component CSS/media queries, not broad global overrides. Also smoke-check Web/PWA/Android when relevant. For menus/transitions, verify state/animation clocks, exact first tap, focus, Welcome Back and no duplicate progress/rewards; never mark physical PASS from a Node VM or web build.
+
+**Current implementation/device status:** No IP01–IP10 runtime changes or physical verification have occurred under this roadmap. The owner chooses which packet to start; recommendation **IP01** shared How to Play/Game Menu consistency, or **IP02** Daily Questions Next and Daily-context Mode Select if those blockers take priority. No code branch merge, App Store, TestFlight, profile import/reset or device install is implied by the roadmap.
+
+---
+## HISTORICAL — WHEEL-01 candidate before #158 owner iPad PASS (superseded)
 
 **Owner reproduction / bug:** In native iPad Wheel of Bible, opening Game Menu freezes a running raining Bible Bux animation correctly. Muting from the menu and closing it can leave the game clock/animation permanently paused; the menu button then rejects reopening even though task-switching still shows a responsive Welcome Back. Report reproduced; no Xcode JavaScript stack trace was captured.
 
