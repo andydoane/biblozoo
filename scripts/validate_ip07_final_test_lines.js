@@ -17,7 +17,7 @@ function between(s, a, b) {
 const renderer = between(app, "function finalRecallNode(showVerse = false) {",
   "function instructionAudioFile(key) {");
 const fitter = between(app, "function getSmartLearnLineHeight(",
-  "/* =========================\n    4. Verse Loading");
+  "/* =========================\n   4. Verse Loading");
 assert.match(app, /return first \+ "_"\.repeat\(restLen\);/, "old Remove Words blanks preserved");
 assert.ok(!renderer.includes("underscoresForWord("), "Final Test never emits underscore glyphs");
 assert.match(renderer, /if \(showVerse\)\s*\{\s*node = document\.createTextNode\(t\.text\)/);
