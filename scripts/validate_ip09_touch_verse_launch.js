@@ -30,7 +30,30 @@ for(const name of feedImages) {
   assert.ok(feed.includes(name), "original Feeding art unchanged");
 }
 assert.match(css,/\.vl-steering-overlay\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*40;/s);
-assert.match(css,/\.vl-space-controls\[hidden\]/);
+// IP09 owner-device follow-up: no on-screen left/right buttons in Drag,
+// Tilt, chooser, or desktop gameplay. Physical keyboard keys remain functional.
+const asteroidRender=part(game,"function renderAsteroidGame() {","function renderEnd() {");
+assert.doesNotMatch(asteroidRender,/vlArrowControls|vlLeftBtn|vlRightBtn|vl-space-controls|vl-space-arrow/,
+  "asteroid board never renders the old obstructing arrow buttons");
+assert.doesNotMatch(css,/\.vl-space-controls|\.vl-space-arrow/,
+  "retired arrow-button rules cannot reintroduce visible controls");
+
+// The red wrong-answer flash must cover the padded game wrapper without
+// changing the original board dimensions, hit targets, or flash animation.
+const gameRender=part(game,"function renderGame() {","function renderTravel() {");
+assert.match(gameRender,/<div class="vl-game-wrap">\s*<div class="vl-red-flash" id="vlRedFlash" aria-hidden="true"><\/div>\s*<div class="vl-game-board" id="vlBoard">/,
+  "the visual-only red overlay is outside the board, inside the padded wrapper");
+assert.equal((gameRender.match(/id="vlRedFlash"/g)||[]).length,1);
+assert.match(css,/\.vl-game-wrap\s*\{[^}]*position:\s*relative;[^}]*padding:\s*0 0 var\(--vl-game-bottom-pad\);/s,
+  "wrapper anchors the flash and retains original bottom safe-area padding");
+assert.match(css,/\.vl-game-board\s*\{[^}]*min-height:\s*260px;[^}]*background:\s*transparent;/s,
+  "the gameplay board geometry remains unchanged");
+assert.match(css,/\.vl-red-flash\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*pointer-events:\s*none;/s,
+  "full wrapper coverage cannot intercept child taps");
+assert.match(css,/\.vl-red-flash\.is-flashing\s*\{\s*animation:\s*vlRedFlash 380ms ease/,
+  "preserve existing red flash duration");
+assert.match(game,/function flashWrongBoard\(\)\s*\{[\s\S]*?\$\("#vlRedFlash"\)/,
+  "wrong-answer feedback still uses the original flash trigger");
 assert.match(game,/\$\{renderAstroSteeringChoice\(\)\}\s*\$\{renderHelpOverlay\(\)\}/,
   "control chooser is sibling to the nonselectable asteroid stage, not within it");
 assert.match(css,/\.vl-steering-option:focus-visible/);
@@ -57,7 +80,6 @@ function harness({touch=true,sensor=true,permission="granted"}={}) {
     setPointerCapture(id){this.captures.push(id);},
     releasePointerCapture(id){this.released.push(id);}
   };
-  const arrows={hidden:false};
   // Chooser lives OUTSIDE the touch-suppressed game stage so the control
   // buttons and explanatory copy retain normal accessibility/callouts.
   const screen={insertAdjacentHTML(_,html){rendered=html;dialog=makeDialog();}};
@@ -84,10 +106,10 @@ function harness({touch=true,sensor=true,permission="granted"}={}) {
   Orientation.requestPermission=()=>{permissionCalls++;return Promise.resolve(permission)};
   const window={DeviceOrientationEvent:sensor?Orientation:undefined,
     matchMedia:q=>({matches:touch&&q==="(pointer: coarse)"}),
-    innerHeight:800};
+    addEventListener(){},innerHeight:800};
   const document={hidden:false,
     querySelector:sel=>sel==="#vlAstroStage"?stage:
-      sel===".vl-asteroid-screen"?screen:sel==="#vlArrowControls"?arrows:
+      sel===".vl-asteroid-screen"?screen:
       sel==="#vlSteeringOverlay"?dialog:
       sel==="#vlSteeringConfirm"&&state.astroControlPhase==="instructions"?{onclick:null}:null};
   const jq=sel=>document.querySelector(sel);
@@ -102,15 +124,16 @@ function harness({touch=true,sensor=true,permission="granted"}={}) {
   ctx.$=jq;
   const src=part(game,"function safeLeftPct(x) {","function bonusTravelInstructionHtml() {")+
     part(game,"async function requestAstroTiltPermission() {","function astroKeyboardDirForKey(key) {")+
+    part(game,"function astroKeyboardDirForKey(key) {","function modeAstroMultiplier() {")+
     part(game,"function renderAstroSteeringChoice() {","function wireAstroControls() {")+
     "\nthis.ip09={showAstroSteeringChoice,showAstroSteeringInstructions,chooseAstroSteering,"+
     "confirmAstroSteering,wireAstroDragControls,canUseAstroControls,handleAstroOrientation,"+
-    "renderAstroSteeringChoice,resetAstroInput};";
+    "renderAstroSteeringChoice,resetAstroInput,handleAstroKeyDown,handleAstroKeyUp};";
   // Context stub uses binding for $ as document selector.
   delete ctx.$;
   ctx.$=jq;
   vm.createContext(ctx);vm.runInContext(src,ctx);
-  return {ctx,state,astroInput,stage,arrows,api:ctx.ip09,
+  return {ctx,state,astroInput,stage,api:ctx.ip09,
     get started(){return started;},get permissionCalls(){return permissionCalls;},
     get html(){return rendered;},get moves(){return visualMoves;}};
 }
@@ -130,7 +153,6 @@ async function steeringCases() {
   await drag.api.chooseAstroSteering("drag");
   assert.equal(drag.state.astroControlPhase,"instructions");
   assert.equal(drag.astroInput.controlMode,"drag");
-  assert.equal(drag.arrows.hidden,false,"Drag can retain arrow accessibility fallback");
   assert.equal(drag.permissionCalls,0);
   assert.match(drag.html,/Drag your finger to dodge asteroids/);
   assert.match(drag.html,/Got It!/);
@@ -179,7 +201,6 @@ async function steeringCases() {
   await pending;
   assert.equal(tilt.astroInput.controlMode,"tilt");
   assert.equal(tilt.astroInput.tiltEnabled,true);
-  assert.equal(tilt.arrows.hidden,true,"Tilt hides pointer arrows after chooser");
   assert.equal(tilt.state.astroControlPhase,"instructions");
   tilt.api.confirmAstroSteering();
   assert.equal(tilt.started,1);
@@ -222,9 +243,19 @@ async function steeringCases() {
   const desktop=harness({touch:false,sensor:false});
   assert.equal(desktop.ctx.navigator.maxTouchPoints,0);
   assert.equal(desktop.api.canUseAstroControls(),false);
-  assert.match(game,/function shouldShowAstroArrowButtons\(\)\s*\{[\s\S]*return !astroInput\.tiltEnabled/);
-  assert.match(game,/function handleAstroKeyDown\(event\)/);
-  assert.match(game,/function handleAstroKeyUp\(event\)/);
+  // Exercise actual keyboard control without any on-screen arrow buttons.
+  desktop.state.astroRunning=true;
+  desktop.state.astroControlPhase="playing";
+  let prevented=0;
+  desktop.api.handleAstroKeyDown({key:"ArrowLeft",preventDefault(){prevented++;}});
+  assert.equal(desktop.state.astroMoveDir,-1);
+  desktop.api.handleAstroKeyUp({key:"ArrowLeft",preventDefault(){prevented++;}});
+  assert.equal(desktop.state.astroMoveDir,0);
+  desktop.api.handleAstroKeyDown({key:"ArrowRight",preventDefault(){prevented++;}});
+  assert.equal(desktop.state.astroMoveDir,1);
+  desktop.api.handleAstroKeyUp({key:"ArrowRight",preventDefault(){prevented++;}});
+  assert.equal(desktop.state.astroMoveDir,0);
+  assert.equal(prevented,4,"keyboard arrows remain gesture-owned");
 }
 async function cutsceneCase(touch) {
   const s={screen:"game",bonusTravelTextVisible:false,bonusFadeActive:false,
@@ -260,5 +291,5 @@ async function cutsceneCase(touch) {
   await steeringCases();
   await cutsceneCase(true);
   await cutsceneCase(false);
-  console.log("IP09 PASS: real Verse Launch cutscene-to-choice timing, Feeding-style two-step popup, gesture-only tilt permission/grant/deny/no-sensor, bounded pointer capture, menu/Welcome/hidden guards, keyboard fallback, exact How to Play and Bounce-only iPadOS callout scope.");
+  console.log("IP09 PASS: real Verse Launch cutscene-to-choice timing, Feeding-style two-step popup, gesture-only tilt permission/grant/deny/no-sensor, bounded pointer capture, menu/Welcome/hidden guards, keyboard fallback, no on-screen arrows, full padded wrong-answer flash, exact How to Play and Bounce-only iPadOS callout scope.");
 })().catch(err=>{console.error(err);process.exitCode=1;});
