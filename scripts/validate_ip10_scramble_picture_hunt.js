@@ -90,6 +90,7 @@ function harness(mode="easy",verseId="john_3_16") {
   };
   vm.createContext(ctx);
   vm.runInContext("let bonusPicturePreloads=[];\n"+
+    part(game,"function introLetterHtml(ch, index){","function renderInstructionHtml(")+
     selection+
     part(game,"function renderBonusFindHtml(){","function renderBonusFinalHtml(){")+
     part(game,"function makeBonusPictureTiles() {","function renderBonusPointerHtml() {")+
