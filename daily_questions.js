@@ -56,6 +56,9 @@
     });
 
   const DAILY_QUESTION_REWARD_POPUP_MS = 900;
+  // A short, visible disabled state for answers without a star animation.
+  // Keep the answer and Next button DOM stable while iOS finishes the tap.
+  const DAILY_QUESTION_NEXT_SETTLE_MS = 320;
 
   /*
     Any verse with valid Daily Question reflection data may
@@ -133,7 +136,12 @@
     interruptDailyQuestionAudio();
     cancelQuestionPageTransition?.();
     clearDailyQuestionRewardPopupTimer();
-    if (dailySession) dailySession.showStarRewardPopup = false;
+    if (dailySession) {
+      dailySession.showStarRewardPopup = false;
+      // On explicit Welcome Back the already-credited answer is still valid.
+      // Do not strand Next disabled after cancelling its feedback timer.
+      if (dailySession.answered) dailySession.nextReady = true;
+    }
     // Check the Verse uses the shared published-verse native/HTML preview.
     // Cancel the exact pending attempt, do not grant question completion,
     // and redraw the currently visible (possibly not hidden!) iOS card so
@@ -409,31 +417,59 @@
     rewardPopupTimeoutId = 0;
   }
 
-  function showDailyQuestionRewardPopup(
+  function scheduleDailyQuestionNextReady(
     session,
-    questionIndex
+    questionIndex,
+    showStarReward = false
   ) {
-    if (!session) {
-      return;
-    }
+    if (!session) return;
 
     clearDailyQuestionRewardPopupTimer();
 
-    session.showStarRewardPopup = true;
+    // An answer is committed once in the choice handler. The Next button
+    // stays visibly disabled while feedback/its optional star animation runs.
+    session.nextReady = false;
+    session.showStarRewardPopup = showStarReward;
 
-    rewardPopupTimeoutId =
-      setTimeout(() => {
-        rewardPopupTimeoutId = 0;
+    rewardPopupTimeoutId = setTimeout(() => {
+      rewardPopupTimeoutId = 0;
 
-        if (
-          dailySession === session &&
-          session.phase === SESSION_PHASES.QUESTION &&
-          session.questionIndex === questionIndex
-        ) {
-          session.showStarRewardPopup = false;
-          appApi?.renderApp?.();
-        }
-      }, DAILY_QUESTION_REWARD_POPUP_MS);
+      if (
+        dailySession !== session ||
+        session.phase !== SESSION_PHASES.QUESTION ||
+        session.questionIndex !== questionIndex ||
+        !session.answered
+      ) return;
+
+      session.showStarRewardPopup = false;
+      session.nextReady = true;
+
+      // Previously the 900 ms star-popup expiry replaced the entire slide.
+      // WebKit could discard a tap whose touchstart and click crossed that
+      // replacement. Leave the current Next button mounted and enable it
+      // IN PLACE, including if another UI event rerendered the question.
+      // Nothing here starts a round, grants a star, or bypasses Welcome Back.
+      if (document.hidden || dailyQuestionsReturnPaused()) return;
+      document.querySelectorAll(".daily-question-session").forEach(wrap => {
+        const next = wrap.querySelector("[data-daily-question-next]");
+        if (!next || !next.disabled) return;
+        const screenNumber = wrap.querySelector(
+          "[data-daily-question-number]"
+        )?.getAttribute("data-daily-question-number");
+        if (Number(screenNumber) !== questionIndex + 1) return;
+        next.disabled = false;
+        next.removeAttribute("aria-busy");
+        next.classList.remove("is-waiting");
+        wrap.querySelectorAll(".daily-question-star-reward")
+          .forEach(star => star.remove());
+      });
+    }, showStarReward
+      ? DAILY_QUESTION_REWARD_POPUP_MS
+      : DAILY_QUESTION_NEXT_SETTLE_MS);
+  }
+
+  function showDailyQuestionRewardPopup(session, questionIndex) {
+    scheduleDailyQuestionNextReady(session, questionIndex, true);
   }
 
   function initialize(api) {
@@ -1226,6 +1262,7 @@
       selectedAnswer: null,
       answered: false,
       answerCorrect: false,
+      nextReady: false,
       showStarRewardPopup: false,
       earnedStarPegCount:
         questionSession.initialStarPegCount,
@@ -2919,9 +2956,10 @@
                 session.answered
                   ? `
                     <button
-                      class="daily-question-feedback-next no-zoom"
+                      class="daily-question-feedback-next no-zoom${session.nextReady ? "" : " is-waiting"}"
                       type="button"
                       data-daily-question-next
+                      ${session.nextReady ? "" : 'disabled aria-busy="true"'}
                     >
                       Next
                     </button>
@@ -3061,13 +3099,16 @@
                 dailySession.earnedStarPegCount =
                   currentStarCount + 1;
               } else {
-                clearDailyQuestionRewardPopupTimer();
-                dailySession.showStarRewardPopup = false;
+                scheduleDailyQuestionNextReady(
+                  dailySession,
+                  dailySession.questionIndex
+                );
               }
             } else {
-              clearDailyQuestionRewardPopupTimer();
-              dailySession.showStarRewardPopup =
-                false;
+              scheduleDailyQuestionNextReady(
+                dailySession,
+                dailySession.questionIndex
+              );
             }
 
             appApi?.renderApp?.();
@@ -3105,6 +3146,8 @@
           if (
             !dailySession || document.hidden || dailyQuestionsReturnPaused() ||
             questionPageTransition ||
+            nextQuestionButton.disabled ||
+            dailySession.nextReady !== true ||
             dailySession.phase !==
               SESSION_PHASES.QUESTION ||
             !dailySession.answered
@@ -3141,6 +3184,7 @@
               dailySession.answered = false;
               dailySession.answerCorrect =
                 false;
+              dailySession.nextReady = false;
 
               appApi?.renderApp?.();
             });
