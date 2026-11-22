@@ -1,6 +1,26 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — IP04 Zoo Break shared popup controls, PR #165 (2026-11-21 EST / 2026-11-22 UTC)
+## CURRENT — IP05 game result screens and overlays, [PR #166](https://github.com/andydoane/biblozoo/pull/166) (2026-11-21 EST / 2026-11-22 UTC)
+
+**Verified stable base:** Owner merged IP04 PR #165 to ios-prep at aedb41818ac0c0a885561700504bfb93665344ca; its postmerge GitHub Actions #44973956398 SUCCESS (full Node regression checks and production web build). IP04 is MERGED, but owner has NOT yet reported iPad/iPhone acceptance. Owner separately tested the prior IP03 clipboard follow-up PR #164 and says it is working great: OWNER PASS / COMPLETE. Together with the four previously approved IP03 findings, IP03 is now OWNER PASS 5/5. IP01 #160 remains 8/8 OWNER PASS; IP02 #161 remains 2/2 OWNER PASS. Exact hardware/orientation subtests were not itemized; do not invent them. [IP04 merged PR #165](https://github.com/andydoane/biblozoo/pull/165); [stable postmerge Actions #44973956398](https://github.com/andydoane/biblozoo/actions/runs/44973956398). There were no open PRs at the start of IP05.
+
+**Active change:** [IP05 #166](https://github.com/andydoane/biblozoo/pull/166) OPEN / UNMERGED / OWNER DEVICE NOT TESTED; branch fix/ip05-game-results-overlay-visual-polish → ios-prep, from stable aedb41818ac0c0a885561700504bfb93665344ca. The seven owner visual findings (P1) are implemented without game timing, score, prize/reward, native sound/AVAudioSession, profile, navigation, rescue or game mode changes:
+
+1. **Feeding green ✔ To-Do Complete:** iPad-only min-width 700px rule lets the existing completion action size to its text, maintaining one-line checkmark plus wording within the card. Narrow iPhones preserve prior wrapping, with the same action.
+2. **Wheel Final Round instruction pill:** text intrinsic max-content width plus normal 8px/16px padding; max 100% of parent or 720px, whichever is narrower, with word wrapping for short screens.
+3. **Verse Launch:** remove tablet-only 26px rounded gameplay corners; paint the continuous starfield/dark overlay on the pre-existing full-height outer game root and make inner gameboard transparent. Preserve exact original bottom safe-area padding and board dimensions to avoid altering ship physics or tappable layout.
+4. **Wheel Time's Up / Verse complete dim:** mount existing time-result overlay at full-width, full-height .wob-root rather than inside narrower .wob-card; maintain 2500ms hold and 320ms exit, animation, pop sound, pointer-events:none, and cleanup, so it neither clips edges nor blocks later controls.
+5. **Bounce next serve:** grammatically correct lower-case "1 ball left!" versus "2 balls left!" / "3 balls left!"; original lives count, Launch action, disabled/ready behavior and scoring unchanged.
+6. **Versey Bird post-bonus result:** reuse existing bundled gameIconImageHtmlForId markup above result title, with a responsive 52–82px noninteractive icon, existing Continue action, and scrollable compact-height card.
+7. **Dino Dash post-bonus result:** identical scoped reuse of bundled Dino Dash game icon, preserving title/result percentages and Continue behavior; extra-large text and short landscape may scroll the card rather than clipping the action.
+
+**Checks and acceptance:** New scripts/validate_ip05_result_visuals.js, wired into .github/workflows/ios-prep-validation.yml, asserts all seven CSS/markup contracts; executes actual Bounce serve message for 1/2/3 balls and Wheel result overlay functions in fake DOM with unchanged timings and removal. Full pre-existing IP01–IP04, Zoo, audio and Daily regressions and production web build are retained. **Exact PR-head CI pending** as this record is authored; no real Apple Xcode SDK build/Archive, iPad/iPhone screenshot or hardware IP05 PASS. Owner must test iPad portrait/landscape, iPhone SE 2020/regular portrait/landscape, extra-large text/reduced motion/safe areas; check no clipped result buttons, overlays truly edge-to-edge and removed before later play, no audio/score regression. Owner alone reviews/merges, reports actual outcomes and does not auto-promote to main or TestFlight/App Store. **Next scheduled packet IP06 (fade-to-black transitions) remains unstarted.**
+
+**Data safety:** Preserve separately backed up ten original production Zookeeper profiles and eleven Audio Test profiles; family backup v2 does not include independently stored Zoo rescue/surprise state. No family-profile import, reset, uninstall/reinstall, app-signing change, release or AVAudioSession modification.
+
+---
+
+## HISTORICAL — IP04 Zoo Break shared popup controls, PR #165 (2026-11-21 EST / 2026-11-22 UTC)
 
 **Verified base:** Owner merged clipboard PR #164 into stable ios-prep at 9f908b6fc506fb88c98373b736e67031a3bf1667. Postmerge Actions #44972781484 SUCCESS (Node regressions and production web build). Owner is currently testing the clipboard change; its physical result is PENDING, not a confirmed pass. IP01 #160 is owner PASS 8/8; IP02 #161 owner PASS 2/2; IP03 #162 owner PASS 4/5 with the clipboard follow-up #164 merged but not device-accepted. No open PRs existed before this IP04 branch. See https://github.com/andydoane/biblozoo/actions/runs/44972781484 and https://github.com/andydoane/biblozoo/pull/164.
 
