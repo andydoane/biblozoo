@@ -50,6 +50,9 @@ jobs:
       - name: Validate IP01 17-activity How to Play and Game Menu consistency
         run: node scripts/validate_ip01_external_help_menu.js
 
+      - name: Validate IP02 Daily Questions Next and fixed Daily To-Do game mode
+        run: node scripts/validate_ip02_daily_next_mode.js
+
       - name: Validate Wheel of Bible native menu mute and resume
         run: node scripts/validate_wheel_menu_mute_resume.js
 
