@@ -102,7 +102,8 @@ const document = { activeElement: null, getElementById: id => elements[id] || nu
 const scope = {
   document, window: {},
   escapeHtml: text => String(text),
-  isGameMixLaunch: () => false
+  isGameMixLaunch: () => false,
+  isDailyTodoLaunch: () => false // IP02: ordinary launch in legacy IP01 harness
 };
 vm.createContext(scope);
 vm.runInContext(shellParts +
@@ -144,6 +145,7 @@ for (const [directory, menuId, helpId] of [
     window: { VerseGameShell: {} },
     escapeHtml: text => String(text),
     isGameMixLaunch: () => false,
+    isDailyTodoLaunch: () => false,
     focusedBack: false
   };
   vm.createContext(s);
