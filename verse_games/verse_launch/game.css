@@ -284,12 +284,15 @@ select {
 }
 
 .vl-game-wrap {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   /* Preserve the original bottom safe-area/gameplay sizing. The parent
-   * .vl-root already paints the full starfield behind this space. */
+   * .vl-root already paints the full starfield behind this space.
+   * The wrong-answer flash is positioned against this padded wrapper so
+   * it covers the bottom gap without changing the play board geometry. */
   padding: 0 0 var(--vl-game-bottom-pad);
 }
 
@@ -313,6 +316,7 @@ select {
   }
 }
 
+/* Visual-only: covers the padded gameplay wrapper, not just the inner board. */
 .vl-red-flash {
   position: absolute;
   inset: 0;
@@ -1452,7 +1456,6 @@ select {
   background: rgba(25, 18, 34, .58);
 }
 .vl-steering-overlay[hidden],
-.vl-space-controls[hidden],
 .vl-steering-choice[hidden],
 .vl-steering-instructions[hidden],
 .vl-steering-message[hidden] {
@@ -1787,39 +1790,6 @@ select {
   z-index: 7;
   filter: drop-shadow(0 0 8px rgba(255, 199, 81, .76));
   animation: vlAsteroidRewardStar 680ms ease-out forwards;
-}
-
-.vl-space-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--vl-bonus-bottom-pad);
-  display: flex;
-  justify-content: center;
-  gap: 18px;
-  z-index: 8;
-}
-
-.vl-space-arrow {
-  width: 78px;
-  height: 78px;
-  border: none;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, .14);
-  color: #fff;
-  font-size: 40px;
-  font-weight: 900;
-  box-shadow: 0 6px 0 rgba(0, 0, 0, .24);
-  cursor: pointer;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-
-.vl-space-arrow:active {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, .24);
 }
 
 .vl-space-status {

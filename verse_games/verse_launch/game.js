@@ -1936,8 +1936,8 @@
   `;
       })()}
           <div class="vl-game-wrap">
+            <div class="vl-red-flash" id="vlRedFlash" aria-hidden="true"></div>
             <div class="vl-game-board" id="vlBoard">
-              <div class="vl-red-flash" id="vlRedFlash"></div>
               <div class="vl-flight-layer" id="vlFlightLayer"></div>
               <div class="vl-smoke-layer" id="vlSmokeLayer"></div>
               <div class="vl-firework-layer" id="vlFireworkLayer"></div>
@@ -2031,12 +2031,6 @@
             </div>
           </div>
           ${renderAstroLandingOverlay()}
-          ${shouldShowAstroArrowButtons() ? `
-            <div class="vl-space-controls" id="vlArrowControls">
-              <button class="vl-space-arrow no-zoom" id="vlLeftBtn" type="button" aria-label="Move left">‹</button>
-              <button class="vl-space-arrow no-zoom" id="vlRightBtn" type="button" aria-label="Move right">›</button>
-            </div>
-          ` : ""}
         </div>
         ${renderAstroSteeringChoice()}
         ${renderHelpOverlay()}
@@ -2328,8 +2322,6 @@
     astroInput.tiltEnabled = false;
     const screen = $(".vl-asteroid-screen");
     if (!screen) return;
-    const arrows = $("#vlArrowControls");
-    if (arrows) arrows.hidden = false;
     $("#vlSteeringOverlay")?.remove();
     screen.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
     wireAstroSteeringChoice();
@@ -2342,8 +2334,6 @@
     state.astroControlMessage = "";
     const screen = $(".vl-asteroid-screen");
     if (!screen) return;
-    const arrows = $("#vlArrowControls");
-    if (arrows) arrows.hidden = choice === "tilt";
     $("#vlSteeringOverlay")?.remove();
     screen.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
     wireAstroSteeringChoice();
@@ -2443,26 +2433,9 @@
   }
 
   function wireAstroControls() {
-    const leftBtn = $("#vlLeftBtn");
-    const rightBtn = $("#vlRightBtn");
-
+    // Touch Drag owns the board; physical keyboard arrow keys remain wired
+    // separately for desktop and other keyboard-capable devices.
     wireAstroDragControls();
-
-    if (leftBtn) {
-      leftBtn.onpointerdown = (e) => { e.preventDefault(); setAstroPointerDir(-1); };
-      leftBtn.onpointerup = (e) => { e.preventDefault(); clearAstroPointerDir(-1); };
-      leftBtn.onpointercancel = (e) => { e.preventDefault(); clearAstroPointerDir(-1); };
-      leftBtn.onpointerleave = (e) => { e.preventDefault(); clearAstroPointerDir(-1); };
-      leftBtn.oncontextmenu = (e) => e.preventDefault();
-    }
-
-    if (rightBtn) {
-      rightBtn.onpointerdown = (e) => { e.preventDefault(); setAstroPointerDir(1); };
-      rightBtn.onpointerup = (e) => { e.preventDefault(); clearAstroPointerDir(1); };
-      rightBtn.onpointercancel = (e) => { e.preventDefault(); clearAstroPointerDir(1); };
-      rightBtn.onpointerleave = (e) => { e.preventDefault(); clearAstroPointerDir(1); };
-      rightBtn.oncontextmenu = (e) => e.preventDefault();
-    }
   }
 
   function flashWrongBoard() {
@@ -3004,13 +2977,6 @@
   function shouldTryTiltControls() {
     return isLikelyTouchDevice() && hasDeviceOrientationSupport();
   }
-
-  function shouldShowAstroArrowButtons() {
-    // Retain keyboard/arrow fallback on desktop and when Tilt is unavailable.
-    // These buttons also remain usable alongside Drag for accessibility.
-    return !astroInput.tiltEnabled;
-  }
-
 
   function bonusTravelInstructionHtml() {
     if (shouldTryTiltControls()) {
