@@ -56,6 +56,9 @@ jobs:
       - name: Validate IP03 onboarding, pet unlock and hub visual contracts
         run: node scripts/validate_ip03_onboarding_pet_hub.js
 
+      - name: Validate IP04 shared Zoo Break popup controls and safe exit
+        run: node scripts/validate_ip04_zoo_popup_controls.js
+
       - name: Validate Wheel of Bible native menu mute and resume
         run: node scripts/validate_wheel_menu_mute_resume.js
 
