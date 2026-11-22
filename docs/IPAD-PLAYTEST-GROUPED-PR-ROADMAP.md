@@ -13,7 +13,7 @@
 | 3. Feeding Bounce copy | Dynamic drag/tilt prompts now **“Drag to Bounce!”** / **“Tilt to Bounce!”**; existing Patch 73 tests updated |
 | 4. Scripture Snake | Exact first sentence: “Tap and hold where you want the snake to go.” |
 | 5. Ghost Writer | Two centered `p` paragraphs, no bullet list or indent |
-| 6. Purple consistency | Both shared How to Play header/pill and bottom action use `--vm-purple` (the standard BibloZoo purple), ignoring per-game accent overrides **only for Help chrome**; no global geometry/breakpoint rewrites |
+| 6. Purple consistency | Both shared How to Play header/pill and bottom action use `--vm-purple` (the standard BibloZoo purple), ignoring per-game accent overrides **only for Help chrome**; Verse Splat's separate in-round Help popup also gets the same purple pill and action. No global geometry/breakpoint rewrites |
 | 7. Bird + Dino Help | Their in-game menu callbacks close Menu, call shared `openHelp(..., "back", "Back")` and focus the visible Back button; Help Back restores Menu. Normal game pause/preflight remains owned by existing callbacks |
 | 8. Verse Jam menu mute | Shared menu adds backwards-compatible `showMute=true` option; Verse Jam sets `showMute:false` for **game-menu UI only**, leaving game audio/mute internals and all other 16 activities unchanged |
 
