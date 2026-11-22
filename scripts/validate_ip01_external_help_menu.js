@@ -64,6 +64,14 @@ for (const sentence of [
 ]) assert.ok(helpSplat.includes("<p>" + sentence + "</p>"), sentence);
 assert.doesNotMatch(helpSplat, /Then tap the Bible book|Keep splatting colorful paint/);
 assert.match(splat, /\$\{nonGameHelpHtml\(\)\}<\/div>/);
+// Verse Splat also owns an in-round Help card, separate from shared Help.
+assert.match(splat, /vsp-overlay-title vsp-overlay-title-help/);
+assert.match(splat, /vm-btn vsp-menu-action vsp-help-action/);
+const splatCss = read("verse_games/verse_splat/game.css");
+assert.match(splatCss,
+  /\\.vsp-overlay-title-help\\s*\\{[^}]*background:\\s*var\\(--vm-purple,/s);
+assert.match(splatCss,
+  /\\.vsp-help-action\\s*\\{[^}]*background:\\s*var\\(--vm-purple,/s);
 assert.match(read("verse_games/verse_snake/game.js"),
   /Tap and hold where you want the snake to go\./);
 const feed = read("daily_questions_feed_game.js");
