@@ -535,6 +535,12 @@
       }
     }
     function showExit(visible, stageForExit = stage) {
+      // destroy() invokes resetDisplay() after removing injected nodes.
+      // Never reparent the exit after teardown or leak a clickable Back.
+      if (disposed) {
+        exitButton.hidden = true;
+        return;
+      }
       const useHome = visible && stageForExit === "break";
       // Class and DOM placement are changed together before making the
       // control visible. There is never a second Back/Home to get out of sync.
