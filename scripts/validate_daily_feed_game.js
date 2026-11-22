@@ -4186,7 +4186,10 @@ function testDailySnackEarlyExitDoesNotClaimReward() {
   assert.ok(backEnd > backStart);
   const callback = dailyScreen.slice(backStart, backEnd);
   assert.ok(callback.includes('State.dailySnackSession = null;'));
-  assert.ok(callback.includes('go(Screen.TITLE);'));
+  assert.ok(callback.includes('transitionToAppScreen(Screen.TITLE)'),
+    "IP06 reuses app-level black fade to the SAME Home destination");
+  assert.ok(callback.indexOf('transitionToAppScreen') < callback.indexOf('State.dailySnackSession = null;'),
+    "a refused/hidden fade must not discard the Feeding session");
   assert.ok(!callback.includes('rewardClaimed'),
     "An incomplete reward must not trap the player");
   assert.ok(!callback.includes('claimDailyTodoSnack'),
@@ -4195,17 +4198,35 @@ function testDailySnackEarlyExitDoesNotClaimReward() {
   assert.ok(dailyScreen.slice(0, backStart).includes('claimDailyTodoSnack('),
     "Successful game completion is still the only claim path");
 
-  // Execute the actual app callback with an unclaimed reward: leaving cannot
-  // mark it claimed, and should return to the title screen immediately.
+  // Execute the actual app callback with an unclaimed reward: leaving must
+  // never claim it, and a hidden/busy fade retains it for retry.
   const callbackBody = callback.slice(callback.indexOf('{') + 1);
-  const State = { dailySnackSession: { rewardComplete: false, rewardClaimed: false } };
-  let destination = null;
-  const go = (next) => { destination = next; };
+  const session = { rewardComplete: false, rewardClaimed: false };
+  const State = { dailySnackSession: session };
+  const document = { hidden: false };
   const Screen = { TITLE: 'home' };
-  const back = new Function('State', 'go', 'Screen', `return () => {${callbackBody}}`)(State, go, Screen);
+  let destination = null, allowed = true, calls = 0;
+  const transitionToAppScreen = next => {
+    calls++;
+    if (allowed) destination = next;
+    return allowed;
+  };
+  const back = new Function('State', 'document', 'transitionToAppScreen', 'Screen',
+    `return () => {${callbackBody}}`)(State, document, transitionToAppScreen, Screen);
+  document.hidden = true;
+  assert.strictEqual(back(), false);
+  assert.strictEqual(calls, 0);
+  assert.strictEqual(State.dailySnackSession, session);
+  document.hidden = false;
+  allowed = false;
+  assert.strictEqual(back(), false);
+  assert.strictEqual(State.dailySnackSession, session);
+  allowed = true;
   assert.strictEqual(back(), true);
   assert.strictEqual(State.dailySnackSession, null);
   assert.strictEqual(destination, 'home');
+  assert.strictEqual(session.rewardClaimed, false);
+  assert.strictEqual(calls, 2);
 }
 
 function testLabyrinthDoubleDiameterAndPassableGaps() {

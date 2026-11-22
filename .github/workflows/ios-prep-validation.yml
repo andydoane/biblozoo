@@ -62,6 +62,9 @@ jobs:
       - name: Validate IP05 result screens and full-board overlays
         run: node scripts/validate_ip05_result_visuals.js
 
+      - name: Validate IP06 Final Test and Feeding return-to-Zoo fades
+        run: node scripts/validate_ip06_return_fades.js
+
       - name: Validate Wheel final letter modal and permanent Welcome Back Home
         run: node scripts/validate_welcome_home_wheel_followup.js
 
