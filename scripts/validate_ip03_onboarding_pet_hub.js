@@ -141,7 +141,7 @@ assert.match(app,/const btnHome = wrap.querySelector\("#btnPetUnlockHome"\)/);
 // Original profile picture comes from the real per-verse getter. Only Daily
 // To-Do wrapper/photo image loses circular crop and object-fit cover; global
 // avatar and other app screens are unchanged.
-assert.match(app,/petVisualHtml: dailyVerseId[\s\S]*?profilePictureVisualHtml\(/[\s\S]*?className:\s*"daily-zoo-todo-profile-picture"/);
+assert.match(app,/petVisualHtml: dailyVerseId[\s\S]*?profilePictureVisualHtml\([\s\S]*?className:\s*"daily-zoo-todo-profile-picture"/);
 assert.match(profileCss,/\.profile-picture-img\s*\{[^}]*object-fit:\s*cover/s,
   "the global profile component remains untouched");
 const pStart = dailyCss.indexOf(".todo-dev-screen.is-daily-mode\n  .daily-zoo-todo-profile-picture {");
