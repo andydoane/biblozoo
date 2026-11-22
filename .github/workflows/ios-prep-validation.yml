@@ -65,6 +65,9 @@ jobs:
       - name: Validate IP06 Final Test and Feeding return-to-Zoo fades
         run: node scripts/validate_ip06_return_fades.js
 
+      - name: Validate IP07 measured continuous Final Test missing-letter lines
+        run: node scripts/validate_ip07_final_test_lines.js
+
       - name: Validate Wheel final letter modal and permanent Welcome Back Home
         run: node scripts/validate_welcome_home_wheel_followup.js
 
