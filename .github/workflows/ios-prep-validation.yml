@@ -68,6 +68,9 @@ jobs:
       - name: Validate IP07 measured continuous Final Test missing-letter lines
         run: node scripts/validate_ip07_final_test_lines.js
 
+      - name: Validate IP08 Verse Splat and Bible Bugs bonus pace and book-wave fade
+        run: node scripts/validate_ip08_practice_bonus_pacing.js
+
       - name: Validate Wheel final letter modal and permanent Welcome Back Home
         run: node scripts/validate_welcome_home_wheel_followup.js
 
