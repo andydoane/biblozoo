@@ -220,8 +220,42 @@
   color: #333;
 }
 .bz-zoo-action-slot [hidden], .bz-zoo-pen[hidden],
-.bz-zoo-exit[hidden] { display: none !important; }
+.bz-zoo-exit[hidden], .bz-zoo-home[hidden] { display: none !important; }
 .bz-zoo-lock-icon { width: 29px; height: 29px; object-fit: contain; vertical-align: -4px; }
+/* Preserve the original full-width LOCK GATE hit target during any pending
+ * recovery; only the supplied lock artwork remains visible and centered. */
+.bz-zoo-action-slot .bz-welcome-action.bz-zoo-lock-processing {
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+.bz-zoo-instruction.bz-zoo-instruction-balanced {
+  text-wrap: balance;
+}
+/* Same white house silhouette and charcoal background as app.js Home pill,
+ * positioned in the overlay's own bounds for both standalone and Feeding. */
+.bz-zoo-home {
+  position: absolute;
+  z-index: 12;
+  top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
+  left: max(18px, calc(env(safe-area-inset-left, 0px) + 12px));
+  width: 48px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: #333333;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.bz-zoo-home .nav-icon { width: 24px; height: 24px; }
+.bz-zoo-home:focus-visible { outline: 4px solid #ffffff; outline-offset: 3px; }
+.bz-zoo-home:active { transform: scale(.98); }
 .bz-zoo-active .bz-welcome-title {
   min-height: 2.12em;
   display: flex;
