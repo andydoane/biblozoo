@@ -60,8 +60,8 @@ function bounceTitle(lives) {
   return rt.startTitleEl.textContent;
 }
 assert.equal(bounceTitle(1),"1 ball left!");
-assert.equal(bounceTitle(2),"2 balls left!");
-assert.equal(bounceTitle(3),"3 balls left!");
+assert.equal(bounceTitle(2),"2 Balls Left!");
+assert.equal(bounceTitle(3),"3 Balls Left!");
 
 // Wheel pill measures intrinsic content and clamps; popup overlays root bounds.
 const intro=rules(wheelCss,".wob-final-intro-subtitle");
