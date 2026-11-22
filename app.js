@@ -24376,6 +24376,16 @@ function getUiTapSoundTarget(eventTarget) {
   return tapTarget;
 }
 
+// Card-list scrolling must not pop the same button the finger is gliding
+// across. Keep the existing immediate audio gestures for all other UI.
+function isScrollAwareCard(tapTarget) {
+  return !!tapTarget?.matches?.(
+    ".practice-scroll-wrap .practice-game-card, " +
+    ".practice-scroll-wrap .new-verse-card, " +
+    ".new-verse-picker-screen .new-verse-card"
+  );
+}
+
 function setupAppUiTapSounds() {
   if (appUiTapSoundsBound) return;
   appUiTapSoundsBound = true;
@@ -24384,8 +24394,75 @@ function setupAppUiTapSounds() {
   // defer Swift activation and prewarm to the first actual UI gesture.
   if (!isNativeUiAudioMode()) void preloadUiTapSoundBuffers();
 
+  let pendingCardTouch = null;
+
+  function trackCardTouchStart(event, tapTarget) {
+    const point = event.changedTouches?.[0] || event;
+    const scrollHost = tapTarget.closest(".practice-scroll-wrap") ||
+      tapTarget.closest(".new-verse-picker-screen");
+    pendingCardTouch = {
+      target: tapTarget,
+      pointerId: event.pointerId,
+      touchId: point.identifier,
+      startX: point.clientX,
+      startY: point.clientY,
+      scrollHost,
+      scrollTop: scrollHost?.scrollTop ?? 0,
+      scrollLeft: scrollHost?.scrollLeft ?? 0,
+      moved: false,
+      gestureScreen: State.screen
+    };
+  }
+
+  function trackCardTouchMove(event) {
+    const pending = pendingCardTouch;
+    if (!pending) return;
+    if (event.type === "pointermove" && pending.pointerId !== event.pointerId) return;
+    const point = event.changedTouches?.[0] || event;
+    if (event.type === "touchmove" && pending.touchId !== undefined &&
+        point.identifier !== pending.touchId) return;
+    if (Math.hypot(point.clientX - pending.startX,
+      point.clientY - pending.startY) > 10) pending.moved = true;
+  }
+
+  function finishCardTouch(event) {
+    const pending = pendingCardTouch;
+    if (!pending) return;
+    if (event.type === "pointerup" && pending.pointerId !== event.pointerId) return;
+    const point = event.changedTouches?.[0] || event;
+    if (event.type === "touchend" && pending.touchId !== undefined &&
+        point.identifier !== pending.touchId) return;
+    trackCardTouchMove(event);
+    pendingCardTouch = null;
+    const hostScrolled = pending.scrollHost && (
+      Math.abs(pending.scrollHost.scrollTop - pending.scrollTop) > 2 ||
+      Math.abs(pending.scrollHost.scrollLeft - pending.scrollLeft) > 2
+    );
+    if (pending.moved || hostScrolled ||
+        State.screen !== pending.gestureScreen ||
+        !pending.target.isConnected ||
+        getUiTapSoundTarget(event.target) !== pending.target) return;
+    // Visual feedback happens only on a completed stationary tap.
+    pending.target.classList.add("is-confirmed-tap");
+    setTimeout(() => pending.target.classList.remove("is-confirmed-tap"), 180);
+    // This runs synchronously on a trusted pointerup/touchend user gesture,
+    // including native iOS. No click/navigation handler is intercepted.
+    handleUiTapGesture(event);
+  }
+
   function handleUiTapGesture(event) {
     if (event.button !== undefined && event.button !== 0) return;
+    const initialTarget = getUiTapSoundTarget(event.target);
+    if (isScrollAwareCard(initialTarget)) {
+      if (event.type === "touchstart") {
+        if (!window.PointerEvent) trackCardTouchStart(event, initialTarget);
+        return; // Pointer Events handle modern iOS; never pop on touchstart.
+      }
+      if (event.type === "pointerdown" && event.pointerType === "touch") {
+        trackCardTouchStart(event, initialTarget);
+        return;
+      }
+    }
 
     const now = performance.now();
 
@@ -24427,6 +24504,13 @@ function setupAppUiTapSounds() {
 
   document.addEventListener("touchstart", handleUiTapGesture, { capture: true, passive: true });
   document.addEventListener("pointerdown", handleUiTapGesture, { capture: true, passive: true });
+  // Observe only: don't preventDefault, capture pointers, or block scrolling.
+  document.addEventListener("pointermove", trackCardTouchMove, { capture: true, passive: true });
+  document.addEventListener("touchmove", trackCardTouchMove, { capture: true, passive: true });
+  document.addEventListener("pointerup", finishCardTouch, { capture: true, passive: true });
+  document.addEventListener("touchend", finishCardTouch, { capture: true, passive: true });
+  document.addEventListener("pointercancel", () => { pendingCardTouch = null; }, { capture: true, passive: true });
+  document.addEventListener("touchcancel", () => { pendingCardTouch = null; }, { capture: true, passive: true });
 
   document.addEventListener("keydown", (event) => {
     if (event.repeat) return;
