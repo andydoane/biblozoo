@@ -2484,7 +2484,8 @@
       id: "verseJamGameMenuOverlay",
 
       muted,
-      showModeSelect: true
+      showModeSelect: true,
+      showMute: false
     });
   }
 
