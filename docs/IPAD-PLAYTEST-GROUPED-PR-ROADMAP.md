@@ -4,7 +4,7 @@
 
 ### Active packet — IP03 onboarding, pet unlock and hub visual polish
 
-**Implementation candidate:** `fix/ip03-onboarding-pet-hub-visuals` → `ios-prep`, based on verified stable **`c9ce784adbf8958b4fc6c03e1ee751f6a5655a98`** (owner-merged [IP02 PR #161](https://github.com/andydoane/biblozoo/pull/161), [post-merge Actions #44969280133](https://github.com/andydoane/biblozoo/actions/runs/44969280133) **SUCCESS**). IP02 device acceptance **PENDING**: owner explicitly says they are testing and will report. IP01 **OWNER PASS / COMPLETE** for all eight requested items; owner explicitly reported 8/8 fixed, but did not give separate iPhone/orientation matrix evidence. IP03 includes **5/5 requested changes in the branch only**, with real iPad/iPhone verification **NOT TESTED**.
+**[IP03 PR #162](https://github.com/andydoane/biblozoo/pull/162): OPEN / UNMERGED; owner hardware NOT TESTED.** Branch `fix/ip03-onboarding-pet-hub-visuals` → `ios-prep`, based on verified stable **`c9ce784adbf8958b4fc6c03e1ee751f6a5655a98`** (owner-merged [IP02 PR #161](https://github.com/andydoane/biblozoo/pull/161), [post-merge Actions #44969280133](https://github.com/andydoane/biblozoo/actions/runs/44969280133) **SUCCESS**). IP02 device acceptance **PENDING**: owner explicitly says they are testing and will report. IP01 **OWNER PASS / COMPLETE** for all eight requested items; owner explicitly reported 8/8 fixed, but did not give separate iPhone/orientation matrix evidence. IP03 includes **5/5 requested changes in the branch only**, with real iPad/iPhone verification **NOT TESTED**.
 
 | IP03 observation | Scoped candidate change |
 | --- | --- |
