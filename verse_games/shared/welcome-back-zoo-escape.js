@@ -303,7 +303,10 @@
     homeButton.setAttribute("aria-label", "Back to Zoo");
     homeButton.innerHTML = ZOO_HOME_SVG;
     homeButton.hidden = true;
-    overlay.appendChild(homeButton);
+    // Focus order follows the top-left visual order, before the dialog card.
+    // Most owners place the card directly in the overlay; handle wrappers too.
+    if (card.parentNode === overlay) overlay.insertBefore(homeButton, card);
+    else overlay.insertBefore(homeButton, overlay.firstChild || null);
     const field = doc.createElement("div");
     field.className = "bz-zoo-field";
     field.setAttribute("role", "group");
