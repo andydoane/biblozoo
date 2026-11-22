@@ -2323,6 +2323,7 @@
     layer.hidden = false;
     layer.innerHTML = `
       <div class="vb2-result-card" role="dialog" aria-live="polite" aria-label="Bonus result">
+        <div class="vb2-result-icon" aria-hidden="true">${GAME_ICON_HTML}</div>
         <h2 class="vb2-result-title">Great flying!</h2>
         <p class="vb2-result-stat">Pipes cleared: ${state.pipesCleared}</p>
         <button class="vb2-result-button" id="vb2ContinueButton" type="button">Continue</button>

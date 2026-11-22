@@ -3894,8 +3894,8 @@
   }
 
   async function showTimesUpPopup() {
-    const card = document.querySelector(".wob-card");
-    if (!card) {
+    const root = document.querySelector(".wob-root");
+    if (!root) {
       await sleep(900);
       return;
     }
@@ -3908,7 +3908,7 @@
         <div class="wob-times-up-title">Time’s Up!</div>
       </div>
     `;
-    card.appendChild(popup);
+    root.appendChild(popup);
 
     playPrize();
     await sleep(2500);
@@ -3920,8 +3920,8 @@
 
 
   async function showVerseCompletePopup() {
-    const card = document.querySelector(".wob-card");
-    if (!card) {
+    const root = document.querySelector(".wob-root");
+    if (!root) {
       await sleep(900);
       return;
     }
@@ -3933,7 +3933,7 @@
         <div class="wob-times-up-title wob-verse-complete-title">Verse complete!</div>
       </div>
     `;
-    card.appendChild(popup);
+    root.appendChild(popup);
 
     playPrize();
     await sleep(2500);

@@ -82,6 +82,7 @@ body {
    App frame / shared layout
    ========================= */
 .wob-root {
+  position: relative;
   min-height: 100dvh;
   height: 100dvh;
   width: 100%;
@@ -1384,9 +1385,13 @@ button.wob-ref-group {
 }
 
 .wob-final-intro-subtitle {
-  width: fit-content;
-  max-width: min(90%, 720px);
+  display: inline-block;
+  width: max-content;
+  max-width: min(100%, 720px);
+  min-width: 0;
+  padding: 8px 16px;
   align-self: center;
+  overflow-wrap: break-word;
 }
 
 .wob-final-begin-btn {
@@ -1648,6 +1653,7 @@ button.wob-ref-group {
 }
 
 .wob-times-up-overlay {
+  /* Attached to the full .wob-root, not the narrower .wob-card. */
   position: absolute;
   inset: 0;
   z-index: 58;

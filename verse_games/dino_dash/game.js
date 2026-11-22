@@ -7213,6 +7213,7 @@
 
     layer.innerHTML = `
       <div class="dd2-result-card" role="dialog" aria-live="polite" aria-label="Bonus result">
+        <div class="dd2-result-icon" aria-hidden="true">${GAME_ICON_HTML}</div>
         <h2 class="dd2-result-title">${title}</h2>
         <p class="dd2-result-stat">You finished ${getBonusCoursePercent()}% of the course.</p>
         <button class="dd2-result-button" id="dd2ContinueButton" type="button">Continue</button>

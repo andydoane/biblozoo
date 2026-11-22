@@ -1421,7 +1421,9 @@ function testBounceThreeLivesAndPopup() {
     assert.strictEqual(state.livesLeft, lives);
     if (lives) {
       assert.strictEqual(state.waitingServe, true);
-      assert.strictEqual(runtime.startTitleEl.textContent, `${lives} Balls Left!`);
+      assert.strictEqual(runtime.startTitleEl.textContent,
+        lives === 1 ? "1 ball left!" : `${lives} Balls Left!`,
+        "Bounce relaunch uses singular for one ball and preserves other counts");
       assert.strictEqual(runtime.startInstructionEl.textContent, "");
       assert.strictEqual(runtime.startInstructionEl.hidden, true,
         "Redundant Tap to launch instruction is hidden");

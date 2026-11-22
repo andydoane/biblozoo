@@ -313,6 +313,19 @@
   cursor: pointer;
 }
 
+/* IP05: iPad completion action fits checkmark and label on one line;
+ * narrow iPhones retain previous wrapping instead of overflowing. */
+@media (min-width: 700px) {
+  .daily-feed-result-back {
+    width: max-content;
+    max-width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+  }
+}
+
 .daily-feed-result-check {
   display: inline-block;
   width: 1em;
