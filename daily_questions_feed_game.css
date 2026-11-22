@@ -38,6 +38,21 @@
   -webkit-user-select: none;
 }
 
+/* IP09: Bounce playfield only. iPadOS can still show a long-press
+   text magnifier/context callout despite user-select: none. The active
+   playfield and drawn/catcher surfaces are gesture-only; control chooser,
+   result cards, buttons and selectable app text are intentionally excluded. */
+.daily-feed-game[data-daily-feed-mode="bounce"] .daily-feed-stage,
+.daily-feed-game[data-daily-feed-mode="bounce"] .daily-feed-canvas,
+.daily-feed-game[data-daily-feed-mode="bounce"] .daily-feed-catcher,
+.daily-feed-game[data-daily-feed-mode="bounce"] .daily-feed-paddle,
+.daily-feed-game[data-daily-feed-mode="bounce"] .daily-feed-score-popups {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .daily-feed-canvas {
   position: absolute;
   inset: 0;
