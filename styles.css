@@ -1656,21 +1656,6 @@ Zoo To-Do Clipboard Prototype
   text-align: center;
 }
 
-.todo-tutorial-note[data-tutorial-page="1"],
-.todo-tutorial-note[data-tutorial-page="2"],
-.todo-tutorial-note[data-tutorial-page="3"] {
-  min-height: var(--todo-tutorial-note-min-height, 0px);
-}
-
-.todo-tutorial-measure {
-  position: absolute;
-  visibility: hidden;
-  pointer-events: none;
-  z-index: -1;
-  height: auto;
-  overflow: visible;
-}
-
 .todo-tutorial-heading {
   color: #333333;
   font-size: clamp(32px, 7.8vw, 56px);
@@ -8704,6 +8689,31 @@ body:has(#app .todo-dev-screen.is-tutorial-mode),
   .slide:has(.todo-dev-screen.is-tutorial-mode) {
     background-image: url("verse_images/daily_zoo_todo/zoo_to_do_background_ipad.jpg") !important;
   }
+}
+
+/* IP03 follow-up: all four first-time clipboards fill the usable viewport.
+ * The paper/board may grow beyond this minimum; short screens still scroll.
+ * The tutorial-only scope leaves Daily To-Do and the care info board alone. */
+.todo-dev-screen.is-tutorial-mode .todo-dev-page {
+  --tutorial-clipboard-page-top: calc(34px + var(--safeT));
+  --tutorial-clipboard-page-bottom: calc(24px + var(--safeB));
+  --tutorial-clipboard-board-top: clamp(28px, 6vw, 54px);
+  padding-top: var(--tutorial-clipboard-page-top);
+  padding-bottom: var(--tutorial-clipboard-page-bottom);
+}
+
+.todo-dev-screen.is-tutorial-mode .todo-dev-clipboard {
+  margin-top: var(--tutorial-clipboard-board-top);
+  min-height: calc(
+    var(--appH) - var(--tutorial-clipboard-page-top) -
+    var(--tutorial-clipboard-page-bottom) - var(--tutorial-clipboard-board-top)
+  );
+  display: flex;
+  flex-direction: column;
+}
+
+.todo-dev-screen.is-tutorial-mode .todo-dev-paper {
+  flex: 1 1 auto;
 }
 
 /* Patch 73: Current Verse is a real accessible My Verses navigation button. */

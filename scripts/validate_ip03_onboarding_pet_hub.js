@@ -1,109 +1,69 @@
 "use strict";
-// IP03 iPad-first visual contract + actual tutorial height equalizer behavior.
-// No real iPad/iPhone screenshot or Apple SDK result is implied by this test.
+// IP03 iPad-first contracts and owner-requested all-four-page clipboard fit.
+// Node checks do not replace real iPad/iPhone screenshots or Apple SDK build.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 const read = p => fs.readFileSync(path.join(root, p), "utf8");
 const app = read("app.js");
 const css = read("styles.css");
 const dailyCss = read("daily_zoo_todo.css");
 const profileCss = read("profiles.css");
-const begin = "function equalizeZooTodoTutorialClipboardPages(rootEl = document) {";
-const end = "function playZooTodoTutorialPageAudio(pageNumber, { explicit = false } = {}) {";
-const a = app.indexOf(begin), b = app.indexOf(end, a + begin.length);
-assert.ok(a > 0 && b > a, "must execute actual tutorial height equalizer");
-const fn = app.slice(a, b);
 
-// Explicitly demonstrate the new iPad page-1 no-equalization branch, while
-// phone page 1 and pages 2/3 still use the original height matching.
-function equalizeInFakeViewport({ width, page, initialHeight = "400px" }) {
-  let measured = 0, appended = 0, removed = 0, measuredPages = [];
-  const styles = { "--todo-tutorial-note-min-height": initialHeight };
-  const paper = {
-    clientWidth: Math.min(width - 50, 700),
-    style: {
-      removeProperty(prop) { delete styles[prop]; },
-      setProperty(prop, value) { styles[prop] = value; }
-    },
-    querySelector(sel) {
-      assert.equal(sel, ".todo-tutorial-note[data-tutorial-page]");
-      return {getAttribute: name => {
-        assert.equal(name, "data-tutorial-page");
-        return String(page);
-      }};
-    },
-    appendChild(element) { appended++; assert.ok(element); }
-  };
-  const rootEl = {querySelectorAll: selector => {
-    assert.equal(selector, ".todo-dev-paper");
-    return [paper];
-  }};
-  const doc = {createElement: tag => {
-    assert.equal(tag, "div");
-    measured++;
-    return {
-      className:"", style:{}, innerHTML:"",
-      setAttribute(){},
-      querySelectorAll(selector) {
-        assert.equal(selector, ".todo-tutorial-note");
-        return [345, 365].map(height => ({
-          getBoundingClientRect: () => ({height})
-        }));
-      },
-      remove(){removed++;}
-    };
-  }};
-  const window = {
-    matchMedia: media => {
-      assert.equal(media, "(min-width: 700px)");
-      return {matches:width >= 700};
-    },
-    getComputedStyle: () => ({
-      paddingLeft:"18px",paddingRight:"18px",paddingTop:"52px"
-    })
-  };
-  const sandbox={
-    window,document:doc,Math,Array,
-    renderZooTodoTutorialHtml: n => { measuredPages.push(n); return `<mock-${n}></mock-${n}>`; }
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(fn + "\nthis.equalize = equalizeZooTodoTutorialClipboardPages;",sandbox);
-  sandbox.equalize(rootEl);
-  return {styles,measured,appended,removed,measuredPages};
+function cssRule(selector) {
+  const start = css.lastIndexOf(selector + " {");
+  assert.ok(start >= 0, "expected CSS rule " + selector);
+  const end = css.indexOf("}", start);
+  assert.ok(end > start, "expected closing brace for " + selector);
+  return css.slice(start, end + 1);
 }
-for(const width of [768, 1024, 1180]) {
-  const test = equalizeInFakeViewport({width,page:1});
-  assert.equal(test.styles["--todo-tutorial-note-min-height"],undefined,
-    "iPad welcome must not inherit long page-2/3 clipboard height");
-  assert.equal(test.appended,0,"iPad short welcome needs no temporary measuring DOM");
+
+// Pages 1–4 share the first-time screen; page 4 is the post-Learn screen.
+// The board's viewport height is a MINIMUM; never clip overflowing content.
+const tutorialStart = app.indexOf("function renderZooTodoTutorialHtml(");
+const tutorialEnd = app.indexOf("function playZooTodoTutorialPageAudio(", tutorialStart);
+assert.ok(tutorialStart > 0 && tutorialEnd > tutorialStart);
+const tutorialMarkup = app.slice(tutorialStart, tutorialEnd);
+for (const page of [1, 2, 3, 4]) {
+  assert.ok(tutorialMarkup.includes('data-tutorial-page="' + page + '"'),
+    "all four tutorial pages keep the same viewport-fitting clipboard");
 }
-for(const width of [320, 375, 390, 428]) {
-  const test = equalizeInFakeViewport({width,page:1});
-  assert.equal(test.styles["--todo-tutorial-note-min-height"],"365px",
-    "existing narrow/typical iPhone tutorial height behavior is preserved");
-  assert.equal(test.appended,1);
-  assert.equal(test.removed,1);
-}
-for(const page of [2,3]) {
-  const test = equalizeInFakeViewport({width:834,page});
-  assert.equal(test.styles["--todo-tutorial-note-min-height"],"365px",
-    "later tutorial pages retain stable clipboard height across transitions");
-  assert.equal(test.appended,1);
-  assert.equal(test.removed,1);
-}
-const page4 = equalizeInFakeViewport({width:834,page:4});
-assert.equal(page4.appended,0);
-assert.equal(page4.styles["--todo-tutorial-note-min-height"],undefined,
-  "page four never uses page-1/2/3 equalization");
-assert.match(css,/\.todo-dev-screen\s*\{[^}]*overflow-y:\s*auto/s,
-  "the clipboard parent continues to scroll vertically when content is long");
-assert.match(css,/-webkit-overflow-scrolling:\s*touch/);
-assert.match(css,/\.todo-dev-page\s*\{[^}]*min-height:\s*100%/s);
-assert.match(css,/\.todo-dev-paper\s*\{[^}]*min-height:\s*420px/s,
-  "paper retains minimum size instead of collapsing on short content");
+assert.match(app, /wrap\.classList\.add\("is-tutorial-mode"\)/,
+  "all tutorial steps, including post-Learn page 4, use scoped layout");
+assert.doesNotMatch(app, /equalizeZooTodoTutorialClipboardPages/,
+  "retire page-2/3 measurement and special tablet/phone height logic");
+assert.doesNotMatch(css, /--todo-tutorial-note-min-height|\.todo-tutorial-measure/,
+  "retire measured per-page minimums");
+const pageLayout = cssRule(".todo-dev-screen.is-tutorial-mode .todo-dev-page");
+const boardLayout = cssRule(".todo-dev-screen.is-tutorial-mode .todo-dev-clipboard");
+const paperLayout = cssRule(".todo-dev-screen.is-tutorial-mode .todo-dev-paper");
+assert.match(pageLayout, /--tutorial-clipboard-page-top:\s*calc\(34px \+ var\(--safeT\)\)/);
+assert.match(pageLayout, /--tutorial-clipboard-page-bottom:\s*calc\(24px \+ var\(--safeB\)\)/);
+assert.match(pageLayout, /--tutorial-clipboard-board-top:\s*clamp\(28px, 6vw, 54px\)/);
+assert.match(pageLayout, /padding-top:\s*var\(--tutorial-clipboard-page-top\)/);
+assert.match(pageLayout, /padding-bottom:\s*var\(--tutorial-clipboard-page-bottom\)/);
+assert.match(boardLayout, /margin-top:\s*var\(--tutorial-clipboard-board-top\)/);
+assert.match(boardLayout, /min-height:\s*calc\(/);
+for (const term of [
+  "var(--appH)", "var(--tutorial-clipboard-page-top)",
+  "var(--tutorial-clipboard-page-bottom)", "var(--tutorial-clipboard-board-top)"
+]) assert.ok(boardLayout.includes(term), "viewport subtraction needs " + term);
+assert.match(boardLayout, /display:\s*flex/);
+assert.match(boardLayout, /flex-direction:\s*column/);
+assert.match(paperLayout, /flex:\s*1 1 auto/,
+  "the white sheet stretches with the brown board");
+assert.ok(!boardLayout.includes("max-height:") && !boardLayout.includes("overflow: hidden") &&
+  !boardLayout.includes("\n  height:"),
+  "board may grow for long content instead of clipping");
+assert.match(css, /\.todo-dev-screen\s*\{[^}]*overflow-y:\s*auto/s,
+  "the screen remains vertically scrollable for overflowing iPhone content");
+assert.match(css, /-webkit-overflow-scrolling:\s*touch/);
+assert.match(css, /\.todo-dev-page\s*\{[^}]*min-height:\s*100%/s);
+assert.match(css, /\.todo-dev-paper\s*\{[^}]*min-height:\s*420px/s,
+  "short screens retain the existing natural paper minimum");
+assert.match(app, /if \(tutorialActive\) \{\s*wrap\.classList\.add\("is-tutorial-mode"\)/);
+assert.match(app, /if \(tutorial\.step === TUTORIAL_STEPS\.LEARN_DONE\) \{\s*return 4/);
 
 // The three numbered entries on page 2 must wrap normally, but balanced
 // paragraph wrapping and page content itself remain unchanged.
@@ -164,4 +124,4 @@ assert.match(soundCard,/cardTextColor: "#ffffff"/);
 const fishCard = app.split('\n').find(line => line.includes('id: "fish", title: "Fish"'));
 assert.match(fishCard,/cardTextColor: "#0d454b"/,
   "other Listen activity card theme colors remain unchanged");
-console.log("IP03 tablet welcome fit, iPhone preservation, list, unlock, uncropped Daily avatar and Listen card PASS");
+console.log("IP03 all-four-page viewport clipboard fit/scroll contracts, list, unlock, Daily avatar and Listen card PASS");
