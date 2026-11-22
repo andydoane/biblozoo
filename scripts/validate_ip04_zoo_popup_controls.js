@@ -27,6 +27,7 @@ assert.match(engine, /exitButton\.className\s*=\s*"bz-zoo-exit no-zoom"/);
 assert.match(engine, /overlay\.setAttribute\("data-zoo-stage", next\)/);
 assert.match(css, /\.bz-zoo-instruction-balanced \.bz-zoo-instruction-line\s*\{[^}]*display:\s*block/s);
 assert.match(css, /\.bz-zoo-instruction-balanced \.bz-zoo-instruction-line\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+assert.match(css, /\.bz-zoo-escape \.bz-welcome-action-slot\.bz-zoo-balanced-hint,\s*\.bz-zoo-escape \.bz-welcome-action-slot\.bz-zoo-balanced-hint \.bz-zoo-action-slot\s*\{[^}]*height:\s*auto/s);
 assert.match(css, /\.bz-zoo-action-slot \.bz-welcome-action\.bz-zoo-lock-processing\s*\{[^}]*width:\s*100%;[^}]*display:\s*grid;[^}]*place-items:\s*center/s);
 assert.match(css, /\.bz-zoo-home\s*\{[^}]*position:\s*absolute;[^}]*z-index:\s*12/s);
 assert.match(css, /\.bz-zoo-home\s*\{[^}]*safe-area-inset-top/s);
@@ -84,6 +85,8 @@ function assertBreak(h, oldExit) {
     "top-left Home comes before popup in focus order");
   const text = instruction(h);
   assert.equal(text.className, "bz-zoo-instruction bz-zoo-instruction-balanced");
+  assert.equal(h.button.parentNode.parentNode.classList.contains("bz-zoo-balanced-hint"), !text.hidden,
+    "two-line hint gets natural height only while visible; LOCK GATE restores old height");
   assert.equal(text.getAttribute("aria-label"), "Drag pets to the pen!");
   assert.deepEqual(text.children.map(n => n.textContent), ["Drag pets ", "to the pen!"],
     "explicit balanced lines remain two lines even when iPad has ample width");
@@ -112,6 +115,8 @@ async function main() {
   h.advance(1200);
   h.rescueFirst();
   assertLock(h, false);
+  assert.equal(h.button.parentNode.parentNode.classList.contains("bz-zoo-balanced-hint"), false,
+    "normal single-pet LOCK GATE keeps ordinary action height");
   h.button.trigger("click");
   assertLock(h, true);
   assert.equal(h.recovery.length, 2);
@@ -124,6 +129,8 @@ async function main() {
   for (let i = 0; i < count; i++) h.rescueFirst();
   assert.equal(h.ctl.getState().rescued, count);
   assertLock(h, false);
+  assert.equal(h.button.parentNode.parentNode.classList.contains("bz-zoo-balanced-hint"), false,
+    "extra two-line height releases for LOCK GATE");
   assertBreak(h, exit);
   h.button.trigger("click");
   assertLock(h, true);

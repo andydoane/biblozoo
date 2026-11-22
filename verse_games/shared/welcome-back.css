@@ -211,6 +211,18 @@
 }
 .bz-zoo-action-slot > * { grid-area: 1 / 1; }
 .bz-zoo-action-slot .bz-welcome-action { min-height: 64px; }
+/* The forced two-line Break instruction is taller than the ordinary 64px
+ * button. Let BOTH nested grid slots grow for the hint; once LOCK GATE
+ * appears the controller removes this class and restores 64px exactly. */
+.bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint,
+.bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint .bz-zoo-action-slot {
+  height: auto;
+  min-height: 64px;
+  flex: 0 0 auto;
+}
+.bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint .bz-zoo-instruction {
+  padding: 6px 3px;
+}
 .bz-zoo-instruction {
   box-sizing: border-box;
   margin: 0;

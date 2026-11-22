@@ -280,9 +280,10 @@
     penImg.draggable = false;
     pen.appendChild(penImg);
     avatar.appendChild(pen);
+    const outerActionSlot = button.parentNode;
     const slot = doc.createElement("div");
     slot.className = "bz-zoo-action-slot";
-    button.parentNode.insertBefore(slot, button);
+    outerActionSlot.insertBefore(slot, button);
     slot.appendChild(button);
     const instruction = doc.createElement("p");
     instruction.className = "bz-zoo-instruction";
@@ -567,6 +568,9 @@
       exitButton.hidden = !visible;
     }
     function setInstruction(text, balance = false) {
+      // Two actual lines need their own natural row height, otherwise the
+      // 64px fixed action slots let the hint overlap the card above/below.
+      outerActionSlot.classList.toggle("bz-zoo-balanced-hint", balance);
       instruction.className = balance
         ? "bz-zoo-instruction bz-zoo-instruction-balanced"
         : "bz-zoo-instruction";
@@ -600,6 +604,7 @@
       return icon;
     }
     function setLockButton(focus = true) {
+      outerActionSlot.classList.remove("bz-zoo-balanced-hint");
       instruction.hidden = true;
       button.hidden = false;
       button.classList.remove("bz-zoo-lock-processing");
@@ -612,6 +617,7 @@
       if (focus) button.focus?.({ preventScroll: true });
     }
     function setLockProcessing() {
+      outerActionSlot.classList.remove("bz-zoo-balanced-hint");
       // No layout replacement: this is the SAME full-width button and slot.
       // Screen readers get status while sighted players see only the lock art.
       button.classList.add("bz-zoo-lock-processing");
@@ -1161,6 +1167,7 @@
       runAnimation();
     }
     function resetDisplay() {
+      outerActionSlot.classList.remove("bz-zoo-balanced-hint");
       card.classList.remove("bz-zoo-active", "bz-zoo-shake-escape", "bz-zoo-shake-break");
       overlay.classList.remove("bz-zoo-escape", "bz-zoo-fade-black", "bz-zoo-backgrounded");
       overlay.setAttribute("data-zoo-stage", "welcome");
