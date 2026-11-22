@@ -837,7 +837,15 @@
   cursor: pointer;
 }
 
-.daily-question-feedback-next:active {
+.daily-question-feedback-next.is-waiting,
+.daily-question-feedback-next:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
+.daily-question-feedback-next:not(:disabled):active {
   transform: translateY(3px);
 
   box-shadow:
