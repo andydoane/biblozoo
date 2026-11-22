@@ -1296,10 +1296,10 @@ function overlayMarkup(){
     return `
       <div class="vsp-overlay">
         <div class="vsp-overlay-card">
-          <div class="vsp-overlay-title">How to Play</div>
+          <div class="vsp-overlay-title vsp-overlay-title-help">How to Play</div>
           <div class="vsp-overlay-copy">${nonGameHelpHtml()}</div>
           <div class="vsp-overlay-actions">
-            <button class="vm-btn vsp-menu-action" data-action="close-help">${state.helpBackMode ? 'Back' : 'OK'}</button>
+            <button class="vm-btn vsp-menu-action vsp-help-action" data-action="close-help">${state.helpBackMode ? 'Back' : 'OK'}</button>
           </div>
         </div>
       </div>
