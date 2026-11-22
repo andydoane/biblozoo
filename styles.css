@@ -6239,7 +6239,6 @@ BibloPet Unlock Screen
 .pet-unlock-care-text {
   width: min(92vw, 520px);
   max-width: 100%;
-  margin-top: clamp(2px, 0.8vh, 8px);
   font-size: clamp(19px, 4.8vw, 31px);
   font-weight: 900;
   line-height: 1.08;
