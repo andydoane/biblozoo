@@ -691,7 +691,13 @@
    the Welcome Back card. Keep the card's original height in every Zoo
    Escape stage rather than adding a second exit row beneath LOCK GATE. */
 .daily-feed-resume-overlay .bz-zoo-exit { display: none !important; }
-/* Keep the emergency Back pill above any escaped portrait passing under it. */
+/* The host's own arrow is a second exit on Feeding. During Zoo Break
+   hide it: the shared controller moves its single Home control to the safe
+   top-left. Normal Welcome Back/escaped-pet audio denial keeps its Back. */
+.daily-feed-resume-overlay[data-zoo-stage="break"] .daily-feed-resume-back {
+  display: none !important;
+}
+/* Keep the emergency Back above escaping pets in all non-Break stages. */
 .daily-feed-resume-overlay.bz-zoo-escape .daily-feed-resume-back {
   z-index: 6;
 }

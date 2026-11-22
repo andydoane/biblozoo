@@ -295,18 +295,10 @@
     exitButton.textContent = "Back to Zoo";
     exitButton.hidden = true;
     card.appendChild(exitButton);
-    // Zoo Break alone uses the app's top-left Home icon instead of this
-    // bottom exit. Keep the bottom link for a lone escape or denied audio.
-    const homeButton = doc.createElement("button");
-    homeButton.type = "button";
-    homeButton.className = "bz-zoo-home no-zoom";
-    homeButton.setAttribute("aria-label", "Back to Zoo");
-    homeButton.innerHTML = ZOO_HOME_SVG;
-    homeButton.hidden = true;
-    // Focus order follows the top-left visual order, before the dialog card.
-    // Most owners place the card directly in the overlay; handle wrappers too.
-    if (card.parentNode === overlay) overlay.insertBefore(homeButton, card);
-    else overlay.insertBefore(homeButton, overlay.firstChild || null);
+    // One *physical* exit control is moved and restyled between stages.
+    // The old two-button arrangement could leave a visible bottom Back
+    // while the separate Home was absent/obscured by a host overlay.
+    // Reusing this node makes that inconsistent state impossible.
     const field = doc.createElement("div");
     field.className = "bz-zoo-field";
     field.setAttribute("role", "group");
@@ -542,17 +534,53 @@
         title.appendChild(line);
       }
     }
-    function showExit(visible) {
-      // A Zoo Break has an icon-only top-left Home, but other recovery paths
-      // retain their existing text link so denied audio always has an exit.
-      const useHome = visible && stage === "break";
-      homeButton.hidden = !useHome;
-      exitButton.hidden = !visible || useHome;
+    function showExit(visible, stageForExit = stage) {
+      const useHome = visible && stageForExit === "break";
+      // Class and DOM placement are changed together before making the
+      // control visible. There is never a second Back/Home to get out of sync.
+      if (useHome) {
+        if (exitButton.className !== "bz-zoo-home no-zoom") {
+          exitButton.className = "bz-zoo-home no-zoom";
+          exitButton.innerHTML = ZOO_HOME_SVG;
+        }
+        // Top-left position and first keyboard/focus order, even with hosts
+        // whose card is wrapped in another element.
+        if (exitButton.parentNode !== overlay) {
+          if (card.parentNode === overlay)
+            overlay.insertBefore(exitButton, card);
+          else overlay.insertBefore(exitButton, overlay.firstChild || null);
+        }
+      } else {
+        if (exitButton.className !== "bz-zoo-exit no-zoom") {
+          exitButton.className = "bz-zoo-exit no-zoom";
+          exitButton.textContent = "Back to Zoo";
+        }
+        if (exitButton.parentNode !== card) card.appendChild(exitButton);
+      }
+      exitButton.setAttribute("aria-label", "Back to Zoo");
+      exitButton.hidden = !visible;
     }
     function setInstruction(text, balance = false) {
-      instruction.textContent = text;
+      instruction.className = balance
+        ? "bz-zoo-instruction bz-zoo-instruction-balanced"
+        : "bz-zoo-instruction";
+      if (balance && text === "Drag pets to the pen!") {
+        // text-wrap:balance by itself does NOT wrap a one-line string on
+        // wide iPads. These visually balanced lines are intentional.
+        // The trailing blank preserves the exact combined readable phrase.
+        const first = doc.createElement("span");
+        first.className = "bz-zoo-instruction-line";
+        first.textContent = "Drag pets ";
+        const second = doc.createElement("span");
+        second.className = "bz-zoo-instruction-line";
+        second.textContent = "to the pen!";
+        instruction.replaceChildren(first, second);
+        instruction.setAttribute("aria-label", text);
+      } else {
+        instruction.textContent = text;
+        instruction.removeAttribute?.("aria-label");
+      }
       instruction.hidden = false;
-      instruction.classList.toggle("bz-zoo-instruction-balanced", balance);
       button.hidden = true;
       button.disabled = false;
       button.classList.remove("bz-zoo-lock-processing");
@@ -599,6 +627,7 @@
       stage = next;
       card.classList.toggle("bz-zoo-active", next === "escape" || next === "break");
       overlay.classList.toggle("bz-zoo-escape", next === "escape" || next === "break");
+      overlay.setAttribute("data-zoo-stage", next);
       pen.hidden = next !== "escape" && next !== "break";
       showExit(next === "escape" || next === "break");
       if (status) status.hidden = true;
@@ -1041,16 +1070,16 @@
     }
     function exitToZoo() {
       if (disposed) return;
-      const wasBreak = stage === "break" || !homeButton.hidden;
+      const wasBreak = stage === "break" ||
+        exitButton.className === "bz-zoo-home no-zoom";
       stage = "exiting";
       pending = false;
       serial++;
       emptyField();
       log("zoo-escape-exit", { attemptCount, rescued, total });
       try { onExit?.({ attemptCount, rescued, total, completedBreak: breakCredited }); } catch (_) {
-        // If the owner navigation throws, never hide the only safe exit.
-        homeButton.hidden = !wasBreak;
-        exitButton.hidden = wasBreak;
+        // If host navigation throws, restore the same reachable exit.
+        showExit(true, wasBreak ? "break" : "escape");
         overlay.classList.remove("bz-zoo-fade-black");
       }
     }
@@ -1128,6 +1157,7 @@
     function resetDisplay() {
       card.classList.remove("bz-zoo-active", "bz-zoo-shake-escape", "bz-zoo-shake-break");
       overlay.classList.remove("bz-zoo-escape", "bz-zoo-fade-black", "bz-zoo-backgrounded");
+      overlay.setAttribute("data-zoo-stage", "welcome");
       title.innerHTML = originalTitle; // original template content, not user data
       root.BibloZooWelcomeBack?.populate?.(overlay, { profileId, name, pictureBase: safeBase });
       button.innerHTML = originalButton;
@@ -1202,10 +1232,9 @@
       button.removeEventListener("click", attempt);
       pen.removeEventListener("click", tapPen);
       exitButton.removeEventListener("click", exitToZoo);
-      homeButton.removeEventListener("click", exitToZoo);
       field.remove(); effects.remove(); rescueStatus.remove(); pen.remove(); instruction.remove();
       slot.parentNode?.insertBefore(button, slot);
-      slot.remove(); exitButton.remove(); homeButton.remove();
+      slot.remove(); exitButton.remove();
       resetDisplay();
     }
     if (allowTestMenu) {
@@ -1218,7 +1247,6 @@
     button.addEventListener("click", attempt);
     pen.addEventListener("click", tapPen);
     exitButton.addEventListener("click", exitToZoo);
-    homeButton.addEventListener("click", exitToZoo);
     doc.addEventListener("visibilitychange", onVisibility);
     return Object.freeze({ start, startSurprise, resumeVisible, destroy, exit: exitToZoo,
       isPaused: () => pending, getStage: () => stage,
