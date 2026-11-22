@@ -4719,7 +4719,7 @@
     state.waitingServe = true;
     runtime.introUnlockAt = now + 550;
     if (runtime.startTitleEl) {
-      runtime.startTitleEl.textContent = `${state.livesLeft} Balls Left!`;
+      runtime.startTitleEl.textContent = `${state.livesLeft} ${state.livesLeft === 1 ? "ball" : "balls"} left!`;
       runtime.startTitleEl.hidden = false;
     }
     if (runtime.startBallsEl) runtime.startBallsEl.hidden = true;

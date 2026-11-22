@@ -288,7 +288,8 @@ select {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 0 var(--vl-game-bottom-pad);
+  /* IP05: extend the starfield to the game viewport bottom. */
+  padding: 0;
 }
 
 .vl-game-board {
@@ -306,12 +307,9 @@ select {
 }
 
 @media (min-width: 700px) {
-  .vl-game-wrap {
-    padding: 0 0 var(--vl-game-bottom-pad);
-  }
-
+  /* Tablet gameplay is full-bleed too: no rounded corner wedges. */
   .vl-game-board {
-    border-radius: 26px;
+    border-radius: 0;
   }
 }
 
