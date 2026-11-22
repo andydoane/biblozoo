@@ -185,6 +185,9 @@
     astroDrainFadeMs: 0,
     astroLandingMessageVisible: false,
     astroRunning: false,
+    astroControlPhase: "playing",
+    astroControlMessage: "",
+    astroControlPending: false,
     astroMoonPhase: false,
     astroMoonY: -240,
     astroMoonVisible: false,
@@ -378,7 +381,10 @@
     tiltEnabled: false,
     tiltPermissionState: "unknown",
     tiltRawDir: 0,
-    tiltDir: 0
+    tiltDir: 0,
+    controlMode: null,
+    dragging: false,
+    dragPointerId: null
   };
 
   const ASTRO_DURATION_BY_MODE_MS = {
@@ -928,6 +934,14 @@
     state.bonusReady = false;
     state.bonusTravelTextVisible = false;
     state.bonusFadeActive = false;
+    state.astroControlPhase = "playing";
+    state.astroControlMessage = "";
+    state.astroControlPending = false;
+    astroInput.controlMode = null;
+    astroInput.tiltEnabled = false;
+    astroInput.tiltPermissionState = "unknown";
+    astroInput.dragging = false;
+    astroInput.dragPointerId = null;
     state.bonusRocketColorKey = "red";
     state.bonusOutcome = "";
     state.bonusMedalAlreadyEarned = false;
@@ -1165,7 +1179,7 @@
 
   function helpHtml() {
     return `
-    Tap the next word to launch it into the verse!<br><br>Then help your rocket reach the moon.<br><br>Tilt your phone or tablet, or tap the arrows to dodge asteroids!
+    Tap the next word to launch it into the verse!<br><br>Then help your rocket reach the moon.<br><br>Tilt your device or drag your finger to dodge asteroids.
   `;
   }
 
@@ -1205,6 +1219,10 @@
   // and bonus sleep() delays. Foreground recovery is a separate pause owner:
   // closing a menu must never resume time while Welcome Back remains open.
   function syncGameClockPause() {
+    if (returnPaused || state.menuOpen || state.helpOpen) {
+      astroInput.dragging = false;
+      astroInput.dragPointerId = null;
+    }
     if (returnPaused || nativeLaunchPending || nativeLaunchFailure ||
         state.menuOpen || state.helpOpen || state.speedMenuOpen) {
       welcomeClock.pause();
@@ -2014,18 +2032,20 @@
           </div>
           ${renderAstroLandingOverlay()}
           ${shouldShowAstroArrowButtons() ? `
-            <div class="vl-space-controls">
+            <div class="vl-space-controls" id="vlArrowControls">
               <button class="vl-space-arrow no-zoom" id="vlLeftBtn" type="button" aria-label="Move left">‹</button>
               <button class="vl-space-arrow no-zoom" id="vlRightBtn" type="button" aria-label="Move right">›</button>
             </div>
           ` : ""}
         </div>
+        ${renderAstroSteeringChoice()}
         ${renderHelpOverlay()}
         ${renderGameMenuOverlay()}
       </div>`;
     wireBonusMenuOnly();
     syncGameMenuOpenState();
     wireAstroControls();
+    wireAstroSteeringChoice();
     cacheAstroDomRefs();
   }
 
@@ -2258,9 +2278,175 @@
 
   }
 
+  // IP09 uses Feeding's two-step Tilt / Drag chooser visual and assets.
+  // Do not import Feeding's runtime: its reward/audio clock is unrelated.
+  // The modal is shown AFTER the travel cutscene, before the asteroid RAF.
+  function renderAstroSteeringChoice() {
+    if (state.astroControlPhase === "playing") return "";
+    const selected = astroInput.controlMode;
+    const instructions = selected === "tilt"
+      ? "Tilt your device to dodge asteroids."
+      : "Drag your finger to dodge asteroids.";
+    return `
+      <div class="vl-steering-overlay" id="vlSteeringOverlay" role="dialog"
+        aria-modal="true" aria-label="Verse Launch steering controls">
+        <div class="vl-steering-card">
+          <div class="vl-steering-choice" ${state.astroControlPhase === "choose" ? "" : "hidden"}>
+            <div class="vl-steering-heading">Choose Controls</div>
+            <div class="vl-steering-options" role="group" aria-label="Choose one steering control">
+              <button class="vl-steering-option no-zoom" type="button" data-vl-steering="tilt"
+                aria-label="Choose Tilt controls">
+                <img src="../../verse_images/daily_questions/dq_feed_control_tilt.png" alt="" draggable="false">
+                <span>Tilt</span>
+              </button>
+              <button class="vl-steering-option no-zoom" type="button" data-vl-steering="drag"
+                aria-label="Choose Drag controls">
+                <img src="../../verse_images/daily_questions/dq_feed_control_drag.png" alt="" draggable="false">
+                <span>Drag</span>
+              </button>
+            </div>
+            <p class="vl-steering-message" role="status" aria-live="polite"
+              ${state.astroControlMessage ? "" : "hidden"}>${escapeHtml(state.astroControlMessage)}</p>
+          </div>
+          <div class="vl-steering-instructions" ${state.astroControlPhase === "instructions" ? "" : "hidden"}>
+            <img class="vl-steering-selected-icon"
+              src="../../verse_images/daily_questions/dq_feed_control_${selected === "tilt" ? "tilt" : "drag"}.png"
+              alt="" draggable="false">
+            <p>${instructions}</p>
+            <button class="vl-steering-confirm no-zoom" id="vlSteeringConfirm"
+              type="button">Got It!</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function showAstroSteeringChoice(message = "") {
+    if (state.screen !== "asteroids") return;
+    state.astroControlPhase = "choose";
+    state.astroControlMessage = message;
+    astroInput.controlMode = null;
+    astroInput.tiltEnabled = false;
+    const screen = $(".vl-asteroid-screen");
+    if (!screen) return;
+    const arrows = $("#vlArrowControls");
+    if (arrows) arrows.hidden = false;
+    $("#vlSteeringOverlay")?.remove();
+    screen.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
+    wireAstroSteeringChoice();
+  }
+
+  function showAstroSteeringInstructions(choice) {
+    if (state.screen !== "asteroids" || state.astroControlPhase !== "choose") return;
+    astroInput.controlMode = choice;
+    state.astroControlPhase = "instructions";
+    state.astroControlMessage = "";
+    const screen = $(".vl-asteroid-screen");
+    if (!screen) return;
+    const arrows = $("#vlArrowControls");
+    if (arrows) arrows.hidden = choice === "tilt";
+    $("#vlSteeringOverlay")?.remove();
+    screen.insertAdjacentHTML("beforeend", renderAstroSteeringChoice());
+    wireAstroSteeringChoice();
+  }
+
+  async function chooseAstroSteering(choice) {
+    if (state.screen !== "asteroids" || state.astroControlPhase !== "choose" ||
+        state.astroControlPending || state.menuOpen || state.helpOpen ||
+        returnPaused || document.hidden) return;
+    if (choice === "drag") {
+      astroInput.tiltEnabled = false;
+      showAstroSteeringInstructions("drag");
+      return;
+    }
+    if (choice !== "tilt") return;
+    if (!shouldTryTiltControls()) {
+      showAstroSteeringChoice("Tilt isn't available. Please choose Drag.");
+      return;
+    }
+    state.astroControlPending = true;
+    // requestPermission runs synchronously inside this REAL button gesture,
+    // never in the cutscene, a timer, or foreground/Welcome Back resume.
+    const allowed = await requestAstroTiltPermission();
+    state.astroControlPending = false;
+    if (state.screen !== "asteroids" || state.astroControlPhase !== "choose" ||
+        returnPaused || document.hidden) return;
+    if (!allowed) {
+      showAstroSteeringChoice("Tilt permission wasn't granted. Please choose Drag.");
+      return;
+    }
+    showAstroSteeringInstructions("tilt");
+  }
+
+  function confirmAstroSteering() {
+    if (state.screen !== "asteroids" || state.astroControlPhase !== "instructions" ||
+        !["tilt", "drag"].includes(astroInput.controlMode) ||
+        state.menuOpen || state.helpOpen || returnPaused || document.hidden ||
+        nativeLaunchPending || nativeLaunchFailure || state.astroControlPending) return;
+    state.astroControlPhase = "playing";
+    $("#vlSteeringOverlay")?.remove();
+    startAstroLoop();
+  }
+
+  function wireAstroSteeringChoice() {
+    const overlay = $("#vlSteeringOverlay");
+    if (!overlay) return;
+    overlay.querySelectorAll("[data-vl-steering]").forEach(button => {
+      button.onclick = event => {
+        event.preventDefault();
+        void chooseAstroSteering(button.dataset.vlSteering);
+      };
+    });
+    const confirm = $("#vlSteeringConfirm");
+    if (confirm) confirm.onclick = event => {
+      event.preventDefault();
+      confirmAstroSteering();
+    };
+  }
+
+  function wireAstroDragControls() {
+    const stage = $("#vlAstroStage");
+    if (!stage) return;
+    const move = event => {
+      const rect = stage.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      state.astroPlayerX = safeLeftPct((event.clientX - rect.left) / rect.width);
+      renderAstroEntities(rect);
+    };
+    stage.onpointerdown = event => {
+      if (astroInput.controlMode !== "drag" || !canUseAstroControls() ||
+          event.target?.closest?.("button, [role='dialog']")) return;
+      if (astroInput.dragging) return;
+      event.preventDefault();
+      astroInput.dragging = true;
+      astroInput.dragPointerId = event.pointerId;
+      try { stage.setPointerCapture(event.pointerId); } catch (_) { }
+      move(event);
+    };
+    stage.onpointermove = event => {
+      if (!astroInput.dragging || astroInput.controlMode !== "drag" ||
+          astroInput.dragPointerId !== event.pointerId || !canUseAstroControls()) return;
+      event.preventDefault();
+      move(event);
+    };
+    const finish = event => {
+      if (!astroInput.dragging || astroInput.dragPointerId !== event.pointerId) return;
+      astroInput.dragging = false;
+      astroInput.dragPointerId = null;
+      try { stage.releasePointerCapture(event.pointerId); } catch (_) { }
+    };
+    stage.onpointerup = finish;
+    stage.onpointercancel = finish;
+    stage.onlostpointercapture = () => {
+      astroInput.dragging = false;
+      astroInput.dragPointerId = null;
+    };
+  }
+
   function wireAstroControls() {
     const leftBtn = $("#vlLeftBtn");
     const rightBtn = $("#vlRightBtn");
+
+    wireAstroDragControls();
 
     if (leftBtn) {
       leftBtn.onpointerdown = (e) => { e.preventDefault(); setAstroPointerDir(-1); };
@@ -2820,6 +3006,8 @@
   }
 
   function shouldShowAstroArrowButtons() {
+    // Retain keyboard/arrow fallback on desktop and when Tilt is unavailable.
+    // These buttons also remain usable alongside Drag for accessibility.
     return !astroInput.tiltEnabled;
   }
 
@@ -2911,6 +3099,8 @@
   function canUseAstroControls() {
     return state.screen === "asteroids" &&
       state.astroRunning &&
+      state.astroControlPhase === "playing" &&
+      !returnPaused && !document.hidden &&
       !state.astroMoonPhase &&
       !state.menuOpen &&
       !state.helpOpen &&
@@ -2928,7 +3118,8 @@
         astroInput.rightKey && !astroInput.leftKey ? 1 :
           0;
 
-    const tiltDir = astroInput.tiltEnabled ? astroInput.tiltDir : 0;
+    const tiltDir = astroInput.controlMode === "tilt" && astroInput.tiltEnabled
+      ? astroInput.tiltDir : 0;
 
     state.astroMoveDir = astroInput.pointerDir || keyboardDir || tiltDir;
   }
@@ -2937,6 +3128,8 @@
     astroInput.leftKey = false;
     astroInput.rightKey = false;
     astroInput.pointerDir = 0;
+    astroInput.dragging = false;
+    astroInput.dragPointerId = null;
     astroInput.tiltRawDir = 0;
     astroInput.tiltDir = 0;
     state.astroMoveDir = 0;
@@ -3507,8 +3700,13 @@
 
     state.bonusFadeActive = false;
     state.bonusTravelTextVisible = false;
+    // Pause on the fully loaded asteroid screen. Only the child's Tilt or
+    // Drag selection + Got It! makes the bonus ship controllable. Non-touch
+    // Web/desktop keeps the existing keyboard/arrow-key fallback directly.
+    state.astroControlPhase = isLikelyTouchDevice() ? "choose" : "playing";
+    state.astroControlMessage = "";
     setScreen("asteroids");
-    startAstroLoop();
+    if (state.astroControlPhase === "playing") startAstroLoop();
   }
 
   function clearAstroDomCache() {
@@ -4505,8 +4703,8 @@
     if (choiceId === "bonus_launch") {
       state.busy = true;
 
-      await requestAstroTiltPermission();
-
+      // Never request motion permission before the launch cutscene.
+      // It belongs only to the child's explicit Tilt choice afterwards.
       await fadeOutBonusLaunchButton();
       await playLaunchCountdown();
       playGameSound("launchButton");

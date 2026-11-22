@@ -60,6 +60,8 @@ function makeHarness() {
     // N6k: this legacy fixture runs the real browser callbacks without a
     // Capacitor bridge, so all new native-only pause owners are inactive.
     "const nativeLaunchAudio=null;let nativeLaunchPending=false,nativeLaunchFailure=false;",
+    // IP09: real clock-pause callback now cancels any active drag capture.
+    "const astroInput={dragging:false,dragPointerId:null};",
     "const HELP_OVERLAY_ID='vlHelpOverlay';",
     "const ASTRO_MAX_FRAME_DT_MS=50;",
     "const gameNow=()=>welcomeClock.now();",
