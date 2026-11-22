@@ -1201,7 +1201,9 @@ function applyBuildTextRender(){
 
 function nonGameHelpHtml(){
   return `
-    Tap the bouncing blob with the next word of the verse.<br><br>Then tap the Bible book and verse numbers.<br><br>Keep splatting colorful paint across the board!
+    <p>Tap the bouncing blob with the next word of the verse.</p>
+    <p>Each splat fills in squares on the board.</p>
+    <p>Fill in every square to earn a surprise painting!</p>
   `;
 }
 
