@@ -68,10 +68,12 @@ assert.match(splat, /\$\{nonGameHelpHtml\(\)\}<\/div>/);
 assert.match(splat, /vsp-overlay-title vsp-overlay-title-help/);
 assert.match(splat, /vm-btn vsp-menu-action vsp-help-action/);
 const splatCss = read("verse_games/verse_splat/game.css");
-assert.match(splatCss,
-  /\\.vsp-overlay-title-help\\s*\\{[^}]*background:\\s*var\\(--vm-purple,/s);
-assert.match(splatCss,
-  /\\.vsp-help-action\\s*\\{[^}]*background:\\s*var\\(--vm-purple,/s);
+for (const selector of [".vsp-overlay-title-help{", ".vsp-help-action{"]) {
+  assert.ok(splatCss.includes(selector), "Splat has scoped Help chrome " + selector);
+  const block = splatCss.split(selector)[1].split("}")[0];
+  assert.ok(block.includes("background:var(--vm-purple,"),
+    "Splat custom in-round Help uses app purple");
+}
 assert.match(read("verse_games/verse_snake/game.js"),
   /Tap and hold where you want the snake to go\./);
 const feed = read("daily_questions_feed_game.js");
