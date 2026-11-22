@@ -3325,8 +3325,12 @@
   }
 
   function openHelpFromMenu(){
-    const overlay = document.getElementById(HELP_OVERLAY_ID);
-    if (overlay) overlay.removeAttribute("hidden");
+    // The shared Help modal needs its is-open flag and Back return mode.
+    const menu = document.getElementById(MENU_OVERLAY_ID);
+    menu?.classList.remove("is-open");
+    menu?.setAttribute("aria-hidden", "true");
+    window.VerseGameShell.openHelp(HELP_OVERLAY_ID, "back", "Back");
+    document.getElementById(`${HELP_OVERLAY_ID}CloseBtn`)?.focus?.({preventScroll:true});
   }
 
   function setPaused(paused, reason = ""){
