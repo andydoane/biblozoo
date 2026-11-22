@@ -70,7 +70,7 @@ async function testChoiceFlow() {
  eq(drag.startConfirmEl.hidden,false,"instructions displayed");
  eq(drag.startConfirmButton.textContent,"Got It!","confirmation action");
  eq(drag.startSelectedIconEl.src.endsWith("dq_feed_control_drag.png"),true,"drag icon");
- eq(drag.startInstructionEl.textContent,"Drag to rebound the white ball; feed your pet the colored snacks!","exact Bounce drag instruction");
+ eq(drag.startInstructionEl.textContent,"Drag to Bounce! Feed your pet the colored snacks!","exact Bounce drag instruction");
  const missing=make();h.setRuntime(missing);
  delete window.DeviceOrientationEvent;
  await h.chooseFeedingControl(missing,"tilt");
@@ -90,7 +90,7 @@ async function testChoiceFlow() {
  eq(permissionCalls,2,"permission requested for tilt");
  eq(allowed.controlMode,"tilt","allowed tilt locked");
  eq(allowed.tiltEnabled,true,"tilt selected");
- eq(allowed.startInstructionEl.textContent,"Tilt to rebound the white ball; feed your pet the colored snacks!","exact Bounce tilt instruction");
+ eq(allowed.startInstructionEl.textContent,"Tilt to Bounce! Feed your pet the colored snacks!","exact Bounce tilt instruction");
  eq(allowed.startSelectedIconEl.src.endsWith("dq_feed_control_tilt.png"),true,"tilt icon");
 }
 
