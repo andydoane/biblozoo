@@ -449,6 +449,13 @@ html.bb-native-capacitor .bb-build-wrap {
   will-change: transform, opacity;
 }
 
+/* IP08: book-round wave only. Since the play layer is rebuilt each RAF,
+   opacity is computed from spawn age in JS rather than a CSS animation
+   that would restart with each fresh button. */
+.bb-bug-wrap.is-book-enter {
+  opacity: var(--bb-book-enter-opacity, 1);
+}
+
 .bb-bug-btn {
   width: clamp(104px, 28vw, 220px);
   min-height: clamp(92px, 22vw, 152px);

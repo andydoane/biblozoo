@@ -77,6 +77,16 @@
 
   const BONUS_BUG_LIFE_MS = 1850;
   const BONUS_BUG_EXTRA_LIFE_MS = 950;
+  // IP08: book-round labels should arrive softly. The renderer rebuilds DOM
+  // each frame, so the opacity comes from each bug's pause-shifted bornAt.
+  const BOOK_WAVE_FADE_MS = 260;
+  // Refill empty bonus slots sooner without changing bug life, the three-bug
+  // on-screen cap, the original initial stagger or end-of-round difficulty.
+  const BONUS_REFILL_DELAYS_MS = {
+    automatic: [90, 220],
+    good: [85, 205],
+    stink: [110, 260]
+  };
   const BONUS_INITIAL_STAGGER_MS = [0, 360, 780];
   const BONUS_EAT_MS = 360;
   const BONUS_SCORE_REVEAL_MS = 1850;
@@ -2124,6 +2134,12 @@
     );
   }
 
+  function scheduleBonusRefill(kind = "automatic") {
+    const [minimum, maximum] = BONUS_REFILL_DELAYS_MS[kind] ||
+      BONUS_REFILL_DELAYS_MS.automatic;
+    scheduleBonusSpawn(minimum + Math.random() * (maximum - minimum));
+  }
+
   function scheduleBonusSpawn(delayMs = 0) {
     if (!state.bonusMode || state.done) return;
     if (performance.now() >= state.bonusEndsAt) return;
@@ -2267,7 +2283,7 @@
       scheduleAction(560, () => {
         state.bonusBugs = state.bonusBugs.filter((item) => item.id !== bug.id);
         state.bonusEating = false;
-        scheduleBonusSpawn(160 + Math.random() * 320);
+        scheduleBonusRefill("stink");
       });
 
       return;
@@ -2299,7 +2315,7 @@
       state.tongue = null;
       state.bonusBugs = state.bonusBugs.filter((item) => item.id !== bug.id);
       state.bonusEating = false;
-      scheduleBonusSpawn(120 + Math.random() * 260);
+      scheduleBonusRefill("good");
     });
   }
 
@@ -2384,7 +2400,7 @@
     });
 
     if (state.bonusMode && now < state.bonusEndsAt && !state.bonusEating && getBonusSpawnSlotCount() < BONUS_MAX_BUGS) {
-      scheduleBonusSpawn(140 + Math.random() * 360);
+      scheduleBonusRefill("automatic");
     }
   }
 
@@ -2661,7 +2677,19 @@
     const isTutorial = !!bug.tutorial;
     const statusClass = bug.status === "poof" ? " is-poof" : bug.status === "eating" ? " is-eating" : "";
     const bonusClass = isBonus ? ` bb-bug--bonus${bug.kind === "stink" ? " bb-bug--stink" : ""}` : "";
-    const popClass = now >= bug.bornAt && now - bug.bornAt < 260 ? " is-pop" : "";
+    const isBookWaveArrival = !isBonus && !isTutorial &&
+      state.phase === "book" && bug.status === "falling";
+    // CSS animations would restart because renderFrame replaces innerHTML
+    // every RAF. The opacity instead advances from the actual spawn time.
+    const bookFadeOpacity = isBookWaveArrival
+      ? shell.clamp((now - bug.bornAt) / BOOK_WAVE_FADE_MS, 0, 1)
+      : 1;
+    const bookEnterClass = isBookWaveArrival ? " is-book-enter" : "";
+    const bookEnterStyle = isBookWaveArrival
+      ? ` --bb-book-enter-opacity:${bookFadeOpacity.toFixed(3)};`
+      : "";
+    const popClass = !isBookWaveArrival && now >= bug.bornAt &&
+      now - bug.bornAt < 260 ? " is-pop" : "";
     const word = isBonus || isTutorial ? "" : `<div class="bb-bug-word">${escapeHtml(bug.text)}</div>`;
 
     const isBonusPoof = isBonus && bug.status === "poof";
@@ -2714,7 +2742,7 @@
     const buttonOpacity = isBonusPoof ? ` opacity:${sinkOpacity.toFixed(3)};` : "";
 
     return `
-      <div class="bb-bug-wrap${bonusClass}${statusClass}${popClass}" style="--bb-x:${x.toFixed(2)}px; --bb-y:${y.toFixed(2)}px;">
+      <div class="bb-bug-wrap${bonusClass}${statusClass}${bookEnterClass}${popClass}" style="--bb-x:${x.toFixed(2)}px; --bb-y:${y.toFixed(2)}px;${bookEnterStyle}">
         <button class="bb-bug-btn" type="button" data-bug-id="${escapeHtml(bug.id)}"${disabled} style="transform:${buttonTransform};${buttonOpacity}">
           ${word}
           ${bugVisual}
