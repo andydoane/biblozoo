@@ -21,7 +21,7 @@ assert.match(pill,/width:\s*max-content/);
 assert.match(pill,/max-width:\s*min\(92%,\s*500px\)/);
 assert.match(pill,/padding:\s*8px 16px/);
 assert.match(pill,/overflow-wrap:\s*break-word/);
-assert.match(css,/\.wob-final-intro-panel\s*\{[^}]*width:\s*100%/s);
+assert.match(css,/\.wob-bonus-panel,\s*\.wob-final-intro-panel,\s*\.wob-money-panel\s*\{[^}]*width:\s*100%/s);
 assert.match(css,/\.wob-final-modal\s*\{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*z-index:\s*50;/s);
 assert.match(css,/\.wob-root\s*\{[^}]*position:\s*relative;[^}]*height:\s*100dvh;[^}]*width:\s*100%;/s);
 
