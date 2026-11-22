@@ -252,14 +252,15 @@
   width: 100%;
   overflow-wrap: anywhere;
 }
-/* ONE permanent Home at overlay top-left, from the FIRST Welcome Back
- * frame through single-pet Escape and Zoo Break. No bottom text Back link.
- * Same app white glyph / charcoal pill / iOS safe-area offsets. */
+/* Anchor the single Home INSIDE the popup, never at the screen edge.
+ * The host overlay already pads the card for iOS safe areas. Only the
+ * controller-backed popup needs a positioning context in Welcome stage. */
+[data-zoo-stage] .bz-welcome-card { position: relative; }
 .bz-zoo-home {
   position: absolute;
   z-index: 12;
-  top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
-  left: max(18px, calc(env(safe-area-inset-left, 0px) + 12px));
+  top: 12px;
+  left: 12px;
   width: 48px;
   height: 44px;
   display: inline-flex;

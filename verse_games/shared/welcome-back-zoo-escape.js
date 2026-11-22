@@ -292,7 +292,7 @@
     slot.appendChild(instruction);
     // This is only presentation. The existing onExit remains the single
     // safe way out of Welcome Back / single-pet Escape / Zoo Break.
-    // Keep its Home target outside the card and before it in focus order,
+    // Keep its Home target INSIDE the popup card, first in focus order,
     // including the Welcome stage BEFORE the first Let's go! gesture.
     const exitButton = doc.createElement("button");
     exitButton.type = "button";
@@ -300,9 +300,7 @@
     exitButton.setAttribute("aria-label", "Back to Zoo");
     exitButton.innerHTML = ZOO_HOME_SVG;
     exitButton.hidden = true;
-    if (card.parentNode === overlay)
-      overlay.insertBefore(exitButton, card);
-    else overlay.insertBefore(exitButton, overlay.firstChild || null);
+    card.insertBefore(exitButton, avatar);
     const field = doc.createElement("div");
     field.className = "bz-zoo-field";
     field.setAttribute("role", "group");

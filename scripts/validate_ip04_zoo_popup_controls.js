@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 "use strict";
-/* IP04 owner follow-up. Exercise ONE real exit node and the exact two
- * visible Zoo Break instruction lines, rather than only checking hidden
- * attributes on two different buttons or a non-binding CSS balance hint. */
+/* IP04 owner follow-up. Exercise ONE real Home INSIDE the popup card,
+ * and exact two-line rescue hints, not screen-edge overlay positioning. */
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -30,9 +29,12 @@ assert.match(css, /\.bz-zoo-instruction-balanced \.bz-zoo-instruction-line\s*\{[
 assert.match(css, /\.bz-zoo-instruction-balanced \.bz-zoo-instruction-line\s*\{[^}]*overflow-wrap:\s*anywhere/s);
 assert.match(css, /\.bz-zoo-escape \.bz-welcome-action-slot\.bz-zoo-balanced-hint,\s*\.bz-zoo-escape \.bz-welcome-action-slot\.bz-zoo-balanced-hint \.bz-zoo-action-slot\s*\{[^}]*height:\s*auto/s);
 assert.match(css, /\.bz-zoo-action-slot \.bz-welcome-action\.bz-zoo-lock-processing\s*\{[^}]*width:\s*100%;[^}]*display:\s*grid;[^}]*place-items:\s*center/s);
-assert.match(css, /\.bz-zoo-home\s*\{[^}]*position:\s*absolute;[^}]*z-index:\s*12/s);
-assert.match(css, /\.bz-zoo-home\s*\{[^}]*safe-area-inset-top/s);
-assert.match(css, /\.bz-zoo-home\s*\{[^}]*safe-area-inset-left/s);
+assert.match(css, /\[data-zoo-stage\] \.bz-welcome-card\s*\{[^}]*position:\s*relative/s,
+  "controller popup is the positioning context, including initial Welcome Back");
+assert.match(css, /\.bz-zoo-home\s*\{[^}]*position:\s*absolute;[^}]*z-index:\s*12;[^}]*top:\s*12px;[^}]*left:\s*12px/s,
+  "Home uses card-local offsets, not viewport-safe-area offsets");
+assert.doesNotMatch(css.match(/\.bz-zoo-home\s*\{[^}]*\}/)?.[0] || "", /safe-area-inset/,
+  "Home must not be positioned using screen-edge safe-area offsets");
 assert.match(css, /\.bz-zoo-home\s*\{[^}]*background:\s*#333333;[^}]*color:\s*#ffffff/s);
 assert.match(css, /\.bz-zoo-home:focus-visible\s*\{/);
 assert.match(css, /\.bz-zoo-home\[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/);
@@ -60,7 +62,7 @@ const visibleExit = h => {
   assert.equal(links.length, 1, "ONE exit DOM element in this popup, never two");
   return links[0];
 };
-const home = h => h.overlay.children.find(n => n.className === "bz-zoo-home no-zoom");
+const home = h => h.card.children.find(n => n.className === "bz-zoo-home no-zoom");
 const bottom = h => h.card.children.find(n => n.className === "bz-zoo-exit no-zoom");
 const instruction = h => h.button.parentNode.children.find(n => n.className.startsWith("bz-zoo-instruction"));
 function assertLock(h, busy) {
@@ -77,13 +79,16 @@ function assertHome(h, exit, expectedStage) {
   assert.equal(h.overlay.getAttribute("data-zoo-stage"), expectedStage);
   assert.equal(visibleExit(h), exit, "exactly the same Home for all three stages");
   assert.equal(bottom(h), undefined, "no bottom text Back, including Welcome");
-  assert.equal(home(h), exit, "Home lives outside the card");
-  assert.equal(exit.hidden, false, "top-left safe Home always visible");
+  assert.equal(home(h), exit, "Home lives INSIDE the yellow popup card");
+  assert.equal(exit.parentNode, h.card, "not attached to the full-screen overlay");
+  assert.equal(h.overlay.children.includes(exit), false, "screen-edge Home must not return");
+  assert.equal(exit.hidden, false, "card-corner Home always visible");
   assert.ok(exit.innerHTML.includes(iconPath), "real app white Home path");
   assert.equal(exit.getAttribute("aria-label"), "Back to Zoo");
   assert.equal(exit.listeners.click.length, 1);
-  assert.ok(h.overlay.children.indexOf(exit) < h.overlay.children.indexOf(h.card),
-    "top-left Home first in focus order");
+  assert.ok(h.card.children.indexOf(exit) < h.card.children.indexOf(h.title),
+    "Home comes before popup content in keyboard order");
+  assert.equal(h.card.children[0], exit, "Home is the first card control in tab order");
 }
 function assertBalancedHint(h, textValue, line1) {
   const hint=instruction(h);
@@ -189,6 +194,6 @@ async function main() {
     "successful Break completion is exactly once");
   completed.ctl.destroy();
 
-  console.log("IP04 follow-up PASS: permanently visible Home from Welcome through Escape/Break, two balanced hints, no text Back or host duplicates, original lock and deferred audio/credit safety");
+  console.log("IP04 popup Home PASS: same Home INSIDE the card from Welcome through Escape/Break, two balanced hints, no text Back or host duplicates, original lock and deferred audio/credit safety");
 }
 main().catch(e => { console.error(e); process.exitCode = 1; });
