@@ -659,6 +659,20 @@ body{
   color:var(--vsp-purple);
 }
 
+/* IP01: Splat's own in-round Help must match the shared purple Help pill. */
+.vsp-overlay-title-help{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  max-width:100%;
+  padding:8px 20px;
+  border-radius:999px;
+  background:var(--vm-purple, var(--vsp-purple));
+  color:#ffffff;
+  text-align:center;
+  text-wrap:balance;
+}
+
 .vsp-overlay-copy{
   margin-top:10px;
   font-size:clamp(18px,3.8vw,24px);
@@ -678,6 +692,11 @@ body{
 
 .vsp-menu-action{
   background:var(--vsp-purple);
+  color:#ffffff;
+}
+
+.vsp-help-action{
+  background:var(--vm-purple, var(--vsp-purple));
   color:#ffffff;
 }
 
