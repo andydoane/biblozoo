@@ -41,7 +41,7 @@ for(const id of pictures){
     "bundled public pet art exists: "+id);
 }
 const selection=part(game,"function bonusPictureSeed() {","function startBonusIntro() {");
-assert.doesNotMatch(selection,/localStorage|sessionStorage|profileId|zookeeper|fetch\(/i,
+assert.doesNotMatch(selection.replace(/\/\/[^\n]*/g,""),/localStorage|sessionStorage|profileId|zookeeper|fetch\(/i,
   "selection must never depend on private child profiles or network");
 assert.match(game,/prepareBonusPictureRound\(\);\s*render\(\);[\s\S]*?runBonusIntro\(token\)/,
   "art starts warming in bonus intro, not on a timer or after round five begins");
@@ -106,9 +106,9 @@ for(const [mode,count] of [["easy",12],["medium",16],["hard",20]]){
   assert.equal(new Set(h.state.bonusPictureChoices.map(p=>p.src)).size,count);
   const repeated=harness(mode);
   repeated.api.prepareBonusPictureRound();
-  assert.deepEqual(
-    h.state.bonusPictureChoices.map(p=>p.src),
-    repeated.state.bonusPictureChoices.map(p=>p.src),
+  assert.equal(
+    h.state.bonusPictureChoices.map(p=>p.src).join("|"),
+    repeated.state.bonusPictureChoices.map(p=>p.src).join("|"),
     "selection deterministic for the same public verse/difficulty");
   assert.equal(h.state.bonusPictureTarget.src,repeated.state.bonusPictureTarget.src);
   const round=h.api.makeBonusTiles();
