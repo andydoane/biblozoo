@@ -2982,34 +2982,11 @@
   }
 
   function bonusTravelInstructionHtml() {
-    if (shouldTryTiltControls()) {
-      if (astroInput.tiltEnabled) {
-        return `
-            Reach the moon!<br>
-            Dodge the asteroids.<br>
-            Tilt to steer.
-          `;
-      }
-
-      if (astroInput.tiltPermissionState === "denied") {
-        return `
-            Reach the moon!<br>
-            Dodge the asteroids.<br>
-            Tap the arrows to steer.
-          `;
-      }
-
-      return `
-            Reach the moon!<br>
-            Dodge the asteroids.<br>
-            Tilt to steer, or tap the arrows.
-          `;
-    }
-
+    // Steering is chosen *after* this cutscene. Don't mention retired
+    // arrows/keys or assume Tilt before the child chooses Tilt or Drag.
     return `
             Reach the moon!<br>
-            Dodge the asteroids.<br>
-            Use arrow keys to steer.
+            Dodge the asteroids.
           `;
   }
 
