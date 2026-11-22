@@ -211,6 +211,18 @@
 }
 .bz-zoo-action-slot > * { grid-area: 1 / 1; }
 .bz-zoo-action-slot .bz-welcome-action { min-height: 64px; }
+/* The forced two-line Break instruction is taller than the ordinary 64px
+ * button. Let BOTH nested grid slots grow for the hint; once LOCK GATE
+ * appears the controller removes this class and restores 64px exactly. */
+.bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint,
+.bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint .bz-zoo-action-slot {
+  height: auto;
+  min-height: 64px;
+  flex: 0 0 auto;
+}
+.bz-zoo-escape .bz-welcome-action-slot.bz-zoo-balanced-hint .bz-zoo-instruction {
+  padding: 6px 3px;
+}
 .bz-zoo-instruction {
   box-sizing: border-box;
   margin: 0;
@@ -230,10 +242,19 @@
   place-items: center;
 }
 .bz-zoo-instruction.bz-zoo-instruction-balanced {
+  text-align: center;
   text-wrap: balance;
 }
-/* Same white house silhouette and charcoal background as app.js Home pill,
- * positioned in the overlay's own bounds for both standalone and Feeding. */
+/* Explicit two-line Zoo Break copy: a balanced wrap even when the phrase
+ * would otherwise fit in one line on iPad. Allow long text to grow/scroll. */
+.bz-zoo-instruction-balanced .bz-zoo-instruction-line {
+  display: block;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+/* The SAME exit button is moved from the bottom of the card to the
+ * overlay top-left during Zoo Break. No extra Back link can remain behind.
+ * Shared white app Home glyph, charcoal pill and safe-area offsets. */
 .bz-zoo-home {
   position: absolute;
   z-index: 12;
