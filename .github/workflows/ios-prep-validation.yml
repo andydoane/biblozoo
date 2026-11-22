@@ -59,6 +59,9 @@ jobs:
       - name: Validate IP04 shared Zoo Break popup controls and safe exit
         run: node scripts/validate_ip04_zoo_popup_controls.js
 
+      - name: Validate IP05 result screens and full-board overlays
+        run: node scripts/validate_ip05_result_visuals.js
+
       - name: Validate Wheel of Bible native menu mute and resume
         run: node scripts/validate_wheel_menu_mute_resume.js
 
