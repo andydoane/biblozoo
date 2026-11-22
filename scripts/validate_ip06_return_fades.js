@@ -90,6 +90,7 @@ function fadeHarness({native = false, reduced = false} = {}) {
   const state = {isSliding: false};
   const context = {
     IS_NATIVE_CAPACITOR: native,
+    APP_PAGE_TRANSITION_MS: 300,
     State: state,
     document,
     window: {matchMedia: () => ({matches: reduced}), setTimeout: setTimer},
