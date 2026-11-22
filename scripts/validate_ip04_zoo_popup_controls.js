@@ -101,8 +101,9 @@ async function main() {
   assert.equal(h.fired.filter(x => x === "recovered").length, 0);
   h.advance(9000);
   assert.equal(h.fired.filter(x => x.exit).length, 1);
+  const oldHome = home(h);
   h.ctl.destroy();
-  assert.equal(home(h).parentNode, null, "destroy cleans new Home control");
+  assert.equal(oldHome.parentNode, null, "destroy cleans new Home control");
 
   // Abandoning a direct random Zoo Break cannot fabricate rescue or sound.
   const direct = harness([], { reduced: true });
