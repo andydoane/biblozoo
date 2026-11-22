@@ -69,24 +69,43 @@
   const PROFILE_PICTURE_FALLBACK_SRC =
     `${PROFILE_PICTURE_DIR}profile_picture_fallback.png`;
 
-  // IP10: a curated set of existing PUBLIC bundled pet art, not Zookeeper
-  // photos/profile identifiers. The 24 filenames are checked by CI.
-  // A fixed pool also works offline when verse_list.json cannot be fetched.
+  // Public, bundled artwork only (no Zookeeper/child photos or network
+  // catalog). The CI regression verifies each of these 125 filenames.
+  // Order is verse-seeded, not difficulty-seeded; field size drives density.
   const BONUS_PICTURE_VERSE_IDS = [
-    "genesis_1_1", "genesis_1_27", "exodus_15_11", "joshua_1_9",
-    "psalm_23_4", "psalm_46_1", "psalm_91_1", "psalm_119_105",
-    "proverbs_3_5", "isaiah_26_3", "isaiah_41_10", "daniel_2_44",
-    "matthew_5_16", "matthew_6_26", "matthew_11_28", "luke_2_11",
-    "john_3_16", "john_14_6", "acts_16_31", "romans_5_8",
-    "romans_8_28", "1_corinthians_15_22", "galatians_5_22_23",
-    "ephesians_2_8_9"
+    "1_chronicles_16_8", "1_corinthians_11_26", "1_corinthians_15_22", "1_corinthians_15_3_4",
+    "1_corinthians_3_16", "1_john_3_5", "1_peter_5_7", "1_samuel_16_7",
+    "1_timothy_1_15", "1_timothy_2_5", "2_corinthians_12_9", "2_corinthians_5_17",
+    "2_timothy_1_7", "2_timothy_3_16_17", "acts_16_31", "acts_1_8",
+    "acts_2_38_39", "acts_4_31", "acts_5_29", "daniel_2_44",
+    "deuteronomy_10_17", "deuteronomy_5_15", "deuteronomy_6_5", "ephesians_2_8_9",
+    "ephesians_3_20", "exodus_15_11", "galatians_2_20", "galatians_3_13",
+    "galatians_5_22_23", "genesis_1_1", "genesis_1_27", "genesis_50_20",
+    "hebrews_10_19", "hebrews_11_30", "hebrews_11_6", "hebrews_13_3",
+    "isaiah_1_18", "isaiah_26_3", "isaiah_41_10", "isaiah_45_5",
+    "isaiah_46_9_10", "james_5_13", "jeremiah_32_27", "john_11_25",
+    "john_11_35", "john_13_34", "john_14_16", "john_14_6",
+    "john_15_13", "john_16_33", "john_1_12", "john_1_14",
+    "john_20_31", "john_3_14_15", "john_3_16", "john_3_3",
+    "john_5_39", "john_6_35", "joshua_1_9", "joshua_21_45",
+    "lamentations_3_22", "luke_19_10", "luke_1_32", "luke_2_11",
+    "luke_6_27", "mark_10_45", "mark_1_17", "matthew_11_28",
+    "matthew_12_40", "matthew_18_3", "matthew_1_21", "matthew_22_31_32",
+    "matthew_22_37_38", "matthew_24_44", "matthew_28_19", "matthew_28_20",
+    "matthew_5_16", "matthew_6_20", "matthew_6_26", "matthew_6_33",
+    "matthew_7_12", "numbers_23_19", "philippians_2_10", "philippians_2_8",
+    "philippians_4_13", "philippians_4_6", "proverbs_14_12", "proverbs_15_3",
+    "proverbs_16_16", "proverbs_17_17", "proverbs_3_5", "psalm_100_3",
+    "psalm_103_19", "psalm_105_8", "psalm_107_1", "psalm_115_2_3",
+    "psalm_117_2", "psalm_118_6", "psalm_119_105", "psalm_119_36",
+    "psalm_121_1_2", "psalm_128_1", "psalm_135_6", "psalm_136_1",
+    "psalm_23_4", "psalm_24_8", "psalm_27_1", "psalm_29_4",
+    "psalm_34_15", "psalm_46_1", "psalm_47_2", "psalm_77_11",
+    "psalm_91_1", "psalm_96_5", "psalm_98_4", "revelation_7_9",
+    "romans_10_15", "romans_12_2", "romans_3_10_11", "romans_3_23",
+    "romans_5_8", "romans_6_23", "romans_8_18", "romans_8_28",
+    "romans_8_31"
   ];
-
-  const BONUS_PICTURE_COUNT_BY_MODE = {
-    easy: 12,
-    medium: 16,
-    hard: 20
-  };
 
   const PROFILE_MAGNET_COLORS = [
     "#ff5a51",
@@ -2025,12 +2044,10 @@
   }
 
 
-  // A public verse + difficulty determines distinct picture choices without
-  // using any private Zookeeper/profile data. Seven is coprime with 24,
-  // so visiting the pool in steps of seven never repeats a picture.
+  // No private IDs or difficulty feed the picture selection.
+  // Seven is coprime with the 125-art catalog, so cycling it cannot repeat.
   function bonusPictureSeed() {
-    const text = String(ctx.verseId || "biblozoo") + "|" +
-      String(selectedMode || "easy");
+    const text = String(ctx.verseId || "biblozoo") + "|picture-hunt";
     let hash = 2166136261;
     for (const char of text) {
       hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
@@ -2040,11 +2057,9 @@
 
   function prepareBonusPictureRound() {
     const seed = bonusPictureSeed();
-    const count = BONUS_PICTURE_COUNT_BY_MODE[selectedMode] || 12;
     const poolSize = BONUS_PICTURE_VERSE_IDS.length;
     const choices = [];
-
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < poolSize; i++) {
       const index = ((seed % poolSize) + i * 7) % poolSize;
       const verseId = BONUS_PICTURE_VERSE_IDS[index];
       choices.push({
@@ -2052,19 +2067,56 @@
         src: `${PROFILE_PICTURE_DIR}profile_picture_${verseId}.png`
       });
     }
-
     state.bonusPictureChoices = choices;
     state.bonusPictureTarget = choices[(seed >>> 16) % choices.length];
 
-    // Warm bundled assets during the existing intro + four letter rounds.
-    // No fetch, timers, bonus clock changes, or wait for image loading.
+    // Prewarm a bounded subset during intro + four letter rounds; only the
+    // density-selected art is actually inserted into the fifth-round field.
+    const warm = choices.slice(0, 28);
+    if (!warm.includes(state.bonusPictureTarget)) warm.push(state.bonusPictureTarget);
     bonusPicturePreloads = typeof Image === "function"
-      ? choices.map(choice => {
+      ? warm.map(choice => {
           const img = new Image();
           img.src = choice.src;
           return img;
         })
       : [];
+  }
+
+  function bonusPictureGridMetrics(width, height, tileWidth, tileHeight) {
+    const margin = 4;
+    const gap = Math.max(5, Math.min(12, Math.min(width, height) * 0.012));
+    const columns = Math.max(1, Math.floor((width - margin * 2 + gap) / (tileWidth + gap)));
+    const rows = Math.max(1, Math.floor((height - margin * 2 + gap) / (tileHeight + gap)));
+    return { margin, gap, columns, rows, capacity: columns * rows };
+  }
+
+  function measuredBonusPictureCount() {
+    // The FIND intro already rendered the real board, but its message field
+    // uses full-board geometry. Measure an invisible round-field probe so
+    // CSS media queries, safe areas and iPhone/iPad orientation are honored.
+    const board = document.getElementById("vsnBoard");
+    if (!board || !document.createElement) return 28;
+    const fieldProbe = document.createElement("div");
+    fieldProbe.className = "vsn-letter-field";
+    fieldProbe.style.visibility = "hidden";
+    fieldProbe.style.pointerEvents = "none";
+    const tileProbe = document.createElement("button");
+    tileProbe.className = "vsn-magnet vsn-bonus-picture-tile";
+    tileProbe.type = "button";
+    fieldProbe.appendChild(tileProbe);
+    board.appendChild(fieldProbe);
+    const fieldRect = fieldProbe.getBoundingClientRect();
+    const tileRect = tileProbe.getBoundingClientRect();
+    fieldProbe.remove();
+    if (!fieldRect.width || !fieldRect.height || !tileRect.width || !tileRect.height) return 28;
+    const grid = bonusPictureGridMetrics(fieldRect.width, fieldRect.height,
+      tileRect.width, tileRect.height);
+    // A lively, almost full picture hunt, not a fixed 12/16/20 count.
+    // Leave a few natural holes, preserve >=46px phone hitboxes and cap to
+    // the number of distinct bundled art assets. All modes share this rule.
+    return Math.max(1, Math.min(BONUS_PICTURE_VERSE_IDS.length,
+      Math.floor(grid.capacity * 0.9)));
   }
 
   function startBonusIntro() {
@@ -2189,9 +2241,14 @@
   }
 
   function makeBonusPictureTiles() {
-    // The same player-vs-pointer target contract used by letter rounds:
-    // exactly one picture target and distinct decoys, no extra scoring.
-    return shuffle(state.bonusPictureChoices.map(picture => ({
+    // Exactly one visible target; the count depends on measured field area,
+    // never difficulty. Use distinct public images before any duplicates.
+    const count = Math.min(state.bonusPictureChoices.length, measuredBonusPictureCount());
+    const pictures = [state.bonusPictureTarget].concat(
+      state.bonusPictureChoices.filter(picture => picture !== state.bonusPictureTarget)
+        .slice(0, Math.max(0, count - 1))
+    );
+    return shuffle(pictures.map(picture => ({
       id: `vsn_tile_${state.tileSeed++}`,
       source: picture === state.bonusPictureTarget
         ? "bonus-target" : "bonus-decoy",
@@ -3301,6 +3358,52 @@
     render();
   }
 
+  function layoutBonusPictureMagnets(field, rect, buttons) {
+    if (!buttons.length) return;
+    // A shuffled, gently jittered grid avoids the random rejection/hiding
+    // that was designed for 110 letter magnets. Every cell fits a full,
+    // uncropped photo and leaves a clear gap for accurate child taps.
+    const first = buttons[0];
+    const tileWidth = first.offsetWidth || 54;
+    const tileHeight = first.offsetHeight || 54;
+    const grid = bonusPictureGridMetrics(rect.width, rect.height, tileWidth, tileHeight);
+    const slotWidth = (rect.width - grid.margin * 2) / grid.columns;
+    const slotHeight = (rect.height - grid.margin * 2) / grid.rows;
+    const slots = shuffle(Array.from({ length: grid.capacity }, (_, index) => ({
+      col: index % grid.columns,
+      row: Math.floor(index / grid.columns)
+    })));
+    const targets = buttons.filter(btn =>
+      state.tiles.some(tile => tile.id === btn.dataset.tileId && tile.isBonusTarget));
+    const decoys = buttons.filter(btn => !targets.includes(btn));
+    const ordered = targets.concat(shuffle(decoys));
+    ordered.forEach((btn, index) => {
+      btn.style.display = "";
+      btn.style.left = "0px";
+      btn.style.top = "0px";
+      btn.style.visibility = "hidden";
+      btn.classList.remove("is-hidden-decoy", "is-laid-out");
+      const slot = slots[index];
+      if (!slot) {
+        // On a mid-round rotation to a smaller field, never hide the target.
+        btn.classList.add("is-hidden-decoy");
+        btn.style.display = "none";
+        return;
+      }
+      const slackX = Math.max(0, slotWidth - tileWidth);
+      const slackY = Math.max(0, slotHeight - tileHeight);
+      const jitterX = (Math.random() - 0.5) * Math.min(16, slackX * 0.8);
+      const jitterY = (Math.random() - 0.5) * Math.min(16, slackY * 0.8);
+      const x = grid.margin + slot.col * slotWidth + slackX / 2 + jitterX;
+      const y = grid.margin + slot.row * slotHeight + slackY / 2 + jitterY;
+      btn.style.left = `${Math.max(0, Math.min(rect.width - tileWidth, x))}px`;
+      btn.style.top = `${Math.max(0, Math.min(rect.height - tileHeight, y))}px`;
+      btn.style.visibility = "visible";
+      btn.style.setProperty("--spawn-delay", `${Math.floor(Math.random() * 360)}ms`);
+      btn.classList.add("is-laid-out");
+    });
+  }
+
   function layoutMagnets(){
     const field = document.getElementById("vsnLetterField");
     if (!field) return;
@@ -3309,6 +3412,11 @@
     if (rect.width <= 0 || rect.height <= 0) return;
 
     const buttons = Array.from(field.querySelectorAll(".vsn-magnet"));
+    if (state.bonusActive && state.bonusRound === 5 &&
+        state.bonusStage === "round" && state.bonusPictureTarget) {
+      layoutBonusPictureMagnets(field, rect, buttons);
+      return;
+    }
     const byId = new Map(buttons.map(btn => [btn.dataset.tileId, btn]));
 
     const priorityTiles =
