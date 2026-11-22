@@ -10,7 +10,7 @@
 2. **Wheel Final Round instruction pill:** text intrinsic max-content width plus normal 8px/16px padding; max 100% of parent or 720px, whichever is narrower, with word wrapping for short screens.
 3. **Verse Launch:** remove tablet-only 26px rounded gameplay corners; paint the continuous starfield/dark overlay on the pre-existing full-height outer game root and make inner gameboard transparent. Preserve exact original bottom safe-area padding and board dimensions to avoid altering ship physics or tappable layout.
 4. **Wheel Time's Up / Verse complete dim:** mount existing time-result overlay at full-width, full-height .wob-root rather than inside narrower .wob-card; maintain 2500ms hold and 320ms exit, animation, pop sound, pointer-events:none, and cleanup, so it neither clips edges nor blocks later controls.
-5. **Bounce next serve:** grammatically correct lower-case "1 ball left!" versus "2 balls left!" / "3 balls left!"; original lives count, Launch action, disabled/ready behavior and scoring unchanged.
+5. **Bounce next serve:** grammatically correct lower-case "1 ball left!" versus "2 Balls Left!" / "3 Balls Left!"; original lives count, Launch action, disabled/ready behavior and scoring unchanged.
 6. **Versey Bird post-bonus result:** reuse existing bundled gameIconImageHtmlForId markup above result title, with a responsive 52–82px noninteractive icon, existing Continue action, and scrollable compact-height card.
 7. **Dino Dash post-bonus result:** identical scoped reuse of bundled Dino Dash game icon, preserving title/result percentages and Continue behavior; extra-large text and short landscape may scroll the card rather than clipping the action.
 
