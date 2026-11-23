@@ -1,6 +1,26 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — IP12 merged + owner accepted; release-prep regression baseline (2026-11-22 EST)
+## CURRENT — Phase 1 / Step 1 production developer-gate and version follow-up (2026-11-22 EST)
+
+**PR under review:** `fix/release-prod-dev-gate-version` → `ios-prep`, **unmerged / owner acceptance pending**. From live `ios-prep` `e1e19a492c0273b94ceaecba699cf543cf2f69f2` (merged [docs #178](https://github.com/andydoane/biblozoo/pull/178)). Settings' former `Version 1.0.12 Black Startup Shell` becomes **Version 1.0**, matching existing Xcode marketing version (build 1). The shared hidden-shortcut guard on native iOS now **fails closed** when native-only output identity is missing/incomplete, but the explicit separate Audio Test identity preserves its intended tools. Web/PWA/Android behavior is unchanged. No private data, native audio/Swift, signing, `main` or app distribution changes.
+
+**Pre-PR owner device evidence:** Owner launched the existing app in **Xcode Release configuration on an iPhone simulator** and tested ~2-second long presses of Settings heading, Practice Games heading, and home-screen Zoo To-Do. **All three produced no developer response (owner PASS for these observed gestures)**. The Settings screen still displayed the old codename before this PR. No claim is made about untested hidden entry points, physical iPhone/iPad Release distribution, or a new PR binary.
+
+**Automation:** The existing workflow-wired `scripts/validate_native_production_dev_hardening.js` now executes the *actual* shared `allowDevShortcuts()` function under production iOS, Audio Test, Web/PWA, Android, native with absent/partial identity, and the `capacitor:` protocol fallback. It confirms `DEBUG_MODE=false`, Daily Questions automatic debug off, `Version 1.0` display and Xcode version 1.0/build 1/bundle ID, plus existing guarded long-press entry points/native DEV tools. PR exact-head CI **PENDING** and Apple SDK/physical device **NOT TESTED** by Node.
+
+**Owner retest once merged** (use a **simulator** first, do not reset real family data):
+
+1. Fetch/pull `ios-prep` after merging; `npm ci && npm run build && npx cap sync ios && npx cap open ios`. Choose an iPhone simulator and set Product → Scheme → Edit Scheme → Run → Info → **Release**.
+2. Open BibloZoo **Settings** and confirm it visibly reads **Version 1.0** (no old codename).
+3. Hold the **Settings heading**, **Practice Games heading** and **Zoo To-Do button** for ~2 seconds; no debug Utilities, hidden practice game, or Daily Preview dialog. Also verify ordinary short taps work normally.
+4. If the Daily Pet Questions forced-offer/developer entry point can be tested non-destructively with a disposable profile, confirm it is unavailable. Do **not** reset real production data, force unlocks or recreate private Zookeepers.
+5. Restore Xcode Run configuration to Debug if preferred after the test. Report **PASS / FAIL / NOT TESTED** with simulator/device.
+
+**Phase 1 checklist tracking:** The granular owner-progress mirror lives in [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md); preserve owner-reported completion vs source implementation vs post-merge verification as separate kinds of evidence.
+
+---
+
+## HISTORICAL accepted baseline — IP12 merged + owner accepted (2026-11-22 EST)
 
 **Stable evidence:** [PR #177](https://github.com/andydoane/biblozoo/pull/177) is **MERGED** to `ios-prep` at `39217b899db40733e5a39eb6f8da3ece74c3069d`. Exact post-merge [Actions #45089867489](https://github.com/andydoane/biblozoo/actions/runs/45089867489) completed **SUCCESS**. The owner has tested the merged latest build and reports the #177 behavior is working as intended. Mark #177 / IP12 **OWNER PASS / RESOLVED** for its scoped fixes: full measured fifth-round picture grid rather than deliberate ~10% holes, fresh random target selection across same-verse plays rather than a verse-locked target, and the compact square charcoal image-only target note. This acceptance does not invent a separate physical result for older #176 card-scroll feedback or Verse Launch cutscene copy.
 
