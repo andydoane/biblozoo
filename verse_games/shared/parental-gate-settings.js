@@ -11,6 +11,10 @@
   function identity(win) {
     try {
       const cap = win.Capacitor;
+      // A confirmed Android Capacitor app is not the Kids iOS product,
+      // even if its WebView happens to use a capacitor: URL scheme.
+      if (cap?.isNativePlatform?.() === true && cap?.getPlatform?.() === "android")
+        return "web-or-other";
       const nativeIOS = (cap?.isNativePlatform?.() === true &&
         cap?.getPlatform?.() === "ios") ||
         win.location?.protocol === "capacitor:";
