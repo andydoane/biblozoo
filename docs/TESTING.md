@@ -2,7 +2,7 @@
 
 ## CURRENT — Kids parental gate PR 3 Settings / redesigned popup acceptance (November 23, 2026)
 
-**Context:** [PR #192](https://github.com/andydoane/biblozoo/pull/192) is **merged** at `79e2e2dde2a5d854546cf8a9bee176ee6e3cc83f`; the owner reports Ghost Writer parental-gated Share **works**. Feature branch `feat/ios-parental-gate-pr3-settings-redesign-20261123` targets `ios-prep`, **unmerged until owner reviews/tests**. This PR adds Settings/backups/outgoing links and adjusts the *shared* popup, not game content, Swift or real data.
+**Context:** [PR #192](https://github.com/andydoane/biblozoo/pull/192) is **merged** at `79e2e2dde2a5d854546cf8a9bee176ee6e3cc83f`; the owner reports Ghost Writer parental-gated Share **works**. [PR #193](https://github.com/andydoane/biblozoo/pull/193), feature branch `feat/ios-parental-gate-pr3-settings-redesign-20261123` targets `ios-prep`, **unmerged until owner reviews/tests**. This PR adds Settings/backups/outgoing links and adjusts the *shared* popup, not game content, Swift or real data.
 
 **Mac / no profile risk:** From PR branch (or after owner merge, `ios-prep` and GitHub Desktop **Pull Origin**), run:
 ```bash
