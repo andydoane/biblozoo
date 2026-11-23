@@ -1,6 +1,16 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Paid ZapSplat sound download confirmation (2026-11-22 EST)
+## CURRENT — Release 1.0 BSB verse-corpus metadata and old ESV debug fallback (2026-11-22 EST)
+
+**Stable evidence:** [#182](https://github.com/andydoane/biblozoo/pull/182) **MERGED** to `ios-prep` at `017205a4998a81f64a83cc551453ba454a422ce5` with **SUCCESS** Node regression and production web build jobs. Owner provided a [Florence S Chalkboard font source](https://www.dafont.com/chalkboard-3.font) but **elects to leave the embedding/license investigation for later**; do not call it cleared.
+
+**New PR:** `fix/release-bsb-verse-audit` → `ios-prep`, **OPEN / unmerged / exact-head CI PENDING**. Replaces the `app.js` ESV-labeled **inactive** John 3:16 debug fallback with a canonical BSB public-domain sample from `verse_data/john_3_16.json`. `DEBUG_MODE=false` remains unchanged, and no published verse JSON, verse/audio MP3, Bible gameplay, user profile, Swift or signing files change. Adds a Node validator in `scripts/validate_release_bsb_verse_corpus.js`, wired to GitHub Actions, to check all **124 listed** verse IDs, matching JSON files and ID values, BSB translation label, public-domain attribution and matching canonical debug fallback. Run the PR's exact-head CI before calling this PASS.
+
+**Limits:** This metadata check does **not** independently compare the full corpus word-for-word against the publisher's authoritative BSB edition, determine the authorship of meanings/reflections/questions, or license independently recorded narration. Those rights remain under review. The owner’s real 10 family and 11 Audio Test profile sets must not be deleted, reinstalled or overwritten; this code scope requires no such action. A quick Release-simulator spot check is reasonable after owner approval/merge, but the changed fixture is disabled in normal gameplay.
+
+---
+
+## HISTORICAL — Paid ZapSplat sound download confirmation (2026-11-22 EST)
 
 **Stable evidence:** [PR #181](https://github.com/andydoane/biblozoo/pull/181) is **MERGED** into `ios-prep` at `67acbfe57f18088eb59a8e948e7f6c1a1591c8e5`, with **SUCCESS** Node regression and production web build checks at its exact head. The owner now confirms that their **ZapSplat sound effects were downloaded during an active paid subscription**. Under [ZapSplat's current Standard License](https://www.zapsplat.com/license-type/standard-license/), Premium downloads can be used in finished commercial apps without attribution after cancellation, but this does **not** independently clear individual tracks or standalone redistribution of raw files.
 
