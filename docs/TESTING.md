@@ -1,5 +1,32 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — Kids first-launch follow-up: owner UI fixes and Flashcards first-mic-grant recovery (November 23, 2026)
+
+**User observations:** PR #196's first-launch setup works when microphone and Add Photos are granted. Skipping initial permissions correctly causes Ghost Writer to ask for Photos on its first Save. However, Flashcards' first microphone grant incorrectly displayed **Continue without Recording** once, and the immediately repeated Record worked. Exact OS/AVAudioSession cause is still unknown. New PR candidate `fix/ios-kids-setup-ux-first-mic-20261123` addresses the native preparation handoff with one bounded retry only following a newly granted first permission.
+
+**Automated source and packaged checks:**
+```bash
+node scripts/validate_kids_setup_owner_feedback.js
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr4_permissions.js
+node scripts/validate_kids_setup_onboarding.js
+node scripts/validate_native_n7c_flashcards_capture.js
+npm run build
+node scripts/validate_kids_setup_owner_feedback.js
+```
+Check both CI jobs pass on the exact final feature-branch head; Linux/Node cannot display Apple authorization sheets or physically capture speech.
+
+**Owner visual checks:** On the first full purple invitation, `Let's Get BibloZoo Ready!` has no blue outline. **Grown-up Setup** is still white/purple. **Explore the Zoo for Now** is a charcoal `#333333` button with white text and exactly the same button sizing, pill shape and interaction shadow. On the second screen, the small existing animals-and-logo splash stays above the features; **Record My Verses** shows owner PNG `icon_microphone_permission.png`, and **Save My Creations** shows owner PNG `icon_photos_permission.png`. Confirm icon aspect/size on iPhone and iPad portrait, and VoiceOver/keyboard buttons retain visible focus even though programmatic *heading* focus has no outline.
+
+**Shared Grown-up Check copy:** For native first mic and Add Photos prompts, Ghost Writer Share, sensitive Settings, backups and links, the popup shows its **specific action explanation only**, not the repetitive prefixed `A grown-up needs to help with this part of BibloZoo.`. A rare generic/unknown action keeps fallback copy. The original randomized two-digit minus two-digit plus one-digit math, cancel/3-strike denial and foreground/protected actions must still function.
+
+**Critical first-grant Flashcards test (disposable clean native production-ID simulator or other owner-controlled, safely backed-up test target):** (1) Start with microphone **Not Determined** and skip initial Grown-up Setup. (2) Enter Flashcards → Record → native shared math → approve → native microphone alert → tap **Allow**. (3) The SAME Record action should now proceed to original 3-2-1 countdown, record a real verse, Stop, replay and Wacky. **No premature Continue without Recording popup**; no second grown-up math or second OS alert. (4) Repeat Record: no math, no first-time OS prompt. (5) Repeat under denying microphone: no native recording, safe Continue without Recording only as already designed. (6) Test cancellation, three wrong math answers, backgrounding during pending permission/settle, and denied OS status: no stale capture, duplicate alert or auto recording. (7) Simulate genuinely unavailable native output: after one bounded retry, the original fallback still works and does not pretend to record. (8) Confirm granting permissions on onboarding from start still works and Ghost Writer Save/Share guards remain unchanged.
+
+**Risk note:** This patch mitigates a suspected first-authorization audio-session transition without proving its exact real-device root cause. If the first-grant popup persists, capture which native phase fails (first prompt result, output barrier, prepareCapture or beginCapture) on a disposable test; do not label device PASS without that evidence. Real stored profiles/backups and public `main` remain untouched.
+
+---
+
+
 ## CURRENT — [PR #196](https://github.com/andydoane/biblozoo/pull/196) optional Kids first-launch Grown-up Setup (November 23, 2026)
 
 **Baseline/ownership:** Kids [PR #195](https://github.com/andydoane/biblozoo/pull/195) is **merged**, but owner PR4 first-time permission and accessibility testing is still in progress (no phone PASS inferred). This focused [PR #196](https://github.com/andydoane/biblozoo/pull/196), `feat/ios-kids-first-launch-grownup-setup-20261123` → `ios-prep`, is **OPEN, not yet owner-tested or merged**. Both validation jobs passed on the first corrected implementation head in [Actions #45265788915](https://github.com/andydoane/biblozoo/actions/runs/45265788915); check the exact final PR head again. Never reset an existing production-ID phone's family profiles or install/uninstall just to create a first-launch condition.

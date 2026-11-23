@@ -155,6 +155,7 @@
         // granted recording, later child Record taps need no math challenge.
         // The separate Audio Test build retains its original DEV request.
         let permission;
+        let firstGrantJustApproved = false;
         if (root.BibloZooNativeOnlyOutput?.devToolsAllowed === false) {
           if (typeof api.getPermissionStatus !== "function" ||
               typeof api.requestFirstPermission !== "function" ||
@@ -174,6 +175,10 @@
           }
           // The grant came from native permission state or the approved
           // first OS prompt. Do NOT call an OS request method a second time.
+          // A freshly dismissed iOS authorization sheet may briefly leave
+          // the audio session/output barrier busy even though it granted
+          // access. Treat that as a readiness transition, not a denial.
+          firstGrantJustApproved = approved?.reason === "approved";
           permission = { granted: true };
         } else {
           permission = await api.requestPermission();
@@ -182,24 +187,60 @@
         if (permission?.granted !== true) return failed(
           permission?.reason === "permission-denied" ? "permission-denied" :
           "permission-required");
+        // Allow the first iOS permission sheet to finish dismissing before
+        // taking ownership of AVAudioSession. Only the just-approved first
+        // request takes this short, bounded settling path.
+        const stillCurrent = () =>
+          token === generation && !doc.hidden && status === "requesting";
+        if (firstGrantJustApproved) {
+          await new Promise(resolve => setTimeout(resolve, 220));
+          if (!stillCurrent()) return "cancelled";
+        }
+
         // R01: The native microphone barrier discards the *shared* PCM
         // output bank, including Home/Flashcards ui-pop-1 and ui-pop-2.
-        // Invalidate their JS "ready" cache BEFORE that barrier: otherwise
-        // every later tap tries to play an effect Swift has already disposed.
-        // This only revokes cached readiness; it does not stop anything,
-        // activate an audio session, or steal Apple Music in the background.
-        // The next real UI tap performs the existing gesture-bound rewarm.
-        root.BibloZooNativeUiAudio?.invalidate?.();
-        // All AVAudioEngine playback nodes must actually finish stopping
-        // before the shared AVAudioSession changes category.
-        const handoff = await output.devPrepareForMicrophone();
-        if (token !== generation || doc.hidden) return "cancelled";
-        if (handoff?.prepared !== true) return failed("output-busy");
-        nativeOwned = true;
-        const prepared = await api.prepareCapture();
-        if (token !== generation || doc.hidden) return "cancelled";
-        if (prepared?.prepared !== true) return failed("prepare-failed");
-        status = "preparing";notify();
+        // Invalidate that cache BEFORE each native output barrier.
+        async function prepareNativeCapture() {
+          root.BibloZooNativeUiAudio?.invalidate?.();
+          const handoff = await output.devPrepareForMicrophone();
+          if (!stillCurrent()) return { reason: "cancelled" };
+          if (handoff?.prepared !== true) return { reason: "output-busy" };
+          nativeOwned = true;
+          const prepared = await api.prepareCapture();
+          if (!stillCurrent()) return { reason: "cancelled" };
+          return prepared?.prepared === true
+            ? { ready: true } : { reason: "prepare-failed" };
+        }
+
+        let preparation = await prepareNativeCapture();
+        if (firstGrantJustApproved && !preparation.ready &&
+            preparation.reason !== "cancelled") {
+          // A one-time retry is allowed only for the SAME child's Record tap
+          // after native iOS has already approved this new microphone grant.
+          // No second Grown-up Check/OS sheet; no browser recorder fallback.
+          // If Swift had begun capture preparation, release its session
+          // before trying again, even if the first prepare failed.
+          if (nativeOwned) {
+            try { await api.discardCapture(); } catch (_) {}
+            nativeOwned = false;
+          }
+          await new Promise(resolve => setTimeout(resolve, 300));
+          if (!stillCurrent()) return "cancelled";
+          // Fresh read-only verification; never invoke requestPermission
+          // or requestFirstPermission a second time.
+          const currentPermission = await api.getPermissionStatus();
+          if (!stillCurrent()) return "cancelled";
+          if (currentPermission?.permission === "denied")
+            return failed("permission-denied");
+          if (currentPermission?.permission !== "granted") {
+            dispose(); notify();
+            return "cancelled";
+          }
+          preparation = await prepareNativeCapture();
+        }
+        if (preparation.reason === "cancelled") return "cancelled";
+        if (!preparation.ready) return failed(preparation.reason);
+        status = "preparing"; notify();
 
         // EXACT original 3,2,1 UI countdown. Do not capture samples here.
         const proceed = beforeStart ? await beforeStart() : true;

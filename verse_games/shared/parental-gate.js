@@ -120,11 +120,13 @@
         icon.setAttribute("aria-hidden", "true");
         const title = element("h2", "bz-parental-gate-title", "Grown-up Check");
         title.id = "bz-parental-gate-title";
-        const message = element("p", "bz-parental-gate-description",
-          "A grown-up needs to help with this part of BibloZoo.");
         const actionLabel = typeof options.actionLabel === "string"
           ? options.actionLabel.trim().slice(0, 80) : "";
-        if (actionLabel) message.textContent += " " + actionLabel;
+        // Show the specific action once; avoid repeating the general
+        // "A grown-up needs..." preamble before every permission/share gate.
+        // Other callers without a label retain a helpful fallback.
+        const message = element("p", "bz-parental-gate-description",
+          actionLabel || "A grown-up needs to help with this part of BibloZoo.");
         const content = element("div", "bz-parental-gate-content");
         dialog.setAttribute("role", "dialog");
         dialog.setAttribute("aria-modal", "true");
