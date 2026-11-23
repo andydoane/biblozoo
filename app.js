@@ -15896,38 +15896,45 @@ function screenProfileManage(idx) {
           return;
         }
 
+        const liveManageButton = () =>
+          State.screen === Screen.PROFILE_MANAGE && btn.isConnected &&
+          getProfileApi()?.getActiveProfileId?.() === profile.id;
+
         if (action === "add") {
-          openAddProfileEditor(
-            Screen.PROFILE_MANAGE
-          );
+          void runParentManagementAction(
+            () => openAddProfileEditor(Screen.PROFILE_MANAGE),
+            liveManageButton);
           return;
         }
 
         if (action === "edit") {
-          openEditProfileEditor(
-            profile.id,
-            Screen.PROFILE_MANAGE
-          );
+          void runParentManagementAction(
+            () => openEditProfileEditor(profile.id, Screen.PROFILE_MANAGE),
+            liveManageButton);
           return;
         }
 
         if (action === "backup") {
-          exportActiveProfileSaveData();
+          void runParentManagementAction(
+            () => exportActiveProfileSaveData(), liveManageButton);
           return;
         }
 
         if (action === "reset") {
-          openActiveProfileResetDialog();
+          void runParentManagementAction(
+            () => openActiveProfileResetDialog(), liveManageButton);
           return;
         }
 
         if (action === "delete") {
-          openDeleteProfileDialog();
+          void runParentManagementAction(
+            () => openDeleteProfileDialog(), liveManageButton);
           return;
         }
 
         if (action === "erase-family") {
-          openEraseAllFamilyDataDialog();
+          void runParentManagementAction(
+            () => openEraseAllFamilyDataDialog(), liveManageButton);
         }
       };
     });
@@ -19131,18 +19138,24 @@ function screenSettings(idx) {
 
       const action = btn.getAttribute("data-settings-action");
 
+      const liveSettingsButton = () =>
+        State.screen === Screen.SETTINGS && btn.isConnected;
+
       if (action === "manage-profile") {
-        openProfileManagement();
+        void runParentManagementAction(
+          () => openProfileManagement(), liveSettingsButton);
         return;
       }
 
       if (action === "export") {
-        exportSaveData();
+        void runParentManagementAction(
+          () => exportSaveData(), liveSettingsButton);
         return;
       }
 
       if (action === "import") {
-        openImportSaveDataPicker();
+        void runParentManagementAction(
+          () => openImportSaveDataPicker(), liveSettingsButton);
         return;
       }
 
@@ -19162,12 +19175,14 @@ function screenSettings(idx) {
       }
 
       if (action === "erase-family") {
-        openEraseAllFamilyDataDialog();
+        void runParentManagementAction(
+          () => openEraseAllFamilyDataDialog(), liveSettingsButton);
         return;
       }
 
       if (action === "reset") {
-        openActiveProfileResetDialog();
+        void runParentManagementAction(
+          () => openActiveProfileResetDialog(), liveSettingsButton);
       }
     };
   });
