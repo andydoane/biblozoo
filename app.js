@@ -4738,10 +4738,13 @@ function resetAllProgressData() {
 }
 
 function openResetProgressDialog() {
+  // Older, currently unused reset path must not be a native bypass.
+  if (!parentManagementAllowed()) return;
   let challenge = generateResetMathQuestion();
 
   const resetBtn = dlgBtn("Reset", {
     onClick: () => {
+      if (!parentManagementAllowed()) { closeDialog(); return; }
       resetAllProgressData();
       closeDialog();
 
