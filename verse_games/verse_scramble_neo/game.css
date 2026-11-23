@@ -734,29 +734,38 @@ select{ font:inherit; }
   animation:vsnShake .28s ease-in-out both;
 }
 
-/* Show the round-five example clearly on the existing target note,
-   reserving additional space BELOW it, not above the menu or verse text. */
+/* IP12: a compact charcoal SQUARE for the fifth-round example picture.
+   No visible Find: label or large vertical padding. Keep this scoped to
+   round five so the four letter hunts retain their original target note. */
 .vsn-bonus-picture-round .vsn-target-note {
-  min-width: clamp(160px, 24vw, 225px);
-  height: clamp(72px, 11vh, 108px);
+  box-sizing: border-box;
+  width: clamp(76px, 10vw, 96px);
+  min-width: 0;
+  max-width: var(--vsn-target-max-width, calc(100% - 112px));
+  height: clamp(76px, 10vw, 96px);
+  aspect-ratio: 1 / 1;
+  padding: 5px;
+  border-radius: 14px;
+  background: #333333;
 }
 .vsn-bonus-picture-round .vsn-target-text {
-  font-family: "Baloo 2", system-ui, sans-serif;
-  font-size: clamp(19px, 3.7vw, 28px);
-  line-height: 1;
-  white-space: normal;
-}
-.vsn-bonus-picture-target {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
+  height: 100%;
   align-items: center;
   justify-content: center;
-  gap: clamp(8px, 1.5vw, 16px);
-  font-weight: 900;
+}
+.vsn-bonus-picture-target {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
 }
 .vsn-bonus-picture-target img {
   display: block;
-  width: clamp(50px, 8vw, 76px);
-  height: clamp(50px, 8vh, 76px);
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   border: 0;
   border-radius: 0;
