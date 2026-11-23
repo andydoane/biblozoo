@@ -364,6 +364,8 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "BibloZooMicSessionProbe"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "requestPermission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPermissionStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestFirstPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beginProbe", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endProbe", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getProbeState", returnType: CAPPluginReturnPromise),
@@ -608,35 +610,75 @@ final class BibloZooMicSessionProbePlugin: CAPPlugin, CAPBridgedPlugin {
         stopPlaybackInternal(reason: "disposed", notify: false)
     }
 
-    // The ONLY microphone-permission prompt. Called on explicit DEV button
-    // tap; reading state or opening the app NEVER requests a permission.
+    // Kids PR4: a read-only state snapshot never opens an iOS prompt.
+    @objc func getPermissionStatus(_ call: CAPPluginCall) {
+        onMain { [weak self] in
+            guard let self = self, self.isNativeAppBundle else {
+                call.resolve(["permission": "unavailable"])
+                return
+            }
+            call.resolve(["permission": self.permissionLabel()])
+        }
+    }
+
+    // Existing DEV Audio Test calls stay unchanged. A production invocation
+    // of the ordinary bridge may not silently open the first OS mic prompt.
+    // The user-facing Record path uses the shared grown-up check first, then
+    // calls requestFirstPermission for the single intended OS authorization.
     @objc func requestPermission(_ call: CAPPluginCall) {
         onMain { [weak self] in
+            self?.requestPermissionNow(call, firstTimeApproved: false)
+        }
+    }
+
+    @objc func requestFirstPermission(_ call: CAPPluginCall) {
+        onMain { [weak self] in
             guard let self = self, self.isNativeAppBundle,
-                  UIApplication.shared.applicationState == .active else {
-                call.resolve(["granted":false,"reason":"not-foreground-native"])
+                  !self.isDevBundle else {
+                call.resolve(["granted": false, "reason": "not-production"])
                 return
             }
-            guard !self.requestInFlight && !self.isProbing &&
-                  !self.capturePrepared && !self.captureRunning else {
-                call.resolve(["granted":false,"reason":"busy"])
-                return
-            }
-            self.requestInFlight = true
-            AVAudioSession.sharedInstance().requestRecordPermission {
-                [weak self] granted in
-                DispatchQueue.main.async {
-                    guard let self = self else {
-                        call.resolve(["granted":false,"reason":"unavailable"])
-                        return
-                    }
-                    self.requestInFlight = false
-                    self.lastReason = granted ? "permission-granted" :
-                                                "permission-denied"
-                    call.resolve(["granted":granted,
-                                  "reason":self.lastReason,
-                                  "permission":self.permissionLabel()])
+            self.requestPermissionNow(call, firstTimeApproved: true)
+        }
+    }
+
+    private func requestPermissionNow(_ call: CAPPluginCall,
+                                      firstTimeApproved: Bool) {
+        guard isNativeAppBundle,
+              UIApplication.shared.applicationState == .active else {
+            call.resolve(["granted": false, "reason": "not-foreground-native"])
+            return
+        }
+        guard !requestInFlight && !isProbing &&
+              !capturePrepared && !captureRunning else {
+            call.resolve(["granted": false, "reason": "busy"])
+            return
+        }
+        let state = permissionLabel()
+        if !isDevBundle && state == "undetermined" && !firstTimeApproved {
+            call.resolve(["granted": false, "reason": "grown-up-check-required"])
+            return
+        }
+        // An already denied/restricted mic never opens a new prompt.
+        if state == "denied" || state == "unknown" {
+            call.resolve(["granted": false, "reason": "permission-denied",
+                          "permission": state])
+            return
+        }
+        requestInFlight = true
+        AVAudioSession.sharedInstance().requestRecordPermission {
+            [weak self] granted in
+            DispatchQueue.main.async {
+                guard let self = self else {
+                    call.resolve(["granted": false, "reason": "unavailable"])
+                    return
                 }
+                self.requestInFlight = false
+                self.lastReason = granted ? "permission-granted" :
+                                            "permission-denied"
+                call.resolve(["granted": granted,
+                              "reason": self.lastReason,
+                              "permission": self.permissionLabel()])
             }
         }
     }
@@ -2707,6 +2749,8 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "BibloZooGhostWriterExport"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPhotosPermissionStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestPhotosPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveImage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "beginVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "appendVideoFrame", returnType: CAPPluginReturnPromise),
@@ -2769,6 +2813,41 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         try? FileManager.default.removeItem(at: folder)
     }
 
+    // Read-only PhotoKit add-only state. PHPicker and Files selection
+    // intentionally remain permission-free and are not gated here.
+    private func photosPermissionLabel() -> String {
+        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
+        case .authorized, .limited: return "granted"
+        case .denied, .restricted: return "denied"
+        case .notDetermined: return "undetermined"
+        @unknown default: return "unknown"
+        }
+    }
+
+    @objc func getPhotosPermissionStatus(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            call.resolve(["permission": self.photosPermissionLabel()])
+        }
+    }
+
+    // Explicit user-approved first-time permission entry point. This is
+    // invoked only after the shared JS Grown-up Check approval callback.
+    @objc func requestPhotosPermission(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard UIApplication.shared.applicationState == .active,
+                  self.photosPermissionLabel() == "undetermined" else {
+                call.resolve(["granted": false,
+                              "reason": "not-first-time-active"])
+                return
+            }
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                call.resolve(["granted": status == .authorized ||
+                                         status == .limited,
+                              "permission": self.photosPermissionLabel()])
+            }
+        }
+    }
+
     private func saveToPhotos(_ url: URL, video: Bool, call: CAPPluginCall) {
         // PhotoKit add-only: no access to the child's existing library.
         // Complete the Promise only after the OS confirms the asset was saved.
@@ -2776,6 +2855,15 @@ final class BibloZooGhostWriterExportPlugin: CAPPlugin, CAPBridgedPlugin {
             guard UIApplication.shared.applicationState == .active else {
                 self.cleanupExport(at: url)
                 call.reject("Return to BibloZoo to save to Photos.")
+                return
+            }
+            // Ordinary saveImage/finishVideo bridge calls cannot trigger a
+            // first-time Photos prompt. The approved preflight runs BEFORE
+            // costly image/MP4 construction and must authorize PhotoKit first.
+            guard BibloZooIOSIdentity.experimentalToolsEnabled ||
+                  self.photosPermissionLabel() == "granted" else {
+                self.cleanupExport(at: url)
+                call.reject("Allow Add Photos with a grown-up before saving.")
                 return
             }
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
