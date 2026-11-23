@@ -3,7 +3,7 @@
 
 ## CURRENT — Parental gate UX follow-up, phone acceptance before PR 4 (November 23, 2026)
 
-**Owner evidence:** [PR #193](https://github.com/andydoane/biblozoo/pull/193) **merged** into `ios-prep` at `d9532717742e5f4a047cb0139f35c626bb352678`; owner reports **all** on-phone parental-check tests passed. The owner authorizes test use of their currently installed phone profiles and considers their data replaceable. This follow-up is not owner-tested or merged yet.
+**Owner evidence:** [PR #193](https://github.com/andydoane/biblozoo/pull/193) **merged** into `ios-prep` at `d9532717742e5f4a047cb0139f35c626bb352678`; owner reports **all** on-phone parental-check tests passed. The owner authorizes test use of their currently installed phone profiles and considers their data replaceable. [PR #194](https://github.com/andydoane/biblozoo/pull/194) is OPEN/unmerged and not yet owner-tested.
 
 **New challenge:** Every protected action (Ghost Writer picture/video Share, Settings backup/management, external email and links) must render a fresh randomized **`A − B + C = ?`**, with A=20..99, B=10..(A−1) and C=1..9. No multiplication, no negative subtraction, no answer greater than 99; maximum is **98**, minimum **2**. All responses remain private to the controller, three wrong answers deny, Not Now aborts without action. Example: `64 − 27 + 4 = 41`. The native purple/white Zoo Break lock styling remains unchanged.
 
