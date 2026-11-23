@@ -4146,7 +4146,8 @@ function showFamilyImportResult(importedProfiles, mode) {
   });
 }
 
-function runFamilyImport(familyData, mode) {
+function runFamilyImport(familyData, mode, { fromFirstProfile = false } = {}) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   try {
     const importedProfiles =
       applyFamilyImport(familyData, mode);
@@ -4179,6 +4180,7 @@ function openFamilyImportDialog(
     fromFirstProfile = false
   } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   const existingCount =
     (profileApi?.getAllProfiles?.() || []).length;
@@ -4189,7 +4191,7 @@ function openFamilyImportDialog(
 
   const restoreFamily = () => {
     closeDialog();
-    runFamilyImport(familyData, "replace");
+    runFamilyImport(familyData, "replace", { fromFirstProfile });
   };
 
   if (!existingCount || fromFirstProfile) {
@@ -4220,7 +4222,7 @@ function openFamilyImportDialog(
       dlgBtn("Add Zookeepers", {
         onClick: () => {
           closeDialog();
-          runFamilyImport(familyData, "add");
+          runFamilyImport(familyData, "add", { fromFirstProfile });
         }
       }),
       dlgBtn("Replace All", {
@@ -4245,8 +4247,10 @@ function openFamilyImportDialog(
 }
 
 function runIndividualProfileImportAsNew(
-  profileEntry
+  profileEntry,
+  { fromFirstProfile = false } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   try {
     const importedProfiles =
       applyFamilyImport(
@@ -4296,6 +4300,7 @@ function openIndividualProfileImportDialog(
     fromFirstProfile = false
   } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   const existingProfiles =
     profileApi?.getAllProfiles?.() || [];
@@ -4320,7 +4325,8 @@ function openIndividualProfileImportDialog(
           onClick: () => {
             closeDialog();
             runIndividualProfileImportAsNew(
-              importedProfile
+              importedProfile,
+              { fromFirstProfile }
             );
           }
         })
@@ -4344,7 +4350,8 @@ function openIndividualProfileImportDialog(
           onClick: () => {
             closeDialog();
             runIndividualProfileImportAsNew(
-              importedProfile
+              importedProfile,
+              { fromFirstProfile }
             );
           }
         })
@@ -4364,7 +4371,8 @@ function openIndividualProfileImportDialog(
         onClick: () => {
           closeDialog();
           runIndividualProfileImportAsNew(
-            importedProfile
+            importedProfile,
+            { fromFirstProfile }
           );
         }
       }),
@@ -4480,7 +4488,8 @@ function importSaveDataFromFile(
 
       openRestoreProgressDialog(
         importedProgress,
-        parsed
+        parsed,
+        { fromFirstProfile }
       );
     } catch (err) {
       console.warn("Could not import save data", err);
@@ -4519,6 +4528,7 @@ function restoreImportedProgressToActiveProfile(
   importedProgress,
   activeProfile
 ) {
+  if (!parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   let snapshot = null;
 
@@ -4611,8 +4621,10 @@ function restoreImportedProgressToActiveProfile(
 
 function openRestoreProgressDialog(
   importedProgress,
-  saveData
+  saveData,
+  { fromFirstProfile = false } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   const activeProfile =
     profileApi?.getActiveProfile?.();
@@ -4859,10 +4871,15 @@ function openProfileDestructiveMathDialog({
   confirmLabel,
   onConfirm
 }) {
+  if (!parentManagementAllowed()) return;
   let challenge = generateResetMathQuestion();
 
   const confirmBtn = dlgBtn(confirmLabel, {
     onClick: () => {
+      if (!parentManagementAllowed()) {
+        closeDialog();
+        return;
+      }
       closeDialog();
 
       try {
