@@ -82,6 +82,39 @@ const REQUIRE_STANDALONE_PWA = true;
 const IS_NATIVE_CAPACITOR =
   !!window.Capacitor?.isNativePlatform?.();
 
+// Kids PR3 — same shared math gate, with one RAM-only unlocked Settings
+// visit. The web/PWA and Android preserve their original action behavior.
+// Missing native gate/identity is never permission to export/delete data.
+const parentAreaGate = window.BibloZooParentActions?.create?.({
+  getScreen: () => State.screen,
+  getProfileId: () => getProfileApi()?.getActiveProfileId?.()
+}) || null;
+
+function isNativeParentGateContext() {
+  return IS_NATIVE_CAPACITOR || window.location?.protocol === "capacitor:";
+}
+
+function parentManagementAllowed() {
+  return !isNativeParentGateContext() ||
+    parentAreaGate?.isAuthorized?.() === true;
+}
+
+function runParentManagementAction(onApproved, isCurrent = () => true) {
+  if (!isNativeParentGateContext()) {
+    if (isCurrent()) return onApproved();
+    return false;
+  }
+  return parentAreaGate?.runManagement?.({ onApproved, isCurrent }) ?? false;
+}
+
+function runParentOutgoingAction(onApproved, isCurrent = () => true) {
+  if (!isNativeParentGateContext()) {
+    if (isCurrent()) return onApproved();
+    return false;
+  }
+  return parentAreaGate?.runOutgoing?.({ onApproved, isCurrent }) ?? false;
+}
+
 const BROWSER_VERSION_URL =
   "https://andydoane.github.io/eatyourbible/pwa/verse";
 
@@ -3100,6 +3133,8 @@ async function shareOrDownloadJsonSave(
   saveData,
   filenamePrefix
 ) {
+  // Fail closed before JSON/File construction, not just before sharing.
+  if (!parentManagementAllowed()) return { method: "cancelled" };
   const json = JSON.stringify(saveData, null, 2);
 
   const now = new Date();
@@ -3150,6 +3185,7 @@ async function shareOrDownloadJsonSave(
   }
 
   if (canShareFile) {
+    if (!parentManagementAllowed()) return { method: "cancelled" };
     try {
       await navigator.share({
         files: [file]
@@ -3174,6 +3210,9 @@ async function shareOrDownloadJsonSave(
     }
   }
 
+  // A native share sheet may background the app or lose its active profile.
+  // The fallback download must NOT bypass a revoked parent visit.
+  if (!parentManagementAllowed()) return { method: "cancelled" };
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
 
@@ -3196,6 +3235,8 @@ async function shareOrDownloadJsonSave(
 }
 
 async function exportSaveData() {
+  // Guard direct helper callers as well as Settings button wiring.
+  if (!parentManagementAllowed()) return;
   try {
     const saveData = createBibloZooFamilySaveData();
 
@@ -3252,6 +3293,7 @@ async function exportSaveData() {
 }
 
 async function exportActiveProfileSaveData() {
+  if (!parentManagementAllowed()) return;
   try {
     const saveData =
       createBibloZooProfileSaveData();
@@ -3321,6 +3363,9 @@ async function exportActiveProfileSaveData() {
 function openImportSaveDataPicker({
   fromFirstProfile = false
 } = {}) {
+  // First-profile restoration is a separate, explicit setup flow.
+  // Imports launched from Settings must belong to a live parent visit.
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".json,application/json";
@@ -3330,7 +3375,7 @@ function openImportSaveDataPicker({
     const file = input.files && input.files[0];
     input.remove();
 
-    if (!file) return;
+    if (!file || (!fromFirstProfile && !parentManagementAllowed())) return;
 
     importSaveDataFromFile(file, {
       fromFirstProfile
@@ -4101,7 +4146,8 @@ function showFamilyImportResult(importedProfiles, mode) {
   });
 }
 
-function runFamilyImport(familyData, mode) {
+function runFamilyImport(familyData, mode, { fromFirstProfile = false } = {}) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   try {
     const importedProfiles =
       applyFamilyImport(familyData, mode);
@@ -4134,6 +4180,7 @@ function openFamilyImportDialog(
     fromFirstProfile = false
   } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   const existingCount =
     (profileApi?.getAllProfiles?.() || []).length;
@@ -4144,7 +4191,7 @@ function openFamilyImportDialog(
 
   const restoreFamily = () => {
     closeDialog();
-    runFamilyImport(familyData, "replace");
+    runFamilyImport(familyData, "replace", { fromFirstProfile });
   };
 
   if (!existingCount || fromFirstProfile) {
@@ -4175,7 +4222,7 @@ function openFamilyImportDialog(
       dlgBtn("Add Zookeepers", {
         onClick: () => {
           closeDialog();
-          runFamilyImport(familyData, "add");
+          runFamilyImport(familyData, "add", { fromFirstProfile });
         }
       }),
       dlgBtn("Replace All", {
@@ -4200,8 +4247,10 @@ function openFamilyImportDialog(
 }
 
 function runIndividualProfileImportAsNew(
-  profileEntry
+  profileEntry,
+  { fromFirstProfile = false } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   try {
     const importedProfiles =
       applyFamilyImport(
@@ -4251,6 +4300,7 @@ function openIndividualProfileImportDialog(
     fromFirstProfile = false
   } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   const existingProfiles =
     profileApi?.getAllProfiles?.() || [];
@@ -4275,7 +4325,8 @@ function openIndividualProfileImportDialog(
           onClick: () => {
             closeDialog();
             runIndividualProfileImportAsNew(
-              importedProfile
+              importedProfile,
+              { fromFirstProfile }
             );
           }
         })
@@ -4299,7 +4350,8 @@ function openIndividualProfileImportDialog(
           onClick: () => {
             closeDialog();
             runIndividualProfileImportAsNew(
-              importedProfile
+              importedProfile,
+              { fromFirstProfile }
             );
           }
         })
@@ -4319,7 +4371,8 @@ function openIndividualProfileImportDialog(
         onClick: () => {
           closeDialog();
           runIndividualProfileImportAsNew(
-            importedProfile
+            importedProfile,
+            { fromFirstProfile }
           );
         }
       }),
@@ -4381,6 +4434,9 @@ function importSaveDataFromFile(
   const reader = new FileReader();
 
   reader.onload = () => {
+    // Never restore a Settings backup after the picker/background invalidated
+    // the parent visit. Keep first-profile onboarding restoration intact.
+    if (!fromFirstProfile && !parentManagementAllowed()) return;
     try {
       const raw = String(reader.result || "");
       const parsed = JSON.parse(raw);
@@ -4432,7 +4488,8 @@ function importSaveDataFromFile(
 
       openRestoreProgressDialog(
         importedProgress,
-        parsed
+        parsed,
+        { fromFirstProfile }
       );
     } catch (err) {
       console.warn("Could not import save data", err);
@@ -4471,6 +4528,7 @@ function restoreImportedProgressToActiveProfile(
   importedProgress,
   activeProfile
 ) {
+  if (!parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   let snapshot = null;
 
@@ -4563,8 +4621,10 @@ function restoreImportedProgressToActiveProfile(
 
 function openRestoreProgressDialog(
   importedProgress,
-  saveData
+  saveData,
+  { fromFirstProfile = false } = {}
 ) {
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const profileApi = getProfileApi();
   const activeProfile =
     profileApi?.getActiveProfile?.();
@@ -4678,10 +4738,13 @@ function resetAllProgressData() {
 }
 
 function openResetProgressDialog() {
+  // Older, currently unused reset path must not be a native bypass.
+  if (!parentManagementAllowed()) return;
   let challenge = generateResetMathQuestion();
 
   const resetBtn = dlgBtn("Reset", {
     onClick: () => {
+      if (!parentManagementAllowed()) { closeDialog(); return; }
       resetAllProgressData();
       closeDialog();
 
@@ -4811,10 +4874,15 @@ function openProfileDestructiveMathDialog({
   confirmLabel,
   onConfirm
 }) {
+  if (!parentManagementAllowed()) return;
   let challenge = generateResetMathQuestion();
 
   const confirmBtn = dlgBtn(confirmLabel, {
     onClick: () => {
+      if (!parentManagementAllowed()) {
+        closeDialog();
+        return;
+      }
       closeDialog();
 
       try {
@@ -5176,6 +5244,22 @@ function showCreditsDialog() {
     `,
     actions: [dlgBtn("OK", { onClick: closeDialog })]
   });
+
+  // Attribution is always readable. Only the actual outgoing GitHub link
+  // requires a separate, action-bound adult check on production native iOS.
+  const link = dlgBody.querySelector(
+    'a[href="https://github.com/cutterbl/SoundTouchJS"]'
+  );
+  link?.addEventListener("click", event => {
+    if (!isNativeParentGateContext()) return; // keep web/PWA link unchanged
+    event.preventDefault();
+    const href = link.href;
+    void runParentOutgoingAction(
+      () => window.open(href, "_blank", "noopener,noreferrer"),
+      () => State.screen === Screen.SETTINGS && link.isConnected &&
+        overlay.classList.contains("show")
+    );
+  });
 }
 
 function showContactSupportDialog() {
@@ -5189,8 +5273,15 @@ function showContactSupportDialog() {
       }),
       dlgBtn("Email", {
         onClick: () => {
-          closeDialog();
-          window.location.href = `mailto:${SUPPORT_EMAIL}`;
+          void runParentOutgoingAction(
+            () => {
+              closeDialog();
+              window.location.href = `mailto:${SUPPORT_EMAIL}`;
+            },
+            () => State.screen === Screen.SETTINGS &&
+              overlay.classList.contains("show") &&
+              dlgTitle.textContent === "Contact Support"
+          );
         }
       })
     ]
@@ -11348,6 +11439,9 @@ function go(nextScreen) {
     return;
   }
 
+  // Leaving the parent-area screen family expires its in-memory approval.
+  parentAreaGate?.onScreenChange?.(nextScreen);
+
   if (from === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
   if (from === Screen.VERSE_DETAIL) cancelVerseDetailListen();
   if (from === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
@@ -11501,6 +11595,8 @@ function go(nextScreen) {
 
 /* If you jump directly (no transition), call this */
 function setScreen(screen) {
+  if (State.screen !== screen)
+    parentAreaGate?.onScreenChange?.(screen);
   if (State.screen !== screen) {
     if (State.screen === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
     if (State.screen === Screen.VERSE_DETAIL) cancelVerseDetailListen();
@@ -15826,38 +15922,45 @@ function screenProfileManage(idx) {
           return;
         }
 
+        const liveManageButton = () =>
+          State.screen === Screen.PROFILE_MANAGE && btn.isConnected &&
+          getProfileApi()?.getActiveProfileId?.() === profile.id;
+
         if (action === "add") {
-          openAddProfileEditor(
-            Screen.PROFILE_MANAGE
-          );
+          void runParentManagementAction(
+            () => openAddProfileEditor(Screen.PROFILE_MANAGE),
+            liveManageButton);
           return;
         }
 
         if (action === "edit") {
-          openEditProfileEditor(
-            profile.id,
-            Screen.PROFILE_MANAGE
-          );
+          void runParentManagementAction(
+            () => openEditProfileEditor(profile.id, Screen.PROFILE_MANAGE),
+            liveManageButton);
           return;
         }
 
         if (action === "backup") {
-          exportActiveProfileSaveData();
+          void runParentManagementAction(
+            () => exportActiveProfileSaveData(), liveManageButton);
           return;
         }
 
         if (action === "reset") {
-          openActiveProfileResetDialog();
+          void runParentManagementAction(
+            () => openActiveProfileResetDialog(), liveManageButton);
           return;
         }
 
         if (action === "delete") {
-          openDeleteProfileDialog();
+          void runParentManagementAction(
+            () => openDeleteProfileDialog(), liveManageButton);
           return;
         }
 
         if (action === "erase-family") {
-          openEraseAllFamilyDataDialog();
+          void runParentManagementAction(
+            () => openEraseAllFamilyDataDialog(), liveManageButton);
         }
       };
     });
@@ -19061,18 +19164,24 @@ function screenSettings(idx) {
 
       const action = btn.getAttribute("data-settings-action");
 
+      const liveSettingsButton = () =>
+        State.screen === Screen.SETTINGS && btn.isConnected;
+
       if (action === "manage-profile") {
-        openProfileManagement();
+        void runParentManagementAction(
+          () => openProfileManagement(), liveSettingsButton);
         return;
       }
 
       if (action === "export") {
-        exportSaveData();
+        void runParentManagementAction(
+          () => exportSaveData(), liveSettingsButton);
         return;
       }
 
       if (action === "import") {
-        openImportSaveDataPicker();
+        void runParentManagementAction(
+          () => openImportSaveDataPicker(), liveSettingsButton);
         return;
       }
 
@@ -19092,12 +19201,14 @@ function screenSettings(idx) {
       }
 
       if (action === "erase-family") {
-        openEraseAllFamilyDataDialog();
+        void runParentManagementAction(
+          () => openEraseAllFamilyDataDialog(), liveSettingsButton);
         return;
       }
 
       if (action === "reset") {
-        openActiveProfileResetDialog();
+        void runParentManagementAction(
+          () => openActiveProfileResetDialog(), liveSettingsButton);
       }
     };
   });
@@ -19255,6 +19366,19 @@ function screenPrivacyPolicy(idx) {
       go(Screen.SETTINGS);
     };
   }
+
+  // Keep every word of the policy visible without approval; only opening
+  // the mail app through the contact anchor needs the Grown-up Check.
+  const mailLink = wrap.querySelector('a[href^="mailto:"]');
+  mailLink?.addEventListener("click", event => {
+    if (!isNativeParentGateContext()) return;
+    event.preventDefault();
+    const href = mailLink.href;
+    void runParentOutgoingAction(
+      () => { window.location.href = href; },
+      () => State.screen === Screen.PRIVACY && mailLink.isConnected
+    );
+  });
 
   return makeSlide({
     idx,
