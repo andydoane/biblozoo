@@ -79,15 +79,19 @@ class FakeElement {
   }
   focus() {
     this.doc.activeElement = this;
-    // Model Safari/WebKit reporting a window blur as an input/keyboard opens.
-    if (this.tagName === "INPUT" && this.doc.simulateWebKitInputFocusBlur) {
-      this.doc.ownerWindow.dispatch("blur");
+    // Focusing an editable Answer field summons the iOS keyboard; focus on
+    // the equation alone must NOT show it on dialog entrance/wrong answer.
+    if (this.tagName === "INPUT") {
+      this.doc.keyboardFocusCount = (this.doc.keyboardFocusCount || 0) + 1;
+      if (this.doc.simulateWebKitInputFocusBlur)
+        this.doc.ownerWindow.dispatch("blur");
     }
   }
 }
 function scenario(platform = "ios", production = true) {
   const doc = {
     listeners: {}, visibilityState: "visible", hidden: false, activeElement: null,
+    keyboardFocusCount: 0,
     createElement(tag) { return new FakeElement(tag, this); },
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
     removeEventListener(type, fn) {
@@ -213,10 +217,21 @@ async function main() {
   assert.equal(await s.gate.requestApproval({ onApproved: action }), false);
   s.click("I'm a Grown-up");
   assert.equal(s.get("bz-parental-gate-equation").textContent, "20 − 10 + 1 = ?");
+  assert.equal(s.doc.activeElement, s.get("bz-parental-gate-equation"),
+    "math question gets initial accessible focus, not the editable Answer field");
+  assert.equal(s.doc.keyboardFocusCount, 0,
+    "no automatic iOS keyboard on first math screen");
+  assert.equal(s.get("bz-parental-gate-equation").attributes.tabindex, "-1");
   assert.equal(s.get("bz-parental-gate-status").textContent, "",
     "click Event must not appear as feedback in the dialog");
   assert.ok(s.get("bz-parental-gate-overlay"),
     "Safari input-focus blur must not close the visible dialog");
+  // A parent deliberately tapping Answer may open the iOS keyboard; that
+  // Safari focus change must keep the grown-up math challenge alive.
+  s.get("bz-parental-gate-answer").focus();
+  assert.equal(s.doc.keyboardFocusCount, 1);
+  assert.ok(s.get("bz-parental-gate-overlay"),
+    "manual input focus must not dismiss the dialog");
   s.win.dispatch("blur");
   assert.ok(s.get("bz-parental-gate-overlay"),
     "mere window blur while page remains visible is not app backgrounding");
@@ -235,8 +250,13 @@ async function main() {
   const denied = s.gate.requestApproval({ onApproved: action });
   s.click("I'm a Grown-up");
   s.randomValues.push(1, 1, 1);
+  const beforeRetryFocus = s.doc.keyboardFocusCount;
   s.answer(999);
   assert.equal(s.get("bz-parental-gate-equation").textContent, "21 − 11 + 2 = ?");
+  assert.equal(s.doc.activeElement, s.get("bz-parental-gate-equation"),
+    "new math gets accessible focus after wrong answer");
+  assert.equal(s.doc.keyboardFocusCount, beforeRetryFocus,
+    "wrong-answer retry must not automatically reopen the keyboard");
   s.answer(-1);
   s.answer(0);
   assert.equal(await denied, false);
