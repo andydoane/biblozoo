@@ -222,7 +222,7 @@
       s.root.innerHTML = s.stage === "invite"
         ? '<main class="bz-kids-setup-page bz-kids-setup-invite">' +
           brandHtml(false) +
-          '<h1 id="bz-kids-setup-title">Let’s Get BibloZoo Ready!</h1>' +
+          '<h1 id="bz-kids-setup-title" tabindex="-1">Let’s Get BibloZoo Ready!</h1>' +
           '<p class="bz-kids-setup-intro">A grown-up can help turn on a couple of fun ' +
           'features before you explore the Zoo!</p>' +
           '<div class="bz-kids-setup-actions">' +
@@ -235,7 +235,7 @@
           '<p class="bz-kids-setup-note" role="status">' + s.note + '</p></main>'
         : '<main class="bz-kids-setup-page bz-kids-setup-options">' +
           brandHtml(true) +
-          '<h1 id="bz-kids-setup-title">Let’s Set Up!</h1>' +
+          '<h1 id="bz-kids-setup-title" tabindex="-1">Let’s Set Up!</h1>' +
           '<p class="bz-kids-setup-intro">These optional features work only when ' +
           'you choose to use them. You can skip either one.</p>' +
           '<div class="bz-kids-setup-features">' +
