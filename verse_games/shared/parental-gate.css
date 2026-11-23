@@ -22,6 +22,7 @@
 }
 .bz-parental-gate-dialog {
   width: min(100%, 480px);
+  max-height: 90vh; /* Fallback for earliest supported iOS 15 WebKit. */
   max-height: min(90dvh, 760px);
   overflow-y: auto;
   border: 3px solid #482776;
@@ -96,6 +97,8 @@
   font-size: 1.3rem;
   text-align: center;
 }
+.bz-parental-gate-answer:focus,
+.bz-parental-gate-btn:focus,
 .bz-parental-gate-answer:focus-visible,
 .bz-parental-gate-btn:focus-visible {
   outline: 3px solid #087f8c;
