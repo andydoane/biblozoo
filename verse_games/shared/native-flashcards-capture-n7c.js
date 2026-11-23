@@ -44,6 +44,7 @@
     const notify = () => onChange?.();
     const mic = () => root.Capacitor?.Plugins?.BibloZooMicSessionProbe;
     const sound = () => root.Capacitor?.Plugins?.BibloZooNativeSound;
+    const firstPermission = root.BibloZooKidsFirstPermission?.create?.() || null;
 
     function resetLocal() {
       generation += 1;
@@ -149,8 +150,34 @@
       try {
         await cleanup.catch(()=>{});
         if (token !== generation || doc.hidden) return "cancelled";
-        // The ONLY microphone prompt, from Flashcards' true Record tap.
-        const permission = await api.requestPermission();
+        // The first OS microphone prompt must follow an adult check.
+        // Read native permission status without prompting. Once the OS has
+        // granted recording, later child Record taps need no math challenge.
+        // The separate Audio Test build retains its original DEV request.
+        let permission;
+        if (root.BibloZooNativeOnlyOutput?.devToolsAllowed === false) {
+          if (typeof api.getPermissionStatus !== "function" ||
+              typeof api.requestFirstPermission !== "function" ||
+              !firstPermission) return failed("missing-native-bridge");
+          const approved = await firstPermission.ensure({
+            kind: "microphone",
+            getStatus: () => api.getPermissionStatus(),
+            requestFirst: () => api.requestFirstPermission(),
+            isCurrent: () => token === generation && !doc.hidden &&
+              status === "requesting"
+          });
+          if (token !== generation || doc.hidden) return "cancelled";
+          if (approved?.granted !== true) {
+            if (approved?.reason === "denied") return failed("permission-denied");
+            dispose(); notify();
+            return "cancelled";
+          }
+          // The grant came from native permission state or the approved
+          // first OS prompt. Do NOT call an OS request method a second time.
+          permission = { granted: true };
+        } else {
+          permission = await api.requestPermission();
+        }
         if (token !== generation || doc.hidden) return "cancelled";
         if (permission?.granted !== true) return failed(
           permission?.reason === "permission-denied" ? "permission-denied" :
