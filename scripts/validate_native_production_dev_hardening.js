@@ -45,6 +45,43 @@ for(const f of [
 "daily_questions_feed_game.js"
 ])assert.match(read(f),/BibloZooNativeOnlyOutput\?\.devToolsAllowed/,"missing dev gate "+f);
 const app=read("app.js");
+// Execute the actual shared shortcut policy, not just a source-text regex.
+// Release/native iOS must DENY hidden gesture entry points if the injected
+// identity is missing, incomplete or not explicitly the Audio Test bundle.
+const gateDefinition=app.match(/function allowDevShortcuts\(\) \{[\s\S]*?\n\}/);
+assert.ok(gateDefinition,"shared shortcut gate missing");
+function shortcutsAllowed(win){
+ return vm.runInNewContext(gateDefinition[0]+"\nallowDevShortcuts()",{window:win});
+}
+assert.equal(shortcutsAllowed(prod),false,"production iOS shortcuts must be disabled");
+assert.equal(shortcutsAllowed(test),true,"Audio Test keeps intentional owner tools");
+assert.equal(shortcutsAllowed(make("com.andydoane.biblozoo","web")),true,
+             "ordinary web/PWA behavior unchanged");
+assert.equal(shortcutsAllowed(make("com.andydoane.biblozoo","android")),true,
+             "Android behavior unchanged");
+const noIdentity={
+ Capacitor:{isNativePlatform:()=>true,getPlatform:()=>"ios"},
+ location:{protocol:"capacitor:"}
+};
+assert.equal(shortcutsAllowed(noIdentity),false,"missing native identity must fail closed");
+assert.equal(shortcutsAllowed({...noIdentity,
+ BibloZooNativeOnlyOutput:{devToolsAllowed:true}}),false,
+ "a missing enabled marker cannot open dev tools");
+assert.equal(shortcutsAllowed({...noIdentity,
+ BibloZooNativeOnlyOutput:{enabled:true,devToolsAllowed:false}}),false,
+ "explicit production identity denies shortcuts");
+assert.equal(shortcutsAllowed({location:{protocol:"capacitor:"}}),false,
+ "capacitor URL must fail closed even if the Capacitor bridge is unavailable");
+// The visible Settings label must match the Xcode public app version,
+// without an old developer codename or release-build number.
+assert.match(app,/const APP_VERSION = "1\.0";/);
+assert.match(app,/Version \$\{escapeHtml\(APP_VERSION\)\}/);
+assert.match(app,/const DEBUG_MODE = false;/);
+assert.match(app,/DAILY_PET_QUESTIONS_DEBUG: false/);
+const project=read("ios/App/App.xcodeproj/project.pbxproj");
+assert.equal(project.split("MARKETING_VERSION = 1.0;").length-1,2);
+assert.equal(project.split("CURRENT_PROJECT_VERSION = 1;").length-1,2);
+assert.equal(project.split("PRODUCT_BUNDLE_IDENTIFIER = com.andydoane.biblozoo;").length-1,2);
 for(const t of ["titleTodoBtn","titleZooStrip","titleLogoSecretWrap","settingsHeading",
 'wrap.querySelector("#todoComingSoonCard")',"practiceTitle"]){
  assert.ok(app.includes("if (allowDevShortcuts()) bindLongPress("+t+", {"),"unguarded "+t);
@@ -59,4 +96,4 @@ if(fs.existsSync(path.join(root,"dist/index.html"))){
  assert.ok(code.includes('var packagedAppId = "'+id+'";'));
  assert.ok(!code.includes(token));
 }
-console.log("Step 3a PASS: packaged DEV identity, hidden native tools, stale force flag, shortcut gating, native capture path and platform isolation.");
+console.log("Step 3a PASS: packaged DEV identity, fail-closed production shortcuts, Audio Test isolation, Settings version 1.0, hidden native tools and platform safety.");
