@@ -18,6 +18,10 @@
     let generation = 0;
     let status = "idle";
     let nativeOwned = false;
+    // The first iOS microphone permission prompt can leave the narration
+    // output session requiring a new explicit child gesture. Only the Stop
+    // tap for the capture that followed that grant may restore the narrator.
+    let captureAfterFirstMicGrant = false;
     let cleanup = Promise.resolve();
     let hasRecording = false;
     let message = "";
@@ -48,6 +52,7 @@
 
     function resetLocal() {
       generation += 1;
+      captureAfterFirstMicGrant = false;
       clearTimeout(stopTimer);stopTimer = null;
       status = "idle";
       hasRecording = false;
@@ -260,6 +265,7 @@
         level = null;
         recordingDeadline = performance.now() + limitMs;
         status = "recording";
+        captureAfterFirstMicGrant = firstGrantJustApproved;
         // Challenge appears when the native input engine is actually live.
         onStart?.();
         notify();
@@ -272,12 +278,26 @@
     function stop() {
       if (status !== "recording") return;
       const token = generation;
+      const shouldPrimeNarration = captureAfterFirstMicGrant;
+      captureAfterFirstMicGrant = false;
       status = "stopping";recordingDeadline = 0;notify();
       stopTimer = setTimeout(() => {
         if (token === generation && status === "stopping") interrupt();
       }, 5000);
       Promise.resolve(mic()?.finishCapture?.()).then(result => {
         if (token !== generation || status !== "stopping") return;
+        // A successful first-permission capture returns to the comparison
+        // instruction immediately. The Apple authorization sheet may have
+        // invalidated the sound owner's prior gesture lease; prime only from
+        // this child's actual Stop tap, and only AFTER Swift has restored
+        // .soloAmbient and acknowledged the retained take. The native sound
+        // bridge decides whether activation is actually needed/allowed.
+        // Never attempt it from autoplay, a watchdog, an interrupted capture,
+        // or a failed restore; never restart the child's recorded audio here.
+        if (shouldPrimeNarration && result?.ready === true &&
+            result?.restored === true && !doc.hidden) {
+          root.BibloZooNativeLearnTracks?.primeFromGesture?.();
+        }
         captured(result);
       }).catch(() => {
         if (token === generation) interrupt();
