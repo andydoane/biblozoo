@@ -162,7 +162,8 @@ function integration() {
   }
   assert.match(gate, /session\.attempts >= 3/);
   assert.match(shared, /kind === "microphone"/);
-  assert.match(shared, /kind === "photos"/);
+  assert.match(shared, /\["microphone", "photos"\]\.includes\(kind\)/,
+    "the shared helper explicitly limits first-permission actions to microphone and photos");
   assert.doesNotMatch(shared, /localStorage|sessionStorage|indexedDB/);
 
   assert.match(swift, /CAPPluginMethod\(name: "getPermissionStatus"/);
