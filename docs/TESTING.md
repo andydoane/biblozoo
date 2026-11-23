@@ -1,6 +1,16 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — #179 accepted; Phase 1 Step 2 licensing inventory (2026-11-22 EST)
+## CURRENT — Owner art/audio provenance and provider licensing (2026-11-22 EST)
+
+**Latest stable evidence:** [PR #180](https://github.com/andydoane/biblozoo/pull/180) **MERGED** at `ios-prep` `7f3e25e38a10db507a81cbab501e0f14cb87ee36`. Exact PR head `16ec89b4dffa9f6d6ad0c21e09ecef76d53c473b` **PASS** for Node regressions and production web build. The owner-reported #179 Xcode Release-simulator version/long-press PASS remains documented below; portrait-only iPhone/iPad is the intentional 1.0 policy.
+
+**Current documentation-only PR:** `docs/phase1-owner-art-audio-provenance` → `ios-prep`, **OPEN / unmerged**. Updates [ASSET-LICENSES.md](ASSET-LICENSES.md) with owner confirmation that images were created by owner or generated via ChatGPT and owner-edited (no outside image sites), audio generated through Voicertool, and sound effects bought through a ZapSplat subscription. Records verified current official provider terms, with important **per-file paid-license/date, public-repo raw-sound-redistribution, fonts, ESV debug fixture, third-party rights** still open. The broader asset-rights checklist remains **unchecked**.
+
+**Test boundary:** No asset/audio/code or app packaging changes; no need to rebuild or install over any real Zookeeper data for this PR. GitHub Node/web checks must pass on this PR head before merge. CI and vendor terms pages cannot prove provenance or license compliance for every creative asset. The private production family and Audio Test Zookeeper data remain untouched.
+
+---
+
+## HISTORICAL — #179 accepted; Phase 1 Step 2 licensing inventory premerge (2026-11-22 EST)
 
 **Latest stable reference:** [#179](https://github.com/andydoane/biblozoo/pull/179) **MERGED** into `ios-prep` at `bd1d7bf148e9e4e8214efaa353f820871fabd886`, and later `ios-prep` `2675c7c106c670cf6a09d4feeb307d770f8c5e74` includes a shared Xcode app scheme. The #179 exact-head [Actions #45105176348](https://github.com/andydoane/biblozoo/actions/runs/45105176348) passed **Node regressions and production web build**; the later branch head also passed both checks. The owner fetched/pulled, rebuilt, and tested merged #179 in **Xcode Release mode on iPhone Simulator**, reporting **Settings: Version 1.0, no hidden developer screen from Settings/Practice Games/Zoo To-Do ~2-second holds, normal taps all expected: scoped OWNER PASS**. This is not TestFlight or a complete physical iPhone/iPad test matrix. The owner also confirms **portrait-only iPhone and iPad** is intentional for release 1.0, matching `Info.plist`.
 
