@@ -6174,10 +6174,16 @@
   }
 
   async function saveGhostWriterImage(options = state.remix, destination = "photos",
-                                      onReadyToSave = null) {
+                                      onReadyToSave = null, isCurrentShare = null) {
+    // A native share must have a current action-bound approval callback.
+    // Save to Photos is deliberately outside this per-share gate.
+    const shareAbandoned = () => IS_NATIVE_CAPACITOR && destination === "share" &&
+      (typeof isCurrentShare !== "function" || !isCurrentShare());
+    if (shareAbandoned()) return { cancelled: true };
     const cleanOptions = sanitizeRemixOptions({ ...options });
     const size = EXPORT_SIZES[cleanOptions.exportSize || "square"] || EXPORT_SIZES.square;
     await waitForExportAssets(cleanOptions);
+    if (shareAbandoned()) return { cancelled: true };
 
     const canvas = document.createElement("canvas");
     canvas.width = size.width;
@@ -6198,6 +6204,7 @@
       }
       // Save goes straight to PhotoKit; Share preserves the original file
       // name in iOS Files/AirDrop. Never fall back to WKWebView downloads.
+      if (shareAbandoned()) return { cancelled: true };
       onReadyToSave?.(); // Canvas is rendered; PhotoKit is about to begin.
       const result = await nativeGhostExport[method]({
         png: canvas.toDataURL("image/png"),
