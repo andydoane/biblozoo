@@ -335,7 +335,10 @@ function childAccessibleEditRoutingTests() {
   assert.ok(saveStart > 0 && updateStart > saveStart && updateEnd > updateStart);
   const editSave = app.slice(updateStart, updateEnd);
   assert.match(editSave, /profileApi\.updateProfile\(\s*State\.editingProfileId,\s*\{\s*name:\s*validation\.name,\s*avatarVerseId\s*\}/);
-  assert.doesNotMatch(editSave, /export|backup|reset|delete|erase|shareOrDownload/i);
+  // Clearing the editor's temporary state is not a destructive data reset.
+  // Exclude only the actual protected backup/mutation entry points.
+  assert.doesNotMatch(editSave,
+    /\b(?:exportSaveData|exportActiveProfileSaveData|shareOrDownloadJsonSave|openProfileDestructiveMathDialog|eraseAllFamilyData|deleteActiveProfileData|resetActiveProfileProgress)\s*\(/);
 }
 
 async function main() {
