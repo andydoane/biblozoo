@@ -1,6 +1,6 @@
 # BibloZoo — Version 1.0 Asset Rights and Attribution Ledger
 
-**Status: INITIAL INVENTORY COMPLETE; OWNER ART AND AUDIO SOURCES IDENTIFIED; RIGHTS CLEARANCE NOT YET COMPLETE.**
+**Status: INITIAL INVENTORY COMPLETE; OWNER ART/AUDIO SOURCES IDENTIFIED; BSB CORPUS AUTOMATED CHECK ADDED; RIGHTS CLEARANCE NOT YET COMPLETE.**
 **Initial inventory baseline:** `andydoane/biblozoo`, `ios-prep` at `2675c7c106c670cf6a09d4feeb307d770f8c5e74` (2026-11-22 EST). The inventory arrived in [merged PR #180](https://github.com/andydoane/biblozoo/pull/180) at merge commit `7f3e25e38a10db507a81cbab501e0f14cb87ee36`. This source/owner-declaration ledger is **not legal advice, a license certificate, or proof of final archive contents**.
 
 **Purpose:** Establish evidence before publicly distributing version 1.0. Do **not** infer that a tracked, publicly visible, AI-generated, free-to-download, or bundled file is automatically licensed for App Store redistribution. Do not claim rights to imagery/recordings without the creator's or licensor's evidence. Owner must approve actual file replacements or removals separately.
@@ -52,18 +52,25 @@ The owner reports:
 
 **Note on the numbers:** The table counts files **in each relevant Git subtree**, not unique works or unique sounds (a file may be duplicated in a native bundle or derive from another asset). Other code-generated sound effects should also be inventoried by authorship/source when relevant, even if not shipped as standalone audio files.
 
-## 3. Bible text and an inactive ESV debug fixture
+### Follow-up release BSB corpus/fixture audit (PR from `ios-prep` at `017205a4998a81f64a83cc551453ba454a422ce5`)
+
+- Production `app.js` previously included an **ESV-labeled** `DEBUG_VERSE_JSON` literal, even though `DEBUG_MODE=false`. This release-prep PR updates the *unused offline-only fallback* to copy `verse_data/john_3_16.json`'s BSB verse text, echoes, hide plan and public-domain attribution. Ordinary published Bible verse JSON and child-facing gameplay are **not modified**.
+- Adds `scripts/validate_release_bsb_verse_corpus.js`, wired to `.github/workflows/ios-prep-validation.yml`. It reads all **124** IDs in `verse_data/verse_list.json`, requires one matching JSON per ID (no extras), checks `verseId`, translation `BSB`, explicit Berean/public-domain attribution and nonempty `verseText`, and compares the bundled debug fixture to canonical John 3:16. **Check exact-head CI before calling the audit PASS**.
+- This is a *metadata/source-integrity* audit, **not** a byte-for-byte comparison of each verse against the Berean publisher's current authorized master text. Narration recording rights and the original authorship of meanings, reflections and question wording also require separate evidence.
+- The owner **chose to defer** confirmation of the Chalkboard app-embedding license. Keep that item **OPEN** and do not claim it is fully licensed merely because the [DaFont Florence S listing](https://www.dafont.com/chalkboard-3.font) says **100% Free**. No fonts changed in this PR.
+
+## 3. Bible text and release debug fixture
 
 ### Verified evidence
 
 - `verse_data/john_3_16.json` and `verse_data/philippians_2_8.json` declare **BSB**, include an attribution, and contain associated game/learning text. `verse_data/verse_list.json` enumerates **124** verse IDs.
 - The Berean Bible publisher states that its Bible texts entered the **public domain April 30, 2023**: https://berean.bible/licensing.htm. This supports use of authorized BSB text. The separate **recorded audio** rights still require proof.
-- `app.js` still contains a packaged `DEBUG_VERSE_JSON` literal with `"translation": "ESV"`, an ESV-style John 3:16 excerpt and the attribution string **“Debug mode verse data (remove before publishing).”** `DEBUG_MODE` is **false**, so this fixture is not used in the normal release flow, but `scripts/build.js` copies `app.js` into the production bundle. **Do not treat an inactive debug constant as exempt from source/rights review.**
+- Previously, `app.js` packaged an inactive `DEBUG_VERSE_JSON` ESV-style John 3:16 despite `DEBUG_MODE=false`. **This PR replaces only that offline fallback** with the canonical BSB John 3:16 text/attribution, echo parts and hide plan. Published verse files and ordinary gameplay remain unchanged. CI must pass before marking this cleanup complete.
 
 ### Follow-up
 
-- [ ] Check **all 124** published verse JSON translations and attribution fields; resolve any deviation from the authorized BSB corpus.
-- [ ] In a separate **small, owner-reviewed PR**, remove the obsolete ESV debug fixture if no longer needed, or replace it with correctly attributed public-domain BSB test text while preserving existing debug/test behavior. Record regression results. **No code is changed by this initial inventory PR.**
+- [ ] Verify **all 124** listed verse JSON files declare BSB and the Berean public-domain attribution via the newly wired validator; **exact PR-head CI pending**. Separately verify a sample or all literal wordings against the authorized source if needed.
+- [ ] **ESV debug fixture cleanup in this owner-reviewed PR:** changed its text to the canonical BSB John 3:16 sample while retaining debug-only behavior; CI and merge approval pending.
 - [ ] Confirm ownership/permission for each original meaning/recall/reflection/application prompt (text created by owner, independently authored, or licensed from a third party).
 - [x] Record owner's **Voicertool** source for generated verse/reference/chunk narration and find official commercial-use terms (see owner evidence above).
 - [ ] Correlate narration MP3s with Voicertool output, confirm rights at generation dates, and retain applicable license evidence.
@@ -124,7 +131,7 @@ For each group, record one of: **created by owner**, **created for owner with tr
 - [ ] Confirm individual audio/music track mapping, relevant per-file license types, and whether any atypical notice applies; retain plan and download proof privately where appropriate.
 - [ ] Resolve the separate public-GitHub **raw licensed sound-file** redistribution question before public release; do not treat the in-app license as a source-file sharing license.
 - [ ] Verify all 124 verse-text translations/attributions and original learning commentary rights.
-- [ ] Address the inactive ESV debug fixture in an owner-reviewed follow-up.
+- [ ] Verify the new BSB debug fallback + full 124-file metadata check pass CI and merge the dedicated owner-reviewed cleanup PR.
 - [x] Record owner-provided Chalkboard source (Florence S / DaFont) and identical SHA of the two bundled copies; neither was replaced.
 - [ ] Verify all 13 font paths, including **exact Chalkboard embedding/redistribution grant**, then preserve notices and resolve any unlicensed fonts.
 - [ ] Complete third-party code/dependency notices review and any needed redistribution obligations.
