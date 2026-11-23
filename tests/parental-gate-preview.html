@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>BibloZoo Grown-up Check — local PR 1 preview</title>
+  <link rel="stylesheet" href="../verse_games/shared/parental-gate.css">
+  <style>
+    body { margin:0; min-height:100vh; display:grid; place-items:center;
+      background:#e7dcf7; color:#2d2051; font:18px/1.5 system-ui,sans-serif; }
+    main { width:min(92vw,520px); border-radius:24px; background:#fff9ee;
+      padding:28px; box-sizing:border-box; box-shadow:0 12px 40px #3f287533; }
+    h1 { line-height:1.15; }
+    button { padding:12px 20px; border-radius:12px; border:0;
+      font:inherit; color:white; background:#4c2b7d; cursor:pointer; }
+    #result { min-height:2em; }
+  </style>
+  <script>
+    // THIS FILE IS TEST-ONLY. scripts/build.js does not package tests/.
+    // Mimic the identity of the production iOS bundle for a local visual preview.
+    window.Capacitor = {
+      isNativePlatform: () => true,
+      getPlatform: () => "ios"
+    };
+    window.BibloZooNativeOnlyOutput =
+      { enabled: true, devToolsAllowed: false };
+  </script>
+  <script src="../verse_games/shared/parental-gate.js"></script>
+</head>
+<body>
+  <main>
+    <h1>BibloZoo Grown-up Check</h1>
+    <p>This local-only preview uses the exact shared popup and math challenge.
+      It never shares files, opens external apps, saves data, or changes profiles.</p>
+    <button id="try-gate" type="button">Try Grown-up Check</button>
+    <p id="result" role="status" aria-live="polite">No approval yet.</p>
+    <p>Try <strong>Not Now</strong>, wrong answers, a correct answer, and
+      leaving this tab. The protected test action should run only after
+      a correct answer. Each new attempt generates fresh numbers.</p>
+  </main>
+  <script>
+    const output = document.getElementById("result");
+    let approvals = 0;
+    document.getElementById("try-gate").addEventListener("click", async () => {
+      output.textContent = "Grown-up Check opened.";
+      const allowed = await window.BibloZooParentalGate.requestApproval({
+        actionLabel: "This is a preview only.",
+        onApproved: () => {
+          approvals += 1;
+          output.textContent = "Approved! Test action ran " + approvals + " time(s).";
+        }
+      });
+      if (!allowed) output.textContent = "Not approved. Nothing was done.";
+    });
+  </script>
+</body>
+</html>
