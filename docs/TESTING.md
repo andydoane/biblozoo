@@ -1,6 +1,38 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
 
+## CURRENT — PR4 first-time iOS microphone/Photos parental gate acceptance (November 23, 2026)
+
+**Baseline:** [PR #194](https://github.com/andydoane/biblozoo/pull/194) is **merged** into `ios-prep` at `7a4a26666e0d8a54f4d43439577439cd09f4ca60`. Owner says simpler math and child-safe Zookeeper Edit work on iPhone. PR4 is scoped to **first-time native iOS OS permission requests** and a targeted bypass/VoiceOver audit; the user is comfortable testing on their phone with installed profiles, but no destructive reset is necessary.
+
+**Source/packaging validation (PR branch or post-merge `ios-prep`):**
+```bash
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr2_ghost_share.js
+node scripts/validate_parental_gate_pr3_settings.js
+node scripts/validate_parental_gate_pr4_permissions.js
+node scripts/validate_native_n7c_flashcards_capture.js
+node scripts/validate_native_ghost_writer_export.js
+npm run build
+node scripts/validate_parental_gate_pr4_permissions.js
+```
+Require both exact-head GitHub Actions jobs PASS, including `swiftc -frontend -parse ios/App/App/SceneDelegate.swift`. Swift parser and Node mocks do **not** replace Xcode SDK build/link tests or actual OS prompt observation.
+
+**Phone permissions test, no user data deletion required:** A first-time permission prompt is testable only when the relevant iOS app authorization state is **Not Determined**. If Flashcards microphone or BibloZoo Add Photos permission was previously allowed/denied, iOS remembers that choice. For a truly fresh test, use a clean disposable simulator or knowingly reset just the app's privacy decisions where possible in Settings; avoid erasing all phone contents or resetting Zookeeper profiles. Pre-granted/denied test on the existing phone is still meaningful.
+1. **Microphone, first-time:** Open Flashcards, tap **Record**. Grown-up Check should appear **before** the iOS Microphone permission sheet. Tap **Not Now**: no microphone prompt or capture begins. Repeat with three wrong answers: no prompt/capture. Solve the new `A − B + C` problem (answer <=99): **exactly one** OS mic permission prompt appears. Choose **Allow**; countdown/recording/stop/replay and optional Wacky Replay should retain prior behavior.
+2. **Microphone, already granted:** Record a second time. **No further math**. If iOS Mic is **Denied/Restricted**, no new math/OS prompt should appear and recording must fail gracefully. If available, test interruption/background/exit during the Grown-up Check: no stale recording can begin.
+3. **Photos, first-time add-only:** Ghost Writer → Remix → **Save Picture**. Grown-up Check appears **before** the iOS Add Photos prompt and before generating exported PNG. Not Now, three wrong answers, or navigating away must not open the OS prompt or save media. Correct math allows one add-only permission prompt. Choose **Allow**; Save completes with existing success modal. No iOS library read access is requested.
+4. **Photos, second save/video:** **Save Picture again**, then **Save Video** in both Simple/More Options as time permits; no math check once PhotoKit access is granted. A previously **Denied** Photos permission must gracefully refuse saving without a new OS prompt or automatically opening an unapproved Share sheet. Retry after changing authorization in iPhone Settings if desired.
+5. **Picker remains free:** Ghost Writer → More Options → Import Background → Photos/Files chooser. Select/cancel a photo or file: **no Grown-up Check** merely for opening a system picker (PHPicker/UIDocumentPicker), no camera option or broad library permission.
+6. **Bypass smoke:** Ghost Writer **Share Picture** and **Share Video** in Simple/More still need a **fresh check every time**, whereas Save after granted Photos does not. Settings family/profile backups, Support Email, Privacy email, Credits external site and Add/Reset/Delete/Erase controls keep their PR3 gating. Manage → Edit name/picture remains child-accessible. Cancel or background a check: no action. Rapid taps must not duplicate dialogs, native sheets or export work.
+7. **Accessibility and lifecycle:** Test the actual Grown-up Check with iPhone **VoiceOver** if possible, increased text size, landscape/iPad if available, hardware keyboard focus and Not Now. Notice if focus escapes, the lock is spoken unnecessarily, answer is cut off, or a new OS permission prompt appears unexpectedly. Cold relaunch with already granted access should not re-prompt for a Grown-up Check.
+
+**Caveats / release sign-off:** State read-only probes and JS one-shot approval are not secure against a compromised native WebView / arbitrary JS calling bridge methods directly; native method provenance remains a defense-in-depth limitation. Apple's Kids Category requires adult-level safeguards but this does not constitute legally verified parental consent. Separate privacy/SDK, App Store metadata and licensed content/audio/font review remain open. Keep PR4 unmerged until exact-head CI and owner phone acceptance.
+
+---
+
+
+
 ## CURRENT — Parental gate UX follow-up, phone acceptance before PR 4 (November 23, 2026)
 
 **Owner evidence:** [PR #193](https://github.com/andydoane/biblozoo/pull/193) **merged** into `ios-prep` at `d9532717742e5f4a047cb0139f35c626bb352678`; owner reports **all** on-phone parental-check tests passed. The owner authorizes test use of their currently installed phone profiles and considers their data replaceable. [PR #194](https://github.com/andydoane/biblozoo/pull/194) is OPEN/unmerged and not yet owner-tested.
