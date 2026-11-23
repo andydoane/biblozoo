@@ -61,7 +61,7 @@ assert.match(game,/id="vsnLetterField" aria-label="\$\{pictureRound \? "Pet pict
   "a11y labels match the visual round");
 assert.match(game,/In round 5, find the matching pet picture!/);
 
-function harness(mode="easy",verseId="john_3_16") {
+function harness(mode="easy",verseId="john_3_16",randomFraction=0.15) {
   const imageLoads=[];
   class FakeImage {
     set src(value){this.value=value;imageLoads.push(value);}
@@ -74,8 +74,10 @@ function harness(mode="easy",verseId="john_3_16") {
     bonusPlayerWins:0,bonusPointerWins:0,bonusDeadline:5000,
     busy:false,menuOpen:false,helpOpen:false,bonusResultText:"",bonusResultKind:""
   };
+  const testMath=Object.create(Math);
+  testMath.random=()=>randomFraction;
   const ctx={
-    state,ctx:{verseId},selectedMode:mode,Image:FakeImage,
+    state,ctx:{verseId},selectedMode:mode,Image:FakeImage,Math:testMath,
     BONUS_PICTURE_VERSE_IDS:pictures,
     PROFILE_PICTURE_DIR:"../../profile_pictures/",
     PROFILE_PICTURE_FALLBACK_SRC:"../../profile_pictures/profile_picture_fallback.png",
@@ -106,13 +108,14 @@ for(const [mode,count] of [["easy",28],["medium",28],["hard",28]]){
   assert.ok(h.imageLoads.length===28||h.imageLoads.length===29,
     mode+" bounded image prewarm including target");
   assert.equal(new Set(h.state.bonusPictureChoices.map(p=>p.src)).size,pictures.length);
-  const repeated=harness(mode);
+  const repeated=harness(mode,"john_3_16",0.82);
   repeated.api.prepareBonusPictureRound();
   assert.equal(
     h.state.bonusPictureChoices.map(p=>p.src).join("|"),
     repeated.state.bonusPictureChoices.map(p=>p.src).join("|"),
     "selection deterministic for the same public verse");
-  assert.equal(h.state.bonusPictureTarget.src,repeated.state.bonusPictureTarget.src);
+  assert.notEqual(h.state.bonusPictureTarget.src,repeated.state.bonusPictureTarget.src,
+    "replaying same verse selects a fresh randomized target");
   const round=h.api.makeBonusTiles();
   h.state.tiles=round;
   assert.equal(round.length,count,mode+" photo tiles with missing layout probe fallback");
@@ -131,6 +134,8 @@ for(const [mode,count] of [["easy",28],["medium",28],["hard",28]]){
   assert.match(h.api.renderBonusFindHtml(),/Find the matching pet picture/);
   assert.match(h.api.renderBonusTargetHtml(),/vsn-bonus-picture-target/);
   assert.match(h.api.renderBonusTargetHtml(),/Pet picture [0-9]+/);
+  assert.doesNotMatch(h.api.renderBonusTargetHtml(),/<span>Find:<\/span>/,
+    "round-five target note shows picture only");
   for(let roundIndex=1;roundIndex<=4;roundIndex++){
     h.state.bonusRound=roundIndex;
     h.state.bonusTargetLetter="A";

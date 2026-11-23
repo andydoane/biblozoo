@@ -41,7 +41,7 @@ assert.match(game, /const desiredTotal = 110;/, "original letter rounds unchange
 assert.match(game, /state\.bonusDeadline = gameNow\(\) \+ bonusTimeWithWiggle\(\);/,
   "original race clock unchanged");
 
-function pictureHarness(mode, width, height, tileSize) {
+function pictureHarness(mode, width, height, tileSize, randomFraction=0.22) {
   const images = [];
   const fieldRect = { width, height };
   const board = { appendChild() {} };
@@ -64,8 +64,10 @@ function pictureHarness(mode, width, height, tileSize) {
     bonusPictureChoices: [], bonusPictureTarget: null,
     bonusRound: 5, tileSeed: 0
   };
+  const deterministicMath=Object.create(Math);
+  deterministicMath.random=()=>randomFraction;
   const context = {
-    document, Image: FakeImage, state, ctx: { verseId: "john_3_16" },
+    document, Image: FakeImage, Math:deterministicMath, state, ctx: { verseId: "john_3_16" },
     selectedMode: mode, BONUS_PICTURE_VERSE_IDS: picIds,
     PROFILE_PICTURE_DIR: "../../profile_pictures/",
     shuffle: arr => arr.slice().reverse()
@@ -87,6 +89,15 @@ const tabletCount = tablet.api.measuredBonusPictureCount();
 assert.ok(phoneCount >= 20, "small iPhone field is not mostly empty: " + phoneCount);
 assert.ok(tabletCount > phoneCount, "large iPad uses more of its playfield");
 assert.ok(tabletCount >= 40, "large iPad field has meaningful picture density");
+assert.equal(phoneCount, phone.api.bonusPictureGridMetrics(340,370,50,50).capacity,
+  "every iPhone row/column cell filled");
+assert.equal(tabletCount, tablet.api.bonusPictureGridMetrics(850,700,86,86).capacity,
+  "every iPad row/column cell filled");
+const sameVerseDifferentPlay=pictureHarness("hard",850,700,86,0.8);
+sameVerseDifferentPlay.api.prepareBonusPictureRound();
+assert.notEqual(sameVerseDifferentPlay.state.bonusPictureTarget.src,
+  tablet.state.bonusPictureTarget.src,
+  "same public verse and mode do NOT lock a single target pet image");
 for (const [w,h,size] of [[340,370,50],[850,700,86],[420,300,54]]) {
   const results=[];
   for (const mode of ["easy","medium","hard"]) {
@@ -95,6 +106,10 @@ for (const [w,h,size] of [[340,370,50],[850,700,86],[420,300,54]]) {
     const round=run.api.makeBonusPictureTiles();
     results.push(round.length);
     assert.equal(round.length, run.api.measuredBonusPictureCount());
+    assert.equal(round.length, run.api.bonusPictureGridMetrics(w,h,size,size).capacity,
+      "exact complete grid, not 90% density");
+    assert.ok(round.every(t=>Math.abs(t.rotation)<=5),
+      "gentle rotations fit a completely filled grid");
     assert.equal(round.filter(t=>t.isBonusTarget).length, 1, "always one target");
     assert.equal(new Set(round.map(t=>t.pictureSrc)).size, round.length, "no repeated art");
     assert.ok(run.images.length <= 29, "bounded prewarm");
@@ -133,6 +148,24 @@ tablet.api.layoutBonusPictureMagnets({}, {width:850,height:700}, buttons);
 assert.ok(buttons.every(b=>b.style.visibility==="visible"&&b.style.display!=="none"),
   "all tiles return when viewport expands after earlier decoy hiding");
 assert.match(game,/object-fit|vsn-bonus-picture-tile/);
+assert.match(game,/state\.bonusPictureTarget = choices\[Math\.floor\(Math\.random\(\) \* choices\.length\)\]/,
+  "target index chosen randomly for each play");
+assert.doesNotMatch(game,/Math\.floor\(grid\.capacity \* 0\.9\)/,
+  "no intentional empty grid slots");
+const noteCss=read("verse_games/verse_scramble_neo/game.css");
+const noteRule=part(noteCss,".vsn-bonus-picture-round .vsn-target-note {",
+  ".vsn-bonus-picture-round .vsn-target-text {");
+assert.match(noteRule,/width:\s*clamp\(76px, 10vw, 96px\)/);
+assert.match(noteRule,/height:\s*clamp\(76px, 10vw, 96px\)/);
+assert.match(noteRule,/aspect-ratio:\s*1 \/ 1/);
+assert.match(noteRule,/padding:\s*5px/);
+assert.match(noteRule,/background:\s*#333333/);
+const htmlTarget=part(game,"function renderBonusTargetHtml() {","function renderBonusPointerHtml() {");
+assert.match(htmlTarget,/vsn-bonus-picture-target/);
+assert.doesNotMatch(part(htmlTarget,"if (state.bonusRound === 5", "return `Find:"),
+  /<span>Find:<\/span>/,
+  "fifth-round charcoal square contains ONLY the pet image");
+assert.match(noteCss,/\.vsn-bonus-picture-target img\s*\{[^}]*object-fit:\s*contain/s);
 assert.match(read("verse_games/verse_scramble_neo/game.css"),
   /\.vsn-bonus-picture-tile img\s*\{[^}]*object-fit:\s*contain/s);
 assert.match(read("verse_games/verse_scramble_neo/game.css"),
@@ -220,4 +253,4 @@ assert.match(travel,/Reach the moon!<br>[\s\S]*Dodge the asteroids\./);
 assert.doesNotMatch(travel.replace(/\/\/[^\n]*/g,""), /Tilt to steer|arrows to steer|arrow keys|drag to steer/i);
 assert.match(launch,/function renderAstroSteeringChoice\(\)/,
   "separate control chooser still retained");
-console.log("IP11 PASS: 125 public photos, measured phone/iPad field density, same count for all modes, single nonoverlapping target and rotation guard; swipes silent/no depression, taps/mouse/fallback/native audio correct; cutscene copy cleaned.");
+console.log("IP11/IP12 PASS: 125 public photos, every measured iPhone/iPad grid cell filled across modes, random target on replay, 5-degree tilt, square image-only sample, one target and orientation guard; scroll-safe card UI/native pop and cutscene unchanged.");

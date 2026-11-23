@@ -2068,7 +2068,10 @@
       });
     }
     state.bonusPictureChoices = choices;
-    state.bonusPictureTarget = choices[(seed >>> 16) % choices.length];
+    // Every play gets a NEW random target, even when replaying the same
+    // verse. The old verse-seeded index repeated the exact same picture.
+    // This is the existing public bundled art list; never private photos.
+    state.bonusPictureTarget = choices[Math.floor(Math.random() * choices.length)];
 
     // Prewarm a bounded subset during intro + four letter rounds; only the
     // density-selected art is actually inserted into the fifth-round field.
@@ -2112,11 +2115,11 @@
     if (!fieldRect.width || !fieldRect.height || !tileRect.width || !tileRect.height) return 28;
     const grid = bonusPictureGridMetrics(fieldRect.width, fieldRect.height,
       tileRect.width, tileRect.height);
-    // A lively, almost full picture hunt, not a fixed 12/16/20 count.
-    // Leave a few natural holes, preserve >=46px phone hitboxes and cap to
-    // the number of distinct bundled art assets. All modes share this rule.
+    // Fill EVERY measured slot rather than the prior 90% density. The
+    // 125-public-art pool exceeds phone/iPad grid capacity, so there are
+    // no intentionally empty cells and each picture stays unique.
     return Math.max(1, Math.min(BONUS_PICTURE_VERSE_IDS.length,
-      Math.floor(grid.capacity * 0.9)));
+      grid.capacity));
   }
 
   function startBonusIntro() {
@@ -2256,7 +2259,9 @@
       isBonusPicture: true,
       pictureSrc: picture.src,
       pictureNumber: picture.pictureNumber,
-      rotation: Math.round(Math.random() * 24 - 12)
+      // A slight tilt feels scattered without overlapping adjacent artwork
+      // in a fully occupied nonoverlapping grid.
+      rotation: Math.round(Math.random() * 10 - 5)
     })));
   }
 
@@ -2342,8 +2347,9 @@
   function renderBonusTargetHtml() {
     if (state.bonusStage !== "round") return "";
     if (state.bonusRound === 5 && state.bonusPictureTarget) {
+      // Compact image-only sample; the square target note and its existing
+      // accessible label convey what to find without a wide "Find:" banner.
       return `<span class="vsn-bonus-picture-target">
-        <span>Find:</span>
         <img src="${escapeHtml(state.bonusPictureTarget.src)}"
           alt="Pet picture ${state.bonusPictureTarget.pictureNumber}" draggable="false">
       </span>`;
