@@ -15934,9 +15934,9 @@ function screenProfileManage(idx) {
         }
 
         if (action === "edit") {
-          void runParentManagementAction(
-            () => openEditProfileEditor(profile.id, Screen.PROFILE_MANAGE),
-            liveManageButton);
+          // Names and profile pictures are child-facing personalization.
+          // The edit form only updates those two fields, not backup or reset.
+          openEditProfileEditor(profile.id, Screen.PROFILE_MANAGE);
           return;
         }
 
@@ -19168,8 +19168,9 @@ function screenSettings(idx) {
         State.screen === Screen.SETTINGS && btn.isConnected;
 
       if (action === "manage-profile") {
-        void runParentManagementAction(
-          () => openProfileManagement(), liveSettingsButton);
+        // Child-accessible navigation: only sensitive controls inside the
+        // Manage screen require parental approval.
+        openProfileManagement();
         return;
       }
 
