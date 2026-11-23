@@ -8746,3 +8746,30 @@ body:has(#app .todo-dev-screen.is-tutorial-mode),
 .home-screen button.title-current-verse-panel * {
   font-family: "Titan One", "Baloo 2", system-ui, sans-serif !important;
 }
+
+/* IP11: card-list swipes are not presses. The browser's :active state
+   begins on finger-down, before we can tell whether it is a scroll.
+   The shared handler adds is-confirmed-tap only on a stationary release. */
+@media (pointer: coarse) {
+  .practice-scroll-wrap .practice-game-card:active,
+  .practice-scroll-wrap .new-verse-card:active,
+  .new-verse-picker-screen .new-verse-card:active {
+    transform: none;
+    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.24);
+  }
+  .practice-scroll-wrap .my-verses-learned-card.is-current:active {
+    box-shadow:
+      0 8px 0 rgba(0, 0, 0, 0.24),
+      0 0 0 3px rgba(255, 199, 81, 0.32);
+  }
+  .practice-scroll-wrap .practice-game-card.is-confirmed-tap,
+  .practice-scroll-wrap .new-verse-card.is-confirmed-tap,
+  .new-verse-picker-screen .new-verse-card.is-confirmed-tap {
+    animation: bzConfirmedCardTap 180ms ease-out both;
+  }
+}
+@keyframes bzConfirmedCardTap {
+  0% { transform: translateY(0); }
+  42% { transform: translateY(5px); }
+  100% { transform: translateY(0); }
+}

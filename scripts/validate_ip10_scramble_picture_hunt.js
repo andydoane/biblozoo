@@ -32,7 +32,7 @@ const pictures=Array.from(
   part(game,"const BONUS_PICTURE_VERSE_IDS = [","];")
     .matchAll(/"([^"]+)"/g), m=>m[1]
 );
-assert.equal(pictures.length,24,"fixed, distinct bundled public picture catalog");
+assert.equal(pictures.length,125,"expanded fixed, distinct bundled public picture catalog");
 assert.equal(new Set(pictures).size,pictures.length);
 assert.ok(!pictures.includes("fallback"));
 for(const id of pictures){
@@ -77,9 +77,9 @@ function harness(mode="easy",verseId="john_3_16") {
   const ctx={
     state,ctx:{verseId},selectedMode:mode,Image:FakeImage,
     BONUS_PICTURE_VERSE_IDS:pictures,
-    BONUS_PICTURE_COUNT_BY_MODE:{easy:12,medium:16,hard:20},
     PROFILE_PICTURE_DIR:"../../profile_pictures/",
     PROFILE_PICTURE_FALLBACK_SRC:"../../profile_pictures/profile_picture_fallback.png",
+    document:{getElementById:()=>null},
     MAGNET_COLORS:["#ff5a51","#ffa351","#ffc751"],LETTERS:["A","B","C","D"],
     randomItem:values=>values[0],
     bonusNearMatchCounts:()=>({sameLetterWrongColor:1,sameColorWrongLetter:1}),
@@ -99,22 +99,23 @@ function harness(mode="easy",verseId="john_3_16") {
     "renderBonusFindHtml,renderBonusTargetHtml,renderScrambleTileHtml};",ctx);
   return {ctx,state,api:ctx.ip10,imageLoads};
 }
-for(const [mode,count] of [["easy",12],["medium",16],["hard",20]]){
+for(const [mode,count] of [["easy",28],["medium",28],["hard",28]]){
   const h=harness(mode);
   h.api.prepareBonusPictureRound();
-  assert.equal(h.state.bonusPictureChoices.length,count,mode+" image count");
-  assert.equal(h.imageLoads.length,count,mode+" preloads images ahead of game round");
-  assert.equal(new Set(h.state.bonusPictureChoices.map(p=>p.src)).size,count);
+  assert.equal(h.state.bonusPictureChoices.length,pictures.length,mode+" full art catalog");
+  assert.ok(h.imageLoads.length===28||h.imageLoads.length===29,
+    mode+" bounded image prewarm including target");
+  assert.equal(new Set(h.state.bonusPictureChoices.map(p=>p.src)).size,pictures.length);
   const repeated=harness(mode);
   repeated.api.prepareBonusPictureRound();
   assert.equal(
     h.state.bonusPictureChoices.map(p=>p.src).join("|"),
     repeated.state.bonusPictureChoices.map(p=>p.src).join("|"),
-    "selection deterministic for the same public verse/difficulty");
+    "selection deterministic for the same public verse");
   assert.equal(h.state.bonusPictureTarget.src,repeated.state.bonusPictureTarget.src);
   const round=h.api.makeBonusTiles();
   h.state.tiles=round;
-  assert.equal(round.length,count,mode+" photo tiles");
+  assert.equal(round.length,count,mode+" photo tiles with missing layout probe fallback");
   assert.ok(round.every(t=>t.isBonusPicture&&t.pictureSrc.startsWith("../../profile_pictures/")));
   assert.equal(round.filter(t=>t.isBonusTarget).length,1,"exactly one real picture target");
   assert.equal(round.filter(t=>t.source==="bonus-decoy").length,count-1);

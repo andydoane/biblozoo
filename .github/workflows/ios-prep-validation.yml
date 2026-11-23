@@ -77,6 +77,9 @@ jobs:
       - name: Validate IP10 fifth-round Verse Scramble picture hunt and Verse Launch popup consistency
         run: node scripts/validate_ip10_scramble_picture_hunt.js
 
+      - name: Validate IP11 responsive pet picture hunt, scroll-aware card presses and cutscene copy
+        run: node scripts/validate_ip11_picture_density_scroll_cards.js
+
       - name: Validate Wheel final letter modal and permanent Welcome Back Home
         run: node scripts/validate_welcome_home_wheel_followup.js
 

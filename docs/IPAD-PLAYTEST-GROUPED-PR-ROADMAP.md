@@ -1,8 +1,21 @@
 # BibloZoo — iPad playtest grouped PR roadmap
 
-**CURRENT status (2026-11-22 EST):** IP01 8/8, IP02 2/2, IP03 5/5, IP04/05 corrections, IP06 2/2, IP07 across verse sizes and IP08 3/3 all owner-accepted where recorded. IP09 [#173](https://github.com/andydoane/biblozoo/pull/173) and corrective [#174](https://github.com/andydoane/biblozoo/pull/174) are **MERGED**; owner says #174 **“it's working well”**, accepting both observed Verse Launch fixes (arrow removal and bottom red flash). Exact stable #174 merge `90edd333867552258d275a65610d96b30b715b1f`, [postmerge Node/web CI SUCCESS](https://github.com/andydoane/biblozoo/actions/runs/45074372630). No unreported global IP09 hardware matrix claimed. **IP10 [#175](https://github.com/andydoane/biblozoo/pull/175) OPEN / UNMERGED / owner device pending**, plus requested Verse Launch second-popup finish. Random Feeding Bounce “1 ball left!” physical remains **NOT TESTED**.
+**CURRENT status (2026-11-22 EST):** IP01–IP09 prior acceptance remains where actually reported. [IP10 #175](https://github.com/andydoane/biblozoo/pull/175) **MERGED** at `0cc87ee931baf6e94bc6e7afc7c8d6ef3c3a0e87`; owner reports Verse Launch popup and Scramble final pictures **working nicely**, accepting those observed paths without assuming a full device matrix. **Follow-up [PR #176](https://github.com/andydoane/biblozoo/pull/176) OPEN / UNMERGED / device testing pending.** Random Feeding Bounce “1 ball left!” still **NOT PHYSICALLY TESTED**.
 
-### CURRENT — IP10 Verse Scramble pet picture bonus round and Verse Launch second-popup polish, [PR #175](https://github.com/andydoane/biblozoo/pull/175)
+### CURRENT — IP11 responsive Scramble fifth picture field and card-list scroll feedback, PR #176
+
+**Scope:** This is a focused owner-requested follow-up, not a redo of IP01–IP10. Replace 12/16/20 by mode with a **single measured, viewport-aware picture count** in round 5. The new 125-item *public bundled asset* catalog is never derived from children/Zookeepers, never uses private photos or remote fetch. Actual bonus field/tile CSS measurements determine 90% safe-grid occupancy, with scattered jittered non-overlapping raw pet pictures and exactly one target, bounded image preload and orientation-shrink target safety; phones and tablets use their actual space. Existing **110 letter magnets rounds 1–4** unchanged. Computer speed/difficulty, score, timer, false-tap penalty, reward, native session, help and accessibility retain existing behavior.
+
+**Shared scrolling feel:** Move card-specific UI pop and pressed visual feedback from touch-start to stationary touch-release for scrollable practice/Playground/external-games/Learn/Read/New Verse/My Verses cards, suppressing accidental pop/depression on swipes. Motion cancellation, scroll-position test, pointercancel, touch-only fallback, mouse and keyboard paths covered; no scroll `preventDefault` or card-click override. Leave other button sound handling untouched. Owner test native iOS gesture-audio path and Web/PWA.
+
+**Small cutscene copy:** Verse Launch “Reach the moon! / Dodge the asteroids.” preserved; stale arrows/tilt/keys text removed before user-chosen Tilt/Drag popup.
+
+**Gate:** CI adds `scripts/validate_ip11_picture_density_scroll_cards.js` and adapts IP10 checks to all 125 real filenames; old workflow checks maintained. Source/synthetic CI does **not** verify actual iPhone/iPad frame density, native AVFoundation, sensor permission or Xcode build. **Owner device PASS/FAIL/NOT TESTED required** for both iPad orientations, at least one iPhone/short-screen if possible, matching image count in all three modes, target visible after rotation, unframed art/no overlaps, score/pointer, scroll-silent cards vs one-pop stationary taps, and clean Verse Launch cutscene. No private-data reset, family backup or release changes; only owner merges PR #176.
+
+---
+
+
+### HISTORICAL — IP10 Verse Scramble pet picture bonus round and Verse Launch second-popup polish, [PR #175](https://github.com/andydoane/biblozoo/pull/175)
 
 **Verified acceptance/base:** [#174](https://github.com/andydoane/biblozoo/pull/174) merged to `ios-prep` at `90edd333867552258d275a65610d96b30b715b1f`; [exact merge-head Actions #45074372630](https://github.com/andydoane/biblozoo/actions/runs/45074372630) Node regressions and production web **SUCCESS**. Owner tested the fix and says **“it's working well”**: mark old Drag-arrow and bottom-gap flash failures **OWNER ACCEPTED** (no invented per-device acceptance for other IP09 details). The remaining independent random Feeding Bounce “1 ball left!” remains NOT TESTED.
 
