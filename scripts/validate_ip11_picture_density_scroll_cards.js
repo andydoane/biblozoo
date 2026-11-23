@@ -108,7 +108,9 @@ tablet.state.tiles=bigTiles;
 const buttons=bigTiles.map(t=>{
   const classes=new Set();
   return {
-    dataset:{tileId:t.id}, offsetWidth:86, offsetHeight:86,
+    dataset:{tileId:t.id},
+    get offsetWidth(){return this.style.display==="none"?0:86;},
+    get offsetHeight(){return this.style.display==="none"?0:86;},
     style:{setProperty(){}, left:"", top:"", display:"", visibility:""},
     classList:{add:(...names)=>names.forEach(n=>classes.add(n)),
       remove:(...names)=>names.forEach(n=>classes.delete(n)),
@@ -127,6 +129,9 @@ tablet.api.layoutBonusPictureMagnets({}, {width:340,height:370}, buttons);
 assert.equal(buttons.filter(b=>b.style.visibility==="visible"&&b.style.display!=="none")
   .filter(b=>bigTiles.find(t=>t.id===b.dataset.tileId).isBonusTarget).length,1,
   "target never lost on mid-round shrink");
+tablet.api.layoutBonusPictureMagnets({}, {width:850,height:700}, buttons);
+assert.ok(buttons.every(b=>b.style.visibility==="visible"&&b.style.display!=="none"),
+  "all tiles return when viewport expands after earlier decoy hiding");
 assert.match(game,/object-fit|vsn-bonus-picture-tile/);
 assert.match(read("verse_games/verse_scramble_neo/game.css"),
   /\.vsn-bonus-picture-tile img\s*\{[^}]*object-fit:\s*contain/s);
