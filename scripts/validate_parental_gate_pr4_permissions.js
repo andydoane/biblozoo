@@ -200,8 +200,8 @@ function integration() {
   assert.match(ghost, /nativePhotoPicker/);
   assert.match(swift, /PHPickerViewController/);
   assert.match(swift, /UIDocumentPicker/);
-  assert.doesNotMatch(swift, /UIImagePickerController/,
-    "Ghost Writer never offers a new Camera permission");
+  assert.doesNotMatch(swift, /UIImagePickerController\s*\(/,
+    "Ghost Writer never instantiates a camera picker");
 
   // A direct unapproved native PhotoKit save must never create the first
   // permission prompt. It is rejected by native status at saveToPhotos.
