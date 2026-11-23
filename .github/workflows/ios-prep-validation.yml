@@ -98,6 +98,9 @@ jobs:
       - name: Validate Kids PR1 shared parental gate and one-shot approval
         run: node scripts/validate_parental_gate_pr1.js
 
+      - name: Validate Kids PR2 Ghost Writer native share, cancellation and math bounds
+        run: node scripts/validate_parental_gate_pr2_ghost_share.js
+
       - name: Validate iOS first-party privacy manifest and protected-resource purposes
         run: node scripts/validate_native_ios_privacy_manifest.js
 
@@ -677,6 +680,9 @@ jobs:
 
       - name: Verify packaged Kids PR1 shared parental-gate assets
         run: node scripts/validate_parental_gate_pr1.js
+
+      - name: Verify packaged Kids PR2 protected share and no test-preview leakage
+        run: node scripts/validate_parental_gate_pr2_ghost_share.js
 
       - name: Validate packaged production iOS developer controls
         run: node scripts/validate_native_production_dev_hardening.js

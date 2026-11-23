@@ -19,7 +19,7 @@
   }
 
   const NON_ROUND_TWO_DIGIT_NUMBERS = Object.freeze(
-    Array.from({ length: 89 }, (_, index) => index + 11)
+    Array.from({ length: 19 }, (_, index) => index + 11)
       .filter(number => number % 10 !== 0)
   );
 
@@ -44,7 +44,7 @@
     }
     const data = new Uint32Array(1);
     const bound = Math.floor(0x100000000 / exclusiveMax) * exclusiveMax;
-    // Rejection sampling avoids modulo bias; all max values are <= 81.
+    // Rejection sampling avoids modulo bias; all max values are <= 18.
     for (let attempt = 0; attempt < 10; attempt += 1) {
       win.crypto.getRandomValues(data);
       if (data[0] < bound) return data[0] % exclusiveMax;

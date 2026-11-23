@@ -143,10 +143,17 @@ async function run() {
   assert.equal(first.fn.makeFriendlyExportFilename("Video","mp4"),
     "DanTDM's Video - John 11_35.mp4");
   const shared=env();
-  await shared.fn.saveGhostWriterImage({exportSize:"square"},"share");
+  // PR2: only an existing action-bound share may reach native PNG export.
+  await shared.fn.saveGhostWriterImage({exportSize:"square"},"share",null,()=>true);
   assert.deepEqual(shared.calls.map(x=>x[0]),["renderPNG","shareImage"]);
   assert.equal(shared.calls[1][1].name,"DanTDM's Picture - John 11_35.png");
 
+  const deniedImage=env();
+  const deniedImageResult=await deniedImage.fn.saveGhostWriterImage(
+    {exportSize:"square"},"share");
+  assert.equal(deniedImageResult.cancelled,true);
+  assert.equal(deniedImage.calls.length,0,
+    "unapproved picture share must not render or cross the bridge");
   const missing=env();
   missing.ctx.nativeGhostExport=null;
   await assert.rejects(missing.fn.saveGhostWriterImage({exportSize:"square"}),/Native picture saving is unavailable/);
@@ -174,10 +181,16 @@ async function run() {
   assert.equal(h.progress[h.progress.length-1],"Saving to Photos...");
   const sharedVideo=env();
   await sharedVideo.fn.saveGhostWriterNativeVideo(
-    {speed:"normal"},sharedVideo.job,sharedVideo.report,"share");
+    {speed:"normal"},sharedVideo.job,sharedVideo.report,"share",()=>true);
   assert.equal(sharedVideo.calls.find(x=>x[0]==="finish")[1].destination,"share");
   assert.equal(sharedVideo.progress.at(-1),"Opening Video Share...");
 
+  const deniedVideo=env();
+  const deniedVideoResult=await deniedVideo.fn.saveGhostWriterNativeVideo(
+    {speed:"normal"},deniedVideo.job,deniedVideo.report,"share");
+  assert.equal(deniedVideoResult.cancelled,true);
+  assert.equal(deniedVideo.calls.length,0,
+    "unapproved video share must not begin encoding");
   const cancelled=env({onAppend(args,job){if(args.index===2) job.cancelled=true;}});
   await cancelled.fn.saveGhostWriterNativeVideo({speed:"normal"},cancelled.job,cancelled.report);
   assert(cancelled.calls.some(x=>x[0]==="cancel"),"explicit cancellation drains native job");

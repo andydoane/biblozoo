@@ -3515,6 +3515,9 @@
       ? window.BibloZooGhostExportDialog?.create?.(
           document.getElementById("ghostExportOverlay"))
       : null;
+    const shareApproval = nativeGhostExport
+      ? window.BibloZooGhostWriterShareApproval?.create?.()
+      : null;
 
     const announceExport = (message, failed = false) => {
       if (!exportStatus?.isConnected) return;
@@ -3535,6 +3538,27 @@
       }
     }
 
+    // Require a fresh grown-up check before any native Share media is made.
+    // Local Save to Photos, replay and remix remain unchanged.
+    async function requestApprovedShare(kind, button, action) {
+      if (!nativeGhostExport || !button?.isConnected || button.disabled ||
+          state.screen !== "remix" || activeGhostImageExport ||
+          activeGhostVideoExport) return;
+      if (!shareApproval) {
+        announceExport("Grown-up Check is unavailable. Nothing was shared.", true);
+        return;
+      }
+      await shareApproval.run({
+        kind,
+        isCurrent: () => state.screen === "remix" && button.isConnected &&
+          !document.hidden && !activeGhostImageExport && !activeGhostVideoExport,
+        setBusy: setExportActionsDisabled,
+        onApproved: action,
+        onUnavailable: () => announceExport(
+          "Grown-up Check is unavailable. Nothing was shared.", true)
+      });
+    }
+
     async function onPictureAction(destination, button) {
       if (!button || button.disabled || activeGhostImageExport ||
           activeGhostVideoExport) return;
@@ -3552,7 +3576,8 @@
       try {
         const result = await saveGhostWriterImage(
           pictureOptions(), destination,
-          () => { if (modal) modal.saving(); }
+          () => { if (modal) modal.saving(); },
+          () => state.screen === "remix" && button.isConnected && !document.hidden
         );
         if (modal && result?.saved === true) {
           modal.success(); // PhotoKit confirmed, never just sheet presentation
@@ -3576,7 +3601,10 @@
       }
     }
     saveImageBtn?.addEventListener("click", () => void onPictureAction("photos", saveImageBtn));
-    shareImageBtn?.addEventListener("click", () => void onPictureAction("share", shareImageBtn));
+    shareImageBtn?.addEventListener("click", () => void requestApprovedShare(
+      "picture", shareImageBtn,
+      () => onPictureAction("share", shareImageBtn)
+    ));
 
     // Share Video keeps its original inline cancellation and share-sheet
     // behavior. Save Video uses the modal's Cancel in the same reserved slot.
@@ -3616,7 +3644,8 @@
             } else if (button.isConnected) {
               button.textContent = label;
             }
-          }, destination);
+          }, destination,
+          () => state.screen === "remix" && button.isConnected && !document.hidden);
         if (job.cancelled || result?.cancelled) {
           if (modal) modal.close();
           else announceExport("Video export cancelled.");
@@ -3648,7 +3677,10 @@
       }
     }
     saveVideoBtn?.addEventListener("click", () => void onVideoAction("photos", saveVideoBtn));
-    shareVideoBtn?.addEventListener("click", () => void onVideoAction("share", shareVideoBtn));
+    shareVideoBtn?.addEventListener("click", () => void requestApprovedShare(
+      "video", shareVideoBtn,
+      () => onVideoAction("share", shareVideoBtn)
+    ));
 
     const startOverBtn = document.getElementById("ghostAgainBtn");
     const startOverConfirm = document.getElementById("ghostStartOverConfirm");
@@ -6142,10 +6174,16 @@
   }
 
   async function saveGhostWriterImage(options = state.remix, destination = "photos",
-                                      onReadyToSave = null) {
+                                      onReadyToSave = null, isCurrentShare = null) {
+    // A native share must have a current action-bound approval callback.
+    // Save to Photos is deliberately outside this per-share gate.
+    const shareAbandoned = () => IS_NATIVE_CAPACITOR && destination === "share" &&
+      (typeof isCurrentShare !== "function" || !isCurrentShare());
+    if (shareAbandoned()) return { cancelled: true };
     const cleanOptions = sanitizeRemixOptions({ ...options });
     const size = EXPORT_SIZES[cleanOptions.exportSize || "square"] || EXPORT_SIZES.square;
     await waitForExportAssets(cleanOptions);
+    if (shareAbandoned()) return { cancelled: true };
 
     const canvas = document.createElement("canvas");
     canvas.width = size.width;
@@ -6166,6 +6204,7 @@
       }
       // Save goes straight to PhotoKit; Share preserves the original file
       // name in iOS Files/AirDrop. Never fall back to WKWebView downloads.
+      if (shareAbandoned()) return { cancelled: true };
       onReadyToSave?.(); // Canvas is rendered; PhotoKit is about to begin.
       const result = await nativeGhostExport[method]({
         png: canvas.toDataURL("image/png"),
@@ -6208,7 +6247,12 @@
     return Math.ceil(milliseconds * NATIVE_SOCIAL_VIDEO.fps / 1000);
   }
 
-  async function saveGhostWriterNativeVideo(options, job, showProgress, destination = "photos") {
+  async function saveGhostWriterNativeVideo(options, job, showProgress, destination = "photos",
+                                            isCurrentShare = null) {
+    // Protect the asynchronous begin/frames/finish sequence against Remix exit
+    // or app backgrounding. Temp MP4 is canceled in the existing finally.
+    const shareAbandoned = () => destination === "share" &&
+      (typeof isCurrentShare !== "function" || !isCurrentShare());
     if (!nativeGhostExport?.beginVideo || !nativeGhostExport?.appendVideoFrame ||
         !nativeGhostExport?.finishVideo || !nativeGhostExport?.cancelVideo) {
       throw new Error("Native MP4 export bridge is unavailable.");
@@ -6220,8 +6264,8 @@
     try {
       showProgress("Preparing Video...", { phase: "making", progress: 0 });
       await waitForExportAssets(cleanOptions);
-      if (job.cancelled || state.screen !== "remix" || document.hidden)
-        return { cancelled: true };
+      if (job.cancelled || state.screen !== "remix" || document.hidden ||
+          shareAbandoned()) return { cancelled: true };
 
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
@@ -6254,7 +6298,8 @@
 
       let completeFrames = 0, frameCount = 0;
       for (; frameCount < size.maxFrames; frameCount++) {
-        if (job.cancelled || state.screen !== "remix" || document.hidden) {
+        if (job.cancelled || state.screen !== "remix" || document.hidden ||
+            shareAbandoned()) {
           job.cancelled = true;
           break;
         }
@@ -6280,6 +6325,10 @@
       if (job.cancelled) return { cancelled: true };
       if (completeFrames < size.endHoldFrames) {
         throw new Error("The verse animation exceeded the safe video duration.");
+      }
+      if (shareAbandoned() || job.cancelled || document.hidden) {
+        job.cancelled = true;
+        return { cancelled: true };
       }
       showProgress(destination === "share"
         ? "Opening Video Share..." : "Saving to Photos...",
