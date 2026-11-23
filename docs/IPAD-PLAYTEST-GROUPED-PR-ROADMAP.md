@@ -1,8 +1,21 @@
 # BibloZoo — iPad playtest grouped PR roadmap
 
-**CURRENT status (2026-11-22 EST):** IP01–IP09 prior acceptance remains where actually reported. [IP10 #175](https://github.com/andydoane/biblozoo/pull/175) **MERGED** at `0cc87ee931baf6e94bc6e7afc7c8d6ef3c3a0e87`; owner reports Verse Launch popup and Scramble final pictures **working nicely**, accepting those observed paths without assuming a full device matrix. **Follow-up [PR #176](https://github.com/andydoane/biblozoo/pull/176) OPEN / UNMERGED / device testing pending.** Random Feeding Bounce “1 ball left!” still **NOT PHYSICALLY TESTED**.
+**CURRENT status (2026-11-22 EST):** [#176](https://github.com/andydoane/biblozoo/pull/176) is **MERGED** to `ios-prep` at `3b1521890df2ebb5e5b1d375d65283b0714d00ab`; owner supplied iPad/iPhone screenshot evidence: its fifth picture grid leaves ~10% slots blank, correct picture repeats the same Philippians 2:8 art three plays on the same verse, and the Find: note is too tall. These are **3 specific OWNER FAIL observations**; no independent device PASS/FAIL was reported for #176 shared card scrolling or Verse Launch copy. Corrective [PR #177](https://github.com/andydoane/biblozoo/pull/177) is **OPEN / UNMERGED**, owner device approval pending. Random Feeding Bounce “1 ball left!” remains NOT PHYSICALLY TESTED.
 
-### CURRENT — IP11 responsive Scramble fifth picture field and card-list scroll feedback, PR #176
+### CURRENT — IP12 follow-up to IP11 round-five grid / random target / image-only square, PR #177
+
+**Design and cause:** IP11 deliberately counted `Math.floor(grid.capacity * 0.9)`, creating 6–7 holes in the owner's iPhone/iPad grids; IP12 fills **exactly 100% of available safe cells** on entry, up to 125 real public art files, and keeps the same grid count at a fixed viewport regardless of difficulty. Retain shuffled/jittered placements, decrease tilt to **±5°** for full-cell visibility without introducing overlapping tap targets; the single target is guaranteed present and decoys are distinct, never private family photos or remote downloads. On orientation shrink existing decoy-hiding guard protects the target; on expansion previously hidden art returns.
+
+**Replay bug:** Previously the correct picture was always picked by a public verse-derived hash; repeated same-verse plays were guaranteed the same image. The target is now selected randomly on each new bonus from the 125 public pictures, so the same verse produces varied targets. Keep existing picture preload, 110 letter hunts in rounds 1–4, computer difficulty/race/timing, wrong-picture penalty, native/Web sound, scoring and rewards unchanged.
+
+**Target note:** Only in round five, replace the wide charcoal **Find: [art]** note with a **charcoal square** (equal responsive 76–96px sides, 5px padding all around), **single uncropped pet image**, no visible Find: prefix; original full-screen FIND transition remains and the note's accessible spoken target label is retained. Existing field offsets and menu remain unchanged.
+
+**CI and owner gate:** Extend already workflow-wired IP10 and IP11 production-helper VM regressions to assert distinct target outcomes from differing random draws on replay, **all slots filled** across simulated iPhone/iPad/difficulty, safe grid/rotation, square CSS and image-only HTML. Full Node native/Swift/privacy and production web build still run. This is not physical iOS/WebKit or Xcode SDK evidence. **Owner PASS/FAIL/NOT TESTED**: iPad both orientations, iPhone portrait (landscape if possible) filled grid with no holes/overlaps, target note square minimal/equal padding, several same-verse replays with varied targets, original rounds 1–4/score/clock/computer intact, keyboard and Welcome Back. #176 separate card gesture and Verse Launch hardware behavior still NOT REPORTED, do not claim owner PASS.
+
+---
+
+
+### HISTORICAL (premerge snapshot) — IP11 responsive Scramble fifth picture field and card-list scroll feedback, PR #176
 
 **Scope:** This is a focused owner-requested follow-up, not a redo of IP01–IP10. Replace 12/16/20 by mode with a **single measured, viewport-aware picture count** in round 5. The new 125-item *public bundled asset* catalog is never derived from children/Zookeepers, never uses private photos or remote fetch. Actual bonus field/tile CSS measurements determine 90% safe-grid occupancy, with scattered jittered non-overlapping raw pet pictures and exactly one target, bounded image preload and orientation-shrink target safety; phones and tablets use their actual space. Existing **110 letter magnets rounds 1–4** unchanged. Computer speed/difficulty, score, timer, false-tap penalty, reward, native session, help and accessibility retain existing behavior.
 
