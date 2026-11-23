@@ -296,7 +296,10 @@
         // or a failed restore; never restart the child's recorded audio here.
         if (shouldPrimeNarration && result?.ready === true &&
             result?.restored === true && !doc.hidden) {
-          root.BibloZooNativeLearnTracks?.primeFromGesture?.();
+          // Narration readiness is optional: a bridge error may never discard
+          // the successfully recorded verse or fabricate spoken completion.
+          try { root.BibloZooNativeLearnTracks?.primeFromGesture?.(); }
+          catch (_) { /* Replay Instructions remains the manual fallback. */ }
         }
         captured(result);
       }).catch(() => {
