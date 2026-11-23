@@ -92,6 +92,9 @@ jobs:
       - name: Verify production iOS developer controls are hidden
         run: node scripts/validate_native_production_dev_hardening.js
 
+      - name: Verify Release privacy policy screen and standalone page agree
+        run: node scripts/validate_release_privacy_policy_alignment.js
+
       - name: Validate iOS first-party privacy manifest and protected-resource purposes
         run: node scripts/validate_native_ios_privacy_manifest.js
 
