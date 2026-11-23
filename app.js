@@ -19132,7 +19132,7 @@ function screenPrivacyPolicy(idx) {
 
         <section class="settings-card privacy-policy-card">
           <p class="privacy-policy-updated">
-            Last updated: September 15, 2026
+            Last updated: November 22, 2026
           </p>
 
           <p>
@@ -19162,6 +19162,38 @@ function screenPrivacyPolicy(idx) {
             to us.
           </p>
 
+          <h2>Optional Voice Recording</h2>
+
+          <p>
+            Flashcards can use the microphone with your permission
+            so you can record and play back your voice. You can
+            practice without recording. Audio is held only in
+            memory for the current attempt and discarded when you
+            continue, re-record or leave Flashcards. Recordings
+            are not saved to files, profile data or backups,
+            and are never uploaded.
+          </p>
+
+          <h2>Photos and Files in Ghost Writer</h2>
+
+          <p>
+            Ghost Writer can let you choose one picture from Photos
+            or Files to use as a background. The selected picture
+            is processed on your device for the current activity.
+            BibloZoo does not automatically upload it or add it
+            to your saved Zookeeper profile.
+          </p>
+
+          <p>
+            If you choose Save or Share, BibloZoo may prepare a
+            temporary picture or silent video file on your device.
+            You choose whether to save it to Photos or share it
+            using the device's sharing options. Temporary export
+            files are cleaned up when the action finishes.
+            A service you choose to share with may handle your
+            file under its own privacy practices.
+          </p>
+
           <h2>Internet Use</h2>
 
           <p>
@@ -19183,9 +19215,12 @@ function screenPrivacyPolicy(idx) {
 
           <p>
             BibloZoo can export and import a family backup when you
-            choose to use those features. Backup files are created
-            or opened only at your direction. BibloZoo does not
-            automatically upload your backups to a server.
+            choose to use those features. Backup files can include
+            Zookeeper names and memorization progress. Files are
+            created or opened only at your direction. BibloZoo does
+            not automatically upload your backups to a server.
+            If you choose to share a backup, the destination you
+            select handles the file under its own privacy practices.
           </p>
 
           <h2>Deleting Your Data</h2>
