@@ -1,8 +1,8 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Optional Kids first-launch Grown-up Setup PR candidate (November 23, 2026)
+## CURRENT — [PR #196](https://github.com/andydoane/biblozoo/pull/196) optional Kids first-launch Grown-up Setup (November 23, 2026)
 
-**Baseline/ownership:** Kids [PR #195](https://github.com/andydoane/biblozoo/pull/195) is **merged**, but owner PR4 first-time permission and accessibility testing is still in progress (no phone PASS inferred). This new focused candidate `feat/ios-kids-first-launch-grownup-setup-20261123` → `ios-prep` is **not yet owner-tested or merged**. Never reset an existing production-ID phone's family profiles or install/uninstall just to create a first-launch condition.
+**Baseline/ownership:** Kids [PR #195](https://github.com/andydoane/biblozoo/pull/195) is **merged**, but owner PR4 first-time permission and accessibility testing is still in progress (no phone PASS inferred). This focused [PR #196](https://github.com/andydoane/biblozoo/pull/196), `feat/ios-kids-first-launch-grownup-setup-20261123` → `ios-prep`, is **OPEN, not yet owner-tested or merged**. Both validation jobs passed on the first corrected implementation head in [Actions #45265788915](https://github.com/andydoane/biblozoo/actions/runs/45265788915); check the exact final PR head again. Never reset an existing production-ID phone's family profiles or install/uninstall just to create a first-launch condition.
 
 **Automated source + production-bundle checks:**
 ```bash
