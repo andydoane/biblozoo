@@ -1,6 +1,16 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Release 1.0 BSB verse-corpus metadata and old ESV debug fallback (2026-11-22 EST)
+## CURRENT — Release privacy policy parity and data-collection source audit (2026-11-22 EST)
+
+**Baseline:** [PR #183](https://github.com/andydoane/biblozoo/pull/183) **MERGED** into `ios-prep` at `3af13aa905b50a71812fa90f1d1733d9656f3eab`, with **SUCCESS** Node regression (including 124 BSB metadata) and production web build at exact PR head. The owner has deferred Florence S Chalkboard embedding-license verification; it remains open before App Store distribution.
+
+**Current PR:** `fix/release-privacy-policy-sync-audit` → `ios-prep`, **OPEN / unmerged / exact-head CI PENDING**. Identified outdated in-app privacy-policy date and missing microphone text despite standalone HTML already documenting it. Both policies now share November 22, 2026 date and disclose temporary in-memory Flashcards voice, Ghost Writer user-selected Photos/Files input and temporary exported PNG/MP4 files, voluntary Save/Share destinations, family backup JSON names/progress, website-host traffic and local game/profile data. Source inventory and unverified runtime/SDK boundaries in [APP-PRIVACY-PREFLIGHT.md](APP-PRIVACY-PREFLIGHT.md). A dedicated `scripts/validate_release_privacy_policy_alignment.js` regression check is wired to GitHub Actions.
+
+**Verification:** GitHub exact-head Node/production-web checks must PASS. After owner reviews/merges, perform a **read-only simulator UI check** of Settings → Privacy Policy, comparing it to the standalone HTML page. This scope changes text, **not** user data, JS storage, permissions, audio capture or native Swift. Do not reinstall/reset the original 10 production or separate 11 Audio Test profiles. Future final App Privacy approval separately needs **actual Release binary/sdk/permissions/network tests** and public HTTPS policy URL verification. Do **not** claim `No data collected` in App Store Connect based solely on source scans or a manifest declaring empty collected types.
+
+---
+
+## HISTORICAL — Release 1.0 BSB verse-corpus metadata and old ESV debug fallback (2026-11-22 EST)
 
 **Stable evidence:** [#182](https://github.com/andydoane/biblozoo/pull/182) **MERGED** to `ios-prep` at `017205a4998a81f64a83cc551453ba454a422ce5` with **SUCCESS** Node regression and production web build jobs. Owner provided a [Florence S Chalkboard font source](https://www.dafont.com/chalkboard-3.font) but **elects to leave the embedding/license investigation for later**; do not call it cleared.
 
