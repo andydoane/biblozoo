@@ -113,7 +113,8 @@
       return new Promise((resolve, reject) => {
         const overlay = element("div", "bz-parental-gate-overlay");
         const dialog = element("section", "bz-parental-gate-dialog");
-        const icon = element("div", "bz-parental-gate-lock", "🔒");
+        // Existing Zoo Break/Pet Escape lock art is applied by shared CSS.
+        const icon = element("div", "bz-parental-gate-lock");
         icon.setAttribute("aria-hidden", "true");
         const title = element("h2", "bz-parental-gate-title", "Grown-up Check");
         title.id = "bz-parental-gate-title";
