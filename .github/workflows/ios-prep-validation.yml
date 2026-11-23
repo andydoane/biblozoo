@@ -110,6 +110,9 @@ jobs:
       - name: Validate optional native Kids first-launch Grown-up Setup
         run: node scripts/validate_kids_setup_onboarding.js
 
+      - name: Validate Kids setup owner feedback and first-grant recording readiness
+        run: node scripts/validate_kids_setup_owner_feedback.js
+
       - name: Validate iOS first-party privacy manifest and protected-resource purposes
         run: node scripts/validate_native_ios_privacy_manifest.js
 
@@ -701,6 +704,9 @@ jobs:
 
       - name: Verify packaged optional Kids first-launch setup
         run: node scripts/validate_kids_setup_onboarding.js
+
+      - name: Verify packaged Kids setup owner feedback and first-grant recording readiness
+        run: node scripts/validate_kids_setup_owner_feedback.js
 
       - name: Validate packaged production iOS developer controls
         run: node scripts/validate_native_production_dev_hardening.js
