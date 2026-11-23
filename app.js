@@ -3133,6 +3133,8 @@ async function shareOrDownloadJsonSave(
   saveData,
   filenamePrefix
 ) {
+  // Fail closed before JSON/File construction, not just before sharing.
+  if (!parentManagementAllowed()) return { method: "cancelled" };
   const json = JSON.stringify(saveData, null, 2);
 
   const now = new Date();
@@ -3183,6 +3185,7 @@ async function shareOrDownloadJsonSave(
   }
 
   if (canShareFile) {
+    if (!parentManagementAllowed()) return { method: "cancelled" };
     try {
       await navigator.share({
         files: [file]
@@ -3207,6 +3210,9 @@ async function shareOrDownloadJsonSave(
     }
   }
 
+  // A native share sheet may background the app or lose its active profile.
+  // The fallback download must NOT bypass a revoked parent visit.
+  if (!parentManagementAllowed()) return { method: "cancelled" };
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
 
@@ -3229,6 +3235,8 @@ async function shareOrDownloadJsonSave(
 }
 
 async function exportSaveData() {
+  // Guard direct helper callers as well as Settings button wiring.
+  if (!parentManagementAllowed()) return;
   try {
     const saveData = createBibloZooFamilySaveData();
 
@@ -3285,6 +3293,7 @@ async function exportSaveData() {
 }
 
 async function exportActiveProfileSaveData() {
+  if (!parentManagementAllowed()) return;
   try {
     const saveData =
       createBibloZooProfileSaveData();
@@ -3354,6 +3363,9 @@ async function exportActiveProfileSaveData() {
 function openImportSaveDataPicker({
   fromFirstProfile = false
 } = {}) {
+  // First-profile restoration is a separate, explicit setup flow.
+  // Imports launched from Settings must belong to a live parent visit.
+  if (!fromFirstProfile && !parentManagementAllowed()) return;
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".json,application/json";
@@ -3363,7 +3375,7 @@ function openImportSaveDataPicker({
     const file = input.files && input.files[0];
     input.remove();
 
-    if (!file) return;
+    if (!file || (!fromFirstProfile && !parentManagementAllowed())) return;
 
     importSaveDataFromFile(file, {
       fromFirstProfile
@@ -4414,6 +4426,9 @@ function importSaveDataFromFile(
   const reader = new FileReader();
 
   reader.onload = () => {
+    // Never restore a Settings backup after the picker/background invalidated
+    // the parent visit. Keep first-profile onboarding restoration intact.
+    if (!fromFirstProfile && !parentManagementAllowed()) return;
     try {
       const raw = String(reader.result || "");
       const parsed = JSON.parse(raw);
