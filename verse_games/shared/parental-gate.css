@@ -99,7 +99,6 @@
   text-align: center;
 }
 .bz-parental-gate-answer:focus,
-.bz-parental-gate-btn:focus,
 .bz-parental-gate-answer:focus-visible,
 .bz-parental-gate-btn:focus-visible {
   outline: 0;
