@@ -3363,7 +3363,9 @@
     // A shuffled, gently jittered grid avoids the random rejection/hiding
     // that was designed for 110 letter magnets. Every cell fits a full,
     // uncropped photo and leaves a clear gap for accurate child taps.
-    const first = buttons[0];
+    // After rotating to a smaller field some decoys may be display:none.
+    // Measure a still-visible tile when rotating back to a larger board.
+    const first = buttons.find(btn => btn.offsetWidth > 0) || buttons[0];
     const tileWidth = first.offsetWidth || 54;
     const tileHeight = first.offsetHeight || 54;
     const grid = bonusPictureGridMetrics(rect.width, rect.height, tileWidth, tileHeight);
