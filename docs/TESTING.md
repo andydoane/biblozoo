@@ -2,7 +2,7 @@
 
 ## CURRENT — Kids parental gate PR 1, review-only test procedure (November 23, 2026)
 
-**Status:** Implementation branch `feat/ios-parental-gate-pr1-20261123` targets `ios-prep`. No production share/backup/link/permission path has been wired to this controller yet; **a normal tap on Ghost Writer Share will still share** until the later integration PRs. This PR does not claim App Review readiness or permission-gate coverage.
+**Status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) is OPEN / unmerged; implementation branch `feat/ios-parental-gate-pr1-20261123` targets `ios-prep`. No production share/backup/link/permission path has been wired to this controller yet; **a normal tap on Ghost Writer Share will still share** until the later integration PRs. This PR does not claim App Review readiness or permission-gate coverage.
 
 **On the Mac (source tests, no simulator install):**
 1. In GitHub Desktop, switch to the PR branch before merging, or switch to `ios-prep` and Pull Origin after the owner merges. Open Terminal in that checkout. Do not switch to `main`.
