@@ -232,8 +232,10 @@ async function main() {
       s.doc.hidden = false;
     }
     if (lifecycle === "removed") {
+      const detachedForm = s.get("bz-parental-gate-form");
       s.get("bz-parental-gate-overlay").remove();
-      s.answer(23);
+      // Dispatch on the already-held stale form, not a live DOM lookup.
+      detachedForm.dispatch("submit");
     }
     assert.equal(await pending, false, lifecycle + " denied");
     assert.equal(invocations, 1);
