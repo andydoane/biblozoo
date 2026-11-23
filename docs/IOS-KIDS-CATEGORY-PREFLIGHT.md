@@ -1,6 +1,6 @@
 # BibloZoo 1.0 — Kids Category / parental-gate preflight
 
-**November 23, 2026 | status: INITIAL SOURCE REVIEW COMPLETE; KIDS CATEGORY IMPLEMENTATION AND APP REVIEW ACCEPTANCE OPEN.**
+**November 23, 2026 | status: INITIAL SOURCE REVIEW COMPLETE; DETAILED FOUR-PR IMPLEMENTATION PLAN DOCUMENTED; IMPLEMENTATION AND APP REVIEW ACCEPTANCE OPEN.**
 
 **Proposed, not yet selected in App Store Connect:** Primary category **Education**, **Made for Kids / Kids Category**, age band **6–8** (early independent readers). The owner describes the sweet spot as elementary-age readers; older elementary children remain welcome. The owner agreed this positioning sounds good. **Do not treat this document as confirmation that App Review will approve the category or that the owner has made an irreversible App Store Connect selection.**
 
@@ -28,6 +28,10 @@ This is a product/code preflight, not independent legal advice or an Apple appro
 | External/navigation and debug paths | `app.js` `navigateToExternalPage` is also used for **in-app relative game** transitions; `BROWSER_VERSION_URL`/`BIBLOZOO_INSTALL_URL` constants exist. Hidden utilities are production-guarded by earlier #179 tests. | Gate **genuine external destinations**, not every location change. Confirm active call sites before changing a shared navigation helper. Keep debug tooling inaccessible in production. |
 | Advertising, analytics, online chat/feed | No direct advertising or analytics SDK was declared in `package.json`; source/privacy review found no automatic first-party profile upload. No public chat/feed functionality identified in inspected paths. | Favor no ads, tracking or online user-content posting. **Do not** claim complete third-party runtime clearance based only on manifest declarations or Proxyman. Finish the separate App Privacy audit. |
 
+## Follow-on implementation handoff
+
+The complete proposed **four-PR delivery plan**, including the parent-gate interaction, approval lifetime, exact protected surfaces, module/entrypoint constraints, per-PR acceptance criteria, simulator safety, and a ready-to-paste next-chat kickoff is in **[IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md](IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md)**. The source matrix below is still the initial risk inventory. **Neither this document nor the plan implements any gate.**
+
 ## Recommended implementation sequence — **no code changes in this review**
 
 1. **Design a consistent adult-entry flow** for the native iOS Kids build, backed by an actual adult-level task with Cancel. Gate immediately before any external link, email, native share sheet or profile/family backup export. Avoid a “tap Yes” check or easily solved arithmetic targeted at 6–8-year-olds. Provide accessible instructions and do not persist an unlimited bypass. Decide whether a short in-session adult unlock is appropriate and ensure it cannot be carried over to another Zookeeper unexpectedly.
@@ -42,7 +46,8 @@ This is a product/code preflight, not independent legal advice or an Apple appro
 - [x] Intended audience established: independent-reading elementary children, with **6–8 as proposed main Kids band** and Education as proposed primary category.
 - [x] Initial Apple rules review and source-level risk inventory completed on `ios-prep` as of November 23, 2026.
 - [x] Public App Store privacy page [verified by owner](https://andydoane.github.io/biblozoo/app-store-privacy.html) and [support page verified by owner](https://andydoane.github.io/biblozoo/app-support.html); support page was published through merged [PR #187](https://github.com/andydoane/biblozoo/pull/187) on `main`.
-- [ ] Owner approves parental-gate UX/spec and scope; **no gate implementation is claimed** in this document.
+- [x] Detailed four-PR gate implementation plan prepared for a separate chat; **planning is not implementation** ([plan](IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md)).
+- [ ] Owner reviews/approves final parental-gate UX/spec and scope; **no gate implementation is claimed** in this document.
 - [ ] Native-only external link, share, backup gates implemented and verified, including bypasses and accessibility.
 - [ ] Confirm Kids Category/age band in App Store Connect only after compliance acceptance.
 - [ ] Finish independent privacy/SDK, legal, content/asset rights, and review metadata requirements.
