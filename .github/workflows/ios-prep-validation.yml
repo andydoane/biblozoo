@@ -104,6 +104,9 @@ jobs:
       - name: Validate Kids PR3 parent Settings, outgoing links, backup fallback and shared visual design
         run: node scripts/validate_parental_gate_pr3_settings.js
 
+      - name: Validate Kids PR4 first native mic/Photos prompts and bypass audit
+        run: node scripts/validate_parental_gate_pr4_permissions.js
+
       - name: Validate iOS first-party privacy manifest and protected-resource purposes
         run: node scripts/validate_native_ios_privacy_manifest.js
 
@@ -689,6 +692,9 @@ jobs:
 
       - name: Verify packaged Kids PR3 Settings parent gate and lock-image assets
         run: node scripts/validate_parental_gate_pr3_settings.js
+
+      - name: Verify packaged Kids PR4 permission state gates and native source
+        run: node scripts/validate_parental_gate_pr4_permissions.js
 
       - name: Validate packaged production iOS developer controls
         run: node scripts/validate_native_production_dev_hardening.js
