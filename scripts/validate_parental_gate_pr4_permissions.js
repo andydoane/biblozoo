@@ -182,7 +182,8 @@ function integration() {
   assert.match(swift, /CAPPluginMethod\(name: "getPhotosPermissionStatus"/);
   assert.match(swift, /CAPPluginMethod\(name: "requestPhotosPermission"/);
   assert.match(swift, /PHPhotoLibrary\.authorizationStatus\(for: \.addOnly\)/);
-  assert.match(swift, /guard self\.photosPermissionLabel\(\) == "granted" else/);
+  assert.match(swift, /guard BibloZooIOSIdentity\.experimentalToolsEnabled \|\|\s*self\.photosPermissionLabel\(\) == "granted" else/,
+    "production bridge refuses new Photos prompt while Audio Test stays unchanged");
   assert.match(swift, /PHPhotoLibrary\.requestAuthorization\(for: \.addOnly\)/);
   assert.match(ghost, /firstPermission\?\.ensure\?\.\(\{\s*kind: "photos"/);
   assert.match(ghost, /nativeGhostExport\.getPhotosPermissionStatus\(\)/);
