@@ -198,12 +198,13 @@
       if (status === "checking") return "Checking permission…";
       return "Unavailable — try again later";
     }
-    function featureHtml(s, kind, symbol, name, description) {
+    function featureHtml(s, kind, artSrc, name, description) {
       const status = s.status[kind];
       const canRequest = status === "undetermined" && !s.busy;
       return '<section class="bz-kids-setup-feature" aria-label="' + name + '">' +
         '<div class="bz-kids-setup-feature-header">' +
-        '<span class="bz-kids-setup-symbol" aria-hidden="true">' + symbol + '</span>' +
+        '<img class="bz-kids-setup-symbol" src="' + artSrc +
+        '" alt="" aria-hidden="true" draggable="false">' +
         '<div class="bz-kids-setup-feature-copy">' +
         '<h2>' + name + '</h2><p>' + description + '</p>' +
         '<div class="bz-kids-setup-status" aria-live="polite">' +
@@ -229,7 +230,7 @@
           '<button class="bz-kids-setup-button" type="button" ' +
           'data-kids-setup-action="enter"' + (s.busy ? ' disabled' : '') +
           '>Grown-up Setup</button>' +
-          '<button class="bz-kids-setup-text-button" type="button" ' +
+          '<button class="bz-kids-setup-button bz-kids-setup-skip" type="button" ' +
           'data-kids-setup-action="done"' + (s.busy ? ' disabled' : '') +
           '>Explore the Zoo for Now</button></div>' +
           '<p class="bz-kids-setup-note" role="status">' + s.note + '</p></main>'
@@ -239,9 +240,9 @@
           '<p class="bz-kids-setup-intro">These optional features work only when ' +
           'you choose to use them. You can skip either one.</p>' +
           '<div class="bz-kids-setup-features">' +
-          featureHtml(s, "microphone", "🎙️", "Record My Verses",
+          featureHtml(s, "microphone", "verse_images/game_ui/icon_microphone_permission.png", "Record My Verses",
             "Let your child record and hear their Bible verses in Flashcards.") +
-          featureHtml(s, "photos", "🖼️", "Save My Creations",
+          featureHtml(s, "photos", "verse_images/game_ui/icon_photos_permission.png", "Save My Creations",
             "Let your child save Ghost Writer pictures and videos to Photos. " +
             "This does not give BibloZoo access to browse your photo library.") +
           '</div>' +
