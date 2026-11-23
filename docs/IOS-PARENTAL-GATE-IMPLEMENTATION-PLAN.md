@@ -1,5 +1,11 @@
 # BibloZoo 1.0 — Parental-gate implementation plan (four PRs)
 
+
+**Current UX follow-up before PR 4 (November 23, 2026):** PR 1 [#190](https://github.com/andydoane/biblozoo/pull/190), Safari fix [#191](https://github.com/andydoane/biblozoo/pull/191), PR 2 [#192](https://github.com/andydoane/biblozoo/pull/192) and PR 3 [#193](https://github.com/andydoane/biblozoo/pull/193) are now **MERGED** to `ios-prep`, latest baseline `d9532717742e5f4a047cb0139f35c626bb352678`. The owner reports all previously checked gates pass on their iPhone. Owner's next requested refinement in `fix/ios-kids-gate-ux-math-profile-edit-20261123` (not yet owner accepted): new shared adult problem `A − B + C`, with A=20..99, B=10..A−1, C=1..9, and result 2..98; remove the gate from **Settings → Manage Zookeeper** navigation and **Edit Zookeeper name/picture**. Preserve gated Add Zookeeper, imports/exports, destructive reset/delete/erase, outgoing Mail/GitHub links and Ghost Writer shares. **PR 4 remains pending until the owner tests the UX follow-up**; it covers first-time native microphone/Photos permission prompts when needed, native bridge/bypass audit and accessibility/release acceptance. The math task must remain reviewable as adult-level for the intended 6–8 band; Apple does not specify this exact formula.
+
+**Historical specifications below document the prior implementation choices and are not the current challenge formula.**
+
+
 **Planning baseline:** November 23, 2026, `ios-prep` after [merged Kids Category preflight PR #188](https://github.com/andydoane/biblozoo/pull/188).
 
 **Owner's updated challenge choice for PR 2 (November 23):** A fresh `(A × B) + C` math question where `A` is **11–29, excluding 20**, `B` is 2–9, and `C` is 1–9. The app generates new numbers; do not reuse the existing easy reset arithmetic. This tightens the originally approved PR 1 11–99 range in one shared helper for all future gates.
