@@ -82,6 +82,39 @@ const REQUIRE_STANDALONE_PWA = true;
 const IS_NATIVE_CAPACITOR =
   !!window.Capacitor?.isNativePlatform?.();
 
+// Kids PR3 — same shared math gate, with one RAM-only unlocked Settings
+// visit. The web/PWA and Android preserve their original action behavior.
+// Missing native gate/identity is never permission to export/delete data.
+const parentAreaGate = window.BibloZooParentActions?.create?.({
+  getScreen: () => State.screen,
+  getProfileId: () => getProfileApi()?.getActiveProfileId?.()
+}) || null;
+
+function isNativeParentGateContext() {
+  return IS_NATIVE_CAPACITOR || window.location?.protocol === "capacitor:";
+}
+
+function parentManagementAllowed() {
+  return !isNativeParentGateContext() ||
+    parentAreaGate?.isAuthorized?.() === true;
+}
+
+function runParentManagementAction(onApproved, isCurrent = () => true) {
+  if (!isNativeParentGateContext()) {
+    if (isCurrent()) return onApproved();
+    return false;
+  }
+  return parentAreaGate?.runManagement?.({ onApproved, isCurrent }) ?? false;
+}
+
+function runParentOutgoingAction(onApproved, isCurrent = () => true) {
+  if (!isNativeParentGateContext()) {
+    if (isCurrent()) return onApproved();
+    return false;
+  }
+  return parentAreaGate?.runOutgoing?.({ onApproved, isCurrent }) ?? false;
+}
+
 const BROWSER_VERSION_URL =
   "https://andydoane.github.io/eatyourbible/pwa/verse";
 
@@ -11348,6 +11381,9 @@ function go(nextScreen) {
     return;
   }
 
+  // Leaving the parent-area screen family expires its in-memory approval.
+  parentAreaGate?.onScreenChange?.(nextScreen);
+
   if (from === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
   if (from === Screen.VERSE_DETAIL) cancelVerseDetailListen();
   if (from === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
@@ -11501,6 +11537,8 @@ function go(nextScreen) {
 
 /* If you jump directly (no transition), call this */
 function setScreen(screen) {
+  if (State.screen !== screen)
+    parentAreaGate?.onScreenChange?.(screen);
   if (State.screen !== screen) {
     if (State.screen === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
     if (State.screen === Screen.VERSE_DETAIL) cancelVerseDetailListen();
