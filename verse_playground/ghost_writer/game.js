@@ -3565,7 +3565,7 @@
     // Photos/Files *picker*. A new OS permission prompt must occur only after
     // the shared grown-up check, before any PNG/MP4 media is prepared.
     async function approveFirstPhotosSave(button) {
-      const state = await firstPermission?.ensure?.({
+      const decision = await firstPermission?.ensure?.({
         kind: "photos",
         getStatus: () => nativeGhostExport.getPhotosPermissionStatus(),
         requestFirst: () => nativeGhostExport.requestPhotosPermission(),
@@ -3573,8 +3573,8 @@
           button?.isConnected && !button.disabled &&
           !document.hidden && !activeGhostImageExport && !activeGhostVideoExport
       });
-      if (state?.granted !== true) {
-        announceExport(state?.reason === "denied"
+      if (decision?.granted !== true) {
+        announceExport(decision?.reason === "denied"
           ? "Photos access is off. You can change it in iPhone Settings."
           : "Picture or video was not saved. Grown-up approval is needed only for first-time Photos access.",
           true);
