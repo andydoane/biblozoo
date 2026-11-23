@@ -1,6 +1,34 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Safari parental-gate preview fix, owner retest (November 23, 2026)
+## CURRENT — Kids parental gate PR 2 Ghost Writer share acceptance (November 23, 2026)
+
+**Status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) and [PR #191](https://github.com/andydoane/biblozoo/pull/191) are merged; the owner reported the corrected Safari preview **passed all checks**. New feature branch `feat/ios-parental-gate-pr2-ghost-share-20261123` proposes Share Picture / Share Video gates and the easier math range **11–29 excluding 20**; **not yet owner-accepted**. PRs 3–4 remain unimplemented.
+
+**Source and CI:** Review the new PR targeting `ios-prep` and confirm **both** GitHub Actions jobs pass at its final head. From that branch (or after owner merges, `ios-prep` + Pull Origin) run:
+
+```bash
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr2_ghost_share.js
+node scripts/validate_native_ghost_writer_export.js
+npm run build
+node scripts/validate_parental_gate_pr2_ghost_share.js
+```
+
+Expected: `Kids PR1 PASS`, `Kids PR2 PASS`, `Native Ghost Writer export PASS` and a successful build. All tests use synthetic mocks: they **cannot prove a native UIActivityViewController appears**. The preview `open tests/parental-gate-preview.html` now generates only first numbers 11–19 or 21–29; no first number 20 or greater than 29.
+
+**Owner simulator acceptance (disposable fictional profile only; never install over the real production or Audio Test profiles):**
+1. Build and sync only the isolated `ios-prep` app in a disposable iOS simulator (`npm run build`, `npx cap sync ios`, Xcode Run). Do **not** replace/reset the original family apps, import real backups, or use personal voice/photos.
+2. In Ghost Writer, complete or open a **fictional/short** verse practice until **Remix Your Verse** appears. Test **Simple** mode first. Tap **Share Picture**: you should see Grown-up Check, **not** iOS Share yet. Tap **Not Now**; return to the **same Remix** without a share sheet or lost settings. Try again and enter wrong answers: a fresh problem on each attempt, cancel after three wrong answers; no file/sheet. Then solve the current formula; exactly **one** picture share sheet should appear. Dismiss it without posting.
+3. Independently tap **Share Video** and repeat cancel/wrong/correct flow. No native `beginVideo`/encoding or share sheet should begin until correct approval. After approval the original silent video export/progress may take time; exactly one video sheet appears after successful export. Dismiss it; exercise the existing Cancel Video behavior if desired.
+4. Switch to **More Options** and repeat both picture/video share checks. Each new tap must require a **fresh math problem**, even after approving the other media type. Rapid double taps must not spawn duplicate dialogs/sheets.
+5. Confirm **Save Picture** and **Save Video** still use the existing Photos flow without a *per-save* gate when Photos permission was **already granted**. Replay, Remix settings, custom-background picker and exit/back should look unchanged. **PR 4 will address first-time OS permission prompts**; do not interpret an ungated new Photos authorization as final Kids compliance.
+6. While a gate is open, background the simulator or leave its view; return and ensure the old request cannot later open a sheet. Check cancel keeps draft Remix work; report any failure, screenshots, Xcode warnings, focus or accessibility issues. Verify VoiceOver and larger Dynamic Type as feasible.
+
+**Expected limits:** Ordinary browser/PWA `main` behavior must remain unchanged. The distinct Audio Test build stays outside the Kids gate; do not use it for production acceptance. Outgoing family backup, links, Support email and first-time native permissions remain **ungated until PRs 3–4**. A green CI run is not a real-device or final App Review pass.
+
+---
+
+## HISTORICAL — Safari parental-gate preview fix, owner retest (November 23, 2026)
 
 **Owner-reported failure, corrective [PR #191](https://github.com/andydoane/biblozoo/pull/191) OPEN/unmerged, after merged [PR #190](https://github.com/andydoane/biblozoo/pull/190):** The local `tests/parental-gate-preview.html` showed the introductory buttons. **Not Now** worked, but **I'm a Grown-up** closed the modal instead of showing the equation. The earlier green Node CI did **not** cover the browser focus transition. This fix is limited to the shared controller, a new synthetic focus/blur regression, and documentation. Bare window blur no longer immediately cancels; true tab/app backgrounding through `visibilitychange`, `pagehide`, or navigation remains protected. The button now explicitly calls the question renderer without passing a click Event as feedback text.
 
