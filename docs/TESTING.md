@@ -1,6 +1,33 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Kids parental gate PR 2 Ghost Writer share acceptance (November 23, 2026)
+## CURRENT — Kids parental gate PR 3 Settings / redesigned popup acceptance (November 23, 2026)
+
+**Context:** [PR #192](https://github.com/andydoane/biblozoo/pull/192) is **merged** at `79e2e2dde2a5d854546cf8a9bee176ee6e3cc83f`; the owner reports Ghost Writer parental-gated Share **works**. Feature branch `feat/ios-parental-gate-pr3-settings-redesign-20261123` targets `ios-prep`, **unmerged until owner reviews/tests**. This PR adds Settings/backups/outgoing links and adjusts the *shared* popup, not game content, Swift or real data.
+
+**Mac / no profile risk:** From PR branch (or after owner merge, `ios-prep` and GitHub Desktop **Pull Origin**), run:
+```bash
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr2_ghost_share.js
+node scripts/validate_native_ghost_writer_export.js
+node scripts/validate_parental_gate_pr3_settings.js
+npm run build
+node scripts/validate_parental_gate_pr3_settings.js
+```
+Expected: all PASS / successful build; GitHub Actions Node regressions and Production web build both SUCCESS at final PR SHA. For the visual review run `open tests/parental-gate-preview.html`: try the intro **Not Now** and **I'm a Grown-up**, then the formula. **Confirm:** BibloZoo purple background (`#7f66c6`), all popup copy white, balanced subtitle wrapping, borderless solid white buttons with purple labels, no circle behind the **Zoo Break / Pet Escape lock image**, readable error feedback, visible keyboard focus when using Tab, and smaller 11–29-but-not-20 challenge. Preview uses synthetic identity and is not included in `dist/`.
+
+**Native owner review — disposable simulator with fictional data only:**
+1. In an isolated simulator, never reinstall/reset/export with real production 10 or separate Audio Test 11 Zookeepers. Open **Settings**. Read **Privacy Policy**, **Credits** and **Contact Support** information without any check; these must remain readable.
+2. From **Contact Support**, click **Email**. The Grown-up Check should appear *before* Mail. **Not Now** / incorrect answers must leave Mail unopened. Correct answer may open Mail; cancel sending without contacting support. Repeat Privacy Policy's email link, and Credits' SoundTouchJS project link (no outbound browser before approval). Link-outs use a fresh action-specific check each time.
+3. In **Settings → Export Family Backup** with a fictional family, first tap triggers the check. Cancel: **no backup file, share sheet or download**. Correct answer: the normal file/share flow may open; cancel without transferring family data. While still in Settings visit, **Import Backup** or another parent management action should not require a *second* check. Use only disposable fictional JSON for import; do not replace or overwrite original profiles.
+4. From Settings select **Manage Zookeeper**, then **Back Up Zookeeper** (fictional), Reset Progress or Delete. The gate should appear only if the previous parent approval expired; a continuous parent visit remains unlocked. **Never actually confirm Reset/Delete/Erase on any real device.** In the disposable simulator, confirm the existing independent destructive math dialog is still shown and cancellation is safe.
+5. Navigate Home then back into Settings: another sensitive action must require a fresh check. Switch Zookeeper: prior parent approval expires. Send the app to the background and return: approval expires. Rapid taps or a canceled/stale check must never export, erase, open Mail or open a website.
+6. Smoke check Ghost Writer Share Picture/Video still prompts for **each** share and Save to Photos retains existing behavior with **previously granted** permission. No gate should block reading the Privacy Policy. First-time native OS permission requests and full native-bridge bypass audit remain **PR 4**.
+
+**Review caveats:** A Photos/Files picker or native share sheet may interrupt the app and revoke a Settings visit; an operation should fail closed rather than fall back to an unapproved download. If legitimate import cannot complete after the OS picker, report it for a focused fix. Node tests simulate workflows but do not replace owner Safari, VoiceOver, or disposable iOS simulator tests. Avoid merging into `main` or treating this as App Store compliance sign-off.
+
+---
+
+## HISTORICAL — Kids parental gate PR 2 Ghost Writer share acceptance (November 23, 2026)
 
 **Status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) and [PR #191](https://github.com/andydoane/biblozoo/pull/191) are merged; the owner reported the corrected Safari preview **passed all checks**. New [PR #192](https://github.com/andydoane/biblozoo/pull/192), branch `feat/ios-parental-gate-pr2-ghost-share-20261123` proposes Share Picture / Share Video gates and the easier math range **11–29 excluding 20**; **not yet owner-accepted**. PRs 3–4 remain unimplemented.
 
