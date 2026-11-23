@@ -1,5 +1,34 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — iOS first-post-microphone Flashcards narration + parental math keyboard follow-up (November 23, 2026)
+
+**Owner observation after merged #197:** First-time microphone request → approve → real recording now succeeds. But the *next automatic Flashcards instruction narration* shows the red `Instructions couldn't play. Tap Replay Instructions.` toast; pressing Replay Instructions works. Also the shared Grown-up Check auto-focuses its Answer input and opens the iOS keyboard too early, partially covering the math popup.
+
+**Automated validation (read-only mocked sessions, not OS acceptance):**
+```bash
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_kids_setup_owner_feedback.js
+node scripts/validate_parental_gate_pr4_permissions.js
+node scripts/validate_native_n7c_flashcards_capture.js
+npm run build
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_kids_setup_owner_feedback.js
+```
+Both GitHub Actions jobs need PASS at the exact final PR head. JS regressions don't prove iOS speech actually plays.
+
+**Owner device acceptance (prefer disposable production-identity iOS simulator and fictional Zookeeper; don't reset actual family profiles):**
+
+1. Start with microphone status **Not Determined** and choose **Explore the Zoo for Now** on first launch. In Flashcards, enter a learned verse and choose a difficulty. Complete Grown-up Check when Record requests a first microphone permission, then allow Apple's microphone sheet. The same Record tap must count down 3-2-1, record and Stop; compare/playback screen must play its *first spoken instructions* without a red failure toast or needing **Replay Instructions**. The recording itself and Wacky Replay must still work, with no repeat math or microphone authorization alert.
+2. On later recordings when mic permission is already granted, narration should still work, no new microphone request, and no extra audio activation just because the user tapped Stop.
+3. Test a denial, cancel, background during OS sheet/recording/Stop and a failed capture: no auto narration activation, no stale recording, no false rewards; safe fallback remains when recording truly fails. Native Audio Test and browser/PWA paths should not change.
+4. For **any** shared Grown-up Check (first mic, Photos, Ghost Writer Share, Settings/backup), press **I'm a Grown-up**. The math challenge must be fully visible without the iOS keyboard showing. VoiceOver should announce the equation; tapping the **Answer** field deliberately opens the keyboard and the popup should remain visible/scroll correctly. Incorrect answer should show a new equation **without automatically reopening the keyboard**. Correct answer, 3 strikes, Not Now, ESC/Tab and real background dismissal should still work.
+5. Check iPhone small display with increased text size and iPad portrait; do not claim device or VoiceOver PASS without owner observation.
+
+**Implementation caveat:** This is a targeted suspected handoff fix: the native Flashcards sound engine already has a guarded per-Stop capture-restored signal, but the JS narration layer may need an explicit post-authorization prime tied to the user's Stop gesture. We don't know the original native failure reason from the phone, so if the red message persists, record which Flashcards instruction screen failed, and a read-only native refusal reason if available. Avoid uncontrolled retries, artificial success or automatic audio-session takeover.
+
+---
+
+
 ## CURRENT — Kids first-launch follow-up: owner UI fixes and Flashcards first-mic-grant recovery (November 23, 2026)
 
 **User observations:** PR #196's first-launch setup works when microphone and Add Photos are granted. Skipping initial permissions correctly causes Ghost Writer to ask for Photos on its first Save. However, Flashcards' first microphone grant incorrectly displayed **Continue without Recording** once, and the immediately repeated Record worked. Exact OS/AVAudioSession cause is still unknown. New PR candidate `fix/ios-kids-setup-ux-first-mic-20261123` addresses the native preparation handoff with one bounded retry only following a newly granted first permission.
