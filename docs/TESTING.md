@@ -1,6 +1,16 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Owner art/audio provenance and provider licensing (2026-11-22 EST)
+## CURRENT — Paid ZapSplat sound download confirmation (2026-11-22 EST)
+
+**Stable evidence:** [PR #181](https://github.com/andydoane/biblozoo/pull/181) is **MERGED** into `ios-prep` at `67acbfe57f18088eb59a8e948e7f6c1a1591c8e5`, with **SUCCESS** Node regression and production web build checks at its exact head. The owner now confirms that their **ZapSplat sound effects were downloaded during an active paid subscription**. Under [ZapSplat's current Standard License](https://www.zapsplat.com/license-type/standard-license/), Premium downloads can be used in finished commercial apps without attribution after cancellation, but this does **not** independently clear individual tracks or standalone redistribution of raw files.
+
+**Current PR:** [#182](https://github.com/andydoane/biblozoo/pull/182), `docs/phase1-zapsplat-paid-license-confirmation` → `ios-prep`, **OPEN / unmerged / exact-head CI to recheck after docs edits**. This remains documentation-only: record paid ZapSplat download timing and distinguish permitted embedded sounds from **potential GitHub source-MP3 redistribution**; also record the owner's [Florence S Chalkboard source](https://www.dafont.com/chalkboard-3.font), **100% Free** listing, and identical Git blob SHA of the two packaged font copies. **Font file equivalence to the download archive, explicit commercial app-embedding and raw-source-font redistribution are not verified**. Both issues need owner review before public distribution. No media deletions, history rewrites, Swift/audio code, signing, family data, or app build changes.
+
+**Owner testing:** **NOT NEEDED** for this doc-only PR. GitHub Node and production-web checks should still pass; no iPhone simulator or real-device reinstall, and no paid Apple membership is required. Broader asset clearance stays **OPEN**.
+
+---
+
+## HISTORICAL — Owner art/audio provenance and provider licensing (2026-11-22 EST)
 
 **Latest stable evidence:** [PR #180](https://github.com/andydoane/biblozoo/pull/180) **MERGED** at `ios-prep` `7f3e25e38a10db507a81cbab501e0f14cb87ee36`. Exact PR head `16ec89b4dffa9f6d6ad0c21e09ecef76d53c473b` **PASS** for Node regressions and production web build. The owner-reported #179 Xcode Release-simulator version/long-press PASS remains documented below; portrait-only iPhone/iPad is the intentional 1.0 policy.
 
