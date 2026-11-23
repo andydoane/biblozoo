@@ -1,6 +1,8 @@
 # BibloZoo 1.0 — Parental-gate implementation plan (four PRs)
 
 **Planning baseline:** November 23, 2026, `ios-prep` after [merged Kids Category preflight PR #188](https://github.com/andydoane/biblozoo/pull/188).
+
+**Owner's concrete PR 1 challenge choice (November 23):** A fresh `(A × B) + C` math question where `A` is 11–99 **and never ends in 0**, `B` is 2–9, and `C` is 1–9. The app generates new numbers; do not reuse the existing easy reset arithmetic. The PR 1 branch is `feat/ios-parental-gate-pr1-20261123`, adding shared UI/controller, unit tests and an unshipped local visual preview; **production sharing/backups/links/permissions remain unchanged until later PRs**.
 **Status: PLAN ONLY — NOT IMPLEMENTED OR TESTED.** This document is a handoff for a **separate implementation chat**. Four focused PRs are the recommended estimate (three could be enough if reviews allow; scope can expand if code inspection or App Review requirements uncover new entry points). No PRs in this plan are already completed.
 **Release direction:** The owner confirms BibloZoo is designed primarily for independent-reading elementary children. Proposed storefront: **Education** + **Made for Kids**, age band **6–8**; older elementary users remain welcome. **Do not select Made for Kids in App Store Connect until compliance is accepted.**
 
