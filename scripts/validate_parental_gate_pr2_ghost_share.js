@@ -138,22 +138,26 @@ async function approvalTests() {
   assert.equal(await runner.run(options), false);
   assert.equal(work, 2);
 
+  // Shared math is updated centrally; Ghost Writer uses the same
+  // randomized two-digit subtraction + one-digit addition controller.
   const seen = new Set();
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 80; i++) {
     let call = 0;
     const q = makeQuestion(max => {
-      assert.ok([18, 8, 9].includes(max));
-      return [i, 7, 8][call++];
+      assert.equal(max, [80, i + 10, 9][call]);
+      return [i, 0, 8][call++];
     });
-    assert.ok(q.first >= 11 && q.first <= 29);
-    assert.notEqual(q.first % 10, 0);
-    assert.equal(q.multiplier, 9);
+    assert.equal(q.first, 20 + i);
+    assert.equal(q.subtrahend, 10);
     assert.equal(q.addition, 9);
-    assert.equal(q.answer, q.first * 9 + 9);
+    assert.equal(q.answer, q.first - 10 + 9);
+    assert.ok(q.answer > 0 && q.answer <= 99);
     seen.add(q.first);
   }
-  assert.equal(seen.size, 18);
-  assert.equal(seen.has(20), false);
+  assert.equal(seen.size, 80);
+  const maximum = makeQuestion(max => max - 1);
+  assert.ok(maximum.first === 99 && maximum.subtrahend === 98 &&
+    maximum.addition === 9 && maximum.answer === 10);
 }
 
 async function exporterTests(ghost) {
@@ -301,6 +305,6 @@ async function main() {
     assert.match(read("dist/verse_playground/ghost_writer/index.html"), /ghost-writer-share-approval\.js/);
     assert.ok(!fs.existsSync(path.join(dist, "tests/parental-gate-preview.html")));
   }
-  console.log("Kids PR2 PASS: 18-number math range, native share gate, cancel/stale/duplicate protection, no pre-approval image/MP4 generation, Save Photos unchanged.");
+  console.log("Kids PR2 PASS: bounded subtraction-plus-addition math, native share gate, cancel/stale/duplicate protection, no pre-approval image/MP4 generation, Save Photos unchanged.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
