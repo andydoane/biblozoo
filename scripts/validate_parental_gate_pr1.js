@@ -158,20 +158,21 @@ async function main() {
   // Explicit owner's math spec: two-digit non-zero ones, one-digit multiplier
   // 2..9, then one-digit 1..9; every generated answer is exact.
   const seen = new Set();
-  for (let i = 0; i < 81; i++) {
+  for (let i = 0; i < 18; i++) {
     let call = 0;
     const question = makeQuestion(max => {
-      assert.ok([81, 8, 9].includes(max));
+      assert.ok([18, 8, 9].includes(max));
       return [i, 7, 8][call++];
     });
-    assert.ok(question.first >= 11 && question.first <= 99);
+    assert.ok(question.first >= 11 && question.first <= 29);
     assert.notEqual(question.first % 10, 0);
     assert.equal(question.multiplier, 9);
     assert.equal(question.addition, 9);
     assert.equal(question.answer, question.first * 9 + 9);
     seen.add(question.first);
   }
-  assert.equal(seen.size, 81);
+  assert.equal(seen.size, 18);
+  assert.equal(seen.has(20), false, "20 must never be selected");
 
   for (const platform of ["web", "android"]) {
     const s = scenario(platform);
@@ -283,6 +284,6 @@ async function main() {
     assert.match(read("dist/index.html"), /parental-gate\.js/);
     assert.match(read("dist/verse_playground/ghost_writer/index.html"), /parental-gate\.js/);
   }
-  console.log("Kids PR1 PASS: 81 allowed two-digit choices, Safari input focus, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
+  console.log("Kids PR1 PASS: 18 allowed two-digit choices (11–29 excluding 20), Safari input focus, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
