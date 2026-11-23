@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Support and troubleshooting for BibloZoo on iPhone and iPad.">
+  <title>App Support | BibloZoo</title>
+  <style>
+    :root {
+      --purple: #7f66c6;
+      --dark-purple: #66529e;
+      --paper: #fbf8f6;
+      --text: #333333;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--purple);
+      color: var(--text);
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px;
+    }
+    main {
+      width: min(100%, 760px);
+      background: var(--paper);
+      border-radius: 28px;
+      padding: clamp(24px, 6vw, 48px);
+    }
+    h1 {
+      margin: 0 0 14px;
+      color: var(--purple);
+      font-size: clamp(36px, 8vw, 56px);
+      line-height: 1.05;
+    }
+    h2 {
+      margin: 32px 0 10px;
+      color: var(--dark-purple);
+      font-size: clamp(24px, 5vw, 32px);
+      line-height: 1.15;
+    }
+    h3 {
+      margin: 22px 0 8px;
+      color: var(--dark-purple);
+      font-size: 21px;
+    }
+    p, li {
+      font-size: clamp(17px, 4vw, 20px);
+      line-height: 1.5;
+    }
+    p { margin: 0 0 16px; }
+    ul { margin: 0 0 18px; padding-left: 25px; }
+    li + li { margin-top: 10px; }
+    a {
+      color: var(--dark-purple);
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    a:focus-visible {
+      outline: 3px solid var(--dark-purple);
+      outline-offset: 4px;
+      border-radius: 3px;
+    }
+    .intro { margin-bottom: 22px; }
+    .contact {
+      display: inline-block;
+      margin: 4px 0 16px;
+      padding: 12px 18px;
+      background: var(--purple);
+      border-radius: 999px;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 800;
+    }
+    .contact:hover, .contact:focus-visible { background: var(--dark-purple); }
+    .note { font-size: 17px; }
+    footer {
+      margin-top: 34px;
+      padding-top: 20px;
+      border-top: 1px solid #d7cedd;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>BibloZoo Support</h1>
+      <p class="intro">
+        Help with BibloZoo for iPhone and iPad. BibloZoo is a
+        Bible-verse memorization app with local Zookeeper profiles,
+        learning activities, and games.
+      </p>
+    </header>
+
+    <section aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact Support</h2>
+      <p>Questions, feedback, or a problem with BibloZoo? Email us:</p>
+      <a class="contact" href="mailto:biblozooapp@gmail.com">Email BibloZoo Support</a>
+      <p>
+        <a href="mailto:biblozooapp@gmail.com">biblozooapp@gmail.com</a>
+      </p>
+      <p class="note">
+        It helps to include your device model, iOS version, BibloZoo
+        version (shown in Settings), and what happened. Please do not
+        email family backup files, children's profile details, private
+        photos, or voice recordings.
+      </p>
+    </section>
+
+    <section aria-labelledby="troubleshooting-title">
+      <h2 id="troubleshooting-title">Troubleshooting</h2>
+
+      <h3>App won't respond</h3>
+      <p>
+        Close BibloZoo and open it again. If needed, restart your device.
+        Do not delete or reinstall the app as a troubleshooting step:
+        Zookeeper profiles and progress are stored locally, and
+        uninstalling may erase them.
+      </p>
+
+      <h3>Sound or microphone trouble</h3>
+      <p>
+        Check your device's volume and audio output, including any
+        connected Bluetooth device. Flashcards voice recording is optional.
+        If recording is unavailable, check the microphone permission for
+        BibloZoo in iOS Settings &gt; Privacy &amp; Security &gt; Microphone.
+        You can still practice a verse without recording.
+      </p>
+
+      <h3>Ghost Writer photos and videos</h3>
+      <p>
+        To import a background, select a supported picture from Photos
+        or Files when prompted. For saving a Ghost Writer picture or
+        silent video to Photos, check BibloZoo's Photos permission in
+        iOS Settings. Sharing is optional and uses the destination you
+        choose in the iOS share sheet.
+      </p>
+
+      <h3>Family backups</h3>
+      <p>
+        In BibloZoo, open Settings &gt; Backup &amp; Restore &gt; Export Family
+        Backup to make a copy of saved family profile and verse progress
+        data. Keep the exported JSON file somewhere private, such as
+        Files, and maintain a second safe copy.
+      </p>
+      <p>
+        Be careful with Import Backup: depending on the option selected,
+        it can replace existing Zookeepers. A family backup does not
+        necessarily include every separate Zoo rescue or surprise
+        statistic. Verify your backup before making changes, and keep
+        the existing app installed if you need to preserve its data.
+      </p>
+    </section>
+
+    <footer>
+      <h2>Privacy</h2>
+      <p>
+        For details about local storage, microphone recording,
+        Photos/Files, and sharing, read the
+        <a href="./app-store-privacy.html">BibloZoo Privacy Policy</a>.
+      </p>
+    </footer>
+  </main>
+</body>
+</html>
