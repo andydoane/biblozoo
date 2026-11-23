@@ -1,6 +1,16 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — Phase 1 / Step 1 production developer-gate and version follow-up (2026-11-22 EST)
+## CURRENT — #179 accepted; Phase 1 Step 2 licensing inventory (2026-11-22 EST)
+
+**Latest stable reference:** [#179](https://github.com/andydoane/biblozoo/pull/179) **MERGED** into `ios-prep` at `bd1d7bf148e9e4e8214efaa353f820871fabd886`, and later `ios-prep` `2675c7c106c670cf6a09d4feeb307d770f8c5e74` includes a shared Xcode app scheme. The #179 exact-head [Actions #45105176348](https://github.com/andydoane/biblozoo/actions/runs/45105176348) passed **Node regressions and production web build**; the later branch head also passed both checks. The owner fetched/pulled, rebuilt, and tested merged #179 in **Xcode Release mode on iPhone Simulator**, reporting **Settings: Version 1.0, no hidden developer screen from Settings/Practice Games/Zoo To-Do ~2-second holds, normal taps all expected: scoped OWNER PASS**. This is not TestFlight or a complete physical iPhone/iPad test matrix. The owner also confirms **portrait-only iPhone and iPad** is intentional for release 1.0, matching `Info.plist`.
+
+**Current PR:** `docs/phase1-asset-rights-inventory` → `ios-prep`, **OPEN / UNMERGED**. This audit inventories packaged Bible text, pet/profile/UI/game/Playground imagery, recordings, every bundled font path, and the existing SoundTouchJS MPL-2.0 license. See [ASSET-LICENSES.md](ASSET-LICENSES.md). **Rights clearance remains OPEN** pending owner provenance and licensing evidence. Important follow-ups: two `Chalkboard-Regular.ttf` copies with unknown source/license, the inactive ESV-based debug fixture still packaged in `app.js`, comprehensive verse translations/attributions, and hundreds of original/third-party visual and audio assets.
+
+**Acceptance/CI boundary:** This PR is documentation-only: no runtime changes, removal of assets, native audio, signed build, profile/backup mutation, or family-data test. Exact PR-head CI still required for merge; Node/web checks cannot verify creative-work ownership or real speaker/font presentation. The owner can review the inventory without installing any app or paying the $99 Apple Developer membership.
+
+---
+
+## HISTORICAL (premerge snapshot) — Phase 1 / Step 1 production developer-gate and version follow-up (2026-11-22 EST)
 
 **PR under review:** `fix/release-prod-dev-gate-version` → `ios-prep`, **unmerged / owner acceptance pending**. From live `ios-prep` `e1e19a492c0273b94ceaecba699cf543cf2f69f2` (merged [docs #178](https://github.com/andydoane/biblozoo/pull/178)). Settings' former `Version 1.0.12 Black Startup Shell` becomes **Version 1.0**, matching existing Xcode marketing version (build 1). The shared hidden-shortcut guard on native iOS now **fails closed** when native-only output identity is missing/incomplete, but the explicit separate Audio Test identity preserves its intended tools. Web/PWA/Android behavior is unchanged. No private data, native audio/Swift, signing, `main` or app distribution changes.
 
