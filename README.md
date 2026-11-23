@@ -1,8 +1,8 @@
 # BibloZoo
 
-> **Working on BibloZoo?** Start with the branch-local **canonical [Living Project Handoff](docs/PROJECT-HANDOFF.md)**, then consult [Audio Recovery](docs/AUDIO-RECOVERY.md), [Testing & PR Workflow](docs/TESTING.md), and the [R17 integration-to-`ios-prep` acceptance ledger](docs/R17-IOS-PREP-PROMOTION-READINESS.md) while promotion is pending. The `ios-prep` branch **already has** its own copy of this handoff (original PR #2); the R17 promotion will refresh it to the verified integration version.
+> **Working on BibloZoo?** Start with the branch-local **canonical [Living Project Handoff](docs/PROJECT-HANDOFF.md)**, then consult [Testing & PR Workflow](docs/TESTING.md), [Audio Recovery](docs/AUDIO-RECOVERY.md), and the historical [R17 promotion acceptance ledger](docs/R17-IOS-PREP-PROMOTION-READINESS.md). The handoff now contains the ordered **App Store release checklist**, including the explicit gate for delaying paid Apple Developer Program enrollment until distribution work actually requires it.
 >
-> **Development workflow:** Until R17 promotion, remaining stabilization/docs PRs branch from and target `integration/native-audio-to-ios-prep`; the **separate** promotion PR will have base `ios-prep` and compare `integration/native-audio-to-ios-prep`. **After owner-reviewed promotion**, ordinary work branches from and targets stable `ios-prep` (not `main`). On **every** subsequent code, docs-only, build, or CI PR, update **`docs/PROJECT-HANDOFF.md` in that PR**, based on the actual target branch and current GitHub/owner evidence—never let a stale note override live commits. The owner reviews/merges and then pulls in GitHub Desktop. See the [PR template](.github/pull_request_template.md). No automatic promotion, installed-app update, or `main` merge.
+> **Development workflow:** Native-audio promotion is complete and normal development now branches from and targets stable `ios-prep` (not `main`). The project is feature-stable and primarily in bug-cleanup/release-preparation mode. On **every** code, docs-only, build, or CI PR, update **`docs/PROJECT-HANDOFF.md` in that PR** from current GitHub/owner evidence. The owner reviews/merges and then pulls in GitHub Desktop. See the [PR template](.github/pull_request_template.md). No automatic App Store upload, installed-app update, release, or `main` merge.
 
 
 BibloZoo is a Bible verse memorization app built around guided learning, practice games, family profiles, and collectible BibloPets. It runs as a web/PWA experience and, on the `ios-prep` branch, as a packaged native iOS app using Capacitor.
@@ -24,7 +24,7 @@ Major work in this branch includes:
 - iOS safe-area, status-area, audio, viewport, and performance fixes
 - local family/profile backup export and import
 - updated privacy-policy behavior
-- a new Daily Pet Questions module that is still under active development
+- the Daily Pet Questions module, now part of the feature-stable pre-release app
 
 The current bundle identifier is:
 
@@ -163,11 +163,13 @@ Normal automatic daily behavior is enabled. The automatic debug mode is off:
 DAILY_PET_QUESTIONS_DEBUG: false
 ```
 
-A hidden title-screen long-press remains available for manual testing:
+The source still has the Daily Questions long-press debug flag enabled:
 
 ```js
 DAILY_PET_QUESTIONS_DEBUG_LONG_PRESS: true
 ```
+
+Production-native iOS is intended to suppress developer shortcuts through `allowDevShortcuts()` unless native dev tools are explicitly allowed. **Before App Store submission, verify that behavior in the actual Release build and either prove the debug entry point is unavailable or disable/remove it.** Apple does not permit hidden, dormant, or undocumented production functionality.
 
 The Daily Questions flow includes:
 
