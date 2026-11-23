@@ -63,6 +63,11 @@
   font-size: 1.08rem;
   font-weight: 600;
 }
+/* Programmatic focus announces the math to VoiceOver without a keyboard.
+   Only interactive Answer/buttons need visible keyboard focus rings. */
+.bz-parental-gate-equation:focus {
+  outline: none;
+}
 .bz-parental-gate-equation {
   margin: 8px 0 18px;
   padding: 14px 6px;
