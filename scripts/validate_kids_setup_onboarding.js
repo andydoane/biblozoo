@@ -186,7 +186,7 @@ async function main() {
   assert.match(setup, /getPhotosPermissionStatus/);
   assert.match(setup, /getPermissionStatus/);
   assert.match(setup, /requestApproval/);
-  assert.match(originalPermissions, /state\?\.permission === "undetermined"/);
+  assert.match(originalPermissions, /state\?\.permission !== "undetermined"/);
 
   const output = path.join(ROOT, "dist");
   if (fs.existsSync(path.join(output, "index.html"))) {
