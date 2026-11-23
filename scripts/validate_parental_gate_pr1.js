@@ -155,24 +155,33 @@ function scenario(platform = "ios", production = true) {
 }
 
 async function main() {
-  // Explicit owner's math spec: two-digit non-zero ones, one-digit multiplier
-  // 2..9, then one-digit 1..9; every generated answer is exact.
+  // Owner's revised challenge: two digits - two digits + one digit,
+  // with a positive result never above 99. Probe all 80 first numbers,
+  // and the allowed ends of the second/subtrahend range.
   const seen = new Set();
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 80; i++) {
     let call = 0;
     const question = makeQuestion(max => {
-      assert.ok([18, 8, 9].includes(max));
-      return [i, 7, 8][call++];
+      assert.equal(max, [80, 10 + i, 9][call]);
+      return [i, max - 1, 8][call++];
     });
-    assert.ok(question.first >= 11 && question.first <= 29);
-    assert.notEqual(question.first % 10, 0);
-    assert.equal(question.multiplier, 9);
+    assert.equal(question.first, 20 + i);
+    assert.equal(question.subtrahend, question.first - 1);
     assert.equal(question.addition, 9);
-    assert.equal(question.answer, question.first * 9 + 9);
+    assert.equal(question.answer, 10);
+    assert.ok(question.first >= 20 && question.first <= 99);
+    assert.ok(question.subtrahend >= 10 && question.subtrahend < question.first);
+    assert.ok(question.answer >= 1 && question.answer <= 99);
     seen.add(question.first);
   }
-  assert.equal(seen.size, 18);
-  assert.equal(seen.has(20), false, "20 must never be selected");
+  assert.equal(seen.size, 80);
+  assert.deepEqual(makeQuestion(() => 0),
+    { first: 20, subtrahend: 10, addition: 1, answer: 11 });
+  let maxCall = 0;
+  assert.deepEqual(makeQuestion(() => [79, 0, 8][maxCall++]),
+    { first: 99, subtrahend: 10, addition: 9, answer: 98 });
+  assert.throws(() => makeQuestion(() => -1), /Could not create/);
+  assert.throws(() => makeQuestion(() => 10000), /Could not create/);
 
   for (const platform of ["web", "android"]) {
     const s = scenario(platform);
@@ -203,7 +212,7 @@ async function main() {
   s.doc.simulateWebKitInputFocusBlur = true;
   assert.equal(await s.gate.requestApproval({ onApproved: action }), false);
   s.click("I'm a Grown-up");
-  assert.equal(s.get("bz-parental-gate-equation").textContent, "(11 × 2) + 1 = ?");
+  assert.equal(s.get("bz-parental-gate-equation").textContent, "20 − 10 + 1 = ?");
   assert.equal(s.get("bz-parental-gate-status").textContent, "",
     "click Event must not appear as feedback in the dialog");
   assert.ok(s.get("bz-parental-gate-overlay"),
@@ -211,14 +220,14 @@ async function main() {
   s.win.dispatch("blur");
   assert.ok(s.get("bz-parental-gate-overlay"),
     "mere window blur while page remains visible is not app backgrounding");
-  assert.equal(s.get("bz-parental-gate-equation").textContent.includes("23"), false,
+  assert.equal(s.get("bz-parental-gate-equation").textContent.includes("= 11"), false,
     "expected answer must not be displayed");
   const focusable = s.get("bz-parental-gate-overlay").querySelectorAll("button:not([disabled]), input:not([disabled])");
   focusable[0].focus();
   const tab = s.doc.dispatch("keydown", { key: "Tab", shiftKey: true });
   assert.equal(tab.defaultPrevented, true, "focus trap");
   assert.equal(s.doc.activeElement, focusable[focusable.length - 1]);
-  s.answer(23);
+  s.answer(11);
   assert.equal(await approved, true);
   assert.equal(invocations, 1);
 
@@ -227,7 +236,7 @@ async function main() {
   s.click("I'm a Grown-up");
   s.randomValues.push(1, 1, 1);
   s.answer(999);
-  assert.equal(s.get("bz-parental-gate-equation").textContent, "(12 × 3) + 2 = ?");
+  assert.equal(s.get("bz-parental-gate-equation").textContent, "21 − 11 + 2 = ?");
   s.answer(-1);
   s.answer(0);
   assert.equal(await denied, false);
@@ -284,6 +293,6 @@ async function main() {
     assert.match(read("dist/index.html"), /parental-gate\.js/);
     assert.match(read("dist/verse_playground/ghost_writer/index.html"), /parental-gate\.js/);
   }
-  console.log("Kids PR1 PASS: 18 allowed two-digit choices (11–29 excluding 20), Safari input focus, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
+  console.log("Kids PR1 PASS: two-digit subtraction + one-digit addition, result at most 99, Safari input focus, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

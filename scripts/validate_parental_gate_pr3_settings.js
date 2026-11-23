@@ -246,9 +246,105 @@ async function backupFallbackTests() {
   assert.equal(revokeCount, 1);
 }
 
+
+function childAccessibleEditRoutingTests() {
+  // Execute the real click-handler wiring with harmless fake buttons.
+  // A child must be able to reach Manage and edit only name/picture,
+  // while every backup, Add, Reset, Delete or Erase remains gated.
+  const app = read("app.js");
+  const settingsStart = app.indexOf("function screenSettings(");
+  const settingsEnd = app.indexOf("function screenPrivacyPolicy(", settingsStart);
+  const settings = app.slice(settingsStart, settingsEnd);
+  const manageStart = app.indexOf("function screenProfileManage(");
+  const manageEnd = app.indexOf("function screenIntro(", manageStart);
+  const manage = app.slice(manageStart, manageEnd);
+  function handlers(block, selector) {
+    const start = block.indexOf(selector);
+    const end = block.indexOf("  return makeSlide({", start);
+    assert.ok(start > 0 && end > start, "live handler found: " + selector);
+    return block.slice(start, end);
+  }
+  const settingsHandlers = handlers(
+    settings, 'wrap.querySelectorAll("[data-settings-action]").forEach((btn) => {');
+  const manageHandlers = handlers(
+    manage, 'wrap\n    .querySelectorAll("[data-profile-manage-action]")');
+
+  function execute(section, action) {
+    const calls = [];
+    const btn = {
+      isConnected: true,
+      getAttribute() { return action; },
+      onclick: null
+    };
+    const ctx = {
+      wrap: { querySelectorAll() { return [btn]; } },
+      btn,
+      Screen: {
+        SETTINGS: "settings",
+        PROFILE_MANAGE: "profile_manage"
+      },
+      State: { screen: section },
+      profile: { id: "synthetic-1" },
+      getProfileApi: () => ({ getActiveProfileId: () => "synthetic-1" }),
+      runParentManagementAction() {
+        calls.push("parent-check");
+        return Promise.resolve(false); // simulate cancel, never perform action
+      },
+      openProfileManagement() { calls.push("open-manage"); },
+      openEditProfileEditor(id, returnScreen) {
+        assert.equal(id, "synthetic-1");
+        assert.equal(returnScreen, "profile_manage");
+        calls.push("open-edit");
+      },
+      openProfilePicker() { calls.push("switch"); },
+      openPrivacyPolicy() { calls.push("read-privacy"); },
+      showCreditsDialog() { calls.push("read-credits"); },
+      showContactSupportDialog() { calls.push("read-contact"); }
+    };
+    const src = section === "settings" ? settingsHandlers : manageHandlers;
+    vm.runInNewContext(src, ctx);
+    assert.equal(typeof btn.onclick, "function");
+    btn.onclick({ stopPropagation() {} });
+    return calls;
+  }
+
+  assert.deepEqual(execute("settings", "manage-profile"), ["open-manage"]);
+  assert.deepEqual(execute("profile_manage", "edit"), ["open-edit"]);
+  assert.deepEqual(execute("profile_manage", "switch"), ["switch"]);
+  for (const action of ["export", "import", "reset", "erase-family"]) {
+    assert.deepEqual(execute("settings", action), ["parent-check"],
+      "sensitive Settings action requires adult check: " + action);
+  }
+  for (const action of ["add", "backup", "reset", "delete", "erase-family"]) {
+    assert.deepEqual(execute("profile_manage", action), ["parent-check"],
+      "sensitive Zookeeper action requires adult check: " + action);
+  }
+  for (const [action,expected] of [
+    ["privacy", "read-privacy"], ["credits", "read-credits"],
+    ["contact", "read-contact"]
+  ]) {
+    assert.deepEqual(execute("settings", action), [expected],
+      "read-only information stays accessible: " + action);
+  }
+
+  // Confirm that editing only updates two personalization fields.
+  const saveStart = app.indexOf("async function submitProfileEditor()");
+  const updateStart = app.indexOf(
+    "if (State.profileEditorMode === PROFILE_EDITOR_MODES.EDIT)", saveStart);
+  const updateEnd = app.indexOf("let createdProfile = null", updateStart);
+  assert.ok(saveStart > 0 && updateStart > saveStart && updateEnd > updateStart);
+  const editSave = app.slice(updateStart, updateEnd);
+  assert.match(editSave, /profileApi\.updateProfile\(\s*State\.editingProfileId,\s*\{\s*name:\s*validation\.name,\s*avatarVerseId\s*\}/);
+  // Clearing the editor's temporary state is not a destructive data reset.
+  // Exclude only the actual protected backup/mutation entry points.
+  assert.doesNotMatch(editSave,
+    /\b(?:exportSaveData|exportActiveProfileSaveData|shareOrDownloadJsonSave|openProfileDestructiveMathDialog|eraseAllFamilyData|deleteActiveProfileData|resetActiveProfileProgress)\s*\(/);
+}
+
 async function main() {
   await controllerTests();
   await backupFallbackTests();
+  childAccessibleEditRoutingTests();
   const css = read("verse_games/shared/parental-gate.css");
   const gate = read("verse_games/shared/parental-gate.js");
   assert.match(css, /var\(--purple, #7f66c6\)/);
@@ -281,6 +377,6 @@ async function main() {
     assert.match(read("dist/index.html"), /parental-gate-settings\.js/);
     assert.ok(fs.existsSync(path.join(dist, "verse_images/zoobreak_lock.png")));
   }
-  console.log("Kids PR3 PASS: scoped parent visit, profile/background expiry, guarded email/links, backup fallback, Zoo Break art and purple/white UI.");
+  console.log("Kids PR3 PASS: child-accessible Zookeeper name/picture editing, protected backups/resets, scoped parent visit, outgoing links, backup fallback and shared popup.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

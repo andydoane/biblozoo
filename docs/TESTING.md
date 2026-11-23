@@ -1,5 +1,39 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+
+## CURRENT — Parental gate UX follow-up, phone acceptance before PR 4 (November 23, 2026)
+
+**Owner evidence:** [PR #193](https://github.com/andydoane/biblozoo/pull/193) **merged** into `ios-prep` at `d9532717742e5f4a047cb0139f35c626bb352678`; owner reports **all** on-phone parental-check tests passed. The owner authorizes test use of their currently installed phone profiles and considers their data replaceable. [PR #194](https://github.com/andydoane/biblozoo/pull/194) is OPEN/unmerged and not yet owner-tested.
+
+**New challenge:** Every protected action (Ghost Writer picture/video Share, Settings backup/management, external email and links) must render a fresh randomized **`A − B + C = ?`**, with A=20..99, B=10..(A−1) and C=1..9. No multiplication, no negative subtraction, no answer greater than 99; maximum is **98**, minimum **2**. All responses remain private to the controller, three wrong answers deny, Not Now aborts without action. Example: `64 − 27 + 4 = 41`. The native purple/white Zoo Break lock styling remains unchanged.
+
+**Review on the Mac:** Verify both final-commit CI jobs PASS; switch GitHub Desktop to the feature PR branch (or after merging, `ios-prep` + Pull Origin) and run:
+
+```bash
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr2_ghost_share.js
+node scripts/validate_parental_gate_pr3_settings.js
+node scripts/validate_native_ghost_writer_export.js
+npm run build
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr3_settings.js
+open tests/parental-gate-preview.html
+```
+
+Expect each validator PASS and the Safari popup to use only two-digit subtraction plus one-digit addition, with a final result at most 99, including fresh wrong-answer questions and correct one-shot approval.
+
+**Owner iPhone test after merge:**
+1. Settings → **Manage [Zookeeper]**: NO Grown-up Check. Choose **Edit [Zookeeper]**: still NO check. Change just the name or profile picture; Save and verify it persists. Return Home, reenter and edit again: still no check.
+2. Staying in Manage, tap **Back Up [Zookeeper]**: Grown-up Check appears. Not Now must not export. Try again with correct subtraction answer, then cancel the native backup/share sheet. **Add Zookeeper**, **Reset**, **Delete**, and **Erase All Family Data** must remain protected and retain destructive confirmations; test gates and cancel safely, avoiding unintended deletion.
+3. In main Settings, Export Family Backup and Import Backup remain gated, with one valid approval per uninterrupted parent visit. Leaving Settings, switching Zookeepers or backgrounding expires the unlock.
+4. Contact Support **Email**, Privacy Policy email link and Credits SoundTouchJS outgoing link must still request fresh approvals. No external app or website launches on cancellation.
+5. In Ghost Writer Simple/More Remix, **Share Picture** and **Share Video** must continue to request one fresh math check per share. Save Picture/Video with already-granted Photos permission remains unchanged.
+
+**Scope limits:** Testing actual iOS permission authorization prompts and final bypass/a11y audit is **PR 4**, after this follow-up passes. This PR does not modify `main` PWA, audio, Swift native bridge, Photos permissions, actual backup files or production family data in the repository. Record any unexpected modal/bypass on the phone in the next handoff.
+
+---
+
+
 ## CURRENT — Kids parental gate PR 3 Settings / redesigned popup acceptance (November 23, 2026)
 
 **Context:** [PR #192](https://github.com/andydoane/biblozoo/pull/192) is **merged** at `79e2e2dde2a5d854546cf8a9bee176ee6e3cc83f`; the owner reports Ghost Writer parental-gated Share **works**. [PR #193](https://github.com/andydoane/biblozoo/pull/193), feature branch `feat/ios-parental-gate-pr3-settings-redesign-20261123` targets `ios-prep`, **unmerged until owner reviews/tests**. This PR adds Settings/backups/outgoing links and adjusts the *shared* popup, not game content, Swift or real data.
