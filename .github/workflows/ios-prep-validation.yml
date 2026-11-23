@@ -95,6 +95,9 @@ jobs:
       - name: Verify Release privacy policy screen and standalone page agree
         run: node scripts/validate_release_privacy_policy_alignment.js
 
+      - name: Validate Kids PR1 shared parental gate and one-shot approval
+        run: node scripts/validate_parental_gate_pr1.js
+
       - name: Validate iOS first-party privacy manifest and protected-resource purposes
         run: node scripts/validate_native_ios_privacy_manifest.js
 
@@ -671,6 +674,9 @@ jobs:
       - name: Validate N1 guard placement in every packaged HTML entrypoint
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'
         run: node scripts/validate_native_only_ios_output.js
+
+      - name: Verify packaged Kids PR1 shared parental-gate assets
+        run: node scripts/validate_parental_gate_pr1.js
 
       - name: Validate packaged production iOS developer controls
         run: node scripts/validate_native_production_dev_hardening.js

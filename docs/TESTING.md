@@ -1,5 +1,24 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — Kids parental gate PR 1, review-only test procedure (November 23, 2026)
+
+**Status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) is OPEN / unmerged; implementation branch `feat/ios-parental-gate-pr1-20261123` targets `ios-prep`. No production share/backup/link/permission path has been wired to this controller yet; **a normal tap on Ghost Writer Share will still share** until the later integration PRs. This PR does not claim App Review readiness or permission-gate coverage.
+
+**On the Mac (source tests, no simulator install):**
+1. In GitHub Desktop, switch to the PR branch before merging, or switch to `ios-prep` and Pull Origin after the owner merges. Open Terminal in that checkout. Do not switch to `main`.
+2. Run `node scripts/validate_parental_gate_pr1.js`. Expected: `Kids PR1 PASS` and no errors. This exercises formula constraints, one-shot approval, wrong-answer retry, three-failure denial, cancel/background/back/focus-loss behavior, duplicate denial, PWA/Android/Audio Test inactivity, shared files and preview exclusion.
+3. Run `npm run build`, then `node scripts/validate_parental_gate_pr1.js` again. This additionally asserts the shared JS/CSS are in `dist/` and the test preview is **not**.
+4. Open `tests/parental-gate-preview.html` in Safari (Finder double-click or `open tests/parental-gate-preview.html` in Terminal). This **test-only local HTML** simulates the native identity solely for a visual preview. Press **Try Grown-up Check**. Confirm the first screen shows **Not Now** and **I'm a Grown-up**. Continue to the problem. Verify every question is of the form `(37 × 6) + 8 = ?` with a 2-digit first number **not ending in 0**, multiplier 2–9 and addition 1–9. Actual numbers will differ.
+5. Test **Not Now**, incorrect answer (new problem), three wrong attempts (closes), correct answer (shows `Approved! Test action ran 1 time(s).`), Escape on Mac keyboard, and switching away from the tab during the prompt (denied). No share sheet, outgoing link or file should open. Try Safari zoom or VoiceOver, and resize to narrow widths to check focus, buttons, readable text, answer field and scrolling.
+
+**Native simulator smoke (optional, disposable app only):** `npm run build` → `npx cap sync ios` → run an isolated simulator using Xcode Release. Open normal main menus and Ghost Writer and verify they still operate. The actual Grown-up Check cannot be launched from the production UI in PR 1; this is **intentional**, not a failure. Node packaging tests and the local preview verify the new gate until PRs 2–4 connect it. Never install/reset/import over the real 10-profile production or 11-profile Audio Test app for PR 1.
+
+**Acceptance evidence:** Record exact PR head/CI results separately from owner's Mac visual preview and simulator observations. Green Node checks do not prove iPhone VoiceOver, Xcode compilation, Kids acceptance or absence of bypasses in later integrations. PR 2 must gate Ghost Writer Share specifically; PR 3 Settings/link/export paths; PR 4 first-time native permissions and final end-to-end audit.
+
+---
+
+
+
 ## CURRENT — Release privacy policy parity and data-collection source audit (2026-11-22 EST)
 
 **Baseline:** [PR #183](https://github.com/andydoane/biblozoo/pull/183) **MERGED** into `ios-prep` at `3af13aa905b50a71812fa90f1d1733d9656f3eab`, with **SUCCESS** Node regression (including 124 BSB metadata) and production web build at exact PR head. The owner has deferred Florence S Chalkboard embedding-license verification; it remains open before App Store distribution.
