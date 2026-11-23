@@ -2,7 +2,7 @@
 
 ## CURRENT — Kids parental gate PR 2 Ghost Writer share acceptance (November 23, 2026)
 
-**Status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) and [PR #191](https://github.com/andydoane/biblozoo/pull/191) are merged; the owner reported the corrected Safari preview **passed all checks**. New feature branch `feat/ios-parental-gate-pr2-ghost-share-20261123` proposes Share Picture / Share Video gates and the easier math range **11–29 excluding 20**; **not yet owner-accepted**. PRs 3–4 remain unimplemented.
+**Status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) and [PR #191](https://github.com/andydoane/biblozoo/pull/191) are merged; the owner reported the corrected Safari preview **passed all checks**. New [PR #192](https://github.com/andydoane/biblozoo/pull/192), branch `feat/ios-parental-gate-pr2-ghost-share-20261123` proposes Share Picture / Share Video gates and the easier math range **11–29 excluding 20**; **not yet owner-accepted**. PRs 3–4 remain unimplemented.
 
 **Source and CI:** Review the new PR targeting `ios-prep` and confirm **both** GitHub Actions jobs pass at its final head. From that branch (or after owner merges, `ios-prep` + Pull Origin) run:
 
