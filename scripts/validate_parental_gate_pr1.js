@@ -24,8 +24,8 @@ class FakeElement {
     return this._text + this.children.map(child => child.textContent).join("");
   }
   set textContent(value) {
-    this._text = String(value);
     this.replaceChildren();
+    this._text = String(value);
   }
   get isConnected() {
     return this === this.doc.body || !!this.parent?.isConnected;
@@ -205,7 +205,6 @@ async function main() {
   s.answer(23);
   assert.equal(await approved, true);
   assert.equal(invocations, 1);
-  s.answer /* no second event can be delivered via a removed element */;
 
   // Wrong answers get fresh questions; third wrong response denies.
   const denied = s.gate.requestApproval({ onApproved: action });
