@@ -44,8 +44,8 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 
 
 // =========================================================
-// DEBUG fallback: lets the app run offline (file://) without fetch()
-// Set DEBUG_MODE = false when you’re ready to remove this.
+// Disabled offline fallback for local development (never used in release).
+// Leave DEBUG_MODE false for production and use only public-domain test text.
 // =========================================================
 const DEBUG_MODE = false;
 
@@ -262,27 +262,63 @@ window.BibloZooAppPageTransitions =
 setAppPageTransitionChromeBlack(true);
 revealAppPageWhenReady();
 
+// DEBUG_MODE is off in production. Keep this optional offline fixture
+// in sync with the same public-domain BSB text as verse_data/john_3_16.json.
 const DEBUG_VERSE_JSON = {
   "verseId": "john_3_16",
-  "translation": "ESV",
-  "attribution": "Debug mode verse data (remove before publishing).",
-  "verseText": "For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.",
+  "translation": "BSB",
+  "attribution": "The Holy Bible, Berean Standard Bible, BSB is produced in cooperation with Bible Hub, Discovery Bible, OpenBible.com, and the Berean Bible Translation Committee. This text of God's Word has been dedicated to the public domain.",
+  "verseText": "For God so loved the world that He gave His one and only Son, that everyone who believes in Him shall not perish but have eternal life.",
   "echoParts": [
     "For God so loved the world",
-    "that he gave his only Son",
-    "that whoever believes in him",
-    "should not perish but have eternal life."
+    "that He gave His one and only Son",
+    "that everyone who believes in Him",
+    "shall not perish",
+    "but have eternal life."
   ],
   "hidePlan": [
-    { "type": "emoji", "word": "God", "occurrence": 1, "emoji": "👑" },
-    { "type": "emoji", "word": "world", "occurrence": 1, "emoji": "🌍" },
-    { "type": "emoji", "word": "gave", "occurrence": 1, "emoji": "🎁" },
-    { "type": "emoji", "word": "Son", "occurrence": 1, "emoji": "👦" },
-    { "type": "underscore", "word": "whoever", "occurrence": 1 },
-    { "type": "underscore", "word": "believes", "occurrence": 1 },
-    { "type": "underscore", "word": "perish", "occurrence": 1 },
-    { "type": "underscore", "word": "eternal", "occurrence": 1 },
-    { "type": "underscore", "word": "life", "occurrence": 1 }
+    {
+      "type": "emoji",
+      "word": "loved",
+      "occurrence": 1,
+      "emoji": "❤️"
+    },
+    {
+      "type": "image",
+      "word": "God",
+      "occurrence": 1,
+      "image": "god_crown"
+    },
+    {
+      "type": "emoji",
+      "word": "Son",
+      "occurrence": 1,
+      "emoji": "👦"
+    },
+    {
+      "type": "emoji",
+      "word": "world",
+      "occurrence": 1,
+      "emoji": "🌍"
+    },
+    {
+      "type": "image",
+      "word": "believes",
+      "occurrence": 1,
+      "image": "believe"
+    },
+    {
+      "type": "emoji",
+      "word": "perish",
+      "occurrence": 1,
+      "emoji": "💀"
+    },
+    {
+      "type": "emoji",
+      "word": "eternal",
+      "occurrence": 1,
+      "emoji": "♾️"
+    }
   ]
 };
 
