@@ -14869,6 +14869,11 @@ function finishProfileWelcome() {
   if (
     State.profileWelcomeNext === "first-profile"
   ) {
+    // The optional native Kids setup appears only before a first
+    // Zookeeper, after the existing welcome splash. Skipping it never
+    // delays first-profile creation or changes the PWA/Audio Test.
+    const setup = window.BibloZooKidsSetup;
+    if (setup?.showFirstLaunch?.(() => openFirstProfileEditor())) return;
     openFirstProfileEditor();
     return;
   }
@@ -19062,6 +19067,17 @@ function screenSettings(idx) {
           </div>
         </section>
 
+        ${window.BibloZooKidsSetup ? `
+        <section class="settings-card">
+          <div class="settings-card-title">Grown-up Setup</div>
+          <div class="settings-action-list">
+            <button class="settings-action no-zoom" type="button" data-settings-action="grown-up-setup">
+              Microphone &amp; Photos
+            </button>
+          </div>
+        </section>
+        ` : ""}
+
         <section class="settings-card">
           <div class="settings-card-title">Backup &amp; Restore</div>
           <div class="settings-action-list">
@@ -19171,6 +19187,13 @@ function screenSettings(idx) {
         // Child-accessible navigation: only sensitive controls inside the
         // Manage screen require parental approval.
         openProfileManagement();
+        return;
+      }
+
+      if (action === "grown-up-setup") {
+        // Settings reentry uses a fresh Grown-up Check and never reuses
+        // an earlier Settings/backup approval.
+        void window.BibloZooKidsSetup?.showFromSettings?.(liveSettingsButton);
         return;
       }
 
