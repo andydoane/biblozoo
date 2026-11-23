@@ -25,12 +25,12 @@
   max-height: 90vh; /* Fallback for earliest supported iOS 15 WebKit. */
   max-height: min(90dvh, 760px);
   overflow-y: auto;
-  border: 3px solid #482776;
+  border: 0;
   border-radius: 26px;
   padding: clamp(20px, 4vw, 30px);
-  color: #261747;
+  color: #fff;
   text-align: center;
-  background: #fff9ee;
+  background: var(--purple, #7f66c6);
   box-shadow: 0 18px 64px rgba(0, 0, 0, 0.4);
   -webkit-overflow-scrolling: touch;
 }
@@ -38,22 +38,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #e6d7ff;
-  font-size: 30px;
+  width: 80px;
+  height: 80px;
+  border: 0;
+  border-radius: 0;
+  background: url("../../verse_images/zoobreak_lock.png") center / contain no-repeat;
 }
 .bz-parental-gate-title {
   margin: 10px 0 4px;
-  color: #482776;
+  color: #fff;
   font-size: clamp(1.65rem, 4.5vw, 2rem);
   line-height: 1.2;
 }
 .bz-parental-gate-description {
   margin: 0 auto 18px;
   max-width: 34ch;
-  color: #493d5f;
+  color: #fff;
+  text-wrap: balance;
   font-size: 1.05rem;
   line-height: 1.45;
 }
@@ -66,8 +67,8 @@
   margin: 8px 0 18px;
   padding: 14px 6px;
   border-radius: 16px;
-  background: #efe6fc;
-  color: #382267;
+  background: rgba(255, 255, 255, 0.13);
+  color: #fff;
   font-size: clamp(1.48rem, 6vw, 2rem);
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -88,11 +89,11 @@
 .bz-parental-gate-answer {
   width: 100%;
   min-height: 52px;
-  border: 2px solid #7b68a9;
+  border: 2px solid #fff;
   border-radius: 14px;
   padding: 8px 14px;
   background: #fff;
-  color: #261747;
+  color: #4f3391;
   font: inherit;
   font-size: 1.3rem;
   text-align: center;
@@ -101,13 +102,13 @@
 .bz-parental-gate-btn:focus,
 .bz-parental-gate-answer:focus-visible,
 .bz-parental-gate-btn:focus-visible {
-  outline: 3px solid #087f8c;
-  outline-offset: 3px;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.7), 0 0 0 5px #2a184c;
 }
 .bz-parental-gate-status {
   min-height: 1.5em;
   margin: 3px 0;
-  color: #792b35;
+  color: #fff;
   font-size: 0.96rem;
 }
 .bz-parental-gate-actions {
@@ -120,7 +121,8 @@
   flex: 1 1 140px;
   min-height: 50px;
   padding: 10px 12px;
-  border: 2px solid transparent;
+  border: 0;
+  outline: 0;
   border-radius: 15px;
   font: inherit;
   font-size: 1.06rem;
@@ -129,12 +131,9 @@
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.bz-parental-gate-primary {
-  background: #4c2b7d;
-  color: #fff;
-}
+.bz-parental-gate-primary,
 .bz-parental-gate-secondary {
-  border-color: #4c2b7d;
+  border: 0;
   background: #fff;
   color: #4c2b7d;
 }
