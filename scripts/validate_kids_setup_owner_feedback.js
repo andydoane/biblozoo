@@ -49,14 +49,16 @@ assert.ok(native.includes("await output.devPrepareForMicrophone()"));
 assert.ok(native.includes("await api.prepareCapture()"));
 
 function world({firstGrant=true,firstHandoffFails=false,firstPrepareFails=false,
-  denied=false,hiddenOnRetry=false}={}){
+  denied=false,hiddenOnRetry=false,finishRestored=true,finishReady=true}={}){
   const events=[];
   const document={
     hidden:false,visibilityState:"visible",addEventListener(){}
   };
   let permission=firstGrant ? "undetermined" : (denied ? "denied" : "granted");
   let outputAttempts=0,prepareAttempts=0,grants=0;
-  let countdowns=0, recordings=0;
+  let countdowns=0, recordings=0, instructionPrimes=0;
+  // The iOS permission sheet may revoke narration's earlier gesture lease.
+  let narrationReady = !firstGrant;
   const bridge={
     getPermissionStatus:async()=>{
       events.push("status:"+permission);return {permission};
@@ -76,8 +78,11 @@ function world({firstGrant=true,firstHandoffFails=false,firstPrepareFails=false,
       return {started:true,captureKey:1};
     },
     discardCapture:async()=>{events.push("discard");return{discarded:true};},
-    finishCapture:async()=>({ready:true,restored:true,
-      frameCount:48000,takeId:"test-recording"}),
+    finishCapture:async()=>{
+      events.push("finish");
+      return {ready:finishReady,restored:finishRestored,
+        frameCount:48000,takeId:"test-recording"};
+    },
     playCapture:async()=>({started:true,playToken:1}),
     stopCapturePlayback:async()=>({stopped:true})
   };
@@ -94,6 +99,15 @@ function world({firstGrant=true,firstHandoffFails=false,firstPrepareFails=false,
       Plugins:{BibloZooMicSessionProbe:bridge,BibloZooNativeSound:output}},
     BibloZooRecording:{create:()=>({})},
     BibloZooNativeUiAudio:{invalidate:()=>events.push("invalidate")},
+    BibloZooNativeLearnTracks:{
+      primeFromGesture:()=>{
+        instructionPrimes++;events.push("prime-instructions");
+        narrationReady=true;
+        return true;
+      },
+      play:async()=>({ended:narrationReady,
+        reason:narrationReady?"native-ended":"gesture-required-after-interruption"})
+    },
     BibloZooKidsFirstPermission:{create:()=>({
       ensure:async({kind,getStatus,requestFirst,isCurrent})=>{
         assert.equal(kind,"microphone");
@@ -134,6 +148,10 @@ function world({firstGrant=true,firstHandoffFails=false,firstPrepareFails=false,
   });
   return {recorder,events,document,
     counts:()=>({outputAttempts,prepareAttempts,grants,countdowns,recordings}),
+    instructionPrimes:()=>instructionPrimes,
+    async playInstructions(){
+      return window.BibloZooNativeLearnTracks.play("flashcard-instruction-listen");
+    },
     async start(){
       return recorder.start(()=>events.push("challenge"),
         async()=>{countdowns++;events.push("3-2-1");return true;},()=>7000);
@@ -195,6 +213,59 @@ async function run(){
     assert.equal(w.counts().outputAttempts,1);
     assert.equal(w.counts().recordings,0);
   }
-  console.log("Kids setup feedback PASS: charcoal same-size skip, focus safety, committed icons, concise gate copy, newly approved mic readiness and single retry; no double prompt, no Web fallback.");
+  // The owner's next observation: first microphone grant records correctly
+  // but the immediate comparison narration reports failure; a manual Replay
+  // Instructions succeeds. Prime the narrator from the successful Stop tap
+  // *after* native capture restores its audio session, not during capture or
+  // from an unsolicited background retry.
+  {
+    const w=world({firstGrant:true});
+    assert.equal(await w.start(),"recording");
+    assert.equal(w.instructionPrimes(),0,"no output activation during capture");
+    w.recorder.stop();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(w.recorder.snapshot().status,"ready");
+    assert.equal(w.instructionPrimes(),1,"Stop handoff primes narrator once");
+    assert.ok(w.events.indexOf("finish")<w.events.indexOf("prime-instructions"),
+      "Swift capture must restore the session BEFORE narration activation");
+    assert.equal((await w.playInstructions()).ended,true,
+      "first comparison narration succeeds without needing Replay");
+    assert.equal(w.counts().grants,1,"no second mic permission");
+    w.recorder.stop();
+    assert.equal(w.instructionPrimes(),1,"repeated Stop cannot re-prime");
+    w.recorder.dispose();
+  }
+  {
+    const w=world({firstGrant:false});
+    assert.equal(await w.start(),"recording");
+    w.recorder.stop();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(w.instructionPrimes(),0,
+      "ordinary already-granted capture uses established safe handoff");
+    w.recorder.dispose();
+  }
+  for(const options of [
+    {firstGrant:true,finishRestored:false},
+    {firstGrant:true,finishReady:false}
+  ]){
+    const w=world(options);
+    assert.equal(await w.start(),"recording");
+    w.recorder.stop();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(w.instructionPrimes(),0,
+      "failed native capture/restore must never activate narration");
+    w.recorder.dispose();
+  }
+  {
+    const w=world({firstGrant:true});
+    assert.equal(await w.start(),"recording");
+    w.recorder.stop();
+    w.document.hidden=true;
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(w.instructionPrimes(),0,
+      "app hidden before Stop ACK must not prime audio");
+    w.recorder.dispose();
+  }
+  console.log("Kids setup feedback PASS: UI, consent copy, first-mic recording plus first-Stop native instruction-audio handoff; no double prompt, failed/background handoff and no Web fallback.");
 }
 run().catch(e=>{console.error(e);process.exitCode=1;});
