@@ -195,6 +195,10 @@
           const equation = element("p", "bz-parental-gate-equation",
             session.question.first + " − " + session.question.subtrahend +
             " + " + session.question.addition + " = ?");
+          // Focus the non-editable challenge so VoiceOver reads the equation
+          // without iOS opening its numeric keyboard over this modal.
+          // Parents tap the clearly labelled Answer field when ready.
+          equation.setAttribute("tabindex", "-1");
           const form = element("form", "bz-parental-gate-form");
           form.setAttribute("novalidate", "");
           const label = element("label", "bz-parental-gate-answer-label", "Answer");
@@ -245,7 +249,7 @@
             }
           });
           content.append(prompt, equation, form);
-          input.focus({ preventScroll: true });
+          equation.focus({ preventScroll: true });
         }
 
         try {
