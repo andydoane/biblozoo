@@ -5241,6 +5241,22 @@ function showCreditsDialog() {
     `,
     actions: [dlgBtn("OK", { onClick: closeDialog })]
   });
+
+  // Attribution is always readable. Only the actual outgoing GitHub link
+  // requires a separate, action-bound adult check on production native iOS.
+  const link = dlgBody.querySelector(
+    'a[href="https://github.com/cutterbl/SoundTouchJS"]'
+  );
+  link?.addEventListener("click", event => {
+    if (!isNativeParentGateContext()) return; // keep web/PWA link unchanged
+    event.preventDefault();
+    const href = link.href;
+    void runParentOutgoingAction(
+      () => window.open(href, "_blank", "noopener,noreferrer"),
+      () => State.screen === Screen.SETTINGS && link.isConnected &&
+        overlay.classList.contains("show")
+    );
+  });
 }
 
 function showContactSupportDialog() {
@@ -5254,8 +5270,15 @@ function showContactSupportDialog() {
       }),
       dlgBtn("Email", {
         onClick: () => {
-          closeDialog();
-          window.location.href = `mailto:${SUPPORT_EMAIL}`;
+          void runParentOutgoingAction(
+            () => {
+              closeDialog();
+              window.location.href = `mailto:${SUPPORT_EMAIL}`;
+            },
+            () => State.screen === Screen.SETTINGS &&
+              overlay.classList.contains("show") &&
+              dlgTitle.textContent === "Contact Support"
+          );
         }
       })
     ]
@@ -19340,6 +19363,19 @@ function screenPrivacyPolicy(idx) {
       go(Screen.SETTINGS);
     };
   }
+
+  // Keep every word of the policy visible without approval; only opening
+  // the mail app through the contact anchor needs the Grown-up Check.
+  const mailLink = wrap.querySelector('a[href^="mailto:"]');
+  mailLink?.addEventListener("click", event => {
+    if (!isNativeParentGateContext()) return;
+    event.preventDefault();
+    const href = mailLink.href;
+    void runParentOutgoingAction(
+      () => { window.location.href = href; },
+      () => State.screen === Screen.PRIVACY && mailLink.isConnected
+    );
+  });
 
   return makeSlide({
     idx,
