@@ -1,9 +1,24 @@
 # BibloZoo — Version 1.0 Asset Rights and Attribution Ledger
 
-**Status: INITIAL INVENTORY COMPLETE; RIGHTS CLEARANCE NOT YET COMPLETE.**
-**Repository baseline:** `andydoane/biblozoo`, `ios-prep` at `2675c7c106c670cf6a09d4feeb307d770f8c5e74` (2026-11-22 EST). The branch contains [merged PR #179](https://github.com/andydoane/biblozoo/pull/179) and a subsequent shared Xcode-scheme commit. This is a source inventory, **not legal advice, a license certificate, or proof of final archive contents**.
+**Status: INITIAL INVENTORY COMPLETE; OWNER ART AND AUDIO SOURCES IDENTIFIED; RIGHTS CLEARANCE NOT YET COMPLETE.**
+**Initial inventory baseline:** `andydoane/biblozoo`, `ios-prep` at `2675c7c106c670cf6a09d4feeb307d770f8c5e74` (2026-11-22 EST). The inventory arrived in [merged PR #180](https://github.com/andydoane/biblozoo/pull/180) at merge commit `7f3e25e38a10db507a81cbab501e0f14cb87ee36`. This source/owner-declaration ledger is **not legal advice, a license certificate, or proof of final archive contents**.
 
 **Purpose:** Establish evidence before publicly distributing version 1.0. Do **not** infer that a tracked, publicly visible, AI-generated, free-to-download, or bundled file is automatically licensed for App Store redistribution. Do not claim rights to imagery/recordings without the creator's or licensor's evidence. Owner must approve actual file replacements or removals separately.
+
+## Owner-confirmed provenance and current license research (2026-11-22 EST)
+
+The owner reports:
+- **All artwork/images** (BibloPets, app/game illustrations, backgrounds, etc.) were either created by the owner or generated using **ChatGPT and edited by the owner**. The owner reports **no images sourced from outside websites or image libraries**. This settles the initial origin question **by owner declaration**, not binary-by-binary proof or a third-party logo/trademark audit. Do not disclose the owner's private prompts/photos/assets in public licensing notes.
+- **Audio narration** was generated through **Voicertool**, https://voicertool.com/. This is the owner's stated source for generated audio; exact files/services/dates were not separately matched.
+- **Sound effects** were purchased/downloaded through a **ZapSplat subscription**, https://www.zapsplat.com/. Which individual sound files and any musical tracks came from that subscription, the subscription tier, and exact dates of downloads are **not independently verified**.
+
+### Official-provider licensing evidence (checked November 2026)
+
+1. **Voicertool:** Its published February 2026 [Terms of Service](https://voicertool.com/terms) explicitly allow **commercial use of generated text-to-speech output**, currently without a charge; its [About page](https://voicertool.com/about) also advertises commercial licensing. This is promising support for voice recordings generated with that service, **not** permission for independently copyrighted input text, exclusive ownership of synthesized voice technology, or a guarantee that all versions of its terms at earlier creation dates were identical. Save a copy of the applicable terms and, if available, a dated generation/source summary. Confirm the exact narration tracks were produced with those rights. 
+2. **ZapSplat:** Its [Standard License, updated May 8, 2026](https://www.zapsplat.com/license-type/standard-license/), expressly permits sound effects/music **incorporated in games/apps/software**. It states **Premium** sounds downloaded during an **active Premium** subscription remain usable attribution-free for life, including after cancellation; **Basic** downloads generally require attribution. See also [Premium Account Upgrade Terms](https://www.zapsplat.com/premium-account-upgrade-terms-and-conditions/). The licence **does not transfer ownership**, and prohibits redistributing licensed sounds as standalone files/sound libraries outside a completed production. Verify any **per-file special licenses** and confirm **the relevant sounds were obtained while the paid tier was active**; keep a billing-date/download summary privately rather than adding receipts or account IDs to the public repo.
+3. **Public repository caution:** `andydoane/biblozoo` is a **public** GitHub repository, and several bundled `*.mp3` files are committed as normal media files that may be individually downloadable from the repo. ZapSplat's permitted **in-app sound** use is distinct from a public distribution of stand-alone source MP3s. **Potential redistribution-license question, not a definitive legal conclusion:** identify the ZapSplat files and review their public GitHub/source-asset exposure. Obtain written permission or another compliant repository/distribution plan if needed. Do **not** delete files, rewrite Git history, privatize the repo, or alter app audio without owner approval and a safety/migration review.
+
+**Important boundaries:** A provider's current generic terms do not verify the exact date, subscription tier, file origin, individual track license or the right to share raw assets separately. These entries distinguish owner-provided provenance and provider's current documented policies from final project-specific rights clearance.
 
 ## 1. Inventory method and limits
 
@@ -17,16 +32,16 @@
 | Source folder / asset family | Git inventory evidence | Current rights assessment / next proof |
 | --- | --- | --- |
 | `verse_data/` — verse content and family-learning prompts | 124 verse JSONs plus `verse_list.json` (124 IDs). Sampled John 3:16 and Philippians 2:8 are `"translation": "BSB"` with BSB public-domain attribution. | **Strong BSB text basis for sampled verses**, not comprehensive verification. Confirm all published JSONs use authorized text, and owner authorship or authorized rights to original explanations/reflections/questions. |
-| `pet_images/` — collectible BibloPets | 126 PNG files (and one `desktop.ini`). | **OPEN:** owner/creator/AI/commercial-license source and modification/redistribution rights. |
-| `profile_pictures/` — public selectable pet pictures | 126 PNG files, one JSON manifest, one `desktop.ini`. | **OPEN:** establish same provenance. These are bundled public artwork, not the protected private family photos. |
-| `verse_images/` — UI, illustrations, scenes, icons, medals, themed backgrounds and some sounds | 183 PNG, 74 JPG, 3 SVG, 1 GIF, 19 MP3, one JSON. Includes `andymoji/`, `pet_backgrounds/`, `daily_questions/`, `daily_zoo_todo/`, `game_icons/`, `read_my_verse/`. | **OPEN:** establish origin/rights for illustrations/backgrounds/icons and separate audio-file provenance. |
-| `verse_audio/` — reference/verse/chunk recordings | **857 MP3 files**. | **OPEN:** Bible *text* rights do not establish rights to a specific person's narration, recorded performance, synthesized voice preset, music or produced MP3. Record how these tracks were created/licensed. |
-| `ui_audio/` — shared UI sounds | 3 MP3 files. | **OPEN:** identify recording/composition and redistribution permission. |
-| `verse_games/` — external practice games | 131 PNG, 65 SVG, 2 JPG, **114 MP3**, plus 2 TTF font files. Includes Dino Dash, Bible Bugs, Verse Invaders, Verse Launch, Verse Scramble, etc. | **OPEN:** establish art and every sound-effect/music provenance, and check both embedded fonts separately. |
-| `verse_playground/` — Playground activities | 63 PNG, 37 SVG, 19 JPG, **35 MP3**, **5 TTF + 1 WOFF** font files. Includes Ghost Writer, Scripture Scrub, Verse Typer, Wheel of Bible, Verse Jam. | **OPEN:** establish artwork/audio rights and pay special attention to the two `Chalkboard-Regular.ttf` copies. |
-| `flashcards/` — badges/backgrounds, narration, third-party audio code | 15 PNG, 12 JPG, **5 MP3** and vendored SoundTouchJS runtime. | **OPEN** media rights; **identified license** for SoundTouchJS (section 4). |
+| `pet_images/` — collectible BibloPets | 126 PNG files (and one `desktop.ini`). | **ORIGIN OWNER-CONFIRMED:** owner-created or ChatGPT-generated and owner-edited; final visual/trademark check still pending. |
+| `profile_pictures/` — public selectable pet pictures | 126 PNG files, one JSON manifest, one `desktop.ini`. | **ORIGIN OWNER-CONFIRMED:** owner-created or ChatGPT-generated and owner-edited. These are bundled public artwork, not the protected private family photos; final rights/trademark check pending. |
+| `verse_images/` — UI, illustrations, scenes, icons, medals, themed backgrounds and some sounds | 183 PNG, 74 JPG, 3 SVG, 1 GIF, 19 MP3, one JSON. Includes `andymoji/`, `pet_backgrounds/`, `daily_questions/`, `daily_zoo_todo/`, `game_icons/`, `read_my_verse/`. | **ART ORIGIN OWNER-CONFIRMED:** owner-created or ChatGPT-generated and owner-edited. MP3 sounds require separate Voicertool/ZapSplat origin mapping and any premium-license proof; final visual/trademark check pending. |
+| `verse_audio/` — reference/verse/chunk recordings | **857 MP3 files**. | **SOURCE OWNER-CONFIRMED:** Voicertool generated audio. Its published terms permit commercial generated output; exact track/source and original Bible text rights still need verification. |
+| `ui_audio/` — shared UI sounds | 3 MP3 files. | **SOURCE CATEGORY OWNER-CONFIRMED:** sounds bought through ZapSplat subscription, or generated with Voicertool where applicable; map individual files and confirm paid-tier download timing/licensing. |
+| `verse_games/` — external practice games | 131 PNG, 65 SVG, 2 JPG, **114 MP3**, plus 2 TTF font files. Includes Dino Dash, Bible Bugs, Verse Invaders, Verse Launch, Verse Scramble, etc. | **ART ORIGIN OWNER-CONFIRMED:** owner/ChatGPT. Sound effects from ZapSplat subscription by owner report, but file-by-file mapping and music origin still needed; fonts separately open. |
+| `verse_playground/` — Playground activities | 63 PNG, 37 SVG, 19 JPG, **35 MP3**, **5 TTF + 1 WOFF** font files. Includes Ghost Writer, Scripture Scrub, Verse Typer, Wheel of Bible, Verse Jam. | **ART ORIGIN OWNER-CONFIRMED:** owner/ChatGPT. Audio sources owner-reported as Voicertool/ZapSplat, but confirm file mapping/music and prioritize the two `Chalkboard-Regular.ttf` copies. |
+| `flashcards/` — badges/backgrounds, narration, third-party audio code | 15 PNG, 12 JPG, **5 MP3** and vendored SoundTouchJS runtime. | **ART ORIGIN OWNER-CONFIRMED**; audio Voicertool/ZapSplat category reported; individual file mapping needed. **Identified license** for SoundTouchJS (section 4). |
 | `verse_fonts/` | 5 TTF files. | **OPEN:** match each exact binary to its upstream font and license; collect notices (section 5). |
-| Root web icons and `ios/App/App/Assets.xcassets/` | Root favicon/touch icons and Xcode app icon/splash resources; iOS asset catalog includes four PNGs. | **OPEN:** confirm source/rights of branding and any third-party element incorporated in final icons/splashes. |
+| Root web icons and `ios/App/App/Assets.xcassets/` | Root favicon/touch icons and Xcode app icon/splash resources; iOS asset catalog includes four PNGs. | **ORIGIN OWNER-CONFIRMED:** owner-created or ChatGPT-generated and owner-edited; final marks/branding/third-party-element check pending. |
 
 **Note on the numbers:** The table counts files **in each relevant Git subtree**, not unique works or unique sounds (a file may be duplicated in a native bundle or derive from another asset). Other code-generated sound effects should also be inventoried by authorship/source when relevant, even if not shipped as standalone audio files.
 
@@ -43,7 +58,8 @@
 - [ ] Check **all 124** published verse JSON translations and attribution fields; resolve any deviation from the authorized BSB corpus.
 - [ ] In a separate **small, owner-reviewed PR**, remove the obsolete ESV debug fixture if no longer needed, or replace it with correctly attributed public-domain BSB test text while preserving existing debug/test behavior. Record regression results. **No code is changed by this initial inventory PR.**
 - [ ] Confirm ownership/permission for each original meaning/recall/reflection/application prompt (text created by owner, independently authored, or licensed from a third party).
-- [ ] Confirm all recorded verse/reference/chunk narration files were made by/for the owner with redistribution rights, or document the exact audio source/license.
+- [x] Record owner's **Voicertool** source for generated verse/reference/chunk narration and find official commercial-use terms (see owner evidence above).
+- [ ] Correlate narration MP3s with Voicertool output, confirm rights at generation dates, and retain applicable license evidence.
 
 ## 4. Third-party audio processing code
 
@@ -91,12 +107,14 @@ For each group, record one of: **created by owner**, **created for owner with tr
 - [x] Identify the BSB public-domain **text** source and the sampled verse attribution.
 - [x] Locate existing SoundTouchJS MPL-2.0 source/license records.
 - [x] Identify all bundled font locations, including Chalkboard and Chunk.
-- [ ] Owner confirms source/rights for BibloPets, profile pictures, backgrounds, interface/game/playground art, icons, and app/splash branding.
-- [ ] Owner confirms source/rights for all prerecorded voice, sound effects, and music, including commercial use and embedding.
+- [x] Owner confirms **source/provenance** for BibloPets, profile pictures, backgrounds, interface/game/playground art, icons and branding: owner-created or ChatGPT-generated and owner-edited; no external images by owner report.
+- [ ] Perform final trademark/third-party-character review; verify ChatGPT image-generation terms applicable to the assets and whether any third-party likenesses are included.
+- [x] Owner identifies **Voicertool** for generated narration and a **paid ZapSplat subscription** for sound effects; official terms researched.
+- [ ] Confirm individual audio/music track mapping, subscription tier and download timing, any special licenses/attribution, and the separate public-GitHub redistribution question. Keep proofs privately where appropriate.
 - [ ] Verify all 124 verse-text translations/attributions and original learning commentary rights.
 - [ ] Address the inactive ESV debug fixture in an owner-reviewed follow-up.
 - [ ] Verify all 13 font paths (especially Chalkboard), then preserve notices and resolve any unlicensed fonts.
 - [ ] Complete third-party code/dependency notices review and any needed redistribution obligations.
 - [ ] Owner reviews this ledger, resolves unknowns and signs off on asset redistribution before the first App Store upload.
 
-**Stop/go rule:** **Do not mark the broader “Run a source/asset license audit” release checklist as complete yet.** This PR delivers the inventory and concrete list of unresolved rights questions, not a legal clearance for every bundled asset. No Apple Developer Program membership or App Store distribution is needed to finish this work.
+**Stop/go rule:** **Do not mark the broader “Run a source/asset license audit” release checklist as complete yet.** The initial inventory and owner-source declarations resolve major questions, but font, per-track audio/music, original-text, third-party/branding, source-repository redistribution and final attribution/notice checks remain unresolved. No Apple Developer Program membership or App Store distribution is needed to finish this work.
