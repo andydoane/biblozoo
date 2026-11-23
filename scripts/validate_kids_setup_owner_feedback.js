@@ -49,7 +49,8 @@ assert.ok(native.includes("await output.devPrepareForMicrophone()"));
 assert.ok(native.includes("await api.prepareCapture()"));
 
 function world({firstGrant=true,firstHandoffFails=false,firstPrepareFails=false,
-  denied=false,hiddenOnRetry=false,finishRestored=true,finishReady=true}={}){
+  denied=false,hiddenOnRetry=false,finishRestored=true,finishReady=true,
+  primeThrows=false}={}){
   const events=[];
   const document={
     hidden:false,visibilityState:"visible",addEventListener(){}
@@ -102,6 +103,7 @@ function world({firstGrant=true,firstHandoffFails=false,firstPrepareFails=false,
     BibloZooNativeLearnTracks:{
       primeFromGesture:()=>{
         instructionPrimes++;events.push("prime-instructions");
+        if(primeThrows) throw Error("injected-narrator-unavailable");
         narrationReady=true;
         return true;
       },
@@ -264,6 +266,16 @@ async function run(){
     await new Promise(resolve=>setImmediate(resolve));
     assert.equal(w.instructionPrimes(),0,
       "app hidden before Stop ACK must not prime audio");
+    w.recorder.dispose();
+  }
+  {
+    const w=world({firstGrant:true,primeThrows:true});
+    assert.equal(await w.start(),"recording");
+    w.recorder.stop();
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(w.recorder.snapshot().status,"ready",
+      "narration activation failure must never lose the real recorded verse");
+    assert.equal(w.recorder.snapshot().hasRecording,true);
     w.recorder.dispose();
   }
   console.log("Kids setup feedback PASS: UI, consent copy, first-mic recording plus first-Stop native instruction-audio handoff; no double prompt, failed/background handoff and no Web fallback.");
