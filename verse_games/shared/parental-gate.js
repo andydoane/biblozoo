@@ -18,23 +18,25 @@
     }
   }
 
-  const NON_ROUND_TWO_DIGIT_NUMBERS = Object.freeze(
-    Array.from({ length: 19 }, (_, index) => index + 11)
-      .filter(number => number % 10 !== 0)
-  );
-
+  // Easier adult challenge: (two-digit - two-digit) + single-digit.
+  // Keep the subtraction non-negative and the final answer below 100.
+  // First is 20..99, second is 10..(first - 1), addition is 1..9.
+  // Maximum possible answer: 99 - 10 + 9 = 98.
   function makeQuestion(randomIndex) {
-    const first = NON_ROUND_TWO_DIGIT_NUMBERS[randomIndex(NON_ROUND_TWO_DIGIT_NUMBERS.length)];
-    const multiplier = randomIndex(8) + 2;
+    const first = randomIndex(80) + 20;
+    const subtrahend = randomIndex(first - 10) + 10;
     const addition = randomIndex(9) + 1;
-    if (!Number.isInteger(first) || !Number.isInteger(multiplier) ||
-        !Number.isInteger(addition)) {
+    if (!Number.isInteger(first) || first < 20 || first > 99 ||
+        !Number.isInteger(subtrahend) || subtrahend < 10 ||
+        subtrahend >= first || !Number.isInteger(addition) ||
+        addition < 1 || addition > 9) {
       throw new Error("Could not create a parental-gate question.");
     }
-    return Object.freeze({
-      first, multiplier, addition,
-      answer: first * multiplier + addition
-    });
+    const answer = first - subtrahend + addition;
+    if (answer < 1 || answer > 99) {
+      throw new Error("Parental-gate result is out of range.");
+    }
+    return Object.freeze({ first, subtrahend, addition, answer });
   }
 
   function secureIndex(win, exclusiveMax) {
@@ -44,7 +46,7 @@
     }
     const data = new Uint32Array(1);
     const bound = Math.floor(0x100000000 / exclusiveMax) * exclusiveMax;
-    // Rejection sampling avoids modulo bias; all max values are <= 18.
+    // Rejection sampling avoids modulo bias; all max values are <= 89.
     for (let attempt = 0; attempt < 10; attempt += 1) {
       win.crypto.getRandomValues(data);
       if (data[0] < bound) return data[0] % exclusiveMax;
@@ -189,8 +191,8 @@
           const prompt = element("p", "bz-parental-gate-prompt",
             "Solve this problem to continue:");
           const equation = element("p", "bz-parental-gate-equation",
-            "(" + session.question.first + " × " + session.question.multiplier +
-            ") + " + session.question.addition + " = ?");
+            session.question.first + " − " + session.question.subtrahend +
+            " + " + session.question.addition + " = ?");
           const form = element("form", "bz-parental-gate-form");
           form.setAttribute("novalidate", "");
           const label = element("label", "bz-parental-gate-answer-label", "Answer");
@@ -202,7 +204,7 @@
           input.setAttribute("pattern", "[0-9]*");
           input.setAttribute("autocomplete", "off");
           input.setAttribute("aria-required", "true");
-          input.maxLength = 4;
+          input.maxLength = 2;
           const status = element("p", "bz-parental-gate-status", feedbackText || "");
           status.setAttribute("role", "status");
           status.setAttribute("aria-live", "polite");
@@ -223,7 +225,7 @@
               return;
             }
             const typed = input.value.trim();
-            if (/^[0-9]{1,4}$/.test(typed) &&
+            if (/^[0-9]{1,2}$/.test(typed) &&
                 Number(typed) === session.question.answer) {
               finish(true);
               return;
