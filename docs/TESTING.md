@@ -1,5 +1,36 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — [PR #196](https://github.com/andydoane/biblozoo/pull/196) optional Kids first-launch Grown-up Setup (November 23, 2026)
+
+**Baseline/ownership:** Kids [PR #195](https://github.com/andydoane/biblozoo/pull/195) is **merged**, but owner PR4 first-time permission and accessibility testing is still in progress (no phone PASS inferred). This focused [PR #196](https://github.com/andydoane/biblozoo/pull/196), `feat/ios-kids-first-launch-grownup-setup-20261123` → `ios-prep`, is **OPEN, not yet owner-tested or merged**. Both validation jobs passed on the first corrected implementation head in [Actions #45265788915](https://github.com/andydoane/biblozoo/actions/runs/45265788915); check the exact final PR head again. Never reset an existing production-ID phone's family profiles or install/uninstall just to create a first-launch condition.
+
+**Automated source + production-bundle checks:**
+```bash
+node scripts/validate_kids_setup_onboarding.js
+node scripts/validate_parental_gate_pr1.js
+node scripts/validate_parental_gate_pr2_ghost_share.js
+node scripts/validate_parental_gate_pr3_settings.js
+node scripts/validate_parental_gate_pr4_permissions.js
+npm run build
+node scripts/validate_kids_setup_onboarding.js
+```
+Both exact-final-head GitHub Actions jobs must pass; Xcode and iOS permission sheets still require a real device or simulator.
+
+**Owner acceptance (prefer a NEW, disposable simulator with NO existing profiles or permissions):**
+
+1. Launch the **native production-ID build** with a fresh, disposable app container. Existing **Welcome to BibloZoo** animals/logo splash still runs, then the new purple **Let's Get BibloZoo Ready!** full-screen invitation appears. No iOS OS permission prompt is requested automatically. Check large text, iPhone SE scrolling and iPad portrait.
+2. Tap **Explore the Zoo for Now**. It goes directly to the existing **first Zookeeper creation** (no profile data erased and no required math). On relaunch after creating a profile, do **not** see the invitation again.
+3. For a second clean disposable session, choose **Grown-up Setup**. The existing purple lock popup asks for `A − B + C`; cancel and three wrong answers return to the optional invitation without requesting native permissions. Solve successfully. On **Let's Set Up!**, the **smaller original animals/logo splash** is at the top, above two cards. Nothing has requested OS permission yet.
+4. Tap **Enable Microphone**: exactly one native iOS Microphone sheet, only if authorization was Not Determined. Choose Allow; card becomes Ready. Tap **Enable Photos** and confirm exactly one *Add Photos* (not photo-library read) native sheet. Choose Allow; card becomes Ready. Already granted shows Ready with no prompt; denied shows the iPhone Settings direction and no repeated OS prompt. Check opposite order too.
+5. **All Done — Let's Go!** opens the original first-Zookeeper creation. Complete a fictional profile and verify tutorial, Flashcards Record/replay and Ghost Writer local Save now work without a repeated math gate or second OS permission request. Ghost Writer **Share** must still request a fresh adult check per share.
+6. On an **existing installed production app** with profiles, there should be **no first-launch invitation**. In **Settings → Grown-up Setup → Microphone & Photos**, expect a fresh shared Grown-up Check; cancellation keeps Settings open. Returning to Settings and tapping again must require a fresh check. From setup, **Back to Settings** restores it normally. No permission prompt unless a parent specifically taps Enable and iOS says Not Determined.
+7. Background/foreground, exit, double taps, permission denial, cancellation, missing native method, VoiceOver focus/labels and Dynamic Type must not produce duplicate/unauthorized native prompts. A parent may need to complete a new math check after backgrounding.
+8. Web/PWA `main` and native **Audio Test** must show no new onboarding/Settings setup route; original PR4 per-feature fallback remains, including child-friendly declined microphone/Photos behavior.
+
+**Important:** Apple may prefer optional permission alerts at first use despite parent-initiated setup. Treat first-launch pre-permission timing and Kids accessibility as App Review risks until formally accepted. Keep the first-use gating as a fallback, and preserve owner-controlled PR merge. No App Store signing/upload or membership purchase is authorized.
+
+---
+
 
 ## CURRENT — PR4 first-time iOS microphone/Photos parental gate acceptance (November 23, 2026)
 
