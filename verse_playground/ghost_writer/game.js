@@ -3518,6 +3518,8 @@
     const shareApproval = nativeGhostExport
       ? window.BibloZooGhostWriterShareApproval?.create?.()
       : null;
+    const firstPermission = nativeGhostExport
+      ? window.BibloZooKidsFirstPermission?.create?.() : null;
 
     const announceExport = (message, failed = false) => {
       if (!exportStatus?.isConnected) return;
@@ -3559,9 +3561,35 @@
       });
     }
 
+    // PhotoKit add-only is separate from Share and from the permission-free
+    // Photos/Files *picker*. A new OS permission prompt must occur only after
+    // the shared grown-up check, before any PNG/MP4 media is prepared.
+    async function approveFirstPhotosSave(button) {
+      const state = await firstPermission?.ensure?.({
+        kind: "photos",
+        getStatus: () => nativeGhostExport.getPhotosPermissionStatus(),
+        requestFirst: () => nativeGhostExport.requestPhotosPermission(),
+        isCurrent: () => state.screen === "remix" &&
+          button?.isConnected && !button.disabled &&
+          !document.hidden && !activeGhostImageExport && !activeGhostVideoExport
+      });
+      if (state?.granted !== true) {
+        announceExport(state?.reason === "denied"
+          ? "Photos access is off. You can change it in iPhone Settings."
+          : "Picture or video was not saved. Grown-up approval is needed only for first-time Photos access.",
+          true);
+        return false;
+      }
+      return state.screen === "remix" && button?.isConnected &&
+        !button.disabled && !document.hidden &&
+        !activeGhostImageExport && !activeGhostVideoExport;
+    }
+
     async function onPictureAction(destination, button) {
       if (!button || button.disabled || activeGhostImageExport ||
           activeGhostVideoExport) return;
+      if (destination === "photos" && nativeGhostExport &&
+          !(await approveFirstPhotosSave(button))) return;
       const modal = destination === "photos" ? exportDialog : null;
       if (modal && !modal.open("picture", {
         onRetry: () => { void onPictureAction("photos", saveImageBtn); }
@@ -3619,6 +3647,8 @@
     async function onVideoAction(destination, button) {
       if (!nativeGhostExport || !button || button.disabled ||
           activeGhostImageExport || activeGhostVideoExport) return;
+      if (destination === "photos" &&
+          !(await approveFirstPhotosSave(button))) return;
       const job = { cancelled: false };
       const modal = destination === "photos" ? exportDialog : null;
       if (modal && !modal.open("video", {
