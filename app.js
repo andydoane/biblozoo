@@ -39,7 +39,7 @@ const PET_STATUS_HAPPY_ICON = IMG_DIR + "pet_status_happy.png";
 const PET_STATUS_HUNGRY_ICON = IMG_DIR + "pet_status_hungry.png";
 const PET_STATUS_ASLEEP_ICON = IMG_DIR + "pet_status_asleep.png";
 
-const APP_VERSION = "1.0.12 Black Startup Shell";
+const APP_VERSION = "1.0";
 const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 
 
@@ -50,8 +50,17 @@ const SUPPORT_EMAIL = "BibloZooApp@gmail.com";
 const DEBUG_MODE = false;
 
 // Hide progress/reset/utility debug shortcuts on production native iOS.
-// Leave their historical behavior on Web/PWA/Android and Audio Test.
+// Fail closed even if the packaged iOS identity script did not initialize.
+// Preserve explicit Audio Test access and historical Web/PWA/Android behavior.
 function allowDevShortcuts() {
+  const nativeIOS = (
+    window.Capacitor?.isNativePlatform?.() === true &&
+    window.Capacitor?.getPlatform?.() === "ios"
+  ) || window.location?.protocol === "capacitor:";
+  if (nativeIOS) {
+    return window.BibloZooNativeOnlyOutput?.enabled === true &&
+      window.BibloZooNativeOnlyOutput?.devToolsAllowed === true;
+  }
   return window.BibloZooNativeOnlyOutput?.enabled !== true ||
     window.BibloZooNativeOnlyOutput?.devToolsAllowed === true;
 }
