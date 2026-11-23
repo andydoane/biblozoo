@@ -3,7 +3,7 @@
 
 ## CURRENT — PR4 first-time iOS microphone/Photos parental gate acceptance (November 23, 2026)
 
-**Baseline:** [PR #194](https://github.com/andydoane/biblozoo/pull/194) is **merged** into `ios-prep` at `7a4a26666e0d8a54f4d43439577439cd09f4ca60`. Owner says simpler math and child-safe Zookeeper Edit work on iPhone. PR4 is scoped to **first-time native iOS OS permission requests** and a targeted bypass/VoiceOver audit; the user is comfortable testing on their phone with installed profiles, but no destructive reset is necessary.
+**Baseline:** [PR #194](https://github.com/andydoane/biblozoo/pull/194) is **merged** into `ios-prep` at `7a4a26666e0d8a54f4d43439577439cd09f4ca60`. Owner says simpler math and child-safe Zookeeper Edit work on iPhone. [PR #195](https://github.com/andydoane/biblozoo/pull/195) (OPEN/unmerged) is scoped to **first-time native iOS OS permission requests** and a targeted bypass/VoiceOver audit; the user is comfortable testing on their phone with installed profiles, but no destructive reset is necessary.
 
 **Source/packaging validation (PR branch or post-merge `ios-prep`):**
 ```bash
