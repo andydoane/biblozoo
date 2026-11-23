@@ -1,6 +1,16 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — Kids parental gate PR 1 implementation candidate (November 23, 2026)
+## CURRENT — PR 1 Grown-up Check Safari preview correction (November 23, 2026)
+
+**Owner test outcome:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) was **MERGED into `ios-prep` at `0532f4495e3c8878afe3c8b84a7687e38b3eec33`** after both exact-head CI jobs passed. The owner then tested `tests/parental-gate-preview.html` and reported: Try Grown-up Check opened the two-button intro; **Not Now closed correctly, but I'm a Grown-up also closed instead of displaying math**. This is an **owner-reported FAIL** of visual acceptance, not a full gate acceptance.
+
+**Fix candidate:** [PR #191](https://github.com/andydoane/biblozoo/pull/191) (OPEN/unmerged, CI and owner retest pending) on feature branch `fix/ios-parental-gate-preview-dismissal-20261123` targets `ios-prep` and changes only the shared `verse_games/shared/parental-gate.js`, its synthetic regression, and docs. The controller originally registered an unconditional `window.blur` cancellation; Safari/WebKit can generate blur during transition into a text input/keyboard, immediately calling `finish(false)`. The correction avoids treating bare window blur as confirmed app backgrounding. It continues to cancel on actual hidden/visibilitychange, pagehide, popstate, explicit Cancel and stale/removed dialog, and requires visible native identity for approval. The intro button now passes `() => renderQuestion()` rather than passing a click Event into the feedback argument. The regression simulates WebKit input-focus blur and verifies the equation stays visible and the click Event is not rendered as text. **The suspected cause is not confirmed by a captured Safari trace; owner retest is required.** There is still no production share/settings/permission wiring. Do not install over real production or Audio Test family profiles.
+
+**Acceptance:** Owner should merge the follow-up PR after exact-head Node/web-build CI passes, pull `ios-prep`, then reopen `tests/parental-gate-preview.html` in Safari and check Not Now, I'm a Grown-up → equation, correct/wrong answer, tab background cancellation, Escape, and display sizing. Record actual owner PASS/FAIL in next handoff. PRs 2–4 remain pending.
+
+### Superseded PR 1 handoff (merged, follow-up in review)
+
+## HISTORICAL — Kids parental gate PR 1 implementation candidate (November 23, 2026)
 
 **Scope / status:** [PR #190](https://github.com/andydoane/biblozoo/pull/190) (OPEN, unmerged, owner acceptance pending), feature branch `feat/ios-parental-gate-pr1-20261123` originates at current `ios-prep` baseline `6a29743154fd76bd894a8a562b81a460014a435e` (merged documentation plan #189). **PR 1 is implementation for owner review, NOT merged, NOT device-tested; PRs 2–4 remain unimplemented.** The owner's challenge specification is `(two-digit × one-digit) + one-digit`, first number 11–99 excluding numbers ending in zero, multiplier 2–9, addition 1–9; all values randomized freshly for a challenge, with a maximum of three incorrect answers per attempt.
 
