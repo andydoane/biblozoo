@@ -91,18 +91,21 @@ Also check the Capacitor/npm/Swift package dependency notices separately during 
 | `verse_games/verse_launch/verse_launch_fonts/Orbitron.ttf` | Orbitron | Likely Google Fonts OFL family; verify binary/source and notice. |
 | `verse_games/verse_scramble_neo/verse_scramble_fonts/Caprasimo-Regular.ttf` | Caprasimo | Likely Google Fonts OFL family; verify binary/source and notice. |
 | `verse_playground/ghost_writer/ghost_writer_fonts/Playwrite_US_Modern.woff` | Playwrite US Modern | Public Playwrite US Modern family is available under OFL, but check the exact bundled WOFF and notice. |
-| `verse_playground/scripture_scrub/Chalkboard-Regular.ttf` | Chalkboard | **PRIORITY / OPEN:** exact font designer, binary source and whether redistribution in a commercial App Store app is authorized. |
-| `verse_playground/scripture_scrub/fonts/Chalkboard-Regular.ttf` | Chalkboard duplicate path | **PRIORITY / OPEN:** do not assume it shares provenance or license without comparing binaries. |
+| `verse_playground/scripture_scrub/Chalkboard-Regular.ttf` | Chalkboard (Florence S, owner-stated source) | **SOURCE IDENTIFIED:** owner points to [DaFont's Chalkboard by Florence S](https://www.dafont.com/chalkboard-3.font), labeled **100% Free**; downloadable filename matches. Exact archive-byte comparison and explicit embedding/redistribution grant **not yet verified**. |
+| `verse_playground/scripture_scrub/fonts/Chalkboard-Regular.ttf` | Same bundled Chalkboard binary | **IDENTICAL GIT CONTENT:** same blob SHA as sibling path (`709bfa185de550276126db43f4e0d49eaa0af2e6`), so one exact font file in two locations; both copies share the same unresolved license/embedding question. |
 | `verse_playground/scripture_scrub/fonts/TitanOne-Regular.ttf` | Titan One | Likely OFL but exact file and notices still need checking. |
 | `verse_playground/verse_typer/fonts/TitanOne-Regular.ttf` | Titan One | Likely OFL but exact file and notices still need checking. |
 | `verse_playground/wheel_of_bible/wheel_of_bible_fonts/Chunk.ttf` | Chunk / ChunkFive | The League of Moveable Type publishes the Chunk family with an **Open Font License**: https://www.theleagueofmoveabletype.com/chunk. Verify bundled binary origin/variant and original notice. |
 
-**Why Chalkboard is singled out:** A filename is not proof of a license. Third-party catalog pages for similarly named Chalkboard font files show **conflicting personal/commercial-use claims**. Apple's system font name and a freely downloadable third-party font are not interchangeable licensing evidence. Treat both packaged `Chalkboard-Regular.ttf` files as **unresolved** until the owner can identify their original download/source and applicable rights; if needed, replace with a known permitted font in a later targeted, visually tested PR. **Do not remove them casually or change Scripture Scrub appearance in this audit.**
+**Chalkboard source identified, permission still to confirm (2026-11-22 EST):** The owner supplies the exact [DaFont Chalkboard page](https://www.dafont.com/chalkboard-3.font). That page identifies the author as **Florence S**, marks the font **“100% Free”**, lists `Chalkboard-Regular.ttf` and first publication August 2, 2022. This is **not** the similarly named DaFont fonts credited to different authors that are designated personal-use-only. GitHub shows **identical blob SHA `709bfa185de550276126db43f4e0d49eaa0af2e6` for both Scripture Scrub copies**. The bundled TrueType name records say **“Chalkboard Regular”** / `Chalkboard-Regular`. The actual DaFont ZIP could not be independently downloaded for byte-by-byte verification, so **file name/name-record match + owner report is not a verified byte match**.
+
+DaFont's official [FAQ](https://www.dafont.com/faq.php#copyright) explicitly says the download-page category is an indication, not the definitive license, and advises checking archive readmes or the author's terms/contact. The current listing contains **no separate embedding/redistribution license text**. Therefore **“100% Free” is promising for use but is not independently sufficient to assert the right to package/distribute the TTF inside a paid or free App Store app or expose raw TTF on GitHub**. Seek written permission from Florence S to include the file in a commercially distributed iOS app and a public GitHub source repository (or find an explicit official license/readme that covers those uses). If not possible, consider an owner-approved, suitably licensed substitute in a separate visually tested PR. **Do not remove or alter the font in this evidence-only PR.**
 
 **Font licensing reference:** SIL's OFL FAQ explains how font copyrights and license notices should be handled when bundling a font in a mobile app: https://openfontlicense.org/ofl-faq/. Google Fonts licenses can be retrieved from the corresponding official upstream repositories once each exact binary is identified.
 
 - [ ] Verify exact origin, designer, license and copyright notice for all 13 paths (duplicates may share evidence).
-- [ ] Resolve `Chalkboard-Regular.ttf` **before App Store upload**.
+- [x] Identify **owner-provided source page and author** for Chalkboard (DaFont, **Florence S**, 100% Free listing); verify both repository copies are the same Git blob.
+- [ ] **Confirm explicit commercial app-embedding and source-TTF redistribution rights**, including by author/official archive notice if available; source ZIP hash equivalence remains unverified. Resolve before App Store upload.
 - [ ] Preserve/add license and copyright notices for all confirmed bundled open-source fonts, following their terms.
 - [ ] If any font is not licensed for redistribution, decide on a visually suitable permitted replacement and test it on iPhone/iPad.
 
@@ -122,7 +125,8 @@ For each group, record one of: **created by owner**, **created for owner with tr
 - [ ] Resolve the separate public-GitHub **raw licensed sound-file** redistribution question before public release; do not treat the in-app license as a source-file sharing license.
 - [ ] Verify all 124 verse-text translations/attributions and original learning commentary rights.
 - [ ] Address the inactive ESV debug fixture in an owner-reviewed follow-up.
-- [ ] Verify all 13 font paths (especially Chalkboard), then preserve notices and resolve any unlicensed fonts.
+- [x] Record owner-provided Chalkboard source (Florence S / DaFont) and identical SHA of the two bundled copies; neither was replaced.
+- [ ] Verify all 13 font paths, including **exact Chalkboard embedding/redistribution grant**, then preserve notices and resolve any unlicensed fonts.
 - [ ] Complete third-party code/dependency notices review and any needed redistribution obligations.
 - [ ] Owner reviews this ledger, resolves unknowns and signs off on asset redistribution before the first App Store upload.
 
