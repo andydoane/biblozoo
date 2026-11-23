@@ -71,7 +71,6 @@
       doc.removeEventListener("keydown", session.onKeydown, true);
       doc.removeEventListener("visibilitychange", session.onVisibility, true);
       win.removeEventListener("pagehide", session.onCancel, true);
-      win.removeEventListener("blur", session.onCancel, true);
       win.removeEventListener("popstate", session.onCancel, true);
       const stillVisible = session.overlay.isConnected &&
         doc.visibilityState !== "hidden" && !doc.hidden &&
@@ -176,7 +175,8 @@
           cancel.addEventListener("click", () => finish(false));
           const continueButton = element("button", "bz-parental-gate-btn bz-parental-gate-primary", "I'm a Grown-up");
           continueButton.type = "button";
-          continueButton.addEventListener("click", renderQuestion);
+          // Do not pass the click Event as the feedback message.
+          continueButton.addEventListener("click", () => renderQuestion());
           actions.append(cancel, continueButton);
           content.append(actions);
           continueButton.focus({ preventScroll: true });
@@ -248,7 +248,9 @@
           doc.addEventListener("keydown", session.onKeydown, true);
           doc.addEventListener("visibilitychange", session.onVisibility, true);
           win.addEventListener("pagehide", session.onCancel, true);
-          win.addEventListener("blur", session.onCancel, true);
+          // Do not use window blur to cancel: Safari/WebKit can emit it while
+          // focus moves into the numeric input or its keyboard. Real app
+          // backgrounding and page transitions are handled above.
           win.addEventListener("popstate", session.onCancel, true);
           renderIntro();
         } catch (_) {
