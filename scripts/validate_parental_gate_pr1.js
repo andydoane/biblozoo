@@ -77,7 +77,13 @@ class FakeElement {
     walk(this);
     return all;
   }
-  focus() { this.doc.activeElement = this; }
+  focus() {
+    this.doc.activeElement = this;
+    // Model Safari/WebKit reporting a window blur as an input/keyboard opens.
+    if (this.tagName === "INPUT" && this.doc.simulateWebKitInputFocusBlur) {
+      this.doc.ownerWindow.dispatch("blur");
+    }
+  }
 }
 function scenario(platform = "ios", production = true) {
   const doc = {
@@ -118,6 +124,7 @@ function scenario(platform = "ios", production = true) {
     },
     dispatch(type) { for (const fn of (this.listeners[type] || []).slice()) fn(); }
   };
+  doc.ownerWindow = win;
   const gate = createGate(win);
   function get(className) {
     const all = [];
@@ -192,9 +199,17 @@ async function main() {
 
   // Correct answer runs one callback. The duplicate request cannot authorize.
   const approved = s.gate.requestApproval({ onApproved: action });
+  s.doc.simulateWebKitInputFocusBlur = true;
   assert.equal(await s.gate.requestApproval({ onApproved: action }), false);
   s.click("I'm a Grown-up");
   assert.equal(s.get("bz-parental-gate-equation").textContent, "(11 × 2) + 1 = ?");
+  assert.equal(s.get("bz-parental-gate-status").textContent, "",
+    "click Event must not appear as feedback in the dialog");
+  assert.ok(s.get("bz-parental-gate-overlay"),
+    "Safari input-focus blur must not close the visible dialog");
+  s.win.dispatch("blur");
+  assert.ok(s.get("bz-parental-gate-overlay"),
+    "mere window blur while page remains visible is not app backgrounding");
   assert.equal(s.get("bz-parental-gate-equation").textContent.includes("23"), false,
     "expected answer must not be displayed");
   const focusable = s.get("bz-parental-gate-overlay").querySelectorAll("button:not([disabled]), input:not([disabled])");
@@ -219,11 +234,10 @@ async function main() {
 
   // Explicit cancellation, backgrounding, pagehide, back navigation and loss
   // of a live dialog must never execute the selected callback.
-  for (const lifecycle of ["cancel", "blur", "pagehide", "popstate", "visibility", "removed"]) {
+  for (const lifecycle of ["cancel", "pagehide", "popstate", "visibility", "removed"]) {
     const pending = s.gate.requestApproval({ onApproved: action });
     s.click("I'm a Grown-up");
     if (lifecycle === "cancel") s.gate.cancelActive();
-    if (lifecycle === "blur") s.win.dispatch("blur");
     if (lifecycle === "pagehide") s.win.dispatch("pagehide");
     if (lifecycle === "popstate") s.win.dispatch("popstate");
     if (lifecycle === "visibility") {
@@ -269,6 +283,6 @@ async function main() {
     assert.match(read("dist/index.html"), /parental-gate\.js/);
     assert.match(read("dist/verse_playground/ghost_writer/index.html"), /parental-gate\.js/);
   }
-  console.log("Kids PR1 PASS: 81 allowed two-digit choices, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
+  console.log("Kids PR1 PASS: 81 allowed two-digit choices, Safari input focus, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
