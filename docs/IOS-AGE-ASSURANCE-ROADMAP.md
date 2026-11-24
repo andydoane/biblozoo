@@ -1,6 +1,10 @@
 # BibloZoo — native age-assurance roadmap and chat-independent handoff
 
-**Current checkpoint:** November 24, 2026. Candidate PR #238; verified base `089b72844d5f31a770e97c3cba6706cac9194ed5` (merged #237). This is the authoritative navigation/checkpoint document for this small workstream, not a legal opinion or assertion of production readiness. Keep it and PROJECT-HANDOFF.md current in every related PR, recording actual verified acceptance rather than predicted success. Historical checkpoint docs are linked below.
+## CURRENT — isolated simulator fixtures (November 24, 2026)
+
+Merged #238 at `9b4a663e0f7bb47a7f4173ff8bb6837bd5a2a5b0`. Owner tested exact head `0288c201`: 128 synthetic assertions PASS and ordinary unsigned simulator BUILD SUCCEEDED (SDK 26.5, both architectures), branch CI passed. Non-Debug live-flag failure test remains outstanding. Candidate #239 adds [isolated Debug simulator fixtures](IOS-AGE-ASSURANCE-SIMULATOR.md) using the existing native gate/coordinator with synthetic decisions only, separate exact bundle ID com.andydoane.biblozoo.agefixture, mutually exclusive fixture/live compile flags, no fixture device/Release build permitted. Ordinary production, Audio Test and PWA unchanged by design. No real Apple age API, enrollment, account, signing change, backend, fees or family data in fixture mode. Actual UI/lifecycle acceptance pending; fixture identity deliberately does not enable production native audio or diagnostic tools, so this is not audio parity or proof of consent, offline compatibility or revocation. Initial minor consent and notification/serverless sufficiency still unresolved; do not enable live release or install on family devices. See [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) for next gates. Expected 128 prior + 25 Debug fixture assertions, normal and fixture unsigned compile, expected-failure compile fences. Author has not run native build or simulator. Owner reviews/merges after acceptance.
+
+**Current checkpoint:** November 24, 2026. Candidate PR #239; verified base `9b4a663e0f7bb47a7f4173ff8bb6837bd5a2a5b0` (merged #238). This is the authoritative navigation/checkpoint document for this small workstream, not a legal opinion or assertion of production readiness. Keep it and PROJECT-HANDOFF.md current in every related PR, recording actual verified acceptance rather than predicted success. Historical checkpoint docs are linked below.
 
 ## 1. Owner decisions and boundaries
 
@@ -20,8 +24,9 @@
 | [#234](https://github.com/andydoane/biblozoo/pull/234) | Native access policy, pre-WebView gate | 64 checks and unsigned simulator compile PASS on 5172c734 |
 | [#235](https://github.com/andydoane/biblozoo/pull/235) | Significant-update adapter | 89 checks PASS on f3bf2dca; native compile FAILED |
 | [#236](https://github.com/andydoane/biblozoo/pull/236) | PermissionKit denial and read-only default correction | 89 checks and unsigned simulator compile PASS on 0d8ad7bb |
-| [#237](https://github.com/andydoane/biblozoo/pull/237) | Foreground ticket invalidation and staged recheck | 110 checks and unsigned simulator compile PASS on a8b28874; merged at baseline above; CI success |
-| [#238](https://github.com/andydoane/biblozoo/pull/238) | Unsupported-platform distinction, offline-policy cases, release compile fence, standalone roadmap | Candidate: expect 128 checks; native compile pending |
+| [#237](https://github.com/andydoane/biblozoo/pull/237) | Foreground ticket invalidation and staged recheck | 110 checks and unsigned simulator compile PASS on a8b28874; merged; CI success |
+| [#238](https://github.com/andydoane/biblozoo/pull/238) | Unsupported-platform distinction, offline-policy cases, release compile fence, standalone roadmap | 128 checks and unsigned simulator compile PASS on 0288c201; CI passed; release-fence failure test pending |
+| [#239](https://github.com/andydoane/biblozoo/pull/239) | Isolated simulator fixture mode | Candidate: 128 ordinary + 25 Debug fixture checks; builds and UI acceptance pending |
 
 All checks above are owner-provided logs and recorded GitHub status, not independently run on the assistant host. Generic simulator builds are unsigned compile/link only, arm64 and x86_64. Legacy age declaration deprecation and skipped AppIntents metadata warnings nonblocking in #237. No live or opt-in runtime test, signed Apple API response, deployment test or legal acceptance has been performed. #237 tests pure state logic, not actual UIKit/audio behavior.
 
@@ -44,7 +49,7 @@ Rechecked November 24, 2026:
 
 | Stage | Acceptance / decision |
 | --- | --- |
-| #238 candidate | 128 synthetic checks and unsigned simulator compile; confirm GitHub validation, owner merge; update roadmap with result |
+| #239 candidate | See simulator guide: normal 128 + 25 Debug-only checks, compile fences, normal and isolated fixture builds; owner acceptance and merge |
 | Evidence / feasibility gate | Obtain supported initial-consent signal or authoritative confirmation of an acceptable native-only method, determine notification obligations, verify age rating API applicability and older OS/offline policy. If unresolved, don't make up signals or continue speculative production enforcement; record gap, ask owner how to proceed before spending. |
 | Isolated pre-enrollment test | Owner-approved simulator-only synthetic test harness with fixtures, never real family data or live age API; actual native UI transition, denied/retry, foreground retention/audio, accessibility. Separate identity, clearly fake, never distribution. Remove/guard harness from release. If needed, fix lifecycle before any live testing. |
 | Real native policy | Use actual verified store evidence only; implement significant-change detection/version-specific responses, safe delay/cancellation/account change/revocation and retry, no fake 1.0 update. Define old OS/offline/no-requirements behavior from evidence. Keep data and child-safe defaults. Verify no-server sufficiency or stop. |
@@ -59,7 +64,7 @@ Acceptance matrix: not-required/no prompt; regulated bands and ambiguous/missing
 
 Read this roadmap and the top CURRENT section of [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md). Verify remote branch head, latest PR status/diff and CI; don't assume this snapshot is latest. Review [plan](IOS-AGE-ASSURANCE-PLAN.md), [foundation](IOS-AGE-ASSURANCE-FOUNDATION.md), [startup](IOS-AGE-ASSURANCE-STARTUP.md), [access](IOS-AGE-ASSURANCE-ACCESS.md), [consent](IOS-AGE-ASSURANCE-CONSENT.md), [lifecycle](IOS-AGE-ASSURANCE-LIFECYCLE.md) and [testing](TESTING.md) as needed. Fetch source at verified commit before editing. Preserve historical docs and notices; update roadmap and relevant docs in each PR with decision, exact evidence, blockers and next step. Do not repeat completed tests unless source changed or a specific verification remains.
 
-For current candidate, from clean repo root (do not switch with uncommitted changes):
+Historical #238 commands below (already passed ordinary test/build; fence still pending). For #239 use the [current simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md). From clean repo root (do not switch with uncommitted changes):
 
 ```bash
 git status --short

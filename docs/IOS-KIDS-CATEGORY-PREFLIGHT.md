@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — Kids Category / parental-gate preflight
 
+## CURRENT — isolated simulator fixtures (November 24, 2026)
+
+Merged #238 owner-tested exact head 0288c201: 128 synthetic checks and unsigned simulator compile PASS; branch CI passed. Candidate #239 adds [isolated synthetic simulator mode](IOS-AGE-ASSURANCE-SIMULATOR.md) only with Debug, simulator, explicit fixture flag and exact separate bundle ID. No real age API call in fixture mode, no production activation, native audio parity, signing, backend, iCloud, cost or family data change. Normal production, Audio Test and PWA unchanged by design. No genuine consent, revocation, older OS or offline evidence. Initial consent and notification obligations unresolved. Release/physical-device fixture compile fences added; testing pending. See [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) for remaining gates; previous legal, privacy, listing and Kids decisions unchanged.
+
 ## CURRENT — age-assurance roadmap and availability checkpoint (November 24, 2026)
 
 See [standalone age-assurance roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) for the complete current checkpoint and remaining release gates. Merged #237 owner-tested exact head a8b28874: 110 synthetic checks and unsigned simulator compile PASS. Candidate #238 distinguishes unsupported platform from temporary/unavailable check, adds a non-Debug live-flag compile fence and synthetic offline policy assertions. No live activation, new data persistence, connectivity probe, signing, backend, iCloud, cost or changes to ordinary app, PWA or Audio Test. Initial minor consent, legacy-account eligibility, offline/revocation behavior and notification obligations unresolved; no implied legal clearance or new privacy-label/metadata decision. Existing release gates remain. Candidate acceptance pending; future updates must maintain the roadmap and relevant docs.
