@@ -18,6 +18,7 @@ class FakeElement {
     this.listeners = {};
     this.attributes = {};
     this.className = "";
+    this.style = {};
     this.value = "";
   }
   get textContent() {
@@ -108,8 +109,18 @@ function scenario(platform = "ios", production = true) {
   doc.body.append(rootButton);
   rootButton.focus();
   const randomValues = [];
+  const viewport = {
+    width: 834, height: 1112, offsetTop: 0, offsetLeft: 0,
+    listeners: {},
+    addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
+    removeEventListener(type, fn) {
+      this.listeners[type] = (this.listeners[type] || []).filter(x => x !== fn);
+    },
+    dispatch(type) { for (const fn of (this.listeners[type] || []).slice()) fn(); }
+  };
   const win = {
     document: doc,
+    innerWidth: 834, innerHeight: 1112, visualViewport: viewport,
     Capacitor: {
       isNativePlatform: () => platform !== "web",
       getPlatform: () => platform
@@ -155,7 +166,7 @@ function scenario(platform = "ios", production = true) {
     field.value = String(value);
     get("bz-parental-gate-form").dispatch("submit");
   }
-  return { win, doc, gate, get, click, answer, randomValues, rootButton };
+  return { win, doc, gate, get, click, answer, randomValues, rootButton, viewport };
 }
 
 async function main() {
@@ -263,6 +274,78 @@ async function main() {
   assert.equal(await approved, true);
   assert.equal(invocations, 1);
 
+  // iPad visual viewport shrinks when the software keyboard appears, even
+  // though the fixed-position layout viewport itself may not change.
+  const ipad = scenario();
+  let ipadInvocations = 0;
+  const ipadApproval = ipad.gate.requestApproval({
+    onApproved() { ipadInvocations++; }
+  });
+  const ipadOverlay = ipad.get("bz-parental-gate-overlay");
+  const ipadDialog = ipad.get("bz-parental-gate-dialog");
+  assert.equal(ipad.viewport.listeners.resize.length, 1);
+  assert.equal(ipad.viewport.listeners.scroll.length, 1);
+  assert.equal(ipadOverlay.style.height, "",
+    "normal dialog positioning is unchanged when keyboard is hidden");
+  ipad.click("I'm a Grown-up");
+  assert.equal(ipad.doc.keyboardFocusCount, 0,
+    "iPad does not open the keyboard until the parent selects Answer");
+  ipad.get("bz-parental-gate-answer").focus();
+  ipad.viewport.height = 625;
+  ipad.viewport.offsetTop = 18;
+  ipad.viewport.dispatch("resize");
+  assert.equal(ipadOverlay.style.top, "18px");
+  assert.equal(ipadOverlay.style.left, "0px");
+  assert.equal(ipadOverlay.style.height, "625px");
+  assert.equal(ipadOverlay.style.bottom, "auto");
+  assert.equal(ipadDialog.style.maxHeight, "593px",
+    "dialog shrinks inside keyboard-visible area instead of hiding buttons");
+  ipad.viewport.offsetTop = 25;
+  ipad.viewport.dispatch("scroll");
+  assert.equal(ipadOverlay.style.top, "25px",
+    "viewport scroll adjusts the visible overlay position");
+  ipad.viewport.height = 1112;
+  ipad.viewport.offsetTop = 0;
+  ipad.viewport.dispatch("resize");
+  assert.equal(ipadOverlay.style.height, "",
+    "keyboard dismissal restores original centered layout");
+  assert.equal(ipadDialog.style.maxHeight, "",
+    "keyboard dismissal restores CSS max-height");
+  ipad.click("Not Now");
+  assert.equal(await ipadApproval, false);
+  assert.equal(ipadInvocations, 0);
+  assert.equal(ipad.viewport.listeners.resize.length, 0);
+  assert.equal(ipad.viewport.listeners.scroll.length, 0);
+  assert.equal((ipad.win.listeners.resize || []).length, 0,
+    "viewport listeners are removed on cancellation");
+
+  // iPhone already moves its modal into view; avoid a second adjustment.
+  const iphone = scenario();
+  iphone.viewport.width = 390;
+  const iphoneApproval = iphone.gate.requestApproval({
+    onApproved() { throw Error("No approval intended"); }
+  });
+  iphone.click("I'm a Grown-up");
+  iphone.get("bz-parental-gate-answer").focus();
+  iphone.viewport.height = 520;
+  iphone.viewport.dispatch("resize");
+  assert.equal(iphone.get("bz-parental-gate-overlay").style.height, "",
+    "iPhone positioning remains unchanged");
+  iphone.click("Not Now");
+  assert.equal(await iphoneApproval, false);
+
+  // No VisualViewport API: preserve the original behavior and no exception.
+  const noViewport = scenario();
+  delete noViewport.win.visualViewport;
+  const fallbackApproval = noViewport.gate.requestApproval({
+    onApproved() { throw Error("No approval intended"); }
+  });
+  noViewport.click("I'm a Grown-up");
+  noViewport.get("bz-parental-gate-answer").focus();
+  noViewport.win.dispatch("resize");
+  noViewport.click("Not Now");
+  assert.equal(await fallbackApproval, false);
+
   // Wrong answers get fresh questions; third wrong response denies.
   const denied = s.gate.requestApproval({ onApproved: action });
   s.click("I'm a Grown-up");
@@ -330,6 +413,6 @@ async function main() {
     assert.match(read("dist/index.html"), /parental-gate\.js/);
     assert.match(read("dist/verse_playground/ghost_writer/index.html"), /parental-gate\.js/);
   }
-  console.log("Kids PR1 PASS: two-digit subtraction + one-digit addition, result at most 99, Safari input focus, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
+  console.log("Kids PR1 PASS: math, Safari input focus, iPad visual-viewport keyboard fit, iPhone isolation, keyboard dismissal, listener cleanup, one-shot approval, cancellation/lifecycle, platform isolation, shared assets, unshipped preview.");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

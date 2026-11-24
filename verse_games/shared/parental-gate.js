@@ -74,6 +74,9 @@
       doc.removeEventListener("visibilitychange", session.onVisibility, true);
       win.removeEventListener("pagehide", session.onCancel, true);
       win.removeEventListener("popstate", session.onCancel, true);
+      win.removeEventListener("resize", session.onViewport, true);
+      session.viewport?.removeEventListener?.("resize", session.onViewport);
+      session.viewport?.removeEventListener?.("scroll", session.onViewport);
       const stillVisible = session.overlay.isConnected &&
         doc.visibilityState !== "hidden" && !doc.hidden &&
         isNativeKidsBuild(win);
@@ -141,11 +144,16 @@
         dialog.append(icon, title, message, content);
         overlay.appendChild(dialog);
 
+        const viewport = win.visualViewport;
+        // Capture the unobscured height before focus opens the iPad keyboard.
+        // iOS may shrink the *visual* viewport but leave fixed CSS overlays
+        // centered in the older layout viewport.
+        const initialViewportHeight = viewport?.height;
         const session = {
-          overlay, dialog, content, resolve, reject,
+          overlay, dialog, content, resolve, reject, viewport,
           onApproved: options.onApproved,
           previousFocus: doc.activeElement,
-          initialFocus: null,
+          initialFocus: null, answerInput: null, onViewport: null,
           finished: false, attempts: 0, question,
           onCancel: () => finish(false),
           onVisibility: () => {
@@ -179,8 +187,42 @@
         };
         active = session;
 
+        session.onViewport = () => {
+          if (active !== session || session.finished || !overlay.isConnected) return;
+          const vp = session.viewport;
+          // This compensates for the iPad keyboard overlay, not text scaling
+          // or general iPhone positioning. No change while keyboard is hidden.
+          const keyboardReducedViewport = session.answerInput &&
+            Number.isFinite(initialViewportHeight) &&
+            Number.isFinite(vp?.height) && Number.isFinite(vp?.width) &&
+            vp.width >= 600 && initialViewportHeight - vp.height > 120;
+          if (!keyboardReducedViewport) {
+            overlay.style.top = "";
+            overlay.style.left = "";
+            overlay.style.right = "";
+            overlay.style.bottom = "";
+            overlay.style.width = "";
+            overlay.style.height = "";
+            dialog.style.maxHeight = "";
+            return;
+          }
+          // A fixed overlay is otherwise centered below the visible region
+          // in WKWebView. Re-center it inside the visual viewport and make
+          // the dialog internally scrollable if the keyboard leaves less room.
+          overlay.style.top = Math.max(0, vp.offsetTop || 0) + "px";
+          overlay.style.left = Math.max(0, vp.offsetLeft || 0) + "px";
+          overlay.style.right = "auto";
+          overlay.style.bottom = "auto";
+          overlay.style.width = vp.width + "px";
+          overlay.style.height = vp.height + "px";
+          dialog.style.maxHeight =
+            Math.min(760, Math.max(160, Math.floor(vp.height - 32))) + "px";
+        };
+
         function renderIntro() {
+          session.answerInput = null;
           content.replaceChildren();
+          session.onViewport();
           const actions = element("div", "bz-parental-gate-actions");
           const cancel = element("button", "bz-parental-gate-btn bz-parental-gate-secondary", "Not Now");
           cancel.type = "button";
@@ -223,6 +265,7 @@
           input.setAttribute("autocomplete", "off");
           input.setAttribute("aria-required", "true");
           input.maxLength = 2;
+          session.answerInput = input;
           const status = element("p", "bz-parental-gate-status", feedbackText || "");
           status.setAttribute("role", "status");
           status.setAttribute("aria-live", "polite");
@@ -261,6 +304,7 @@
             }
           });
           content.append(prompt, equation, form);
+          session.onViewport();
           session.initialFocus = prompt;
           prompt.focus({ preventScroll: true });
         }
@@ -274,6 +318,9 @@
           // focus moves into the numeric input or its keyboard. Real app
           // backgrounding and page transitions are handled above.
           win.addEventListener("popstate", session.onCancel, true);
+          win.addEventListener("resize", session.onViewport, true);
+          viewport?.addEventListener?.("resize", session.onViewport);
+          viewport?.addEventListener?.("scroll", session.onViewport);
           renderIntro();
         } catch (_) {
           finish(false);
