@@ -244,6 +244,26 @@ struct BibloZooAgeForegroundEpoch {
     }
 }
 
+// Bounded preflight only: readiness is not an age/consent decision. The
+// coordinator checks the real UIKit conditions again before issuing a ticket.
+// Twenty 100 ms waits let the initial scene/window activation settle without
+// leaving the native gate in a permanent checking state.
+struct BibloZooAgeStartupReadiness {
+    enum Step: Equatable { case start, wait, hold }
+    private(set) var remainingWaits: Int
+
+    init(maxWaits: Int = 20) {
+        remainingWaits = max(0, maxWaits)
+    }
+
+    mutating func next(ready: Bool) -> Step {
+        if ready { return .start }
+        guard remainingWaits > 0 else { return .hold }
+        remainingWaits -= 1
+        return .wait
+    }
+}
+
 // One automatic attempt per foreground authorization cycle, even if a system sheet temporarily deactivates
 // the scene. No age data, approval or access decision is retained by this gate.
 struct BibloZooAgeStartupAttempt {
@@ -261,6 +281,10 @@ struct BibloZooAgeStartupAttempt {
         attempted = true
         return true
     }
+
+    // A preflight timeout or true background requires an explicit Retry,
+    // even if no actual age request was issued yet.
+    mutating func requireExplicitRetry() { attempted = true }
 }
 
 #if DEBUG
@@ -521,37 +545,62 @@ final class BibloZooAgeStartupCoordinator {
 
     static var useStagedGate: Bool { useNativeGate || useFixtureGate }
 
+    private func presenterReady(_ scene: UIScene, _ presenter: BibloZooAgeGateViewController) -> Bool {
+        scene.activationState == .foregroundActive
+            && UIApplication.shared.applicationState == .active
+            && presenter.viewIfLoaded?.window?.windowScene === scene
+            && presenter.viewIfLoaded?.window?.rootViewController === presenter
+            && presenter.presentedViewController == nil
+            && !presenter.isBeingDismissed
+    }
+
     func sceneBecameActive(_ scene: UIScene, presenter: BibloZooAgeGateViewController,
                            completion: @escaping (BibloZooAgeAccessDecision) -> Void) {
-        guard task == nil, scene.activationState == .foregroundActive,
-              UIApplication.shared.applicationState == .active,
-              presenter.viewIfLoaded?.window?.windowScene === scene,
-              presenter.presentedViewController == nil,
-              !presenter.isBeingDismissed else { return }
-        guard attempt.begin(bundleID: Bundle.main.bundleIdentifier,
-                            liveEnabled: Self.useNativeGate,
-                            activePresenter: true, fixtureEnabled: Self.useFixtureGate),
-              let ticket = epoch.begin() else { return }
+        // The first scene callback can precede application/window readiness.
+        // Reserve a single cancellable preflight; no Apple request or epoch
+        // ticket until all existing foreground/presenter checks are true.
+        guard Self.useStagedGate, task == nil, !attempt.attempted else { return }
         presenter.showChecking()
-
-        task = Task { @MainActor [weak self, weak presenter] in
-            guard let self = self, self.epoch.current == ticket else { return }
-            guard let presenter = presenter, !Task.isCancelled,
-                  scene.activationState == .foregroundActive,
-                  UIApplication.shared.applicationState == .active,
-                  presenter.viewIfLoaded?.window?.windowScene === scene,
-                  presenter.presentedViewController == nil else {
-                self.finish(ticket, decision: .holdUnavailable, foreground: false,
-                            cancelled: Task.isCancelled, completion: completion)
-                return
+        task = Task { @MainActor [weak self, weak presenter, weak scene] in
+            guard let self = self else { return }
+            var readiness = BibloZooAgeStartupReadiness()
+            while !Task.isCancelled {
+                guard let presenter = presenter, let scene = scene else {
+                    self.attempt.requireExplicitRetry()
+                    self.task = nil
+                    return
+                }
+                switch readiness.next(ready: self.presenterReady(scene, presenter)) {
+                case .wait:
+                    do { try await Task.sleep(nanoseconds: 100_000_000) }
+                    catch { return } // background/disconnect owns cancellation cleanup
+                    continue
+                case .hold:
+                    self.attempt.requireExplicitRetry()
+                    self.task = nil
+                    #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
+                    NSLog("[BibloZooAgeFixture] readiness timeout: sceneActive=\(scene.activationState == .foregroundActive) appActive=\(UIApplication.shared.applicationState == .active) attached=\(presenter.viewIfLoaded?.window?.windowScene === scene) root=\(presenter.viewIfLoaded?.window?.rootViewController === presenter) modal=\(presenter.presentedViewController != nil) dismissing=\(presenter.isBeingDismissed)")
+                    #endif
+                    completion(.holdUnavailable)
+                    return
+                case .start:
+                    guard self.attempt.begin(bundleID: Bundle.main.bundleIdentifier,
+                                             liveEnabled: Self.useNativeGate,
+                                             activePresenter: self.presenterReady(scene, presenter),
+                                             fixtureEnabled: Self.useFixtureGate),
+                          let ticket = self.epoch.begin() else {
+                        self.attempt.requireExplicitRetry()
+                        self.task = nil
+                        completion(.holdUnavailable)
+                        return
+                    }
+                    let decision = await self.evaluate(in: presenter)
+                    self.finish(ticket, decision: decision,
+                                foreground: self.presenterReady(scene, presenter),
+                                cancelled: Task.isCancelled, completion: completion)
+                    return
+                }
             }
-            let decision = await self.evaluate(in: presenter)
-            let foreground = scene.activationState == .foregroundActive
-                && UIApplication.shared.applicationState == .active
-                && presenter.viewIfLoaded?.window?.windowScene === scene
-                && presenter.presentedViewController == nil
-            self.finish(ticket, decision: decision, foreground: foreground,
-                        cancelled: Task.isCancelled, completion: completion)
         }
     }
 
@@ -606,6 +655,7 @@ final class BibloZooAgeStartupCoordinator {
         task?.cancel()
         task = nil
         if recheck { attempt = BibloZooAgeStartupAttempt() }
+        else { attempt.requireExplicitRetry() }
         return recheck
     }
 }
@@ -615,6 +665,7 @@ final class BibloZooAgeStartupCoordinator {
 @MainActor
 final class BibloZooAgeGateViewController: UIViewController {
     var onRetry: (() -> Void)?
+    var onAppearance: (() -> Void)?
     private let message = UILabel()
     private let retryButton = UIButton(type: .system)
 
@@ -656,7 +707,13 @@ final class BibloZooAgeGateViewController: UIViewController {
         showChecking()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        onAppearance?()
+    }
+
     func showChecking() {
+        loadViewIfNeeded()
         message.text = "Checking App Store requirements…"
         retryButton.isHidden = true
     }

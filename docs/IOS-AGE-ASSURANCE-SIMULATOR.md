@@ -1,6 +1,6 @@
 # BibloZoo — isolated synthetic age-assurance simulator testing
 
-November 24, 2026. Merged [#239](https://github.com/andydoane/biblozoo/pull/239) at `6408916e5c043578e716e3759c454a040834c63f`. Owner's Terminal log for exact PR head `25b9827b` confirms all 153 Debug synthetic Swift assertions PASS (128 prior + 25 fixtures), ordinary unsigned simulator BUILD SUCCEEDED on iOS SDK 26.5 (arm64/x86_64, iOS 15 target), with nonblocking legacy age declaration and AppIntents metadata warnings. [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45453241058) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45455557027) passed; those runs did not execute the age-assurance Swift tests. The fixture-flag simulator build, exact built fixture bundle ID, compile-failure fences and interactive simulator scenarios are not present in the supplied log and remain unverified. See [simulator acceptance guide](IOS-AGE-ASSURANCE-SIMULATOR.md) and [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). No release activation, live Apple API, entitlement/signing, backend, iCloud, cost or family data change. Initial minor consent, notification/serverless sufficiency, older OS/offline and actual revocation remain release blockers. Fixture identity deliberately excludes production native audio parity. Owner reviews and merges.
+November 24, 2026. Merged [#240](https://github.com/andydoane/biblozoo/pull/240) at `c6ef302f8d1496e9e5fec31309ba8f49a938e007`; portable CI passed. The prior fixture stalled on `minor-unknown`. [#241](https://github.com/andydoane/biblozoo/pull/241) adds bounded, cancellable startup readiness and explicit retry after interruption. Owner tested source head `c6301837c05ebb58bf2c560e921fb03dae72f924`: [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45461548336) passed, including synthetic policy/compile fences; 164 local Debug assertions, ordinary and fixture unsigned simulator builds (SDK 26.5, arm64/x86_64), fixture identity, 15 synthetic runtime scenarios, allowed gameplay progress retention and Larger Text PASS on iPhone 17 / iOS 26.5 simulator. Startup stall no longer reproduced; original root cause remains inferred. VoiceOver not found by owner in Simulator; deferred, not passed. Native microphone/audio excluded by fixture identity as designed; production audio parity, prompt/modal/direct-link and real-device behavior not fully verified. No real Apple consent, live activation, enrollment, backend, cost or family data changes. Source acceptance is recorded; documentation-only follow-up to #241 requires green CI and owner merge. Next gate: initial consent, notification/serverless sufficiency, StoreKit rating applicability, older OS/offline and revocation evidence; no speculative production enforcement.
 
 ## Isolation
 
@@ -8,20 +8,20 @@ The existing native gate and foreground authorization ticket use fake decisions,
 
 ## A — compile-only acceptance
 
-**Recorded acceptance:** exact #239 head passed 153 Debug assertions and the ordinary unsigned simulator build. The two intentional failure commands, fixture-only build and bundle ID check below remain pending on the owner's Mac; do not repeat successful commands unless source changes or needed to recreate a build. Current follow-up: portable ordinary and Debug synthetic Swift tests plus diagnostic-checked compile fences in the existing Ubuntu CI on ios-prep only. No new runner or infrastructure. Candidate CI results pending; Linux does not type-check UIKit/Apple frameworks or verify actual iOS fixture builds. Continue outstanding Mac-only acceptance in the simulator guide.
+**Recorded acceptance:** #241 exact source head `c6301837` passed 164 local Debug assertions, ordinary and fixture unsigned builds, fixture ID check and runtime retest; CI passed portable ordinary/Debug tests and fences. Prior #239 Mac negative fences passed; not rerun locally for #241. Do not reinstall original identity or use family data.
 
 From clean repo root (do not switch with uncommitted changes):
 
 ```bash
 git status --short
-git fetch origin refs/pull/239/head && git switch --detach FETCH_HEAD
+git fetch origin fix/ios-age-assurance-startup-readiness && git switch --detach FETCH_HEAD
 git rev-parse --short HEAD
 
 tmpdir="$(mktemp -d)"
 xcrun swiftc -D DEBUG ios/App/App/BibloZooAgeAssurance.swift scripts/validate_ios_age_assurance_foundation.swift -o "$tmpdir/age-test" && "$tmpdir/age-test"
 ```
 
-Expect previous 128 plus PASS: 25 synthetic simulator fixture assertions = 153. Without -D DEBUG, original 128. Tests are pure logic, not UIKit or real Apple responses.
+Expect 139 ordinary + 25 Debug fixture assertions = 164, including 11 startup readiness assertions. Without -D DEBUG, 139. Tests are pure logic, not UIKit or real Apple responses.
 
 These commands must fail with intentional #error messages:
 
@@ -42,13 +42,13 @@ Distinct fixture compile only:
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BibloZooAgeFixtureBuild CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER=com.andydoane.biblozoo.agefixture 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG BIBLOZOO_AGE_ASSURANCE_FIXTURE' build
 ```
 
-Ordinary build already succeeded at the tested head; the distinct fixture build should also report BUILD SUCCEEDED. Verify actual bundle identity before any subsequent installation:
+Both builds must report BUILD SUCCEEDED for the new candidate. Verify actual bundle identity before any subsequent installation:
 
 ```bash
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' /tmp/BibloZooAgeFixtureBuild/Build/Products/Debug-iphonesimulator/App.app/Info.plist
 ```
 
-Must output com.andydoane.biblozoo.agefixture. Report exact head and remaining results. #239 is merged; fixture compile/identity and runtime acceptance are still pending.
+Must output com.andydoane.biblozoo.agefixture. Report exact candidate head and results. #241 owner compile/identity passed. Commands retained for future source changes.
 
 ## B — after compile acceptance, isolated simulator runtime
 
@@ -78,12 +78,12 @@ xcrun simctl launch SIMULATOR_UDID com.andydoane.biblozoo.agefixture --biblozoo-
 
 Between scenarios terminate only fixture app with `xcrun simctl terminate SIMULATOR_UDID com.andydoane.biblozoo.agefixture` (not-running error benign). Repeat launch with new argument. No family backups or real data.
 
-| Fixture | Expected behavior, not observed yet |
+| Fixture | Expected behavior — observed on #241 unless noted |
 | --- | --- |
 | allow | normal bridge opens, no Apple call |
-| adult | normal child-safe experience; Grown-up Check unchanged |
+| adult | normal app opened; Grown-up Check not separately exercised |
 | minor-approved | synthetic consent opens bridge |
-| minor-unknown | adult assistance hold |
+| minor-unknown | adult assistance consent hold; #241 correct hold observed after prior startup stall |
 | declined | age-sharing help |
 | denied | permission unavailable hold |
 | unavailable | retryable hold |
@@ -94,8 +94,15 @@ Between scenarios terminate only fixture app with `xcrun simctl terminate SIMULA
 | slow-allow | five-second fake check; background before result; return held; explicit retry; late result cannot unlock |
 | missing/invalid/duplicate | unavailable hold |
 
-Also test allow across background/foreground (fake progress remains, intended same controller), large Dynamic Type, VoiceOver, absence of unexpected prompts. Actual bridge reattachment, storyboard initialization, layer/audio state, modal transitions, direct URL handling need verification. Fixture does not emulate Apple's real API availability, account, network, consent or revocation. Production native audio parity explicitly not tested under fixture identity. Report blockers and evidence for each scenario, not just compilation. No iPhone install or production activation.
+If readiness times out, capture only the fixture diagnostic (booleans, no age data): `xcrun simctl spawn SIMULATOR_UDID log show --last 2m --predicate 'eventMessage CONTAINS "[BibloZooAgeFixture]"' --style compact`. A retryable unavailable hold is safer than endless checking but is not a pass for minor-unknown. Also test allow across background/foreground (fake progress remains, intended same controller), large Dynamic Type, VoiceOver, absence of unexpected prompts. Actual bridge reattachment, storyboard initialization, layer/audio state, modal transitions, direct URL handling need verification. Fixture does not emulate Apple's real API availability, account, network, consent or revocation. Production native audio parity explicitly not tested under fixture identity. Report blockers and evidence for each scenario, not just compilation. No iPhone install or production activation.
+
+## Recorded owner runtime evidence — #241
+
+- All 15 scenarios in the table passed (missing, invalid and duplicate counted separately). `minor-unknown` showed actual consent hold, not generic unavailable; `allow`, `adult`, `minor-approved` opened normal setup/app. `retry-allow` held then opened on Retry. Unsupported had no retry. Missing/conflicting arguments stayed blocked.
+- `reentry-denied`: an initial ambiguous observation was not counted; controlled background/return using exact fixture ID retained PID 9692 and screenshot showed permission denial. `slow-allow`: PID 9801 retained on return, screenshot showed unavailable/retry hold; owner tapped Retry, check screen then normal app. No claim about every frame of the transition.
+- `allow`: owner reported fake gameplay progress retained after background/return. Larger Text passed. VoiceOver could not be located in Simulator settings; deferred to a supported environment. No production microphone/audio parity: fixture bundle is excluded from native permission/audio paths; owner observed microphone access unavailable. No change to those guards. Prompt absence, modal/direct-link handling and full layer/audio behavior not independently established; retain as outstanding targeted checks before live activation. No real consent or family data tested.
+- Local ordinary build completed `BUILD SUCCEEDED` with SDK 26.5, arm64/x86_64; nonblocking AVAudioSession/age declaration deprecation and skipped AppIntents metadata warnings. Source head unchanged by this documentation follow-up.
 
 ## Next
 
-After owner merge return to ios-prep, pull --ff-only, update [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). Resolve observed UI/lifecycle defects, initial consent evidence, notification obligations, older OS/offline behavior and actual StoreKit/PermissionKit evidence. No release activation or enrollment without explicit decision; stop/reassess if no-server policy cannot be established.
+After owner merge return to ios-prep, pull --ff-only, update [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). Startup stall resolved in tested fixture; complete deferred checks and resolve initial consent evidence, notification obligations, older OS/offline behavior and actual StoreKit/PermissionKit evidence. No release activation or enrollment without explicit decision; stop/reassess if no-server policy cannot be established.

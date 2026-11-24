@@ -60,6 +60,26 @@ struct BibloZooAgeAssuranceTests {
         precondition(newScene.begin(bundleID: prod, liveEnabled: true, activePresenter: true))
         print("PASS: 10 synthetic startup lifecycle assertions")
 
+        // Delayed foreground/window readiness must not consume an age attempt.
+        var readiness = BibloZooAgeStartupReadiness(maxWaits: 2)
+        precondition(readiness.next(ready: false) == .wait)
+        precondition(readiness.remainingWaits == 1)
+        precondition(readiness.next(ready: true) == .start)
+        var timeout = BibloZooAgeStartupReadiness(maxWaits: 2)
+        precondition(timeout.next(ready: false) == .wait)
+        precondition(timeout.next(ready: false) == .wait)
+        precondition(timeout.next(ready: false) == .hold)
+        precondition(timeout.remainingWaits == 0)
+        var readyAtDeadline = BibloZooAgeStartupReadiness(maxWaits: 0)
+        precondition(readyAtDeadline.next(ready: true) == .start)
+        var interrupted = BibloZooAgeStartupAttempt()
+        interrupted.requireExplicitRetry()
+        precondition(interrupted.attempted)
+        precondition(!interrupted.begin(bundleID: prod, liveEnabled: true, activePresenter: true))
+        interrupted = BibloZooAgeStartupAttempt()
+        precondition(interrupted.begin(bundleID: prod, liveEnabled: true, activePresenter: true))
+        print("PASS: 11 synthetic startup readiness assertions")
+
         let regulated: [(Int?, Int?, Bool, O)] = [
             (nil, 12, false, .minor), (13, 15, false, .minor),
             (16, 17, false, .minor), (18, nil, true, .confirmedAdult),

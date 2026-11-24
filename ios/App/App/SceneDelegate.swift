@@ -179,6 +179,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     #if canImport(DeclaredAgeRange)
     private func makeAgeGate(_ scene: UIScene) -> BibloZooAgeGateViewController {
         let gate = BibloZooAgeGateViewController()
+        gate.onAppearance = { [weak self, weak gate, weak scene] in
+            guard let self = self, let gate = gate, let scene = scene,
+                  scene.activationState == .foregroundActive || scene.activationState == .foregroundInactive else { return }
+            self.beginAgeGate(scene, gate: gate, retry: false)
+        }
         gate.onRetry = { [weak self, weak gate, weak scene] in
             guard let self = self, let gate = gate, let scene = scene else { return }
             self.beginAgeGate(scene, gate: gate, retry: true)

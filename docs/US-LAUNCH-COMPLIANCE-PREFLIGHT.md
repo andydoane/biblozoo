@@ -1,8 +1,8 @@
 # BibloZoo 1.0 — US launch compliance preflight
 
-## CURRENT — merged simulator fixtures; acceptance pending (November 24, 2026)
+## CURRENT — startup readiness retest passed (November 24, 2026)
 
-PR #239 merged at `6408916e5c043578e716e3759c454a040834c63f`. Owner's exact-head `25b9827b` log confirms 153 Debug synthetic assertions and ordinary unsigned simulator build PASS (SDK 26.5, both architectures); PR and merge CI passed. Fixture-only build and exact bundle ID, compile-failure fences and interactive simulator acceptance are unverified. See [current roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md). No release activation, live Apple calls, new backend, costs, or family data changes; prior consent, notification and release blockers remain.
+Merged [#240](https://github.com/andydoane/biblozoo/pull/240); [#241](https://github.com/andydoane/biblozoo/pull/241) fixes the observed simulator startup stall. Owner tested source head `c6301837c05ebb58bf2c560e921fb03dae72f924`: [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45461548336), 164 local Debug assertions, both unsigned simulator builds, fixture identity, all 15 synthetic runtime scenarios, allowed gameplay progress retention and Larger Text PASS. VoiceOver deferred (not found in Simulator); production audio/microphone intentionally excluded from fixture; prompt/modal/direct-link and real-device checks remain outstanding. No real Apple consent, live activation, enrollment, backend, costs or family data changes. Documentation-only follow-up and owner merge pending. See [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md) for exact evidence and remaining initial-consent, notification/serverless, StoreKit rating, older OS/offline and revocation gates.
 
 ## CURRENT — availability policy and age-assurance roadmap (November 24, 2026)
 
