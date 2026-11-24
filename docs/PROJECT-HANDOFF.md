@@ -1,5 +1,15 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — owner approves App Privacy disclosure and confirms monitored contact (November 24, 2026)
+
+**Baseline:** ios-prep at c9d16fa45817ed3a897bc3a20d129ad8000e8362, following merged [PR #213](https://github.com/andydoane/biblozoo/pull/213).
+
+- [x] **Owner App Privacy disclosure approval:** owner explicitly approved the proposed native iOS App Store Connect answer `No, we do not collect data from this app` (Data Not Collected), subject to final release validation. Evidence includes the scoped first-party and SDK source/configuration assessments, archive manifest inventory, simulator and physical-device observations, and local SDK signature verification recorded below. This is pre-enrollment owner sign-off, not a completed App Store Connect submission, exhaustive traffic/binary audit, or Apple acceptance.
+- [x] **Contact mailbox monitoring:** owner explicitly confirmed monitoring biblozooapp@gmail.com and reported opening it today. No independent deliverability test performed. Existing November 22 privacy policy wording remains owner-approved and unchanged.
+- **Remaining gates:** final production-equivalent archive/SDK and required-reason validation, any remaining permission/recovery and offline/device smoke paths, and App Store Connect upload/privacy validation after enrollment. Revisit the disclosure if the final build, SDKs, or evidence changes. No new runtime testing claimed here.
+- **Next pre-enrollment work:** encryption/export compliance assessment (review actual app and dependencies, Apple guidance, and applicable declaration before changing Info.plist or answering App Store Connect). Continue other release preparation while outstanding asset-rights questions remain tracked separately. Do not enroll or alter app data without owner authorization.
+- Documentation only; no app code, policy, dependency, signing, asset, or saved-data changes. Owner reviews and merges each checkpoint PR.
+
 ## CURRENT — owner approves existing privacy policy wording (November 24, 2026)
 
 **Baseline:** ios-prep at 82b50c8a80033f9cb2c088004c1b34261db85348, following merged [PR #212](https://github.com/andydoane/biblozoo/pull/212).
