@@ -84,6 +84,28 @@ struct BibloZooAgeAssessment: Equatable {
     }
 }
 
+// StoreKit's app rating code is opaque metadata, not a person's age,
+// approval or evidence that an update is pending. A development zero is
+// not usable as a production baseline. Nothing here stores a baseline.
+enum BibloZooAppRatingComparison: Equatable {
+    case inactive
+    case unsupportedPlatform
+    case unavailable
+    case baselineMissing
+    case unchanged
+    case changed
+
+    static func evaluate(enabled: Bool, supported: Bool, previous: Int?,
+                         current: Int?, cancelled: Bool) -> Self {
+        guard enabled else { return .inactive }
+        guard !cancelled else { return .unavailable }
+        guard supported else { return .unsupportedPlatform }
+        guard let current = current, current != 0 else { return .unavailable }
+        guard let previous = previous, previous != 0 else { return .baselineMissing }
+        return previous == current ? .unchanged : .changed
+    }
+}
+
 enum BibloZooInitialConsent {
     case unknown
     case verified
@@ -334,6 +356,9 @@ enum BibloZooAgeFixture: String, CaseIterable {
 #if os(iOS) && canImport(DeclaredAgeRange)
 import UIKit
 import DeclaredAgeRange
+#if canImport(StoreKit)
+import StoreKit
+#endif
 #if canImport(PermissionKit)
 import PermissionKit
 #endif
@@ -432,6 +457,26 @@ final class BibloZooAgeAssurance {
         }
     }
 }
+
+// Compile-only staged native reader; no launch, fixture, UI or update caller.
+// The previous value must eventually come from a separately reviewed,
+// trustworthy app-rating baseline. Never derive it from a child's age,
+// local profiles, the listing draft or a development StoreKit zero.
+#if canImport(StoreKit)
+@MainActor
+enum BibloZooAppRatingService {
+    static func compare(previous: Int?) async -> BibloZooAppRatingComparison {
+        guard BibloZooAgeStartupCoordinator.useNativeGate else { return .inactive }
+        guard !Task.isCancelled else { return .unavailable }
+        guard #available(iOS 26.2, *) else { return .unsupportedPlatform }
+        let current = await AppStore.ageRatingCode
+        return BibloZooAppRatingComparison.evaluate(
+            enabled: BibloZooAgeStartupCoordinator.useNativeGate,
+            supported: true, previous: previous, current: current,
+            cancelled: Task.isCancelled)
+    }
+}
+#endif
 
 // Staged system adapter for real significant updates only. Version 1.0 has
 // no pending change. These methods deliberately have no launch caller yet:

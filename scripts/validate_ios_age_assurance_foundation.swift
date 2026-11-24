@@ -260,6 +260,32 @@ struct BibloZooAgeAssuranceTests {
         precondition(!offlineEpoch.authorized)
         print("PASS: \(availability.count + 6) synthetic availability and offline-policy assertions")
 
+        // Opaque synthetic codes: no numeric age mapping or approval inference.
+        typealias Rating = BibloZooAppRatingComparison
+        let ratings: [(Bool, Bool, Int?, Int?, Bool, Rating)] = [
+            (false, true, 41, 99, false, .inactive),
+            (false, false, nil, nil, true, .inactive),
+            (true, false, 41, 99, false, .unsupportedPlatform),
+            (true, true, 41, nil, false, .unavailable),
+            (true, true, nil, nil, false, .unavailable),
+            (true, true, 41, 0, false, .unavailable),
+            (true, true, 0, 0, false, .unavailable),
+            (true, true, nil, 99, false, .baselineMissing),
+            (true, true, 0, 99, false, .baselineMissing),
+            (true, true, 41, 41, false, .unchanged),
+            (true, true, 41, 99, false, .changed),
+            (true, true, 99, 41, false, .changed),
+            (true, true, 41, 41, true, .unavailable),
+            (true, true, 41, 99, true, .unavailable),
+            (true, true, nil, 99, true, .unavailable)
+        ]
+        for (enabled, supported, previous, current, cancelled, expected) in ratings {
+            precondition(Rating.evaluate(enabled: enabled, supported: supported,
+                                         previous: previous, current: current,
+                                         cancelled: cancelled) == expected)
+        }
+        print("PASS: \(ratings.count) synthetic app-rating comparison cases")
+
         #if DEBUG
         typealias F = BibloZooAgeFixture
         let fixtureID = "com.andydoane.biblozoo.agefixture"
