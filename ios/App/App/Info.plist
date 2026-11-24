@@ -26,6 +26,8 @@
 	<string>BibloZoo saves your Ghost Writer verse pictures and silent videos to Photos when you tap Save.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>BibloZoo uses the microphone so you can record and listen to yourself practicing a verse. Recordings are not saved or uploaded.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
