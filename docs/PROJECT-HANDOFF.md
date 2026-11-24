@@ -1,5 +1,14 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — font upstream notices and exact-version reconciliation (November 24, 2026)
+
+**Baseline:** ios-prep f4209ae4c5bf417f55e461ac2acafffdce4f9302, following merged #226.
+
+- [x] Rechecked 13 tracked font paths / 10 unique blobs; no font binaries changed. Titan One has three identical paths; Chalkboard has two. Retrieved full authoritative upstream notices for Baloo 2, News Cycle, Titan One, VT323, Orbitron, Caprasimo and Playwrite US Modern from google/fonts main ofl directories; Chunk from theleagueof/chunk master Open Font License.markdown. **Correction:** Special Elite is in google/fonts apache/specialelite with Apache 2.0 license and Astigmatic copyright in METADATA.pb, not OFL. All eight OFL family licenses permit commercial bundling subject to terms; Apache 2.0 has distinct notice obligations. [OFL mobile bundling guidance](https://openfontlicense.org/how-to-use-ofl-fonts).
+- [x] Added [upstream full notices](../verse_fonts/THIRD-PARTY-FONT-LICENSES.txt) in verse_fonts/ so scripts/build.js recursive runtime directory copy should include them in dist and synced iOS app. Texts copied from upstream sources, including copyright and Special Elite metadata statement, not an assertion that the exact bundled versions have been licensed. No UI, font appearance, PWA main or binaries changed. Actual archive presence and exact notice adequacy still require verification.
+- [ ] **Exact version reconciliation:** current upstream Git blob hashes differ from bundled copies for Baloo 2, News Cycle, Special Elite, Titan One, VT323, Orbitron, Caprasimo and Chunk; Playwrite upstream is TTF while bundled is WOFF, no exact comparison possible. Older versions/build variants are plausible, not proven. GitHub connector rejected binary blob reads (UTF-8-only). Need local read-only SFNT/WOFF name-record inspection (copyright, family, version, license description/URL, vendor and reserved names), owner original downloads or historical authoritative binaries as needed; reconcile notices against exact versions, including Apache notice/modification obligations and any OFL modified-version reserved-name requirements. No license clearance asserted merely from family match. Chalkboard remains deferred/open, no license applied to it.
+- [ ] Final clean build/Capacitor sync and archive verification of bundled notices, fonts and third-party terms. No build, CI or device test run here. Next: local font metadata inventory, then targeted audio provenance inventory. Existing rights blockers remain open; no paid enrollment or distribution approval.
+
 ## CURRENT — offline App Store listing draft and screenshot storyboard (November 24, 2026)
 
 **Baseline:** ios-prep at 87c03fd547bbc8ecf9563f5c4b5793aa0ad0cd5b, following merged [PR #225](https://github.com/andydoane/biblozoo/pull/225).
