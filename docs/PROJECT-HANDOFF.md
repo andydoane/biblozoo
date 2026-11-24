@@ -1,5 +1,13 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — native age assurance foundation (November 24, 2026)
+
+**Baseline:** `ios-prep` at `d9fe4065b20aeab1dfbeeab608e0d23854a5f81c` following merged [PR #231](https://github.com/andydoane/biblozoo/pull/231).
+
+- Owner reports Xcode 26.6 (17F113), iPhoneOS SDK 26.5. Meets planned compilation SDK. Owner chooses native-only implementation and App Review rather than a developer-forum post; review acceptance is not legal clearance, and server notification applicability remains unresolved. No backend, paid service, iCloud or accounts authorized.
+- First code checkpoint: isolated `ios/App/App/BibloZooAgeAssurance.swift` added to existing Xcode App Sources, native regulatory query (26.4+ feature set, 26.2+ eligibility fallback), Apple request/response adapter, transient age-band classification, distinct declined/ambiguous/unavailable states, 26.5 confirmed status plus guarded legacy confirmation. No runtime caller or launch gate, no entitlement/signing or deployment target change, no JS bridge or data persistence. Result is not consent proof or access authorization. Older OS unavailable not automatically not-required.
+- [Foundation compile/acceptance notes](IOS-AGE-ASSURANCE-FOUNDATION.md) include synthetic Swift cases and simulator unsigned compile commands. Actual Xcode compile, SDK availability/weak linkage, free-team capability, Apple sandbox, offline/old-OS behavior, minor download consent, significant updates, revocation and release legality remain OPEN. Do not install production ID or alter real family/Audio Test data. No build/test results claimed until owner verifies exact candidate. No PWA changes. Next phase: after compile acceptance, propose production-only lifecycle/access and entitlement/signing handling before any live Apple check.
+
 ## CURRENT — no-backend age assurance feasibility gate (November 24, 2026)
 
 **Baseline:** `ios-prep` at `d49595c23a6f80f16002850bd8323414a7769b55`, following merged [PR #230](https://github.com/andydoane/biblozoo/pull/230).
