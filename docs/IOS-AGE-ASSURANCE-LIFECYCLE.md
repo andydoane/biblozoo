@@ -1,5 +1,9 @@
 # BibloZoo — staged age assurance foreground lifecycle
 
+## CURRENT — availability policy and age-assurance roadmap (November 24, 2026)
+
+Merged #237 at `089b72844d5f31a770e97c3cba6706cac9194ed5`. Owner tested exact head `a8b28874`: all 110 synthetic assertions PASS; unsigned simulator BUILD SUCCEEDED (SDK 26.5, arm64/x86_64, iOS 15 target); branch validation passed. Current candidate #238 separates unsupported platform from transient system failures and adds a non-Debug live-flag compile fence. The conservative staged gate still holds unresolved consent/errors, not a final older-OS or offline release policy. It does not assume connectivity, cache approvals, infer consent from installation, or alter normal builds. No backend, iCloud, signing, new costs, PWA or Audio Test changes. See [standalone age-assurance roadmap and resume instructions](IOS-AGE-ASSURANCE-ROADMAP.md) for exact baseline, completed PRs, remaining acceptance and stop/go gates. The roadmap is the current entry point for this workstream; older checkpoints are historical. Apple's [Q&A](https://developer.apple.com/support/age-assurance/) and [June 3 Texas update](https://developer.apple.com/news/?id=sg176nne) were rechecked November 24; initial minor consent signal, server notification applicability, legacy-account eligibility and offline behavior remain unresolved. Expected prior 110 + 18 availability/offline-policy assertions; candidate compile not yet verified. Do not activate for release, enroll/pay or install on family devices. Next: obtain decisive evidence and run isolated synthetic lifecycle/UI acceptance, not speculative implementation of consent.
+
 Baseline merged #236 `4a7c45a850545f06d8d68b1b7ac110ffae8f43e7`. Owner tested exact #236 head `0d8ad7bb`: 89 synthetic checks PASS, unsigned iOS simulator BUILD SUCCEEDED (both architectures, SDK 26.5, iOS 15 target). GitHub Actions validation passed. No live mode test. November 24, 2026.
 
 ## Scope and evidence

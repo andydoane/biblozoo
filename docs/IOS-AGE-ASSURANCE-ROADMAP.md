@@ -1,0 +1,87 @@
+# BibloZoo — native age-assurance roadmap and chat-independent handoff
+
+**Current checkpoint:** November 24, 2026. Candidate PR #238; verified base `089b72844d5f31a770e97c3cba6706cac9194ed5` (merged #237). This is the authoritative navigation/checkpoint document for this small workstream, not a legal opinion or assertion of production readiness. Keep it and PROJECT-HANDOFF.md current in every related PR, recording actual verified acceptance rather than predicted success. Historical checkpoint docs are linked below.
+
+## 1. Owner decisions and boundaries
+
+- Repository `andydoane/biblozoo`, working branch `ios-prep`; owner reviews/merges each PR. Do not merge on owner's behalf. Work on native iPhone/iPad only, preserving free PWA, Audio Test, features, Scripture, audio, child-safe design, Zookeeper profiles, existing game progress/backups, and Grown-up Check. US-only initial storefront, $4.99 paid upfront; no ads, subscription or IAP. Education and conditional Kids ages 6–8. Existing approval of Grown-up Check is not legal verification of consent.
+- Hobby project: **no developer-operated backend (even free tier), recurring charges, paid age verification, external account, database, iCloud storage, DOB/identity collection, or unnecessary network dependency** without separate owner approval. Paid Apple Developer enrollment deferred; no charges or capability/signing changes authorized yet. If mandatory backend or unacceptable offline loss is established, stop and reassess; do not spend or release by default.
+- Owner elected implementation, testing, then App Review rather than posting on a developer forum. No forum inquiry, official individual reply or legal clearance obtained. Apple system calls may need connectivity. App Review is not legal clearance and Apple says its review process is unchanged.
+- Mac: Xcode 26.6 build 17F113, iOS SDK 26.5. iOS 15.0 minimum provisional, Swift 5, Capacitor 8.5.2. Do not raise deployment target without evidence/owner agreement. No original-ID device install without established recovery. Current build has no tracked live flag or entitlement. `BIBLOZOO_AGE_ASSURANCE_LIVE` is disabled by default; #238 adds compile rejection when defined without DEBUG. The unfinished path is not for distribution.
+
+## 2. Completed evidence vs work in progress
+
+| PR | Scope | Recorded owner acceptance |
+| --- | --- | --- |
+| [#230](https://github.com/andydoane/biblozoo/pull/230) | US-only release / privacy preflight | Merged, documentation |
+| [#231](https://github.com/andydoane/biblozoo/pull/231) | Serverless feasibility / implementation plan | Merged, documentation |
+| [#232](https://github.com/andydoane/biblozoo/pull/232) | Native age-range foundation | 14 classification checks and unsigned simulator compile PASS on e573925f |
+| [#233](https://github.com/andydoane/biblozoo/pull/233) | Staged startup and regulatory routing | 31 synthetic checks and unsigned simulator compile PASS on 191ca61a |
+| [#234](https://github.com/andydoane/biblozoo/pull/234) | Native access policy, pre-WebView gate | 64 checks and unsigned simulator compile PASS on 5172c734 |
+| [#235](https://github.com/andydoane/biblozoo/pull/235) | Significant-update adapter | 89 checks PASS on f3bf2dca; native compile FAILED |
+| [#236](https://github.com/andydoane/biblozoo/pull/236) | PermissionKit denial and read-only default correction | 89 checks and unsigned simulator compile PASS on 0d8ad7bb |
+| [#237](https://github.com/andydoane/biblozoo/pull/237) | Foreground ticket invalidation and staged recheck | 110 checks and unsigned simulator compile PASS on a8b28874; merged at baseline above; CI success |
+| [#238](https://github.com/andydoane/biblozoo/pull/238) | Unsupported-platform distinction, offline-policy cases, release compile fence, standalone roadmap | Candidate: expect 128 checks; native compile pending |
+
+All checks above are owner-provided logs and recorded GitHub status, not independently run on the assistant host. Generic simulator builds are unsigned compile/link only, arm64 and x86_64. Legacy age declaration deprecation and skipped AppIntents metadata warnings nonblocking in #237. No live or opt-in runtime test, signed Apple API response, deployment test or legal acceptance has been performed. #237 tests pure state logic, not actual UIKit/audio behavior.
+
+## 3. Current architecture and user-visible state
+
+- `ios/App/App/BibloZooAgeAssurance.swift`: DeclaredAgeRange guarded by OS availability, age gates 13/16/18, conservative bounds classification, regulatory feature routing (26.4+; broad 26.2/26.3 eligibility fallback), transient policy, significant-update PermissionKit/adult acknowledgment adapter (no actual update caller), one foreground ticket, native hold/retry screen. No raw age, verification method, account IDs or consent evidence in logs, backup, JS or persistent storage. Initial minor consent remains unknown in actual adapter; synthetic verified input is not real evidence.
+- `ios/App/App/SceneDelegate.swift`: opt-in native gate before WKWebView creation, recheck after true background on previously authorized scene, same retained controller restoration. Stale/cancelled check cannot authorize. Actual retained bridge JS/audio, modal and layer behavior not yet tested. No automatic assumption that a retained controller is secure.
+- `scripts/validate_ios_age_assurance_foundation.swift`: pure Swift synthetic tests; macOS excludes UIKit and Apple frameworks. Normal app behavior remains unchanged. Gate exists in source but not visible or active in ordinary builds. Audio Test and PWA unaffected.
+- #238 separates unsupported OS from generic temporary/unavailable check; no retry button for unsupported OS in staged screen. Generic errors may be offline but are not classified as such without evidence. A fresh successful OS result may be used even offline if the system supplies it; unavailable/unsupported does not become notRequired or verified consent. No reachability checks, cached grants, custom network or local consent collection. This conservative test policy would block affected users if enabled today; **do not ship it**. Non-Debug live flag is a compile error until explicitly reviewed activation.
+
+## 4. Verified external evidence and unresolved release questions
+
+Rechecked November 24, 2026:
+- [Apple June 3 Texas announcement](https://developer.apple.com/news/?id=sg176nne): new Texas accounts subject to law starting June 4; checklist covers Declared Age Range, PermissionKit, StoreKit rating property and server notification. [Apple Q&A](https://developer.apple.com/support/age-assurance/): developers must check age in applicable regions; Apple prevents launch after revocation and directs developers to RESCIND_CONSENT. Significant-update access is developer responsibility. Existing Apple Accounts on iOS/iPadOS 18 or earlier unaffected; this is not an exemption for every account on older devices or all laws. No evidence of an API identifying this cohort merely by OS version.
+- [Texas Business & Commerce Code Chapter 121](https://tcss.legis.texas.gov/resources/BC/htm/BC.121.v3.htm), §§121.022, .024, .052–.055: separate age category and minor consent verification, restricted use/deletion, significant changes and disclosures. Statute does not expressly specify a developer server in these sections; Apple checklist includes notification. No conclusion that OS-only enforcement meets all obligations. Review litigation and each applicable state at release; US-only is not a Texas exclusion.
+- [Apple sample](https://developer.apple.com/documentation/declaredagerange/implementing-age-assurance-and-permissions) uses original app version and iCloud for significant-change handling. Not proof iCloud is mandatory. No separate native initial-download consent field identified in [AgeRange](https://developer.apple.com/documentation/declaredagerange/agerangeservice/agerange); no AppTransaction purchase/installation inference, parental-controls inference or math-gate substitute. No fake first-release significant change. StoreKit age-rating property still to assess for paid-upfront/no-IAP app.
+- Unknowns: native evidence of initial consent for an eligible child; whether platform installation/launch enforcement is sufficient under applicable law; handling already-running and offline revoked app; notification requirement for a local app; legacy/new account cohort; old iOS and offline first/repeat launch; significant-update delayed response/recovery without prohibited persistence. No current confirmation. Do not use an adult Apple Account as proof of individual players' ages or to bypass Grown-up Check.
+
+## 5. Remaining ordered roadmap (not fixed PR numbers)
+
+| Stage | Acceptance / decision |
+| --- | --- |
+| #238 candidate | 128 synthetic checks and unsigned simulator compile; confirm GitHub validation, owner merge; update roadmap with result |
+| Evidence / feasibility gate | Obtain supported initial-consent signal or authoritative confirmation of an acceptable native-only method, determine notification obligations, verify age rating API applicability and older OS/offline policy. If unresolved, don't make up signals or continue speculative production enforcement; record gap, ask owner how to proceed before spending. |
+| Isolated pre-enrollment test | Owner-approved simulator-only synthetic test harness with fixtures, never real family data or live age API; actual native UI transition, denied/retry, foreground retention/audio, accessibility. Separate identity, clearly fake, never distribution. Remove/guard harness from release. If needed, fix lifecycle before any live testing. |
+| Real native policy | Use actual verified store evidence only; implement significant-change detection/version-specific responses, safe delay/cancellation/account change/revocation and retry, no fake 1.0 update. Define old OS/offline/no-requirements behavior from evidence. Keep data and child-safe defaults. Verify no-server sufficiency or stop. |
+| Enrollment / capability decision | Owner explicitly approves paid membership and isolated signed sandbox identity/capability; no original-ID family install. Keep live release compile fence. |
+| Signed sandbox/device | [Apple sandbox guide](https://developer.apple.com/documentation/storekit/testing-age-assurance-in-sandbox); new/existing accounts, regulated/unregulated, confirmed/unconfirmed adult, child consent approved/denied/revoked, declined/unknown/errors, age bands, region/account changes, offline, OS versions, background/relaunch, real update flow. Observe actual signals and notification delivery, preserve data and audio. |
+| Production activation review | Only after preceding evidence and tests: owner-approved release PR removes compile fence and enables required capability/live mode in release. Confirm no regression or unsupported mandatory architecture. No automatic activation because source compiles. |
+| Final release checks | Actual archive/privacy manifests and policy/labels, Kids eligibility and rating, rights, storefront, legal review as appropriate, App Review. Maintain [US preflight](US-LAUNCH-COMPLIANCE-PREFLIGHT.md), [privacy preflight](APP-PRIVACY-PREFLIGHT.md), [listing](APP-STORE-LISTING-DRAFT.md), [Kids acceptance](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md), [asset ledger](ASSET-LICENSES.md). |
+
+Acceptance matrix: not-required/no prompt; regulated bands and ambiguous/missing bounds; no proof of consent vs verified/denied/revoked; no pending update vs pending/approved/denied/unknown; older OS and unsupported platform; offline cold/reentry/API error; stale/cancelled responses and rapid scene transitions; retained bridge audio, resume and family progress; real-device data minimization; direct links and JS cannot bypass. No real family restore or original-ID install. Evidence for each case and exact head needed; test fixture success is not legal proof.
+
+## 6. Resume from a new chat
+
+Read this roadmap and the top CURRENT section of [PROJECT-HANDOFF.md](PROJECT-HANDOFF.md). Verify remote branch head, latest PR status/diff and CI; don't assume this snapshot is latest. Review [plan](IOS-AGE-ASSURANCE-PLAN.md), [foundation](IOS-AGE-ASSURANCE-FOUNDATION.md), [startup](IOS-AGE-ASSURANCE-STARTUP.md), [access](IOS-AGE-ASSURANCE-ACCESS.md), [consent](IOS-AGE-ASSURANCE-CONSENT.md), [lifecycle](IOS-AGE-ASSURANCE-LIFECYCLE.md) and [testing](TESTING.md) as needed. Fetch source at verified commit before editing. Preserve historical docs and notices; update roadmap and relevant docs in each PR with decision, exact evidence, blockers and next step. Do not repeat completed tests unless source changed or a specific verification remains.
+
+For current candidate, from clean repo root (do not switch with uncommitted changes):
+
+```bash
+git status --short
+git fetch origin refs/pull/238/head && git switch --detach FETCH_HEAD
+git rev-parse --short HEAD
+
+tmpdir="$(mktemp -d)"
+xcrun swiftc ios/App/App/BibloZooAgeAssurance.swift scripts/validate_ios_age_assurance_foundation.swift -o "$tmpdir/age-test" && "$tmpdir/age-test"
+```
+
+Expect previous 110 plus `PASS: 18 synthetic availability and offline-policy assertions` = 128. Verify release fence with expected failure separately (no app installation):
+
+```bash
+xcrun swiftc -D BIBLOZOO_AGE_ASSURANCE_LIVE -typecheck ios/App/App/BibloZooAgeAssurance.swift
+```
+
+Expected failure with intentional message: BibloZoo age assurance is not approved for live Release activation. A successful command would be a failed fence test. Normal unsigned simulator build:
+
+```bash
+xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BibloZooAgeAssuranceBuild CODE_SIGNING_ALLOWED=NO build
+```
+
+Expected BUILD SUCCEEDED. No launch/install. After owner merges, `git switch ios-prep` and `git pull --ff-only`. If already merged, verify candidate is ancestor and use exact merged commit; don't fetch a deleted branch name. Previous opt-in compile-only check remains unverified; do not run live builds. No author-side native compile or candidate acceptance claimed.
+
+**Suggested new-chat request:** "Review the current ios-prep branch of andydoane/biblozoo, read docs/IOS-AGE-ASSURANCE-ROADMAP.md and docs/PROJECT-HANDOFF.md, verify latest merged PR and tests, and resume the next unblocked age-assurance checkpoint. Keep native-only/no backend/no recurring costs, preserve family data, and update docs with each PR. I review and merge."
