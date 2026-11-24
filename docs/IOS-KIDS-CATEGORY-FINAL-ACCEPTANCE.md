@@ -1,5 +1,14 @@
 # BibloZoo 1.0 — Kids Category final acceptance and remaining release gates
 
+## CURRENT — owner approves conditional Kids Category positioning and parental gate (November 24, 2026)
+
+**Baseline:** ios-prep at 00d7fad66fa4dcd676dab391797880f63c5c816c, following merged [PR #222](https://github.com/andydoane/biblozoo/pull/222).
+
+- [x] **Owner product decision — Grown-up Check:** owner explicitly approved retaining the existing parental gate for version 1.0, subject to Apple's review. Keep existing randomized two-step arithmetic and protections; no speculative redesign. This is product approval, not a finding of childproof security, legal parental consent or confirmed adult-level compliance. Prior scoped source and device evidence remains unchanged.
+- [x] **Owner product decision — listing:** owner explicitly approved Education and Made for Kids ages 6–8, provided BibloZoo qualifies. Secondary category remains undecided. Do not select or market as Made for Kids until truthful final age-rating answers establish eligibility; final App Review and Kids Category acceptance remain open. If ineligible, revisit the product/listing decision with the owner rather than assume an Education-only fallback.
+- **Remaining:** consult Apple after enrollment on sacramental wine, abstract arcade violence/weapon references/frequency and gate suitability; visual/audio content assessment, final questionnaire, applicable privacy/rights/storefront obligations, production artifact and App Review verification remain open. Preserve Scripture, gameplay and existing gate unless a specific issue is identified and the owner authorizes a change. No new testing or approval by Apple claimed.
+- **Next pre-enrollment milestone:** developer enrollment preparation (individual vs organization, public seller identity, business/contact and account requirements); draft store metadata and prepare remaining release checks. Do not purchase membership yet. Documentation only; no app, assets, user data or availability changes. Owner reviews and merges.
+
 ## CURRENT — parental-gate suitability recheck and Apple consultation preparation (November 24, 2026)
 
 **Baseline:** ios-prep at 6c0530c18ab85563710a840419c4c5a97ad1eef5, following merged [PR #221](https://github.com/andydoane/biblozoo/pull/221).
