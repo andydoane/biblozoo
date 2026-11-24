@@ -120,6 +120,9 @@
         icon.setAttribute("aria-hidden", "true");
         const title = element("h2", "bz-parental-gate-title", "Grown-up Check");
         title.id = "bz-parental-gate-title";
+        // Focus static content first so VoiceOver can read the dialog in order
+        // without automatically summoning the numeric keyboard.
+        title.setAttribute("tabindex", "-1");
         const actionLabel = typeof options.actionLabel === "string"
           ? options.actionLabel.trim().slice(0, 80) : "";
         // Show the specific action once; avoid repeating the general
@@ -131,7 +134,9 @@
         dialog.setAttribute("role", "dialog");
         dialog.setAttribute("aria-modal", "true");
         dialog.setAttribute("aria-labelledby", title.id);
-        dialog.setAttribute("aria-describedby", "bz-parental-gate-description");
+        // The description remains normal readable text, not an ARIA
+        // description on the entire dialog. iOS VoiceOver otherwise repeats
+        // "Description" and the same action text for every focused child.
         message.id = "bz-parental-gate-description";
         dialog.append(icon, title, message, content);
         overlay.appendChild(dialog);
@@ -140,6 +145,7 @@
           overlay, dialog, content, resolve, reject,
           onApproved: options.onApproved,
           previousFocus: doc.activeElement,
+          initialFocus: null,
           finished: false, attempts: 0, question,
           onCancel: () => finish(false),
           onVisibility: () => {
@@ -158,7 +164,8 @@
               return;
             }
             const first = focusable[0], last = focusable[focusable.length - 1];
-            if (event.shiftKey && doc.activeElement === first) {
+            if (event.shiftKey && (doc.activeElement === first ||
+                doc.activeElement === session.initialFocus)) {
               event.preventDefault();
               last.focus();
             } else if (!event.shiftKey && doc.activeElement === last) {
@@ -184,7 +191,10 @@
           continueButton.addEventListener("click", () => renderQuestion());
           actions.append(cancel, continueButton);
           content.append(actions);
-          continueButton.focus({ preventScroll: true });
+          // Start at the title, then let screen readers encounter the
+          // visible action explanation and both buttons in document order.
+          session.initialFocus = title;
+          title.focus({ preventScroll: true });
         }
 
         function renderQuestion(feedbackText) {
@@ -192,12 +202,14 @@
           content.replaceChildren();
           const prompt = element("p", "bz-parental-gate-prompt",
             "Solve this problem to continue:");
+          prompt.setAttribute("tabindex", "-1");
           const equation = element("p", "bz-parental-gate-equation",
             session.question.first + " − " + session.question.subtrahend +
             " + " + session.question.addition + " = ?");
-          // Focus the non-editable challenge so VoiceOver reads the equation
-          // without iOS opening its numeric keyboard over this modal.
-          // Parents tap the clearly labelled Answer field when ready.
+          // Keep the equation as ordinary screen-reader-readable text.
+          // The static instruction receives initial focus so the equation
+          // follows it in swipe order without opening the numeric keyboard.
+          // Parents tap Answer only when ready.
           equation.setAttribute("tabindex", "-1");
           const form = element("form", "bz-parental-gate-form");
           form.setAttribute("novalidate", "");
@@ -249,7 +261,8 @@
             }
           });
           content.append(prompt, equation, form);
-          equation.focus({ preventScroll: true });
+          session.initialFocus = prompt;
+          prompt.focus({ preventScroll: true });
         }
 
         try {

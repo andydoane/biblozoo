@@ -24,6 +24,8 @@
 
 ### B. Small, specific accessibility / device matrix (owner; disposable tester preferred)
 
+**Owner-reported VoiceOver issue (November 23 ET):** The Settings Grown-up Check announced "I'm a Grown-up," then the extra spoken label **"Description"** and "A grown-up needs to approve these settings." On the math stage VoiceOver read an equation such as `90 − 14 + 8`, then repeated "Description" and the same explanation. **Current status: limited iPhone VoiceOver observation, needs focused fix/retest; not a PASS.** The candidate remedy is to remove the dialog-wide `aria-describedby` association while keeping visible readable text and focus the static heading/prompt in reading order. After the fix is merged, separately test **Settings** and **Ghost Writer Share Picture** on iPhone; confirm the dialog/title, purpose, prompt, math, Answer and buttons are all reachable, that VoiceOver no longer says "Description" unnecessarily, and that the keyboard still opens only on an explicit Answer tap. Do not infer behavior from synthetic tests alone.
+
 | Test | Expected PASS / observation to record |
 | --- | --- |
 | **VoiceOver on iPhone (portrait)** | Announces "Grown-up Check," action, full randomized equation, Answer label, feedback and Not Now/Check Answer buttons in logical order; focus does not escape modal; focus restores after cancel. |
