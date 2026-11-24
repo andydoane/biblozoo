@@ -1,6 +1,16 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — Kids Category parental-gate source/policy review; retain current 1.0 math candidate (November 23, 2026 ET)
+## CURRENT — asset-rights provider and repository-source recheck complete; two licensing questions remain (November 23, 2026 ET)
+
+**Native source baseline:** `ios-prep` at `3d9be01be62c2b750e8529dd8a13f14855b5d7fd`, merged [PR #208](https://github.com/andydoane/biblozoo/pull/208). [Asset rights ledger](ASSET-LICENSES.md#current--updated-10-rights-source-inventory-and-provider-terms-november-23-2026-et) now documents a **scoped Git inventory and authoritative provider policy recheck**, not a license sign-off. Verified **13 font paths / 10 distinct binaries** and **1,033 MP3 paths** (857 in `verse_audio/`, 176 other paths / 131 distinct blobs). The raw source MP3 and font files are accessible in the public repository and are copied into iOS builds by `scripts/build.js`. Existing SoundTouchJS license/source notice files remain; complete font notices and per-track provenance do not.
+
+**Highest-priority OPEN rights decisions:** ZapSplat's current Standard License supports use of paid-era sounds **inside the app**, but separately restricts standalone licensed audio redistribution; **request written guidance about raw/near-raw sounds in public GitHub and prior history**. Florence S's DaFont **Chalkboard 100% Free** listing is promising, but DaFont says its label is not the full license; **obtain explicit iOS bundling and public-source-TTF redistribution permissions** or choose a separately approved alternative. These questions are real unresolved release work, **not established infringement, not grounds to delete assets without permission, and not a completed license audit**. All other sources (owner-created/ChatGPT art, Voicertool narration, BSB public-domain text, likely OFL fonts, MPL SoundTouchJS) have useful existing evidence but final per-file rights/notices remain. In particular `verse_audio/biblozoo_jingle.mp3` and the `verse_crawl_theme*.mp3` need music source classification.
+
+**Next practical action:** Gather provider response/author permission and privately correlate downloads with exact filenames, retaining account/receipt details outside GitHub. After resolved, run a scoped font/audio notice-compliance PR if needed. Continue independent privacy/SDK/App Store work in parallel; do not claim the overall rights gate PASS or upload to App Store before ownership review. Current parental math is the recommended 1.0 candidate but still awaits owner/App Review decision. No source code, family test saves, `main`, app bundle, Git history or repo visibility changes here. Keep all PRs owner-reviewed and unmerged until explicitly approved.
+
+---
+
+## HISTORICAL — Kids Category parental-gate source/policy review; retain current 1.0 math candidate (November 23, 2026 ET)
 
 **Current verified native baseline:** `ios-prep` at `42b8d6124549326cb8128cf85773b3b79672a4fb`, after merged [PR #207](https://github.com/andydoane/biblozoo/pull/207) records the real-device family backup v3 round-trip PASS. No change to the live gameplay or math code is proposed by this checkpoint.
 
