@@ -1,5 +1,13 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
+## CURRENT — owner approves existing privacy policy wording (November 24, 2026)
+
+**Baseline:** ios-prep at 82b50c8a80033f9cb2c088004c1b34261db85348, following merged [PR #212](https://github.com/andydoane/biblozoo/pull/212).
+
+- [x] **Owner privacy policy wording approval:** owner reviewed the published [BibloZoo privacy policy](https://andydoane.github.io/biblozoo/app-store-privacy.html) and reported it all looks good. Retain the November 22, 2026 wording, including the listed contact biblozooapp@gmail.com; no policy text changes requested. Actual mailbox monitoring/deliverability was not independently verified or separately confirmed. Suggested optional clarifications from #212 are not required changes for this checkpoint.
+- **Next:** obtain explicit owner approval of proposed native App Privacy answer (No data collected), and confirm contact mailbox monitoring. Final production archive and App Store upload validation remain open; revisit disclosure if evidence changes. No Apple approval claimed.
+- Documentation only; no app, data, asset, dependency, signing, or public website changes.
+
 ## CURRENT — scoped SDK runtime privacy assessment complete; owner policy approval next (November 24, 2026)
 
 **Source baseline:** ios-prep at 446b739d4f6e4ba8575a84d0a5887fa670be08cf following merged [PR #211](https://github.com/andydoane/biblozoo/pull/211).
@@ -107,6 +115,7 @@ Apple defines **data “collected”** for its App Privacy labels as data **tran
 - [x] **Scoped simulator permissions/picker cancellation — owner reported PASS:** microphone denied produced a BibloZoo fallback prompt; Photos add denied produced a BibloZoo Save error; Photos and Files picker cancellation both worked without getting stuck.
 - [ ] **Remaining permission matrix:** owner now reports custom-photo import PASS; applicable permission recovery/re-enablement, unexpected interruptions and real-iPhone device acceptance remain separate. Do not reset/reinstall the production app.
 - [ ] **App Privacy answers:** record yes/no, all relevant data types and partner practices from actual verified Release app behavior before entering App Store Connect. If collection remains genuinely absent, prepare `No data collected` with evidence instead of an assumption.
-- [ ] **Owner reviews final wording and contact details:** ensure both policy copies explain the actual experience and that Save/Share semantics are understood.
+- [x] **Owner reviews final policy wording:** owner approved the published policy; existing substantive wording retained in both copies.
+- [ ] **Contact mailbox monitoring:** listed address retained as part of approved wording; separate confirmation that the inbox is monitored remains outstanding.
 
 **Safety and scope of this follow-up:** The initial privacy-alignment PR changed only policy wording and source checks; this follow-up records **owner-reported observations only** and updates docs/checklists. No profile storage, permissions, microphones, PhotoKit functionality, network calls, third-party packages, Swift behavior, package pins, signing or repository visibility changes. **Unresolved asset-rights licensing** (deferred Chalkboard, public GitHub raw ZapSplat sound issue, etc.) is tracked separately in [ASSET-LICENSES.md](ASSET-LICENSES.md). Continue release preparation without treating those unresolved obligations as cleared.
