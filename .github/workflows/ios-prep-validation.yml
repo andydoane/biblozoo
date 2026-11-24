@@ -150,6 +150,34 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      # Portable synthetic logic only; no iOS SDK, UIKit or live Apple calls.
+      - name: Validate native age-assurance synthetic policy and compile fences
+        if: github.base_ref == 'ios-prep' || github.ref == 'refs/heads/ios-prep'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          source=ios/App/App/BibloZooAgeAssurance.swift
+          tests=scripts/validate_ios_age_assurance_foundation.swift
+          swiftc "$source" "$tests" -o "$tmpdir/age-ordinary"
+          "$tmpdir/age-ordinary"
+          swiftc -D DEBUG "$source" "$tests" -o "$tmpdir/age-debug"
+          "$tmpdir/age-debug"
+          expect_failure() {
+            local expected="$1"
+            shift
+            if swiftc "$@" -typecheck "$source" >"$tmpdir/fence.log" 2>&1; then
+              echo "ERROR: forbidden build unexpectedly succeeded"
+              return 1
+            fi
+            cat "$tmpdir/fence.log"
+            grep -F -- "$expected" "$tmpdir/fence.log"
+          }
+          expect_failure 'error: BibloZoo age assurance is not approved for live Release activation.' -D BIBLOZOO_AGE_ASSURANCE_LIVE
+          expect_failure 'error: BibloZoo age fixtures are restricted to iOS Debug simulator builds.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_FIXTURE
+          expect_failure 'error: BibloZoo fixture and live age assurance modes are mutually exclusive.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_FIXTURE -D BIBLOZOO_AGE_ASSURANCE_LIVE
+
       # Welcome Back presentation only: measure full-size name against button
       # width and swap playful busy copy into fixed slot without layout jumps.
       # Recreation only: real Let's go! recovery must run FIRST and succeed,

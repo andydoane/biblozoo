@@ -1,8 +1,8 @@
 # BibloZoo 1.0 — App Store listing draft
 
-## CURRENT — isolated simulator fixtures (November 24, 2026)
+## CURRENT — merged simulator fixtures; acceptance pending (November 24, 2026)
 
-Merged #238 owner-tested exact head 0288c201: 128 synthetic checks and unsigned simulator compile PASS; branch CI passed. Candidate #239 adds [isolated synthetic simulator mode](IOS-AGE-ASSURANCE-SIMULATOR.md) only with Debug, simulator, explicit fixture flag and exact separate bundle ID. No real age API call in fixture mode, no production activation, native audio parity, signing, backend, iCloud, cost or family data change. Normal production, Audio Test and PWA unchanged by design. No genuine consent, revocation, older OS or offline evidence. Initial consent and notification obligations unresolved. Release/physical-device fixture compile fences added; testing pending. See [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) for remaining gates; previous legal, privacy, listing and Kids decisions unchanged.
+PR #239 merged at `6408916e5c043578e716e3759c454a040834c63f`. Owner's exact-head `25b9827b` log confirms 153 Debug synthetic assertions and ordinary unsigned simulator build PASS (SDK 26.5, both architectures); PR and merge CI passed. Fixture-only build and exact bundle ID, compile-failure fences and interactive simulator acceptance are unverified. See [current roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md). No release activation, live Apple calls, new backend, costs, or family data changes; prior consent, notification and release blockers remain.
 
 ## CURRENT — age-assurance roadmap and availability checkpoint (November 24, 2026)
 
