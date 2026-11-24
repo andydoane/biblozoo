@@ -1,5 +1,13 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — owner approves existing privacy policy wording (November 24, 2026)
+
+**Baseline:** ios-prep at 82b50c8a80033f9cb2c088004c1b34261db85348, following merged [PR #212](https://github.com/andydoane/biblozoo/pull/212).
+
+- [x] **Owner privacy policy wording approval:** owner reviewed the published [BibloZoo privacy policy](https://andydoane.github.io/biblozoo/app-store-privacy.html) and reported it all looks good. Retain the November 22, 2026 wording, including the listed contact biblozooapp@gmail.com; no policy text changes requested. Actual mailbox monitoring/deliverability was not independently verified or separately confirmed. Suggested optional clarifications from #212 are not required changes for this checkpoint.
+- **Next:** obtain explicit owner approval of proposed native App Privacy answer (No data collected), and confirm contact mailbox monitoring. Final production archive and App Store upload validation remain open; revisit disclosure if evidence changes. No Apple approval claimed.
+- Documentation only; no app, data, asset, dependency, signing, or public website changes.
+
 ## CURRENT — scoped SDK runtime privacy assessment complete; owner policy approval next (November 24, 2026)
 
 **Source baseline:** ios-prep at 446b739d4f6e4ba8575a84d0a5887fa670be08cf following merged [PR #211](https://github.com/andydoane/biblozoo/pull/211).
