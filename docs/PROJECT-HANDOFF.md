@@ -1,6 +1,16 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — owner decision: Larger Text deferred for BibloZoo 1.0; iPad portrait check next (November 23, 2026 ET)
+## CURRENT — iPad keyboard-visible Grown-up Check candidate fix (November 23, 2026 ET)
+
+**Owner-reported iPad portrait behavior:** Initial modal fits well; selecting the Answer field displays the software keyboard but does **not** raise the modal as observed on iPhone. The Answer input remains visible; **Check Answer requires keyboard dismissal**. Previous documentation [#203](https://github.com/andydoane/biblozoo/pull/203) is merged (SHA `bbf97c13f7a92f03b199a5123f0b961fddfc3765`).
+
+**This focused code candidate (owner review; NOT yet real-device PASSED):** Only the native production shared `verse_games/shared/parental-gate.js` overlay uses `visualViewport` resize/scroll to temporarily center the modal inside the iPad keyboard-visible viewport when it shrinks more than 120px on a tablet-width display (>=600px) and a math Answer input exists. The existing CSS max-height is temporarily constrained for internal scrolling; normal size/position return after keyboard closure. iPhone-width behavior, no-auto-keyboard initial focus, math, three attempts, cancellation, native identity isolation, production family data and separate `main` PWA remain unchanged. The Node regression adds synthetic viewport/restore/cleanup/iPhone/fallback checks; these do **not** prove actual WKWebView behavior.
+
+**Next owner acceptance AFTER merge:** On the physical iPad **portrait**, open Settings' Grown-up Check, tap I'm a Grown-up, select Answer to bring up the keyboard, and verify **both Check Answer and Not Now are reachable while the keyboard remains open**; verify dismissing the keyboard re-centers the popup and safe Not Now cancellation changes no data. Briefly check iPhone Answer/keyboarding for regression. If the iPad viewport API doesn't report keyboard height on that device/iOS build, record a device FAIL and investigate a narrowly scoped fallback; do not assume this candidate worked. Use a separate **small documentation PR** to record the outcome.
+
+---
+
+## HISTORICAL — owner decision: Larger Text deferred for BibloZoo 1.0; iPad portrait check next (November 23, 2026 ET)
 
 **Owner-approved version 1.0 scope decision:** After actual iPhone testing showed that enabling iOS **Larger Accessibility Sizes** did **not** visibly resize BibloZoo text, the owner accepted the recommendation to **keep the existing carefully fitted game text/layouts for 1.0**. Do **not** implement a broad WebView/Dynamic Type resizing system, redesign verse/game containers or claim **Larger Text** support in App Store accessibility information for this version. Treat comprehensive system-driven text scaling as a possible **post-1.0 enhancement**, not a presumed Kids Category-specific obligation or automatic App Review blocker. This is a product scope decision, **not a successful Larger Text test**.
 
