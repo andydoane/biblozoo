@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — App Store listing draft
 
+## CURRENT — age-assurance metadata checkpoint (November 24, 2026)
+
+The [native age-access policy](IOS-AGE-ASSURANCE-ACCESS.md) is staged, not active in normal builds. Do not claim live age verification, legal compliance or approval in listing or questionnaire before entitlement and signed sandbox acceptance. No changed listing copy, screenshot plan, price, US storefront choice or conditional Kids position. Revisit actual capabilities, privacy declarations and App Review notes before submission.
+
 ## CURRENT — storefront scope update (November 24, 2026)
 
 Owner approved US-only version 1.0, superseding prior five-country planning. Keep $4.99 USD, paid upfront, no IAP/subscriptions/ads, iPhone/iPad, Education and conditional Kids ages 6–8 unchanged. Canada, UK, Australia and New Zealand are future candidates only. Manually select US availability after enrollment, subject to all outstanding US compliance, rights, age assurance and Apple review gates; no App Store Connect action yet. See [US launch preflight](US-LAUNCH-COMPLIANCE-PREFLIGHT.md). Listing copy and screenshot storyboard otherwise unchanged.

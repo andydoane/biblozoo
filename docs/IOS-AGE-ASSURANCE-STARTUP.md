@@ -1,5 +1,9 @@
 # Native age assurance — startup integration checkpoint
 
+## CURRENT — owner acceptance and next checkpoint (November 24, 2026)
+
+PR #233 merged at `191ca61a27e4ce38ee4dca93e14436180f7b9110`, which matches the owner's reported build commit. 14 classification, 7 regulatory, 10 startup assertions PASS; unsigned iOS simulator BUILD SUCCEEDED (arm64/x86_64, SDK 26.5); legacy declaration deprecation warnings nonblocking. The original discarded-outcome path below is historical: [access policy candidate](IOS-AGE-ASSURANCE-ACCESS.md) consumes a transient assessment and uses a native gate before WebView only if the live compile condition is enabled; it is still off by default. No live calls, actual minor consent or significant-update flow confirmed. Follow current combined testing instructions.
+
 Baseline `e573925f24a78aee8fe19de9d2bbf7eca2c993ee`, merged #232 plus Documentation Update. Owner reported 14/14 pure Swift tests and successful unsigned simulator build on that clean matching commit. This candidate is **not yet a release-compliant access gate**.
 
 ## What changed

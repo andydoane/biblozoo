@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — Native-only age assurance feasibility and implementation plan
 
+## CURRENT — implementation progress and revised sequence (November 24, 2026)
+
+Owner chose native-only implementation plus App Review rather than a developer forum; no reply or legal clearance implied. PR #232 and #233 merged; owner-reported synthetic and unsigned compilation passes at `191ca61a27e4ce38ee4dca93e14436180f7b9110`. Current candidate adds [native access policy and staged pre-WebView gate](IOS-AGE-ASSURANCE-ACCESS.md), preserving raw-data minimization and separate consent inputs. Live flag remains disabled. Initial minor consent source, real PermissionKit/acknowledgement, version-scoped update evidence, revocation/re-entry, old OS and offline behavior remain unresolved. No automatic release gate or paid infrastructure authorized; original plan below is historical baseline, with this sequence superseding its pre-implementation forum step. No first-release significant update is fabricated. Next steps are actual native consent evidence and safe lifecycle, then isolated signed tests.
+
 **Status:** planning only, November 24, 2026. Baseline `d49595c23a6f80f16002850bd8323414a7769b55` (merged #230). No code, SDK, entitlement, signing, cloud service, privacy policy or device changes. No claim of compliance or guaranteed no-server outcome.
 
 ## 1. Non-negotiable design and stop/go gate

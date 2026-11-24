@@ -1,5 +1,9 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — native age-assurance access policy candidate (November 24, 2026)
+
+Owner verified merged #233 at `191ca61a27e4ce38ee4dca93e14436180f7b9110`: 14 classification + 7 routing + 10 startup assertions PASS and unsigned simulator build succeeded. For the new candidate follow [access acceptance](IOS-AGE-ASSURANCE-ACCESS.md): 14 + 7 + 10 + 9 regulated category + 24 access-policy assertions, unsigned simulator build for ordinary configuration and opt-in compile only, verify exact commit. No installation, signing, family data or live system requests. The opt-in flag is not configured in repo; do not run opt-in builds on real family devices. Future disposable sandbox must test actual initial consent, significant updates, revocation/account changes, offline and older OS plus native screen/VoiceOver/large text and existing gameplay; no real child fixtures or backup restore. Existing regression and release checks remain required.
+
 ## CURRENT — Zoo backup v3 acceptance without real family restore (November 23, 2026)
 
 **Purpose:** Close the two missing per-Zookeeper Zoo storage records in family and single-profile exports. Candidate PR: `fix/ios-zoo-family-profile-backup-v3-20261123` → `ios-prep`. This PR changes only backup format/import, a new shared helper and tests/docs, not gameplay or permissions.

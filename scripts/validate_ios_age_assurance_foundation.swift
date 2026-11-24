@@ -59,5 +59,59 @@ struct BibloZooAgeAssuranceTests {
         var newScene = BibloZooAgeStartupAttempt()
         precondition(newScene.begin(bundleID: prod, liveEnabled: true, activePresenter: true))
         print("PASS: 10 synthetic startup lifecycle assertions")
+
+        let regulated: [(Int?, Int?, Bool, O)] = [
+            (nil, 12, false, .minor), (13, 15, false, .minor),
+            (16, 17, false, .minor), (18, nil, true, .confirmedAdult),
+            (nil, 17, true, .ambiguous), (12, 15, true, .ambiguous),
+            (13, 17, true, .ambiguous), (16, 18, true, .ambiguous),
+            (18, nil, false, .adultNotConfirmed)
+        ]
+        for (index, test) in regulated.enumerated() {
+            precondition(O.classifyRegulated(lower: test.0, upper: test.1,
+                                             confirmed: test.2) == test.3,
+                         "Regulated category case \(index) failed")
+        }
+        print("PASS: \(regulated.count) synthetic regulated age-category cases")
+
+        typealias A = BibloZooAgeAssessment
+        typealias D = BibloZooAgeAccessDecision
+        typealias C = BibloZooInitialConsent
+        typealias U = BibloZooUpdateState
+        let policy: [(A, C, U, D)] = [
+            (A(.notRequired), .unknown, .firstReleaseNoPending, .allowChildSafe),
+            (A(.updateRequirementsOnly, adultUpdateNotice: true), .unknown, .firstReleaseNoPending, .allowChildSafe),
+            (A(.confirmedAdult), .unknown, .firstReleaseNoPending, .allowChildSafe),
+            (A(.adultNotConfirmed), .unknown, .firstReleaseNoPending, .holdAgeVerification),
+            (A(.minor), .unknown, .firstReleaseNoPending, .holdInitialConsent),
+            (A(.minor), .verified, .firstReleaseNoPending, .allowChildSafe),
+            (A(.minor), .deniedOrRevoked, .firstReleaseNoPending, .holdDenied),
+            (A(.declined), .unknown, .firstReleaseNoPending, .holdAgeVerification),
+            (A(.ambiguous), .unknown, .firstReleaseNoPending, .holdAgeVerification),
+            (A(.unavailable), .unknown, .firstReleaseNoPending, .holdUnavailable),
+            (A(.needsCheck), .unknown, .firstReleaseNoPending, .holdUnavailable),
+            (A(.confirmedAdult, unknownRequirement: true), .unknown, .firstReleaseNoPending, .holdUnavailable),
+            (A(.notRequired, unknownRequirement: true), .unknown, .firstReleaseNoPending, .holdUnavailable),
+            (A(.confirmedAdult, adultUpdateNotice: true), .unknown, .pending, .holdUpdate),
+            (A(.minor, minorUpdateConsent: true), .verified, .pending, .holdUpdate),
+            (A(.minor, minorUpdateConsent: true), .verified, .approved, .allowChildSafe),
+            (A(.minor, minorUpdateConsent: true), .unknown, .approved, .holdInitialConsent),
+            (A(.confirmedAdult), .unknown, .denied, .holdDenied),
+            (A(.notRequired), .unknown, .unknown, .holdUnavailable),
+            (A(.confirmedAdult), .unknown, .verifiedNoPending, .allowChildSafe),
+            (A(.updateRequirementsOnly, minorUpdateConsent: true), .unknown, .pending, .holdUpdate),
+            (A(.confirmedAdult), .deniedOrRevoked, .approved, .holdDenied)
+        ]
+        for (index, test) in policy.enumerated() {
+            precondition(D.evaluate(test.0, initialConsent: test.1, update: test.2) == test.3,
+                         "Access policy case \(index) failed")
+        }
+        let mixed = A(.needsCheck, adultUpdateNotice: true,
+                      minorUpdateConsent: true, unknownRequirement: true)
+        let response = mixed.withOutcome(.confirmedAdult)
+        precondition(response.adultUpdateNotice && response.minorUpdateConsent && response.unknownRequirement)
+        precondition(D.evaluate(response, initialConsent: .unknown,
+                                update: .firstReleaseNoPending) == .holdUnavailable)
+        print("PASS: \(policy.count + 2) synthetic access policy assertions")
     }
 }

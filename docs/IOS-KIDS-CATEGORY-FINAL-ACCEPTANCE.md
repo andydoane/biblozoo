@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — Kids Category final acceptance and remaining release gates
 
+## CURRENT — separate state age-assurance gate (November 24, 2026)
+
+The [native-only access policy candidate](IOS-AGE-ASSURANCE-ACCESS.md) is separate from Kids Category and the existing Grown-up Check. It is disabled by default, does not grant adult privileges to any local Zookeeper, and does not change approved existing parental gate or first-time permissions. Required minor consent is not verified by arithmetic or age range alone. Live entitlement, initial consent, update handling, revocation and legal acceptance remain open; all earlier Kids acceptance and consultation gates remain.
+
 ## CURRENT — owner approves conditional Kids Category positioning and parental gate (November 24, 2026)
 
 **Baseline:** ios-prep at 00d7fad66fa4dcd676dab391797880f63c5c816c, following merged [PR #222](https://github.com/andydoane/biblozoo/pull/222).
