@@ -13,6 +13,8 @@ const requiredNotices=[
   "flashcards/vendor/soundtouchjs-2.1.1/LICENSE",
   "flashcards/vendor/soundtouchjs-2.1.1/SOURCE.md"
 ];
+const licenseOriginal="flashcards/vendor/soundtouchjs-2.1.1/LICENSE";
+const licenseDisplayPath=licenseOriginal+".txt";
 const expectedSdkManifests=[
   "Frameworks/Capacitor.framework/PrivacyInfo.xcprivacy",
   "Frameworks/Cordova.framework/PrivacyInfo.xcprivacy"
@@ -56,6 +58,9 @@ function inspectPublic(dir,sourceRoot=root){
     const expected=fs.readFileSync(path.join(sourceRoot,rel));
     assert.ok(expected.length>0&&actual.equals(expected),"Packaged notice differs from source: "+rel);
   }
+  assert.ok(membership.get(licenseDisplayPath)?.bytes>0,"Missing or empty packaged license display alias");
+  assert.ok(fs.readFileSync(path.join(dir,licenseDisplayPath)).equals(fs.readFileSync(path.join(sourceRoot,licenseOriginal))),
+    "Packaged license display alias differs from source");
   const groups=new Map(),hashes=new Map();
   for(const file of files){
     const key=file.path.includes("/")?file.path.split("/")[0]:"(root)";
@@ -70,7 +75,7 @@ function inspectPublic(dir,sourceRoot=root){
   const review=files.filter(f=>reviewPaths.has(f.path));
   return {
     files:files.length,bytes:files.reduce((sum,f)=>sum+f.bytes,0),
-    notices:requiredNotices.slice(),groups:[...groups.values()].sort((a,b)=>b.bytes-a.bytes),
+    notices:requiredNotices.slice(),licenseDisplayPath,groups:[...groups.values()].sort((a,b)=>b.bytes-a.bytes),
     duplicateGroups:duplicateGroups.length,
     duplicateBytes:duplicateGroups.reduce((sum,h)=>sum+(h.count-1)*h.bytes,0),
     review,reviewBytes:review.reduce((sum,f)=>sum+f.bytes,0)
@@ -93,6 +98,7 @@ function printInventory(i){
   console.log("Public payload: "+i.files+" files, "+i.bytes+" bytes (uncompressed)");
   console.log("Packaged notices byte-match source: "+i.notices.length);
   for(const rel of i.notices)console.log("  "+rel);
+  console.log("License display alias byte-matches original: "+i.licenseDisplayPath);
   console.log("Public folder breakdown:");
   for(const g of i.groups)console.log("  "+g.folder+": "+g.files+" files, "+g.bytes+" bytes");
   console.log("Exact duplicate payload groups: "+i.duplicateGroups+"; additional bytes: "+i.duplicateBytes);
@@ -117,4 +123,4 @@ function main(args=process.argv.slice(2)){
 if(require.main===module){
   try{main();}catch(e){console.error("PACKAGING AUDIT NOT ACCEPTED: "+e.message);process.exitCode=1;}
 }
-module.exports={inspectPublic,requireSdkManifests,requiredNotices,expectedSdkManifests};
+module.exports={inspectPublic,requireSdkManifests,requiredNotices,expectedSdkManifests,licenseDisplayPath,licenseOriginal};

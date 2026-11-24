@@ -32,15 +32,19 @@ function element(tag){
   return {tag,children:[],open:false,textContent:"",append(...xs){this.children.push(...xs)},appendChild(x){this.children.push(x)},addEventListener(type,fn){this[type]=fn;}};
 }
 async function main(){
-  const paths=require("./audit_ios_production_packaging.js").requiredNotices;
+  const audit=require("./audit_ios_production_packaging.js");
+  const paths=audit.requiredNotices.map(p=>p===audit.licenseOriginal?audit.licenseDisplayPath:p);
   const calls=[];
-  let failure=true,unblock;
+  let failure=true,htmlResponse=0;
   const context={document:{createElement:element},fetch:async(url,options)=>{
     calls.push(url);assert.equal(options.redirect,"error");
     assert.ok(paths.includes(url.slice(2)));
     if(failure){failure=false;return {ok:false};}
-    if(unblock)await new Promise(resolve=>{unblock=resolve;});
-    return {ok:true,text:async()=>"<a href='https://example.com'>literal</a>\n"+read(url.slice(2))};
+    if(htmlResponse===1){htmlResponse=0;return {ok:true,headers:{get:()=>"text/html; charset=utf-8"},text:async()=>"<p>Wrong document</p>"};}
+    if(htmlResponse===2){htmlResponse=0;return {ok:true,headers:{get:()=>"text/plain"},text:async()=>"  <!DOCTYPE html><html>Home</html>"};}
+    if(htmlResponse===3){htmlResponse=0;return {ok:true,headers:{get:()=>"text/plain"},text:async()=>" "};}
+    const original=url.slice(2)===audit.licenseDisplayPath?audit.licenseOriginal:url.slice(2);
+    return {ok:true,headers:{get:()=>"text/plain"},text:async()=>read(original)+"\n<a href='https://example.com'>literal</a>"};
   }};
   const add=vm.runInNewContext(app.slice(start,end)+"\naddBundledCreditsNotices;",context);
   const container=element("div");add(container);add(null);
@@ -50,17 +54,25 @@ async function main(){
   await first.toggle();assert.equal(calls.length,0);
   first.open=true;await first.toggle();
   assert.match(first.children[1].textContent,/retry/);
+  for(const mode of [1,2,3]){
+    htmlResponse=mode;
+    first.open=false;await first.toggle();first.open=true;await first.toggle();
+    assert.match(first.children[1].textContent,/retry/);
+    assert.doesNotMatch(first.children[1].textContent,/<html|Wrong document/i);
+  }
   first.open=false;await first.toggle();first.open=true;await first.toggle();
   assert.match(first.children[1].textContent,/<a href=/);
   assert.equal(first.children[1].innerHTML,undefined);
-  await first.toggle();assert.equal(calls.length,2);
+  await first.toggle();assert.equal(calls.length,5);
   for(const section of container.children.slice(1)){section.open=true;await section.toggle();assert.match(section.children[1].textContent,/<a href=/);}
-  assert.deepEqual(calls,["./"+paths[0],...paths.map(p=>"./"+p)]);
+  assert.deepEqual(calls,[...Array(4).fill("./"+paths[0]),...paths.map(p=>"./"+p)]);
+  assert.match(container.children[2].children[1].textContent,/^Mozilla Public License Version 2\.0/);
   const dist=path.join(root,"dist");
   if(fs.existsSync(path.join(dist,"index.html"))){
-    for(const p of paths)assert.ok(fs.readFileSync(path.join(dist,p)).equals(fs.readFileSync(path.join(root,p))));
+    for(const p of audit.requiredNotices)assert.ok(fs.readFileSync(path.join(dist,p)).equals(fs.readFileSync(path.join(root,p))));
+    assert.ok(fs.readFileSync(path.join(dist,audit.licenseDisplayPath)).equals(fs.readFileSync(path.join(root,audit.licenseOriginal))));
     assert.ok(read("dist/app.js").includes("addBundledCreditsNotices"));
   }
-  console.log("Release polish PASS: generated metadata exclusion, local plain-text notice loading/retry/cache and existing outgoing gate contract.");
+  console.log("Release polish PASS: generated metadata exclusion, local plain-text notice loading/retry/cache, HTML response rejection and exact license alias and existing outgoing gate contract.");
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
