@@ -113,5 +113,55 @@ struct BibloZooAgeAssuranceTests {
         precondition(D.evaluate(response, initialConsent: .unknown,
                                 update: .firstReleaseNoPending) == .holdUnavailable)
         print("PASS: \(policy.count + 2) synthetic access policy assertions")
+
+        let change = BibloZooSignificantUpdate(version: "1.1", description: "Synthetic update description")
+        let first = BibloZooSignificantUpdate(version: "1.0", description: "Synthetic")
+        let blank = BibloZooSignificantUpdate(version: "1.1", description: " ")
+        typealias R = BibloZooUpdateRoute
+        let routes: [(A, BibloZooSignificantUpdate?, String?, R)] = [
+            (A(.confirmedAdult, adultUpdateNotice: true), nil, "1.0", .noPrompt),
+            (A(.minor, minorUpdateConsent: true), nil, "1.0", .noPrompt),
+            (A(.confirmedAdult, adultUpdateNotice: true), first, "1.0", .unavailable),
+            (A(.confirmedAdult, adultUpdateNotice: true), change, "1.2", .unavailable),
+            (A(.confirmedAdult, adultUpdateNotice: true), change, nil, .unavailable),
+            (A(.confirmedAdult, adultUpdateNotice: true), blank, "1.1", .unavailable),
+            (A(.confirmedAdult, adultUpdateNotice: true), change, "1.1", .adultAcknowledgment),
+            (A(.minor, minorUpdateConsent: true), change, "1.1", .parentalPermission),
+            (A(.minor, adultUpdateNotice: true), change, "1.1", .noPrompt),
+            (A(.confirmedAdult, minorUpdateConsent: true), change, "1.1", .noPrompt),
+            (A(.notRequired), change, "1.1", .noPrompt),
+            (A(.updateRequirementsOnly, adultUpdateNotice: true), change, "1.1", .needsAge),
+            (A(.needsCheck), change, "1.1", .needsAge),
+            (A(.declined), change, "1.1", .unavailable),
+            (A(.adultNotConfirmed), change, "1.1", .unavailable),
+            (A(.ambiguous), change, "1.1", .unavailable),
+            (A(.unavailable), change, "1.1", .unavailable),
+            (A(.confirmedAdult, adultUpdateNotice: true, unknownRequirement: true), change, "1.1", .unavailable)
+        ]
+        for (index, test) in routes.enumerated() {
+            precondition(R.resolve(test.0, pending: test.1,
+                                   installedVersion: test.2) == test.3,
+                         "Update route case \(index) failed")
+        }
+        print("PASS: \(routes.count) synthetic significant-update routing cases")
+
+        let currentID = UUID()
+        let otherID = UUID()
+        typealias M = BibloZooUpdateResponseMatch
+        precondition(M.evaluate(expectedID: currentID, responseID: currentID,
+                                reply: .approved, cancelled: false) == .approved)
+        precondition(M.evaluate(expectedID: currentID, responseID: currentID,
+                                reply: .denied, cancelled: false) == .denied)
+        precondition(M.evaluate(expectedID: currentID, responseID: currentID,
+                                reply: .unknown, cancelled: false) == .unknown)
+        precondition(M.evaluate(expectedID: currentID, responseID: otherID,
+                                reply: .approved, cancelled: false) == nil)
+        precondition(M.evaluate(expectedID: currentID, responseID: currentID,
+                                reply: .approved, cancelled: true) == nil)
+        precondition(M.evaluate(expectedID: currentID, responseID: otherID,
+                                reply: .denied, cancelled: false) == nil)
+        precondition(D.evaluate(A(.minor, minorUpdateConsent: true),
+                                initialConsent: .unknown, update: .approved) == .holdInitialConsent)
+        print("PASS: 7 synthetic significant-update response assertions")
     }
 }

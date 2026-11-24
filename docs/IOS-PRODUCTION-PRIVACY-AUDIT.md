@@ -1,5 +1,9 @@
 # BibloZoo — Step 3b iOS first-party privacy and release audit
 
+## CURRENT — Apple significant-update adapter checkpoint (November 24, 2026)
+
+See [current consent implementation](IOS-AGE-ASSURANCE-CONSENT.md). #234 merged and owner verified normal unsigned build and 64 synthetic assertions. New candidate adds documented Apple significant-update acknowledgment and PermissionKit request/response adapter only, with no live caller or enabled gate, no fabricated first-release update, no initial consent inference, and no persistence or developer backend. In-flight opaque question ID matched to response; no logs/JS/raw age data, no iCloud or signing change. Normal app, PWA and Audio Test unchanged. Initial minor consent, update recovery/account scope, revocation, older OS/offline, entitlement and sandbox verification remain open. No change to proposed privacy labels, Kids positioning, listing, gate or legal release clearance; reassess after activation.
+
 ## CURRENT — age-assurance source delta (November 24, 2026)
 
 [Staged age access policy](IOS-AGE-ASSURANCE-ACCESS.md) adds native transient evaluation of age categories and separate consent/update state, no raw bounds/identifier persistence, logs, JS age bridge or developer network client. No new SDK dependency, entitlement, manifest or signed binary change established; live flag remains disabled. Prior archive evidence below predates the age-assurance implementation and does not validate a future activated build. Re-run final archive/manifest/traffic assessment and reconsider disclosures after native activation.

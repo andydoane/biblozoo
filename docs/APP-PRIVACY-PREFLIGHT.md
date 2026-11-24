@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
+## CURRENT — Apple significant-update adapter checkpoint (November 24, 2026)
+
+See [current consent implementation](IOS-AGE-ASSURANCE-CONSENT.md). #234 merged and owner verified normal unsigned build and 64 synthetic assertions. New candidate adds documented Apple significant-update acknowledgment and PermissionKit request/response adapter only, with no live caller or enabled gate, no fabricated first-release update, no initial consent inference, and no persistence or developer backend. In-flight opaque question ID matched to response; no logs/JS/raw age data, no iCloud or signing change. Normal app, PWA and Audio Test unchanged. Initial minor consent, update recovery/account scope, revocation, older OS/offline, entitlement and sandbox verification remain open. No change to proposed privacy labels, Kids positioning, listing, gate or legal release clearance; reassess after activation.
+
 ## CURRENT — staged age access policy privacy checkpoint (November 24, 2026)
 
 Age-assurance foundation/startup merged and owner verified unsigned compile; current [access policy candidate](IOS-AGE-ASSURANCE-ACCESS.md) requests age categories only when applicable, retains no raw bounds, account IDs, declaration methods, logs, storage or JS-exposed age information. Native-only transient decision; no account, backend, iCloud, tracking or new permission for ordinary builds. Live mode remains OFF. Minor consent cannot be inferred from age sharing, app installation or Grown-up Check. Actual signed sandbox traffic, retention, system behavior, privacy policy/labels and legal assessment remain open; no change to published privacy policy or owner-approved provisional Data Not Collected answer. Review final archive after activation.

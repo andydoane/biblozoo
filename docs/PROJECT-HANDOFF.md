@@ -1,5 +1,9 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — significant-update system adapter (November 24, 2026)
+
+Merged #234 (`bef654266bb7c545c3def8bc5a9970321e767154`); owner tested exact head 5172c734, reported 14 + 7 + 10 + 9 + 24 synthetic assertions PASS and normal unsigned simulator BUILD SUCCEEDED; branch validation passed. Separate opt-in build remains unverified. Current candidate adds [Apple significant-update adapter](IOS-AGE-ASSURANCE-CONSENT.md): documented adult acknowledgment and PermissionKit question/response APIs, scoped to an actual version-specific change, matched in-memory response ID, conservative decline default and cancellation/unknown handling. The adapter has no live startup caller, and the live gate remains disabled. First release 1.0 has no pending significant update. Initial minor consent is not exposed as a field in Apple's documented AgeRange response; no substitute invented, so initial consent, persistence/recovery, account change/revocation, older OS/offline and signed sandbox acceptance remain release blockers. No backend, iCloud, accounts, extra cost, signing or visible ordinary app change. App Review not legal clearance.
+
 ## CURRENT — staged native age access policy (November 24, 2026)
 
 **Baseline:** `ios-prep` at `191ca61a27e4ce38ee4dca93e14436180f7b9110` (merged [PR #233](https://github.com/andydoane/biblozoo/pull/233)). Owner's uploaded log confirms 14 classification cases, 7 regulatory cases, 10 startup assertions PASS and unsigned simulator BUILD SUCCEEDED for both architectures with SDK 26.5, iOS 15 target; only expected legacy declaration deprecation warnings noted. Git fetch failure was already-merged branch; local HEAD matches remote. No live API test.

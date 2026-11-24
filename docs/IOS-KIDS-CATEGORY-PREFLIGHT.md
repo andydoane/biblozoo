@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — Kids Category / parental-gate preflight
 
+## CURRENT — Apple significant-update adapter checkpoint (November 24, 2026)
+
+See [current consent implementation](IOS-AGE-ASSURANCE-CONSENT.md). #234 merged and owner verified normal unsigned build and 64 synthetic assertions. New candidate adds documented Apple significant-update acknowledgment and PermissionKit request/response adapter only, with no live caller or enabled gate, no fabricated first-release update, no initial consent inference, and no persistence or developer backend. In-flight opaque question ID matched to response; no logs/JS/raw age data, no iCloud or signing change. Normal app, PWA and Audio Test unchanged. Initial minor consent, update recovery/account scope, revocation, older OS/offline, entitlement and sandbox verification remain open. No change to proposed privacy labels, Kids positioning, listing, gate or legal release clearance; reassess after activation.
+
 ## CURRENT — age-assurance follow-up (November 24, 2026)
 
 [Native state age-assurance access policy](IOS-AGE-ASSURANCE-ACCESS.md) is staged and disabled by default; it does not change Kids Category positioning, age-rating questionnaire, Grown-up Check or ordinary game behavior. Do not conflate age categories or Apple Account adult status with verified parental consent, local profile ages or Kids gate suitability. See final acceptance and privacy preflight for remaining checks.
