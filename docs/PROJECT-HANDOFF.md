@@ -1,6 +1,18 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — owner accessibility checkpoint: VoiceOver retest and Larger Text nonresponse (November 23, 2026 ET)
+## CURRENT — owner decision: Larger Text deferred for BibloZoo 1.0; iPad portrait check next (November 23, 2026 ET)
+
+**Owner-approved version 1.0 scope decision:** After actual iPhone testing showed that enabling iOS **Larger Accessibility Sizes** did **not** visibly resize BibloZoo text, the owner accepted the recommendation to **keep the existing carefully fitted game text/layouts for 1.0**. Do **not** implement a broad WebView/Dynamic Type resizing system, redesign verse/game containers or claim **Larger Text** support in App Store accessibility information for this version. Treat comprehensive system-driven text scaling as a possible **post-1.0 enhancement**, not a presumed Kids Category-specific obligation or automatic App Review blocker. This is a product scope decision, **not a successful Larger Text test**.
+
+**Practical exception:** Any **observed severe clipping or unreadable essential control**, especially Grown-up Check, Cancel, backup/privacy management, should receive a targeted fix regardless of the deferred global feature. Do not mark full accessibility acceptance passed. VoiceOver initial announcement/swipe behavior remains the narrow owner-reported PASS from merged [#201](https://github.com/andydoane/biblozoo/pull/201) and the merged documentation checkpoint [#202](https://github.com/andydoane/biblozoo/pull/202); modal containment and full screen reader matrix are separate.
+
+**iPad portrait owner observation — partial PASS / keyboard usability issue open:** The owner tested the native Grown-up Check on an iPad and reports the popup works well in portrait overall. After tapping the Answer field, however, the iPad software keyboard **does not move the popup upward as it does on the tested iPhone**. The Answer field stays visible, but the **Check Answer action is behind the keyboard; the owner must dismiss the keyboard to reach the button**. Record layout and basic popup presentation as **PASS for observed non-keyboard behavior**, and **keyboard-visible Check Answer accessibility as NOT PASS / focused fix candidate**. Do not claim complete iPad acceptance; the owner did not report a separate iPad VoiceOver or keyboard Return-key test. No actual backup export/import/data reset was requested or performed as part of this test.
+
+**Next focused action:** Investigate a **modal-only** iPad software-keyboard viewport adjustment or equivalent reachable submit action, preserving existing iPhone behavior, math, cancel and the no-automatic-keyboard fix. A possible cause is the fixed-position Capacitor WKWebView overlay and an on-screen keyboard reducing the *visual* viewport without changing the CSS layout viewport; this is an informed hypothesis, **not a diagnosed device root cause**. Use a separately reviewed small code PR and test on real iPad before checking off keyboard-visible usability. Do not redesign games or implement full Dynamic Type. Do not test unsupported iPad landscape. Then proceed to native bridge/Kids/privacy and synthetic v3 restore sign-offs. Preserve real family/Audio Test profiles; keep `main` separate from `ios-prep`.
+
+---
+
+## HISTORICAL — owner accessibility checkpoint: VoiceOver retest and Larger Text nonresponse (November 23, 2026 ET)
 
 **Verified baseline:** [PR #201](https://github.com/andydoane/biblozoo/pull/201) is **MERGED** to `ios-prep`, merge SHA `445956ef836ccb1258c9f2095270831a213c60ee`. No new code change is requested in this checkpoint. The owner wants **one small documentation-update PR after each verified release-readiness checkpoint**, to preserve current accepted results across conversations; leave each PR for owner review/merge, never auto-merge.
 
