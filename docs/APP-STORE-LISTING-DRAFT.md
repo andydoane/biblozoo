@@ -1,8 +1,8 @@
 # BibloZoo 1.0 — App Store listing draft
 
-## CURRENT — merged simulator fixtures; acceptance pending (November 24, 2026)
+## CURRENT — simulator startup readiness defect (November 24, 2026)
 
-PR #239 merged at `6408916e5c043578e716e3759c454a040834c63f`. Owner's exact-head `25b9827b` log confirms 153 Debug synthetic assertions and ordinary unsigned simulator build PASS (SDK 26.5, both architectures); PR and merge CI passed. Fixture-only build and exact bundle ID, compile-failure fences and interactive simulator acceptance are unverified. See [current roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md). No release activation, live Apple calls, new backend, costs, or family data changes; prior consent, notification and release blockers remain.
+Merged #240 at `c6ef302f8d1496e9e5fec31309ba8f49a938e007`; PR and merge CI passed. Owner's #239 exact head 25b9827b: 153 Debug assertions, ordinary and fixture unsigned builds, bundle ID and both Mac compile-failure fences PASS. Isolated iPhone 17 simulator launched with fake-consent banner, but `minor-unknown` stayed on checking indefinitely on two launches. Runtime acceptance FAIL. Candidate bounded foreground-readiness fix and explicit Retry fallback pending build/retest; see [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md). No release activation, live Apple API, backend, costs or family data change; prior consent and notification blockers remain.
 
 ## CURRENT — age-assurance roadmap and availability checkpoint (November 24, 2026)
 

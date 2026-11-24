@@ -1,6 +1,6 @@
 # BibloZoo — isolated synthetic age-assurance simulator testing
 
-November 24, 2026. Merged [#239](https://github.com/andydoane/biblozoo/pull/239) at `6408916e5c043578e716e3759c454a040834c63f`. Owner's Terminal log for exact PR head `25b9827b` confirms all 153 Debug synthetic Swift assertions PASS (128 prior + 25 fixtures), ordinary unsigned simulator BUILD SUCCEEDED on iOS SDK 26.5 (arm64/x86_64, iOS 15 target), with nonblocking legacy age declaration and AppIntents metadata warnings. [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45453241058) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45455557027) passed; those runs did not execute the age-assurance Swift tests. The fixture-flag simulator build, exact built fixture bundle ID, compile-failure fences and interactive simulator scenarios are not present in the supplied log and remain unverified. See [simulator acceptance guide](IOS-AGE-ASSURANCE-SIMULATOR.md) and [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). No release activation, live Apple API, entitlement/signing, backend, iCloud, cost or family data change. Initial minor consent, notification/serverless sufficiency, older OS/offline and actual revocation remain release blockers. Fixture identity deliberately excludes production native audio parity. Owner reviews and merges.
+November 24, 2026. Merged [#240](https://github.com/andydoane/biblozoo/pull/240) at `c6ef302f8d1496e9e5fec31309ba8f49a938e007`. [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45458987332) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45459264030) passed, including the portable age-assurance step. Owner tested #239 head `25b9827b`: 153 Debug assertions, normal and isolated fixture unsigned builds on SDK 26.5 (arm64/x86_64), both Mac negative compile fences and exact built `com.andydoane.biblozoo.agefixture` identity PASS. The owner fast-forwarded to #240; native files unchanged from tested head. Isolated iPhone 17 / iOS 26.5 simulator installation, launch and fake-consent banner PASS, but `minor-unknown` remained on Checking App Store requirements indefinitely, including after terminate/relaunch; no gameplay access observed. Runtime acceptance FAIL, remaining scenarios not yet tested. Candidate fix addresses a likely startup readiness race: one bounded cancellable preflight waits for all existing application/scene/window/presenter guards (20 x 100 ms), then starts one check or displays retryable unavailable hold; gate appearance also triggers the guarded preflight. True background invalidates/cancels, requires explicit Retry for interrupted initial checks, and retains prior reauthorization rules. Adds 11 portable assertions (expected 139 ordinary / 164 Debug). Exact cause and actual fix not yet proven; candidate CI and Mac rebuild/retest pending. No changes to ordinary app routing, release fences, consent policy, signing, production identity, backend, costs or family data. No live release, signed Apple calls or legal acceptance. Initial consent, notification/serverless sufficiency, older OS/offline and revocation remain blockers.
 
 ## Isolation
 
@@ -8,20 +8,20 @@ The existing native gate and foreground authorization ticket use fake decisions,
 
 ## A — compile-only acceptance
 
-**Recorded acceptance:** exact #239 head passed 153 Debug assertions and the ordinary unsigned simulator build. The two intentional failure commands, fixture-only build and bundle ID check below remain pending on the owner's Mac; do not repeat successful commands unless source changes or needed to recreate a build. Current follow-up: portable ordinary and Debug synthetic Swift tests plus diagnostic-checked compile fences in the existing Ubuntu CI on ios-prep only. No new runner or infrastructure. Candidate CI results pending; Linux does not type-check UIKit/Apple frameworks or verify actual iOS fixture builds. Continue outstanding Mac-only acceptance in the simulator guide.
+**Recorded acceptance:** prior #239 compile acceptance complete; #240 CI green. Candidate readiness fix requires fresh ordinary and fixture builds, exact bundle ID check and runtime retest. Do not reinstall original identity or use family data.
 
 From clean repo root (do not switch with uncommitted changes):
 
 ```bash
 git status --short
-git fetch origin refs/pull/239/head && git switch --detach FETCH_HEAD
+git fetch origin fix/ios-age-assurance-startup-readiness && git switch --detach FETCH_HEAD
 git rev-parse --short HEAD
 
 tmpdir="$(mktemp -d)"
 xcrun swiftc -D DEBUG ios/App/App/BibloZooAgeAssurance.swift scripts/validate_ios_age_assurance_foundation.swift -o "$tmpdir/age-test" && "$tmpdir/age-test"
 ```
 
-Expect previous 128 plus PASS: 25 synthetic simulator fixture assertions = 153. Without -D DEBUG, original 128. Tests are pure logic, not UIKit or real Apple responses.
+Expect 139 ordinary + 25 Debug fixture assertions = 164, including 11 startup readiness assertions. Without -D DEBUG, 139. Tests are pure logic, not UIKit or real Apple responses.
 
 These commands must fail with intentional #error messages:
 
@@ -42,13 +42,13 @@ Distinct fixture compile only:
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BibloZooAgeFixtureBuild CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER=com.andydoane.biblozoo.agefixture 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG BIBLOZOO_AGE_ASSURANCE_FIXTURE' build
 ```
 
-Ordinary build already succeeded at the tested head; the distinct fixture build should also report BUILD SUCCEEDED. Verify actual bundle identity before any subsequent installation:
+Both builds must report BUILD SUCCEEDED for the new candidate. Verify actual bundle identity before any subsequent installation:
 
 ```bash
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' /tmp/BibloZooAgeFixtureBuild/Build/Products/Debug-iphonesimulator/App.app/Info.plist
 ```
 
-Must output com.andydoane.biblozoo.agefixture. Report exact head and remaining results. #239 is merged; fixture compile/identity and runtime acceptance are still pending.
+Must output com.andydoane.biblozoo.agefixture. Report exact candidate head and results. Prior compile/identity passed; candidate rebuild/retest pending.
 
 ## B — after compile acceptance, isolated simulator runtime
 
@@ -83,7 +83,7 @@ Between scenarios terminate only fixture app with `xcrun simctl terminate SIMULA
 | allow | normal bridge opens, no Apple call |
 | adult | normal child-safe experience; Grown-up Check unchanged |
 | minor-approved | synthetic consent opens bridge |
-| minor-unknown | adult assistance hold |
+| minor-unknown | adult assistance hold; prior build stuck on checking, retest first (must show actual consent hold, not just unavailable) |
 | declined | age-sharing help |
 | denied | permission unavailable hold |
 | unavailable | retryable hold |
@@ -94,7 +94,7 @@ Between scenarios terminate only fixture app with `xcrun simctl terminate SIMULA
 | slow-allow | five-second fake check; background before result; return held; explicit retry; late result cannot unlock |
 | missing/invalid/duplicate | unavailable hold |
 
-Also test allow across background/foreground (fake progress remains, intended same controller), large Dynamic Type, VoiceOver, absence of unexpected prompts. Actual bridge reattachment, storyboard initialization, layer/audio state, modal transitions, direct URL handling need verification. Fixture does not emulate Apple's real API availability, account, network, consent or revocation. Production native audio parity explicitly not tested under fixture identity. Report blockers and evidence for each scenario, not just compilation. No iPhone install or production activation.
+If readiness times out, capture only the fixture diagnostic (booleans, no age data): `xcrun simctl spawn SIMULATOR_UDID log show --last 2m --predicate 'eventMessage CONTAINS "[BibloZooAgeFixture]"' --style compact`. A retryable unavailable hold is safer than endless checking but is not a pass for minor-unknown. Also test allow across background/foreground (fake progress remains, intended same controller), large Dynamic Type, VoiceOver, absence of unexpected prompts. Actual bridge reattachment, storyboard initialization, layer/audio state, modal transitions, direct URL handling need verification. Fixture does not emulate Apple's real API availability, account, network, consent or revocation. Production native audio parity explicitly not tested under fixture identity. Report blockers and evidence for each scenario, not just compilation. No iPhone install or production activation.
 
 ## Next
 
