@@ -1,5 +1,14 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — owner confirms reward mechanics and arcade visual effects (November 24, 2026)
+
+Owner supplied explicit confirmations during review of open [PR #220](https://github.com/andydoane/biblozoo/pull/220), following merged #219 at 53562b80ca1b8cea7b0e0a9c99e4cc6e606e2756.
+
+- [x] **Owner confirms chance-based reward facts:** Bible Bux, prizes and BibloPet rewards have no real-world monetary value, cannot be purchased and are not wagered. Together with the scoped scoring-path source review below, supports provisional Gambling No, Simulated Gambling None, Loot Boxes No under [Apple age-rating definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions/). Recheck final build/questionnaire before submission.
+- [x] **Owner describes actual gameplay effects:** Verse Invaders uses eight-bit descending aliens with nearby words; player presses a button to send a colored particle toward the correct alien, collision produces a colored particle explosion, and other aliens disappear with a CRT-monitor turn-off effect. Owner confirms no graphic injuries, blood or gore in this game. Food Slice bombs produce cartoon effects without injuring characters. Ghost Writer is friendly/playful rather than designed to frighten. Owner description, not independently observed new device test.
+- **Descriptor implications:** these observations support non-realistic classification of the reviewed gameplay, but do not exclude cartoon/fantasy violence or weapon references under Apple's broad definitions. The alien-hit mechanic is part of normal repeated play; owner did not quantify typical session frequency. Frequent cartoon/fantasy violence or weapon references can produce 13+; do not equate mild with infrequent. Scripture/lesson sensitive references (including communion wine), other content, actual questionnaire, final age rating and Kids eligibility remain OPEN. Consider Apple clarification for ambiguous descriptors rather than selecting an unsupported frequency. No gameplay changes requested.
+- No new tests or application changes. Updated the existing open PR #220 rather than opening a competing checkpoint PR; owner review/merge remains required.
+
 ## CURRENT — targeted gameplay mechanics review for age-rating answers (November 24, 2026)
 
 **Baseline:** ios-prep at 53562b80ca1b8cea7b0e0a9c99e4cc6e606e2756, following merged [PR #219](https://github.com/andydoane/biblozoo/pull/219).
