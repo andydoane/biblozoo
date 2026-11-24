@@ -1,5 +1,7 @@
 # BibloZoo
 
+**Rights and licensing:** BibloZoo's original project materials are proprietary; see [COPYRIGHT.md](COPYRIGHT.md). Third-party and public-domain material retain their own terms. The public repository and free PWA do not constitute a general reuse license for original materials.
+
 > **Working on BibloZoo?** Start with the branch-local **canonical [Living Project Handoff](docs/PROJECT-HANDOFF.md)**, then consult [Testing & PR Workflow](docs/TESTING.md), [Audio Recovery](docs/AUDIO-RECOVERY.md), and the historical [R17 promotion acceptance ledger](docs/R17-IOS-PREP-PROMOTION-READINESS.md). The handoff now contains the ordered **App Store release checklist**, including the explicit gate for delaying paid Apple Developer Program enrollment until distribution work actually requires it.
 >
 > **Development workflow:** Native-audio promotion is complete and normal development now branches from and targets stable `ios-prep` (not `main`). The project is feature-stable and primarily in bug-cleanup/release-preparation mode. On **every** code, docs-only, build, or CI PR, update **`docs/PROJECT-HANDOFF.md` in that PR** from current GitHub/owner evidence. The owner reviews/merges and then pulls in GitHub Desktop. See the [PR template](.github/pull_request_template.md). No automatic App Store upload, installed-app update, release, or `main` merge.
