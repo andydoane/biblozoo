@@ -1,5 +1,12 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — offline App Store listing draft and screenshot storyboard (November 24, 2026)
+
+**Baseline:** ios-prep at 87c03fd547bbc8ecf9563f5c4b5793aa0ad0cd5b, following merged [PR #225](https://github.com/andydoane/biblozoo/pull/225).
+
+- [x] **Draft prepared:** [APP-STORE-LISTING-DRAFT.md](APP-STORE-LISTING-DRAFT.md) includes name, subtitle, promotional text, description, keywords, URLs, category/price notes, copyright placeholder, initial release notes, App Review notes, TestFlight copy and six-shot storyboard. Verified draft field lengths against current Apple official documentation (30/30/170/4000 characters and 100 keyword bytes). Neutral public wording avoids Kids-specific terms while eligibility remains open; no misleading fallback or price in public copy.
+- [ ] **Owner review and final validation:** approve wording, legal copyright rights-holder, name availability, secondary category if desired, supported locales, final rating/Kids status, final binary feature and privacy claims, screenshot capture and dimensions. Actual screenshots not captured; fictional profiles only, preserve real family and Audio Test. No enrollment, pricing settings, application or PWA changes. CI not yet verified. Owner reviews and merges.
+
 ## CURRENT — owner approves $4.99 USD one-time native launch price (November 24, 2026)
 
 **Baseline:** ios-prep at f84f40c9abec27b660573893091682f22ac0ede2, following merged [PR #224](https://github.com/andydoane/biblozoo/pull/224).
