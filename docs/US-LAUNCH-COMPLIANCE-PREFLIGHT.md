@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — US launch compliance preflight
 
+## CURRENT — serverless release constraint and state timeline clarification (November 24, 2026)
+
+The owner has stated that recurring server costs could make this hobby release infeasible. Follow the [native-only feasibility plan](IOS-AGE-ASSURANCE-PLAN.md) before proposing code or paid enrollment. Texas statute does not explicitly prescribe a developer server, but Apple's June 3 checklist includes server notifications; OS launch blocking alone is not yet confirmed sufficient. No backend, account, paid service or new cloud data store authorized. Apple's February 24 Utah/Louisiana dates below are historical announcements, not the current statutory schedule: [November 19 legal review](https://www.privacyworld.blog/2026/11/app-store-age-verification-laws-your-questions-answered-updated/) reports Utah May 6, 2027 and Louisiana July 1, 2027, California and Alabama January 1, 2027 (California distinct OS-signal model; Alabama challenge pending). Confirm primary statutes, court orders and current Apple implementation before release. Texas enforcement remains subject to pending appeal. No clearance claimed.
+
 **Status:** preliminary planning and source/official-guidance screening, November 24, 2026. Baseline `8a59cedb2b35ca5563a5f34a9230e498adfebb5f` (merged #229). Not legal, tax, export or App Review clearance. Owner has selected United States only; no enrollment or actual availability setting yet.
 
 ## Launch scope
