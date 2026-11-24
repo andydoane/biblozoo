@@ -1,8 +1,8 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
-## CURRENT — simulator startup readiness defect (November 24, 2026)
+## CURRENT — startup readiness retest passed (November 24, 2026)
 
-Merged #240 at `c6ef302f8d1496e9e5fec31309ba8f49a938e007`; PR and merge CI passed. Owner's #239 exact head 25b9827b: 153 Debug assertions, ordinary and fixture unsigned builds, bundle ID and both Mac compile-failure fences PASS. Isolated iPhone 17 simulator launched with fake-consent banner, but `minor-unknown` stayed on checking indefinitely on two launches. Runtime acceptance FAIL. Candidate bounded foreground-readiness fix and explicit Retry fallback pending build/retest; see [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md). No release activation, live Apple API, backend, costs or family data change; prior consent and notification blockers remain.
+Merged [#240](https://github.com/andydoane/biblozoo/pull/240); [#241](https://github.com/andydoane/biblozoo/pull/241) fixes the observed simulator startup stall. Owner tested source head `c6301837c05ebb58bf2c560e921fb03dae72f924`: [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45461548336), 164 local Debug assertions, both unsigned simulator builds, fixture identity, all 15 synthetic runtime scenarios, allowed gameplay progress retention and Larger Text PASS. VoiceOver deferred (not found in Simulator); production audio/microphone intentionally excluded from fixture; prompt/modal/direct-link and real-device checks remain outstanding. No real Apple consent, live activation, enrollment, backend, costs or family data changes. Documentation-only follow-up and owner merge pending. See [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md) and [simulator guide](IOS-AGE-ASSURANCE-SIMULATOR.md) for exact evidence and remaining initial-consent, notification/serverless, StoreKit rating, older OS/offline and revocation gates.
 
 ## CURRENT — age-assurance roadmap and availability checkpoint (November 24, 2026)
 
