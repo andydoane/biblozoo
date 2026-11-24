@@ -2996,13 +2996,39 @@ function migrateLegacyProgressForProfile(profileId) {
 }
 
 const FAMILY_SAVE_TYPE = "biblozoo-family-save";
-const FAMILY_SAVE_VERSION = 2;
+const FAMILY_SAVE_VERSION = 3;
 const PROFILE_SAVE_TYPE = "biblozoo-profile-save";
-const PROFILE_SAVE_VERSION = 2;
+const PROFILE_SAVE_VERSION = 3;
 const LEGACY_SAVE_TYPE = "verse-memory-save";
 
 function cloneJsonForSave(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function getZooBackupApi() {
+  const api = window.BibloZooZooBackup;
+  if (!api || typeof api.read !== "function" ||
+      typeof api.normalize !== "function" ||
+      typeof api.write !== "function" ||
+      typeof api.snapshot !== "function" ||
+      typeof api.restoreSnapshot !== "function" ||
+      typeof api.cleanupOrphans !== "function") {
+    throw new Error("The Zoo backup system is unavailable. No data was changed.");
+  }
+  return api;
+}
+
+function isSupportedBackupVersion(value, newestVersion) {
+  const version = Number(value);
+  return Number.isInteger(version) && version >= 2 && version <= newestVersion;
+}
+
+function importedZooForVersion(entry, saveVersion) {
+  // v2 predated standalone Zoo records; undefined means do not overwrite a
+  // currently available matching-ID record with fictional zero totals.
+  return Number(saveVersion) >= 3
+    ? getZooBackupApi().normalize(entry.zoo)
+    : undefined;
 }
 
 function normalizeImportedProgress(rawProgress) {
@@ -3086,7 +3112,8 @@ function createBibloZooFamilySaveData() {
       avatarVerseId: profile.avatarVerseId || "",
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
-      progress: readProfileProgressForBackup(profile.id)
+      progress: readProfileProgressForBackup(profile.id),
+      zoo: getZooBackupApi().read(localStorage, profile.id)
     }))
   };
 }
@@ -3124,7 +3151,8 @@ function createBibloZooProfileSaveData(
       avatarVerseId: profile.avatarVerseId || "",
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
-      progress: readProfileProgressForBackup(profile.id)
+      progress: readProfileProgressForBackup(profile.id),
+      zoo: getZooBackupApi().read(localStorage, profile.id)
     }
   };
 }
@@ -3387,10 +3415,7 @@ function openImportSaveDataPicker({
 }
 
 function parseFamilySaveData(parsed) {
-  if (
-    Number(parsed?.saveVersion) !==
-    FAMILY_SAVE_VERSION
-  ) {
+  if (!isSupportedBackupVersion(parsed?.saveVersion, FAMILY_SAVE_VERSION)) {
     throw new Error(
       "This family backup uses an unsupported save version."
     );
@@ -3433,17 +3458,15 @@ function parseFamilySaveData(parsed) {
           String(entry.avatarVerseId || "").trim(),
         createdAt: Number(entry.createdAt) || Date.now(),
         updatedAt: Number(entry.updatedAt) || Date.now(),
-        progress: normalizeImportedProgress(entry.progress)
+        progress: normalizeImportedProgress(entry.progress),
+        zoo: importedZooForVersion(entry, parsed.saveVersion)
       };
     })
   };
 }
 
 function parseProfileSaveData(parsed) {
-  if (
-    Number(parsed?.saveVersion) !==
-    PROFILE_SAVE_VERSION
-  ) {
+  if (!isSupportedBackupVersion(parsed?.saveVersion, PROFILE_SAVE_VERSION)) {
     throw new Error(
       "This individual backup uses an unsupported save version."
     );
@@ -3478,7 +3501,8 @@ function parseProfileSaveData(parsed) {
         String(entry.avatarVerseId || "").trim(),
       createdAt: Number(entry.createdAt) || Date.now(),
       updatedAt: Number(entry.updatedAt) || Date.now(),
-      progress: normalizeImportedProgress(entry.progress)
+      progress: normalizeImportedProgress(entry.progress),
+      zoo: importedZooForVersion(entry, parsed.saveVersion)
     }
   };
 }
@@ -3617,7 +3641,8 @@ function captureFamilyStorageSnapshot() {
   return {
     registryRaw:
       localStorage.getItem(registryKey),
-    progressEntries
+    progressEntries,
+    zooEntries: getZooBackupApi().snapshot(localStorage)
   };
 }
 
@@ -3694,7 +3719,19 @@ function rollbackFamilyStorage(
   originalError
 ) {
   try {
-    restoreFamilyStorageSnapshot(snapshot);
+    let rollbackError = null;
+    try {
+      restoreFamilyStorageSnapshot(snapshot);
+    } catch (err) {
+      rollbackError = err;
+    }
+    // Attempt the independent Zoo rollback even if progress rollback failed.
+    try {
+      getZooBackupApi().restoreSnapshot(localStorage, snapshot.zooEntries);
+    } catch (err) {
+      rollbackError = rollbackError || err;
+    }
+    if (rollbackError) throw rollbackError;
   } catch (rollbackError) {
     console.error(
       "Could not restore the pre-import Zookeeper data",
@@ -3969,7 +4006,8 @@ function prepareFamilyImport(familyData, mode) {
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt
       },
-      progress: entry.progress
+      progress: entry.progress,
+      zoo: entry.zoo
     };
   });
 
@@ -4008,6 +4046,10 @@ function applyFamilyImport(familyData, mode) {
         item.profile.id,
         item.progress
       );
+      // New IDs are used when adding; v2 has no Zoo state to invent.
+      if (item.zoo !== undefined) {
+        getZooBackupApi().write(localStorage, item.profile.id, item.zoo);
+      }
     });
 
     const verifiedRegistry =
@@ -4018,6 +4060,13 @@ function applyFamilyImport(familyData, mode) {
     cleanupOrphanedProfileProgressKeys(
       verifiedRegistry
     );
+    // Replace All removes Zoo keys for profiles no longer in this family.
+    // For v2 backups, a matching existing profile ID keeps its local totals.
+    if (mode === "replace") {
+      getZooBackupApi().cleanupOrphans(
+        localStorage, verifiedRegistry.profiles.map(p => p.id)
+      );
+    }
   } catch (err) {
     if (snapshot) {
       rollbackFamilyStorage(
@@ -4380,7 +4429,8 @@ function openIndividualProfileImportDialog(
         onClick: () => {
           restoreImportedProgressToActiveProfile(
             importedProfile.progress,
-            activeProfile
+            activeProfile,
+            importedProfile.zoo
           );
         }
       }),
@@ -4526,7 +4576,8 @@ function importSaveDataFromFile(
 
 function restoreImportedProgressToActiveProfile(
   importedProgress,
-  activeProfile
+  activeProfile,
+  importedZoo
 ) {
   if (!parentManagementAllowed()) return;
   const profileApi = getProfileApi();
@@ -4559,6 +4610,11 @@ function restoreImportedProgressToActiveProfile(
       activeProfile.id,
       expectedProgress
     );
+    // v3 replaces both independent records; older saves leave existing
+    // matching-profile Zoo information alone rather than erasing it.
+    if (importedZoo !== undefined) {
+      getZooBackupApi().write(localStorage, activeProfile.id, importedZoo);
+    }
 
     const verifiedRegistry =
       writeAndVerifyProfileRegistry(

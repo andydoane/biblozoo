@@ -128,8 +128,11 @@ jobs:
       - name: Test read-only archived SDK privacy manifest summaries
         run: node scripts/validate_ios_archive_privacy_manifest_summary.js
 
-      - name: Test offline family backup structure validator without using real profiles
+      - name: Test offline family backup v2/v3 validator without real profiles
         run: node scripts/validate_family_backup_file_test.js
+
+      - name: Validate Zoo backup v3 family/single export, import remapping and rollback
+        run: node scripts/validate_zoo_backup_integrity.js
 
       - name: Validate child Review hub, Listen Activities and Daily reward isolation
         run: node scripts/validate_learn_listen_activities.js
@@ -698,6 +701,9 @@ jobs:
 
       - name: Verify packaged Kids PR3 Settings parent gate and lock-image assets
         run: node scripts/validate_parental_gate_pr3_settings.js
+
+      - name: Verify packaged Zoo backup v3 helper and family/individual import safety
+        run: node scripts/validate_zoo_backup_integrity.js
 
       - name: Verify packaged Kids PR4 permission state gates and native source
         run: node scripts/validate_parental_gate_pr4_permissions.js

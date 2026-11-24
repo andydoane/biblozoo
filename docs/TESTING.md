@@ -1,5 +1,18 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — Zoo backup v3 acceptance without real family restore (November 23, 2026)
+
+**Purpose:** Close the two missing per-Zookeeper Zoo storage records in family and single-profile exports. Candidate PR: `fix/ios-zoo-family-profile-backup-v3-20261123` → `ios-prep`. This PR changes only backup format/import, a new shared helper and tests/docs, not gameplay or permissions.
+
+**Automated (fictional only):** Run `node scripts/validate_zoo_backup_integrity.js`, `node scripts/validate_family_backup_file_test.js`, and `npm run build`, then rerun `node scripts/validate_zoo_backup_integrity.js` against the packaged `dist/` files. Both GitHub Actions jobs must pass at exact final head. The tests execute real app.js export/parse/import functions in a mocked JS storage context and confirm v3 round-trip and rollback, old v2 compatibility, Add-as-New ID remapping, replace/clear semantics, malformed Zoo input failure and unrelated localStorage preservation. No actual child backup or saved family data is read by CI.
+
+**Owner smoke after merge (non-destructive):** (1) From existing native app **Export Family Backup** and **Back Up Zookeeper** for the same Zookeeper; do not import either into production. (2) Confirm both JSON have `saveVersion: 3`, a `zoo` object on every profile, and the same Zookeeper's two Zoo objects match at export time (unless gameplay occurred between exports). A missing record is represented by JSON `null`. (3) Preserve a separate private copy of the previous v2 files and the new v3 backups. These files contain private names/IDs/progress: do not place on GitHub or in CI logs. (4) In a fresh disposable environment with made-up profiles, test add-new, replace-progress and replace-all, and validate the recorded rescue counts and same-day surprise history after export→restore→export. Test v2 imports without a reset of existing independent counts for matching IDs. (5) Confirm no game, Flashcards, parental-gate, browser PWA, Audio Test or native permission regression.
+
+**Limits:** A v3 backup can only preserve Zoo data still present on the exporting device; a v2 file contains no missing counts. A read-only JSON review cannot prove real-device restore or network/SDK privacy. Do not reset, reinstall, delete, or overwrite existing production or Audio Test profiles to exercise new backup code.
+
+---
+
+
 ## CURRENT — iOS first-post-microphone Flashcards narration + parental math keyboard follow-up (November 23, 2026)
 
 **Owner observation after merged #197:** First-time microphone request → approve → real recording now succeeds. But the *next automatic Flashcards instruction narration* shows the red `Instructions couldn't play. Tap Replay Instructions.` toast; pressing Replay Instructions works. Also the shared Grown-up Check auto-focuses its Answer input and opens the iOS keyboard too early, partially covering the math popup.

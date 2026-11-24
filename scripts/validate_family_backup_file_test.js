@@ -32,7 +32,24 @@ try{
  assert.ok(!run.stdout.includes("profile_one"));
  assert.equal(fs.readFileSync(f,"utf8"),original,"checker must never write to the backup");
  checkFails({...sample,saveType:"biblozoo-profile-save"},"Expected Export Family Backup");
- checkFails({...sample,saveVersion:3},"Unsupported Family Backup");
+ const upgraded={...sample,saveVersion:3,
+   profiles:sample.profiles.map((p,i)=>({...p,zoo:{
+     rescueStats:i===0?{petsRescued:7,zooBreaksStopped:2,pendingPets:1,pendingBreaks:0}:null,
+     surprise:i===0?{day:"2026-11-23",breaksTriggered:1}:null
+   }}))};
+ assert.deepEqual(tool.validate(upgraded),{profiles:2,verseRecords:1,version:3});
+ assert.deepEqual(tool.validate(sample),{profiles:2,verseRecords:1,version:2},
+   "legacy v2 remains readable");
+ checkFails({...upgraded,saveVersion:4},"Unsupported Family Backup");
+ checkFails({...sample,saveVersion:1},"Unsupported Family Backup");
+ checkFails({...upgraded,profiles:[{...upgraded.profiles[0],zoo:undefined}]},"missing its Zoo");
+ checkFails({...upgraded,profiles:[{...upgraded.profiles[0],zoo:{
+   rescueStats:{petsRescued:-1,zooBreaksStopped:2,pendingPets:0,pendingBreaks:0},
+   surprise:null
+ }}]},"Invalid Zoo rescue counter");
+ checkFails({...upgraded,profiles:[{...upgraded.profiles[0],zoo:{
+   rescueStats:null,surprise:{day:"yesterday",breaksTriggered:1}
+ }}]},"Invalid Zoo surprise");
  checkFails({...sample,profiles:[]},"no Zookeeper profiles");
  checkFails({...sample,profiles:[{...sample.profiles[0],name:""}]},"no Zookeeper name");
  checkFails({...sample,profiles:[{...sample.profiles[0],progress:{version:2}}]},"verse-progress");
@@ -40,5 +57,5 @@ try{
  checkFails({...sample,profiles:[{...sample.profiles[0],progress:{version:99,verses:{}}}]},"newer");
  fs.writeFileSync(f,"not json");
  assert.throws(()=>tool.fromFile(f),/not readable JSON/);
- console.log("Step 3g PASS: private read-only family backup schema, legacy/wrong versions, empty/duplicate/bad progress and no data logging.");
+ console.log("Zoo backup PASS: private read-only family v2/v3 schema, complete Zoo records, invalid/duplicate/bad progress and no data logging.");
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
