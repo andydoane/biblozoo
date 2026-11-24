@@ -1,6 +1,6 @@
 # BibloZoo — isolated synthetic age-assurance simulator testing
 
-November 24, 2026. Merged [#240](https://github.com/andydoane/biblozoo/pull/240) at `c6ef302f8d1496e9e5fec31309ba8f49a938e007`; portable CI passed. The prior fixture stalled on `minor-unknown`. [#241](https://github.com/andydoane/biblozoo/pull/241) adds bounded, cancellable startup readiness and explicit retry after interruption. Owner tested source head `c6301837c05ebb58bf2c560e921fb03dae72f924`: [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45461548336) passed, including synthetic policy/compile fences; 164 local Debug assertions, ordinary and fixture unsigned simulator builds (SDK 26.5, arm64/x86_64), fixture identity, 15 synthetic runtime scenarios, allowed gameplay progress retention and Larger Text PASS on iPhone 17 / iOS 26.5 simulator. Startup stall no longer reproduced; original root cause remains inferred. VoiceOver not found by owner in Simulator; deferred, not passed. Native microphone/audio excluded by fixture identity as designed; production audio parity, prompt/modal/direct-link and real-device behavior not fully verified. No real Apple consent, live activation, enrollment, backend, cost or family data changes. Source acceptance is recorded; documentation-only follow-up to #241 requires green CI and owner merge. Next gate: initial consent, notification/serverless sufficiency, StoreKit rating applicability, older OS/offline and revocation evidence; no speculative production enforcement.
+November 24, 2026. Merged [#241](https://github.com/andydoane/biblozoo/pull/241) at `4ee00467a6dec937178dcf85ff2947fb9a07690f`; [final PR CI](https://github.com/andydoane/biblozoo/actions/runs/45469095169) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45469430157) passed. Owner tested source `c6301837`: 164 Debug assertions, both unsigned simulator builds, exact fixture identity, 15 synthetic runtime scenarios, progress retention and Larger Text PASS. VoiceOver, native audio parity, prompt/modal/direct-link and real-device checks remain deferred. Current candidate stages [StoreKit app-rating comparison](IOS-AGE-ASSURANCE-STOREKIT-RATING.md): async optional opaque code (iOS 26.2+), compare nonzero values only; Apple staff reports zero expected in development/sandbox/TestFlight. Nil/zero, missing baseline and cancellation do not prove unchanged. No runtime caller, consent inference, persistence, new prompt, backend, IAP, signing, deployment-target or family data changes. Expected 154 ordinary / 179 Debug assertions; candidate CI/Mac build pending. Initial consent, notification/serverless sufficiency, rating-baseline provenance, older OS/offline and revocation remain release blockers. No live activation or enrollment.
 
 ## Isolation
 
@@ -14,14 +14,14 @@ From clean repo root (do not switch with uncommitted changes):
 
 ```bash
 git status --short
-git fetch origin fix/ios-age-assurance-startup-readiness && git switch --detach FETCH_HEAD
+git fetch origin feat/ios-age-assurance-storekit-rating && git switch --detach FETCH_HEAD
 git rev-parse --short HEAD
 
 tmpdir="$(mktemp -d)"
 xcrun swiftc -D DEBUG ios/App/App/BibloZooAgeAssurance.swift scripts/validate_ios_age_assurance_foundation.swift -o "$tmpdir/age-test" && "$tmpdir/age-test"
 ```
 
-Expect 139 ordinary + 25 Debug fixture assertions = 164, including 11 startup readiness assertions. Without -D DEBUG, 139. Tests are pure logic, not UIKit or real Apple responses.
+For the StoreKit comparison candidate expect 154 ordinary + 25 Debug fixture assertions = 179, including 15 new comparison cases. Without -D DEBUG, 154. #241 historical totals were 139/164. Tests are pure logic, not UIKit or real Apple responses.
 
 These commands must fail with intentional #error messages:
 
@@ -42,7 +42,7 @@ Distinct fixture compile only:
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BibloZooAgeFixtureBuild CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER=com.andydoane.biblozoo.agefixture 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG BIBLOZOO_AGE_ASSURANCE_FIXTURE' build
 ```
 
-Both builds must report BUILD SUCCEEDED for the new candidate. Verify actual bundle identity before any subsequent installation:
+For a changed source candidate, both builds must report BUILD SUCCEEDED; the previous fixture runtime acceptance remains historical. Verify actual bundle identity before any subsequent installation:
 
 ```bash
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' /tmp/BibloZooAgeFixtureBuild/Build/Products/Debug-iphonesimulator/App.app/Info.plist
@@ -105,4 +105,4 @@ If readiness times out, capture only the fixture diagnostic (booleans, no age da
 
 ## Next
 
-After owner merge return to ios-prep, pull --ff-only, update [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). Startup stall resolved in tested fixture; complete deferred checks and resolve initial consent evidence, notification obligations, older OS/offline behavior and actual StoreKit/PermissionKit evidence. No release activation or enrollment without explicit decision; stop/reassess if no-server policy cannot be established.
+After each owner merge return to ios-prep, pull --ff-only, update [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). Startup stall resolved in tested fixture; complete deferred checks and resolve initial consent evidence, notification obligations, older OS/offline behavior and actual StoreKit/PermissionKit evidence. No release activation or enrollment without explicit decision; stop/reassess if no-server policy cannot be established.
