@@ -163,5 +163,43 @@ struct BibloZooAgeAssuranceTests {
         precondition(D.evaluate(A(.minor, minorUpdateConsent: true),
                                 initialConsent: .unknown, update: .approved) == .holdInitialConsent)
         print("PASS: 7 synthetic significant-update response assertions")
+
+        // Only freshly completed foreground checks can authorize the scene.
+        var epoch = BibloZooAgeForegroundEpoch()
+        let firstTicket = epoch.begin()!
+        precondition(epoch.begin() == nil)
+        precondition(!epoch.authorized)
+        precondition(epoch.finish(firstTicket, decision: .allowChildSafe,
+                                  foreground: true, cancelled: false) == .allowChildSafe)
+        precondition(epoch.authorized)
+        precondition(epoch.begin() == nil)
+        precondition(epoch.invalidate())
+        precondition(!epoch.authorized)
+        let secondTicket = epoch.begin()!
+        precondition(firstTicket != secondTicket)
+        precondition(epoch.finish(firstTicket, decision: .allowChildSafe,
+                                  foreground: true, cancelled: false) == nil)
+        precondition(epoch.current == secondTicket)
+        precondition(epoch.finish(secondTicket, decision: .holdDenied,
+                                  foreground: true, cancelled: false) == .holdDenied)
+        precondition(!epoch.authorized)
+        precondition(!epoch.invalidate())
+        let thirdTicket = epoch.begin()!
+        precondition(!epoch.invalidate())
+        precondition(epoch.finish(thirdTicket, decision: .allowChildSafe,
+                                  foreground: true, cancelled: false) == nil)
+        let fourthTicket = epoch.begin()!
+        precondition(epoch.finish(fourthTicket, decision: .allowChildSafe,
+                                  foreground: false, cancelled: false) == .holdUnavailable)
+        precondition(!epoch.authorized)
+        let fifthTicket = epoch.begin()!
+        precondition(epoch.finish(fifthTicket, decision: .allowChildSafe,
+                                  foreground: true, cancelled: true) == .holdUnavailable)
+        precondition(!epoch.authorized)
+        let retryTicket = epoch.begin()!
+        precondition(epoch.finish(retryTicket, decision: .allowChildSafe,
+                                  foreground: true, cancelled: false) == .allowChildSafe)
+        precondition(epoch.authorized)
+        print("PASS: 21 synthetic foreground authorization assertions")
     }
 }

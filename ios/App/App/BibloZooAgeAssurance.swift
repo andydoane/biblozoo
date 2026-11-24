@@ -194,7 +194,40 @@ enum BibloZooAgeAccessDecision: Equatable {
     }
 }
 
-// One automatic attempt per scene lifetime, even if a system sheet temporarily deactivates
+// Foreground-scoped transient authorization. A previously allowed scene is
+// never allowed to return on an old decision after a true background event.
+// Tickets are random in-memory correlation values, not account identifiers.
+struct BibloZooAgeForegroundEpoch {
+    private(set) var current: UUID?
+    private(set) var authorized = false
+
+    mutating func begin() -> UUID? {
+        guard current == nil, !authorized else { return nil }
+        let ticket = UUID()
+        current = ticket
+        return ticket
+    }
+
+    mutating func finish(_ ticket: UUID, decision: BibloZooAgeAccessDecision,
+                         foreground: Bool, cancelled: Bool) -> BibloZooAgeAccessDecision? {
+        guard current == ticket else { return nil }
+        current = nil
+        let result = foreground && !cancelled ? decision : .holdUnavailable
+        authorized = result == .allowChildSafe
+        return result
+    }
+
+    // Return whether this was a granted session requiring a fresh check.
+    // An interrupted initial request instead waits for explicit Retry.
+    mutating func invalidate() -> Bool {
+        let wasAuthorized = authorized
+        current = nil
+        authorized = false
+        return wasAuthorized
+    }
+}
+
+// One automatic attempt per foreground authorization cycle, even if a system sheet temporarily deactivates
 // the scene. No age data, approval or access decision is retained by this gate.
 struct BibloZooAgeStartupAttempt {
     private(set) var attempted = false
@@ -391,6 +424,7 @@ final class BibloZooSignificantUpdateService {
 @MainActor
 final class BibloZooAgeStartupCoordinator {
     private var attempt = BibloZooAgeStartupAttempt()
+    private var epoch = BibloZooAgeForegroundEpoch()
     private let service = BibloZooAgeAssurance()
     private var task: Task<Void, Never>?
 
@@ -411,18 +445,19 @@ final class BibloZooAgeStartupCoordinator {
               !presenter.isBeingDismissed else { return }
         guard attempt.begin(bundleID: Bundle.main.bundleIdentifier,
                             liveEnabled: Self.useNativeGate,
-                            activePresenter: true) else { return }
+                            activePresenter: true),
+              let ticket = epoch.begin() else { return }
         presenter.showChecking()
 
         task = Task { @MainActor [weak self, weak presenter] in
-            guard let self = self else { return }
-            defer { self.task = nil }
+            guard let self = self, self.epoch.current == ticket else { return }
             guard let presenter = presenter, !Task.isCancelled,
                   scene.activationState == .foregroundActive,
                   UIApplication.shared.applicationState == .active,
                   presenter.viewIfLoaded?.window?.windowScene === scene,
                   presenter.presentedViewController == nil else {
-                completion(.holdUnavailable)
+                self.finish(ticket, decision: .holdUnavailable, foreground: false,
+                            cancelled: Task.isCancelled, completion: completion)
                 return
             }
             // 1.0 has not previously shipped on the App Store. Do not assume
@@ -430,21 +465,27 @@ final class BibloZooAgeStartupCoordinator {
             let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             let update: BibloZooUpdateState = version == "1.0" ? .firstReleaseNoPending : .unknown
             let assessment = await self.service.check(in: presenter)
-            guard !Task.isCancelled,
-                  scene.activationState == .foregroundActive,
-                  UIApplication.shared.applicationState == .active,
-                  presenter.viewIfLoaded?.window?.windowScene === scene,
-                  presenter.presentedViewController == nil else {
-                completion(.holdUnavailable)
-                return
-            }
             // No native proof of initial minor consent has yet been wired.
             // This MUST NOT change to verified just because the app is installed.
             // Future code must supply verified store evidence, or stay blocked.
             let decision = BibloZooAgeAccessDecision.evaluate(
                 assessment, initialConsent: .unknown, update: update)
-            completion(decision)
+            let foreground = scene.activationState == .foregroundActive
+                && UIApplication.shared.applicationState == .active
+                && presenter.viewIfLoaded?.window?.windowScene === scene
+                && presenter.presentedViewController == nil
+            self.finish(ticket, decision: decision, foreground: foreground,
+                        cancelled: Task.isCancelled, completion: completion)
         }
+    }
+
+    private func finish(_ ticket: UUID, decision: BibloZooAgeAccessDecision,
+                        foreground: Bool, cancelled: Bool,
+                        completion: (BibloZooAgeAccessDecision) -> Void) {
+        guard let result = epoch.finish(ticket, decision: decision,
+                                        foreground: foreground, cancelled: cancelled) else { return }
+        task = nil
+        completion(result)
     }
 
     func retry(_ scene: UIScene, presenter: BibloZooAgeGateViewController,
@@ -455,10 +496,15 @@ final class BibloZooAgeStartupCoordinator {
         sceneBecameActive(scene, presenter: presenter, completion: completion)
     }
 
-    func sceneLeftForeground() {
-        // An Apple sheet may cause willResignActive; only true background or
-        // disconnect cancels. A cancelled completion cannot authorize access.
+    @discardableResult
+    func sceneLeftForeground() -> Bool {
+        // True background invalidates the ticket before cancellation; a late
+        // completion cannot change the new foreground or clear its task.
+        let recheck = epoch.invalidate()
         task?.cancel()
+        task = nil
+        if recheck { attempt = BibloZooAgeStartupAttempt() }
+        return recheck
     }
 }
 
