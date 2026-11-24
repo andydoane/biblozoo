@@ -1,6 +1,14 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — merged #204 and owner iPad keyboard PASS; native bridge review next (November 23, 2026 ET)
+## CURRENT — source-level native parental gate bridge review completed; fictional v3 restore next (November 23, 2026 ET)
+
+**Source review baseline:** `ios-prep` at `b56e837d6faac22ca42529e17208395a1add749c` (merged [PR #205](https://github.com/andydoane/biblozoo/pull/205)). Read [Native parental-gate / Capacitor bridge review](IOS-NATIVE-PARENTAL-GATE-BRIDGE-REVIEW.md) for the inspected Swift/Capacitor methods, JS action routes, evidence and explicit limitations. **Scoped finding:** the ordinary shipped UI routes inspected use the Grown-up Check correctly and **no child-reachable bypass was identified**; no speculative hardening code PR is warranted by the source reviewed. **Residual risk:** special native first-time mic/Photos permission and Ghost Writer share calls **trust the calling JS**, not an independent native adult-proof. If arbitrary untrusted JavaScript executes in the privileged WebView, it may call those bridges outside the normal gate. The present packaged-local config has no remote server URL or navigation allowlist, and inspected child UI has no such injection path; **this is not a claim of provable unbypassability**. No new device/CI security exercise was performed. Apple's actual Kids gate suitability remains unapproved.
+
+**Next focused action:** [Safe backup v3 round-trip](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md#d-safe-backup-v3-round-trip-acceptance-fictional-test-data-only) in a **disposable** simulator/browser using fabricated Zookeeper(s), including nonzero Zoo independent fields, Add as New/Replace modes, export-restore-re-export equality, legacy v2 and rollback. Existing automated tests and real-device read-only export comparison already passed, but this deliberate end-to-end **fictional restore** is still OPEN. **Do not** restore, reset, reinstall or overwrite either production bundle's real family data; never commit actual backup JSON. Then finish Kids adult-level task, final privacy/SDK, asset/legal, App Store listing and archive sign-offs. Whole-app Dynamic Type remains deferred for 1.0. As requested, a small documentation PR follows each checked-off review, left open for owner merge.
+
+---
+
+## HISTORICAL — merged #204 and owner iPad keyboard PASS; native bridge review next (November 23, 2026 ET)
 
 **Verified merge:** [PR #204](https://github.com/andydoane/biblozoo/pull/204) **merged** to native `ios-prep`, merge commit `559aa0126d3554b66da55a77bd5964e86dca16b8`. The owner subsequently tested on a **physical iPad** and reported the focused keyboard fix **"did exactly what we wanted it to."** Record **PASS for the previously obscured Check Answer/iPad keyboard usability issue**: this is owner evidence after the merged fix, not just synthetic viewport tests. The owner has not separately reported full iPad VoiceOver, Switch Control, complete keyboard/focus matrix, or an end-to-end backup export/cancel exercise; don't claim those passed. No new gameplay work is needed from this result.
 
