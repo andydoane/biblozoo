@@ -72,6 +72,12 @@ fs.mkdirSync(dist, { recursive: true });
 for (const file of rootFiles) copyEntry(file);
 for (const dir of runtimeDirs) copyEntry(dir);
 
+// Capacitor iOS treats extensionless paths as SPA routes to index.html.
+// Keep the original vendor LICENSE untouched and expose an exact text alias
+// in the generated package for the local Credits reader.
+const soundTouchLicense = path.join(dist, "flashcards/vendor/soundtouchjs-2.1.1/LICENSE");
+fs.copyFileSync(soundTouchLicense, soundTouchLicense + ".txt");
+
 /*
  * N1: An early output guard must run on EVERY Capacitor HTML entrypoint,
  * including standalone games and Playground pages. Inject into the built

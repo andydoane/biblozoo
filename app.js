@@ -5281,7 +5281,7 @@ function openPrivacyPolicy() {
 const BIBLOZOO_LOCAL_NOTICE_FILES = Object.freeze([
   Object.freeze({ label: "Font licenses", path: "verse_fonts/THIRD-PARTY-FONT-LICENSES.txt" }),
   Object.freeze({ label: "Software notices", path: "utilities/THIRD-PARTY-SOFTWARE-NOTICES.txt" }),
-  Object.freeze({ label: "SoundTouchJS license", path: "flashcards/vendor/soundtouchjs-2.1.1/LICENSE" }),
+  Object.freeze({ label: "SoundTouchJS license", path: "flashcards/vendor/soundtouchjs-2.1.1/LICENSE.txt" }),
   Object.freeze({ label: "SoundTouchJS source information", path: "flashcards/vendor/soundtouchjs-2.1.1/SOURCE.md" })
 ]);
 
@@ -5306,7 +5306,13 @@ function addBundledCreditsNotices(container) {
         const response = await fetch("./" + notice.path, { redirect: "error" });
         if (!response.ok) throw new Error("Notice unavailable");
         const content = await response.text();
-        if (!content.trim()) throw new Error("Empty notice");
+        // The local SPA router can return index.html with a successful
+        // status. Never display an HTML document in a license section.
+        if (/\b(?:text\/html|application\/xhtml\+xml)\b/i.test(response.headers?.get("content-type") || "") ||
+            /^\s*<(?:!doctype\b|html\b|head\b|body\b|!--|\?xml\b)/i.test(content) ||
+            !content.trim()) {
+          throw new Error("Unexpected notice response");
+        }
         text.textContent = content;
         loaded = true;
       } catch (_) {

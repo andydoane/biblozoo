@@ -17,14 +17,17 @@ try{
     put(source,rel,"notice "+i);
     put(built,rel,"notice "+i);
   }
+  const alias=tool.licenseDisplayPath;
+  const license=fs.readFileSync(path.join(source,tool.licenseOriginal),"utf8");
+  put(built,alias,license);
   put(built,"verse_audio/biblozoo_jingle.mp3","sound");
   put(built,"ui_audio/other.mp3","sound");
   const good=tool.inspectPublic(built,source);
-  assert.equal(good.files,7);
-  assert.equal(good.bytes,4+4*8+5+5);
+  assert.equal(good.files,8);
+  assert.equal(good.bytes,4+5*8+5+5);
   assert.equal(good.notices.length,4);
-  assert.equal(good.duplicateGroups,1);
-  assert.equal(good.duplicateBytes,5);
+  assert.equal(good.duplicateGroups,2);
+  assert.equal(good.duplicateBytes,13);
   assert.equal(good.review.length,1);
   assert.equal(good.reviewBytes,5);
   assert.equal(good.groups.reduce((sum,g)=>sum+g.bytes,0),good.bytes);
@@ -33,6 +36,13 @@ try{
     assert.throws(()=>tool.inspectPublic(built,source),/Unexpected desktop metadata/);
     fs.unlinkSync(metadata);
   }
+  fs.rmSync(path.join(built,alias));
+  assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged license display alias/);
+  put(built,alias,"");
+  assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged license display alias/);
+  put(built,alias,"wrong license");
+  assert.throws(()=>tool.inspectPublic(built,source),/alias differs from source/);
+  put(built,alias,license);
   const notice=tool.requiredNotices[0];
   fs.rmSync(path.join(built,notice));
   assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged notice/);
