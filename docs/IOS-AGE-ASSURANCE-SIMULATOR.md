@@ -1,12 +1,14 @@
 # BibloZoo — isolated synthetic age-assurance simulator testing
 
-November 24, 2026. Candidate #239; baseline merged #238 `9b4a663e0f7bb47a7f4173ff8bb6837bd5a2a5b0`. Owner's #238 head 0288c201 passed 128 synthetic checks, unsigned simulator compile and GitHub branch validation. No signed Apple API or UI acceptance. Release-fence failure test still outstanding. This checkpoint is independent of unresolved legal/consent evidence.
+November 24, 2026. Merged [#239](https://github.com/andydoane/biblozoo/pull/239) at `6408916e5c043578e716e3759c454a040834c63f`. Owner's Terminal log for exact PR head `25b9827b` confirms all 153 Debug synthetic Swift assertions PASS (128 prior + 25 fixtures), ordinary unsigned simulator BUILD SUCCEEDED on iOS SDK 26.5 (arm64/x86_64, iOS 15 target), with nonblocking legacy age declaration and AppIntents metadata warnings. [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45453241058) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45455557027) passed; those runs did not execute the age-assurance Swift tests. The fixture-flag simulator build, exact built fixture bundle ID, compile-failure fences and interactive simulator scenarios are not present in the supplied log and remain unverified. See [simulator acceptance guide](IOS-AGE-ASSURANCE-SIMULATOR.md) and [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md). No release activation, live Apple API, entitlement/signing, backend, iCloud, cost or family data change. Initial minor consent, notification/serverless sufficiency, older OS/offline and actual revocation remain release blockers. Fixture identity deliberately excludes production native audio parity. Owner reviews and merges.
 
 ## Isolation
 
 The existing native gate and foreground authorization ticket use fake decisions, not Apple API calls. Requires Debug, iOS simulator, explicit BIBLOZOO_AGE_ASSURANCE_FIXTURE flag and exact bundle ID com.andydoane.biblozoo.agefixture. Live flag is mutually exclusive; fixture flag on non-simulator/non-Debug is a compile error. Production and Audio Test identities do not accept fixtures. No tracked build settings/signing changes. Gate shows SIMULATOR TEST — FAKE CONSENT. Fixture identity deliberately does not enable production-only native audio or Audio Test diagnostics; exercise UI, bridge transition and state retention only, not production audio parity. App after approval may have normal icon/display name; launch by exact fixture ID from Terminal. No real profiles, photos, recordings, backups or Apple Account. No physical-device install, backend or new cost. Fake evidence never represents genuine consent.
 
 ## A — compile-only acceptance
+
+**Recorded acceptance:** exact #239 head passed 153 Debug assertions and the ordinary unsigned simulator build. The two intentional failure commands, fixture-only build and bundle ID check below remain pending on the owner's Mac; do not repeat successful commands unless source changes or needed to recreate a build. Current follow-up: portable ordinary and Debug synthetic Swift tests plus diagnostic-checked compile fences in the existing Ubuntu CI on ios-prep only. No new runner or infrastructure. Candidate CI results pending; Linux does not type-check UIKit/Apple frameworks or verify actual iOS fixture builds. Continue outstanding Mac-only acceptance in the simulator guide.
 
 From clean repo root (do not switch with uncommitted changes):
 
@@ -40,13 +42,13 @@ Distinct fixture compile only:
 xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/BibloZooAgeFixtureBuild CODE_SIGNING_ALLOWED=NO PRODUCT_BUNDLE_IDENTIFIER=com.andydoane.biblozoo.agefixture 'SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG BIBLOZOO_AGE_ASSURANCE_FIXTURE' build
 ```
 
-Both should BUILD SUCCEEDED. Verify actual bundle identity before any subsequent installation:
+Ordinary build already succeeded at the tested head; the distinct fixture build should also report BUILD SUCCEEDED. Verify actual bundle identity before any subsequent installation:
 
 ```bash
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' /tmp/BibloZooAgeFixtureBuild/Build/Products/Debug-iphonesimulator/App.app/Info.plist
 ```
 
-Must output com.andydoane.biblozoo.agefixture. Report exact head and results before merge. Author has not run compile or simulator; no success claimed.
+Must output com.andydoane.biblozoo.agefixture. Report exact head and remaining results. #239 is merged; fixture compile/identity and runtime acceptance are still pending.
 
 ## B — after compile acceptance, isolated simulator runtime
 
