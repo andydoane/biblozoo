@@ -1,5 +1,14 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — broader encryption source scan and local declaration verification PASS (November 24, 2026)
+
+**Baseline:** ios-prep at 5c079072f5e0515ba82ec76f7e84772dbceee5af, merged [PR #215](https://github.com/andydoane/biblozoo/pull/215).
+
+- [x] **Broader tracked-source encryption indicator scan (scoped):** owner supplied local Mac Terminal output from git grep at 82b50c8a80033f9cb2c088004c1b34261db85348 over tracked JS/HTML/Swift/TS/MJS/M/MM/H/C/CPP files, excluding scripts/docs/tests. Seven matches: app.js lines 3515–3516 and profiles.js lines 200–201 use crypto.randomUUID for profile IDs; verse_games/shared/parental-gate.js lines 44 and 51 use crypto.getRandomValues for arithmetic question randomization; app.js line 20544 matches Ecclesiastes abbreviation Ecc. No unexpected encryption indicators reported. This is a keyword-based tracked-source scan, not exhaustive semantic review of every file, generated assets, compiled SDK binaries or legal classification.
+- [x] **Local source declaration verification:** owner fast-forwarded clean ios-prep checkout from 82b50c8a to 5c079072, confirmed HEAD and origin/ios-prep agree, git status --short empty, and git show HEAD:ios/App/App/Info.plist displays ITSAppUsesNonExemptEncryption followed by Boolean false. Independently verified the exact current branch SHA and plist on GitHub. GitHub compare between these revisions lists only docs/APP-PRIVACY-PREFLIGHT.md, docs/PROJECT-HANDOFF.md and the two-line plist addition. Thus no scanned executable source changed; earlier scan remains applicable without rerunning. Personal filesystem paths and raw logs omitted.
+- **Conclusion:** scoped preflight source evidence supports the merged declaration; no additional source changes proposed. Owner merged #215. Final Release archive plist/dependency inventory, applicable export classification/reporting and destination-country obligations, and App Store Connect validation remain OPEN. No government exemption or Apple acceptance claimed.
+- **Next:** review applicable export obligations and proposed launch storefronts, then continue age-rating/Kids Category and other pre-enrollment work. Do not enroll, build/install over original profiles, or modify assets without owner authorization. Documentation only; owner reviews and merges.
+
 ## CURRENT — encryption/export compliance preflight and proposed iOS declaration (November 24, 2026)
 
 **Baseline:** ios-prep at 48b1b2a94ba61cdce38b3af7ab424c5c032dc647 after merged [PR #214](https://github.com/andydoane/biblozoo/pull/214).
