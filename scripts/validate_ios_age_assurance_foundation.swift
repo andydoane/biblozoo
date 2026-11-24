@@ -201,5 +201,43 @@ struct BibloZooAgeAssuranceTests {
                                   foreground: true, cancelled: false) == .allowChildSafe)
         precondition(epoch.authorized)
         print("PASS: 21 synthetic foreground authorization assertions")
+
+        // No connectivity probe, account-cohort guess or persisted approval.
+        // A fresh successful system result is usable regardless of whether
+        // the OS obtained it online or locally; an error is never permission.
+        let availability: [(A, C, U, D)] = [
+            (A(.unsupportedPlatform), .unknown, .firstReleaseNoPending, .holdUnsupportedPlatform),
+            (A(.unsupportedPlatform), .verified, .firstReleaseNoPending, .holdUnsupportedPlatform),
+            (A(.unsupportedPlatform), .deniedOrRevoked, .firstReleaseNoPending, .holdDenied),
+            (A(.unsupportedPlatform), .unknown, .denied, .holdDenied),
+            (A(.unavailable), .verified, .approved, .holdUnavailable),
+            (A(.unavailable), .unknown, .firstReleaseNoPending, .holdUnavailable),
+            (A(.notRequired), .unknown, .firstReleaseNoPending, .allowChildSafe),
+            (A(.minor), .unknown, .firstReleaseNoPending, .holdInitialConsent),
+            (A(.minor), .unknown, .approved, .holdInitialConsent),
+            (A(.minor), .verified, .firstReleaseNoPending, .allowChildSafe),
+            (A(.confirmedAdult), .unknown, .firstReleaseNoPending, .allowChildSafe),
+            (A(.notRequired, unknownRequirement: true), .unknown, .firstReleaseNoPending, .holdUnavailable)
+        ]
+        for (index, test) in availability.enumerated() {
+            precondition(D.evaluate(test.0, initialConsent: test.1, update: test.2) == test.3,
+                         "Availability policy case \(index) failed")
+        }
+        precondition(R.resolve(A(.unsupportedPlatform), pending: change,
+                               installedVersion: "1.1") == .unavailable)
+        // Even a previously granted session cannot reenter using a stale
+        // decision when the next system check is unavailable.
+        var offlineEpoch = BibloZooAgeForegroundEpoch()
+        let onlineTicket = offlineEpoch.begin()!
+        precondition(offlineEpoch.finish(onlineTicket, decision: .allowChildSafe,
+                                         foreground: true, cancelled: false) == .allowChildSafe)
+        precondition(offlineEpoch.invalidate())
+        let offlineTicket = offlineEpoch.begin()!
+        precondition(offlineEpoch.finish(onlineTicket, decision: .allowChildSafe,
+                                         foreground: true, cancelled: false) == nil)
+        precondition(offlineEpoch.finish(offlineTicket, decision: .holdUnavailable,
+                                         foreground: true, cancelled: false) == .holdUnavailable)
+        precondition(!offlineEpoch.authorized)
+        print("PASS: \(availability.count + 6) synthetic availability and offline-policy assertions")
     }
 }

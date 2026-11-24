@@ -2,6 +2,13 @@
 // No persistence, logs, network client, JavaScript bridge or raw age retention.
 import Foundation
 
+// A staged gate with unresolved release prerequisites must never silently
+// become a distribution build. Remove this fence only in an explicitly
+// reviewed release-activation PR after the roadmap's stop/go checks.
+#if BIBLOZOO_AGE_ASSURANCE_LIVE && !DEBUG
+#error("BibloZoo age assurance is not approved for live Release activation.")
+#endif
+
 enum BibloZooAgeRangeOutcome: Equatable {
     case minor
     case confirmedAdult
@@ -9,6 +16,7 @@ enum BibloZooAgeRangeOutcome: Equatable {
     case ambiguous
     case declined
     case unavailable
+    case unsupportedPlatform
     case notRequired
     case needsCheck
     case updateRequirementsOnly
@@ -120,7 +128,7 @@ enum BibloZooUpdateRoute: Equatable {
             return assessment.adultUpdateNotice ? .adultAcknowledgment : .noPrompt
         case .minor:
             return assessment.minorUpdateConsent ? .parentalPermission : .noPrompt
-        case .adultNotConfirmed, .ambiguous, .declined, .unavailable:
+        case .adultNotConfirmed, .ambiguous, .declined, .unavailable, .unsupportedPlatform:
             return .unavailable
         }
     }
@@ -152,6 +160,7 @@ enum BibloZooAgeAccessDecision: Equatable {
     case holdInitialConsent
     case holdUpdate
     case holdUnavailable
+    case holdUnsupportedPlatform
     case holdDenied
 
     // This staged policy is intentionally conservative. An age range,
@@ -171,6 +180,8 @@ enum BibloZooAgeAccessDecision: Equatable {
             guard case .verified = initialConsent else { return .holdInitialConsent }
         case .adultNotConfirmed, .ambiguous, .declined:
             return .holdAgeVerification
+        case .unsupportedPlatform:
+            return .holdUnsupportedPlatform
         case .unavailable, .needsCheck:
             return .holdUnavailable
         }
@@ -284,8 +295,13 @@ final class BibloZooAgeAssurance {
                 let eligible = try await AgeRangeService.shared.isEligibleForAgeFeatures
                 return BibloZooAgeAssessment(eligible ? .needsCheck : .notRequired)
             }
-            return BibloZooAgeAssessment(.unavailable)
+            // The framework is unavailable for regional checks on this OS.
+            // Apple discusses existing accounts on iOS 18 or earlier, but we
+            // cannot identify that account cohort from the OS version alone.
+            return BibloZooAgeAssessment(.unsupportedPlatform)
         } catch {
+            // This could be temporary or offline; do not infer region, age,
+            // consent, or even connectivity from an unspecified system error.
             return BibloZooAgeAssessment(.unavailable)
         }
     }
@@ -429,7 +445,7 @@ final class BibloZooAgeStartupCoordinator {
     private var task: Task<Void, Never>?
 
     static var useNativeGate: Bool {
-        #if BIBLOZOO_AGE_ASSURANCE_LIVE
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_LIVE
         return Bundle.main.bundleIdentifier == "com.andydoane.biblozoo"
         #else
         return false
@@ -559,10 +575,13 @@ final class BibloZooAgeGateViewController: UIViewController {
             message.text = "Permission for this app update is needed."
         case .holdDenied:
             message.text = "App Store permission is not available."
+        case .holdUnsupportedPlatform:
+            message.text = "This device cannot complete the required App Store check. Ask a grown-up for help."
         case .holdUnavailable, .allowChildSafe:
-            message.text = "The required App Store check is unavailable. Ask a grown-up or try again."
+            message.text = "The App Store check could not finish. Ask a grown-up to check the connection, or try again."
         }
-        retryButton.isHidden = false
+        // Repeated attempts cannot make an unsupported API available.
+        retryButton.isHidden = decision == .holdUnsupportedPlatform
     }
 
     @objc private func retryTapped() { onRetry?() }
