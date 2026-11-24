@@ -1,5 +1,9 @@
 # BibloZoo — Step 3b iOS first-party privacy and release audit
 
+## CURRENT — age-assurance source delta (November 24, 2026)
+
+[Staged age access policy](IOS-AGE-ASSURANCE-ACCESS.md) adds native transient evaluation of age categories and separate consent/update state, no raw bounds/identifier persistence, logs, JS age bridge or developer network client. No new SDK dependency, entitlement, manifest or signed binary change established; live flag remains disabled. Prior archive evidence below predates the age-assurance implementation and does not validate a future activated build. Re-run final archive/manifest/traffic assessment and reconsider disclosures after native activation.
+
 **Status (2026-11-15):** First-party required-reason manifest via #114, asset/SPM audit via #116 and no-install Xcode archive helper via #117 merged. Owner's **Apple-SDK original-ID Xcode archive and sampled resources PASSED**; Apple-generated report PDF is **one blank page (806 bytes)**. After merged [PR #118](https://github.com/andydoane/biblozoo/pull/118), owner's read-only scan of the **actual archive contents** established app, Capacitor.framework and Cordova.framework all declare no tracking, domains or collected data; the app declares SystemBootTime/35F9.1 and FileTimestamp/3B52.1, with no extra SDK required-reason categories declared. `npm audit --omit=dev` reports **0 runtime dependency vulnerabilities** (seven full-install advisories remain unattributed). These are **manifest declarations, not independent SDK code-use or App Store privacy certification**. No original-profile backup/restore or real-iPhone production-ID audio/mic test has been reported. See [backup preflight](IOS-FAMILY-BACKUP-SAFETY.md) in Step 3g [PR #119](https://github.com/andydoane/biblozoo/pull/119).
 
 ## 1. Required-reason API inventory — first-party Swift code

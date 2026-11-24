@@ -97,7 +97,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Run after the existing audio/visual restoration, including its
         // early-return path on cold launch. No effect in ordinary builds yet.
         defer {
-            ageStartup.sceneBecameActive(scene, presenter: window?.rootViewController)
+            if let gate = window?.rootViewController as? BibloZooAgeGateViewController {
+                beginAgeGate(scene, gate: gate, retry: false)
+            }
         }
         #endif
         guard let paused = switcherPausedLayerTime,
@@ -127,11 +129,50 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
+        #if canImport(DeclaredAgeRange)
+        if BibloZooAgeStartupCoordinator.useNativeGate {
+            let gate = BibloZooAgeGateViewController()
+            gate.onRetry = { [weak self, weak gate, weak scene] in
+                guard let self = self, let gate = gate, let scene = scene else { return }
+                self.beginAgeGate(scene, gate: gate, retry: true)
+            }
+            window?.rootViewController = gate
+        } else {
+            window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
+        }
+        #else
         window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
+        #endif
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
+
+    #if canImport(DeclaredAgeRange)
+    private func beginAgeGate(_ scene: UIScene, gate: BibloZooAgeGateViewController,
+                              retry: Bool) {
+        guard window?.rootViewController === gate else { return }
+        let completion: (BibloZooAgeAccessDecision) -> Void = { [weak self, weak gate, weak scene] decision in
+            guard let self = self, let gate = gate, let scene = scene,
+                  self.window?.rootViewController === gate else { return }
+            if decision == .allowChildSafe,
+               scene.activationState == .foregroundActive,
+               UIApplication.shared.applicationState == .active,
+               gate.presentedViewController == nil {
+                // No user content, web runtime or bridge existed before this
+                // point. Preserve the ordinary production controller exactly.
+                self.window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
+            } else {
+                gate.showHold(decision)
+            }
+        }
+        if retry {
+            ageStartup.retry(scene, presenter: gate, completion: completion)
+        } else {
+            ageStartup.sceneBecameActive(scene, presenter: gate, completion: completion)
+        }
+    }
+    #endif
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)

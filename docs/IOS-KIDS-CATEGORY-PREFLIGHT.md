@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — Kids Category / parental-gate preflight
 
+## CURRENT — age-assurance follow-up (November 24, 2026)
+
+[Native state age-assurance access policy](IOS-AGE-ASSURANCE-ACCESS.md) is staged and disabled by default; it does not change Kids Category positioning, age-rating questionnaire, Grown-up Check or ordinary game behavior. Do not conflate age categories or Apple Account adult status with verified parental consent, local profile ages or Kids gate suitability. See final acceptance and privacy preflight for remaining checks.
+
 **November 23, 2026 | current status: FOUR-PHASE PARENTAL-GATE IMPLEMENTATION MERGED; APPLE KIDS/ACCESSIBILITY/SECURITY ACCEPTANCE OPEN.**
 
 **Proposed, not yet selected in App Store Connect:** Primary category **Education**, **Made for Kids / Kids Category**, age band **6–8** (early independent readers). The owner describes the sweet spot as elementary-age readers; older elementary children remain welcome. The owner agreed this positioning sounds good. **Do not treat this document as confirmation that App Review will approve the category or that the owner has made an irreversible App Store Connect selection.**

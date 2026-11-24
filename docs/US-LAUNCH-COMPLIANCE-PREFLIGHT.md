@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — US launch compliance preflight
 
+## CURRENT — native-only implementation checkpoint (November 24, 2026)
+
+Owner elected native implementation/testing and App Review rather than a forum post. Current [access policy candidate](IOS-AGE-ASSURANCE-ACCESS.md) handles known age outcomes separately from verified minor consent and significant-update state, retaining no raw age data. Live compile condition remains OFF; no actual initial minor consent signal, PermissionKit approval, revocation enforcement, older OS/offline acceptance or legal clearance established. No server, endpoint, iCloud or new recurring costs authorized. Texas §§121.054–.055 and [Apple Q&A](https://developer.apple.com/support/age-assurance/) remain release gates; App Review does not substitute for law. No change to US-only release scope.
+
 ## CURRENT — serverless release constraint and state timeline clarification (November 24, 2026)
 
 The owner has stated that recurring server costs could make this hobby release infeasible. Follow the [native-only feasibility plan](IOS-AGE-ASSURANCE-PLAN.md) before proposing code or paid enrollment. Texas statute does not explicitly prescribe a developer server, but Apple's June 3 checklist includes server notifications; OS launch blocking alone is not yet confirmed sufficient. No backend, account, paid service or new cloud data store authorized. Apple's February 24 Utah/Louisiana dates below are historical announcements, not the current statutory schedule: [November 19 legal review](https://www.privacyworld.blog/2026/11/app-store-age-verification-laws-your-questions-answered-updated/) reports Utah May 6, 2027 and Louisiana July 1, 2027, California and Alabama January 1, 2027 (California distinct OS-signal model; Alabama challenge pending). Confirm primary statutes, court orders and current Apple implementation before release. Texas enforcement remains subject to pending appeal. No clearance claimed.
