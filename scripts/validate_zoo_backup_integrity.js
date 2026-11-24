@@ -75,7 +75,8 @@ function freshEnvironment() {
   const win = { BibloZooZooBackup: zoo };
   const ctx = {
     window: win, localStorage: storage, getProfileApi: () => api,
-    PROGRESS_VERSION: 2, createEmptyProgress: () => ({ version: 2, verses: {}, tutorial: {} }),
+    PROGRESS_VERSION: 2, VERSE_ID: "", titleZooPetVerseId: "",
+    createEmptyProgress: () => ({ version: 2, verses: {}, tutorial: {} }),
     migrateTrafficProgress: () => false,
     migrateTutorialProgress: () => false,
     migrateDailyQuestionsProgress: () => false,
