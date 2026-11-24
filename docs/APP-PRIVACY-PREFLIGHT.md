@@ -1,5 +1,15 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
+## CURRENT — owner approves App Privacy disclosure and confirms monitored contact (November 24, 2026)
+
+**Baseline:** ios-prep at c9d16fa45817ed3a897bc3a20d129ad8000e8362, following merged [PR #213](https://github.com/andydoane/biblozoo/pull/213).
+
+- [x] **Owner App Privacy disclosure approval:** owner explicitly approved the proposed native iOS App Store Connect answer `No, we do not collect data from this app` (Data Not Collected), subject to final release validation. Evidence includes the scoped first-party and SDK source/configuration assessments, archive manifest inventory, simulator and physical-device observations, and local SDK signature verification recorded below. This is pre-enrollment owner sign-off, not a completed App Store Connect submission, exhaustive traffic/binary audit, or Apple acceptance.
+- [x] **Contact mailbox monitoring:** owner explicitly confirmed monitoring biblozooapp@gmail.com and reported opening it today. No independent deliverability test performed. Existing November 22 privacy policy wording remains owner-approved and unchanged.
+- **Remaining gates:** final production-equivalent archive/SDK and required-reason validation, any remaining permission/recovery and offline/device smoke paths, and App Store Connect upload/privacy validation after enrollment. Revisit the disclosure if the final build, SDKs, or evidence changes. No new runtime testing claimed here.
+- **Next pre-enrollment work:** encryption/export compliance assessment (review actual app and dependencies, Apple guidance, and applicable declaration before changing Info.plist or answering App Store Connect). Continue other release preparation while outstanding asset-rights questions remain tracked separately. Do not enroll or alter app data without owner authorization.
+- Documentation only; no app code, policy, dependency, signing, asset, or saved-data changes. Owner reviews and merges each checkpoint PR.
+
 ## CURRENT — owner approves existing privacy policy wording (November 24, 2026)
 
 **Baseline:** ios-prep at 82b50c8a80033f9cb2c088004c1b34261db85348, following merged [PR #212](https://github.com/andydoane/biblozoo/pull/212).
@@ -114,8 +124,9 @@ Apple defines **data “collected”** for its App Privacy labels as data **tran
 - [ ] **Comprehensive runtime/data-collection verification:** owner reported a successful custom-photo import and no new proxy traffic; still separately verify offline-first behavior and other relevant external-link/game paths as appropriate, traffic bypassing the proxy, SDK behavior, and an on-device App Privacy Report/production-equivalent environment. Review SDK partner practices and actual data transfer before final Apple disclosure answers. Do not disturb original profiles.
 - [x] **Scoped simulator permissions/picker cancellation — owner reported PASS:** microphone denied produced a BibloZoo fallback prompt; Photos add denied produced a BibloZoo Save error; Photos and Files picker cancellation both worked without getting stuck.
 - [ ] **Remaining permission matrix:** owner now reports custom-photo import PASS; applicable permission recovery/re-enablement, unexpected interruptions and real-iPhone device acceptance remain separate. Do not reset/reinstall the production app.
-- [ ] **App Privacy answers:** record yes/no, all relevant data types and partner practices from actual verified Release app behavior before entering App Store Connect. If collection remains genuinely absent, prepare `No data collected` with evidence instead of an assumption.
+- [x] **Pre-enrollment App Privacy answer and owner approval:** intended native answer is `No data collected`, supported by scoped evidence and explicitly approved by owner on November 24.
+- [ ] **Final App Privacy submission verification:** recheck final production archive, applicable SDK/required-reason and runtime evidence, and upload warnings; enter the approved answer in App Store Connect only if supported by the final build. Revisit if evidence changes.
 - [x] **Owner reviews final policy wording:** owner approved the published policy; existing substantive wording retained in both copies.
-- [ ] **Contact mailbox monitoring:** listed address retained as part of approved wording; separate confirmation that the inbox is monitored remains outstanding.
+- [x] **Contact mailbox monitoring:** owner explicitly confirmed monitoring the listed address and opening it on November 24; no independent deliverability test performed.
 
 **Safety and scope of this follow-up:** The initial privacy-alignment PR changed only policy wording and source checks; this follow-up records **owner-reported observations only** and updates docs/checklists. No profile storage, permissions, microphones, PhotoKit functionality, network calls, third-party packages, Swift behavior, package pins, signing or repository visibility changes. **Unresolved asset-rights licensing** (deferred Chalkboard, public GitHub raw ZapSplat sound issue, etc.) is tracked separately in [ASSET-LICENSES.md](ASSET-LICENSES.md). Continue release preparation without treating those unresolved obligations as cleared.
