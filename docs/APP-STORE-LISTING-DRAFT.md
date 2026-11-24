@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — App Store listing draft
 
+## CURRENT — Apple significant-update adapter checkpoint (November 24, 2026)
+
+See [current consent implementation](IOS-AGE-ASSURANCE-CONSENT.md). #234 merged and owner verified normal unsigned build and 64 synthetic assertions. New candidate adds documented Apple significant-update acknowledgment and PermissionKit request/response adapter only, with no live caller or enabled gate, no fabricated first-release update, no initial consent inference, and no persistence or developer backend. In-flight opaque question ID matched to response; no logs/JS/raw age data, no iCloud or signing change. Normal app, PWA and Audio Test unchanged. Initial minor consent, update recovery/account scope, revocation, older OS/offline, entitlement and sandbox verification remain open. No change to proposed privacy labels, Kids positioning, listing, gate or legal release clearance; reassess after activation.
+
 ## CURRENT — age-assurance metadata checkpoint (November 24, 2026)
 
 The [native age-access policy](IOS-AGE-ASSURANCE-ACCESS.md) is staged, not active in normal builds. Do not claim live age verification, legal compliance or approval in listing or questionnaire before entitlement and signed sandbox acceptance. No changed listing copy, screenshot plan, price, US storefront choice or conditional Kids position. Revisit actual capabilities, privacy declarations and App Review notes before submission.

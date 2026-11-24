@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — US launch compliance preflight
 
+## CURRENT — Apple significant-update adapter checkpoint (November 24, 2026)
+
+See [current consent implementation](IOS-AGE-ASSURANCE-CONSENT.md). #234 merged and owner verified normal unsigned build and 64 synthetic assertions. New candidate adds documented Apple significant-update acknowledgment and PermissionKit request/response adapter only, with no live caller or enabled gate, no fabricated first-release update, no initial consent inference, and no persistence or developer backend. In-flight opaque question ID matched to response; no logs/JS/raw age data, no iCloud or signing change. Normal app, PWA and Audio Test unchanged. Initial minor consent, update recovery/account scope, revocation, older OS/offline, entitlement and sandbox verification remain open. No change to proposed privacy labels, Kids positioning, listing, gate or legal release clearance; reassess after activation.
+
 ## CURRENT — native-only implementation checkpoint (November 24, 2026)
 
 Owner elected native implementation/testing and App Review rather than a forum post. Current [access policy candidate](IOS-AGE-ASSURANCE-ACCESS.md) handles known age outcomes separately from verified minor consent and significant-update state, retaining no raw age data. Live compile condition remains OFF; no actual initial minor consent signal, PermissionKit approval, revocation enforcement, older OS/offline acceptance or legal clearance established. No server, endpoint, iCloud or new recurring costs authorized. Texas §§121.054–.055 and [Apple Q&A](https://developer.apple.com/support/age-assurance/) remain release gates; App Review does not substitute for law. No change to US-only release scope.

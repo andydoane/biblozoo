@@ -1,5 +1,11 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — significant-update system adapter (November 24, 2026)
+
+Merged #234 (`bef654266bb7c545c3def8bc5a9970321e767154`); owner tested exact head 5172c734, reported 14 + 7 + 10 + 9 + 24 synthetic assertions PASS and normal unsigned simulator BUILD SUCCEEDED; branch validation passed. Separate opt-in build remains unverified. Current candidate adds [Apple significant-update adapter](IOS-AGE-ASSURANCE-CONSENT.md): documented adult acknowledgment and PermissionKit question/response APIs, scoped to an actual version-specific change, matched in-memory response ID, conservative decline default and cancellation/unknown handling. The adapter has no live startup caller, and the live gate remains disabled. First release 1.0 has no pending significant update. Initial minor consent is not exposed as a field in Apple's documented AgeRange response; no substitute invented, so initial consent, persistence/recovery, account change/revocation, older OS/offline and signed sandbox acceptance remain release blockers. No backend, iCloud, accounts, extra cost, signing or visible ordinary app change. App Review not legal clearance.
+
+Candidate acceptance: see current consent guide, expected prior 64 assertions plus 18 update routing and 7 response assertions; normal unsigned simulator compile, no install. Do not confuse pure fixtures with actual Apple permissions.
+
 ## CURRENT — native age-assurance access policy candidate (November 24, 2026)
 
 Owner verified merged #233 at `191ca61a27e4ce38ee4dca93e14436180f7b9110`: 14 classification + 7 routing + 10 startup assertions PASS and unsigned simulator build succeeded. For the new candidate follow [access acceptance](IOS-AGE-ASSURANCE-ACCESS.md): 14 + 7 + 10 + 9 regulated category + 24 access-policy assertions, unsigned simulator build for ordinary configuration and opt-in compile only, verify exact commit. No installation, signing, family data or live system requests. The opt-in flag is not configured in repo; do not run opt-in builds on real family devices. Future disposable sandbox must test actual initial consent, significant updates, revocation/account changes, offline and older OS plus native screen/VoiceOver/large text and existing gameplay; no real child fixtures or backup restore. Existing regression and release checks remain required.
