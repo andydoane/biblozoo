@@ -128,6 +128,9 @@ jobs:
       - name: Test read-only archived SDK privacy manifest summaries
         run: node scripts/validate_ios_archive_privacy_manifest_summary.js
 
+      - name: Test read-only production packaging inventory and refusal cases
+        run: node scripts/validate_ios_production_packaging_audit.js
+
       - name: Test offline family backup v2/v3 validator without real profiles
         run: node scripts/validate_family_backup_file_test.js
 
@@ -716,6 +719,9 @@ jobs:
 
       - name: Build production web bundle for Capacitor
         run: npm run build
+
+      - name: Audit production dist notices and payload inventory
+        run: node scripts/audit_ios_production_packaging.js --dist
 
       - name: Validate N1 guard placement in every packaged HTML entrypoint
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'

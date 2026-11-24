@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — App Store listing draft
 
+## CURRENT — production packaging and beta readiness (November 24, 2026)
+
+Merged [#243](https://github.com/andydoane/biblozoo/pull/243) at `f922305b70fccab48675bb1357b6f3bdbc395067`; [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45472618806) passed. Age-assurance feasibility HOLD unchanged. Current candidate adds [production packaging audit](IOS-PRODUCTION-PACKAGING-AUDIT.md): read-only dist/explicit archive inventory, four byte-matched license/source files, actual archive identity/resource and app/SDK manifest checks, duplicate and review-candidate reporting. Candidate CI and owner unsigned archive acceptance pending. No runtime or asset changes, signing, enrollment, upload, costs or family data changes. TestFlight beta downloads free to testers after enrollment, eligible signed build and external review, subject to applicable beta rights/privacy/age requirements. No external testing authorized. Full legal notice access, rights and final privacy validation remain open.
+
 ## CURRENT — native feasibility HOLD (November 24, 2026)
 
 Merged [#242](https://github.com/andydoane/biblozoo/pull/242) at `5f7f4753be55b6e702c136201329f08ba9dcfc88`; owner verified `f8ca90f3`: 179 Debug assertions, both unsigned SDK 26.5 builds PASS; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45470611910), [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45470829861) and [acceptance](https://github.com/andydoane/biblozoo/pull/242#issuecomment-7142275725). Prior #241 runtime acceptance retained. Current docs-only [native feasibility decision](IOS-AGE-ASSURANCE-NATIVE-FEASIBILITY.md): initial consent and no-server revocation sufficiency unresolved; release HOLD. No code, signing, enrollment, backend, new costs or family data changes. No new Mac test needed. Owner decision on next evidence route required; see [roadmap](IOS-AGE-ASSURANCE-ROADMAP.md).

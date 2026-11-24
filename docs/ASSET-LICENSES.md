@@ -1,5 +1,9 @@
 # BibloZoo — Version 1.0 Asset Rights and Attribution Ledger
 
+## CURRENT — production packaging and beta readiness (November 24, 2026)
+
+Merged [#243](https://github.com/andydoane/biblozoo/pull/243) at `f922305b70fccab48675bb1357b6f3bdbc395067`; [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45472618806) passed. Age-assurance feasibility HOLD unchanged; no speculative native policy. Current candidate adds [production packaging audit](IOS-PRODUCTION-PACKAGING-AUDIT.md): read-only dist/explicit archive inventory, four byte-matched license/source files, actual archive identity/resource and app/SDK manifest checks, duplicate and review-candidate reporting. Source runtime folders include 2,173 paths / 114,448,688 bytes, not measured archive size. Notice accessibility and rights remain open; no assets removed, no runtime or signing changes. Candidate CI and owner unsigned archive acceptance pending. TestFlight is included in $99/year membership; free beta downloads after enrollment, eligible signed build and external review, subject to applicable beta rights/privacy/age requirements. No enrollment, upload, distribution or family data authorized. Next: inventory evidence, targeted cleanup/notice accessibility, screenshots and final release-candidate testing.
+
 ## CURRENT — proprietary owner intent, preliminary branding and software notices (November 24, 2026)
 
 **Baseline:** `ios-prep` at `861290f97fbb735368393c03f39f8ebfc6c6f871`, following merged [PR #228](https://github.com/andydoane/biblozoo/pull/228).

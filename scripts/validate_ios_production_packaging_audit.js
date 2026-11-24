@@ -1,0 +1,52 @@
+/* Synthetic packaging audit tests; no real archive, profile or device. */
+"use strict";
+const fs=require("node:fs"),path=require("node:path"),os=require("node:os");
+const assert=require("node:assert/strict");
+const tool=require("./audit_ios_production_packaging.js");
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),"biblozoo-package-test-"));
+const source=path.join(tmp,"source"),built=path.join(tmp,"public");
+function put(dir,rel,body){
+  const file=path.join(dir,rel);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(file,body);
+  return file;
+}
+try{
+  put(built,"index.html","home");
+  for(const [i,rel] of tool.requiredNotices.entries()){
+    put(source,rel,"notice "+i);
+    put(built,rel,"notice "+i);
+  }
+  put(built,"verse_audio/biblozoo_jingle.mp3","sound");
+  put(built,"ui_audio/other.mp3","sound");
+  put(built,"pet_images/desktop.ini","metadata");
+  const good=tool.inspectPublic(built,source);
+  assert.equal(good.files,8);
+  assert.equal(good.bytes,4+4*8+5+5+8);
+  assert.equal(good.notices.length,4);
+  assert.equal(good.duplicateGroups,1);
+  assert.equal(good.duplicateBytes,5);
+  assert.equal(good.review.length,2);
+  assert.equal(good.reviewBytes,13);
+  assert.equal(good.groups.reduce((sum,g)=>sum+g.bytes,0),good.bytes);
+  const notice=tool.requiredNotices[0];
+  fs.rmSync(path.join(built,notice));
+  assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged notice/);
+  put(built,notice,"");
+  assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged notice/);
+  put(built,notice,"different");
+  assert.throws(()=>tool.inspectPublic(built,source),/differs from source/);
+  put(built,notice,"notice 0");
+  const link=path.join(built,"unexpected-link");
+  fs.symlinkSync(path.join(built,"index.html"),link);
+  assert.throws(()=>tool.inspectPublic(built,source),/Unexpected symbolic link/);
+  fs.unlinkSync(link);
+  fs.rmSync(path.join(built,"index.html"));
+  assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty index/);
+  put(built,"index.html","home");
+  assert.doesNotThrow(()=>tool.requireSdkManifests(tool.expectedSdkManifests));
+  for(const manifest of tool.expectedSdkManifests)
+    assert.throws(()=>tool.requireSdkManifests(tool.expectedSdkManifests.filter(x=>x!==manifest)),/SDK privacy manifest missing/);
+  assert.deepEqual(tool.inspectPublic(built,source),good);
+  console.log("Production packaging audit PASS: synthetic inventory, exact notice bytes, duplicate/candidate reporting, missing/empty/modified notices, symlink refusal, SDK manifest presence.");
+}finally{fs.rmSync(tmp,{recursive:true,force:true});}
