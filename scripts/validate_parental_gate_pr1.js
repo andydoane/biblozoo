@@ -80,7 +80,7 @@ class FakeElement {
   focus() {
     this.doc.activeElement = this;
     // Focusing an editable Answer field summons the iOS keyboard; focus on
-    // the equation alone must NOT show it on dialog entrance/wrong answer.
+    // the static heading/prompt must NOT show it on entrance/wrong answer.
     if (this.tagName === "INPUT") {
       this.doc.keyboardFocusCount = (this.doc.keyboardFocusCount || 0) + 1;
       if (this.doc.simulateWebKitInputFocusBlur)
@@ -204,6 +204,15 @@ async function main() {
   assert.equal(await s.gate.requestApproval({}), false, "no callback denies");
   const cancelled = s.gate.requestApproval({ onApproved: action });
   assert.ok(s.get("bz-parental-gate-overlay"));
+  const dialog = s.get("bz-parental-gate-dialog");
+  assert.equal(dialog.attributes["aria-labelledby"], "bz-parental-gate-title",
+    "dialog still has an accessible name");
+  assert.equal(dialog.attributes["aria-describedby"], undefined,
+    "VoiceOver must not repeat Description and the action on each child");
+  const heading = s.get("bz-parental-gate-title");
+  assert.equal(heading.attributes.tabindex, "-1");
+  assert.equal(s.doc.activeElement, heading,
+    "screen reader starts with dialog heading, not I'm a Grown-up button");
   assert.equal(s.get("bz-parental-gate-equation"), undefined, "intro stage first");
   s.click("Not Now");
   assert.equal(await cancelled, false);
@@ -217,11 +226,14 @@ async function main() {
   assert.equal(await s.gate.requestApproval({ onApproved: action }), false);
   s.click("I'm a Grown-up");
   assert.equal(s.get("bz-parental-gate-equation").textContent, "20 − 10 + 1 = ?");
-  assert.equal(s.doc.activeElement, s.get("bz-parental-gate-equation"),
-    "math question gets initial accessible focus, not the editable Answer field");
+  assert.equal(s.doc.activeElement, s.get("bz-parental-gate-prompt"),
+    "math instruction gets initial accessible focus before the equation");
   assert.equal(s.doc.keyboardFocusCount, 0,
     "no automatic iOS keyboard on first math screen");
+  assert.equal(s.get("bz-parental-gate-prompt").attributes.tabindex, "-1");
   assert.equal(s.get("bz-parental-gate-equation").attributes.tabindex, "-1");
+  assert.equal(s.get("bz-parental-gate-prompt").textContent,
+    "Solve this problem to continue:");
   assert.equal(s.get("bz-parental-gate-status").textContent, "",
     "click Event must not appear as feedback in the dialog");
   assert.ok(s.get("bz-parental-gate-overlay"),
@@ -242,6 +254,11 @@ async function main() {
   const tab = s.doc.dispatch("keydown", { key: "Tab", shiftKey: true });
   assert.equal(tab.defaultPrevented, true, "focus trap");
   assert.equal(s.doc.activeElement, focusable[focusable.length - 1]);
+  s.get("bz-parental-gate-prompt").focus();
+  const shiftFromStatic = s.doc.dispatch("keydown", { key: "Tab", shiftKey: true });
+  assert.equal(shiftFromStatic.defaultPrevented, true,
+    "Shift-Tab from static initial focus stays trapped in dialog");
+  assert.equal(s.doc.activeElement, focusable[focusable.length - 1]);
   s.answer(11);
   assert.equal(await approved, true);
   assert.equal(invocations, 1);
@@ -253,8 +270,8 @@ async function main() {
   const beforeRetryFocus = s.doc.keyboardFocusCount;
   s.answer(999);
   assert.equal(s.get("bz-parental-gate-equation").textContent, "21 − 11 + 2 = ?");
-  assert.equal(s.doc.activeElement, s.get("bz-parental-gate-equation"),
-    "new math gets accessible focus after wrong answer");
+  assert.equal(s.doc.activeElement, s.get("bz-parental-gate-prompt"),
+    "retry math instruction receives accessible focus, not the Answer input");
   assert.equal(s.doc.keyboardFocusCount, beforeRetryFocus,
     "wrong-answer retry must not automatically reopen the keyboard");
   s.answer(-1);

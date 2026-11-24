@@ -1,5 +1,13 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — VoiceOver spoken "Description" owner feedback / focused fix candidate (November 23, 2026 ET)
+
+**Owner-observed physical iPhone VoiceOver FAIL (limited scope):** Opening the native Settings Grown-up Check first announces "I'm a Grown-up" followed by the spoken role label **"Description"** and "A grown-up needs to approve these settings." Moving to the math stage announces the equation (example `90 − 14 + 8`), then repeats **"Description"** and the Settings explanation. The equation is accessible, but the reading order and repeated explanation are undesirable. This is direct owner evidence, **not** a complete screen-reader failure or device/VoiceOver PASS.
+
+**Narrow candidate fix for owner review:** [final Kids Category acceptance checklist](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md) now tracks the report. The parent-gate dialog retains `role="dialog"`, `aria-modal`, and `aria-labelledby` for its title, but removes the dialog-wide `aria-describedby` association causing repetitive iOS VoiceOver "Description" announcements. The explanation stays visible and can be read as its own paragraph. Start focus on the static **Grown-up Check** title; after selecting "I'm a Grown-up," focus the static **Solve this problem to continue** prompt, followed in swipe order by the equation, Answer, Not Now, Check Answer. Preserve manual Answer keyboard opening, no automatic keyboard, VoiceOver/Tab containment, math/cancel/3-try lifecycle, all actual protected actions and native identity boundaries. Synthetic source tests inspect intended focus and semantic attributes; **they cannot verify real VoiceOver announcements**. After owner merges a focused fix PR, request one brief iPhone VoiceOver retest of **both Settings and Ghost Writer**. Do not merge before owner approval or touch original family profiles.
+
+---
+
 ## CURRENT — 1.0 release readiness after parental-gate and Zoo backup v3 merges (November 23, 2026 ET; final merge November 24 UTC)
 
 **Verified current `ios-prep` HEAD:** `18db0c3cad8dc703a9b5b94344eb1328ad88304c`, [PR #199](https://github.com/andydoane/biblozoo/pull/199) merged; **PRs #189–#199 are all CLOSED/MERGED** into `ios-prep`. [#199 exact PR-head Actions #45301713790](https://github.com/andydoane/biblozoo/actions/runs/45301713790) passed **Node regression checks** and **production web build** at `158cff3c79af21a21679e5e94717c447e61262b7`. This does not claim a separate post-merge Actions or native Xcode run. `main` PWA remains at the separate support-page merge `32f96b9923f2a0972932e0ec92507e389dd04947`; do **not** merge `ios-prep` into `main`.
