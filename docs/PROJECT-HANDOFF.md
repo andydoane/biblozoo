@@ -1,5 +1,13 @@
 # BibloZoo — Living Project Handoff
 
+## CURRENT — staged native age assurance startup integration (November 24, 2026)
+
+**Baseline:** `ios-prep` at `e573925f24a78aee8fe19de9d2bbf7eca2c993ee`, following merged [PR #232](https://github.com/andydoane/biblozoo/pull/232) and owner documentation update. Owner reports all 14 synthetic classification cases PASS, unsigned iOS simulator BUILD SUCCEEDED on clean matching remote commit. Xcode 26.6 / iOS SDK 26.5; no live age request tested.
+
+- Second implementation checkpoint: existing SceneDelegate first-active hook invokes a native one-attempt-per-scene coordinator (production exact bundle only). True background/disconnect cancels pending work; ordinary resign-active from system UI does not reprompt or cancel. Existing audio restoration and PWA/Audio Test untouched. Apple's [RegulatoryFeature cases](https://developer.apple.com/documentation/declaredagerange/agerangeservice/regulatoryfeature) distinguish required age range from significant-update-only obligations; 26.4+ adapter routes them separately, keeps unknown/error distinct, retains 26.2 fallback. No raw age data logged, stored or bridged. Tests extend pure Swift classification with seven routing cases and ten startup assertions.
+- **Live calls intentionally OFF by default:** Apple [requires Declared Age Range capability/entitlement](https://developer.apple.com/documentation/declaredagerange/). The coordinator's compile condition `BIBLOZOO_AGE_ASSURANCE_LIVE` is not configured by this PR. Do not enable or alter signing on family devices. This is wired but not active or sufficient compliance; no age/consent result unlocks or blocks content yet. Need actual native access/consent policy, minor download consent, significant updates, entitlement/provisioning, sandbox/older OS/offline testing, revocation and legal review. No server, fees, accounts or iCloud authorized.
+- [Startup acceptance notes](IOS-AGE-ASSURANCE-STARTUP.md) contain exact branch/tests/unsigned compile. No new tests/builds performed by PR author; require owner's candidate compile before merge. Do not reinstall original app or touch family data. Next: implement native access and consent policy with explicit safe fallbacks, then provision Apple capability and enable only in approved isolated signed test build; no recurring infrastructure.
+
 ## CURRENT — native age assurance foundation (November 24, 2026)
 
 **Baseline:** `ios-prep` at `d9fe4065b20aeab1dfbeeab608e0d23854a5f81c` following merged [PR #231](https://github.com/andydoane/biblozoo/pull/231).

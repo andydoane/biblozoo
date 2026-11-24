@@ -74,6 +74,9 @@ enum BibloZooEssentialVoiceSession {
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    #if canImport(DeclaredAgeRange)
+    private let ageStartup = BibloZooAgeStartupCoordinator()
+    #endif
     // N7f.2: freeze the presented iOS view the INSTANT the scene loses
     // foreground activity, even if WKWebView delays document.visibilitychange
     // while the user holds the App Switcher. This is a visual pause only.
@@ -90,6 +93,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
+        #if canImport(DeclaredAgeRange)
+        // Run after the existing audio/visual restoration, including its
+        // early-return path on cold launch. No effect in ordinary builds yet.
+        defer {
+            ageStartup.sceneBecameActive(scene, presenter: window?.rootViewController)
+        }
+        #endif
         guard let paused = switcherPausedLayerTime,
               let layer = window?.rootViewController?.view.layer else { return }
         layer.speed = 1
@@ -99,6 +109,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         switcherPausedLayerTime = nil
         // Read My Verse remains frozen by its own read-audio-paused class
         // until an explicit owner Resume Audio tap verifies actual playback.
+    }
+
+    func sceneDidEnterBackground(_ scene: UIScene) {
+        #if canImport(DeclaredAgeRange)
+        ageStartup.sceneLeftForeground()
+        #endif
+    }
+
+    func sceneDidDisconnect(_ scene: UIScene) {
+        #if canImport(DeclaredAgeRange)
+        ageStartup.sceneLeftForeground()
+        #endif
     }
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
