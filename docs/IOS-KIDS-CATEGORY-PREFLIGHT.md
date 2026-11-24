@@ -1,8 +1,16 @@
 # BibloZoo 1.0 — Kids Category / parental-gate preflight
 
-**November 23, 2026 | status: INITIAL SOURCE REVIEW COMPLETE; DETAILED FOUR-PR IMPLEMENTATION PLAN DOCUMENTED; IMPLEMENTATION AND APP REVIEW ACCEPTANCE OPEN.**
+**November 23, 2026 | current status: FOUR-PHASE PARENTAL-GATE IMPLEMENTATION MERGED; APPLE KIDS/ACCESSIBILITY/SECURITY ACCEPTANCE OPEN.**
 
 **Proposed, not yet selected in App Store Connect:** Primary category **Education**, **Made for Kids / Kids Category**, age band **6–8** (early independent readers). The owner describes the sweet spot as elementary-age readers; older elementary children remain welcome. The owner agreed this positioning sounds good. **Do not treat this document as confirmation that App Review will approve the category or that the owner has made an irreversible App Store Connect selection.**
+
+## CURRENT — implementation completion, not Kids approval
+
+The original source-path table and proposed four-PR sequence below were written **before implementation**; they are retained as a historical risk inventory. **All related implementation and follow-on fixes are now merged** into `ios-prep`: shared Grown-up Check [#190](https://github.com/andydoane/biblozoo/pull/190), fix [#191](https://github.com/andydoane/biblozoo/pull/191), Ghost Writer [#192](https://github.com/andydoane/biblozoo/pull/192), parent Settings/links [#193](https://github.com/andydoane/biblozoo/pull/193), math/editor [#194](https://github.com/andydoane/biblozoo/pull/194), first-time permissions [#195](https://github.com/andydoane/biblozoo/pull/195), optional setup [#196](https://github.com/andydoane/biblozoo/pull/196), Flashcards first permission [#197](https://github.com/andydoane/biblozoo/pull/197), and instruction audio/keyboard [#198](https://github.com/andydoane/biblozoo/pull/198). The independent backup v2 Zoo-state export gap was corrected by merged [#199](https://github.com/andydoane/biblozoo/pull/199) with **v3** backups; preexisting v2 backups cannot contain data that was never saved.
+
+Current exact `ios-prep` head `18db0c3cad8dc703a9b5b94344eb1328ad88304c`. The owner reports key physical iPhone functional/usability checks PASS; [#199 CI](https://github.com/andydoane/biblozoo/actions/runs/45301713790) passed Node checks and production web build on the PR head. A positive real-iPhone v3 export field comparison passed, but **full restore in a disposable environment remains unaccepted**.
+
+**Use [IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md) for current remaining actions**: adult-level math suitability for ages 6–8, VoiceOver/large text/iPad portrait and background/cancel acceptance, native bridge defense in depth, fictional-data v3 round-trip, final Kids/privacy/rights/App Store disclosures. The proposed Education / Made for Kids 6–8 category is not yet selected or approved, and `No data collected` remains provisional. Do not repeat broad gameplay tests merely because old notes below list them.
 
 ## Apple requirements used for this review
 
@@ -14,7 +22,7 @@
 
 This is a product/code preflight, not independent legal advice or an Apple approval prediction.
 
-## Inspected `ios-prep` code — feature-by-feature
+## HISTORICAL pre-implementation `ios-prep` source review — feature-by-feature
 
 | Surface | Source evidence and current behavior | Kids Category decision / required follow-up |
 | --- | --- | --- |
@@ -32,12 +40,12 @@ This is a product/code preflight, not independent legal advice or an Apple appro
 
 The complete proposed **four-PR delivery plan**, including the parent-gate interaction, approval lifetime, exact protected surfaces, module/entrypoint constraints, per-PR acceptance criteria, simulator safety, and a ready-to-paste next-chat kickoff is in **[IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md](IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md)**. The source matrix below is still the initial risk inventory. **Neither this document nor the plan implements any gate.**
 
-## Recommended implementation sequence — **no code changes in this review**
+## HISTORICAL recommended implementation sequence — **no code changes in that review**
 
 1. **Design a consistent adult-entry flow** for the native iOS Kids build, backed by an actual adult-level task with Cancel. Gate immediately before any external link, email, native share sheet or profile/family backup export. Avoid a “tap Yes” check or easily solved arithmetic targeted at 6–8-year-olds. Provide accessible instructions and do not persist an unlimited bypass. Decide whether a short in-session adult unlock is appropriate and ensure it cannot be carried over to another Zookeeper unexpectedly.
 2. **Audit all entry points**: Ghost Writer share both media types and Remix modes, Settings family export, individual Zookeeper export, contact Mail, embedded policy Mail, Credits GitHub link, and any other native `href`/`window.open`/`navigator.share`/`UIActivityViewController` call sites. Include export failures/download fallbacks in the protection.
 3. **Preserve gameplay**: Flashcards recording, Photo/Files pickers, Save Picture and Save Video to the local photo library, learning and games should continue to work. Keep privacy policy and contact *information* accessible without a gate. Protect sending/leaving rather than hiding information.
-4. **Review the parent-only data-management UX**: decide whether backup import and destructive reset should live behind the same parent entry; keep existing confirmation steps and add safe cancellation. Local backups v2 still **omit standalone Zoo rescue/surprise keys**; gating cannot solve that format gap.
+4. **Review the parent-only data-management UX**: decide whether backup import and destructive reset should live behind the same parent entry; keep existing confirmation steps and add safe cancellation. At the time of the source audit, local backups v2 omitted standalone Zoo rescue/surprise keys. **Merged #199 later fixed new exports through v3**; old v2 files still cannot reconstruct unsaved values.
 5. **Add automated and disposable-simulator acceptance**: simulate a child failing/canceling the gate; assert no external URL, mail composer, share sheet, file export, or data deletion occurred. Confirm a correct adult gate permits exactly the selected action; exercise Ghost Writer both simple/more Remix and family/profile backup paths. Check PWA paths remain unaffected; do not install over original family Zookeepers. Treat the owner’s already-passed functional/media/privacy checks as established; test **only the new gate behavior**.
 6. **Before App Store submission**: obtain owner-approved Kids positioning, age questionnaire answers, final SDK/data-collection clearance, matching policy/App Review notes, and confirm actual release build behavior.
 
@@ -47,9 +55,10 @@ The complete proposed **four-PR delivery plan**, including the parent-gate inter
 - [x] Initial Apple rules review and source-level risk inventory completed on `ios-prep` as of November 23, 2026.
 - [x] Public App Store privacy page [verified by owner](https://andydoane.github.io/biblozoo/app-store-privacy.html) and [support page verified by owner](https://andydoane.github.io/biblozoo/app-support.html); support page was published through merged [PR #187](https://github.com/andydoane/biblozoo/pull/187) on `main`.
 - [x] Detailed four-PR gate implementation plan prepared for a separate chat; **planning is not implementation** ([plan](IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md)).
-- [ ] Owner reviews/approves final parental-gate UX/spec and scope; **no gate implementation is claimed** in this document.
-- [ ] Native-only external link, share, backup gates implemented and verified, including bypasses and accessibility.
-- [ ] Confirm Kids Category/age band in App Store Connect only after compliance acceptance.
+- [x] Implemented Grown-up Check UX and source-level protected action paths in merged [#190–#198](https://github.com/andydoane/biblozoo/pull/198); owner reports physical iPhone acceptance for the main user-visible fixes. This is **not** an App Review/accessibility/security pass.
+- [x] Native-only external link, share and backup gates **implemented and targeted-source-tested**; owner reports key iPhone functionality PASS.
+- [ ] Complete VoiceOver/large-text/iPad portrait, native-bridge threat-model/bypass acceptance and parent-task age suitability per [final checklist](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md).
+- [ ] Confirm Kids Category/age band in App Store Connect **only after** remaining compliance acceptance; planned Education / Made for Kids 6–8 is not an approved selection.
 - [ ] Finish independent privacy/SDK, legal, content/asset rights, and review metadata requirements.
 
 **Branch/data safety:** Any implementation PR targets `ios-prep`, not `main`. Shared JS modifications must not unintentionally change live PWA behavior. Keep owner’s real 10 production and separate 11 Audio Test Zookeepers and backups out of tests, source control and destructive restore flows. Owner decides when to merge.

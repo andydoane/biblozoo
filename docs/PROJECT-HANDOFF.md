@@ -1,6 +1,18 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — Zoo family and individual backup v3 completeness candidate (November 23, 2026)
+## CURRENT — 1.0 release readiness after parental-gate and Zoo backup v3 merges (November 23, 2026 ET; final merge November 24 UTC)
+
+**Verified current `ios-prep` HEAD:** `18db0c3cad8dc703a9b5b94344eb1328ad88304c`, [PR #199](https://github.com/andydoane/biblozoo/pull/199) merged; **PRs #189–#199 are all CLOSED/MERGED** into `ios-prep`. [#199 exact PR-head Actions #45301713790](https://github.com/andydoane/biblozoo/actions/runs/45301713790) passed **Node regression checks** and **production web build** at `158cff3c79af21a21679e5e94717c447e61262b7`. This does not claim a separate post-merge Actions or native Xcode run. `main` PWA remains at the separate support-page merge `32f96b9923f2a0972932e0ec92507e389dd04947`; do **not** merge `ios-prep` into `main`.
+
+**Parental-gate release milestone COMPLETE at implementation level:** Four planned phases via [#190](https://github.com/andydoane/biblozoo/pull/190)–[#195](https://github.com/andydoane/biblozoo/pull/195), including shared randomized `A − B + C` Grown-up Check, native Ghost Writer **Share Picture/Video**, parent-only sensitive Settings/backup/outgoing links, and first-time native microphone/Photos add-only authorization gates. Further merged [#196](https://github.com/andydoane/biblozoo/pull/196)–[#198](https://github.com/andydoane/biblozoo/pull/198) added skippable Grown-up Setup, Flashcards first-mic permission/recording/narration recovery and improved challenge keyboard presentation. Owner reports **iPhone PASS** for key sharing/Settings/editing/onboarding/first-record/first-instruction/keyboard scenarios. New normal gameplay testing is **not requested** unless a particular regression is identified. Apple Kids adult-level challenge suitability, VoiceOver/large text/iPad portrait acceptance, and native JavaScript-to-Swift bridge defense in depth remain **OPEN**.
+
+**Zoo family/individual backup v3 milestone COMPLETE at export/implementation level:** [#199](https://github.com/andydoane/biblozoo/pull/199) updates both formats to `saveVersion: 3`, including independent Zoo rescue/pending-celebration and same-day surprise history; retains v2 read compatibility and transactional restore logic. Owner's **read-only actual iPhone export comparison PASS**: positive nonzero Zoo rescue and stopped-break fields matched the Zookeeper Stats display in the saved individual v3 JSON. This supports verified export field accuracy, **not** exhaustive end-to-end real-device restore. Synthetic automated Add/Replace/rollback checks PASS. A **fictional-data disposable-environment export → restore → re-export** remains a focused acceptance gate. Do not replace/delete/reset/reinstall original production or separate Audio Test profile sets; keep private backup files out of GitHub.
+
+**Next release handoff:** [Focused Kids Category acceptance and remaining release gates](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md) is the **current owner-review checklist**, separate from completed feature development. Prioritize (1) adult-level challenge suitability and small VoiceOver/large-text/iPhone/iPad-portrait matrix, (2) native bridge/external-action defense-in-depth assessment, (3) fictional v3 full restore acceptance, then (4) final Kids/App Privacy/SDK, age-rating, legal/asset rights and store/production build sign-offs. Proposed listing remains **Education + Made for Kids ages 6–8**, not selected or approved. Final "No data collected" answer remains **provisional**. Owner has verified public [Privacy Policy](https://andydoane.github.io/biblozoo/app-store-privacy.html) and [App Support](https://andydoane.github.io/biblozoo/app-support.html). Old sections below are historical notes and may still describe then-open branches; **this top section and GitHub merge metadata supersede them**.
+
+---
+
+## HISTORICAL — Zoo family and individual backup v3 completeness candidate (November 23, 2026)
 
 **Scope:** A read-only audit of the owner's two private November 23 backups (one family, one individual) confirmed both use v2 progress-only exports. The family file contains 11 Zookeeper entries and the individual is one of those profiles with newer Flashcards progress. Do **not** commit either real JSON file, names, profile IDs, or progress into GitHub or tests. The separate active localStorage records `biblozooZooEscapeStats:v1:<id>` (four rescue/pending-celebration counters) and `biblozooZooSurprise:v2:<id>` (today's break odds/history) are omitted by both v2 exporters. Current installed data has **not** been erased, migrated, or modified.
 
@@ -13,7 +25,7 @@
 ---
 
 
-## CURRENT — Owner follow-up: first-post-mic Flashcards instruction audio and iOS Grown-up Check keyboard (November 23, 2026)
+## HISTORICAL — Owner follow-up: first-post-mic Flashcards instruction audio and iOS Grown-up Check keyboard (November 23, 2026)
 
 **Baseline:** [PR #197](https://github.com/andydoane/biblozoo/pull/197) is **MERGED** into `ios-prep` at `3e90d97f8eef744a5248eee93a37332945561bee`. Owner reports the newly granted microphone now records successfully from the same first Flashcards Record action; the new permission icons, charcoal Skip, smaller welcome splash and shorter gate text all work well. However, the first spoken Flashcards instructions **after that newly authorized microphone recording** display a red `Instructions couldn't play. Tap Replay Instructions.` toast; manual **Replay Instructions** then plays correctly. The shared math Grown-up Check also automatically summons the iOS numeric keyboard, partially obscuring the popup before the parent hides/reopens the keyboard.
 
@@ -26,7 +38,7 @@
 ---
 
 
-## CURRENT — Kids setup owner-feedback follow-up PR candidate (November 23, 2026)
+## HISTORICAL — Kids setup owner-feedback follow-up PR candidate (November 23, 2026)
 
 **Baseline:** [PR #196](https://github.com/andydoane/biblozoo/pull/196) is **MERGED** into `ios-prep` and the owner has tested the optional first-launch setup: both permission grants worked; skipping setup properly deferred microphone authorization until Flashcards and Photos authorization until Ghost Writer Save. Two newly committed image assets (`verse_images/game_ui/icon_microphone_permission.png`, `icon_photos_permission.png`) are present on `ios-prep` commit `c8227d9b9163f9af2946a7d9de513160a91ab1df`.
 
@@ -39,7 +51,7 @@
 ---
 
 
-## CURRENT — PR #196 optional native first-launch Grown-up Setup (November 23, 2026)
+## HISTORICAL — PR #196 optional native first-launch Grown-up Setup (November 23, 2026)
 
 **Code baseline:** [Kids PR #195](https://github.com/andydoane/biblozoo/pull/195) is **MERGED** into `ios-prep` at `0b760f366cee8a7262ac81fb7e59d60c091ec5a0`. Its source-head [Actions #45258031407](https://github.com/andydoane/biblozoo/actions/runs/45258031407) reports **SUCCESS** for Node regressions and production web build. The owner is still testing the PR4 native first-time mic/Add Photos flow. **Do not substitute this code-merge/CI result for the pending owner device acceptance, accessible OS alert checks, legal consent, Kids Category or App Review sign-off.**
 
@@ -68,7 +80,7 @@
 
 
 
-## CURRENT — Grown-up Check easier arithmetic and child-safe Zookeeper editing (November 23, 2026)
+## HISTORICAL — Grown-up Check easier arithmetic and child-safe Zookeeper editing (November 23, 2026)
 
 **Baseline:** [PR #193](https://github.com/andydoane/biblozoo/pull/193) is **MERGED** into `ios-prep` at `d9532717742e5f4a047cb0139f35c626bb352678`. The owner explicitly reports **all PR 3 iPhone Grown-up Check tests passed** (including Settings, Ghost Writer and outgoing links). The owner is comfortable testing on the phone with existing installed profiles and says the saved data is not sensitive or irreplaceable; nevertheless no tests or PR changes should silently erase real profiles.
 
@@ -81,7 +93,7 @@
 ### Earlier PR 3 handoff (historical)
 
 
-## CURRENT — Kids parental gate PR 3, parent Settings + shared popup redesign (November 23, 2026)
+## HISTORICAL — Kids parental gate PR 3, parent Settings + shared popup redesign (November 23, 2026)
 
 **Merged foundation and owner acceptance:** Native `ios-prep` is at `79e2e2dde2a5d854546cf8a9bee176ee6e3cc83f`, the merge of [PR #192](https://github.com/andydoane/biblozoo/pull/192). The owner says Ghost Writer Share gating is **working** after PR 2; this is an owner-reported success, not comprehensive future Kids/Apple permission sign-off. Shared PR 1 visual issue was corrected in merged PR #191. Retain real production (10 Zookeepers) and separate Audio Test (11 Zookeepers) intact.
 
@@ -127,7 +139,7 @@
 
 ### Previous release and privacy context (retained below)
 
-## CURRENT — feature-stable `ios-prep`; November 23, 2026 parental-gate implementation handoff and release progress
+## HISTORICAL — feature-stable `ios-prep`; November 23, 2026 parental-gate implementation handoff and release progress
 
 **Current branch and public-policy status (November 23):** `ios-prep` is at merge SHA `6b5b2ea3855c04935a64db874f7df8168a5dd5c1`; privacy alignment [PR #184](https://github.com/andydoane/biblozoo/pull/184) is **MERGED**. Public standalone App Store privacy page [PR #185](https://github.com/andydoane/biblozoo/pull/185) is **MERGED to `main` only**. The owner confirmed that [https://andydoane.github.io/biblozoo/app-store-privacy.html](https://andydoane.github.io/biblozoo/app-store-privacy.html) serves the current November 22, 2026 policy. GitHub Pages continues to publish the older PWA from `main`; there is no plan to merge all of `ios-prep` into `main`.
 
@@ -181,7 +193,11 @@ Official references:
 - [x] **PR 1 — reusable native-only grown-up check and isolated regression tests.** [#190](https://github.com/andydoane/biblozoo/pull/190) and Safari correction [#191](https://github.com/andydoane/biblozoo/pull/191) merged; owner accepted the visual correction.
 - [x] **PR 2 — protect Ghost Writer Share Picture/Video.** [#192](https://github.com/andydoane/biblozoo/pull/192) merged; owner reported successful native sharing gate testing.
 - [x] **PR 3 — parent-only Settings/backups/outgoing links.** [#193](https://github.com/andydoane/biblozoo/pull/193) merged and owner-reported iPhone checks passed; [#194](https://github.com/andydoane/biblozoo/pull/194) simplified math and allowed child name/picture editing.
-- [x] **PR 4 implementation merged** via [#195](https://github.com/andydoane/biblozoo/pull/195): new microphone/Photos first-time requests and targeted source-level bypass checks. **Owner device/VoiceOver acceptance remains pending**; [#196](https://github.com/andydoane/biblozoo/pull/196) is an optional first-launch setup follow-up, not part of the PR4 merge.
+- [x] **PR 4 implementation merged** via [#195](https://github.com/andydoane/biblozoo/pull/195): first native microphone/Photos requests and scoped JS/source bypass checks. **Device/VoiceOver completeness and native bridge threat-model acceptance remain open.**
+- [x] **Follow-on Kids setup and owner usability fixes merged:** optional native Grown-up Setup [#196](https://github.com/andydoane/biblozoo/pull/196), first-mic Flashcards recovery [#197](https://github.com/andydoane/biblozoo/pull/197), first-instruction/keyboard fix [#198](https://github.com/andydoane/biblozoo/pull/198). Owner reports relevant actual-iPhone checks PASS, not full accessibility coverage.
+- [x] **Backup v3 source and positive iPhone export milestone merged:** [#199](https://github.com/andydoane/biblozoo/pull/199) includes separate Zoo state in family/individual backups; owner confirmed observed nonzero rescue data in actual device export; synthetic tests/CI PASS.
+- [ ] **Focused owner Kids Category release acceptance** — follow [IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md) for adult-level math suitability, VoiceOver/large-text/iPad portrait, background/cancel and security threat-model review; do not repeat broad gameplay tests.
+- [ ] **Synthetic v3 backup full round-trip acceptance** — fake profiles only; confirm add/replace/re-export fidelity and v2 behavior in disposable environment. Owner's positive real iPhone export is already accepted; full restore not yet independently accepted.
 - [ ] **Complete child privacy/SDK, legal, Kids Category and age-rating acceptance** before making the lasting Made for Kids selection. No app-code implementation or Apple approval is claimed.
 
 #### Privacy verification progress — November 23, 2026
@@ -192,7 +208,7 @@ Official references:
 - [x] **Run scoped disposable-simulator network checks:** Learn/Daily To-Do, Flashcards voice, Ghost Writer gameplay/Save/Share, fictional backup export/import; no identifiable BibloZoo traffic through Proxyman.
 - [x] **Run simulator denial and picker cancellation checks:** mic denied, Photos add denied, Photos picker canceled, Files picker canceled; owner reported normal fallback behavior.
 - [ ] **Finish full SDK/network/App Privacy determination:** assess possible proxy bypass and third-party practices, remaining Release-device paths and warnings; owner approves the final data disclosure answer.
-- [ ] **Finish remaining device/media/backups integrity cases:** owner now reports successful Ghost Writer custom-photo import with no new simulator Proxyman traffic; applicable real-device permission/interruptions checks, broader third-party verification and family v2's separate Zoo rescue/surprise-state preservation gap remain.
+- [ ] **Finish remaining release-device/privacy cases:** owner reports successful Ghost Writer custom-photo import with no new Proxyman traffic; final applicable permission/interruptions/accessibility scenarios and broader SDK/privacy review remain. **The v2 Zoo rescue/surprise export gap was fixed for new v3 backups in merged #199**, but v2 files cannot retroactively contain those absent records; synthetic full restore acceptance remains open.
 - [ ] **Final owner review of privacy text in the current Release app** and consistency with final runtime findings.
 
 Detailed evidence, precise limits and remaining gates: [APP-PRIVACY-PREFLIGHT.md](APP-PRIVACY-PREFLIGHT.md).
@@ -227,11 +243,12 @@ These checkmarks reflect owner decisions, the merged #179 PR, verified CI, and t
 - [ ] **Confirm product/device policy.** Decide intentionally whether native iPhone/iPad support is portrait-only (current Info.plist behavior) or whether landscape should be supported. Test what is actually declared. Do not promise unsupported orientations in store text/screenshots.
 - [ ] **Finish the source/asset licensing clearance.** The [ASSET-LICENSES.md](ASSET-LICENSES.md) Git inventory is complete. Owner confirms all images are owner-created or ChatGPT-generated and owner-edited (no external image sites), generated narration via **Voicertool**, and purchased sound effects via **ZapSplat subscription**. Published provider terms support commercial generated speech and licensed sounds embedded in apps, respectively. **Paid-at-download timing confirmed by owner;** still verify per-file audio/music licenses, whether original ZapSplat media exposed via the public GitHub repo requires a different distribution arrangement; 13 font paths (**owner deferred Chalkboard; app-embedding grant pending**); 124-verse BSB translation/attribution metadata now under full automated CI audit and ESV debug fixture replaced with canonical BSB in this PR (**exact-head CI pending**); human Bible-wording/commentary rights review remains; third-party marks; notices and owner rights sign-off. **Not complete**, no App Store distribution yet.
 - [ ] **Complete privacy-policy release verification (public URL passed; final wording review open).** The November 22 in-app/standalone policy alignment merged via [#184](https://github.com/andydoane/biblozoo/pull/184). The owner verified the HTTPS [App Store policy page](https://andydoane.github.io/biblozoo/app-store-privacy.html) published via `main`-only [#185](https://github.com/andydoane/biblozoo/pull/185). Still obtain owner sign-off on the entire wording and contact information, view Settings → Privacy Policy in a current Release run, and ensure descriptions match completed runtime/SDK checks.
+- [x] **Implement complete Zoo rescue/surprise backup export coverage.** [#199](https://github.com/andydoane/biblozoo/pull/199) merged family/profile backup v3 and positive actual-iPhone export field validation. **Not full restore acceptance**; [focused fictional restore plan](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md) remains open.
 - [ ] **Complete App Privacy/SDK data-collection audit (scoped tests passed; full clearance open).** [APP-PRIVACY-PREFLIGHT.md](APP-PRIVACY-PREFLIGHT.md) documents the source scan, fresh November 23 archive/manifests and disposable Release-simulator HTTP(S) proxy tests of Learn/Daily To-Do, Flashcards, Ghost Writer Save/Share, and fictional backup export/import. No identifiable BibloZoo proxy traffic was observed. Still assess proxy-bypassing/third-party SDK behavior and partner practices, remaining Release-device scenarios, and final Apple privacy disclosures. `No data collected` is provisional.
 - [ ] **Finish privacy manifest / required-reason SDK audit (November 23 archive declarations verified).** Owner found `PrivacyInfo.xcprivacy` in archived `App.app`, `Capacitor.framework` and `Cordova.framework`; all declared no tracking or collection, with known app SystemBootTime `35F9.1` and FileTimestamp `3B52.1` reasons. Generated report was a blank 806-byte PDF, not a collection certification. Still review SDK runtime behavior/provenance and applicable build/upload warnings.
 - [ ] **Resolve export-compliance/encryption classification.** Determine whether BibloZoo uses only encryption supplied by Apple's OS (for example normal HTTPS/TLS) or includes any non-exempt/custom cryptography. If it uses only exempt/system encryption, document that conclusion and decide whether to add the appropriate `ITSAppUsesNonExemptEncryption` setting so repeated uploads are simpler. Do not guess.
 - [x] **Complete scoped simulator permission-denial and picker-cancel checks.** Owner confirmed the Flashcards mic-denial fallback popup, Ghost Writer Photos Add denial message, and normal cancellation of both Photos and Files pickers. The physical-device matrix, recovery/re-enable and successful custom-photo import are separate remaining gates.
-- [ ] **Finalize Kids Category eligibility and parental gates (source review done; implementation open).** Proposed listing is **Education + Made for Kids / ages 6–8** for independent-reading elementary children, per owner preference. Initial source audit found direct native Ghost Writer Share Picture/Video, family/profile backup export/share, external Credits GitHub and support email actions. See [Kids Category preflight](IOS-KIDS-CATEGORY-PREFLIGHT.md) and the [four-PR gate implementation handoff](IOS-PARENTAL-GATE-IMPLEMENTATION-PLAN.md). Require a deliberate adult-level parental gate for outgoing actions and review backup/destructive controls, verify non-bypass and accessibility, preserve local Save and gameplay, finish third-party/children's privacy and rating answers. Only then select the Kids Category in App Store Connect; no code gating or approval is claimed.
+- [ ] **Finalize Kids Category release acceptance (parental-gate implementation MERGED; Apple eligibility open).** [#190–#198](https://github.com/andydoane/biblozoo/pull/198) implement and refine the gate, sharing, sensitive parent actions and first permission prompts, with owner-reported iPhone usability PASSES. See [final acceptance checklist](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md) and historical [preflight](IOS-KIDS-CATEGORY-PREFLIGHT.md). Adult-level suitability for intended 6–8 readers, accessibility, unforgeable native bridge limits/threat model, Kids privacy and rating remain open. Proposed **Education + Made for Kids / ages 6–8** must not be selected/claimed approved prematurely.
 - [ ] **Draft the current age-rating questionnaire answers.** Review every game/content element and prepare factual responses. Use Apple's current age-rating system; do not rely on an old rating questionnaire.
 - [ ] **Decide category and storefront strategy.** Draft primary/secondary category choices (likely Education plus an appropriate secondary category) and decide where version 1.0 should be available. Do not automatically enable every storefront if a country/region may impose extra game, religious-content or regulatory obligations.
 - [ ] **Decide EU Digital Services Act trader status.** Work out whether the owner is a “trader” for DSA purposes before App Store Connect asks. If distributing as a trader in the EU, understand what contact information Apple will display. Make the legal/privacy decision before enabling EU availability.
