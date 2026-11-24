@@ -1,5 +1,9 @@
 # BibloZoo — staged Apple consent adapter
 
+## CURRENT — PermissionKit SDK compile correction (November 24, 2026)
+
+Merged #235 at `f0019574b4e650efcdb5cdcf47d336af7effeb67`. Owner verified exact PR head `f3bf2dca`: all 89 synthetic checks passed; branch validation succeeded. The unsigned iOS simulator build **FAILED** on SDK 26.5 for both architectures: `defaultChoice` is get-only and `PermissionChoice.Answer` has no `.decline` case. Apple [defaultChoice reference](https://developer.apple.com/documentation/permissionkit/permissionquestion/defaultchoice) confirms a read-only most-restrictive default; [Answer reference](https://developer.apple.com/documentation/permissionkit/permissionchoice/answer-swift.enum) confirms `.approval` / `.denial`. Corrective candidate checks that the system default is denial (otherwise returns unknown before sending), and maps `.denial` to denied. No policy relaxation, live caller or activation, new storage, signing, backend or gameplay change. Re-run unsigned simulator build and existing 89 synthetic checks on exact correction head before merge. Native compile, live response semantics, initial consent and other existing release gates remain open; this is not a successful build claim.
+
 Baseline merged #234, `bef654266bb7c545c3def8bc5a9970321e767154`. Owner reported 64 synthetic assertions and ordinary unsigned simulator build PASS on exact PR head 5172c734, branch validation passed. Opt-in compile not verified.
 
 ## Evidence and scope

@@ -353,8 +353,9 @@ final class BibloZooSignificantUpdateService {
         defer { busy = false }
         let question = PermissionQuestion(significantAppUpdateTopic:
             SignificantAppUpdateTopic(description: change.description))
-        // Never use an affirmative fallback if no guardian response is available.
-        question.defaultChoice = .decline
+        // PermissionKit chooses the most restrictive default (read-only).
+        // Fail closed if the actual question does not default to denial.
+        guard question.defaultChoice.answer == .denial else { return .unknown }
         let responses = AskCenter.shared.responses(for: SignificantAppUpdateTopic.self)
         do {
             try await AskCenter.shared.ask(question, in: presenter)
@@ -368,7 +369,7 @@ final class BibloZooSignificantUpdateService {
             let reply: BibloZooUpdateReply
             switch response.choice.answer {
             case .approval: reply = .approved
-            case .decline: reply = .denied
+            case .denial: reply = .denied
             default: reply = .unknown
             }
             if let result = BibloZooUpdateResponseMatch.evaluate(
