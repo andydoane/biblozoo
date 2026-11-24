@@ -19,16 +19,20 @@ try{
   }
   put(built,"verse_audio/biblozoo_jingle.mp3","sound");
   put(built,"ui_audio/other.mp3","sound");
-  put(built,"pet_images/desktop.ini","metadata");
   const good=tool.inspectPublic(built,source);
-  assert.equal(good.files,8);
-  assert.equal(good.bytes,4+4*8+5+5+8);
+  assert.equal(good.files,7);
+  assert.equal(good.bytes,4+4*8+5+5);
   assert.equal(good.notices.length,4);
   assert.equal(good.duplicateGroups,1);
   assert.equal(good.duplicateBytes,5);
-  assert.equal(good.review.length,2);
-  assert.equal(good.reviewBytes,13);
+  assert.equal(good.review.length,1);
+  assert.equal(good.reviewBytes,5);
   assert.equal(good.groups.reduce((sum,g)=>sum+g.bytes,0),good.bytes);
+  for(const name of ["desktop.ini",".DS_Store","DESKTOP.INI"]){
+    const metadata=put(built,"pet_images/"+name,"metadata");
+    assert.throws(()=>tool.inspectPublic(built,source),/Unexpected desktop metadata/);
+    fs.unlinkSync(metadata);
+  }
   const notice=tool.requiredNotices[0];
   fs.rmSync(path.join(built,notice));
   assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged notice/);

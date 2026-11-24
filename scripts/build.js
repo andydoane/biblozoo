@@ -49,6 +49,12 @@ const runtimeDirs = [
     "verse_playground"
 ];
 
+// OS-generated directory metadata is never a gameplay resource.
+// Filter the generated copy only, never delete source files.
+function includeRuntimeEntry(source) {
+    return !/^(\.DS_Store|desktop\.ini)$/i.test(path.basename(source));
+}
+
 function copyEntry(name) {
     const source = path.join(root, name);
     const target = path.join(dist, name);
@@ -57,7 +63,7 @@ function copyEntry(name) {
         throw new Error(`Required runtime asset is missing: ${name}`);
     }
 
-    fs.cpSync(source, target, { recursive: true });
+    fs.cpSync(source, target, { recursive: true, filter: includeRuntimeEntry });
 }
 
 fs.rmSync(dist, { recursive: true, force: true });

@@ -5276,6 +5276,48 @@ function openPrivacyPolicy() {
 }
 
 
+// Fixed, bundled paths only. Plain text prevents license URLs/markup from
+// becoming ungated links. No network service, storage, or profile access.
+const BIBLOZOO_LOCAL_NOTICE_FILES = Object.freeze([
+  Object.freeze({ label: "Font licenses", path: "verse_fonts/THIRD-PARTY-FONT-LICENSES.txt" }),
+  Object.freeze({ label: "Software notices", path: "utilities/THIRD-PARTY-SOFTWARE-NOTICES.txt" }),
+  Object.freeze({ label: "SoundTouchJS license", path: "flashcards/vendor/soundtouchjs-2.1.1/LICENSE" }),
+  Object.freeze({ label: "SoundTouchJS source information", path: "flashcards/vendor/soundtouchjs-2.1.1/SOURCE.md" })
+]);
+
+function addBundledCreditsNotices(container) {
+  if (!container) return;
+  for (const notice of BIBLOZOO_LOCAL_NOTICE_FILES) {
+    const details = document.createElement("details");
+    details.className = "credits-notice";
+    const summary = document.createElement("summary");
+    summary.textContent = notice.label;
+    const text = document.createElement("pre");
+    text.className = "credits-notice-text";
+    text.textContent = "Open to read the bundled notice.";
+    details.append(summary, text);
+    container.appendChild(details);
+    let loading = false, loaded = false;
+    details.addEventListener("toggle", async () => {
+      if (!details.open || loaded || loading) return;
+      loading = true;
+      text.textContent = "Loading bundled notice…";
+      try {
+        const response = await fetch("./" + notice.path, { redirect: "error" });
+        if (!response.ok) throw new Error("Notice unavailable");
+        const content = await response.text();
+        if (!content.trim()) throw new Error("Empty notice");
+        text.textContent = content;
+        loaded = true;
+      } catch (_) {
+        text.textContent = "Notice could not be loaded. Close and reopen this section to retry.";
+      } finally {
+        loading = false;
+      }
+    });
+  }
+}
+
 function showCreditsDialog() {
   showDialog({
     title: "Credits",
@@ -5300,6 +5342,23 @@ function showCreditsDialog() {
     `,
     actions: [dlgBtn("OK", { onClick: closeDialog })]
   });
+
+  // Only the packaged production-style native iOS experience gains this
+  // surface; existing browser and Audio Test Credits remain unchanged.
+  if (isNativeParentGateContext() &&
+      window.BibloZooNativeOnlyOutput?.enabled === true &&
+      window.BibloZooNativeOnlyOutput?.devToolsAllowed === false) {
+    const section = document.createElement("div");
+    section.className = "credits-local-notices";
+    const heading = document.createElement("p");
+    heading.textContent = "Bundled licenses and notices (available offline)";
+    section.appendChild(heading);
+    const container = dlgBody.querySelector(".settings-info-dialog");
+    if (container) {
+      container.appendChild(section);
+      addBundledCreditsNotices(section);
+    }
+  }
 
   // Attribution is always readable. Only the actual outgoing GitHub link
   // requires a separate, action-bound adult check on production native iOS.

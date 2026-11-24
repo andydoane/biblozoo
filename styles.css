@@ -3034,6 +3034,29 @@ Settings Screen
   text-underline-offset: 2px;
 }
 
+.credits-local-notices {
+  margin-top: 16px;
+}
+.credits-notice {
+  margin: 8px 0;
+}
+.credits-notice summary {
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 800;
+}
+.credits-notice-text {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 0.9em;
+  font-weight: 400;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .settings-reset-dialog {
   color: rgba(255, 255, 255, 0.95);
   font-weight: 700;
