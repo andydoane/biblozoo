@@ -1,6 +1,18 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — VoiceOver spoken "Description" owner feedback / focused fix candidate (November 23, 2026 ET)
+## CURRENT — owner accessibility checkpoint: VoiceOver retest and Larger Text nonresponse (November 23, 2026 ET)
+
+**Verified baseline:** [PR #201](https://github.com/andydoane/biblozoo/pull/201) is **MERGED** to `ios-prep`, merge SHA `445956ef836ccb1258c9f2095270831a213c60ee`. No new code change is requested in this checkpoint. The owner wants **one small documentation-update PR after each verified release-readiness checkpoint**, to preserve current accepted results across conversations; leave each PR for owner review/merge, never auto-merge.
+
+**VoiceOver — scoped owner iPhone observation PASS:** The Grown-up Check automatically announces **"Grown up Check, heading level 2"**, then a parent can select/read the explanation or buttons. After choosing the grown-up option, it announces **"Solve this problem to continue"** automatically. One-finger swipe right reads/focuses the next element, and swipe left the previous element. The previous extra spoken **"Description"** was **not reported in this post-#201 retest**. This supports **initial announcements and sequential accessibility navigation**; do **not** imply proven VoiceOver containment, exact complete element order, Ghost Writer-specific behavior, Switch Control, or full iPhone/iPad accessibility acceptance. Those remain open if deemed necessary.
+
+**Larger Text / Dynamic Type — owner iPhone observation NOT PASS:** With **Settings → Accessibility → Display & Text Size → Larger Text → Larger Accessibility Sizes enabled** and the slider enlarged, the owner saw **no visible text-size change anywhere in BibloZoo**. This is a confirmed *observed nonresponse*, not a completed larger-text acceptance or a proven universal incompatibility across OS/device configurations. Current app uses a Capacitor WebView/custom styling; investigate whether the native text-size preference reaches the web layer and decide the smallest appropriate fix or accessibility alternative. **Do not claim this is a Kids-only requirement or automatic App Review rejection.** If a fix is later pursued, isolate it from gameplay and verify actual device scaling.
+
+**Current next step:** See [Kids Category final acceptance](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md). Preserve already owner-tested gate functionality; focus the next check on why the text-size setting does not change the interface, without a broad regression cycle. No changes to production family or separate Audio Test profiles, no native app install and no `main` PWA changes.
+
+---
+
+## HISTORICAL — VoiceOver spoken "Description" owner feedback / focused fix before #201 merge (November 23, 2026 ET)
 
 **Owner-observed physical iPhone VoiceOver FAIL (limited scope):** Opening the native Settings Grown-up Check first announces "I'm a Grown-up" followed by the spoken role label **"Description"** and "A grown-up needs to approve these settings." Moving to the math stage announces the equation (example `90 − 14 + 8`), then repeats **"Description"** and the Settings explanation. The equation is accessible, but the reading order and repeated explanation are undesirable. This is direct owner evidence, **not** a complete screen-reader failure or device/VoiceOver PASS.
 
@@ -8,7 +20,7 @@
 
 ---
 
-## CURRENT — 1.0 release readiness after parental-gate and Zoo backup v3 merges (November 23, 2026 ET; final merge November 24 UTC)
+## HISTORICAL — 1.0 release readiness after parental-gate and Zoo backup v3 merges (November 23, 2026 ET; final merge November 24 UTC)
 
 **Verified current `ios-prep` HEAD:** `18db0c3cad8dc703a9b5b94344eb1328ad88304c`, [PR #199](https://github.com/andydoane/biblozoo/pull/199) merged; **PRs #189–#199 are all CLOSED/MERGED** into `ios-prep`. [#199 exact PR-head Actions #45301713790](https://github.com/andydoane/biblozoo/actions/runs/45301713790) passed **Node regression checks** and **production web build** at `158cff3c79af21a21679e5e94717c447e61262b7`. This does not claim a separate post-merge Actions or native Xcode run. `main` PWA remains at the separate support-page merge `32f96b9923f2a0972932e0ec92507e389dd04947`; do **not** merge `ios-prep` into `main`.
 
