@@ -8,6 +8,12 @@ import Foundation
 #if BIBLOZOO_AGE_ASSURANCE_LIVE && !DEBUG
 #error("BibloZoo age assurance is not approved for live Release activation.")
 #endif
+#if BIBLOZOO_AGE_ASSURANCE_FIXTURE && (!DEBUG || !targetEnvironment(simulator) || !os(iOS))
+#error("BibloZoo age fixtures are restricted to iOS Debug simulator builds.")
+#endif
+#if BIBLOZOO_AGE_ASSURANCE_FIXTURE && BIBLOZOO_AGE_ASSURANCE_LIVE
+#error("BibloZoo fixture and live age assurance modes are mutually exclusive.")
+#endif
 
 enum BibloZooAgeRangeOutcome: Equatable {
     case minor
@@ -244,13 +250,62 @@ struct BibloZooAgeStartupAttempt {
     private(set) var attempted = false
 
     mutating func begin(bundleID: String?, liveEnabled: Bool,
-                        activePresenter: Bool) -> Bool {
-        guard !attempted, liveEnabled, activePresenter,
-              bundleID == "com.andydoane.biblozoo" else { return false }
+                        activePresenter: Bool, fixtureEnabled: Bool = false) -> Bool {
+        let liveIdentity = liveEnabled && !fixtureEnabled && bundleID == "com.andydoane.biblozoo"
+        #if DEBUG
+        let fixtureIdentity = fixtureEnabled && !liveEnabled && bundleID == "com.andydoane.biblozoo.agefixture"
+        #else
+        let fixtureIdentity = false
+        #endif
+        guard !attempted, activePresenter, liveIdentity || fixtureIdentity else { return false }
         attempted = true
         return true
     }
 }
+
+#if DEBUG
+// Synthetic test inputs only. Never evidence about a real Apple Account.
+// The runtime caller is separately restricted to the simulator fixture flag
+// and isolated bundle. Pure logic is available to the macOS Debug test.
+enum BibloZooAgeFixture: String, CaseIterable {
+    case allow, adult, minorApproved = "minor-approved", minorUnknown = "minor-unknown"
+    case declined, denied, unavailable, unsupported, updatePending = "update-pending"
+    case retryAllow = "retry-allow", reentryDenied = "reentry-denied", slowAllow = "slow-allow"
+
+    static func select(arguments: [String]) -> Self {
+        let prefix = "--biblozoo-age-fixture="
+        let matches = arguments.filter { $0.hasPrefix(prefix) }
+        guard matches.count == 1,
+              let fixture = Self(rawValue: String(matches[0].dropFirst(prefix.count))) else {
+            return .unavailable
+        }
+        return fixture
+    }
+
+    func decision(at attempt: Int) -> BibloZooAgeAccessDecision {
+        var outcome: BibloZooAgeRangeOutcome = .unavailable
+        var consent: BibloZooInitialConsent = .unknown
+        var update: BibloZooUpdateState = .firstReleaseNoPending
+        switch self {
+        case .allow, .slowAllow: outcome = .notRequired
+        case .adult: outcome = .confirmedAdult
+        case .minorApproved: outcome = .minor; consent = .verified
+        case .minorUnknown: outcome = .minor
+        case .declined: outcome = .declined
+        case .denied: outcome = .minor; consent = .deniedOrRevoked
+        case .unavailable: break
+        case .unsupported: outcome = .unsupportedPlatform
+        case .updatePending: outcome = .confirmedAdult; update = .pending
+        case .retryAllow: outcome = attempt > 1 ? .notRequired : .unavailable
+        case .reentryDenied:
+            outcome = attempt > 1 ? .minor : .notRequired
+            if attempt > 1 { consent = .deniedOrRevoked }
+        }
+        return BibloZooAgeAccessDecision.evaluate(
+            BibloZooAgeAssessment(outcome), initialConsent: consent, update: update)
+    }
+}
+#endif
 
 #if os(iOS) && canImport(DeclaredAgeRange)
 import UIKit
@@ -443,7 +498,11 @@ final class BibloZooAgeStartupCoordinator {
     private var epoch = BibloZooAgeForegroundEpoch()
     private let service = BibloZooAgeAssurance()
     private var task: Task<Void, Never>?
+    #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
+    private var fixtureAttempts = 0
+    #endif
 
+    // Real API adapters retain the strict live-only guard.
     static var useNativeGate: Bool {
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_LIVE
         return Bundle.main.bundleIdentifier == "com.andydoane.biblozoo"
@@ -451,6 +510,16 @@ final class BibloZooAgeStartupCoordinator {
         return false
         #endif
     }
+
+    static var useFixtureGate: Bool {
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
+        return Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.agefixture"
+        #else
+        return false
+        #endif
+    }
+
+    static var useStagedGate: Bool { useNativeGate || useFixtureGate }
 
     func sceneBecameActive(_ scene: UIScene, presenter: BibloZooAgeGateViewController,
                            completion: @escaping (BibloZooAgeAccessDecision) -> Void) {
@@ -461,7 +530,7 @@ final class BibloZooAgeStartupCoordinator {
               !presenter.isBeingDismissed else { return }
         guard attempt.begin(bundleID: Bundle.main.bundleIdentifier,
                             liveEnabled: Self.useNativeGate,
-                            activePresenter: true),
+                            activePresenter: true, fixtureEnabled: Self.useFixtureGate),
               let ticket = epoch.begin() else { return }
         presenter.showChecking()
 
@@ -476,16 +545,7 @@ final class BibloZooAgeStartupCoordinator {
                             cancelled: Task.isCancelled, completion: completion)
                 return
             }
-            // 1.0 has not previously shipped on the App Store. Do not assume
-            // later versions are first release or invent a significant update.
-            let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            let update: BibloZooUpdateState = version == "1.0" ? .firstReleaseNoPending : .unknown
-            let assessment = await self.service.check(in: presenter)
-            // No native proof of initial minor consent has yet been wired.
-            // This MUST NOT change to verified just because the app is installed.
-            // Future code must supply verified store evidence, or stay blocked.
-            let decision = BibloZooAgeAccessDecision.evaluate(
-                assessment, initialConsent: .unknown, update: update)
+            let decision = await self.evaluate(in: presenter)
             let foreground = scene.activationState == .foregroundActive
                 && UIApplication.shared.applicationState == .active
                 && presenter.viewIfLoaded?.window?.windowScene === scene
@@ -493,6 +553,32 @@ final class BibloZooAgeStartupCoordinator {
             self.finish(ticket, decision: decision, foreground: foreground,
                         cancelled: Task.isCancelled, completion: completion)
         }
+    }
+
+    private func evaluate(in presenter: UIViewController) async -> BibloZooAgeAccessDecision {
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
+        // No real age API, even if the fixture argument is missing or invalid.
+        guard Self.useFixtureGate else { return .holdUnavailable }
+        fixtureAttempts += 1
+        let attemptNumber = fixtureAttempts
+        let fixture = BibloZooAgeFixture.select(arguments: ProcessInfo.processInfo.arguments)
+        if fixture == .slowAllow {
+            do { try await Task.sleep(nanoseconds: 5_000_000_000) }
+            catch { return .holdUnavailable }
+        }
+        guard !Task.isCancelled else { return .holdUnavailable }
+        return fixture.decision(at: attemptNumber)
+        #else
+        guard Self.useNativeGate else { return .holdUnavailable }
+        // 1.0 has not previously shipped on the App Store. Do not assume
+        // later versions are first release or invent a significant update.
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        let update: BibloZooUpdateState = version == "1.0" ? .firstReleaseNoPending : .unknown
+        let assessment = await service.check(in: presenter)
+        // No native proof of initial minor consent has yet been wired.
+        return BibloZooAgeAccessDecision.evaluate(
+            assessment, initialConsent: .unknown, update: update)
+        #endif
     }
 
     private func finish(_ ticket: UUID, decision: BibloZooAgeAccessDecision,
@@ -545,6 +631,17 @@ final class BibloZooAgeGateViewController: UIViewController {
         retryButton.titleLabel?.adjustsFontForContentSizeCategory = true
         retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
         let stack = UIStackView(arrangedSubviews: [message, retryButton])
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
+        if BibloZooAgeStartupCoordinator.useFixtureGate {
+            let banner = UILabel()
+            banner.text = "SIMULATOR TEST — FAKE CONSENT"
+            banner.font = .preferredFont(forTextStyle: .headline)
+            banner.adjustsFontForContentSizeCategory = true
+            banner.textAlignment = .center
+            banner.numberOfLines = 0
+            stack.insertArrangedSubview(banner, at: 0)
+        }
+        #endif
         stack.axis = .vertical
         stack.spacing = 20
         stack.alignment = .center
@@ -565,6 +662,7 @@ final class BibloZooAgeGateViewController: UIViewController {
     }
 
     func showHold(_ decision: BibloZooAgeAccessDecision) {
+        loadViewIfNeeded()
         // No raw age, identifiers, or detailed API errors in UI or diagnostics.
         switch decision {
         case .holdAgeVerification:

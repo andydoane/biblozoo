@@ -87,13 +87,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private var switcherPausedLayerTime: CFTimeInterval?
 
     func sceneWillResignActive(_ scene: UIScene) {
-        guard BibloZooIOSIdentity.nativeAudioEnabled,
+        #if canImport(DeclaredAgeRange)
+        let stagedAgeGate = BibloZooAgeStartupCoordinator.useStagedGate
+        #else
+        let stagedAgeGate = false
+        #endif
+        guard BibloZooIOSIdentity.nativeAudioEnabled || stagedAgeGate,
               switcherPausedLayerTime == nil,
               let layer = window?.rootViewController?.view.layer else { return }
         let clock = layer.convertTime(CACurrentMediaTime(), from: nil)
         switcherPausedLayerTime = clock
         #if canImport(DeclaredAgeRange)
-        if BibloZooAgeStartupCoordinator.useNativeGate { agePausedLayer = layer }
+        if BibloZooAgeStartupCoordinator.useStagedGate { agePausedLayer = layer }
         #endif
         layer.speed = 0
         layer.timeOffset = clock
@@ -111,7 +116,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         #endif
         #if canImport(DeclaredAgeRange)
         // During a staged recheck leave the detached gameplay layer frozen.
-        if BibloZooAgeStartupCoordinator.useNativeGate, ageRetainedBridge != nil { return }
+        if BibloZooAgeStartupCoordinator.useStagedGate, ageRetainedBridge != nil { return }
         #endif
         guard let layer = window?.rootViewController?.view.layer else { return }
         restoreSwitcherLayer(layer)
@@ -122,7 +127,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private func restoreSwitcherLayer(_ layer: CALayer) {
         guard let paused = switcherPausedLayerTime else { return }
         #if canImport(DeclaredAgeRange)
-        if BibloZooAgeStartupCoordinator.useNativeGate, agePausedLayer !== layer { return }
+        if BibloZooAgeStartupCoordinator.useStagedGate, agePausedLayer !== layer { return }
         agePausedLayer = nil
         #endif
         layer.speed = 1
@@ -135,7 +140,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidEnterBackground(_ scene: UIScene) {
         #if canImport(DeclaredAgeRange)
         let needsRecheck = ageStartup.sceneLeftForeground()
-        guard BibloZooAgeStartupCoordinator.useNativeGate else { return }
+        guard BibloZooAgeStartupCoordinator.useStagedGate else { return }
         if needsRecheck, let bridge = window?.rootViewController as? BibloZooDiagnosticsBridgeViewController {
             ageRetainedBridge = bridge
             window?.rootViewController = makeAgeGate(scene)
@@ -158,7 +163,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         window = UIWindow(windowScene: windowScene)
         #if canImport(DeclaredAgeRange)
-        if BibloZooAgeStartupCoordinator.useNativeGate {
+        if BibloZooAgeStartupCoordinator.useStagedGate {
             window?.rootViewController = makeAgeGate(scene)
         } else {
             window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
@@ -214,7 +219,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
         #if canImport(DeclaredAgeRange)
-        if BibloZooAgeStartupCoordinator.useNativeGate,
+        if BibloZooAgeStartupCoordinator.useStagedGate,
            window?.rootViewController is BibloZooAgeGateViewController { return }
         #endif
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
@@ -222,7 +227,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
         #if canImport(DeclaredAgeRange)
-        if BibloZooAgeStartupCoordinator.useNativeGate,
+        if BibloZooAgeStartupCoordinator.useStagedGate,
            window?.rootViewController is BibloZooAgeGateViewController { return }
         #endif
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)

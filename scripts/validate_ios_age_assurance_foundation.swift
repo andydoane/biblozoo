@@ -239,5 +239,35 @@ struct BibloZooAgeAssuranceTests {
                                          foreground: true, cancelled: false) == .holdUnavailable)
         precondition(!offlineEpoch.authorized)
         print("PASS: \(availability.count + 6) synthetic availability and offline-policy assertions")
+
+        #if DEBUG
+        typealias F = BibloZooAgeFixture
+        let fixtureID = "com.andydoane.biblozoo.agefixture"
+        let fixtureCases: [(F, Int, D)] = [
+            (.allow, 1, .allowChildSafe), (.adult, 1, .allowChildSafe),
+            (.minorApproved, 1, .allowChildSafe), (.minorUnknown, 1, .holdInitialConsent),
+            (.declined, 1, .holdAgeVerification), (.denied, 1, .holdDenied),
+            (.unavailable, 1, .holdUnavailable), (.unsupported, 1, .holdUnsupportedPlatform),
+            (.updatePending, 1, .holdUpdate), (.retryAllow, 1, .holdUnavailable),
+            (.retryAllow, 2, .allowChildSafe), (.reentryDenied, 1, .allowChildSafe),
+            (.reentryDenied, 2, .holdDenied), (.slowAllow, 1, .allowChildSafe)
+        ]
+        for (fixture, attempt, expected) in fixtureCases {
+            precondition(fixture.decision(at: attempt) == expected)
+        }
+        precondition(F.select(arguments: []) == .unavailable)
+        precondition(F.select(arguments: ["--biblozoo-age-fixture=unknown"]) == .unavailable)
+        precondition(F.select(arguments: ["--biblozoo-age-fixture=allow", "--biblozoo-age-fixture=adult"]) == .unavailable)
+        precondition(F.select(arguments: ["--biblozoo-age-fixture=minor-approved"]) == .minorApproved)
+        var fixtureStartup = BibloZooAgeStartupAttempt()
+        precondition(!fixtureStartup.begin(bundleID: prod, liveEnabled: false, activePresenter: true, fixtureEnabled: true))
+        precondition(!fixtureStartup.begin(bundleID: fixtureID, liveEnabled: true, activePresenter: true, fixtureEnabled: true))
+        precondition(!fixtureStartup.begin(bundleID: fixtureID, liveEnabled: true, activePresenter: true))
+        precondition(!fixtureStartup.begin(bundleID: fixtureID, liveEnabled: false, activePresenter: false, fixtureEnabled: true))
+        precondition(!fixtureStartup.begin(bundleID: fixtureID, liveEnabled: false, activePresenter: true))
+        precondition(fixtureStartup.begin(bundleID: fixtureID, liveEnabled: false, activePresenter: true, fixtureEnabled: true))
+        precondition(!fixtureStartup.begin(bundleID: fixtureID, liveEnabled: false, activePresenter: true, fixtureEnabled: true))
+        print("PASS: \(fixtureCases.count + 11) synthetic simulator fixture assertions")
+        #endif
     }
 }
