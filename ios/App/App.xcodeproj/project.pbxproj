@@ -16,6 +16,7 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		B1B102320000000000000002 /* BibloZooAgeAssurance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B102320000000000000001 /* BibloZooAgeAssurance.swift */; };
 		B1B000000000000000000001 /* BibloZooNativeSoundPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B000000000000000000002 /* BibloZooNativeSoundPlugin.swift */; };
 		B1B000000000000000000003 /* ui_pet_unlock.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B1B000000000000000000004 /* ui_pet_unlock.mp3 */; };
 		B1B000000000000000000005 /* dq_feed_star.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B1B000000000000000000006 /* dq_feed_star.mp3 */; };
@@ -37,6 +38,7 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		B1B102320000000000000001 /* BibloZooAgeAssurance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibloZooAgeAssurance.swift; sourceTree = "<group>"; };
 		B1B000000000000000000002 /* BibloZooNativeSoundPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibloZooNativeSoundPlugin.swift; sourceTree = "<group>"; };
 		B1B000000000000000000004 /* ui_pet_unlock.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = ui_pet_unlock.mp3; path = ../../../ui_audio/ui_pet_unlock.mp3; sourceTree = "<group>"; };
 		B1B000000000000000000006 /* dq_feed_star.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; name = dq_feed_star.mp3; path = ../../../verse_images/daily_questions/dq_feed_star.mp3; sourceTree = "<group>"; };
@@ -82,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
+				B1B102320000000000000001 /* BibloZooAgeAssurance.swift */,
 				B1B000000000000000000002 /* BibloZooNativeSoundPlugin.swift */,
 				B1B000000000000000000004 /* ui_pet_unlock.mp3 */,
 				B1B000000000000000000006 /* dq_feed_star.mp3 */,
@@ -191,6 +194,7 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				B1B102320000000000000002 /* BibloZooAgeAssurance.swift in Sources */,
 				B1B000000000000000000001 /* BibloZooNativeSoundPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
