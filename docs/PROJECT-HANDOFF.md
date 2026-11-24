@@ -1,6 +1,16 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — iPad keyboard-visible Grown-up Check candidate fix (November 23, 2026 ET)
+## CURRENT — merged #204 and owner iPad keyboard PASS; native bridge review next (November 23, 2026 ET)
+
+**Verified merge:** [PR #204](https://github.com/andydoane/biblozoo/pull/204) **merged** to native `ios-prep`, merge commit `559aa0126d3554b66da55a77bd5964e86dca16b8`. The owner subsequently tested on a **physical iPad** and reported the focused keyboard fix **"did exactly what we wanted it to."** Record **PASS for the previously obscured Check Answer/iPad keyboard usability issue**: this is owner evidence after the merged fix, not just synthetic viewport tests. The owner has not separately reported full iPad VoiceOver, Switch Control, complete keyboard/focus matrix, or an end-to-end backup export/cancel exercise; don't claim those passed. No new gameplay work is needed from this result.
+
+**Next technical action (no family data/device reinstall):** Perform the focused **native JS-to-Swift/Capacitor parental-gate boundary review** from [Kids Category final acceptance §C](IOS-KIDS-CATEGORY-FINAL-ACCEPTANCE.md). Inventory native production handlers for first-time microphone/Photos permission requests, file/media sharing, and external links; determine whether any child-reachable WebView route can invoke those methods without Grown-up Check. Treat theoretical JavaScript-injection access separately from a demonstrated bypass. Prefer a documented no-change finding if code is robust; propose a small `ios-prep` hardening PR only for an identified concrete weakness. Preserve normal parental gate behavior and release branch boundaries.
+
+**After the bridge review:** Complete synthetic/disposable-environment **backup v3 export → restore → re-export** (no real-family restore), followed by the open Kids adult-level gate assessment, App Privacy/SDK, legal/asset rights, App Store configuration and final archive review. Dynamic Type remains intentionally deferred for 1.0; do not claim Larger Text support. As requested, create a **small, owner-reviewed documentation PR** whenever we verify another acceptance result. Never merge PRs on the owner's behalf.
+
+---
+
+## HISTORICAL — iPad keyboard-visible Grown-up Check candidate fix before merged #204 (November 23, 2026 ET)
 
 **Owner-reported iPad portrait behavior:** Initial modal fits well; selecting the Answer field displays the software keyboard but does **not** raise the modal as observed on iPhone. The Answer input remains visible; **Check Answer requires keyboard dismissal**. Previous documentation [#203](https://github.com/andydoane/biblozoo/pull/203) is merged (SHA `bbf97c13f7a92f03b199a5123f0b961fddfc3765`).
 
