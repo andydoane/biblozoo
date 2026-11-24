@@ -15,8 +15,8 @@ function validate(save){
  assert.ok(object(save),"Backup must contain a JSON object");
  assert.equal(save.saveType,FAMILY_SAVE_TYPE,
    "Expected Export Family Backup, not an individual/legacy/different file");
- const version=Number(save.saveVersion);
- assert.ok(Number.isInteger(version)&&version>=MIN_FAMILY_SAVE_VERSION&&version<=FAMILY_SAVE_VERSION,
+ const formatVersion=Number(save.saveVersion);
+ assert.ok(Number.isInteger(formatVersion)&&formatVersion>=MIN_FAMILY_SAVE_VERSION&&formatVersion<=FAMILY_SAVE_VERSION,
    "Unsupported Family Backup version (supported formats are 2 and 3)");
  assert.ok(typeof save.exportedAt==="string" &&
    Number.isFinite(Date.parse(save.exportedAt)),
@@ -40,10 +40,10 @@ function validate(save){
    const version=Number(entry.progress.version||0);
    assert.ok(Number.isFinite(version) && version<=PROGRESS_VERSION,
      hint+" has an unsupported newer progress version");
-   if(version>=3) zooBackup.normalize(entry.zoo);
+   if(formatVersion>=3) zooBackup.normalize(entry.zoo);
    verseCount+=Object.keys(entry.progress.verses).length;
  }
- return {profiles:save.profiles.length,verseRecords:verseCount,version};
+ return {profiles:save.profiles.length,verseRecords:verseCount,version:formatVersion};
 }
 function fromFile(filepath){
  assert.ok(typeof filepath==="string"&&filepath.trim(),
