@@ -5,7 +5,9 @@
 "use strict";
 const fs=require("node:fs"),path=require("node:path"),assert=require("node:assert/strict");
 const FAMILY_SAVE_TYPE="biblozoo-family-save";
-const FAMILY_SAVE_VERSION=2;
+const FAMILY_SAVE_VERSION=3;
+const MIN_FAMILY_SAVE_VERSION=2;
+const zooBackup=require("../verse_games/shared/zoo-backup-state.js");
 const PROGRESS_VERSION=2;
 const MAX_BYTES=25*1024*1024;
 function object(v){return v!==null&&typeof v==="object"&&!Array.isArray(v);}
@@ -13,8 +15,9 @@ function validate(save){
  assert.ok(object(save),"Backup must contain a JSON object");
  assert.equal(save.saveType,FAMILY_SAVE_TYPE,
    "Expected Export Family Backup, not an individual/legacy/different file");
- assert.equal(Number(save.saveVersion),FAMILY_SAVE_VERSION,
-   "Unsupported Family Backup version (current format is 2)");
+ const version=Number(save.saveVersion);
+ assert.ok(Number.isInteger(version)&&version>=MIN_FAMILY_SAVE_VERSION&&version<=FAMILY_SAVE_VERSION,
+   "Unsupported Family Backup version (supported formats are 2 and 3)");
  assert.ok(typeof save.exportedAt==="string" &&
    Number.isFinite(Date.parse(save.exportedAt)),
    "Family Backup export timestamp missing or invalid");
@@ -37,9 +40,10 @@ function validate(save){
    const version=Number(entry.progress.version||0);
    assert.ok(Number.isFinite(version) && version<=PROGRESS_VERSION,
      hint+" has an unsupported newer progress version");
+   if(version>=3) zooBackup.normalize(entry.zoo);
    verseCount+=Object.keys(entry.progress.verses).length;
  }
- return {profiles:save.profiles.length,verseRecords:verseCount,version:FAMILY_SAVE_VERSION};
+ return {profiles:save.profiles.length,verseRecords:verseCount,version};
 }
 function fromFile(filepath){
  assert.ok(typeof filepath==="string"&&filepath.trim(),
@@ -62,7 +66,7 @@ function main(){
  console.log("Family format v"+result.version+"; Zookeeper profiles: "+result.profiles+
    "; verse-progress records: "+result.verseRecords);
  console.log("JSON file size: "+result.bytes+" bytes; no profile names or data printed.");
- console.log("NOT VERIFIED: restoration, other per-profile storage keys, app sandbox safety.");
+ console.log("NOT VERIFIED: on-device restoration, all stored data, or app sandbox safety.");
  console.log("Keep the original app and a separately saved copy of this backup intact.");
 }
 if(require.main===module){
