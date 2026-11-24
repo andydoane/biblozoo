@@ -76,6 +76,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     #if canImport(DeclaredAgeRange)
     private let ageStartup = BibloZooAgeStartupCoordinator()
+    // Staged live mode only: keep the existing bridge in RAM during recheck
+    // rather than creating a new web session or altering stored family data.
+    private var ageRetainedBridge: BibloZooDiagnosticsBridgeViewController?
+    private weak var agePausedLayer: CALayer?
     #endif
     // N7f.2: freeze the presented iOS view the INSTANT the scene loses
     // foreground activity, even if WKWebView delays document.visibilitychange
@@ -88,6 +92,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
               let layer = window?.rootViewController?.view.layer else { return }
         let clock = layer.convertTime(CACurrentMediaTime(), from: nil)
         switcherPausedLayerTime = clock
+        #if canImport(DeclaredAgeRange)
+        if BibloZooAgeStartupCoordinator.useNativeGate { agePausedLayer = layer }
+        #endif
         layer.speed = 0
         layer.timeOffset = clock
     }
@@ -102,26 +109,47 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             }
         }
         #endif
-        guard let paused = switcherPausedLayerTime,
-              let layer = window?.rootViewController?.view.layer else { return }
+        #if canImport(DeclaredAgeRange)
+        // During a staged recheck leave the detached gameplay layer frozen.
+        if BibloZooAgeStartupCoordinator.useNativeGate, ageRetainedBridge != nil { return }
+        #endif
+        guard let layer = window?.rootViewController?.view.layer else { return }
+        restoreSwitcherLayer(layer)
+        // Read My Verse remains frozen by its own read-audio-paused class
+        // until an explicit owner Resume Audio tap verifies actual playback.
+    }
+
+    private func restoreSwitcherLayer(_ layer: CALayer) {
+        guard let paused = switcherPausedLayerTime else { return }
+        #if canImport(DeclaredAgeRange)
+        if BibloZooAgeStartupCoordinator.useNativeGate, agePausedLayer !== layer { return }
+        agePausedLayer = nil
+        #endif
         layer.speed = 1
         layer.timeOffset = 0
         layer.beginTime = 0
         layer.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil) - paused
         switcherPausedLayerTime = nil
-        // Read My Verse remains frozen by its own read-audio-paused class
-        // until an explicit owner Resume Audio tap verifies actual playback.
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
         #if canImport(DeclaredAgeRange)
-        ageStartup.sceneLeftForeground()
+        let needsRecheck = ageStartup.sceneLeftForeground()
+        guard BibloZooAgeStartupCoordinator.useNativeGate else { return }
+        if needsRecheck, let bridge = window?.rootViewController as? BibloZooDiagnosticsBridgeViewController {
+            ageRetainedBridge = bridge
+            window?.rootViewController = makeAgeGate(scene)
+        } else if let gate = window?.rootViewController as? BibloZooAgeGateViewController {
+            // An interrupted check cannot leave an indefinite checking screen.
+            gate.showHold(.holdUnavailable)
+        }
         #endif
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
         #if canImport(DeclaredAgeRange)
         ageStartup.sceneLeftForeground()
+        ageRetainedBridge = nil
         #endif
     }
 
@@ -131,12 +159,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = UIWindow(windowScene: windowScene)
         #if canImport(DeclaredAgeRange)
         if BibloZooAgeStartupCoordinator.useNativeGate {
-            let gate = BibloZooAgeGateViewController()
-            gate.onRetry = { [weak self, weak gate, weak scene] in
-                guard let self = self, let gate = gate, let scene = scene else { return }
-                self.beginAgeGate(scene, gate: gate, retry: true)
-            }
-            window?.rootViewController = gate
+            window?.rootViewController = makeAgeGate(scene)
         } else {
             window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
         }
@@ -149,6 +172,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     #if canImport(DeclaredAgeRange)
+    private func makeAgeGate(_ scene: UIScene) -> BibloZooAgeGateViewController {
+        let gate = BibloZooAgeGateViewController()
+        gate.onRetry = { [weak self, weak gate, weak scene] in
+            guard let self = self, let gate = gate, let scene = scene else { return }
+            self.beginAgeGate(scene, gate: gate, retry: true)
+        }
+        return gate
+    }
+
     private func beginAgeGate(_ scene: UIScene, gate: BibloZooAgeGateViewController,
                               retry: Bool) {
         guard window?.rootViewController === gate else { return }
@@ -159,9 +191,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                scene.activationState == .foregroundActive,
                UIApplication.shared.applicationState == .active,
                gate.presentedViewController == nil {
-                // No user content, web runtime or bridge existed before this
-                // point. Preserve the ordinary production controller exactly.
-                self.window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
+                // Cold launch creates the bridge; reentry restores the same
+                // instance. No reset/restore, reload or backup operation.
+                if let retained = self.ageRetainedBridge {
+                    self.window?.rootViewController = retained
+                    self.restoreSwitcherLayer(retained.view.layer)
+                    self.ageRetainedBridge = nil
+                } else {
+                    self.window?.rootViewController = BibloZooDiagnosticsBridgeViewController()
+                }
             } else {
                 gate.showHold(decision)
             }
@@ -175,10 +213,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     #endif
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        #if canImport(DeclaredAgeRange)
+        if BibloZooAgeStartupCoordinator.useNativeGate,
+           window?.rootViewController is BibloZooAgeGateViewController { return }
+        #endif
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        #if canImport(DeclaredAgeRange)
+        if BibloZooAgeStartupCoordinator.useNativeGate,
+           window?.rootViewController is BibloZooAgeGateViewController { return }
+        #endif
         SceneDelegateProxy.shared.scene(scene, continue: userActivity)
     }
 }
