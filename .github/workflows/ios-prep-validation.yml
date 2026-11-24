@@ -131,6 +131,9 @@ jobs:
       - name: Test read-only production packaging inventory and refusal cases
         run: node scripts/validate_ios_production_packaging_audit.js
 
+      - name: Verify release polish metadata filtering and offline Credits
+        run: node scripts/validate_ios_release_polish.js
+
       - name: Test offline family backup v2/v3 validator without real profiles
         run: node scripts/validate_family_backup_file_test.js
 
@@ -722,6 +725,9 @@ jobs:
 
       - name: Audit production dist notices and payload inventory
         run: node scripts/audit_ios_production_packaging.js --dist
+
+      - name: Verify packaged offline Credits and metadata filter
+        run: node scripts/validate_ios_release_polish.js
 
       - name: Validate N1 guard placement in every packaged HTML entrypoint
         if: github.base_ref == 'experiment/native-ios-audio' || github.base_ref == 'integration/native-audio-to-ios-prep' || github.base_ref == 'ios-prep' || github.ref == 'refs/heads/experiment/native-ios-audio' || github.ref == 'refs/heads/integration/native-audio-to-ios-prep' || github.ref == 'refs/heads/ios-prep'

@@ -38,6 +38,7 @@ function inspectPublic(dir,sourceRoot=root){
     for(const item of fs.readdirSync(folder,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
       const full=path.join(folder,item.name);
       const rel=relative?relative+"/"+item.name:item.name;
+      assert.ok(!/^(\.DS_Store|desktop\.ini)$/i.test(item.name),"Unexpected desktop metadata in public: "+rel);
       assert.ok(!item.isSymbolicLink(),"Unexpected symbolic link in public: "+rel);
       if(item.isDirectory())walk(full,rel);
       else {
@@ -66,7 +67,7 @@ function inspectPublic(dir,sourceRoot=root){
     h.count++;hashes.set(hash,h);
   }
   const duplicateGroups=[...hashes.values()].filter(h=>h.count>1);
-  const review=files.filter(f=>reviewPaths.has(f.path)||/(^|\/)(desktop\.ini|\.DS_Store)$/i.test(f.path));
+  const review=files.filter(f=>reviewPaths.has(f.path));
   return {
     files:files.length,bytes:files.reduce((sum,f)=>sum+f.bytes,0),
     notices:requiredNotices.slice(),groups:[...groups.values()].sort((a,b)=>b.bytes-a.bytes),
