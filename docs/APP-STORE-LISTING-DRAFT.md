@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — App Store listing draft
 
+## CURRENT — storefront scope update (November 24, 2026)
+
+Owner approved US-only version 1.0, superseding prior five-country planning. Keep $4.99 USD, paid upfront, no IAP/subscriptions/ads, iPhone/iPad, Education and conditional Kids ages 6–8 unchanged. Canada, UK, Australia and New Zealand are future candidates only. Manually select US availability after enrollment, subject to all outstanding US compliance, rights, age assurance and Apple review gates; no App Store Connect action yet. See [US launch preflight](US-LAUNCH-COMPLIANCE-PREFLIGHT.md). Listing copy and screenshot storyboard otherwise unchanged.
+
 **Status:** offline copy for owner review, November 24, 2026. Baseline ios-prep 87c03fd547bbc8ecf9563f5c4b5793aa0ad0cd5b (merged #225). No App Store Connect record created; name availability, owner approval, final build/rights, metadata and Kids eligibility remain open.
 
 Apple references: [App information](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information/), [platform version information](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information), [product page guidance](https://developer.apple.com/app-store/product-page/), [Review Guidelines §2.3.7–2.3.8](https://developer.apple.com/app-store/review/guidelines/). Name/subtitle max 30 characters each; promotional text 170; description 4000; keywords 100 bytes. Avoid prices in marketing metadata; use actual pricing field. Neutral public copy below intentionally avoids Kids-only wording pending eligibility; not a decision to launch outside Kids Category. If eligibility fails, owner must reconsider positioning and actual intended audience, not simply relabel.

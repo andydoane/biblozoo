@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
+## CURRENT — US-only launch privacy and age-assurance follow-up (November 24, 2026)
+
+Owner approved US-only launch; other four candidate storefronts deferred. Existing owner-approved Data Not Collected proposal and policy remain unchanged subject to final archive validation. No assertion of COPPA exemption or legally verified parental consent: FTC [COPPA FAQ](https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions) distinguishes local processing from disclosure via third-party sharing. Review parent-gated Ghost Writer OS shares, backup exports, support correspondence, hosting and any state-specific duties. Apple's [age assurance guidance](https://developer.apple.com/support/age-assurance/) and [Texas update](https://developer.apple.com/news/?id=sg176nne) raise separate age/consent requirements; investigate data minimization, revocation and any required privacy disclosure changes before implementation. Existing math gate is not age verification. See [US launch preflight](US-LAUNCH-COMPLIANCE-PREFLIGHT.md). No data collection, policy, SDK, permission or app behavior change in this checkpoint.
+
 ## CURRENT — owner approves App Privacy disclosure and confirms monitored contact (November 24, 2026)
 
 **Baseline:** ios-prep at c9d16fa45817ed3a897bc3a20d129ad8000e8362, following merged [PR #213](https://github.com/andydoane/biblozoo/pull/213).
