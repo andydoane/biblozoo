@@ -23,6 +23,23 @@ for(const rel of ["verse_images/andy_dancing.mp4","verse_audio/biblozoo_jingle.m
   const source=fs.readFileSync(path.join(root,rel));assert.ok(source.length>0,rel);
   if(process.argv.includes("--dist"))assert.ok(fs.readFileSync(path.join(root,"dist",rel)).equals(source),rel+" dist byte match");
 }
+// Exercise the real slide-completion branch. About Me must retain the
+// connected incoming video/slide, not call render() and recreate the media.
+const keepStart=app.indexOf("const keepArrivedMenuScreen =");
+const keepEnd=app.indexOf("        render();",keepStart);
+assert.ok(keepStart>=0&&keepEnd>keepStart,"slide completion branch");
+const completion=app.slice(keepStart,keepEnd)+"render();";
+const screens=Object.fromEntries(["ABOUT_ME","PRACTICE_HUB","LEARN_HUB","LISTEN_ACTIVITIES","PRACTICE","PLAYGROUND","FLASHCARDS","NEW_VERSE_PICKER","SETTINGS"].map(key=>[key,key]));
+for(const nextScreen of Object.values(screens)){
+  const video={identity:"original video"};
+  let removed=0,nav=0,rebuild=0;
+  const outgoing={dataset:{idx:"1"},classList:{contains:name=>name==="slide"},remove(){removed++;}};
+  const incoming={dataset:{idx:"2"},classList:{contains:name=>name==="slide"},video,remove(){throw Error("incoming slide removed");}};
+  const appHost={children:[outgoing,incoming]};
+  vm.runInNewContext("(function(){"+completion+"})()",{Screen:screens,nextScreen,fromIdx:1,app:appHost,renderNav(){nav++;},render(){rebuild++;}});
+  if(nextScreen===screens.SETTINGS){assert.equal(rebuild,1);assert.equal(removed,0);assert.equal(nav,0);}
+  else{assert.equal(rebuild,0,nextScreen+" must not recreate its slide");assert.equal(removed,1);assert.equal(nav,1);assert.equal(incoming.video,video);}
+}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 async function main(){
   let clips=[],listeners={},inactive,activations=[];
