@@ -20,7 +20,7 @@ try{
   const alias=tool.licenseDisplayPath;
   const license=fs.readFileSync(path.join(source,tool.licenseOriginal),"utf8");
   put(built,alias,license);
-  put(built,"verse_audio/biblozoo_jingle.mp3","sound");
+  put(built,"verse_audio/testverse_1_1.mp3","sound");
   put(built,"ui_audio/other.mp3","sound");
   const good=tool.inspectPublic(built,source);
   assert.equal(good.files,8);
