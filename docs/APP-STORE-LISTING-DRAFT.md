@@ -1,5 +1,9 @@
 # BibloZoo 1.0 — App Store listing draft
 
+## CURRENT — owner repository backup copies (November 25, 2026 US Eastern)
+
+After merging [#248](https://github.com/andydoane/biblozoo/pull/248), owner added [20 promotional PNG copies](app_store_screenshots/) on ios-prep. Base `bb088c0c240ceccb8b5b281c79a5ebb2378096dc` contains ten iPhone and ten iPad filenames (iPad #8 is spelled ipad_screenshot_008.png). Backup copies only; no upload to App Store Connect. No new pixel/byte/visual check of repository copies versus earlier corrected ZIP. Because the repo is public, only keep publishable fictional/test content and cleared artwork here; keep private master/editable project separately. No deletion or renaming authorized. Build allowlist excludes docs and candidate packaging audit adds explicit refusal of docs/app_store_screenshots in generated public. Final upload slots, order, rights and exact release correspondence open.
+
 ## CURRENT — owner promotional screenshot assets prepared (November 25, 2026 US Eastern)
 
 Owner created a coordinated ten-image portrait promotional collection per device with large genuine-app-screen-style panels, consistent white frames, patterned backgrounds and short captions. Corrected local ZIP `Screenshots Take 2.zip`: independently opened all 20 PNGs and checked integrity, RGB/no alpha or transparency metadata, iPhone/1–10 exactly 1206 × 2622 and iPad/1–10 exactly 2064 × 2752. Both prior export errors resolved. This supersedes the planning-only six-image storyboard below. Owner keeps original ZIP and editable artwork privately; no files uploaded to repository/App Store Connect. Do not infer final visual/fictional profile clearance from technical inspection.
