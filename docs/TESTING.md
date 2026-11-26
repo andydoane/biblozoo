@@ -1,5 +1,25 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — owner focused Credits/privacy device acceptance PASS (November 26, 2026 US Eastern)
+
+Merged [#249](https://github.com/andydoane/biblozoo/pull/249) at `9a16a989c88c0f11f4ded9e1c24414f1e1da3f9d`; exact PR head `6c6e143e883c7d6fc95eb24619de4695e8af3ac3` [Actions #45755663854](https://github.com/andydoane/biblozoo/actions/runs/45755663854) SUCCESS. No separate merge-head CI independently verified. Owner reports **all seven requested checks passed**: airplane mode with Wi-Fi off, Settings → Credits, all four bundled notice sections readable, close/reopen offline, restore connectivity, cancel SoundTouchJS outgoing Grown-up Check with no browser launch, and Settings → Privacy Policy displays correctly. Scope is owner-reported routine iPhone runtime acceptance; exact installed build SHA/device OS and optional App Privacy Report were not separately supplied. No new traffic capture or full text comparison claimed. This closes the specified notice usability/offline/cancel and policy display checks, not license grants or exhaustive runtime/SDK/signed validation. Prior provisional Data Not Collected and approved privacy wording remain unchanged.
+
+## CURRENT — targeted iPad orientation/window acceptance (November 26, 2026 US Eastern)
+
+Prior Nov 25 unsigned Release archive passed but warned that all interface orientations must be supported unless full screen is required. Current Info.plist: portrait only for iPhone and iPad; UIRequiresFullScreen absent; UIApplicationSupportsMultipleScenes=false. Owner chose portrait-only 1.0. Apple [TN3192](https://developer.apple.com/documentation/technotes/tn3192-migrating-your-app-from-the-deprecated-uirequiresfullscreen-key) describes deprecated compatibility mode and adapting to changing scene dimensions. Do not add deprecated key or change orientation support merely to suppress a warning; check actual behavior first.
+
+**Owner acceptance — pending:** use current ordinary iPad build (or iPad simulator if physical iPad unavailable; label which); if installed version includes the #246 fix and subsequent changes are audit/docs-only, no rebuild required. Record iPad model, OS and build if known. Turn off system rotation lock for the duration, restoring it afterward. Use a disposable profile if gameplay is needed; no delete/reinstall/restore or experimental flags.
+
+| Check | What to observe and report |
+| --- | --- |
+| Portrait full screen | Open Home, Learn/Chunks and one representative game; verify content fits and primary controls work. |
+| Rotation | Rotate to landscape and back while on Home and one active game. Report whether app remains portrait, rotates, letterboxes or changes window geometry. If geometry changes, check controls, text and active gameplay remain usable and state survives. Do not claim landscape support if it does not rotate. |
+| Window resizing | If the installed iPadOS/device offers windowed multitasking, enter a smaller window, try a narrow/tall and wider size, then restore full screen. Check Home/navigation and one gameplay screen for clipping, inaccessible controls or lost progress. If unavailable, record NOT AVAILABLE (not a pass). |
+| Settings dialog | In any changed geometry, open Settings/Grown-up Check, proceed to math and keyboard, then cancel. Verify answer/Not Now controls remain reachable; do not change settings. Prior normal iPad keyboard fix acceptance remains valid. |
+| Return to portrait | Restore original full-screen size and portrait orientation. Confirm app still usable without forced restart and restore rotation-lock preference. |
+
+Report observations rather than forcing a specific rotation result. Stop/report actual clipping, crashes, stuck modal or lost state. This is not a new all-game or accessibility matrix, or signed App Store validation; do not repeat completed iPhone Credits checks. No changes to code or settings in this documentation PR.
+
 ## CURRENT — focused iPhone release acceptance (November 25, 2026 US Eastern)
 
 Baseline after #248 and owner screenshot backup: `bb088c0c240ceccb8b5b281c79a5ebb2378096dc`. No runtime changes relative to `d1c67a2c`, owner archive accepted; candidate changes only read-only packaging audit/tests and docs. These device observations are needed to close existing open Credits/privacy checks, **not** to test a new runtime feature. Owner reviews/merges after green CI; no premerge device test required.
