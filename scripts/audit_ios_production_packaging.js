@@ -41,7 +41,10 @@ function inspectPublic(dir,sourceRoot=root){
       const full=path.join(folder,item.name);
       const rel=relative?relative+"/"+item.name:item.name;
       assert.ok(!/^(\.DS_Store|desktop\.ini)$/i.test(item.name),"Unexpected desktop metadata in public: "+rel);
-      // Store screenshots/docs are release materials, never runtime payload.\n      const releaseMaterial=(!relative&&/^docs$/i.test(item.name))||/^app_store_screenshots$/i.test(item.name);\n      assert.ok(!releaseMaterial,"Unexpected release documentation or screenshot backup in public: "+rel);\n      assert.ok(!item.isSymbolicLink(),"Unexpected symbolic link in public: "+rel);
+      // Store screenshots/docs are release materials, never runtime payload.
+      const releaseMaterial=(!relative&&/^docs$/i.test(item.name))||/^app_store_screenshots$/i.test(item.name);
+      assert.ok(!releaseMaterial,"Unexpected release documentation or screenshot backup in public: "+rel);
+      assert.ok(!item.isSymbolicLink(),"Unexpected symbolic link in public: "+rel);
       if(item.isDirectory())walk(full,rel);
       else {
         assert.ok(item.isFile(),"Unexpected non-file entry in public: "+rel);
