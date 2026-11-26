@@ -36,7 +36,18 @@ try{
     assert.throws(()=>tool.inspectPublic(built,source),/Unexpected desktop metadata/);
     fs.unlinkSync(metadata);
   }
-  // Source-side release materials are allowed; their presence in public is not.\n  put(source,"docs/app_store_screenshots/iphone_screenshot_01.png","synthetic screenshot");\n  assert.deepEqual(tool.inspectPublic(built,source),good);\n  for(const rel of ["docs/app_store_screenshots/iphone_screenshot_01.png","DOCS/readme.md","utilities/app_store_screenshots/ipad_screenshot_01.png","APP_STORE_SCREENSHOTS/image.png"]){\n    put(built,rel,"synthetic screenshot");\n    assert.throws(()=>tool.inspectPublic(built,source),/Unexpected release documentation or screenshot backup/);\n    const dir=rel.startsWith("utilities/")?"utilities/app_store_screenshots":rel.split("/")[0];\n    fs.rmSync(path.join(built,dir),{recursive:true,force:true});\n    if(rel.startsWith("utilities/")&&fs.readdirSync(path.join(built,"utilities")).length===0)fs.rmdirSync(path.join(built,"utilities"));\n  }\n  assert.deepEqual(tool.inspectPublic(built,source),good);\n  fs.rmSync(path.join(built,alias));
+  // Source-side release materials are allowed; their presence in public is not.
+  put(source,"docs/app_store_screenshots/iphone_screenshot_01.png","synthetic screenshot");
+  assert.deepEqual(tool.inspectPublic(built,source),good);
+  for(const rel of ["docs/app_store_screenshots/iphone_screenshot_01.png","DOCS/readme.md","utilities/app_store_screenshots/ipad_screenshot_01.png","APP_STORE_SCREENSHOTS/image.png"]){
+    put(built,rel,"synthetic screenshot");
+    assert.throws(()=>tool.inspectPublic(built,source),/Unexpected release documentation or screenshot backup/);
+    const dir=rel.startsWith("utilities/")?"utilities/app_store_screenshots":rel.split("/")[0];
+    fs.rmSync(path.join(built,dir),{recursive:true,force:true});
+    if(rel.startsWith("utilities/")&&fs.readdirSync(path.join(built,"utilities")).length===0)fs.rmdirSync(path.join(built,"utilities"));
+  }
+  assert.deepEqual(tool.inspectPublic(built,source),good);
+  fs.rmSync(path.join(built,alias));
   assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged license display alias/);
   put(built,alias,"");
   assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged license display alias/);
