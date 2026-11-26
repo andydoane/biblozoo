@@ -1,5 +1,13 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — About Me entry fix owner acceptance and 2px edge crop (November 26, 2026 US Eastern)
+
+Merged [#253](https://github.com/andydoane/biblozoo/pull/253) at `0dfcc4a2d37b1b38da1daeec2826e580c1eb99dd`; exact PR head `ecabd9761140d18645b6f7b8a23ff997ee219c1d` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45834516622) SUCCESS. Separate merge-head CI not independently verified. Owner reports About Me is working well after the video guard correction; previous entry restart no longer reported. Scoped owner acceptance only, not separate confirmation of every #252 audio, interruption, offline, parental-gate and iPad test.
+
+Owner noticed a tiny black strip from source cropping and requested a 2px visual inset. Candidate wraps the existing video in a rounded-square clipping span, extends the video 4 CSS px in each dimension and offsets it -2px on both axes, retaining the square footprint, aspect ratio, rounding and button pointer handling. This is a centered display crop, not a change to encoded video pixels. Original MP4, autoplay/mute/loop, native guard, jingle logic, external gate, page layout, dependencies and signing remain unchanged. Existing About Me CI test adds markup/CSS contract assertions; visual result on device is pending. No release or rights clearance implied.
+
+**Focused owner retest:** after green PR and merge Actions, use normal pull/build/sync/Xcode Play workflow. Open About Me, confirm black strip is gone, rounded-square video loops and remains undistorted, tap video to start/stop/restart jingle, back/reopen without restart. Complete any outstanding #252 checks if not already reported; no need to repeat unrelated device tests. No new archive, erase or reinstall for this scoped visual adjustment.
+
 ## CURRENT — About Me entry restart regression and targeted video guard fix (November 26, 2026 US Eastern)
 
 Merged [#252](https://github.com/andydoane/biblozoo/pull/252) at `52e93dd167574aefdfb509f1989f3f5e32920036`; exact PR head `b42403dbca0291232e1625f8c53ce36aebec4629` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45832195866) SUCCESS. Owner reports app restarted immediately upon tapping About Me in Settings, before a jingle tap. Supplied Xcode console includes WebContent/OS service warnings and "QUARANTINED DUE TO HIGH LOGGING VOLUME"; no specific crash stack, termination reason or jetsam report. Do not infer precise cause from generic sandbox/AVAudioSession warnings. About Me device acceptance is FAIL on entry, remaining checks untested.

@@ -19445,7 +19445,9 @@ function screenAboutMe(idx) {
           <button class="about-me-video-button no-zoom" type="button" data-about-music
             aria-label="${aboutMeAudio ? "Stop BibloZoo jingle" : "Play BibloZoo jingle"}"
             aria-pressed="${aboutMeAudio !== null}">
-            <video class="about-me-video" ${active ? 'src="verse_images/andy_dancing.mp4" autoplay' : ""} muted loop playsinline disablepictureinpicture disableremoteplayback aria-hidden="true"></video>
+            <span class="about-me-video-crop">
+              <video class="about-me-video" ${active ? 'src="verse_images/andy_dancing.mp4" autoplay' : ""} muted loop playsinline disablepictureinpicture disableremoteplayback aria-hidden="true"></video>
+            </span>
             <span class="about-me-music-hint">${aboutMeAudio ? "♫ Tap to stop music!" : "♫ Tap for music!"}</span>
           </button>
           <p>BibloZoo was created by Andy Doane, a family discipleship pastor in West Michigan. Andy is passionate about equipping moms and dads to disciple their children. You can find many free family Bible resources at the link below, including daily devotionals and weekly Bible talks.</p>
