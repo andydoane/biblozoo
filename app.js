@@ -1932,6 +1932,7 @@ function toggleMute() {
   muted = !muted;
   applyMute();
   window.BibloZooDailyQuestions?.onMuteChanged?.(muted);
+  if (muted) stopAboutMeMusic();
   if (muted) window.BibloZooNativeUiAudio?.invalidate?.({ stop: true });
   if (!muted && !isNativeUiAudioMode()) void unlockAppAudio();
   if (muted) {
@@ -10230,6 +10231,7 @@ const Screen = {
   DAILY_SNACK: "daily_snack",
   SETTINGS: "settings",
   PRIVACY: "privacy",
+  ABOUT_ME: "about_me",
   TODO: "todo",
   TODO_DEV: "todo_dev",
   NEW_VERSE_PICKER: "new_verse_picker",
@@ -10270,6 +10272,7 @@ const SCREEN_ORDER = Object.freeze([
   Screen.PROFILE_MANAGE,
   Screen.SETTINGS,
   Screen.PRIVACY,
+  Screen.ABOUT_ME,
   Screen.TODO,
   Screen.TODO_DEV,
   Screen.DAILY_SNACK,
@@ -11563,6 +11566,7 @@ function go(nextScreen) {
   // Leaving the parent-area screen family expires its in-memory approval.
   parentAreaGate?.onScreenChange?.(nextScreen);
 
+  if (from === Screen.ABOUT_ME) stopAboutMeMusic();
   if (from === Screen.TODO_DEV) stopZooTodoTutorialPageAudio({ offerRetry: true });
   if (from === Screen.VERSE_DETAIL) cancelVerseDetailListen();
   if (from === Screen.PET_UNLOCK) stopPetUnlockPackageSound();
@@ -14132,6 +14136,7 @@ function renderNav() {
     State.screen !== Screen.DAILY_SNACK &&
     State.screen !== Screen.SETTINGS &&
     State.screen !== Screen.PRIVACY &&
+    State.screen !== Screen.ABOUT_ME &&
     State.screen !== Screen.TODO &&
     State.screen !== Screen.TODO_DEV &&
     State.screen !== Screen.NEW_VERSE_PICKER &&
@@ -19223,6 +19228,7 @@ function screenSettings(idx) {
             <button class="settings-action no-zoom" type="button" data-settings-action="credits">
               Credits
             </button>
+            ${aboutMeAvailable() ? `<button class="settings-action no-zoom" type="button" data-settings-action="about-me">About Me</button>` : ""}
           </div>
         </section>
 
@@ -19335,6 +19341,11 @@ function screenSettings(idx) {
         return;
       }
 
+      if (action === "about-me") {
+        if (aboutMeAvailable() && liveSettingsButton()) go(Screen.ABOUT_ME);
+        return;
+      }
+
       if (action === "credits") {
         showCreditsDialog();
         return;
@@ -19358,6 +19369,109 @@ function screenSettings(idx) {
     };
   });
 
+  return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
+}
+
+// About Me is an informational production-iOS screen. The local avatar
+// stays muted; optional music uses the existing fixed native Read output bank.
+let aboutMeAudio = null;
+function aboutMeAvailable() {
+  return isNativeParentGateContext() &&
+    window.BibloZooNativeOnlyOutput?.enabled === true &&
+    window.BibloZooNativeOnlyOutput?.devToolsAllowed === false &&
+    window.Capacitor?.getPlatform?.() === "ios";
+}
+function syncAboutMeMusicButton() {
+  const button = document.querySelector("[data-about-music]");
+  if (!button) return;
+  const playing = aboutMeAudio !== null;
+  button.setAttribute("aria-pressed", String(playing));
+  button.setAttribute("aria-label", playing ? "Stop BibloZoo jingle" : "Play BibloZoo jingle");
+  const hint = button.querySelector(".about-me-music-hint");
+  if (hint) hint.textContent = playing ? "♫ Tap to stop music!" : "♫ Tap for music!";
+}
+function stopAboutMeMusic(expected = aboutMeAudio) {
+  if (!expected || aboutMeAudio !== expected) return;
+  // Retire this owner before calling pause; stale events cannot stop a new tap.
+  aboutMeAudio = null;
+  void Promise.resolve(expected.pause()).catch(() => {});
+  syncAboutMeMusicButton();
+}
+function toggleAboutMeMusic() {
+  if (State.screen !== Screen.ABOUT_ME || document.hidden || State.isSliding) return;
+  if (aboutMeAudio) { stopAboutMeMusic(); return; }
+  if (muted || !aboutMeAvailable()) return;
+  const output = window.BibloZooNativeReadOutputController;
+  if (!output?.enabled || typeof output.NativeAudio !== "function") return;
+  const audio = new output.NativeAudio("./verse_audio/biblozoo_jingle.mp3");
+  aboutMeAudio = audio;
+  audio.addEventListener("ended", () => stopAboutMeMusic(audio));
+  audio.addEventListener("error", () => stopAboutMeMusic(audio));
+  syncAboutMeMusicButton();
+  try {
+    // Native activation is invoked within the actual video tap. No autoplay,
+    // no Crawl/essential-voice lease and no WebKit audio fallback.
+    const ready = output.activateFromGesture();
+    void Promise.resolve(ready).then(activated => {
+      if (aboutMeAudio !== audio) return;
+      if (!activated || muted || document.hidden || State.screen !== Screen.ABOUT_ME) {
+        stopAboutMeMusic(audio); return;
+      }
+      return audio.play();
+    }).catch(() => stopAboutMeMusic(audio));
+  } catch (_) { stopAboutMeMusic(audio); }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopAboutMeMusic();
+});
+window.addEventListener("pagehide", () => stopAboutMeMusic());
+window.BibloZooNativeReadOutputController?.onAppInactive?.(() => stopAboutMeMusic());
+
+function screenAboutMe(idx) {
+  const wrap = document.createElement("div");
+  wrap.className = "settings-screen about-me-screen";
+  const active = State.screen === Screen.ABOUT_ME;
+  wrap.innerHTML = `
+    <div class="settings-page about-me-page">
+      <div class="settings-shell about-me-shell">
+        <div class="settings-header">
+          <button class="screen-title-pill no-zoom" type="button" data-about-back aria-label="Back to Settings">
+            ${SVG_BACK}
+          </button>
+          <h1 class="settings-heading">About Me</h1>
+          <div class="settings-header-spacer" aria-hidden="true"></div>
+        </div>
+        <section class="settings-card about-me-card">
+          <button class="about-me-video-button no-zoom" type="button" data-about-music
+            aria-label="${aboutMeAudio ? "Stop BibloZoo jingle" : "Play BibloZoo jingle"}"
+            aria-pressed="${aboutMeAudio !== null}">
+            <video class="about-me-video" ${active ? 'src="verse_images/andy_dancing.mp4" autoplay' : ""} muted loop playsinline disablepictureinpicture disableremoteplayback aria-hidden="true"></video>
+            <span class="about-me-music-hint">${aboutMeAudio ? "♫ Tap to stop music!" : "♫ Tap for music!"}</span>
+          </button>
+          <p>BibloZoo was created by Andy Doane, a family discipleship pastor in West Michigan. Andy is passionate about equipping moms and dads to disciple their children. You can find many free family Bible resources at the link below, including daily devotionals and weekly Bible talks.</p>
+          <button class="settings-action no-zoom" type="button" data-about-website>eatyourbible.com</button>
+        </section>
+      </div>
+    </div>`;
+  const back = wrap.querySelector("[data-about-back]");
+  back.onclick = () => { if (State.screen === Screen.ABOUT_ME) go(Screen.SETTINGS); };
+  const music = wrap.querySelector("[data-about-music]");
+  music.onclick = () => { if (music.isConnected) toggleAboutMeMusic(); };
+  const video = wrap.querySelector("video");
+  if (active) {
+    video.muted = true;
+    video.defaultMuted = true;
+  }
+  const website = wrap.querySelector("[data-about-website]");
+  website.onclick = () => {
+    if (!aboutMeAvailable() || State.screen !== Screen.ABOUT_ME ||
+        State.isSliding || !website.isConnected) return;
+    stopAboutMeMusic();
+    void runParentOutgoingAction(
+      () => window.open("https://eatyourbible.com", "_blank", "noopener,noreferrer"),
+      () => State.screen === Screen.ABOUT_ME && !State.isSliding && website.isConnected
+    );
+  };
   return makeSlide({ idx, bg: "var(--purple)", navHidden: true, inner: wrap });
 }
 
@@ -24598,6 +24712,7 @@ function render() {
     }
     if (screen === Screen.SETTINGS) slide = screenSettings(idx);
     if (screen === Screen.PRIVACY) slide = screenPrivacyPolicy(idx);
+    if (screen === Screen.ABOUT_ME) slide = screenAboutMe(idx);
     if (screen === Screen.TODO) slide = screenTodo(idx);
     if (screen === Screen.TODO_DEV) slide = screenTodoDev(idx);
     if (screen === Screen.NEW_VERSE_PICKER) slide = screenNewVersePicker(idx);
