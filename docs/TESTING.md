@@ -1,5 +1,9 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — owner closes About Me flash and three asset rights items (November 26, 2026 US Eastern)
+
+Merged [#255](https://github.com/andydoane/biblozoo/pull/255) at `682dd88ac43985a3ab0d65c168055ad9a9fa0043`; exact PR head `b8a95a798eaf158ac8b43e980f7e3cd61f2f978f` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45840383131) SUCCESS. Separate merge-head CI not independently verified. Owner reports latest PR did the trick: recurring About Me entry flash resolved, following earlier successful crop and restart fix. Scoped device acceptance only; no separate confirmation of every #252 offline, audio, background, parent-link and iPad case. No further visual change needed. Return to feature freeze.
+
 ## CURRENT — About Me crop accepted and avoid duplicate arrival render (November 26, 2026 US Eastern)
 
 Merged [#254](https://github.com/andydoane/biblozoo/pull/254) at `8e27d0e94644a46e77972a6749c0b001b51b78a4`; exact PR head `98bc95a6ffe24c043a5857a6f6a94ee5931661b0` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45838835394) SUCCESS. Merge-head CI not independently verified. Owner confirms two-pixel crop worked and reports a brief flash every time About Me opens before video starts. Source review: go() renders the incoming About Me slide and local autoplay video, then calls render() after the 340ms transition, which clears app.innerHTML and creates another video element. Existing arrived-menu preservation branch already avoids that exact pattern to prevent WebKit image repaint/redecode. Candidate includes About Me in that existing branch, removes only departing slide and updates navigation, leaving the incoming media connected. No extra preload, delay, opacity effect, global render change or media alteration. This eliminates the known duplicate construction; initial decoder/compositor flash remains possible, and exact visual cause is not proven until owner retest.
