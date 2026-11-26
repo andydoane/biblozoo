@@ -11666,14 +11666,14 @@ function go(nextScreen) {
         State.forceSlideForward = false;
 
         /*
-          Menu and picker screens are already fully
-          rendered in their arrived position.
+          Menu, picker and About Me screens are already
+          fully rendered in their arrived position.
 
           Keep that existing DOM instead of
           destroying and recreating it after the
           slide animation. Rebuilding these screens
           can make WebKit briefly repaint/redecode
-          their card images.
+          their card images or restart the About Me video.
         */
         const keepArrivedMenuScreen =
           nextScreen ===
@@ -11689,7 +11689,9 @@ function go(nextScreen) {
           nextScreen ===
             Screen.FLASHCARDS ||
           nextScreen ===
-            Screen.NEW_VERSE_PICKER;
+            Screen.NEW_VERSE_PICKER ||
+          nextScreen ===
+            Screen.ABOUT_ME;
 
         if (keepArrivedMenuScreen) {
           const outgoingSlide =
