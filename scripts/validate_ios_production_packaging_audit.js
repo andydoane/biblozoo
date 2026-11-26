@@ -36,6 +36,17 @@ try{
     assert.throws(()=>tool.inspectPublic(built,source),/Unexpected desktop metadata/);
     fs.unlinkSync(metadata);
   }
+  // Source-side release materials are allowed; their presence in public is not.
+  put(source,"docs/app_store_screenshots/iphone_screenshot_01.png","synthetic screenshot");
+  assert.deepEqual(tool.inspectPublic(built,source),good);
+  for(const rel of ["docs/app_store_screenshots/iphone_screenshot_01.png","DOCS/readme.md","utilities/app_store_screenshots/ipad_screenshot_01.png","APP_STORE_SCREENSHOTS/image.png"]){
+    put(built,rel,"synthetic screenshot");
+    assert.throws(()=>tool.inspectPublic(built,source),/Unexpected release documentation or screenshot backup/);
+    const dir=rel.startsWith("utilities/")?"utilities/app_store_screenshots":rel.split("/")[0];
+    fs.rmSync(path.join(built,dir),{recursive:true,force:true});
+    if(rel.startsWith("utilities/")&&fs.readdirSync(path.join(built,"utilities")).length===0)fs.rmdirSync(path.join(built,"utilities"));
+  }
+  assert.deepEqual(tool.inspectPublic(built,source),good);
   fs.rmSync(path.join(built,alias));
   assert.throws(()=>tool.inspectPublic(built,source),/Missing or empty packaged license display alias/);
   put(built,alias,"");
@@ -62,5 +73,5 @@ try{
   for(const manifest of tool.expectedSdkManifests)
     assert.throws(()=>tool.requireSdkManifests(tool.expectedSdkManifests.filter(x=>x!==manifest)),/SDK privacy manifest missing/);
   assert.deepEqual(tool.inspectPublic(built,source),good);
-  console.log("Production packaging audit PASS: synthetic inventory, exact notice bytes, duplicate/candidate reporting, missing/empty/modified notices, symlink refusal, SDK manifest presence.");
+  console.log("Production packaging audit PASS: synthetic inventory, exact notice bytes, duplicate/candidate reporting, missing/empty/modified notices, release-material and symlink refusal, SDK manifest presence.");
 }finally{fs.rmSync(tmp,{recursive:true,force:true});}
