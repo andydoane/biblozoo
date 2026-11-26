@@ -723,6 +723,9 @@ jobs:
       - name: Build production web bundle for Capacitor
         run: npm run build
 
+      - name: Validate About Me lifecycle and bundled local media
+        run: node scripts/validate_ios_about_me.js --dist
+
       - name: Audit production dist notices and payload inventory
         run: node scripts/audit_ios_production_packaging.js --dist
 
