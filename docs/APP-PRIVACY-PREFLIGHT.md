@@ -1,5 +1,11 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
+## CURRENT — focused device acceptance prepared after #248 (November 25, 2026 US Eastern)
+
+Merged [#248](https://github.com/andydoane/biblozoo/pull/248) at `83697169ca5e08fbb7e38c8b80c39a4e5738dc1c`; exact PR head CI [45754313779](https://github.com/andydoane/biblozoo/actions/runs/45754313779) SUCCESS. Compare owner-tested `d1c67a2c` to new base `bb088c0c240ceccb8b5b281c79a5ebb2378096dc` shows only documentation and 20 store artwork backup PNGs under docs. build.js fixed root/runtime allowlist and Xcode generated public folder reference exclude docs by design. Candidate read-only audit and synthetic checks guard against accidental inclusion of that docs/marketing directory; no runtime changes or newly verified device traffic. Public backups are not private; no independent visual/fictional-data clearance of repo copies.
+
+[Focused acceptance checklist](TESTING.md) specifies offline all-four Credits reads and fresh reopen, outgoing adult-check cancel without navigation, current in-app policy and optional scoped App Privacy Report. Reuse known existing #246-or-later ordinary installed build with unchanged runtime; otherwise normal same-ID workflow after merge/green CI. No repeating prior scoped device/network/backup tests, no intentional erase or install of synthetic age fixture. All new observations pending. Prior owner-approved provisional Data Not Collected and policy unchanged; do not infer full runtime/SDK/required-reason, Kids/legal or signed Apple validation. Age-assurance HOLD remains.
+
 ## CURRENT — fresh archive and targeted privacy delta review (November 25, 2026 US Eastern)
 
 Exact reviewed baseline `d1c67a2c5c9f0244686ae5a2e9f9dc8eb4ef7a88` (#247). Owner's fresh unsigned Release archive audit confirms `App.app` identity, Capacitor/Cordova manifests, tracking false, no tracking domains/collected types declared and app reasons 35F9.1 / 3B52.1. Production npm audit reports zero vulnerabilities (full install 7 advisories); see [packaging checkpoint](IOS-PRODUCTION-PACKAGING-AUDIT.md). This is declarations and packaging evidence, not network/binary certification.
