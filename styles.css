@@ -2972,7 +2972,16 @@ Settings Screen
   width: min(100%, 320px); border: 0; background: transparent; padding: 0;
   color: #66529e; font: inherit; cursor: pointer;
 }
-.about-me-video { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: clamp(18px, 5vw, 30px); pointer-events: none; }
+/* Clip 2 CSS px from each edge without changing the source or square footprint. */
+.about-me-video-crop {
+  display: block; position: relative; width: 100%; aspect-ratio: 1 / 1;
+  overflow: hidden; border-radius: clamp(18px, 5vw, 30px); pointer-events: none;
+}
+.about-me-video {
+  display: block; position: absolute; top: -2px; left: -2px;
+  width: calc(100% + 4px); height: calc(100% + 4px);
+  max-width: none; max-height: none; object-fit: cover; pointer-events: none;
+}
 .about-me-music-hint { font-size: clamp(14px, 3.5vw, 18px); font-weight: 800; }
 .about-me-video-button:focus-visible { outline: 3px solid #66529e; outline-offset: 4px; border-radius: 18px; }
 
