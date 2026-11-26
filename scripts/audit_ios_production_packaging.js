@@ -21,7 +21,6 @@ const expectedSdkManifests=[
 ];
 // Review only: names are leads, not proof of runtime reachability or disuse.
 const reviewPaths=new Set([
-  "verse_audio/biblozoo_jingle.mp3",
   "pet_images/pet_1_testverse_1_2_3.png",
   "verse_audio/testverse_1_1.mp3",
   "verse_audio/testverse_1_1_ref.mp3",

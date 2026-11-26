@@ -2962,6 +2962,20 @@ Settings Screen
   color: #ff5a51;
 }
 
+
+/* About Me — the same Settings shell/card and a bounded square avatar. */
+.about-me-shell { gap: clamp(16px, 4vw, 24px); }
+.about-me-card { display: flex; flex-direction: column; align-items: center; gap: clamp(14px, 4vw, 24px); }
+.about-me-card p { margin: 0; font-size: clamp(16px, 4vw, 21px); line-height: 1.45; font-weight: 600; }
+.about-me-video-button {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: min(100%, 320px); border: 0; background: transparent; padding: 0;
+  color: #66529e; font: inherit; cursor: pointer;
+}
+.about-me-video { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: clamp(18px, 5vw, 30px); pointer-events: none; }
+.about-me-music-hint { font-size: clamp(14px, 3.5vw, 18px); font-weight: 800; }
+.about-me-video-button:focus-visible { outline: 3px solid #66529e; outline-offset: 4px; border-radius: 18px; }
+
 .privacy-policy-shell {
   gap: clamp(16px, 4vw, 24px);
 }

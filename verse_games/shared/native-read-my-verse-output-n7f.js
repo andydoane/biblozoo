@@ -28,6 +28,7 @@
     {name:"NotAllowedError"});
   function clipIdFor(src) {
     if (typeof src !== "string") return "";
+    if (src === "./verse_audio/biblozoo_jingle.mp3") return "about-me-jingle";
     const verse = /^\.\/verse_audio\/([a-z0-9_-]{1,80})\.mp3$/.exec(src);
     if (verse) return "verse:" + verse[1];
     const fixed = Object.freeze({
