@@ -1,5 +1,21 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
+## CURRENT — focused iPhone release acceptance (November 25, 2026 US Eastern)
+
+Baseline after #248 and owner screenshot backup: `bb088c0c240ceccb8b5b281c79a5ebb2378096dc`. No runtime changes relative to `d1c67a2c`, owner archive accepted; candidate changes only read-only packaging audit/tests and docs. These device observations are needed to close existing open Credits/privacy checks, **not** to test a new runtime feature. Owner reviews/merges after green CI; no premerge device test required.
+
+Use existing ordinary native BibloZoo iPhone installation if known to include #246 Credits fix (and no intervening runtime changes); otherwise after merge and green Actions use normal pull/build/sync/open workflow below, same identity and existing signing. Record device/iOS and build SHA if known. No reinstall, erase, repeat backup, permission resets, live or fixture age flags. Existing family v3 round-trip evidence remains accepted for its scope; don't repeat it.
+
+| Focused check | Procedure and expected observation |
+| --- | --- |
+| Fresh offline Credits | Close Credits if open. Enable airplane mode and separately verify Wi-Fi is off. In Settings → Credits expand Font licenses, Software notices, SoundTouchJS license and SoundTouchJS source information one at a time. All four show readable nonblank text, no raw HTML or load error. Scroll if needed; do not follow any external link. |
+| Reopen offline | Collapse/reopen the four sections, tap OK, then reopen Credits and expand again while still offline. Text should load in the new dialog, not just a previously opened section. Restore connectivity afterward. |
+| Outgoing link cancel | Tap SoundTouchJS project link in Credits with network restored. Grown-up Check should appear; choose Not Now (or cancel) without solving. No browser/webview navigation or external app opens; Credits/Settings remains usable. No need to approve the external link to prove cancel. |
+| In-app policy | Settings → Privacy Policy: confirm the displayed date, local profiles, optional recording, Ghost Writer Photos/Files, Internet use, backups/deletion and contact match the already approved [published policy](https://andydoane.github.io/biblozoo/app-store-privacy.html). Do not change wording based solely on this test. |
+| Optional scoped report | If App Privacy Report is already enabled, note whether any BibloZoo network/website entries appear during these checks; do not clear the existing report. Note observation period and whether entries could predate this test. No reported activity is not proof of zero traffic; canceled link must not initiate navigation. No screenshots of private data or unrelated app activity required. |
+
+Reply with PASS/FAIL/NOT TESTED per row and any unexpected behavior; don't infer a pass for unreported sections. No new broad gameplay, permissions/restore, or accessibility matrix required for this specific PR. Later final Release-device checks and signed upload remain distinct.
+
 ## CURRENT — owner iPhone workflow and Credits correction acceptance (November 24, 2026)
 
 Merged [#246](https://github.com/andydoane/biblozoo/pull/246) at `e7aeed78d171e3091fcf229df48c4a8b95c3400d`; candidate `7434680e73b6a1b72347cab1897c936cfcba1c2a`. [PR CI](https://github.com/andydoane/biblozoo/actions/runs/45478982444) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/45479681894) passed, including release polish and exact alias packaging checks. [Owner acceptance](https://github.com/andydoane/biblozoo/pull/246#issuecomment-7143548255): owner reports Credits look good after testing the correction; scoped visual/license-display acceptance. No local command log or individual section, offline, outgoing-link or exact fresh unsigned Release archive results supplied; do not treat these as passed. Ordinary real-iPhone testing preferred; saves are disposable test data. Preserve identity and data by default; no intentional erase/uninstall. No release authorization, rights clearance, iPad orientation resolution, privacy certification or age-assurance activation. Current docs-only checkpoint records owner workflow; see [testing](TESTING.md) and [packaging audit](IOS-PRODUCTION-PACKAGING-AUDIT.md).
