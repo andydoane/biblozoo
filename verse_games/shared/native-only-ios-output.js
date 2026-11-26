@@ -54,6 +54,14 @@
   hideWebAudioConstructor("AudioContext");
   hideWebAudioConstructor("webkitAudioContext");
 
+  // defaultMuted reflects the muted HTML attribute. Even setting it to
+  // true again can enqueue a MutationObserver record. Only repair actual
+  // differences so our own observer cannot schedule itself indefinitely.
+  function ensureVideoMuted(element) {
+    if (element.defaultMuted !== true) element.defaultMuted = true;
+    if (element.muted !== true) element.muted = true;
+  }
+
   // HTML audio/HTMLMedia playback cannot be a fallback when native is
   // unavailable. A rejected play() is deliberate: do NOT invent playback
   // progress or success for owner recovery/narration/recording controllers.
@@ -70,7 +78,7 @@
         value: function nativeOnlyMediaPlay() {
           // Visual videos may continue, but never with HTML/WebKit sound.
           if (typeof videoCtor === "function" && this instanceof videoCtor) {
-            try { this.muted = true; this.defaultMuted = true; } catch (_) { }
+            try { ensureVideoMuted(this); } catch (_) { }
             mutedVideoPlays += 1;
             return originalPlay.apply(this, arguments);
           }
@@ -100,7 +108,7 @@
       }
       try { element.pause(); } catch (_) { }
     } else if (element.tagName === "VIDEO") {
-      try { element.muted = true; element.defaultMuted = true; }
+      try { ensureVideoMuted(element); }
       catch (_) { /* best effort */ }
     }
   }
