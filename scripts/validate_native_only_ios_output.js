@@ -19,6 +19,19 @@ function environment(kind) {
   let onDOMReady;
   let observer;
   let stopped = false;
+  const pendingMutations = [];
+  let observed = false;
+  function queueAttribute(target, attributeName) {
+    if (observed) pendingMutations.push({type:"attributes",target,attributeName});
+  }
+  function flushMutations() {
+    let deliveries = 0;
+    while (pendingMutations.length) {
+      if (++deliveries > 12) throw new Error("Non-converging reflected media attribute mutations");
+      observer.callback(pendingMutations.splice(0));
+    }
+    return deliveries;
+  }
 
   class Media {
     constructor(tagName = "AUDIO") {
@@ -26,14 +39,26 @@ function environment(kind) {
       this.tagName = tagName;
       this.autoplay = false;
       this.muted = false;
-      this.defaultMuted = false;
       this.pauses = 0;
       this.attributes = new Set();
     }
     play() { originalPlays += 1; return Promise.resolve("html-played"); }
     pause() { this.pauses += 1; }
     hasAttribute(name) { return this.attributes.has(name); }
-    removeAttribute(name) { this.attributes.delete(name); }
+    // Model reflected HTML boolean attributes: setting an already present
+    // attribute can queue another mutation record, even with the same value.
+    get defaultMuted() { return this.attributes.has("muted"); }
+    set defaultMuted(value) {
+      if (value) {
+        this.attributes.add("muted");
+        queueAttribute(this,"muted");
+      } else {
+        this.removeAttribute("muted");
+      }
+    }
+    removeAttribute(name) {
+      if (this.attributes.delete(name)) queueAttribute(this,name);
+    }
   }
   class Video extends Media {
     constructor() { super("VIDEO"); }
@@ -71,7 +96,7 @@ function environment(kind) {
     MediaRecorder: mediaRecorder,
     MutationObserver: class MutationObserver {
       constructor(cb) { this.callback = cb; observer = this; }
-      observe(target, options) { this.target = target; this.options = options; }
+      observe(target, options) { this.target = target; this.options = options; observed = true; }
     },
     stop() { stopped = true; }
   };
@@ -81,6 +106,7 @@ function environment(kind) {
     mediaRecorder, scriptedAudio, scriptedVideo, document, html,
     domReady: () => onDOMReady?.(),
     observer: () => observer,
+    flushMutations,
     originalPlays: () => originalPlays,
     videoPlays: () => videoPlays,
     stopped: () => stopped
@@ -144,6 +170,32 @@ async function main() {
     assert.equal(inserted.autoplay, false);
     assert.equal(inserted.attributes.has("autoplay"), false);
     assert.equal(e.observer().options.subtree, true);
+
+    // About Me inserts an already-muted autoplay video, then a render can
+    // insert a fresh element. Neither insertion nor a repair may churn.
+    e.flushMutations();
+    const insertedMutedVideo = new e.Video();
+    insertedMutedVideo.defaultMuted = true;
+    insertedMutedVideo.muted = true;
+    insertedMutedVideo.autoplay = true;
+    e.flushMutations();
+    e.observer().callback([{type:"childList",addedNodes:[insertedMutedVideo]}]);
+    assert.equal(e.flushMutations(), 0, "already muted insertion must not write attributes");
+    assert.equal(await insertedMutedVideo.play(), "html-played");
+    assert.equal(e.flushMutations(), 0, "already muted play must not write attributes");
+    assert.equal(insertedMutedVideo.autoplay, true, "keep visual autoplay");
+    const freshVideo = new e.Video();
+    e.observer().callback([{type:"childList",addedNodes:[freshVideo]}]);
+    assert.equal(e.flushMutations(), 1, "new video repair must converge after one reflected write");
+    assert.equal(freshVideo.defaultMuted, true);
+    assert.equal(freshVideo.muted, true);
+    freshVideo.muted = false;
+    freshVideo.removeAttribute("muted");
+    assert.equal(e.flushMutations(), 2, "external unmute attribute repair must converge");
+    assert.equal(freshVideo.defaultMuted, true);
+    assert.equal(freshVideo.muted, true);
+    assert.equal(e.flushMutations(), 0);
+
   }
 
   // Confirm a guarded built entrypoint exists for EVERY shipped HTML page.
