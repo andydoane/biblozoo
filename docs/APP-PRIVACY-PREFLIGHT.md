@@ -1,5 +1,11 @@
 # BibloZoo 1.0 — First-party Privacy Policy and App Privacy Preflight
 
+## CURRENT — owner focused Credits/privacy device acceptance PASS (November 26, 2026 US Eastern)
+
+Merged [#249](https://github.com/andydoane/biblozoo/pull/249) at `9a16a989c88c0f11f4ded9e1c24414f1e1da3f9d`; exact PR head `6c6e143e883c7d6fc95eb24619de4695e8af3ac3` [Actions #45755663854](https://github.com/andydoane/biblozoo/actions/runs/45755663854) SUCCESS. No separate merge-head CI independently verified. Owner reports **all seven requested checks passed**: airplane mode with Wi-Fi off, Settings → Credits, all four bundled notice sections readable, close/reopen offline, restore connectivity, cancel SoundTouchJS outgoing Grown-up Check with no browser launch, and Settings → Privacy Policy displays correctly. Scope is owner-reported routine iPhone runtime acceptance; exact installed build SHA/device OS and optional App Privacy Report were not separately supplied. No new traffic capture or full text comparison claimed. This closes the specified notice usability/offline/cancel and policy display checks, not license grants or exhaustive runtime/SDK/signed validation. Prior provisional Data Not Collected and approved privacy wording remain unchanged.
+
+The optional App Privacy Report was not among the seven required checks; no fresh network observation is inferred. Remaining final signed SDK/required-reason validation, scoped release-device permission/recovery and legal review remain open. See [handoff](PROJECT-HANDOFF.md).
+
 ## CURRENT — focused device acceptance prepared after #248 (November 25, 2026 US Eastern)
 
 Merged [#248](https://github.com/andydoane/biblozoo/pull/248) at `83697169ca5e08fbb7e38c8b80c39a4e5738dc1c`; exact PR head CI [45754313779](https://github.com/andydoane/biblozoo/actions/runs/45754313779) SUCCESS. Compare owner-tested `d1c67a2c` to new base `bb088c0c240ceccb8b5b281c79a5ebb2378096dc` shows only documentation and 20 store artwork backup PNGs under docs. build.js fixed root/runtime allowlist and Xcode generated public folder reference exclude docs by design. Candidate read-only audit and synthetic checks guard against accidental inclusion of that docs/marketing directory; no runtime changes or newly verified device traffic. Public backups are not private; no independent visual/fictional-data clearance of repo copies.
