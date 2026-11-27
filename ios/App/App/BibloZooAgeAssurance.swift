@@ -15,6 +15,15 @@ import Foundation
 #error("BibloZoo fixture and live age assurance modes are mutually exclusive.")
 #endif
 
+// Sandbox requests real Apple APIs using a separate development-signed
+// identity; never use this flag in a simulator, Release, or another mode.
+#if BIBLOZOO_AGE_ASSURANCE_SANDBOX && (!DEBUG || targetEnvironment(simulator) || !os(iOS))
+#error("BibloZoo age sandbox is restricted to iOS Debug physical-device builds.")
+#endif
+#if BIBLOZOO_AGE_ASSURANCE_SANDBOX && (BIBLOZOO_AGE_ASSURANCE_LIVE || BIBLOZOO_AGE_ASSURANCE_FIXTURE)
+#error("BibloZoo age sandbox is mutually exclusive with live and fixture modes.")
+#endif
+
 enum BibloZooAgeRangeOutcome: Equatable {
     case minor
     case confirmedAdult
@@ -292,14 +301,17 @@ struct BibloZooAgeStartupAttempt {
     private(set) var attempted = false
 
     mutating func begin(bundleID: String?, liveEnabled: Bool,
-                        activePresenter: Bool, fixtureEnabled: Bool = false) -> Bool {
-        let liveIdentity = liveEnabled && !fixtureEnabled && bundleID == "com.andydoane.biblozoo"
+                        activePresenter: Bool, fixtureEnabled: Bool = false,
+                        sandboxEnabled: Bool = false) -> Bool {
+        let liveIdentity = liveEnabled && !fixtureEnabled && !sandboxEnabled && bundleID == "com.andydoane.biblozoo"
         #if DEBUG
-        let fixtureIdentity = fixtureEnabled && !liveEnabled && bundleID == "com.andydoane.biblozoo.agefixture"
+        let fixtureIdentity = fixtureEnabled && !liveEnabled && !sandboxEnabled && bundleID == "com.andydoane.biblozoo.agefixture"
+        let sandboxIdentity = sandboxEnabled && !liveEnabled && !fixtureEnabled && bundleID == "com.andydoane.biblozoo.agesandbox"
         #else
         let fixtureIdentity = false
+        let sandboxIdentity = false
         #endif
-        guard !attempted, activePresenter, liveIdentity || fixtureIdentity else { return false }
+        guard !attempted, activePresenter, liveIdentity || fixtureIdentity || sandboxIdentity else { return false }
         attempted = true
         return true
     }
@@ -571,7 +583,8 @@ final class BibloZooAgeStartupCoordinator {
     private var fixtureAttempts = 0
     #endif
 
-    // Real API adapters retain the strict live-only guard.
+    // Real API adapters retain the strict production live-only guard; the
+    // separately compiled sandbox permits real API evidence on its own ID.
     static var useNativeGate: Bool {
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_LIVE
         return Bundle.main.bundleIdentifier == "com.andydoane.biblozoo"
@@ -588,7 +601,15 @@ final class BibloZooAgeStartupCoordinator {
         #endif
     }
 
-    static var useStagedGate: Bool { useNativeGate || useFixtureGate }
+    static var useSandboxGate: Bool {
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        return Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.agesandbox"
+        #else
+        return false
+        #endif
+    }
+
+    static var useStagedGate: Bool { useNativeGate || useFixtureGate || useSandboxGate }
 
     private func presenterReady(_ scene: UIScene, _ presenter: BibloZooAgeGateViewController) -> Bool {
         scene.activationState == .foregroundActive
@@ -632,7 +653,8 @@ final class BibloZooAgeStartupCoordinator {
                     guard self.attempt.begin(bundleID: Bundle.main.bundleIdentifier,
                                              liveEnabled: Self.useNativeGate,
                                              activePresenter: self.presenterReady(scene, presenter),
-                                             fixtureEnabled: Self.useFixtureGate),
+                                             fixtureEnabled: Self.useFixtureGate,
+                                             sandboxEnabled: Self.useSandboxGate),
                           let ticket = self.epoch.begin() else {
                         self.attempt.requireExplicitRetry()
                         self.task = nil
@@ -663,7 +685,7 @@ final class BibloZooAgeStartupCoordinator {
         guard !Task.isCancelled else { return .holdUnavailable }
         return fixture.decision(at: attemptNumber)
         #else
-        guard Self.useNativeGate else { return .holdUnavailable }
+        guard Self.useNativeGate || Self.useSandboxGate else { return .holdUnavailable }
         // 1.0 has not previously shipped on the App Store. Do not assume
         // later versions are first release or invent a significant update.
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -731,6 +753,17 @@ final class BibloZooAgeGateViewController: UIViewController {
         if BibloZooAgeStartupCoordinator.useFixtureGate {
             let banner = UILabel()
             banner.text = "SIMULATOR TEST — FAKE CONSENT"
+            banner.font = .preferredFont(forTextStyle: .headline)
+            banner.adjustsFontForContentSizeCategory = true
+            banner.textAlignment = .center
+            banner.numberOfLines = 0
+            stack.insertArrangedSubview(banner, at: 0)
+        }
+        #endif
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        if BibloZooAgeStartupCoordinator.useSandboxGate {
+            let banner = UILabel()
+            banner.text = "DEVICE TEST — AGE ASSURANCE SANDBOX"
             banner.font = .preferredFont(forTextStyle: .headline)
             banner.adjustsFontForContentSizeCategory = true
             banner.textAlignment = .center
