@@ -1,5 +1,15 @@
 # BibloZoo — isolated development-signed Apple age-assurance sandbox
 
+## H — isolated significant-update response experiment (candidate, November 27, 2026)
+
+Only after green PR and merge CI: clean pull, build/sync, run synthetic suite (199 Debug assertions expected). Repeat separate development-signed sandbox build from stage C with fresh temporary DerivedData and command-line `MARKETING_VERSION=1.1` in addition to the existing exact sandbox ID, sandbox entitlement and Debug flag. No tracked version change, no App Store update. Verify signed app, profile, exact sandbox ID, version 1.1 and entitlements before installing. Use only the existing disposable Sandbox Apple Account; confirm it is active and select the intended scenario before launch. Never test with real family account or actual production app. If Apple requests another entitlement, account or service, stop.
+
+Use exact sandbox process and explicit argument after bundle identifier (check devicectl launch --help if necessary):
+```bash
+xcrun devicectl device process launch --device "$sandbox_device" --terminate-existing --console com.andydoane.biblozoo.agesandbox --biblozoo-test-significant-update
+```
+Report only tagged lines and visible system prompt/hold behavior. Do not restart or change scenario while awaiting a response; if no result after about 60 seconds, record pending/unknown and stop console; no automatic retry. Relaunch per case with correct Settings selection. Test under 13 approved first, then 13–15 approved, 16–17 declined, adult confirmed change applicable (acknowledge system prompt if shown), adult confirmed change not applicable (no request), unconfirmed adult (no request). Expected parental route for minor update flags, approved/denied from matching PermissionKit response only; adult acknowledgment only for applicable flag. Unknown, cancelled, unexpected/default-denial mismatch or unavailable remains non-authorizing. The experiment deliberately blocks content even for adult approval or noPrompt. Minor approval cannot resolve initial consent. No actual update or revocation, no real permission to use app proved. Version 1.0 and ordinary launch behavior unchanged; after tests revert to previous 1.0 sandbox build if further first-release testing needed. Pending UI is test-only; branded native redesign deferred until update/revocation evidence. No server or iCloud, no Release activation.
+
 ## G — signed diagnostic and reliability acceptance (November 27, 2026)
 
 Baseline [#258](https://github.com/andydoane/biblozoo/pull/258), merge `904db90179d58ad08372ebfb6beef1d651beb482`; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46022964296) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46023289616) SUCCESS. Owner reports fresh web build/sync, 186 assertions, signed sandbox build, signature and matching sandbox profile/entitlements verified, clean Git status, and tagged console output on iPhone 15 Plus / iOS 27.0.1. All listed assessments had regulatory=needsCheck, unknown=false, request attempted/completed and policy decision applied.

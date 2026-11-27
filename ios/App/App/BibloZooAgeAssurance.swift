@@ -144,6 +144,26 @@ struct BibloZooSignificantUpdate: Equatable {
     }
 }
 
+// Pure authorization predicate for the one-off device experiment. No API or
+// persistence here. The actual caller additionally has a physical Debug fence.
+enum BibloZooUpdateSandboxPlan {
+    static let argument = "--biblozoo-test-significant-update"
+    static func permits(sandbox: Bool, bundleID: String?, version: String?,
+                        arguments: [String]) -> Bool {
+        sandbox && bundleID == "com.andydoane.biblozoo.agesandbox"
+            && version == "1.1" && arguments.contains(argument)
+    }
+
+    // An experiment never opens the WebView, including after approval.
+    // Unknown initial minor consent remains unknown.
+    static func barrier(_ assessment: BibloZooAgeAssessment,
+                        result: BibloZooUpdateState) -> BibloZooAgeAccessDecision {
+        let policy = BibloZooAgeAccessDecision.evaluate(
+            assessment, initialConsent: .unknown, update: result)
+        return policy == .allowChildSafe ? .holdUpdate : policy
+    }
+}
+
 enum BibloZooUpdateRoute: Equatable {
     case noPrompt
     case needsAge
@@ -409,6 +429,23 @@ private enum BibloZooAgeSandboxTrace {
         print("[BibloZooAgeSandbox] applied=\(decision)")
     }
 
+    static func updateRoute(_ route: BibloZooUpdateRoute) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] updateRoute=\(route)")
+    }
+
+    enum UpdateEvent: String {
+        case started, pending, finished, repeated, invalidVersion
+    }
+    static func updateEvent(_ event: UpdateEvent) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] updateEvent=\(event.rawValue)")
+    }
+    static func updateResult(_ result: BibloZooUpdateState) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] updateResult=\(result)")
+    }
+
     static func discarded() {
         guard enabled else { return }
         print("[BibloZooAgeSandbox] discarded=true")
@@ -563,18 +600,31 @@ enum BibloZooAppRatingService {
 }
 #endif
 
-// Staged system adapter for real significant updates only. Version 1.0 has
-// no pending change. These methods deliberately have no launch caller yet:
-// account-scoped durable approval/recovery and initial consent remain open.
+// Staged system adapter for real significant updates and the explicit 1.1
+// device sandbox experiment only. No production launch caller; account-scoped
+// durable approval/recovery and initial consent remain open.
 @MainActor
 final class BibloZooSignificantUpdateService {
     private var busy = false
+
+    private var permitted: Bool {
+        if BibloZooAgeStartupCoordinator.useNativeGate { return true }
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        return BibloZooUpdateSandboxPlan.permits(
+            sandbox: BibloZooAgeStartupCoordinator.useSandboxGate,
+            bundleID: Bundle.main.bundleIdentifier,
+            version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            arguments: ProcessInfo.processInfo.arguments)
+        #else
+        return false
+        #endif
+    }
 
     func acknowledgeAdult(_ change: BibloZooSignificantUpdate,
                           assessment: BibloZooAgeAssessment,
                           in scene: UIWindowScene) async -> BibloZooUpdateState {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        guard !busy, BibloZooAgeStartupCoordinator.useNativeGate,
+        guard !busy, permitted,
               BibloZooUpdateRoute.resolve(assessment, pending: change,
                                          installedVersion: version) == .adultAcknowledgment,
               scene.activationState == .foregroundActive, !Task.isCancelled,
@@ -601,7 +651,7 @@ final class BibloZooSignificantUpdateService {
                                in presenter: UIViewController,
                                onPending: @escaping () -> Void) async -> BibloZooUpdateState {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        guard !busy, BibloZooAgeStartupCoordinator.useNativeGate,
+        guard !busy, permitted,
               BibloZooUpdateRoute.resolve(assessment, pending: change,
                                          installedVersion: version) == .parentalPermission,
               presenter.viewIfLoaded?.window?.windowScene?.activationState == .foregroundActive,
@@ -652,6 +702,10 @@ final class BibloZooAgeStartupCoordinator {
     private var epoch = BibloZooAgeForegroundEpoch()
     private let service = BibloZooAgeAssurance()
     private var task: Task<Void, Never>?
+    #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+    private let sandboxUpdateService = BibloZooSignificantUpdateService()
+    private var sandboxUpdateStarted = false
+    #endif
     #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
     private var fixtureAttempts = 0
     #endif
@@ -764,6 +818,11 @@ final class BibloZooAgeStartupCoordinator {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
         let update: BibloZooUpdateState = version == "1.0" ? .firstReleaseNoPending : .unknown
         let assessment = await service.check(in: presenter)
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        if Self.useSandboxGate && ProcessInfo.processInfo.arguments.contains(BibloZooUpdateSandboxPlan.argument) {
+            return await evaluateSandboxUpdate(assessment, version: version, in: presenter)
+        }
+        #endif
         // No native proof of initial minor consent has yet been wired.
         let decision = BibloZooAgeAccessDecision.evaluate(
             assessment, initialConsent: .unknown, update: update)
@@ -773,6 +832,59 @@ final class BibloZooAgeStartupCoordinator {
         return decision
         #endif
     }
+
+    #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+    // Never allow child content during this experiment. No auto-resend, no
+    // durable grants, no simulated consent. Explicit launch argument + actual
+    // separate 1.1 sandbox bundle required; never a 1.0 update.
+    private func evaluateSandboxUpdate(_ assessment: BibloZooAgeAssessment,
+                                       version: String?,
+                                       in presenter: BibloZooAgeGateViewController) async -> BibloZooAgeAccessDecision {
+        guard BibloZooUpdateSandboxPlan.permits(
+            sandbox: Self.useSandboxGate, bundleID: Bundle.main.bundleIdentifier,
+            version: version, arguments: ProcessInfo.processInfo.arguments) else {
+            BibloZooAgeSandboxTrace.updateEvent(.invalidVersion)
+            return .holdUnavailable
+        }
+        guard !sandboxUpdateStarted else {
+            BibloZooAgeSandboxTrace.updateEvent(.repeated)
+            return .holdUpdate
+        }
+        guard !Task.isCancelled else { return .holdUnavailable }
+        sandboxUpdateStarted = true
+        let change = BibloZooSignificantUpdate(version: "1.1",
+            description: "BibloZoo sandbox test only: simulated future significant app update. No actual app change or initial consent request.")
+        let route = BibloZooUpdateRoute.resolve(assessment, pending: change, installedVersion: version)
+        BibloZooAgeSandboxTrace.updateRoute(route)
+        BibloZooAgeSandboxTrace.updateEvent(.started)
+        let result: BibloZooUpdateState
+        switch route {
+        case .adultAcknowledgment:
+            if let scene = presenter.viewIfLoaded?.window?.windowScene {
+                result = await sandboxUpdateService.acknowledgeAdult(change, assessment: assessment, in: scene)
+            } else { result = .unknown }
+        case .parentalPermission:
+            #if canImport(PermissionKit)
+            result = await sandboxUpdateService.requestParentalUpdate(change, assessment: assessment, in: presenter) {
+                guard !Task.isCancelled else { return }
+                BibloZooAgeSandboxTrace.updateEvent(.pending)
+                presenter.showSandboxUpdatePending()
+            }
+            #else
+            result = .unknown
+            #endif
+        case .noPrompt:
+            result = .verifiedNoPending
+        case .needsAge, .unavailable:
+            result = .unknown
+        }
+        BibloZooAgeSandboxTrace.updateResult(result)
+        BibloZooAgeSandboxTrace.updateEvent(.finished)
+        let decision = BibloZooUpdateSandboxPlan.barrier(assessment, result: result)
+        BibloZooAgeSandboxTrace.evaluated(assessment.outcome, decision: decision)
+        return decision
+    }
+    #endif
 
     private func finish(_ ticket: UUID, decision: BibloZooAgeAccessDecision,
                         foreground: Bool, cancelled: Bool,
@@ -880,6 +992,15 @@ final class BibloZooAgeGateViewController: UIViewController {
         message.text = "Checking App Store requirements…"
         retryButton.isHidden = true
     }
+
+    #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+    func showSandboxUpdatePending() {
+        guard BibloZooAgeStartupCoordinator.useSandboxGate else { return }
+        loadViewIfNeeded()
+        message.text = "Waiting for sandbox update response…"
+        retryButton.isHidden = true
+    }
+    #endif
 
     func showHold(_ decision: BibloZooAgeAccessDecision) {
         loadViewIfNeeded()

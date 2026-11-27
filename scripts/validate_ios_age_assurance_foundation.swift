@@ -200,6 +200,23 @@ struct BibloZooAgeAssuranceTests {
                                 initialConsent: .unknown, update: .approved) == .holdInitialConsent)
         print("PASS: 7 synthetic significant-update response assertions")
 
+        let argument = BibloZooUpdateSandboxPlan.argument
+        typealias P = BibloZooUpdateSandboxPlan
+        precondition(P.permits(sandbox: true, bundleID: sandboxID, version: "1.1", arguments: [argument]))
+        precondition(!P.permits(sandbox: false, bundleID: sandboxID, version: "1.1", arguments: [argument]))
+        precondition(!P.permits(sandbox: true, bundleID: prod, version: "1.1", arguments: [argument]))
+        precondition(!P.permits(sandbox: true, bundleID: sandboxID, version: "1.0", arguments: [argument]))
+        precondition(!P.permits(sandbox: true, bundleID: sandboxID, version: "1.2", arguments: [argument]))
+        precondition(!P.permits(sandbox: true, bundleID: sandboxID, version: nil, arguments: [argument]))
+        precondition(!P.permits(sandbox: true, bundleID: sandboxID, version: "1.1", arguments: []))
+        precondition(P.barrier(A(.minor, minorUpdateConsent: true), result: .approved) == .holdInitialConsent)
+        precondition(P.barrier(A(.minor, minorUpdateConsent: true), result: .denied) == .holdDenied)
+        precondition(P.barrier(A(.confirmedAdult, adultUpdateNotice: true), result: .approved) == .holdUpdate)
+        precondition(P.barrier(A(.confirmedAdult), result: .verifiedNoPending) == .holdUpdate)
+        precondition(P.barrier(A(.adultNotConfirmed), result: .unknown) == .holdAgeVerification)
+        precondition(P.barrier(A(.unavailable), result: .unknown) == .holdUnavailable)
+        print("PASS: 13 synthetic sandbox update isolation assertions")
+
         // Only freshly completed foreground checks can authorize the scene.
         var epoch = BibloZooAgeForegroundEpoch()
         let firstTicket = epoch.begin()!
