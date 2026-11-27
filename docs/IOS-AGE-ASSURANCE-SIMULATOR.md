@@ -1,5 +1,19 @@
 # BibloZoo — isolated synthetic age-assurance simulator testing
 
+## Post-#266 iPad visual acceptance (November 27, 2026)
+
+Merged [#266](https://github.com/andydoane/biblozoo/pull/266) at `eedf0eae0618e47bd0331dddec118df3d9d48e34`; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46070282895) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46070624282) SUCCESS. Owner screenshot confirms enlarged portrait minor-unknown fixture on iPad Pro 11-inch (M5), iOS 26.5; owner accepted proportions. Larger Text worked by owner report. All five additional fixture screens performed as expected by owner report:
+
+| Fixture | Expected heading / behavior | Result |
+| --- | --- | --- |
+| declined | A Grown-up Can Help! — age-sharing | PASS |
+| denied | Permission Isn't Available | PASS |
+| update-pending | App Update Permission | PASS |
+| unavailable | Let's Try Again | PASS |
+| unsupported | This Device Needs Help — no retry | PASS |
+
+Final simulator checks reported PASS: same standard purple in light/dark appearances and images stable during retry. A prior shell glob error from accidentally copied placeholder text was resolved by giving literal commands; no app defect indicated. Portrait only per owner; physical iPad unavailable. No real consent, Apple account, full gameplay, production audio or unsupported OS acceptance inferred from synthetic fixture. iPad narrow-window testing and real-device acceptance remain open if needed. Earlier signed iPhone Baloo 2/size stability/Larger Text/VoiceOver evidence documented in signed sandbox runbook; #266 post-change physical iPhone color smoke not supplied. Documentation-only checkpoint; Release HOLD.
+
 ## CURRENT — iPad portrait scaling and consistent purple (November 27, 2026 US Eastern)
 
 Merged [#265](https://github.com/andydoane/biblozoo/pull/265) at `931347d60e925f95950b7bcd1f814569ea5a8de0`; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46063134299) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46063486586) SUCCESS. Owner reports signed 1.1 sandbox compile succeeded, valid signature/exact ID and version, signed age entitlement and get-task-allow true, bundled Baloo2.ttf and both PNGs present, separate sandbox installed/launched. Owner confirms actual Baloo 2 appearance and images no longer change size during retries. Nine completed minor holdInitialConsent traces across three launches, no allow shown; Control+C terminations expected. Position not separately measured. Owner confirms darker purple appearance worked, max Larger Text screenshot showed readable wrapping, image proportions and scrolling to retry, VoiceOver passed by owner report (specific announcements not supplied). Owner elected standard BibloZoo purple in both system appearances to match existing app. iPad Pro 11-inch (M5) iOS 26.5 simulator fixture build/install and minor-unknown portrait screenshot showed correct branding and layout but content too small. Owner confirms portrait-only app; no landscape acceptance requested; physical iPad unavailable. No actual child permission established.
