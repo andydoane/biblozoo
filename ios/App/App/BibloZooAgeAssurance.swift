@@ -965,7 +965,7 @@ final class BibloZooAgeGateViewController: UIViewController {
             // bold/semibold outlines, clamping CSS weight 900 to its maximum.
             let value = weight == .heavy ? 800 : weight == .bold ? 800 : 650
             let axis = NSNumber(value: UInt32(0x77676874)) // 'wght'
-            let key = UIFontDescriptor.Attribute(rawValue: kCTFontVariationAttribute as String)
+            let key = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
             let descriptor = regular.fontDescriptor.addingAttributes([
                 key: [axis: NSNumber(value: value)]
             ])
