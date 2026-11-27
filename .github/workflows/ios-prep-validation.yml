@@ -184,6 +184,11 @@ jobs:
           expect_failure 'error: BibloZoo age fixtures are restricted to iOS Debug simulator builds.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_FIXTURE
           expect_failure 'error: BibloZoo fixture and live age assurance modes are mutually exclusive.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_FIXTURE -D BIBLOZOO_AGE_ASSURANCE_LIVE
 
+          expect_failure 'error: BibloZoo age sandbox is restricted to iOS Debug physical-device builds.' -D BIBLOZOO_AGE_ASSURANCE_SANDBOX
+          expect_failure 'error: BibloZoo age sandbox is restricted to iOS Debug physical-device builds.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_SANDBOX
+          expect_failure 'error: BibloZoo age sandbox is mutually exclusive with live and fixture modes.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_SANDBOX -D BIBLOZOO_AGE_ASSURANCE_LIVE
+          expect_failure 'error: BibloZoo age sandbox is mutually exclusive with live and fixture modes.' -D DEBUG -D BIBLOZOO_AGE_ASSURANCE_SANDBOX -D BIBLOZOO_AGE_ASSURANCE_FIXTURE
+
       # Welcome Back presentation only: measure full-size name against button
       # width and swap playful busy copy into fixed slot without layout jumps.
       # Recreation only: real Let's go! recovery must run FIRST and succeed,
