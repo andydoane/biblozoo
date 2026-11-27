@@ -388,6 +388,7 @@ enum BibloZooAgeFixture: String, CaseIterable {
 
 #if os(iOS) && canImport(DeclaredAgeRange)
 import UIKit
+import CoreText
 import DeclaredAgeRange
 #if canImport(StoreKit)
 import StoreKit
@@ -946,35 +947,72 @@ final class BibloZooAgeGateViewController: UIViewController {
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
 
-    private func roundedFont(_ size: CGFloat, weight: UIFont.Weight,
+    // Register the same local variable font used by kids-setup.css, once
+    // per process. No Info.plist change, second font copy or WebView needed.
+    private static let balooAvailable: Bool = {
+        if UIFont(name: "Baloo2-Regular", size: 19) != nil { return true }
+        guard let directory = Bundle.main.resourceURL else { return false }
+        let url = directory.appendingPathComponent("public/verse_fonts/Baloo2.ttf")
+        _ = CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+        return UIFont(name: "Baloo2-Regular", size: 19) != nil
+    }()
+
+    private func brandedFont(_ size: CGFloat, weight: UIFont.Weight,
                              style: UIFont.TextStyle) -> UIFont {
-        let base = UIFont.systemFont(ofSize: size, weight: weight)
-        let rounded = base.fontDescriptor.withDesign(.rounded)
-            .map { UIFont(descriptor: $0, size: size) } ?? base
-        return UIFontMetrics(forTextStyle: style).scaledFont(for: rounded)
+        let base: UIFont
+        if Self.balooAvailable, let regular = UIFont(name: "Baloo2-Regular", size: size) {
+            // The bundled font has a wght axis (400...800). Use its real
+            // bold/semibold outlines, clamping CSS weight 900 to its maximum.
+            let value = weight == .heavy ? 800 : weight == .bold ? 800 : 650
+            let axis = NSNumber(value: UInt32(0x77676874)) // 'wght'
+            let key = UIFontDescriptor.Attribute(rawValue: kCTFontVariationAttribute as String)
+            let descriptor = regular.fontDescriptor.addingAttributes([
+                key: [axis: NSNumber(value: value)]
+            ])
+            base = UIFont(descriptor: descriptor, size: size)
+        } else {
+            // A missing/unreadable font cannot interfere with permission UI.
+            let system = UIFont.systemFont(ofSize: size, weight: weight)
+            base = system.fontDescriptor.withDesign(.rounded)
+                .map { UIFont(descriptor: $0, size: size) } ?? system
+        }
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: base)
     }
 
     private func styleLabel(_ label: UILabel, size: CGFloat, weight: UIFont.Weight,
                             style: UIFont.TextStyle) {
-        label.font = roundedFont(size, weight: weight, style: style)
+        label.font = brandedFont(size, weight: weight, style: style)
         label.adjustsFontForContentSizeCategory = true
         label.textColor = .white
         label.textAlignment = .center
         label.numberOfLines = 0
     }
 
-    private func brandImage(_ name: String, height: CGFloat) -> UIImageView? {
+    private func brandImage(_ name: String, height: CGFloat,
+                            label: String? = nil) -> UIView? {
         guard let directory = Bundle.main.resourceURL,
               let image = UIImage(contentsOfFile: directory
                 .appendingPathComponent("public/verse_images")
                 .appendingPathComponent(name).path) else { return nil }
         let imageView = UIImageView(image: image)
         imageView.contentMode = .scaleAspectFit
-        imageView.isAccessibilityElement = false
-        imageView.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        imageView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        imageView.heightAnchor.constraint(equalToConstant: height).isActive = true
-        return imageView
+        // The arranged view has no image intrinsic size. Its required
+        // geometry is set by the stable column, not by other stack content.
+        let holder = UIView()
+        holder.isAccessibilityElement = false
+        imageView.isAccessibilityElement = label != nil
+        imageView.accessibilityLabel = label
+        imageView.accessibilityTraits = .image
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        holder.addSubview(imageView)
+        NSLayoutConstraint.activate([
+            holder.heightAnchor.constraint(equalToConstant: height),
+            imageView.leadingAnchor.constraint(equalTo: holder.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: holder.trailingAnchor),
+            imageView.topAnchor.constraint(equalTo: holder.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: holder.bottomAnchor)
+        ])
+        return holder
     }
 
     override func viewDidLoad() {
@@ -984,6 +1022,7 @@ final class BibloZooAgeGateViewController: UIViewController {
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.alwaysBounceVertical = false
         scroll.showsHorizontalScrollIndicator = false
+        scroll.contentInsetAdjustmentBehavior = .never
         scroll.indicatorStyle = .white
         view.addSubview(scroll)
 
@@ -1001,10 +1040,7 @@ final class BibloZooAgeGateViewController: UIViewController {
             stack.addArrangedSubview(animals)
             stack.setCustomSpacing(4, after: animals)
         }
-        if let logo = brandImage("title_biblozoo.png", height: 82) {
-            logo.isAccessibilityElement = true
-            logo.accessibilityLabel = "BibloZoo"
-            logo.accessibilityTraits = .image
+        if let logo = brandImage("title_biblozoo.png", height: 82, label: "BibloZoo") {
             stack.addArrangedSubview(logo)
         } else {
             // A missing decorative resource must never prevent a hold or retry.
@@ -1051,7 +1087,7 @@ final class BibloZooAgeGateViewController: UIViewController {
         retryButton.setTitle("Try Again", for: .normal)
         retryButton.setTitleColor(Self.buttonInk, for: .normal)
         retryButton.backgroundColor = .white
-        retryButton.titleLabel?.font = roundedFont(21, weight: .heavy, style: .headline)
+        retryButton.titleLabel?.font = brandedFont(21, weight: .heavy, style: .headline)
         retryButton.titleLabel?.adjustsFontForContentSizeCategory = true
         retryButton.titleLabel?.numberOfLines = 0
         retryButton.titleLabel?.textAlignment = .center
@@ -1065,12 +1101,20 @@ final class BibloZooAgeGateViewController: UIViewController {
         retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
         stack.addArrangedSubview(retryButton)
 
-        // Center when there is room; scroll at larger Dynamic Type sizes or
-        // on shorter devices. Width is bounded on iPad, never wider than safe area.
+        // Anchor artwork to the viewport, not the changing stack midpoint.
+        // A fixed top spacer depends only on available height. At short
+        // heights it collapses to 24pt; larger text can extend the scroll area.
+        let topSpace = UILayoutGuide()
+        content.addLayoutGuide(topSpace)
+        let preferredTop = topSpace.heightAnchor.constraint(
+            equalTo: scroll.frameLayoutGuide.heightAnchor, multiplier: 0.5, constant: -210)
+        preferredTop.priority = UILayoutPriority(999)
         let preferredHeight = content.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor)
         preferredHeight.priority = UILayoutPriority(249)
+        // Prefer full safe width minus margins, unless the required iPad
+        // maximum wins. This beats text/image intrinsic sizing priorities.
         let preferredWidth = stack.widthAnchor.constraint(equalTo: content.widthAnchor, constant: -48)
-        preferredWidth.priority = .defaultHigh
+        preferredWidth.priority = UILayoutPriority(999)
         NSLayoutConstraint.activate([
             scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
@@ -1083,9 +1127,13 @@ final class BibloZooAgeGateViewController: UIViewController {
             content.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
             content.heightAnchor.constraint(greaterThanOrEqualTo: scroll.frameLayoutGuide.heightAnchor),
             preferredHeight,
+            topSpace.topAnchor.constraint(equalTo: content.topAnchor),
+            topSpace.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            topSpace.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            topSpace.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
+            preferredTop,
             stack.centerXAnchor.constraint(equalTo: content.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            stack.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: 24),
+            stack.topAnchor.constraint(equalTo: topSpace.bottomAnchor),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -30),
             stack.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -24),
