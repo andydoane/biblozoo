@@ -60,6 +60,22 @@ struct BibloZooAgeAssuranceTests {
         precondition(newScene.begin(bundleID: prod, liveEnabled: true, activePresenter: true))
         print("PASS: 10 synthetic startup lifecycle assertions")
 
+        let sandboxID = "com.andydoane.biblozoo.agesandbox"
+        var sandboxStartup = BibloZooAgeStartupAttempt()
+        precondition(!sandboxStartup.begin(bundleID: prod, liveEnabled: false, activePresenter: true, sandboxEnabled: true))
+        precondition(!sandboxStartup.begin(bundleID: sandboxID, liveEnabled: false, activePresenter: true))
+        precondition(!sandboxStartup.begin(bundleID: sandboxID, liveEnabled: true, activePresenter: true, sandboxEnabled: true))
+        precondition(!sandboxStartup.begin(bundleID: sandboxID, liveEnabled: false, activePresenter: true, fixtureEnabled: true, sandboxEnabled: true))
+        precondition(!sandboxStartup.begin(bundleID: sandboxID, liveEnabled: false, activePresenter: false, sandboxEnabled: true))
+        #if DEBUG
+        precondition(sandboxStartup.begin(bundleID: sandboxID, liveEnabled: false, activePresenter: true, sandboxEnabled: true))
+        precondition(!sandboxStartup.begin(bundleID: sandboxID, liveEnabled: false, activePresenter: true, sandboxEnabled: true))
+        print("PASS: 7 synthetic sandbox identity assertions")
+        #else
+        precondition(!sandboxStartup.begin(bundleID: sandboxID, liveEnabled: false, activePresenter: true, sandboxEnabled: true))
+        print("PASS: 6 synthetic sandbox identity assertions")
+        #endif
+
         // Delayed foreground/window readiness must not consume an age attempt.
         var readiness = BibloZooAgeStartupReadiness(maxWaits: 2)
         precondition(readiness.next(ready: false) == .wait)
