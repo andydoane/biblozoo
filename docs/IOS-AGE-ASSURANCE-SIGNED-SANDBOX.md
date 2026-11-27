@@ -1,5 +1,31 @@
 # BibloZoo — isolated development-signed Apple age-assurance sandbox
 
+## G — signed diagnostic and reliability acceptance (November 27, 2026)
+
+Baseline [#258](https://github.com/andydoane/biblozoo/pull/258), merge `904db90179d58ad08372ebfb6beef1d651beb482`; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46022964296) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46023289616) SUCCESS. Owner reports fresh web build/sync, 186 assertions, signed sandbox build, signature and matching sandbox profile/entitlements verified, clean Git status, and tagged console output on iPhone 15 Plus / iOS 27.0.1. All listed assessments had regulatory=needsCheck, unknown=false, request attempted/completed and policy decision applied.
+
+| Selected scenario | adultNotice | minorConsent | Classification | Applied decision |
+| --- | --- | --- | --- | --- |
+| 18+, confirmed, change applicable (owner corrected earlier selection) | true | false | confirmedAdult | allowChildSafe |
+| 18+, confirmed, change not applicable | false | false | confirmedAdult | allowChildSafe |
+| 18+, not confirmed, change not applicable | false | false | adultNotConfirmed | holdAgeVerification |
+| Under 13, change approved | false | true | minor | holdInitialConsent |
+
+Native holds observed for unconfirmed adult and under 13. Original unexpected allow in stage E not reproduced; cause unknown. Prior 13–15 and 16–17 visible results remain scoped to E. No actual update permission call or verified initial consent.
+
+| Reliability case | Owner-reported evidence / scope |
+| --- | --- |
+| Adult allow → minor hold after Settings change and foreground return | Same process, epoch 0→1, fresh completed request, applied hold and white barrier |
+| Repeated minor restriction | Epoch 2 and another applied minor hold; no bypass in recorded policy; exact visual continuity and retry trigger not separately confirmed |
+| Offline adult cold launch | Airplane Mode/Wi-Fi off per test instructions; confirmedAdult, allowChildSafe, WebView loaded |
+| Offline scenario change | Developer Settings required internet; changed to under 13 online instead |
+| Offline minor cold launch | Two completed minor/holdInitialConsent assessments; not an offline foreground transition test |
+| Reconnect / restoration | Same console session: third minor hold, then confirmedAdult/allowChildSafe and WebView loaded; owner says app opened after Try Again following instructed reconnect and adult restoration sequence; no independent connectivity timestamp for each line |
+
+No actual connectivity-related error or timeout, so no error recovery tested. No evidence of real-account offline availability, actual parental consent revocation, authorization of a real child, or legal sufficiency. Do not infer that WebView lifecycle messages imply content was visible or that absence of a reported flash proves none occurred. Production microphone retest, accessibility and native UI polish remain separate. Do not enable Release gate.
+
+End this round by stopping the console (Control+C), setting sandbox Age Assurance to Off, and restoring normal connectivity; leave the separate sandbox installed. Owner was advised to do so; completion not separately confirmed. Next decision is initial/current minor app-specific consent feasibility, not another forced sandbox request or policy change. Preserve no-backend boundary and Release HOLD.
+
 ## E — owner-reported initial signed device matrix (November 27, 2026)
 
 iPhone 15 Plus, iOS 27.0.1; 186 synthetic checks, unsigned and signed device builds, signature and matching profile entitlement/identity checks, sandbox installation and account configuration reported passed. All six scenario launches completed.
