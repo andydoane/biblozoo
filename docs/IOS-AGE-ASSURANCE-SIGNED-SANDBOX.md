@@ -1,5 +1,9 @@
 # BibloZoo — isolated development-signed Apple age-assurance sandbox
 
+## H follow-up — compile correction (November 27, 2026)
+
+Owner-reported clean #260 merge checkout, build/sync and 199 Debug assertions PASS. Signed 1.1 build failed at the iOS-only call to evaluateSandboxUpdate: generic UIViewController argument incompatible with BibloZooAgeGateViewController. The sole caller already supplies the specific native gate controller; candidate narrows private evaluate(in:) signature accordingly, no forced cast or access-policy change. Provisioning inputs prepared, but no successful signed build, final entitlement/profile validation or install. After green PR/merge checks, clean pull and repeat synthetic suite and signed stage H build (fresh temporary DerivedData). Do not alter signing or reinstall until successful verification. Host CI is not device SDK typechecking evidence. All stage H scope and stop conditions remain in force.
+
 ## H — isolated significant-update response experiment (candidate, November 27, 2026)
 
 Only after green PR and merge CI: clean pull, build/sync, run synthetic suite (199 Debug assertions expected). Repeat separate development-signed sandbox build from stage C with fresh temporary DerivedData and command-line `MARKETING_VERSION=1.1` in addition to the existing exact sandbox ID, sandbox entitlement and Debug flag. No tracked version change, no App Store update. Verify signed app, profile, exact sandbox ID, version 1.1 and entitlements before installing. Use only the existing disposable Sandbox Apple Account; confirm it is active and select the intended scenario before launch. Never test with real family account or actual production app. If Apple requests another entitlement, account or service, stop.
