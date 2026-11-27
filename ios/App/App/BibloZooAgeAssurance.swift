@@ -930,56 +930,175 @@ final class BibloZooAgeStartupCoordinator {
 final class BibloZooAgeGateViewController: UIViewController {
     var onRetry: (() -> Void)?
     var onAppearance: (() -> Void)?
+    private let heading = UILabel()
     private let message = UILabel()
+    private let spinner = UIActivityIndicatorView(style: .large)
     private let retryButton = UIButton(type: .system)
+
+    // Native counterpart of verse_games/shared/kids-setup.css. Reuse the
+    // packaged local artwork, not the setup WebView, its JS or permission code.
+    private static let purple = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 73/255, green: 53/255, blue: 117/255, alpha: 1)
+            : UIColor(red: 127/255, green: 102/255, blue: 198/255, alpha: 1)
+    }
+    private static let buttonInk = UIColor(red: 76/255, green: 43/255, blue: 125/255, alpha: 1)
+
+    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+
+    private func roundedFont(_ size: CGFloat, weight: UIFont.Weight,
+                             style: UIFont.TextStyle) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: weight)
+        let rounded = base.fontDescriptor.withDesign(.rounded)
+            .map { UIFont(descriptor: $0, size: size) } ?? base
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: rounded)
+    }
+
+    private func styleLabel(_ label: UILabel, size: CGFloat, weight: UIFont.Weight,
+                            style: UIFont.TextStyle) {
+        label.font = roundedFont(size, weight: weight, style: style)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .white
+        label.textAlignment = .center
+        label.numberOfLines = 0
+    }
+
+    private func brandImage(_ name: String, height: CGFloat) -> UIImageView? {
+        guard let directory = Bundle.main.resourceURL,
+              let image = UIImage(contentsOfFile: directory
+                .appendingPathComponent("public/verse_images")
+                .appendingPathComponent(name).path) else { return nil }
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        imageView.isAccessibilityElement = false
+        imageView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        imageView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        imageView.heightAnchor.constraint(equalToConstant: height).isActive = true
+        return imageView
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-        message.font = .preferredFont(forTextStyle: .body)
-        message.adjustsFontForContentSizeCategory = true
-        message.textColor = .label
-        message.textAlignment = .center
-        message.numberOfLines = 0
-        retryButton.setTitle("Try Again", for: .normal)
-        retryButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
-        retryButton.titleLabel?.adjustsFontForContentSizeCategory = true
-        retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
-        let stack = UIStackView(arrangedSubviews: [message, retryButton])
+        view.backgroundColor = Self.purple
+        let scroll = UIScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.alwaysBounceVertical = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.indicatorStyle = .white
+        view.addSubview(scroll)
+
+        let content = UIView()
+        content.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(content)
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 16
+        stack.alignment = .fill
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(stack)
+
+        if let animals = brandImage("title_biblozoo_animals.png", height: 110) {
+            stack.addArrangedSubview(animals)
+            stack.setCustomSpacing(4, after: animals)
+        }
+        if let logo = brandImage("title_biblozoo.png", height: 82) {
+            logo.isAccessibilityElement = true
+            logo.accessibilityLabel = "BibloZoo"
+            logo.accessibilityTraits = .image
+            stack.addArrangedSubview(logo)
+        } else {
+            // A missing decorative resource must never prevent a hold or retry.
+            let brand = UILabel()
+            styleLabel(brand, size: 32, weight: .heavy, style: .title1)
+            brand.text = "BibloZoo"
+            stack.addArrangedSubview(brand)
+        }
+
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
         if BibloZooAgeStartupCoordinator.useFixtureGate {
             let banner = UILabel()
+            styleLabel(banner, size: 15, weight: .bold, style: .footnote)
             banner.text = "SIMULATOR TEST — FAKE CONSENT"
-            banner.font = .preferredFont(forTextStyle: .headline)
-            banner.adjustsFontForContentSizeCategory = true
-            banner.textAlignment = .center
-            banner.numberOfLines = 0
-            stack.insertArrangedSubview(banner, at: 0)
+            stack.addArrangedSubview(banner)
         }
         #endif
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
         if BibloZooAgeStartupCoordinator.useSandboxGate {
             let banner = UILabel()
+            styleLabel(banner, size: 15, weight: .bold, style: .footnote)
             banner.text = "DEVICE TEST — AGE ASSURANCE SANDBOX"
-            banner.font = .preferredFont(forTextStyle: .headline)
-            banner.adjustsFontForContentSizeCategory = true
-            banner.textAlignment = .center
-            banner.numberOfLines = 0
-            stack.insertArrangedSubview(banner, at: 0)
+            stack.addArrangedSubview(banner)
+            if ProcessInfo.processInfo.arguments.contains(BibloZooUpdateSandboxPlan.argument) {
+                let note = UILabel()
+                styleLabel(note, size: 15, weight: .semibold, style: .footnote)
+                note.text = "Update test only — the Zoo stays closed even after approval."
+                stack.addArrangedSubview(note)
+            }
         }
         #endif
-        stack.axis = .vertical
-        stack.spacing = 20
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+
+        styleLabel(heading, size: 30, weight: .heavy, style: .title1)
+        heading.accessibilityTraits.insert(.header)
+        stack.addArrangedSubview(heading)
+        styleLabel(message, size: 19, weight: .semibold, style: .body)
+        stack.addArrangedSubview(message)
+
+        spinner.color = .white
+        spinner.hidesWhenStopped = true
+        spinner.isAccessibilityElement = false
+        stack.addArrangedSubview(spinner)
+
+        retryButton.setTitle("Try Again", for: .normal)
+        retryButton.setTitleColor(Self.buttonInk, for: .normal)
+        retryButton.backgroundColor = .white
+        retryButton.titleLabel?.font = roundedFont(21, weight: .heavy, style: .headline)
+        retryButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        retryButton.titleLabel?.numberOfLines = 0
+        retryButton.titleLabel?.textAlignment = .center
+        retryButton.titleLabel?.lineBreakMode = .byWordWrapping
+        retryButton.contentEdgeInsets = UIEdgeInsets(top: 14, left: 18, bottom: 14, right: 18)
+        retryButton.layer.cornerRadius = 27
+        retryButton.layer.shadowColor = UIColor.black.cgColor
+        retryButton.layer.shadowOpacity = 0.23
+        retryButton.layer.shadowOffset = CGSize(width: 0, height: 6)
+        retryButton.layer.shadowRadius = 0
+        retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
+        stack.addArrangedSubview(retryButton)
+
+        // Center when there is room; scroll at larger Dynamic Type sizes or
+        // on shorter devices. Width is bounded on iPad, never wider than safe area.
+        let preferredHeight = content.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor)
+        preferredHeight.priority = UILayoutPriority(249)
+        let preferredWidth = stack.widthAnchor.constraint(equalTo: content.widthAnchor, constant: -48)
+        preferredWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
-            stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+            scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            content.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            content.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            content.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
+            content.heightAnchor.constraint(greaterThanOrEqualTo: scroll.frameLayoutGuide.heightAnchor),
+            preferredHeight,
+            stack.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            stack.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -30),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -24),
+            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+            preferredWidth,
+            retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 54)
         ])
         showChecking()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        retryButton.layer.cornerRadius = retryButton.bounds.height / 2
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -987,40 +1106,60 @@ final class BibloZooAgeGateViewController: UIViewController {
         onAppearance?()
     }
 
-    func showChecking() {
+    private func render(title: String, detail: String, busy: Bool, retry: Bool) {
         loadViewIfNeeded()
-        message.text = "Checking App Store requirements…"
-        retryButton.isHidden = true
+        let changed = heading.text != title || message.text != detail
+        heading.text = title
+        message.text = detail
+        retryButton.isHidden = !retry
+        if busy { spinner.startAnimating() } else { spinner.stopAnimating() }
+        if changed, view.window != nil, UIAccessibility.isVoiceOverRunning {
+            UIAccessibility.post(notification: .screenChanged, argument: heading)
+        }
+    }
+
+    func showChecking() {
+        render(title: "Getting BibloZoo Ready!",
+               detail: "Checking App Store requirements. This may take a moment.",
+               busy: true, retry: false)
     }
 
     #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
     func showSandboxUpdatePending() {
         guard BibloZooAgeStartupCoordinator.useSandboxGate else { return }
-        loadViewIfNeeded()
-        message.text = "Waiting for sandbox update response…"
-        retryButton.isHidden = true
+        render(title: "Waiting for Permission",
+               detail: "Waiting for the sandbox update response from Apple.",
+               busy: true, retry: false)
     }
     #endif
 
     func showHold(_ decision: BibloZooAgeAccessDecision) {
-        loadViewIfNeeded()
-        // No raw age, identifiers, or detailed API errors in UI or diagnostics.
+        // Only the presentation changes. No raw age, identifiers, detailed
+        // errors, skip action or local permission grant. Preserve retry policy.
+        let title: String
+        let detail: String
         switch decision {
         case .holdAgeVerification:
-            message.text = "Ask a grown-up to check the age-sharing settings for this Apple Account."
+            title = "A Grown-up Can Help!"
+            detail = "Please ask a grown-up to check the age-sharing settings for this Apple Account."
         case .holdInitialConsent:
-            message.text = "App Store permission could not be confirmed. Ask a grown-up for help."
+            title = "A Grown-up Can Help!"
+            detail = "We couldn't confirm App Store permission for BibloZoo. Please ask a grown-up for help."
         case .holdUpdate:
-            message.text = "Permission for this app update is needed."
+            title = "App Update Permission"
+            detail = "Permission for this app update is needed. Please ask a grown-up for help."
         case .holdDenied:
-            message.text = "App Store permission is not available."
+            title = "Permission Isn't Available"
+            detail = "App Store permission is not available. Please ask a grown-up for help."
         case .holdUnsupportedPlatform:
-            message.text = "This device cannot complete the required App Store check. Ask a grown-up for help."
+            title = "This Device Needs Help"
+            detail = "This device cannot complete the required App Store check. Please ask a grown-up for help."
         case .holdUnavailable, .allowChildSafe:
-            message.text = "The App Store check could not finish. Ask a grown-up to check the connection, or try again."
+            title = "Let's Try Again"
+            detail = "The App Store check could not finish. Ask a grown-up to check the connection, or try again."
         }
-        // Repeated attempts cannot make an unsupported API available.
-        retryButton.isHidden = decision == .holdUnsupportedPlatform
+        render(title: title, detail: detail, busy: false,
+               retry: decision != .holdUnsupportedPlatform)
     }
 
     @objc private func retryTapped() { onRetry?() }
