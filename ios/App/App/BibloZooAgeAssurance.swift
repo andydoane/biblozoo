@@ -798,7 +798,7 @@ final class BibloZooAgeStartupCoordinator {
         }
     }
 
-    private func evaluate(in presenter: UIViewController) async -> BibloZooAgeAccessDecision {
+    private func evaluate(in presenter: BibloZooAgeGateViewController) async -> BibloZooAgeAccessDecision {
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
         // No real age API, even if the fixture argument is missing or invalid.
         guard Self.useFixtureGate else { return .holdUnavailable }
