@@ -1,5 +1,24 @@
 # BibloZoo — isolated development-signed Apple age-assurance sandbox
 
+## I — signed significant-update sandbox results (November 27, 2026)
+
+[#261](https://github.com/andydoane/biblozoo/pull/261) merged at `6300d58664bfec4aa31abbfa2e3325bcf31acde0`; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46044370576) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46045225725) SUCCESS. Owner reports signed build succeeded, exact sandbox ID and version 1.1, signature/designated requirement valid, signed/profile age entitlement and get-task-allow true, matching profile ID suffix, clean Git status. Previous #260 199 assertion output PASS; no repeat output after #261 supplied. New signed experiment traces confirm installed sandbox launched. No real-family data or distribution.
+
+| Owner-selected Apple scenario | adultNotice / minorConsent | Route and result | First applied policy |
+| --- | --- | --- | --- |
+| Under 13, approved | false / true | parentalPermission, pending, approved | holdInitialConsent |
+| 13–15, approved | false / true | parentalPermission, pending, approved | holdInitialConsent |
+| 16–17, declined | false / true | parentalPermission, pending, denied | holdDenied |
+| 18+ confirmed, change applicable | true / false | adultAcknowledgment, approved | holdUpdate |
+| 18+ confirmed, no change | false / false | noPrompt, verifiedNoPending | holdUpdate |
+| 18+ unconfirmed, no change | false / false | unavailable, unknown | holdAgeVerification |
+
+All six reported regulatory=needsCheck, unknown=false, age request attempted/completed, updateEvent=started/finished. Owner saw system adult acknowledgment prompt and tapped Continue; then native screen said permission for app update needed. Last two cases went to native block. Minor visual prompt details not supplied. No WebView load shown in supplied traces. All six scoped diagnostic expectations met; experiment never grants access on update approval. Not a real significant app update, real child authorization or durable consent test.
+
+Subsequent assessments in both approved minor runs, declined minor run and applicable adult run reported updateEvent=repeated and applied=holdUpdate, no repeated update request in observed coordinator lifetime. Generic barrier replaced more specific minor reasons; fix messaging/state semantics before production, not evidence of durable permission. Two devicectl connection invalidations after recorded results; exact cause unknown, screen timeout suspected for one. No actual permission API failure recovery, account-scoped persistence, pending cancellation/restart recovery or consent revocation tested.
+
+Stop console (Control+C), set sandbox Age Assurance Off, leave separate sandbox installed; advised, not independently confirmed. Next review revocation documentation/sandbox limits; no server-based simulation can establish native-only revocation acceptance. No trigger on production ID or real accounts. No new build required for this documentation checkpoint. Native branded barrier design follows revocation investigation; system prompts remain Apple-owned. Initial app-specific consent, durable update handling, actual revocation/restoration and release feasibility remain HOLD.
+
 ## H follow-up — compile correction (November 27, 2026)
 
 Owner-reported clean #260 merge checkout, build/sync and 199 Debug assertions PASS. Signed 1.1 build failed at the iOS-only call to evaluateSandboxUpdate: generic UIViewController argument incompatible with BibloZooAgeGateViewController. The sole caller already supplies the specific native gate controller; candidate narrows private evaluate(in:) signature accordingly, no forced cast or access-policy change. Provisioning inputs prepared, but no successful signed build, final entitlement/profile validation or install. After green PR/merge checks, clean pull and repeat synthetic suite and signed stage H build (fresh temporary DerivedData). Do not alter signing or reinstall until successful verification. Host CI is not device SDK typechecking evidence. All stage H scope and stop conditions remain in force.
