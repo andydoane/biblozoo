@@ -1,5 +1,6 @@
 // Native-only age assurance, staged access policy and startup shell.
-// No persistence, logs, network client, JavaScript bridge or raw age retention.
+// No app persistence, network client, JavaScript bridge or raw age retention.
+// Only the isolated device sandbox emits coarse console diagnostics.
 import Foundation
 
 // A staged gate with unresolved release prerequisites must never silently
@@ -375,6 +376,46 @@ import StoreKit
 import PermissionKit
 #endif
 
+#if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+@MainActor
+private enum BibloZooAgeSandboxTrace {
+    // The console is an explicit test surface, not app-owned storage.
+    // Only fixed policy enums and booleans; never raw Apple responses/errors.
+    private static var enabled: Bool {
+        Bundle.main.bundleIdentifier == "com.andydoane.biblozoo.agesandbox"
+    }
+
+    static func regulatory(_ status: BibloZooAgeAssessment) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] regulatory=\(status.outcome) adultNotice=\(status.adultUpdateNotice) minorConsent=\(status.minorUpdateConsent) unknown=\(status.unknownRequirement)")
+    }
+
+    enum RequestEvent: String {
+        case skippedRegulatory, skippedPresenter, attempted, cancelled, completed, failed, skippedBusy
+    }
+
+    static func request(_ event: RequestEvent) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] request=\(event.rawValue)")
+    }
+
+    static func evaluated(_ outcome: BibloZooAgeRangeOutcome, decision: BibloZooAgeAccessDecision) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] classification=\(outcome) policy=\(decision)")
+    }
+
+    static func finished(_ decision: BibloZooAgeAccessDecision) {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] applied=\(decision)")
+    }
+
+    static func discarded() {
+        guard enabled else { return }
+        print("[BibloZooAgeSandbox] discarded=true")
+    }
+}
+#endif
+
 @MainActor
 final class BibloZooAgeAssurance {
     private var checking = false
@@ -425,23 +466,52 @@ final class BibloZooAgeAssurance {
     // The native startup controller owns the presenter and invokes this only when needed.
     // Status is not an access grant or evidence of minor parental consent.
     func check(in presenter: UIViewController) async -> BibloZooAgeAssessment {
-        guard !checking else { return BibloZooAgeAssessment(.unavailable) }
+        guard !checking else {
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.request(.skippedBusy)
+            #endif
+            return BibloZooAgeAssessment(.unavailable)
+        }
         checking = true
         defer { checking = false }
 
         let status = await regulatoryStatus()
-        guard status.outcome == .needsCheck else { return status }
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        BibloZooAgeSandboxTrace.regulatory(status)
+        #endif
+        guard status.outcome == .needsCheck else {
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.request(.skippedRegulatory)
+            #endif
+            return status
+        }
         guard #available(iOS 26.2, *),
               UIApplication.shared.applicationState == .active,
               presenter.viewIfLoaded?.window != nil,
               presenter.presentedViewController == nil,
-              !Task.isCancelled else { return status.withOutcome(.unavailable) }
+              !Task.isCancelled else {
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.request(.skippedPresenter)
+            #endif
+            return status.withOutcome(.unavailable)
+        }
 
         do {
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.request(.attempted)
+            #endif
             let response = try await AgeRangeService.shared.requestAgeRange(
                 ageGates: 13, 16, 18, in: presenter
             )
-            guard !Task.isCancelled else { return status.withOutcome(.unavailable) }
+            guard !Task.isCancelled else {
+                #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+                BibloZooAgeSandboxTrace.request(.cancelled)
+                #endif
+                return status.withOutcome(.unavailable)
+            }
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.request(.completed)
+            #endif
             switch response {
             case .declinedSharing:
                 return status.withOutcome(.declined)
@@ -465,6 +535,9 @@ final class BibloZooAgeAssurance {
             }
         } catch {
             // Do not retain or expose error details, which may contain account context.
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.request(.failed)
+            #endif
             return status.withOutcome(.unavailable)
         }
     }
@@ -692,8 +765,12 @@ final class BibloZooAgeStartupCoordinator {
         let update: BibloZooUpdateState = version == "1.0" ? .firstReleaseNoPending : .unknown
         let assessment = await service.check(in: presenter)
         // No native proof of initial minor consent has yet been wired.
-        return BibloZooAgeAccessDecision.evaluate(
+        let decision = BibloZooAgeAccessDecision.evaluate(
             assessment, initialConsent: .unknown, update: update)
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        BibloZooAgeSandboxTrace.evaluated(assessment.outcome, decision: decision)
+        #endif
+        return decision
         #endif
     }
 
@@ -701,8 +778,16 @@ final class BibloZooAgeStartupCoordinator {
                         foreground: Bool, cancelled: Bool,
                         completion: (BibloZooAgeAccessDecision) -> Void) {
         guard let result = epoch.finish(ticket, decision: decision,
-                                        foreground: foreground, cancelled: cancelled) else { return }
+                                        foreground: foreground, cancelled: cancelled) else {
+            #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+            BibloZooAgeSandboxTrace.discarded()
+            #endif
+            return
+        }
         task = nil
+        #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
+        BibloZooAgeSandboxTrace.finished(result)
+        #endif
         completion(result)
     }
 

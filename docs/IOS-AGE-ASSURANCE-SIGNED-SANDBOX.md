@@ -1,5 +1,30 @@
 # BibloZoo — isolated development-signed Apple age-assurance sandbox
 
+## E — owner-reported initial signed device matrix (November 27, 2026)
+
+iPhone 15 Plus, iOS 27.0.1; 186 synthetic checks, unsigned and signed device builds, signature and matching profile entitlement/identity checks, sandbox installation and account configuration reported passed. All six scenario launches completed.
+
+| Scenario | Observed |
+| --- | --- |
+| 18+, confirmed, no change | Allowed; no Apple prompt reported |
+| 18+, unconfirmed, no change | Allowed unexpectedly; no Apple prompt reported |
+| Under 13, change approved | Initial consent hold; retry returns to hold |
+| 13–15, change approved | Initial consent hold |
+| 16–17, change declined | Initial consent hold |
+| 18+, confirmed, change applicable | Allowed |
+
+First two launches alone do not establish whether regulatory status required age or the request was invoked. Remaining prompt behavior not established. No PermissionKit or initial consent verification. Optional setup reported microphone unavailable and Photos ready; verify regular production identity separately, not an audio regression claim.
+
+## F — diagnostic retest (candidate, pending CI and owner approval)
+
+After green PR/merge checks, pull ios-prep and repeat the existing clean build/sync, synthetic checks and separately signed Stage C build with sandbox-only entitlement, same separate ID, new temporary DerivedData. Verify actual signed app, profile and identity again before reinstalling sandbox only. Do not uninstall normal app or change tracked production settings. Retest unconfirmed adult, confirmed adult and under 13 first. Use the existing exact device and app identity. To collect stdout, inspect `xcrun devicectl device process launch --help` for console support, then:
+
+```bash
+xcrun devicectl device process launch --device "$sandbox_device" --terminate-existing --console com.andydoane.biblozoo.agesandbox
+```
+
+Stop the console session before changing scenario and relaunching. Share only lines prefixed `[BibloZooAgeSandbox]` and visible hold/allow outcome; no full console dump. If console is unavailable or no tagged lines arrive, report limitation; do not infer a regulatory result. Diagnostics distinguish regulatory outcome/feature booleans, request skipped/attempted/completed/failed/cancelled, classification/policy, and applied or discarded epoch result. A completed request is not proof of consent; no raw bounds, method, identifiers, payloads or errors. Console output may be captured by host tooling; no app-owned storage or telemetry. Diagnostics compiled only for physical iOS Debug sandbox and emitted only for exact sandbox identity. Do not change policy or force requests to produce desired results. Release HOLD remains. No new server, production entitlement or distribution.
+
 ## Scope / stop conditions
 
 November 27, 2026. Owner elects sandbox-first and defers contacting Apple. Membership active, paid developer team selected with automatic signing, ordinary iPhone app runs normally. Owner verified Debug/Release effective signing and unchanged production ID; Debug has DEBUG only, Release no conditions reported. Production identifier registered and App Store Connect BibloZoo iOS 1.0 record created/corrected, Prepare for Submission. Xcode project diff showed only reorder of three existing references, no functional settings changes; advised discard cosmetic change only after review. Verify clean checkout before test. Never publish account email, team/device IDs, provisioning contents, sandbox credentials or raw age/transaction responses. Owner approved preparation, not production activation, upload, additional spending or server.

@@ -166,6 +166,26 @@ jobs:
           trap 'rm -rf "$tmpdir"' EXIT
           source=ios/App/App/BibloZooAgeAssurance.swift
           tests=scripts/validate_ios_age_assurance_foundation.swift
+          swiftc -frontend -parse "$source"
+          # Verify diagnostic emission and calls remain in exact sandbox compile blocks.
+          python3 - "$source" <<'PY'
+          import sys
+          stack = []
+          count = 0
+          fence = '#if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)'
+          for line in open(sys.argv[1]):
+              s = line.strip()
+              if s.startswith('#if '):
+                  stack.append(s)
+              elif s.startswith(('#else', '#elseif')):
+                  stack[-1] = s
+              elif s == '#endif':
+                  stack.pop()
+              elif 'BibloZooAgeSandboxTrace' in s or '[BibloZooAgeSandbox]' in s:
+                  assert fence in stack, s
+                  count += 1
+          assert count >= 12, count
+          PY
           swiftc "$source" "$tests" -o "$tmpdir/age-ordinary"
           "$tmpdir/age-ordinary"
           swiftc -D DEBUG "$source" "$tests" -o "$tmpdir/age-debug"
