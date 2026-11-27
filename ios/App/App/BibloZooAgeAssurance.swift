@@ -938,11 +938,8 @@ final class BibloZooAgeGateViewController: UIViewController {
 
     // Native counterpart of verse_games/shared/kids-setup.css. Reuse the
     // packaged local artwork, not the setup WebView, its JS or permission code.
-    private static let purple = UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 73/255, green: 53/255, blue: 117/255, alpha: 1)
-            : UIColor(red: 127/255, green: 102/255, blue: 198/255, alpha: 1)
-    }
+    // Match the existing setup screen in either system appearance.
+    private static let purple = UIColor(red: 127/255, green: 102/255, blue: 198/255, alpha: 1)
     private static let buttonInk = UIColor(red: 76/255, green: 43/255, blue: 125/255, alpha: 1)
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
@@ -1018,6 +1015,14 @@ final class BibloZooAgeGateViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = Self.purple
+        // Match the larger portrait iPad canvas without altering iPhone.
+        // All scales depend on device class, never the current hold state.
+        // Required safe-area margins still bound the column on narrow windows.
+        let isPad = traitCollection.userInterfaceIdiom == .pad
+        let artworkScale: CGFloat = isPad ? 1.5 : 1
+        let textScale: CGFloat = isPad ? 1.35 : 1
+        let spacingScale: CGFloat = isPad ? 1.25 : 1
+        let margin: CGFloat = isPad ? 36 : 24
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.alwaysBounceVertical = false
@@ -1031,21 +1036,21 @@ final class BibloZooAgeGateViewController: UIViewController {
         scroll.addSubview(content)
         let stack = UIStackView()
         stack.axis = .vertical
-        stack.spacing = 16
+        stack.spacing = 16 * spacingScale
         stack.alignment = .fill
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
 
-        if let animals = brandImage("title_biblozoo_animals.png", height: 110) {
+        if let animals = brandImage("title_biblozoo_animals.png", height: 110 * artworkScale) {
             stack.addArrangedSubview(animals)
-            stack.setCustomSpacing(4, after: animals)
+            stack.setCustomSpacing(4 * spacingScale, after: animals)
         }
-        if let logo = brandImage("title_biblozoo.png", height: 82, label: "BibloZoo") {
+        if let logo = brandImage("title_biblozoo.png", height: 82 * artworkScale, label: "BibloZoo") {
             stack.addArrangedSubview(logo)
         } else {
             // A missing decorative resource must never prevent a hold or retry.
             let brand = UILabel()
-            styleLabel(brand, size: 32, weight: .heavy, style: .title1)
+            styleLabel(brand, size: 32 * textScale, weight: .heavy, style: .title1)
             brand.text = "BibloZoo"
             stack.addArrangedSubview(brand)
         }
@@ -1053,7 +1058,7 @@ final class BibloZooAgeGateViewController: UIViewController {
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_FIXTURE && targetEnvironment(simulator)
         if BibloZooAgeStartupCoordinator.useFixtureGate {
             let banner = UILabel()
-            styleLabel(banner, size: 15, weight: .bold, style: .footnote)
+            styleLabel(banner, size: 15 * textScale, weight: .bold, style: .footnote)
             banner.text = "SIMULATOR TEST — FAKE CONSENT"
             stack.addArrangedSubview(banner)
         }
@@ -1061,22 +1066,22 @@ final class BibloZooAgeGateViewController: UIViewController {
         #if DEBUG && BIBLOZOO_AGE_ASSURANCE_SANDBOX && !targetEnvironment(simulator)
         if BibloZooAgeStartupCoordinator.useSandboxGate {
             let banner = UILabel()
-            styleLabel(banner, size: 15, weight: .bold, style: .footnote)
+            styleLabel(banner, size: 15 * textScale, weight: .bold, style: .footnote)
             banner.text = "DEVICE TEST — AGE ASSURANCE SANDBOX"
             stack.addArrangedSubview(banner)
             if ProcessInfo.processInfo.arguments.contains(BibloZooUpdateSandboxPlan.argument) {
                 let note = UILabel()
-                styleLabel(note, size: 15, weight: .semibold, style: .footnote)
+                styleLabel(note, size: 15 * textScale, weight: .semibold, style: .footnote)
                 note.text = "Update test only — the Zoo stays closed even after approval."
                 stack.addArrangedSubview(note)
             }
         }
         #endif
 
-        styleLabel(heading, size: 30, weight: .heavy, style: .title1)
+        styleLabel(heading, size: 30 * textScale, weight: .heavy, style: .title1)
         heading.accessibilityTraits.insert(.header)
         stack.addArrangedSubview(heading)
-        styleLabel(message, size: 19, weight: .semibold, style: .body)
+        styleLabel(message, size: 19 * textScale, weight: .semibold, style: .body)
         stack.addArrangedSubview(message)
 
         spinner.color = .white
@@ -1087,16 +1092,17 @@ final class BibloZooAgeGateViewController: UIViewController {
         retryButton.setTitle("Try Again", for: .normal)
         retryButton.setTitleColor(Self.buttonInk, for: .normal)
         retryButton.backgroundColor = .white
-        retryButton.titleLabel?.font = brandedFont(21, weight: .heavy, style: .headline)
+        retryButton.titleLabel?.font = brandedFont(21 * textScale, weight: .heavy, style: .headline)
         retryButton.titleLabel?.adjustsFontForContentSizeCategory = true
         retryButton.titleLabel?.numberOfLines = 0
         retryButton.titleLabel?.textAlignment = .center
         retryButton.titleLabel?.lineBreakMode = .byWordWrapping
-        retryButton.contentEdgeInsets = UIEdgeInsets(top: 14, left: 18, bottom: 14, right: 18)
-        retryButton.layer.cornerRadius = 27
+        retryButton.contentEdgeInsets = UIEdgeInsets(top: 14 * textScale, left: 18 * spacingScale,
+                                                     bottom: 14 * textScale, right: 18 * spacingScale)
+        retryButton.layer.cornerRadius = 27 * textScale
         retryButton.layer.shadowColor = UIColor.black.cgColor
         retryButton.layer.shadowOpacity = 0.23
-        retryButton.layer.shadowOffset = CGSize(width: 0, height: 6)
+        retryButton.layer.shadowOffset = CGSize(width: 0, height: 6 * spacingScale)
         retryButton.layer.shadowRadius = 0
         retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
         stack.addArrangedSubview(retryButton)
@@ -1107,13 +1113,13 @@ final class BibloZooAgeGateViewController: UIViewController {
         let topSpace = UILayoutGuide()
         content.addLayoutGuide(topSpace)
         let preferredTop = topSpace.heightAnchor.constraint(
-            equalTo: scroll.frameLayoutGuide.heightAnchor, multiplier: 0.5, constant: -210)
+            equalTo: scroll.frameLayoutGuide.heightAnchor, multiplier: 0.5, constant: isPad ? -300 : -210)
         preferredTop.priority = UILayoutPriority(999)
         let preferredHeight = content.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor)
         preferredHeight.priority = UILayoutPriority(249)
         // Prefer full safe width minus margins, unless the required iPad
         // maximum wins. This beats text/image intrinsic sizing priorities.
-        let preferredWidth = stack.widthAnchor.constraint(equalTo: content.widthAnchor, constant: -48)
+        let preferredWidth = stack.widthAnchor.constraint(equalTo: content.widthAnchor, constant: -2 * margin)
         preferredWidth.priority = UILayoutPriority(999)
         NSLayoutConstraint.activate([
             scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -1130,16 +1136,16 @@ final class BibloZooAgeGateViewController: UIViewController {
             topSpace.topAnchor.constraint(equalTo: content.topAnchor),
             topSpace.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             topSpace.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            topSpace.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
+            topSpace.heightAnchor.constraint(greaterThanOrEqualToConstant: 24 * spacingScale),
             preferredTop,
             stack.centerXAnchor.constraint(equalTo: content.centerXAnchor),
             stack.topAnchor.constraint(equalTo: topSpace.bottomAnchor),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -30),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -24),
-            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 420),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -30 * spacingScale),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: content.leadingAnchor, constant: margin),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -margin),
+            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 420 * artworkScale),
             preferredWidth,
-            retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 54)
+            retryButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 54 * textScale)
         ])
         showChecking()
     }
