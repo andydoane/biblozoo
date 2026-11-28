@@ -1,6 +1,25 @@
 # BibloZoo — first TestFlight beta readiness runbook
 
-## CURRENT — iPad uniform scaling Phase 1 owner acceptance; Phase 2 functional smoke (November 27, 2026 US Eastern)
+## CURRENT — iPad uniform scaling Phase 2 owner PASS; resume fresh archive (November 27, 2026 US Eastern)
+
+Merged [#273](https://github.com/andydoane/biblozoo/pull/273) at `9351f50d7a4f7d36d39d3d2c88b517095e4ece41`; exact PR head `e95a85b1777d727cf7771d3006fedfd91adb860b` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46099306819) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46099750613) SUCCESS (verified). Owner submitted all eight Phase 2 checks as PASS:
+
+| Representative check | Owner-reported result |
+| --- | --- |
+| Scripture Snake | PASS |
+| Verse Launch | PASS |
+| Flashcards | PASS |
+| Ghost Writer | PASS |
+| Grown-up Check | PASS |
+| App Switcher | PASS |
+| iPad multitasking | PASS |
+| iPhone | PASS |
+
+Together with the earlier scoped Phase 1 visual acceptance, this closes the requested representative iPad presentation/functionality checkpoint on the tested configurations. No failures or NOT TESTED entries reported. Exact device models/OS, separate physical tilt verification, detailed motion/keyboard/accessibility observations and exhaustive coverage were not supplied; do not independently claim those or all games tested. No further orientation work or repeat of these eight checks indicated unless a specific issue appears. Keep existing #270/#272 orientation and uniform scaling implementation. This is documentation only; no executable, entitlement, signing, dependencies, version, privacy, storage or gameplay change.
+
+**Next owner step:** after merge/pull, resume the ordinary production Release archive workflow in the TestFlight runbook, sections 3–4. Confirm correct branch, clean/reviewed source changes, standard production app identity/team and unused build number in ASC; run the normal build/sync and production dist audit, select App scheme / Any iOS Device (arm64) / Product > Archive. Do not reuse the previous rejected archive. Inspect the exact newly created archive with all three scripts and signature/metadata/entitlement checks. Then Apple Organizer Validate App; report outcome and any warnings/errors, with no sensitive information. Do not upload until validation and inspection outcomes are reviewed. Hardware-specific checks not separately documented remain targeted follow-ups on suitable devices, not invented passes. This PR performs no archive, validation, upload, distribution or public review. Controlled adult-only TestFlight plan and public-release parental authorization HOLD unchanged.
+
+## HISTORICAL — iPad uniform scaling Phase 1 owner acceptance; Phase 2 functional smoke (completed; results above) (November 27, 2026 US Eastern)
 
 Merged [#272](https://github.com/andydoane/biblozoo/pull/272) at `44fe776c51b3c6b241920da2d09ab34bf491625d`; exact PR head `0356c978d752014d2ceeb6c53516a6693f9e1b15` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46097667461) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46098050381) SUCCESS (verified). Owner reports “Phase 1 seems a pass” and requests Phase 2. Record scoped owner-reported visual acceptance for the previously requested five-screen sample (Home, My Verses, Practice menu, Learn — Listen Activities, Settings, portrait/landscape/return); no separate per-screen result, measured pixel comparison, device/OS details or full-app assertion supplied. This is a practical visual checkpoint, not a proof of every screen, input path, orientation, accessibility or actual Apple validation. Do not repeat the entire Phase 1 sample unless a regression appears.
 
