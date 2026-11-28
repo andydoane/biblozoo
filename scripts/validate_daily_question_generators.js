@@ -18,9 +18,10 @@ function loadVerses() {
     .map((verseId) => {
       const verse = readJson(path.join(dataDir, `${verseId}.json`));
       assert.strictEqual(verse.verseId, verseId);
-      assert.strictEqual(verse.published, true);
+      assert.strictEqual(typeof verse.published, "boolean");
       return verse;
-    });
+    })
+    .filter(verse => verse.published === true);
 }
 
 function choiceKey(choice) {
@@ -282,8 +283,12 @@ function testSelection(verses) {
 }
 
 function testShortDevelopmentVerse(verses) {
-  const verse = verses.find((entry) => entry.verseId === "john_11_35");
-  if (!verse) return;
+  // Keep exercising the retained two-word fixture independently of the
+  // published catalog; it must never enter the distractor pool.
+  const verse = readJson(path.join(dataDir, "john_11_35.json"));
+  assert.strictEqual(verse.verseId, "john_11_35");
+  assert.strictEqual(verse.published, false);
+  assert.ok(!verses.some(entry => entry.verseId === verse.verseId));
   const report = Generators.listEligibility({ verse, verses, seed: "short" });
   assert.ok(report.some((entry) => entry.eligible));
   assert.ok(report.some((entry) => !entry.eligible));

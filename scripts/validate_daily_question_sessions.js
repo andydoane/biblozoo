@@ -30,7 +30,7 @@ function loadVerses() {
     readJson(
       path.join(dataDir, `${verseId}.json`)
     )
-  );
+  ).filter(verse => verse.published === true);
 }
 
 function makePlan(verseId, questionSession) {
