@@ -1,6 +1,33 @@
 # BibloZoo — Living Project Handoff
 
-## CURRENT — uniform iPad portrait scaling after #271 (November 27, 2026 US Eastern)
+## CURRENT — iPad uniform scaling Phase 1 owner acceptance; Phase 2 functional smoke (November 27, 2026 US Eastern)
+
+Merged [#272](https://github.com/andydoane/biblozoo/pull/272) at `44fe776c51b3c6b241920da2d09ab34bf491625d`; exact PR head `0356c978d752014d2ceeb6c53516a6693f9e1b15` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46097667461) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46098050381) SUCCESS (verified). Owner reports “Phase 1 seems a pass” and requests Phase 2. Record scoped owner-reported visual acceptance for the previously requested five-screen sample (Home, My Verses, Practice menu, Learn — Listen Activities, Settings, portrait/landscape/return); no separate per-screen result, measured pixel comparison, device/OS details or full-app assertion supplied. This is a practical visual checkpoint, not a proof of every screen, input path, orientation, accessibility or actual Apple validation. Do not repeat the entire Phase 1 sample unless a regression appears.
+
+This PR is **documentation-only**. No runtime, geometry, CSS/JS, native audio, age assurance, plist, signing, build/version, dependencies or gameplay changes are indicated by the reported Phase 1 result. After owner merge, the already-tested ordinary #272 app can be used for Phase 2; no rebuild/sync solely for these documentation changes. If the installed binary is not known to be #272, use the normal same-identity build/sync workflow. Do not uninstall, reset profiles, enable age/audio fixtures, or introduce private test data; use a disposable local profile and innocuous sample inputs where needed.
+
+### Phase 2 — representative functional acceptance
+
+Run the following focused checks, primarily in pillarboxed landscape. Compare against portrait only where needed. Rotate during one active game, not every activity. Report PASS / FAIL / NOT TESTED for each; record device/simulator and OS if readily available. If a common scaling/input failure occurs, stop repetitive testing and report the screen, orientation, interaction, expected/actual result and a screenshot if useful. Preserve any in-progress state and avoid destructive recovery steps.
+
+| Check | Owner action and expected outcome |
+| --- | --- |
+| 1. Scripture Snake | Start a normal round; use its normal touch controls in landscape. Check responsive, correctly located touches and movement. Rotate during the active round and return to portrait; no unintended restart, lost progress, broken controls, or layout expansion. Any existing intentional pause/resume behavior is acceptable. |
+| 2. Verse Launch | Choose Drag; check the character tracks the intended touch/drag positions in landscape. If a physical iPad with tilt is available, also select Tilt and check steering direction/control in portrait and landscape. Simulator-only testing is not proof of motion-sensor behavior; report tilt NOT TESTED if unavailable. |
+| 3. Flashcards | In landscape, record a brief nonpersonal sample using the normal microphone flow; check meter/controls and replay, then return to portrait. No new recording persistence or permission changes. If the simulator/host lacks usable mic or audio, report that limitation and defer to a suitable device. |
+| 4. Ghost Writer | Use ordinary canvas/editor interaction in landscape; check selection, dragging or other applicable touch targets and a built-in verse preview. Open an existing native picker or share dialog where available, cancel it, and confirm the editor returns intact. No actual external share, photo access beyond the existing user-selected path, or personal image required. |
+| 5. Grown-up Check | Open a normal existing protected action, check the keyboard and input placement/focus with the scaled canvas, then cancel/dismiss without completing an outgoing action. No offscreen controls or stranded overlay. |
+| 6. App Switcher | During an ordinary activity, enter the app switcher/background and return in landscape. Check the established pause/recovery path, resume when prompted, and confirm correct layout and no unintended reset or audio overlap. |
+| 7. iPad window resizing | If the OS/simulator supports windowed multitasking, resize through a wider and a narrower practical window and back to full screen. The whole portrait canvas should stay centered, uniformly scaled and usable; touch a visible control. Very small windows can shrink targets; report practical usability rather than claiming arbitrary size support. |
+| 8. iPhone smoke | On an available iPhone or simulator, open Home in portrait, enter/exit one ordinary screen, and confirm unchanged layout, touches and portrait preference. |
+
+Optional accessibility smoke if readily available: confirm the scaled app remains navigable with VoiceOver and Larger Text; do not claim accessibility acceptance from ordinary visual/touch tests alone. A simulator-only PASS does not verify physical iPad sensors, hardware audio, or all multitasking modes. Record unavailable tests explicitly and assess remaining hardware-only gaps before deciding whether to proceed to TestFlight; do not convert NOT TESTED to PASS.
+
+### Release decision after Phase 2
+
+If the representative functional checks are satisfactory and any unavailable checks are explicitly assessed, record results in a follow-up handoff checkpoint and resume the fresh ordinary Release archive, exact archive/package/privacy/signing inspections, and Apple Organizer Validate App. Fix a concrete shared problem first if one is found. No new gameplay work or exhaustive replay unless evidence warrants it. No archive, Apple validation, upload, TestFlight installation, external beta review or public distribution performed by this PR. Controlled adult-only TestFlight roadmap and public-release parental authorization HOLD remain unchanged.
+
+## HISTORICAL — uniform iPad portrait scaling after #271 (merged #272; Phase 1 checkpoint above) (November 27, 2026 US Eastern)
 
 Owner merged #271 at `627ec9f213e5791c28c629c17035d3d5e1fbe6a9` and supplied portrait and landscape screenshots. Black sidebars and centered geometry work, but Home controls change relative proportions and Zoo artwork is clipped; owner reports normally fitting screens require additional scrolling in the alternate orientation. #271 is therefore NOT accepted as the final presentation. Diagnosis: the native host resized the actual WKWebView to a smaller portrait-shaped viewport, activating different responsive rules and retaining fixed CSS sizes. Owner explicitly approved a focused replacement and wants landscape to be the same interactive portrait layout uniformly scaled to available height, not reflowed or a static screenshot.
 
