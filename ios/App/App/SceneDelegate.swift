@@ -239,11 +239,63 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
+// BEGIN PORTABLE IPAD PORTRAIT VIEWPORT GEOMETRY
+enum BibloZooPortraitViewportGeometry {
+    static func frame(in bounds: CGRect) -> CGRect {
+        let width = min(bounds.width, bounds.height * 0.75)
+        return CGRect(x: bounds.midX - width / 2, y: bounds.minY,
+                      width: width, height: bounds.height)
+    }
+}
+// END PORTABLE IPAD PORTRAIT VIEWPORT GEOMETRY
+
+// Keep the actual WKWebView viewport portrait-shaped (not a scaled snapshot).
+// Layout is driven by the current window bounds, including multitasking resize;
+// the same view and bridge survive rotation. No device orientation forcing.
+private final class BibloZooPortraitViewportHost: UIView {
+    private let contentView: UIView
+
+    init(webView: UIView) {
+        contentView = webView
+        super.init(frame: .zero)
+        backgroundColor = .black
+        clipsToBounds = true
+        contentView.autoresizingMask = []
+        addSubview(contentView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("BibloZooPortraitViewportHost is programmatic")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let target = BibloZooPortraitViewportGeometry.frame(in: bounds)
+        if contentView.frame != target {
+            contentView.frame = target
+        }
+    }
+}
+
 // Patch 58: register an opt-in diagnostic-only local Capacitor bridge.
 // The underlying WKWebView configuration and playback behavior are unchanged.
 final class BibloZooDiagnosticsBridgeViewController: CAPBridgeViewController {
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        // Capacitor 8.5.2 reads the unqualified (iPhone) orientation array.
+        // Honor the existing four-orientation iPad plist contract explicitly.
+        if UIDevice.current.userInterfaceIdiom == .pad { return .all }
+        return super.supportedInterfaceOrientations
+    }
+
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        // CAPBridgeViewController's final loadView has created the web view
+        // and bridge, but the root view has not yet entered the window.
+        // Retain that exact controller, web view, plugin instances and session.
+        // Do not replace the root controller (age/lifecycle code checks it).
+        if UIDevice.current.userInterfaceIdiom == .pad, let webView = webView {
+            view = BibloZooPortraitViewportHost(webView: webView)
+        }
         // The opt-in diagnostic event bridge is not part of child-facing
         // production. Do not register it outside the isolated Audio Test.
         if BibloZooIOSIdentity.experimentalToolsEnabled {
