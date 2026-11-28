@@ -28,6 +28,28 @@ function plistString(xml,key){
   const m=xml.match(new RegExp("<key>\\s*"+key+"\\s*</key>\\s*<string>([^<]+)</string>"));
   return m?m[1]:null;
 }
+// The production iPad multitasking bundle must declare every orientation
+// (App Store Connect validation error 90474). Phone preference remains portrait.
+function assertOrientationDeclarations(xml){
+  const portrait="UIInterfaceOrientationPortrait";
+  const ipad=[portrait,"UIInterfaceOrientationPortraitUpsideDown",
+    "UIInterfaceOrientationLandscapeLeft","UIInterfaceOrientationLandscapeRight"];
+  function orientations(key){
+    const pattern=new RegExp("<key>\\s*"+key+"\\s*</key>\\s*<array>([\\s\\S]*?)</array>","g");
+    const entries=[...xml.matchAll(pattern)];
+    assert.equal(entries.length,1,"Expected exactly one "+key+" array");
+    const body=entries[0][1];
+    assert.equal(body.replace(/<string>[^<]*<\/string>/g,"").trim(),"",
+      "Unexpected non-string value in "+key);
+    return [...body.matchAll(/<string>\s*([^<]+?)\s*<\/string>/g)].map(m=>m[1]);
+  }
+  assert.deepEqual(orientations("UISupportedInterfaceOrientations"),[portrait],
+    "iPhone orientation must remain portrait-only");
+  assert.deepEqual(orientations("UISupportedInterfaceOrientations~ipad").sort(),ipad.sort(),
+    "iPad must declare all four orientations for multitasking (90474)");
+  assert.doesNotMatch(xml,/<key>\s*UIRequiresFullScreen\s*<\/key>\s*<true\s*\/>/,
+    "Do not opt out of iPad multitasking using UIRequiresFullScreen");
+}
 function appForArchive(dir){
   assert.ok(dir.endsWith(".xcarchive")&&isDir(dir),"Select an existing .xcarchive");
   const apps=path.join(dir,"Products","Applications");
@@ -43,6 +65,7 @@ function inspectArchive(archive){
     "Wrong bundle identity: expected the original production BibloZoo app");
   assert.equal(plistString(info,"CFBundleDisplayName"),"BibloZoo",
     "Original BibloZoo home-screen name must be retained");
+  assertOrientationDeclarations(info);
   for(const key of ["NSMicrophoneUsageDescription","NSPhotoLibraryAddUsageDescription"])
     assert.ok(plistString(info,key),"Missing iOS permission purpose: "+key);
   const manifest=path.join(app,"PrivacyInfo.xcprivacy");
@@ -116,6 +139,7 @@ function main(){
   console.log("ARCHIVE SOURCE CHECK PASS (read-only; NO device installation)");
   console.log("Archive: "+report.archiveName+"; last updated: "+report.archiveUpdated);
   console.log("Bundle: "+report.bundleId+"; sampled web/audio resources: "+report.assetCount);
+  console.log("Orientation declarations: iPhone portrait; iPad all four (multitasking)");
   console.log("Other bundled privacy manifests found: "+report.sdkManifests.length);
   for(const f of report.sdkManifests)console.log("  "+f);
   console.log("STILL OPEN: Xcode Generate Privacy Report, third-party SDK audit, device/backup testing.");
@@ -123,4 +147,4 @@ function main(){
 if(require.main===module){
   try{main();}catch(e){console.error("ARCHIVE AUDIT NOT ACCEPTED: "+e.message);process.exitCode=1;}
 }
-module.exports={inspectArchive,latestArchives,rootMp3s,publicFiles};
+module.exports={inspectArchive,latestArchives,rootMp3s,publicFiles,assertOrientationDeclarations};
