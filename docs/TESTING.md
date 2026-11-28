@@ -1,6 +1,20 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — first TestFlight build installed; internal acceptance 8/8 PASS (November 28, 2026 US Eastern)
+## CURRENT — TestFlight information saved; canonical public privacy and support URLs (November 28, 2026 US Eastern)
+
+Merged [#276](https://github.com/andydoane/biblozoo/pull/276) at `3eebb89ea4fd80da5be154e5e15b8aa54b5e696c`; [post-merge CI](https://github.com/andydoane/biblozoo/actions/runs/46154313027) SUCCESS (verified). Owner reports saving the TestFlight Test Information fields and clarifies that the dedicated public App Store privacy page was deliberately published on main. Exact saved field values were not independently inspected after save. Owner previously verified HTTPS policy and support pages; source files checked again for this checkpoint. Use these canonical public links:
+
+| Purpose | Public URL | Publishing source |
+| --- | --- | --- |
+| App Store / TestFlight Privacy Policy | https://andydoane.github.io/biblozoo/app-store-privacy.html | `main/app-store-privacy.html`, [#185](https://github.com/andydoane/biblozoo/pull/185) |
+| App Store Support URL | https://andydoane.github.io/biblozoo/app-support.html | `main/app-support.html`, [#187](https://github.com/andydoane/biblozoo/pull/187) |
+| Marketing / PWA website | https://andydoane.github.io/biblozoo/ | main GitHub Pages |
+
+The approved native in-app policy is `ios-prep/privacy_policy.html` (November 22, 2026); checked substantive visible wording of the standalone main App Store policy matches it, including local profiles, ephemeral microphone recording, Ghost Writer photo/file import and save/share, web hosting, backups, deletion and contact. The older `main/privacy_policy.html` is intentionally separate PWA content and is NOT the App Store privacy URL. Prior suggestion to update the main privacy policy was based on looking at the wrong file and is superseded. Do not merge ios-prep into main or change either policy to fix this nonexistent discrepancy. Prefer HTTPS URLs in ASC. Prior owner verification of live URLs and wording approval are recorded in [APP-PRIVACY-PREFLIGHT.md](APP-PRIVACY-PREFLIGHT.md); this checkpoint rechecked repository source, not live HTTP delivery or mailbox monitoring. If native privacy practices change, review both native policy and dedicated main publishing copy via scoped changes. This checkpoint is documentation-only, no runtime or publishing changes.
+
+Next: confirm the saved TestFlight Privacy Policy URL is the dedicated HTTPS URL above, accurate disclosures/contact and adult-only beta eligibility/legal scope. Then prepare private external group and existing standard 1.0 (1) build for owner-authorized TestFlight Beta App Review. No external submission, invitations, public link, minor testers or public release authorized by this PR; public-release parental authorization HOLD unchanged. No new build needed.
+
+## HISTORICAL — first TestFlight build installed; internal acceptance 8/8 PASS (November 28, 2026 US Eastern)
 
 Merged [#275](https://github.com/andydoane/biblozoo/pull/275) at `025ba802e0c9695eeea2f13de10b58bc11fa2312`; [post-merge CI](https://github.com/andydoane/biblozoo/actions/runs/46104007062) SUCCESS (verified). Owner uploaded the same validated November 27 10:18 PM archive (production ID com.andydoane.biblozoo, version 1.0 build 1) through Xcode Organizer's App Store Connect standard distribution option, NOT TestFlight Internal Only. Xcode reported upload completed with warnings; only displayed warning was the previously documented April 2027 SDK requirement. ASC initially showed No Builds; by November 28 8:45 AM the owner screenshot confirmed version 1.0, build 1, Ready to Submit, expires in 90 days, no visible Missing Compliance warning. This confirms successful build visibility/processing, not external beta review or public App Store approval. Final distribution signing details were not separately supplied.
 
