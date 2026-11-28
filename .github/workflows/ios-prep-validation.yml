@@ -156,6 +156,19 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
+      - name: Test iPad portrait viewport geometry using production Swift helper
+        if: github.base_ref == 'ios-prep' || github.ref == 'refs/heads/ios-prep'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          source=ios/App/App/SceneDelegate.swift
+          # Extract the actual platform-neutral production helper, not a duplicate.
+          { echo 'import Foundation'; sed -n '/^\/\/ BEGIN PORTABLE IPAD PORTRAIT VIEWPORT GEOMETRY$/,/^\/\/ END PORTABLE IPAD PORTRAIT VIEWPORT GEOMETRY$/p' "$source"; } > "$tmpdir/Geometry.swift"
+          swiftc "$tmpdir/Geometry.swift" scripts/validate_ios_ipad_portrait_viewport.swift -o "$tmpdir/viewport"
+          "$tmpdir/viewport"
+
       # Portable synthetic logic only; no iOS SDK, UIKit or live Apple calls.
       - name: Validate native age-assurance synthetic policy and compile fences
         if: github.base_ref == 'ios-prep' || github.ref == 'refs/heads/ios-prep'
