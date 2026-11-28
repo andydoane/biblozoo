@@ -1,5 +1,13 @@
 # BibloZoo 1.0 — App Store listing draft
 
+## CURRENT — App Store Connect preparation and hidden test verse (November 27, 2026 US Eastern)
+
+Owner reports app record configured: BibloZoo / Bible Verse Memory Games; Education primary, Games secondary; rights declaration completed; owner confirms all content rights cleared (original or authorized content; BSB public domain). This is owner-confirmed clearance, not independent legal certification. Age questionnaire saved, Made for Kids ages 6–8 selected; owner reassessed abstract colored-ball/particle minigame as not cartoon violence. Initial calculated 9+ before that change; final numeric rating not separately supplied, verify actual ASC display and accurate final content before submission. Age Assurance answered No while staged native gate disabled; reassess against actual submitted build. No claim that Kids/category selection satisfies legal age assurance. Pricing and availability completed by owner, intended US-only $4.99 upfront, no IAP/subscriptions; exact price/territory screen not independently supplied. Owner entered approved privacy URL https://andydoane.github.io/biblozoo/app-store-privacy.html, optional choices URL blank, Data Not Collected preview seen; Publish instructed, explicit publish confirmation not supplied. Reconfirm final archive and actual disclosure status. Listing version 1.0: promotional text says over a hundred Bible lessons; description and keywords entered, support URL https://andydoane.github.io/biblozoo/app-support.html, owner reports copyright, 20 promotional screenshots, review contact, sign-in not required, manual release and Save completed. No build uploaded or review submission authorized. Paid Apps Agreement, banking/tax status not yet confirmed; do not collect sensitive details. DSA status and applicable export compliance final check open.
+
+Owner requested John 11:35 hidden (two-word development test verse). Existing published flag changed true to false; all 124 source JSONs, text, reflection, pet, recordings/artwork and other resources remain; 123 published catalog entries expected. Main app catalog, daily selection, pet/avatar lists use published catalog; stale remembered or boot-return routes must not reopen test verse, incomplete tutorial may choose a visible replacement; existing per-verse progress is retained, not erased. Main loader rejects explicitly unpublished verses. This is visibility, not a security boundary; direct raw assets remain available, and no change to separate main/PWA branch authorized. CI audit extended for 124 retained / 123 published and stale route/restore test. Owner visual smoke pending: confirm hidden from picker/My Verses, ordinary other verse opens; if test progress existed, no hidden pet displayed. Listing description draft count updated to 123; owner must adjust entered exact count or use over a hundred. No new permissions, backend, additional costs or age-assurance activation.
+
+#267 merged at `b6353c5c36f0286514bf1c53f8fc4552c4e01f2c`; [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46072235583), [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46072639453) SUCCESS. Owner reports ordinary iPhone app working normally after visual checkpoint; no extensive retest or separate microphone assertion supplied. Defer repetitive significant-update persistence experiment until an actual significant update is planned; basic sandbox feasibility established, durable lifecycle remains unresolved. Initial minor consent/unlock, no-server revocation sufficiency, older OS/current legal review remain RELEASE HOLD. No new consent sandbox experiment unless it can answer a new release-critical question. Return to definitive initial-consent strategy after this checkpoint.
+
 ## CURRENT — owner repository backup copies (November 25, 2026 US Eastern)
 
 After merging [#248](https://github.com/andydoane/biblozoo/pull/248), owner added [20 promotional PNG copies](app_store_screenshots/) on ios-prep. Base `bb088c0c240ceccb8b5b281c79a5ebb2378096dc` contains ten iPhone and ten iPad filenames (iPad #8 is spelled ipad_screenshot_008.png). Backup copies only; no upload to App Store Connect. No new pixel/byte/visual check of repository copies versus earlier corrected ZIP. Because the repo is public, only keep publishable fictional/test content and cleared artwork here; keep private master/editable project separately. No deletion or renaming authorized. Build allowlist excludes docs and candidate packaging audit adds explicit refusal of docs/app_store_screenshots in generated public. Final upload slots, order, rights and exact release correspondence open.
@@ -58,7 +66,7 @@ Apple references: [App information](https://developer.apple.com/help/app-store-c
 
 - Name (8/30): BibloZoo
 - Subtitle (25/30): Bible Memory Through Play
-- Promotional text (144/170): Learn Scripture, collect BibloPets, and grow your own zoo. Explore 124 Bible lessons, playful memory games, and daily practice at your own pace.
+- Promotional text (144/170): Learn Scripture, collect BibloPets, and grow your own zoo. Explore over a hundred Bible lessons, playful memory games, and daily practice at your own pace.
 - Keywords (86/100 ASCII bytes): scripture,memorize,verse,christian,faith,flashcards,devotional,learning,games,zoo,pets
 - Support URL: https://andydoane.github.io/biblozoo/app-support.html
 - Privacy URL: https://andydoane.github.io/biblozoo/app-store-privacy.html
@@ -73,7 +81,7 @@ Apple references: [App information](https://developer.apple.com/help/app-store-c
 
 Learn Scripture, collect BibloPets, and grow a zoo one verse at a time.
 
-BibloZoo brings Bible memorization to life through interactive learning, creative activities, and rewarding practice. Discover 124 Scripture lessons from the Berean Standard Bible (BSB), complete with explanations and reflection questions.
+BibloZoo brings Bible memorization to life through interactive learning, creative activities, and rewarding practice. Discover 123 Scripture lessons from the Berean Standard Bible (BSB), complete with explanations and reflection questions.
 
 LEARN THE VERSE
 Listen to narrated Scripture, practice manageable chunks, and echo the words as you build confidence.
