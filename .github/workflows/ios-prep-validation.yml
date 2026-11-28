@@ -156,7 +156,7 @@ jobs:
           # source, so parse the actual modified Swift file too.
           swiftc -frontend -parse ios/App/App/SceneDelegate.swift
 
-      - name: Test iPad portrait viewport geometry using production Swift helper
+      - name: Test iPad logical portrait viewport and uniform scaling using production Swift helper
         if: github.base_ref == 'ios-prep' || github.ref == 'refs/heads/ios-prep'
         shell: bash
         run: |
