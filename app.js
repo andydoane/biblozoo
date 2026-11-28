@@ -2577,6 +2577,7 @@ function getFirstLearnedVerseIdForTutorial(progress) {
   if (!progress.verses || typeof progress.verses !== "object") return "";
 
   for (const [verseId, verseProgress] of Object.entries(progress.verses)) {
+    if (VERSE_LIST.length && !isVerseAvailableForRestore(verseId)) continue;
     if (verseProgress?.learnCompleted) {
       return verseId;
     }
@@ -2608,6 +2609,11 @@ function normalizeTutorialProgress(rawTutorial, progress) {
     });
   }
 
+  // An unfinished tutorial can refer to a verse that is no longer published.
+  // Leave its per-verse progress intact; choose a visible verse instead.
+  if (VERSE_LIST.length && selectedVerseId && !isVerseAvailableForRestore(selectedVerseId)) {
+    selectedVerseId = "";
+  }
   if (!selectedVerseId) {
     selectedVerseId = getFirstLearnedVerseIdForTutorial(progress);
   }
@@ -10009,6 +10015,12 @@ async function loadVerse(verseId) {
     }
   }
 
+  // Unpublished content remains packaged for development but is not playable
+  // through the ordinary parent app, including a stale explicit verse link.
+  if (json.published === false) {
+    throw new Error("This verse is not available.");
+  }
+
   cfg = json;
   VERSE_ID = json.verseId;
   TRANSLATION = json.translation || "";
@@ -14764,6 +14776,20 @@ function captureBootRouteFromUrl() {
   const params = new URLSearchParams(
     window.location.search
   );
+
+  // Do not replay a game return or unlock for an unpublished verse. The
+  // catalog is loaded before this function; preserve normal remembered-verse
+  // fallback and never delete saved progress or other URL parameters.
+  if (VERSE_LIST.length && [params.get("v"), params.get("petUnlock")]
+      .some(id => id && !isVerseAvailableForRestore(id))) {
+    for (const key of ["v", "screen", "petUnlock", "tutorialPractice", "mixNext",
+      "completedGameId", "mixPetUnlock", "internalReturn", "profileId", "changeVerse"]) {
+      params.delete(key);
+    }
+    const url = new URL(window.location.href);
+    url.search = params.toString();
+    history.replaceState(history.state, "", url.href);
+  }
 
   return {
     verseId: params.get("v") || "",
