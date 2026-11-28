@@ -1,6 +1,29 @@
 # BibloZoo — Testing, PR Review, and iPhone Acceptance
 
-## CURRENT — production archive validated by Apple; controlled TestFlight upload next (November 27, 2026 US Eastern)
+## CURRENT — first TestFlight build installed; internal acceptance 8/8 PASS (November 28, 2026 US Eastern)
+
+Merged [#275](https://github.com/andydoane/biblozoo/pull/275) at `025ba802e0c9695eeea2f13de10b58bc11fa2312`; [post-merge CI](https://github.com/andydoane/biblozoo/actions/runs/46104007062) SUCCESS (verified). Owner uploaded the same validated November 27 10:18 PM archive (production ID com.andydoane.biblozoo, version 1.0 build 1) through Xcode Organizer's App Store Connect standard distribution option, NOT TestFlight Internal Only. Xcode reported upload completed with warnings; only displayed warning was the previously documented April 2027 SDK requirement. ASC initially showed No Builds; by November 28 8:45 AM the owner screenshot confirmed version 1.0, build 1, Ready to Submit, expires in 90 days, no visible Missing Compliance warning. This confirms successful build visibility/processing, not external beta review or public App Store approval. Final distribution signing details were not separately supplied.
+
+Owner created the internal testing group, added self, received invitation email and installed Apple's TestFlight. TestFlight detected an existing same-ID development installation. Owner exported a backup, deleted two prior app installations, and installed BibloZoo through TestFlight. Fresh installation had no existing saves or permissions, and worked normally. This is a clean-install/restore test, NOT an in-place update preservation test. Do not delete valuable installations to troubleshoot; preserve backups outside the app. Future same-ID TestFlight build update should explicitly verify retained profiles/progress and permissions without uninstalling. Exact device models, OS versions, and identity of the second deleted app were not supplied.
+
+Owner submitted all eight internal TestFlight acceptance checks as PASS:
+
+| Representative check | Owner-reported result |
+| --- | --- |
+| Fresh installation and first-time onboarding | PASS |
+| Create a new profile | PASS |
+| Play a practice game and verify audio | PASS |
+| Complete an activity and verify progress is saved | PASS |
+| Close and relaunch the app to confirm persistence | PASS |
+| Test Flashcards microphone permission, recording and playback | PASS |
+| Restore exported family backup and verify profiles, pets and progress | PASS |
+| Check iPad portrait and landscape scaling on the TestFlight build | PASS |
+
+Internal acceptance checkpoint complete for the tested configurations. This does not establish exhaustive coverage, specific physical sensor/OS combinations, accessibility, offline mode or Photos permission separately, actual SDK API/privacy compliance, or in-place update data preservation. No runtime changes indicated. Keep the accepted 1.0 (1) build and existing SDK maintenance plan. Do not rebuild solely for this documentation PR.
+
+**Next gate — external adult-only beta preparation:** review existing runbook sections 6–7 and current ASC Test Information, actual privacy disclosures and contact details, eligibility/legal scope and tester instructions. Obtain owner confirmation that the restricted beta scope is appropriate before external submission. Create private external group for verified adult evaluators only; add existing standard 1.0 (1) build, complete accurate beta information and submit for TestFlight App Review when authorized. No public link, minor testers, real child profiles/photos/recordings, external invitations before approval, or public App Store submission. Use individual email invitations only after beta review approval and eligibility confirmation; track minimal feedback. The staged native age-assurance feature remains disabled in ordinary Release, and public-release parental authorization HOLD remains unchanged. This PR does not create a group, submit a build for review, send an invitation, or perform any external distribution.
+
+## HISTORICAL — production archive validated by Apple; controlled TestFlight upload next (completed; see above) (November 27, 2026 US Eastern)
 
 Merged [#274](https://github.com/andydoane/biblozoo/pull/274) at `3af585c79bc4c2c80f488e19176daac5e3606615`; exact PR head `6eed960d35a559bbe9ca69f2126ade2248527ec9` [PR CI](https://github.com/andydoane/biblozoo/actions/runs/46101216999) and [merge CI](https://github.com/andydoane/biblozoo/actions/runs/46101861349) SUCCESS (verified). Owner provided Terminal output and Xcode Organizer screenshot of the fresh production archive App 11-27-26, 10.18 PM.xcarchive, November 27 at 10:18 PM US Eastern (last updated 2026-11-28T03:18:39.992Z). Bundle com.andydoane.biblozoo, version 1.0, build 1; no output from git status --short. Exact local git SHA was not printed. Read-only source and packaging checks PASS; iPhone portrait and iPad all four orientation declarations confirmed in the actual archive; 16 sampled resources, 2,203 public files / 129,984,777 uncompressed bytes, four byte-matching source notices and matching license display alias, 57 duplicate groups / 1,695,385 additional bytes, 10 review-only candidates / 1,167,155 bytes, unchanged from prior archive. Do not infer asset rights, download size, or complete payload identity from these aggregate measures. App, Capacitor and Cordova manifests declare no collection/tracking/domains; app required-reason codes 35F9.1 and 3B52.1, SDK manifests no declared reasons. These are declarations only, not privacy certification. Signature valid on disk and designated requirement satisfied; expected production application/team identifiers, development-stage get-task-allow true, no sandbox Declared Age Range entitlement. Deprecated codesign colon syntax warning concerns command only. Final distribution signing/profile still needs verification; Xcode privacy report, actual SDK API use, backup and suitable real-device checks remain separately tracked.
 
