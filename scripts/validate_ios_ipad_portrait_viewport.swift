@@ -3,26 +3,39 @@ import Foundation
 @main
 struct BibloZooPortraitViewportTests {
     static func main() {
-        func check(_ width: CGFloat, _ height: CGFloat, _ expectedWidth: CGFloat) {
-            let bounds = CGRect(x: 0, y: 0, width: width, height: height)
-            let frame = BibloZooPortraitViewportGeometry.frame(in: bounds)
-            precondition(abs(frame.width - expectedWidth) < 0.001, "Unexpected width for \(bounds): \(frame)")
-            precondition(abs(frame.midX - bounds.midX) < 0.001)
-            precondition(frame.minY == bounds.minY && frame.height == bounds.height)
-            precondition(frame.minX >= bounds.minX && frame.maxX <= bounds.maxX)
+        func check(_ screen: CGSize, _ window: CGSize, _ expectedScale: CGFloat,
+                   origin: CGPoint = .zero) {
+            let bounds = CGRect(origin: origin, size: window)
+            guard let layout = BibloZooPortraitViewportGeometry.layout(in: bounds, screenSize: screen) else {
+                fatalError("Expected layout")
+            }
+            let logical = CGSize(width: min(screen.width, screen.height),
+                                 height: max(screen.width, screen.height))
+            precondition(layout.logicalSize == logical, "Logical viewport changed")
+            precondition(abs(layout.scale - expectedScale) < 0.000001, "Wrong scale")
+            precondition(layout.center == CGPoint(x: bounds.midX, y: bounds.midY))
+            let visible = CGSize(width: logical.width * layout.scale, height: logical.height * layout.scale)
+            precondition(visible.width <= bounds.width + 0.000001)
+            precondition(visible.height <= bounds.height + 0.000001)
+            precondition(abs(visible.width / visible.height - logical.width / logical.height) < 0.000001)
         }
-        check(834, 1194, 834) // ordinary 11-inch portrait
-        check(1024, 1366, 1024) // 4:3-class portrait
-        check(1194, 834, 625.5) // wide landscape
-        check(1366, 1024, 768)
-        check(600, 800, 600) // exact ratio boundary
-        check(601, 800, 600) // continuous transition
-        check(600, 600, 450) // square resizable window
-        check(1000, 700, 525)
-        check(320, 700, 320) // narrow multitasking window
-        check(0, 0, 0)
-        let offset = CGRect(x: 10, y: 20, width: 1000, height: 700)
-        precondition(BibloZooPortraitViewportGeometry.frame(in: offset) == CGRect(x: 247.5, y: 20, width: 525, height: 700))
-        print("iPad portrait viewport geometry PASS (portable Swift; not UIKit runtime acceptance)")
+        for portrait in [CGSize(width: 768, height: 1024), CGSize(width: 834, height: 1194),
+                         CGSize(width: 1024, height: 1366), CGSize(width: 744, height: 1133)] {
+            let landscape = CGSize(width: portrait.height, height: portrait.width)
+            check(portrait, portrait, 1)
+            check(portrait, landscape, portrait.width / portrait.height)
+            check(landscape, landscape, portrait.width / portrait.height)
+            check(landscape, portrait, 1)
+            check(portrait, portrait, 1) // round trip
+        }
+        let screen = CGSize(width: 768, height: 1024)
+        check(screen, CGSize(width: 320, height: 700), 320.0 / 768.0)
+        check(screen, CGSize(width: 600, height: 600), 600.0 / 1024.0)
+        check(screen, CGSize(width: 1000, height: 700), 700.0 / 1024.0,
+              origin: CGPoint(x: 10, y: 20))
+        check(screen, CGSize(width: 1200, height: 1600), 1) // never enlarge above native portrait
+        precondition(BibloZooPortraitViewportGeometry.layout(in: .zero, screenSize: screen) == nil)
+        precondition(BibloZooPortraitViewportGeometry.layout(in: CGRect(origin: .zero, size: screen), screenSize: .zero) == nil)
+        print("iPad uniform portrait scale PASS (portable Swift; UIKit runtime not tested)")
     }
 }

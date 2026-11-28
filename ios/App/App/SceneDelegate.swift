@@ -241,38 +241,78 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 // BEGIN PORTABLE IPAD PORTRAIT VIEWPORT GEOMETRY
 enum BibloZooPortraitViewportGeometry {
-    static func frame(in bounds: CGRect) -> CGRect {
-        let width = min(bounds.width, bounds.height * 0.75)
-        return CGRect(x: bounds.midX - width / 2, y: bounds.minY,
-                      width: width, height: bounds.height)
+    struct Layout {
+        let logicalSize: CGSize
+        let scale: CGFloat
+        let center: CGPoint
+    }
+
+    static func layout(in bounds: CGRect, screenSize: CGSize) -> Layout? {
+        let width = min(screenSize.width, screenSize.height)
+        let height = max(screenSize.width, screenSize.height)
+        guard width.isFinite, height.isFinite, width > 0, height > 0,
+              bounds.width.isFinite, bounds.height.isFinite,
+              bounds.width > 0, bounds.height > 0 else { return nil }
+        let scale = min(1, min(bounds.width / width, bounds.height / height))
+        return Layout(logicalSize: CGSize(width: width, height: height),
+                      scale: scale, center: CGPoint(x: bounds.midX, y: bounds.midY))
     }
 }
 // END PORTABLE IPAD PORTRAIT VIEWPORT GEOMETRY
 
-// Keep the actual WKWebView viewport portrait-shaped (not a scaled snapshot).
-// Layout is driven by the current window bounds, including multitasking resize;
-// the same view and bridge survive rotation. No device orientation forcing.
+// The live web view keeps the device's full logical portrait viewport.
+// Transform a surrounding view, not the WKWebView frame on every resize.
+// UIKit maps touches through the transform; WebKit layout, plugin instances
+// and the existing bridge remain intact. Runtime verification is required.
 private final class BibloZooPortraitViewportHost: UIView {
     private let contentView: UIView
+    private let scaledCanvas = UIView(frame: .zero)
 
     init(webView: UIView) {
         contentView = webView
         super.init(frame: .zero)
         backgroundColor = .black
         clipsToBounds = true
+        scaledCanvas.backgroundColor = .black
+        scaledCanvas.clipsToBounds = true
+        scaledCanvas.autoresizingMask = []
         contentView.autoresizingMask = []
-        addSubview(contentView)
+        addSubview(scaledCanvas)
+        scaledCanvas.addSubview(contentView)
     }
 
     required init?(coder: NSCoder) {
         fatalError("BibloZooPortraitViewportHost is programmatic")
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        setNeedsLayout()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        let target = BibloZooPortraitViewportGeometry.frame(in: bounds)
-        if contentView.frame != target {
-            contentView.frame = target
+        // Use the attached scene's screen, never a hard-coded 3:4 or the
+        // current (potentially already narrowed) window as the reference.
+        guard let screen = window?.windowScene?.screen,
+              let layout = BibloZooPortraitViewportGeometry.layout(
+                in: bounds, screenSize: screen.fixedCoordinateSpace.bounds.size
+              ) else { return }
+        let logicalBounds = CGRect(origin: .zero, size: layout.logicalSize)
+        // A transformed view's frame is undefined. Update bounds and center
+        // instead; the untransformed child always retains logical dimensions.
+        if scaledCanvas.bounds != logicalBounds {
+            scaledCanvas.bounds = logicalBounds
+        }
+        if contentView.frame != logicalBounds {
+            contentView.frame = logicalBounds
+        }
+        if scaledCanvas.center != layout.center {
+            scaledCanvas.center = layout.center
+        }
+        let transform = CGAffineTransform(scaleX: layout.scale, y: layout.scale)
+        if scaledCanvas.transform != transform {
+            scaledCanvas.transform = transform
         }
     }
 }
